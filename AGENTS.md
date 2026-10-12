@@ -2,6 +2,10 @@
 
 This repo rebuilds the ww2-rts game natively: a Rust rules core and server, and an Unreal Engine 5.8 client. Read `README.md` and `DESIGN.md` first. The plan and its open work are issue #1 and its sub-issues.
 
+## Agent coordination
+
+At task start, task boundaries, before interface changes and before integration-ready reports, read `docs/agent-coordination.md`, issue #5 and relevant contract PR replies. Acknowledge addressed requests explicitly. Consult `docs/contracts/README.md` before depending on an interface; drafts are not agreed contracts.
+
 ## Always update the changelog
 
 Every change must be recorded in `CHANGELOG.md` in the same commit as the change.
