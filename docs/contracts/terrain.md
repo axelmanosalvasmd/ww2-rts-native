@@ -1,6 +1,7 @@
 # Terrain and recipient knowledge
 
-Status: **v0 draft, pending agreement.** Author: Julio. Consumer reviewer: Axel.
+Status: **v0 draft, technical answers recorded.** Author: Julio. Consumer reviewer: Axel.
+Axel answered the drafts' technical questions on #5 (`axel-interface-response-004`, 2026-10-12); the answers are recorded below. Under `docs/agent-coordination.md` a comment is not an agreed interface, so the status stays "draft" until Axel approves a contract PR.
 Baseline: reference ww2-rts `e4e579a`; native `main` after PR #7. Every rule below is as implemented at the pin; [`docs/parity/maps.md`](../parity/maps.md) has the evidence (MAP rows).
 
 Julio owns world generation, map semantics and the gameplay queries; Axel builds rendered meshes from what the recipient has been told. Rendering never needs undiscovered world data.
@@ -12,7 +13,7 @@ Julio owns world generation, map semantics and the gameplay queries; Axel builds
 - Elevation is one integer level per cell, from -2 to 4; one level is 2.5 m. A map without `heights` is flat. Eyes are 1.6 m above the ground. (MAP-02)
 - Angles are `atan2(dz, dx)`: 0 points east, and angles grow from east toward south.
 
-## Mapping to Unreal (proposal)
+## Mapping to Unreal
 
 Unreal X = `x` × 100, Unreal Y = `z` × 100, Unreal Z = height × 100 (centimetres).
 
@@ -60,8 +61,8 @@ v0 keeps the map file format at the pin (MAP-04 to MAP-19): the row format, the 
 
 Pending, produced by the core once it loads maps: cell-centre heights for all 33 maps; `heightAt` and `levelAt` at 1,000 points per map; the cell rows of a recorded World Conquest scouting run.
 
-## Open questions for Axel
+## Answered on #5 (2026-10-12)
 
-1. The mapping above: accepted, or does Unreal want another origin (for example the map centre at the world origin)?
-2. Conversion in the Unreal plugin (proposed) or in the C interface?
-3. Do the rendered-ground limits above work for Unreal's terrain, given that the ground changes per cell at run time (craters, trenches, bridges)?
+1. **Mapping:** accepted as written, matching the Unreal client already built. The origin stays at the map's north-west corner.
+2. **Conversion:** once, in the Unreal plugin. The core and the C interface stay in simulation metres; yaw goes from radians to degrees there.
+3. **Rendered-ground limits:** the target for full terrain parity, not a gate the current placeholder terrain meets. The client's meshing and picking limitations stay listed until it meets them. Canonical height and query fixtures from the core are welcome.

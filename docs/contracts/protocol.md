@@ -1,6 +1,7 @@
 # Network protocol
 
-Status: **v0 draft, pending agreement.** Author: Julio. Consumer reviewer: Axel.
+Status: **v0 draft, technical answers recorded.** Author: Julio. Consumer reviewer: Axel.
+Axel answered the drafts' technical questions on #5 (`axel-interface-response-004`, 2026-10-12); the answers are recorded below. Under `docs/agent-coordination.md` a comment is not an agreed interface, so the status stays "draft" until Axel approves a contract PR.
 Baseline: reference ww2-rts `e4e579a`; native `main` after PR #7.
 
 ## What v0 is
@@ -37,7 +38,7 @@ These are new relative to the reference. The pinned browser client and Node serv
 
 ## Corrections the Rust server makes
 
-The reference leaks some information to clients that should not have it. The Rust server corrects these without changing message shapes, so the browser client keeps working. Each still needs Axel's agreement, because a player could notice the difference.
+The reference leaks some information to clients that should not have it. The proposals below correct these without changing message shapes, so the browser client would keep working. Axel keeps all three pending (#5): each lands only as its own documented security change, with browser and Unreal fixtures, once both owners decide it. They block no other work, and until then the Rust server behaves as the reference does.
 
 1. **The companion's hit direction.** At the pin, `operative.from` sends the hidden attacker's position to the metre for 10 ticks after a hit (NET and FPS limitations). The browser client uses only its bearing (`client/operative-view.js:342`). The Rust server sends a point 20 m from the soldier along that bearing instead: the hit indicator is unchanged and the attacker's range stays hidden.
 2. **Spectators outside World Conquest.** At the pin, anyone who joins a running match with a new token becomes a spectator and sees the whole map, so a player can watch the enemy from a second tab. Tokens are free to make, so no rule based on who joined when closes this. Options for Axel: (a) an observer delay: spectator snapshots run a fixed time behind the match (for example 60 s), which the browser client handles unchanged; (b) spectators get seat 0's team view, as in World Conquest; (c) keep the reference behavior until accounts exist. Julio proposes (a).
@@ -62,9 +63,13 @@ Pending. The plan, part of the headless test client issue #4 asks for:
 
 The transcripts also settle the field reference's unverified items (close codes, subprotocols, deflate parameters).
 
-## Open questions for Axel
+## Answered on #5 (2026-10-12)
 
-1. Is JSON over WebSocket workable for slice 1a in Unreal, or does Unreal need something else from the server before v1?
-2. Spectator rule (correction 2): observer delay, seat 0's team view, or the reference behavior for now?
-3. Flag bits for allies (correction 3): should teammates see open gates, companions and carried squads?
-4. Should the Unreal client send `proto: 0` from its first build, so the Rust server can tell clients apart from the start?
+1. **JSON over WebSocket** works in the Unreal client on Linux. Keep the reference wire shapes for this phase.
+2. **`proto` and `client`:** the Unreal client will send `proto: 0` and a client identifier in its next integration follow-up; the build running on 2026-10-12 does not send them yet.
+
+## Still open (product and security decisions)
+
+1. Spectators (correction 2): observer delay, seat 0's team view, or the reference behavior.
+2. Flag bits for allies (correction 3): whether teammates see open gates, companions and carried squads.
+3. The companion's hit direction (correction 1): the proposed point 20 m along the bearing.

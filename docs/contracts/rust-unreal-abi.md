@@ -1,6 +1,7 @@
 # Rust to Unreal interface
 
-Status: **v0 draft, pending agreement.** Author: Julio. Consumer reviewer: Axel.
+Status: **v0 draft, technical answers recorded.** Author: Julio. Consumer reviewer: Axel.
+Axel answered the drafts' technical questions on #5 (`axel-interface-response-004`, 2026-10-12); the answers are recorded below. Under `docs/agent-coordination.md` a comment is not an agreed interface, so the status stays "draft" until Axel approves a contract PR.
 Baseline: reference ww2-rts `e4e579a`; native `main` after PR #7. No Rust code exists yet; nothing here is verified by a build.
 
 ## What the client needs from the core
@@ -18,9 +19,9 @@ Baseline: reference ww2-rts `e4e579a`; native `main` after PR #7. No Rust code e
 | Soldiers and motion | squad-man slots, companion prediction, vehicle pose, shell flight | IF-09 to IF-11 |
 | Authoring | `validateMap`, `createGame`, `playMatch` (map editor and fairness check) | IF-12, only if an Unreal editor is in scope |
 
-## Proposal: the core owns what the client knows
+## The core owns what the client knows
 
-Issue #4 asks for one canonical decoder and knowledge state rather than two that drift. The proposal: the core provides a **client view**, a handle that holds exactly what one recipient has been told.
+Issue #4 asks for one canonical decoder and knowledge state rather than two that drift. Axel accepted this design on #5: the core provides a **client view**, a handle that holds exactly what one recipient has been told.
 
 - Unreal passes every server message, as received, to the view. The view decodes it with the same code the Rust server uses to encode it.
 - Unreal reads what it draws from the view: units, changed terrain cells, fog, regions, resources.
@@ -47,23 +48,26 @@ With the browser client, Unreal and the Rust server sharing one decoder, a proto
 | --- | --- | --- | --- |
 | Windows client | `x86_64-pc-windows-msvc` | `ww2_ffi.lib` (static) | the Windows PC |
 | Mac client | `aarch64-apple-darwin` | `libww2_ffi.a` (static) | the Mac |
+| Linux client | `x86_64-unknown-linux-gnu` | `libww2_ffi.a` (static) | any Linux machine (the Vostro) |
 | Server | `x86_64-unknown-linux-gnu`, plus the client targets | `ww2-server` binary (no FFI) | any |
 
-Build: `cargo build -p ww2-ffi --release --target <triple>`. Julio owns these artifacts; Axel owns linking them into the Unreal plugin and packaging (issue #4). The client platforms are pending Axel's answer on #5.
+Build: `cargo build -p ww2-ffi --release --target <triple>`. Julio owns these artifacts; Axel owns linking them into the Unreal plugin and packaging (issue #4). Linux x86_64 is the first verified client target, because Axel develops and tests the client on Linux; Windows and Mac are planned and not yet proven.
 
 ## First calls, for the #3 bridge test
 
-1. `ww2_abi_version()` and `ww2_rules_hash()`: prove the library links and loads on both platforms.
+1. `ww2_abi_version()` and `ww2_rules_hash()`: prove the library links and loads on each client platform, Linux first.
 2. `ww2_formation_spots`: a pure function with real float math and a variable-size result, so it exercises the math module and the buffer rules. Input: a formation request (unit count, slot size, line start and end, facing). The expected output comes from the pinned JavaScript `facingSpots` for the same input, recorded as a fixture, so the Unreal result is checked against the reference, not against itself.
 
 ## Later slices
 
 The client view and its readers (units, cells, fog, regions) come with slice 1c, when Unreal first talks to the Rust server. The availability, placement, entrenchment and cover queries follow the client features that need them. Each slice adds functions and raises `ww2_abi_version`; each function arrives with a fixture recorded from the reference.
 
-## Open questions for Axel
+## Answered on #5 (2026-10-12)
 
-1. Client platforms: Win64 and macOS arm64, or more?
-2. Core-owned client view (proposed), or Unreal keeps its own entity state and calls pure functions with arrays?
-3. Static libraries linked into an Unreal plugin: acceptable, or does Unreal need dynamic libraries?
-4. Static tables: one JSON buffer at startup (`ww2_tables_json`), or typed structs per table?
-5. Is a map editor in scope for Unreal? If not, the authoring group (IF-12) stays out of the interface.
+1. **Client platforms:** Linux x86_64 first, then Win64 (MSVC) and macOS arm64.
+2. **Client view:** the core owns the recipient's client view behind the separate `ww2-ffi` crate. Unreal keeps derived render and UI caches, not a second decoder of gameplay state or knowledge. The client's temporary decoding and availability code is replaced feature by feature, each with fixtures.
+3. **Linking:** static libraries are acceptable.
+4. **Static tables:** a versioned JSON buffer at startup (`ww2_tables_json`); typed results for high-frequency queries later.
+5. **Map authoring:** in the rewrite's scope, but not a prerequisite for the first bridge or gameplay slice. Its interface (IF-12) is inventoried separately and deferred until scheduled.
+
+The memory, freeing, error, threading and panic rules under Mechanics are the intended boundary, subject to verification once the crate exists.
