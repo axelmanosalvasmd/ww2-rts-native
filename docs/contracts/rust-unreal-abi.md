@@ -2,7 +2,7 @@
 
 Status: **v0 draft, technical answers recorded.** Author: Julio. Consumer reviewer: Axel.
 Axel answered the drafts' technical questions on #5 (`axel-interface-response-004`, 2026-10-12); the answers are recorded below. Under `docs/agent-coordination.md` a comment is not an agreed interface, so the status stays "draft" until Axel approves a contract PR.
-Baseline: reference ww2-rts `e4e579a`; native `main` after PR #7. No Rust code exists yet; nothing here is verified by a build.
+Baseline: reference ww2-rts `e4e579a`; native `main` after PR #12. The first calls below are built and verified on Linux x86_64 (branch `julio/ffi-first-calls`); the rest of this document is not built yet.
 
 ## What the client needs from the core
 
@@ -53,10 +53,59 @@ With the browser client, Unreal and the Rust server sharing one decoder, a proto
 
 Build: `cargo build -p ww2-ffi --release --target <triple>`. Julio owns these artifacts; Axel owns linking them into the Unreal plugin and packaging (issue #4). Linux x86_64 is the first verified client target, because Axel develops and tests the client on Linux; Windows and Mac are planned and not yet proven.
 
-## First calls, for the #3 bridge test
+Link the static library with the system libraries `cargo rustc -p ww2-ffi --release --target <triple> -- --print native-static-libs` lists. For `x86_64-unknown-linux-gnu` with rustc 1.99.0 that is `-lgcc_s -lutil -lrt -lpthread -lm -ldl -lc` (measured on the Vostro, 2026-10-12). The library is built with Rust's default `panic = "unwind"`, which the panic boundary needs; a build with `panic = "abort"` would turn a caught panic into a crash.
 
-1. `ww2_abi_version()` and `ww2_rules_hash()`: prove the library links and loads on each client platform, Linux first.
-2. `ww2_formation_spots`: a pure function with real float math and a variable-size result, so it exercises the math module and the buffer rules. Input: a formation request (unit count, slot size, line start and end, facing). The expected output comes from the pinned JavaScript `facingSpots` for the same input, recorded as a fixture, so the Unreal result is checked against the reference, not against itself.
+## First calls (built 2026-10-12)
+
+`rust/crates/ffi` (`ww2-ffi`) holds the first five functions, for the #3 bridge test. `ww2_abi_version()` returns 1 and `ww2_rules_hash()` returns `0xed0ee23d32a621d1`.
+
+```c
+uint32_t ww2_abi_version(void);
+uint64_t ww2_rules_hash(void);
+int32_t ww2_last_error(char *buf, size_t capacity, size_t *out_len);
+int32_t ww2_formation_slot_size(uint8_t infantry, double radius, double *out);
+int32_t ww2_formation_spots(const struct ww2_formation_item *items, size_t count,
+                            double at_x, double at_z, double face, double reach,
+                            int32_t shape, double spread,
+                            struct ww2_formation_spot *out, size_t out_capacity, size_t *out_len);
+```
+
+- **Header.** cbindgen 0.29.4 writes `rust/crates/ffi/include/ww2_core.h`, which is committed with the full comments. `cargo test -p ww2-ffi --test header` fails when it is stale; `WW2_WRITE_HEADER=1 cargo test -p ww2-ffi --test header` rewrites it.
+- **Status codes.** `WW2_OK` 0, `WW2_ERR_PANIC` -1, `WW2_ERR_NULL_POINTER` -2, `WW2_ERR_BAD_ARGUMENT` -3 (an unknown shape), `WW2_ERR_CAPACITY` -4. Parse, state and version errors arrive with the functions that need them.
+- **Panics.** Every exported function runs inside `catch_unwind`; the library does not rely on `panic = "abort"`. A panic returns `WW2_ERR_PANIC` and `ww2_last_error` gives its message. No handle exists yet, so nothing is poisoned.
+- **Memory.** `ww2_formation_spots` writes into the caller's array, at most one spot per item, so nothing needs freeing and no free function exists yet. `ww2_bytes` and `ww2_bytes_free` arrive with the first result whose size the caller cannot know in advance.
+- **Arguments.** Shapes are `WW2_SHAPE_LINE` 0, `WW2_SHAPE_BLOCK` 1, `WW2_SHAPE_COLUMN` 2 and `WW2_SHAPE_WEDGE` 3, in the Formation menu's order. Booleans (`infantry`, `back`) are `uint8_t`, nonzero meaning true, so no value from C is invalid in Rust. A null pointer is an error unless its length is 0.
+- **`out_len`.** The draft's signature had no output count. It needs one: the JavaScript returns no spots at all for a line or block whose average slot times `spread` is NaN, or is 0 while the drag is 0 or not finite, so the count is `count` or 0.
+- **Rules hash.** FNV-1a 64 of the rules compiled into the core, which today are only the formation constants: the four shape names, then the slot minimums (3 m, 5 m), the slot margin and rank gap (1.5 m), the line rank (10), the stretch limit (3) and the comparator's centimetre steps (100). The vision rules are loaded at run time and not covered.
+
+**Fixture.** `harness/formation-fixture.mjs` records the pinned `facingSpots`, `normalizeFace` and `slotSize` with x64 Node 24.21.0 into `rust/crates/core/tests/fixtures/formation.txt` (215 KB): 10,300 seeded cases (10,000 with 1 to 80 units, 300 with 81 to 400) stored as one hash each, plus 32 cases written out in full, among them one unit with no drag (`one`), six units with no drag and with a 30 m drag (`line.click`, `line.drag`), empty and degenerate formations, and the comparator's near-ties. The file is the same byte for byte when written on the Mac (darwin-x64 Node under Rosetta) and on the Vostro (linux-x64 Node).
+
+**Verified on the Vostro** (Ubuntu 24.04, x86_64, rustc 1.99.0, gcc 13.3.0), from a fresh copy of `rust/`, 2026-10-12:
+
+```
+cargo build -p ww2-ffi --release --target x86_64-unknown-linux-gnu
+cargo rustc -p ww2-ffi --release --target x86_64-unknown-linux-gnu -- --print native-static-libs
+  note: native-static-libs: -lgcc_s -lutil -lrt -lpthread -lm -ldl -lc
+cc -std=c11 -Wall -Wextra -pedantic -I crates/ffi/include crates/ffi/examples/link_check.c \
+  target/x86_64-unknown-linux-gnu/release/libww2_ffi.a -lgcc_s -lutil -lrt -lpthread -lm -ldl -lc -o link_check
+./link_check crates/core/tests/fixtures/formation.txt
+  ww2_abi_version() = 1 (header WW2_ABI_VERSION 1)
+  ww2_rules_hash() = ed0ee23d32a621d1
+  slot sizes: infantry radius 0.5 -> 3, vehicle radius 2.2 -> 5.9000000000000004
+  unknown shape 9: -3 (unknown shape 9: expected a WW2_SHAPE_* from 0 to 3)
+  no room for the spot: -4 (out has room for 0 spots but there are 1 items)
+  null items: -2 (items is null)
+  null out_len: -2 (out_len is null)
+  case one: line, spread 1, reach 0, face 0, 1 units -> 1 spots, bit-equal
+           7 50 60
+  ...
+  32 written cases, 215 spots: 0 differ from the JavaScript
+  all checks passed
+cargo test -p ww2-core   # formation: 10,300 seeded and 32 written cases bit-equal; math, grid pass
+cargo test -p ww2-ffi    # the header check, the error cases and the panic boundary pass
+```
+
+The C program compiles without warnings and also passes on the Mac (`aarch64-apple-darwin`, Apple clang, linked with `-lSystem -lc -lm`); the Mac stays a planned target until the plugin links the library there.
 
 ## Later slices
 

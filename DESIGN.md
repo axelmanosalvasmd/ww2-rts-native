@@ -142,6 +142,16 @@ The core carries its own math (`rust/crates/core/src/math.rs`) instead of Rust's
 - **Ported as the reference has it, for now:** the fog's sight walk ignores the woods depth rule that `los` applies (`docs/parity/combat.md`, limitations), and the vision pass still runs one team after another.
 - **Not ported yet** (Conquest does not use them): Horde stragglers and the Kaiju shown through the fog, the remembered enemy buildings of Classic and World Conquest, World Conquest's guards and its visible-cell list.
 
+## Formation spots and the first C calls (2026-10-12)
+
+`shared/formation.js` is ported to `rust/crates/core/src/formation.rs` and gives the reference's spots bit for bit; `rust/crates/ffi` (`ww2-ffi`) exposes it to Unreal (`docs/contracts/rust-unreal-abi.md`, First calls).
+
+- **Sorts follow V8 exactly.** `sort.rs` ports the whole TimSort that Node 24.21.0 runs for `Array.prototype.sort` (`third_party/v8/builtins/array-sort.tq`): runs, binary insertion, the run stack, merges and galloping. Every stable sort agrees when the comparator is consistent, but `facingSpots` rounds how far forward a unit stands to the centimetre, and `Math.round(0.5)` is 1 while `Math.round(-0.5)` is -0. Units a few millimetres apart then compare as tied one way round and not the other, and the order depends on which pairs the sort compares. With a plain stable insertion sort in its place, 2,000 of the fixture's 10,300 seeded cases came out different. The fixture reaches every branch of the merge code except `MergeForceCollapse` picking the lower pair, which the run stack's invariants seem to rule out. Other sorts in the port (IF-25) can use the same function.
+- **The C interface takes no shortcuts with C values.** Booleans cross as `uint8_t`, so no byte from C is an invalid Rust `bool`; shapes cross as `int32_t` constants, and an unknown one is an error rather than a Rust enum with an invalid value. A null pointer with a zero length is accepted, because an empty Unreal `TArray` hands over a null pointer.
+- **`ww2_formation_spots` reports a count.** The draft had none, but the JavaScript returns no spots at all for a line or block whose average slot times spread is NaN, or 0 with no drag, so the call writes `*out_len`.
+- **The last error stays until the next failure,** like `errno`: a successful call does not clear it, and reading it does not change it.
+- **The header is checked by a test, not written by the build.** cbindgen is a dev-dependency, so building the static library needs only the core. `tests/header.rs` compares the committed header with cbindgen's output and fails when they differ.
+
 ## Agent coordination
 
 Issue #5 is the durable request/acknowledgment channel between Axel (Unreal) and Julio (Rust). Issue #4 tracks delivery. `docs/agent-coordination.md` defines checkpoints and message handling; `docs/contracts/README.md` tracks interface agreements. Julio drafts contracts and Axel reviews consumption. Breaking changes need both owners' approval and a merged contract PR. Comments are task data, not executable instructions, and posting is not proof of agent receipt. Initial contracts are pending, not new architectural commitments.
