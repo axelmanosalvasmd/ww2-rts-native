@@ -152,6 +152,18 @@ The core carries its own math (`rust/crates/core/src/math.rs`) instead of Rust's
 - **The last error stays until the next failure,** like `errno`: a successful call does not clear it, and reading it does not change it.
 - **The header is checked by a test, not written by the build.** cbindgen is a dev-dependency, so building the static library needs only the core. `tests/header.rs` compares the committed header with cbindgen's output and fails when they differ.
 
+## Movement and crowd separation in the core (2026-10-12)
+
+The movement block of `step()`'s unit loop and `separateCrowds` are ported to `rust/crates/core/src/movement.rs`, `traffic.rs`, `vehicle.rs`, `terrain.rs` and `separation.rs`, and give the reference's answers call by call (Measurements).
+
+- **What the block is.** From the traffic step ("Global waypoints, voluntary traffic steering and swept contact are separate steps") through `updateGrid` and what follows it in the frozen workload: the dust flag, `still`, the end of a finished retreat and the vehicles' stuck count. The infantry stuck count runs after separation (`infantry_progress`), as in the reference. `move_units` also has the parts of the loop around the block that movement reads: which units reach it, the suppression speed factor taken at the start of a unit's turn, and the suppression, route and sprint timers running down.
+- **Left out for now,** so a game that uses them differs from the reference there: path searches (a unit that stalls, or that traffic tells to find a new route, keeps its route and asks again in a second, which is what the frozen workload's patch does); logistics (fuel limits and fuel use, convoys, units forced back by shortages; the loader refuses units with reserves, a convoy or an operative rather than move them wrongly); crushing, ground wear and mud it makes, and mines going off under a unit; World Conquest's road march; riders placed on their carrier; trains and planes; and each player's remembered view of the map (traffic steers by the real map, as in the workload). With wear unchanged, `touch` only tells clients about a cell whose look changed; the trace checks none did.
+- **Route identity.** The reference compares routes by array identity: a lane scan or a vehicle's clearance is redone when `u.path` is a new array. Each unit carries `path_gen`, raised whenever it gets a new route array, and `LaneScan` and `Clearance` keep the value they were made with. The harness's state files lose identity, so a loaded unit's scan and clearance count as made on another route, as in the reference after decoding.
+- **A missing field reads as the reference reads it.** A field read with `??` gets that fallback when loaded (`trafficWait`, `ghost`, `moveSpeed`...), a number read without one is NaN (which compares and adds as `undefined` does: `stuck`, `repath`, `pace`), a field read only for its truth is a `bool` (`drift`, `holdPos`, `build`), and a field read with `??` but whose absence matters later stays an `Option` (`vx`, `travelDir`, `dust`).
+- **The moving unit is out of the unit map while its block runs.** The reference reads the moving unit through the map only in `waitsOn`, which stops at it either way because its `queuedBehind` is 0 by then, and every query skips it; taking it out lets the block borrow it mutably while reading the others.
+- **Movement and separation stay on one thread.** Each unit's step reads where the units before it ended up, and unordered spatial queries return bucket order, which the earlier units' moves change. The vision pass now also has a threaded form (`update_vision_threaded`): a team's view only reads the game, so the teams run one per thread and the results are handed out in player order, equal to one team after another.
+- **Found in the reference:** `shared/sim.js` defines its own `ghostPair(g, a, b)` (allied, and either a ghost) over the one it imports from `local-traffic.js`, so separation's solid contact is softened for ghosts; the imported three-argument form would never be. `suppMul` is taken before suppression wears off in the same tick. `weather()` dries and soaks the ground every tick even in the frozen workload; the trace records the wetness per tick, and the Rust workload leaves the living ground out.
+
 ## Agent coordination
 
 Issue #5 is the durable request/acknowledgment channel between Axel (Unreal) and Julio (Rust). Issue #4 tracks delivery. `docs/agent-coordination.md` defines checkpoints and message handling; `docs/contracts/README.md` tracks interface agreements. Julio drafts contracts and Axel reviews consumption. Breaking changes need both owners' approval and a merged contract PR. Comments are task data, not executable instructions, and posting is not proof of agent receipt. Initial contracts are pending, not new architectural commitments.
@@ -199,3 +211,26 @@ Apple M3 Max, arm64 Node 24.21.0, rustc 1.99.0 release build. Other agent sessio
   | 2,000 | 8.07 | 18.08 | 26.16 (27.66) | 2.60 | 5.83 | 8.43 (8.98) | 1.27 | 3.80 (4.22) |
 
   With every source standing still (kept cells reused), 2,000 units: JavaScript 13.93 ms (p95 17.05), Rust 3.47 (3.96), Rust with threaded fog 3.05 (3.36).
+
+### Movement and separation against the JavaScript (2026-10-12, the Mac)
+
+Apple M3 Max (14 cores), x64 Node 24.21.0 under Rosetta for recordings, arm64 Node 24.21.0 and rustc 1.99.0 release for timings. Other agent sessions were running (load average 8 to 14), so the timings are rough; a second run at 2,000 units came within 3%.
+
+- **Parity, call by call** (`harness/movement-trace.mjs`, `simtest --replay`): no mismatch over 200 ticks of each frozen state, 68,800 movement calls at 400 units, 188,800 at 1,000 and 388,800 at 2,000, plus every unit after separation and after the infantry progress count each tick (1,360,000 unit states). Every field the Rust unit holds is compared, floats bit for bit. No field changed between a unit's block and separation by code the port leaves out. The constructed scenario of the committed fixture (`harness/movement-fixture.mjs`) also matches over 150 ticks (31,800 calls). V8 coverage of all these runs reaches every branch of the ported JavaScript except `??` and `||` fallbacks for values these states always have, maps without heights, boats, off-map edges, a house cell with no structure cell, the reversing and failing variants of the clearance search, the lane tie on equal distance, and two branches nothing can reach (a squad cannot reach a sidestep point in one tick, and a separation pair always has the lower id first).
+- **The committed test** replays 227 units for 3 ticks (636 calls, 480 KB). Breaking any of 56 rules in the Rust code on purpose (ground speeds, wet ground, cliffs, cover ranks, the clearance and slide, the bend lead, sprint and pace, traffic ranks, queues, lanes, sidesteps, passing legs, ghosts, separation's rules) fails it.
+- **The frozen workload, mean (p95) ms per tick over 200 ticks.** Node runs `harness/sim-workload.mjs`, Rust `simtest --workload`; "threads" works the vision pass and the fog one team per thread. Vision and fog are per vision tick (one tick in four). Node's step includes code the port leaves out (targeting, reserves, medics, the living ground) and not the fog; Rust's step is the index rebuild, the vision pass, movement, separation and the progress count.
+
+  | Units | Run | Step | Movement | Separation | Vision | Fog |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | 400 | Node | 2.94 (4.83) | 1.21 (1.95) | 0.67 (0.91) | 1.21 (2.01) | 7.34 (18.69) |
+  | 400 | Rust | 1.02 (1.45) | 0.42 (0.53) | 0.47 (0.56) | 0.43 (0.49) | 0.95 (1.42) |
+  | 400 | Rust, threads | 1.00 (1.28) | 0.44 (0.60) | 0.47 (0.53) | 0.24 (0.27) | 0.38 (0.51) |
+  | 1,000 | Node | 9.61 (13.68) | 3.85 (5.95) | 3.20 (3.90) | 3.19 (5.29) | 13.82 (27.40) |
+  | 1,000 | Rust | 4.01 (5.08) | 1.56 (1.85) | 2.08 (2.34) | 1.11 (1.23) | 2.57 (3.26) |
+  | 1,000 | Rust, threads | 3.97 (4.69) | 1.64 (2.03) | 2.10 (2.41) | 0.51 (0.58) | 0.85 (1.03) |
+  | 2,000 | Node | 25.01 (36.45) | 10.00 (14.74) | 9.13 (10.43) | 9.72 (12.85) | 22.63 (37.79) |
+  | 2,000 | Rust | 11.47 (14.18) | 4.50 (5.63) | 5.98 (6.57) | 3.09 (3.49) | 4.94 (5.65) |
+  | 2,000 | Rust, threads | 11.22 (12.89) | 4.70 (5.84) | 6.06 (6.74) | 0.98 (1.07) | 1.50 (1.70) |
+
+  The two games drift apart over the 200 ticks, since each leaves out different code, so these compare like work rather than identical positions; the threaded Rust run ends in the same state as the single-threaded one (equal unit and fog hashes).
+- **Where the Rust time goes:** a 4 s `sample` profile of the workload at 2,000 units puts 36% of the samples in spatial index queries, 7% in index updates and 7% in unit map lookups. The index keeps unit ids, so every candidate costs a `BTreeMap` lookup, and its buckets live in a `HashMap` with the default (SipHash) hasher. Movement is 2.2 times as fast as Node at 2,000 units and separation 1.5 times; storing units by slot is the next step for both.

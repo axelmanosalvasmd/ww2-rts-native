@@ -290,6 +290,44 @@ pub fn update_vision(g: &mut Game, rules: &Rules, grid: &SpatialGrid) {
     }
 }
 
+/// Like `update_vision`, with each team's view worked out on a thread of its own. A team's view only reads
+/// the game, so the views equal those of one team after another; they are handed out in player order.
+pub fn update_vision_threaded(g: &mut Game, rules: &Rules, grid: &SpatialGrid) {
+    g.vision_tick = Some(g.tick);
+    let seen = {
+        let g: &Game = g;
+        let list: Vec<&Unit> = g.units.values().collect();
+        let teams: Vec<Team> = list.iter().map(|u| g.team_of(u)).collect();
+        let mut order: Vec<Team> = Vec::new();
+        for p in &g.players {
+            if !order.contains(&p.team) {
+                order.push(p.team);
+            }
+        }
+        let views: Vec<Vec<UnitId>> = std::thread::scope(|scope| {
+            let (list, teams) = (&list, &teams);
+            let threads: Vec<_> = order
+                .iter()
+                .map(|&team| scope.spawn(move || team_sees(g, rules, grid, list, teams, team)))
+                .collect();
+            threads
+                .into_iter()
+                .map(|t| t.join().expect("a vision thread panicked"))
+                .collect()
+        });
+        g.players
+            .iter()
+            .map(|p| {
+                let i = order.iter().position(|&t| t == p.team).expect("listed");
+                views[i].clone()
+            })
+            .collect::<Vec<_>>()
+    };
+    for (p, visible) in g.players.iter_mut().zip(seen) {
+        p.visible = visible;
+    }
+}
+
 /// What each player sees, worked out once per team, in player order.
 fn team_views(g: &Game, rules: &Rules, grid: &SpatialGrid) -> Vec<Vec<UnitId>> {
     let list: Vec<&Unit> = g.units.values().collect();

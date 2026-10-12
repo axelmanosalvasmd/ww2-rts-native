@@ -1,6 +1,7 @@
-//! Rules data the vision and fog passes read: unit kinds, the vision numbers from `CFG` and `SUPPORT`, and
-//! the weather kinds. For now they are loaded from the reference game's own tables (`harness/tables.mjs`);
-//! the core will own them later (`docs/parity/interface.md`, IF-01).
+//! Rules data the ported passes read: unit kinds, the vision numbers from `CFG` and `SUPPORT`, the movement
+//! numbers from `CFG`, `TRAFFIC`, `LANE` and the vehicle profiles, and the weather kinds. For now they are
+//! loaded from the reference game's own tables (`harness/tables.mjs`); the core will own them later
+//! (`docs/parity/interface.md`, IF-01).
 //!
 //! `RULES_HASH` covers the rules compiled into the core instead, so a client and a server built from
 //! different rules can tell.
@@ -39,7 +40,7 @@ const fn fnv1a(mut hash: u64, bytes: &[u8]) -> u64 {
     hash
 }
 
-/// What the vision and fog passes need to know about a unit kind (`UNITS` in `shared/sim.js`).
+/// What the ported passes need to know about a unit kind (`UNITS` in `shared/sim.js`).
 #[derive(Clone, Debug, PartialEq)]
 pub struct UnitKind {
     pub name: String,
@@ -54,6 +55,62 @@ pub struct UnitKind {
     pub infantry: bool,
     /// Half a ship's length, 0 for everything else: a ship is seen along its whole hull.
     pub hull: f64,
+    /// Top speed on open dry ground, metres per second.
+    pub speed: f64,
+    /// Size in metres: the hull's half length is 0.8 of it (`bodyRadius`).
+    pub radius: f64,
+    pub naval: bool,
+    /// A ship kept off the shoals.
+    pub deep: bool,
+    pub air: bool,
+    /// Runs on rails (the train).
+    pub rail: bool,
+    /// Has a weapon (`def.w`): a building without one never reaches the movement block.
+    pub weapon: bool,
+    /// The speed factor of the kind's sprint ability, if it has one (`def.ab.speed`).
+    pub ability_speed: Option<f64>,
+    /// How a ground vehicle drives (`movementProfile`); `None` for everything else.
+    pub vehicle: Option<VehicleProfile>,
+}
+
+impl UnitKind {
+    /// A vehicle on the ground: no infantry, structure, plane or ship (`isGroundVehicle`).
+    pub fn ground_vehicle(&self) -> bool {
+        !self.infantry && !self.structure && !self.air && !self.naval
+    }
+
+    /// The hull's half length (`bodyRadius`).
+    pub fn body_radius(&self) -> f64 {
+        self.radius * 0.8
+    }
+
+    /// The terrain bits that stop this kind (`blockOf`): ships keep to water (deep ones off the shoals),
+    /// vehicles keep out of water and off tank traps, infantry out of water.
+    pub fn block(&self) -> u16 {
+        use crate::game::{LAND, MOVE, SHOAL, VBLOCK};
+        if self.deep {
+            LAND | SHOAL
+        } else if self.naval {
+            LAND
+        } else if !self.infantry {
+            MOVE | VBLOCK
+        } else {
+            MOVE
+        }
+    }
+}
+
+/// A ground vehicle's motion (`VEHICLE_PROFILES` in `shared/vehicle-motion.js`, or its fallback).
+#[derive(Clone, Debug, PartialEq)]
+pub struct VehicleProfile {
+    /// Metres per second squared, forward.
+    pub acceleration: f64,
+    pub reverse_acceleration: f64,
+    pub braking: f64,
+    /// Reverse speed as a share of top speed.
+    pub reverse_speed: f64,
+    /// Radians per second.
+    pub hull_turn: f64,
 }
 
 /// The `CFG` and `SUPPORT` numbers the passes read.
@@ -90,6 +147,88 @@ pub struct VisionRules {
     pub recon_width: f64,
 }
 
+/// Local traffic between units (`TRAFFIC` in `shared/local-traffic.js`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct TrafficRules {
+    /// Seconds ahead a unit looks for someone it would run into.
+    pub horizon: f64,
+    /// Seconds blocked before a unit steps aside.
+    pub wait: f64,
+    /// Seconds blocked before it asks for a new route.
+    pub replan: f64,
+    /// Seconds of waiting per step of priority.
+    pub age: f64,
+    /// Seconds a sidestep lasts at most.
+    pub max_yield: f64,
+    /// Seconds boxed in by a friend before passing through friends.
+    pub ghost: f64,
+    /// Seconds a unit passes through friends.
+    pub ghost_time: f64,
+}
+
+/// One-lane stretches (`LANE` in `shared/local-traffic.js`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct LaneRules {
+    /// Metres of route a hull looks along.
+    pub ahead: f64,
+    /// Room beyond two hulls and the passing gap.
+    pub margin: f64,
+    /// How far short of a stretch a hull stops, beyond its own length.
+    pub hold: f64,
+}
+
+/// The `CFG` numbers the movement block and crowd separation read.
+#[derive(Clone, Debug, PartialEq)]
+pub struct MovementRules {
+    /// Seconds per tick (`TICK`).
+    pub tick: f64,
+    /// Speed factor while retreating (`CFG.retreatSpeed`).
+    pub retreat_speed: f64,
+    /// Speed lost per unit of grade, infantry and vehicles (`CFG.slope`).
+    pub slope: [f64; 2],
+    /// A ford's speed, shallow to deep (`CFG.fordSpeed`).
+    pub ford_speed: [f64; 2],
+    /// Wet ground's effect on fords and on open ground and mud (`CFG.weather.wetFord`, `wetGround`).
+    pub wet_ford: f64,
+    pub wet_ground: f64,
+    /// Infantry speed through wire and along trenches (`CFG.wireSpeed`, `CFG.trench.speed`).
+    pub wire_speed: f64,
+    pub trench_speed: f64,
+    /// Suppression a squad in a trench loses per second (`CFG.trench.rally`).
+    pub trench_rally: f64,
+    /// A dug trench protects against fire within this cosine of its front (`CFG.trench.arc`).
+    pub trench_arc: f64,
+    /// Vehicle speed in woods and the woods' share of cover (`CFG.wood.speed`, `CFG.wood.cover`).
+    pub wood_speed: f64,
+    pub wood_cover: f64,
+    /// Vehicle speed on an unbroken road (`CFG.roadSpeed`).
+    pub road_speed: f64,
+    /// Vehicle speed in mud, shallow to deep (`CFG.mudSpeed`).
+    pub mud_speed: [f64; 2],
+    /// Speed lost on fully churned open ground (`CFG.churn`).
+    pub churn: f64,
+    /// Speed factor while backing up (`CFG.behavior.reverseSpeed`).
+    pub reverse_speed: f64,
+    /// Hit points per house kind (`CFG.houses[k].hp`).
+    pub house_hp: Vec<f64>,
+    /// Hit points of the other structure letters (`CFG.terrainHp`), by terrain letter.
+    pub terrain_hp: Vec<(u8, f64)>,
+    /// How far a hull's arc may stray off a straight line while turning (`CORNER_BULGE`).
+    pub corner_bulge: f64,
+    pub traffic: TrafficRules,
+    pub lane: LaneRules,
+}
+
+impl MovementRules {
+    /// A terrain letter's hit points (`CFG.terrainHp[ch]`).
+    pub fn terrain_hp(&self, ch: u8) -> Option<f64> {
+        self.terrain_hp
+            .iter()
+            .find(|(c, _)| *c == ch)
+            .map(|&(_, hp)| hp)
+    }
+}
+
 /// A weather state (`WEATHER` in `shared/weather.js`).
 #[derive(Clone, Debug, PartialEq)]
 pub struct WeatherKind {
@@ -98,12 +237,16 @@ pub struct WeatherKind {
     pub sight: f64,
     /// Rain is the living ground's own rain: its sight loss comes from the rain level, not from here.
     pub rains: bool,
+    /// Speed multipliers for infantry and for vehicles (`weatherSpeed`).
+    pub inf: f64,
+    pub veh: f64,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Rules {
     pub kinds: Vec<UnitKind>,
     pub vision: VisionRules,
+    pub movement: MovementRules,
     pub weather: Vec<WeatherKind>,
 }
 
