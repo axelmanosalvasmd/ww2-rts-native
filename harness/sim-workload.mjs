@@ -4,56 +4,19 @@
 // Prints one RESULT line of JSON: per-tick milliseconds (mean, p95) for movement, crowd separation, the vision
 // pass and the fog pass, the whole step for context, and hashes of positions and fog after the run.
 //
-// Module hooks rewrite shared/sim.js as it loads, without touching reference/:
-// - timers around the movement block of step()'s unit loop, the separation pass and the vision pass;
-// - a path request keeps the current route (and waits a second before asking again), and every path search
-//   returns no route, so units only follow the routes they have; idle units do not space out or seek cover (react);
-// - the weather and falling debris stand still;
-// - units steer by the real map, not each player's remembered view of it, which the Rust port leaves out.
-// The frozen state makes everything else quiet: nobody fires, nothing is in flight, and with crushing and
-// ground wear off the terrain never changes. The run checks that: no random draw and no terrain change.
-import { registerHooks } from 'node:module';
+// The changes to shared/sim.js and the rules turned off are in harness/workload-patches.mjs, shared with
+// harness/movement-trace.mjs. The run checks that the frozen state stays quiet: no random draw and no terrain change.
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { decode } from './state-codec.mjs';
+import { loadSim, freeze } from './workload-patches.mjs';
 
-const PATCHES = [
-  ['export const CELL', 'export const __timing = { move: 0, separate: 0, vision: 0 };\nexport const CELL'],
-  ['    // Global waypoints, voluntary traffic steering and swept contact are separate steps.\n',
-    '    const __moveStart = performance.now();\n    // Global waypoints, voluntary traffic steering and swept contact are separate steps.\n'],
-  ['    updateGrid(g, u);\n    if (def.crushes && moved > 0)', '    updateGrid(g, u);\n    __timing.move += performance.now() - __moveStart;\n    if (def.crushes && moved > 0)'],
-  ['  separateCrowds(g, list);\n', '  { const t0 = performance.now(); separateCrowds(g, list); __timing.separate += performance.now() - t0; }\n'],
-  ['  if (g.tick % 4 === 1) updateVision(g);\n', '  if (g.tick % 4 === 1) { const t0 = performance.now(); updateVision(g); __timing.vision += performance.now() - t0; }\n'],
-  ['function requestStepPath(g, u, to, kind) {\n', 'function requestStepPath(g, u, to, kind) {\n  u.repath = 1; return;\n'],
-  ['        else { const route = findPath(g, u, goal); if (route.length) u.path = route; u.repath = 1; }\n', '        else { u.repath = 1; }\n'],
-  ['  stepWorldDebris(g, TICK);\n', ''],
-  ['  stepWeather(g);\n', ''],
-  // units steer by the real map instead of each player's remembered view of it (rebuilt every tick from the cell log)
-  ['    const trafficView = () => trafficTerrain ??= knownTerrainFor(g, u.owner);\n', '    const trafficView = () => g;\n'],
-  // units follow the routes they have: no new route from spacing or cover (react) or from medics and retreats
-  ['    if (!def.structure && !u.convoy && !u.logistics?.forced) react(g, u, def);\n', ''],
-  ['export function findPath(g, from, to) {\n', 'export function findPath(g, from, to) {\n  return [];\n'],
-];
-registerHooks({
-  load(url, context, nextLoad) {
-    const result = nextLoad(url, context);
-    if (!url.endsWith('/reference/ww2-rts/shared/sim.js')) return result;
-    let source = typeof result.source === 'string' ? result.source : Buffer.from(result.source).toString('utf8');
-    for (const [from, to] of PATCHES) {
-      // each target must occur exactly once, so a moved pin fails here instead of timing the wrong code
-      if (source.split(from).length !== 2) throw new Error(`patch target not found exactly once: ${from.slice(0, 60)}`);
-      source = source.replace(from, to);
-    }
-    return { ...result, source };
-  },
-});
-const sim = await import('../reference/ww2-rts/shared/sim.js');
+const sim = await loadSim();
 
 const args = process.argv.slice(2), file = args[0], TICKS = Number(args.includes('--ticks') ? args[args.indexOf('--ticks') + 1] : 200);
 if (!file) throw new Error('usage: node harness/sim-workload.mjs <state.json> [--ticks N]');
 const saved = JSON.parse(readFileSync(file, 'utf8')), g = decode(saved.game);
-sim.CFG.crush = {};
-sim.CFG.traffic = 0;
+freeze(sim);
 
 let draws = 0;
 const random = Math.random;

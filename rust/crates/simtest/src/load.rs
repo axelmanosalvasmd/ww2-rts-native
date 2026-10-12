@@ -1,17 +1,26 @@
 //! Builds the core's rules and game state from the harness's JSON: `harness/tables.mjs` for the rules, and a
-//! game state from `harness/sim-state.mjs` or `harness/vision-fixture.mjs` (written by
-//! `harness/state-codec.mjs`). Only the fields the vision and fog passes read are taken.
+//! game state from `harness/sim-state.mjs`, `harness/vision-fixture.mjs` or `harness/movement-trace.mjs`
+//! (written by `harness/state-codec.mjs`). Only the fields the ported passes read are taken.
+//!
+//! Movement fields follow the reference's own reading of a missing value: a field it reads with `??` gets
+//! that fallback, a number it reads without one is NaN (which compares and adds as `undefined` does), and a
+//! field it reads only for its truth is a `bool`. A state cut down for the vision passes, with no movement
+//! fields or terrain letters, loads as units with no route on open ground.
 
 use std::collections::BTreeMap;
 
 use serde_json::Value;
 use ww2_core::fog::{Fog, FogTerrain, KeptCells, KeptSource, TeamFog};
 use ww2_core::game::{
-    CELL, Game, MOVE, ModeKind, PlaneState, Player, SIGHT, Section, Smoke, Strike, StrikeKind,
-    TRENCH, Unit, WOOD,
+    CELL, COVER, Clearance, FORD, Game, LAND, LaneScan, MOVE, MUD, ModeKind, PlaneState, Player,
+    Point, Pose, ROAD, SHOAL, SIGHT, Section, Smoke, Strike, StrikeKind, TRENCH, Traffic, Unit,
+    VBLOCK, WIRE, WOOD, Wreck,
 };
 use ww2_core::grid::UnitId;
-use ww2_core::rules::{Rules, UnitKind, VisionRules, WeatherKind};
+use ww2_core::rules::{
+    LaneRules, MovementRules, Rules, TrafficRules, UnitKind, VehicleProfile, VisionRules,
+    WeatherKind,
+};
 
 use crate::codec::{
     Result, compared, field, given, map_entries, num, num_or, number, numbers, set_items, short,
@@ -65,8 +74,16 @@ pub fn load_rules(t: &Value) -> Result<Rules> {
     for (key, bits) in [
         ("move", MOVE),
         ("sight", SIGHT),
+        ("cover", COVER),
         ("trench", TRENCH),
+        ("ford", FORD),
+        ("wire", WIRE),
+        ("vblock", VBLOCK),
+        ("road", ROAD),
+        ("mud", MUD),
         ("wood", WOOD),
+        ("land", LAND),
+        ("shoal", SHOAL),
     ] {
         if num(flags, key)? != f64::from(bits) {
             return Err(format!(
@@ -89,6 +106,15 @@ pub fn load_rules(t: &Value) -> Result<Rules> {
                 building: flag(u, "building"),
                 infantry: flag(u, "infantry"),
                 hull: num_or(u, "hull", 0.0)?,
+                speed: num(u, "speed")?,
+                radius: num(u, "radius")?,
+                naval: flag(u, "naval"),
+                deep: flag(u, "deep"),
+                air: flag(u, "air"),
+                rail: flag(u, "rail"),
+                weapon: flag(u, "weapon"),
+                ability_speed: given(u, "abilitySpeed").and_then(number),
+                vehicle: given(u, "vehicle").map(profile).transpose()?,
             })
         })
         .collect::<Result<Vec<_>>>()?;
@@ -131,13 +157,88 @@ pub fn load_rules(t: &Value) -> Result<Rules> {
                 name: text(w, "name")?.to_string(),
                 sight: num(w, "sight")?,
                 rains: flag(w, "rains"),
+                inf: num(w, "inf")?,
+                veh: num(w, "veh")?,
             })
         })
         .collect::<Result<Vec<_>>>()?;
     Ok(Rules {
         kinds,
         vision,
+        movement: movement_rules(t)?,
         weather,
+    })
+}
+
+fn pair(v: &Value, key: &str) -> Result<[f64; 2]> {
+    let items = given(v, key)
+        .and_then(numbers)
+        .ok_or_else(|| format!("{key}: expected two numbers"))?;
+    items
+        .try_into()
+        .map_err(|_| format!("{key}: expected two numbers"))
+}
+
+fn profile(v: &Value) -> Result<VehicleProfile> {
+    Ok(VehicleProfile {
+        acceleration: num(v, "acceleration")?,
+        reverse_acceleration: num(v, "reverseAcceleration")?,
+        braking: num(v, "braking")?,
+        reverse_speed: num(v, "reverseSpeed")?,
+        hull_turn: num(v, "hullTurn")?,
+    })
+}
+
+/// The movement numbers (`movement` and `tick` in `harness/tables.mjs`).
+fn movement_rules(t: &Value) -> Result<MovementRules> {
+    let m = given(t, "movement").ok_or("movement: missing")?;
+    let tr = given(m, "traffic").ok_or("movement.traffic: missing")?;
+    let lane = given(m, "lane").ok_or("movement.lane: missing")?;
+    let terrain_hp = given(m, "terrainHp")
+        .and_then(Value::as_object)
+        .ok_or("terrainHp: expected an object")?
+        .iter()
+        .map(|(letter, hp)| match (letter.as_bytes(), number(hp)) {
+            ([ch], Some(hp)) => Ok((*ch, hp)),
+            _ => Err(format!("terrainHp: bad entry {letter}")),
+        })
+        .collect::<Result<Vec<_>>>()?;
+    Ok(MovementRules {
+        tick: num(t, "tick")?,
+        retreat_speed: num(m, "retreatSpeed")?,
+        slope: pair(m, "slope")?,
+        ford_speed: pair(m, "fordSpeed")?,
+        wet_ford: num(m, "wetFord")?,
+        wet_ground: num(m, "wetGround")?,
+        wire_speed: num(m, "wireSpeed")?,
+        trench_speed: num(m, "trenchSpeed")?,
+        trench_rally: num(m, "trenchRally")?,
+        trench_arc: num(m, "trenchArc")?,
+        wood_speed: num(m, "woodSpeed")?,
+        wood_cover: num(m, "woodCover")?,
+        road_speed: num(m, "roadSpeed")?,
+        mud_speed: pair(m, "mudSpeed")?,
+        churn: num(m, "churn")?,
+        reverse_speed: num(m, "reverseSpeed")?,
+        house_hp: given(m, "houseHp")
+            .and_then(numbers)
+            .ok_or("houseHp: expected numbers")?,
+        terrain_hp,
+        corner_bulge: num(m, "cornerBulge")?,
+        traffic: TrafficRules {
+            horizon: num(tr, "horizon")?,
+            wait: num(tr, "wait")?,
+            replan: num(tr, "replan")?,
+            age: num(tr, "age")?,
+            max_yield: num(tr, "maxYield")?,
+            ghost: num(tr, "ghost")?,
+            ghost_time: num(tr, "ghostTime")?,
+        },
+        lane: LaneRules {
+            ahead: num(lane, "ahead")?,
+            margin: num(lane, "margin")?,
+            hold: num(lane, "hold")?,
+        },
     })
 }
 
@@ -169,7 +270,94 @@ fn garrison(v: &Value, key: &str) -> Result<Option<usize>> {
     Ok(if g >= 0.0 { Some(int(g, key)?) } else { None })
 }
 
-fn unit(u: &Value, rules: &Rules, players: usize, cells: usize) -> Result<Unit> {
+/// A number the reference reads without a fallback: missing is NaN (as `undefined` in arithmetic and
+/// comparisons), `null` is 0, a boolean 0 or 1.
+fn js_num(v: &Value, key: &str) -> Result<f64> {
+    match field(v, key) {
+        None => Ok(f64::NAN),
+        Some(Value::Null) => Ok(0.0),
+        Some(Value::Bool(b)) => Ok(f64::from(u8::from(*b))),
+        Some(x) => number(x).ok_or_else(|| format!("{key}: expected a number")),
+    }
+}
+
+fn point(v: &Value) -> Result<Point> {
+    Ok(Point {
+        x: num(v, "x")?,
+        z: num(v, "z")?,
+    })
+}
+
+fn pose(v: &Value) -> Result<Pose> {
+    Ok(Pose {
+        x: num(v, "x")?,
+        z: num(v, "z")?,
+        rot: num(v, "rot")?,
+    })
+}
+
+/// A point field that is present and not null (`u.worldGoal` and the like are read for their truth).
+fn opt_point(u: &Value, key: &str) -> Result<Option<Point>> {
+    given(u, key).map(point).transpose()
+}
+
+fn points(v: Option<&Value>, what: &str) -> Result<Vec<Point>> {
+    match v {
+        None => Ok(Vec::new()),
+        Some(v) => v
+            .as_array()
+            .ok_or_else(|| format!("{what}: expected an array"))?
+            .iter()
+            .map(point)
+            .collect(),
+    }
+}
+
+/// The unit's route is the array `laneScan.path` or `motionClearance.path` holds: the trace records that as
+/// `samePathLane` and `samePathClearance`. Saved states never share it (decoding makes separate arrays).
+fn same_path(u: &Value, key: &str) -> bool {
+    given(u, key).and_then(Value::as_bool) == Some(true)
+}
+
+/// The route array a loaded unit holds; 0 stands for any other.
+const LOADED_PATH: u64 = 1;
+
+fn traffic(v: &Value) -> Result<Traffic> {
+    Ok(Traffic {
+        goal: point(given(v, "goal").ok_or("traffic.goal: missing")?)?,
+        legs: points(given(v, "legs"), "traffic.legs")?,
+        passing: flag(v, "passing"),
+        by: int(num(v, "by")?, "traffic.by")?,
+        until: num(v, "until")?,
+    })
+}
+
+fn lane_scan(v: &Value, same: bool) -> Result<LaneScan> {
+    let lane = match given(v, "lane") {
+        None => None,
+        Some(l) => Some((
+            point(given(l, "entry").ok_or("lane.entry: missing")?)?,
+            point(given(l, "exit").ok_or("lane.exit: missing")?)?,
+        )),
+    };
+    Ok(LaneScan {
+        path: if same { LOADED_PATH } else { 0 },
+        until: num(v, "until")?,
+        lane,
+    })
+}
+
+fn clearance(v: &Value, same: bool) -> Result<Clearance> {
+    Ok(Clearance {
+        goal: pose(given(v, "goal").ok_or("motionClearance.goal: missing")?)?,
+        reverse: flag(v, "reverse"),
+        path: if same { LOADED_PATH } else { 0 },
+        until: num(v, "until")?,
+    })
+}
+
+/// One unit of a state file (or of a movement trace).
+pub fn unit(u: &Value, rules: &Rules, players: usize, cells: usize) -> Result<Unit> {
     let id: UnitId = int(num(u, "id")?, "id")?;
     let type_name = text(u, "type")?;
     let kind = rules
@@ -178,6 +366,13 @@ fn unit(u: &Value, rules: &Rules, players: usize, cells: usize) -> Result<Unit> 
     let owner: usize = int(num(u, "owner")?, "owner")?;
     if owner >= players {
         return Err(format!("unit {id}: owner {owner} has no player"));
+    }
+    for key in ["operative", "convoy", "logistics"] {
+        if flag(u, key) {
+            return Err(format!(
+                "unit {id}: has {key}, which the core does not move yet"
+            ));
+        }
     }
     let air = if truthy(field(u, "air")) {
         let air = field(u, "air").expect("truthy");
@@ -195,6 +390,12 @@ fn unit(u: &Value, rules: &Rules, players: usize, cells: usize) -> Result<Unit> 
         }
         _ => None,
     };
+    let some_num = |key: &str| -> Result<Option<f64>> {
+        given(u, key)
+            .map(|v| number(v).ok_or_else(|| format!("{key}: expected a number")))
+            .transpose()
+    };
+    let attack = truthy(field(u, "attackId"));
     Ok(Unit {
         id,
         kind,
@@ -206,15 +407,57 @@ fn unit(u: &Value, rules: &Rules, players: usize, cells: usize) -> Result<Unit> 
         riding: truthy(field(u, "riding")),
         air,
         still: compared(u, "still")?,
-        shot_at: given(u, "shotAt")
-            .map(|v| number(v).ok_or("shotAt: expected a number"))
-            .transpose()?,
-        dust: given(u, "dust")
-            .map(|v| number(v).ok_or("dust: expected a number"))
-            .transpose()?,
+        shot_at: some_num("shotAt")?,
+        dust: some_num("dust")?,
         built: compared(u, "built")?,
         cells: footprint,
         heavy: !rules.kinds[kind].infantry,
+        hp: js_num(u, "hp")?,
+        path: points(given(u, "path"), "path")?,
+        path_gen: LOADED_PATH,
+        reverse: opt_point(u, "reverse")?,
+        pace: js_num(u, "pace")?,
+        attack,
+        retreating: flag(u, "retreating"),
+        sprint: js_num(u, "sprint")?,
+        supp: js_num(u, "supp")?,
+        hit_from: opt_point(u, "hitFrom")?,
+        stuck: js_num(u, "stuck")?,
+        repath: js_num(u, "repath")?,
+        world_goal: opt_point(u, "worldGoal")?,
+        amove: opt_point(u, "amove")?,
+        move_speed: num_or(u, "moveSpeed", 0.0)?,
+        travel_dir: some_num("travelDir")?,
+        vx: some_num("vx")?,
+        vz: some_num("vz")?,
+        drift: flag(u, "drift"),
+        motion_before: given(u, "motionBefore").map(pose).transpose()?,
+        clearance: given(u, "motionClearance")
+            .map(|v| clearance(v, same_path(u, "samePathClearance")))
+            .transpose()?,
+        traffic: given(u, "traffic").map(traffic).transpose()?,
+        traffic_wait: num_or(u, "trafficWait", 0.0)?,
+        traffic_trail: match given(u, "trafficTrail") {
+            None => Vec::new(),
+            Some(t) => t
+                .as_array()
+                .ok_or("trafficTrail: expected an array")?
+                .iter()
+                .map(pose)
+                .collect::<Result<Vec<_>>>()?,
+        },
+        traffic_entered: flag(u, "trafficEntered"),
+        queued_behind: int(num_or(u, "queuedBehind", 0.0)?, "queuedBehind")?,
+        lane_scan: given(u, "laneScan")
+            .map(|v| lane_scan(v, same_path(u, "samePathLane")))
+            .transpose()?,
+        ghost: num_or(u, "ghost", 0.0)?,
+        hold_pos: flag(u, "holdPos"),
+        build: flag(u, "build"),
+        dig: flag(u, "dig"),
+        entrench: flag(u, "entrench"),
+        board: int(num_or(u, "board", 0.0)?, "board")?,
+        rail: flag(u, "rail"),
     })
 }
 
@@ -253,6 +496,10 @@ pub fn load_game(g: &Value, rules: &Rules) -> Result<Loaded> {
                     })
                     .collect::<Result<Vec<UnitId>>>()?,
             };
+            // the vision pass fills it in the units' order; `Player::sees` relies on that
+            if !visible.is_sorted() {
+                return Err("visible: not in ascending id order".to_string());
+            }
             Ok(Player {
                 slot: int(num(p, "slot")?, "slot")?,
                 team: int(num(p, "team")?, "team")?,
@@ -338,6 +585,7 @@ pub fn load_game(g: &Value, rules: &Rules) -> Result<Loaded> {
                 Section {
                     failed,
                     hp: num(s, "hp")?,
+                    max_hp: given(s, "maxHp").and_then(number),
                 },
             );
         }
@@ -354,12 +602,52 @@ pub fn load_game(g: &Value, rules: &Rules) -> Result<Loaded> {
         None => 0.0,
         Some(wx) => num_or(wx, "rain", 0.0)?,
     };
+    let floats = |key: &str| -> Result<Option<Vec<f32>>> {
+        match given(g, key) {
+            None => Ok(None),
+            Some(v) => {
+                let items = numbers(v).ok_or_else(|| format!("{key}: expected numbers"))?;
+                if items.len() != n {
+                    return Err(format!("{key}: {} cells, not {n}", items.len()));
+                }
+                // the reference keeps these as 32-bit floats, which the file holds exactly
+                Ok(Some(items.into_iter().map(|x| x as f32).collect()))
+            }
+        }
+    };
+    let wrecks = match given(g, "wrecks") {
+        None => Vec::new(),
+        Some(list) => list
+            .as_array()
+            .ok_or("wrecks: expected an array")?
+            .iter()
+            .map(|w| {
+                Ok(Wreck {
+                    x: num(w, "x")?,
+                    z: num(w, "z")?,
+                    moving: flag(w, "motion"),
+                })
+            })
+            .collect::<Result<Vec<_>>>()?,
+    };
     let game = Game {
         w,
         h,
         flags,
         height,
         house,
+        chars: letters(given(g, "chars"), n, "chars")?.unwrap_or_else(|| vec![b'.'; n]),
+        ground: letters(given(g, "ground"), n, "ground")?,
+        objects: letters(given(g, "objects"), n, "objects")?,
+        wear: floats("wear")?,
+        cell_hp: floats("cellHp")?.unwrap_or_else(|| vec![0.0; n]),
+        trench_front: floats("trenchFront")?,
+        tough: given(g, "tough")
+            .map(|t| numbers(t).ok_or("tough: expected numbers"))
+            .transpose()?,
+        wet: given(g, "wx").map(|wx| js_num(wx, "wet")).transpose()?,
+        reveal: flag(g, "reveal"),
+        wrecks,
         tick: int(num(g, "tick")?, "tick")?,
         vision_tick: given(g, "visionTick")
             .map(|t| {
@@ -381,6 +669,28 @@ pub fn load_game(g: &Value, rules: &Rules) -> Result<Loaded> {
     };
     let fog = load_fog(g, &game)?;
     Ok(Loaded { game, fog })
+}
+
+/// Terrain letters, one per cell: an array of one-letter strings as the game keeps them, a string, or a typed
+/// array of character codes (`harness/movement-trace.mjs` writes them so, as runs).
+fn letters(v: Option<&Value>, n: usize, what: &str) -> Result<Option<Vec<u8>>> {
+    let Some(v) = v else { return Ok(None) };
+    let items: Vec<u8> = match v {
+        Value::String(s) => s.bytes().collect(),
+        Value::Object(_) => ints(Some(v), what)?,
+        Value::Array(a) => a
+            .iter()
+            .map(|c| match c.as_str().map(str::as_bytes) {
+                Some([b]) => Ok(*b),
+                _ => Err(format!("{what}: expected one letter per cell")),
+            })
+            .collect::<Result<Vec<_>>>()?,
+        _ => return Err(format!("{what}: expected letters")),
+    };
+    if items.len() != n {
+        return Err(format!("{what}: {} cells, not {n}", items.len()));
+    }
+    Ok(Some(items))
 }
 
 /// The fog caches saved with the game: `fogTerrain`, `fogSources` and `fog`.
