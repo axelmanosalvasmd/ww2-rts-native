@@ -1,0 +1,23 @@
+# Rust
+target/
+
+# Unreal editor and build output
+/unreal/Binaries/
+/unreal/Intermediate/
+/unreal/Saved/
+/unreal/DerivedDataCache/
+/unreal/Plugins/*/Binaries/
+/unreal/Plugins/*/Intermediate/
+*.sln
+*.VC.db
+*.opensdf
+*.sdf
+.vs/
+
+# Editors and OS
+.idea/
+.vscode/
+.DS_Store
+
+# Node, for harnesses that run the reference game
+node_modules/

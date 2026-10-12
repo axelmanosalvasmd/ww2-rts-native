@@ -1,0 +1,3 @@
+[submodule "reference/ww2-rts"]
+	path = reference/ww2-rts
+	url = https://github.com/axelmanosalvasmd/ww2-rts.git
