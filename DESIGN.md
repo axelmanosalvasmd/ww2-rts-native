@@ -104,7 +104,7 @@ Decided now so release stays cheap:
 | Claim | Confidence | Settled by |
 | --- | --- | --- |
 | Rules core outside the engine, server as referee, fog filtering | Very high | It's how the game already works |
-| A native server fits more units into each tick | High | #2 |
+| A native server fits more units into each tick | Measured: the straight port of the hot path is about 2 times faster than Node (17.2 ms against 35.7 ms per tick at 2,000 units, Measurements); more needs data layout and the parallel tick | #2 |
 | The Rust core links cleanly into Unreal | High | #3 |
 | Unreal is the right client (agent speed in Unreal, runtime terrain, crowd cost) | Good, not certain | #3 |
 | Thousands of units | Unknown | #2, then the step 2 benchmark |
@@ -234,3 +234,27 @@ Apple M3 Max (14 cores), x64 Node 24.21.0 under Rosetta for recordings, arm64 No
 
   The two games drift apart over the 200 ticks, since each leaves out different code, so these compare like work rather than identical positions; the threaded Rust run ends in the same state as the single-threaded one (equal unit and fog hashes).
 - **Where the Rust time goes:** a 4 s `sample` profile of the workload at 2,000 units puts 36% of the samples in spatial index queries, 7% in index updates and 7% in unit map lookups. The index keeps unit ids, so every candidate costs a `BTreeMap` lookup, and its buckets live in a `HashMap` with the default (SipHash) hasher. Movement is 2.2 times as fast as Node at 2,000 units and separation 1.5 times; storing units by slot is the next step for both.
+
+### Sim test (#2): Node against Rust (2026-10-12, the Vostro)
+
+The frozen workload of `harness/sim-workload.mjs` (Node) and `simtest --workload` (Rust) on `frozen-400`, `frozen-1000` and `frozen-2000`, 200 ticks each. The Vostro: Intel i5-12400 (6 cores, 12 threads), Ubuntu 24.04.5, kernel 6.8, `powersave` governor; x64 Node 24.21.0; rustc 1.99.0, release build; PR #14 (`5b01e00`). Three rounds alternating Node, Rust on one thread and Rust with threads; the table gives the median of the three. The machine was not idle: its load average was 0.76 just before and 3.2 to 4.0 during and after the runs, part of it other work, so a quiet-window rerun may come out lower on both sides.
+
+Milliseconds, mean (p95). Movement and separation run every tick; vision and fog every fourth tick, and their columns are per vision tick. "Ported work per tick" adds movement, separation and a quarter of vision and fog: the average cost of what Rust has ported. Node's whole `step()` is in the last column for context; it also runs code the port leaves out.
+
+| Units | Side | Movement | Separation | Vision | Fog (6 teams) | Ported work per tick | Node `step()` |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 400 | Node | 1.88 (3.00) | 0.95 (1.44) | 1.58 (3.11) | 8.62 (22.47) | 5.38 | 4.32 (6.93) |
+| 400 | Rust, 1 thread | 0.61 (0.74) | 0.62 (0.66) | 0.55 (0.59) | 1.60 (2.25) | 1.77 | |
+| 400 | Rust, threads | 0.68 (0.94) | 0.68 (0.90) | 0.30 (0.38) | 0.73 (1.18) | 1.62 | |
+| 1,000 | Node | 5.62 (8.89) | 4.23 (6.34) | 4.04 (7.47) | 14.89 (32.40) | 14.59 | 13.12 (21.14) |
+| 1,000 | Rust, 1 thread | 2.39 (2.99) | 2.89 (3.12) | 1.54 (1.63) | 4.26 (5.53) | 6.73 | |
+| 1,000 | Rust, threads | 2.44 (3.00) | 2.95 (3.36) | 0.68 (0.77) | 1.65 (2.19) | 5.98 | |
+| 2,000 | Node | 14.72 (22.79) | 12.41 (14.64) | 11.30 (17.76) | 23.04 (44.13) | 35.72 | 34.43 (54.97) |
+| 2,000 | Rust, 1 thread | 7.13 (9.09) | 8.61 (9.40) | 4.46 (5.00) | 7.97 (9.47) | 18.85 | |
+| 2,000 | Rust, threads | 7.30 (9.28) | 8.72 (9.85) | 1.71 (1.88) | 2.92 (3.62) | 17.18 | |
+
+What it says, at 2,000 units:
+- **This port is about twice as fast as Node, not ten times.** Ported work per tick: 35.7 ms in Node, 18.9 ms in Rust on one thread, 17.2 ms with threads. Rust's whole tick averages 17.1 ms with a p95 of 21.6, inside the 50 ms tick; Node's frozen `step()` averages 34.4 ms with a p95 of 55.0, over it.
+- **Vision and fog gain most:** fog is 2.9 times faster on one thread and 7.9 times with a thread per team; vision 2.5 times, and 6.6 times threaded.
+- **Movement gains 2.1 times and separation 1.4 times,** and neither uses threads, because each unit's step reads where the units before it ended up. Spatial-index lookups take about 36% of Rust's time (one `BTreeMap` lookup per candidate unit). Storing units by slot is the obvious next step, and the plan's group pathfinding and parallel tick (`DESIGN.md`, "Thousands of units") are the larger ones.
+- **The parity result:** the vision and fog passes give the JavaScript's answers exactly on all four states; movement and separation match call by call over 200 ticks of each frozen state (646,400 calls, 1,360,000 unit states); the math matches x64 Node bit for bit. Whole ticks are not compared, because the port leaves out code that also moves units (`PARITY.md`, "How parity is judged").
