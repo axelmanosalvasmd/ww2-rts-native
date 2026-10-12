@@ -28,9 +28,10 @@ The client links the rules core through a small C interface for placement checks
 
 ```
 reference/ww2-rts/   the JavaScript game, pinned as a git submodule (read-only here)
-rust/                Cargo workspace (created by #2)
+rust/                Cargo workspace, pinned to Rust 1.99.0
   crates/core/       rules core: no engine, networking or file-system code
   crates/server/     ww2-server (later)
+harness/             Node scripts that record fixtures from the reference game (run them with x64 Node)
 unreal/              Unreal 5.8 project (created by #3), binary assets in Git LFS
 DESIGN.md            decisions and measurements
 PARITY.md            what the JavaScript prototype does, and how the native game is measured against it

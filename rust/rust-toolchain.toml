@@ -1,0 +1,4 @@
+# One compiler for every build and benchmark, so measurements compare like with like.
+[toolchain]
+channel = "1.99.0"
+components = ["rustfmt", "clippy"]

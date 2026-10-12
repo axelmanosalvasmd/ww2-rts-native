@@ -1,0 +1,1835 @@
+# Written by harness/math-fixture.mjs; regenerate with `node harness/math-fixture.mjs`. Do not edit.
+# Numbers are the hex of their IEEE 754 bits. NaN is always 7ff8000000000000: JavaScript has one NaN.
+# pow is V8's own pow (Node with --no-use-std-math-pow); Node's default pow is the OS library's.
+# range <label> <function> <seed> <count> <FNV-1a 64 of the outputs> <kind:lo:hi per argument>
+# sample <label> <inputs> <output>: the first 16 of each range
+# edge <function> <inputs> <output>
+node v24.21.0
+v8 13.6.233.17-node.53
+arch x64
+range sin.game sin 1 200000 f2c9634332e08df4 real:-20:20
+sample sin.game 401454f2d7e0700c bfedd3f09a8e0648
+sample sin.game 3ff190ec4df3df60 3fec7ce1f6a09c13
+sample sin.game 4032bc308ec33e80 bfbd3b9454afccec
+sample sin.game 40120de1367351a4 bfef5e98c2c88809
+sample sin.game c007beb6b2c1a818 bfc617d2d709f949
+sample sin.game bffca060e5c72cf0 bfef3d79be28fde7
+sample sin.game c02ce2a3e4cfb34e bfee84b5660aa37c
+sample sin.game c02432b5e9f3a3fb 3fe3fa76da611bfe
+sample sin.game bfdbcaa81b538880 bfdaed27edba8a0a
+sample sin.game c010dc648ee54342 3fec204662287cd7
+sample sin.game c021218d8c80bae8 bfe83c356cd842a5
+sample sin.game c0324a72a0f6e79c 3fe0f6c2355c2c94
+sample sin.game 400cec22453f9430 bfdd32305bb48b8f
+sample sin.game c0206910a6af8ffa bfee0be609e62ea6
+sample sin.game 40194cfd80d75f88 3fa57f77facbe368
+sample sin.game 4024ace8cccf6cd4 bfe95258c0520e3b
+range sin.wide sin 2 200000 1aad8b402001875d real:-1000000:1000000
+sample sin.wide 411c98578e2a1e34 3fe42bd4dae3e52f
+sample sin.wide c11a357f8e948ee8 bfe4adcff807121c
+sample sin.wide 4126e7dfc9e40bc4 bfe82b647d7f506a
+sample sin.wide c098f368f7121a00 bfe98696554e7ec5
+sample sin.wide 41212fd39f7d02c0 bfc9fcff9d91051d
+sample sin.wide 412172abf5516024 3fef0c5c341e8186
+sample sin.wide c1027fe5521ca8a8 3fef66c4e3dcc866
+sample sin.wide 4103da868d2918e8 3fe131ae3dc93d6f
+sample sin.wide 41150619d5265b54 bfe7489c1fe6a6eb
+sample sin.wide 412cc8f5cae09486 3fef8a5a70841a8d
+sample sin.wide 41295777254c4d9c bfd79cc8a57d8ca9
+sample sin.wide c126b41e1a8f000a bfb45e30462daf1d
+sample sin.wide c12e1579be7a6ae6 bfec3790239b5fcd
+sample sin.wide c0f766b3ed981478 bfee6772596f45b8
+sample sin.wide 412dcf6999a6347e bfe8cd99d4b157b0
+sample sin.wide c0ef493ddc2baba0 3fed388f1898d74a
+range sin.huge sin 3 200000 86a269b9bc6f5436 real:-1e+300:1e+300
+sample sin.huge 7e250bd619a9b004 bfea0a4bc1316f4c
+sample sin.huge fe00bf05c49701e8 3feeab3ee259ffb8
+sample sin.huge 7e292269a0d47ec4 bfcc78609d64284f
+sample sin.huge fde44a9054595cc0 3fe1cda2bf8df289
+sample sin.huge fe269fec2ced7e57 bfb8a4fd41da77d5
+sample sin.huge fe2d27db7c2ec33e 3fdd1a5bc81275c0
+sample sin.huge 7e246e4c04291004 3febb26222169d0f
+sample sin.huge 7e2c12238df026fc 3fd2a3db3834547f
+sample sin.huge fe20db0995b21f0e bfe22ac521fcd12f
+sample sin.huge fe246138ad2ef179 3fee48c77c752be2
+sample sin.huge 7df43496fad75140 bfa42caab345013a
+sample sin.huge 7dfe8a6ea3d37370 bfe78148349ec011
+sample sin.huge 7e3207fa20c693ea 3fd2dc7f2a556c3f
+sample sin.huge 7e34df693309d494 bfed897e64f69563
+sample sin.huge fe0e5bff2c3cbcf0 3fea82e53c869a48
+sample sin.huge fe30845ffae43e64 3fd6fdd4c1a88bc0
+range cos.game cos 4 200000 9c6ac142beb8a4f6 real:-20:20
+sample cos.game 4030f208df6d5264 bfd4f06c4faa2587
+sample cos.game c026443dcba973e6 3fc19238c5e72f49
+sample cos.game c02547bc890751fc bfd6460c51e5488f
+sample cos.game c030e782db190ba7 bfd76827165826c7
+sample cos.game 401386a7b64e87cc 3fc58b06f9f6d88b
+sample cos.game 402573a1d65d882a bfd10dde07f4674d
+sample cos.game 4022997eea3611ec bfefc01a25335362
+sample cos.game 3ff26979b1dbbde0 3fda196d91494bc6
+sample cos.game c0090a90fa630e50 bfefff76ee4c9aa8
+sample cos.game 4022df820f3a7536 bfefff6ef4f06da7
+sample cos.game 40332e7e2cb2da90 3fee4080a0e90f62
+sample cos.game c01853d04441e7d0 3fef5a860ed53154
+sample cos.game c022747cb2f3d2c5 bfef6120c834f7f4
+sample cos.game 3ff1a57b4e5b6fb0 3fdcdd54dfb1b947
+sample cos.game bffc405e26f90aa0 bfc8cab87cc7b428
+sample cos.game bfe29f3c1e4cc620 3feabb96e16360b2
+range cos.wide cos 5 200000 c933a5a7a63c2b24 real:-1000000:1000000
+sample cos.wide 41172a7749ee6c38 3fbf85ca8470140f
+sample cos.wide c1211ab3f55488d4 3fd2244ffdf6277d
+sample cos.wide c129523b31c9ec6c 3fecf8f725851d55
+sample cos.wide 411ade31f76271c0 bfc758c68ca21b77
+sample cos.wide 4128c1d60047b6d4 bfe00b3f6f326766
+sample cos.wide 412114dda879c814 bfd08c5c01bdd5df
+sample cos.wide 411399806da845ec 3fe331410a8a9ff0
+sample cos.wide c0f0e4d2f0d8f320 3fec9dcf4189a376
+sample cos.wide 4128341721cedad0 bfcae717ecfb7627
+sample cos.wide 411f2a095c8c18d8 bfe83e4221abfef1
+sample cos.wide c11e14af36c22fad bfef860eb0553023
+sample cos.wide 4121ea10fbcadb7c bfec637829a2ac4f
+sample cos.wide c11bc1a57e3f0e10 bfefbc3b175697b8
+sample cos.wide c0ed3897a8209920 bfeb6ee9fe91e2b7
+sample cos.wide c11f11fbf0f92079 bfe7b4be9e68bb5e
+sample cos.wide 412546c4607d1480 bfe62cec0b2c2760
+range cos.huge cos 6 200000 5de784f4a9442c22 real:-1e+300:1e+300
+sample cos.huge 7df3af1d966eb4e0 3fe706b19c9b53e7
+sample cos.huge 7e1f2ff5c08704bc bfdf02491a2f2d04
+sample cos.huge 7e0019d0657c5e40 3fc12511243292f1
+sample cos.huge fe37acba3874e6ff 3fc4f5673bf0ea6c
+sample cos.huge 7e367c0f22958da8 3fedda955c4b7a03
+sample cos.huge 7e34bcd95eb9a230 bfe6932958618b95
+sample cos.huge fe36d2d17cb57385 3fefbdfad49de03a
+sample cos.huge fe01f7d0443221e0 3fee96e321fa5771
+sample cos.huge 7e19173427c6c690 bfc852311b4cc024
+sample cos.huge fe11d773cb52ebcc bfe7fa92c3445f5f
+sample cos.huge 7e374ff9ff37a97c bfd8e7e826e3f8e9
+sample cos.huge fe26104707186159 bfcba734a677cbdc
+sample cos.huge 7e30e2ce8b16b2f0 3fdf57a554c39bd2
+sample cos.huge 7e22f80191eb01a8 3fb528ae109fdd39
+sample cos.huge 7e360fea412f5f54 3feffb7266580345
+sample cos.huge fe2aec134a045bfc bfe47a2f80a83b46
+range tan.game tan 7 200000 a98937b1ccadf35c real:-1.5:1.5
+sample tan.game bff7702c07bd06a8 c022d02d751d3554
+sample tan.game 3ff6e43db1c18daa 401c5e93bcf224da
+sample tan.game 3fb0784fb63770e0 3fb07e23650c68f6
+sample tan.game bfb9eeef4047bcd0 bfba05bcef0bd6ee
+sample tan.game 3fc47a1ec4984070 3fc4a74d7553f65f
+sample tan.game bfe73fecbdd1076a bfec7078ed79a65b
+sample tan.game 3fe95a45e6f1c444 3ff038ae82a0ec7f
+sample tan.game bfed132799fcad0d bff485a5340a8ac4
+sample tan.game bfe3d927468caa3e bfe6db88a27a2afc
+sample tan.game bfe38d6347c21e00 bfe669dbc9dcc8b1
+sample tan.game bfe83c9d482bbbb0 bfee41a563a71db8
+sample tan.game bfedaf1a5af2357a bff55915f128f52c
+sample tan.game bff093bbf1b208ca bffb0392cefd6051
+sample tan.game 3fc264e700248f40 3fc285963577aeac
+sample tan.game bff46c525b542dc9 c00a63935ab0b7b7
+sample tan.game 3fc49ffb3beeb438 3fc4ce28220bb568
+range tan.wide tan 8 200000 acd48ea0d931d6a7 real:-1000000:1000000
+sample tan.wide c124fa6351ee6c5f bff4b69fea1b280e
+sample tan.wide c118553b579d956e 3fdc1a938fa5bfde
+sample tan.wide 4104c1119e738b70 40290e295c66885b
+sample tan.wide 4123749e363a6a7a c001dc65b23ca62d
+sample tan.wide 40c9d9aa7f31aa40 bfc9a8d8cb80cabf
+sample tan.wide 40dbb3f500592740 bfee059c45c0a5a2
+sample tan.wide 4100f4ea7b4ccc80 3fe84c47da845e5c
+sample tan.wide c124b7f1862b064e bfd43fa9d036f022
+sample tan.wide 41179cb29eec11a0 c0119a4043deddeb
+sample tan.wide c126b78331ce62a1 bff5465089fd2001
+sample tan.wide 40fb564d12459ff0 3fc62ee5671898a9
+sample tan.wide 411ed97509351148 bff9db5a61ec3978
+sample tan.wide c12c18a250f9540c bff2c2b12f5852aa
+sample tan.wide c111424c07174e12 3fe62fb82f7baa2a
+sample tan.wide c115d93020dbb720 c0406c39a0cd4a87
+sample tan.wide c126e92369d87a4c bfecee710324fa69
+range tan.huge tan 9 200000 bd6f02584be1daf7 real:-1e+300:1e+300
+sample tan.huge fe2cca94a7ca0fef 3fe7d4547c3b6059
+sample tan.huge fe311e161d9cd4ce 4014bb71e82ca43f
+sample tan.huge 7e25635ccef6cc54 c0088c3cf47de524
+sample tan.huge fe26ad14a6072f6d bfef63bb5a0b48f0
+sample tan.huge fe31a3798d256321 c00c115735402371
+sample tan.huge 7e22ec71f62b24a8 bfe4e8d6f6f84d48
+sample tan.huge fe24b260ef749637 3fff213bb01a0c7b
+sample tan.huge fe245a7bc12266ff bfd1b64bef268d2e
+sample tan.huge 7e1b22c6ddcc1b20 401a72e5419d1919
+sample tan.huge 7dfb2d1817ef56c0 bff61ab37f9e1b83
+sample tan.huge 7e3177b05621c4ac bfe7492de28cb2ec
+sample tan.huge 7e31db1ffdb04218 bfd5bafe4cfc6ab6
+sample tan.huge 7e20f131f904670c 3fd72eb87f01c495
+sample tan.huge fe3597eab638b2c6 3fe6e0c18cd55754
+sample tan.huge fe2c3c805c88438d bfd731c2dc56b944
+sample tan.huge fdd2122346cd76c0 3fdb892aae2a10b0
+range atan.game atan 10 200000 aebf7059705f3c30 real:-4:4
+sample atan.game 3f90518d3d5c0d00 3f905132b893f635
+sample atan.game 3ff87d1e49e6ab4c 3fefbef82f0fd32c
+sample atan.game bfd5cd5af71a7260 bfd50357ab42b852
+sample atan.game c0030dbb007aa6ee bff2c5c25c412882
+sample atan.game c00dd0ddb10035c3 bff4f04284bab690
+sample atan.game 400b0399940846e6 3ff486affbd06abb
+sample atan.game bfeb7334259ca80c bfe6b03ad8090777
+sample atan.game bfdc82cb3a260e70 bfdad264284b249a
+sample atan.game bffabc04ec988e16 bff081021bd9427b
+sample atan.game 400be81a898a1ade 3ff4aa72bda0f7d9
+sample atan.game bfec7de6c04dfb90 bfe7476bec0d1d54
+sample atan.game 3fc5129db5ed5de0 3fc4e2a809d91cd3
+sample atan.game bffa4b1346542e7a bff062db62d0d4c2
+sample atan.game bfedb2cf807b9714 bfe7f08a1a88708a
+sample atan.game c00d10972c5f2fc5 bff4d5d0376af274
+sample atan.game c00d896126bb3e68 bff4e692d482c4f9
+range atan.wide atan 11 200000 135b21e639d96c52 real:-1000000:1000000
+sample atan.wide 40d6a1863e236d20 3ff921ce14d6fd4d
+sample atan.wide 410a6569073638d8 3ff921f67adf5558
+sample atan.wide 412568e2c8f26c9a 3ff921f9d5a2ddcf
+sample atan.wide c129a2175a9bdcda bff921fa14ae2ddc
+sample atan.wide 410a4d8957abb150 3ff921f676789573
+sample atan.wide c0e37d61e99a6fd0 bff921e10f1956e8
+sample atan.wide c1038983fbe47408 bff921f4c70d97ca
+sample atan.wide 411628c4b2835374 3ff921f870e422ad
+sample atan.wide c1239f35b4eb27d6 bff921f9b2c61e04
+sample atan.wide c10969269f2d07c8 bff921f64abbad6f
+sample atan.wide 410424d1502c0398 3ff921f4f99057b6
+sample atan.wide 4107b39f58ac9da8 3ff921f5edbf1d56
+sample atan.wide c103eaedf96f9a58 bff921f4e7188e22
+sample atan.wide 4122a3a340549b92 3ff921f99cc34071
+sample atan.wide c11643a91adf5fe4 bff921f8746132fc
+sample atan.wide c11e50067d4d18b3 bff921f937c3d61f
+range atan2.game atan2 12 200000 7ed980030ace3f72 real:-1000:1000 real:-1000:1000
+sample atan2.game c07a7b2bb7508aa2 40640a4eeac15710 bff3584e45b97308
+sample atan2.game c085b3a791ed24fe 4078801f12e5042c bff0e913872f3e67
+sample atan2.game 405b6794d9f83c10 c08d58f656a57edb 40083401b0d36102
+sample atan2.game c075b1e4040596f2 407f3710aab38ecc bfe36f94fc397400
+sample atan2.game 404f5e29d05e0d60 408f17a6669e0f7a 3fb01ed291aa7a44
+sample atan2.game c07863a7344c8862 c06c10c3e9e6cb98 c000be451b948da8
+sample atan2.game c0808b0f6882411a c0690523b4a671b0 bffeeaa26dcf9771
+sample atan2.game c07c7af1dc4cd936 c075fe18b837be2c c001d3acf04e87e8
+sample atan2.game 406ab6e1ed7cadc0 c07b5b5006779bf6 40057fc16ad16881
+sample atan2.game c073474b5d7e5388 c0691940dc89b37c c0012ec606590b65
+sample atan2.game c08491de65627fc4 4062807b5f99adf0 bff597fefd47a548
+sample atan2.game c085e722ea80a87e 4079d64f8889baf4 bff09b3eeee66161
+sample atan2.game c08601a3d98cdf34 c065f5af7c6a920c bffd0b5e76dff08f
+sample atan2.game c08adbcec52b33c8 c06c0a82fd2ff670 bffd37bb86270f06
+sample atan2.game c064f6a8f1b93648 40800e3165f52330 bfd4317759168fc0
+sample atan2.game c08d625c92d249c9 40439ea51c5c6740 bff87726a117840c
+range exp.game exp 13 200000 ee6c0291de09de51 real:-50:50
+sample exp.game 401a877076300bf8 4087b999212a796c
+sample exp.game c045786feb059777 3c108e8c21ee6a76
+sample exp.game c04729553827a94c 3bc200c2823e656c
+sample exp.game c044708b6ca84a93 3c4043d915e7e971
+sample exp.game 40174f6a4ccc3d48 4075386f3de54e90
+sample exp.game 402f1d05ff97de78 4155c25b9e8cc6e8
+sample exp.game c034df86abc35c45 3e0d93c12b3fd9b4
+sample exp.game 40184977f8021a98 407b16fe6566a8d0
+sample exp.game 401eecbaab763310 40a1cc94f1c3ab23
+sample exp.game c042ddce53efad1b 3c87a323d9fb41c8
+sample exp.game c01a39afa3c9aca0 3f574877391f534e
+sample exp.game c03016334245abe0 3e7bb2faea17cdb8
+sample exp.game 4038958c41ac57f0 42261f6fe36d62a6
+sample exp.game c04485e213ec4287 3c3b88f55f74e53c
+sample exp.game c046fc382572ee4f 3bc99c2ec9169194
+sample exp.game c0350c9bfd34891c 3e08cd2211763758
+range exp.wide exp 14 200000 c265ba589638c7c2 real:-800:800
+sample exp.wide c054d1160ad5ad18 386d441a12c7d164
+sample exp.wide 40311eb8ab3628c0 4179f91da20c677b
+sample exp.wide c07e91f8cd317250 13d4501986ab2ebc
+sample exp.wide 4071387881e51218 58c6b47165ebd59a
+sample exp.wide 4085c270a565ca88 7eb784f276b47807
+sample exp.wide c06bc21c732b7d2c 2be8b3905d68aa91
+sample exp.wide 4079efc4c30111b8 6559f2ce4dddeae0
+sample exp.wide c080dda6807528ad 0f44a79a1f6c8583
+sample exp.wide c05dd2c893fb3fe8 352dc58ed9a20337
+sample exp.wide c08599d0b2c5c849 019b4a98d788aed5
+sample exp.wide c07876d401f2c054 1ca391dc7f50dbbf
+sample exp.wide c0658d3da5019780 3063272df53e733e
+sample exp.wide 406e08aff2168720 5598e825e4271716
+sample exp.wide c07805325a99ed28 1d473526514dc9d3
+sample exp.wide c08679911c5193ec 000000156709b1c4
+sample exp.wide c07a9c4292f08fe4 198ae481c7d8d0d0
+range log.game log 15 200000 0c70a79d3b21d192 real:0:1000000
+sample log.game 410d088034cc0ce6 4028c23aa16fba08
+sample log.game 411895ac8801bd61 4029cff743cfb4b2
+sample log.game 410b30f33d728225 4028a0ab55213790
+sample log.game 412caba1e39ba4f7 402b8192f461643b
+sample log.game 40f001b61d8198bc 40262e79bfbcd97f
+sample log.game 41162366094bfd28 40299a4cfb3445b4
+sample log.game 40d4fc32e4f85a6f 4023f358ced65ffe
+sample log.game 410c6448996a11ba 4028b6ca3116d71c
+sample log.game 40f80a116b7e12b0 4026feb2ba54d280
+sample log.game 412d3e7c009c4030 402b8bb790552c62
+sample log.game 4115af1a086b9829 40298faf5c6ab965
+sample log.game 411d513a276df79d 402a2a1b1c93f80a
+sample log.game 4118ad99ad72648c 4029d1e89c31b1e2
+sample log.game 4126ff13ae59cf6c 402b10a9c16b277e
+sample log.game 412236a751918ce5 402a99470f51886b
+sample log.game 41234f5743a560c5 402ab73517993122
+range log.unit log 16 200000 7d0e63a2f1b6bb2c real:0:2
+sample log.unit 3ff43463b8c49e49 3fcddd8ea0254144
+sample log.unit 3ff81326b96c6cbc 3fda262185ba047b
+sample log.unit 3fe5bd64edc1428a bfd8bde4fe83ae69
+sample log.unit 3ffe039f1ef06d7a 3fe4216c9a67900a
+sample log.unit 3fd803c3d8777ddb bfef5def4bb84db4
+sample log.unit 3fed19bf5bc06139 bfb850793ee8c98f
+sample log.unit 3fe17c600e5abc91 bfe356ca2d3ff926
+sample log.unit 3ff289308edb143e 3fc2d4d85b1bf79c
+sample log.unit 3fe5d0c61d5a9ba5 bfd884f118d9c1f8
+sample log.unit 3ffb269cd5a52c11 3fe0ec15a62ee915
+sample log.unit 3ff66e03622a3111 3fd59e7fadcb35ac
+sample log.unit 3ff4de8b9df846fa 3fd10116249507a8
+sample log.unit 3feec5e48120186d bfa4049b0374143e
+sample log.unit 3ff9f4cc9f7985e4 3fdef6f744fc4f1c
+sample log.unit 3fd52de2810307f4 bff1b19c16ab8dac
+sample log.unit 3ffbcbdc0824994c 3fe1ac90cb9896be
+range pow.game pow 17 200000 63d605319488ad84 real:0:100 real:-10:10
+sample pow.game 4050edc30b8cd101 3fe415f07269e700 402c30e77ed8e203
+sample pow.game 40218e99e2b82a20 c0116e275ab448b0 3f144d044242843f
+sample pow.game 4039ad0be938567f 4017ba2a1138657c 41ab5fcf6fce3b5e
+sample pow.game 403798c93677dade 4004e5bf3b363858 40ae201698137c07
+sample pow.game 403d5b5a0ad05d30 400e95709ecb30b4 4118ec17857f11f2
+sample pow.game 404bcf69419c6e5e 3ff4e3b9d941e0c8 4067bd77c624b312
+sample pow.game 401988181379930f 401e1fbaea09a850 41319fb88a067faa
+sample pow.game 404538bc7a45bf7f 4000d08678276268 40a49d064848264d
+sample pow.game 4036fbdbb7144dae c01f977d99536fee 3db3717813979a64
+sample pow.game 404003b920db774f 40117526bacfc1a8 414c660b76810d82
+sample pow.game 40438aabc4165948 c020827993b97376 3d345090ee416bfc
+sample pow.game 4038c9620aad2de9 4020e32c77ee471c 42613b166e9d44d3
+sample pow.game 4032aa4096aaa288 40184e7c28bcda50 41893b911c977398
+sample pow.game 40518b8bfc51226d bfde51e5fa645980 3fc115486751d5be
+sample pow.game 404d5d6c5c4fd7fd c020ae4b4900f6f4 3cdfcff665f459c4
+sample pow.game 4057c098e5ffc00c c020fd051444c4c3 3c724b26fdceb206
+range pow.wide pow 18 200000 827ab579cfa1065e real:0:1000 real:-200:200
+sample pow.wide 4078e2978120b661 40250553ff5f25b0 459b7c523e9dc3b0
+sample pow.wide 40891e3f1093a1ac 40556eab1da4ee9c 73a44be65246e86a
+sample pow.wide 4061a8b5657e7224 c045beca71f25aa4 2c84c3753b996518
+sample pow.wide 4069373d7311d820 40498748f401a2a0 585df4a1998cead5
+sample pow.wide 408d69b6cf77e9ba 4062ccbb26de5d5e 7ff0000000000000
+sample pow.wide 405bbbce3354a696 c05944eb869eced8 150414e20ccf299b
+sample pow.wide 4068d172f6f7ac3b c05e49518ea38844 06231c67b0ec8cb9
+sample pow.wide 40893d949f38f051 c05360a0c440684b 1125a41f946b8400
+sample pow.wide 408db3264dd2cec5 40604cbcaf47f4ea 7ff0000000000000
+sample pow.wide 4082e2d86fa0a0ad c04b70c3a16bbe98 203eb681a81f8739
+sample pow.wide 408035d14c593b7d c002bb3d5c14aac0 3e9d824321be49b6
+sample pow.wide 408101a3e2e406fe c0540111a9ca4385 127c01a464549018
+sample pow.wide 408d62256a40cc46 4066205ab619e9c0 7ff0000000000000
+sample pow.wide 40791e032ebc84a9 c05db74fb1775280 000035e771c07548
+sample pow.wide 4085b18ff0432075 c064cfbf42d2c2fe 0000000000000000
+sample pow.wide 4076ece49a505ef0 4064bf077584b4f6 7ff0000000000000
+range pow.int pow 19 200000 f6af1e7199b1f153 real:-10:10 int:-30:30
+sample pow.int c021a881d77aecaa c008000000000000 bf57ce14fda20a22
+sample pow.int 40237696a80ce6a4 4022000000000000 41c7547e190fd178
+sample pow.int 3fe301d7d68e3e00 c038000000000000 4110694e1617e444
+sample pow.int 3ff8900175bf5370 4010000000000000 4016376006b3a86e
+sample pow.int c0202ff87ffbde7e 4028000000000000 42326636ec157088
+sample pow.int bfe51e3616031b00 c03a000000000000 40e8138a210d7e0e
+sample pow.int 40014ca22b4deffc c035000000000000 3e78d659415ac214
+sample pow.int c0125cc0be330d09 403a000000000000 4381f224161a36d6
+sample pow.int c01ba7bc925ae7aa 4039000000000000 c44aaad3831e854a
+sample pow.int c023f105286b9b02 403a000000000000 455329a2c766ede7
+sample pow.int bfc1578ee6152300 c033000000000000 c35bb50f5767018e
+sample pow.int 401bdf5886853314 c020000000000000 3e88260116152d22
+sample pow.int 3fdbc66c9ca65ee0 0000000000000000 3ff0000000000000
+sample pow.int c01fc46e7a78abd4 4018000000000000 410ea10624d82ce7
+sample pow.int 401f1396b5900f78 c026000000000000 3de614ac01fed36a
+sample pow.int c01c67f872a35e26 4032000000000000 431dfd21494395ce
+range hypot.game hypot 20 200000 96070e71f1189aea real:-1000:1000 real:-1000:1000
+sample hypot.game 407f938a8bc1201c 406866d70d75c770 4080ecfec7dcbb0c
+sample hypot.game c06224bbd6520d18 407c744d713f3134 407ddd8d11e40835
+sample hypot.game c06501d1c961db80 c07f994104105c03 4080a639bb53c2c2
+sample hypot.game c07bb47da3cd309c c081c28de8cfe4da 40868605b2b0146d
+sample hypot.game 408d558ab3215fbc c08618f9697f2f18 40925ceb630a591c
+sample hypot.game c088e47fd6d21f22 c06eea037bfaa400 408a10929048c50b
+sample hypot.game 408ab9ac8bbaae4c 408c83c1bde3fe28 40938a5f8d731bd3
+sample hypot.game c08347e1b1647942 c08087f30a5e140a 408965b787a97338
+sample hypot.game 4041389c34564a20 c084ce3432daafac 4084d5538764def2
+sample hypot.game 4084ad2eee9b1d3c 40833e1d4e53c68a 408c3ecb78a8ab2a
+sample hypot.game 4087457afa36e346 406f393781d385b0 40888bb14b96bed4
+sample hypot.game c0828fad372639b5 c06cd03a2d35c84c 4083e8f521efddad
+sample hypot.game 40542f9ba7d92410 c08e01cecca97038 408e1ceb20abcc46
+sample hypot.game c0634d531aaea8ec 4088e03084b1d766 408956e695462f15
+sample hypot.game c05181985165bd10 4083fc844db86fd0 40841b17d6e5cbd8
+sample hypot.game 4079135e28844398 c08b40f55579f01a 408dffd84e48b075
+range hypot3.game hypot3 21 200000 f1cd5e4aa3b04730 real:-1000:1000 real:-1000:1000 real:-1000:1000
+sample hypot3.game c060ed5c9fc23e24 c07b16e936f633a4 c0474a7e783c02d0 407c87a0d7ea9040
+sample hypot3.game 40872157c4d71ccc c05c93f43bb7d690 c08372422390bcac 408e6dd7dc11c435
+sample hypot3.game 406c5036dfeb0508 c08930d41894bf13 c0825979a9e6dab8 408ff5840c1a236f
+sample hypot3.game 40843517f595b826 c036a540eab20640 4058d62920ecd940 408474eca5eebe64
+sample hypot3.game c08922d0e3b0b32c 4083087f3501a57e 40729af265a3a304 40906fb750ee370b
+sample hypot3.game c083c7c859893618 c06d9122d31c20b4 4070f2dd266f2968 4086c0ddc986631c
+sample hypot3.game c06bd7b336442e20 40647b1a39ac5640 c07732e43e4ee7b4 407cedac427944f1
+sample hypot3.game 408a5746b2dfacf8 40718e49cdcbf86c c04c93f972fc5d40 408bd288fcef7336
+sample hypot3.game c088e78589dbbcfb c06afc02edb5a4dc c07b84c4ba2f306c 408d3dc97301d068
+sample hypot3.game 4073d9b416f73bac c08d0d208b39f574 c087a9bc948fd622 4093616cdadd2bed
+sample hypot3.game 40697eb09e25f770 c07c5f78dc37a8b0 c081da3f9b3f2ce2 4087ad45f0bc617d
+sample hypot3.game 408d7182902a7768 c07fd7396cb6c495 c089d947fbb5147e 4095253fe13b86ef
+sample hypot3.game 408415fd4a251e80 c0664a6fd97ef008 c0813a8f2bfea330 408b0b06e5abdb04
+sample hypot3.game 4081e3efcc3d1a40 c06e3fefb80d8a20 405cec4496563680 4083c1b6af0f766a
+sample hypot3.game c08bf0c56b952f89 408994ec8bc77c58 c0652d1e2f12b748 4093201a8869acec
+sample hypot3.game c07471b1437b6160 4078a5329f6a616c 4063510d7c97ef70 4080b916d64c0b6b
+range round.game round 22 200000 4c066f746d90e648 real:-1000:1000
+sample round.game 406e7792c2372ed8 406e800000000000
+sample round.game c0812d1f00772aeb c081300000000000
+sample round.game c070edb0b2b4dbd4 c070f00000000000
+sample round.game c05b506a505f6018 c05b400000000000
+sample round.game 407e97e875ca10b4 407e900000000000
+sample round.game c0888b23784719cf c088880000000000
+sample round.game c083d1e61aca6313 c083d00000000000
+sample round.game c0859d0f7fdefede c085a00000000000
+sample round.game c0813a26ea465d92 c081380000000000
+sample round.game 40819704b7979ae2 4081980000000000
+sample round.game 4081284592a1e102 4081280000000000
+sample round.game 40747459a507cc48 4074700000000000
+sample round.game c08ef658c38f06d5 c08ef80000000000
+sample round.game 40702a679edb00f0 4070300000000000
+sample round.game c08487eff8f90d44 c084880000000000
+sample round.game 4083c5964d1f60d2 4083c80000000000
+range round.halves round 23 200000 83f09a981b10c519 half:-1000000:1000000
+sample round.halves c128dbb500000000 c128dbb400000000
+sample round.halves 4110208200000000 4110208400000000
+sample round.halves c1157ce200000000 c1157ce000000000
+sample round.halves 40d78f2000000000 40d78f4000000000
+sample round.halves 4123e66300000000 4123e66400000000
+sample round.halves 4119796a00000000 4119796c00000000
+sample round.halves c12940e500000000 c12940e400000000
+sample round.halves 4124b7f300000000 4124b7f400000000
+sample round.halves 411d752a00000000 411d752c00000000
+sample round.halves c0f7413800000000 c0f7413000000000
+sample round.halves 412da34700000000 412da34800000000
+sample round.halves 41251d4d00000000 41251d4e00000000
+sample round.halves c122dfa500000000 c122dfa400000000
+sample round.halves c124ec5700000000 c124ec5600000000
+sample round.halves c10f694c00000000 c10f694800000000
+sample round.halves 412b392900000000 412b392a00000000
+range max.game max 24 200000 24db92a253a7ac3c real:-1000:1000 real:-1000:1000
+sample max.game c074ff5ae02d84da c079c2dc72ce08bc c074ff5ae02d84da
+sample max.game 404927ce1ec4efe0 c07ca872b24591a4 404927ce1ec4efe0
+sample max.game 408797a42b57f270 4071fc7f7a1735ec 408797a42b57f270
+sample max.game c0899bf6dfd31d82 40756a4bebc5ef04 40756a4bebc5ef04
+sample max.game 408b5970bfe1af20 4033a91ab5f070a0 408b5970bfe1af20
+sample max.game 4081919d160d0cb8 408d15e565c294fc 408d15e565c294fc
+sample max.game 4073cd9d3b6b3360 c083746c7d844266 4073cd9d3b6b3360
+sample max.game 408a95ba8eb990b6 c0833a1141528c51 408a95ba8eb990b6
+sample max.game 407b44a2b292b1e8 c06892e5678125f0 407b44a2b292b1e8
+sample max.game c08b1ff06937c360 40857bb4edd76570 40857bb4edd76570
+sample max.game c030fe4748a7ede0 4088375562e4a2cc 4088375562e4a2cc
+sample max.game 4074c334f89c4798 c075c82b321f296e 4074c334f89c4798
+sample max.game c086785124fd6d3c 40564a01a0c0ea10 40564a01a0c0ea10
+sample max.game 408caba1d3c89118 407ca66d7f31222c 408caba1d3c89118
+sample max.game 408ecc303d0616b6 4088ee0b1385fd82 408ecc303d0616b6
+sample max.game c0676bed04fab3b4 408a78ea639d91dc 408a78ea639d91dc
+range min.game min 25 200000 18af6ddbe126ae7b real:-1000:1000 real:-1000:1000
+sample min.game 40687bffb5135290 4062b986dc03ec50 4062b986dc03ec50
+sample min.game c07c4f836c91d02c c062175976b2f9d0 c07c4f836c91d02c
+sample min.game c0748081a416a0d4 c07f7a70b8cd0cf5 c07f7a70b8cd0cf5
+sample min.game 40492346d98c8400 407ec8abf2de72a4 40492346d98c8400
+sample min.game c08047e088943344 c0559164a798cf98 c08047e088943344
+sample min.game 408820ba24438d1a 40831dc94169c73e 40831dc94169c73e
+sample min.game c08bf43ef9fff682 c07a4bdadafd2118 c08bf43ef9fff682
+sample min.game c088336b4bfccada 40746bb4612a5df0 c088336b4bfccada
+sample min.game 408d0268052e1360 4084a14c06f57c80 4084a14c06f57c80
+sample min.game c07f5f712463b516 408998094085341c c07f5f712463b516
+sample min.game c054bdf0ebabdba8 4080ad0c9c539afc c054bdf0ebabdba8
+sample min.game c07615b61fdeb546 406dd2b6846d12b0 c07615b61fdeb546
+sample min.game 4081c5413cc34858 c074fa22714cf450 c074fa22714cf450
+sample min.game c080668c399be76b 407a17bf8eed1ef0 c080668c399be76b
+sample min.game c089d39cd016b470 4065b3149c896858 c089d39cd016b470
+sample min.game 4080d1f867110cd6 c07be9a021bcb5f4 c07be9a021bcb5f4
+range sign.game sign 26 200000 c03651cbfcad4da5 real:-1:1
+sample sign.game 3f97821985f2b740 3ff0000000000000
+sample sign.game 3f94c417780363c0 3ff0000000000000
+sample sign.game 3fe4a008cee2841a 3ff0000000000000
+sample sign.game 3fef5ea4596fc71c 3ff0000000000000
+sample sign.game 3fe50ac41736c006 3ff0000000000000
+sample sign.game bfdfa6dca5f7ab50 bff0000000000000
+sample sign.game 3fe6a6c7f6b579da 3ff0000000000000
+sample sign.game 3fe70569dec23038 3ff0000000000000
+sample sign.game 3fd4fabd0fd14b40 3ff0000000000000
+sample sign.game 3fd82fb06f89da50 3ff0000000000000
+sample sign.game 3fc72bda2d451570 3ff0000000000000
+sample sign.game 3fd2994b2dfe3ce0 3ff0000000000000
+sample sign.game 3fbe973448846960 3ff0000000000000
+sample sign.game 3fd90c23385e3d30 3ff0000000000000
+sample sign.game 3fd048b9756a1efc 3ff0000000000000
+sample sign.game bfe9a6fa6de4718b bff0000000000000
+edge sin 0000000000000000 0000000000000000
+edge sin 8000000000000000 8000000000000000
+edge sin 7ff0000000000000 7ff8000000000000
+edge sin fff0000000000000 7ff8000000000000
+edge sin 7ff8000000000000 7ff8000000000000
+edge sin 0000000000000001 0000000000000001
+edge sin 8000000000000001 8000000000000001
+edge sin 000fffffffffffff 000fffffffffffff
+edge sin 0010000000000000 0010000000000000
+edge sin 7fefffffffffffff 3f7452fc98b34e97
+edge sin ffefffffffffffff bf7452fc98b34e97
+edge sin 3ff0000000000000 3feaed548f090cee
+edge sin bff0000000000000 bfeaed548f090cee
+edge sin 3fe0000000000000 3fdeaee8744b05f0
+edge sin bfe0000000000000 bfdeaee8744b05f0
+edge sin 3e30000000000000 3e30000000000000
+edge sin 3e40000000000000 3e40000000000000
+edge sin 01a56e1fc2f8f359 01a56e1fc2f8f359
+edge sin 81a56e1fc2f8f359 81a56e1fc2f8f359
+edge sin 7e37e43c8800759c bfea2c16b010e385
+edge sin fe37e43c8800759c 3fea2c16b010e385
+edge sin 3ff921fb54442d17 3ff0000000000000
+edge sin bff921fb54442d17 bff0000000000000
+edge sin 3ff921fb54442d18 3ff0000000000000
+edge sin bff921fb54442d18 bff0000000000000
+edge sin 3ff921fb54442d19 3ff0000000000000
+edge sin bff921fb54442d19 bff0000000000000
+edge sin 400921fb54442d17 3cc469898cc51702
+edge sin c00921fb54442d17 bcc469898cc51702
+edge sin 400921fb54442d18 3ca1a62633145c07
+edge sin c00921fb54442d18 bca1a62633145c07
+edge sin 400921fb54442d19 bcb72cece675d1fd
+edge sin c00921fb54442d19 3cb72cece675d1fd
+edge sin 4012d97c7f3321d1 bff0000000000000
+edge sin c012d97c7f3321d1 3ff0000000000000
+edge sin 4012d97c7f3321d2 bff0000000000000
+edge sin c012d97c7f3321d2 3ff0000000000000
+edge sin 4012d97c7f3321d3 bff0000000000000
+edge sin c012d97c7f3321d3 3ff0000000000000
+edge sin 401921fb54442d17 bcd469898cc51702
+edge sin c01921fb54442d17 3cd469898cc51702
+edge sin 401921fb54442d18 bcb1a62633145c07
+edge sin c01921fb54442d18 3cb1a62633145c07
+edge sin 401921fb54442d19 3cc72cece675d1fd
+edge sin c01921fb54442d19 bcc72cece675d1fd
+edge sin 401f6a7a2955385d 3ff0000000000000
+edge sin c01f6a7a2955385d bff0000000000000
+edge sin 401f6a7a2955385e 3ff0000000000000
+edge sin c01f6a7a2955385e bff0000000000000
+edge sin 401f6a7a2955385f 3ff0000000000000
+edge sin c01f6a7a2955385f bff0000000000000
+edge sin 402921fb54442d17 bce469898cc51702
+edge sin c02921fb54442d17 3ce469898cc51702
+edge sin 402921fb54442d18 bcc1a62633145c07
+edge sin c02921fb54442d18 3cc1a62633145c07
+edge sin 402921fb54442d19 3cd72cece675d1fd
+edge sin c02921fb54442d19 bcd72cece675d1fd
+edge sin 404921fb54442d17 bd0469898cc51702
+edge sin c04921fb54442d17 3d0469898cc51702
+edge sin 404921fb54442d18 bce1a62633145c07
+edge sin c04921fb54442d18 3ce1a62633145c07
+edge sin 404921fb54442d19 3cf72cece675d1fd
+edge sin c04921fb54442d19 bcf72cece675d1fd
+edge sin 40988b2f704a9408 bd5b4f1053787878
+edge sin c0988b2f704a9408 3d5b4f1053787878
+edge sin 40988b2f704a9409 bd469e20a6f0f0ef
+edge sin c0988b2f704a9409 3d469e20a6f0f0ef
+edge sin 40988b2f704a940a 3d32c3beb21e1e21
+edge sin c0988b2f704a940a bd32c3beb21e1e21
+edge sin 412921fb54442d17 bde469898cc51702
+edge sin c12921fb54442d17 3de469898cc51702
+edge sin 412921fb54442d18 bdc1a62633145c07
+edge sin c12921fb54442d18 3dc1a62633145c07
+edge sin 412921fb54442d19 3dd72cece675d1fd
+edge sin c12921fb54442d19 bdd72cece675d1fd
+edge sin 413921fb54442d17 bdf469898cc51702
+edge sin c13921fb54442d17 3df469898cc51702
+edge sin 413921fb54442d18 bdd1a62633145c07
+edge sin c13921fb54442d18 3dd1a62633145c07
+edge sin 413921fb54442d19 3de72cece675d1fd
+edge sin c13921fb54442d19 bde72cece675d1fd
+edge sin 4137f7ec53a8d490 bdf7ab35f183a5a5
+edge sin c137f7ec53a8d490 3df7ab35f183a5a5
+edge sin 4137f7ec53a8d491 bddeacd7c60e9693
+edge sin c137f7ec53a8d491 3ddeacd7c60e9693
+edge sin 4137f7ec53a8d492 3de0a9941cf8b4b6
+edge sin c137f7ec53a8d492 bde0a9941cf8b4b6
+edge sin 43165286144ada41 bfd718f6b742cb9a
+edge sin c3165286144ada41 3fd718f6b742cb9a
+edge sin 43165286144ada42 bfbe73716d61a202
+edge sin c3165286144ada42 3fbe73716d61a202
+edge sin 43165286144ada43 3fc0b0d36a346677
+edge sin c3165286144ada43 bfc0b0d36a346677
+edge sin 3fe921faffffffff 3fe6a09e2ae9667d
+edge sin bfe921faffffffff bfe6a09e2ae9667d
+edge sin 3fe921fb00000000 3fe6a09e2ae9667e
+edge sin bfe921fb00000000 bfe6a09e2ae9667e
+edge sin 3fe921fb00000001 3fe6a09e2ae9667e
+edge sin bfe921fb00000001 bfe6a09e2ae9667e
+edge sin 3fe921fbffffffff 3fe6a09edfee58ba
+edge sin bfe921fbffffffff bfe6a09edfee58ba
+edge sin 3fe921fc00000000 3fe6a09edfee58ba
+edge sin bfe921fc00000000 bfe6a09edfee58ba
+edge sin 3fe921fc00000001 3fe6a09edfee58bb
+edge sin bfe921fc00000001 bfe6a09edfee58bb
+edge sin 4002d97bffffffff 3fe6a09fce45a2d9
+edge sin c002d97bffffffff bfe6a09fce45a2d9
+edge sin 4002d97c00000000 3fe6a09fce45a2d6
+edge sin c002d97c00000000 bfe6a09fce45a2d6
+edge sin 4002d97c00000001 3fe6a09fce45a2d3
+edge sin c002d97c00000001 bfe6a09fce45a2d3
+edge sin 413921faffffffff bfd4b02e5c25af00
+edge sin c13921faffffffff 3fd4b02e5c25af00
+edge sin 413921fb00000000 bfd4b02e5be91e9e
+edge sin c13921fb00000000 3fd4b02e5be91e9e
+edge sin 413921fb00000001 bfd4b02e5bac8e3c
+edge sin c13921fb00000001 3fd4b02e5bac8e3c
+edge sin 413921fbffffffff 3fe3e479a5ff2619
+edge sin c13921fbffffffff bfe3e479a5ff2619
+edge sin 413921fc00000000 3fe3e479a61836eb
+edge sin c13921fc00000000 bfe3e479a61836eb
+edge sin 413921fc00000001 3fe3e479a63147bc
+edge sin c13921fc00000001 bfe3e479a63147bc
+edge sin 3e3fffffffffffff 3e3fffffffffffff
+edge sin be3fffffffffffff be3fffffffffffff
+edge sin 3e40000000000000 3e40000000000000
+edge sin be40000000000000 be40000000000000
+edge sin 3e40000000000001 3e40000000000001
+edge sin be40000000000001 be40000000000001
+edge sin 3e2fffffffffffff 3e2fffffffffffff
+edge sin be2fffffffffffff be2fffffffffffff
+edge sin 3e30000000000000 3e30000000000000
+edge sin be30000000000000 be30000000000000
+edge sin 3e30000000000001 3e30000000000001
+edge sin be30000000000001 be30000000000001
+edge sin 3fd33332ffffffff 3fd2e9cd64d0f0d9
+edge sin bfd33332ffffffff bfd2e9cd64d0f0d9
+edge sin 3fd3333300000000 3fd2e9cd64d0f0da
+edge sin bfd3333300000000 bfd2e9cd64d0f0da
+edge sin 3fd3333300000001 3fd2e9cd64d0f0db
+edge sin bfd3333300000001 bfd2e9cd64d0f0db
+edge sin 3fe8ffffffffffff 3fe6888a4e134b2e
+edge sin bfe8ffffffffffff bfe6888a4e134b2e
+edge sin 3fe9000000000000 3fe6888a4e134b2f
+edge sin bfe9000000000000 bfe6888a4e134b2f
+edge sin 3fe9000000000001 3fe6888a4e134b2f
+edge sin bfe9000000000001 bfe6888a4e134b2f
+edge sin 3fe59427ffffffff 3fe3fae8600608f6
+edge sin bfe59427ffffffff bfe3fae8600608f6
+edge sin 3fe5942800000000 3fe3fae8600608f7
+edge sin bfe5942800000000 bfe3fae8600608f7
+edge sin 3fe5942800000001 3fe3fae8600608f8
+edge sin bfe5942800000001 bfe3fae8600608f8
+edge sin 3fe921fbffffffff 3fe6a09edfee58ba
+edge sin bfe921fbffffffff bfe6a09edfee58ba
+edge sin 413921fbffffffff 3fe3e479a5ff2619
+edge sin c13921fbffffffff bfe3e479a5ff2619
+edge sin 4480f0cf064dd592 bfeb453ab76bf397
+edge sin c480f0cf064dd592 3feb453ab76bf397
+edge sin 54b249ad2594c37d bfd85c5e5b929359
+edge sin d4b249ad2594c37d 3fd85c5e5b929359
+edge sin 6974e718d7d7625a bfe49b644938c64c
+edge sin e974e718d7d7625a 3fe49b644938c64c
+edge sin 7e70000000000000 bfc460b8ae1c886e
+edge sin fe70000000000000 3fc460b8ae1c886e
+edge sin 7fe0000000000000 3fe205248cbdb760
+edge sin ffe0000000000000 bfe205248cbdb760
+edge sin 7e3d7ee8bcbbd351 bfdc4276966cb33a
+edge sin fe3d7ee8bcbbd351 3fdc4276966cb33a
+edge cos 0000000000000000 3ff0000000000000
+edge cos 8000000000000000 3ff0000000000000
+edge cos 7ff0000000000000 7ff8000000000000
+edge cos fff0000000000000 7ff8000000000000
+edge cos 7ff8000000000000 7ff8000000000000
+edge cos 0000000000000001 3ff0000000000000
+edge cos 8000000000000001 3ff0000000000000
+edge cos 000fffffffffffff 3ff0000000000000
+edge cos 0010000000000000 3ff0000000000000
+edge cos 7fefffffffffffff bfefffe62ecfab75
+edge cos ffefffffffffffff bfefffe62ecfab75
+edge cos 3ff0000000000000 3fe14a280fb5068c
+edge cos bff0000000000000 3fe14a280fb5068c
+edge cos 3fe0000000000000 3fec1528065b7d50
+edge cos bfe0000000000000 3fec1528065b7d50
+edge cos 3e30000000000000 3ff0000000000000
+edge cos 3e40000000000000 3ff0000000000000
+edge cos 01a56e1fc2f8f359 3ff0000000000000
+edge cos 81a56e1fc2f8f359 3ff0000000000000
+edge cos 7e37e43c8800759c bfe2699022adc4c1
+edge cos fe37e43c8800759c bfe2699022adc4c1
+edge cos 3ff921fb54442d17 3cb469898cc51702
+edge cos bff921fb54442d17 3cb469898cc51702
+edge cos 3ff921fb54442d18 3c91a62633145c07
+edge cos bff921fb54442d18 3c91a62633145c07
+edge cos 3ff921fb54442d19 bca72cece675d1fd
+edge cos bff921fb54442d19 bca72cece675d1fd
+edge cos 400921fb54442d17 bff0000000000000
+edge cos c00921fb54442d17 bff0000000000000
+edge cos 400921fb54442d18 bff0000000000000
+edge cos c00921fb54442d18 bff0000000000000
+edge cos 400921fb54442d19 bff0000000000000
+edge cos c00921fb54442d19 bff0000000000000
+edge cos 4012d97c7f3321d1 bcd34f272993d141
+edge cos c012d97c7f3321d1 bcd34f272993d141
+edge cos 4012d97c7f3321d2 bcaa79394c9e8a0a
+edge cos c012d97c7f3321d2 bcaa79394c9e8a0a
+edge cos 4012d97c7f3321d3 3cc961b1acd85d7d
+edge cos c012d97c7f3321d3 3cc961b1acd85d7d
+edge cos 401921fb54442d17 3ff0000000000000
+edge cos c01921fb54442d17 3ff0000000000000
+edge cos 401921fb54442d18 3ff0000000000000
+edge cos c01921fb54442d18 3ff0000000000000
+edge cos 401921fb54442d19 3ff0000000000000
+edge cos c01921fb54442d19 3ff0000000000000
+edge cos 401f6a7a2955385d 3cd583ebeff65cc2
+edge cos c01f6a7a2955385d 3cd583ebeff65cc2
+edge cos 401f6a7a2955385e 3cb60fafbfd97309
+edge cos c01f6a7a2955385e 3cb60fafbfd97309
+edge cos 401f6a7a2955385f bcc4f8282013467c
+edge cos c01f6a7a2955385f bcc4f8282013467c
+edge cos 402921fb54442d17 3ff0000000000000
+edge cos c02921fb54442d17 3ff0000000000000
+edge cos 402921fb54442d18 3ff0000000000000
+edge cos c02921fb54442d18 3ff0000000000000
+edge cos 402921fb54442d19 3ff0000000000000
+edge cos c02921fb54442d19 3ff0000000000000
+edge cos 404921fb54442d17 3ff0000000000000
+edge cos c04921fb54442d17 3ff0000000000000
+edge cos 404921fb54442d18 3ff0000000000000
+edge cos c04921fb54442d18 3ff0000000000000
+edge cos 404921fb54442d19 3ff0000000000000
+edge cos c04921fb54442d19 3ff0000000000000
+edge cos 40988b2f704a9408 3ff0000000000000
+edge cos c0988b2f704a9408 3ff0000000000000
+edge cos 40988b2f704a9409 3ff0000000000000
+edge cos c0988b2f704a9409 3ff0000000000000
+edge cos 40988b2f704a940a 3ff0000000000000
+edge cos c0988b2f704a940a 3ff0000000000000
+edge cos 412921fb54442d17 3ff0000000000000
+edge cos c12921fb54442d17 3ff0000000000000
+edge cos 412921fb54442d18 3ff0000000000000
+edge cos c12921fb54442d18 3ff0000000000000
+edge cos 412921fb54442d19 3ff0000000000000
+edge cos c12921fb54442d19 3ff0000000000000
+edge cos 413921fb54442d17 3ff0000000000000
+edge cos c13921fb54442d17 3ff0000000000000
+edge cos 413921fb54442d18 3ff0000000000000
+edge cos c13921fb54442d18 3ff0000000000000
+edge cos 413921fb54442d19 3ff0000000000000
+edge cos c13921fb54442d19 3ff0000000000000
+edge cos 4137f7ec53a8d490 3ff0000000000000
+edge cos c137f7ec53a8d490 3ff0000000000000
+edge cos 4137f7ec53a8d491 3ff0000000000000
+edge cos c137f7ec53a8d491 3ff0000000000000
+edge cos 4137f7ec53a8d492 3ff0000000000000
+edge cos c137f7ec53a8d492 3ff0000000000000
+edge cos 43165286144ada41 3fedd7e684411bae
+edge cos c3165286144ada41 3fedd7e684411bae
+edge cos 43165286144ada42 3fefc5d6fb4145a3
+edge cos c3165286144ada42 3fefc5d6fb4145a3
+edge cos 43165286144ada43 3fefba0e6b5dd248
+edge cos c3165286144ada43 3fefba0e6b5dd248
+edge cos 3fe921faffffffff 3fe6a09ea2151080
+edge cos bfe921faffffffff 3fe6a09ea2151080
+edge cos 3fe921fb00000000 3fe6a09ea215107f
+edge cos bfe921fb00000000 3fe6a09ea215107f
+edge cos 3fe921fb00000001 3fe6a09ea215107e
+edge cos bfe921fb00000001 3fe6a09ea215107e
+edge cos 3fe921fbffffffff 3fe6a09ded101c54
+edge cos bfe921fbffffffff 3fe6a09ded101c54
+edge cos 3fe921fc00000000 3fe6a09ded101c54
+edge cos bfe921fc00000000 3fe6a09ded101c54
+edge cos 3fe921fc00000001 3fe6a09ded101c53
+edge cos bfe921fc00000001 3fe6a09ded101c53
+edge cos 4002d97bffffffff bfe6a09cfeb8be68
+edge cos c002d97bffffffff bfe6a09cfeb8be68
+edge cos 4002d97c00000000 bfe6a09cfeb8be6a
+edge cos c002d97c00000000 bfe6a09cfeb8be6a
+edge cos 4002d97c00000001 bfe6a09cfeb8be6d
+edge cos c002d97c00000001 bfe6a09cfeb8be6d
+edge cos 413921faffffffff 3fee483125700ac3
+edge cos c13921faffffffff 3fee483125700ac3
+edge cos 413921fb00000000 3fee4831257a62da
+edge cos c13921fb00000000 3fee4831257a62da
+edge cos 413921fb00000001 3fee48312584baf1
+edge cos c13921fb00000001 3fee48312584baf1
+edge cos 413921fbffffffff 3fe910d18d3aa54e
+edge cos c13921fbffffffff 3fe910d18d3aa54e
+edge cos 413921fc00000000 3fe910d18d26c0d4
+edge cos c13921fc00000000 3fe910d18d26c0d4
+edge cos 413921fc00000001 3fe910d18d12dc5b
+edge cos c13921fc00000001 3fe910d18d12dc5b
+edge cos 3e3fffffffffffff 3ff0000000000000
+edge cos be3fffffffffffff 3ff0000000000000
+edge cos 3e40000000000000 3ff0000000000000
+edge cos be40000000000000 3ff0000000000000
+edge cos 3e40000000000001 3ff0000000000000
+edge cos be40000000000001 3ff0000000000000
+edge cos 3e2fffffffffffff 3ff0000000000000
+edge cos be2fffffffffffff 3ff0000000000000
+edge cos 3e30000000000000 3ff0000000000000
+edge cos be30000000000000 3ff0000000000000
+edge cos 3e30000000000001 3ff0000000000000
+edge cos be30000000000001 3ff0000000000000
+edge cos 3fd33332ffffffff 3fee921ddbbfc253
+edge cos bfd33332ffffffff 3fee921ddbbfc253
+edge cos 3fd3333300000000 3fee921ddbbfc253
+edge cos bfd3333300000000 3fee921ddbbfc253
+edge cos 3fd3333300000001 3fee921ddbbfc253
+edge cos bfd3333300000001 3fee921ddbbfc253
+edge cos 3fe8ffffffffffff 3fe6b898fa9efb5e
+edge cos bfe8ffffffffffff 3fe6b898fa9efb5e
+edge cos 3fe9000000000000 3fe6b898fa9efb5d
+edge cos bfe9000000000000 3fe6b898fa9efb5d
+edge cos 3fe9000000000001 3fe6b898fa9efb5c
+edge cos bfe9000000000001 3fe6b898fa9efb5c
+edge cos 3fe59427ffffffff 3fe8fef3a3aa8b7f
+edge cos bfe59427ffffffff 3fe8fef3a3aa8b7f
+edge cos 3fe5942800000000 3fe8fef3a3aa8b7e
+edge cos bfe5942800000000 3fe8fef3a3aa8b7e
+edge cos 3fe5942800000001 3fe8fef3a3aa8b7e
+edge cos bfe5942800000001 3fe8fef3a3aa8b7e
+edge cos 3fe921fbffffffff 3fe6a09ded101c54
+edge cos bfe921fbffffffff 3fe6a09ded101c54
+edge cos 413921fbffffffff 3fe910d18d3aa54e
+edge cos c13921fbffffffff 3fe910d18d3aa54e
+edge cos 4480f0cf064dd592 3fe0be2cef01c8f4
+edge cos c480f0cf064dd592 3fe0be2cef01c8f4
+edge cos 54b249ad2594c37d 3fed9757496841f5
+edge cos d4b249ad2594c37d 3fed9757496841f5
+edge cos 6974e718d7d7625a 3fe87b4df51f679e
+edge cos e974e718d7d7625a 3fe87b4df51f679e
+edge cos 7e70000000000000 3fef9785160c8815
+edge cos fe70000000000000 3fef9785160c8815
+edge cos 7fe0000000000000 bfea719f26c232be
+edge cos ffe0000000000000 bfea719f26c232be
+edge cos 7e3d7ee8bcbbd351 3fecb622d1da8ee2
+edge cos fe3d7ee8bcbbd351 3fecb622d1da8ee2
+edge tan 0000000000000000 0000000000000000
+edge tan 8000000000000000 8000000000000000
+edge tan 7ff0000000000000 7ff8000000000000
+edge tan fff0000000000000 7ff8000000000000
+edge tan 7ff8000000000000 7ff8000000000000
+edge tan 0000000000000001 0000000000000001
+edge tan 8000000000000001 8000000000000001
+edge tan 000fffffffffffff 000fffffffffffff
+edge tan 0010000000000000 0010000000000000
+edge tan 7fefffffffffffff bf74530cfe729484
+edge tan ffefffffffffffff 3f74530cfe729484
+edge tan 3ff0000000000000 3ff8eb245cbee3a6
+edge tan bff0000000000000 bff8eb245cbee3a6
+edge tan 3fe0000000000000 3fe17b4f5bf3474a
+edge tan bfe0000000000000 bfe17b4f5bf3474a
+edge tan 3e30000000000000 3e30000000000000
+edge tan 3e40000000000000 3e40000000000000
+edge tan 01a56e1fc2f8f359 01a56e1fc2f8f359
+edge tan 81a56e1fc2f8f359 81a56e1fc2f8f359
+edge tan 7e37e43c8800759c 3ff6be411f37ac77
+edge tan fe37e43c8800759c bff6be411f37ac77
+edge tan 3ff921fb54442d17 4329153d9443ed0b
+edge tan bff921fb54442d17 c329153d9443ed0b
+edge tan 3ff921fb54442d18 434d02967c31cdb5
+edge tan bff921fb54442d18 c34d02967c31cdb5
+edge tan 3ff921fb54442d19 c33617a15494767a
+edge tan bff921fb54442d19 433617a15494767a
+edge tan 400921fb54442d17 bcc469898cc51702
+edge tan c00921fb54442d17 3cc469898cc51702
+edge tan 400921fb54442d18 bca1a62633145c07
+edge tan c00921fb54442d18 3ca1a62633145c07
+edge tan 400921fb54442d19 3cb72cece675d1fd
+edge tan c00921fb54442d19 bcb72cece675d1fd
+edge tan 4012d97c7f3321d1 430a8410087262e4
+edge tan c012d97c7f3321d1 c30a8410087262e4
+edge tan 4012d97c7f3321d2 4333570efd768923
+edge tan c012d97c7f3321d2 c333570efd768923
+edge tan 4012d97c7f3321d3 c3142c0d64d5de51
+edge tan c012d97c7f3321d3 43142c0d64d5de51
+edge tan 401921fb54442d17 bcd469898cc51702
+edge tan c01921fb54442d17 3cd469898cc51702
+edge tan 401921fb54442d18 bcb1a62633145c07
+edge tan c01921fb54442d18 3cb1a62633145c07
+edge tan 401921fb54442d19 3cc72cece675d1fd
+edge tan c01921fb54442d19 bcc72cece675d1fd
+edge tan 401f6a7a2955385d 4307cc080f895856
+edge tan c01f6a7a2955385d c307cc080f895856
+edge tan 401f6a7a2955385e 432735453027d7c4
+edge tan c01f6a7a2955385e c32735453027d7c4
+edge tan 401f6a7a2955385f c3186aa4a3a127a4
+edge tan c01f6a7a2955385f 43186aa4a3a127a4
+edge tan 402921fb54442d17 bce469898cc51702
+edge tan c02921fb54442d17 3ce469898cc51702
+edge tan 402921fb54442d18 bcc1a62633145c07
+edge tan c02921fb54442d18 3cc1a62633145c07
+edge tan 402921fb54442d19 3cd72cece675d1fd
+edge tan c02921fb54442d19 bcd72cece675d1fd
+edge tan 404921fb54442d17 bd0469898cc51702
+edge tan c04921fb54442d17 3d0469898cc51702
+edge tan 404921fb54442d18 bce1a62633145c07
+edge tan c04921fb54442d18 3ce1a62633145c07
+edge tan 404921fb54442d19 3cf72cece675d1fd
+edge tan c04921fb54442d19 bcf72cece675d1fd
+edge tan 40988b2f704a9408 bd5b4f1053787878
+edge tan c0988b2f704a9408 3d5b4f1053787878
+edge tan 40988b2f704a9409 bd469e20a6f0f0ef
+edge tan c0988b2f704a9409 3d469e20a6f0f0ef
+edge tan 40988b2f704a940a 3d32c3beb21e1e21
+edge tan c0988b2f704a940a bd32c3beb21e1e21
+edge tan 412921fb54442d17 bde469898cc51702
+edge tan c12921fb54442d17 3de469898cc51702
+edge tan 412921fb54442d18 bdc1a62633145c07
+edge tan c12921fb54442d18 3dc1a62633145c07
+edge tan 412921fb54442d19 3dd72cece675d1fd
+edge tan c12921fb54442d19 bdd72cece675d1fd
+edge tan 413921fb54442d17 bdf469898cc51702
+edge tan c13921fb54442d17 3df469898cc51702
+edge tan 413921fb54442d18 bdd1a62633145c07
+edge tan c13921fb54442d18 3dd1a62633145c07
+edge tan 413921fb54442d19 3de72cece675d1fd
+edge tan c13921fb54442d19 bde72cece675d1fd
+edge tan 4137f7ec53a8d490 bdf7ab35f183a5a5
+edge tan c137f7ec53a8d490 3df7ab35f183a5a5
+edge tan 4137f7ec53a8d491 bddeacd7c60e9693
+edge tan c137f7ec53a8d491 3ddeacd7c60e9693
+edge tan 4137f7ec53a8d492 3de0a9941cf8b4b6
+edge tan c137f7ec53a8d492 bde0a9941cf8b4b6
+edge tan 43165286144ada41 bfd8c44405c15afb
+edge tan c3165286144ada41 3fd8c44405c15afb
+edge tan 43165286144ada42 bfbeab2f027684df
+edge tan c3165286144ada42 3fbeab2f027684df
+edge tan 43165286144ada43 3fc0d59f2059e56b
+edge tan c3165286144ada43 bfc0d59f2059e56b
+edge tan 3fe921faffffffff 3fefffff5777a789
+edge tan bfe921faffffffff bfefffff5777a789
+edge tan 3fe921fb00000000 3fefffff5777a78b
+edge tan bfe921fb00000000 bfefffff5777a78b
+edge tan 3fe921fb00000001 3fefffff5777a78d
+edge tan bfe921fb00000001 bfefffff5777a78d
+edge tan 3fe921fbffffffff 3ff00000abbbd680
+edge tan bfe921fbffffffff bff00000abbbd680
+edge tan 3fe921fc00000000 3ff00000abbbd681
+edge tan bfe921fc00000000 bff00000abbbd681
+edge tan 3fe921fc00000001 3ff00000abbbd682
+edge tan bfe921fc00000001 bff00000abbbd682
+edge tan 4002d97bffffffff bff00001fccca6e7
+edge tan c002d97bffffffff 3ff00001fccca6e7
+edge tan 4002d97c00000000 bff00001fccca6e3
+edge tan c002d97c00000000 3ff00001fccca6e3
+edge tan 4002d97c00000001 bff00001fccca6df
+edge tan c002d97c00000001 3ff00001fccca6df
+edge tan 413921faffffffff bfd5dca6bd5e8435
+edge tan c13921faffffffff 3fd5dca6bd5e8435
+edge tan 413921fb00000000 bfd5dca6bd170c6f
+edge tan c13921fb00000000 3fd5dca6bd170c6f
+edge tan 413921fb00000001 bfd5dca6bccf94a9
+edge tan c13921fb00000001 3fd5dca6bccf94a9
+edge tan 413921fbffffffff 3fe9654894a13da8
+edge tan c13921fbffffffff bfe9654894a13da8
+edge tan 413921fc00000000 3fe9654894d5652a
+edge tan c13921fc00000000 bfe9654894d5652a
+edge tan 413921fc00000001 3fe9654895098cac
+edge tan c13921fc00000001 bfe9654895098cac
+edge tan 3e3fffffffffffff 3e3fffffffffffff
+edge tan be3fffffffffffff be3fffffffffffff
+edge tan 3e40000000000000 3e40000000000000
+edge tan be40000000000000 be40000000000000
+edge tan 3e40000000000001 3e40000000000001
+edge tan be40000000000001 be40000000000001
+edge tan 3e2fffffffffffff 3e2fffffffffffff
+edge tan be2fffffffffffff be2fffffffffffff
+edge tan 3e30000000000000 3e30000000000000
+edge tan be30000000000000 be30000000000000
+edge tan 3e30000000000001 3e30000000000001
+edge tan be30000000000001 be30000000000001
+edge tan 3fd33332ffffffff 3fd3cc2a0cc92fb9
+edge tan bfd33332ffffffff bfd3cc2a0cc92fb9
+edge tan 3fd3333300000000 3fd3cc2a0cc92fba
+edge tan bfd3333300000000 bfd3cc2a0cc92fba
+edge tan 3fd3333300000001 3fd3cc2a0cc92fbb
+edge tan bfd3333300000001 bfd3cc2a0cc92fbb
+edge tan 3fe8ffffffffffff 3fefbc511df5917d
+edge tan bfe8ffffffffffff bfefbc511df5917d
+edge tan 3fe9000000000000 3fefbc511df5917f
+edge tan bfe9000000000000 bfefbc511df5917f
+edge tan 3fe9000000000001 3fefbc511df59181
+edge tan bfe9000000000001 bfefbc511df59181
+edge tan 3fe59427ffffffff 3fe99427887a14d4
+edge tan bfe59427ffffffff bfe99427887a14d4
+edge tan 3fe5942800000000 3fe99427887a14d6
+edge tan bfe5942800000000 bfe99427887a14d6
+edge tan 3fe5942800000001 3fe99427887a14d8
+edge tan bfe5942800000001 bfe99427887a14d8
+edge tan 3fe921fbffffffff 3ff00000abbbd680
+edge tan bfe921fbffffffff bff00000abbbd680
+edge tan 413921fbffffffff 3fe9654894a13da8
+edge tan c13921fbffffffff bfe9654894a13da8
+edge tan 4480f0cf064dd592 bffa0f79c1b6b258
+edge tan c480f0cf064dd592 3ffa0f79c1b6b258
+edge tan 54b249ad2594c37d bfda5807d6f76f7d
+edge tan d4b249ad2594c37d 3fda5807d6f76f7d
+edge tan 6974e718d7d7625a bfeaef7845d41e88
+edge tan e974e718d7d7625a 3feaef7845d41e88
+edge tan 7e70000000000000 bfc4a41d560c08cc
+edge tan fe70000000000000 3fc4a41d560c08cc
+edge tan 7fe0000000000000 bfe5ce6b4c0d02a3
+edge tan ffe0000000000000 3fe5ce6b4c0d02a3
+edge tan 7e3d7ee8bcbbd351 bfdf7f1410d53197
+edge tan fe3d7ee8bcbbd351 3fdf7f1410d53197
+edge atan 0000000000000000 0000000000000000
+edge atan 8000000000000000 8000000000000000
+edge atan 7ff0000000000000 3ff921fb54442d18
+edge atan fff0000000000000 bff921fb54442d18
+edge atan 7ff8000000000000 7ff8000000000000
+edge atan 0000000000000001 0000000000000001
+edge atan 8000000000000001 8000000000000001
+edge atan 000fffffffffffff 000fffffffffffff
+edge atan 0010000000000000 0010000000000000
+edge atan 7fefffffffffffff 3ff921fb54442d18
+edge atan ffefffffffffffff bff921fb54442d18
+edge atan 3ff0000000000000 3fe921fb54442d18
+edge atan bff0000000000000 bfe921fb54442d18
+edge atan 3fe0000000000000 3fddac670561bb4f
+edge atan bfe0000000000000 bfddac670561bb4f
+edge atan 3e30000000000000 3e30000000000000
+edge atan 3e40000000000000 3e40000000000000
+edge atan 01a56e1fc2f8f359 01a56e1fc2f8f359
+edge atan 81a56e1fc2f8f359 81a56e1fc2f8f359
+edge atan 7e37e43c8800759c 3ff921fb54442d18
+edge atan fe37e43c8800759c bff921fb54442d18
+edge atan 3fdbffffffffffff 3fda64eec3cc23fc
+edge atan bfdbffffffffffff bfda64eec3cc23fc
+edge atan 3fdc000000000000 3fda64eec3cc23fd
+edge atan bfdc000000000000 bfda64eec3cc23fd
+edge atan 3fdc000000000001 3fda64eec3cc23fe
+edge atan bfdc000000000001 bfda64eec3cc23fe
+edge atan 3fe5ffffffffffff 3fe345f01cce37ba
+edge atan bfe5ffffffffffff bfe345f01cce37ba
+edge atan 3fe6000000000000 3fe345f01cce37bb
+edge atan bfe6000000000000 bfe345f01cce37bb
+edge atan 3fe6000000000001 3fe345f01cce37bc
+edge atan bfe6000000000001 bfe345f01cce37bc
+edge atan 3ff2ffffffffffff 3febde70ed439fe6
+edge atan bff2ffffffffffff bfebde70ed439fe6
+edge atan 3ff3000000000000 3febde70ed439fe7
+edge atan bff3000000000000 bfebde70ed439fe7
+edge atan 3ff3000000000001 3febde70ed439fe8
+edge atan bff3000000000001 bfebde70ed439fe8
+edge atan 40037fffffffffff 3ff2e75728833a54
+edge atan c0037fffffffffff bff2e75728833a54
+edge atan 4003800000000000 3ff2e75728833a54
+edge atan c003800000000000 bff2e75728833a54
+edge atan 4003800000000001 3ff2e75728833a54
+edge atan c003800000000001 bff2e75728833a54
+edge atan 440fffffffffffff 3ff921fb54442d18
+edge atan c40fffffffffffff bff921fb54442d18
+edge atan 4410000000000000 3ff921fb54442d18
+edge atan c410000000000000 bff921fb54442d18
+edge atan 4410000000000001 3ff921fb54442d18
+edge atan c410000000000001 bff921fb54442d18
+edge atan 3e3fffffffffffff 3e3fffffffffffff
+edge atan be3fffffffffffff be3fffffffffffff
+edge atan 3e40000000000000 3e40000000000000
+edge atan be40000000000000 be40000000000000
+edge atan 3e40000000000001 3e40000000000001
+edge atan be40000000000001 be40000000000001
+edge atan2 0000000000000000 0000000000000000 0000000000000000
+edge atan2 0000000000000000 8000000000000000 400921fb54442d18
+edge atan2 0000000000000000 7ff0000000000000 0000000000000000
+edge atan2 0000000000000000 fff0000000000000 400921fb54442d18
+edge atan2 0000000000000000 7ff8000000000000 7ff8000000000000
+edge atan2 0000000000000000 3ff0000000000000 0000000000000000
+edge atan2 0000000000000000 bfe0000000000000 400921fb54442d18
+edge atan2 0000000000000000 0000000000000001 0000000000000000
+edge atan2 0000000000000000 01a56e1fc2f8f359 0000000000000000
+edge atan2 0000000000000000 7e37e43c8800759c 0000000000000000
+edge atan2 0000000000000000 fe37e43c8800759c 400921fb54442d18
+edge atan2 8000000000000000 0000000000000000 8000000000000000
+edge atan2 8000000000000000 8000000000000000 c00921fb54442d18
+edge atan2 8000000000000000 7ff0000000000000 8000000000000000
+edge atan2 8000000000000000 fff0000000000000 c00921fb54442d18
+edge atan2 8000000000000000 7ff8000000000000 7ff8000000000000
+edge atan2 8000000000000000 3ff0000000000000 8000000000000000
+edge atan2 8000000000000000 bfe0000000000000 c00921fb54442d18
+edge atan2 8000000000000000 0000000000000001 8000000000000000
+edge atan2 8000000000000000 01a56e1fc2f8f359 8000000000000000
+edge atan2 8000000000000000 7e37e43c8800759c 8000000000000000
+edge atan2 8000000000000000 fe37e43c8800759c c00921fb54442d18
+edge atan2 7ff0000000000000 0000000000000000 3ff921fb54442d18
+edge atan2 7ff0000000000000 8000000000000000 3ff921fb54442d18
+edge atan2 7ff0000000000000 7ff0000000000000 3fe921fb54442d18
+edge atan2 7ff0000000000000 fff0000000000000 4002d97c7f3321d2
+edge atan2 7ff0000000000000 7ff8000000000000 7ff8000000000000
+edge atan2 7ff0000000000000 3ff0000000000000 3ff921fb54442d18
+edge atan2 7ff0000000000000 bfe0000000000000 3ff921fb54442d18
+edge atan2 7ff0000000000000 0000000000000001 3ff921fb54442d18
+edge atan2 7ff0000000000000 01a56e1fc2f8f359 3ff921fb54442d18
+edge atan2 7ff0000000000000 7e37e43c8800759c 3ff921fb54442d18
+edge atan2 7ff0000000000000 fe37e43c8800759c 3ff921fb54442d18
+edge atan2 fff0000000000000 0000000000000000 bff921fb54442d18
+edge atan2 fff0000000000000 8000000000000000 bff921fb54442d18
+edge atan2 fff0000000000000 7ff0000000000000 bfe921fb54442d18
+edge atan2 fff0000000000000 fff0000000000000 c002d97c7f3321d2
+edge atan2 fff0000000000000 7ff8000000000000 7ff8000000000000
+edge atan2 fff0000000000000 3ff0000000000000 bff921fb54442d18
+edge atan2 fff0000000000000 bfe0000000000000 bff921fb54442d18
+edge atan2 fff0000000000000 0000000000000001 bff921fb54442d18
+edge atan2 fff0000000000000 01a56e1fc2f8f359 bff921fb54442d18
+edge atan2 fff0000000000000 7e37e43c8800759c bff921fb54442d18
+edge atan2 fff0000000000000 fe37e43c8800759c bff921fb54442d18
+edge atan2 7ff8000000000000 0000000000000000 7ff8000000000000
+edge atan2 7ff8000000000000 8000000000000000 7ff8000000000000
+edge atan2 7ff8000000000000 7ff0000000000000 7ff8000000000000
+edge atan2 7ff8000000000000 fff0000000000000 7ff8000000000000
+edge atan2 7ff8000000000000 7ff8000000000000 7ff8000000000000
+edge atan2 7ff8000000000000 3ff0000000000000 7ff8000000000000
+edge atan2 7ff8000000000000 bfe0000000000000 7ff8000000000000
+edge atan2 7ff8000000000000 0000000000000001 7ff8000000000000
+edge atan2 7ff8000000000000 01a56e1fc2f8f359 7ff8000000000000
+edge atan2 7ff8000000000000 7e37e43c8800759c 7ff8000000000000
+edge atan2 7ff8000000000000 fe37e43c8800759c 7ff8000000000000
+edge atan2 3ff0000000000000 0000000000000000 3ff921fb54442d18
+edge atan2 3ff0000000000000 8000000000000000 3ff921fb54442d18
+edge atan2 3ff0000000000000 7ff0000000000000 0000000000000000
+edge atan2 3ff0000000000000 fff0000000000000 400921fb54442d18
+edge atan2 3ff0000000000000 7ff8000000000000 7ff8000000000000
+edge atan2 3ff0000000000000 3ff0000000000000 3fe921fb54442d18
+edge atan2 3ff0000000000000 bfe0000000000000 4000468a8ace4df6
+edge atan2 3ff0000000000000 0000000000000001 3ff921fb54442d18
+edge atan2 3ff0000000000000 01a56e1fc2f8f359 3ff921fb54442d18
+edge atan2 3ff0000000000000 7e37e43c8800759c 01a56e1fc2f8f359
+edge atan2 3ff0000000000000 fe37e43c8800759c 400921fb54442d18
+edge atan2 bfe0000000000000 0000000000000000 bff921fb54442d18
+edge atan2 bfe0000000000000 8000000000000000 bff921fb54442d18
+edge atan2 bfe0000000000000 7ff0000000000000 8000000000000000
+edge atan2 bfe0000000000000 fff0000000000000 c00921fb54442d18
+edge atan2 bfe0000000000000 7ff8000000000000 7ff8000000000000
+edge atan2 bfe0000000000000 3ff0000000000000 bfddac670561bb4f
+edge atan2 bfe0000000000000 bfe0000000000000 c002d97c7f3321d2
+edge atan2 bfe0000000000000 0000000000000001 bff921fb54442d18
+edge atan2 bfe0000000000000 01a56e1fc2f8f359 bff921fb54442d18
+edge atan2 bfe0000000000000 7e37e43c8800759c 81956e1fc2f8f359
+edge atan2 bfe0000000000000 fe37e43c8800759c c00921fb54442d18
+edge atan2 0000000000000001 0000000000000000 3ff921fb54442d18
+edge atan2 0000000000000001 8000000000000000 3ff921fb54442d18
+edge atan2 0000000000000001 7ff0000000000000 0000000000000000
+edge atan2 0000000000000001 fff0000000000000 400921fb54442d18
+edge atan2 0000000000000001 7ff8000000000000 7ff8000000000000
+edge atan2 0000000000000001 3ff0000000000000 0000000000000001
+edge atan2 0000000000000001 bfe0000000000000 400921fb54442d18
+edge atan2 0000000000000001 0000000000000001 3fe921fb54442d18
+edge atan2 0000000000000001 01a56e1fc2f8f359 3b17e43c8800759b
+edge atan2 0000000000000001 7e37e43c8800759c 0000000000000000
+edge atan2 0000000000000001 fe37e43c8800759c 400921fb54442d18
+edge atan2 01a56e1fc2f8f359 0000000000000000 3ff921fb54442d18
+edge atan2 01a56e1fc2f8f359 8000000000000000 3ff921fb54442d18
+edge atan2 01a56e1fc2f8f359 7ff0000000000000 0000000000000000
+edge atan2 01a56e1fc2f8f359 fff0000000000000 400921fb54442d18
+edge atan2 01a56e1fc2f8f359 7ff8000000000000 7ff8000000000000
+edge atan2 01a56e1fc2f8f359 3ff0000000000000 01a56e1fc2f8f359
+edge atan2 01a56e1fc2f8f359 bfe0000000000000 400921fb54442d18
+edge atan2 01a56e1fc2f8f359 0000000000000001 3ff921fb54442d18
+edge atan2 01a56e1fc2f8f359 01a56e1fc2f8f359 3fe921fb54442d18
+edge atan2 01a56e1fc2f8f359 7e37e43c8800759c 0000000000000000
+edge atan2 01a56e1fc2f8f359 fe37e43c8800759c 400921fb54442d18
+edge atan2 7e37e43c8800759c 0000000000000000 3ff921fb54442d18
+edge atan2 7e37e43c8800759c 8000000000000000 3ff921fb54442d18
+edge atan2 7e37e43c8800759c 7ff0000000000000 0000000000000000
+edge atan2 7e37e43c8800759c fff0000000000000 400921fb54442d18
+edge atan2 7e37e43c8800759c 7ff8000000000000 7ff8000000000000
+edge atan2 7e37e43c8800759c 3ff0000000000000 3ff921fb54442d18
+edge atan2 7e37e43c8800759c bfe0000000000000 3ff921fb54442d18
+edge atan2 7e37e43c8800759c 0000000000000001 3ff921fb54442d18
+edge atan2 7e37e43c8800759c 01a56e1fc2f8f359 3ff921fb54442d18
+edge atan2 7e37e43c8800759c 7e37e43c8800759c 3fe921fb54442d18
+edge atan2 7e37e43c8800759c fe37e43c8800759c 4002d97c7f3321d2
+edge atan2 fe37e43c8800759c 0000000000000000 bff921fb54442d18
+edge atan2 fe37e43c8800759c 8000000000000000 bff921fb54442d18
+edge atan2 fe37e43c8800759c 7ff0000000000000 8000000000000000
+edge atan2 fe37e43c8800759c fff0000000000000 c00921fb54442d18
+edge atan2 fe37e43c8800759c 7ff8000000000000 7ff8000000000000
+edge atan2 fe37e43c8800759c 3ff0000000000000 bff921fb54442d18
+edge atan2 fe37e43c8800759c bfe0000000000000 bff921fb54442d18
+edge atan2 fe37e43c8800759c 0000000000000001 bff921fb54442d18
+edge atan2 fe37e43c8800759c 01a56e1fc2f8f359 bff921fb54442d18
+edge atan2 fe37e43c8800759c 7e37e43c8800759c bfe921fb54442d18
+edge atan2 fe37e43c8800759c fe37e43c8800759c c002d97c7f3321d2
+edge exp 0000000000000000 3ff0000000000000
+edge exp 8000000000000000 3ff0000000000000
+edge exp 7ff0000000000000 7ff0000000000000
+edge exp fff0000000000000 0000000000000000
+edge exp 7ff8000000000000 7ff8000000000000
+edge exp 0000000000000001 3ff0000000000000
+edge exp 8000000000000001 3ff0000000000000
+edge exp 000fffffffffffff 3ff0000000000000
+edge exp 0010000000000000 3ff0000000000000
+edge exp 7fefffffffffffff 7ff0000000000000
+edge exp ffefffffffffffff 0000000000000000
+edge exp 3ff0000000000000 4005bf0a8b145769
+edge exp bff0000000000000 3fd78b56362cef38
+edge exp 3fe0000000000000 3ffa61298e1e069c
+edge exp bfe0000000000000 3fe368b2fc6f960a
+edge exp 3e30000000000000 3ff0000001000000
+edge exp 3e40000000000000 3ff0000002000000
+edge exp 01a56e1fc2f8f359 3ff0000000000000
+edge exp 81a56e1fc2f8f359 3ff0000000000000
+edge exp 7e37e43c8800759c 7ff0000000000000
+edge exp fe37e43c8800759c 0000000000000000
+edge exp 40862e42fefa39ee 7feffffffffffb2a
+edge exp 40862e42fefa39ef 7fefffffffffff2a
+edge exp 40862e42fefa39f0 7ff0000000000000
+edge exp c0874910d52d3050 0000000000000001
+edge exp c0874910d52d3051 0000000000000001
+edge exp c0874910d52d3052 0000000000000000
+edge exp 40862e41ffffffff 7feffc045692fc9e
+edge exp 40862e4200000000 7feffc045693009d
+edge exp 40862e4200000001 7feffc045693049d
+edge exp 3ff0000000000000 4005bf0a8b145769
+edge exp bff0000000000000 3fd78b56362cef38
+edge exp 4000000000000000 401d8e64b8d4ddae
+edge exp c000000000000000 3fc152aaa3bf81cc
+edge exp 4049000000000000 44719103e4080b45
+edge exp c049000000000000 3b6d257d547e083f
+edge exp 4059000000000000 48f3494a9b171bf5
+edge exp c059000000000000 36ea8c1f14e2af5d
+edge exp 3fd62e42fefa39ef 3ff6a09e667f3bcc
+edge exp bfd62e42fefa39ef 3fe6a09e667f3bcc
+edge exp 3ff0a2b23f3bab73 4006a09e667f3bcc
+edge exp bff0a2b23f3bab73 3fd6a09e667f3bcd
+edge exp 40862c0000000000 7fe81e9b4b52d0c9
+edge exp 40862d999999999a 7fed75ae7a50ee14
+edge exp c086233333333333 000ff15b469edf89
+edge exp c08628cccccccccd 0007eabddec4fd38
+edge exp c086800000000000 0000000993b4dc95
+edge exp c087200000000000 0000000000000055
+edge exp c087480000000000 0000000000000001
+edge exp 3fd62e41ffffffff 3ff6a09e0c594ff2
+edge exp bfd62e41ffffffff 3fe6a09ec0a5290e
+edge exp 3fd62e4200000000 3ff6a09e0c594ff3
+edge exp bfd62e4200000000 3fe6a09ec0a5290d
+edge exp 3fd62e4200000001 3ff6a09e0c594ff3
+edge exp bfd62e4200000001 3fe6a09ec0a5290d
+edge exp 3fd62e42ffffffff 3ff6a09e66dbc8d9
+edge exp bfd62e42ffffffff 3fe6a09e6622aec0
+edge exp 3fd62e4300000000 3ff6a09e66dbc8da
+edge exp bfd62e4300000000 3fe6a09e6622aec0
+edge exp 3fd62e4300000001 3ff6a09e66dbc8da
+edge exp bfd62e4300000001 3fe6a09e6622aec0
+edge exp 3ff0a2b1ffffffff 4006a09e0d126a08
+edge exp bff0a2b1ffffffff 3fd6a09ebfec0ef2
+edge exp 3ff0a2b200000000 4006a09e0d126a0a
+edge exp bff0a2b200000000 3fd6a09ebfec0ef1
+edge exp 3ff0a2b200000001 4006a09e0d126a0b
+edge exp bff0a2b200000001 3fd6a09ebfec0ef0
+edge exp 3e2fffffffffffff 3ff0000001000000
+edge exp be2fffffffffffff 3feffffffe000000
+edge exp 3e30000000000000 3ff0000001000000
+edge exp be30000000000000 3feffffffe000000
+edge exp 3e30000000000001 3ff0000001000000
+edge exp be30000000000001 3feffffffe000000
+edge log 0000000000000000 fff0000000000000
+edge log 8000000000000000 fff0000000000000
+edge log 7ff0000000000000 7ff0000000000000
+edge log fff0000000000000 7ff8000000000000
+edge log 7ff8000000000000 7ff8000000000000
+edge log 0000000000000001 c0874385446d71c3
+edge log 8000000000000001 7ff8000000000000
+edge log 000fffffffffffff c086232bdd7abcd2
+edge log 0010000000000000 c086232bdd7abcd2
+edge log 7fefffffffffffff 40862e42fefa39ef
+edge log ffefffffffffffff 7ff8000000000000
+edge log 3ff0000000000000 0000000000000000
+edge log bff0000000000000 7ff8000000000000
+edge log 3fe0000000000000 bfe62e42fefa39ef
+edge log bfe0000000000000 7ff8000000000000
+edge log 3e30000000000000 c033687a9f1af2b1
+edge log 3e40000000000000 c032b708872320e2
+edge log 01a56e1fc2f8f359 c085963447f87fb5
+edge log 81a56e1fc2f8f359 7ff8000000000000
+edge log 7e37e43c8800759c 4085963447f87fb5
+edge log fe37e43c8800759c 7ff8000000000000
+edge log 3fefffffffffffff bca0000000000000
+edge log 3ff0000000000000 0000000000000000
+edge log 3ff0000000000001 3cafffffffffffff
+edge log 3fffffffffffffff 3fe62e42fefa39ee
+edge log 4000000000000000 3fe62e42fefa39ef
+edge log 4000000000000001 3fe62e42fefa39f1
+edge log 4005bf0a8b145769 3ff0000000000000
+edge log 3ff6a09e667f3bcc 3fd62e42fefa39ee
+edge log 3ff6a09e667f3bcd 3fd62e42fefa39f0
+edge log 3ff6a09e667f3bce 3fd62e42fefa39f3
+edge log 3fe6a09e667f3bcc bfd62e42fefa39f1
+edge log 3fe6a09e667f3bcd bfd62e42fefa39ee
+edge log 3fe6a09e667f3bce bfd62e42fefa39eb
+edge log 3ff0000100000000 3eafffff00000aab
+edge log 3feffffe00000000 beb0000080000555
+edge log 3ff0000080000000 3e9fffff800002ab
+edge log 4024000000000000 40026bb1bbb55516
+edge log 000012688b70e62b c0864e69394d9508
+edge log 00000000000013c4 c086ff49a03cacf5
+edge log 3ff61479ffffffff 3fd49d018ee476f7
+edge log 3ff6147a00000000 3fd49d018ee476fa
+edge log 3ff6147a00000001 3fd49d018ee476fd
+edge log 3ff6b850ffffffff 3fd67126ed7cbb55
+edge log 3ff6b85100000000 3fd67126ed7cbb58
+edge log 3ff6b85100000001 3fd67126ed7cbb5a
+edge pow 0000000000000000 0000000000000000 3ff0000000000000
+edge pow 0000000000000000 8000000000000000 3ff0000000000000
+edge pow 0000000000000000 3ff0000000000000 0000000000000000
+edge pow 0000000000000000 bff0000000000000 7ff0000000000000
+edge pow 0000000000000000 4000000000000000 0000000000000000
+edge pow 0000000000000000 c000000000000000 7ff0000000000000
+edge pow 0000000000000000 3fe0000000000000 0000000000000000
+edge pow 0000000000000000 bfe0000000000000 7ff0000000000000
+edge pow 0000000000000000 4008000000000000 0000000000000000
+edge pow 0000000000000000 c008000000000000 7ff0000000000000
+edge pow 0000000000000000 3ff8000000000000 0000000000000000
+edge pow 0000000000000000 7ff0000000000000 0000000000000000
+edge pow 0000000000000000 fff0000000000000 7ff0000000000000
+edge pow 0000000000000000 7ff8000000000000 7ff8000000000000
+edge pow 0000000000000000 7e37e43c8800759c 0000000000000000
+edge pow 0000000000000000 41e0000000200000 0000000000000000
+edge pow 0000000000000000 3fd3333333333333 0000000000000000
+edge pow 8000000000000000 0000000000000000 3ff0000000000000
+edge pow 8000000000000000 8000000000000000 3ff0000000000000
+edge pow 8000000000000000 3ff0000000000000 8000000000000000
+edge pow 8000000000000000 bff0000000000000 fff0000000000000
+edge pow 8000000000000000 4000000000000000 0000000000000000
+edge pow 8000000000000000 c000000000000000 7ff0000000000000
+edge pow 8000000000000000 3fe0000000000000 0000000000000000
+edge pow 8000000000000000 bfe0000000000000 7ff0000000000000
+edge pow 8000000000000000 4008000000000000 8000000000000000
+edge pow 8000000000000000 c008000000000000 fff0000000000000
+edge pow 8000000000000000 3ff8000000000000 0000000000000000
+edge pow 8000000000000000 7ff0000000000000 0000000000000000
+edge pow 8000000000000000 fff0000000000000 7ff0000000000000
+edge pow 8000000000000000 7ff8000000000000 7ff8000000000000
+edge pow 8000000000000000 7e37e43c8800759c 0000000000000000
+edge pow 8000000000000000 41e0000000200000 8000000000000000
+edge pow 8000000000000000 3fd3333333333333 0000000000000000
+edge pow 3ff0000000000000 0000000000000000 3ff0000000000000
+edge pow 3ff0000000000000 8000000000000000 3ff0000000000000
+edge pow 3ff0000000000000 3ff0000000000000 3ff0000000000000
+edge pow 3ff0000000000000 bff0000000000000 3ff0000000000000
+edge pow 3ff0000000000000 4000000000000000 3ff0000000000000
+edge pow 3ff0000000000000 c000000000000000 3ff0000000000000
+edge pow 3ff0000000000000 3fe0000000000000 3ff0000000000000
+edge pow 3ff0000000000000 bfe0000000000000 3ff0000000000000
+edge pow 3ff0000000000000 4008000000000000 3ff0000000000000
+edge pow 3ff0000000000000 c008000000000000 3ff0000000000000
+edge pow 3ff0000000000000 3ff8000000000000 3ff0000000000000
+edge pow 3ff0000000000000 7ff0000000000000 7ff8000000000000
+edge pow 3ff0000000000000 fff0000000000000 7ff8000000000000
+edge pow 3ff0000000000000 7ff8000000000000 7ff8000000000000
+edge pow 3ff0000000000000 7e37e43c8800759c 3ff0000000000000
+edge pow 3ff0000000000000 41e0000000200000 3ff0000000000000
+edge pow 3ff0000000000000 3fd3333333333333 3ff0000000000000
+edge pow bff0000000000000 0000000000000000 3ff0000000000000
+edge pow bff0000000000000 8000000000000000 3ff0000000000000
+edge pow bff0000000000000 3ff0000000000000 bff0000000000000
+edge pow bff0000000000000 bff0000000000000 bff0000000000000
+edge pow bff0000000000000 4000000000000000 3ff0000000000000
+edge pow bff0000000000000 c000000000000000 3ff0000000000000
+edge pow bff0000000000000 3fe0000000000000 7ff8000000000000
+edge pow bff0000000000000 bfe0000000000000 7ff8000000000000
+edge pow bff0000000000000 4008000000000000 bff0000000000000
+edge pow bff0000000000000 c008000000000000 bff0000000000000
+edge pow bff0000000000000 3ff8000000000000 7ff8000000000000
+edge pow bff0000000000000 7ff0000000000000 7ff8000000000000
+edge pow bff0000000000000 fff0000000000000 7ff8000000000000
+edge pow bff0000000000000 7ff8000000000000 7ff8000000000000
+edge pow bff0000000000000 7e37e43c8800759c 3ff0000000000000
+edge pow bff0000000000000 41e0000000200000 bff0000000000000
+edge pow bff0000000000000 3fd3333333333333 7ff8000000000000
+edge pow 3fe0000000000000 0000000000000000 3ff0000000000000
+edge pow 3fe0000000000000 8000000000000000 3ff0000000000000
+edge pow 3fe0000000000000 3ff0000000000000 3fe0000000000000
+edge pow 3fe0000000000000 bff0000000000000 4000000000000000
+edge pow 3fe0000000000000 4000000000000000 3fd0000000000000
+edge pow 3fe0000000000000 c000000000000000 4010000000000000
+edge pow 3fe0000000000000 3fe0000000000000 3fe6a09e667f3bcd
+edge pow 3fe0000000000000 bfe0000000000000 3ff6a09e667f3bcc
+edge pow 3fe0000000000000 4008000000000000 3fc0000000000000
+edge pow 3fe0000000000000 c008000000000000 4020000000000000
+edge pow 3fe0000000000000 3ff8000000000000 3fd6a09e667f3bcc
+edge pow 3fe0000000000000 7ff0000000000000 0000000000000000
+edge pow 3fe0000000000000 fff0000000000000 7ff0000000000000
+edge pow 3fe0000000000000 7ff8000000000000 7ff8000000000000
+edge pow 3fe0000000000000 7e37e43c8800759c 0000000000000000
+edge pow 3fe0000000000000 41e0000000200000 0000000000000000
+edge pow 3fe0000000000000 3fd3333333333333 3fe9fdf8bcce533e
+edge pow c000000000000000 0000000000000000 3ff0000000000000
+edge pow c000000000000000 8000000000000000 3ff0000000000000
+edge pow c000000000000000 3ff0000000000000 c000000000000000
+edge pow c000000000000000 bff0000000000000 bfe0000000000000
+edge pow c000000000000000 4000000000000000 4010000000000000
+edge pow c000000000000000 c000000000000000 3fd0000000000000
+edge pow c000000000000000 3fe0000000000000 7ff8000000000000
+edge pow c000000000000000 bfe0000000000000 7ff8000000000000
+edge pow c000000000000000 4008000000000000 c020000000000000
+edge pow c000000000000000 c008000000000000 bfc0000000000000
+edge pow c000000000000000 3ff8000000000000 7ff8000000000000
+edge pow c000000000000000 7ff0000000000000 7ff0000000000000
+edge pow c000000000000000 fff0000000000000 0000000000000000
+edge pow c000000000000000 7ff8000000000000 7ff8000000000000
+edge pow c000000000000000 7e37e43c8800759c 7ff0000000000000
+edge pow c000000000000000 41e0000000200000 fff0000000000000
+edge pow c000000000000000 3fd3333333333333 7ff8000000000000
+edge pow c008000000000000 0000000000000000 3ff0000000000000
+edge pow c008000000000000 8000000000000000 3ff0000000000000
+edge pow c008000000000000 3ff0000000000000 c008000000000000
+edge pow c008000000000000 bff0000000000000 bfd5555555555555
+edge pow c008000000000000 4000000000000000 4022000000000000
+edge pow c008000000000000 c000000000000000 3fbc71c71c71c71c
+edge pow c008000000000000 3fe0000000000000 7ff8000000000000
+edge pow c008000000000000 bfe0000000000000 7ff8000000000000
+edge pow c008000000000000 4008000000000000 c03b000000000000
+edge pow c008000000000000 c008000000000000 bfa2f684bda12f68
+edge pow c008000000000000 3ff8000000000000 7ff8000000000000
+edge pow c008000000000000 7ff0000000000000 7ff0000000000000
+edge pow c008000000000000 fff0000000000000 0000000000000000
+edge pow c008000000000000 7ff8000000000000 7ff8000000000000
+edge pow c008000000000000 7e37e43c8800759c 7ff0000000000000
+edge pow c008000000000000 41e0000000200000 fff0000000000000
+edge pow c008000000000000 3fd3333333333333 7ff8000000000000
+edge pow 7ff0000000000000 0000000000000000 3ff0000000000000
+edge pow 7ff0000000000000 8000000000000000 3ff0000000000000
+edge pow 7ff0000000000000 3ff0000000000000 7ff0000000000000
+edge pow 7ff0000000000000 bff0000000000000 0000000000000000
+edge pow 7ff0000000000000 4000000000000000 7ff0000000000000
+edge pow 7ff0000000000000 c000000000000000 0000000000000000
+edge pow 7ff0000000000000 3fe0000000000000 7ff0000000000000
+edge pow 7ff0000000000000 bfe0000000000000 0000000000000000
+edge pow 7ff0000000000000 4008000000000000 7ff0000000000000
+edge pow 7ff0000000000000 c008000000000000 0000000000000000
+edge pow 7ff0000000000000 3ff8000000000000 7ff0000000000000
+edge pow 7ff0000000000000 7ff0000000000000 7ff0000000000000
+edge pow 7ff0000000000000 fff0000000000000 0000000000000000
+edge pow 7ff0000000000000 7ff8000000000000 7ff8000000000000
+edge pow 7ff0000000000000 7e37e43c8800759c 7ff0000000000000
+edge pow 7ff0000000000000 41e0000000200000 7ff0000000000000
+edge pow 7ff0000000000000 3fd3333333333333 7ff0000000000000
+edge pow fff0000000000000 0000000000000000 3ff0000000000000
+edge pow fff0000000000000 8000000000000000 3ff0000000000000
+edge pow fff0000000000000 3ff0000000000000 fff0000000000000
+edge pow fff0000000000000 bff0000000000000 8000000000000000
+edge pow fff0000000000000 4000000000000000 7ff0000000000000
+edge pow fff0000000000000 c000000000000000 0000000000000000
+edge pow fff0000000000000 3fe0000000000000 7ff0000000000000
+edge pow fff0000000000000 bfe0000000000000 0000000000000000
+edge pow fff0000000000000 4008000000000000 fff0000000000000
+edge pow fff0000000000000 c008000000000000 8000000000000000
+edge pow fff0000000000000 3ff8000000000000 7ff0000000000000
+edge pow fff0000000000000 7ff0000000000000 7ff0000000000000
+edge pow fff0000000000000 fff0000000000000 0000000000000000
+edge pow fff0000000000000 7ff8000000000000 7ff8000000000000
+edge pow fff0000000000000 7e37e43c8800759c 7ff0000000000000
+edge pow fff0000000000000 41e0000000200000 fff0000000000000
+edge pow fff0000000000000 3fd3333333333333 7ff0000000000000
+edge pow 7ff8000000000000 0000000000000000 3ff0000000000000
+edge pow 7ff8000000000000 8000000000000000 3ff0000000000000
+edge pow 7ff8000000000000 3ff0000000000000 7ff8000000000000
+edge pow 7ff8000000000000 bff0000000000000 7ff8000000000000
+edge pow 7ff8000000000000 4000000000000000 7ff8000000000000
+edge pow 7ff8000000000000 c000000000000000 7ff8000000000000
+edge pow 7ff8000000000000 3fe0000000000000 7ff8000000000000
+edge pow 7ff8000000000000 bfe0000000000000 7ff8000000000000
+edge pow 7ff8000000000000 4008000000000000 7ff8000000000000
+edge pow 7ff8000000000000 c008000000000000 7ff8000000000000
+edge pow 7ff8000000000000 3ff8000000000000 7ff8000000000000
+edge pow 7ff8000000000000 7ff0000000000000 7ff8000000000000
+edge pow 7ff8000000000000 fff0000000000000 7ff8000000000000
+edge pow 7ff8000000000000 7ff8000000000000 7ff8000000000000
+edge pow 7ff8000000000000 7e37e43c8800759c 7ff8000000000000
+edge pow 7ff8000000000000 41e0000000200000 7ff8000000000000
+edge pow 7ff8000000000000 3fd3333333333333 7ff8000000000000
+edge pow 0000000000000001 0000000000000000 3ff0000000000000
+edge pow 0000000000000001 8000000000000000 3ff0000000000000
+edge pow 0000000000000001 3ff0000000000000 0000000000000001
+edge pow 0000000000000001 bff0000000000000 7ff0000000000000
+edge pow 0000000000000001 4000000000000000 0000000000000000
+edge pow 0000000000000001 c000000000000000 7ff0000000000000
+edge pow 0000000000000001 3fe0000000000000 1e60000000000000
+edge pow 0000000000000001 bfe0000000000000 6180000000000000
+edge pow 0000000000000001 4008000000000000 0000000000000000
+edge pow 0000000000000001 c008000000000000 7ff0000000000000
+edge pow 0000000000000001 3ff8000000000000 0000000000000000
+edge pow 0000000000000001 7ff0000000000000 0000000000000000
+edge pow 0000000000000001 fff0000000000000 7ff0000000000000
+edge pow 0000000000000001 7ff8000000000000 7ff8000000000000
+edge pow 0000000000000001 7e37e43c8800759c 0000000000000000
+edge pow 0000000000000001 41e0000000200000 0000000000000000
+edge pow 0000000000000001 3fd3333333333333 2bcbdb8cdadbe161
+edge pow 7e37e43c8800759c 0000000000000000 3ff0000000000000
+edge pow 7e37e43c8800759c 8000000000000000 3ff0000000000000
+edge pow 7e37e43c8800759c 3ff0000000000000 7e37e43c8800759c
+edge pow 7e37e43c8800759c bff0000000000000 01a56e1fc2f8f359
+edge pow 7e37e43c8800759c 4000000000000000 7ff0000000000000
+edge pow 7e37e43c8800759c c000000000000000 0000000000000000
+edge pow 7e37e43c8800759c 3fe0000000000000 5f138d352e5096af
+edge pow 7e37e43c8800759c bfe0000000000000 20ca2fe76a3f9475
+edge pow 7e37e43c8800759c 4008000000000000 7ff0000000000000
+edge pow 7e37e43c8800759c c008000000000000 0000000000000000
+edge pow 7e37e43c8800759c 3ff8000000000000 7ff0000000000000
+edge pow 7e37e43c8800759c 7ff0000000000000 7ff0000000000000
+edge pow 7e37e43c8800759c fff0000000000000 0000000000000000
+edge pow 7e37e43c8800759c 7ff8000000000000 7ff8000000000000
+edge pow 7e37e43c8800759c 7e37e43c8800759c 7ff0000000000000
+edge pow 7e37e43c8800759c 41e0000000200000 7ff0000000000000
+edge pow 7e37e43c8800759c 3fd3333333333333 529f6b0f09295984
+edge pow 3ff000001ad7f29b 0000000000000000 3ff0000000000000
+edge pow 3ff000001ad7f29b 8000000000000000 3ff0000000000000
+edge pow 3ff000001ad7f29b 3ff0000000000000 3ff000001ad7f29b
+edge pow 3ff000001ad7f29b bff0000000000000 3fefffffca501b24
+edge pow 3ff000001ad7f29b 4000000000000000 3ff0000035afe563
+edge pow 3ff000001ad7f29b c000000000000000 3fefffff94a036a2
+edge pow 3ff000001ad7f29b 3fe0000000000000 3ff000000d6bf948
+edge pow 3ff000001ad7f29b bfe0000000000000 3fefffffe5280d87
+edge pow 3ff000001ad7f29b 4008000000000000 3ff000005087d858
+edge pow 3ff000001ad7f29b c008000000000000 3fefffff5ef0527a
+edge pow 3ff000001ad7f29b 3ff8000000000000 3ff000002843ebf9
+edge pow 3ff000001ad7f29b 7ff0000000000000 7ff0000000000000
+edge pow 3ff000001ad7f29b fff0000000000000 0000000000000000
+edge pow 3ff000001ad7f29b 7ff8000000000000 7ff8000000000000
+edge pow 3ff000001ad7f29b 7e37e43c8800759c 7ff0000000000000
+edge pow 3ff000001ad7f29b 41e0000000200000 534c2d02a3948591
+edge pow 3ff000001ad7f29b 3fd3333333333333 3ff00000080d9590
+edge pow 3fefffffca501acb 0000000000000000 3ff0000000000000
+edge pow 3fefffffca501acb 8000000000000000 3ff0000000000000
+edge pow 3fefffffca501acb 3ff0000000000000 3fefffffca501acb
+edge pow 3fefffffca501acb bff0000000000000 3ff000001ad7f2c8
+edge pow 3fefffffca501acb 4000000000000000 3fefffff94a035f0
+edge pow 3fefffffca501acb c000000000000000 3ff0000035afe5bc
+edge pow 3fefffffca501acb 3fe0000000000000 3fefffffe5280d5a
+edge pow 3fefffffca501acb bfe0000000000000 3ff000000d6bf95e
+edge pow 3fefffffca501acb 4008000000000000 3fefffff5ef0516f
+edge pow 3fefffffca501acb c008000000000000 3ff000005087d8de
+edge pow 3fefffffca501acb 3ff8000000000000 3fefffffaf782852
+edge pow 3fefffffca501acb 7ff0000000000000 0000000000000000
+edge pow 3fefffffca501acb fff0000000000000 7ff0000000000000
+edge pow 3fefffffca501acb 7ff8000000000000 7ff8000000000000
+edge pow 3fefffffca501acb 7e37e43c8800759c 0000000000000000
+edge pow 3fefffffca501acb 41e0000000200000 2c922bd53feeff0a
+edge pow 3fefffffca501acb 3fd3333333333333 3fefffffefe4d4cd
+edge hypot 0000000000000000 0000000000000000 0000000000000000
+edge hypot 0000000000000000 8000000000000000 0000000000000000
+edge hypot 0000000000000000 7ff0000000000000 7ff0000000000000
+edge hypot 0000000000000000 fff0000000000000 7ff0000000000000
+edge hypot 0000000000000000 7ff8000000000000 7ff8000000000000
+edge hypot 0000000000000000 c008000000000000 4008000000000000
+edge hypot 0000000000000000 0000000000000001 0000000000000001
+edge hypot 0000000000000000 7e37e43c8800759c 7e37e43c8800759c
+edge hypot 0000000000000000 7fefffffffffffff 7fefffffffffffff
+edge hypot 8000000000000000 0000000000000000 0000000000000000
+edge hypot 8000000000000000 8000000000000000 0000000000000000
+edge hypot 8000000000000000 7ff0000000000000 7ff0000000000000
+edge hypot 8000000000000000 fff0000000000000 7ff0000000000000
+edge hypot 8000000000000000 7ff8000000000000 7ff8000000000000
+edge hypot 8000000000000000 c008000000000000 4008000000000000
+edge hypot 8000000000000000 0000000000000001 0000000000000001
+edge hypot 8000000000000000 7e37e43c8800759c 7e37e43c8800759c
+edge hypot 8000000000000000 7fefffffffffffff 7fefffffffffffff
+edge hypot 7ff0000000000000 0000000000000000 7ff0000000000000
+edge hypot 7ff0000000000000 8000000000000000 7ff0000000000000
+edge hypot 7ff0000000000000 7ff0000000000000 7ff0000000000000
+edge hypot 7ff0000000000000 fff0000000000000 7ff0000000000000
+edge hypot 7ff0000000000000 7ff8000000000000 7ff0000000000000
+edge hypot 7ff0000000000000 c008000000000000 7ff0000000000000
+edge hypot 7ff0000000000000 0000000000000001 7ff0000000000000
+edge hypot 7ff0000000000000 7e37e43c8800759c 7ff0000000000000
+edge hypot 7ff0000000000000 7fefffffffffffff 7ff0000000000000
+edge hypot fff0000000000000 0000000000000000 7ff0000000000000
+edge hypot fff0000000000000 8000000000000000 7ff0000000000000
+edge hypot fff0000000000000 7ff0000000000000 7ff0000000000000
+edge hypot fff0000000000000 fff0000000000000 7ff0000000000000
+edge hypot fff0000000000000 7ff8000000000000 7ff0000000000000
+edge hypot fff0000000000000 c008000000000000 7ff0000000000000
+edge hypot fff0000000000000 0000000000000001 7ff0000000000000
+edge hypot fff0000000000000 7e37e43c8800759c 7ff0000000000000
+edge hypot fff0000000000000 7fefffffffffffff 7ff0000000000000
+edge hypot 7ff8000000000000 0000000000000000 7ff8000000000000
+edge hypot 7ff8000000000000 8000000000000000 7ff8000000000000
+edge hypot 7ff8000000000000 7ff0000000000000 7ff0000000000000
+edge hypot 7ff8000000000000 fff0000000000000 7ff0000000000000
+edge hypot 7ff8000000000000 7ff8000000000000 7ff8000000000000
+edge hypot 7ff8000000000000 c008000000000000 7ff8000000000000
+edge hypot 7ff8000000000000 0000000000000001 7ff8000000000000
+edge hypot 7ff8000000000000 7e37e43c8800759c 7ff8000000000000
+edge hypot 7ff8000000000000 7fefffffffffffff 7ff8000000000000
+edge hypot c008000000000000 0000000000000000 4008000000000000
+edge hypot c008000000000000 8000000000000000 4008000000000000
+edge hypot c008000000000000 7ff0000000000000 7ff0000000000000
+edge hypot c008000000000000 fff0000000000000 7ff0000000000000
+edge hypot c008000000000000 7ff8000000000000 7ff8000000000000
+edge hypot c008000000000000 c008000000000000 4010f876ccdf6cda
+edge hypot c008000000000000 0000000000000001 4008000000000000
+edge hypot c008000000000000 7e37e43c8800759c 7e37e43c8800759c
+edge hypot c008000000000000 7fefffffffffffff 7fefffffffffffff
+edge hypot 0000000000000001 0000000000000000 0000000000000001
+edge hypot 0000000000000001 8000000000000000 0000000000000001
+edge hypot 0000000000000001 7ff0000000000000 7ff0000000000000
+edge hypot 0000000000000001 fff0000000000000 7ff0000000000000
+edge hypot 0000000000000001 7ff8000000000000 7ff8000000000000
+edge hypot 0000000000000001 c008000000000000 4008000000000000
+edge hypot 0000000000000001 0000000000000001 0000000000000001
+edge hypot 0000000000000001 7e37e43c8800759c 7e37e43c8800759c
+edge hypot 0000000000000001 7fefffffffffffff 7fefffffffffffff
+edge hypot 7e37e43c8800759c 0000000000000000 7e37e43c8800759c
+edge hypot 7e37e43c8800759c 8000000000000000 7e37e43c8800759c
+edge hypot 7e37e43c8800759c 7ff0000000000000 7ff0000000000000
+edge hypot 7e37e43c8800759c fff0000000000000 7ff0000000000000
+edge hypot 7e37e43c8800759c 7ff8000000000000 7ff8000000000000
+edge hypot 7e37e43c8800759c c008000000000000 7e37e43c8800759c
+edge hypot 7e37e43c8800759c 0000000000000001 7e37e43c8800759c
+edge hypot 7e37e43c8800759c 7e37e43c8800759c 7e40e4d50f99b211
+edge hypot 7e37e43c8800759c 7fefffffffffffff 7fefffffffffffff
+edge hypot 7fefffffffffffff 0000000000000000 7fefffffffffffff
+edge hypot 7fefffffffffffff 8000000000000000 7fefffffffffffff
+edge hypot 7fefffffffffffff 7ff0000000000000 7ff0000000000000
+edge hypot 7fefffffffffffff fff0000000000000 7ff0000000000000
+edge hypot 7fefffffffffffff 7ff8000000000000 7ff8000000000000
+edge hypot 7fefffffffffffff c008000000000000 7fefffffffffffff
+edge hypot 7fefffffffffffff 0000000000000001 7fefffffffffffff
+edge hypot 7fefffffffffffff 7e37e43c8800759c 7fefffffffffffff
+edge hypot 7fefffffffffffff 7fefffffffffffff 7ff0000000000000
+edge hypot3 8000000000000000 8000000000000000 8000000000000000 0000000000000000
+edge hypot3 8000000000000000 8000000000000000 7ff0000000000000 7ff0000000000000
+edge hypot3 8000000000000000 8000000000000000 7ff8000000000000 7ff8000000000000
+edge hypot3 8000000000000000 8000000000000000 4008000000000000 4008000000000000
+edge hypot3 8000000000000000 8000000000000000 7e37e43c8800759c 7e37e43c8800759c
+edge hypot3 8000000000000000 7ff0000000000000 8000000000000000 7ff0000000000000
+edge hypot3 8000000000000000 7ff0000000000000 7ff0000000000000 7ff0000000000000
+edge hypot3 8000000000000000 7ff0000000000000 7ff8000000000000 7ff0000000000000
+edge hypot3 8000000000000000 7ff0000000000000 4008000000000000 7ff0000000000000
+edge hypot3 8000000000000000 7ff0000000000000 7e37e43c8800759c 7ff0000000000000
+edge hypot3 8000000000000000 7ff8000000000000 8000000000000000 7ff8000000000000
+edge hypot3 8000000000000000 7ff8000000000000 7ff0000000000000 7ff0000000000000
+edge hypot3 8000000000000000 7ff8000000000000 7ff8000000000000 7ff8000000000000
+edge hypot3 8000000000000000 7ff8000000000000 4008000000000000 7ff8000000000000
+edge hypot3 8000000000000000 7ff8000000000000 7e37e43c8800759c 7ff8000000000000
+edge hypot3 8000000000000000 4008000000000000 8000000000000000 4008000000000000
+edge hypot3 8000000000000000 4008000000000000 7ff0000000000000 7ff0000000000000
+edge hypot3 8000000000000000 4008000000000000 7ff8000000000000 7ff8000000000000
+edge hypot3 8000000000000000 4008000000000000 4008000000000000 4010f876ccdf6cda
+edge hypot3 8000000000000000 4008000000000000 7e37e43c8800759c 7e37e43c8800759c
+edge hypot3 8000000000000000 7e37e43c8800759c 8000000000000000 7e37e43c8800759c
+edge hypot3 8000000000000000 7e37e43c8800759c 7ff0000000000000 7ff0000000000000
+edge hypot3 8000000000000000 7e37e43c8800759c 7ff8000000000000 7ff8000000000000
+edge hypot3 8000000000000000 7e37e43c8800759c 4008000000000000 7e37e43c8800759c
+edge hypot3 8000000000000000 7e37e43c8800759c 7e37e43c8800759c 7e40e4d50f99b211
+edge hypot3 7ff0000000000000 8000000000000000 8000000000000000 7ff0000000000000
+edge hypot3 7ff0000000000000 8000000000000000 7ff0000000000000 7ff0000000000000
+edge hypot3 7ff0000000000000 8000000000000000 7ff8000000000000 7ff0000000000000
+edge hypot3 7ff0000000000000 8000000000000000 4008000000000000 7ff0000000000000
+edge hypot3 7ff0000000000000 8000000000000000 7e37e43c8800759c 7ff0000000000000
+edge hypot3 7ff0000000000000 7ff0000000000000 8000000000000000 7ff0000000000000
+edge hypot3 7ff0000000000000 7ff0000000000000 7ff0000000000000 7ff0000000000000
+edge hypot3 7ff0000000000000 7ff0000000000000 7ff8000000000000 7ff0000000000000
+edge hypot3 7ff0000000000000 7ff0000000000000 4008000000000000 7ff0000000000000
+edge hypot3 7ff0000000000000 7ff0000000000000 7e37e43c8800759c 7ff0000000000000
+edge hypot3 7ff0000000000000 7ff8000000000000 8000000000000000 7ff0000000000000
+edge hypot3 7ff0000000000000 7ff8000000000000 7ff0000000000000 7ff0000000000000
+edge hypot3 7ff0000000000000 7ff8000000000000 7ff8000000000000 7ff0000000000000
+edge hypot3 7ff0000000000000 7ff8000000000000 4008000000000000 7ff0000000000000
+edge hypot3 7ff0000000000000 7ff8000000000000 7e37e43c8800759c 7ff0000000000000
+edge hypot3 7ff0000000000000 4008000000000000 8000000000000000 7ff0000000000000
+edge hypot3 7ff0000000000000 4008000000000000 7ff0000000000000 7ff0000000000000
+edge hypot3 7ff0000000000000 4008000000000000 7ff8000000000000 7ff0000000000000
+edge hypot3 7ff0000000000000 4008000000000000 4008000000000000 7ff0000000000000
+edge hypot3 7ff0000000000000 4008000000000000 7e37e43c8800759c 7ff0000000000000
+edge hypot3 7ff0000000000000 7e37e43c8800759c 8000000000000000 7ff0000000000000
+edge hypot3 7ff0000000000000 7e37e43c8800759c 7ff0000000000000 7ff0000000000000
+edge hypot3 7ff0000000000000 7e37e43c8800759c 7ff8000000000000 7ff0000000000000
+edge hypot3 7ff0000000000000 7e37e43c8800759c 4008000000000000 7ff0000000000000
+edge hypot3 7ff0000000000000 7e37e43c8800759c 7e37e43c8800759c 7ff0000000000000
+edge hypot3 7ff8000000000000 8000000000000000 8000000000000000 7ff8000000000000
+edge hypot3 7ff8000000000000 8000000000000000 7ff0000000000000 7ff0000000000000
+edge hypot3 7ff8000000000000 8000000000000000 7ff8000000000000 7ff8000000000000
+edge hypot3 7ff8000000000000 8000000000000000 4008000000000000 7ff8000000000000
+edge hypot3 7ff8000000000000 8000000000000000 7e37e43c8800759c 7ff8000000000000
+edge hypot3 7ff8000000000000 7ff0000000000000 8000000000000000 7ff0000000000000
+edge hypot3 7ff8000000000000 7ff0000000000000 7ff0000000000000 7ff0000000000000
+edge hypot3 7ff8000000000000 7ff0000000000000 7ff8000000000000 7ff0000000000000
+edge hypot3 7ff8000000000000 7ff0000000000000 4008000000000000 7ff0000000000000
+edge hypot3 7ff8000000000000 7ff0000000000000 7e37e43c8800759c 7ff0000000000000
+edge hypot3 7ff8000000000000 7ff8000000000000 8000000000000000 7ff8000000000000
+edge hypot3 7ff8000000000000 7ff8000000000000 7ff0000000000000 7ff0000000000000
+edge hypot3 7ff8000000000000 7ff8000000000000 7ff8000000000000 7ff8000000000000
+edge hypot3 7ff8000000000000 7ff8000000000000 4008000000000000 7ff8000000000000
+edge hypot3 7ff8000000000000 7ff8000000000000 7e37e43c8800759c 7ff8000000000000
+edge hypot3 7ff8000000000000 4008000000000000 8000000000000000 7ff8000000000000
+edge hypot3 7ff8000000000000 4008000000000000 7ff0000000000000 7ff0000000000000
+edge hypot3 7ff8000000000000 4008000000000000 7ff8000000000000 7ff8000000000000
+edge hypot3 7ff8000000000000 4008000000000000 4008000000000000 7ff8000000000000
+edge hypot3 7ff8000000000000 4008000000000000 7e37e43c8800759c 7ff8000000000000
+edge hypot3 7ff8000000000000 7e37e43c8800759c 8000000000000000 7ff8000000000000
+edge hypot3 7ff8000000000000 7e37e43c8800759c 7ff0000000000000 7ff0000000000000
+edge hypot3 7ff8000000000000 7e37e43c8800759c 7ff8000000000000 7ff8000000000000
+edge hypot3 7ff8000000000000 7e37e43c8800759c 4008000000000000 7ff8000000000000
+edge hypot3 7ff8000000000000 7e37e43c8800759c 7e37e43c8800759c 7ff8000000000000
+edge hypot3 4008000000000000 8000000000000000 8000000000000000 4008000000000000
+edge hypot3 4008000000000000 8000000000000000 7ff0000000000000 7ff0000000000000
+edge hypot3 4008000000000000 8000000000000000 7ff8000000000000 7ff8000000000000
+edge hypot3 4008000000000000 8000000000000000 4008000000000000 4010f876ccdf6cda
+edge hypot3 4008000000000000 8000000000000000 7e37e43c8800759c 7e37e43c8800759c
+edge hypot3 4008000000000000 7ff0000000000000 8000000000000000 7ff0000000000000
+edge hypot3 4008000000000000 7ff0000000000000 7ff0000000000000 7ff0000000000000
+edge hypot3 4008000000000000 7ff0000000000000 7ff8000000000000 7ff0000000000000
+edge hypot3 4008000000000000 7ff0000000000000 4008000000000000 7ff0000000000000
+edge hypot3 4008000000000000 7ff0000000000000 7e37e43c8800759c 7ff0000000000000
+edge hypot3 4008000000000000 7ff8000000000000 8000000000000000 7ff8000000000000
+edge hypot3 4008000000000000 7ff8000000000000 7ff0000000000000 7ff0000000000000
+edge hypot3 4008000000000000 7ff8000000000000 7ff8000000000000 7ff8000000000000
+edge hypot3 4008000000000000 7ff8000000000000 4008000000000000 7ff8000000000000
+edge hypot3 4008000000000000 7ff8000000000000 7e37e43c8800759c 7ff8000000000000
+edge hypot3 4008000000000000 4008000000000000 8000000000000000 4010f876ccdf6cda
+edge hypot3 4008000000000000 4008000000000000 7ff0000000000000 7ff0000000000000
+edge hypot3 4008000000000000 4008000000000000 7ff8000000000000 7ff8000000000000
+edge hypot3 4008000000000000 4008000000000000 4008000000000000 4014c8dc2e423980
+edge hypot3 4008000000000000 4008000000000000 7e37e43c8800759c 7e37e43c8800759c
+edge hypot3 4008000000000000 7e37e43c8800759c 8000000000000000 7e37e43c8800759c
+edge hypot3 4008000000000000 7e37e43c8800759c 7ff0000000000000 7ff0000000000000
+edge hypot3 4008000000000000 7e37e43c8800759c 7ff8000000000000 7ff8000000000000
+edge hypot3 4008000000000000 7e37e43c8800759c 4008000000000000 7e37e43c8800759c
+edge hypot3 4008000000000000 7e37e43c8800759c 7e37e43c8800759c 7e40e4d50f99b211
+edge hypot3 7e37e43c8800759c 8000000000000000 8000000000000000 7e37e43c8800759c
+edge hypot3 7e37e43c8800759c 8000000000000000 7ff0000000000000 7ff0000000000000
+edge hypot3 7e37e43c8800759c 8000000000000000 7ff8000000000000 7ff8000000000000
+edge hypot3 7e37e43c8800759c 8000000000000000 4008000000000000 7e37e43c8800759c
+edge hypot3 7e37e43c8800759c 8000000000000000 7e37e43c8800759c 7e40e4d50f99b211
+edge hypot3 7e37e43c8800759c 7ff0000000000000 8000000000000000 7ff0000000000000
+edge hypot3 7e37e43c8800759c 7ff0000000000000 7ff0000000000000 7ff0000000000000
+edge hypot3 7e37e43c8800759c 7ff0000000000000 7ff8000000000000 7ff0000000000000
+edge hypot3 7e37e43c8800759c 7ff0000000000000 4008000000000000 7ff0000000000000
+edge hypot3 7e37e43c8800759c 7ff0000000000000 7e37e43c8800759c 7ff0000000000000
+edge hypot3 7e37e43c8800759c 7ff8000000000000 8000000000000000 7ff8000000000000
+edge hypot3 7e37e43c8800759c 7ff8000000000000 7ff0000000000000 7ff0000000000000
+edge hypot3 7e37e43c8800759c 7ff8000000000000 7ff8000000000000 7ff8000000000000
+edge hypot3 7e37e43c8800759c 7ff8000000000000 4008000000000000 7ff8000000000000
+edge hypot3 7e37e43c8800759c 7ff8000000000000 7e37e43c8800759c 7ff8000000000000
+edge hypot3 7e37e43c8800759c 4008000000000000 8000000000000000 7e37e43c8800759c
+edge hypot3 7e37e43c8800759c 4008000000000000 7ff0000000000000 7ff0000000000000
+edge hypot3 7e37e43c8800759c 4008000000000000 7ff8000000000000 7ff8000000000000
+edge hypot3 7e37e43c8800759c 4008000000000000 4008000000000000 7e37e43c8800759c
+edge hypot3 7e37e43c8800759c 4008000000000000 7e37e43c8800759c 7e40e4d50f99b211
+edge hypot3 7e37e43c8800759c 7e37e43c8800759c 8000000000000000 7e40e4d50f99b211
+edge hypot3 7e37e43c8800759c 7e37e43c8800759c 7ff0000000000000 7ff0000000000000
+edge hypot3 7e37e43c8800759c 7e37e43c8800759c 7ff8000000000000 7ff8000000000000
+edge hypot3 7e37e43c8800759c 7e37e43c8800759c 4008000000000000 7e40e4d50f99b211
+edge hypot3 7e37e43c8800759c 7e37e43c8800759c 7e37e43c8800759c 7e44b0d0eea55018
+edge round 0000000000000000 0000000000000000
+edge round 8000000000000000 8000000000000000
+edge round 7ff8000000000000 7ff8000000000000
+edge round 7ff0000000000000 7ff0000000000000
+edge round fff0000000000000 fff0000000000000
+edge round 3fe0000000000000 3ff0000000000000
+edge round bfe0000000000000 8000000000000000
+edge round 3ff8000000000000 4000000000000000
+edge round bff8000000000000 bff0000000000000
+edge round 4004000000000000 4008000000000000
+edge round c004000000000000 c000000000000000
+edge round 3fdfffffffffffff 0000000000000000
+edge round bfdfffffffffffff 8000000000000000
+edge round 3fe0000000000001 3ff0000000000000
+edge round bfe0000000000001 bff0000000000000
+edge round 3fd0000000000000 0000000000000000
+edge round bfd0000000000000 8000000000000000
+edge round 0000000000000001 0000000000000000
+edge round 8000000000000001 8000000000000000
+edge round 400d99999999999a 4010000000000000
+edge round c00d99999999999a c010000000000000
+edge round 4330000000000000 4330000000000000
+edge round 4330000000000001 4330000000000001
+edge round 432fffffffffffff 4330000000000000
+edge round c32fffffffffffff c32ffffffffffffe
+edge round 4340000000000000 4340000000000000
+edge round 7fefffffffffffff 7fefffffffffffff
+edge round ffefffffffffffff ffefffffffffffff
+edge max 0000000000000000 0000000000000000 0000000000000000
+edge max 0000000000000000 8000000000000000 0000000000000000
+edge max 0000000000000000 3ff0000000000000 3ff0000000000000
+edge max 0000000000000000 bff0000000000000 0000000000000000
+edge max 0000000000000000 7ff8000000000000 7ff8000000000000
+edge max 0000000000000000 7ff0000000000000 7ff0000000000000
+edge max 0000000000000000 fff0000000000000 0000000000000000
+edge max 8000000000000000 0000000000000000 0000000000000000
+edge max 8000000000000000 8000000000000000 8000000000000000
+edge max 8000000000000000 3ff0000000000000 3ff0000000000000
+edge max 8000000000000000 bff0000000000000 8000000000000000
+edge max 8000000000000000 7ff8000000000000 7ff8000000000000
+edge max 8000000000000000 7ff0000000000000 7ff0000000000000
+edge max 8000000000000000 fff0000000000000 8000000000000000
+edge max 3ff0000000000000 0000000000000000 3ff0000000000000
+edge max 3ff0000000000000 8000000000000000 3ff0000000000000
+edge max 3ff0000000000000 3ff0000000000000 3ff0000000000000
+edge max 3ff0000000000000 bff0000000000000 3ff0000000000000
+edge max 3ff0000000000000 7ff8000000000000 7ff8000000000000
+edge max 3ff0000000000000 7ff0000000000000 7ff0000000000000
+edge max 3ff0000000000000 fff0000000000000 3ff0000000000000
+edge max bff0000000000000 0000000000000000 0000000000000000
+edge max bff0000000000000 8000000000000000 8000000000000000
+edge max bff0000000000000 3ff0000000000000 3ff0000000000000
+edge max bff0000000000000 bff0000000000000 bff0000000000000
+edge max bff0000000000000 7ff8000000000000 7ff8000000000000
+edge max bff0000000000000 7ff0000000000000 7ff0000000000000
+edge max bff0000000000000 fff0000000000000 bff0000000000000
+edge max 7ff8000000000000 0000000000000000 7ff8000000000000
+edge max 7ff8000000000000 8000000000000000 7ff8000000000000
+edge max 7ff8000000000000 3ff0000000000000 7ff8000000000000
+edge max 7ff8000000000000 bff0000000000000 7ff8000000000000
+edge max 7ff8000000000000 7ff8000000000000 7ff8000000000000
+edge max 7ff8000000000000 7ff0000000000000 7ff8000000000000
+edge max 7ff8000000000000 fff0000000000000 7ff8000000000000
+edge max 7ff0000000000000 0000000000000000 7ff0000000000000
+edge max 7ff0000000000000 8000000000000000 7ff0000000000000
+edge max 7ff0000000000000 3ff0000000000000 7ff0000000000000
+edge max 7ff0000000000000 bff0000000000000 7ff0000000000000
+edge max 7ff0000000000000 7ff8000000000000 7ff8000000000000
+edge max 7ff0000000000000 7ff0000000000000 7ff0000000000000
+edge max 7ff0000000000000 fff0000000000000 7ff0000000000000
+edge max fff0000000000000 0000000000000000 0000000000000000
+edge max fff0000000000000 8000000000000000 8000000000000000
+edge max fff0000000000000 3ff0000000000000 3ff0000000000000
+edge max fff0000000000000 bff0000000000000 bff0000000000000
+edge max fff0000000000000 7ff8000000000000 7ff8000000000000
+edge max fff0000000000000 7ff0000000000000 7ff0000000000000
+edge max fff0000000000000 fff0000000000000 fff0000000000000
+edge min 0000000000000000 0000000000000000 0000000000000000
+edge min 0000000000000000 8000000000000000 8000000000000000
+edge min 0000000000000000 3ff0000000000000 0000000000000000
+edge min 0000000000000000 bff0000000000000 bff0000000000000
+edge min 0000000000000000 7ff8000000000000 7ff8000000000000
+edge min 0000000000000000 7ff0000000000000 0000000000000000
+edge min 0000000000000000 fff0000000000000 fff0000000000000
+edge min 8000000000000000 0000000000000000 8000000000000000
+edge min 8000000000000000 8000000000000000 8000000000000000
+edge min 8000000000000000 3ff0000000000000 8000000000000000
+edge min 8000000000000000 bff0000000000000 bff0000000000000
+edge min 8000000000000000 7ff8000000000000 7ff8000000000000
+edge min 8000000000000000 7ff0000000000000 8000000000000000
+edge min 8000000000000000 fff0000000000000 fff0000000000000
+edge min 3ff0000000000000 0000000000000000 0000000000000000
+edge min 3ff0000000000000 8000000000000000 8000000000000000
+edge min 3ff0000000000000 3ff0000000000000 3ff0000000000000
+edge min 3ff0000000000000 bff0000000000000 bff0000000000000
+edge min 3ff0000000000000 7ff8000000000000 7ff8000000000000
+edge min 3ff0000000000000 7ff0000000000000 3ff0000000000000
+edge min 3ff0000000000000 fff0000000000000 fff0000000000000
+edge min bff0000000000000 0000000000000000 bff0000000000000
+edge min bff0000000000000 8000000000000000 bff0000000000000
+edge min bff0000000000000 3ff0000000000000 bff0000000000000
+edge min bff0000000000000 bff0000000000000 bff0000000000000
+edge min bff0000000000000 7ff8000000000000 7ff8000000000000
+edge min bff0000000000000 7ff0000000000000 bff0000000000000
+edge min bff0000000000000 fff0000000000000 fff0000000000000
+edge min 7ff8000000000000 0000000000000000 7ff8000000000000
+edge min 7ff8000000000000 8000000000000000 7ff8000000000000
+edge min 7ff8000000000000 3ff0000000000000 7ff8000000000000
+edge min 7ff8000000000000 bff0000000000000 7ff8000000000000
+edge min 7ff8000000000000 7ff8000000000000 7ff8000000000000
+edge min 7ff8000000000000 7ff0000000000000 7ff8000000000000
+edge min 7ff8000000000000 fff0000000000000 7ff8000000000000
+edge min 7ff0000000000000 0000000000000000 0000000000000000
+edge min 7ff0000000000000 8000000000000000 8000000000000000
+edge min 7ff0000000000000 3ff0000000000000 3ff0000000000000
+edge min 7ff0000000000000 bff0000000000000 bff0000000000000
+edge min 7ff0000000000000 7ff8000000000000 7ff8000000000000
+edge min 7ff0000000000000 7ff0000000000000 7ff0000000000000
+edge min 7ff0000000000000 fff0000000000000 fff0000000000000
+edge min fff0000000000000 0000000000000000 fff0000000000000
+edge min fff0000000000000 8000000000000000 fff0000000000000
+edge min fff0000000000000 3ff0000000000000 fff0000000000000
+edge min fff0000000000000 bff0000000000000 fff0000000000000
+edge min fff0000000000000 7ff8000000000000 7ff8000000000000
+edge min fff0000000000000 7ff0000000000000 fff0000000000000
+edge min fff0000000000000 fff0000000000000 fff0000000000000
+edge sign 0000000000000000 0000000000000000
+edge sign 8000000000000000 8000000000000000
+edge sign 7ff8000000000000 7ff8000000000000
+edge sign 7ff0000000000000 3ff0000000000000
+edge sign fff0000000000000 bff0000000000000
+edge sign 0000000000000001 3ff0000000000000
+edge sign 8000000000000001 bff0000000000000
+edge sign 3ff0000000000000 3ff0000000000000
+edge sign c000000000000000 bff0000000000000
+edge sign 7e37e43c8800759c 3ff0000000000000
