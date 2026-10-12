@@ -1,0 +1,20 @@
+[package]
+name = "ww2-simtest"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+description = "Loads the issue #2 harness's game states into the core and checks the core against the reference JavaScript."
+
+[lib]
+name = "simtest"
+
+[[bin]]
+name = "simtest"
+path = "src/main.rs"
+
+[dependencies]
+ww2-core = { path = "../core" }
+# float_roundtrip parses every number to the nearest double, as JavaScript does; the default parser can be off by
+# one in the last bit, which would break exact comparisons.
+serde_json = { version = "1.0.154", features = ["float_roundtrip"] }
