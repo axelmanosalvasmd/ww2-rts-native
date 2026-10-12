@@ -7,7 +7,8 @@
 // Module hooks rewrite shared/sim.js as it loads, without touching reference/:
 // - timers around the movement block of step()'s unit loop, the separation pass and the vision pass;
 // - a path request keeps the current route (and waits a second before asking again), so no path search runs;
-// - the weather and falling debris stand still.
+// - the weather and falling debris stand still;
+// - units steer by the real map, not each player's remembered view of it, which the Rust port leaves out.
 // The frozen state makes everything else quiet: nobody fires, nothing is in flight, and with crushing and
 // ground wear off the terrain never changes. The run checks that: no random draw and no terrain change.
 import { registerHooks } from 'node:module';
@@ -26,6 +27,8 @@ const PATCHES = [
   ['        else { const route = findPath(g, u, goal); if (route.length) u.path = route; u.repath = 1; }\n', '        else { u.repath = 1; }\n'],
   ['  stepWorldDebris(g, TICK);\n', ''],
   ['  stepWeather(g);\n', ''],
+  // units steer by the real map instead of each player's remembered view of it (rebuilt every tick from the cell log)
+  ['    const trafficView = () => trafficTerrain ??= knownTerrainFor(g, u.owner);\n', '    const trafficView = () => g;\n'],
 ];
 registerHooks({
   load(url, context, nextLoad) {

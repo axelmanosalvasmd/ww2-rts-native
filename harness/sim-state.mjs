@@ -69,8 +69,8 @@ const save = (name, g) => writeFileSync(OUT + name, JSON.stringify({ reference: 
 
 // ---------- the frozen workload ----------
 // Nobody fires, nothing is in flight or burning, nobody digs or builds, and no smoke drifts, so no random number
-// is drawn and the terrain does not change, which keeps every player's terrain view equal to the map.
-// harness/sim-workload.mjs also holds the weather still. Planes leave: they fly by other rules.
+// is drawn and the terrain does not change. harness/sim-workload.mjs also holds the weather still and has units
+// steer by the real map. Planes leave: they fly by other rules.
 export function freeze(g) {
   for (const u of [...g.units.values()]) if (u.air) g.units.delete(u.id);
   for (const u of g.units.values()) Object.assign(u, { holdFire: true, attackId: 0, targetId: 0, amove: null, fireAt: -1, dig: null, build: undefined, entrench: undefined, orders: [] });
