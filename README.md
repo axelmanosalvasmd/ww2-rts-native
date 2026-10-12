@@ -33,6 +33,8 @@ rust/                Cargo workspace (created by #2)
   crates/server/     ww2-server (later)
 unreal/              Unreal 5.8 project (created by #3), binary assets in Git LFS
 DESIGN.md            decisions and measurements
+PARITY.md            what the JavaScript prototype does, and how the native game is measured against it
+docs/parity/         the inventory by area (modes, maps, combat, server, ...)
 AGENTS.md            rules for agents working here
 CHANGELOG.md         every change, in plain words
 ```
@@ -51,5 +53,5 @@ You need Rust (stable) for `rust/`, Node.js to run the reference game and its te
 ## Relation to ww2-rts
 
 - ww2-rts stays the playable game until the native game replaces it, and gameplay changes keep landing there.
-- `reference/ww2-rts` pins the exact commit the Rust core must match. Moving the pin is its own commit, together with the port of whatever rules changed and a passing parity run.
+- `reference/ww2-rts` pins the ww2-rts commit the native game is measured against. That game is a prototype: `PARITY.md` lists what it does and how the native game carries it over, improves it or drops it. Moving the pin is its own commit, together with the port of whatever rules changed.
 - The plan started as axelmanosalvasmd/ww2-rts#65.
