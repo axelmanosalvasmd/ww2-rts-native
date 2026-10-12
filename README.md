@@ -30,6 +30,7 @@ The client links the rules core through a small C interface for placement checks
 reference/ww2-rts/   the JavaScript game, pinned as a git submodule (read-only here)
 rust/                Cargo workspace, pinned to Rust 1.99.0
   crates/core/       rules core: no engine, networking or file-system code
+  crates/simtest/    loads harness states into the core and checks it against the JavaScript
   crates/server/     ww2-server (later)
 harness/             Node scripts that record fixtures from the reference game (run them with x64 Node)
 unreal/              Unreal 5.8 project (created by #3), binary assets in Git LFS
