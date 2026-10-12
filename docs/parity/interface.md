@@ -1,0 +1,183 @@
+# Client/shared interface and determinism (IF)
+
+Source: `reference/ww2-rts` at ww2-rts commit e4e579a; paths are relative to it. The full import table and the mirrored-rules list are in [`client-imports.md`](client-imports.md). Measurements: Node v24.21.0 and rustc 1.98.1 on the Mac (arm64), 1,000,000 inputs per function, measured 2026-10-12 with scratch scripts that are not committed (issue #2 turns this into a committed fixture).
+
+| ID | Behavior / content | Evidence | Rust (Julio) | Unreal (Axel) | Depends on | Acceptance check | Status |
+| --- | --- | --- | --- | --- | --- | --- |---|
+| IF-01 | Static tables and constants: `UNITS` (47 types), `CFG`, `SUPPORT`, `FORTS`, `TERRAIN` and bit flags, `ENTRENCH`, `BUILDABLE`, `CELL`, `TICK`, `OPERATIVE(_WEAPONS)`, `TECH`, `WEATHER`, `SHAPES`, `SLOTS`, limits | `shared/sim.js:26-28,171-177,188,372-473,2042-2044`; `tech.js:13-19`; `weather.js:10,22`; `squad-men.js:8-26` | Export the tables as they stand after module load (load-time edits at `sim.js:177,381,383,413,515-517`); keep `Infinity` in `CFG.houses[3-5].min` (`sim.js:144-146`) | Read tables through the ABI; drop literal copies (20 Hz in 8 files, `* 2` for `CELL`) | UI, NET | Rust table dump equals a Node dump of the module exports, field by field, `Infinity` included | todo |
+| IF-02 | Snapshot decode helpers: `UNIT_ROW` columns, flag bits, `CARGO_SHIFT`, fog runs (`unpackRuns`), cell state bits (`startState`/`packState`), held-set check | `sim.js:2352-2356,4667,5878-5887,5951`; `client/world-state.js:11`; `client/fog.js:29-30,72` | ABI: `decode_fog_runs`, `start_state(ch, c)`, row and flag constants | Decode rows only through these; no hand-written masks (6 literal masks today, see `client-imports.md`) | NET | Recorded snapshot stream decodes to the same unit, fog and cell state as `client/` JS | todo |
+| IF-03 | Availability, prices, population: `priceOf`, `supCost`, `abCost`, `popCap`, `popUse`, `dropPop`, `buildKinds`, `builderTypes`, `canBuild`, `isSkirmishBaseMode`, `productionAccess`, `productionBuildings`, `tierOf`, `techCost`, `winVp`, plus the client's `availability()` and deny codes | `sim.js:378-394,520-549,628`; `tech.js:10,22`; `client/availability.js:6-23,46-164` | ABI over a snapshot-built view (mode, own rows, queues, resources); expose deny reason codes | Call the ABI for every HUD enable state; no Blueprint copies | BASE, LOG, UI | Fixture of 1,000 recorded snapshots plus actions: ABI result equals JS `availability()`; known gaps listed in `client-imports.md` kept or fixed and recorded | todo |
+| IF-04 | Placement preview for buildings and forts: `placementCheck` with `teamSees` on a client view built from the snapshot | `sim.js:1012-1018,1747-1751,3261-3305`; `client/availability.js:169-198`; `client/main.js:1297` | ABI takes a client view (known chars, heights, layers, visible units, smokes, nodes, regions, rail yard), never the world | Build the view from its own snapshot and map | BASE, MAP | 1,000 recorded previews: same `ok`, `reason`, `cells` as JS. Separate fixture lists the known server mismatches (hidden units, mines, weather, planes) | todo |
+| IF-05 | Entrenchment and dig preview: `entrenchPlan`, `segmentCost`, `lineFort`, plus client `nearestDigger` and `defaultDir` | `sim.js:449,477-512,3651-3673`; `client/main.js:1204-1215,1328,1383` | ABI `entrench_plan`, `segment_cost` with V8-exact `atan2`, `cos`, `sin`, `hypot`, `round` | Use ABI output for ghosts and costs | ENG, BASE | 10,000 random (a, b, back, pattern, fort): segment list bit-equal to V8 | todo |
+| IF-06 | Formation orders: `facingSpots`, `slotSize`, `SHAPES`, plus client `rearRank`, `snapToTrench`, clamp; the result is the `move` order payload | `formation.js:8-53`; `client/main.js:1411-1441`; server copy `sim.js:4005-4006` | ABI `facing_spots` (cos, sin, sqrt, `Math.round` in the comparator) | Send ABI spots; replicate `rearRank`, trench snap and clamp or get them from the ABI too | MOV, UI | 10,000 random selections: spot list bit-equal to V8; same click and positions give the same `move` JSON as the browser | todo |
+| IF-07 | Cover preview: cover class per cell and directional cover toward a shooter (client mirror, no shared export) | `client/cover-preview.js:13-53,161-162`; `sim.js:2262-2339` | Add a client-view cover query to the ABI (the sim's rule, not the client's 4-bucket copy) or keep the mirror and record it | Draw cover rings from the ABI | CMB, UI | `test.js:3572` cases pass through the ABI; differences from the JS mirror listed | todo |
+| IF-08 | Map and terrain presentation helpers: `levelOf`, `levelChar`, `houseKindsWhere`, `worldLayers`, `composeWorldCell`, `railYard`, `roadMask`, `mapMood`, `mapWeather`, `weatherEffects`, `territoryEdges`, `insideKnownRegion`, `RAIL_DIRS` | `sim.js:1245-1250,2274-2290,2827-2828`; `world-layers.js:16,53`; `weather.js:37-122`; `world-territories.js:108-144` | Pure ABI functions over the map the client received (`mapForClient`, `world-layers.js:68`) | Use for terrain, houses, borders, rail, weather look | MAP, UI | Every committed map: Rust output equals JS output (house kinds, layers, edges, road mask) | todo |
+| IF-09 | Squad men slots: `SLOTS`, `SLOT_SCALE`, `GUN_SLOTS`, `menDrawn`, `menAt` (hit spots) | `squad-men.js:8-34`; `client/unit-models.js:484-497`; `client/main.js:948` | Export tables; `men_at` in the core (operative hits use it, `sim.js:2069`) | Place men from the tables; men alive via ABI `men_drawn` | FPS, CMB | Same slot list and drawn count for every type and hp | todo |
+| IF-10 | Operative prediction: `OPERATIVE` constants and `predictStep` (client copy of `stepOperative`) | `client/operative-controls.js:5-29`; `sim.js:2042,2109-2135` | ABI `predict_step` matching `stepOperative` minus walls, at TICK | Predict at 20 Hz (JS predicts at 1/120 s, `client/operative-view.js:425`) and reconcile | FPS | Open-ground fixture: ABI step bit-equal to the server step at TICK | todo |
+| IF-11 | Vehicle pose and projectile flight: `movementProfile`, `isGroundVehicle`, `bodyRadius`; `flightAt`/`velocityAt` (client copy) | `vehicle-motion.js:15-17`; `client/engine-presentation.js:138-141`; `projectiles.js:22-26`; `client/projectiles.js:35-39` | ABI exports; presentation only | Use for suspension pose and shell flight | MOV, CMB | Recorded flights: same positions as JS at the same times | todo |
+| IF-12 | Authoring calls: `validateMap`, `spawnsFor`, `createGame`, `findPath`, `migrateScenario`, `migrateWorldMap`, `houseKinds`, `playMatch` (fairness worker plays whole AI matches) | `sim.js:574-628,682,3068`; `client/editor.js:60-168`; `client/fairness.js:5-20` | Optional ABI for an editor: needs the whole core and AI; no hidden state (user's own map) | Only if an Unreal editor is in scope | TOOL, AI | Every committed map: same `validateMap` result; fairness verdict equal with a seed | todo |
+| IF-13 | Client-only command rules: right-click mapping, autocast adoption from local storage, F-key ability, dig recipient | `client/orders.js:9-66`; `client/autocast.js:24-30`; `client/main.js:1328,1387` | None (client rules) | Reproduce, or the same clicks send different commands | UI | Scripted input fixture: Unreal sends the same command JSON as the browser | todo |
+| IF-14 | No hidden world state through the C interface | `client/availability.js:5,45,166` (client rules read only the snapshot); `world-layers.js:68-80` strips mines and triggers | ABI functions take client-built views; no handle to the authoritative game | Never link the server crate into the client | NET | Header review: no ABI symbol accepts or returns a server game handle; fuzz with a fogged view gives no unseen unit | todo |
+| IF-15 | `Math.hypot` with V8's algorithm: 86 two-argument and 4 three-argument calls in `shared/` and the tick path | V8 `src/builtins/math.tq` on main, fetched 2026-10-12 (two args: `sqrt((a/m)^2+(b/m)^2)*m`; three args add a compensation term), matched by Node 24.21.0 on 1,000,000 inputs; 3-arg at `debris-motion.js:14,51`, `projectiles.js:30,93` | `js_hypot2`, `js_hypot3` ports; never `f64::hypot` | Same via ABI | MOV, CMB | Measured: `f64::hypot` differs from V8 on 379,300 of 1,000,000 inputs (max 2 ulp); the ported formula on 0. Keep this as a CI fixture | todo |
+| IF-16 | Transcendentals bit-equal to V8: `sin` 79, `cos` 78, `atan2` 56, `exp` 5, `log` 1, `tan` 1 calls (shared plus tick path) | V8 `src/base/ieee754.cc` on main ("adapted from fdlibm"); confirm for the pinned Node; counts in Determinism hazards | Port V8's fdlibm functions; do not use the platform libm | Same via ABI | all | Measured Rust std vs V8: sin 43,564, cos 46,964, tan 383,747, atan2 177,577, exp 97,471, log 19,364 of 1,000,000 differ (1 to 3 ulp). Fixture: 0 differ after the port, on Linux and Windows too | todo |
+| IF-17 | Power: 17 `**` uses (no `Math.pow`), 7 on the match path (6 with variable exponents; `vehicle-motion.js:90` squares) | `sim.js:885,903,915,931,5590`; `tech.js:32`; `vehicle-motion.js:90`; V8 `src/numbers/ieee754.cc` on main: `y == 2` gives `x * x`, `y == 0.5` gives `sqrt`, otherwise `std::pow` (`--use-std-math-pow` defaults on in Node 24.21.0) | `js_pow` with the same two special cases, then the platform `pow`; pin the reference OS | n/a | ENG, MODE | Measured on macOS: `x ** 2` equals `x * x` on 1,000,000 inputs; random `a ** b` equals Rust `powf` (0 differ). JS itself uses the OS libm here, so rerun on each target OS | todo |
+| IF-18 | `Math.round` halves toward +Infinity and returns -0 for [-0.5, -0): 71 calls | `sim.js:452,3290,5877,6013` (negative inputs possible) | `js_round`; not `f64::round`, not `floor(x + 0.5)` | Same via ABI | NET, AI | `Math.round(-2.5)` is -2, `Math.round(0.49999999999999994)` is 0 (checked in Node); fixture of 10,000 values including halves and -0 | todo |
+| IF-19 | `Math.max`/`min` NaN and -0 rules, JS ToInt32/ToUint32/`imul`, `%` sign | `sim.js:2345,869-873`; `grid.js`; determinism notes | `js_max`, `js_min`, `to_int32`, `to_uint32`, `imul` helpers | n/a | all | Unit fixtures against Node for edge values (NaN, -0, 2^32+x, negatives) | todo |
+| IF-20 | RNG streams: mulberry32 everywhere; global `Math.random` (combat and AI), `g.seed` stream (wind, rain, fire, rubble), Horde profile and purchase streams, per-seat commander streams | `sim.js:674,772,805,2345,869-946,4148-4172,4705-4710,5273-5287,5625`; `ai.js:152-153,1034`; `ai-human.js:40-61` | One mulberry32 type; separate streams; same draw order, including the eager draw at `ai.js:1034`; `f64` accumulator variant for `playMatch` and commanders | n/a | CMB, AI, MODE | Draw-count and sequence fixture: Rust call sites log (site, value) equal to an instrumented JS run for 2,400 ticks | todo |
+| IF-21 | Match seeding: live server never seeds `Math.random`; `playMatch({ seed })` replaces it with mulberry32 for the whole match | `ai-schedule.js:37-72`; `server.js:381`; `sim.js:772` | The Rust match takes one seed and derives the global stream as `playMatch` does | n/a | MODE, NET | `test.js:4828-4832` repeated in Rust: same seed same units, other seed different | todo |
+| IF-22 | Iteration order: `g.units` by ascending id, stepped live (units trained or placed during `step` are visited the same tick); insertion-ordered `g.fires`, `g.soak`, `g.worldContacts`, `g.aid`, navigation `edges` and `routes` | `sim.js:711,768-770,1073,4826-4832,5342,5352,5396`; `navigation.js:276,290` | `BTreeMap` with "next id after the last visited" iteration; `IndexMap` with `shift_remove` | n/a | all | Fire-spread and spawn-in-step fixtures: same per-tick unit and fire order as JS | todo |
+| IF-23 | Spatial grid query order and A* exactly as written: bucket order, append-on-move, sort-on-rebuild, k-way merge; hand-written heap with `Float32Array` g-scores | `grid.js:12-129`; `sim.js:2868,3037-3064,3160-3161,5308,5910,6012` | Literal ports; `rebuildGrid`/`updateGrid` at the same call points | n/a | MOV, CMB | `findPath` fixture on every committed map: identical waypoint lists; grid query fixture: identical id order | todo |
+| IF-24 | Typed-array storage rounding: `Float32Array` cell HP, wear, scar, toughness, A* scores; `Int8Array` heights; compare the `f64` value before storing | `sim.js:752,757,764-776,4772,4783,5039-5076` | Store `f32`/`i8`/`u8`/`u16`/`i16`, compute in `f64` | n/a | ENG, MAP | Crater and trench-wear fixture: cell state rows equal after 6,000 ticks | todo |
+| IF-25 | Sorts: stable, numeric-difference comparators (23 in `sim.js`, 28 in `ai.js`, 9 in `supply-convoys.js`); NaN treated as equal by V8 | determinism notes | `sort_by` (stable) with the same comparator; debug-assert no NaN | Same via ABI (formation comparator) | AI, LOG | Comparator fixtures with ties; debug runs report zero NaN comparisons | todo |
+| IF-26 | Float-derived keys and JSON equality: `x + ',' + z`, `${kind}:${x}:${z}`, quarter-metre handoff keys, `JSON.stringify` comparisons | `sim.js:1906,3216,3434,4026,5861`; `ai.js:187` | Key by `f64` bits with -0 folded to 0; port JSON comparisons as field equality with JS printing rules | n/a | MOV, AI | Fixture with -0, NaN and near-equal floats gives the same grouping | todo |
+| IF-27 | State outside `g`: path queue and retry counts, grid, navigation caches, AI memory, commander seats live in module `WeakMap`s; saves keep `g` and AI memory only | `sim.js:3035,2865`; `ai.js:159`; `ai-human.js:35`; `server/saves.js:18-27`; `server.js:426,447-448` | Either reproduce the reset on load or save the state and record the change in `DESIGN.md` | n/a | MODE, TOOL | Save at tick N, load, run to 2N: compare with JS doing the same | todo |
+| IF-28 | Tick and order timing: 20 Hz, commands applied on arrival between ticks, `away` from socket state, operative input throttled by wall clock | `sim.js:27`; `server.js:633,713,784,791-800` | Queue commands into a per-tick log; parity replays (tick, order, payload), `away` changes and pauses | Send orders as today | NET | Replay a recorded live JS session: same final state hash | todo |
+| IF-29 | AI view beat depends on measured server time: `sent` uses adaptive `snapEvery` (2 to 4) | `room-tick.js:14,21`; `tickmeter.js:21-41`; `ai-schedule.js:28-33` | Make the beat an explicit input (log it per tick) or fix it at 2 and record the change | n/a | AI, NET | With a logged beat, JS and Rust AI orders match per tick | todo |
+| IF-30 | Whole-match parity harness: seeded six-AI runs hashed at the end | `tools/bench.mjs:25-33,53-55,107-114`; `test.js:4828-4832` | Emit the same state JSON (`tick`, `winner`, `vp`, `mp`, units by id with `type`, `owner`, `x`, `z`, `hp`), printing numbers as JS does (shortest round trip, `-0` as `0`), and its sha256 | n/a | TOOL | Classic and Conquest, seed 0x3c1055, 6,000 ticks: Rust sha256 equals JS | todo |
+| IF-31 | World generation determinism, if ported: five mulberry32 streams and an LCG, `sin`/`cos` floored into heights, `Float32Array` cost grids | `world-conquest.js:24-38,176-180`; `world-landforms.js:7-29`; `world-scenery.js:6-32`; `world-roads.js:9,86`; `world-rails.js:10,63` | Port with IF-16 and IF-20, or generate in JS and load as data | n/a | MAP | `test-world-generation.js:37` seeds (0, 1, 42, 20261003, 4294967295), both sizes: maps deep-equal | todo |
+
+## Determinism hazards
+
+Severity: **High** changes the match unless the port copies it exactly; **Medium** can change it in rare cases (ties, edge values, long matches, save and load); **Low** presentation, logging or non-match code.
+
+### `Math.*` calls per file (shared plus tick path)
+
+Command: a Node script counting `/Math\.(\w+)/g` in each file. `server/room-tick.js` and `shared/command-feedback.js`, `scenarios.js`, `tech.js` have none.
+
+| File | max | floor | min | abs | hypot | sin | cos | round | ceil | PI | atan2 | random | imul | sign | sqrt | exp | log | tan | Total |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| shared/ai-human.js | 4 | 2 | 2 | 4 | 2 |  | 1 | 1 |  | 1 |  |  | 3 |  | 1 | 1 | 1 |  | 23 |
+| shared/ai-mind.js | 7 | 3 | 7 | 1 | 1 |  |  |  | 1 |  |  |  |  |  |  |  |  |  | 20 |
+| shared/ai-schedule.js |  |  |  |  |  |  |  |  |  |  |  | 4 | 2 |  |  |  |  |  | 6 |
+| shared/ai-view.js |  | 4 |  |  | 1 |  |  |  |  |  |  |  |  |  |  |  |  |  | 5 |
+| shared/ai.js | 6 | 12 | 7 |  | 3 | 6 | 6 | 5 | 2 | 10 | 6 | 3 |  |  |  |  |  |  | 66 |
+| shared/debris-motion.js | 6 |  | 6 | 1 | 3 | 1 | 1 |  | 1 | 2 |  |  |  |  |  | 4 |  |  | 25 |
+| shared/formation.js | 4 | 1 | 5 |  |  | 2 | 2 | 1 | 4 | 2 | 1 |  |  |  | 1 |  |  |  | 23 |
+| shared/grid.js |  | 10 |  |  | 2 |  |  |  |  |  |  |  |  |  |  |  |  |  | 12 |
+| shared/local-traffic.js | 5 | 3 | 5 | 1 | 6 |  |  | 1 |  |  |  |  |  | 1 |  |  |  |  | 22 |
+| shared/logistics.js | 14 | 2 | 8 |  |  |  |  |  | 1 |  |  |  |  |  |  |  |  |  | 25 |
+| shared/movement.js | 2 |  | 5 | 3 | 2 | 2 | 4 |  |  | 4 | 6 |  |  |  |  |  |  | 1 | 29 |
+| shared/navigation.js | 5 | 14 | 10 | 13 | 2 |  |  |  | 4 |  |  |  |  |  |  |  |  |  | 48 |
+| shared/projectiles.js | 11 | 2 | 9 | 6 | 4 | 1 | 1 |  | 1 | 4 |  |  |  | 2 | 3 |  |  |  | 44 |
+| shared/sim.js | 134 | 128 | 144 | 56 | 41 | 44 | 48 | 22 | 35 | 22 | 36 | 21 | 6 | 4 | 5 |  |  |  | 746 |
+| shared/squad-men.js |  | 1 |  |  |  | 1 | 1 |  | 1 |  |  |  |  |  |  |  |  |  | 4 |
+| shared/story.js | 1 | 1 |  |  |  |  |  | 2 |  |  |  |  |  |  |  |  |  |  | 4 |
+| shared/structures.js |  | 2 |  | 2 |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 4 |
+| shared/supply-convoys.js | 15 | 1 | 14 |  | 1 |  |  | 4 | 1 |  |  |  |  |  |  |  |  |  | 36 |
+| shared/tutorial.js | 1 |  |  |  |  |  |  |  | 1 |  |  |  |  |  |  |  |  |  | 2 |
+| shared/vehicle-motion.js | 16 | 15 | 12 | 30 | 7 | 5 | 6 |  | 3 | 5 | 5 |  |  | 8 | 1 |  |  |  | 113 |
+| shared/weather.js | 1 | 3 | 1 |  |  |  |  | 1 | 1 |  |  |  | 2 |  | 1 |  |  |  | 10 |
+| shared/world-conquest.js |  | 5 | 2 | 2 | 5 | 3 | 2 | 2 |  | 2 |  | 1 | 3 |  |  |  |  |  | 27 |
+| shared/world-landforms.js | 5 | 9 | 7 | 5 | 1 | 7 | 1 | 8 |  | 4 | 1 |  | 2 |  |  |  |  |  | 50 |
+| shared/world-layers.js |  | 1 |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 1 |
+| shared/world-rails.js | 6 | 11 | 5 | 2 | 3 | 1 | 1 | 4 | 1 | 1 | 1 |  |  |  |  |  |  |  | 36 |
+| shared/world-roads.js | 7 | 9 | 6 | 4 | 5 |  |  | 2 |  |  |  |  |  |  |  |  |  |  | 33 |
+| shared/world-scenery.js | 7 | 17 | 1 | 4 | 1 | 6 | 4 | 5 |  | 2 |  |  | 5 |  |  |  |  |  | 52 |
+| shared/world-territories.js | 3 | 5 | 3 | 1 |  |  |  |  |  |  |  |  |  |  |  |  |  |  | 12 |
+| server.js | 6 | 5 | 3 |  |  |  |  | 13 | 4 |  |  | 1 |  |  |  |  |  |  | 32 |
+| **All** | 266 | 266 | 262 | 135 | 90 | 79 | 78 | 71 | 61 | 59 | 56 | 30 | 23 | 15 | 12 | 5 | 1 | 1 | 1510 |
+
+Not used anywhere in scope: `Math.pow`, `cbrt`, `trunc`, `fround`. The `**` operator appears 17 times (`debris-motion.js:5`, `sim.js:772,805,885,903,915,931,5590`, `tech.js:32`, `vehicle-motion.js:90`, `world-rails.js:48` (2), `:56`, `world-roads.js:58` (2), `:148` (2), `server.js:381`). Of the 30 `Math.random` mentions, 4 in `ai-schedule.js` and 1 in `world-conquest.js` are the seeding code or a default, not draws.
+
+Which functions are safe to take from Rust's `f64`: `sqrt` (0 differ in 1,000,000), `floor`, `ceil`, `abs`, casts of in-range values, and basic arithmetic. Not safe: `hypot`, `sin`, `cos`, `tan`, `atan2`, `exp`, `log` (measured, IF-15 and IF-16), `round`, `max`, `min` (semantics, IF-18 and IF-19), and `sign` (`Math.sign(0)` is 0 and `Math.sign(-0)` is -0, while `f64::signum` returns 1 and -1). `pow` depends on the OS libm on both sides (IF-17). Bun plays the same seed differently because "its math functions differ" (`CHANGELOG.md:100`), which is the same hazard seen from another engine.
+
+### Wall clock and unseeded randomness
+
+| Where | What | Severity |
+| --- | --- | --- |
+| `server.js:795-800` | `setInterval` every 10 ms on `process.hrtime`; up to 4 due ticks per poll, then the backlog is dropped. Every room in the process shares one loop and one `Math.random` | High: other rooms' draws change this room's |
+| `server.js:381` | `weatherSeed: Math.floor(Math.random() * 2 ** 31)` drawn before every `createGame` | High (always consumes a draw) |
+| `server.js:365` | World seed from `randomBytes(4)` unless `room.worldSeed` | Medium (log it) |
+| `server/room-tick.js:8-46`, `tickmeter.js:21-41` | `Date.now`/`hrtime` phase timing sets `room.snapEvery`, which sets `sent` (`room-tick.js:14`) and so the AI view beat | High |
+| `server/room-tick.js:24-31` | Snapshots, and the `rebuildGrid` inside `snapshotCache`/`snapshotFor` (`sim.js:5910,6012`), run only when someone is connected | Medium (grid order seen by the next commands) |
+| `server.js:784` | `away` set from socket state every tick; it stops income and VP (`sim.js:5733-5752`) and blocks commands (`sim.js:3409`) | High (log it) |
+| `server.js:713` | `command()` on message arrival, between ticks | High (log tick and order) |
+| `server.js:631-633` | Operative input dropped unless 20 ms of wall time passed | High for FPS |
+| `server.js:509-517`, `743-751` | Pause end by wall clock; half-speed ending (step every second held tick) | Low |
+| `server/map-pings.js:8`, `shared/command-feedback.js:2` | Rate limits | Low |
+
+No `performance.now`, `new Date`, `setTimeout`, `setInterval`, `setImmediate`, `queueMicrotask` or `process.env` in `shared/`.
+
+`Math.random` draw sites on the match path (all from the one global stream): `sim.js:674` (spawn layout), `772` (`g.seed`), `805` (random weather), `2055` (operative spread), `4148` (rocket scatter), `4171-4172` (hit roll, miss offset and side), `4705` (flak downs a plane), `4710` (bombs or recon left), `5273`, `5280`, `5287` (smoke, bombing, artillery offsets), `5625` (salvo impact), `ai.js:152-153` (cover spot or angle), `ai.js:1034` (the object literal `{ ..., flakpos: (Math.random() - 0.5) * 2 }[next]` evaluates the draw every time the line runs, whatever `next` is).
+
+### `shared/sim.js`
+
+High:
+- `rng(g)` (`:2345`) and `hordeRandom` (`:869-873`) use `| 0`, `>>> 0`, `Math.imul`; `g.seed` is a uint32 double before the first draw and an int32 after (`:772`). Streams: `g.seed` feeds wind and rain at creation (`:773-775`), wind every tick and shower changes, fire ignition and spread (one draw per flammable neighbour, `:4832`), rubble spill. Horde: `profileSeed` copies the mutated `g.seed` (`:859`); purchases use `{ seed: profileSeed + wave }` (`:929`, drawn at `:946`).
+- `step()` iterates the live `g.units` Map (`:5342`) while `train()` spawns (`:5352`, `:1073`) and digging places fort units (`:5396`); JS visits entries added during iteration. Other passes iterate copies (`:4914`, `:5605`, `:5798`).
+- `g.fires` is an insertion-ordered Map (`:768`); `burn()` iterates a copy (`:4826`) and draws `rng(g)` per neighbour in that order (`:4832`).
+- Typed arrays the sim reads back: `Float32Array` `cellHp`, `surfaceWear`, `wear`, `scar` (`:764-769`), `tough` (`:752`), `trenchFront` (`:757`), A* `gs` (`:2868`), supply `damage`/`cost`/`rate` (`:5039-5076`); `Int8Array` heights (`:776`); `Uint16Array` flags (`:710`). `(g.wear[c] += ...) >= 1` (`:4772`) and `(g.cellHp[c] -= hit) <= 0` (`:4783`) compare the unrounded `f64`.
+- A*: `cost < gs[n]` against an `f32`-rounded score (`:3160-3161`); hand-written heap with its own tie rules (`:3037-3064`); costs `1.414` and octile heuristic.
+- Snapshot rows rounded with `Math.round(v * 10) / 10` (`:5877`, `:6013`) are the AI's input (`ai-view.js:9-21`); `rot`, `aim`, `vx`, `vz` can be negative halves.
+- `**` with variable exponents on the match path (IF-17).
+
+Medium:
+- Module state outside `g`: `pathWork`, `pathFailures` (`:3035`), `pathBuffers` (`:2865`) and several view caches; lost on save and load.
+- `handoffViews` key `Math.round(n * 4)` joined with `:` (`:1906`); keys `o[1] + ',' + o[2]` (`:3434`, `:4026`), `pathGoalKey` (`:3216`); `JSON.stringify(old) === JSON.stringify(cell)` (`:5861`).
+- `Math.round` on possible negative halves: `squareDir` (`:452`), footprint corner (`:3290`).
+- Insertion-ordered sets used as FIFOs or worklists: `g.worldContacts`, `g.soak` (`:770`), `g.aid`.
+- 23 sorts, all numeric differences; `.sort(...)[0]` picks the first minimum (placement depot, `:3283`).
+- `Math.max(...[])` is `-Infinity`; NaN and -0 handling in `max`/`min`.
+
+Low: 19 other `Math.round` sites on non-negative values; `%` on signed values (JS and Rust agree; never use `rem_euclid`); string-keyed `Object.keys` over tables.
+
+### `shared/grid.js`
+
+High: `SpatialGrid` (16 m buckets) fixes the order of every neighbour query. `inOrder` and `radius` return units-Map order through a per-record `order` counter and a k-way merge; `unordered` and `heavy` return bucket scan order, and moved units sit at the end of their bucket until `rebuild()` sorts it (`grid.js:25-41`, `77-128`). Callers take the first match or sum floats over the result.
+
+### `shared/navigation.js`
+
+High: region labels reuse a free list; Dijkstra breaks ties on score then region id (`navigation.js:247`) with a `Math.hypot` metric (`:246`); neighbours in `edges` Map order (`:276`). Medium: the 128-entry route cache evicts the oldest key (`:290`).
+
+### `shared/ai.js`, `ai-human.js`, `ai-schedule.js`
+
+High: AI draws share the combat stream (`ai.js:152-153`, `1034`). Commander seats seed their own mulberry32 from the live `g.seed` the first time a seat is used (`ai-human.js:61`) and sample timings through `Math.log`, `Math.cos`, `Math.exp` (`ai-human.js:51-52`). Planner beat `(g.tick + slot * 13) % every` with `every` 120, 40, 20 ticks for easy, normal, hard (`ai-schedule.js:14-15`, `ai.js:233-239`); views refresh only on `sent` ticks (`ai-schedule.js:31`).
+
+Medium: AI memory (`ai.js:159`) is saved; commander state (`ai-human.js:35`) is not. `ownPlan` compares `JSON.stringify` output (`ai.js:187`). The `seeded` closures in `ai-schedule.js:37-45` and `ai-human.js:40-48` add `0x6D2B79F5` to a double with no `| 0`, so they stay exact mulberry32 only for about 4.9 million draws (2^53 / 0x6D2B79F5); Rust needs the same `f64` accumulator. 28 sorts in `ai.js`.
+
+### World generation (`world-conquest.js`, `world-landforms.js`, `world-scenery.js`, `world-roads.js`, `world-rails.js`)
+
+High if ported: heights floor `Math.sin`/`Math.cos` values (`world-landforms.js:7-15`), so one ulp can move a level; `Float32Array` road and rail cost grids; five mulberry32 streams (main and hydrology both start from the same seed) and a name LCG (`world-conquest.js:176-180`). Runs once per World match.
+
+### Other files
+
+`supply-convoys.js`: 9 numeric sorts (one subtracts booleans, `:92`), stores follow `g.aid` order (Medium). `weather.js`: seeded plan only for `random` weather (Low). `formation.js:35-40`, `story.js:49`: stable sorts (Low, but `formation.js:36` has `Math.round` inside the comparator and feeds orders, IF-06). `server/saves.js:20-24`: `v8.serialize` keeps doubles, Map and Set order and typed arrays exactly (Medium only through the module state it leaves out).
+
+## Scheduling
+
+- **Tick rate**: 20 Hz (`TICK = 1 / 20`, `shared/sim.js:27`).
+- **Server loop**: catch-up, not a fixed timer. `setInterval(..., 10)` polls `process.hrtime.bigint()`, runs every due tick (at most 4 per poll) and, if still behind, drops the backlog and schedules the next tick one period from now (`server.js:791-800`; the comment explains Windows' 15.6 ms timer steps made `setInterval(50)` run at 80% speed). Rooms tick in `rooms` Map order (`server.js:778-790`).
+- **Within a tick** (`server/room-tick.js:7-46`): `step(g)`, then `aiTick` for the room's AI seats in slot order plus the Horde seat last, then snapshots when `sent`. Ticks are skipped while paused (`server.js:509-519`); after a winner the sim steps every second tick for 6 s (`server.js:742-757`).
+- **Orders**: applied the moment a WebSocket message arrives, between ticks (`server.js:712-714`), so which tick an order lands on depends on the network. Operative input is also throttled by wall time (`server.js:631-633`).
+- **AI scheduling**: fixed in ticks for thinking (`ai-schedule.js:14-15`; commander inputs on their own sampled timings, `ai-human.js:51-52,81-90`) but **adaptive** for what the AI sees: views are rebuilt only when `sent`, and `sent = g.tick % room.snapEvery === 0` with `snapEvery` raised from 2 toward 4 when the p95 snapshot tick exceeds 40 ms and lowered after 10 s under 24 ms (`tickmeter.js:21-41`). So live AI behavior depends on measured server time. `playMatch` and the tools fix the beat at 2 (`ai-schedule.js:28,65`).
+- **Other timing inputs**: the `away` flag from socket state each tick (`server.js:784`), handing a leaving player's army to an AI mid-match (`server.js:521-527`), drop pauses up to 30 s, World autosave every 2 minutes (`server.js:418,787`; no effect on the sim found), connection-dependent `rebuildGrid` from snapshot building.
+- **Does whole-match determinism hold in JS?** Only for headless runs that seed `Math.random`. Tests that run the same seed twice and compare:
+  - `test.js:4828-4832` ("playMatch replays a seed exactly"): default map, 3 AI, 1,200 ticks, compares `[id, type, x, z, hp]` of every unit; another seed must differ.
+  - `test-ai-human.js:18-28`: two 3-minute Conquest runs per level, seed 7, same commander inputs.
+  - `test-world-generation.js:33-38`: `generateWorldMap` twice per seed and size, deep-equal.
+  - `test-movement-lab.js:54-56`: vehicle scenarios twice, same verdict and metrics.
+  - `test-engine-ai.js:148`: Horde wave roster from a seed.
+  - `test.js:7104,7117`: weather plans from a seed.
+  - The CHANGELOG's "same state" claims compare one checkout against another: `tools/bench.mjs` seeds `Math.random` with mulberry32 seed `0x3c1055` (`:25-33,53-55`), plays six Massive AI armies on `king-of-the-hill` (Classic) and `six-fronts` (Conquest) for up to 6,000 ticks with the server's `aiTick`, and prints a sha256 of `{ tick, winner, vp, mp, units: [{ id, type, owner, x, z, hp }] }` (`:107-132`); `--root DIR` runs another checkout. `tools/bench-engine.mjs:61` has a similar `stateHash`. No committed script for the "seeded six-AI World" run was found; it is probably an ad hoc `playMatch` call.
+  - Live rooms are not reproducible (unseeded shared `Math.random`, arrival-time orders, adaptive AI beat).
+
+## Existing limitations
+
+- Live JS play cannot be replayed: there is no order log, `Math.random` is unseeded and shared across rooms in a process, and the AI's view beat follows server load. Parity work must use `playMatch`-style seeded runs or a new replay log (IF-28, IF-29).
+- The JS client's placement preview differs from the server in four known ways: no weather in sight, planes treated as ground eyes, hidden units and mines unknown (`client/availability.js:187-198`).
+- Formation spots come from eased display positions (`client/main.js:1419,1925`), so the same click can produce different `move` orders in two clients.
+- Several rules are hand-copied in the client rather than imported (cover, population with drops in flight, Classic queue limit 5, `isConstructionMode` five times, the 20 Hz literal in 8 files); see [`client-imports.md`](client-imports.md).
+- Save and load restart the commander AI and the path queue, so a loaded match is not the match played straight through (`server.js:447-448`).
+- `CFG.houses` contains `Infinity`, which a JSON export turns into `null`.
+- Bun already plays the same seed differently from Node (`CHANGELOG.md:100`): the game is only reproducible on one engine today.
+
+## Open questions for the owners
+
+1. Julio: is the parity target "same as `playMatch` with a seed" (fixed AI beat of 2, no network timing), or must Rust also replay live sessions? The second needs a JS-side order log first, which means a ww2-rts change.
+2. Julio: should the Rust server keep the adaptive `snapEvery` AI beat, or fix it at 2 and record that in `DESIGN.md`? Keeping it makes AI play depend on machine speed.
+3. Julio: one global combat-and-AI stream shared across rooms is a JS accident. Per-room streams are the obvious fix, but they break parity with live JS (not with `playMatch`). Record as a deliberate change?
+4. Julio: which OS is the parity reference? Node evaluates `a ** b` (other than `b` = 2 or 0.5) with the OS `pow`, so the JS game can itself differ between macOS, Linux and Windows. The 0-difference result above is macOS only; rerun the fixture on the Vostro and on Windows.
+5. Axel: should the cover preview call the sim's real cover rule through the ABI (more exact, needs `coverQ` data the client lacks) or keep the JS client's simplified 4-bucket copy?
+6. Axel: is an Unreal map editor in scope? If not, IF-12 (`createGame`, `findPath`, `playMatch` in the client) can stay out of the ABI.
+7. Both: should the client view passed to `placementCheck` include weather and plane flags (fixing the JS preview gaps), which changes behavior relative to the browser client?
+8. Julio: port World generation to Rust, or generate maps with the pinned JS and load them as data? Porting means matching `sin`/`cos` bit for bit at every height step.

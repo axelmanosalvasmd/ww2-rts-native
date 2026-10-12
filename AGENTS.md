@@ -14,15 +14,17 @@ Every change must be recorded in `CHANGELOG.md` in the same commit as the change
 - Include numbers when you measured something (for example "2,000 units: 9.1 ms mean, 14.3 ms p95 per tick on the Vostro").
 - Note bugs you fixed and anything you found but left for later.
 
-## The rules core must match the JavaScript game
+## The JavaScript game is the prototype
 
-- `reference/ww2-rts` is the specification. From the same map, seed and orders, the Rust core must produce the same match as the pinned JavaScript. A difference is a bug in the port, unless `DESIGN.md` records it as a deliberate change.
-- Never edit `reference/ww2-rts` here. Gameplay changes land in ww2-rts first. Moving the pin is its own commit, with the port of the changed rules and a passing parity run.
-- Keep the core deterministic:
-  - no wall-clock time and no unseeded randomness;
+- `reference/ww2-rts` is the prototype: it was built to try the game's ideas out, and nothing in it is fixed. Build every feature in `PARITY.md` with the same intent, and take the better architecture, algorithm or rule wherever Rust allows one. Record each such choice in `DESIGN.md`.
+- Before marking a `PARITY.md` row done, or changing something players would notice, read "How parity is judged" in `PARITY.md`: it says what is compared exactly, what by outcome, and which changes need both owners.
+- Never edit `reference/ww2-rts` here. Moving the pin is its own commit, with the port of the changed rules and the affected `PARITY.md` rows updated.
+- Keep the core deterministic, so a match replays from its seed and orders on every platform:
+  - no wall-clock time and no unseeded randomness; one recorded seed per match;
   - no iteration over Rust's default `HashMap` or `HashSet` where order affects results (use `BTreeMap` or sorted keys);
   - work split across threads merges in a fixed order;
-  - match V8's `Math` results where the JavaScript uses them (for example `Math.hypot`), or record the difference.
+  - ties break on a defined key such as the unit id, never on incidental container or cache order;
+  - math on the match path goes through the core's own math module, never the platform's math library, so every platform gets the same bits.
 - `rust/crates/core` has no engine, networking or file-system code. Unreal reaches it only through the C interface.
 
 ## Measure, don't guess
