@@ -1,0 +1,19 @@
+[package]
+name = "ww2-ffi"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+description = "The C interface to the ww2-rts rules core, linked into the Unreal client as a static library."
+
+[lib]
+name = "ww2_ffi"
+# staticlib for Unreal; rlib so the crate's own tests can call it.
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+ww2-core = { path = "../core" }
+
+[dev-dependencies]
+# Writes include/ww2_core.h; tests/header.rs fails when the committed header is stale.
+cbindgen = { version = "0.29.4", default-features = false }

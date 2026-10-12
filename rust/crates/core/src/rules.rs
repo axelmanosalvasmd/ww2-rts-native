@@ -1,6 +1,43 @@
 //! Rules data the vision and fog passes read: unit kinds, the vision numbers from `CFG` and `SUPPORT`, and
 //! the weather kinds. For now they are loaded from the reference game's own tables (`harness/tables.mjs`);
 //! the core will own them later (`docs/parity/interface.md`, IF-01).
+//!
+//! `RULES_HASH` covers the rules compiled into the core instead, so a client and a server built from
+//! different rules can tell.
+
+use crate::formation;
+
+/// FNV-1a 64 of the rules data compiled into the core. The C interface returns it from
+/// `ww2_rules_hash`, and the Rust server is to send the same number in `lobby.rules`
+/// (`docs/contracts/rust-unreal-abi.md`). Today the compiled rules are the formation constants
+/// only: each name in `formation::SHAPES` followed by a zero byte, then the little-endian bits of
+/// each number in `formation::RULE_NUMBERS`. The tables below are loaded at run time and not
+/// covered. Rules compiled in later join the hash, which then changes.
+pub const RULES_HASH: u64 = {
+    let mut hash = 0xCBF2_9CE4_8422_2325;
+    let mut i = 0;
+    while i < formation::SHAPES.len() {
+        hash = fnv1a(hash, formation::SHAPES[i].as_bytes());
+        hash = fnv1a(hash, &[0]);
+        i += 1;
+    }
+    let mut i = 0;
+    while i < formation::RULE_NUMBERS.len() {
+        hash = fnv1a(hash, &formation::RULE_NUMBERS[i].to_bits().to_le_bytes());
+        i += 1;
+    }
+    hash
+};
+
+const fn fnv1a(mut hash: u64, bytes: &[u8]) -> u64 {
+    let mut i = 0;
+    while i < bytes.len() {
+        hash ^= bytes[i] as u64;
+        hash = hash.wrapping_mul(0x0000_0100_0000_01B3);
+        i += 1;
+    }
+    hash
+}
 
 /// What the vision and fog passes need to know about a unit kind (`UNITS` in `shared/sim.js`).
 #[derive(Clone, Debug, PartialEq)]

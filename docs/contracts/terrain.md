@@ -17,7 +17,7 @@ Julio owns world generation, map semantics and the gameplay queries; Axel builds
 
 Unreal X = `x` × 100, Unreal Y = `z` × 100, Unreal Z = height × 100 (centimetres).
 
-The simulation's axes (east, south, up) form a left-handed set, as Unreal's X, Y, Z do, so no axis flips. A simulation angle in radians becomes Unreal yaw in degrees by `yaw = angle × 180 / π`, because both turn from the first axis toward the second. A cell is 200 Unreal units and a level 250. The conversion lives in one function in the Unreal plugin; the core and the C interface stay in simulation units (`rust-unreal-abi.md`).
+The simulation's axes (east, south, up) form a left-handed set, as Unreal's X, Y, Z do, so no axis flips. A simulation angle in radians becomes Unreal yaw in degrees by `yaw = angle × 180 / π`. Simulation angles grow from east toward south, the same direction Unreal yaw grows (from +X toward +Y), so there is no sign flip. A cell is 200 Unreal units and a level 250. The conversion lives in one function in the Unreal plugin; the core and the C interface stay in simulation units (`rust-unreal-abi.md`).
 
 ## Gameplay heights
 
