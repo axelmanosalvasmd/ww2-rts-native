@@ -1051,3 +1051,6 @@ The additional original-source trace uses actual `findPath` before and after com
 
 
 At exact `b536f46`, fresh cleanup of all four workspace packages in both profiles preceded compilation from this integration worktree. All eleven affected debug tests passed, including both metadata tests and the navigation, pathfinding, World-memory and staged-observer regressions. Every 233 locked release workspace test passed, followed by strict workspace/all-target Clippy, formatting and locked release FFI. No source repairs were needed. This is bounded corrected-provider proof, not whole World dispatch or an external envelope. Independent copied binary review and fresh platform checks are tracked separately.
+
+
+Independent copied release review verified the raw log and copied binary hashes, reran both metadata tests successfully, and independently counted all eleven debug and 233 release results at the exact corrected source head. No shared cache or Cargo was used for that rerun.

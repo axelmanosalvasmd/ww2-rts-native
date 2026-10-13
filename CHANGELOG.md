@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-- Verified the World metadata warm-cache correction at `b536f46`: all 11 affected debug tests and 233 locked release workspace tests pass, with strict Clippy, formatting and release FFI. No repairs were needed. Source comparison covers 12 scenes, 182 actions, 37 captures and 14 routes; copied review and fresh platform checks remain separate.
+- Independently reran both copied release metadata tests from `b536f46`: 2 passed, with binary/log hashes and all 11 debug and 233 release results verified. Runtime and original fixtures are unchanged.
+
+- Verified the World metadata warm-cache correction at `b536f46`: all 11 affected debug tests and 233 locked release workspace tests pass, with strict Clippy, formatting and release FFI. No repairs were needed. Source comparison covers 12 scenes, 182 actions, 37 captures and 14 routes; an independent copied release rerun passes both metadata tests; fresh platform checks remain separate.
 
 - Fixed World metadata publication losing prewarmed path-cache terrain identities when its accepted component copy moves team buffers. Rebind every existing team through the canonical path/vehicle helper only after all fallible checks. Added one original-source owner/peer route-history trace, bringing the oracle to 12 scenes, 182 actions, 37 captures and 14 exact route queries, plus a late-refusal buffer/memory/history witness. Native checks are pending.
 
