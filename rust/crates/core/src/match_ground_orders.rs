@@ -545,6 +545,9 @@ mod tests {
         }
         let before = format!("{:?}", (&m.world.game.units, &m.commands.units));
         let attack = Command::from_json(&json!({"t":"attack","ids":[1,4],"target":3})).unwrap();
+        // The snapshot scene retains startup metadata after replacing its units.
+        m.firing.remove(4);
+        assert!(m.firing.get(4).is_none());
         assert!(m.execute_command(0, &attack, false).is_err());
         assert_eq!(
             format!("{:?}", (&m.world.game.units, &m.commands.units)),
