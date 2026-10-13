@@ -2,9 +2,11 @@
 
 ## Unreleased
 
+- Added the ordinary Default alias to FPS grenade admission through the shared firing guard and aligned fire admission with internal mode consistency. Rewrote the earlier artificial Default-refusal regression: both aliases replay the same source shots and 11 grenade launches/77 samples, while World and inconsistent internal mode state refuse without changing counters, flights, events or randomness. The dependency and combined FPS changes are source reviewed; native checks remain pending.
+
 - Integrated the checked typed ability-flight dependency into the FPS grenade follow-up, retaining canonical generic hurt and the separate observation grid. The combined FPS fire/grenade tree still awaits its own native checks.
 
-- Prepared explicit-Conquest companion grenade publication through the shared typed flight primitive, with source range clamping, duration before map-edge clipping and grenade counters committed after launch. Replay checks cover nine source traces, 11 launches and 77 trajectory samples, plus atomic rejection cases. Dependency integration and native checks are pending; the shared flight driver does not support the default mode alias yet.
+- Prepared ordinary-Conquest companion grenade publication through the shared typed flight primitive, with source range clamping, duration before map-edge clipping and grenade counters committed after launch. Replay checks cover nine source traces, 11 launches and 77 trajectory samples, plus atomic rejection cases. Dependency integration and native checks were pending at this source checkpoint; the default-alias follow-up is recorded above.
 
 - Added source-written infantry body geometry, sampled first-person ray preparation and canonical seeded shot publication using generic hurt and existing small-arms fields. The original recorder checks 49 traces, 39 squad geometry cases and 66 operations, including carried-target contact coordinates. Native compilation/replay and typed grenade actuation remain pending; no network or C interface changed.
 

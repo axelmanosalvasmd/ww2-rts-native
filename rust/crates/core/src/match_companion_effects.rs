@@ -27,7 +27,8 @@ impl Match {
         let op = &self.companions.records[&companion];
         let body = &self.companions.soldiers[&unit];
         let u = &self.world.game.units[&unit];
-        if self.options.mode != Mode::Conquest
+        if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
+            || self.world.game.mode.is_some()
             || winner_decided
             || self.finish.is_some()
             || !op.online
@@ -97,6 +98,7 @@ impl Match {
         let op = &self.companions.records[&companion];
         let u = &self.world.game.units[&unit];
         if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
+            || self.world.game.mode.is_some()
             || winner_decided
             || self.finish.is_some()
             || !op.online

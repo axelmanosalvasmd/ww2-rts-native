@@ -11,7 +11,7 @@ use ww2_core::{
     companions::{Companion, EDGE_NAMES, Input, Soldier},
     economy::{Faction, Mode},
     economy_state::ArmySize,
-    game::{Point, Smoke},
+    game::{ModeKind, Point, Smoke},
     grid::SpatialGrid,
     map::AuthoritativeMap,
     match_combat::{CombatState, DamageWorld, ExplosionSource},
@@ -745,147 +745,151 @@ fn seeded_fire_match() -> (Match, Input, u32, u32) {
 
 #[test]
 fn canonical_fire_is_seeded_uses_two_draws_and_publishes_hurt_before_small_arms() {
-    // Recorded source tapes validate pure ray arithmetic in the 39-case test.
-    // This test validates the real producer with its recorded Combat RNG stream;
-    // no test hook substitutes source draws into the runtime.
-    let (mut m, aim, shooter, target) = seeded_fire_match();
-    let (mut replay, replay_aim, replay_shooter, replay_target) = seeded_fire_match();
-    assert_eq!((replay_shooter, replay_target), (shooter, target));
-    let soldier = m.companions.soldiers[&shooter].clone();
-    let companion_id = soldier.companion;
-    let counts = m.companions.records[&companion_id].clone();
-    let xp = m.combat.get(shooter).unwrap().xp.to_bits();
-    let impulse = m.combat.get(target).unwrap().death_impulse;
-    let target_retarget = m.firing.get(target).unwrap().retarget.to_bits();
-    let before_order: Vec<_> = m.world.game.units.keys().copied().collect();
-    let mut expected_random = m.start.random.clone();
-    let draws = [
-        expected_random.next_fraction(StreamId::Combat),
-        expected_random.next_fraction(StreamId::Combat),
-    ];
-    let expected_ray = companion_ray::trace(
-        &m.world.game,
-        &m.rules,
-        &m.companions.soldiers,
-        &before_order,
-        shooter,
-        &aim,
-        m.world.game.units[&shooter].move_speed,
-        draws,
-    )
-    .unwrap();
-    assert_eq!(
-        expected_ray.enemy_hit.unwrap().unit,
-        target,
-        "seeded fixture must exercise actual damage"
-    );
-    m.fire_companion(shooter, &aim, false).unwrap();
-    replay.fire_companion(shooter, &replay_aim, false).unwrap();
-    assert_eq!(
-        m.start.random.snapshot(),
-        expected_random.snapshot(),
-        "exactly two Combat draws and no other stream changes"
-    );
-    assert_eq!(m.start.random, replay.start.random);
-    assert_eq!(m.firing, replay.firing);
-    assert_eq!(m.companions, replay.companions);
-    assert_eq!(m.combat, replay.combat);
-    for id in &before_order {
-        // Unit carries dormant undefined-as-NaN fields, so compare its full Debug
-        // representation instead of NaN's deliberately false PartialEq.
+    for mode in [Mode::Default, Mode::Conquest] {
+        // Recorded source tapes validate pure ray arithmetic in the 39-case test.
+        // This test validates the real producer with its recorded Combat RNG stream;
+        // no test hook substitutes source draws into the runtime.
+        let (mut m, aim, shooter, target) = seeded_fire_match();
+        m.options.mode = mode;
+        let (mut replay, replay_aim, replay_shooter, replay_target) = seeded_fire_match();
+        replay.options.mode = mode;
+        assert_eq!((replay_shooter, replay_target), (shooter, target));
+        let soldier = m.companions.soldiers[&shooter].clone();
+        let companion_id = soldier.companion;
+        let counts = m.companions.records[&companion_id].clone();
+        let xp = m.combat.get(shooter).unwrap().xp.to_bits();
+        let impulse = m.combat.get(target).unwrap().death_impulse;
+        let target_retarget = m.firing.get(target).unwrap().retarget.to_bits();
+        let before_order: Vec<_> = m.world.game.units.keys().copied().collect();
+        let mut expected_random = m.start.random.clone();
+        let draws = [
+            expected_random.next_fraction(StreamId::Combat),
+            expected_random.next_fraction(StreamId::Combat),
+        ];
+        let expected_ray = companion_ray::trace(
+            &m.world.game,
+            &m.rules,
+            &m.companions.soldiers,
+            &before_order,
+            shooter,
+            &aim,
+            m.world.game.units[&shooter].move_speed,
+            draws,
+        )
+        .unwrap();
         assert_eq!(
-            format!("{:?}", m.world.game.units[id]),
-            format!("{:?}", replay.world.game.units[id])
+            expected_ray.enemy_hit.unwrap().unit,
+            target,
+            "seeded fixture must exercise actual damage"
         );
-    }
-    exact(
-        &grid_projection(&m),
-        &grid_projection(&replay),
-        "seeded maintained grid",
-    );
-    let weapon = ww2_core::companions::WEAPONS[soldier.weapon];
-    let after = &m.companions.soldiers[&shooter];
-    assert_eq!(after.mags[soldier.weapon], soldier.mags[soldier.weapon] - 1);
-    assert_eq!(
-        after.mags[1 - soldier.weapon],
-        soldier.mags[1 - soldier.weapon]
-    );
-    assert_eq!(after.reload.to_bits(), soldier.reload.to_bits());
-    assert_eq!(after.nades, soldier.nades);
-    assert_eq!(after.nade_time.to_bits(), soldier.nade_time.to_bits());
-    assert_eq!(
-        m.firing.get(shooter).unwrap().cooldown.to_bits(),
-        weapon.interval.to_bits()
-    );
-    assert_eq!(
-        m.world.game.units[&shooter].shot_at.unwrap().to_bits(),
-        (m.world.game.tick as f64).to_bits()
-    );
-    let op = &m.companions.records[&companion_id];
-    assert_eq!(
-        (op.shots, op.hits, op.kills),
-        (counts.shots + 1, counts.hits + 1, counts.kills + 1)
-    );
-    assert_eq!(
-        m.world.game.units[&target].hp.to_bits(),
-        (1.0 - weapon.damage).to_bits()
-    );
-    assert!(
-        m.world.game.units.contains_key(&target),
-        "fire does not retire the victim in this phase"
-    );
-    assert_eq!(m.combat.get(target).unwrap().last_hit, Some(0));
-    assert_eq!(m.combat.get(target).unwrap().hit_by, Some(shooter));
-    assert_eq!(
-        m.combat.get(target).unwrap().hit_at.to_bits(),
-        (m.world.game.tick as f64).to_bits()
-    );
-    assert_eq!(
-        m.world.game.units[&target].hit_from,
-        Some(m.world.game.units[&shooter].at())
-    );
-    assert_eq!(
-        m.combat.get(shooter).unwrap().xp.to_bits(),
-        xp,
-        "FPS fire grants no fabricated shooter XP"
-    );
-    assert_eq!(
-        m.combat.get(target).unwrap().death_impulse,
-        impulse,
-        "FPS fire creates no radial DeathImpulse"
-    );
-    assert_eq!(
-        m.firing.get(target).unwrap().retarget.to_bits(),
-        target_retarget
-    );
-    assert_eq!(m.firing.events.len(), 2);
-    match (&m.firing.events[0], &m.firing.events[1]) {
-        (
-            LaunchEvent::Environment(ww2_core::environment::Effect::Hurt(hurt)),
-            LaunchEvent::SmallArms(shot),
-        ) => {
-            assert_eq!(hurt.unit, target);
-            assert_eq!(hurt.at, m.world.game.units[&target].at());
-            assert!(hurt.killed);
-            assert!(!hurt.local);
-            assert_eq!(shot.at, expected_ray.end);
-            assert_eq!(shot.effect, weapon.fx);
-            assert_eq!((shot.shooter, shot.owner), (shooter, 0));
-            let hit = shot.hit.unwrap();
-            assert_eq!((hit.target, hit.owner, hit.man), (target, 1, None));
-            let projected = m.firing.events[1].to_json(&m.rules);
-            exact(
-                &projected,
-                &json!({"k":weapon.fx,"f":shooter,"fo":0,
-                "x":expected_ray.end.x,"y":expected_ray.end.y,"z":expected_ray.end.z,
-                "t":target,"to":1,"hit":true}),
-                "existing small-arms projection",
+        m.fire_companion(shooter, &aim, false).unwrap();
+        replay.fire_companion(shooter, &replay_aim, false).unwrap();
+        assert_eq!(
+            m.start.random.snapshot(),
+            expected_random.snapshot(),
+            "exactly two Combat draws and no other stream changes"
+        );
+        assert_eq!(m.start.random, replay.start.random);
+        assert_eq!(m.firing, replay.firing);
+        assert_eq!(m.companions, replay.companions);
+        assert_eq!(m.combat, replay.combat);
+        for id in &before_order {
+            // Unit carries dormant undefined-as-NaN fields, so compare its full Debug
+            // representation instead of NaN's deliberately false PartialEq.
+            assert_eq!(
+                format!("{:?}", m.world.game.units[id]),
+                format!("{:?}", replay.world.game.units[id])
             );
         }
-        events => panic!("expected Hurt then SmallArms, received {events:?}"),
+        exact(
+            &grid_projection(&m),
+            &grid_projection(&replay),
+            "seeded maintained grid",
+        );
+        let weapon = ww2_core::companions::WEAPONS[soldier.weapon];
+        let after = &m.companions.soldiers[&shooter];
+        assert_eq!(after.mags[soldier.weapon], soldier.mags[soldier.weapon] - 1);
+        assert_eq!(
+            after.mags[1 - soldier.weapon],
+            soldier.mags[1 - soldier.weapon]
+        );
+        assert_eq!(after.reload.to_bits(), soldier.reload.to_bits());
+        assert_eq!(after.nades, soldier.nades);
+        assert_eq!(after.nade_time.to_bits(), soldier.nade_time.to_bits());
+        assert_eq!(
+            m.firing.get(shooter).unwrap().cooldown.to_bits(),
+            weapon.interval.to_bits()
+        );
+        assert_eq!(
+            m.world.game.units[&shooter].shot_at.unwrap().to_bits(),
+            (m.world.game.tick as f64).to_bits()
+        );
+        let op = &m.companions.records[&companion_id];
+        assert_eq!(
+            (op.shots, op.hits, op.kills),
+            (counts.shots + 1, counts.hits + 1, counts.kills + 1)
+        );
+        assert_eq!(
+            m.world.game.units[&target].hp.to_bits(),
+            (1.0 - weapon.damage).to_bits()
+        );
+        assert!(
+            m.world.game.units.contains_key(&target),
+            "fire does not retire the victim in this phase"
+        );
+        assert_eq!(m.combat.get(target).unwrap().last_hit, Some(0));
+        assert_eq!(m.combat.get(target).unwrap().hit_by, Some(shooter));
+        assert_eq!(
+            m.combat.get(target).unwrap().hit_at.to_bits(),
+            (m.world.game.tick as f64).to_bits()
+        );
+        assert_eq!(
+            m.world.game.units[&target].hit_from,
+            Some(m.world.game.units[&shooter].at())
+        );
+        assert_eq!(
+            m.combat.get(shooter).unwrap().xp.to_bits(),
+            xp,
+            "FPS fire grants no fabricated shooter XP"
+        );
+        assert_eq!(
+            m.combat.get(target).unwrap().death_impulse,
+            impulse,
+            "FPS fire creates no radial DeathImpulse"
+        );
+        assert_eq!(
+            m.firing.get(target).unwrap().retarget.to_bits(),
+            target_retarget
+        );
+        assert_eq!(m.firing.events.len(), 2);
+        match (&m.firing.events[0], &m.firing.events[1]) {
+            (
+                LaunchEvent::Environment(ww2_core::environment::Effect::Hurt(hurt)),
+                LaunchEvent::SmallArms(shot),
+            ) => {
+                assert_eq!(hurt.unit, target);
+                assert_eq!(hurt.at, m.world.game.units[&target].at());
+                assert!(hurt.killed);
+                assert!(!hurt.local);
+                assert_eq!(shot.at, expected_ray.end);
+                assert_eq!(shot.effect, weapon.fx);
+                assert_eq!((shot.shooter, shot.owner), (shooter, 0));
+                let hit = shot.hit.unwrap();
+                assert_eq!((hit.target, hit.owner, hit.man), (target, 1, None));
+                let projected = m.firing.events[1].to_json(&m.rules);
+                exact(
+                    &projected,
+                    &json!({"k":weapon.fx,"f":shooter,"fo":0,
+                "x":expected_ray.end.x,"y":expected_ray.end.y,"z":expected_ray.end.z,
+                "t":target,"to":1,"hit":true}),
+                    "existing small-arms projection",
+                );
+            }
+            events => panic!("expected Hurt then SmallArms, received {events:?}"),
+        }
+        assert!(m.firing.flights.is_empty());
+        assert!(m.firing.salvos.is_empty());
     }
-    assert!(m.firing.flights.is_empty());
-    assert!(m.firing.salvos.is_empty());
 }
 
 fn guard_state(m: &Match) -> String {
@@ -967,9 +971,13 @@ fn canonical_fire_rejects_invalid_metadata_and_exhausted_counters_atomically() {
         "shots",
         "hits",
         "kills",
+        "unsupported mode",
+        "internal mode mismatch",
     ] {
         let (mut m, aim, shooter, target) = seeded_fire_match();
         match failure {
+            "unsupported mode" => m.options.mode = Mode::World,
+            "internal mode mismatch" => m.world.game.mode = Some(ModeKind::Horde),
             "nonfinite source XP" => {
                 m.combat.get_mut(shooter).unwrap().xp = f64::from_bits(0x7ff8_0000_0000_0042)
             }
@@ -1015,91 +1023,91 @@ fn companion_grenades_match_source_launches_clamps_and_trajectory_without_spendi
         .filter(|t| t["category"] == "grenade")
         .collect();
     assert_eq!(traces.len(), 9);
-    let mut launches = 0;
-    let mut samples = 0;
-    for trace in traces {
-        let context = trace["name"].as_str().unwrap();
-        let mut snapshot = trace["initial"].clone();
-        let initial = decoded(&snapshot);
-        let mut m = native_match(&f, &initial);
-        // The canonical physical-flight driver is currently admitted only in the
-        // explicit ordinary Conquest mode. Geometry and source rows are unchanged.
-        m.options.mode = Mode::Conquest;
-        m.firing.next_flight = n(&initial["game"]["nextFlight"]) as u64;
-        let random = m.start.random.snapshot();
-        let economics = m.start.economy.clone();
-        let companion_counts = m.companions.records.clone();
-        for op in trace["operations"].as_array().unwrap() {
-            let mut args = match op["op"].as_str().unwrap() {
-                "throw" => json!({"unit":op["unit"],"input":op["input"]}),
-                "set_tick" => json!({"tick":op["tick"]}),
-                "patch_unit" => json!({"id":op["id"],"fields":op["fields"]}),
-                "sample_flight" => json!({"id":op["id"],"times":op["times"]}),
-                other => panic!("unexpected grenade operation: {other}"),
-            };
-            restore(&mut args, &op["argumentFloatBits"], "");
-            apply_delta(&mut snapshot, &op["delta"]);
-            let expected = decoded(&snapshot);
-            assert!(decoded(&op["rng"]).as_array().unwrap().is_empty());
-            match op["op"].as_str().unwrap() {
-                "throw" => {
-                    let unit = id(&args["unit"]);
-                    let mut aim = Input {
-                        forward: 0.0,
-                        strafe: 0.0,
-                        yaw: 0.0,
-                        pitch: 0.0,
-                        fire: false,
-                        ads: false,
-                        crouch: false,
-                        sprint: false,
-                        weapon: 0,
-                    };
-                    aim.yaw = n(&args["input"]["yaw"]);
-                    aim.pitch = n(&args["input"]["pitch"]);
-                    let old_body = m.companions.soldiers[&unit].clone();
-                    let cooldown = m.firing.get(unit).unwrap().cooldown;
-                    let retained: Vec<_> = m
-                        .firing
-                        .flights
-                        .iter()
-                        .map(|(id, p)| (*id, format!("{p:?}")))
-                        .collect();
-                    let flight = m
-                        .throw_companion(unit, &aim, false)
-                        .unwrap_or_else(|e| panic!("{context}: {e}"));
-                    launches += 1;
-                    let body = &m.companions.soldiers[&unit];
-                    assert_eq!(body.nades, old_body.nades - 1);
-                    assert_eq!(body.nade_time.to_bits(), 1.0f64.to_bits());
-                    assert_eq!(body.mags, old_body.mags);
-                    assert_eq!(body.reload.to_bits(), old_body.reload.to_bits());
-                    assert_eq!(
-                        m.firing.get(unit).unwrap().cooldown.to_bits(),
-                        cooldown.to_bits()
-                    );
-                    assert_eq!(
-                        m.firing.next_flight,
-                        n(&expected["game"]["nextFlight"]) as u64
-                    );
-                    let order: Vec<_> = m.firing.flights.keys().copied().collect();
-                    exact(&json!(order), &expected["flightOrder"], context);
-                    for (id, before) in retained {
+    for mode in [Mode::Default, Mode::Conquest] {
+        let mut launches = 0;
+        let mut samples = 0;
+        for trace in &traces {
+            let context = trace["name"].as_str().unwrap();
+            let mut snapshot = trace["initial"].clone();
+            let initial = decoded(&snapshot);
+            let mut m = native_match(&f, &initial);
+            // Both ordinary aliases replay the same original source rows.
+            m.options.mode = mode;
+            m.firing.next_flight = n(&initial["game"]["nextFlight"]) as u64;
+            let random = m.start.random.snapshot();
+            let economics = m.start.economy.clone();
+            let companion_counts = m.companions.records.clone();
+            for op in trace["operations"].as_array().unwrap() {
+                let mut args = match op["op"].as_str().unwrap() {
+                    "throw" => json!({"unit":op["unit"],"input":op["input"]}),
+                    "set_tick" => json!({"tick":op["tick"]}),
+                    "patch_unit" => json!({"id":op["id"],"fields":op["fields"]}),
+                    "sample_flight" => json!({"id":op["id"],"times":op["times"]}),
+                    other => panic!("unexpected grenade operation: {other}"),
+                };
+                restore(&mut args, &op["argumentFloatBits"], "");
+                apply_delta(&mut snapshot, &op["delta"]);
+                let expected = decoded(&snapshot);
+                assert!(decoded(&op["rng"]).as_array().unwrap().is_empty());
+                match op["op"].as_str().unwrap() {
+                    "throw" => {
+                        let unit = id(&args["unit"]);
+                        let mut aim = Input {
+                            forward: 0.0,
+                            strafe: 0.0,
+                            yaw: 0.0,
+                            pitch: 0.0,
+                            fire: false,
+                            ads: false,
+                            crouch: false,
+                            sprint: false,
+                            weapon: 0,
+                        };
+                        aim.yaw = n(&args["input"]["yaw"]);
+                        aim.pitch = n(&args["input"]["pitch"]);
+                        let old_body = m.companions.soldiers[&unit].clone();
+                        let cooldown = m.firing.get(unit).unwrap().cooldown;
+                        let retained: Vec<_> = m
+                            .firing
+                            .flights
+                            .iter()
+                            .map(|(id, p)| (*id, format!("{p:?}")))
+                            .collect();
+                        let flight = m
+                            .throw_companion(unit, &aim, false)
+                            .unwrap_or_else(|e| panic!("{context}: {e}"));
+                        launches += 1;
+                        let body = &m.companions.soldiers[&unit];
+                        assert_eq!(body.nades, old_body.nades - 1);
+                        assert_eq!(body.nade_time.to_bits(), 1.0f64.to_bits());
+                        assert_eq!(body.mags, old_body.mags);
+                        assert_eq!(body.reload.to_bits(), old_body.reload.to_bits());
                         assert_eq!(
-                            format!("{:?}", m.firing.flights[&id]),
-                            before,
-                            "{context}: registration changed retained flight {id}"
+                            m.firing.get(unit).unwrap().cooldown.to_bits(),
+                            cooldown.to_bits()
                         );
-                    }
-                    let p = &m.firing.flights[&flight];
-                    let source = expected["flights"]
-                        .as_array()
-                        .unwrap()
-                        .iter()
-                        .find(|p| n(&p["id"]) as u64 == flight)
-                        .unwrap();
-                    let blast = p.blast_source.unwrap();
-                    let actual = json!({"id":p.id,"owner":p.owner,"shooter":p.shooter,
+                        assert_eq!(
+                            m.firing.next_flight,
+                            n(&expected["game"]["nextFlight"]) as u64
+                        );
+                        let order: Vec<_> = m.firing.flights.keys().copied().collect();
+                        exact(&json!(order), &expected["flightOrder"], context);
+                        for (id, before) in retained {
+                            assert_eq!(
+                                format!("{:?}", m.firing.flights[&id]),
+                                before,
+                                "{context}: registration changed retained flight {id}"
+                            );
+                        }
+                        let p = &m.firing.flights[&flight];
+                        let source = expected["flights"]
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .find(|p| n(&p["id"]) as u64 == flight)
+                            .unwrap();
+                        let blast = p.blast_source.unwrap();
+                        let actual = json!({"id":p.id,"owner":p.owner,"shooter":p.shooter,
                         "kind":m.rules.kinds[p.source_kind].name,
                         "x":p.solution.origin.x,"y":p.solution.origin.y,"z":p.solution.origin.z,
                         "vx":p.solution.velocity.x,"vy":p.solution.velocity.y,"vz":p.solution.velocity.z,
@@ -1111,83 +1119,84 @@ fn companion_grenades_match_source_launches_clamps_and_trajectory_without_spendi
                         "effect":p.effect,"sent":p.sent,
                         "inf":blast.infantry,"veh":blast.vehicle,"terrain":blast.terrain,
                         "supp":blast.suppression});
-                    let mut wanted = Value::Object(serde_json::Map::new());
-                    for key in actual.as_object().unwrap().keys() {
-                        wanted[key] = match key.as_str() {
-                            "inf" | "veh" | "terrain" | "supp" => {
-                                source["blastSource"][key].clone()
-                            }
-                            _ => source[key].clone(),
-                        };
-                    }
-                    exact(&actual, &wanted, context);
-                    let tickets: Vec<_> = m
-                        .firing
-                        .grenades
-                        .iter()
-                        .map(|ticket| {
-                            json!({"x":ticket.at.x,"z":ticket.at.z,"t":ticket.remaining,
+                        let mut wanted = Value::Object(serde_json::Map::new());
+                        for key in actual.as_object().unwrap().keys() {
+                            wanted[key] = match key.as_str() {
+                                "inf" | "veh" | "terrain" | "supp" => {
+                                    source["blastSource"][key].clone()
+                                }
+                                _ => source[key].clone(),
+                            };
+                        }
+                        exact(&actual, &wanted, context);
+                        let tickets: Vec<_> = m
+                            .firing
+                            .grenades
+                            .iter()
+                            .map(|ticket| {
+                                json!({"x":ticket.at.x,"z":ticket.at.z,"t":ticket.remaining,
                             "owner":ticket.owner,"flight":ticket.flight})
-                        })
-                        .collect();
-                    let source_tickets: Vec<_> = expected["nades"]
-                        .as_array()
-                        .unwrap()
-                        .iter()
-                        .map(|ticket| {
-                            json!({"x":ticket["x"],"z":ticket["z"],"t":ticket["t"],
+                            })
+                            .collect();
+                        let source_tickets: Vec<_> = expected["nades"]
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .map(|ticket| {
+                                json!({"x":ticket["x"],"z":ticket["z"],"t":ticket["t"],
                             "owner":ticket["owner"],"flight":ticket["flight"]})
-                        })
-                        .collect();
-                    exact(&json!(tickets), &json!(source_tickets), context);
-                    let shots: Vec<_> = m
-                        .firing
-                        .events
-                        .iter()
-                        .map(|shot| shot.to_json(&m.rules))
-                        .collect();
-                    exact(&json!(shots), &expected["shots"], context);
-                }
-                "set_tick" => m.world.game.tick = n(&args["tick"]) as i64,
-                "patch_unit" => {
-                    let fields = args["fields"].as_object().unwrap();
-                    assert_eq!(fields.len(), 1);
-                    m.companions
-                        .soldiers
-                        .get_mut(&id(&args["id"]))
-                        .unwrap()
-                        .nade_time = n(&fields["nadeT"]);
-                }
-                "sample_flight" => {
-                    let p = &m.firing.flights[&(n(&args["id"]) as u64)];
-                    let actual: Vec<_> = args["times"].as_array().unwrap().iter().map(|time| {
+                            })
+                            .collect();
+                        exact(&json!(tickets), &json!(source_tickets), context);
+                        let shots: Vec<_> = m
+                            .firing
+                            .events
+                            .iter()
+                            .map(|shot| shot.to_json(&m.rules))
+                            .collect();
+                        exact(&json!(shots), &expected["shots"], context);
+                    }
+                    "set_tick" => m.world.game.tick = n(&args["tick"]) as i64,
+                    "patch_unit" => {
+                        let fields = args["fields"].as_object().unwrap();
+                        assert_eq!(fields.len(), 1);
+                        m.companions
+                            .soldiers
+                            .get_mut(&id(&args["id"]))
+                            .unwrap()
+                            .nade_time = n(&fields["nadeT"]);
+                    }
+                    "sample_flight" => {
+                        let p = &m.firing.flights[&(n(&args["id"]) as u64)];
+                        let actual: Vec<_> = args["times"].as_array().unwrap().iter().map(|time| {
                         let time = n(time);
                         samples += 1;
                         json!({"time":time,
                             "position":point3_json(ww2_core::projectiles::flight_at(p.solution,time).unwrap()),
                             "velocity":point3_json(ww2_core::projectiles::velocity_at(p.solution,time).unwrap())})
                     }).collect();
-                    exact(&json!(actual), &decoded(&op["result"]), context);
+                        exact(&json!(actual), &decoded(&op["result"]), context);
+                    }
+                    other => panic!("unexpected grenade operation: {other}"),
                 }
-                other => panic!("unexpected grenade operation: {other}"),
+                assert_eq!(
+                    m.start.random.snapshot(),
+                    random,
+                    "{context}: grenade spent RNG"
+                );
+                assert_eq!(
+                    m.start.economy, economics,
+                    "{context}: grenade spent wallet or army resources"
+                );
+                assert_eq!(
+                    m.companions.records, companion_counts,
+                    "{context}: grenade counted as fire"
+                );
             }
-            assert_eq!(
-                m.start.random.snapshot(),
-                random,
-                "{context}: grenade spent RNG"
-            );
-            assert_eq!(
-                m.start.economy, economics,
-                "{context}: grenade spent wallet or army resources"
-            );
-            assert_eq!(
-                m.companions.records, companion_counts,
-                "{context}: grenade counted as fire"
-            );
         }
+        assert_eq!(launches, 11);
+        assert_eq!(samples, 77);
     }
-    assert_eq!(launches, 11);
-    assert_eq!(samples, 77);
 }
 
 #[test]
@@ -1198,7 +1207,8 @@ fn companion_grenade_rejection_preserves_counters_flights_events_and_randomness(
         "missing combat",
         "invalid pitch",
         "empty grenades",
-        "default mode alias",
+        "unsupported mode",
+        "internal mode mismatch",
     ] {
         let (mut m, mut aim, shooter, _) = seeded_fire_match();
         m.options.mode = Mode::Conquest;
@@ -1214,7 +1224,8 @@ fn companion_grenade_rejection_preserves_counters_flights_events_and_randomness(
             }
             "invalid pitch" => aim.pitch = f64::NAN,
             "empty grenades" => m.companions.soldiers.get_mut(&shooter).unwrap().nades = 0,
-            "default mode alias" => m.options.mode = Mode::Default,
+            "unsupported mode" => m.options.mode = Mode::World,
+            "internal mode mismatch" => m.world.game.mode = Some(ModeKind::Horde),
             _ => unreachable!(),
         }
         let before = guard_state(&m);
