@@ -140,14 +140,7 @@ fn snapshot(m: &Match) -> Value {
     }).collect::<Vec<_>>();
     json!({"units":units,"money":m.start.economy.players.iter().map(|p|bits(p.mp)).collect::<Vec<_>>(),"shots":[]})
 }
-fn ids(value: &Value) -> Vec<i64> {
-    value
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|v| v.as_i64().unwrap())
-        .collect()
-}
+
 #[test]
 fn source_commands_boarding_riding_and_unload_match_each_checkpoint() {
     let f = fixture();
@@ -157,26 +150,17 @@ fn source_commands_boarding_riding_and_unload_match_each_checkpoint() {
         assert_eq!(snapshot(&m), c["initial"], "{} initial", c["name"]);
         for row in c["rows"].as_array().unwrap() {
             let a = &row["action"];
+            if let Some(tick) = a["tick"].as_i64() {
+                m.world.game.tick = tick;
+            }
             let mut result = Value::Null;
             match a["op"].as_str().unwrap() {
                 "command" => {
                     let cmd = &a["cmd"];
                     let owner = a["owner"].as_u64().unwrap_or(0) as usize;
-                    let denied = match cmd["t"].as_str().unwrap() {
-                        "board" => m
-                            .carrier_board_command(
-                                owner,
-                                &ids(&cmd["ids"]),
-                                cmd["target"].as_i64(),
-                                false,
-                            )
-                            .unwrap(),
-                        "unload" => m
-                            .carrier_unload_command(owner, &ids(&cmd["ids"]), false)
-                            .unwrap(),
-                        _ => m
-                            .execute_command(owner, &Command::from_json(cmd).unwrap(), false)
-                            .unwrap(),
+                    let denied = match Command::from_json(cmd) {
+                        Ok(command) => m.execute_command(owner, &command, false).unwrap(),
+                        Err(denial) => Some(denial),
                     };
                     result = denied.map_or(Value::Null, |d| json!(d.name()));
                 }
@@ -199,9 +183,21 @@ fn source_commands_boarding_riding_and_unload_match_each_checkpoint() {
                     )
                     .unwrap();
                 }
+                "pathBegin" => {
+                    m.begin_path_tick(
+                        a["budget"].as_u64().unwrap() as usize,
+                        a["retryLimit"].as_u64().unwrap_or(20) as u32,
+                    )
+                    .unwrap();
+                }
                 "phase" => {
+                    m.begin_path_tick(
+                        a["budget"].as_u64().unwrap_or(0) as usize,
+                        a["retryLimit"].as_u64().unwrap_or(20) as u32,
+                    )
+                    .unwrap();
                     result = match m
-                        .apply_unit_boarding(a["id"].as_u64().unwrap() as u32)
+                        .apply_unit_boarding_with_routes(a["id"].as_u64().unwrap() as u32)
                         .unwrap()
                     {
                         BoardingOutcome::Boarded { carrier } => json!({"boarded":carrier}),
@@ -226,10 +222,43 @@ fn source_commands_boarding_riding_and_unload_match_each_checkpoint() {
                 c["name"],
                 actions
             );
+            if let Some(source) = row.get("scheduler") {
+                let requests = m.commands.path_requests();
+                assert_eq!(
+                    requests.used(),
+                    source["used"].as_u64().unwrap() as usize,
+                    "{} scheduler usage",
+                    c["name"]
+                );
+                assert_eq!(
+                    requests.queue_len(),
+                    source["queue"].as_array().unwrap().len(),
+                    "{} queue length",
+                    c["name"]
+                );
+                assert_eq!(
+                    requests.pending_len(),
+                    source["pending"].as_array().unwrap().len(),
+                    "{} pending length",
+                    c["name"]
+                );
+                assert_eq!(
+                    requests.stats().deferred,
+                    source["stats"]["deferred"].as_u64().unwrap(),
+                    "{} overflow",
+                    c["name"]
+                );
+                assert_eq!(
+                    requests.stats().dropped,
+                    source["stats"]["dropped"].as_u64().unwrap(),
+                    "{} retry drop",
+                    c["name"]
+                );
+            }
             actions += 1;
         }
     }
-    assert_eq!(actions, 66);
+    assert_eq!(actions, 97);
 }
 fn atomic(m: &Match) -> String {
     format!(
@@ -304,4 +333,74 @@ fn invalid_or_unavailable_carrier_work_preserves_canonical_state() {
         RidingOutcome::UnsupportedEjection
     );
     assert_eq!(atomic(&m), before);
+}
+
+#[test]
+fn recorded_carrier_admission_replays_by_order_key_before_any_unit_phase() {
+    use crate::orders::OrderKey;
+    let fixture = fixture();
+    let case = fixture["traces"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == "full-carrier-keeps-paid-dig")
+        .unwrap();
+    for arrival in [[0usize, 1], [1, 0]] {
+        let mut m = make(case);
+        // Align only the empty command queue with the source component's input clock.
+        // No battle phases or timers execute during this fixture setup.
+        let source_tick = m.world.game.tick;
+        for boundary in 1..=source_tick as u64 {
+            m.world.game.tick = boundary as i64 - 1;
+            assert!(m.apply_commands(boundary, false).unwrap().is_empty());
+        }
+        m.world.game.tick = source_tick;
+        for index in arrival {
+            let row = &case["rows"][index];
+            m.enqueue_command(
+                OrderKey {
+                    tick: source_tick as u64 + 1,
+                    issuer: row["action"]["owner"].as_u64().unwrap_or(0) as u32,
+                    sequence: index as u64 + 1,
+                },
+                Command::from_json(&row["action"]["cmd"]).unwrap(),
+            )
+            .unwrap();
+        }
+        let results = m.apply_commands(source_tick as u64 + 1, false).unwrap();
+        assert_eq!(
+            results.iter().map(|r| r.key.sequence).collect::<Vec<_>>(),
+            [1, 2]
+        );
+        for (index, result) in results.iter().enumerate() {
+            assert_eq!(
+                json!(result.denial.map(|d| d.name())),
+                case["rows"][index]["result"]
+            );
+        }
+        assert_eq!(snapshot(&m), case["rows"][1]["snapshot"]);
+        assert!(m.field_works.is_active(1), "full carrier retains paid work");
+        assert_eq!(m.commands.pending_commands(), 0);
+        assert_eq!(m.commands.path_requests().used(), 0);
+    }
+}
+
+#[test]
+fn board_parser_preserves_explicit_unknown_target_and_whole_order_validation() {
+    let absent = Command::from_json(&json!({"t":"board","ids":[1,2]})).unwrap();
+    assert!(matches!(absent, Command::Board { target: None, .. }));
+    for target in [Value::Null, json!("2"), json!(-1), json!(0), json!(1.25)] {
+        let parsed = Command::from_json(&json!({"t":"board","ids":[1],"target":target})).unwrap();
+        assert!(matches!(
+            parsed,
+            Command::Board {
+                target: Some(_),
+                ..
+            }
+        ));
+    }
+    assert_eq!(
+        Command::from_json(&json!({"t":"board","ids":[1],"orders":[[1,"bad",2]]})),
+        Err(Denial::Blocked)
+    );
 }

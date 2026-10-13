@@ -50,7 +50,7 @@ fn view(m: &Match) -> TerrainView<'_> {
     }
 }
 impl Match {
-    fn validate_carrier_world(&self) -> Result<(), String> {
+    pub(crate) fn validate_carrier_world(&self) -> Result<(), String> {
         let g = &self.world.game;
         if !matches!(self.options.mode, Mode::Default | Mode::Conquest) || g.mode.is_some() {
             return Err("carrier execution requires ordinary Conquest".into());
@@ -66,7 +66,7 @@ impl Match {
         }
         Ok(())
     }
-    fn validate_carrier_unit(&self, id: UnitId) -> Result<(), String> {
+    pub(crate) fn validate_carrier_unit(&self, id: UnitId) -> Result<(), String> {
         let g = &self.world.game;
         let u = g.units.get(&id).ok_or("missing carrier unit")?;
         let kind = self
@@ -124,7 +124,7 @@ impl Match {
         }
         Ok(n as usize)
     }
-    fn carrier_boundary(&self, id: UnitId) -> bool {
+    pub(crate) fn carrier_boundary(&self, id: UnitId) -> bool {
         let u = &self.world.game.units[&id];
         let k = &self.rules.kinds[u.kind];
         k.naval || k.rail || k.air || u.rail || u.air.is_some() || u.garrison.is_some()

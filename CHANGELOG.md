@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Connected Board and Unload to the existing recorded command parser and dispatcher, and attached live carrier goals to the shared path scheduler. The pinned-source fixture now has 19 traces and 97 actions, including immediate searches, moved deferred goals, retry drops and paid-work refusal. Native replay and full tick attachment remain pending.
+
 - Joined the source-reviewed carrier component to corrected engineering input ancestry in a separate recorded-carrier tree. Existing command variants and canonical metadata remain intact; parser, scheduler and native proof follow on this isolated branch.
 
 - Resolved strict compiler-lint findings in the engineering proof tree: redundant copies, casts and reference layers, independent ability fixture flags, and the existing optional delivery-cursor branch. The full release workspace suite passed before this cleanup; all required gates are rerunning at the final code checkpoint.

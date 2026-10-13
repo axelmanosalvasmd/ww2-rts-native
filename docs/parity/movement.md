@@ -300,3 +300,7 @@ Wall clock and scheduling
 ## Retirement and wreck lifecycle evidence
 
 The combat adapter removes dead units through the maintained grid without rebuilding surviving buckets. A focused mid-tick removal regression preserves the surviving query order. Its original-source fixture covers vehicle wreck initialization, motion, final Q cells, scorch and the oldest-hull cap among nine traces with 35 actions. MOV-106 remains in progress pending full tick scheduling and client presentation. Thrown carrier escape in MOV-76 remains outside this slice.
+
+## Recorded ground carrier boundary
+
+Board and Unload now use the canonical parser, dispatcher and recorded queue. The existing unit boarding phase has a checked shared-scheduler handoff that reads the live carrier pose for deferred goals and clears the target on retry-limit failure. The pinned original-source recorder verifies 19 traces and 97 actions; the first 14 traces remain identical. Native replay, complete tick scheduling and broader transport outcomes remain pending. Boats, rail, garrison exit and wrecked-carrier ejection are explicit boundaries; MOV transport rows keep their existing status.

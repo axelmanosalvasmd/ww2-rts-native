@@ -42,6 +42,13 @@ pub enum Stance {
 /// Internal recorded input. This is not a WebSocket or C interface.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Command {
+    Board {
+        ids: Vec<i64>,
+        target: Option<i64>,
+    },
+    Unload {
+        ids: Vec<i64>,
+    },
     Dig {
         ids: Vec<i64>,
         kind: crate::field_works::FortKind,
@@ -313,6 +320,13 @@ impl Command {
                 rows.iter().map(|v| safe_id(v).unwrap_or(-1)).collect()
             });
         match object.get("t").and_then(|v| v.as_str()) {
+            Some("board") => Ok(Self::Board {
+                ids,
+                target: object
+                    .contains_key("target")
+                    .then(|| object.get("target").and_then(safe_id).unwrap_or(-1)),
+            }),
+            Some("unload") => Ok(Self::Unload { ids }),
             Some("dig") => {
                 let at = Point {
                     x: object
@@ -601,6 +615,12 @@ impl crate::match_runtime::Match {
         if matches!(command, Command::Unsupported) {
             return Ok(Some(Denial::Unsupported));
         }
+        if let Command::Board { ids, target } = command {
+            return self.carrier_board_command(owner, ids, *target, winner_decided);
+        }
+        if let Command::Unload { ids } = command {
+            return self.carrier_unload_command(owner, ids, winner_decided);
+        }
         if let Command::Dig {
             ids,
             kind,
@@ -672,7 +692,9 @@ impl crate::match_runtime::Match {
             | Command::Stance { ids, .. }
             | Command::Ability { ids, .. }
             | Command::Autocast { ids, .. } => ids.clone(),
-            Command::Dig { .. }
+            Command::Board { .. }
+            | Command::Unload { .. }
+            | Command::Dig { .. }
             | Command::Technology { .. }
             | Command::Buy { .. }
             | Command::CompanionJoin { .. }
@@ -829,7 +851,9 @@ impl crate::match_runtime::Match {
                     self.commands.units.get_mut(&id).unwrap().auto_cast = *on;
                 }
             }
-            Command::Dig { .. }
+            Command::Board { .. }
+            | Command::Unload { .. }
+            | Command::Dig { .. }
             | Command::Technology { .. }
             | Command::Buy { .. }
             | Command::CompanionJoin { .. }
@@ -1173,6 +1197,15 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
         if kind == RequestKind::Dig {
             return self.match_state.current_dig_goal(id);
         }
+        if kind == RequestKind::Board {
+            return match self.match_state.current_board_goal(id) {
+                Ok(goal) => goal,
+                Err(error) => {
+                    self.error = Some(error);
+                    None
+                }
+            };
+        }
         let u = self.match_state.world.game.units.get(&id)?;
         if u.hp <= 0.0 {
             return None;
@@ -1270,6 +1303,7 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
             match update.request.kind {
                 crate::path_requests::RequestKind::World => u.world_goal = None,
                 crate::path_requests::RequestKind::Amove => u.amove = None,
+                crate::path_requests::RequestKind::Board => u.board = 0,
                 crate::path_requests::RequestKind::Nade => {
                     self.match_state.commands.units.get_mut(&u.id).unwrap().nade = None;
                     let ability = self.match_state.abilities.get_mut(u.id).unwrap();
@@ -1469,6 +1503,58 @@ impl crate::match_runtime::Match {
         }
         Ok(())
     }
+    /// Source Board overflow eligibility follows the carrier's current canonical pose.
+    /// Seat count and ownership are checked by the unit phase, after early queue service.
+    pub fn current_board_goal(&self, id: UnitId) -> Result<Option<Point>, String> {
+        self.validate_carrier_world()?;
+        let Some(unit) = self.world.game.units.get(&id) else {
+            return Ok(None);
+        };
+        self.validate_carrier_unit(id)?;
+        if unit.hp <= 0.0 || unit.retreating || !unit.path.is_empty() || unit.board == 0 {
+            return Ok(None);
+        }
+        if self.carrier_boundary(id) {
+            return Err("unsupported queued boarding actor".into());
+        }
+        let Some(carrier) = self.world.game.units.get(&unit.board) else {
+            return Ok(None);
+        };
+        self.validate_carrier_unit(carrier.id)?;
+        if carrier.hp <= 0.0 {
+            return Ok(None);
+        }
+        let reach = Catalog::compiled()
+            .map_err(|e| e.to_string())?
+            .table("CFG")
+            .map_err(|e| e.to_string())?
+            .get("aid")
+            .and_then(|v| v.get("board"))
+            .and_then(|v| v.number())
+            .ok_or("missing boarding reach")?;
+        if crate::math::hypot(unit.x - carrier.x, unit.z - carrier.z) <= reach {
+            return Ok(None);
+        }
+        if self.carrier_boundary(carrier.id) {
+            return Err("unsupported queued boarding carrier".into());
+        }
+        Ok(Some(carrier.at()))
+    }
+    /// Checked unit-loop handoff. Boarding skips the rest of the turn; a route request
+    /// uses the existing owner-bound scheduler and never stores another carrier pose.
+    pub fn apply_unit_boarding_with_routes(
+        &mut self,
+        id: UnitId,
+    ) -> Result<crate::match_carriers::BoardingOutcome, String> {
+        if self.commands.path_tick != Some(self.world.game.tick) {
+            return Err("begin_path_tick must run before boarding".into());
+        }
+        let outcome = self.apply_unit_boarding(id)?;
+        if let crate::match_carriers::BoardingOutcome::NeedsPath { at, .. } = outcome {
+            self.request_command_path(id, at, crate::path_requests::RequestKind::Board)?;
+        }
+        Ok(outcome)
+    }
     pub fn request_command_path(
         &mut self,
         id: UnitId,
@@ -1482,6 +1568,7 @@ impl crate::match_runtime::Match {
                 | crate::path_requests::RequestKind::Amove
                 | crate::path_requests::RequestKind::Nade
                 | crate::path_requests::RequestKind::Dig
+                | crate::path_requests::RequestKind::Board
         ) {
             return Err("unsupported command path request".into());
         }

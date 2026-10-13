@@ -17,16 +17,20 @@ try{
  const marker='  setupStructures(g, map);';assert.equal(code.split(marker).length,2);
  // Isolate the same authored map/structure checkpoint used by native fixture setup.
  code=code.replace(marker,marker+'\n  return g;').replace(/from '(\.\/[^']+)'/g,(_,p)=>`from '${pathToFileURL(join(ref,'shared',p)).href}'`);
- code+=`\nexport const carrierHooks={early(g,id,dt){for(const u of [g.units.get(id)]){${earlyBlock}}},boarding(g,id){for(const u of [g.units.get(id)]){${boarding}}},beginPathTick,work(g){return pathWork.get(g)},flags:unitFlags};\n`;
+ // Observe calls while retaining the original request and search implementations.
+ code+=`\nconst carrierRequests=[];const originalCarrierRequest=requestStepPath;requestStepPath=function(g,u,to,kind){carrierRequests.push({id:u.id,kind,target:u.board,x:to.x,z:to.z});return originalCarrierRequest(g,u,to,kind);};\nexport const carrierHooks={early(g,id,dt){for(const u of [g.units.get(id)]){${earlyBlock}}},boarding(g,id){for(const u of [g.units.get(id)]){${boarding}}},beginPathTick,work(g){return pathWork.get(g)},requests(){return carrierRequests.splice(0)},flags:unitFlags};\n`;
  writeFileSync(join(temp,'sim.mjs'),code);const sim=await import(pathToFileURL(join(temp,'sim.mjs'))),grid=await import(pathToFileURL(join(ref,'shared/grid.js')));
  const bits=n=>{const b=Buffer.alloc(8);b.writeDoubleBE(n);return b.toString('hex')},pt=p=>p?[bits(p.x),bits(p.z)]:null;
  const map=(w=40,h=30)=>({name:'Carrier checkpoint',w,h,rows:Array(h).fill('.'.repeat(w)),spawns:[{x:0,y:0},{x:w-1,y:h-1}],points:[{x:w>>1,y:h>>1}]}),unit=(id,type,x,z,extra={})=>({id,type,x,z,...extra}),traces=[];
- function record(name,units,actions,terrain=map()){
+ function record(name,units,actions,terrain=map(),scheduler=false){
   Math.random=()=>.5;const g=sim.createGame(terrain,[],false,[],[],{weather:false});Math.random=oldRandom;
   g.players=[0,1].map(slot=>({slot,team:slot,faction:slot,mp:500,mun:0,fuel:0,out:false,away:false,visible:new Set(),spawn:{x:1+slot*(terrain.w*2-2),z:1+slot*(terrain.h*2-2)}}));g.tick=10;g.tech=false;g.seed=123;g.wx={rain:0,wet:0};
   for(const row of units){const d=sim.UNITS[row.type];g.units.set(row.id,{owner:0,rot:0,hp:d.models*d.hpPer,supp:0,path:[],orders:[],riding:0,cargo:[],xp:0,garrison:-1,follow:77,auto:false,autoRetreat:false,holdFire:false,holdPos:false,attackId:0,targetId:0,cd:0,buff:0,ap:false,sprint:0,nade:null,cooldown:0,retarget:0,repath:0,stuck:0,retreating:false,dig:null,build:0,enter:-1,board:0,amove:null,face:null,entrench:null,fireAt:-1,drift:false,reverse:null,traffic:null,trafficWait:0,worldGoal:null,still:0,...structuredClone(row)});}
   grid.rebuildGrid(g);
   const snapshot=()=>({units:[...g.units.values()].sort((a,b)=>a.id-b.id).map(u=>({id:u.id,kind:u.type,owner:u.owner,pose:[u.x,u.z,u.rot].map(bits),hp:bits(u.hp),supp:bits(u.supp),still:bits(u.still),cd:bits(u.cd),cooldown:bits(u.cooldown),retarget:bits(u.retarget),repath:bits(u.repath),board:u.board,riding:u.riding,cargo:[...u.cargo],path:u.path.map(pt),follow:u.follow,attack:u.attackId,target:u.targetId,work:!!u.dig,orders:u.orders.length,face:!!u.face,nade:pt(u.nade),enter:u.enter,fireAt:u.fireAt,build:!!u.build,entrench:!!u.entrench,worldGoal:pt(u.worldGoal),amove:pt(u.amove),traffic:!!u.traffic,trafficWait:bits(u.trafficWait),outcome:u.moveOutcome??null,outcomeTick:u.moveOutcomeTick??null,flags:sim.carrierHooks.flags(g,u)&(262144|524288|(3<<23)),grid:grid.gridFor(g).candidates(u,6).map(v=>v.id)})),money:g.players.map(p=>bits(p.mp)),shots:g.shots});
+  const requestRow=r=>({id:r.id,kind:r.kind,at:r.key.split(':').slice(1).map(n=>bits(Number(n)))});
+  const pathSnapshot=()=>{const w=sim.carrierHooks.work(g),s=g.pathStats;return {used:w?.used??0,budget:w?.budget??0,queue:(w?.queue??[]).map(requestRow),pending:[...(w?.queued.values()??[])].map(requestRow),stats:{calls:s?.calls??0,deferred:s?.deferred??0,failed:s?.failed??0,dropped:s?.dropped??0}};};
+  const begin=action=>{if(action.tick!==undefined)g.tick=action.tick;g.pathBudget=action.budget??0;if(action.retryLimit!==undefined)g.pathRetryLimit=action.retryLimit;sim.carrierHooks.beginPathTick(g);};
   const initial=snapshot(),rows=[];
   for(const action of actions){let result=null;
    if(action.op==='command')result=sim.command(g,action.owner??0,action.cmd)??null;
@@ -34,11 +38,12 @@ try{
    else if(action.op==='mutate')sim.internals.setCell(g,action.cell,action.ch);
    else if(action.op==='early')sim.carrierHooks.early(g,action.id,action.dt??.05);
    else if(action.op==='phase'){
-    g.pathBudget=0;sim.carrierHooks.beginPathTick(g);const u=g.units.get(action.id),before=u.board;
-    sim.carrierHooks.boarding(g,action.id);const pending=sim.carrierHooks.work(g).queued.get(action.id);
-    result=u.riding?{boarded:u.riding}:before&&!u.board?'cleared':pending?{needsPath:u.board,at:pt(g.units.get(u.board))}:'idle';
-   }else throw Error(action.op);
-   rows.push({action,result,snapshot:snapshot()});
+    begin(action);const u=g.units.get(action.id),before=u.board;sim.carrierHooks.requests();
+    sim.carrierHooks.boarding(g,action.id);const request=sim.carrierHooks.requests().find(r=>r.id===action.id&&r.kind==='board');
+    result=u.riding?{boarded:u.riding}:request?{needsPath:request.target,at:pt(request)}:before&&!u.board?'cleared':'idle';
+   }else if(action.op==='pathBegin')begin(action);
+   else throw Error(action.op);
+   rows.push({action,result,snapshot:snapshot(),...(scheduler?{scheduler:pathSnapshot()}:{})});
   }
   traces.push({name,map:terrain,units,initial,rows});
  }
@@ -57,6 +62,11 @@ try{
  record('full-carrier-keeps-paid-dig',[unit(1,'rifle',20,23),unit(2,'halftrack',24,23,{cargo:[3]}),unit(3,'rifle',24,23,{riding:2})],[{op:'command',cmd:{t:'dig',ids:[1],kind:'trench',x:20,z:20,dir:0}},board([1],2),unload([2]),board([1],2),phase(1)]);
  record('hidden-obstacle-owner-route',[unit(1,'rifle',20,20),unit(2,'halftrack',170,20)],[{op:'mutate',cell:10*100+45,ch:'B'},board([1],2)],map(100,40));
  record('duplicate-inputs-do-not-reserve-twice',[unit(1,'rifle',20,20),unit(2,'halftrack',24,20)],[board([1,1,2,2]),phase(1),early(1),unload([2,2])]);
+ record('immediate-board-route-search',[unit(1,'rifle',20,20),unit(2,'halftrack',40,20)],[board([1],2),{op:'prime',id:1,fields:{path:[],repath:0}},{op:'phase',id:1,budget:1}],map(),true);
+ record('queued-moving-carrier-goal-replacement',[unit(1,'rifle',20,20),unit(2,'halftrack',40,20)],[board([1],2),{op:'prime',id:1,fields:{path:[],repath:0}},{op:'phase',id:1,budget:0},{op:'prime',id:2,fields:{x:50,z:23}},{op:'pathBegin',tick:11,budget:1},{op:'phase',id:1,budget:0},{op:'pathBegin',tick:12,budget:1}],map(),true);
+ record('near-blocked-board-request-and-queue-drop',[unit(1,'rifle',20,20),unit(2,'halftrack',24,20)],[board([1],2),{op:'mutate',cell:10*40+11,ch:'B'},{op:'prime',id:1,fields:{path:[],repath:0}},{op:'phase',id:1,budget:0},{op:'pathBegin',tick:11,budget:1},{op:'phase',id:1,budget:1}],map(),true);
+ record('failed-board-route-drops-target',[unit(1,'rifle',5,21),unit(2,'halftrack',40,21)],[board([1],2),...[361,362,363,401,403,441,442,443].map(cell=>({op:'mutate',cell,ch:'W'})),{op:'prime',id:1,fields:{path:[],repath:0}},{op:'phase',id:1,budget:1,retryLimit:1}],map(),true);
+ record('explicit-negative-versus-omitted-target',[unit(1,'rifle',20,20),unit(2,'halftrack',24,20)],[board([1,2],-1),board([1,2],0),board([1,2]),phase(1)],map(),true);
  const output=JSON.stringify({reference:pin,traces},null,2)+'\n',path=join(root,'rust/crates/core/tests/fixtures/carriers.json');clean();
  if(process.argv.includes('--check')){assert.equal(readFileSync(path,'utf8'),output);console.log(`Verified ${traces.length} carrier traces, ${traces.reduce((n,c)=>n+c.rows.length,0)} actions`)}else{writeFileSync(path,output);console.log(`Recorded ${traces.length} carrier traces, ${traces.reduce((n,c)=>n+c.rows.length,0)} actions`)}
 }finally{Math.random=oldRandom;rmSync(temp,{recursive:true,force:true});}
