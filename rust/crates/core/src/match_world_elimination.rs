@@ -70,6 +70,11 @@ impl Match {
                 .combat
                 .get(*id)
                 .ok_or("missing World elimination combat metadata")?;
+            if unit.entrench || unit.build {
+                return Err(
+                    "unsupported World elimination: mass-work and construction plans".into(),
+                );
+            }
             if self.field_works.is_active(*id) != unit.dig {
                 return Err("invalid World elimination paid-work projection".into());
             }

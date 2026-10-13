@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Refuse selected mass-work and construction activity when only Boolean projections exist in this ancestry. Their canonical project membership cleanup remains with the later owner; add atomic refusal witnesses instead of silently dropping unrepresented work.
+
 - Include a registered building whose current HP is negative in the ordered wreck oracle, proving administrative removal still runs its wreck path regardless of current health.
 
 - Extend administrative cleanup proof with an actual paid trench job and assert its descriptor is canceled without restoring the charged wallet.

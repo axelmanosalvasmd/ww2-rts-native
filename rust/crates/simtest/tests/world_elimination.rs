@@ -239,12 +239,14 @@ fn protected(m: &Match) -> String {
 fn unsupported_and_late_world_guards_preserve_every_canonical_owner() {
     let f = fixture();
     let case = &f["cases"][3];
-    let mutations: [fn(&mut Match); 5] = [
+    let mutations: [fn(&mut Match); 7] = [
         |m| m.world.game.height = Some(Vec::new()),
         |m| m.story[0].captures = f64::NAN,
         |m| m.world.game.terrain_version = u32::MAX - 1,
         |m| m.world.game.units.get_mut(&12).unwrap().riding = true,
         |m| m.options.logistics = true,
+        |m| m.world.game.units.get_mut(&12).unwrap().entrench = true,
+        |m| m.world.game.units.get_mut(&12).unwrap().build = true,
     ];
     for change in mutations {
         let mut m = world_scene::make_match(&f, case["input"]["teams"].as_array().unwrap());
