@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Connected the source operative respawn, early unit turn and ordered death hooks in a separate Conquest tick composition. Boundary joins enter prior poses, and operative turns skip ordinary timers. Replaced the earlier unconnected-actor refusal regression with a real queued-join phase test. The provider recorder reproduces 15 traces, 576 operations and 506 original ticks; combined native replay remains pending.
+
+- Connected canonical support cooldown and cover decay after projectiles and before living weather, preserving negative cooldowns and radio ownership before point updates. Active strikes and aircraft remain unavailable. A borrowed ordered boundary iterator rejects queued Support before consuming any input or changing payment, timers or the clock; a focused regression also protects future-boundary admission. Native verification is pending.
+
 - Merged the reviewed operative turn provider and verified effect ancestry into a separate tick composition. Preserved the canonical ability/recovery publication defaults, checked buff/AP launch rules, current engineering/input paths, captured burning and pre-drop cleanup. The additive provider and composed tick still await native verification.
 
 - Consumed the engineering provider's concrete compiler and fixture repairs through immutable source head 96710f5. The checked ability fixture already had the smaller macro projection and keeps that body. No additional tick phase was enabled; first provider and combined native proof remain pending.

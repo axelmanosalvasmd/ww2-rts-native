@@ -1,6 +1,6 @@
 # Operative tick provider
 
-This source-written checkpoint connects the existing operative turn to its real combat methods. It is separate from frozen PR #142 and awaits the sole tick owner's consumer composition, full-step replay and native verification.
+This source-written checkpoint connects the existing operative turn to its real combat methods. It is separate from frozen PR #142. The sole tick owner's separate source composition now calls these methods at the source sites; full native replay remains pending.
 
 `prepare_companion_tick` checks the canonical key/record/body/control identity joins and enough clock headroom for the next tick's death delay. It reads state only. An empty registry preserves the ordinary runner's clock bounds. Other modes and inconsistent internal mode state remain unsupported.
 
@@ -14,4 +14,4 @@ Preflight distinguishes active bindings from retained dead metadata. A retired o
 
 Live operative IDs also must be nonzero, below the allocator head, and match their canonical map key. Zero is the registry's dead-soldier sentinel and cannot represent a live actor. These checks precede clock advancement and respawn publication.
 
-The plain-terrain authored cases leave ordinary vision/projectile body interoperability with operative jump/crouch geometry outside this proof. Grenade contact/settlement, unavailable unrelated phases, transport and whole-game acceptance remain explicit boundaries until actually exercised and connected. Native replay and the consumer composition are pending.
+The plain-terrain authored cases leave ordinary vision/projectile body interoperability with operative jump/crouch geometry outside this proof. Grenade contact/settlement, unavailable unrelated phases, transport and whole-game acceptance remain explicit boundaries until actually exercised and connected. The source composition also connects canonical raw support timer decay after projectile phases and before weather. Active strikes/aircraft remain unavailable, and current-boundary Support refuses before queue or wallet mutation. Native replay of the composition is pending.

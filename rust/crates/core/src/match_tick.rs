@@ -34,6 +34,7 @@ pub enum TickPhase {
     Separation,
     Projectiles,
     Support,
+    SupportTimers,
     Scenario,
     LivingWeather,
     FireFlood,
@@ -106,7 +107,18 @@ impl crate::match_runtime::Match {
         if self.options.mode != crate::economy::Mode::Conquest {
             return Err("tick execution currently requires ordinary Conquest".into());
         }
-        self.validate_command_tick(game.tick as u64 + 1)?;
+        let boundary = game.tick as u64 + 1;
+        self.validate_command_tick(boundary)?;
+        // Reject an unactuated paid input before consuming any boundary key.
+        if self
+            .commands
+            .queue
+            .pending_tick(boundary)
+            .any(|(_, command)| matches!(command, crate::match_commands::Command::Support { .. }))
+        {
+            return Err("support strike tick actuator is not connected".into());
+        }
+        self.validate_tick_capabilities()?;
         if !self.rules.movement.tick.is_finite() || self.rules.movement.tick <= 0.0 {
             return Err("invalid tick duration".into());
         }
@@ -127,7 +139,7 @@ impl crate::match_runtime::Match {
             }
         }
         self.validate_abilities()?;
-        self.validate_tick_actors()?;
+        self.prepare_companion_tick()?;
         if self
             .field_works
             .jobs()
@@ -149,14 +161,14 @@ impl crate::match_runtime::Match {
         Ok(())
     }
 
-    fn validate_tick_actors(&self) -> Result<(), String> {
+    fn validate_tick_capabilities(&self) -> Result<(), String> {
+        if !self.support.strikes.is_empty() || !self.world.game.strikes.is_empty() {
+            return Err("support strike tick actuator is not connected".into());
+        }
         if self.world.game.units.values().any(|unit| {
-            self.commands
-                .units
-                .get(&unit.id)
-                .is_some_and(|control| control.operative)
+            unit.air.is_some() || self.rules.kinds.get(unit.kind).is_some_and(|kind| kind.air)
         }) {
-            return Err("operative tick actuator is not connected".into());
+            return Err("aircraft tick actuator is not connected".into());
         }
         Ok(())
     }
@@ -167,9 +179,9 @@ impl crate::match_runtime::Match {
         let winner_decided = self.finish.is_some();
         // Boundary orders carry the previous clock's timestamps and view keys.
         let commands = self.apply_commands(self.world.game.tick as u64 + 1, winner_decided)?;
-        // A boundary admission may publish an actor whose unit phase is absent.
-        // Fail this staged runner before that actor enters the ground loop.
-        self.validate_tick_actors()?;
+        // Boundary joins are included in prior poses and the same live unit loop.
+        self.prepare_companion_tick()?;
+        self.validate_tick_capabilities()?;
         let mut environment = self.tick_environment_phase(EnvironmentPhase::StructureSync)?;
         self.grid.rebuild(&self.world.game.units);
         self.capture_firing_prior()?;
@@ -187,6 +199,8 @@ impl crate::match_runtime::Match {
             TickPhase::StructureSync,
             TickPhase::Clock,
         ];
+        self.respawn_companions(winner_decided)?;
+        phases.push(TickPhase::Operative);
         environment.extend(self.tick_environment_phase(EnvironmentPhase::Debris)?);
         phases.push(TickPhase::Debris);
         self.sample_conquest_tick()?;
@@ -220,6 +234,15 @@ impl crate::match_runtime::Match {
             let Some((&id, unit)) = next else { break };
             last_id = Some(id);
             if unit.hp <= 0.0 {
+                continue;
+            }
+            if self
+                .commands
+                .units
+                .get(&id)
+                .is_some_and(|control| control.operative)
+            {
+                self.step_companion_turn(id, winner_decided)?;
                 continue;
             }
             let factor = movement::supp_speed(unit.supp);
@@ -271,6 +294,10 @@ impl crate::match_runtime::Match {
         self.advance_firing_grenades(dt)?;
         self.advance_firing_salvos(dt)?;
         phases.push(TickPhase::Projectiles);
+        // Source cooldowns decay even at zero and read radio before point updates.
+        self.advance_support_timers(dt)
+            .map_err(|error| format!("support timers: {error}"))?;
+        phases.push(TickPhase::SupportTimers);
 
         let game = &mut self.world.game;
         let mut smokes: Vec<_> = game
@@ -345,7 +372,6 @@ impl crate::match_runtime::Match {
                 TickPhase::Research,
                 TickPhase::UnitReserves,
                 TickPhase::Production,
-                TickPhase::Operative,
                 TickPhase::AirRail,
                 TickPhase::Riding,
                 TickPhase::Reactions,
@@ -389,10 +415,12 @@ impl crate::match_runtime::Match {
             })
             .collect::<Result<Vec<_>, String>>()?;
         self.validate_story_for_deaths(&facts)?;
+        self.prepare_companion_deaths(unit_order)?;
         let result = self
             .retire_dead(unit_order)
             .map_err(|e| format!("death cleanup: {e:?}"))?;
         for record in &result.retired {
+            self.companion_died(record.unit.id)?;
             let kind = self.rules.kinds[record.unit.kind].name.clone();
             self.record_death(
                 crate::match_story::DeathRecord {

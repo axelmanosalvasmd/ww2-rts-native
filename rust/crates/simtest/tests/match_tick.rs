@@ -345,7 +345,7 @@ fn rejected_clock_does_not_consume_a_tick() {
 }
 
 #[test]
-fn admitted_companion_cannot_enter_the_unconnected_ground_tick() {
+fn queued_companion_join_enters_prior_and_skips_ordinary_timers() {
     let fixture: Value = serde_json::from_str(include_str!("fixtures/match-tick.json")).unwrap();
     let mut m = make(&fixture["cases"][0]);
     let count = m.world.game.units.len();
@@ -360,19 +360,152 @@ fn admitted_companion_cannot_enter_the_unconnected_ground_tick() {
         },
     )
     .unwrap();
-    let error = m.advance_tick().unwrap_err();
-    assert!(error.contains("operative tick actuator"), "{error}");
-    assert_eq!(m.world.game.tick, 0);
+    let report = m.advance_tick().unwrap();
+    assert_eq!(m.world.game.tick, 1);
     assert_eq!(m.world.game.units.len(), count + 1);
-    assert!(m.commands.units.values().any(|control| control.operative));
-    assert!(m.tick_state.fault().is_some());
-    let after = snapshot(&m);
+    let id = *m
+        .commands
+        .units
+        .iter()
+        .find(|(_, control)| control.operative)
+        .unwrap()
+        .0;
+    assert!(report.prior.contains_key(&id));
+    assert!(
+        report
+            .phases
+            .contains(&ww2_core::match_tick::TickPhase::Operative)
+    );
+    assert!(
+        !report
+            .unavailable
+            .contains(&ww2_core::match_tick::TickPhase::Operative)
+    );
+    assert_eq!(m.world.game.units[&id].repath, 0.0);
+    assert_eq!(m.world.game.units[&id].sprint, 0.0);
+    assert_eq!(m.firing.get(id).unwrap().retarget, 0.0);
+    assert!(m.tick_state.fault().is_none());
+}
+
+#[test]
+fn unconnected_support_boundary_preserves_all_pending_input_and_timers() {
+    use ww2_core::{match_commands::Command, orders::OrderKey};
+    let fixture: Value = serde_json::from_str(include_str!("fixtures/match-tick.json")).unwrap();
+    let mut m = make(&fixture["cases"][0]);
+    let first = *m.world.game.units.keys().next().unwrap();
+    m.enqueue_command(
+        OrderKey {
+            tick: 1,
+            issuer: 0,
+            sequence: 1,
+        },
+        Command::Stop {
+            ids: vec![i64::from(first)],
+        },
+    )
+    .unwrap();
+    m.enqueue_command(
+        OrderKey {
+            tick: 1,
+            issuer: 0,
+            sequence: 2,
+        },
+        Command::Support {
+            kind: "artillery".into(),
+            at: Point { x: 8.0, z: 8.0 },
+            direction: None,
+        },
+    )
+    .unwrap();
+    let before = snapshot(&m);
+    let timers = m
+        .start
+        .players
+        .iter()
+        .map(|p| p.support.clone())
+        .collect::<Vec<_>>();
+    let controls = m.commands.units.clone();
     assert!(
         m.advance_tick()
             .unwrap_err()
-            .contains("tick runner faulted")
+            .contains("support strike tick actuator")
     );
-    assert_eq!(snapshot(&m), after);
+    assert_eq!(snapshot(&m), before);
+    assert_eq!(m.commands.units, controls);
+    assert_eq!(m.commands.next_tick(), Some(1));
+    assert_eq!(m.commands.pending_commands(), 2);
+    assert_eq!(
+        m.start
+            .players
+            .iter()
+            .map(|p| p.support.clone())
+            .collect::<Vec<_>>(),
+        timers
+    );
+    assert!(m.support.strikes.is_empty());
+    assert!(m.tick_state.fault().is_none());
+
+    let mut future = make(&fixture["cases"][0]);
+    let timers = future
+        .start
+        .players
+        .iter()
+        .map(|p| p.support.clone())
+        .collect::<Vec<_>>();
+    future
+        .enqueue_command(
+            OrderKey {
+                tick: 2,
+                issuer: 0,
+                sequence: 1,
+            },
+            Command::Support {
+                kind: "artillery".into(),
+                at: Point { x: 8.0, z: 8.0 },
+                direction: None,
+            },
+        )
+        .unwrap();
+    let report = future.advance_tick().unwrap();
+    assert!(
+        report
+            .phases
+            .contains(&ww2_core::match_tick::TickPhase::SupportTimers)
+    );
+    for (slot, row) in timers.iter().enumerate() {
+        for (name, before) in row {
+            assert_eq!(
+                future.start.players[slot].support[name],
+                before - future.rules.movement.tick
+            );
+        }
+    }
+    let before = snapshot(&future);
+    let timers = future
+        .start
+        .players
+        .iter()
+        .map(|p| p.support.clone())
+        .collect::<Vec<_>>();
+    assert!(
+        future
+            .advance_tick()
+            .unwrap_err()
+            .contains("support strike tick actuator")
+    );
+    assert_eq!(snapshot(&future), before);
+    assert_eq!(
+        future
+            .start
+            .players
+            .iter()
+            .map(|p| p.support.clone())
+            .collect::<Vec<_>>(),
+        timers
+    );
+    assert_eq!(future.commands.next_tick(), Some(2));
+    assert_eq!(future.commands.pending_commands(), 1);
+    assert!(future.tick_state.fault().is_none());
 }
 
 #[test]
