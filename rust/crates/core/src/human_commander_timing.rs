@@ -57,14 +57,14 @@ pub enum TimingError {
 /// Owned by one seat, independently of the planner and simulation RNGs.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Timing {
-    value: u32,
+    value_bits: u64,
     draws: u64,
 }
 
 impl Timing {
     pub fn new(seed: u32, slot: u32) -> Self {
         Self {
-            value: seed ^ slot.wrapping_add(1).wrapping_mul(0x9E37_79B1),
+            value_bits: f64::from(seed ^ slot.wrapping_add(1).wrapping_mul(0x9E37_79B1)).to_bits(),
             draws: 0,
         }
     }
@@ -74,8 +74,10 @@ impl Timing {
     }
 
     fn fraction(&mut self) -> f64 {
-        self.value = self.value.wrapping_add(0x6D2B_79F5);
-        let mut t = self.value;
+        // Source retains its Number accumulator, including rounding above 2^53.
+        let value = f64::from_bits(self.value_bits) + f64::from(0x6D2B_79F5_u32);
+        self.value_bits = value.to_bits();
+        let mut t = (value % 4_294_967_296.0) as u32;
         t = (t ^ (t >> 15)).wrapping_mul(t | 1);
         t ^= t.wrapping_add((t ^ (t >> 7)).wrapping_mul(t | 61));
         self.draws += 1;
@@ -153,4 +155,27 @@ pub fn ticks(seconds: f64) -> Result<u64, TimingError> {
 /// Only caller-owned runtime facts, never authoritative hidden match state.
 pub fn needs_view(initialized: bool, look_at: Option<u64>, front_is_plan: bool, now: u64) -> bool {
     !initialized || look_at.is_some_and(|at| at <= now.saturating_add(1)) || front_is_plan
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Timing;
+    #[test]
+    fn source_number_accumulator_survives_integer_precision_boundary() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../tests/fixtures/human-commander-timing.json"
+        ))
+        .unwrap();
+        let mut timing = Timing::new(0x9E37_79B1, 0);
+        let first = fixture["longStream"]["first"].as_u64().unwrap();
+        for _ in 1..first {
+            timing.fraction();
+        }
+        for bits in fixture["longStream"]["values"].as_array().unwrap() {
+            assert_eq!(
+                format!("{:016x}", timing.fraction().to_bits()),
+                bits.as_str().unwrap()
+            );
+        }
+    }
 }

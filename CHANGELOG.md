@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed the human timing stream's long-run accumulator: the Source keeps a floating-point Number rather than wrapping its seed to 32 bits after every draw. Three original fractions around draw 4,917,759 protect the first precision-boundary divergence. The focused native regression is written but not run.
+
 - Added the ordinary human commander's private timing provider: slot-seeded timing, difficulty medians and caps, lognormal opening/reaction/input/scan delays, and view-demand checks. The unchanged Source recorder covers 48 profiles, 336 sequential samples, eight public openings and two reset/level-change records. Native tests are written but not run; camera, alerts, input queues, policy and runner integration remain separate.
 
 - Independently replayed the Default proof's copied core, support and mass-project binaries in both profiles: all 80 test executions pass, with seven artifact hashes, 13 compiled-source hashes and 13 gate-log hashes verified. This documentation closure changes no Rust or harness file.

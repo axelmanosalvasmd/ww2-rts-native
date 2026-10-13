@@ -56,9 +56,12 @@ try{
   if(draws!==14)throw Error('Seven timing samples must consume14 private draws');
   componentCases.push({seed,slot,level,privateSeed,draws,steps});
  }
- clean();const result={reference:pin,node:process.version,arch:process.arch,sourceSha256,scope:'Component exports only seeded/sample/skillOf/ticks appended in memory; public opening/view-demand/camera/reset calls unchanged; no delivered view, planner or actuator execution; clock values are leaf inputs, not full match steps.',startupRandom:{value:.5,draws:globalDraws},skills:human.HUMAN_SKILLS,componentCases,opening,transitions};
+ const longRng=human.__seeded(0),longStream={privateSeed:0,first:4917758,values:[]};
+ for(let i=1;i<longStream.first;i++)longRng();
+ for(let i=0;i<3;i++)longStream.values.push(bits(longRng()));
+ clean();const result={reference:pin,node:process.version,arch:process.arch,sourceSha256,scope:'Component exports only seeded/sample/skillOf/ticks appended in memory; public opening/view-demand/camera/reset calls unchanged; no delivered view, planner or actuator execution; clock values are leaf inputs, not full match steps.',startupRandom:{value:.5,draws:globalDraws},skills:human.HUMAN_SKILLS,componentCases,opening,transitions,longStream};
  const fixturePath=process.env.HUMAN_TIMING_FIXTURE??resolve(root,'rust/crates/core/tests/fixtures/human-commander-timing.json');
  const output=JSON.stringify(result)+'\n';
  if(process.argv.includes('--check')){if(readFileSync(fixturePath,'utf8')!==output)throw Error('Human timing fixture differs');}else writeFileSync(fixturePath,output);
- console.log(`Verified ${componentCases.length} private timing profiles, ${componentCases.reduce((n,r)=>n+r.steps.length,0)} sequential samples, ${opening.length} public openings, ${transitions.length} reset/level-change receipts`);
+ console.log(`Verified ${componentCases.length} private timing profiles, ${componentCases.reduce((n,r)=>n+r.steps.length,0)} sequential samples, ${opening.length} public openings, ${transitions.length} reset/level-change receipts, ${longStream.values.length} long-stream fractions`);
 }finally{Math.random=previous;}
