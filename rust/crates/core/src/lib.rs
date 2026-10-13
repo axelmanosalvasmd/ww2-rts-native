@@ -5,6 +5,7 @@ pub mod catalog;
 pub mod client_view;
 pub mod combat;
 pub mod command_destinations;
+pub mod companions;
 pub mod conquest_end;
 pub mod deployment;
 pub mod economy;
@@ -17,6 +18,7 @@ pub mod formation;
 pub mod game;
 pub mod grid;
 pub mod legacy_scenario;
+pub mod match_companions;
 
 pub mod logistics;
 pub mod map;
@@ -31,6 +33,7 @@ pub mod match_reactions;
 pub mod match_routing;
 pub mod match_runtime;
 pub mod match_story;
+pub mod match_support;
 pub mod match_tick;
 pub mod match_withdrawal;
 pub mod math;
@@ -46,6 +49,7 @@ pub mod pathfinding;
 pub mod produced_units;
 pub mod production;
 pub mod projectiles;
+pub mod recorded_input;
 
 pub mod random;
 pub mod route_knowledge;
@@ -69,3 +73,9 @@ pub mod world;
 pub mod world_generation;
 
 pub mod world_map;
+
+pub mod match_world;
+pub mod match_world_rails;
+
+pub mod match_world_memory;
+pub mod world_memory;

@@ -24,10 +24,12 @@ function random(){state=(state+0x6d2b79f5)>>>0;let t=state;t=Math.imul(t^t>>>15,
 const pick=n=>Math.floor(random()*n),point=(x,z)=>({x,z});
 const runs=array=>{const out=[];for(const v of array){if(out.length&&out.at(-1)[0]===v)out.at(-1)[1]++;else out.push([v,1]);}return out;};
 const scenarios=[];
-function scenario(name,w,h,flags,height,spawn=point(1,1)){
+function scenario(name,w,h,flags,height,spawn=point(1,1),mode=null){
  const g={w,h,flags:Uint16Array.from(flags),height:height&&Int8Array.from(height),players:[{spawn},{spawn:point(w*2-1,h*2-1)}],units:new Map(),nextId:1,
   logisticsEnabled:false,infantryRegionVersion:0,vehicleRegionVersion:0,navalRegionVersion:0};
+ if(mode)g.mode={kind:mode};
  const data={name,w,h,flags:runs(flags),height:height&&runs(height),spawns:g.players.map(p=>p.spawn),actions:[]};scenarios.push(data);
+ if(mode)data.mode=mode;
  return {
   nearest(at,block,origin=null){data.actions.push({op:'nearest',at,block,origin,cell:api.nearestFree(g,at.x,at.z,block,origin)});},
   spawn(type,index,owner=0){const effective=index??g.units.size;const unit=api.spawnUnit(g,owner,type,index);data.actions.push({op:'spawn',type,index:effective,owner,unit});},
@@ -37,6 +39,15 @@ function scenario(name,w,h,flags,height,spawn=point(1,1)){
 const all=scenario('all-represented-non-air-defaults',17,17,Array(289).fill(0),Array(289).fill(0),point(16,16));
 const supported=Object.keys(sim.UNITS).filter(k=>!sim.UNITS[k].air);
 for(const type of supported){all.spawn(type);all.spawn(type,7,1);}
+const modeUnits=Object.entries(sim.UNITS).filter(([,d])=>!d.air);
+const paid=modeUnits.find(([,d])=>d.ab.id!=='none'&&sim.abCost({mode:{kind:'world'}},d.ab)>0)?.[0];
+const free=modeUnits.find(([,d])=>d.ab.id!=='none'&&sim.abCost({mode:{kind:'world'}},d.ab)===0)?.[0];
+const none=modeUnits.find(([,d])=>d.ab.id==='none')?.[0];
+if(!paid||!free||!none)throw Error('Missing source ability-cost representatives');
+for(const mode of['classic','world']){
+ const current=scenario(`mode-control-defaults:${mode}`,17,17,Array(289).fill(0),Array(289).fill(0),point(16,16),mode);
+ for(const [index,type]of[none,paid,free].entries())current.spawn(type,index);
+}
 for(const [name,w,h,flags,height,spawn]of[
  ['one-cell',1,1,[0],null,point(1,1)],
  ['fully-blocked',3,3,Array(9).fill(1|64|1024|2048),Array(9).fill(0),point(3,3)],

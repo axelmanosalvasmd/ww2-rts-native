@@ -27,7 +27,7 @@ try {
 }
 export function fieldStep(g,id,dt) {
  const u=g.units.get(id); if(!u||u.hp<=0)return;
- const requestStepPath=(g,u,at,kind)=>g.fieldRoutes.push({unit:u.id,at:{...at}});
+ const requestStepPath=(g,u,at,kind)=>g.fieldRoutes.push({unit:u.id,at:{x:at.x,z:at.z}});
  const tally=(g,owner,k,v=1)=>g.fieldEvents.push({owner,kind:k,value:v});
  ${work}
 }

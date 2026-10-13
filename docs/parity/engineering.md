@@ -199,3 +199,17 @@ Native static graph progress: `rust/crates/core/src/structures.rs` validates aut
 ## Ground-unit retirement integration evidence
 
 The Match combat adapter initializes vehicle wreck motion and destroys building footprints through canonical World/environment state. Nine original-source traces with 35 actions include building collapse, vehicle scorch, Q settlement, ordered bounty, oldest-hull cleanup and terrain removal of settled wrecks. Three focused tests pass in debug and release, including the negative-sprint expansion and explicit terminal blast direction. ENG-44 and ENG-67 remain in progress until live tick scheduling and presentation are integrated; the adapter returns retirement records for the story, companion, convoy and routing owners.
+
+
+## Ordinary Match digging adapter evidence
+
+The staged adapter uses the singular Match.field_works owner and the shared synchronous cancellation helper. Its recorder calls the original command function and unchanged in-reach work block: eight traces and 31 actions cover replacement, refusal, first selected ID, real team sight, hospital limits, garrison exit, completion at 20 Hz and cached demine goals. Source fixture regeneration passes. Native execution, typed Dig dispatch and actual unit-loop binding remain pending; this checkpoint does not complete an engineering parity row. Shared mass-entrenchment, concrete, bridges, filling and construction remain outside this bounded actuator.
+
+
+The Match recorder was extended to 12 traces and 47 actions. It now uses original beginPathTick and requestStepPath for immediate routing, FIFO deferral, cancellation of a deferred job and failed-route job dropping. Those source results are verified; the corresponding native consumer awaits the coordinated input/routing dependency and native lease.
+
+
+The coordinated source proof tree includes the typed Dig dispatcher and canonical request/drop and Move/Stop cancellation hooks. The native fixture consumer uses that parser and dispatcher directly. Compilation and execution are still unverified; actual unit-loop binding remains pending.
+
+
+The ordinary Match digging provider passed native checks at `00b6448003639fd876df07f5f29c49f19b387d08` on macOS arm64: seven focused debug tests, 206 release workspace tests, strict Clippy, formatting and release FFI. Independent copied release binaries pass two Match digging tests and two primitive tests. The source recorder remains twelve traces and 47 actions; the primitive recorder remains 22 traces and 367 actions. Actual unit-loop/server composition and presentation remain pending, so the engineering parity rows stay in progress.

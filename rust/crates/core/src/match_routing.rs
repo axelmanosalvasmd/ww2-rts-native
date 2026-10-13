@@ -447,7 +447,7 @@ impl Match {
         if !at.x.is_finite() || !at.z.is_finite() {
             return Err("invalid visibility point".into());
         }
-        self.grid.rebuild(&self.world.game.units);
+        let grid = SpatialGrid::new(&self.world.game.units, 16.0);
         let g = &self.world.game;
         let team = g.players[owner].team;
         let reach = g
@@ -456,7 +456,7 @@ impl Match {
             .filter(|u| g.team_of(u) == team)
             .map(|u| vision_of(g, &self.rules, u))
             .fold(1.0, math::max);
-        Ok(sees(g, &self.rules, &self.grid, team, reach, at))
+        Ok(sees(g, &self.rules, &grid, team, reach, at))
     }
 
     /// Query an already refreshed owner state without borrowing all of Match mutably.
@@ -468,12 +468,12 @@ impl Match {
     /// Hidden moving wrecks become static remembered cover; removal waits until seen.
     pub fn observed_wrecks(&mut self, owner: usize) -> Result<Vec<Wreck>, String> {
         self.validate_recipient(owner)?;
-        self.grid.rebuild(&self.world.game.units);
+        let grid = SpatialGrid::new(&self.world.game.units, 16.0);
         refresh_wrecks(
             &mut self.recipients[owner],
             &self.world.game,
             &self.rules,
-            &self.grid,
+            &grid,
             owner,
         );
         Ok(self.recipients[owner].wreck_memory.clone())
