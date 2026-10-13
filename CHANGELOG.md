@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added recorder assertions for the exact Great Bridge structure list at tick 8400: 84 bridge sections begin intact at 2,400 HP and finish failed at 0 HP. The pinned x64 source fixture remains byte-identical after regeneration.
+
 - Added an isolated legacy-trigger runtime provider for source-ordered public Say and canonical Destroy damage. Destroy uses the shared World/Combat damage owner and emits committed effects as they occur; LastHit stays in canonical combat history. Say validation now rejects noncanonical or unsafe execution IDs, and match preflight bounds captured point owners to the actual commander slots. The x64 pinned-source recorder captures independent falling-body inputs and Great Bridge structural section HP/state before and after tick 8400. Native compilation and the sole tick/recipient integration are pending.
 
 - Prepared a separate normal union of frozen ordered-event PR #194 and the consolidated original-source frontier `dfcc0bf`. Preserved the one TickEvent/TickFailure result, producer emission sinks, original World component bodies, approved ABI 2 and the optimized test profile with debug assertions and overflow checks. Migrated the inherited quiet engineering consumer to require empty owned events, and report accepted recipient traffic once rather than unavailable. Published parents remain unchanged; exact union source review and the full optimized native cycle are pending.
