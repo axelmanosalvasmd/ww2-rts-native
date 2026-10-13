@@ -413,7 +413,15 @@ fn full_invariants(
         if ch != bare.grid.chars[c] {
             assert!(matches!(bare.grid.chars[c], b'.' | b'O'));
             assert!(matches!(ch, b'B' | b'R' | b'D' | b'H' | b'O' | b'M'));
-            assert_eq!(g.road_mask[c], 0, "dressing changed road reserve");
+            if g.road_mask[c] != 0 {
+                // Source city squares pave open road verges too; building lots still avoid them.
+                assert_eq!((bare.grid.chars[c], ch), (b'.', b'D'));
+                let (x, y) = (c % w, c / w);
+                assert!(g.regions.iter().any(|r| r.kind == RegionKind::City
+                    && x.abs_diff(r.x) <= 7
+                    && y.abs_diff(r.y) <= 7
+                    && x.abs_diff(r.x) + y.abs_diff(r.y) <= 12));
+            }
         }
     }
     for wide in [false, true] {

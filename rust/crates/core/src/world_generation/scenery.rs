@@ -73,7 +73,7 @@ impl Painter<'_> {
             return false;
         }
         let (rx, ry) = (r.x as isize, r.y as isize);
-        if x0 <= rx + 9 && x0 + bw - 1 >= rx - 9 && y0 <= ry + 9 && y0 + bh - 1 >= ry - 9 {
+        if x0 <= rx + 9 && x0 + bw > rx - 9 && y0 <= ry + 9 && y0 + bh > ry - 9 {
             return false;
         }
         let (mut lo, mut hi) = (9, -1);
