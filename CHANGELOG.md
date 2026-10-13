@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Corrected the coupled replay's unset-pace readback after its first native execution. The shared unit factory deliberately uses NaN for the prototype's undefined pace; the comparison now preserves that absence while keeping exact bits for present values. Production code and the original Source fixture remain unchanged.
+
 - Set the support-coherence integration test's macro recursion limit to 256, as recommended by the actual compiler failure. Restored the exact original flat projection after two insufficient factoring attempts; the limit affects test compilation only, with no production, Source fixture or assertion changes.
 
 - Factored aircraft and mission readback out of the support actor projection after the native retry located a remaining nested JSON macro expansion limit. This is a test-only compiler repair with identical fields and Source expectations.
