@@ -18,18 +18,16 @@ for(let i=0;i<base.cases.length;i++){
   for(let tick=40;tick<=330;tick++) {
    g.tick=tick;const action={tick,deplete:tick===40?tracked.map((u,j)=>({id:u.id,x:at.x+j*.1,z:at.z})):[],arrive:tick>40&&tick%4===0,dead:tick===289?[...g.units.values()].find(u=>u.type==='truck')?.id??null:null,winner:tick===330};
    for(const patch of action.deplete){const u=g.units.get(patch.id);Object.assign(u,patch);u.logistics.ammo=0;u.logistics.provisions=0;u.logistics.cutFor=30;S.updateGrid(g,u);}
-   if(action.arrive)for(const u of g.units.values())if(u.type==='truck'&&u.convoy.destination){Object.assign(u,u.convoy.destination);u.path=[];u.worldGoal=null;u.stuck=0;S.updateGrid(g,u);}
+   if(action.arrive)for(const u of g.units.values())if(u.type==='truck'&&!u.convoy.manual&&!u.convoy.hold&&u.convoy.destination){Object.assign(u,u.convoy.destination);u.path=[];u.worldGoal=null;u.stuck=0;S.updateGrid(g,u);}
    if(action.dead){const u=g.units.get(action.dead);C.convoyDeath(g,u);g.units.delete(u.id);S.rebuildGrid(g);}
    const truck=[...g.units.values()].find(u=>u.type==='truck'&&u.owner===0);
-   if(truck&&tick===283)action.command={kind:'move',id:truck.id,x:truck.x+4,z:truck.z};
-   if(truck&&tick===285)action.command={kind:'stop',id:truck.id};
-   if(truck&&tick===287)action.command={kind:'resume',id:truck.id};
-   if(action.command){const cmd=action.command;action.result=cmd.kind==='resume'?C.commandConvoy(g,0,{t:'logisticsResume',ids:[cmd.id]},S.supplyHooks(g))?.result??null:S.command(g,0,cmd.kind==='stop'?{t:'stop',ids:[cmd.id]}:{t:'move',orders:[[cmd.id,cmd.x,cmd.z]]})??null;}
+   const commands=truck?(tick===283?[{kind:'move',id:truck.id,x:truck.x+4,z:truck.z}]:tick===284?[{kind:'move',id:truck.id,x:truck.x+8,z:truck.z,queue:true},{kind:'move',id:truck.id,x:truck.x+12,z:truck.z,queue:true}]:tick===285?[{kind:'stop',id:truck.id}]:tick===287?[{kind:'resume',id:truck.id}]:[]):[];
+   if(commands.length){action.commands=commands;action.results=commands.map(cmd=>cmd.kind==='resume'?C.commandConvoy(g,0,{t:'logisticsResume',ids:[cmd.id]},S.supplyHooks(g))?.result??null:S.command(g,0,cmd.kind==='stop'?{t:'stop',ids:[cmd.id]}:{t:'move',orders:[[cmd.id,cmd.x,cmd.z]],queue:cmd.queue??false})??null);}
    if(tick===280){action.support={id:tracked[0].id,owner:0,amount:.25};action.supportResult=C.supportProvision(g,g.units.get(action.support.id),0,.25,S.supplyHooks(g));}
    const list=[...g.units.values()];for(const u of list)L.tickReserves(g,u,.05,0);
    if(tick%20===0)S.supplyNetwork(g,list);
    const oldWinner=g.winner;if(action.winner)g.winner=0;C.stepConvoys(g,.05,S.supplyHooks(g));g.winner=oldWinner;
-   const states=[...g.units.values()].filter(u=>u.convoy).map(u=>`${u.id}:${u.convoy.state}`).join(',');const check=tick%20===0||states!==previousStates||action.dead||action.winner||action.command||action.support;trace.steps.push({action,...(check?{expected:runtime(g)}:{})});previousStates=states;
+   const states=[...g.units.values()].filter(u=>u.convoy).map(u=>`${u.id}:${u.convoy.state}`).join(',');const check=tick%20===0||states!==previousStates||action.dead||action.winner||action.commands||action.support;trace.steps.push({action,...(check?{expected:runtime(g)}:{})});previousStates=states;
   }
   traces.push(trace);
  }
@@ -39,7 +37,7 @@ const path=`${root}/rust/crates/simtest/tests/fixtures/match-supply.json`,data=J
 const runtimePath=`${root}/rust/crates/simtest/tests/fixtures/match-supply-runtime.json`,runtimeData=JSON.stringify({reference:pin,traces})+'\n';if(process.argv.includes('--check'))assert.equal(readFileSync(runtimePath,'utf8'),runtimeData);else writeFileSync(runtimePath,runtimeData);console.log(`${process.argv.includes('--check')?'Checked':'Recorded'} ${traces.length} real supply-hook runtime traces with ${traces.reduce((n,t)=>n+t.steps.length,0)} phases`);
 function runtime(g){const s=g.convoys;return {
  reserves:[...g.units.values()].filter(u=>u.logistics).map(u=>{const r=u.logistics;return[u.id,[bits(r.ammo),bits(r.ammoMax),bits(r.ammoPrice),bits(r.ammoCredit),bits(r.provisions),bits(r.fuel),bits(r.emergency),bits(r.warning),r.forced,r.stranded,r.exhausted,bits(r.supplyRate),bits(r.cutFor)]];}),
- trucks:[...g.units.values()].filter(u=>u.type==='truck').map(u=>{const c=u.convoy;return[u.id,u.owner,point(u),u.path.map(point),u.worldGoal?point(u.worldGoal):null,bits(u.repath),u.retreating,u.attackId,u.targetId,u.autoRetreat,c.state,stock(c.cargo),c.origin,bits(c.timer),c.manual,c.hold,c.destination?point(c.destination):null,c.route.map(point),c.target?[c.target.id,c.target.owner,point(c.target),stock(c.target.need),c.target.members??[],c.target.unit??null,c.target.store??null]:null,c.routeFailure??null,c.retry?[c.retry.key,c.retry.wait,c.retry.at]:null];}),
+ trucks:[...g.units.values()].filter(u=>u.type==='truck').map(u=>{const c=u.convoy;return[u.id,u.owner,point(u),u.path.map(point),u.worldGoal?point(u.worldGoal):null,bits(u.repath),u.retreating,u.attackId,u.targetId,u.autoRetreat,c.state,stock(c.cargo),c.origin,bits(c.timer),c.manual,c.hold,c.destination?point(c.destination):null,c.route.map(point),c.target?[c.target.id,c.target.owner,point(c.target),stock(c.target.need),c.target.members??[],c.target.unit??null,c.target.store??null]:null,c.routeFailure??null,c.retry?[c.retry.key,c.retry.wait,c.retry.at]:null,u.orders.map(order=>{const row=order.orders.find(row=>row[0]===u.id);return[row[0],point({x:row[1],z:row[2]})];})];}),
  stores:[...s.stores].map(([id,v])=>[id,[...v.buckets].map(([o,b])=>[o,stock(b)])]),
  jobs:[...s.jobs],losses:[...s.losses],nextSpawn:[...s.nextSpawn],nextSchedule:s.nextSchedule,refresh:s.refreshQueue,schedule:s.scheduleQueue,scheduled:[...s.scheduled],routed:s.routed,
  events:s.events.map(e=>[e.id,e.owner,e.type,e.count,e.x===undefined?null:bits(e.x),e.z===undefined?null:bits(e.z),e.message,bits(e.at)]),alerts:[...s.alerts].map(([id,n])=>[id,bits(n)])

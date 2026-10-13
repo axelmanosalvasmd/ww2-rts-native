@@ -255,7 +255,16 @@ fn runtime(instance: &Match) -> Value {
                 }),
                 c.retry
                     .as_ref()
-                    .map(|r| json!([format!("{},{}", r.key.0, r.key.1), r.wait, r.at]))
+                    .map(|r| json!([format!("{},{}", r.key.0, r.key.1), r.wait, r.at])),
+                controls
+                    .orders
+                    .iter()
+                    .map(|cmd| match cmd {
+                        ww2_core::match_commands::Command::Move { orders, .. } =>
+                            json!([orders[0].unit, point(orders[0].at)]),
+                        _ => panic!("unexpected waiting order"),
+                    })
+                    .collect::<Vec<_>>()
             ])
         })
         .collect::<Vec<_>>();
@@ -290,7 +299,7 @@ fn real_supply_hooks_spawn_route_service_and_retire_in_canonical_match() {
             }
             if action["arrive"].as_bool().unwrap() {
                 for (id, truck) in &instance.convoys.as_ref().unwrap().trucks {
-                    if let Some(at) = truck.destination {
+                    if let Some(at) = truck.destination.filter(|_| !truck.manual && !truck.hold) {
                         let u = instance.world.game.units.get_mut(id).unwrap();
                         u.x = at.x;
                         u.z = at.z;
@@ -312,49 +321,53 @@ fn real_supply_hooks_spawn_route_service_and_retire_in_canonical_match() {
                 instance.combat.remove(id);
                 instance.grid.rebuild(&instance.world.game.units);
             }
-            if !action["command"].is_null() {
-                use ww2_core::{
-                    game::Point,
-                    match_commands::{Command, MoveOrder},
-                };
-                let cmd = &action["command"];
-                let id = cmd["id"].as_u64().unwrap() as u32;
-                let result = match cmd["kind"].as_str().unwrap() {
-                    "resume" => {
-                        if instance.resume_convoys(0, &[id]).unwrap() {
-                            Value::Null
-                        } else {
-                            json!("needs")
+            if let Some(commands) = action["commands"].as_array() {
+                for (index, cmd) in commands.iter().enumerate() {
+                    use ww2_core::{
+                        game::Point,
+                        match_commands::{Command, MoveOrder},
+                    };
+                    let id = cmd["id"].as_u64().unwrap() as u32;
+                    let result = match cmd["kind"].as_str().unwrap() {
+                        "resume" => {
+                            if instance.resume_convoys(0, &[id]).unwrap() {
+                                Value::Null
+                            } else {
+                                json!("needs")
+                            }
                         }
-                    }
-                    kind => {
-                        let command = if kind == "stop" {
-                            Command::Stop {
-                                ids: vec![i64::from(id)],
-                            }
-                        } else {
-                            Command::Move {
-                                control_ids: None,
-                                orders: vec![MoveOrder {
-                                    unit: i64::from(id),
-                                    at: Point {
-                                        x: cmd["x"].as_f64().unwrap(),
-                                        z: cmd["z"].as_f64().unwrap(),
-                                    },
-                                }],
-                                attack_move: false,
-                                queue: false,
-                                together: false,
-                                face: None,
-                            }
-                        };
-                        instance
-                            .execute_command(0, &command, false)
-                            .unwrap()
-                            .map_or(Value::Null, |r| json!(r.name()))
-                    }
-                };
-                assert_eq!(result, action["result"], "case{i} tick{tick} manual result");
+                        kind => {
+                            let command = if kind == "stop" {
+                                Command::Stop {
+                                    ids: vec![i64::from(id)],
+                                }
+                            } else {
+                                Command::Move {
+                                    control_ids: None,
+                                    orders: vec![MoveOrder {
+                                        unit: i64::from(id),
+                                        at: Point {
+                                            x: cmd["x"].as_f64().unwrap(),
+                                            z: cmd["z"].as_f64().unwrap(),
+                                        },
+                                    }],
+                                    attack_move: false,
+                                    queue: cmd["queue"].as_bool().unwrap_or(false),
+                                    together: false,
+                                    face: None,
+                                }
+                            };
+                            instance
+                                .execute_command(0, &command, false)
+                                .unwrap()
+                                .map_or(Value::Null, |r| json!(r.name()))
+                        }
+                    };
+                    assert_eq!(
+                        result, action["results"][index],
+                        "case{i} tick{tick} manual result"
+                    );
+                }
             }
             if !action["support"].is_null() {
                 let request = &action["support"];
