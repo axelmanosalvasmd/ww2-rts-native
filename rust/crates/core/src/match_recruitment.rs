@@ -411,3 +411,7 @@ impl RecruitParts<'_> {
         })
     }
 }
+
+#[cfg(test)]
+#[path = "match_recruitment_tests.rs"]
+mod tests;
