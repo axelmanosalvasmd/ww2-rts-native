@@ -5,10 +5,10 @@ This is the first standalone `ww2-server` slice. It hosts lobbies and sessions o
 From `rust/`:
 
 ```sh
-cargo run -p ww2-server -- --bind 127.0.0.1:8080
+cargo run -p ww2-server -- --bind 127.0.0.1:3000
 ```
 
-`WW2_BIND` also sets the address. The default is `127.0.0.1:8080`; exposing another address is explicit. `--bind 127.0.0.1:0` chooses a free port and prints its actual address. `PUBLIC_URL` sets the invitation URL in lobby messages. The library entry point accepts an already-bound listener, a room limit (default 32, clamped to 1-256), an invitation URL, and a shutdown future. Ctrl-C closes the listener and upgraded sockets.
+The address follows `--bind`, then `WW2_BIND`, then `HOST` and `PORT`, in that order. The default is `127.0.0.1:3000`, matching the reference; exposing another address is explicit. `HOST` accepts an IP address or hostname. Invalid or out-of-range ports fail at startup. `--bind 127.0.0.1:0` chooses a free port and prints its actual address. `PUBLIC_URL` sets the invitation URL in lobby messages. The library entry point accepts an already-bound listener, a room limit (default 32, clamped to 1-256), an invitation URL, and a shutdown future. Ctrl-C closes the listener and upgraded sockets.
 
 ## Available behavior
 
