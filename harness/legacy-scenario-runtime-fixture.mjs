@@ -77,6 +77,12 @@ const bridge8400=traces.find(trace=>trace.name==='the-great-bridge').steps.find(
 assert.equal(bridge8400.recipientInputs.fallingCount,84,'Great Bridge tick 8400 unsettled Source falling sections');
 assert.equal(bridge8400.structureSectionsBefore.length,516,'Great Bridge structural section count before collapse');
 assert.equal(bridge8400.structureSectionsAfter.length,516,'Great Bridge structural section count after collapse');
+const bridgeStructureBefore=bridge8400.structureSectionsBefore.filter(section=>section.structureId==='map:bridge:5573');
+const bridgeStructureAfter=bridge8400.structureSectionsAfter.filter(section=>section.structureId==='map:bridge:5573');
+assert.equal(bridgeStructureBefore.length,84,'Great Bridge structure section count before collapse');
+assert(bridgeStructureBefore.every(section=>section.state==='intact'&&section.hp===2400),'Great Bridge sections begin intact at full HP');
+assert.equal(bridgeStructureAfter.length,84,'Great Bridge structure section count after collapse');
+assert(bridgeStructureAfter.every(section=>section.state==='failed'&&section.hp===0),'Great Bridge sections fail at zero HP');
 assert.equal(bridge8400.structureSectionsAfter.filter(section=>section.state==='failed').length,84,'Great Bridge failed bridge section count');
 assert.equal(bridge8400.structureSectionsAfter.filter(section=>section.state==='failed').reduce((sum,section)=>sum+section.hp,0),0,'failed bridge sections have zero HP');
 const failureTrace=run('the-great-bridge',[8400],'scenario:3:1');
