@@ -91,12 +91,13 @@ for(const spec of [...['standard','large','massive','endless'].map(army=>({army}
    if(opposing)state.combatState=random.state();
    if(spec.retirement||spec.abilities||spec.recovery||spec.field){state.deaths=structuredClone(deaths);state.story=g.players.map((_,i)=>story.STORY_KEYS.map(k=>bits(g.story?.[i]?.[k]??0)));}
    if(spec.abilities||spec.recovery||spec.field){state.abilityRecovery=[...g.units.values()].map(u=>[u.id,bits(u.cd),bits(u.buff),u.ap,ptOrNull(u.nade),!!u.nade?.auto,!!u.nade?.walked,u.hpWas===undefined?null:bits(u.hpWas),u.woundAt??null,u.healAt??null,bits(u.reinf)]);state.grenades=g.nades.map(n=>[n.flight,bits(n.x),bits(n.z),bits(n.t),n.owner]);}
-   if(spec.field)state.field={jobs:[...g.units.values()].filter(u=>u.dig).map(u=>{const d=u.dig;return [u.id,d.kind,bits(d.x),bits(d.z),bits(d.dir),bits(d.t),d.n??null,d.cells,d.front===undefined?null:bits(d.front),d.reach===undefined?null:bits(d.reach),ptOrNull(d.from)];}),chars:g.chars.join(''),front:g.chars.flatMap((ch,c)=>ch==='T'?[[c,bits(g.trenchFront[c])]]:[])};
+   if(spec.field)state.field={jobs:[...g.units.values()].filter(u=>u.dig).map(u=>{const d=u.dig;return [u.id,d.kind,bits(d.x),bits(d.z),bits(d.dir),bits(d.t),d.n??null,d.cells.map(cell=>[...cell]),d.front===undefined?null:bits(d.front),d.reach===undefined?null:bits(d.reach),ptOrNull(d.from)];}),chars:g.chars.join(''),front:g.chars.flatMap((ch,c)=>ch==='T'?[[c,bits(g.trenchFront[c])]]:[])};
    if(spec.commands)state.control=[...g.units.values()].map(u=>[u.id,u.moveOutcome??null,u.moveOutcomeTick??null,(u.orders??[]).length,u.worldGoal?[bits(u.worldGoal.x),bits(u.worldGoal.z)]:null,u.amove?[bits(u.amove.x),bits(u.amove.z)]:null]);
    if(spec.environment)state.environment={fires:[...g.fires].map(([c,left])=>[c,bits(left)]),smokes:g.smokes.map(s=>[s.id,bits(s.x),bits(s.z),bits(s.r),bits(s.t)]),chars:g.chars.join(''),burnt:[...g.burnt]};
    checkpoints.push(state);
   }
  }
+ if(spec.field&&checkpoints[0].field.jobs[0][7].length!==4)throw Error('First work checkpoint must retain its own four-cell queue');
  if(spec.retirement&&!deaths.length)throw Error('Retirement trace must remove a projectile casualty');
  cases.push({map,army,ticks,input,checkpoints,...(opposing?{enemy:true}:{}),...(spec.retirement||spec.abilities||spec.recovery||spec.field?{retirement:true}:{}),...(spec.abilities||spec.recovery||spec.field?{abilityRecovery:true}:{}),...(spec.field?{field:true}:{})});
 }

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed the full-step Dig recorder to copy remaining cell tuples at each checkpoint. The live source deque later emptied earlier saved arrays, falsely recording zero cells at tick one. Regeneration now retains four, three, two and one cells before completion; all ten other traces and the ordering case remain unchanged. Runtime work, payment and timing are unchanged, and native gates are restarting against the corrected oracle.
+
 - Aligned the tick consumer's optional control projection with the original recorder's observed fields. Ability and Dig cases enqueue commands but do not record control rows; the first native run added those extra rows and failed an otherwise exact tick-one comparison. Dedicated command traces still compare every recorded control row. Runtime scheduling and original fixtures are unchanged; full gates are restarting.
 
 - Fixed the ordered-retirement regression's snapshot setup to supply every live unit's canonical firing timer. The first composed native run passed 30 library and two field-work tests, then the new regression panicked on its empty timer map before exercising retirement. Runtime retirement and source fixtures are unchanged; complete gates are restarting at the corrected checkpoint.
