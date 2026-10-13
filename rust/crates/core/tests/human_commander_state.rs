@@ -1,13 +1,136 @@
-use serde_json::{Value, json};
-use ww2_core as core_api;
 use core_api::{
     game::Point,
     human_commander::{Hurt, OwnerHurtBatch, TickControl},
     human_commander_state::{Error, HumanState},
 };
+use serde_json::{Value, json};
+use ww2_core as core_api;
 #[path = "support/human_commander_facts.rs"]
 mod facts;
-use facts::{point, view, batch, exact, input_receipt};
+use facts::{batch, exact, input_receipt, point, view};
+
+#[test]
+fn real_hurt_reset_reseeds_private_timing_without_reusing_subscriber_identity() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("fixtures/human-commander-reset.json")).unwrap();
+    let case = &fixture["cases"][0];
+    let reset = &case["resets"][0];
+    let restart = &reset["reinitialized"];
+    let reset_tick = reset["tick"].as_u64().unwrap();
+    let restart_tick = restart["tick"].as_u64().unwrap();
+    let source_seed = case["sourceSeed"].as_i64().unwrap();
+    let initialization = &case["initializations"][0];
+    let initialization_seed = initialization["initializationSeed"].as_i64().unwrap();
+    let mut human = HumanState::new(initialization_seed as u32, 0, point(&case["sourceSpawn"]));
+    assert_eq!(source_seed as i32, -1_167_756_645);
+    assert_eq!(initialization_seed as u32 as i32, -1_799_592_315);
+    let mut delivered = view(&case["deliveries"][0]["viewSnapshot"]);
+    let mut inputs = Vec::new();
+    let mut alerts = Vec::new();
+    let mut old_receipt = None;
+    let mut plans = 0;
+    for row in case["batches"].as_array().unwrap() {
+        let tick = row["tick"].as_u64().unwrap();
+        if tick == restart_tick {
+            // Source initializes on the next active callback, after the intervening step.
+            let seed = restart["initializationSeed"].as_i64().unwrap();
+            assert_ne!(seed, reset["resetSeed"].as_i64().unwrap());
+            human.reset_with_seed(seed as u32);
+        }
+        if let Some(record) = case["deliveries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|d| d["tick"].as_u64() == Some(tick))
+        {
+            delivered = view(&record["viewSnapshot"]);
+        }
+        let control = &row["control"];
+        let result = human
+            .advance(
+                TickControl {
+                    now: tick,
+                    live_owner_out: control["live_owner_out"].as_bool().unwrap(),
+                    winner: control["winner"].as_bool().unwrap(),
+                    level: control["level"].as_str().unwrap(),
+                },
+                Some(&delivered),
+                &batch(row),
+                |screen| {
+                    let plan = case["plans"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .find(|p| p["tick"].as_u64() == Some(tick))
+                        .expect("actual original raw planner collection");
+                    assert_eq!(screen.tick, plan["viewTick"].as_u64().unwrap());
+                    plans += 1;
+                    Ok(plan["commands"].as_array().unwrap().clone())
+                },
+            )
+            .unwrap();
+        alerts.extend(result.new_alerts);
+        for answer in result.answered {
+            let alert = alerts.iter_mut().find(|a| a.id == answer.id).unwrap();
+            alert.answered = Some(answer.tick);
+        }
+        if let Some(input) = result.input {
+            inputs.push(input_receipt(&input));
+        }
+        if tick == reset_tick {
+            assert_eq!(alerts.len(), 1);
+            assert_eq!(alerts[0].answered, Some(reset_tick));
+            old_receipt = Some(alerts[0].clone());
+            assert_eq!(human.camera(), Some(point(&reset["before"]["camera"])));
+            human.reset();
+            assert_eq!(human.camera(), None);
+            assert!(human.wants_view(tick));
+        }
+        if tick == initialization["tick"].as_u64().unwrap() {
+            let state = human.snapshot().unwrap();
+            assert_eq!(state.timing.draws(), 2);
+            assert_eq!(
+                state.look.unwrap().at,
+                initialization["openingAt"].as_u64().unwrap()
+            );
+        }
+        if tick == restart_tick {
+            let state = human.snapshot().unwrap();
+            assert_eq!(state.timing.draws(), 2);
+            assert_eq!(state.look.unwrap().at, 141);
+            assert_eq!(state.camera, point(&case["sourceSpawn"]));
+            assert!(state.selection.is_empty());
+            assert!(state.inputs.is_empty());
+            assert!(state.recent.is_empty());
+            assert!(state.areas.is_empty());
+            assert_eq!(state.next_alert, 1);
+        }
+        if tick > reset_tick {
+            assert_eq!(alerts[0], *old_receipt.as_ref().unwrap());
+        }
+    }
+    assert_eq!(plans, case["plans"].as_array().unwrap().len());
+    assert_eq!(alerts.len(), 2);
+    assert_ne!(alerts[0].id, alerts[1].id);
+    assert_eq!(case["distinctSubscriberObjects"], true);
+    for (actual, expected) in alerts.iter().zip(case["alerts"].as_array().unwrap()) {
+        assert_eq!(actual.tick, expected["tick"].as_u64().unwrap());
+        assert_eq!(actual.due, expected["due"].as_u64().unwrap());
+        assert_eq!(actual.answered, expected["answered"].as_u64());
+        assert_eq!(actual.at, point(expected));
+    }
+    let mut expected = case["inputs"].clone();
+    for input in expected.as_array_mut().unwrap() {
+        input.as_object_mut().unwrap().remove("accepted");
+    }
+    assert!(exact(&json!(inputs), &expected));
+    let state = human.snapshot().unwrap();
+    assert_eq!(state.camera, point(&case["final"]["state"]["camera"]));
+    assert_eq!(
+        state.next_input,
+        case["final"]["state"]["nextInput"].as_u64().unwrap()
+    );
+}
 
 // Replay actual delivered facts and Source-collected policy output through this component.
 // The callback boundary supplies recorded Source policy output; native admission stays pending.
@@ -22,7 +145,7 @@ fn ordinary_human_state_matches_actual_source_opening_hurts_and_denied_input() {
         for case in f["cases"].as_array().unwrap() {
             let slot = case["slot"].as_u64().unwrap() as u32;
             let mut human = HumanState::new(
-                case["sourceSeed"].as_i64().unwrap() as u32,
+                case["initializationSeed"].as_i64().unwrap() as u32,
                 slot,
                 point(&case["sourceSpawn"]),
             );

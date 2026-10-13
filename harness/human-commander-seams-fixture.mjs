@@ -9,7 +9,22 @@ const ref=process.env.WW2_REFERENCE??resolve(root,'reference/ww2-rts'),pin='e4e5
 if(process.version!=='v24.21.0'||process.arch!=='x64')throw Error('Use exact x64 Node24.21.0');
 const clean=()=>{if(execFileSync('git',['-C',ref,'rev-parse','HEAD'],{encoding:'utf8'}).trim()!==pin||execFileSync('git',['-C',ref,'status','--porcelain','--untracked-files=no'],{encoding:'utf8'}).trim())throw Error('Source pin/clean');};clean();
 const path=ref+'/shared/ai-human.js',original=readFileSync(path,'utf8'),sourceSha256=createHash('sha256').update(original).digest('hex');
-registerHooks({load(url,c,next){const out=next(url,c);if(url!==pathToFileURL(path).href)return out;if(String(out.source)!==original)throw Error('Source bytes changed');return {...out,source:String(out.source)+'\nexport {stateOf as __stateOf,startLook as __startLook,planNow as __planNow,runInput as __runInput,inputsFor as __inputsFor};\n'};}});
+const thinkerPath=ref+'/shared/ai.js',thinkerOriginal=readFileSync(thinkerPath,'utf8'),thinkerSha256=createHash('sha256').update(thinkerOriginal).digest('hex');
+// Append delegates in memory. The original thinker body and submit return value stay unchanged.
+const thinkerDelegate=`
+const __originalThink = think;
+let __thinkObserver;
+export function __observeThink(observer) { __thinkObserver = observer; }
+think = function(g, slot, opts = {}) {
+  if (!__thinkObserver || !opts.submit) return __originalThink(g, slot, opts);
+  const submit = opts.submit;
+  return __originalThink(g, slot, {...opts, submit: function(...args) {
+    __thinkObserver(args[0]);
+    return submit(...args);
+  }});
+};
+`;
+registerHooks({load(url,c,next){const out=next(url,c);if(url===pathToFileURL(thinkerPath).href){if(String(out.source)!==thinkerOriginal)throw Error('Thinker source bytes changed');return {...out,source:String(out.source)+thinkerDelegate};}if(url!==pathToFileURL(path).href)return out;if(String(out.source)!==original)throw Error('Source bytes changed');return {...out,source:String(out.source)+'\nexport {stateOf as __stateOf,startLook as __startLook,planNow as __planNow,runInput as __runInput,inputsFor as __inputsFor};\n'};}});
 const sim=await import(pathToFileURL(ref+'/shared/sim.js')),ai=await import(pathToFileURL(ref+'/shared/ai.js')),human=await import(pathToFileURL(path));
 const clone=x=>JSON.parse(JSON.stringify(x,(_k,v)=>v instanceof Map?[...v]:v instanceof Set?[...v]:v));
 const buffer=new DataView(new ArrayBuffer(8));const bits=n=>{buffer.setFloat64(0,n);return buffer.getBigUint64(0).toString(16).padStart(16,'0')};
@@ -37,17 +52,20 @@ try{
   if(spec.resume){const alert={tick:100,id:1,x:13,z:9,onScreen:true,due:100,answered:null};componentAlert=alert;s.pending=[alert];s.look={at:100,urgent:true,target:null,causes:[]};overlay.pending=clone(s.pending);overlay.look=clone(s.look);}
   const componentInitial=clone(s),callbacks=[],calls=[];
   const opts={view,level:'normal',onInput:i=>callbacks.push(clone(i))};
-  for(const now of spec.calls){g.tick=now;opts.view=ai.observe(g,0);const callView=opts.view,callViewSnapshot={tick:callView.tick,spawn:clone(callView.players[0].spawn),units:clone([...callView.units.values()]),visible:[...callView.players[0].visible],sightings:clone(callView.sightings??[])};const canonicalDigBefore=clone(g.units.get(1).dig??null);const beforePrivate=privateTape.length,beforeInputs=callbacks.length,beforeRng=globalDraws;
+  let rawPlannerAttempts=[];ai.__observeThink(cmd=>rawPlannerAttempts.push(clone(cmd)));
+  for(const now of spec.calls){rawPlannerAttempts=[];g.tick=now;opts.view=ai.observe(g,0);const callView=opts.view,callViewSnapshot={tick:callView.tick,spawn:clone(callView.players[0].spawn),units:clone([...callView.units.values()]),visible:[...callView.players[0].visible],sightings:clone(callView.sightings??[])};const canonicalDigBefore=clone(g.units.get(1).dig??null);const beforePrivate=privateTape.length,beforeInputs=callbacks.length,beforeRng=globalDraws;
    if(spec.resume&&calls.length===0)human.__startLook(g,0,s,opts);
    const afterStartLook=spec.resume&&calls.length===0?clone(s):null;
    human.__runInput(g,0,s,opts);
-   const plannedInputCommands=spec.resume&&calls.length===0?s.inputs.filter(i=>i.cmd&&i.origin===now).map(i=>clone(i.cmd)):[];
-   calls.push({now,plannedInputCommands,componentAlert:componentAlert?clone(componentAlert):null,viewSnapshot:callViewSnapshot,afterStartLook,canonicalDigBefore,canonicalDigAfter:clone(g.units.get(1).dig??null),privateDraws:privateTape.length-beforePrivate,privateTape:privateTape.slice(beforePrivate),globalDraws:globalDraws-beforeRng,globalTape:globalTape.slice(beforeRng).map(bits),callbacks:clone(callbacks.slice(beforeInputs)),state:clone(s),wallet:g.players[0].mp,canonicalUnits:units(g)});
+   const plannedInputCommands=clone(rawPlannerAttempts);
+   const processedInputCommands=s.inputs.filter(i=>i.cmd&&i.origin===now).map(i=>clone(i.cmd));
+   const resumedInputCommands=s.inputs.filter(i=>i.cmd&&i.origin!==now).map(i=>({command:clone(i.cmd),origin:i.origin}));
+   calls.push({now,plannedInputCommands,processedInputCommands,resumedInputCommands,componentAlert:componentAlert?clone(componentAlert):null,viewSnapshot:callViewSnapshot,afterStartLook,canonicalDigBefore,canonicalDigAfter:clone(g.units.get(1).dig??null),privateDraws:privateTape.length-beforePrivate,privateTape:privateTape.slice(beforePrivate),globalDraws:globalDraws-beforeRng,globalTape:globalTape.slice(beforeRng).map(bits),callbacks:clone(callbacks.slice(beforeInputs)),state:clone(s),wallet:g.players[0].mp,canonicalUnits:units(g)});
    if(spec.resume&&s.inputs.length&&spec.calls.length<10)spec.calls.push(Math.max(g.tick+1,s.nextInput));
   }
   cases.push({name:spec.name,map,options,slot:0,level:'normal',matchSeed:stateSeed,initialPrivateDraws:2,setupCommands,viewSnapshot,stateOfResult,componentOverlay:overlay,componentInitial,calls,globalDraws:globalDraws-beforeGlobal});
  }
- clean();const result={reference:pin,node:process.version,arch:process.arch,sourceSha256,scope:'Explicit constructed component state/history/queue/urgent context on real source Game. Original stateOf/startLook/planNow/runInput/inputsFor execute unchanged. Paid Dig and executed commands use canonical source admission. Per-call actual source views and command-sensitive units are Source actuator receipts. Private motor replay is detached and does not claim native policy or actuators. Not natural room timing or full-step evidence.',globalRandom:{value:.5},cases};
+ clean();const result={reference:pin,node:process.version,arch:process.arch,sourceSha256,thinkerSha256,plannerCapture:'plannedInputCommands records raw original thinker submit attempts before human news/formation. processedInputCommands and resumedInputCommands are remaining terminal queue rows after runInput.',scope:'Explicit constructed component state/history/queue/urgent context on real source Game. Original stateOf/startLook/planNow/runInput/inputsFor execute unchanged. Paid Dig and executed commands use canonical source admission. Per-call actual source views and command-sensitive units are Source actuator receipts. Private motor replay is detached and does not claim native policy or actuators. Not natural room timing or full-step evidence.',globalRandom:{value:.5},cases};
  const fixturePath=process.env.HUMAN_SEAMS_FIXTURE??resolve(root,'rust/crates/core/tests/fixtures/human-commander-seams.json'),output=JSON.stringify(result)+'\n';
  if(process.argv.includes('--check')){if(readFileSync(fixturePath,'utf8')!==output)throw Error('Human component seams fixture differs');}else writeFileSync(fixturePath,output);
  for(const c of cases)console.log(JSON.stringify({name:c.name,calls:c.calls.map(r=>({now:r.now,privateDraws:r.privateDraws,globalDraws:r.globalDraws,callbacks:r.callbacks,remaining:r.state.inputs,wallet:r.wallet}))}));

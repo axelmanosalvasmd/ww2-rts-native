@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Resumed the human commander proof: registered cap, locality, urgent resumption and atomic-refusal tests, and captured raw original planner attempts before input filtering. Reset now retains subscriber alert identities and accepts a trusted current seed for fresh timing. A real two-grenade Source replay protects reset identity and first-active seed timing; native compilation, policy composition and command acceptance remain pending.
+
 - Checkpointed paused human commander development, preserving source-only timing/input/state components, original denial and cap/locality/resumption receipts, and unfinished shared proof tests. The cfg seam tests are not registered or compiled; the pre-pause allocator reset patch lacks its identity witness and review. All human native checks, complete policy/producer/runner integration and unavailable ground Attack/Retreat actuators remain pending. No tests or development continued after the pause.
 
 - Added the detached ordinary human commander state provider: camera attention, real owner alerts with shared identity, urgent interruption and resumption, fresh-view planning, input timing/caps/locality, and delayed raw attempts. Three opening traces and two real grenade-alert traces record 441 full Source steps, 12 delivered views and 12 physical inputs. Native component tests replay the actual facts and Source-collected policy output, but have not run. The native policy callback, observation producer, ground Attack/Retreat admission and Match scheduling remain pending; delayed attempts do not claim actuator acceptance.

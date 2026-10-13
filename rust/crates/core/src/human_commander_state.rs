@@ -26,6 +26,10 @@ pub enum Error {
     Timing(timing::TimingError),
     Planner(String),
 }
+
+#[cfg(test)]
+#[path = "human_commander_state_tests.rs"]
+mod tests;
 impl From<inputs::Error> for Error {
     fn from(error: inputs::Error) -> Self {
         Self::Inputs(error)
@@ -240,6 +244,7 @@ fn validate<P>(now: u64, view: Option<&HumanView<P>>, batch: &OwnerHurtBatch) ->
 }
 
 impl HumanState {
+    /// Supply the trusted recorded seed for the first active callback, not an earlier setup seed.
     pub fn new(recorded_seed: u32, owner: u32, initial_spawn: Point) -> Self {
         Self {
             recorded_seed,
@@ -267,8 +272,16 @@ impl HumanState {
             now,
         )
     }
+    /// Reset private runtime and timing, retaining identities of already delivered receipts.
     pub fn reset(&mut self) {
         self.runtime = None;
+    }
+
+    /// The trusted host records the current simulation seed at the next active callback.
+    /// Subscriber identities survive; the next active tick initializes a fresh private stream.
+    pub fn reset_with_seed(&mut self, current_seed: u32) {
+        self.recorded_seed = current_seed;
+        self.reset();
     }
 
     /// The host stages callback-owned planner state/RNG. This function never retries a callback.
