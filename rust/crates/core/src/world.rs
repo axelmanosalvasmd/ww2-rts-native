@@ -259,7 +259,7 @@ struct ObservationUnit {
     built: Option<u64>,
     garrison: Option<usize>,
     air: Option<crate::game::PlaneState>,
-    cells: Option<Vec<usize>>,
+    cells: Option<Vec<u32>>,
 }
 enum ObservationAction {
     None,

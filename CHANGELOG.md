@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix the first native World elimination compile: observation receipts retain canonical `u32` footprint indices, and staged sight validates their checked conversion to bounded terrain indices. No cell data or observation ordering changes.
+
 - Restore explicit flat source/native scene terrain before registering elimination fixtures. This prevents unrelated bootstrap geometry from contaminating debris comparisons when the transition harness does not claim matched startup random streams.
 
 - Warm real World route memory before rollback witnesses and preserve remembered rows, route buffers, versions, fire/bunker and wreck views on refusal. Assert the nonfinite story failure reaches its named post-wreck finish guard.
