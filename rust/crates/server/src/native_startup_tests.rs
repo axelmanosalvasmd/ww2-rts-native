@@ -222,7 +222,9 @@ fn check_public_map(map: &Value) {
                 .all(|row| !row.as_str().unwrap().contains('N'))
         );
     }
-    assert_eq!(map["layers"]["mineMaterials"], json!([]));
+    if let Some(materials) = map["layers"].get("mineMaterials") {
+        assert_eq!(materials, &json!([]));
+    }
 }
 async fn native<T>(control: &NativeRoomControl, change: impl FnOnce(&mut RoomRuntime) -> T) -> T {
     let mut hub = control.server.hub.lock().await;

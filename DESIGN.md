@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## Startup public-map optional fields (2026-10-13, source successor)
+
+The exact `08b378d` startup attempt compiles and reaches the public-map helper, then fails its unconditional `mineMaterials == []` assertion with null versus array. No test passes, and no later gate runs; the raw failure stays at `/private/tmp/ww2-pure-startup-native-08b378d/startup-first.log`. Direct calls to unchanged pinned `mapForClient` match the complete committed Default and El Alamein JSON projections, and both omit `layers.mineMaterials`. Source `world-layers.js:75` replaces that list only if it exists; it does not add an empty field to a rows-only map.
+
+The helper now asserts an empty array only for a present mine-material field. Existing complete map equality preserves the exact optional presence, while hidden mines, associated materials, scripts and the separate El Alamein Scenario rollback assertions remain intact. The repair changes no producer, runtime guard, original asset, core or FFI source. Focused independent source review and fresh native validation are required for this successor.
+
 ## Trusted startup scene admission repair (2026-10-13, source successor)
 
 The exact `7e26c58` first native startup test compiles, then refuses its El Alamein attachment as Scenario. The original map has 246 private mine cells and one three-second message trigger (`reference/ww2-rts/maps/el-alamein.json:278`). Source converts legacy triggers into a Scenario in `shared/scenarios.js:7-10,88`; native startup likewise preserves them in `match_runtime.rs:635-652`. The existing complete snapshot guard at `recipient_snapshot/composition.rs:198-200` explicitly refuses canonical Scenario state. That guard is retained. The failure is recorded in `/private/tmp/ww2-pure-startup-native-7e26c58/startup-first.log`; no test passed in that attempt.
