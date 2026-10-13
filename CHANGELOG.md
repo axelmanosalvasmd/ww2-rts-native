@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added a bounded native strategic callback on the ordinary human attention schedule. It rebuilds policy from detached camera-filtered facts, preserves minimal Move/Cover/Buy/Tech shapes, and stages private human and policy state together. Three real Source openings provide complete packets at seven actual deliveries and three raw planning calls outside scripted think beats. The new policy replay and RNG/refusal assertions are written but unrun; observation cache repair, canonical admission and full human AI remain pending.
+
 - Normally combined the resumed human state proof with the detached observation and checked bounded commander prerequisites in a separate policy assembly. Both parent histories and their distinct evidence remain intact; the observer cache-identity review finding and new native composition checks remain pending.
 
 - Resumed the human commander proof: registered cap, locality, urgent resumption and atomic-refusal tests, and captured raw original planner attempts before input filtering. Reset now retains subscriber alert identities and accepts a trusted current seed for fresh timing. A real two-grenade Source replay protects reset identity and first-active seed timing; native compilation, policy composition and command acceptance remain pending.
