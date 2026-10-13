@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Independently verified the internal World plan and maintained recorder at `4f8d9f9`: all 8 traces and 116 original steps pass pristine replay, the seven earlier case projections remain identical, and 203,578 patches reconstruct the captured state losslessly. The phase/actor/supply/retirement gaps are source-reviewed; no native World runner or interface change is claimed.
+
 - Prepared an internal World tick integration plan from the actual pinned controller and accepted split/epilogue providers. Recorded concrete actor, path-version, unknown-terrain, timer/payment, production, supply, rail and retirement seams before any caller interface change. Reused the maintained World source recorder instead of adding a second suite: 8 traces, 116 original steps and 1,512 phase entries pass original/pristine comparison and lossless delta reconstruction, including post-finish income/capture and neutral guard behavior. Its seven earlier case projections remain unchanged. This evidence is source-only and native World dispatch remains pending. Frozen original-constructor and ordinary candidates are unchanged.
 
 - Normally retained verified main `8f27227` in the separate construction/GroundAttack candidate, including the accepted recipient-known terrain traffic adapter. Existing dispatch, path callbacks, ordered output and source fixtures remain intact. Corrected the sole caller receipt to report connected TrafficKnowledge once instead of listing it as unavailable; the existing actual-runner regression protects that truthful receipt. Combined native verification remains pending and no frozen proof branch changed.
