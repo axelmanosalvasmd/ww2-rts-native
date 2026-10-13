@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified the coherent commander consumer on the Mac at `e7f1b1f`: all 227 locked workspace release tests, 25 focused debug tests, strict all-target Clippy, formatting and the release FFI build pass. The proof covers bounded opening and holder decisions, later research admission, paid Germany MG purchase and next delivered movement, and real Cover job cleanup. Full AI, broader shopping, construction, mass-project Cover and hosted or Unreal acceptance remain pending.
+
 - Name the AI test comparator tuple type required by strict all-target Clippy, preserving the exact waypoint and command comparison.
 
 - Remove two unnecessary staged Buy adapter borrows found by strict Clippy after all 227 combined workspace release tests passed. Final exact-head checks are pending.
