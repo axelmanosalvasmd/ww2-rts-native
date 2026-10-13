@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added original-source ordinary-fire cases for suppressive buffs and AP consumption, including naval target restrictions, manual AP against concrete and empty-ammo retention. The ability recorder now contains 35 traces and 156 actions; the canonical firing borrow and native proof remain pending.
+
 - Integrated stable source-only provision and typed-flight prerequisites for the ability/recovery compiler pass. Reconstructed an erroneous local conflict resolution from preserved Git blobs before any build; final dependency and combined native proofs remain pending.
 
 - Added native fixture consumers for 28 Conquest ability traces (132 actions), two explicit paid-mode refusals and all 23 recovery traces (133 actions), including canonical cache-first provisions. Consumers are source-written and formatted; they have not yet run against incoming runtime prerequisites.

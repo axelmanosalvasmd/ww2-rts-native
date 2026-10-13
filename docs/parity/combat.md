@@ -2,7 +2,7 @@
 
 Source: `reference/ww2-rts` at e4e579a. Paths are relative to it. "test.js" checks are cited by their `check` name; `test-engine-projectiles.js` has no check names, so its assertions are cited by message.
 
-Ground ability/recovery work is in progress in `match_abilities.rs` and `match_recovery.rs`. Canonical rows, Conquest command admission, all seven autocast judgments, queued aimed execution, building section repairs and split captured-list recovery are source-written. The original-source recorders reproduce 30 ability traces (141 actions) and 23 recovery traces (133 actions). Incoming flight/provision prerequisites and native differential verification remain pending. Classic/World ability payment, full tick integration and client rendering remain outside this slice.
+Ground ability/recovery work is in progress in `match_abilities.rs` and `match_recovery.rs`. Canonical rows, Conquest command admission, all seven autocast judgments, queued aimed execution, building section repairs and split captured-list recovery are source-written. The original-source recorders reproduce 35 ability traces (156 actions) and 23 recovery traces (133 actions). Incoming flight/provision prerequisites and native differential verification remain pending. Classic/World ability payment, full tick integration and client rendering remain outside this slice.
 
 | ID | Behavior / content | Evidence | Rust (Julio) | Unreal (Axel) | Depends on | Acceptance check | Status |
 |---|---|---|---|---|---|---|---|

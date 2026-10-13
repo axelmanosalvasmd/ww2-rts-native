@@ -22,9 +22,10 @@ try {
  const timers=extract('    if (def.infantry) u.supp = Math.max(0, u.supp - (inTrench(g, u) ? CFG.trench.rally : 8) * dt);','\n    // auto-retreat:');
  const autocast=extract('    if (u.auto && u.cd <= 0 && !u.nade && !u.retreating && (g.tick + u.id) % AUTO_EVERY === 0) {','\n\n    // Engineers:');
  const aimedBlock=extract('    if (u.nade) {\n      const ab = def.ab, halt = !u.nade.auto || u.nade.walked;','\n\n    // heading into a building:');
+ const firingBlock=extract('    // A vehicle standing still keeps its front armor','  // more engineers build faster');
  const marker='  setupStructures(g, map);';assert.equal(code.split(marker).length,2);
  code=code.replace(marker,marker+'\n  return g;').replace(/from '(\.\/[^']+)'/g,(_,p)=>`from '${pathToFileURL(join(reference,'shared',p)).href}'`);
- code+=`\nexport const abilityHooks={beginPathTick, phase(g,u,dt){const def=UNITS[u.type],w=def.w;${timers}\n${autocast}\n${aimedBlock}},aimed(g,u){const def=UNITS[u.type],w=def.w;${aimedBlock}}};\n`;
+ code+=`\nexport const abilityHooks={beginPathTick, phase(g,u,dt){const def=UNITS[u.type],w=def.w;${timers}\n${autocast}\n${aimedBlock}},aimed(g,u){const def=UNITS[u.type],w=def.w;${aimedBlock}},claim};\nexport function abilityWeapon(g,id,moving,dt){for(const u of [g.units.get(id)]){const def=UNITS[u.type],w=def.w,sm=suppMul(u);${firingBlock}}\n`;
  writeFileSync(join(temp,'sim.mjs'),code);
  const sim=await import(pathToFileURL(join(temp,'sim.mjs'))),H=sim.abilityHooks,grid=await import(pathToFileURL(join(reference,'shared/grid.js')));
  const cases=[],control=['follow','auto','autoRetreat','holdFire','holdPos','attackId','targetId','orders','face','entrench','dig','build','enter','board','amove','fireAt','stuck','drift','reverse','repath','cooldown','retarget','react','traffic','trafficWait','moveOutcome','moveOutcomeTick','moveResult','worldGoal','garrison','shotAt'];
@@ -46,6 +47,7 @@ try {
    Math.random=()=>random.next();
    if(a.op==='command')result=sim.command(g,a.slot,a.cmd,a.auto??false)??null;
    else if(a.op==='target')result=sim.autocastTarget(g,g.units.get(a.id));
+   else if(a.op==='weapon'){g.claims=new Map();for(const u of g.units.values())if(u.hp>0&&u.targetId)H.claim(g,u,u.targetId,1);sim.abilityWeapon(g,a.id,a.moving??false,a.dt??.05);}
    else if(a.op==='prime'){Object.assign(g.units.get(a.id),structuredClone(a.changes));grid.rebuildGrid(g);}
    else if(a.op==='player')Object.assign(g.players[a.slot],a.changes);
    else if(a.op==='visibility')g.players[a.owner].visible=new Set(a.ids);
@@ -86,6 +88,11 @@ try {
  record('autocast-satchel-walks-with-attack-order',[U(1,'ranger',15,15,{auto:true,attackId:2,path:[{x:35,z:15}],orders:[{t:'move',x:60,z:15}]}),U(2,'rifle',30,15,{owner:1,garrison:2})],[phase([1],0,9)]);
  record('throw-exact-range-and-just-outside',[U(1,'rifle')],[command([1],33.001,15),aimed([1]),prime(1,{nade:{x:33,z:15},repath:0}),aimed([1])]);
  record('barrage-exact-range-and-just-outside',[U(1,'mortar')],[command([1],65.001,15),aimed([1]),prime(1,{nade:{x:65,z:15},repath:0}),aimed([1])]);
+ record('suppress-buff-applies-to-ordinary-fire',[U(1,'mg',15,15,{still:20,targetId:2,attackId:2,retarget:100}),U(2,'rifle',30,15,{owner:1})],[command([1]),{op:'weapon',id:1},prime(1,{buff:0,cooldown:0}),{op:'weapon',id:1}]);
+ record('loaded-ap-consumed-after-qualifying-fire',[U(1,'at',15,15,{still:20,targetId:2,attackId:2,retarget:100}),U(2,'tank',30,15,{owner:1})],[command([1]),{op:'weapon',id:1},prime(1,{cooldown:0}),{op:'weapon',id:1}]);
+ record('naval-ap-retained-for-land-target',[U(1,'gunboat',15,15,{still:20,targetId:2,attackId:2,retarget:100}),U(2,'tank',30,15,{owner:1}),U(3,'gunboat',45,15,{owner:1})],[command([1]),{op:'weapon',id:1},prime(1,{targetId:3,attackId:3,cooldown:0}),{op:'weapon',id:1}]);
+ record('manual-ap-qualifies-against-concrete',[U(1,'at',15,15,{still:20,targetId:2,attackId:2,retarget:100}),U(2,'bunker',30,15,{owner:1})],[command([1]),{op:'weapon',id:1}]);
+ record('empty-ammo-preserves-loaded-ap',[U(1,'at',15,15,{still:20,targetId:2,attackId:2,retarget:100,ap:true,logistics:{ammo:0,forced:false,stranded:false}}),U(2,'tank',30,15,{owner:1})],[{op:'weapon',id:1}]);
  const byName=name=>cases.find(c=>c.name===name),last=name=>byName(name).snapshots.at(-1);
  assert.deepEqual(byName('refusal-precedence-and-selection-success').results,['retreating','cooldown','ammo','cooldown','retreating','needs',null]);
  assert.equal(last('command-ownership-carrier-operative-structure-and-dead').units.find(u=>u.id===5).cd,40);
