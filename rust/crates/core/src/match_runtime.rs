@@ -3,6 +3,9 @@ pub use crate::objectives::Objective;
 #[path = "match_recruitment.rs"]
 mod recruitment;
 pub use recruitment::{CompletedRecruitUnit, RecruitError, RecruitMetadata, RecruitRouting};
+#[path = "match_production.rs"]
+mod production_step;
+pub use production_step::{CompletedTrainingUnit, ProductionStepError};
 use std::collections::BTreeMap;
 
 use crate::{
@@ -517,15 +520,16 @@ pub struct BuildingCell {
 /// Authoritative startup state. Each mode admits only its implemented phases.
 /// Live terrain and units have a single owner in `world.game`.
 pub struct Match {
+    pub support: crate::match_support::SupportState,
     pub field_works: crate::field_works::FieldWorksRuntime,
     pub abilities: crate::match_abilities::AbilityState,
     pub recovery: crate::match_recovery::RecoveryState,
-    pub support: crate::match_support::SupportState,
     pub assault: Option<crate::assault_runtime::AssaultState>,
-    pub world_runtime: Option<crate::match_world::WorldRuntime>,
     pub commands: crate::match_commands::MatchCommands,
     pub combat: crate::match_combat::CombatState,
     pub environment: crate::environment::EnvironmentRuntime,
+    pub companions: crate::companions::Companions,
+    pub world_runtime: Option<crate::match_world::WorldRuntime>,
     pub world: World,
     pub start: StartPlan,
     pub options: MatchOptions,
@@ -560,15 +564,36 @@ pub(crate) fn cancel_field_work_state(
     runtime: &mut crate::field_works::FieldWorksRuntime,
     unit: &mut crate::game::Unit,
 ) -> Result<(), String> {
-    if unit.dig != runtime.is_active(unit.id) {
+    if unit.dig != runtime.is_active(unit.id)
+        || unit.entrench != runtime.membership(unit.id).is_some()
+    {
         return Err("unrepresented or inconsistent field-work activity".into());
     }
     runtime.cancel(unit.id);
     unit.dig = false;
+    unit.entrench = false;
     Ok(())
 }
 
 impl Match {
+    /// Source failed Dig routing clears only paid work. The squad remains on its shared project.
+    pub fn drop_field_work_job(&mut self, id: u32) -> Result<(), String> {
+        let unit = self
+            .world
+            .game
+            .units
+            .get_mut(&id)
+            .ok_or("missing dropped field-work unit")?;
+        if unit.id != id
+            || unit.dig != self.field_works.is_active(id)
+            || unit.entrench != self.field_works.membership(id).is_some()
+        {
+            return Err("unrepresented or inconsistent field-work activity".into());
+        }
+        self.field_works.drop_paid_job(id);
+        unit.dig = false;
+        Ok(())
+    }
     /// Cancel current paid work without a refund. The descriptor is removed before its activity flag.
     pub fn cancel_field_work(&mut self, id: u32) -> Result<(), String> {
         let unit = self
@@ -627,15 +652,16 @@ impl Match {
         let player_count = start.players.len();
         let point_count = start.points.len();
         let result = Self {
+            support: crate::match_support::SupportState::default(),
+            field_works: crate::field_works::FieldWorksRuntime::default(),
             abilities: crate::match_abilities::AbilityState::default(),
             recovery: crate::match_recovery::RecoveryState::default(),
-            support: crate::match_support::SupportState::default(),
             assault: None,
-            world_runtime: None,
-            field_works: crate::field_works::FieldWorksRuntime::default(),
             commands: crate::match_commands::MatchCommands::new(4096),
             combat: crate::match_combat::CombatState::default(),
             environment: crate::environment::EnvironmentRuntime::default(),
+            companions: crate::companions::Companions::default(),
+            world_runtime: None,
             grid: SpatialGrid::new(&world.game.units, 16.0),
             recipients: Vec::new(),
             routing_fog: crate::fog::Fog::default(),

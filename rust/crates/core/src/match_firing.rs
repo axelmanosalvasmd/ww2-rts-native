@@ -335,8 +335,12 @@ fn dist(a: Point, b: Point) -> f64 {
 
 impl Match {
     fn supported_firing_mode(&self) -> Result<(), String> {
-        if self.options.mode != crate::economy::Mode::Conquest {
-            return Err("weapon execution currently requires Conquest".into());
+        if !matches!(
+            self.options.mode,
+            crate::economy::Mode::Default | crate::economy::Mode::Conquest
+        ) || self.world.game.mode.is_some()
+        {
+            return Err("weapon execution requires ordinary Conquest mode".into());
         }
         Ok(())
     }
@@ -877,6 +881,14 @@ impl Match {
             })
             .collect();
         for id in released {
+            // Operative admission retains this identity only while its source
+            // metadata backs a live flight. Release the other retained owners
+            // together once the same flight predicate releases Combat.
+            if self.commands.units.get(&id).is_some_and(|c| c.operative) {
+                self.commands.requests.retire_unit(id);
+                self.commands.units.remove(&id);
+                self.firing.remove(id);
+            }
             self.combat.remove(id);
         }
         Ok(())

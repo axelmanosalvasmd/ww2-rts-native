@@ -119,7 +119,12 @@ fn supported(m: &Match, structure: &WorldStructure) -> Result<BTreeSet<String>, 
 impl Match {
     /// Repair existing sections in source order. Dead buildings cannot be restored.
     pub fn repair_building_sections(&mut self, id: UnitId, amount: f64) -> Result<f64, String> {
-        if self.options.mode != crate::economy::Mode::Conquest || !amount.is_finite() || amount < 0.
+        if !matches!(
+            self.options.mode,
+            crate::economy::Mode::Default | crate::economy::Mode::Conquest
+        ) || self.world.game.mode.is_some()
+            || !amount.is_finite()
+            || amount < 0.
         {
             return Err("invalid Conquest repair request".into());
         }
@@ -296,7 +301,10 @@ fn config() -> Result<&'static Value, String> {
 }
 impl Match {
     fn validate_recovery_ids(&self, ids: &[UnitId]) -> Result<(), String> {
-        if self.options.mode != crate::economy::Mode::Conquest
+        if !matches!(
+            self.options.mode,
+            crate::economy::Mode::Default | crate::economy::Mode::Conquest
+        ) || self.world.game.mode.is_some()
             || !(0..9_007_199_254_740_351).contains(&self.world.game.tick)
         {
             return Err("recovery currently requires represented Conquest state".into());

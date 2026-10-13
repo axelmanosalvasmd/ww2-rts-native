@@ -14,6 +14,8 @@ use serde_json::{Map, Value, json};
 mod composition;
 #[path = "recipient_snapshot/delivery.rs"]
 mod delivery;
+#[path = "recipient_snapshot/engineering.rs"]
+mod engineering;
 #[path = "recipient_snapshot/owners.rs"]
 mod owners;
 #[path = "recipient_snapshot/public_state.rs"]
@@ -81,7 +83,7 @@ pub struct SnapshotCache<'a> {
 }
 impl<'a> SnapshotCache<'a> {
     pub fn new(state: &'a Match) -> Result<Self, SnapshotError> {
-        if state.options.mode != Mode::Conquest
+        if !matches!(state.options.mode, Mode::Default | Mode::Conquest)
             || state.world.game.mode.is_some()
             || state.world.geography().is_some()
             || state.assault.is_some()
@@ -121,6 +123,7 @@ impl<'a> SnapshotCache<'a> {
             }
             finite(&[u.x, u.z])?;
         }
+        engineering::validate(state)?;
         let rows = state
             .world
             .game
@@ -134,6 +137,9 @@ impl<'a> SnapshotCache<'a> {
         let mut public = public;
         for (fields, support) in public.iter_mut().zip(support) {
             fields.extend(support);
+        }
+        for (fields, works) in public.iter_mut().zip(engineering::capture(state)?) {
+            fields.insert("works".into(), works);
         }
         Ok(Self {
             state,
@@ -219,7 +225,7 @@ fn unit_row(state: &Match, u: &Unit) -> Result<Value, SnapshotError> {
     if u.air.is_some() || k.air {
         return Err(unsupported(SnapshotCapability::Air));
     }
-    if u.dig || u.entrench || u.build {
+    if u.build {
         return Err(unsupported(SnapshotCapability::Engineering));
     }
     let def = Catalog::compiled()
@@ -301,6 +307,12 @@ fn unit_row(state: &Match, u: &Unit) -> Result<Value, SnapshotError> {
     {
         flags |= 8;
     }
+    if u.dig {
+        flags |= 16;
+    }
+    if u.entrench {
+        flags |= 1024;
+    }
     if let Some(cell) = u.garrison {
         flags |= 32 | u64::from(*g.house.get(cell).ok_or(SnapshotError::Rules)?) << 20;
     }
@@ -363,6 +375,13 @@ fn unit_row(state: &Match, u: &Unit) -> Result<Value, SnapshotError> {
         ];
         finite(&tail)?;
         row.extend(tail.into_iter().map(|n| json!(r(n))));
+    } else if u.dig {
+        let progress = state
+            .field_works
+            .progress(&state.world, u.id)
+            .map_err(|_| SnapshotError::Rules)?;
+        finite(&[progress])?;
+        row.push(json!(math::round(progress * 100.0) / 100.0));
     }
     Ok(Value::Array(row))
 }
@@ -525,7 +544,7 @@ fn economy_fields(state: &Match, slot: usize) -> Result<Map<String, Value>, Snap
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::{
         economy::Faction,
@@ -543,7 +562,7 @@ mod tests {
     fn optional(v: &Value, key: &str) -> Option<f64> {
         v[key].as_f64()
     }
-    pub(super) fn initialize(case: &Value) -> Match {
+    pub(crate) fn initialize(case: &Value) -> Match {
         let map = AuthoritativeMap::from_json(&serde_json::to_vec(&case["map"]).unwrap()).unwrap();
         let mut m = Match::new(
             &map,
@@ -930,7 +949,7 @@ mod tests {
         assert!(matches!(
             SnapshotCache::new(&m),
             Err(SnapshotError::Unsupported {
-                unit: 1,
+                unit: 0,
                 capability: SnapshotCapability::Engineering
             })
         ));

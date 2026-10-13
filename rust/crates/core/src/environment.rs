@@ -1057,20 +1057,46 @@ impl EnvironmentRuntime {
         w.set_level(c, target)?;
         Ok(())
     }
+    /// Ordinary burning uses the complete current actor order.
     pub fn burn(
         &mut self,
         w: &mut World,
         dt: f64,
         ctx: &mut Context<'_>,
     ) -> Result<Vec<Effect>, EnvironmentError> {
+        self.burn_inner(w, dt, ctx, None)
+    }
+    /// Burning after late births uses the source's earlier captured actor list.
+    /// Context keeps all current units for validation, garrison eviction and live
+    /// grid queries. Only direct casualties and list-based rubble effects are captured.
+    pub fn burn_captured(
+        &mut self,
+        w: &mut World,
+        dt: f64,
+        ctx: &mut Context<'_>,
+        actor_order: &[u32],
+    ) -> Result<Vec<Effect>, EnvironmentError> {
+        self.burn_inner(w, dt, ctx, Some(actor_order))
+    }
+    fn burn_inner(
+        &mut self,
+        w: &mut World,
+        dt: f64,
+        ctx: &mut Context<'_>,
+        actor_order: Option<&[u32]>,
+    ) -> Result<Vec<Effect>, EnvironmentError> {
         let t = check(w, ctx)?;
+        let skip = BTreeSet::new();
+        let mut hit = DamageContext::plain(&skip);
+        hit.actor_order = actor_order;
+        check_damage_actors(w, &hit)?;
         if !dt.is_finite() || !(0.0..=7200.).contains(&dt) {
             return Err(EnvironmentError::InvalidInput("burn dt"));
         }
         let mut out = Vec::new();
         let wx = math::cos(ctx.wind_angle);
         let wz = math::sin(ctx.wind_angle);
-        for &id in ctx.unit_order {
+        for &id in actor_order.unwrap_or(ctx.unit_order) {
             let u = &w.game.units[&id];
             let c = if u.hp > 0. && u.air.is_none() && !u.riding && t.kinds.kinds[u.kind].infantry {
                 u.garrison.or_else(|| w.game.cell_of(u.x, u.z))
@@ -1161,8 +1187,6 @@ impl EnvironmentRuntime {
                     * dt
                     * (0.2 + 0.8 * material(w.material_name(c, false).unwrap()).1)
                     * (1. - ctx.rain * 0.7);
-                let skip = BTreeSet::new();
-                let mut hit = DamageContext::plain(&skip);
                 hit.direction = Some(Point { x: wx, z: wz });
                 self.damage_section_inner(w, c, amount, ctx, &hit, &mut out)?;
                 if w.game.sections.get(&(c as u32)).is_some_and(|s| s.failed) {
@@ -1186,7 +1210,7 @@ impl EnvironmentRuntime {
                 w.append_journal(c);
             }
             if ch == b'H' || ch == b'O' {
-                self.wreck_inner(w, c, Some(b'.'), ctx, None, &mut out)?;
+                self.wreck_inner(w, c, Some(b'.'), ctx, actor_order, &mut out)?;
             } else {
                 w.touch(c)?;
             }

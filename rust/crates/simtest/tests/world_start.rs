@@ -120,6 +120,10 @@ fn original_world_startup() {
         let instance = Match::new_world(&m, o.clone(), MatchRandom::new(o.seed)).unwrap();
         let e = &c["expected"];
         let game = &instance.world.game;
+        for id in game.units.keys() {
+            assert_eq!(instance.abilities.get(*id), Some(&Default::default()));
+            assert_eq!(instance.recovery.get(*id), Some(&Default::default()));
+        }
         let runtime = instance.world_runtime.as_ref().unwrap();
         let players:Vec<_>=instance.start.players.iter().zip(&instance.start.economy.players).zip(&game.players).map(|((p,w),g)|json!({
             "spawn":[bits(p.spawn.x),bits(p.spawn.z)],"mp":bits(w.mp),"inc":bits(w.inc),"mun":bits(w.mun),"fuel":bits(w.fuel),"visible":g.visible,
