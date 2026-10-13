@@ -1,5 +1,5 @@
 //! A slot-bound quiet Conquest policy fed only by an owned observation.
-//! Includes a bounded later research prefix; combat, shopping and fortification remain separate.
+//! Includes bounded research and MG purchase prefixes; combat and fortification remain separate.
 pub use crate::game::Point;
 use crate::{
     catalog::{Catalog, Value},
@@ -101,6 +101,7 @@ pub struct ResearchObservation {
     /// Delivered own HQ and Barracks are complete, with no other own structures.
     pub stock_base: bool,
     pub armory_ready: bool,
+    pub standard_army: bool,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct Input {
@@ -152,6 +153,7 @@ pub enum PolicyError {
     UnsupportedSuppression,
     UnsupportedHolder,
     UnsupportedResearch,
+    UnsupportedShopping,
     InvalidFraction,
     ExhaustedFractions,
 }
@@ -365,7 +367,7 @@ fn plan_inner(
     if me.out {
         return Ok(Plan::default());
     }
-    let research_commands = research_prefix(observation)?;
+    let research_commands = economic_prefix(observation)?;
     if (input.tick >= 3600 && input.research.is_none())
         || !input.points.iter().any(|p| p.owner.is_none())
     {
@@ -606,8 +608,8 @@ fn spot_near(observation: &Observation, at: Point, fraction: f64) -> Point {
 }
 
 /// A bounded later quiet frame. Prefix attempts still use the canonical dispatcher.
-/// Only the exercised stock USA roster/budgets are admitted; shopping is separate.
-fn research_prefix(observation: &Observation) -> Result<Vec<Command>, PolicyError> {
+/// Only the exercised research and MG shopping rosters/budgets are admitted.
+fn economic_prefix(observation: &Observation) -> Result<Vec<Command>, PolicyError> {
     let input = &observation.input;
     let Some(research) = &input.research else {
         return Ok(Vec::new());
@@ -626,6 +628,40 @@ fn research_prefix(observation: &Observation) -> Result<Vec<Command>, PolicyErro
         .filter(|(u, _)| u.owner == input.slot)
         .collect();
     let lines = [Technology::Infantry, Technology::Guns, Technology::Armor];
+    if research.faction == Faction::Germany {
+        let before_buy = own.len() == 2 && count("rifle") == 2 && count("mg") == 0;
+        let after_buy = own.len() == 3 && count("rifle") == 2 && count("mg") == 1;
+        let price =
+            crate::economy::price_of(Mode::Conquest, "mg").map_err(|_| PolicyError::Catalog)?;
+        if !research.standard_army
+            || !research.stock_base
+            || research.armory_ready
+            || research.tech.tier() != 3
+            || !research.busy.is_empty()
+            || lines.iter().any(|&k| research.tech.level(k) != 3)
+            || owned.len() != own.len() + 2
+            || owned.iter().any(|(u, k)| {
+                u.hp != k.health || !["rifle", "mg", "hq", "barracks"].contains(&u.kind.as_str())
+            })
+            || owned.iter().filter(|(u, _)| u.kind == "hq").count() != 1
+            || owned.iter().filter(|(u, _)| u.kind == "barracks").count() != 1
+            || input
+                .points
+                .iter()
+                .any(|p| p.owner.is_some() || p.cut || p.locked)
+            || !(before_buy && input.manpower == price.mp || after_buy && input.manpower == 0.0)
+        {
+            return Err(PolicyError::UnsupportedShopping);
+        }
+        return Ok(if before_buy {
+            vec![Command::Buy {
+                kind: "mg".into(),
+                from: None,
+            }]
+        } else {
+            vec![]
+        });
+    }
     if owned.len() != 5
         || owned.iter().any(|(u, k)| {
             u.hp != k.health || !["rifle", "mg", "hq", "barracks"].contains(&u.kind.as_str())

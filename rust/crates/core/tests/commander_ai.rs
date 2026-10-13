@@ -480,6 +480,7 @@ fn research_input(case: &Value, frame: &Value) -> Input {
             .collect(),
         stock_base: own.len() == 2 && ready("hq") == 1 && ready("barracks") == 1,
         armory_ready: ready("armory") != 0,
+        standard_army: frame["delivered"]["army"]["pop"].as_f64() == Some(1.0),
     });
     input
 }
@@ -577,6 +578,101 @@ fn unsupported_research_budget_preserves_state_and_rng() {
     assert_eq!(
         commander_ai::plan(&observation, &mut state, Level::Normal, &mut rng).unwrap_err(),
         PolicyError::UnsupportedResearch
+    );
+    assert_eq!(state, before);
+    assert_eq!(rng, before_rng);
+}
+
+#[test]
+fn original_paid_mg_and_refused_purchase_across_delivered_frames() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("fixtures/commander-shopping.json")).unwrap();
+    let mut frames = 0;
+    for case in array(&fixture["cases"]) {
+        let mut state = SourceState::default();
+        for frame in array(&case["frames"]) {
+            let observation = Observation::new(research_input(case, frame)).unwrap();
+            let fractions: Vec<_> = array(&frame["random"]).iter().map(number).collect();
+            let before = observation.clone();
+            let plan = commander_ai::plan_with_fractions(
+                &observation,
+                &mut state,
+                Level::Normal,
+                &fractions,
+            )
+            .unwrap();
+            let attempts = array(&frame["expected"]["attempts"]);
+            let expected: Vec<_> = attempts
+                .iter()
+                .map(|a| Command::from_json(&a["command"]).unwrap())
+                .collect();
+            let buys = |commands: &[Command]| {
+                commands
+                    .iter()
+                    .filter_map(|c| match c {
+                        Command::Buy { kind, from } => Some((kind.clone(), *from)),
+                        _ => None,
+                    })
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(buys(&plan.commands), buys(&expected));
+            if !buys(&expected).is_empty() {
+                assert!(matches!(plan.commands.first(), Some(Command::Buy { .. })));
+            }
+            let moves = |commands: &[Command]| {
+                commands
+                    .iter()
+                    .filter(|c| matches!(c, Command::Move { .. }))
+                    .cloned()
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(
+                command_bits(&moves(&plan.commands)),
+                command_bits(&moves(&expected))
+            );
+            assert_eq!(plan.commands.len(), attempts.len());
+            assert_eq!(plan.draws, integer(&frame["expected"]["draws"]));
+            assert_eq!(
+                aim_bits(state.aim),
+                aim_bits(aim(&frame["expected"]["mind"]["aim"]))
+            );
+            assert_eq!(observation, before);
+            if case["name"] == "germany-mg-accepted" && frame["tick"] == 3640 {
+                let ids: Vec<_> = moves(&plan.commands)
+                    .into_iter()
+                    .flat_map(|c| match c {
+                        Command::Move { orders, .. } => {
+                            orders.into_iter().map(|o| o.unit).collect::<Vec<_>>()
+                        }
+                        _ => unreachable!(),
+                    })
+                    .collect();
+                assert_eq!(
+                    ids,
+                    vec![11],
+                    "the actually purchased source MG is assigned next frame"
+                );
+            }
+            frames += 1;
+        }
+    }
+    assert_eq!(frames, 4);
+}
+#[test]
+fn unexercised_multiple_purchase_budget_retains_private_state() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("fixtures/commander-shopping.json")).unwrap();
+    let case = &fixture["cases"][0];
+    let mut input = research_input(case, &case["frames"][0]);
+    input.research.as_mut().unwrap().standard_army = false;
+    let observation = Observation::new(input).unwrap();
+    let mut state = SourceState::default();
+    let before = state.clone();
+    let mut rng = MatchRandom::new(559);
+    let before_rng = rng.clone();
+    assert_eq!(
+        commander_ai::plan(&observation, &mut state, Level::Normal, &mut rng).unwrap_err(),
+        PolicyError::UnsupportedShopping
     );
     assert_eq!(state, before);
     assert_eq!(rng, before_rng);

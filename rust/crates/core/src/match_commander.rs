@@ -36,6 +36,9 @@ mod tests {
     use serde_json::{Value, json};
 
     fn instance(seed: u64) -> Match {
+        configured_instance(seed, Faction::Usa, false)
+    }
+    fn configured_instance(seed: u64, faction: Faction, tech: bool) -> Match {
         let map = AuthoritativeMap::from_json(
             &serde_json::to_vec(&json!({
                 "name":"Opening integration", "w":64,"h":64,
@@ -55,7 +58,7 @@ mod tests {
                     PlayerConfig {
                         name: "A".into(),
                         team: 0,
-                        faction: Faction::try_from(0).unwrap(),
+                        faction,
                     },
                     PlayerConfig {
                         name: "B".into(),
@@ -69,7 +72,7 @@ mod tests {
                 weather_seed: None,
                 living_weather: false,
                 map_key: None,
-                tech: false,
+                tech,
                 supply: false,
                 logistics: false,
                 sandbox: false,
@@ -322,8 +325,7 @@ mod tests {
                 0.0,
             ),
         ] {
-            let mut m = instance(1001 + tier as u64);
-            m.options.tech = true;
+            let mut m = configured_instance(1001 + tier as u64, Faction::Usa, true);
             m.production = ProductionState::new(vec![
                 TechState::new(tier, 0, 0, 0).unwrap(),
                 TechState::new(1, 0, 0, 0).unwrap(),
@@ -427,6 +429,166 @@ mod tests {
                 assert_eq!(result.denial, denial);
             }
             assert_eq!(m.production.player(0).unwrap().tech().tier(), tier);
+        }
+    }
+    #[test]
+    fn germany_purchase_publishes_real_mg_before_next_delivered_movement() {
+        use crate::{economy::TechState, production::ProductionState};
+        for blocked in [false, true] {
+            let mut m = configured_instance(1101, Faction::Germany, true);
+            m.production = ProductionState::new(vec![
+                TechState::new(3, 3, 3, 3).unwrap(),
+                TechState::new(1, 0, 0, 0).unwrap(),
+            ])
+            .unwrap();
+            for unit in m
+                .world
+                .game
+                .units
+                .values()
+                .filter(|u| m.rules.kinds[u.kind].building)
+            {
+                m.production.initialize_building(unit.id).unwrap();
+            }
+            // Reproduce the recorder's starting roster, not a death or spawn phase.
+            let old_mg = m
+                .world
+                .game
+                .units
+                .values()
+                .find(|u| u.owner == 0 && m.rules.kinds[u.kind].name == "mg")
+                .unwrap()
+                .id;
+            m.world.game.units.remove(&old_mg);
+            m.grid.remove_unit(old_mg);
+            m.commands.units.remove(&old_mg);
+            m.combat.remove(old_mg);
+            m.firing.remove(old_mg);
+            m.abilities.remove(old_mg);
+            m.recovery.remove(old_mg);
+            m.start.economy.players[0].mp = 150.0;
+            let next_id = m.next_unit_id;
+            let initial_count = m.world.game.units.len();
+            while m.world.game.tick < 3600 {
+                advance(&mut m);
+            }
+            m.world.game.vision_tick = Some(3597);
+            let mut seat = OpeningCommander::new(0, Level::Normal);
+            // A planned Buy is not a spawn. The whole Buy/Move batch must fit first.
+            let mut capacity = m.commands.queue.snapshot();
+            let maximum = capacity.capacity;
+            capacity.capacity = 1;
+            m.commands.queue = OrderQueue::restore(capacity).unwrap();
+            let prior = seat.clone();
+            let prior_rng = m.start.random.clone();
+            assert!(m.tick_opening_commander(&mut seat).is_err());
+            assert_eq!(seat, prior);
+            assert_eq!(m.start.random, prior_rng);
+            assert_eq!(m.next_unit_id, next_id);
+            assert_eq!(m.start.economy.players[0].mp, 150.0);
+            assert_eq!(m.world.game.units.len(), initial_count);
+            assert!(m.commands.queue.is_empty());
+            let mut capacity = m.commands.queue.snapshot();
+            capacity.capacity = maximum;
+            m.commands.queue = OrderQueue::restore(capacity).unwrap();
+            assert!(matches!(
+                m.tick_opening_commander(&mut seat).unwrap(),
+                OpeningTick::Queued(_)
+            ));
+            let queue = m.commands.queue.snapshot();
+            assert_eq!(queue.pending.len(), 2);
+            assert!(
+                matches!(&queue.pending[0].value,Command::Buy{kind,from} if kind=="mg" && from.is_none())
+            );
+            assert_eq!(
+                m.world.game.units.len(),
+                initial_count,
+                "queue admission does not fabricate birth"
+            );
+            assert_eq!(m.start.economy.players[0].mp, 150.0);
+            let random = m.start.random.snapshot();
+            // This actual global gate changes after delivery, just as in the source witness.
+            m.start.economy.players[0].away = blocked;
+            let results = advance(&mut m);
+            assert_eq!(
+                m.start.random.snapshot(),
+                random,
+                "actuation does not spend AI draws"
+            );
+            if blocked {
+                assert!(
+                    results
+                        .iter()
+                        .all(|r| r.denial == Some(crate::match_commands::Denial::Blocked))
+                );
+                assert_eq!(m.world.game.units.len(), initial_count);
+                assert_eq!(m.next_unit_id, next_id);
+                assert_eq!(m.start.economy.players[0].mp, 150.0);
+            } else {
+                assert!(results.iter().all(|r| r.denial.is_none()));
+                assert_eq!(m.world.game.units.len(), initial_count + 1);
+                assert_eq!(m.next_unit_id, next_id + 1);
+                assert_eq!(m.start.economy.players[0].mp, 0.0);
+                let unit = &m.world.game.units[&next_id];
+                assert_eq!(m.rules.kinds[unit.kind].name, "mg");
+                assert!(unit.path.is_empty() && unit.world_goal.is_none());
+                assert!(
+                    m.commands.units.contains_key(&next_id)
+                        && m.recruit_metadata.contains_key(&next_id)
+                );
+                assert!(m.combat.get(next_id).is_some() && m.firing.get(next_id).is_some());
+                assert!(m.abilities.get(next_id).is_some() && m.recovery.get(next_id).is_some());
+                assert!(
+                    m.grid
+                        .unordered(&m.world.game.units, (unit.x, unit.z), 1.0, |_, _| true)
+                        .contains(&next_id)
+                );
+            }
+            while m.world.game.tick < 3640 {
+                assert_eq!(
+                    m.tick_opening_commander(&mut seat).unwrap(),
+                    OpeningTick::Waiting
+                );
+                advance(&mut m);
+            }
+            assert!(matches!(
+                m.tick_opening_commander(&mut seat).unwrap(),
+                OpeningTick::Queued(_)
+            ));
+            let delivered = seat.delivered().unwrap().input();
+            assert_eq!(delivered.manpower, if blocked { 150.0 } else { 0.0 });
+            assert_eq!(
+                delivered
+                    .units
+                    .iter()
+                    .filter(|u| u.owner == 0 && u.kind == "mg")
+                    .count(),
+                usize::from(!blocked)
+            );
+            if !blocked {
+                let queued = m.commands.queue.snapshot();
+                assert_eq!(queued.pending.len(), 1);
+                assert!(
+                    matches!(&queued.pending[0].value,Command::Move{orders,..} if orders.len()==1 && orders[0].unit==i64::from(next_id))
+                );
+            }
+            let results = advance(&mut m);
+            if blocked {
+                assert_eq!(results.len(), 2);
+                assert!(
+                    results
+                        .iter()
+                        .all(|r| r.denial == Some(crate::match_commands::Denial::Blocked))
+                );
+                assert_eq!(m.next_unit_id, next_id);
+                assert_eq!(m.start.economy.players[0].mp, 150.0);
+            } else {
+                assert_eq!(results.len(), 1);
+                assert!(results[0].denial.is_none());
+                assert!(m.world.game.units[&next_id].world_goal.is_some());
+                assert!(!m.world.game.units[&next_id].path.is_empty());
+                assert_eq!(m.start.economy.players[0].mp, 0.0);
+            }
         }
     }
     #[test]
@@ -870,6 +1032,7 @@ impl Match {
                 busy: player.jobs().iter().map(|j| j.kind).collect(),
                 stock_base: own_structures.len() == 2 && ready("hq") == 1 && ready("barracks") == 1,
                 armory_ready: ready("armory") != 0,
+                standard_army: self.options.army == crate::economy_state::ArmySize::Standard,
             })
         } else {
             None
