@@ -1670,3 +1670,9 @@ This adapter still refuses Aviation payloads, persistent flights/salvos/grenades
 ## Server component frontier integration (2026-10-13)
 
 PR #137 consolidates the recipient delta, list history, socket backpressure and host timing providers from #115, #124 and #128 onto main `13a8d1f`, which includes the approved ABI 2 and reviewed core frontier. The normal merge changes no server Rust source, recorder or fixture bytes. Only additive changelog entries conflicted; both histories are retained. The six approved recipient-view calls and generated header remain identical to main. The earlier 23 server debug and 173 workspace release tests are branch-local evidence; fresh combined-head Linux, Windows and macOS checks are pending. Room-loop callbacks, complete simulation, public match admission, wire and privacy decisions remain outside this component frontier.
+
+## Rust CI duration limit (2026-10-13)
+
+The combined snapshot frontier at 6a5d4d6 ran the full debug workspace suite on GitHub-hosted Ubuntu 24.04, Windows 2025 and macOS 15. Run 38443050411 reached the World-memory tests while earlier tests were still passing, then all three jobs were cancelled by the workflow's 20-minute limit. The preserved logs contain no assertion failure. A timeout is not evidence that the remaining tests pass.
+
+The job limit is now 40 minutes so the expanded suite can finish. The platform matrix, pinned toolchain, commands, failure policy and release C-link gate are unchanged. New heads still need fresh checks. GitHub's job timeout setting cancels work at its limit; it does not impose a minimum run duration (https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idtimeout-minutes).

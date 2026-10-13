@@ -309,6 +309,8 @@
 
 - Stacked the checked Conquest command actuator on the reviewed recruitment and recipient-routing checkpoint, retaining its complete command behavior and canonical shared control state. Combined integration checks belong to the shared CI lane.
 
+- Allow 40 minutes for the full three-platform Rust CI job. The combined snapshot frontier reached World-memory tests with no assertion failures before its previous 20-minute limit cancelled all three jobs. Formatting, strict Clippy, the complete debug suite, release FFI build and Linux C replay remain required.
+
 - Refreshed the consolidated Rust frontier in PR #119 onto merged ABI 2 main `d88ef6d`. Preserved all core behavior, both changelog histories, the six approved recipient-view calls and the exact header. Only additive changelog entries conflicted; combined-tree platform checks are rerun on the refreshed head.
 
 - Added canonical Match ground reactions, automatic retreat and idle spacing using shared command destinations, owner-known routes, firing targets and combat hit history. Three focused tests pass in debug and release, comparing 51 unchanged-source reaction/retreat cases and checking atomic rejection. Only the missing reaction timer is added to UnitControl. Air, carrier and garrison retreat exits remain explicit unsupported paths. Complete tick hookup remains separate. Adapted routing to canonical ordered-fire iteration and filled absent reserve defaults in the merged command fixture. At checkpoint ab0394d, strict Clippy stopped on two unused helpers in its inherited firing milestone. Final merged checks are pending.
