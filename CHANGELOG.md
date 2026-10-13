@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Connected admitted Conquest rally purchases to the canonical prepared birth observer. Receipt and Fog publication now follow wallet/unit/story preflight, while rejected previews discard derived path scratch. A late-story regression checks observation and four-metadata atomicity; native and birth-oracle proof remain pending.
+
 - Joined the source-written prepared-observer dependency to recorded recruitment while retaining canonical combat, firing, ability and recovery ownership. This consumer checkpoint awaits source and native proof.
 
 - Added borrowed staged sight sources and a recipient component preview that defers terrain acknowledgements until infallible publication. Existing fog and routing keys stay lazy; the matching World preview defers journal trimming. Original-source and native observer verification remain pending. No authoritative unit is inserted during preparation.
