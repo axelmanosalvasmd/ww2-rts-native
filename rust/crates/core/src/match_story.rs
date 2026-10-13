@@ -321,18 +321,33 @@ impl Match {
     /// the server. Other mode names/reasons do not authorize their incomplete runtime.
     pub fn match_result(&self) -> Result<Option<MatchResult>, String> {
         self.validate_match_finish_state()?;
-        let Some(finish) = self.finish else { return Ok(None); };
+        let Some(finish) = self.finish else {
+            return Ok(None);
+        };
         Ok(Some(MatchResult {
             winner: finish.winner,
             teams: self.start.economy.players.iter().map(|p| p.team).collect(),
-            names: self.start.players.iter().map(|p| p.config.name.clone()).collect(),
+            names: self
+                .start
+                .players
+                .iter()
+                .map(|p| p.config.name.clone())
+                .collect(),
             reason: finish.reason,
             at: finish.end_at,
             end_tick: finish.end_tick,
             story: self.story.iter().map(|row| row.rounded()).collect(),
             timeline: self.timeline.clone(),
-            win_vp: if self.world.game.mode.is_none() { Some(self.start.win_vp) } else { None },
-            mode: if self.world.game.mode.is_none() { "conquest" } else { "assault" },
+            win_vp: if self.world.game.mode.is_none() {
+                Some(self.start.win_vp)
+            } else {
+                None
+            },
+            mode: if self.world.game.mode.is_none() {
+                "conquest"
+            } else {
+                "assault"
+            },
         }))
     }
 }

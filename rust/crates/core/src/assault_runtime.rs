@@ -98,24 +98,51 @@ impl Match {
     /// Source late Assault phase only. Caller supplies finite elapsed simulation time after
     /// income/convoys. Negative time preserves the source arithmetic; normal ticks use TICK.
     /// No clock advance or death cleanup is performed, and generic tick dispatch stays closed.
-    pub fn apply_assault_victory(&mut self, dt: f64) -> Result<Option<crate::match_end::MatchFinish>, String> {
+    pub fn apply_assault_victory(
+        &mut self,
+        dt: f64,
+    ) -> Result<Option<crate::match_end::MatchFinish>, String> {
         if self.options.mode != Mode::Assault || self.world.game.mode != Some(ModeKind::Assault) {
             return Err("Assault victory requires explicit Assault mode".into());
         }
-        if self.finish.is_some() { return Ok(None); }
+        if self.finish.is_some() {
+            return Ok(None);
+        }
         self.validate_match_finish_state()?;
         self.validate_assault_sample_units()?;
         let state = self.assault.ok_or("missing Assault state")?;
         let time_left = state.time_left - dt;
-        if !dt.is_finite() || !time_left.is_finite() { return Err("invalid Assault elapsed time".into()); }
-        let live_bunker = self.world.game.units.values().any(|u| self.rules.kinds[u.kind].name == "bunker" && u.hp > 0.0);
+        if !dt.is_finite() || !time_left.is_finite() {
+            return Err("invalid Assault elapsed time".into());
+        }
+        let live_bunker = self
+            .world
+            .game
+            .units
+            .values()
+            .any(|u| self.rules.kinds[u.kind].name == "bunker" && u.hp > 0.0);
         let decision = if !live_bunker {
-            Some((state.attacker_team, crate::match_end::EndReason::Structures, self.fallen.bunker))
+            Some((
+                state.attacker_team,
+                crate::match_end::EndReason::Structures,
+                self.fallen.bunker,
+            ))
         } else if time_left <= 0.0 {
-            Some((state.defender_team, crate::match_end::EndReason::Timer, None))
-        } else { None };
-        let prepared = decision.map(|(winner, reason, at)| self.prepare_match_finish(winner, reason, at)).transpose()?;
-        self.assault.as_mut().expect("validated Assault state").time_left = time_left;
+            Some((
+                state.defender_team,
+                crate::match_end::EndReason::Timer,
+                None,
+            ))
+        } else {
+            None
+        };
+        let prepared = decision
+            .map(|(winner, reason, at)| self.prepare_match_finish(winner, reason, at))
+            .transpose()?;
+        self.assault
+            .as_mut()
+            .expect("validated Assault state")
+            .time_left = time_left;
         Ok(prepared.map(|finish| self.publish_match_finish(finish)))
     }
 
