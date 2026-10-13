@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Require active Unit drift before interpreting its rally subtype, and clear that subtype when an actual cover, spacing or back-off reaction installs a replacement route. Fix the mixed-input projection to respect drift presence. A pinned original-source history records a real Buy, 129 movement calls, rally completion and a cover route that remains intact when the squad can answer fire. The native differential test is authored; execution remains pending.
+
 - Preserve the actual findPath endpoint when a spacing or cover reaction publishes its accepted route. The existing canonical control is admitted before routing; endpoint publication occurs with the final Unit/control commit, with no inferred outcome or second route store. A real World spacing reaction now checks cold-to-warm memory, the authored cover endpoint and unchanged random state, bringing the continuation to eight source-written tests. Native execution remains pending.
 
 - Normally compose the source-reviewed World ground actor/lifecycle and routing providers into the separate sole-caller continuation. Preserve emitted prefixes, canonical local visibility, real recovery, lazy World terrain reads, full-memory retry versions and region march/home rules. Shared commands and reactions merge without source conflicts. Whole World admission remains closed until reached inactive-phase policies and complete caller review are finished; combined native verification remains pending.

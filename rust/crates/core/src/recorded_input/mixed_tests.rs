@@ -233,7 +233,7 @@ fn compare(m: &Match, expected: &Value) {
         assert_eq!(c.hold_fire, row["holdFire"].as_bool().unwrap());
         assert_eq!(u.hold_pos, row["holdPos"].as_bool().unwrap());
         assert_eq!(a.ap, row["ap"].as_bool().unwrap());
-        let drift = if c.rally_drift {
+        let drift = if u.drift && c.rally_drift {
             json!("rally")
         } else {
             json!(u.drift)

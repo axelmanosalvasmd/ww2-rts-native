@@ -198,6 +198,95 @@ fn source_reactions_retreat_and_spacing_match_canonical_state() {
         assert_eq!(json!(claims), c["claims"], "{} claims", c["name"]);
     }
 }
+
+#[test]
+fn completed_recruit_rally_does_not_relabel_a_later_cover_route() {
+    let f: Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/rally-drift.json")).unwrap();
+    let input = f["initial"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| {
+            let mut row = json!({"hitAt":-1e9,"hitBy":0,"hitFrom":null,"path":[],
+                "worldGoal":null,"amove":null,"reverse":null,"react":0,"drift":false,
+                "target":0,"attack":0,"retreating":false,"orders":[],"garrison":-1,
+                "holdFire":false,"holdPos":false,"autoRetreat":true,"nade":null,
+                "enter":-1,"fireAt":-1,"board":0,"riding":false,"build":false,
+                "dig":false,"entrench":false});
+            for (key, value) in v.as_object().unwrap() {
+                row[key] = value.clone();
+            }
+            row
+        })
+        .collect::<Vec<_>>();
+    let mut m = make(
+        &f,
+        &json!({"input":input,"spawns":f["spawns"],"visible":[f["shooter"]]}),
+    );
+    m.abilities = Default::default();
+    m.recovery = Default::default();
+    m.logistics = Default::default();
+    m.recruit_metadata.clear();
+    m.next_unit_id = f["id"].as_u64().unwrap() as u32;
+    m.start.economy.players[0].mp = 1000.0;
+    m.world.game.reveal = true;
+    let id = m.next_unit_id;
+    m.building_rallies.insert(
+        f["maker"].as_u64().unwrap() as u32,
+        Some(point(&f["rally"])),
+    );
+    let command = Command::Buy {
+        kind: "rifle".into(),
+        from: Some(f["maker"].as_u64().unwrap() as u32),
+    };
+    assert!(m.execute_command(0, &command, false).unwrap().is_none());
+    let project = |m: &Match| {
+        let u = &m.world.game.units[&id];
+        let c = &m.commands.units[&id];
+        // The shared core uses a boolean presence and a rally subtype. Other
+        // reaction subtypes are not represented by the current Unit model.
+        json!({"at":packed(Some(u.at())),"path":u.path.iter().map(|p|packed(Some(*p))).collect::<Vec<_>>(),
+            "goal":packed(u.world_goal),"amove":packed(u.amove),
+            "drift":if u.drift && c.rally_drift {json!("rally")} else {json!(u.drift)},
+            "target":m.firing.get(id).unwrap().target_id})
+    };
+    let compare = |m: &Match, stage: usize| {
+        let mut expected = f["stages"][stage]["expected"].clone();
+        if expected["drift"] == "cover" {
+            expected["drift"] = json!(true);
+        }
+        assert_eq!(project(m), expected, "{}", f["stages"][stage]["name"]);
+    };
+    compare(&m, 0);
+    for _ in 0..f["movements"].as_u64().unwrap() {
+        m.world.game.tick += 1;
+        m.begin_path_tick(4096, 4).unwrap();
+        m.move_unit_with_command_routes(id, 1.0).unwrap();
+    }
+    assert_eq!(m.world.game.tick, f["finalTick"].as_i64().unwrap());
+    assert!(m.world.game.units[&id].path.is_empty());
+    m.prepare_unit_commands(id, false).unwrap();
+    compare(&m, 1);
+    let shooter = f["shooter"].as_u64().unwrap() as u32;
+    let threat = point(&f["threat"]);
+    let enemy = m.world.game.units.get_mut(&shooter).unwrap();
+    enemy.x = threat.x;
+    enemy.z = threat.z;
+    m.grid.update(shooter, enemy);
+    m.world.game.units.get_mut(&id).unwrap().hit_from = Some(threat);
+    let hit = m.combat.get_mut(id).unwrap();
+    hit.hit_at = m.world.game.tick as f64;
+    hit.hit_by = Some(shooter);
+    m.commands.units.get_mut(&id).unwrap().hold_fire = true;
+    m.react_unit(id).unwrap();
+    compare(&m, 2);
+    assert!(!m.commands.units[&id].rally_drift);
+    m.commands.units.get_mut(&id).unwrap().hold_fire = false;
+    assert!(m.can_shoot_target(id, shooter).unwrap());
+    m.react_unit(id).unwrap();
+    compare(&m, 3);
+}
 #[test]
 fn reaction_timer_and_unsupported_exit_preserve_canonical_state() {
     let f = fixture();
