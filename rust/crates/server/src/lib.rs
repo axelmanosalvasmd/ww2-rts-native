@@ -1,5 +1,6 @@
 //! Standalone lobby transport. There is no game simulation or core dependency in this slice.
 mod lobby;
+mod maps;
 
 use axum::{
     Json, Router,
@@ -8,7 +9,7 @@ use axum::{
         ws::{CloseFrame, Message, WebSocket},
     },
     http::header,
-    routing::get,
+    routing::{any, get},
 };
 use lobby::{Connection, Hub, Output};
 use serde_json::{Value, json};
@@ -87,8 +88,9 @@ pub async fn serve(
             get(|| async { Json(json!({"status":"ok","service":"ww2-server","scope":"lobby"})) }),
         )
         .route("/api/rooms", get(directory))
-        .route("/maps", get(maps))
+        .route("/maps", any(maps::serve))
         .route("/ws", get(upgrade))
+        .fallback(maps::serve)
         .with_state((server, stop.subscribe()));
     let result = axum::serve(listener, app)
         .with_graceful_shutdown(async move {
@@ -108,9 +110,6 @@ async fn directory(
         [(header::CACHE_CONTROL, "no-store")],
         Json(server.hub.lock().await.directory()),
     )
-}
-async fn maps(State((server, _)): State<App>) -> Json<Value> {
-    Json(server.hub.lock().await.maps())
 }
 async fn upgrade(
     ws: WebSocketUpgrade,
