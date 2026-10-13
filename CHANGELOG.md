@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added detached ordinary human input helpers for duplicate-order filtering, first matching formation groups, camera and selection changes, keys and clicks. The unchanged Source oracle covers 31 cases and 79 emitted input rows, including raw command extensions, duplicate and missing IDs, minimap moves and exact screen boundaries. Native tests are written but not run; alert scheduling, timed input execution, policy and Match hookup remain pending.
+
 - Fixed the human timing stream's long-run accumulator: the Source keeps a floating-point Number rather than wrapping its seed to 32 bits after every draw. Three original fractions around draw 4,917,759 protect the first precision-boundary divergence. The focused native regression is written but not run.
 
 - Added the ordinary human commander's private timing provider: slot-seeded timing, difficulty medians and caps, lognormal opening/reaction/input/scan delays, and view-demand checks. The unchanged Source recorder covers 48 profiles, 336 sequential samples, eight public openings and two reset/level-change records. Native tests are written but not run; camera, alerts, input queues, policy and runner integration remain separate.
