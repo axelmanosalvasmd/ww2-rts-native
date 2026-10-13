@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Normally merge the verified host timing, snapshot delta, list-version and socket-accounting providers into the engineering delivery branch. Preserve each provider's original fixtures and existing code; the new room integration and combined native proof are pending.
+
+- Added host tick catch-up with the source's four-tick cap and backlog drop, plus snapshot cadence from rolling timing percentiles. Snapshot phases are recorded only on scheduled snapshot ticks; sustained spare capacity recovers the interval. Timing inputs and counter capacity are checked before mutation. The original-source recorder covers 8 meter traces with 747 samples and 7 clock traces with 34 polls. The combined server checkpoint passes 23 debug tests, 173 release workspace tests, strict Clippy, formatting and release FFI at 315f46a. Actual room-loop wiring remains pending; AI keeps its recorded schedule.
+
+- Integrated the server delta, list and socket backpressure checkpoints with the reviewed core ancestry. All original server tests and source fixtures are retained; final native checks remain pending.
+
+- Added socket-local snapshot backpressure with the source's 256 × 1024 UTF-16-unit limit, one owed catch-up frame and stale-socket callback isolation. Write tickets reject duplicate completion and capacity errors before changing counters. Watcher sockets above 4 MiB receive the original 1013 close decision. The original-source recorder matches 13 traces, 54 callback steps and 12 watcher cases through both mode branches. Native checks and room transport wiring remain pending.
+
+- Added ordinary-room shared wreck/node list versions and World recipient-local list history, composed with the unit delta ledger. Full resync and reconnect reset include lists; invalid frames retain delivery state. List equality compares JSON content without depending on object key order or integer/float spelling, and checked version updates cannot partially overflow. The original-source recorder matches 7 traces and 75 steps, including removal of stale delta flags. Native checks and room snapshot wiring remain pending.
+
+- Added recipient-local unit delta ledgers for changed rows, ordered removals, held fingerprints, full resync and start/reconnect resets. The original source oracle matches 68 traces and 409 frames, including actual recipient snapshots from all 33 authored maps. The ledger accepts already filtered rows and rejects malformed or duplicate rows before changing state. Independent source review is clear; native checks, snapshot production and room simulation remain pending.
+
+- Embedded all 33 original authored maps (1,349,980 JSON bytes) in a separate private server catalogue and added native match construction without Node, filesystem map reads or a reference checkout. Cached validated maps remain immutable; each match gets independent mutable world state. Original mines, materials and triggers are retained. Public map routes still use their filtered assets and refuse editor credential access to private data. Room simulation and generated World startup remain unfinished.
+
 - Correct the scuttling atomicity regression to use the recorded startup scene with two live owned units. The first engineering native check passed the orphan-membership guard, then found that the original selected scene contained only one owned unit before the actuator ran. Runtime and Source fixtures are unchanged; fresh combined gates remain pending.
 
 - Converge the engineering replay with the three reviewed timeline test adapters. Preserve both parents' runtime, recorded Source fixtures and strict comparisons; fresh verification of this combined head is pending.
