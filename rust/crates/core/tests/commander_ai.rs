@@ -130,7 +130,8 @@ fn aim(value: &Value) -> Option<Aim> {
 fn aim_bits(value: Option<Aim>) -> Option<(usize, u64)> {
     value.map(|a| (a.i, a.until.to_bits()))
 }
-fn command_bits(commands: &[Command]) -> Vec<(bool, Vec<(i64, u64, u64)>)> {
+type CommandBits = (bool, Vec<(i64, u64, u64)>);
+fn command_bits(commands: &[Command]) -> Vec<CommandBits> {
     commands
         .iter()
         .filter(|c| !matches!(c, Command::Cover { .. }))

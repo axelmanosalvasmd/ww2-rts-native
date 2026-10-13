@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Name the AI test comparator tuple type required by strict all-target Clippy, preserving the exact waypoint and command comparison.
+
 - Remove two unnecessary staged Buy adapter borrows found by strict Clippy after all 227 combined workspace release tests passed. Final exact-head checks are pending.
 
 - Fix the staged Buy rollback witness to send actual source Move order rows through the canonical parser, so it warms and compares real command routes.
