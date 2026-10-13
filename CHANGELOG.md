@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Draft an expressly unagreed opt-in socket transport for the accepted startup tables: exact hello/envelope schemas, bounded UTF-8 bytes, authoritative host hash checks, linked-core compatibility, startup/refusal/reconnect rules and a complete sanitized example. No active server, ABI/header, asset or consumer behavior changes.
+
 - Record both owners' acceptance of the startup-table v1 content/schema candidate and its strict revision/refusal policy. Delivery remains unagreed, and the six ABI 2 calls, runtime producer and Unreal adoption are unchanged. No content, schema or inventory bytes changed.
 
 - Add an unagreed startup-table content/schema proposal for consumer review: all 47 compiled tables plus 17 source-derived public constants, a portable generator, exact field inventory and independent table/formation hashes. Table transport, additional FFI calls and Unreal adoption remain pending explicit agreement.

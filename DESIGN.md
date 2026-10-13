@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## Startup-table transport proposal (2026-10-13, unagreed)
+
+[The isolated transport draft](docs/contracts/startup-tables/transport/README.md) proposes an opt-in `hello.tablesVersion` and one server `tables` envelope carrying the exact core-produced JSON string with out-of-band version and SHA256. A local FFI buffer alone cannot verify the authoritative host's full table identity on reconnect. The socket proposal supplies both data and identity without an ABI change, new route or packaged table asset. It remains unapproved and has no active implementation.
+
+The proposed receiver verifies release expectations and exact inner UTF-8 bytes, including the final LF, before parsing or processing lobby/start/s. It preserves one immutable cache and refuses unknown versions, mismatched hashes, schema/tag errors, missing handshakes and changed reconnect content. Canonical Rust view and formation behavior stay linked through ABI 2 guards, formation hash checks and exact release artifact pairing; this does not enable future Catalog-dependent query interfaces. The draft specifies bounds, ownership, ordered delivery, error logs and Linux-first then three-platform consumer proof. Both owners must approve the concrete wire additions before implementation.
+
 ## Startup-table content review agreement (2026-10-13)
 
 Axel's [explicit review](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6156314777) accepts PR #195's v1 content/schema candidate, strict missing/null/tag handling and separate formation/content identities. Julio agrees with those limits and the policy that every schema-file change increments the version. Inert authoring metadata and packed-field conformance constants enable no editor or second Unreal decoder. Transport remains unagreed; runtime production and actual published Unreal cache consumption remain separate outcomes. The accepted content, schema and inventory bytes are unchanged by this acknowledgment.
