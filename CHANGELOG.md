@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified the World metadata warm-cache correction at `b536f46`: all 11 affected debug tests and 233 locked release workspace tests pass, with strict Clippy, formatting and release FFI. No repairs were needed. Source comparison covers 12 scenes, 182 actions, 37 captures and 14 routes; copied review and fresh platform checks remain separate.
+
 - Fixed World metadata publication losing prewarmed path-cache terrain identities when its accepted component copy moves team buffers. Rebind every existing team through the canonical path/vehicle helper only after all fallible checks. Added one original-source owner/peer route-history trace, bringing the oracle to 12 scenes, 182 actions, 37 captures and 14 exact route queries, plus a late-refusal buffer/memory/history witness. Native checks are pending.
 
 - Refreshed the bounded World commander metadata stack in PR #182 onto main `13a8d1f`, preserving its checked core/test bytes and the approved ABI 2 header. Resolved only additive changelog history. Commander knowledge filters retain their source scope; fresh combined-head platform checks and warm-route cache identity integration remain separate evidence.
