@@ -520,7 +520,10 @@ fn conquest_abilities_match_original_source_phases() {
                 Some(crate::match_commands::Denial::Blocked),
                 "invalid typed aim retains coordinate refusal precedence",
             );
-            assert_eq!(snapshot(&m, &order, &[]), before);
+            // Source mine releases follow before refusing a non-finite aimed command.
+            let mut invalid_expected = before.clone();
+            invalid_expected["units"][0]["control"]["follow"] = json!(0);
+            assert_eq!(snapshot(&m, &order, &[]), invalid_expected);
             unsupported_work += 1;
             continue;
         }

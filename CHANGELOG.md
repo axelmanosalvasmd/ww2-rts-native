@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Corrected the typed invalid-aim regression to expect the source follow reset before Blocked, while preserving paid work and the other captured state. The engineering native run exposed the stale complete-snapshot expectation; runtime behavior is unchanged.
+
 - Corrected recorded Buy denial matching to use RecruitError’s actual public re-export. The combined engineering compile exposed the stale module path; handler behavior is unchanged and native proof is running in its isolated leased tree.
 
 - Corrected inherited ability and recovery fixture constructors to use the checked command owner’s explicit 4,096-order capacity and tick-one queue initialization. Their former Default calls did not exist on this combined ancestry. Native verification remains pending.
