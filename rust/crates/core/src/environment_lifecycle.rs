@@ -119,6 +119,7 @@ impl EnvironmentRuntime {
         });
         let skip = BTreeSet::new();
         let hit = DamageContext {
+            actor_order: None,
             owner,
             contact_id: None,
             direction: Some(Point {

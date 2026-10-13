@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added explicit captured actor membership for blast damage and source-list terrain casualties while keeping full canonical environment validation and ordinary projectile defaults. Bridge casualties and legacy rubble/blocked-cell checks use captured actors; garrison eviction still uses current units. Independent source review passes; native checks are queued.
+
 - Verified the complete command/firing ancestry after recruitment metadata integration: 155 workspace tests, five focused debug/release tests, strict Clippy, formatting and release FFI build pass. The diff against the reviewed command branch contains only weapon-phase code, publication defaults, fixtures and documentation.
 
 - Initialized canonical weapon targets and timers when Match recruitment publishes a unit, and rejects a stale firing row before payment. The existing recruitment source replay checks default rows immediately after each admitted buy; invalid staging snapshots include firing state.
