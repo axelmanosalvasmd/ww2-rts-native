@@ -276,7 +276,7 @@ def build(repo, reference):
     outputs = {"proposed-content.json": json_bytes(content), "proposed-content.schema.json": json_bytes(schema),
                "comparison-inventory.json": json_bytes(inventory)}
     manifest = {
-        "status": "unagreed proposal, no transport implemented", "baselineNative": BASELINE,
+        "status": "content/schema v1 candidate agreed; transport unagreed, no transport implemented", "baselineNative": BASELINE,
         "reference": REFERENCE, "proposedSchemaVersion": 1, "schemaFile": "proposed-content.schema.json",
         "schemaSha256": digest(outputs["proposed-content.schema.json"]), "contentFile": "proposed-content.json",
         "contentSha256": digest(outputs["proposed-content.json"]),
@@ -290,9 +290,9 @@ def build(repo, reference):
                            "allPayloadPaths": len(paths)},
         "notIncluded": ["seed", "match identity", "recipients", "private state", "live actors", "authoring map instances",
                         "operative movement/weapon tables"],
-        "agreementNeeded": ["payload field names and schema revision policy", "public static scope and deferred/editor metadata handling",
-                            "single Rust producer and transport/ownership choice", "exact received-byte hash and number-tag decoding",
-                            "Unreal consumer parser and same-source comparison evidence"],
+        "agreementNeeded": ["verified single Rust producer", "transport mechanism and ownership/lifetime transition",
+                            "producer exact field/value and platform byte/hash evidence",
+                            "published Unreal parser/cache and actual RTS/HUD consumption evidence"],
     }
     outputs["manifest.json"] = json_bytes(manifest)
     return outputs

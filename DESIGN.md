@@ -1,5 +1,9 @@
 # Three Crossroads Native: design decisions
 
+## Startup-table content review agreement (2026-10-13)
+
+Axel's [explicit review](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6156314777) accepts PR #195's v1 content/schema candidate, strict missing/null/tag handling and separate formation/content identities. Julio agrees with those limits and the policy that every schema-file change increments the version. Inert authoring metadata and packed-field conformance constants enable no editor or second Unreal decoder. Transport remains unagreed; runtime production and actual published Unreal cache consumption remain separate outcomes. The accepted content, schema and inventory bytes are unchanged by this acknowledgment.
+
 ## Public startup-table schema proposal (2026-10-13, unagreed)
 
 [The proposal](docs/contracts/startup-tables/README.md) records deterministic public static content separately from match startup and transport. It retains all 47 embedded catalog tables and adds 17 source-derived constants needed for RTS presentation, snapshot-column names and map/editor metadata. It excludes seeds, recipients, private match state, live actors, authored map instances and deferred operative tables. Static definitions do not enable unsupported runtime capabilities.
