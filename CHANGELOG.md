@@ -34,6 +34,8 @@
 - Preserved canonical story, environment, tick, recipient, combat and firing state when joining World startup to the checked Match ancestry. World births initialize fresh combat and firing rows through the shared publication callback; native union checks remain pending.
 
 - Joined the World region startup context to the production integration ancestry while preserving canonical combat, firing and environment ownership. Native checks for this source union remain pending.
+- Fixed recorded buys advancing recipient memory before source purchase refusal. Purchase, actual producer placement and publication preflight now precede routing, which runs only for the staged unit's emitted rally. The recorder observes actual source reads and preserves all 33 prior buy outcomes. A source garrison-exit regression distinguishes the correct remembered `O` cell from the `.` frozen by a premature read. Staged birth sight contribution still needs its routing adapter; native verification is pending.
+
 - Fixed refused recorded buys with rallies sorting maintained gameplay grid buckets during recipient refresh. Visibility and remembered-wreck queries now use a separate current-position observation index, following the checked FPS correction. A focused denial regression preserves both ordinary and heavy moved-bucket order. Removed the stale claim that recruitment spending still needed integration; native checks remain pending.
 
 - Exposed the canonical owner-bound recorded-buy actuator through the Rust API so it can be verified before input-dispatch integration. Its gate, routing and transaction behavior is unchanged; the C ABI and wire interfaces are unchanged.

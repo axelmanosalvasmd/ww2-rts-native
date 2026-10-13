@@ -299,4 +299,93 @@ fn denied_rally_buy_preserves_moved_gameplay_bucket_order() {
     ));
     assert_eq!(unchanged(&m), state);
     assert_eq!(probe(&m), before);
+    // A subsequent legitimate routing read also preserves maintained bucket order.
+    m.refresh_recipient_routing(0).unwrap();
+    assert_eq!(probe(&m), before);
+}
+
+#[test]
+fn refused_buy_does_not_freeze_same_tick_garrison_move_memory() {
+    let fixture: Value = serde_json::from_str(include_str!(
+        "../../simtest/tests/fixtures/match-recruitment.json"
+    ))
+    .unwrap();
+    let r = &fixture["deniedRoutingRegression"];
+    let mut m = make(&r["map"]);
+    let slot = r["slot"].as_u64().unwrap() as usize;
+    let scout = r["scout"].as_u64().unwrap() as u32;
+    m.world.game.units.retain(|id, _| *id == scout);
+    let unit = m.world.game.units.get_mut(&scout).unwrap();
+    let at = point(&r["actorSetup"]["at"]);
+    unit.x = at.x;
+    unit.z = at.z;
+    unit.garrison = Some(r["actorSetup"]["garrison"].as_u64().unwrap() as usize);
+    unit.hold_pos = r["actorSetup"]["holdPos"].as_bool().unwrap();
+    m.grid = crate::grid::SpatialGrid::new(&m.world.game.units, 16.0);
+    m.world.game.tick = r["tick"].as_i64().unwrap();
+    m.start.economy.players[slot].mp = r["money"].as_f64().unwrap();
+    m.player_rallies[slot] = Some(point(&r["rally"]));
+    let cell = r["terrainEdit"]["cell"].as_u64().unwrap() as usize;
+    m.world
+        .set_cell(
+            cell,
+            r["terrainEdit"]["character"].as_str().unwrap().as_bytes()[0],
+        )
+        .unwrap();
+    let before = (
+        m.recipients[slot].remembered().to_vec(),
+        m.recipients[slot].query().navigation().versions,
+        m.world
+            .pending(crate::world::Recipient::Player(slot))
+            .map(|v| v.to_vec()),
+    );
+    let state = unchanged(&m);
+    let result = m.recorded_buy(slot, r["denied"]["command"]["unit"].as_str().unwrap(), None);
+    assert_eq!(reason(result.unwrap_err()), r["denied"]["result"]);
+    assert_eq!(unchanged(&m), state);
+    assert_eq!(
+        (
+            m.recipients[slot].remembered().to_vec(),
+            m.recipients[slot].query().navigation().versions,
+            m.world
+                .pending(crate::world::Recipient::Player(slot))
+                .map(|v| v.to_vec())
+        ),
+        before
+    );
+    let command = crate::match_commands::Command::from_json(&r["move"]["command"]).unwrap();
+    assert_eq!(m.execute_command(slot, &command, false).unwrap(), None);
+    let unit = &m.world.game.units[&scout];
+    assert_eq!(unit.at(), point(&r["move"]["at"]));
+    assert_eq!(unit.garrison, None);
+    let remembered = m.recipients[slot]
+        .remembered()
+        .iter()
+        .find(|row| row.row.cell == cell)
+        .unwrap();
+    assert_eq!(
+        char::from(remembered.row.ch).to_string(),
+        r["move"]["rememberedCell"].as_str().unwrap()
+    );
+    assert_eq!(
+        json!(
+            unit.path
+                .iter()
+                .map(|p| position(Some(*p)))
+                .collect::<Vec<_>>()
+        ),
+        r["move"]["path"]
+    );
+    assert_eq!(position(unit.world_goal), r["move"]["goal"]);
+    assert_eq!(
+        position(m.commands.units[&scout].route_end),
+        r["move"]["routeEnd"]
+    );
+    assert_eq!(
+        m.recipients[slot].remembered().len(),
+        r["move"]["after"]["rows"].as_array().unwrap().len()
+    );
+    assert_eq!(r["denied"]["routeReads"], 0);
+    assert_eq!(r["move"]["routeReads"], 1);
+    assert_eq!(r["prematureRead"]["rememberedCell"], ".");
 }
