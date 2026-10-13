@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Replaced the unsigned fire/flood cadence expression with the standard multiple-of check required by strict Clippy, preserving its every-tenth-tick timing. Removed repeated routing and command design sections introduced by the staged ancestry merge.
+
 - Attached ordered ordinary Conquest retirement to the staged tick through the reviewed combat adapter, followed by canonical death story and removed-route retention before capture/income. Eight actual-source traces now cover 1,825 ticks and 79 checkpoints, including a rifle casualty at tick 483, exact bounty and continued simulation. Combined native validation is pending; recovery, convoy and operative lifecycle integration remain explicit.
 
 - Connected reviewed Conquest weapon timers, per-unit target/launch actions and post-separation flight/salvo steps to the staged tick. Prior poses include boundary command effects before clock advancement. Seven actual-source traces now record 1,025 ticks and 64 checkpoints, including opposing squads receiving suppression and damage with the recorded Combat random stream. Combined native validation is pending; abilities, air/rail, riders and ground terrain effects remain explicit gaps alongside the other unavailable phases.

@@ -416,7 +416,7 @@ impl crate::match_runtime::Match {
                     .step_wrecks(&mut self.world, self.rules.movement.tick, &mut context)
                     .map_err(|e| format!("wreck debris: {e}"))?;
             }
-            EnvironmentPhase::FireFlood if tick % 10 == 0 => {
+            EnvironmentPhase::FireFlood if tick.is_multiple_of(10) => {
                 if !self.world.fires.is_empty() {
                     effects.extend(
                         self.environment
