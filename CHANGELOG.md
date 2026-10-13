@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add an internal single-commander World metadata read over canonical team memory: known geography, regions/home, population/recovery, stations and observed wreck/mine/node lists. All projections stage before journal/memory publication, without draining terrain cursors. Five original-source scenes record 147 actions and 28 captures; native proof is pending. Complete World envelopes, spectators and transport remain separate.
+
 - Prepare a separate World recipient metadata branch by joining checked World administrative state with the reviewed canonical recipient-list providers. No new metadata producer or combined native acceptance is claimed yet.
 
 - Verified bounded World administrative elimination on final code `d52a285`: all 208 locked release workspace tests, strict Clippy, formatting and release FFI pass. Earlier runtime-identical code passed 46 affected debug tests. Six original transitions remain unchanged, including the controlled dead fighter, actual collateral and debris overflow. World tick, fort seizure, logistics, riders/cargo and shared work remain outside this phase.

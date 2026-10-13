@@ -81,6 +81,7 @@ pub mod match_world_regions;
 
 pub mod match_world_memory;
 pub mod world_memory;
+pub mod world_recipient_metadata;
 
 pub mod staged_observer;
 
