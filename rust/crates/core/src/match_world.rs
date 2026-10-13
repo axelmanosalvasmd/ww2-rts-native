@@ -199,6 +199,9 @@ impl Match {
         options: MatchOptions,
         random: MatchRandom,
     ) -> Result<Self, String> {
+        if options.logistics {
+            return Err("World startup does not yet initialize logistics".into());
+        }
         if options.mode != Mode::World || map.geography().is_none() {
             return Err("World startup requires explicit World geography and mode".into());
         }
