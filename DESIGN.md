@@ -1,5 +1,13 @@
 # Three Crossroads Native: design decisions
 
+## Maintained gameplay terrain evidence (source checkpoint)
+
+The terrain fixture lane normally includes current main 4867984, whose runtime source is identical to verified d1f2fb5. Original JavaScript captures cover all 33 authored maps at e4e579a, including all 661,799 cell centres and 1,000 deterministic points per map. They label raw integer levelAt separately from level times 2.5 metres and bilinear heightAt. The sampler is independent test input, not a new match random stream or rendered-ground algorithm.
+
+The World scouting fixture retains a real generated scenery map and all 398 original actors. Existing Source and native memory collectors provide shared-team knowledge, separate recipient cursors, unseen mutation, rescouting and end reveal. Complete cell rows retain omitted fields and optional section, biome, landmark, rail and station metadata. Fixture-only data interning bounds the artifact and is checked against full original rows; no compression or new state owner is introduced on the wire.
+
+Maintained producers live in ww2-simtest, so core rules still perform no file-system or engine I/O. The native exporter derives rows with existing core APIs and embeds the actual build checkout identity and clean status. Export requires that identity to match the supplied clean checkout and validates both Source input pins, so an older copied executable cannot publish a newer producing SHA. Source captures are labeled original results rather than native output. Native equality and export execution remain pending until a coordinated build lease validates the source checkpoint. The six-call ABI, rendered terrain, whole World caller and Unreal adoption remain separate.
+
 ## Startup-table content review agreement (2026-10-13)
 
 Axel's [explicit review](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6156314777) accepts PR #195's v1 content/schema candidate, strict missing/null/tag handling and separate formation/content identities. Julio agrees with those limits and the policy that every schema-file change increments the version. Inert authoring metadata and packed-field conformance constants enable no editor or second Unreal decoder. Transport remains unagreed; runtime production and actual published Unreal cache consumption remain separate outcomes. The accepted content, schema and inventory bytes are unchanged by this acknowledgment.

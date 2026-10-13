@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add maintained original gameplay terrain fixtures requested for the Unreal ground port: all 33 authored maps, 661,799 cell centres and 33,000 deterministic query points. Record a real World scouting history with 398 actors, 32 actions, 17 receipts and 273,678 complete cell rows. Native query/collector consumers and an export tool are written but uncompiled. Bind export provenance to the actual build identity and clean status, refusing an older executable or foreign Source inputs. Keep integer levels, derived metres and interpolated metres distinct; no rendered mesh, whole World tick, ABI or wire change is claimed.
+
 - Record both owners' acceptance of the startup-table v1 content/schema candidate and its strict revision/refusal policy. Delivery remains unagreed, and the six ABI 2 calls, runtime producer and Unreal adoption are unchanged. No content, schema or inventory bytes changed.
 
 - Add an unagreed startup-table content/schema proposal for consumer review: all 47 compiled tables plus 17 source-derived public constants, a portable generator, exact field inventory and independent table/formation hashes. Table transport, additional FFI calls and Unreal adoption remain pending explicit agreement.
