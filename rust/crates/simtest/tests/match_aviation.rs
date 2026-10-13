@@ -618,8 +618,8 @@ fn typed_aircraft_commands_match_original_selection_and_distinct_cleanup() {
             checkpoints += 1;
         }
     }
-    assert_eq!(f["traces"].as_array().unwrap().len(), 70);
-    assert_eq!(checkpoints, 145);
+    assert_eq!(f["traces"].as_array().unwrap().len(), 71);
+    assert_eq!(checkpoints, 147);
     assert_eq!(checkpoints, f["checkpoints"].as_u64().unwrap());
 }
 #[test]

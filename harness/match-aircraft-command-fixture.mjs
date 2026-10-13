@@ -53,6 +53,7 @@ for(const [name,air] of [['fuel-empty',{fuel:0}],['ammo-empty',{ammo:0}]]){
  trace(`move-${name}-cleanup`,[aircraft('fighter','out',0,{air:{state:'out',mission:{kind:'patrol',id:0,x:38,z:39},...air}})],[{command:{t:'move',orders:[[1000,21,22]]}},{command:{t:'stop',ids:[1000]}}]);
 }
 trace('recorded-plane-command-sequence',[aircraft('fighter','base',0,{holdFire:false}),enemy],[{command:{t:'stance',ids:[1000],key:'holdFire',on:true}},{command:{t:'move',orders:[[1000,21,22]]}},{command:{t:'attack',ids:[1000],target:1001}},{command:{t:'stop',ids:[1000]}}]);
+trace('forced-ground-stance-remains-ineligible',[{...friend,logistics:{ammo:100,ammoMax:100,ammoPrice:.01,ammoCredit:0,provisions:120,fuel:180,emergency:60,warning:null,forced:true,stranded:false,exhausted:false}}],[{command:{t:'stance',ids:[1000],key:'holdPos',on:true}}]);
 const checkpoints=traces.reduce((n,t)=>n+t.frames.length+1,0),fixture={reference:pin,node:process.version,arch:process.arch,traces,checkpoints};
 const path=`${root}/rust/crates/simtest/tests/fixtures/match-aircraft-commands.json.gz`,compressed=gzipSync(JSON.stringify(fixture)+'\n',{level:9});
 if(process.argv.includes('--check'))assert.deepEqual(readFileSync(path),compressed);else writeFileSync(path,compressed);
