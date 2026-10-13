@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Corrected the AIR replay's seed readback to the JavaScript signed 32-bit representation, found at its first full-step comparison. Native and source seeds already had identical bits; runtime random state, authored setup and fixtures are unchanged. Removed seven unused aviation-test imports reported by the same build. The candidate passed 57 core debug tests and 18 earlier simtest checks before this failure, with two AIR admission checks also passing; combined final proof remains pending.
+
 - Restored the verified Unseen and Population support denial mappings lost during the aircraft caller union, found by its first native compile. The existing public denial meanings and all command siblings remain unchanged. No tests ran before this compile failure; repaired combined verification is pending and the failure log is preserved.
 
 - Normally incorporated the verified coherent support provider successor into the separate aircraft caller. Runtime support remains identical to the reviewed 817b96d body; its actual test-only compiler/numeric repairs and evidence are retained. Shared caller metadata guards and new scheduling remain separate, with combined native verification pending.

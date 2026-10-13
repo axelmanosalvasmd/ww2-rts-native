@@ -6,13 +6,9 @@ use common::{
 use serde_json::{Value, json};
 use std::io::Read;
 use ww2_core::{
-    economy::{Faction, Mode},
-    economy_state::ArmySize,
     game::{PlaneState, Point},
-    map::AuthoritativeMap,
-    match_runtime::{Match, MatchOptions, PlayerConfig},
+    match_runtime::Match,
     unit_publication::{PublicationParts, StagedUnit, prepare_publication},
-    weather::WeatherChoice,
 };
 fn fixture() -> Value {
     let mut text = String::new();
