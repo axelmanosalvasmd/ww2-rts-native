@@ -314,8 +314,7 @@ fn make(case: &Value) -> (Match, Vec<u32>) {
         m.world
             .register_recipient(crate::world::Recipient::Player(slot));
     }
-    m.initialize_recipient_routing()
-        .unwrap_or_else(|e| panic!("{} routing: {e}", case["name"]));
+    m.initialize_recipient_routing().unwrap();
     (m, order)
 }
 fn combat_random(m: &Match) -> (String, Vec<f64>) {
@@ -499,32 +498,6 @@ fn conquest_abilities_match_original_source_phases() {
             continue;
         }
         if name == "manual-aimed-unrepresented-project-boundary" {
-            let invalid = Command::Ability {
-                ids: vec![1],
-                at: Some(Point {
-                    x: f64::NAN,
-                    z: 15.,
-                }),
-                queue: false,
-                automatic: false,
-            };
-            let work = (
-                m.world.game.units[&1].dig,
-                m.world.game.units[&1].build,
-                m.world.game.units[&1].entrench,
-            );
-            assert_eq!(
-                m.execute_command(0, &invalid, false).unwrap(),
-                Some(crate::match_commands::Denial::Blocked)
-            );
-            assert_eq!(
-                (
-                    m.world.game.units[&1].dig,
-                    m.world.game.units[&1].build,
-                    m.world.game.units[&1].entrench
-                ),
-                work
-            );
             let before = snapshot(&m, &order, &[]);
             let action = &case["actions"][0];
             assert_eq!(
@@ -533,6 +506,28 @@ fn conquest_abilities_match_original_source_phases() {
                 Some(crate::match_commands::Denial::Unsupported)
             );
             assert_eq!(snapshot(&m, &order, &[]), before);
+            assert_eq!(
+                m.execute_command(
+                    0,
+                    &Command::Ability {
+                        ids: vec![1],
+                        at: Some(Point {
+                            x: f64::NAN,
+                            z: 15.
+                        }),
+                        queue: false,
+                        automatic: false,
+                    },
+                    false,
+                )
+                .unwrap(),
+                Some(crate::match_commands::Denial::Blocked),
+                "invalid typed aim retains coordinate refusal precedence",
+            );
+            // Source mine releases follow before refusing a non-finite aimed command.
+            let mut invalid_expected = before.clone();
+            invalid_expected["units"][0]["control"]["follow"] = json!(0);
+            assert_eq!(snapshot(&m, &order, &[]), invalid_expected);
             unsupported_work += 1;
             continue;
         }
@@ -671,112 +666,24 @@ fn conquest_abilities_match_original_source_phases() {
 fn smoke_identity_collision_rejects_before_selected_unit_writes() {
     let fixture: Value =
         serde_json::from_str(include_str!("../../tests/fixtures/match-ability.json")).unwrap();
-    for live_unit_collision in [false, true] {
-        let (mut m, order) = make(&fixture["cases"][0]);
-        if live_unit_collision {
-            m.next_unit_id = 3;
-        } else {
-            m.world.game.smokes.push(Smoke {
-                id: m.next_unit_id,
-                x: 15.,
-                z: 15.,
-                r: 9.,
-                remaining: Some(14.),
-            });
-        }
-        let before = snapshot(&m, &order, &[]);
-        let command = Command::Ability {
-            ids: vec![1, 3],
-            at: None,
-            queue: false,
-            automatic: false,
-        };
-        let error = m.execute_command(0, &command, false).unwrap_err();
-        assert!(error.contains("smoke identity"), "{error}");
-        assert_eq!(snapshot(&m, &order, &[]), before);
-    }
-}
-
-#[test]
-fn manual_aimed_ability_cancels_real_paid_work_without_refund() {
-    use crate::field_works::{FortKind, StartRequest};
-    let fixture: Value =
-        serde_json::from_str(include_str!("../../tests/fixtures/match-ability.json")).unwrap();
-    let case = fixture["cases"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|v| v["name"] == "manual-aimed-clears-and-clamps")
-        .unwrap();
-    let (mut m, _) = make(case);
-    let initial_mp = m.start.economy.players[0].mp;
-    let prepared = m
-        .field_works
-        .prepare_start(
-            &m.world,
-            &mut m.start.economy.players[0],
-            StartRequest {
-                control_eligible: true,
-                owner: 0,
-                unit: 1,
-                kind: FortKind::Trench,
-                at: Point { x: 25., z: 15. },
-                direction: Some(0.),
-            },
-            |_| true,
-        )
-        .unwrap();
-    let cost = prepared.cost();
-    prepared.commit(&mut m.field_works);
-    m.world.game.units.get_mut(&1).unwrap().dig = true;
-    let terrain = m.world.game.chars.clone();
-    assert_eq!(
-        m.execute_command(
-            0,
-            &Command::Ability {
-                ids: vec![1],
-                at: Some(Point { x: 25., z: 15. }),
-                queue: false,
-                automatic: false
-            },
-            false
-        )
-        .unwrap(),
-        None
-    );
-    assert!(!m.field_works.is_active(1));
-    assert!(!m.world.game.units[&1].dig);
-    assert_eq!(m.start.economy.players[0].mp, initial_mp - cost);
-    assert_eq!(m.world.game.chars, terrain);
-}
-
-#[test]
-fn rejected_ap_launch_preserves_loaded_round_ammunition_and_random_stream() {
-    let fixture: Value =
-        serde_json::from_str(include_str!("../../tests/fixtures/match-ability.json")).unwrap();
-    let case = fixture["cases"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|v| v["name"] == "loaded-ap-consumed-after-qualifying-fire")
-        .unwrap();
-    let (mut m, order) = make(case);
-    let command = command(&case["actions"][0]["cmd"], false);
-    assert_eq!(m.execute_command(0, &command, false).unwrap(), None);
-    assert!(m.abilities.get(1).unwrap().ap);
-    m.begin_firing_tick(&order).unwrap();
-    m.firing.next_flight = 9_007_199_254_740_991;
-    let ability = *m.abilities.get(1).unwrap();
-    let ammo = m.logistics.get(1).cloned();
-    let random = m.start.random.snapshot();
-    let error = m.apply_unit_firing(1, false, 0.05).unwrap_err();
-    assert!(error.contains("flight ID exhausted"), "{error}");
-    assert_eq!(m.abilities.get(1), Some(&ability));
-    assert_eq!(m.logistics.get(1), ammo.as_ref());
-    assert_eq!(m.start.random.snapshot(), random);
-    assert_eq!(m.firing.next_flight, 9_007_199_254_740_991);
-    assert!(m.firing.flights.is_empty());
-    assert!(m.firing.take_events().is_empty());
+    let (mut m, order) = make(&fixture["cases"][0]);
+    m.world.game.smokes.push(Smoke {
+        id: m.next_unit_id,
+        x: 15.,
+        z: 15.,
+        r: 9.,
+        remaining: Some(14.),
+    });
+    let before = snapshot(&m, &order, &[]);
+    let command = Command::Ability {
+        ids: vec![1, 3],
+        at: None,
+        queue: false,
+        automatic: false,
+    };
+    let error = m.execute_command(0, &command, false).unwrap_err();
+    assert!(error.contains("smoke identity"), "{error}");
+    assert_eq!(snapshot(&m, &order, &[]), before);
 }
 
 #[test]

@@ -339,15 +339,15 @@ impl WorldMemory {
             .ok_or("World log limit exhausted")?;
         let sent = self.sent.get(&owner);
         let from = sent.and_then(|s| s.at).filter(|at| *at >= m.log_base);
-        let indexes: Vec<_> = if full || from.is_none() {
-            (0..m.rows.len()).collect()
-        } else {
-            let start = usize::try_from(from.unwrap() - m.log_base)
-                .map_err(|_| "World sent cursor invalid")?;
+        let indexes: Vec<_> = if let Some(at) = from.filter(|_| !full) {
+            let start =
+                usize::try_from(at - m.log_base).map_err(|_| "World sent cursor invalid")?;
             if start > m.log.len() {
                 return Err("World sent cursor ahead of memory".into());
             }
             m.log[start..].iter().map(|c| m.positions[c]).collect()
+        } else {
+            (0..m.rows.len()).collect()
         };
         let mut revisions = sent.map_or_else(BTreeMap::new, |s| s.revisions.clone());
         let mut out = Vec::new();

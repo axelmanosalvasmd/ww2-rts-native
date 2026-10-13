@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Joined the checked ordinary engineering provider and its evidence-only handoff into the shared-project branch. The ordinary provider passed seven focused debug checks and 206 release workspace tests; the new project code still requires its own fresh native gates.
+
 - Separated failed Dig route cleanup from accepted replacement cancellation. A retry-limit drop removes only the paid job and Dig flag, preserving shared-project membership, cached active timing and the paid wallet; the queue-owner source review found the earlier full-cancellation mismatch. An actual unreachable-route source trace and native replay are being added.
 
 - Connected typed Entrench intent to the existing recorded queue and shared field-work owner. New and allied joins stage control changes, queued joins retain project identity, per-unit allocation rechecks sight and pays the buildable segment, and waiting plans read real unpaid/active work. Full native/source replay and tick assembly remain pending; construction, fill and concrete stay explicit exclusions.
@@ -33,6 +35,23 @@
 - Rejected smoke allocator collisions with current live units before any selected-unit effect, extending the existing mixed-selection identity regression. Native proof remains pending.
 
 - Connected manual aimed replacement to real paid field-work cancellation without a refund, and rejected unrepresented build or mass-entrench projects before control writes. The original ability recorder now has 36 traces (157 actions), with a separate unsupported-project boundary and a written cancellation regression. Native proof remains pending.
+- Verified the ordinary Match digging provider on macOS arm64: seven focused debug tests, all 206 release workspace tests, strict workspace/all-target Clippy, formatting and the release FFI build pass. Independent copied-binary replay passes both Match digging tests and both primitive tests. Actual unit-loop/server integration remains a separate pending proof.
+
+- Resolved strict compiler-lint findings in the engineering proof tree: redundant copies, casts and reference layers, independent ability fixture flags, and the existing optional delivery-cursor branch. The full release workspace suite passed before this cleanup; all required gates are rerunning at the final code checkpoint.
+
+- Fixed the inherited World memory recorder to collect remembered-wreck iterators as arrays before JSON serialization. Source regeneration verifies four traces and 119 actions; only the collection projections changed. Runtime memory and cache behavior are unchanged.
+- Restored the World-only logistics preflight lost while integrating the Conquest supply adapter. Ordinary Conquest still initializes logistics; World rejects it before creating state, as the existing startup regression requires.
+
+- Integrated the ground supply adapter with checked World startup and memory. World keeps empty convoy/network defaults and its explicit logistics refusal; final combined native checks remain pending.
+
+- Carried the checked ability-flight recorder prerequisites: direct-launch cases use the actual catalog ability range, and actor inputs preserve the source incoming-hit sentinel. The old inputs placed short-range abilities outside the unchanged source phase guard and replaced the hit sentinel with null. Runtime defaults and geometry are unchanged.
+- Fixed the production differential fixture’s paid-job cost projection to compare MP and Fuel by IEEE bits on both sides. This removes the JSON integer-versus-float mismatch found in the coupled engineering release run without changing production arithmetic or runtime behavior.
+
+- Carried the routing owner’s all-team World buffer mapping repair and 14-case original birth fixture into both consumers. The real training replay keeps its three-case scope; provider cross-team success/history coverage remains separately labeled, with native checks pending.
+
+- Added the existing flight-fixture comparison path to numeric mismatch diagnostics so the coupled native proof can identify missing represented values directly. Core release tests passed before the inherited simtest comparison stopped.
+
+- Corrected the inherited non-finite aimed-command guard to retain the source follow reset on a blocked command. Its full snapshot still verifies unchanged work, wallet, terrain and random state; the valid unsupported-project refusal remains unchanged.
 
 - Joined the checked ordinary-launch buff/AP provider dependency after the coupled release replay found the missing flight payload adjustment. The source multiplier, suppression, rate, naval AP restriction and deferred AP consumption retain their reviewed behavior and launch-refusal guard.
 

@@ -894,3 +894,8 @@ The engineering proof tree now includes the input owner's typed Dig dispatcher, 
 
 
 The engineering dependency proof includes the checked ordinary-launch ability provider. Its buff/AP adjustment is the existing owner-reviewed source behavior: buff changes flight damage and suppression with its rate adjustment, naval AP applies only to naval targets, and AP consumption follows validated launch geometry, IDs and ammo publication. The inherited ability replay exposed this missing dependency; the engineering actuator itself remains unchanged.
+
+
+The ordinary Match digging provider is locally verified at `00b6448003639fd876df07f5f29c49f19b387d08` on macOS arm64. Seven focused debug tests and all 206 locked release workspace tests pass, together with strict workspace/all-target Clippy, formatting and the release FFI build. An independent reviewer ran copied release binaries outside the shared cache: two Match digging tests and two primitive tests pass. Native replay covers the canonical paid admission, replacement, cancellation, story publication and actual request/queue/drop paths represented by the twelve source traces and 47 actions.
+
+The proof repaired inherited assembly interfaces and fixture projections using the checked owners' implementations. Source job costs compare exact float bits; remembered wreck iterators become arrays before serialization; source incoming-hit values remain captured instead of substituted. The runtime actor/job owners remain singular. This provider proof does not establish the source unit-loop composition, room integration, Unreal presentation or the three-platform CI result. The separately staged unit-loop owner must verify its combined assembly.

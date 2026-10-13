@@ -176,7 +176,7 @@ impl Match {
                         .map_err(|error| format!("prepared dig admission changed: {error}"))?;
                     let mut unit = self.world.game.units[&id].clone();
                     let mut control = self.commands.units[&id].clone();
-                    let mut firing = self.firing.units[&id].clone();
+                    let mut firing = self.firing.units[&id];
                     let mut ability = *self.abilities.get(id).unwrap();
                     if unit.garrison.is_some() {
                         let game = &self.world.game;
