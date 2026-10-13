@@ -1249,6 +1249,13 @@ impl MatchCommands {
     pub fn pending_commands(&self) -> usize {
         self.queue.len()
     }
+    /// Inspect canonical inputs at one boundary without consuming or cloning them.
+    pub fn pending_tick(
+        &self,
+        tick: u64,
+    ) -> impl Iterator<Item = (&crate::orders::OrderKey, &Command)> {
+        self.queue.pending_tick(tick)
+    }
     pub fn path_requests(&self) -> &PathRequests {
         &self.requests
     }
