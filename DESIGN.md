@@ -1,5 +1,9 @@
 # Three Crossroads Native: design decisions
 
+## Ordinary queue-refusal input retention (2026-10-13, source successor)
+
+Source review found inherited simtest access to the private MatchCommands queue. The consumer now uses its public `pending_commands()` and `next_tick()` accessors and enqueues one actual Unsupported order at the next boundary. A refused restored production queue must leave that boundary, pending count, complete projected state, random streams, fault state and empty event prefix unchanged. After canonical `reconcile_queue(1000, &[])` repairs the unsupported restored scene, one real `advance_tick` must return the same recorded key with its Unsupported denial and consume the input exactly once. This checks retention of an actual order rather than an empty queue snapshot. The original Source missing-mode failure fixture and the Research/Production capability assertions remain unchanged. No helper, runtime guard or original fixture is modified; this source-only successor requires fresh caller composition and native validation.
+
 ## Ordinary research capability report (2026-10-13, consumer successor)
 
 The sole caller's bounded hookup advances Research after optional vision and before project recounting. It does not connect per-building queued training in ordinary Conquest; canonical nonempty ordinary queues remain refused before clock publication. The complete original-step consumer now requires Research to be available and Production to remain in `report.unavailable`, preserving every original state, phase-order, immediate-birth and denial comparison. This is an explicit capability-report correction, not a reduced Source comparison or a new runtime guard. World/Classic queued production and actual building-turn publication remain separate. The source consumer must be composed with the sole caller before a fresh native run; this isolated patch runs no Cargo and carries no native result.

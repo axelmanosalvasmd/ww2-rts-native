@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Replace inherited private queue access in the ordinary production-refusal test with public command count/boundary observations and a real enqueued Unsupported order. After the rejected tick, clear the restored production queue through its canonical reconcile API and verify the same recorded key receives its Unsupported denial on the next successful tick. Keep the original Source failure fixture and all preclock state, RNG, fault and event assertions. No runtime or guard changes; native verification remains pending.
+
 - Correct the ordinary research replay's capability assertion to require Production to remain unavailable while Research is connected. Keep every complete Source projection, phase/order check, immediate-birth comparison and ordinary nonempty-queue refusal. This matches the bounded caller integration; queued World/Classic training and broader production actuation remain separate. No runtime or original fixture changes, and no native validation is claimed for this consumer successor.
 
 - Recorded four complete original ordinary tick traces with 2,429 steps, 4,810 research observations, seven commands and two immediate recruitment births. Added an actual-runner consumer and two original restored-queue failure witnesses. Observed and unobserved Source replay agree; native execution awaits the sole tick owner's research hookup. Retained unsupported restored queues rather than inventing a Conquest mode object.
