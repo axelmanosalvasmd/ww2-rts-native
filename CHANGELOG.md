@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Made the World delivery cursor branch explicit after strict Clippy rejected an unnecessary unwrap; full and incremental read ordering is unchanged. The corrected wreck oracle reproduces four traces and 119 actions.
+
+- Fixed the World oracle's remembered-wreck iterator projection to record actual rows instead of an empty iterator object. Native replay already matched the first terrain, identity and route fingerprints; corrected wreck records are being replayed next.
+
 - Completed the atomic guard fixture setup with the ordinary loader's required capture point. The World source recorder also retains signed-label membership maps and adds a nonmultiple-dimension region-lock trace after the startup fixture changed shape. Native checks remain in progress.
 
 - Integrated the coordinated startup rail/station row projection and canonical region lookup into World memory. Focused atomic guard fixtures now use valid minimum map dimensions. Recipient rows populate the existing CellData fields from borrowed WorldRails, without a second rail representation. Native verification continues.
