@@ -191,6 +191,7 @@ impl Match {
         if self.combat.get(self.next_unit_id).is_some()
             || self.recruit_metadata.contains_key(&self.next_unit_id)
             || self.commands.units.contains_key(&self.next_unit_id)
+            || self.firing.get(self.next_unit_id).is_some()
         {
             return Err(RecruitError::InvalidState(
                 "recruit metadata ID already exists",
@@ -298,6 +299,7 @@ impl Match {
         let purchase = prepared.commit();
         let _published = publication.publish_with(|unit, _| {
             self.combat.initialize(unit.id);
+            self.firing.initialize(unit.id);
         });
         Ok(CompletedRecruitUnit {
             unit: id,
