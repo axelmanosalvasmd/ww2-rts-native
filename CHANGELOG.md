@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Admitted the ordinary Default alias in the sole tick guard after the real called providers were audited and their reviewed guard aliases were normally merged. Game.mode must remain absent; existing options, raw source configuration, RNG and order sequencing are unchanged. The actual Default replay and first composed native proof remain pending.
+
 - Normal-merged the reviewed ordinary Default provider aliases into a separate successor of the verified support/project closure. Existing Source configuration and canonical state remain unchanged; the sole caller guard and actual Default replay are separate source changes with native proof pending.
 
 - Corrected the inherited ground-support scope note to acknowledge the mass-project phase in this coherent head. Rust and harness trees remain identical to tested 0f7850d.

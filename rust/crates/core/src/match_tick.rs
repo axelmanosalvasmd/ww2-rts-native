@@ -166,7 +166,11 @@ impl crate::match_runtime::Match {
         if game.tick < 0 || game.tick >= 9_007_199_254_740_351 {
             return Err("invalid tick clock".into());
         }
-        if self.options.mode != crate::economy::Mode::Conquest || game.mode.is_some() {
+        if !matches!(
+            self.options.mode,
+            crate::economy::Mode::Default | crate::economy::Mode::Conquest
+        ) || game.mode.is_some()
+        {
             return Err("tick execution currently requires ordinary Conquest".into());
         }
         if self.options.logistics || self.convoys.is_some() {
