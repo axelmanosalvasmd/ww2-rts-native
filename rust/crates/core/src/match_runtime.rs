@@ -488,6 +488,7 @@ impl Match {
         result.setup_bases()?;
         for unit in result.world.game.units.values() {
             result.combat.initialize(unit.id);
+            result.firing.initialize(unit.id);
             result.abilities.initialize(unit.id);
             result.recovery.initialize(unit.id);
             let control = crate::match_commands::UnitControl::new(unit, &result.rules)?;

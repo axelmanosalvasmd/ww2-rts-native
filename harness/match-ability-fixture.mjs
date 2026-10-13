@@ -11,6 +11,11 @@ const pin='e4e579a838aabae3b1d9dadbc17a0a87147bc52d',git=args=>execFileSync('git
 const clean=()=>{assert.equal(git(['rev-parse','HEAD']),pin);assert.equal(git(['status','--porcelain','--untracked-files=no']),'');};clean();
 const temp=mkdtempSync(join(tmpdir(),'ww2-match-ability-'));
 const originalRandom=Math.random;
+// Pair source launch inputs with the existing native Combat purpose stream.
+const mask=(1n<<64n)-1n,gamma=0x9e3779b97f4a7c15n;
+const mix=x=>{x=((x^(x>>30n))*0xbf58476d1ce4e5b9n)&mask;x=((x^(x>>27n))*0x94d049bb133111ebn)&mask;return x^(x>>31n);};
+function combatRandom(seed){let state=mix(BigInt(seed)^((3n*gamma)&mask)),draws=[];return {draws,next(){state=(state+gamma)&mask;const v=Number(mix(state)>>11n)/9007199254740992;draws.push(v);return v;},state:()=>state.toString(16).padStart(16,'0')};}
+
 try {
  let code=readFileSync(join(reference,'shared/sim.js'),'utf8');
  const extract=(start,end)=>{assert.equal(code.split(start).length,2);const at=code.indexOf(start),to=code.indexOf(end,at);assert.ok(to>at);return code.slice(at,to);};
@@ -33,12 +38,12 @@ try {
   g.tick=10;g.tech=false;g.seed=123;g.nextId=1000;g.nextFlight=2000;g.wx={rain:0,wet:0};g.wind={a:0,v:.5};g.pathRetryLimit=1;
   for(const v of units){const d=sim.UNITS[v.type];assert.ok(d,v.type);g.units.set(v.id,{owner:0,rot:0,aim:0,hp:d.models*d.hpPer,supp:0,path:[],orders:[],riding:0,cargo:[],xp:0,garrison:-1,follow:77,auto:false,autoRetreat:false,holdFire:false,holdPos:false,attackId:0,targetId:0,cd:0,buff:0,ap:false,sprint:0,nade:null,cooldown:0,retarget:0,repath:0,react:0,stuck:0,retreating:false,dig:null,build:0,enter:-1,board:0,amove:null,face:null,entrench:null,fireAt:-1,drift:false,reverse:null,traffic:null,trafficWait:0,worldGoal:null,moveSpeed:0,vx:0,vz:0,...structuredClone(v)});}
   for(const p of g.players)p.visible=new Set([...g.units.keys()]);grid.rebuildGrid(g);
-  const randomCalls=[],results=[],snapshots=[];
+  const combatSeed=701,random=combatRandom(combatSeed),randomCalls=random.draws,results=[],snapshots=[];
   const flight=p=>Object.fromEntries(Object.entries(p).filter(([k])=>!['source','weapon','blastSource','suppressed'].includes(k)).concat([['suppressed',[...p.suppressed]],['blastSource',p.blastSource??null]]));
-  const snapshot=()=>({tick:g.tick,units:[...g.units.values()].map(u=>({id:u.id,hp:u.hp,x:u.x,z:u.z,cd:u.cd,buff:u.buff,ap:u.ap,sprint:u.sprint,supp:u.supp,nade:u.nade,path:u.path,retreating:u.retreating,logistics:u.logistics??null,control:Object.fromEntries(control.map(k=>[k,u[k]??null]))})),wallets:g.players.map(p=>({mp:p.mp,mun:p.mun,fuel:p.fuel})),smokes:g.smokes,shots:g.shots,flights:[...g.flights.values()].map(flight),salvos:g.salvos,nades:g.nades,nextId:g.nextId,nextFlight:g.nextFlight,randomCalls:[...randomCalls]});
+  const snapshot=()=>({tick:g.tick,units:[...g.units.values()].map(u=>({id:u.id,hp:u.hp,x:u.x,z:u.z,cd:u.cd,buff:u.buff,ap:u.ap,sprint:u.sprint,supp:u.supp,nade:u.nade,path:u.path,retreating:u.retreating,logistics:u.logistics??null,control:Object.fromEntries(control.map(k=>[k,u[k]??null]))})),wallets:g.players.map(p=>({mp:p.mp,mun:p.mun,fuel:p.fuel})),smokes:g.smokes,shots:g.shots,flights:[...g.flights.values()].map(flight),salvos:g.salvos,nades:g.nades,nextId:g.nextId,nextFlight:g.nextFlight,combatSeed,combatRandomState:random.state(),randomCalls:[...randomCalls]});
   const save=()=>snapshots.push(structuredClone(snapshot()));save();
   for(const a of actions){g.shots=[];let result=null;
-   Math.random=()=>{const value=[.125,.25,.375,.5,.625,.75,.875,.0625][randomCalls.length%8];randomCalls.push(value);return value;};
+   Math.random=()=>random.next();
    if(a.op==='command')result=sim.command(g,a.slot,a.cmd,a.auto??false)??null;
    else if(a.op==='target')result=sim.autocastTarget(g,g.units.get(a.id));
    else if(a.op==='prime'){Object.assign(g.units.get(a.id),structuredClone(a.changes));grid.rebuildGrid(g);}
@@ -48,7 +53,7 @@ try {
    else throw Error(a.op);
    results.push(result??null);save();
   }
-  cases.push({name,map,mode:g.mode.kind,initializationRandom,units,actions,results,snapshots});
+  cases.push({name,map,mode:g.mode.kind,combatSeed,initializationRandom,units,actions,results,snapshots});
  }
  record('instant-families-zero-conquest-cost-shared-smoke-ids',[U(1,'mg'),U(2,'at'),U(3,'tank'),U(4,'conscript',20,15,{supp:75,path:[{x:25,z:15}]}),U(5,'tank',30,15)],[command([1,2,3,4,5]),command([3]),phase([1,2,3,4],.05),phase([1,2,3,4],50)]);
  record('refusal-precedence-and-selection-success',[U(1,'rifle',15,15,{cd:2}),U(2,'rifle',15,20,{retreating:true}),U(3,'rifle',20,20,{logistics:{ammo:0,forced:false,stranded:false}}),U(4,'mg')],[command([1,2]),command([2,1]),command([1,3]),command([3,1]),command([999,2]),command([2,999]),command([1,4])]);

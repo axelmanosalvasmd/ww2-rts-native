@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Wrote typed Conquest Ability/Autocast dispatch, canonical instant abilities, all ground autocast judgments and the existing FIFO aimed-path binding. Ability cooldown/buff timers remain separate from weapon timers; smoke IDs use the shared unit counter. The ability recorder now pairs the canonical Combat purpose stream at seed 701. Aimed launches, reinforcement and native differential consumers remain unfinished; no passing native execution claim is made.
+
 - Added source recorders for Conquest ground abilities (30 traces, 141 actions) and recovery/section repairs (22 traces, 128 actions), with exact-pin and clean-reference checks. Wrote canonical section repair, captured recovery preparation, medic healing and team mine discovery; route application, reinforcement, ability execution and native differential verification remain unfinished.
 
 - Reserved one canonical Match ability row for cooldown, buff, AP and aimed-order flags, plus recovery-only wound/heal/reinforcement metadata. Starting and recruited units initialize these rows; Game health/sprint, UnitControl aimed points and logistics provisions retain their existing owners. Ability/recovery execution and native verification remain unfinished.
