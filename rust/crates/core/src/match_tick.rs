@@ -452,6 +452,9 @@ impl crate::match_runtime::Match {
             }
             let factor = movement::supp_speed(unit.supp);
             // Reserve adapters attach before this pre-timer order phase.
+            if self.options.mode == crate::economy::Mode::World {
+                self.apply_world_guard_home(id)?;
+            }
             self.prepare_unit_commands_observing(id, winner_decided, &mut |m, command| {
                 m.observe_tick_command(command)
             })?;

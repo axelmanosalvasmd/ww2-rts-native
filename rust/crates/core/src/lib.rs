@@ -113,6 +113,7 @@ pub mod match_world;
 pub mod match_world_phases;
 pub mod match_world_rails;
 pub mod match_world_regions;
+pub mod match_world_tick;
 
 pub mod match_world_memory;
 pub mod world_memory;

@@ -1926,10 +1926,15 @@ impl crate::match_runtime::Match {
                 .get(&id)
                 .and_then(|c| c.route_end)
                 .unwrap_or(goal);
-            if crate::math::hypot(u.x - end.x, u.z - end.z) <= 0.25
-                && u.path.is_empty()
-                && u.move_speed.abs() < 0.1
-            {
+            let completed = match self.world_retreat_completion(id, goal)? {
+                Some(completed) => completed,
+                None => {
+                    crate::math::hypot(u.x - end.x, u.z - end.z) <= 0.25
+                        && u.path.is_empty()
+                        && u.move_speed.abs() < 0.1
+                }
+            };
+            if completed {
                 let u = self.world.game.units.get_mut(&id).expect("unit");
                 u.world_goal = None;
                 if u.retreating {

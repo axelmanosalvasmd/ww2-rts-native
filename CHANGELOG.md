@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add the actual World guard-home snap and voluntary retreat completion rule to the separate caller continuation. A displaced guard clears only its path and attack intent before command completion, without updating the grid. Voluntary World retreat uses the 15-metre home radius; forced and ordinary completion keep the endpoint/path/speed condition. Reuse the existing staged support timer body for inert World cooldowns, with read-only key, team, finite-output and active-effect guards. Four real-World-constructor tests are written and formatted but not run. Whole World tick admission remains closed while actor and routing providers are assembled.
+
 - Normally retain the source-cleared World tick plan and unchanged eight-trace original recorder in a separate caller continuation from the final runtime bundle. Actual World actor adapters and caller admission are under development; no World tick or native acceptance is claimed.
 
 - Normally include final main `d1f2fb5` in the separate internal runtime bundle. Its tree is identical to the already incorporated ordered-event head `a068dd8`, so provider, ABI 2 and CI source bytes are unchanged. Combined native verification and interface review before publication remain pending.
