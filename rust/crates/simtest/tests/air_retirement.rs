@@ -4,7 +4,7 @@ use ww2_core::{
     economy_state::ArmySize,
     game::{PlaneState, Point},
     match_aviation::{AircraftRuntime, AviationState},
-    match_combat::CombatState,
+    match_combat::{CombatError, CombatState},
     match_firing::FiringState,
     match_runtime::{Match, MatchOptions, PlayerConfig},
     match_story::{DeathRecord, StoryKey},
@@ -242,8 +242,8 @@ fn protected(m: &Match) -> String {
         m.firing,
         m.aviation,
         m.commands.units,
-        m.world.versions,
-        m.world.journal()
+        m.world,
+        m.environment
     )
 }
 #[test]
@@ -281,6 +281,43 @@ fn malformed_air_retirement_rejects_before_clock_seed_id_wallet_or_actor_changes
         assert_eq!(m.world.game.tick, 10);
         assert!(m.retire_dead(&[1000, 1001]).is_err());
         assert_eq!(protected(&m), before);
+    }
+    let mut mixed = f["cases"][0].clone();
+    mixed["units"].as_array_mut().unwrap().push(json!({
+        "id":1002,"kind":"tank","owner":1,"x":25.0,"z":25.0,
+        "hp":0.0,"rot":0.0,"still":2.0,"lastHit":0,"air":null,
+    }));
+    let malformed_terrain: [fn(&mut Match); 4] = [
+        |m| m.world.game.height = Some(Vec::new()),
+        |m| {
+            m.world.game.flags.pop();
+        },
+        |m| {
+            m.world.burnt.clear();
+        },
+        |m| m.world.game.w = 0,
+    ];
+    for change in malformed_terrain {
+        let mut m = scene(&f, &mixed);
+        let order = [1002, 1000, 1001];
+        m.validate_dead_retirement(&order, 11).unwrap();
+        change(&mut m);
+        let before = protected(&m);
+        let expected = CombatError::Environment(
+            ww2_core::environment::EnvironmentError::InvalidInput("terrain shape"),
+        );
+        assert_eq!(
+            m.validate_dead_retirement(&order, 11),
+            Err(expected.clone())
+        );
+        assert_eq!(protected(&m), before);
+        assert_eq!(m.retire_dead(&order).unwrap_err(), expected);
+        assert_eq!(protected(&m), before);
+        assert!(
+            m.world.game.units.contains_key(&1002),
+            "ground corpse remains before a failed wreck admission"
+        );
+        assert_eq!(m.world.game.tick, 10);
     }
     let m = scene(&f, &f["cases"][0]);
     let before = protected(&m);
