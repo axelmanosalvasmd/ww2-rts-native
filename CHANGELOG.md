@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added the shared combat metadata prerequisite for command recent-hit queries, matching the combat lane state at c5c1383. The command phase does not duplicate hit memory.
+
 - Added one canonical Match control row for aim, ability and retreat switches, attack intent, facing and waiting orders. Startup prepares the rows from unit definitions; recruitment can stage them before charging. Command execution is the next part of this lane, and no wire or C interface changed.
 - Added canonical chosen-target and weapon-timer state to Match for the firing integration. Unit health and position, command aim and combat hit history retain their existing owners; the firing phase is still in progress.
 
