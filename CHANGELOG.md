@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Strengthened operative preflight to inspect every operative control row, rejecting unbacked or future identities while preserving metadata-backed dead rows retained for projectiles. Added original full-step recordings: 15 traces, 576 operations and 506 source ticks, with 10 seeded Combat draws and exact paid/led-squad respawn checks. Native replay and tick consumption remain pending.
+
 - Added a source-written operative turn provider for the sole Match tick runner: registry and next-clock preflight, one movement/timer turn, then immediate canonical fire or grenade request consumption. Tick placement, death/respawn consumer hooks, full-step fixtures and native verification are pending; no second timer or runtime state was added.
 
 - Verified combined first-person ray, damage and typed grenade phase methods: 20 focused debug tests, all 174 locked release workspace tests, strict Clippy, formatting and release FFI build pass. Independent copied binaries pass 15 tests in each profile; original recorders pass 49 effects traces/66 operations and 17 lifecycle traces/536 operations. Both ordinary aliases are covered; tick dispatch, grenade settlement and client acceptance remain pending.

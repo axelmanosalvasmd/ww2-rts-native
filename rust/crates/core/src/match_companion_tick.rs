@@ -41,16 +41,24 @@ impl Match {
         for unit in self.companions.soldiers.keys() {
             self.check_companion(*unit)?;
         }
-        for unit in self.world.game.units.values() {
-            if self
-                .commands
-                .units
-                .get(&unit.id)
-                .is_some_and(|control| control.operative)
-            {
-                if !self.companions.soldiers.contains_key(&unit.id) {
+        for (id, control) in &self.commands.units {
+            if !control.operative {
+                continue;
+            }
+            if self.world.game.units.contains_key(id) {
+                if !self.companions.soldiers.contains_key(id) {
                     return Err("operative control has no matching soldier".into());
                 }
+            } else if *id == 0
+                || *id >= self.next_unit_id
+                || self.firing.get(*id).is_none()
+                || self.combat.get(*id).is_none()
+                || self.companions.soldiers.contains_key(id)
+                || self.companions.records.values().any(|op| op.unit_id == *id)
+            {
+                // Generic retirement retains these rows while flights may refer
+                // to their source. A future or unbacked control is not a retiree.
+                return Err("operative control has no live or retained identity".into());
             }
         }
         Ok(())
