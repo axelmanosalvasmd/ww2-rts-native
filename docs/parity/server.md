@@ -4,6 +4,8 @@ Pin: `reference/ww2-rts` at e4e579a. Every path is relative to `reference/ww2-rt
 
 Native delta progress: `rust/crates/server/src/snapshot_delta.rs` supplies recipient-local changed rows, ordered removals, held fingerprints, full resync and resets from already filtered unit rows. The unchanged source oracle passes 68 traces and 409 frames, including all 33 authored maps; independent source review is clear. Native checks and actual room snapshot wiring remain pending, so this does not complete NET-64, NET-67 or NET-68.
 
+Native list progress: `snapshot_lists.rs` composes unit deltas with ordinary shared wreck/node versions and World recipient list history. Full/reset and invalid-state guards are implemented. The original-source recorder matches seven traces and 75 steps; native checks remain pending. This does not complete NET-65 or the actual room delivery pipeline.
+
 Current Rust slice: `rust/crates/server` handles lobby/session behavior; `harness/server-lobby-check.mjs` checks 38 live checkpoints against Node. `harness/map-delivery-check.mjs` adds 96 HTTP comparisons for the 33 embedded client-safe maps and route failures. NET-11 remains in progress because raw editor reads are unavailable; POST editing is not implemented. Rows marked in progress are not claims of full match, static-hosting or persistence parity. See the server README for exact supported commands and limitations.
 
 Test key used in the Evidence and Acceptance columns:

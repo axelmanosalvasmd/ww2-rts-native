@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added ordinary-room shared wreck/node list versions and World recipient-local list history, composed with the unit delta ledger. Full resync and reconnect reset include lists; invalid frames retain delivery state. List equality compares JSON content without depending on object key order or integer/float spelling, and checked version updates cannot partially overflow. The original-source recorder matches 7 traces and 75 steps, including removal of stale delta flags. Native checks and room snapshot wiring remain pending.
+
 - Added recipient-local unit delta ledgers for changed rows, ordered removals, held fingerprints, full resync and start/reconnect resets. The original source oracle matches 68 traces and 409 frames, including actual recipient snapshots from all 33 authored maps. The ledger accepts already filtered rows and rejects malformed or duplicate rows before changing state. Independent source review is clear; native checks, snapshot production and room simulation remain pending.
 
 - Embedded all 33 original authored maps (1,349,980 JSON bytes) in a separate private server catalogue and added native match construction without Node, filesystem map reads or a reference checkout. Cached validated maps remain immutable; each match gets independent mutable world state. Original mines, materials and triggers are retained. Public map routes still use their filtered assets and refuse editor credential access to private data. Room simulation and generated World startup remain unfinished.
