@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added the approved canonical Match field-work owner and startup default, plus synchronous cancellation that removes a real descriptor before clearing its activity flag without a refund. Missing or inconsistent activity rejects before writes. Component and combined native proof remain pending.
+
 - Integrated the frozen field-work component as a source-only prerequisite for the approved canonical Match job owner. Its source recorder and review are recorded, while queued native proof remains pending.
 
 - Updated the provision prerequisite to its verified supply checkpoint (137 release workspace tests, 14 affected debug checks and strict Clippy/formatting). Its runtime source is unchanged; the combined ability/recovery proof remains pending.
