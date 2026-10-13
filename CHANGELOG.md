@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Joined the source World-memory producer for queued-training routing, retaining checked ordinary recipient evidence and the separate World native acceptance boundary. No live-terrain fallback was added.
+
 - Split canonical production into early research and staged single-building training operations, retaining component advance and its original-source traces. Research admission now holds wallet and lab mutations until an explicit commit, so Match can preflight spending records. Focused source-backed tests cover both schedules and dropped admission/completion guards; native verification is pending.
 
 - Corrected the spawn fixture total from 769 to 775 after adding six mode-aware control cases. The World owner found this stale assertion during native verification; the source records and gameplay values are unchanged.
@@ -14,6 +16,21 @@
 - Documented the checked regional lookup and explicit post-rails snapshot projection boundaries, including the first native log failure and remaining mutable-terrain hook consumers.
 
 - Reused the shared mode-aware control initializer for World startup and removed its private ability-cost lookup. Guard overrides stay canonical. Native proof of this updated startup dependency is pending.
+- Completed the atomic guard fixture setup with the ordinary loader's required capture point. The World source recorder also retains signed-label membership maps and adds a nonmultiple-dimension region-lock trace after the startup fixture changed shape. Native checks remain in progress.
+
+- Integrated the coordinated startup rail/station row projection and canonical region lookup into World memory. Focused atomic guard fixtures now use valid minimum map dimensions. Recipient rows populate the existing CellData fields from borrowed WorldRails, without a second rail representation. Native verification continues.
+
+- Carried the startup lane's explicit World rail-position map type into the recipient-memory dependency tree, fixing the compiler's ambiguous index type without changing rail traversal or values. Native verification remains in progress.
+
+- Reused the canonical checked cell-coordinate conversion for World region lookups after the first compile exposed an unavailable math helper. Imported the reviewed optional wreck-identity prerequisite from the combat lane. Native checks continue.
+
+- Added optional durable wreck IDs to query state, preserving absent identity in older query fixtures. The authoritative wreck producer uses the dead unit ID; remembered-routing consumers can reject missing identity explicitly. No wire or C layout changed.
+
+- Corrected World routing wetness to preserve the canonical optional weather state, using source zero wetness when absent. Independent source review caught the scalar/optional type mismatch before native checks.
+
+- Added original-source World recipient knowledge records for three traces and 111 actions, including 6,200 accepted changes, journal and memory-log trimming, teammate delivery cursors, hidden mines, reveal, signed region IDs, remembered wrecks and per-tick route caches. The explicit World visibility phase updates canonical building ghosts and local-defender visibility. Discovered rows borrow existing rail/station metadata. Native checks and review remain pending; full World tick, snapshots and commands remain separate.
+
+- Added checked absolute World journal cursors and prefix trimming, with an explicit zero-epoch startup reset that preserves ordinary journal drains. World runtime now owns lazy shared team terrain memory, stable accepted-row revisions, separate commander delivery and route cursors, and canonical region contested state. Native integration and original-source verification are pending.
 
 - Fixed the missing rail track-position type annotation found by the first World native compile. Added checked World region/economy projections and optional rail/station snapshot fields with atomic post-rails row annotation after the original startup oracle found missing metadata. Mutable-terrain callers still need to invoke the explicit projection hook. Updated the crafted source case to test floating-column lookup on nonmultiple dimensions; full native acceptance remains pending.
 

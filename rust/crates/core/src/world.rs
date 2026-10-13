@@ -18,6 +18,7 @@ pub enum WorldError {
     InvalidChange,
     InvalidTerrain,
     VersionExhausted,
+    InvalidJournalCursor,
 }
 impl std::fmt::Display for WorldError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -29,6 +30,7 @@ impl std::fmt::Display for WorldError {
                 Self::InvalidChange => "invalid terrain change",
                 Self::InvalidTerrain => "terrain does not match its authoritative map",
                 Self::VersionExhausted => "terrain version capacity exhausted",
+                Self::InvalidJournalCursor => "journal cursor is outside the retained range",
             }
         )
     }
@@ -218,6 +220,7 @@ pub struct World {
     new_cells: Vec<CellRow>,
     pending: BTreeMap<Recipient, BTreeSet<usize>>,
     journal: Vec<usize>,
+    journal_base: u64,
     soak: Vec<i64>,
     soak_members: BTreeSet<i64>,
 }
@@ -357,6 +360,7 @@ impl World {
             new_cells: Vec::new(),
             pending: BTreeMap::new(),
             journal: Vec::new(),
+            journal_base: 0,
             soak,
             soak_members,
         };
@@ -528,8 +532,35 @@ impl World {
     pub fn journal(&self) -> &[usize] {
         &self.journal
     }
-    pub fn take_journal(&mut self) -> Vec<usize> {
+    pub fn journal_base(&self) -> u64 {
+        self.journal_base
+    }
+    pub fn journal_end(&self) -> Result<u64, WorldError> {
+        self.journal_base
+            .checked_add(self.journal.len() as u64)
+            .ok_or(WorldError::VersionExhausted)
+    }
+    /// Remove only a checked, already-consumed prefix. Absolute cursors survive trimming.
+    pub fn trim_journal_before(&mut self, at: u64) -> Result<(), WorldError> {
+        let end = self.journal_end()?;
+        if at < self.journal_base || at > end {
+            return Err(WorldError::InvalidJournalCursor);
+        }
+        let count = usize::try_from(at - self.journal_base)
+            .map_err(|_| WorldError::InvalidJournalCursor)?;
+        self.journal.drain(..count);
+        self.journal_base = at;
+        Ok(())
+    }
+    /// Begin a new source journal epoch, used after static World setup.
+    pub fn reset_journal(&mut self) -> Vec<usize> {
+        self.journal_base = 0;
         std::mem::take(&mut self.journal)
+    }
+    /// Legacy ordinary-map drain. This resets the epoch, preserving its original behavior.
+    /// Active World memories instead use checked prefix trimming.
+    pub fn take_journal(&mut self) -> Vec<usize> {
+        self.reset_journal()
     }
     pub fn soak(&self) -> &[i64] {
         &self.soak
@@ -1067,5 +1098,37 @@ impl World {
             None
         };
         Ok(Mutation { logged_index })
+    }
+}
+
+#[cfg(test)]
+mod journal_tests {
+    use super::*;
+    #[test]
+    fn checked_prefix_and_epoch_reset() {
+        let input = serde_json::json!({"name":"guard map","w":20,"h":20,"rows":vec![".".repeat(20);20],"spawns":[{"x":0,"y":0},{"x":19,"y":19}],"points":[{"x":10,"y":10}]});
+        let map = AuthoritativeMap::from_json(&serde_json::to_vec(&input).unwrap()).unwrap();
+        let mut world = World::from_map(&map).unwrap();
+        world.reset_journal();
+        world.touch(1).unwrap();
+        world.touch(2).unwrap();
+        world.trim_journal_before(1).unwrap();
+        assert_eq!(world.journal_base(), 1);
+        assert_eq!(world.journal(), &[2]);
+        assert_eq!(world.journal_end(), Ok(2));
+        assert_eq!(
+            world.trim_journal_before(0),
+            Err(WorldError::InvalidJournalCursor)
+        );
+        world.journal_base = u64::MAX;
+        assert_eq!(
+            world.trim_journal_before(u64::MAX),
+            Err(WorldError::VersionExhausted)
+        );
+        assert_eq!(world.journal(), &[2]);
+        assert_eq!(world.journal_base(), u64::MAX);
+        assert_eq!(world.take_journal(), vec![2]);
+        assert_eq!(world.journal_base(), 0);
+        assert_eq!(world.journal_end(), Ok(0));
     }
 }
