@@ -10,7 +10,7 @@ use ww2_core::{
     match_commands::UnitControl,
     match_firing::FiringState,
     match_runtime::{Match, MatchOptions, PlayerConfig},
-    match_support::{SupportDenial, SupportEvent, SupportState},
+    match_support::{FighterCover, SupportDenial, SupportEvent, SupportState},
     random::StreamId,
     unit_spawn,
     weather::WeatherChoice,
@@ -72,16 +72,18 @@ fn make(t: &Value) -> Match {
         Catalog::compiled().unwrap(),
         kind,
         1,
-        1,
+        t["unit"]["owner"].as_u64().unwrap() as usize,
         Point {
             x: t["unit"]["x"].as_f64().unwrap(),
             z: t["unit"]["z"].as_f64().unwrap(),
         },
     )
     .unwrap();
-    u.still = Some(20.0);
+    u.still = t["unit"]["still"].as_f64();
     m.commands
         .insert(1, UnitControl::new(&u, &m.rules).unwrap());
+    m.commands.units.get_mut(&1).unwrap().hold_fire =
+        t["unit"]["holdFire"].as_bool().unwrap_or(false);
     m.combat.initialize(1).hit_by = Some(0);
     m.firing.initialize(1).retarget = 0.5;
     m.world.game.units.insert(1, u);
@@ -109,9 +111,19 @@ fn make(t: &Value) -> Match {
         m.start.points[0].owner = Some(0);
         m.start.points[0].cut = t["variation"] == "cut";
     }
+    if t["variation"] == "fighters" {
+        m.support.covers.push(FighterCover {
+            team: 1,
+            owner: 1,
+            at: Point { x: 41.0, z: 41.0 },
+            radius: 40.0,
+            remaining: 60.0,
+        });
+    }
     m
 }
 fn snapshot(m: &mut Match) -> Value {
+    ww2_core::vision::update_vision(&mut m.world.game, &m.rules, &m.grid);
     let sparse = |a: &[f32]| {
         a.iter()
             .enumerate()
@@ -124,6 +136,7 @@ fn snapshot(m: &mut Match) -> Value {
         .take_events()
         .into_iter()
         .map(|e| match e {
+            SupportEvent::Bomb(p) => json!({"x":p.x,"z":p.z,"k":"bomb","pub":true}),
             SupportEvent::Shell(p) => json!({"x":p.x,"z":p.z,"k":"shell","pub":true}),
             SupportEvent::SmokeShells(p) => json!({"x":p.x,"z":p.z,"k":"smokeshells","pub":true}),
             SupportEvent::Plane {kind,at,direction,owner} => json!({"k":kind.name(),"x":at.x,"z":at.z,"dir":direction,"fo":owner,"pub":true}),
@@ -142,7 +155,7 @@ fn snapshot(m: &mut Match) -> Value {
         .map(|(_, v)| format!("{v:016x}"));
     // An unused purpose has the same initial state as the original fixture's untouched stream.
     let initial = "89c878576e39a642".to_owned();
-    json!({"mp":m.start.economy.players.iter().map(|p|bits(p.mp)).collect::<Vec<_>>(),"cooldowns":m.start.players.iter().map(|p|p.support.iter().map(|(k,v)|(k.clone(),bits(*v))).collect::<serde_json::Map<String,Value>>()).collect::<Vec<_>>(),"strikes":m.world.game.strikes.iter().map(|s|json!({"kind":s.runtime.as_ref().unwrap().kind.name(),"owner":s.owner,"x":bits(s.x),"z":bits(s.z),"dir":bits(s.dir),"t":bits(s.runtime.as_ref().unwrap().delay),"left":bits(s.runtime.as_ref().unwrap().left),"next":bits(s.runtime.as_ref().unwrap().next),"live":s.live})).collect::<Vec<_>>(),"covers":m.support.covers.iter().map(|c|json!({"team":c.team,"owner":c.owner,"x":bits(c.at.x),"z":bits(c.at.z),"r":bits(c.radius),"t":bits(c.remaining)})).collect::<Vec<_>>(),"smokes":m.world.game.smokes.iter().map(|s|json!({"id":s.id,"x":bits(s.x),"z":bits(s.z),"r":bits(s.r),"t":bits(s.remaining.unwrap())})).collect::<Vec<_>>(),"units":m.world.game.units.values().map(|u|{let c=m.combat.get(u.id).unwrap();json!({"id":u.id,"hp":bits(u.hp),"supp":bits(u.supp),"lastHit":c.last_hit,"hitBy":c.hit_by,"hitAt":bits(c.hit_at),"retarget":bits(m.firing.get(u.id).unwrap().retarget)})}).collect::<Vec<_>>(),"terrain":{"chars":String::from_utf8(m.world.game.chars.clone()).unwrap(),"height":m.world.game.height.clone().unwrap_or_else(||vec![0;m.world.game.w*m.world.game.h]),"hp":sparse(&m.world.game.cell_hp),"wear":sparse(m.world.game.wear.as_deref().unwrap()),"scar":sparse(&m.world.scar),"versions":[m.world.game.terrain_version as u64,m.world.versions.obstruction,m.world.versions.infantry,m.world.versions.vehicle,m.world.versions.naval]},"environment":[m.start.environment_seed,m.next_unit_id],"story":m.story.iter().map(|s|[bits(s.support_calls),bits(s.mp_spent)]).collect::<Vec<_>>(),"shots":shots,"random":random.unwrap_or(initial)})
+    json!({"visible":m.world.game.players.iter().map(|p|p.visible.clone()).collect::<Vec<_>>(),"mp":m.start.economy.players.iter().map(|p|bits(p.mp)).collect::<Vec<_>>(),"cooldowns":m.start.players.iter().map(|p|p.support.iter().map(|(k,v)|(k.clone(),bits(*v))).collect::<serde_json::Map<String,Value>>()).collect::<Vec<_>>(),"strikes":m.world.game.strikes.iter().map(|s|json!({"kind":s.runtime.as_ref().unwrap().kind.name(),"owner":s.owner,"x":bits(s.x),"z":bits(s.z),"dir":bits(s.dir),"t":bits(s.runtime.as_ref().unwrap().delay),"left":bits(s.runtime.as_ref().unwrap().left),"next":bits(s.runtime.as_ref().unwrap().next),"live":s.live})).collect::<Vec<_>>(),"covers":m.support.covers.iter().map(|c|json!({"team":c.team,"owner":c.owner,"x":bits(c.at.x),"z":bits(c.at.z),"r":bits(c.radius),"t":bits(c.remaining)})).collect::<Vec<_>>(),"smokes":m.world.game.smokes.iter().map(|s|json!({"id":s.id,"x":bits(s.x),"z":bits(s.z),"r":bits(s.r),"t":bits(s.remaining.unwrap())})).collect::<Vec<_>>(),"units":m.world.game.units.values().map(|u|{let c=m.combat.get(u.id).unwrap();json!({"id":u.id,"hp":bits(u.hp),"supp":bits(u.supp),"lastHit":c.last_hit,"hitBy":c.hit_by,"hitAt":bits(c.hit_at),"retarget":bits(m.firing.get(u.id).unwrap().retarget)})}).collect::<Vec<_>>(),"terrain":{"chars":String::from_utf8(m.world.game.chars.clone()).unwrap(),"height":m.world.game.height.clone().unwrap_or_else(||vec![0;m.world.game.w*m.world.game.h]),"hp":sparse(&m.world.game.cell_hp),"wear":sparse(m.world.game.wear.as_deref().unwrap()),"scar":sparse(&m.world.scar),"versions":[m.world.game.terrain_version as u64,m.world.versions.obstruction,m.world.versions.infantry,m.world.versions.vehicle,m.world.versions.naval]},"environment":[m.start.environment_seed,m.next_unit_id],"story":m.story.iter().map(|s|[bits(s.support_calls),bits(s.mp_spent),bits(s.planes_downed)]).collect::<Vec<_>>(),"shots":shots,"random":random.unwrap_or(initial)})
 }
 fn compare(a: &Value, b: &Value, path: &str) {
     match b {
@@ -218,7 +231,7 @@ fn actual_support_admission_strikes_and_timers_match_source() {
             count += 1;
         }
     }
-    assert_eq!(count, 900);
+    assert_eq!(count, 2820);
 }
 #[test]
 fn unsupported_air_and_invalid_membership_do_not_charge_or_publish() {
@@ -226,7 +239,7 @@ fn unsupported_air_and_invalid_membership_do_not_charge_or_publish() {
     let mut m = make(&f["traces"][0]);
     let wallet = m.start.economy.players[0].mp;
     let cooldowns = m.start.players[0].support.clone();
-    for name in ["strafe", "bombing", "dive", "para"] {
+    for name in ["para"] {
         assert!(
             m.admit_support(0, name, Point { x: 41.0, z: 41.0 }, None)
                 .is_err()
@@ -238,9 +251,11 @@ fn unsupported_air_and_invalid_membership_do_not_charge_or_publish() {
     m.admit_support(0, "artillery", Point { x: 41.0, z: 41.0 }, None)
         .unwrap();
     let before = m.support.clone();
+    let strikes = m.world.game.strikes.clone();
     let random = m.start.random.snapshot();
     assert!(m.step_support_strikes(&[2], 0.05).is_err());
     assert_eq!(m.support, before);
+    assert_eq!(m.world.game.strikes, strikes);
     assert_eq!(m.start.random.snapshot(), random);
 }
 

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added source-work aircraft payloads for recon, strafing, bombing and dive strikes through canonical combat, flak ammunition and crater mutation. The unchanged prototype oracle passes 188 traces and 2,820 checkpoints, including interception and actual visibility readbacks. Native differential checks, paratrooper publication and complete tick hookup remain pending.
+
 - Integrated the immutable prepared-publication prerequisite into the separate aircraft support continuation. Ground support verification remains on its unchanged frozen candidate; this combined continuation has no native proof yet.
 
 - Started the aircraft support continuation with one canonical Game strike geometry and runtime timer owner, exact pending-drop metadata and source-order recon interception. Payload expansion and original-source/native proof are in progress; the verified-source ground checkpoint stays frozen separately.

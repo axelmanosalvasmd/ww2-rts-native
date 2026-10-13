@@ -16,6 +16,9 @@ use crate::{
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SupportKind {
     Recon,
+    Strafe,
+    Bombing,
+    Dive,
     Artillery,
     Smoke,
     Cover,
@@ -24,6 +27,9 @@ impl SupportKind {
     pub const fn name(self) -> &'static str {
         match self {
             Self::Recon => "recon",
+            Self::Strafe => "strafe",
+            Self::Bombing => "bombing",
+            Self::Dive => "dive",
             Self::Artillery => "artillery",
             Self::Smoke => "smoke",
             Self::Cover => "cover",
@@ -69,6 +75,7 @@ pub struct FighterCover {
 #[derive(Clone, Debug, PartialEq)]
 pub enum SupportEvent {
     Shell(Point),
+    Bomb(Point),
     SmokeShells(Point),
     Plane {
         kind: SupportKind,
@@ -190,10 +197,13 @@ impl Match {
         }
         let kind = match name {
             "recon" => SupportKind::Recon,
+            "strafe" => SupportKind::Strafe,
+            "bombing" => SupportKind::Bombing,
+            "dive" => SupportKind::Dive,
             "artillery" => SupportKind::Artillery,
             "smoke" => SupportKind::Smoke,
             "cover" => SupportKind::Cover,
-            "strafe" | "bombing" | "dive" | "para" => {
+            "para" => {
                 return Err(SupportError::Unsupported(
                     "support plane actuator is unavailable",
                 ));
@@ -227,7 +237,7 @@ impl Match {
                 at.x - self.start.players[owner].spawn.x,
             )
         });
-        let shells = if kind == SupportKind::Artillery {
+        let shells = if def.get("shells").is_some() {
             let doctrine = catalog()?
                 .table("DOCTRINE")
                 .map_err(|e| SupportError::Actuation(e.to_string()))?;
@@ -283,6 +293,168 @@ impl Match {
         self.world.game.strikes.push(strike);
         story.commit();
         Ok(None)
+    }
+    fn blast_support(
+        &mut self,
+        kind: SupportKind,
+        owner: usize,
+        at: Point,
+        unit_order: &[u32],
+    ) -> Result<(), SupportError> {
+        let def = definition(kind)?;
+        let (wind_angle, wind_strength) = self.start.wind;
+        let current_order: Vec<_> = self.world.game.units.keys().copied().collect();
+        let mut damage = DamageWorld {
+            world: &mut self.world,
+            combat: &mut self.combat,
+            grid: &mut self.grid,
+            rules: &self.rules,
+            logistics: &self.logistics,
+            production: &self.production,
+            mode: self.options.mode,
+            tech_enabled: self.options.tech,
+            environment: &mut self.environment,
+            environment_seed: &mut self.start.environment_seed,
+            next_id: &mut self.next_unit_id,
+            unit_order: &current_order,
+            wind_angle,
+            wind_strength,
+        };
+        let effects = damage
+            .explosion_membership(
+                at,
+                number(def, "blast")?,
+                ExplosionSource::support(kind.name())
+                    .map_err(|e| SupportError::Actuation(e.to_string()))?,
+                owner as i32,
+                None,
+                None,
+                None,
+                unit_order,
+                &mut self.firing,
+            )
+            .map_err(|e| SupportError::Actuation(e.to_string()))?;
+        self.support
+            .events
+            .extend(effects.into_iter().map(SupportEvent::Environment));
+        self.dig_support(at, number(def, "dig")?)
+    }
+    fn dent_support(&mut self, c: usize) -> Result<(), SupportError> {
+        let g = &self.world.game;
+        let old = g.height.as_ref().map_or(0, |h| h[c]);
+        let lower = i16::from(old) - 1;
+        let x = c % g.w;
+        let neighbors = [
+            c.checked_sub(g.w),
+            c.checked_add(g.w).filter(|n| *n < g.w * g.h),
+            (x > 0).then(|| c - 1),
+            (x + 1 < g.w).then(|| c + 1),
+        ];
+        if f64::from(lower) >= number(cfg()?, "minLevel")?
+            && !neighbors
+                .into_iter()
+                .flatten()
+                .any(|n| i16::from(g.height.as_ref().map_or(0, |h| h[n])) - lower > 1)
+        {
+            self.world
+                .set_level(c, lower as i8)
+                .map_err(|e| SupportError::Actuation(e.to_string()))?;
+        }
+        Ok(())
+    }
+    fn dig_support(&mut self, at: Point, radius: f64) -> Result<(), SupportError> {
+        let first = self.world.game.cell_of(at.x, at.z);
+        let mut hole = first.into_iter().collect::<Vec<_>>();
+        let n = math::ceil(radius / CELL) as i32;
+        for dy in -n..=n {
+            for dx in -n..=n {
+                if let Some(c) = self
+                    .world
+                    .game
+                    .cell_of(at.x + f64::from(dx) * CELL, at.z + f64::from(dy) * CELL)
+                {
+                    let center = Point {
+                        x: (c % self.world.game.w) as f64 * CELL + CELL / 2.0,
+                        z: (c / self.world.game.w) as f64 * CELL + CELL / 2.0,
+                    };
+                    if Some(c) != first && math::hypot(center.x - at.x, center.z - at.z) <= radius {
+                        hole.push(c);
+                    }
+                }
+            }
+        }
+        for &c in &hole {
+            self.dent_support(c)?;
+            if self.world.game.chars[c] == b'.' {
+                self.world
+                    .set_cell(c, b'+')
+                    .map_err(|e| SupportError::Actuation(e.to_string()))?;
+            }
+        }
+        if radius > 0.0 {
+            for c in hole {
+                let center = Point {
+                    x: (c % self.world.game.w) as f64 * CELL + CELL / 2.0,
+                    z: (c / self.world.game.w) as f64 * CELL + CELL / 2.0,
+                };
+                if self.world.game.chars[c] != b'W'
+                    && math::hypot(center.x - at.x, center.z - at.z) <= radius / 2.0
+                {
+                    self.dent_support(c)?;
+                }
+            }
+        }
+        Ok(())
+    }
+    fn strafe_support(&mut self, strike: &Strike, actors: &[u32]) -> Result<(), SupportError> {
+        let def = definition(SupportKind::Strafe)?;
+        let cx = math::cos(strike.dir);
+        let cz = math::sin(strike.dir);
+        for &id in actors {
+            let u = &self.world.game.units[&id];
+            let dx = u.x - strike.x;
+            let dz = u.z - strike.z;
+            if u.hp <= 0.0
+                || u.air.is_some()
+                || u.riding
+                || math::abs(dx * cx + dz * cz) > number(def, "len")? / 2.0
+                || math::abs(-dx * cz + dz * cx) > number(def, "width")? / 2.0
+            {
+                continue;
+            }
+            let current_order: Vec<_> = self.world.game.units.keys().copied().collect();
+            let (wind_angle, wind_strength) = self.start.wind;
+            let mut damage = DamageWorld {
+                world: &mut self.world,
+                combat: &mut self.combat,
+                grid: &mut self.grid,
+                rules: &self.rules,
+                logistics: &self.logistics,
+                production: &self.production,
+                mode: self.options.mode,
+                tech_enabled: self.options.tech,
+                environment: &mut self.environment,
+                environment_seed: &mut self.start.environment_seed,
+                next_id: &mut self.next_unit_id,
+                unit_order: &current_order,
+                wind_angle,
+                wind_strength,
+            };
+            let hurt = damage
+                .hurt(
+                    id,
+                    ExplosionSource::support("strafe")
+                        .map_err(|e| SupportError::Actuation(e.to_string()))?,
+                    1.0,
+                    strike.owner as i32,
+                    &mut self.firing,
+                )
+                .map_err(|e| SupportError::Actuation(e.to_string()))?;
+            self.support
+                .events
+                .push(SupportEvent::Environment(environment::Effect::Hurt(hurt)));
+        }
+        Ok(())
     }
     /// A passing support is intercepted once, when its arrival delay expires.
     fn intercept_support(
@@ -365,6 +537,11 @@ impl Match {
         });
         timing.left = if timing.kind == SupportKind::Recon {
             self.start.random.next_fraction(StreamId::OffMap) * timing.left
+        } else if timing.kind == SupportKind::Bombing {
+            math::floor(
+                self.start.random.next_fraction(StreamId::OffMap)
+                    * number(definition(timing.kind)?, "shells")?,
+            )
         } else {
             0.0
         };
@@ -440,7 +617,13 @@ impl Match {
                 }
                 if !s.live {
                     s.live = true;
-                    if kind == SupportKind::Recon {
+                    if matches!(
+                        kind,
+                        SupportKind::Recon
+                            | SupportKind::Strafe
+                            | SupportKind::Bombing
+                            | SupportKind::Dive
+                    ) {
                         self.support.events.push(SupportEvent::Plane {
                             kind,
                             at: Point { x: s.x, z: s.z },
@@ -451,6 +634,11 @@ impl Match {
                             s.runtime = Some(timing);
                             continue;
                         }
+                    }
+                    if kind == SupportKind::Dive {
+                        let at = Point { x: s.x, z: s.z };
+                        self.support.events.push(SupportEvent::Bomb(at));
+                        self.blast_support(kind, s.owner, at, unit_order)?;
                     }
                     if kind == SupportKind::Cover {
                         if self.support.covers.len() == 4096 {
@@ -490,6 +678,23 @@ impl Match {
                         .events
                         .push(SupportEvent::SmokeShells(Point { x: s.x, z: s.z }));
                     timing.left = 0.0;
+                } else if kind == SupportKind::Strafe {
+                    self.strafe_support(s, unit_order)?;
+                    timing.left = 0.0;
+                } else if kind == SupportKind::Bombing {
+                    timing.next -= dt;
+                    if timing.next <= 0.0 {
+                        let i = number(def, "shells")? - timing.left;
+                        let at = strip(
+                            s,
+                            (i / (number(def, "shells")? - 1.0) - 0.5) * number(def, "len")?,
+                            (self.start.random.next_fraction(StreamId::OffMap) - 0.5) * 3.0,
+                        );
+                        self.support.events.push(SupportEvent::Bomb(at));
+                        self.blast_support(kind, s.owner, at, unit_order)?;
+                        timing.left -= 1.0;
+                        timing.next = number(def, "every")?;
+                    }
                 } else if kind == SupportKind::Artillery {
                     timing.next -= dt;
                     if timing.next > 0.0 {
@@ -502,68 +707,7 @@ impl Match {
                         * number(def, "width")?;
                     let at = strip(s, along, side);
                     self.support.events.push(SupportEvent::Shell(at));
-                    let (wind_angle, wind_strength) = self.start.wind;
-                    let current_order: Vec<_> = self.world.game.units.keys().copied().collect();
-                    let mut damage = DamageWorld {
-                        world: &mut self.world,
-                        combat: &mut self.combat,
-                        grid: &mut self.grid,
-                        rules: &self.rules,
-                        logistics: &self.logistics,
-                        production: &self.production,
-                        mode: self.options.mode,
-                        tech_enabled: self.options.tech,
-                        environment: &mut self.environment,
-                        environment_seed: &mut self.start.environment_seed,
-                        next_id: &mut self.next_unit_id,
-                        unit_order: &current_order,
-                        wind_angle,
-                        wind_strength,
-                    };
-                    let effects = damage
-                        .explosion_membership(
-                            at,
-                            number(def, "blast")?,
-                            ExplosionSource::support(kind.name())
-                                .map_err(|e| SupportError::Actuation(e.to_string()))?,
-                            s.owner as i32,
-                            None,
-                            None,
-                            None,
-                            unit_order,
-                            &mut self.firing,
-                        )
-                        .map_err(|e| SupportError::Actuation(e.to_string()))?;
-                    self.support
-                        .events
-                        .extend(effects.into_iter().map(SupportEvent::Environment));
-                    // Artillery dig=0 still dents its landing cell and marks open ground as cratered.
-                    if let Some(c) = self.world.game.cell_of(at.x, at.z) {
-                        let g = &self.world.game;
-                        let old = g.height.as_ref().map_or(0, |h| h[c]);
-                        let lower = i16::from(old) - 1;
-                        let x = c % g.w;
-                        let neighbors = [
-                            c.checked_sub(g.w),
-                            c.checked_add(g.w).filter(|n| *n < g.w * g.h),
-                            (x > 0).then(|| c - 1),
-                            (x + 1 < g.w).then(|| c + 1),
-                        ];
-                        if f64::from(lower) >= number(cfg()?, "minLevel")?
-                            && !neighbors.into_iter().flatten().any(|n| {
-                                i16::from(g.height.as_ref().map_or(0, |h| h[n])) - lower > 1
-                            })
-                        {
-                            self.world
-                                .set_level(c, lower as i8)
-                                .map_err(|e| SupportError::Actuation(e.to_string()))?;
-                        }
-                        if self.world.game.chars[c] == b'.' {
-                            self.world
-                                .set_cell(c, b'+')
-                                .map_err(|e| SupportError::Actuation(e.to_string()))?;
-                        }
-                    }
+                    self.blast_support(kind, s.owner, at, unit_order)?;
                     timing.left -= 1.0;
                     timing.next = number(def, "every")?;
                 }
