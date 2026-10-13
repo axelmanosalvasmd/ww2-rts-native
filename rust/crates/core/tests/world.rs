@@ -230,6 +230,7 @@ fn perform(w: &mut World, a: &Value) -> Value {
             }
             if let Some(v) = a["wreck"].as_array() {
                 w.game.wrecks.push(Wreck {
+                    id: None,
                     x: v[0].as_f64().unwrap(),
                     z: v[1].as_f64().unwrap(),
                     cell: v[2].as_u64().map(|v| v as usize),
