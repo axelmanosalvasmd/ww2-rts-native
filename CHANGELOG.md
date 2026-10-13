@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Kept satchel oracle targets within each ability's actual range and corrected the design description of Commando satchels. Launcher admission remains the caller's responsibility.
+
 - Removed the obsolete local weapon-blast import after flights began retaining their own typed blast source.
 
 - Added a typed internal small-arms shot event for the operative producer, preserving its existing effect, shooter, endpoint and optional enemy/man fields. No contact or hit-direction fields were added.
