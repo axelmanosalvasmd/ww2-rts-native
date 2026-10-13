@@ -1,6 +1,7 @@
 //! Independent original-source geometry, sampled rays and carried-target generic Hurt.
-//! These tests load trusted source rows into canonical Match state. They do not step
-//! fire admission, publish flights, settle grenades or adopt a hit-direction policy.
+//! These tests load trusted source rows into canonical Match state and publish
+//! fire/grenade effects. They do not schedule complete phases, settle grenades or
+//! adopt a hit-direction policy.
 //! Dormant ordinary firing fields outside Unit/UnitControl/UnitCombat/Soldier are
 //! retained in the source fixture but excluded from the Hurt state projection.
 use serde_json::{Value, json};
