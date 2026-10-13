@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Joined the independently reviewed narrow Assault actor correction into the World finish successor ancestry. The shared guard and retained source observations were already identical; runtime behavior is unchanged and combined native checks remain pending.
+
 - Tightened the shared sample actor guard after independent review: the hidden local-defender sentinel is accepted only in World. The controlled Assault neutral-bunker source trace remains recorded but is explicitly outside represented native actors; its native checks now require atomic refusal. A malformed-actor regression protects the ordinary publication boundary. Valid commander behavior is unchanged; native checks remain pending.
 
 - Incorporated the World provider's first native test import repair into the extracted shared scene fixture, using the actual world-map module for WorldMapInput. Runtime behavior is unchanged; combined native checks remain pending.
@@ -9,6 +11,7 @@
 - Enabled eligible World endings through canonical Match finish, story, timeline and reveal after staged region capture, income and home updates. Territory thresholds take priority over last-nation victory; draws and the first region captured this tick use source location rules. An actual-constructor JavaScript recorder covers 15 traces and 16 phases on Huge and Massive maps, and three earlier finish-refusal fixtures now test acceptance. Fort/gate seizure, owned-army/building removal and retired tick facts still reject the whole operation before mutation; native checks are pending the managed slot.
 
 - Integrated the immutable World region and memory provider into the separate canonical World finish branch, preserving its capture, income, home and unsupported-side-effect preflights. Shared World finish implementation and native verification remain pending.
+- Corrected Assault finish's shared sample actor guard after independent review: the hidden local-defender sentinel belongs only to World. The original controlled neutral-bunker observation is retained as unrepresented, with sampler and late-phase atomic refusal checks plus a malformed-actor regression. Ordinary commander outcomes are unchanged; no full neutral-actor parity is claimed, and native checks remain pending.
 
 - Shared canonical finish, end reasons and typed source timeline between Conquest and explicit Assault. Assault's late phase now subtracts elapsed simulation time, prioritizes loss of all living bunkers over timer expiry, records a draw when no attacker exists, and freezes its first result and clock. Existing story callbacks and internal results use the same Match state for Assault; generic ticking and other mode actuators remain unsupported. An unchanged-source recorder covers 11 Assault traces and 22 phases; native verification is pending the scheduled build slot.
 
