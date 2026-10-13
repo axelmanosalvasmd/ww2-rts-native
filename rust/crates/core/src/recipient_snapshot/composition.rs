@@ -168,6 +168,16 @@ mod tests {
         ));
         assert_eq!(delivery, before);
         state.world.mine_seen.clear();
+        state
+            .world
+            .mine_seen
+            .insert(state.world.game.chars.len(), 1);
+        assert!(matches!(
+            delivery.capture_quiescent(&mut state, &[false; 3], &[false; 3], &[]),
+            Err(SnapshotError::Rules)
+        ));
+        assert_eq!(delivery, before);
+        state.world.mine_seen.clear();
         let frame = delivery
             .capture_quiescent(&mut state, &[false; 3], &[false; 3], &[])
             .unwrap();

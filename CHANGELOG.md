@@ -2,7 +2,15 @@
 
 ## Unreleased
 
+- Preserved the independently reviewed, Vostro-verified quiet snapshot constructor, actor-order and ordinary logistics startup repairs in the separate active-list extension. The active-list dependency union still needs its own native proof.
+
 - Integrated the source-cleared canonical recipient list and staged observation prerequisites into a separate active-list snapshot extension. Preserved the ordinary snapshot guard and existing actor exclusions. Native verification and all-seat list preparation remain pending.
+
+- Restored the ordinary Conquest logistics initialization call after the shared startup refactor. The native supply regressions exposed empty reserves and an absent convoy service. Initialization again runs after bases, metadata and recipient routing; disabled logistics and other modes keep their existing limits. Combined native verification is pending.
+
+- Fixed two snapshot dependency compilation omissions: initialized the seven canonical World Match owners and supplied the recovery fixture's full-current actor-order argument. Restored the World-only refusal for unrepresented logistics startup. Existing publication callbacks and snapshot mode limits are preserved. Combined native verification is pending.
+
+- Added a quiet snapshot admission regression for an invalid remembered-mine cell. The existing shared routing guard rejects it before terrain or fog acknowledgments change; no runtime behavior changed.
 
 - Added an internal complete seat snapshot for explicitly admitted quiet ordinary Conquest frames. Before terrain/fog delivery, it checks actual persistent actors, paid work, recipient remembered wrecks/discovered mines and caller-owned environment events; unsupported state refuses instead of receiving empty defaults. The original recorder now checks 73 states, 219 partial projections and 219 full source snapshots, including technology omission. Combined native verification is pending; transport, spectators and active actor/list projection remain separate.
 

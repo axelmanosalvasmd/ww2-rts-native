@@ -681,6 +681,7 @@ impl Match {
         self.grid.rebuild(&self.world.game.units);
         if self.world.game.mode.is_none() {
             self.initialize_recipient_routing()?;
+            self.initialize_logistics()?;
         }
         Ok(())
     }
