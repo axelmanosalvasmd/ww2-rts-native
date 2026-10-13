@@ -108,6 +108,40 @@ impl OrderedFires {
         self.timers.clear();
     }
 }
+/// Mine discovery bits retain first-insertion order, including deletion and rediscovery.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct OrderedMineSeen {
+    order: Vec<usize>,
+    bits: BTreeMap<usize, u32>,
+}
+impl OrderedMineSeen {
+    pub fn insert(&mut self, cell: usize, bits: u32) -> Option<u32> {
+        if !self.bits.contains_key(&cell) {
+            self.order.push(cell);
+        }
+        self.bits.insert(cell, bits)
+    }
+    pub fn remove(&mut self, cell: &usize) -> Option<u32> {
+        let prior = self.bits.remove(cell);
+        if prior.is_some() {
+            self.order.retain(|c| c != cell);
+        }
+        prior
+    }
+    pub fn iter(&self) -> impl Iterator<Item = (&usize, &u32)> {
+        self.order.iter().map(|c| (c, &self.bits[c]))
+    }
+    pub fn clear(&mut self) {
+        self.order.clear();
+        self.bits.clear();
+    }
+}
+impl std::ops::Deref for OrderedMineSeen {
+    type Target = BTreeMap<usize, u32>;
+    fn deref(&self) -> &Self::Target {
+        &self.bits
+    }
+}
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FailureMetadata {
     pub impulse: Option<f64>,
@@ -205,7 +239,7 @@ pub struct World {
     pub shoal: Option<Vec<u8>>,
     pub roads: bool,
     pub mines: BTreeMap<usize, i32>,
-    pub mine_seen: BTreeMap<usize, u32>,
+    pub mine_seen: OrderedMineSeen,
     pub aid: BTreeMap<usize, usize>,
     pub fires: OrderedFires,
     pub structures: Vec<WorldStructure>,
@@ -248,7 +282,7 @@ struct ObservationSource {
     wrecks: Vec<crate::game::Wreck>,
     fires: Vec<usize>,
     mines: BTreeMap<usize, i32>,
-    mine_seen: BTreeMap<usize, u32>,
+    mine_seen: OrderedMineSeen,
 }
 #[derive(PartialEq)]
 struct ObservationUnit {
@@ -304,10 +338,7 @@ impl PreparedObservation<'_> {
     }
 }
 impl ObservationReceipt {
-    pub(crate) fn prepare(
-        self,
-        world: &mut World,
-    ) -> Result<(&mut Game, PreparedObservation<'_>), String> {
+    pub(crate) fn validate_source(&self, world: &World) -> Result<(), String> {
         if self
             .frame
             .as_ref()
@@ -315,6 +346,13 @@ impl ObservationReceipt {
         {
             return Err("observation source changed before publication".into());
         }
+        Ok(())
+    }
+    pub(crate) fn prepare(
+        self,
+        world: &mut World,
+    ) -> Result<(&mut Game, PreparedObservation<'_>), String> {
+        self.validate_source(world)?;
         if let ObservationAction::Acknowledge {
             recipient, prior, ..
         } = &self.action
@@ -536,7 +574,7 @@ impl World {
             shoal,
             roads,
             mines,
-            mine_seen: BTreeMap::new(),
+            mine_seen: OrderedMineSeen::default(),
             aid: BTreeMap::new(),
             fires: OrderedFires::default(),
             structures: Vec::new(),

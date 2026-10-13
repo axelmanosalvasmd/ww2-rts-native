@@ -24,15 +24,15 @@ pub mod map;
 pub mod match_abilities;
 pub mod match_combat;
 pub mod match_commands;
-pub mod match_recovery;
-
 pub mod match_end;
 pub mod match_firing;
 pub mod match_logistics;
 pub mod match_reactions;
+pub mod match_recovery;
 pub mod match_routing;
 pub mod match_runtime;
 pub mod match_story;
+pub mod match_support;
 pub mod match_tick;
 pub mod match_world_elimination;
 pub mod match_world_end;
@@ -40,6 +40,7 @@ pub mod math;
 pub mod movement;
 pub mod navigation;
 pub mod observed_memory;
+pub mod recipient_lists;
 
 pub mod objectives;
 pub mod path_requests;
@@ -51,6 +52,7 @@ pub mod production;
 pub mod projectiles;
 
 pub mod random;
+pub mod recipient_snapshot;
 pub mod route_knowledge;
 pub mod rules;
 pub mod separation;

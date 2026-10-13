@@ -20,6 +20,7 @@ use ww2_core::{
 fn context(m: &Match) -> RecipientContext<'_> {
     RecipientContext {
         world: &m.world,
+        environment: &m.environment,
         rules: &m.rules,
         building_cells: &m.building_cells,
         start: &m.start,
@@ -30,6 +31,7 @@ fn world_context(m: &Match) -> WorldRoutingContext<'_> {
     let w = m.world_runtime.as_ref().unwrap();
     WorldRoutingContext {
         world: &m.world,
+        environment: &m.environment,
         rules: &m.rules,
         start: &m.start,
         rails: &w.rails,
@@ -185,7 +187,7 @@ fn original_produce_unit_sees_birth_only_at_source_lazy_cache_boundaries() {
                 let found = route(&mut fork, p.query(), p.live(), &m, peer, point(&h["goal"]));
                 assert_eq!(found["path"], h["path"], "peer path {label}");
                 assert_eq!(found["routeEnd"], h["routeEnd"], "peer end {label}");
-                let (_, commit) = p.prepare_publication(&mut m.world).unwrap();
+                let (_, commit) = p.prepare_publication(&mut m.world, &m.environment).unwrap();
                 commit.commit();
                 paths = fork;
             }
@@ -199,7 +201,7 @@ fn original_produce_unit_sees_birth_only_at_source_lazy_cache_boundaries() {
                         "prior {label}"
                     );
                 }
-                let (_, commit) = p.prepare_publication(&mut m.world).unwrap();
+                let (_, commit) = p.prepare_publication(&mut m.world, &m.environment).unwrap();
                 commit.commit();
             }
             if c["setup"]["advance"] == true {
@@ -275,7 +277,7 @@ fn original_produce_unit_sees_birth_only_at_source_lazy_cache_boundaries() {
             assert_eq!(path["path"], c["expected"]["path"], "path {label}");
             assert_eq!(path["routeEnd"], c["expected"]["routeEnd"], "end {label}");
             let staged = staged_birth(&m, &born, &path);
-            let (game, commit) = p.prepare_publication(&mut m.world).unwrap();
+            let (game, commit) = p.prepare_publication(&mut m.world, &m.environment).unwrap();
             let mut controls = std::collections::BTreeMap::new();
             let mut recruitment = std::collections::BTreeMap::new();
             let players = game.players.len();
@@ -382,7 +384,7 @@ fn original_produce_unit_sees_birth_only_at_source_lazy_cache_boundaries() {
                 let found = route(&mut fork, p.query(), p.live(), &m, scout, point(&h["goal"]));
                 assert_eq!(found["path"], h["path"], "history path {label}");
                 assert_eq!(found["routeEnd"], h["routeEnd"], "history end {label}");
-                let (_, commit) = p.prepare_publication(&mut m.world).unwrap();
+                let (_, commit) = p.prepare_publication(&mut m.world, &m.environment).unwrap();
                 commit.commit();
                 paths = fork;
             }
@@ -394,7 +396,7 @@ fn original_produce_unit_sees_birth_only_at_source_lazy_cache_boundaries() {
                     c["prior"],
                     "prior {label}"
                 );
-                let (_, commit) = p.prepare_publication(&mut m.world).unwrap();
+                let (_, commit) = p.prepare_publication(&mut m.world, &m.environment).unwrap();
                 commit.commit();
             }
             if warm == "fog" {
@@ -443,7 +445,7 @@ fn original_produce_unit_sees_birth_only_at_source_lazy_cache_boundaries() {
             assert_eq!(path["path"], c["expected"]["path"], "path {label}");
             assert_eq!(path["routeEnd"], c["expected"]["routeEnd"], "end {label}");
             let staged = staged_birth(&m, &born, &path);
-            let (game, commit) = p.prepare_publication(&mut m.world).unwrap();
+            let (game, commit) = p.prepare_publication(&mut m.world, &m.environment).unwrap();
             let mut controls = std::collections::BTreeMap::new();
             let mut recruitment = std::collections::BTreeMap::new();
             let players = game.players.len();
@@ -539,7 +541,7 @@ fn aborts_keep_recipient_buffers_receipts_fog_and_prewarmed_search_history() {
         let scout = &m.world.game.units[&(idx(&c["setup"]["scout"]["id"]) as u32)];
         let found = route(&mut fork, p.query(), p.live(), &m, scout, point(&h["goal"]));
         assert_eq!(found["path"], h["path"]);
-        let (_, commit) = p.prepare_publication(&mut m.world).unwrap();
+        let (_, commit) = p.prepare_publication(&mut m.world, &m.environment).unwrap();
         commit.commit();
         paths = fork;
     }
@@ -570,7 +572,7 @@ fn aborts_keep_recipient_buffers_receipts_fog_and_prewarmed_search_history() {
         &born.unit,
         born.rally.unwrap().destination,
     );
-    let (game, receipt) = p.prepare_publication(&mut m.world).unwrap();
+    let (game, receipt) = p.prepare_publication(&mut m.world, &m.environment).unwrap();
     let mut controls = BTreeMap::new();
     let mut recruitment = BTreeMap::new();
     let mut control = UnitControl::new(&born.unit, &m.rules).unwrap();
@@ -651,7 +653,7 @@ fn aborts_keep_recipient_buffers_receipts_fog_and_prewarmed_search_history() {
     // A changed source frame is rejected before any deferred acknowledgements.
     let p = prepare_recipient_routing(context(&m), &mut state, &mut f, 0, Some(observer)).unwrap();
     m.world.game.tick += 1;
-    assert!(p.prepare_publication(&mut m.world).is_err());
+    assert!(p.prepare_publication(&mut m.world, &m.environment).is_err());
     m.world.game.tick -= 1;
     for change in 0..3 {
         let p =
@@ -668,7 +670,7 @@ fn aborts_keep_recipient_buffers_receipts_fog_and_prewarmed_search_history() {
                 m.world.mine_seen.insert(cell, 1);
             }
         }
-        assert!(p.prepare_publication(&mut m.world).is_err());
+        assert!(p.prepare_publication(&mut m.world, &m.environment).is_err());
         match change {
             0 => {
                 m.world.fires.remove(&cell);
@@ -743,7 +745,7 @@ fn world_preview_abort_does_not_trim_journal_or_publish_birth_memory() {
     let observer =
         StagedObserver::new(&m.world.game, &m.rules, born.unit.id, 0, &born.unit).unwrap();
     let p = prepare_world_routing(world_context(&m), &mut memory, 0, Some(observer)).unwrap();
-    let (_, receipt) = p.prepare_publication(&mut m.world).unwrap();
+    let (_, receipt) = p.prepare_publication(&mut m.world, &m.environment).unwrap();
     drop(receipt);
     assert!(memory.team(m.world.game.players[0].team).is_none());
     assert!(memory.live_for(0).is_none());
@@ -763,7 +765,7 @@ fn world_preview_abort_does_not_trim_journal_or_publish_birth_memory() {
         born.rally.unwrap().destination,
     );
     let staged = staged_birth(&m, &born, &path);
-    let (game, receipt) = p.prepare_publication(&mut m.world).unwrap();
+    let (game, receipt) = p.prepare_publication(&mut m.world, &m.environment).unwrap();
     let mut controls = std::collections::BTreeMap::new();
     let mut recruitment = std::collections::BTreeMap::new();
     let players = game.players.len();

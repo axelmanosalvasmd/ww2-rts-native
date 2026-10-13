@@ -25,6 +25,31 @@ pub enum MoveOutcome {
     Unreachable,
     Arrived,
 }
+impl MoveOutcome {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Interrupted => "interrupted",
+            Self::Moving => "moving",
+            Self::Unreachable => "unreachable",
+            Self::Arrived => "completed",
+        }
+    }
+}
+/// The optional source result tail survives later moving/interrupted intents.
+/// Only the actual terminal path/completion operations replace it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MoveResult {
+    Unreachable { tick: i64 },
+    Completed { tick: i64 },
+}
+impl MoveResult {
+    pub fn parts(self) -> (&'static str, i64) {
+        match self {
+            Self::Unreachable { tick } => ("unreachable", tick),
+            Self::Completed { tick } => ("completed", tick),
+        }
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct MoveOrder {
@@ -42,6 +67,11 @@ pub enum Stance {
 /// Internal recorded input. This is not a WebSocket or C interface.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Command {
+    Support {
+        kind: String,
+        at: Point,
+        direction: Option<f64>,
+    },
     Move {
         orders: Vec<MoveOrder>,
         control_ids: Option<Vec<i64>>,
@@ -86,6 +116,7 @@ pub struct UnitControl {
     pub orders: VecDeque<Command>,
     pub outcome: Option<MoveOutcome>,
     pub outcome_tick: Option<i64>,
+    pub move_result: Option<MoveResult>,
     pub route_end: Option<Point>,
     pub supply_hold: bool,
     pub supply_escape: bool,
@@ -140,6 +171,7 @@ impl UnitControl {
             orders: VecDeque::new(),
             outcome: None,
             outcome_tick: None,
+            move_result: None,
             route_end: None,
             supply_hold: false,
             supply_escape: false,
@@ -189,6 +221,7 @@ pub enum Denial {
     Cooldown,
     Retreating,
     Munitions,
+    Manpower,
 }
 impl Denial {
     pub fn name(self) -> &'static str {
@@ -201,6 +234,7 @@ impl Denial {
             Self::Cooldown => "cooldown",
             Self::Retreating => "retreating",
             Self::Munitions => "mun",
+            Self::Manpower => "mp",
         }
     }
 }
@@ -249,6 +283,29 @@ impl Command {
                 rows.iter().map(|v| safe_id(v).unwrap_or(-1)).collect()
             });
         match object.get("t").and_then(|v| v.as_str()) {
+            Some("support") => Ok(Self::Support {
+                kind: object
+                    .get("kind")
+                    .and_then(|v| v.as_str())
+                    .ok_or(Denial::Blocked)?
+                    .into(),
+                at: Point {
+                    x: object
+                        .get("x")
+                        .and_then(|v| v.as_f64())
+                        .filter(|v| v.is_finite())
+                        .ok_or(Denial::Blocked)?,
+                    z: object
+                        .get("z")
+                        .and_then(|v| v.as_f64())
+                        .filter(|v| v.is_finite())
+                        .ok_or(Denial::Blocked)?,
+                },
+                direction: object
+                    .get("dir")
+                    .and_then(|v| v.as_f64())
+                    .filter(|v| v.is_finite()),
+            }),
             Some("move" | "amove") if object.contains_key("orders") => {
                 let face = object
                     .get("face")
@@ -315,6 +372,9 @@ impl Command {
     }
     fn valid(&self) -> bool {
         match self {
+            Self::Support { at, direction, .. } => {
+                at.x.is_finite() && at.z.is_finite() && direction.is_none_or(|v| v.is_finite())
+            }
             Self::Move { orders, face, .. } => {
                 orders.iter().all(|o| {
                     o.unit.unsigned_abs() <= 9007199254740991
@@ -406,6 +466,24 @@ impl crate::match_runtime::Match {
         if matches!(command, Command::Unsupported) {
             return Ok(Some(Denial::Unsupported));
         }
+        if let Command::Support {
+            kind,
+            at,
+            direction,
+        } = command
+        {
+            return match self.admit_support(owner, kind, *at, *direction) {
+                Ok(denial) => Ok(denial.map(|d| match d {
+                    crate::match_support::SupportDenial::Blocked => Denial::Blocked,
+                    crate::match_support::SupportDenial::Cooldown => Denial::Cooldown,
+                    crate::match_support::SupportDenial::Manpower => Denial::Manpower,
+                })),
+                Err(crate::match_support::SupportError::Unsupported(_)) => {
+                    Ok(Some(Denial::Unsupported))
+                }
+                Err(e) => Err(e.to_string()),
+            };
+        }
         if matches!(command, Command::Ability { .. } | Command::Autocast { .. }) {
             self.validate_abilities()?;
         }
@@ -422,7 +500,7 @@ impl crate::match_runtime::Match {
             | Command::Stance { ids, .. }
             | Command::Ability { ids, .. }
             | Command::Autocast { ids, .. } => ids.clone(),
-            Command::Unsupported => unreachable!(),
+            Command::Support { .. } | Command::Unsupported => unreachable!(),
         };
         if matches!(
             command,
@@ -569,7 +647,7 @@ impl crate::match_runtime::Match {
                     self.commands.units.get_mut(&id).unwrap().auto_cast = *on;
                 }
             }
-            Command::Unsupported => unreachable!(),
+            Command::Support { .. } | Command::Unsupported => unreachable!(),
         }
         Ok(None)
     }
@@ -1004,6 +1082,9 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
             if let Some(c) = self.match_state.commands.units.get_mut(&u.id) {
                 c.outcome = Some(MoveOutcome::Unreachable);
                 c.outcome_tick = Some(drop.tick as i64);
+                c.move_result = Some(MoveResult::Unreachable {
+                    tick: drop.tick as i64,
+                });
             }
         }
     }
@@ -1100,6 +1181,9 @@ impl crate::match_runtime::Match {
                     .ok_or("missing completion control")?;
                 c.outcome = Some(MoveOutcome::Arrived);
                 c.outcome_tick = Some(self.world.game.tick);
+                c.move_result = Some(MoveResult::Completed {
+                    tick: self.world.game.tick,
+                });
             } else if u.path.is_empty()
                 && crate::math::hypot(u.x - goal.x, u.z - goal.z) > 0.25
                 && u.repath <= 0.0

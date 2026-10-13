@@ -796,8 +796,43 @@ impl DamageWorld<'_> {
         memory: Option<&mut environment::DamageMemory>,
         retarget: &mut dyn RetargetSink,
     ) -> Result<Vec<environment::Effect>, CombatError> {
+        self.explosion_membership(
+            at,
+            radius,
+            profile,
+            owner,
+            contact_id,
+            direction,
+            memory,
+            self.unit_order,
+            retarget,
+        )
+    }
+    /// Apply direct unit and terrain-list consequences to captured current-unit membership.
+    /// Metadata, grid and environment validation still use the complete canonical unit order.
+    #[allow(clippy::too_many_arguments)]
+    pub fn explosion_membership(
+        &mut self,
+        at: Point,
+        radius: f64,
+        profile: ExplosionSource,
+        owner: i32,
+        contact_id: Option<&str>,
+        direction: Option<Point>,
+        memory: Option<&mut environment::DamageMemory>,
+        actor_order: &[UnitId],
+        retarget: &mut dyn RetargetSink,
+    ) -> Result<Vec<environment::Effect>, CombatError> {
         self.validate()?;
         self.environment_preflight()?;
+        let actors: BTreeSet<_> = actor_order.iter().copied().collect();
+        if actors.len() != actor_order.len()
+            || actor_order
+                .iter()
+                .any(|id| !self.world.game.units.contains_key(id))
+        {
+            return Err(CombatError::InvalidInput("blast actor membership"));
+        }
         profile.checked()?;
         if direction.is_some_and(|d| !d.x.is_finite() || !d.z.is_finite()) {
             return Err(CombatError::InvalidInput("blast direction"));
@@ -824,7 +859,7 @@ impl DamageWorld<'_> {
             .map_err(|_| CombatError::Rules)?;
         let mut effects = Vec::new();
         let mut skip = BTreeSet::new();
-        let ids = self.unit_order.to_vec();
+        let ids = actor_order.to_vec();
         for id in ids {
             let u = &self.world.game.units[&id];
             let distance = math::hypot(u.x - at.x, u.z - at.z);
@@ -877,6 +912,7 @@ impl DamageWorld<'_> {
                 if let Some(&c) = cells.first() {
                     let skip_cells = BTreeSet::new();
                     let mut hit = DamageContext::plain(&skip_cells);
+                    hit.actor_order = Some(actor_order);
                     hit.owner = Some(owner);
                     hit.contact_id = contact_id;
                     hit.direction = Some(Point {
@@ -997,6 +1033,7 @@ impl DamageWorld<'_> {
         }
         if let Some(damage) = profile.terrain.filter(|d| *d != 0.) {
             let mut hit = DamageContext::plain(&skip);
+            hit.actor_order = Some(actor_order);
             hit.owner = Some(owner);
             hit.contact_id = contact_id;
             hit.direction = direction;

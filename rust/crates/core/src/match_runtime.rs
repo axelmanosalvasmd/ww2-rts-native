@@ -517,12 +517,13 @@ pub struct BuildingCell {
 /// Authoritative startup state. Each mode admits only its implemented phases.
 /// Live terrain and units have a single owner in `world.game`.
 pub struct Match {
-    pub assault: Option<crate::assault_runtime::AssaultState>,
     pub field_works: crate::field_works::FieldWorksRuntime,
     pub abilities: crate::match_abilities::AbilityState,
     pub recovery: crate::match_recovery::RecoveryState,
-    pub commands: crate::match_commands::MatchCommands,
+    pub support: crate::match_support::SupportState,
+    pub assault: Option<crate::assault_runtime::AssaultState>,
     pub world_runtime: Option<crate::match_world::WorldRuntime>,
+    pub commands: crate::match_commands::MatchCommands,
     pub combat: crate::match_combat::CombatState,
     pub environment: crate::environment::EnvironmentRuntime,
     pub world: World,
@@ -626,12 +627,13 @@ impl Match {
         let player_count = start.players.len();
         let point_count = start.points.len();
         let result = Self {
-            assault: None,
-            field_works: crate::field_works::FieldWorksRuntime::default(),
             abilities: crate::match_abilities::AbilityState::default(),
             recovery: crate::match_recovery::RecoveryState::default(),
-            commands: crate::match_commands::MatchCommands::new(4096),
+            support: crate::match_support::SupportState::default(),
+            assault: None,
             world_runtime: None,
+            field_works: crate::field_works::FieldWorksRuntime::default(),
+            commands: crate::match_commands::MatchCommands::new(4096),
             combat: crate::match_combat::CombatState::default(),
             environment: crate::environment::EnvironmentRuntime::default(),
             grid: SpatialGrid::new(&world.game.units, 16.0),
@@ -1022,6 +1024,8 @@ impl Match {
         .publish_with(|unit, _| {
             self.combat.initialize(unit.id);
             self.firing.initialize(unit.id);
+            self.abilities.initialize(unit.id);
+            self.recovery.initialize(unit.id);
         });
         Ok(())
     }

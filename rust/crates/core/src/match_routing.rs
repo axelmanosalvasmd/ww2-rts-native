@@ -27,7 +27,8 @@ pub struct RecipientRouting {
     bound_units: Vec<BoundUnit>,
     wetness: f64,
     roads: bool,
-    wreck_memory: Vec<Wreck>,
+    wreck_memory: Vec<crate::recipient_lists::RememberedWreck>,
+    wreck_queries: Vec<Wreck>,
     wrecks: Vec<Wreck>,
 }
 impl RecipientRouting {
@@ -49,7 +50,20 @@ impl RecipientRouting {
         &self.wrecks
     }
     pub fn remembered_wrecks(&self) -> &[Wreck] {
-        &self.wreck_memory
+        &self.wreck_queries
+    }
+    pub fn remembered_wreck_rows(&self) -> Result<Vec<crate::recipient_lists::WreckRow>, String> {
+        self.wreck_memory
+            .iter()
+            .map(|row| {
+                row.display.clone().ok_or_else(|| {
+                    format!(
+                        "missing observed wreck display facts: {}",
+                        row.query.id.unwrap_or(0)
+                    )
+                })
+            })
+            .collect()
     }
     pub fn remembered(&self) -> &[ObservedRow] {
         self.memory.full_rows()
@@ -199,14 +213,54 @@ fn facts(
     }
     Ok(result)
 }
-fn refresh_wrecks(
-    state: &mut RecipientRouting,
+fn collect_wrecks(
     game: &Game,
     rules: &Rules,
     grid: &SpatialGrid,
     owner: usize,
     observer: Option<crate::staged_observer::StagedObserver<'_>>,
-) {
+    environment: &crate::environment::EnvironmentRuntime,
+) -> Result<Vec<crate::recipient_lists::RememberedWreck>, String> {
+    let team = game.players[owner].team;
+    let reach = game
+        .units
+        .values()
+        .filter(|u| game.team_of(u) == team)
+        .map(|u| vision_of(game, rules, u))
+        .fold(1.0, math::max);
+    game.wrecks
+        .iter()
+        .filter(|w| {
+            game.reveal
+                || sees(
+                    game,
+                    rules,
+                    grid,
+                    team,
+                    reach,
+                    Point { x: w.x, z: w.z },
+                    observer,
+                )
+        })
+        .map(|w| {
+            crate::recipient_lists::RememberedWreck::observe(
+                game,
+                rules,
+                w,
+                w.id.and_then(|id| environment.wreck_metadata().get(&id)),
+            )
+        })
+        .collect()
+}
+fn staged_wreck_memory(
+    prior: &[crate::recipient_lists::RememberedWreck],
+    game: &Game,
+    rules: &Rules,
+    grid: &SpatialGrid,
+    owner: usize,
+    observer: Option<crate::staged_observer::StagedObserver<'_>>,
+    accepted: Vec<crate::recipient_lists::RememberedWreck>,
+) -> Vec<crate::recipient_lists::RememberedWreck> {
     let team = game.players[owner].team;
     let reach = game
         .units
@@ -215,34 +269,14 @@ fn refresh_wrecks(
         .map(|u| vision_of(game, rules, u))
         .fold(1.0, math::max);
     let visible = |at| game.reveal || sees(game, rules, grid, team, reach, at, observer);
-    for current in &game.wrecks {
-        if !visible(Point {
-            x: current.x,
-            z: current.z,
-        }) {
-            continue;
-        }
-        let row = Wreck {
-            id: current.id,
-            cell: None,
-            x: math::round(current.x * 10.0) / 10.0,
-            z: math::round(current.z * 10.0) / 10.0,
-            moving: current.moving,
-        };
-        if let Some(old) = state.wreck_memory.iter_mut().find(|w| w.id == current.id) {
-            *old = row;
-        } else {
-            state.wreck_memory.push(row);
-        }
-    }
-    state.wreck_memory.retain(|old| {
-        game.wrecks.iter().any(|w| w.id == old.id) || !visible(Point { x: old.x, z: old.z })
-    });
-    for row in &mut state.wreck_memory {
-        if row.moving && !visible(Point { x: row.x, z: row.z }) {
-            row.moving = false;
-        }
-    }
+    crate::recipient_lists::updated_wreck_memory(prior, game, accepted, visible, visible)
+}
+fn publish_wreck_memory(
+    state: &mut RecipientRouting,
+    rows: Vec<crate::recipient_lists::RememberedWreck>,
+) {
+    state.wreck_queries = rows.iter().map(|row| row.query.clone()).collect();
+    state.wreck_memory = rows;
 }
 
 impl Match {
@@ -285,6 +319,7 @@ impl Match {
                     wetness: 0.0,
                     roads: w.roads,
                     wreck_memory: Vec::new(),
+                    wreck_queries: Vec::new(),
                     wrecks: Vec::new(),
                 })
             })
@@ -299,6 +334,7 @@ impl Match {
                 building_cells: &self.building_cells,
                 start: &self.start,
                 options: &self.options,
+                environment: &self.environment,
             },
             self.recipients.iter(),
             &self.routing_fog,
@@ -337,15 +373,18 @@ impl Match {
     /// Refresh before borrowing recipient query/live and mutable unit or search fields.
     pub fn refresh_recipient_routing(&mut self, owner: usize) -> Result<(), String> {
         self.validate_recipient(owner)?;
-        refresh_recipient_parts(
-            &mut self.world,
-            &self.rules,
-            &mut self.grid,
-            &self.building_cells,
+        let receipt = refresh_recipient_parts(
+            RecipientObservation {
+                world: &self.world,
+                rules: &self.rules,
+                building_cells: &self.building_cells,
+                environment: &self.environment,
+            },
             &mut self.routing_fog,
             &mut self.recipients[owner],
             owner,
-        )
+        )?;
+        receipt.commit(&mut self.world)
     }
     /// Preserve the fields the original cached view still reads from a removed
     /// unit object. The lifecycle owner calls this with the final removed unit.
@@ -413,15 +452,66 @@ impl Match {
     pub fn observed_wrecks(&mut self, owner: usize) -> Result<Vec<Wreck>, String> {
         self.validate_recipient(owner)?;
         let observation_grid = SpatialGrid::new(&self.world.game.units, 16.0);
-        refresh_wrecks(
-            &mut self.recipients[owner],
-            &self.world.game,
+        let game = &self.world.game;
+        let accepted = collect_wrecks(
+            game,
             &self.rules,
             &observation_grid,
             owner,
             None,
+            &self.environment,
+        )?;
+        let rows = staged_wreck_memory(
+            &self.recipients[owner].wreck_memory,
+            game,
+            &self.rules,
+            &observation_grid,
+            owner,
+            None,
+            accepted,
         );
-        Ok(self.recipients[owner].wreck_memory.clone())
+        publish_wreck_memory(&mut self.recipients[owner], rows);
+        Ok(self.recipients[owner].wreck_queries.clone())
+    }
+
+    /// Full display list. Missing imported facts reject before memory publication.
+    pub fn observed_wreck_rows(
+        &mut self,
+        owner: usize,
+    ) -> Result<Vec<crate::recipient_lists::WreckRow>, String> {
+        self.validate_recipient(owner)?;
+        let g = &self.world.game;
+        let grid = SpatialGrid::new(&g.units, 16.0);
+        let accepted = collect_wrecks(g, &self.rules, &grid, owner, None, &self.environment)?;
+        let rows = staged_wreck_memory(
+            &self.recipients[owner].wreck_memory,
+            g,
+            &self.rules,
+            &grid,
+            owner,
+            None,
+            accepted,
+        );
+        let display = crate::recipient_lists::display_rows(&rows)?;
+        publish_wreck_memory(&mut self.recipients[owner], rows);
+        Ok(display)
+    }
+
+    /// Exercise the existing lazy row/revision admission on a component preview.
+    /// The discarded receipt never acknowledges World or publishes an outbox.
+    pub fn preflight_observed_terrain(&self, owner: usize) -> Result<(), String> {
+        self.validate_recipient(owner)?;
+        let mut preview = self.recipients[owner].clone();
+        refresh_memory_parts(
+            &self.world,
+            &self.rules,
+            &self.building_cells,
+            &mut preview,
+            owner,
+            None,
+            false,
+        )?;
+        Ok(())
     }
 
     /// Full/reconnect reads preserve memory order; delta reads drain only its outbox.
@@ -448,6 +538,7 @@ pub struct RecipientContext<'a> {
     pub building_cells: &'a BTreeMap<usize, BuildingCell>,
     pub start: &'a crate::match_runtime::StartPlan,
     pub options: &'a crate::match_runtime::MatchOptions,
+    pub environment: &'a crate::environment::EnvironmentRuntime,
 }
 fn validate_context<'a>(
     context: RecipientContext<'_>,
@@ -564,47 +655,46 @@ fn refresh_memory_parts(
         .map_err(|e| format!("observed refresh: {e:?}"))
 }
 #[derive(Clone, Copy)]
-struct RecipientInputs<'a> {
-    world: &'a World,
-    rules: &'a Rules,
-    buildings: &'a BTreeMap<usize, BuildingCell>,
+pub struct RecipientObservation<'a> {
+    pub world: &'a World,
+    pub rules: &'a Rules,
+    pub building_cells: &'a BTreeMap<usize, BuildingCell>,
+    pub environment: &'a crate::environment::EnvironmentRuntime,
 }
 /// Existing immediate field-level consumer boundary. No gameplay grid mutation.
 pub(crate) fn refresh_recipient_parts(
-    world: &mut World,
-    rules: &Rules,
-    _grid: &mut SpatialGrid,
-    buildings: &BTreeMap<usize, BuildingCell>,
+    context: RecipientObservation<'_>,
     fog: &mut crate::fog::Fog,
     state: &mut RecipientRouting,
     owner: usize,
-) -> Result<(), String> {
-    let receipt = refresh_parts(
-        RecipientInputs {
-            world,
-            rules,
-            buildings,
+) -> Result<crate::world::ObservationReceipt, String> {
+    refresh_parts(
+        RecipientObservation {
+            world: context.world,
+            rules: context.rules,
+            building_cells: context.building_cells,
+            environment: context.environment,
         },
         state,
         fog,
         owner,
         None,
         false,
-    )?;
-    receipt.commit(world)
+    )
 }
 fn refresh_parts(
-    inputs: RecipientInputs<'_>,
+    inputs: RecipientObservation<'_>,
     state: &mut RecipientRouting,
     fog: &mut crate::fog::Fog,
     owner: usize,
     observer: Option<crate::staged_observer::StagedObserver<'_>>,
     capture_frame: bool,
 ) -> Result<crate::world::ObservationReceipt, String> {
-    let RecipientInputs {
+    let RecipientObservation {
         world,
         rules,
-        buildings,
+        building_cells: buildings,
+        environment,
     } = inputs;
     let g = &world.game;
     let key = (g.tick, g.terrain_version, g.vision_tick.unwrap_or(-1));
@@ -613,6 +703,8 @@ fn refresh_parts(
         state.wetness = g.wet.unwrap_or(0.0);
         return Ok(world.defer_observation(None, capture_frame));
     }
+    let grid = SpatialGrid::new(&g.units, 16.0);
+    let accepted = collect_wrecks(g, rules, &grid, owner, observer, environment)?;
     let receipt = refresh_memory_parts(
         world,
         rules,
@@ -626,9 +718,17 @@ fn refresh_parts(
         .memory
         .apply_routes(&mut state.routes)
         .map_err(|e| format!("observed projection: {e:?}"))?;
-    let grid = SpatialGrid::new(&g.units, 16.0);
-    refresh_wrecks(state, g, rules, &grid, owner, observer);
-    state.wrecks = state.wreck_memory.clone();
+    let rows = staged_wreck_memory(
+        &state.wreck_memory,
+        g,
+        rules,
+        &grid,
+        owner,
+        observer,
+        accepted,
+    );
+    publish_wreck_memory(state, rows);
+    state.wrecks = state.wreck_queries.clone();
     state.fires.fill(false);
     // Source teamFog is inside the fire filter callback. An empty fire map
     // leaves a cold fog cache available for the later birth sight source.
@@ -666,6 +766,7 @@ pub struct PreparedRecipientRouting<'a> {
     state: RecipientRouting,
     fog: crate::fog::Fog,
     receipt: crate::world::ObservationReceipt,
+    wreck_frame: crate::recipient_lists::WreckSourceFrame,
 }
 impl PreparedRecipientRouting<'_> {
     /// Preserve canonical search history while rebinding this recipient's
@@ -690,14 +791,15 @@ impl PreparedRecipientRouting<'_> {
         self.state.wrecks()
     }
 }
-pub struct RecipientRoutingCommit<'a, 'w> {
+pub struct RecipientRoutingCommit<'a, 'w, 'e> {
+    _environment: &'e crate::environment::EnvironmentRuntime,
     target: &'a mut RecipientRouting,
     fog_target: &'a mut crate::fog::Fog,
     state: RecipientRouting,
     fog: crate::fog::Fog,
     ledger: crate::world::PreparedObservation<'w>,
 }
-impl RecipientRoutingCommit<'_, '_> {
+impl RecipientRoutingCommit<'_, '_, '_> {
     pub fn commit(self) {
         *self.target = self.state;
         *self.fog_target = self.fog;
@@ -705,21 +807,25 @@ impl RecipientRoutingCommit<'_, '_> {
     }
 }
 impl<'a> PreparedRecipientRouting<'a> {
-    pub fn prepare_publication<'w>(
+    pub fn prepare_publication<'w, 'e>(
         self,
         world: &'w mut World,
-    ) -> Result<(&'w mut Game, RecipientRoutingCommit<'a, 'w>), String> {
+        environment: &'e crate::environment::EnvironmentRuntime,
+    ) -> Result<(&'w mut Game, RecipientRoutingCommit<'a, 'w, 'e>), String> {
         let Self {
             target,
             fog_target,
             state,
             fog,
             receipt,
+            wreck_frame,
         } = self;
+        wreck_frame.validate(environment)?;
         let (game, ledger) = receipt.prepare(world)?;
         Ok((
             game,
             RecipientRoutingCommit {
+                _environment: environment,
                 target,
                 fog_target,
                 state,
@@ -763,10 +869,11 @@ pub fn prepare_recipient_routing<'a>(
     let mut state = target.clone();
     let mut fog = fog_target.clone();
     let receipt = refresh_parts(
-        RecipientInputs {
+        RecipientObservation {
             world: context.world,
             rules: context.rules,
-            buildings: context.building_cells,
+            building_cells: context.building_cells,
+            environment: context.environment,
         },
         &mut state,
         &mut fog,
@@ -780,5 +887,179 @@ pub fn prepare_recipient_routing<'a>(
         state,
         fog,
         receipt,
+        wreck_frame: crate::recipient_lists::WreckSourceFrame::capture(
+            &context.world.game,
+            context.environment,
+        ),
     })
+}
+
+/// Read-only ordinary list preparation. Replacements are transient and become
+/// canonical only after every producer and recipient has passed its preflight.
+pub struct PreparedOrdinaryLists {
+    results: Vec<(usize, crate::recipient_lists::RecipientLists)>,
+    replacements: Vec<ListReplacement>,
+    source: crate::world::ObservationReceipt,
+    environment: crate::recipient_lists::WreckSourceFrame,
+}
+struct ListReplacement {
+    owner: usize,
+    prior: Vec<crate::recipient_lists::RememberedWreck>,
+    rows: Vec<crate::recipient_lists::RememberedWreck>,
+    queries: Vec<Wreck>,
+}
+/// Explicit source inputs allow assembly to borrow the remaining owners separately.
+pub struct OrdinaryListPublication<'a> {
+    pub world: &'a World,
+    pub environment: &'a crate::environment::EnvironmentRuntime,
+    pub options: &'a crate::match_runtime::MatchOptions,
+}
+pub struct OrdinaryListsCommit<'a, 'e> {
+    targets: &'a mut [RecipientRouting],
+    replacements: Vec<ListReplacement>,
+    _source: OrdinaryListPublication<'e>,
+}
+impl OrdinaryListsCommit<'_, '_> {
+    pub fn commit(self) {
+        for replacement in self.replacements {
+            let target = &mut self.targets[replacement.owner];
+            target.wreck_memory = replacement.rows;
+            target.wreck_queries = replacement.queries;
+        }
+    }
+}
+impl PreparedOrdinaryLists {
+    pub fn results(&self) -> &[(usize, crate::recipient_lists::RecipientLists)] {
+        &self.results
+    }
+    /// Validate all sources before acquiring the one canonical memory owner.
+    /// Publication holds source owners immutable and performs no terrain/Fog acknowledgment.
+    pub fn prepare_publication<'a, 'e>(
+        self,
+        source: OrdinaryListPublication<'e>,
+        targets: &'a mut [RecipientRouting],
+    ) -> Result<OrdinaryListsCommit<'a, 'e>, String> {
+        if !matches!(source.options.mode, Mode::Default | Mode::Conquest)
+            || source.world.game.mode.is_some()
+        {
+            return Err("ordinary list publication mode changed".into());
+        }
+        self.source.validate_source(source.world)?;
+        self.environment.validate(source.environment)?;
+        if targets.len() != source.world.game.players.len() {
+            return Err("list recipient table changed".into());
+        }
+        for replacement in &self.replacements {
+            let target = targets
+                .get(replacement.owner)
+                .ok_or("list recipient table changed")?;
+            target
+                .memory
+                .validate_binding(source.world)
+                .map_err(|e| format!("list memory binding: {e:?}"))?;
+            if target.memory.slot() != replacement.owner
+                || target.memory.identity() != replacement.owner as u64
+                || target.wreck_memory != replacement.prior
+            {
+                return Err("recipient wreck memory changed during list preparation".into());
+            }
+        }
+        Ok(OrdinaryListsCommit {
+            targets,
+            replacements: self.replacements,
+            _source: source,
+        })
+    }
+}
+/// All requested ordinary seats are prepared against one unchanged canonical source.
+/// Only each seat's bounded remembered wreck records are copied, not Match or terrain.
+pub fn prepare_ordinary_recipient_lists(
+    state: &Match,
+    owners: &[usize],
+) -> Result<PreparedOrdinaryLists, String> {
+    if !matches!(state.options.mode, Mode::Default | Mode::Conquest)
+        || state.world.game.mode.is_some()
+    {
+        return Err("ordinary list batch requires ordinary Conquest".into());
+    }
+    let mut unique = std::collections::BTreeSet::new();
+    for &owner in owners {
+        if !unique.insert(owner) {
+            return Err("duplicate list recipient".into());
+        }
+        state.validate_recipient(owner)?;
+    }
+    let g = &state.world.game;
+    if state
+        .world
+        .mine_seen
+        .keys()
+        .any(|cell| *cell >= g.chars.len())
+    {
+        return Err("invalid found-mine cell".into());
+    }
+    let grid = SpatialGrid::new(&g.units, 16.0);
+    let mut results = Vec::with_capacity(owners.len());
+    let mut replacements = Vec::with_capacity(owners.len());
+    for &owner in owners {
+        let prior = &state.recipients[owner].wreck_memory;
+        let accepted = collect_wrecks(g, &state.rules, &grid, owner, None, &state.environment)?;
+        let rows = staged_wreck_memory(prior, g, &state.rules, &grid, owner, None, accepted);
+        let wrecks = crate::recipient_lists::display_rows(&rows)?;
+        let team = g.players[owner].team;
+        let found_mines = state
+            .world
+            .mine_seen
+            .iter()
+            .filter_map(|(&cell, &bits)| {
+                ((bits >> team & 1) != 0 && g.chars[cell] == b'N').then_some(cell)
+            })
+            .collect();
+        let queries = rows.iter().map(|row| row.query.clone()).collect();
+        replacements.push(ListReplacement {
+            owner,
+            prior: prior.clone(),
+            rows,
+            queries,
+        });
+        results.push((
+            owner,
+            crate::recipient_lists::RecipientLists {
+                wrecks,
+                found_mines,
+                nodes: None,
+            },
+        ));
+    }
+    Ok(PreparedOrdinaryLists {
+        results,
+        replacements,
+        source: state.world.defer_observation(None, true),
+        environment: crate::recipient_lists::WreckSourceFrame::capture(g, &state.environment),
+    })
+}
+impl Match {
+    pub fn prepare_ordinary_recipient_lists(
+        &self,
+        owners: &[usize],
+    ) -> Result<PreparedOrdinaryLists, String> {
+        prepare_ordinary_recipient_lists(self, owners)
+    }
+    /// Convenience publication after assembly has finished its other fallible work.
+    pub fn publish_ordinary_recipient_lists(
+        &mut self,
+        prepared: PreparedOrdinaryLists,
+    ) -> Result<(), String> {
+        prepared
+            .prepare_publication(
+                OrdinaryListPublication {
+                    world: &self.world,
+                    environment: &self.environment,
+                    options: &self.options,
+                },
+                &mut self.recipients,
+            )?
+            .commit();
+        Ok(())
+    }
 }

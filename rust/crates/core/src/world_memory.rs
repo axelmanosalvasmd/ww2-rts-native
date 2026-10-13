@@ -67,11 +67,15 @@ pub struct TeamMemory {
     path_at: Option<u64>,
     routes: RouteKnowledge,
     pub(crate) regions: Vec<KnownRegion>,
-    pub(crate) wrecks: Vec<Wreck>,
+    pub(crate) wrecks: Vec<crate::recipient_lists::RememberedWreck>,
+    pub(crate) wreck_queries: Vec<Wreck>,
 }
 impl TeamMemory {
     pub fn rows(&self) -> &[WorldRow] {
         &self.rows
+    }
+    pub fn contains_cell(&self, cell: usize) -> bool {
+        self.positions.contains_key(&cell)
     }
     pub fn version(&self) -> u64 {
         self.version
@@ -80,7 +84,20 @@ impl TeamMemory {
         &self.regions
     }
     pub fn remembered_wrecks(&self) -> &[Wreck] {
-        &self.wrecks
+        &self.wreck_queries
+    }
+    pub fn remembered_wreck_rows(&self) -> Result<Vec<crate::recipient_lists::WreckRow>, String> {
+        self.wrecks
+            .iter()
+            .map(|row| {
+                row.display.clone().ok_or_else(|| {
+                    format!(
+                        "missing observed World wreck display facts: {}",
+                        row.query.id.unwrap_or(0)
+                    )
+                })
+            })
+            .collect()
     }
     pub fn query(&self) -> RouteQuery<'_> {
         self.routes.query()
@@ -314,6 +331,7 @@ impl WorldMemory {
                     routes,
                     regions: Vec::new(),
                     wrecks: Vec::new(),
+                    wreck_queries: Vec::new(),
                 },
             ));
         }

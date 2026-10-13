@@ -734,7 +734,8 @@ impl Match {
                         z: z as f64 * CELL + CELL / 2.,
                     };
                     if self.world.game.chars[c] == b'N' && !known && dist(at, center) <= detect {
-                        *self.world.mine_seen.entry(c).or_default() |= bit;
+                        let seen = self.world.mine_seen.get(&c).copied().unwrap_or(0) | bit;
+                        self.world.mine_seen.insert(c, seen);
                         self.world.log_cell(c, false).map_err(|e| e.to_string())?;
                     }
                 }

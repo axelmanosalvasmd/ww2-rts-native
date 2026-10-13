@@ -295,6 +295,7 @@ impl Match {
             field_works: crate::field_works::FieldWorksRuntime::default(),
             abilities: crate::match_abilities::AbilityState::default(),
             recovery: crate::match_recovery::RecoveryState::default(),
+            support: crate::match_support::SupportState::default(),
             recipients: Vec::new(),
             routing_fog: crate::fog::Fog::default(),
             tick_state: crate::match_tick::TickState::default(),

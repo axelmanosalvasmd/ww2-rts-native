@@ -370,3 +370,9 @@ When no seat, spectator or operative is connected for more than 60 s, the room a
 - The full refusal reason chains on shared/sim.js:3640 (`dig`) and 3695 (`build`), which are long single-line expressions only partly read here; placement reasons come from `placementCheck` (ENG and BASE).
 - The complete key list of `shots` and `flights` entries (CMB owns them).
 - The close status a browser sees after `ws.close()` with no code (1005 expected, not checked).
+
+### Recipient ground-list checkpoint
+
+A source-written internal producer now retains complete observed wreck rows from canonical Environment metadata and Game hulls, preserves found-mine discovery order, and projects World nodes from actual team memory and ResourceNode owners. Ordinary nodes remain absent; missing imported wreck facts reject explicitly. Five original-source traces cover 92 actions. The native list guards and bounded ordinary active-list envelope assembly pass within the Mac combined check at compiled 48c7e15: 12 affected snapshot debug tests, 213 release workspace tests and all strict gates. Eleven active frames compare 33 complete seat results; existing evidence retains 73 states with 219 partial and 219 quiet full results, plus 13 delivery steps and 39 recipients. Complete World envelopes, active actors, spectators, transport and list deltas remain separate; the draft wire contract is unchanged.
+
+Ordinary list assembly can prepare all requested seats read-only, inspect their ordered typed results and publish their remembered wreck replacements only after every producer passes preflight. Source-frame and prior-memory checks reject stale preparations. This boundary neither acknowledges terrain/Fog nor advances server delivery versions; the batch atomicity guards pass in the combined native checks above.
