@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Raised the FPS replay test's macro recursion limit so its complete represented-unit JSON comparison compiles. The recorded data and runtime rules are unchanged.
+
 - Fixed the direct building-wreck caller after captured blast membership added an actor-order argument. Building retirement keeps its source fresh current-unit membership for each section; captured blast behavior is unchanged.
 
 - Fixed the shared alias rejection test to snapshot canonical command rows rather than require Clone and PartialEq on the command dispatcher. Guard ordering and whole represented actor-state checks are unchanged.

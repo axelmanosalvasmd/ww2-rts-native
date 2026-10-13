@@ -4,6 +4,7 @@
 //! adopt a hit-direction policy.
 //! Dormant ordinary firing fields outside Unit/UnitControl/UnitCombat/Soldier are
 //! retained in the source fixture but excluded from the Hurt state projection.
+#![recursion_limit = "256"]
 use serde_json::{Value, json};
 use ww2_core::{
     combat::DeathImpulse,
