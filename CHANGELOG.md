@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Joined the checked ordinary-launch buff/AP provider dependency after the coupled release replay found the missing flight payload adjustment. The source multiplier, suppression, rate, naval AP restriction and deferred AP consumption retain their reviewed behavior and launch-refusal guard.
+
 - Carried the verified provider repair for ordered ability refusal results into the engineering union after its release replay exposed lost ineligible selections. Fixture visibility lists now meet the canonical sorted recipient contract. The existing field-work cancellation remains singular and unchanged.
 
 - Removed a duplicated smoke-duration field from an inherited routing fixture. The release workspace compiler exposed the duplicate after the focused engineering and command tests passed.

@@ -56,6 +56,7 @@ pub fn make(c: &Value) -> Match {
     m.next_unit_id = 1000;
     m.world.game.rain = 0.0;
     m.world.game.wet = Some(0.0);
+    m.abilities = ww2_core::match_abilities::AbilityState::default();
     m.firing = FiringState::default();
     m.combat = CombatState::default();
     m.commands.units.clear();
@@ -92,6 +93,7 @@ pub fn make(c: &Value) -> Match {
         state.target_id = v["target"].as_u64().unwrap() as u32;
         state.cooldown = v["cooldown"].as_f64().unwrap();
         state.retarget = v["retarget"].as_f64().unwrap();
+        m.abilities.initialize(id);
         let meta = m.combat.initialize(id);
         meta.xp = v["xp"].as_f64().unwrap();
         meta.hit_at = v["hitAt"].as_f64().unwrap();

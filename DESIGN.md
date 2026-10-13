@@ -868,3 +868,6 @@ Manual aimed ability replacement shares the ordinary field-work cancellation bou
 
 
 The engineering proof tree now includes the input owner's typed Dig dispatcher, source current-goal callback, request eligibility, failure-drop cancellation and accepted Move/Stop cancellation. Its replay calls the actual parser and dispatcher. Queued ordinary digs and known excluded projects parse to represented unsupported inputs and are refused by dispatch before mutation. Real unit-loop binding and native execution remain pending.
+
+
+The engineering dependency proof includes the checked ordinary-launch ability provider. Its buff/AP adjustment is the existing owner-reviewed source behavior: buff changes flight damage and suppression with its rate adjustment, naval AP applies only to naval targets, and AP consumption follows validated launch geometry, IDs and ammo publication. The inherited ability replay exposed this missing dependency; the engineering actuator itself remains unchanged.
