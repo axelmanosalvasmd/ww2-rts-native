@@ -1,4 +1,4 @@
-//! Canonical finish and source timeline. Explicit Conquest and Assault phases use this state;
+//! Canonical finish and source timeline. Explicit Conquest, Assault and bounded World phases use this state;
 //! other mode reasons reserve their source meaning without enabling those runtime modes.
 use crate::{
     economy::Mode,
@@ -63,8 +63,8 @@ impl Match {
     }
     pub(crate) fn validate_story_mode(&self) -> Result<(), String> {
         match (self.options.mode, self.world.game.mode) {
-            (Mode::Default | Mode::Conquest, None) | (Mode::Assault, Some(ModeKind::Assault)) => Ok(()),
-            _ => Err("finish/story supports represented Conquest and Assault only".into()),
+            (Mode::Default | Mode::Conquest, None) | (Mode::Assault, Some(ModeKind::Assault)) | (Mode::World, Some(ModeKind::World)) => Ok(()),
+            _ => Err("finish/story supports represented Conquest, Assault and World only".into()),
         }
     }
     pub(crate) fn validate_match_finish_state(&self) -> Result<(), String> {
@@ -113,6 +113,15 @@ impl Match {
                 || (state.attacker_team >= 0 && !players.iter().any(|p| p.team == state.attacker_team))
             { return Err("invalid Assault finish state".into()); }
         } else if self.assault.is_some() { return Err("unexpected Assault state in Conquest".into()); }
+        if self.options.mode == Mode::World {
+            let regions = self.world_economy_regions()?;
+            let runtime = self.world_runtime.as_ref().ok_or("missing World runtime")?;
+            if regions.len() != self.world.geography().ok_or("missing World geography")?.size.region_count()
+                || runtime.regions.iter().any(|r| !(-1..6).contains(&r.team) || !r.progress.is_finite()
+                    || !(0.0..=1.0).contains(&r.progress) || r.capper.is_some_and(|slot| slot >= players.len())
+                    || r.cap_tick.is_some_and(|tick| !(-9_007_199_254_740_991..=9_007_199_254_740_991).contains(&tick)))
+            { return Err("invalid canonical World finish regions".into()); }
+        }
         for at in [self.fallen.structure, self.fallen.bunker, self.fallen.hq].into_iter().flatten() {
             if !at.x.is_finite() || !at.z.is_finite() { return Err("invalid fallen position".into()); }
         }
@@ -135,7 +144,7 @@ impl Match {
         }
         Ok(())
     }
-    pub(crate) fn validate_assault_sample_units(&self) -> Result<(), String> {
+    pub(crate) fn validate_sample_units(&self) -> Result<(), String> {
         let players = &self.start.economy.players;
         for unit in self.world.game.units.values() {
             if unit.kind >= self.rules.kinds.len() || !unit.hp.is_finite()
@@ -157,12 +166,12 @@ impl Match {
             for value in &mut vp { *value = value.floor(); }
             Ok(MatchSample::Conquest {t, vp})
         } else {
-            self.validate_assault_sample_units()?;
+            self.validate_sample_units()?;
             let mut points = vec![0.0; n];
             let mut structures = vec![0.0; n];
             for p in &self.start.points { if let Some(owner) = p.owner { points[players[owner].team as usize] += 1.0; } }
             for u in self.world.game.units.values() {
-                if u.hp > 0.0 && self.rules.kinds[u.kind].structure && self.rules.kinds[u.kind].name == "bunker"
+                if u.hp > 0.0 && self.rules.kinds[u.kind].structure && (self.options.mode == Mode::World || self.rules.kinds[u.kind].name == "bunker")
                     && let Some(owner) = players.get(u.owner)
                 { structures[owner.team as usize] += 1.0; }
             }

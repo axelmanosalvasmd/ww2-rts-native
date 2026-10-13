@@ -68,9 +68,9 @@ record('allied shares away and out',{teams:[0,0,1],army:'endless',regions:{1:{te
 record('explicit retained depot facts',{units:[unit(20,0,'depot',0,{built:1})],nodes:[{c:0,...at(0),depot:20,rate:3,fuel:false}],supported:false,steps:[{dt:.05,order:[20],deleteUnits:[20],tickFacts:[unit(20,0,'depot',0,{built:1})]}]});
 record('unsupported fort transfer',{units:[unit(1,0),unit(20,-1,'gate',2,{open:true,gateT:4})],supported:false,steps:[{dt:8}]});
 record('unsupported army elimination',{regions:{0:{team:-1,progress:0}},units:[unit(1,0)],supported:false,steps:[{dt:.05}]});
-record('unsupported World finish',{regions:Object.fromEntries(Array.from({length:39},(_,i)=>[i,{team:0,progress:1}])),supported:false,steps:[{dt:0}]});
-record('unsupported nations finish',{regions:{63:{team:-1,progress:0}},supported:false,steps:[{dt:0}]});
-record('unsupported draw finish',{regions:{0:{team:-1,progress:0},63:{team:-1,progress:0}},supported:false,steps:[{dt:0}]});
+record('supported World finish',{regions:Object.fromEntries(Array.from({length:39},(_,i)=>[i,{team:0,progress:1}])),steps:[{dt:0}]});
+record('supported nations finish',{regions:{63:{team:-1,progress:0}},steps:[{dt:0}]});
+record('supported draw finish',{regions:{0:{team:-1,progress:0},63:{team:-1,progress:0}},steps:[{dt:0}]});
 const output=JSON.stringify({reference:pin,node:process.version,definitions,cases})+'\n';
 const path=fileURLToPath(new URL('../rust/crates/simtest/tests/fixtures/world-region.json',import.meta.url));
 if(process.argv.includes('--check')){if(readFileSync(path,'utf8')!==output)throw Error('World region fixture differs');}else writeFileSync(path,output);

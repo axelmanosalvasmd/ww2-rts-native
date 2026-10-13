@@ -44,7 +44,8 @@ fn truthy(value: &Value) -> bool {
 
 impl Match {
     /// Source income precedes region capture. Prepare every consequence before publishing.
-    /// Unsupported fort transfer, army elimination and finish paths leave the phase intact.
+    /// Unsupported fort transfer and army elimination leave the whole phase intact. Eligible
+    /// source finish is prepared after those preflights, then published on canonical state.
     pub fn apply_world_capture_income(
         &mut self,
         unit_order: &[u32],
@@ -320,27 +321,7 @@ impl Match {
                 spawns[slot] = best.expect("owned region").0;
             }
         }
-        let mut all_teams = BTreeSet::new();
-        let mut alive = Vec::new();
-        for p in &wallets.players {
-            all_teams.insert(p.team);
-            if !p.out && !alive.contains(&p.team) {
-                alive.push(p.team);
-            }
-        }
-        let total = geography.size.region_count();
-        let tuning = catalog.table("WORLD_TUNING").map_err(|e| e.to_string())?;
-        let goal = (total as f64 * n(tuning, "winShare")?).ceil() as usize;
-        let rivals = all_teams.len() > 1;
-        if alive.is_empty()
-            || (rivals && alive.len() == 1)
-            || alive.iter().any(|team| {
-                let owned = regions.iter().filter(|r| r.team == *team).count();
-                owned == total || (rivals && owned >= goal)
-            })
-        {
-            return Err("unsupported World phase: canonical World finish".into());
-        }
+        let finish = self.prepare_world_finish(&wallets, &regions)?;
         let changes: Vec<_> = captured
             .iter()
             .map(|event| StoryChange {
@@ -359,6 +340,7 @@ impl Match {
             player.spawn = at;
         }
         story.commit();
+        if let Some(finish) = finish { self.publish_match_finish(finish); }
         Ok(captured)
     }
 }

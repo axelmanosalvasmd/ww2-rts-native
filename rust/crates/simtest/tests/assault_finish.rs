@@ -92,5 +92,5 @@ fn first_finish_freezes_clock_reveal_story_and_source_reason() {
     let finish=m.apply_assault_victory(0.0).unwrap().unwrap();assert_eq!(finish.reason,EndReason::Timer);
     let before=commit_state(&m);assert_eq!(m.apply_assault_victory(f64::NAN).unwrap(),None);assert!(!m.sample_match_tick().unwrap());m.record_spending(0,30.0).unwrap();assert_eq!(commit_state(&m),before);
     assert_eq!([EndReason::VictoryPoints,EndReason::Headquarters,EndReason::Bunkers,EndReason::Structures,EndReason::Timer,EndReason::Draw,EndReason::World,EndReason::Nations,EndReason::Tutorial].map(EndReason::as_str),["vp","hq","bunkers","structures","timer","draw","world","nations","tutorial"]);
-    m.options.mode=Mode::World;assert!(m.apply_assault_victory(0.05).is_err());assert!(m.sample_match_tick().is_err());assert!(m.match_result().is_err());
+    m.options.mode=Mode::Classic;assert!(m.apply_assault_victory(0.05).is_err());assert!(m.sample_match_tick().is_err());assert!(m.match_result().is_err());
 }

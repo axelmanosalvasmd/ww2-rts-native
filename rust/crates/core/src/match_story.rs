@@ -332,7 +332,7 @@ impl Match {
             story: self.story.iter().map(|row| row.rounded()).collect(),
             timeline: self.timeline.clone(),
             win_vp: if self.world.game.mode.is_none() { Some(self.start.win_vp) } else { None },
-            mode: if self.world.game.mode.is_none() { "conquest" } else { "assault" },
+            mode: match self.options.mode { crate::economy::Mode::World => "world", crate::economy::Mode::Assault => "assault", _ => "conquest" },
         }))
     }
 }

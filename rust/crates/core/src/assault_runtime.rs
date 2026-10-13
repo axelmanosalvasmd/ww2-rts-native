@@ -104,7 +104,7 @@ impl Match {
         }
         if self.finish.is_some() { return Ok(None); }
         self.validate_match_finish_state()?;
-        self.validate_assault_sample_units()?;
+        self.validate_sample_units()?;
         let state = self.assault.ok_or("missing Assault state")?;
         let time_left = state.time_left - dt;
         if !dt.is_finite() || !time_left.is_finite() { return Err("invalid Assault elapsed time".into()); }
