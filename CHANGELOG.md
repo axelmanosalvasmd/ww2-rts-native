@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Integrated the checked ground-support component into a separate source-only tick-provider tree. Frozen tick behavior remains unchanged; the future support phase caller and native composition checks remain pending.
+
+- Verified bounded Conquest ground support against 60 original-source traces and 1,400 checkpoints, including every effect/lifetime transition and unsampled-tick silence checks. Three support, three combat and three firing debug regressions pass; all 158 locked release workspace tests, strict workspace Clippy, formatting and release FFI build pass. Aircraft support and complete tick integration remain separate.
+
+- Fixed the captured-membership prerequisite's building-wreck lifecycle call to pass explicit full-current membership. The original source wreckBuilding uses current units; captured support blast actors remain separate. This closes the first native compile failure, with the 60-trace/1,400-checkpoint source fixture unchanged. Native gates are in progress.
+
+- Closed the support replay consumer gap on unsampled ticks: unexpected effects or premature strike/cover lifetime transitions now fail immediately. This strengthens the same 60-trace, 1,400-checkpoint source fixture without changing runtime code; native proof is pending.
+
+- Fixed support oracle sampling that missed arrival events after repeated floating-point delay subtraction. The original-source recorder now captures every effect, strike activation/removal and cover expiry, with 60 traces and 1,400 checkpoints. Ground runtime code is unchanged from 8604e01; native verification is pending.
+
 - Updated the operative tick replay after central control state gained the reaction timer. Trusted fixture patches now set canonical `UnitControl.react`, and operative rows compare its exact preserved value. Ordinary reaction execution remains unavailable and its timer remains outside this bounded projection. No runtime phase or gameplay state was added; native verification is pending.
 
 - Normal-merged the checked central abilities/World metadata provider 643ad2b into a separate successor of frozen ac43c28. Preserved the sole operative caller and all four stale-ID guards and default publication callbacks for join and respawn. Reaction and World providers remain available components without enabling their missing tick phases. The merged original World memory recorder reproduces four traces and 120 actions while preserving the explicit remembered-wreck arrays. First combined operative native proof remains pending.

@@ -190,6 +190,10 @@ fn actual_support_admission_strikes_and_timers_match_source() {
             } else {
                 let tick = action["tick"].as_i64().unwrap();
                 for current in last + 1..=tick {
+                    let prior = (
+                        m.support.strikes.iter().map(|s| s.live).collect::<Vec<_>>(),
+                        m.support.covers.len(),
+                    );
                     m.world.game.tick = current;
                     m.support.events.clear();
                     m.step_support_strikes(
@@ -202,6 +206,20 @@ fn actual_support_admission_strikes_and_timers_match_source() {
                     )
                     .unwrap();
                     m.advance_support_timers(0.05).unwrap();
+                    if current < tick {
+                        assert!(
+                            m.support.events.is_empty(),
+                            "unexpected effect on unsampled tick {current}"
+                        );
+                        assert_eq!(
+                            (
+                                m.support.strikes.iter().map(|s| s.live).collect::<Vec<_>>(),
+                                m.support.covers.len()
+                            ),
+                            prior,
+                            "unexpected lifetime transition on unsampled tick {current}"
+                        );
+                    }
                 }
                 last = tick;
                 None
@@ -215,7 +233,7 @@ fn actual_support_admission_strikes_and_timers_match_source() {
             count += 1;
         }
     }
-    assert_eq!(count, 900);
+    assert_eq!(count, 1400);
 }
 #[test]
 fn unsupported_air_and_invalid_membership_do_not_charge_or_publish() {
