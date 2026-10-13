@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Consumed the engineering provider's concrete compiler and fixture repairs through immutable source head 96710f5. The checked ability fixture already had the smaller macro projection and keeps that body. No additional tick phase was enabled; first provider and combined native proof remain pending.
+
 - Connected the real ordinary field-work actuator between autocast and aimed ability/fire in the staged tick. Recorded Dig, accepted Move/Stop/Ability cancellation and retry-limit drop use the canonical descriptor and request scheduler. The actual-step recorder now covers eleven traces, 2,185 ticks and 120 checkpoints, including four paid trench cells completing at ticks 61, 122, 183 and 244; all ten prior traces are unchanged. Combined native validation remains pending.
 
 - Guarded unconnected operative unit execution before clock advancement, including an actor created by a recorded boundary join. A focused queued-admission regression checks the committed join remains visible while the staged runner faults before applying ground phases or retrying. Other missing phases and server match start remain explicit.
@@ -77,6 +79,11 @@
 - Rejected smoke allocator collisions with current live units before any selected-unit effect, extending the existing mixed-selection identity regression. Native proof remains pending.
 
 - Connected manual aimed replacement to real paid field-work cancellation without a refund, and rejected unrepresented build or mass-entrench projects before control writes. The original ability recorder now has 36 traces (157 actions), with a separate unsupported-project boundary and a written cancellation regression. Native proof remains pending.
+- Updated inherited native fixture consumers for the complete damage ordering context and ordered pending-cell set. The recovery fixture keeps the existing full actor list, and recruitment snapshots preserve the same cell contents. Native proof is restarting after these test compiler errors.
+
+- Split the existing ability fixture control projection into a local JSON value to fit the macro recursion limit when the engineering library tests compile. The represented fields and expected fixture values are unchanged.
+
+- Repaired the engineering union compiler boundaries: recruitment errors use the existing public re-export, section retirement supplies the source full-list ordering option, and recovery validates optional section maxima before arithmetic. The first native compile exposed these inherited mismatches; the coupled proof is restarting at the repaired checkpoint.
 
 - Corrected the engineering replay to the coordinated command constructor and checked excluded work through parse plus dispatch. Queued digs and known excluded forts are represented inputs whose dispatcher returns unsupported. Native execution remains pending.
 

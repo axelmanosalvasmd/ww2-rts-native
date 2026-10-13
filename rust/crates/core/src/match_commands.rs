@@ -624,10 +624,10 @@ impl crate::match_runtime::Match {
             }
             return match self.recorded_buy(owner, kind, *from) {
                 Ok(_) => Ok(None),
-                Err(crate::match_recruitment::RecruitError::Admission(
+                Err(crate::match_runtime::RecruitError::Admission(
                     crate::production::Error::Denied(d),
                 )) => Ok(Some(d.into())),
-                Err(crate::match_recruitment::RecruitError::Placement(
+                Err(crate::match_runtime::RecruitError::Placement(
                     crate::produced_units::Error::UnsupportedAir,
                 )) => Ok(Some(Denial::Unsupported)),
                 Err(e) => Err(format!("recorded buy: {e:?}")),

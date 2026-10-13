@@ -489,6 +489,7 @@ fn represented_recovery_phases_match_original_source() {
                         owner: Some(a["owner"].as_i64().unwrap_or(1) as i32),
                         contact_id: Some(&contact),
                         direction: None,
+                        actor_order: None,
                         debit_entity: true,
                         skip_buildings: &skip,
                         memory: None,
