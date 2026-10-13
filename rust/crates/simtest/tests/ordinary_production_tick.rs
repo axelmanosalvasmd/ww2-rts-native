@@ -12,7 +12,7 @@ use ww2_core::{
     map::AuthoritativeMap,
     match_abilities::AbilityState,
     match_combat::CombatState,
-    match_commands::{Command, MatchCommands, UnitControl},
+    match_commands::{Command, Denial, MatchCommands, UnitControl},
     match_end::{EndReason, MatchFinish, MatchSample},
     match_firing::FiringState,
     match_recovery::RecoveryState,
@@ -377,15 +377,33 @@ fn restored_ordinary_training_queue_is_refused_before_the_clock() {
         let scene = json!({"map":f["traces"][0]["map"],"specs":source["specs"],"bootstrap":source["bootstrap"]});
         let mut m = make(&scene);
         m.production.reconcile_queue(1000, &["rifle"]).unwrap();
+        let key = OrderKey {
+            tick: 1,
+            issuer: 0,
+            sequence: 37,
+        };
+        m.enqueue_command(key, Command::Unsupported).unwrap();
         let before = projection(&m);
         let rng = m.start.random.snapshot();
-        let queue = m.commands.queue.snapshot();
+        let queue = (m.commands.pending_commands(), m.commands.next_tick());
+        assert_eq!(queue, (1, Some(key.tick)));
         let failure = m.advance_tick().unwrap_err();
         assert_eq!(failure.tick, 0);
         assert!(failure.events.is_empty());
         assert!(m.tick_state.fault().is_none());
         assert_eq!(projection(&m), before);
-        assert_eq!(m.commands.queue.snapshot(), queue);
+        assert_eq!(
+            (m.commands.pending_commands(), m.commands.next_tick()),
+            queue
+        );
         assert_eq!(m.start.random.snapshot(), rng);
+        m.production.reconcile_queue(1000, &[]).unwrap();
+        let report = m.advance_tick().unwrap();
+        assert_eq!(report.tick, key.tick as i64);
+        assert_eq!(report.commands.len(), 1);
+        assert_eq!(report.commands[0].key, key);
+        assert_eq!(report.commands[0].denial, Some(Denial::Unsupported));
+        assert_eq!(m.commands.pending_commands(), 0);
+        assert_eq!(m.commands.next_tick(), Some(key.tick + 1));
     }
 }
