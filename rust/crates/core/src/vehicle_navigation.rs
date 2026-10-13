@@ -25,6 +25,7 @@ impl Identity {
         }
     }
 }
+#[derive(Clone)]
 struct Entry {
     identity: Identity,
     versions: Versions,
@@ -34,12 +35,24 @@ struct Entry {
     incremental: bool,
     serial: u64,
 }
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub(crate) struct VehicleNavigation {
     classes: BTreeMap<(u16, u64), Entry>,
     serial: u64,
 }
 impl VehicleNavigation {
+    pub(crate) fn cloned_buffers(&self, cloned: &Self) -> Vec<(usize, usize)> {
+        self.classes
+            .iter()
+            .map(|(key, entry)| {
+                (
+                    entry.flags.as_ptr() as usize,
+                    cloned.classes[key].flags.as_ptr() as usize,
+                )
+            })
+            .collect()
+    }
+
     pub(crate) fn view<'a>(
         &'a mut self,
         source: TerrainView<'a>,
