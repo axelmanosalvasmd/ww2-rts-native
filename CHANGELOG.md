@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Shared project segment prices now accept source cell counts beyond six; the first native source replay exposed an unsupported cap, including the existing seven-cell and eight-cell price fixtures.
+
 - Joined the checked ordinary engineering provider and its evidence-only handoff into the shared-project branch. The ordinary provider passed seven focused debug checks and 206 release workspace tests; the new project code still requires its own fresh native gates.
 
 - Separated failed Dig route cleanup from accepted replacement cancellation. A retry-limit drop removes only the paid job and Dig flag, preserving shared-project membership, cached active timing and the paid wallet; the queue-owner source review found the earlier full-cancellation mismatch. An actual unreachable-route source trace and native replay are being added.

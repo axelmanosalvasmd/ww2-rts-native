@@ -473,7 +473,7 @@ pub struct Segment {
 
 /// Exact source price for the buildable part of a segment, without paying yet.
 pub fn segment_cost(kind: FortKind, cells: usize) -> Result<f64, Error> {
-    if !line_fort(kind) || cells > 6 {
+    if !line_fort(kind) {
         return Err(Error::InvalidInput);
     }
     let d = &definitions()?.forts[&kind];
