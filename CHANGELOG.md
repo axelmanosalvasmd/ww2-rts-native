@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Merged the byte-identical typed-flight convergence and checked publication prerequisite, retaining ability/recovery defaults inside the infallible recruitment publication callback. The combined ability proof remains pending.
+
 - Rejected smoke allocator collisions with current live units before any selected-unit effect, extending the existing mixed-selection identity regression. Native proof remains pending.
 
 - Connected manual aimed replacement to real paid field-work cancellation without a refund, and rejected unrepresented build or mass-entrench projects before control writes. The original ability recorder now has 36 traces (157 actions), with a separate unsupported-project boundary and a written cancellation regression. Native proof remains pending.
@@ -39,6 +41,10 @@
 - Added immediate canonical medic route replacement and captured-frame reinforcement with actual provision hooks and spending tallies. Corrected the recovery recorder to capture separate frames on cadence ticks 9 and 10 (23 traces, 133 actions). Native differential verification and aimed-flight execution remain pending.
 
 - Wrote typed Conquest Ability/Autocast dispatch, canonical instant abilities, all ground autocast judgments and the existing FIFO aimed-path binding. Ability cooldown/buff timers remain separate from weapon timers; smoke IDs use the shared unit counter. The ability recorder now pairs the canonical Combat purpose stream at seed 701. Aimed launches, reinforcement and native differential consumers remain unfinished; no passing native execution claim is made.
+- Integrated the checked shared-publication firing base into typed ability-flight work, preserving both combat/firing fresh-ID guards and publication defaults. Typed launch behavior and fixtures are unchanged; native verification of the combined head is pending.
+
+- Kept satchel oracle targets within each ability's actual range and corrected the design description of Commando satchels. Launcher admission remains the caller's responsibility.
+
 - Removed the obsolete local weapon-blast import after flights began retaining their own typed blast source.
 
 - Added a typed internal small-arms shot event for the operative producer, preserving its existing effect, shooter, endpoint and optional enemy/man fields. No contact or hit-direction fields were added.
@@ -48,6 +54,7 @@
 - Fixed physical ability launch admission at the inclusive map edge, which the source ability command permits. Added an unchanged-source grenade edge case before native verification.
 
 - Added typed grenade/satchel launch requests, retained ability blast profiles in canonical flights, and shared the physical salvo launcher with ordinary fire and barrage. Flight-linked grenade tickets keep source late-phase pruning without a second blast. The new pinned-source oracle records 30 traces and 210 checkpoints; native verification is pending the shared build slot.
+- Preserved both combat and firing defaults in the shared recruitment publication callback, including fresh-ID guards before charging.
 
 - Verified the complete command/firing ancestry after recruitment metadata integration: 155 workspace tests, five focused debug/release tests, strict Clippy, formatting and release FFI build pass. The diff against the reviewed command branch contains only weapon-phase code, publication defaults, fixtures and documentation.
 
@@ -71,6 +78,26 @@
 
 
 - Connected ordinary ground and naval target acquisition, aim, cooldowns, per-model fire and physical salvo launches to Match. The Rust replay matches 66 original-source traces across 264 phases, including cover, moving fire, visibility, hold-fire, incoming threats and veterancy. Flights keep immutable launch solutions and shared volley identities. Contact stepping and damage hookup remain in progress; air, rail, operative, beam and active ability/terrain fire are explicitly unsupported by this phase.
+- Preserved recruited combat metadata in the shared publication callback and rejected occupied combat IDs before charging during integration.
+
+- Verified shared unit publication with 130 workspace tests, five release transaction/recruitment tests, strict Clippy/formatting and independent review. Original JavaScript regeneration matches six traces and 33 buys, including the negative-HP casualty regression; World/FPS execution and training remain separate integrations.
+
+- Simplified publication pose validation to satisfy strict Clippy after debug and release transaction checks passed. The validation condition and rejection behavior remain the same.
+
+- Corrected the publication regression map to include the required authoring name. Its first native run rejected the incomplete fixture before reaching the transaction checks.
+
+- Added the canonical optional World guard home to UnitControl and checked it before publication. The World actor regression checks invalid home rejection and preserved staged home; the source guard return phase still needs tick integration.
+
+- Fixed publication validation rejecting unrelated casualties with negative HP before source death removal. Existing units accept finite negative health, while new drafts and staged squad HP stay nonnegative. An added original-source buy trace protects the admission behavior.
+
+- Added explicit World actor staging and publication policy to the shared unit guard while keeping ordinary commander checks strict. Three focused regressions cover refused/aborted batches, ordered HP/payment publication and the World-only neutral identity.
+
+- Added a shared prepared unit publication guard for source-ordered batches, canonical controls/grid/IDs and staged squad HP updates. Ordinary staging reuses scatter before pose overrides; recruitment delegates its final insertion to this primitive.
+
+- Reserved a fixed internal World local-defender actor identity outside commander slots. World team and alliance queries recognize that actor without adding a player seat or wallet; ordinary invalid owner behavior is unchanged. Native World construction and guard tick execution remain pending.
+
+
+- Embedded all 33 original authored maps (1,349,980 JSON bytes) in a separate private server catalogue and added native match construction without Node, filesystem map reads or a reference checkout. Cached validated maps remain immutable; each match gets independent mutable world state. Original mines, materials and triggers are retained. Public map routes still use their filtered assets and refuse editor credential access to private data. Room simulation and generated World startup remain unfinished.
 - Adapted command fixtures to the canonical optional territorial supply fields, preserving their absent values during integration.
 
 - Stacked the checked Conquest command actuator on the reviewed recruitment and recipient-routing checkpoint, retaining its complete command behavior and canonical shared control state. Combined integration checks belong to the shared CI lane.

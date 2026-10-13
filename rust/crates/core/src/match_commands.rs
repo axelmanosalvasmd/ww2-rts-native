@@ -93,6 +93,8 @@ pub struct UnitControl {
     pub rally_drift: bool,
     /// Operatives reject ordinary squad orders.
     pub operative: bool,
+    /// World local guards return here in the guard phase, owned by tick scheduling.
+    pub guard_home: Option<Point>,
 }
 impl UnitControl {
     /// Prepare before publishing a spawned unit or charging a wallet.
@@ -130,6 +132,7 @@ impl UnitControl {
             nade: None,
             rally_drift: false,
             operative: false,
+            guard_home: None,
         })
     }
 }
