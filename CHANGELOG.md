@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified bounded World administrative elimination on final code `d52a285`: all 208 locked release workspace tests, strict Clippy, formatting and release FFI pass. Earlier runtime-identical code passed 46 affected debug tests. Six original transitions remain unchanged, including the controlled dead fighter, actual collateral and debris overflow. World tick, fort seizure, logistics, riders/cargo and shared work remain outside this phase.
+
 - Formatted the inherited finish/story provider and three phase comparison tests after the strict format check. All 208 locked release workspace tests and strict Clippy passed at the preceding source; final formatted-source gates follow.
 
 - Converged the existing test-only observer wetness projection repair after the World elimination release gate found JSON `0.0` versus `0` and an unused import. The 46 affected debug tests passed at the preceding head; release and strict final gates require the repaired source.
