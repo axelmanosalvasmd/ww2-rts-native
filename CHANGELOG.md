@@ -3,16 +3,21 @@
 ## Unreleased
 
 - Preserved canonical recruited combat defaults through the shared publication callback when integrating the reviewed combat ancestry. Fresh combat identities reject before payment; production stepping remains under implementation.
+- Verified shared unit publication with 130 workspace tests, five release transaction/recruitment tests, strict Clippy/formatting and independent review. Original JavaScript regeneration matches six traces and 33 buys, including the negative-HP casualty regression; World/FPS execution and training remain separate integrations.
+
+- Simplified publication pose validation to satisfy strict Clippy after debug and release transaction checks passed. The validation condition and rejection behavior remain the same.
+
+- Corrected the publication regression map to include the required authoring name. Its first native run rejected the incomplete fixture before reaching the transaction checks.
 
 - Added the canonical optional World guard home to UnitControl and checked it before publication. The World actor regression checks invalid home rejection and preserved staged home; the source guard return phase still needs tick integration.
 
 - Fixed publication validation rejecting unrelated casualties with negative HP before source death removal. Existing units accept finite negative health, while new drafts and staged squad HP stay nonnegative. An added original-source buy trace protects the admission behavior.
 
-- Added explicit World actor staging and publication policy to the shared unit guard while keeping ordinary commander checks strict. Three focused regressions now cover refused/aborted batches, ordered HP/payment publication and the World-only neutral identity; native verification is pending.
+- Added explicit World actor staging and publication policy to the shared unit guard while keeping ordinary commander checks strict. Three focused regressions cover refused/aborted batches, ordered HP/payment publication and the World-only neutral identity.
 
-- Add a shared prepared unit publication guard for source-ordered batches, canonical controls/grid/IDs and staged squad HP updates. Ordinary staging reuses scatter before pose overrides; recruitment delegates its final insertion to this primitive. This source-only prerequisite still needs Rust verification and regression review before public merge.
+- Added a shared prepared unit publication guard for source-ordered batches, canonical controls/grid/IDs and staged squad HP updates. Ordinary staging reuses scatter before pose overrides; recruitment delegates its final insertion to this primitive.
 
-- Reserved a fixed internal World local-defender actor identity outside commander slots. World team and alliance queries recognize that actor without adding a player seat or wallet; ordinary invalid owner behavior is unchanged. Native World construction and guarded publication remain pending.
+- Reserved a fixed internal World local-defender actor identity outside commander slots. World team and alliance queries recognize that actor without adding a player seat or wallet; ordinary invalid owner behavior is unchanged. Native World construction and guard tick execution remain pending.
 
 
 - Initialized canonical combat metadata when Match recruitment publishes a new unit, so its first combat event passes admission. Existing original-source recruitment traces now check each admitted unit has the source defaults.

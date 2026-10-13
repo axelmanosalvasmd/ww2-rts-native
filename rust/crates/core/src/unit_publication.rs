@@ -76,10 +76,10 @@ impl StagedUnit {
             }
             _ => return Err(PublicationError::Invalid("spawn actor")),
         };
-        if let Some(at) = pose_override {
-            if !finite(at) {
-                return Err(PublicationError::Invalid("spawn override"));
-            }
+        if let Some(at) = pose_override
+            && !finite(at)
+        {
+            return Err(PublicationError::Invalid("spawn override"));
         }
         let profile = rules
             .kinds
