@@ -123,6 +123,26 @@ fn explicit_assault_start_matches_original_create_game() {
                 "case{index} unit{}",
                 unit.id
             );
+            let firing = m.firing.get(unit.id).expect("canonical firing metadata");
+            assert_eq!(
+                bits(firing.cooldown),
+                bits(raw["cooldown"].as_f64().unwrap())
+            );
+            assert_eq!(
+                bits(firing.retarget),
+                bits(raw["retarget"].as_f64().unwrap())
+            );
+            assert_eq!(firing.target_id as u64, raw["targetId"].as_u64().unwrap());
+            let combat = m.combat.get(unit.id).expect("canonical combat metadata");
+            assert_eq!(bits(combat.xp), bits(raw["xp"].as_f64().unwrap()));
+            assert_eq!(bits(combat.hit_at), bits(raw["hitAt"].as_f64().unwrap()));
+            assert_eq!(
+                combat.hit_by.unwrap_or(0) as u64,
+                raw["hitBy"].as_u64().unwrap()
+            );
+            assert!(
+                combat.cargo.is_empty() && combat.carrier.is_none() && combat.last_hit.is_none()
+            );
             units += 1;
             assert!(
                 m.grid

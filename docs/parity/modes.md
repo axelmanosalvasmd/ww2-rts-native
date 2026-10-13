@@ -172,6 +172,12 @@ Conventions used below:
 | MODE-102 | Lobby: mode, map (non-Horde maps greyed in Horde), World size, army, weather, defender, sandbox, AI level, team and faction controls; Horde best record. | `client/main.js:263-274`, `:391-408` | none | Lobby | UI, NET | Capture with host and guest views | todo |
 | MODE-103 | Objective line: the Tutorial goal ("Objective: ...") or active and completed scenario objectives. | `client/objectives.js:65-70` | none | Objective line | UI | Capture in Tutorial | todo |
 
+## Explicit Assault startup evidence
+
+`Match::new_assault` implements source attacker-team normalization, reserved-spawn cycling, manpower-only objective filtering with remapped prerequisites, defender fortifications before ordinary bases, role MP and canonical clock/bunker totals. A pinned original-source recorder compares 43 starts and 702 units, including legacy trigger state, all terrain arrays/logs, controls, production and combat/firing defaults. Focused debug regressions and all 162 locked release workspace tests pass, as do strict Clippy, formatting and release FFI.
+
+MODE-18, MODE-20 and MODE-28 remain in progress. This explicit constructor does not enable generic startup/tick dispatch. Assault clock execution, victory, recruitment, scenario execution, server hosting and client acceptance remain separate checkpoints.
+
 ## Canonical story and internal result evidence
 
 The Match point phase now records captures in the same canonical seven-counter story used by checked death, spending/refund, built, support and plane-down callbacks. The internal Conquest result projects the source's rounded story, existing timeline, finish reason/location/tick, VP goal and team/name metadata. Seven original-source traces cover 42 actions, including enemy/ally/neutral deaths, last fallen structures, signed resource changes, repeated callbacks and post-winner freezes. Focused Rust tests exercise prepared publication separately.

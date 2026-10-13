@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified the final Assault/World/canonical Match union: 43 original-source starts and 702 units compare deployment, legacy trigger state, combat/firing defaults, control and production rows, terrain logs and structures. All 162 locked release workspace tests, focused debug regressions, strict Clippy, formatting and release FFI pass. The original five-map legacy-trigger rejection and two Clippy style errors found during checks were corrected; full Assault runtime and three-platform CI remain pending.
+
 - Converged Assault startup with the verified World/canonical Match dependency head. Shared publication and final startup initialize existing combat/firing metadata once; recipient routing retains its Conquest guard, and Assault deployment order and filtered capture timestamps remain unchanged. Final combined verification is pending.
 
 - Fixed an overbroad Assault admission guard found by its first native test run: five authored maps with legacy timed triggers now retain the shared scenario state. The original recorder also compares that state; newer authored scenarios remain explicitly unsupported.
@@ -10,7 +12,7 @@
 
 - Brought the proven World rail annotation/inference repair and coordinated region accessors into the Assault prerequisite chain, retaining its explicit startup profile and canonical story fields. Combined native checks remain pending.
 
-- Added an explicit Assault startup constructor and canonical defender, attacker, clock and bunker-count state. It normalizes attacker teams, cycles reserved defender spawns, drops VP-only objectives with remapped prerequisites, builds ordered trenches, sandbags, command bunkers and flak before ordinary bases, and preserves source MP and army/weather choices. A pinned original-JavaScript recorder covers 43 starts and 702 units on all 33 authored maps and six synthetic terrains. Native checks are pending. Generic startup and Conquest phases still refuse Assault; Assault tick, recruitment, finish, scenarios and server delivery remain unfinished.
+- Added an explicit Assault startup constructor and canonical defender, attacker, clock and bunker-count state. It normalizes attacker teams, cycles reserved defender spawns, drops VP-only objectives with remapped prerequisites, builds ordered trenches, sandbags, command bunkers and flak before ordinary bases, and preserves source MP and army/weather choices. A pinned original-JavaScript recorder covers 43 starts and 702 units on all 33 authored maps and six synthetic terrains. Focused debug checks, all 162 locked release workspace tests, strict Clippy, formatting and release FFI pass. Generic startup and Conquest phases still refuse Assault; Assault tick, recruitment, finish, scenarios and server delivery remain unfinished.
 
 - Integrated the reviewed explicit World startup feature ancestry into the isolated Assault branch so both mode-specific constructors share one startup plan and publication policy. Combined native verification remains pending.
 

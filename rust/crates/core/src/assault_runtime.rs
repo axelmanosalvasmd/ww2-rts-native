@@ -118,10 +118,10 @@ impl Match {
                     x: spawn.x + math::cos(toward + a) * rr * CELL,
                     z: spawn.z + math::sin(toward + a) * rr * CELL,
                 };
-                if let Some(c) = self.world.game.cell_of(at.x, at.z) {
-                    if self.world.game.chars[c] == b'.' {
-                        self.world.set_cell(c, ch).map_err(|e| e.to_string())?;
-                    }
+                if let Some(c) = self.world.game.cell_of(at.x, at.z)
+                    && self.world.game.chars[c] == b'.'
+                {
+                    self.world.set_cell(c, ch).map_err(|e| e.to_string())?;
                 }
             }
             a += 0.04;
