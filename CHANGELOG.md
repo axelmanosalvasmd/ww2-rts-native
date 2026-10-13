@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Repaired two reaction consumer checks exposed by the first Vostro debug run: observe the lazy Combat stream through a test-only clone before the first real draw, and compare the absent pace NaN sentinel by bits before whole-unit equality. Runtime, fixtures and live RNG remain unchanged; full native gates are pending.
+
 - Updated the inherited operative design note to reflect its completed coherent Mac proof. Reaction composition still awaits its own native cycle.
 
 - Fixed accepted ground retreat to commit its real route endpoint to canonical control state. A preceding Move previously left a stale endpoint, preventing home arrival from clearing retreat state. The added actual-source Move-to-retreat trace completes at home on tick 53; the full recorder now has 19 traces, 2,474 ticks and 354 checkpoints. Combined native proof remains pending.
