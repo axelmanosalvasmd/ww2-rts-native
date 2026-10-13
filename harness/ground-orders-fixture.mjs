@@ -26,6 +26,7 @@ const timers=['cd','cooldown','retarget','repath','buff','sprint','react','still
 const map=()=>({name:'Ground order checkpoint',w:80,h:60,rows:Array(60).fill('.'.repeat(80)),spawns:[{x:1,y:1},{x:78,y:58}],points:[{x:40,y:58}]});
 const wallMap=column=>{const terrain=map();terrain.rows=terrain.rows.map(row=>row.slice(0,column)+'W'+row.slice(column+1));return terrain;};
 const spawn=(alias,type,x,z,extra={})=>({alias,type,owner:0,pose:{x,z},...extra});
+const building=(alias,x,y,owner=0)=>({alias,type:'hq',owner,pose:{x:(x+sim.UNITS.hq.size/2)*sim.CELL,z:(y+sim.UNITS.hq.size/2)*sim.CELL},placement:{cell:y*80+x,finished:true}});
 const step=()=>({op:'step'}),prime=units=>({op:'prime',units});
 const command=(t,ids,extra={},sequence)=>({op:'command',cmd:{t,ids,...extra},...(sequence===undefined?{}:{sequence})});
 const oldRandom=Math.random,cases=[];let totalSteps=0,totalCommands=0;
@@ -39,7 +40,7 @@ try {
   assert.equal(g.mode,undefined);assert.equal(g.wx,null);assert.equal(g.supply,false);assert.equal(g.logisticsEnabled,false);assert.equal(g.tech,false);
   const creation={seed:g.seed>>>0,nextId:g.nextId,actorOrder:[...g.units.keys()],units:[...g.units.values()].map(u=>({id:u.id,type:u.type,owner:u.owner,...point(u),rot:bits(u.rot),hp:bits(u.hp)}))};
   const aliases={};
-  for(const spec of spawns){const u=sim.internals.spawnUnit(g,spec.owner,spec.type);aliases[spec.alias]=u.id;Object.assign(u,spec.pose);}
+  for(const spec of spawns){if(spec.placement){const size=sim.UNITS[spec.type].size,x=spec.placement.cell%g.w,y=Math.floor(spec.placement.cell/g.w);assert.ok(x+size<=g.w&&y+size<=g.h);const cells=Array.from({length:size*size},(_,i)=>(y+Math.floor(i/size))*g.w+x+i%size);assert.ok(cells.every(c=>g.chars[c]==='.'));assert.ok([...g.units.values()].every(u=>!cells.includes(Math.floor(u.z/sim.CELL)*g.w+Math.floor(u.x/sim.CELL))));}const u=spec.placement?sim.internals.placeBuilding(g,spec.owner,spec.type,spec.placement.cell,spec.placement.finished):sim.internals.spawnUnit(g,spec.owner,spec.type);aliases[spec.alias]=u.id;if(spec.placement){assert.deepEqual({x:u.x,z:u.z},spec.pose);spec.placement.cells=structuredClone(u.cells);assert.equal(u.structureId,`building:${u.id}`);}else Object.assign(u,spec.pose);}
   const resolveId=id=>typeof id==='string'?(aliases[id]??Number(id)):id;
   const resolveFields=fields=>keys(Object.entries(fields).map(([k,v])=>[k,['board','riding','follow','attackId','targetId'].includes(k)?resolveId(v):k==='cargo'?v.map(resolveId):structuredClone(v)]));
   for(const u of g.units.values())Object.assign(u,quiet);
@@ -99,7 +100,7 @@ try {
  record('paid-dig-attack-cancellation-no-refund',[U('attacker','engineer',30,33),...scene().slice(1)],[command('dig',['attacker'],{kind:'trench',x:30,z:30,dir:0}),attack(),step()],{check:({states,unit})=>{assert.ok(unit(states[1],'attacker').dig);assert.equal(unit(states[2],'attacker').dig,null);assert.equal(states[1].players[0].mp,states[2].players[0].mp);}});
  record('shared-paid-job-attack-cancellation',[U('attacker','engineer',30,33),U('coworker','engineer',34,33),...scene().slice(1)],[command('entrench',['attacker','coworker'],{pattern:'line',fort:'trench',x:30,z:30,x2:38,z2:30}),step(),attack(),step()],{check:({states,unit})=>{assert.ok(unit(states[2],'attacker').dig);assert.equal(unit(states[3],'attacker').dig,null);assert.equal(unit(states[3],'attacker').entrench,null);assert.equal(states[2].players[0].mp,states[3].players[0].mp);}});
  record('retreat-default-home-repeated',[U('attacker','rifle',60,40)],[retreat(),step(),retreat(),step()],{check:({states,unit})=>{assert.equal(unit(states[1],'attacker').controls.retreating,true);assert.ok(unit(states[1],'attacker').path.length);assert.equal(unit(states[3],'attacker').controls.retreating,true);}});
- record('retreat-nearest-finished-own-HQ',[U('attacker','rifle',60,40),U('near','hq',50,40),U('unfinished','hq',59,40),U('enemyHQ','hq',58,40,1)],[retreat(),step()],{unitPrime:{near:{built:1},unfinished:{built:.5},enemyHQ:{built:1}},check:({states,unit})=>assert.deepEqual(unit(states[1],'attacker').controls.worldGoal,{x:{f64:bits(50)},z:{f64:bits(40)}})});
+ record('retreat-nearest-finished-own-HQ',[U('attacker','rifle',60,40),building('near',24,19),building('unfinished',28,22),building('enemyHQ',32,19,1)],[retreat(),step()],{unitPrime:{near:{built:1},unfinished:{built:.5},enemyHQ:{built:1}},check:({states,unit})=>assert.deepEqual(unit(states[1],'attacker').controls.worldGoal,{x:{f64:bits(51)},z:{f64:bits(41)}})});
  const startupHQScene=[U('attacker','rifle',60,40)];
  // This explicit setup removes home eligibility by unfinished construction, retaining every actor identity.
  record('retreat-fallback-player-spawn',startupHQScene,[retreat(),step()],{unitPrime:{'7':{built:0}},check:({states,unit})=>assert.deepEqual(unit(states[1],'attacker').controls.worldGoal,states[1].players[0].spawn?{x:{f64:states[1].players[0].spawn.x},z:{f64:states[1].players[0].spawn.z}}:null)});
@@ -147,7 +148,7 @@ try {
  }});
  // Source chooses home after the physical exit, which changes the nearest HQ.
  record('retreat-nearest-HQ-after-garrison-exit',[
-  U('attacker','rifle',31,31),U('beforeExitHQ','hq',27,31),U('afterExitHQ','hq',36,31),
+  U('attacker','rifle',31,31),building('beforeExitHQ',8,14),building('afterExitHQ',21,14),
  ],[retreat(),step()],{terrain:house,unitPrime:{
   attacker:{garrison:15*80+15},beforeExitHQ:{built:1},afterExitHQ:{built:1},
  },check:({states,records,unit})=>{
@@ -156,7 +157,7 @@ try {
   assert.deepEqual([before.x,before.z],[bits(31),bits(31)]);
   assert.deepEqual([exited.x,exited.z],[bits(35),bits(31)],'actual nearest-free physical exit');
   assert.equal(exited.controls.garrison.f64,bits(-1));assert.equal(exited.controls.retreating,true);
-  assert.deepEqual(exited.controls.worldGoal,{x:{f64:bits(36)},z:{f64:bits(31)}},'nearest finished own HQ must use the exited pose');
+  assert.deepEqual(exited.controls.worldGoal,{x:{f64:bits(45)},z:{f64:bits(31)}},'nearest finished own HQ must use the exited pose');
   assert.deepEqual(after.controls.worldGoal,exited.controls.worldGoal);
   assert.equal(after.controls.garrison.f64,bits(-1));assert.equal(after.controls.retreating,true);
   assert.equal(states[0].players[0].mp,states[1].players[0].mp,'Retreat neither spends nor refunds');

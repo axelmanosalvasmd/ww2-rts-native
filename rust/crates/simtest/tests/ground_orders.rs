@@ -238,7 +238,54 @@ fn make(c: &Value) -> Match {
                 !m.rules.kinds[kind].rail,
                 "rail factory metadata is excluded explicitly"
             );
-            let staged = StagedUnit::ordinary(
+            let placement = spec.get("placement");
+            let building_cells = placement.map(|placement| {
+                assert!(m.rules.kinds[kind].building);
+                assert_eq!(placement["finished"], true);
+                let cell = placement["cell"].as_u64().unwrap() as usize;
+                let definition = ww2_core::catalog::Catalog::compiled()
+                    .unwrap()
+                    .unit(name)
+                    .unwrap();
+                let size = definition.get("size").and_then(|v| v.number()).unwrap() as usize;
+                let x = cell % m.world.game.w;
+                let y = cell / m.world.game.w;
+                assert!(x + size <= m.world.game.w && y + size <= m.world.game.h);
+                let width = m.world.game.w;
+                let cells = (0..size)
+                    .flat_map(|dy| (0..size).map(move |dx| (y + dy) * width + x + dx))
+                    .collect::<Vec<_>>();
+                assert_eq!(
+                    json!(cells),
+                    placement["cells"],
+                    "declared actual Source footprint"
+                );
+                assert_eq!(
+                    at,
+                    Point {
+                        x: (x as f64 + size as f64 / 2.0) * ww2_core::game::CELL,
+                        z: (y as f64 + size as f64 / 2.0) * ww2_core::game::CELL
+                    }
+                );
+                let top = cells
+                    .iter()
+                    .map(|&c| m.world.game.height.as_ref().map_or(0, |h| h[c]))
+                    .max()
+                    .unwrap();
+                for &c in &cells {
+                    if m.world.game.height.as_ref().map_or(0, |h| h[c]) < top {
+                        m.world.set_level(c, top).unwrap();
+                    }
+                    m.world.set_cell(c, b'K').unwrap();
+                }
+                cells
+            });
+            assert_eq!(
+                m.rules.kinds[kind].building,
+                building_cells.is_some(),
+                "building scene requires actual placement"
+            );
+            let mut staged = StagedUnit::ordinary(
                 &m.world.game,
                 &m.rules,
                 owner,
@@ -249,6 +296,10 @@ fn make(c: &Value) -> Match {
                 Some(at),
             )
             .unwrap();
+            if let Some(cells) = &building_cells {
+                staged.unit.cells = Some(cells.iter().map(|&c| c as u32).collect());
+                staged.unit.built = Some(1.0);
+            }
             prepare_publication(
                 PublicationParts {
                     units: &mut m.world.game.units,
@@ -267,6 +318,24 @@ fn make(c: &Value) -> Match {
             m.firing.initialize(id);
             m.abilities.initialize(id);
             m.recovery.initialize(id);
+            if let Some(cells) = building_cells {
+                m.production.initialize_building(id).unwrap();
+                m.building_rallies.insert(id, None);
+                for &c in &cells {
+                    m.building_cells.insert(
+                        c,
+                        ww2_core::match_runtime::BuildingCell {
+                            unit: id,
+                            owner,
+                            at,
+                        },
+                    );
+                }
+                let hp = m.world.game.units[&id].hp;
+                m.world
+                    .register_building_structure(id, &cells, hp, hp)
+                    .unwrap();
+            }
         }
         assert_eq!(m.next_unit_id, id.checked_add(1).unwrap());
     }
