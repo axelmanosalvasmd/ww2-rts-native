@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The navigation fixture generator now verifies the reference's exact pinned commit and rejects tracked changes before importing its source. Untracked and ignored files, including `node_modules`, do not invalidate the fixture run.
+
 - Added the Rust terrain region and directed portal planner behind a borrowed, caller-supplied terrain view. It preserves insertion-order ties, incremental chunk updates and bounded route caching from `shared/navigation.js`. All 4,888 recorded x64 Node 24.21.0 queries match the target, connection status, leg limit, allowed regions and cell filter, including 277 terrain updates, directed cliffs and map edges. Invalid shapes and cell indices return errors. This is the coarse prerequisite for fine A*, not full pathfinding; movement and FFI remain unchanged and performance is unmeasured.
 
 - Issue #2 measured on the Vostro (i5-12400, Ubuntu 24.04, x64 Node 24.21.0, rustc 1.99.0; median of three 200-tick runs; load average 3.2 to 4.0, so not idle). Ported work per tick (movement, separation and a quarter of vision and fog) at 400, 1,000 and 2,000 units: Node 5.4, 14.6 and 35.7 ms; Rust on one thread 1.8, 6.7 and 18.9 ms; Rust with threads 1.6, 6.0 and 17.2 ms. At 2,000 units fog is 7.9 times faster threaded and vision 6.6 times, movement 2.1 times and separation 1.4 times on one thread. Full table and reading in `DESIGN.md` ("Sim test (#2)"); the confidence row for a native server is updated with it, and the README status no longer says no code exists.

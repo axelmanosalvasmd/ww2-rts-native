@@ -1,10 +1,19 @@
 // Record actual navigationLeg outputs. Run with x64 Node 24.21.0 from the repo root:
 // node harness/navigation-fixture.mjs > rust/crates/simtest/tests/fixtures/navigation.json
 // WW2_REFERENCE may name another checkout of the same read-only reference pin.
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 if (process.arch !== 'x64' || process.version !== 'v24.21.0') throw Error('Use x64 Node v24.21.0');
-const source = process.env.WW2_REFERENCE ? pathToFileURL(resolve(process.env.WW2_REFERENCE, 'shared/navigation.js')) : new URL('../reference/ww2-rts/shared/navigation.js', import.meta.url);
+const reference = resolve(process.env.WW2_REFERENCE ?? fileURLToPath(new URL('../reference/ww2-rts/', import.meta.url)));
+const expectedHead = 'e4e579a838aabae3b1d9dadbc17a0a87147bc52d';
+const git = args => execFileSync('git', ['-C', reference, ...args], { encoding: 'utf8' }).trim();
+const head = git(['rev-parse', 'HEAD']);
+if (head !== expectedHead) throw Error(`Reference HEAD must be ${expectedHead}, found ${head}`);
+// Ignore untracked and ignored files, including node_modules. Tracked changes
+// would change the oracle without changing its recorded commit identifier.
+if (git(['status', '--porcelain', '--untracked-files=no'])) throw Error('Reference has tracked changes; use a clean pinned checkout');
+const source = pathToFileURL(resolve(reference, 'shared/navigation.js'));
 const { navigationLeg } = await import(source);
 let seed = 0x7a931ac;
 function random() {
