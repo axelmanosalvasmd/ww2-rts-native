@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Prepared the source-reviewed construction/ground caller for a coherent native cycle by normally retaining the ordered-event publication parent, current main and the central 40-minute CI budget. Core and simulation consumer bytes remain exactly `c501e12`; the approved ABI 2 header and server provider bytes come from those accepted parents. New combined native and platform results remain pending, and earlier ABI 1 branch FFI evidence is not an ABI 2 consumer result.
+
 - Adapted the three remaining construction, aircraft and carrier replay timeline readers to the shared MatchSample enum after independent source review found their obsolete struct-field accesses in the normal union. Each preserves the original Conquest `{t, vp}` projection and explicitly refuses Territories. Runtime, inputs, original fixtures and every state comparison are unchanged; this combined head still awaits native compilation.
 
 - Migrated the inherited quiet engineering snapshot consumer to require an empty owned TickEvent result, preserving its original source fixture and state comparisons. Ground full-step checks now require exactly one typed GroundAttack receipt instead of matching a planned Debug name. These integration consumers have not run on this combined source head.
@@ -17,6 +19,14 @@
 - Connected canonical construction to the single ordinary tick: paired admission before input and after publication, worker capture after autocast, and ordered completion/repair before late unit capture. The actual construction receipt is now reported once; accepted builder retreat uses the provider's paired cleanup instead of the old blanket refusal. The 29-case source fixture and construction consumer remain unchanged pending owned event migration and combined native proof.
 
 - Normally joined the source-reviewed construction provider and ordered-event caller in a separate assembly. Both canonical producer sinks and paired builder cleanup remain intact; construction scheduling, consumer event migration and combined native proof are pending. Frozen ordered-event and AIR candidates are unchanged.
+- Retained the newly published AIR frontier by normal merge so the event closure has one accepted parent instead of a misleading crisscross comparison. Runtime, event source fixtures and the approved ABI 2 header are unchanged; exact combined platform checks remain pending.
+
+- Verified ordered tick outputs on the Mac (arm64): 105 focused debug tests and all 270 release workspace tests pass at `625705e`; final strict Clippy, formatting and release FFI pass at the annotation-only `ad90eac`. Independent hashed copies pass 105 tests in each profile. Three original complete traces reproduce 375 steps and 103 chronological shots, including real launch/route-failure and section/later-origin failure witnesses. The publication closure normally retains current main, approved ABI 2 and the central 40-minute CI budget; its fresh combined platform and host checks remain separate from the earlier ABI 1 branch library proof.
+
+- Normally incorporated the current main server-helper frontier into the ordered-event closure. Core event code and fixtures remain unchanged; complete combined platform verification is pending, and component evidence does not establish an attached room loop.
+
+- Normally joined the published AIR parent and approved ABI 2 ancestry into a separate ordered-event closure. Core event bodies and original fixtures remain the verified event predecessor; the combined publication head awaits fresh platform checks. The earlier event static-library result remains ABI 1 branch evidence, not ABI 2 consumer proof.
+
 
 - Marked the shared aircraft component snapshot wrapper as intentionally unused by the detached-event runner test, fixing its strict-lint failure after all 105 focused debug tests and 270 release workspace tests passed at `625705e`. The annotation changes no helper body, runtime, input or fixture. Final lint, formatting and release FFI checks remain pending; the original failure is preserved.
 
@@ -31,6 +41,12 @@
 - Corrected construction source-review findings: invalid Assist targets and unlisted Build kinds retain prior follow state, and Pillbox object slit definitions retain the raw finite direction instead of normalizing it. Added the finite-angle boundary check; native proof remains pending.
 
 - Added the source-only paid ordinary-construction provider: one canonical builder site identity, typed Build/Assist and normalized waiting orders, exact worker capture and ordered completion/repair. Rare accepted placements stage World, grid and observation/path caches before routes, share the immutable authored snapshot, and publish in place after all guards. Empty fire lists preserve lazy fog warming. Immediate Build/Assist clears prior retry failure rows only after a committed route; queued and rejected operations retain them. Repair now preflights every logged terrain layer and aggregate capacity before progress, story or health writes; existing raw fixture loaders retain numeric build identities. Original source recording covers 29 cases, 113 actions, 1,919 full steps and 2,013 snapshots. Real runner integration, independent final review and native checks remain pending; depot/coastal/cache/cancel lifecycle and Classic/World caller admission remain future work.
+- Applied the published 40-minute CI job limit from PR #192 to AIR PR #188. Its prior run `38442565009` passed formatting and strict Clippy on all platforms before all three jobs exceeded 20 minutes during workspace tests; no assertion failure appears in the preserved logs. Remaining tests and release builds still require fresh completion. Runtime, gates and approved ABI 2 remain unchanged.
+
+- Refreshed AIR PR #188 onto the landed server-provider main `a173dc7`, retaining unchanged AIR/core/tick code and canonical server provider bytes. Both additive documentation histories are preserved; fresh combined checks are required.
+
+- Refreshed the published AIR and ordinary-tick frontier in PR #188 onto main `13a8d1f`, preserving checked aircraft, support, carrier and Default caller code. Retained both additive changelog histories and the approved ABI 2 header. No future ordered-event or construction code was imported; fresh platform checks cover the combined head.
+
 
 - Verified the ordinary AIR/support caller on Mac arm64 at db3da8d: 56 final focused simulation debug tests, all 267 release workspace tests, strict Clippy, formatting and release FFI pass. The unchanged core's 57 debug passes remain attributed to 2d3b860. Independent hashed copies pass 38 debug and 38 release tests. Recorded both actual test dependency repairs and preserved their failing logs; the full-source AIR replay covers 10 traces and 4,972 steps. Logistics, unsupported aircraft weapons, later construction/event output, hosted platform checks and full room startup remain separate.
 
@@ -575,6 +591,28 @@
 
 - Preserved canonical recruited combat defaults through the shared publication callback when integrating the reviewed combat ancestry. Fresh combat identities reject before payment; production stepping remains under implementation.
 - Preserved recruited combat metadata in the shared publication callback and rejected occupied combat IDs before charging during integration.
+
+
+- Refreshed the consolidated server delta, list, backpressure and timing frontier in PR #137 onto ABI 2 main `13a8d1f`. Preserved both changelog histories and all server source, original-source recorders and fixtures. Only additive changelog entries conflicted; fresh combined-head platform checks remain pending.
+
+- Added host tick catch-up with the source's four-tick cap and backlog drop, plus snapshot cadence from rolling timing percentiles. Snapshot phases are recorded only on scheduled snapshot ticks; sustained spare capacity recovers the interval. Timing inputs and counter capacity are checked before mutation. The original-source recorder covers 8 meter traces with 747 samples and 7 clock traces with 34 polls. The combined server checkpoint passes 23 debug tests, 173 release workspace tests, strict Clippy, formatting and release FFI at 315f46a. Actual room-loop wiring remains pending; AI keeps its recorded schedule.
+
+- Integrated the server delta, list and socket backpressure checkpoints with the reviewed core ancestry. All original server tests and source fixtures are retained; final native checks remain pending.
+
+- Added socket-local snapshot backpressure with the source's 256 × 1024 UTF-16-unit limit, one owed catch-up frame and stale-socket callback isolation. Write tickets reject duplicate completion and capacity errors before changing counters. Watcher sockets above 4 MiB receive the original 1013 close decision. The original-source recorder matches 13 traces, 54 callback steps and 12 watcher cases through both mode branches. Native checks and room transport wiring remain pending.
+
+- Added ordinary-room shared wreck/node list versions and World recipient-local list history, composed with the unit delta ledger. Full resync and reconnect reset include lists; invalid frames retain delivery state. List equality compares JSON content without depending on object key order or integer/float spelling, and checked version updates cannot partially overflow. The original-source recorder matches 7 traces and 75 steps, including removal of stale delta flags. Native checks and room snapshot wiring remain pending.
+
+- Added recipient-local unit delta ledgers for changed rows, ordered removals, held fingerprints, full resync and start/reconnect resets. The original source oracle matches 68 traces and 409 frames, including actual recipient snapshots from all 33 authored maps. The ledger accepts already filtered rows and rejects malformed or duplicate rows before changing state. Independent source review is clear; native checks, snapshot production and room simulation remain pending.
+
+- Embedded all 33 original authored maps (1,349,980 JSON bytes) in a separate private server catalogue and added native match construction without Node, filesystem map reads or a reference checkout. Cached validated maps remain immutable; each match gets independent mutable world state. Original mines, materials and triggers are retained. Public map routes still use their filtered assets and refuse editor credential access to private data. Room simulation and generated World startup remain unfinished.
+
+
+- Allow 40 minutes for the full three-platform Rust CI job. The combined snapshot frontier reached World-memory tests with no assertion failures before its previous 20-minute limit cancelled all three jobs. Formatting, strict Clippy, the complete debug suite, release FFI build and Linux C replay remain required.
+
+- Refreshed the consolidated Rust frontier in PR #119 onto merged ABI 2 main `d88ef6d`. Preserved all core behavior, both changelog histories, the six approved recipient-view calls and the exact header. Only additive changelog entries conflicted; combined-tree platform checks are rerun on the refreshed head.
+
+
 - Added canonical Match ground reactions, automatic retreat and idle spacing using shared command destinations, owner-known routes, firing targets and combat hit history. Three focused tests pass in debug and release, comparing 51 unchanged-source reaction/retreat cases and checking atomic rejection. Only the missing reaction timer is added to UnitControl. Air, carrier and garrison retreat exits remain explicit unsupported paths. Complete tick hookup remains separate. Adapted routing to canonical ordered-fire iteration and filled absent reserve defaults in the merged command fixture. At checkpoint ab0394d, strict Clippy stopped on two unused helpers in its inherited firing milestone. Final merged checks are pending.
 - Verified the read-only mass-project tick helper at `914efe7`: four focused debug guards, all 214 locked release workspace tests, strict Clippy, formatting and release FFI passed after both-profile package cleans. Independent copied debug and release binaries each passed the four guards. The seven-case, 193-step source oracle is verified; its native sole-runner replay remains separate.
 
@@ -1139,6 +1177,12 @@
 
 
 - Added complete event-adapter preflight for canonical retreat velocities, pose, suppression and sprint values so malformed later blast targets fail before earlier unit damage. Focused native checks pass.
+- Refreshed PR #16 onto main `242997f` with the approved ABI 2 header and six view calls unchanged. Recorded Axel's reported Linux UE 5.8.3 guard, build, replay and live shadow checks on `03a49ac`: 1,236 replay messages, 7,650 rows, 61 edge checks, 18 formation tests and 2,230 live snapshots passed. The consumer source is unpublished; packaged Linux, Windows and macOS builds and authoritative decoder adoption remain pending. Earlier pending-verification entries describe their original checkpoints.
+
+- Documented the ABI mismatch path for the staged consumer update: the Rust export returns version 2 directly, and an ABI 1 consumer must reject it against its own version constant before making other calls. No library version-mismatch error code or current Unreal guard verification is claimed.
+
+- Refreshed PR #16 against the landed Rust recipient decoder and current main, retaining the exact ABI 2 header, six view calls and formation signatures. Recorded Axel's explicit client-consumption approval and Julio's Rust-side approval for staged adoption. PR merge and current Unreal build/link/runtime verification remain pending; no broader interface, gameplay or privacy decision is changed.
+- Added the native Match Conquest victory phase and finish bookkeeping: team VP in slot order, latest still-held capture location, 0.1 m end rounding, first-winner preservation, reveal and exact Conquest timeline fields. Canonical point accounting now freezes VP and capture story counts after the winner while ownership and manpower can continue. Three focused tests compare 12 original-JavaScript traces (24 assembled-match checkpoints) and invalid-state atomicity; existing startup and point-income tests pass. Other modes, command refusal, remaining story counters, result transport and the full battle loop remain unfinished.
 
 - Added one canonical Match control row for aim, ability and retreat switches, attack intent, facing and waiting orders. Startup prepares the rows from unit definitions; recruitment can stage them before charging. Command execution is the next part of this lane, and no wire or C interface changed.
 - Added canonical chosen-target and weapon-timer state to Match for the firing integration. Unit health and position, command aim and combat hit history retain their existing owners; the firing phase is still in progress.
