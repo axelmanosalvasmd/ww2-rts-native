@@ -533,6 +533,7 @@ pub fn load_game(g: &Value, rules: &Rules) -> Result<Loaded> {
         .enumerate()
         .map(|(i, s)| {
             Ok(Smoke {
+                remaining: given(s, "t").and_then(Value::as_f64),
                 id: i as u32,
                 x: num(s, "x")?,
                 z: num(s, "z")?,
@@ -623,6 +624,7 @@ pub fn load_game(g: &Value, rules: &Rules) -> Result<Loaded> {
             .iter()
             .map(|w| {
                 Ok(Wreck {
+                    id: None,
                     cell: w
                         .get("c")
                         .and_then(serde_json::Value::as_u64)

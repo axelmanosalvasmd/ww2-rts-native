@@ -95,7 +95,7 @@ fn snapshot(w: &World) -> Value {
     "mines":runs(w.mine_layer.iter().map(|v|json!(v))),"flags":runs(g.flags.iter().map(|v|json!(v))),"height":g.height.as_ref().map(|v|runs(v.iter().map(|v|json!(v)))),
     "hp":floats(&g.cell_hp),"wear":floats(g.wear.as_ref().unwrap()),"surfaceWear":floats(&w.surface_wear),"front":g.trench_front.as_ref().map(|v|floats(v)),"burnt":runs(w.burnt.iter().map(|v|json!(v))),"scar":floats(&w.scar),"state":runs(w.cell_state.iter().map(|v|json!(v))),"tough":g.tough.as_ref().map(|v|runs(v.iter().map(|v|json!(v)))),
     "materials":map(&w.materials,|v|json!(v)),"baseMaterials":map(&w.base_materials,|v|json!(v)),"objectMaterials":map(&w.object_materials,|v|json!(v)),"mineMaterials":map(&w.mine_materials,|v|json!(v)),
-    "mineOwners":map(&w.mines,|v|json!(v)),"mineSeen":map(&w.mine_seen,|v|json!(v)),"aid":map(&w.aid,|v|json!(v)),"fires":map(&w.fires,|v|json!(v)),"wrecks":g.wrecks.iter().map(|x|json!([x.x,x.z,x.cell,x.moving])).collect::<Vec<_>>(),
+    "mineOwners":map(&w.mines,|v|json!(v)),"mineSeen":map(&w.mine_seen,|v|json!(v)),"aid":map(&w.aid,|v|json!(v)),"fires":map(&w.fires.iter().map(|(c,t)|(*c,*t)).collect(),|v|json!(v)),"wrecks":g.wrecks.iter().map(|x|json!([x.x,x.z,x.cell,x.moving])).collect::<Vec<_>>(),
     "roads":w.roads,"shoal":w.shoal,"versions":[g.terrain_version as u64,w.versions.obstruction,w.versions.infantry,w.versions.vehicle,w.versions.naval],"soak":w.soak(),"journal":w.journal(),"log":w.cell_log().iter().map(row).collect::<Vec<_>>(),"newCells":w.new_cells().iter().map(row).collect::<Vec<_>>(),"pending":pending,"watch":w.pending(Recipient::Spectators),"structures":structures,"current":w.sections.iter().map(|(c,s)|json!([c,s.id])).collect::<Vec<_>>(),
     "initial":{"chars":String::from_utf8(initial.chars.clone()).unwrap(),"ground":String::from_utf8(initial.ground.clone()).unwrap(),"objects":String::from_utf8(initial.objects.clone()).unwrap(),"mines":initial.mines,"height":initial.height,"front":initial.trench_front.as_ref().map(|v|floats(v))}
     })
@@ -230,6 +230,7 @@ fn perform(w: &mut World, a: &Value) -> Value {
             }
             if let Some(v) = a["wreck"].as_array() {
                 w.game.wrecks.push(Wreck {
+                    id: None,
                     x: v[0].as_f64().unwrap(),
                     z: v[1].as_f64().unwrap(),
                     cell: v[2].as_u64().map(|v| v as usize),
