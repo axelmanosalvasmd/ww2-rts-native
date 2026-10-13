@@ -13,7 +13,7 @@ use ww2_core::{
     map::AuthoritativeMap,
     match_commands::{Command, MoveOutcome, UnitControl},
     match_runtime::{Match, MatchOptions, PlayerConfig},
-    match_tick::{TickPathConfig, TickPhase},
+    match_tick::{TickEvent, TickPathConfig, TickPhase},
     production::ProductionState,
     random::RandomSnapshot,
     unit_spawn,
@@ -827,9 +827,12 @@ fn original_paid_construction_replays_full_match_ticks() {
                     assert!(position(TickPhase::Construction) < position(TickPhase::Separation));
                     effects = json!(
                         report
-                            .environment
+                            .events
                             .iter()
-                            .map(|e| e.to_json())
+                            .map(|event| match event {
+                                TickEvent::Environment(effect) => effect.to_json(),
+                                other => panic!("{name}: unexpected producer in quiet construction scene: {other:?}"),
+                            })
                             .collect::<Vec<_>>()
                     );
                     steps += 1;

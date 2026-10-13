@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Migrated the construction replay to the caller's chronological event result. Its declared quiet scenes compare direct environment effects in order and reject unexpected producer families instead of filtering them away. Original source fixture and all existing state comparisons are unchanged; the combined construction runner has not compiled or run natively.
+
 - Connected canonical construction to the single ordinary tick: paired admission before input and after publication, worker capture after autocast, and ordered completion/repair before late unit capture. The actual construction receipt is now reported once; accepted builder retreat uses the provider's paired cleanup instead of the old blanket refusal. The 29-case source fixture and construction consumer remain unchanged pending owned event migration and combined native proof.
 
 - Normally joined the source-reviewed construction provider and ordered-event caller in a separate assembly. Both canonical producer sinks and paired builder cleanup remain intact; construction scheduling, consumer event migration and combined native proof are pending. Frozen ordered-event and AIR candidates are unchanged.
