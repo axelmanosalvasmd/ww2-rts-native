@@ -8,8 +8,9 @@
 //!
 //! Its answers match the reference call for call (`harness/movement-trace.mjs`, `simtest --replay`), as the
 //! frozen workload of issue #2 runs it. Left out, and so different from the reference where they apply:
-//! - path searches: a unit that stalls or is told by traffic to find a new route keeps its route and waits a
-//!   second (`repath = 1`), as the workload's patch makes `findPath` and `requestStepPath` do;
+//! - the default entry points preserve the frozen workload's disabled path search. The `with_routes`
+//!   entry points call supplied routing at the real recovery/replan point; callers select terrain,
+//!   apply routes and handle deferred searches. Full order scheduling is separate;
 //! - logistics: fuel limits and fuel use (`consumeDrivingFuel`), convoys, and units forced back by
 //!   shortages; the loader refuses units that have reserves or a convoy;
 //! - crushing, ground wear and the mud it makes, and mines going off under a unit (the workload turns
@@ -72,6 +73,15 @@ pub struct Moved {
 /// The movement block for unit `id` (see the module notes): steer through traffic, walk or drive along the
 /// route, update the spatial index and the unit's dust, stillness, retreat and stuck count. `supp_speed` is
 /// `suppMul(u).speed` taken at the start of the unit's turn, before its suppression wore off this tick.
+/// Why a moving unit needs a replacement route.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RouteRequest {
+    /// A stalled infantry route, subject to the step's request budget.
+    Recovery,
+    /// Vehicle stalls and traffic replans search immediately.
+    Immediate,
+}
+
 pub fn move_unit(
     g: &mut Game,
     rules: &Rules,
@@ -79,10 +89,29 @@ pub fn move_unit(
     id: UnitId,
     supp_speed: f64,
 ) -> Option<Moved> {
+    move_unit_with_routes(g, rules, grid, id, supp_speed, &mut |_, _, u, _, _| {
+        u.repath = 1.0;
+    })
+}
+
+/// Runs one movement block with real routing supplied by the caller.
+/// The callback runs after traffic steering, at the reference's exact replan point.
+/// It may update the unit's path and retry timer or defer a budgeted request. A new
+/// path must increment `path_gen`, including an empty replacement. The game does
+/// not contain this unit during the callback; its current state is supplied as `u`.
+/// Terrain selection and search errors remain the caller's responsibility.
+pub fn move_unit_with_routes(
+    g: &mut Game,
+    rules: &Rules,
+    grid: &mut SpatialGrid,
+    id: UnitId,
+    supp_speed: f64,
+    routes: &mut impl FnMut(&Game, &Rules, &mut Unit, Point, RouteRequest),
+) -> Option<Moved> {
     // The unit is out of the map while it moves. The reference reads it there only through `waitsOn`, which
     // stops at it either way (its `queuedBehind` is 0 by then), and every query skips it.
     let mut u = g.units.remove(&id)?;
-    let speed = block(g, rules, grid, &mut u, supp_speed);
+    let speed = block(g, rules, grid, &mut u, supp_speed, routes);
     grid.update(id, &u);
     let infantry = rules.kinds[u.kind].infantry;
     g.units.insert(id, u);
@@ -93,7 +122,14 @@ pub fn move_unit(
     })
 }
 
-fn block(g: &Game, rules: &Rules, grid: &SpatialGrid, u: &mut Unit, supp_speed: f64) -> f64 {
+fn block(
+    g: &Game,
+    rules: &Rules,
+    grid: &SpatialGrid,
+    u: &mut Unit,
+    supp_speed: f64,
+    routes: &mut impl FnMut(&Game, &Rules, &mut Unit, Point, RouteRequest),
+) -> f64 {
     let m = &rules.movement;
     let dt = m.tick;
     let kind = &rules.kinds[u.kind];
@@ -156,10 +192,13 @@ fn block(g: &Game, rules: &Rules, grid: &SpatialGrid, u: &mut Unit, supp_speed: 
         && !steer.waiting;
     if (steer.replan || stalled) && u.repath <= 0.0 {
         let goal = u.world_goal.or(u.amove).or(u.path.last().copied());
-        if goal.is_some() {
-            // The reference asks for a new route here; path searches are not ported, so the unit keeps its
-            // route and asks again in a second, as the frozen workload's patch has it.
-            u.repath = 1.0;
+        if let Some(goal) = goal {
+            let request = if kind.infantry && !steer.replan {
+                RouteRequest::Recovery
+            } else {
+                RouteRequest::Immediate
+            };
+            routes(g, rules, u, goal, request);
         }
     }
     // The route followed now: the unit's own route, or a sidestep's single point.
@@ -539,6 +578,18 @@ pub fn reaches_block(rules: &Rules, u: &Unit) -> bool {
 /// its suppression speed factor, then suppression wearing off and the route and sprint timers running down,
 /// then the movement block. Returns what moved, for the infantry progress count after separation.
 pub fn move_units(g: &mut Game, rules: &Rules, grid: &mut SpatialGrid) -> Vec<Moved> {
+    move_units_with_routes(g, rules, grid, &mut |_, _, u, _, _| {
+        u.repath = 1.0;
+    })
+}
+
+/// Runs the movement loop with the same route callback as `move_unit_with_routes`.
+pub fn move_units_with_routes(
+    g: &mut Game,
+    rules: &Rules,
+    grid: &mut SpatialGrid,
+    routes: &mut impl FnMut(&Game, &Rules, &mut Unit, Point, RouteRequest),
+) -> Vec<Moved> {
     let dt = rules.movement.tick;
     let ids: Vec<UnitId> = g.units.keys().copied().collect();
     let mut moved = Vec::with_capacity(ids.len());
@@ -560,7 +611,7 @@ pub fn move_units(g: &mut Game, rules: &Rules, grid: &mut SpatialGrid) -> Vec<Mo
         }
         u.repath -= dt;
         u.sprint -= dt;
-        if let Some(m) = move_unit(g, rules, grid, id, factor) {
+        if let Some(m) = move_unit_with_routes(g, rules, grid, id, factor, routes) {
             moved.push(m);
         }
     }

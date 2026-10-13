@@ -154,16 +154,40 @@ The initial `catalog.rs` catalog embedded 42 post-initialization reference table
 
 The recorded expectations call the JavaScript helpers themselves. Tests cover 10 mode inputs, every unit/faction, 80 support cases, 640 ability cases, 480 research cases and 56,400 damage multipliers. Grouped fingerprints plus 3,600 direct bit comparisons keep the fixture at 304 KB. The initial catalog was 26.6 KB; the following section records its expansion to 46 tables.
 
-The existing movement/vision `Rules` loader still accepts harness data. This catalog does not change the C interface or its formation-only `RULES_HASH`. Purchase execution, income, full army population counting, availability and placement remain separate work; these helpers alone do not validate an order.
+The existing movement/vision `Rules` loader still accepts harness data. This catalog does not change the C interface or its formation-only `RULES_HASH`. At this stage, purchase execution, income, full army population counting, availability and placement were separate work; these helpers alone do not validate an order. The wallet foundation below adds income and population operations without validating purchases.
 
 
 ## Compiled simulation rules (2026-10-12)
 
 `Rules::compiled()` now constructs the existing movement, vision and fog rule structs from the embedded catalog, without Node, caller JSON or filesystem access. `Rules::from_catalog()` accepts an already decoded catalog. The catalog parser still runs once through `OnceLock`; the constructor returns owned typed rules that callers can hold independently.
 
-The catalog now contains 46 tables. Four additions provide `TRAFFIC`, `LANE`, `CORNER_BULGE` and resolved `MOVEMENT_PROFILES`. The recorder calls the original `movementProfile(type, UNITS[type])` for every unit, so profiles for 13 ground unit types include the source's private fallback without copied constants. Unit and weather indices follow the recorded `UNIT_TYPES` and `WEATHER_KINDS` arrays. Terrain hit-point entries keep the lexical key order used by the existing fixture loader.
+This step expanded the catalog from 42 to 46 tables. Four additions provide `TRAFFIC`, `LANE`, `CORNER_BULGE` and resolved `MOVEMENT_PROFILES`. The recorder calls the original `movementProfile(type, UNITS[type])` for every unit, so profiles for 13 ground unit types include the source's private fallback without copied constants. Unit and weather indices follow the recorded `UNIT_TYPES` and `WEATHER_KINDS` arrays. Terrain hit-point entries keep the lexical key order used by the existing fixture loader.
 
 One equivalence test reuses the existing vision recording and its independent `load_rules` parser. It compares every typed field, optional value, list order and floating-point bit for all 47 unit types, all five weather kinds and the movement/vision settings. The existing movement and vision replay tests remain unchanged. This does not connect the server to the core, implement a full simulation or change the ABI. `RULES_HASH` remains limited to formation constants; compiling these additional tables does not expand its agreed scope.
+
+## Wallet, population and income state (2026-10-12)
+
+`economy_state.rs` owns each player's wallet, income readouts and VP. It borrows an ordered view of units, building queues, pending drops, capture points, depots and World regions. The player vector index is the slot. This keeps the operations independent of the legacy `Game` and lets a future match runner supply authoritative state directly. World node-to-region resolution belongs to that runner; this module requires explicit regions and does not infer territory from hidden global state. The catalog now contains 47 tables, including the original exported `WORLD_TUNING`.
+
+Population includes owned field units even when their hp is zero but they remain in the unit collection, queues only on structures, and incoming support units until their drop becomes live. Caps use the selected army size. World caps subtract all team seats from owned regions, split growth among seats not marked out, clamp before army scaling, then round. An away seat still participates in that split. A recipient-only World cap is returned unchanged.
+
+The income phase preserves the reference's order: the leading VP total is captured before the player loop, each default-mode player's VP changes during the loop, and catch-up reads the updated team total. `Mode::Default` represents the absent mode object used by normal Conquest. Explicit Conquest, Tutorial and unknown mode objects retain the Assault fallback. Classic and World use living-unit upkeep and finished, living, owned depots; World additionally requires the depot's region to belong to its owner's team and splits regional income among teammates not marked out, including away teammates. Away or out players receive no income. Starting balances, wave and kill rewards, capture, elimination and production are outside this phase.
+
+Three focused tests compare 37 original-JavaScript traces comprising 217 income steps and 865 player states, including all four army sizes, the seven game modes, absent and unknown modes, cutoff points, mixed teams, queues, drops, depot changes and World territory changes. Three additional World cap cases cover the clamp, eliminated teammates and fewer owned regions than seats; recipient previews and invalid-context errors are checked too. An independent review found that grouping a city's base and bonus changed the last bit: with two ordinary regions followed by a city, the source returns `5.550000000000001` MP/s. The regression now records that original-source result, and the implementation adds each base and bonus separately in source order.
+
+Invalid slots or region indices, duplicate unit IDs, unknown catalog names, non-finite input and negative dt return errors before a wallet changes. This is a deliberate typed-input boundary in place of unchecked JavaScript objects. The fixture calls the unchanged source income block and `worldIncome` at `e4e579a`; it is component evidence, not a running match or end-to-end mode proof. Full economy and mode rows stay in progress. The server, wire snapshots, ABI and formation-only rules hash are unchanged.
+
+## Authoritative ordinary-map loading (2026-10-12)
+
+`map::AuthoritativeMap::from_json` accepts original authoritative JSON bytes supplied by its caller. The core performs no file, network or engine I/O. It validates ordinary legacy maps and version-2 layers, retains the complete original JSON, and exposes typed spawns, capture points, buildings, legacy triggers and normalized layers. This is separate from the server's public map projections. Those projections have already lost hidden mines, materials and scripts; the format has no provenance marker, so the caller must guarantee that the input is the original authoritative document.
+
+`initialize_terrain` uses `Rules::compiled` and the compiled catalog to build physical flags, optional height levels, house kinds, cell HP, stone-bridge toughness, deterministic starting wear, trench directions and naval shoals. Mines remain a separate layer, so their presence does not replace the underlying physical flags. Material maps use ordered keys. `TerrainState::query_game` supplies the existing movement, vision and navigation query state, with players, units and structural sections empty. It does not create a playable match or initialize structural graphs, scenario execution, mode state or match randomness.
+
+The bounded validator returns `Unsupported` whenever a `world`, `scenario` or `structures` property is present, including empty values. Legacy timed triggers are retained and checked against their migrated scenario bounds, but no trigger executes. Invalid supported fields return field-specific errors, without promising the JavaScript's exact error strings. JSON input is capped at 16 MiB before parsing; this is a core resource bound, separate from the reference editor's 8 MB HTTP limit. No server endpoint or C interface changes in this slice.
+
+The recorder checks reference `e4e579a838aabae3b1d9dadbc17a0a87147bc52d` and a clean tracked source tree. It executes the original `createGame` initialization statements up to height initialization, then returns before structural setup, starting units and mode changes. All 33 authored maps and 15 valid boundary maps match the original source document, normalized layers and materials, flags, heights, house kinds, HP and wear float bits, trench-direction float bits and shoal masks. Another 55 cases record validation rejection, and three record the unsupported property boundary. The fixture includes the 1024 by 1024 size limit and Unicode string-length cases.
+
+Issue #35 tracks this slice. The local workspace tests, strict Clippy, formatting and fixture regeneration checks pass on macOS. This is component evidence, not full `validateMap` parity, spawn-to-point reachability, mode behavior, match startup, structural destruction or Unreal integration. The affected map rows remain in progress until their complete behavior and integration checks pass. No performance measurement is claimed.
 
 ## Terrain navigation regions (2026-10-12)
 
@@ -199,6 +223,24 @@ The original `findPath` produces 1,175 oracle searches across all 33 authored ma
 
 
 
+## Internal Rust recipient view (2026-10-12)
+
+`rust/crates/core/src/client_view.rs` is an internal Rust decoder of the pinned reference protocol. It holds one recipient's received knowledge, resets on each start, applies held-unit deltas and fog XOR updates, and retains raw terrain rows and HUD messages. Inputs are validated before mutation, with limits of 16 MiB per message, four million map cells and 100,000 held units. Pending terrain-cell changes accumulate until drained. The transport owns resync requests and their rate limit.
+
+The view exposes typed unit rows and retains complete raw rows and extra fields. Its terrain cache is the latest received row per cell, not composed terrain or placement-query parity. Raw seen and explored masks exclude rendering effects such as fading, temporary unit illumination and lifting fog after a match. Unknown message types leave the view unchanged.
+
+`harness/protocol-record.mjs` captures complete, sanitized reference messages. `harness/view-check.mjs` reads back the pinned browser's unit state and fog masks and exercises its cell-application functions with rendering dependencies stubbed. All 1,236 expected reports cover two recipients in Conquest and World Conquest. `simtest --view` compares these received-state reports, including raw terrain-row caches. Gzip belongs to simtest, not the core. Reconnects, operative sessions, save/load and transport behavior remain outside these recordings.
+
+This extraction adds no C functions or consumer contract. ABI 1, the generated header and the formation-only rules hash remain unchanged. PR #16 retains the six proposed C view calls and ABI 2 transition pending Axel's explicit approval. Pure Rust callers can use the internal view independently of that review; Unreal integration and the remaining terrain and availability queries are separate work.
+
+## Pure projectile flight and contact helpers (2026-10-12)
+
+`rust/crates/core/src/projectiles.rs` provides typed, standalone versions of all pure helpers in the pinned `shared/projectiles.js`: profile selection, flight position and velocity, launch solutions, box/body/naval-hull sweeps, segment distance, crossed-cell traversal and material ricochet response. The module has no game-state, renderer or networking dependency. Projectile and material constants stay beside these helpers for now; they are not part of the compiled catalog or the public rules hash.
+
+The port keeps source arithmetic, x/y/z slab order, corner-cell order, strict earliest-hit comparisons, box-before-cap ties and bounded rotational pieces. Trigonometry and two/three-argument hypot use the core's own math; square roots use the same hardware operation as the math module. The checked API rejects nonfinite inputs, reversed bounds, negative radii/lengths and nonpositive explicit flight durations. Grid dimensions are limited to 2^26 cells per side with an area fitting `usize`; hull angle wrapping allows at most 4,096 full-turn reductions. These limits prevent malformed input from overflowing indexing or keeping a tick in an unbounded loop.
+
+`harness/projectile-fixture.mjs` calls the original helpers with x64 Node 24.21.0, refuses a changed reference pin or tracked source tree, and records exact floating-point bits. Six focused tests pass in debug and release on the Mac, covering 941 oracle cases: all profile/material constants, precedence, zero/negative elapsed time, launch arcs, tangent and corner contacts, translating bodies, rotating naval hulls, grid-cell order and ricochet thresholds. Strict core Clippy and formatting checks pass. This is pure-helper evidence only. Combat firing, flight expiry, game-world contact selection, damage, terrain changes and random scatter are not connected yet; CMB-48, CMB-49, CMB-50 and CMB-160 remain in progress.
+
 ## Ground-vehicle pathfinding (2026-10-12)
 
 Issue #34 extends the initial infantry/naval search to all 12 non-rail ground types, including the lorry and Kaiju fallback profiles. A private vehicle navigation cache expands blocked cells by the hull's turning radius and rejects destinations without that clearance. `PathTerrain` adds explicit observed wear, public wetness and road presence; `PathRules` adds ground-speed constants. Road, mud, wood, ford and churn costs refresh for each search, as do mines, fires and bunkers. Road-aware estimates and smoothing preserve the chosen road route. The caller still supplies the entire terrain view; no `Game`, hidden world or automatic knowledge selection is consulted.
@@ -209,6 +251,12 @@ The extended original-JavaScript fixture has 1,529 searches: 1,108 found routes,
 
 Aircraft, trains and structures still return `UnsupportedProfile`. Automatic recipient-view selection, retry policy, request scheduling and movement integration remain separate work. MOV-27 and MOV-28 are in progress, since search fixtures alone do not verify vehicle driving or an end-to-end match. No ABI or wire interface changed, and no performance claim is made.
 
+
+## Routing inside movement (2026-10-13)
+
+The movement block now has `move_unit_with_routes` and `move_units_with_routes` entry points. They invoke the caller's route handler at the reference's actual recovery point, after traffic has selected its steering goal. Infantry stalls request budgeted recovery; vehicle stalls and traffic replans request an immediate search. The handler owns terrain selection, scheduling, errors and path replacement. A replaced path advances `path_gen`, preserving the identity checks used by lane and clearance caches. Existing entry points retain the disabled-search behavior needed by the frozen benchmark.
+
+Four original-JavaScript recordings run real fine searches inside movement for infantry and tanks on passable and disconnected maps. Across 48 ticks, all movement fields, separation and infantry progress match. The recorder restores the three disabled search hooks in the existing workload and supplies an explicit observed terrain view; other workload exclusions remain. This verifies the fine-search-to-movement connection, not a full match loop, recipient knowledge selection, logistics or combat. The standalone scheduler is a separate integration step.
 
 ## The core's math (2026-10-12)
 
