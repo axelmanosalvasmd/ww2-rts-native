@@ -2,6 +2,8 @@
 
 ## Final internal runtime source bundle (2026-10-13)
 
+The final normal merge explicitly includes main `d1f2fb5`. That main tree is identical to already incorporated ordered-event head `a068dd8`; the merge adds ancestry without changing runtime source, approved header, original fixtures or the optimized test profile.
+
 The separate normal merge combines Ground and construction `bf293cc` with RTI and Human `32670c2`. Ground retains its accepted stored Attack, Assist and Entrench Join anchors and the one real six-command queued Cover regression. Human retains detached owner-filtered observations and the three-lifetime receipt; RTI retains caller-owned scheduled batches, Current capture isolation and committed failure output. Shared routing composes the Ground provider with the two additive Human preview and path-history APIs. The trusted host keeps its read-only admission guard against the combined tick input rules. No source conflict requires a policy change.
 
 Axel acknowledgment 032 confirms the original queue at main `d1f2fb5` and requires fresh checks on the exact final head for Linux, Windows and macOS, with the approved ABI 2 header unchanged. Envelope or host wiring requires interface review before merge. This source checkpoint does not satisfy those publication gates; combined native tests, including the new Cover regression, remain pending. Privacy, spectator and new gameplay decisions remain pending, and FPS and editor remain deferred.

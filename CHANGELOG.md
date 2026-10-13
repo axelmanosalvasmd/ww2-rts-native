@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Normally include final main `d1f2fb5` in the separate internal runtime bundle. Its tree is identical to the already incorporated ordered-event head `a068dd8`, so provider, ABI 2 and CI source bytes are unchanged. Combined native verification and interface review before publication remain pending.
+
 - Normally join source-cleared Ground and construction successor `bf293cc` with the trusted room and Human bundle `32670c2` in a separate checkout. Keep the accepted six-command Cover regression, canonical queues, chronological event receipts, private recipient projections and immutable parent evidence. Source files merge without conflicts; combined native verification and publication remain pending.
 
 - Normally combine the source-cleared trusted room and event projector union `e56a627` with Human commander union `6f213a5` in a separate source-only bundle. Preserve detached private observations, canonical command queues, chronological shot ordinals and three-owner observation receipts. Only additive documentation conflicted; combined native verification and publication remain pending.
