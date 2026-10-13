@@ -99,6 +99,13 @@ fn explicit_assault_start_matches_original_create_game() {
         let points:Vec<_>=m.start.points.iter().map(|p|json!({"id":p.id,"at":[bits(p.at.x),bits(p.at.z)],"vp":bits(p.vp),"mp":bits(p.mp),"kind":p.kind,"needs":p.needs.map_or(-1,|v|v as i64)})).collect();
         assert_eq!(json!(points), expected["points"], "case{index} points");
         assert_eq!(bits(m.start.win_vp), expected["winVp"]);
+        assert!(
+            equivalent(
+                &m.scenario.as_ref().map_or(Value::Null, |s| s.state_json()),
+                &expected["scenario"]
+            ),
+            "case{index} legacy trigger state"
+        );
         let raw = expected["units"].as_array().unwrap();
         assert_eq!(m.world.game.units.len(), raw.len());
         assert_eq!(json!(m.next_unit_id), expected["nextId"]);

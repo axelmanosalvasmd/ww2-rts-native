@@ -43,8 +43,9 @@ impl Match {
         {
             return Err("Assault startup requires original team IDs 0-5".into());
         }
-        // Scenario execution is a separate mode runner; a partial constructor must not drop it.
-        if !map.triggers().is_empty() || map.source().get("scenario").is_some() {
+        // Legacy timed triggers use the existing shared shell state. New authored scenarios
+        // need their own setup/runtime adapter and must not be silently dropped here.
+        if map.source().get("scenario").is_some() {
             return Err("Assault startup does not yet apply authored scenarios".into());
         }
         let attacker_team = options

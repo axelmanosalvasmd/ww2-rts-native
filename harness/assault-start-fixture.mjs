@@ -31,7 +31,7 @@ function record(index,teams,defender,army='standard',shuffle=false,weather='map'
  cases.push({map:index,seed:String(seed),players,defender,army,shuffle,weather,living,tech,expected:{
   mode:g.mode,players:g.players.map(p=>({team:p.team,spawn:[bits(p.spawn.x),bits(p.spawn.z)],mp:bits(p.mp),inc:bits(p.inc),vp:bits(p.vp)})),
   points:g.points.map(p=>({id:p.scenarioId,at:[bits(p.x),bits(p.z)],vp:bits(p.vp),mp:bits(p.mp),kind:p.kind??null,needs:p.needs})),
-  winVp:bits(g.winVp),units:[...g.units.values()],nextId:g.nextId,
+  winVp:bits(g.winVp),units:[...g.units.values()],nextId:g.nextId,scenario:g.scenario??null,
   controls:[...g.units.values()].map(u=>[u.id,bits(u.aim),u.auto,u.autoRetreat,u.attackId,u.orders]),
   production:[...g.units.values()].filter(u=>u.queue).map(u=>[u.id,u.queue,u.productionJobs,bits(u.prog),u.rally]),
   tech:g.players.map(p=>p.tier===undefined?null:[p.tier,p.armory,p.lab]),

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed an overbroad Assault admission guard found by its first native test run: five authored maps with legacy timed triggers now retain the shared scenario state. The original recorder also compares that state; newer authored scenarios remain explicitly unsupported.
+
 - Integrated the coordinated mode-aware control initializer and World usage into Assault prerequisites. Ordinary deployment uses the shared ability-cost policy without enabling mode tick dispatch. Native combined verification remains pending.
 
 - Brought the proven World rail annotation/inference repair and coordinated region accessors into the Assault prerequisite chain, retaining its explicit startup profile and canonical story fields. Combined native checks remain pending.
