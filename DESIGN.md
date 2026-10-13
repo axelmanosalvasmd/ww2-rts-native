@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## Pure Ground and construction publication candidate (2026-10-13, source only)
+
+Axel acknowledgment 034 requires Ground and construction to have their own lint-clean, exact-head validation separate from host startup repair and RTI/Human delivery work. This candidate starts from source-cleared `bf293cc` and normally includes current main `d1f2fb5`. Its source receives only the four reviewed Core lint changes from `64dd57d`; the two affected files are byte-identical to that lint child. Variant matching and safe-ID conversion still precede actor reads, owned-actor checks still precede forced-reserve reads, and control membership is checked through the same canonical map. Queue ordering, staged publication, Cover anchors and the real six-command regression remain unchanged.
+
+The earlier exact combined `d9941e3` check exited 101 at strict all-target Clippy on three collapsible conditions and one map-membership diagnostic, before tests ran. Its retained log is evidence of that failed combined head, not a result for this pure Ground successor. This candidate has not run Cargo; fresh strict, native and exact-head Linux, Windows and macOS validation remain pending. The approved ABI 2 header, reference pin, test profile, original recorders and fixtures stay unchanged. Privacy and public admission decisions remain pending.
+
 ## Construction and GroundAttack after the original queue (2026-10-13, source only)
 
 Independent union review found that the inherited Cover reader recognized only waiting Move, Cover and Ability coordinates. The newly composed ordinary command producers also normalize Attack and Assist with their observed destination, and a queued project join records its first job position. Source `sim.js:3588-3591` uses the last waiting row's x/z for the Cover display anchor, without re-resolving that row's target. The reader now accepts those three existing normalized anchors through the same finite check and staged queue publication. Raw missing anchors and unsupported command families still fail before queue publication. This repair does not choose cover early, start queued work, pay again or change phase timing.

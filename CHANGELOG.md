@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Prepare a pure Ground and construction candidate from source-cleared `bf293cc`, normally joined with final main `d1f2fb5`. Apply only the four reviewed Core lint edits from `64dd57d`: preserve short-circuit order in the Attack, Retreat and forced-row let-chains, and use the existing control map membership query. Retain the earlier combined `d9941e3` strict failure, which reported four diagnostics before any tests ran. Exact-head native and three-platform checks remain pending.
+
 - Fixed queued Cover after accepted waiting Attack, Assist and shared-project Join orders in the combined construction/GroundAttack caller. Cover now inherits the stored waiting anchor with the existing finite-coordinate check, rather than failing the boundary or querying a changed target. A real recorded-batch regression is written; native execution remains pending.
 
 - Normally joined the source-reviewed construction and GroundAttack continuation with the final ordered-event frontier and consolidated original providers. Retained canonical paid-work cancellation, command observers, original source fixtures, approved ABI 2 and the optimized test profile. Resolved shared command, World transaction and typed timeline conflicts without adding mode capabilities, and removed a duplicate route endpoint assignment introduced by automatic merge. This new combined source requires owner review and its own native proof; earlier parent results remain separate.

@@ -834,29 +834,26 @@ impl crate::match_runtime::Match {
         if let Command::Attack {
             ids, target, queue, ..
         } = command
+            && !ids
+                .iter()
+                .take(50.max(self.world.game.units.len()))
+                .any(|raw| {
+                    self.eligible_command_unit(*raw, owner, command)
+                        .is_some_and(|id| self.is_aircraft_command_unit(id))
+                })
         {
-            if !ids
-                .iter()
-                .take(50.max(self.world.game.units.len()))
-                .any(|raw| {
-                    self.eligible_command_unit(*raw, owner, command)
-                        .is_some_and(|id| self.is_aircraft_command_unit(id))
-                })
-            {
-                return self.ground_attack_command(owner, ids, *target, *queue);
-            }
+            return self.ground_attack_command(owner, ids, *target, *queue);
         }
-        if let Command::Retreat { ids } = command {
-            if !ids
+        if let Command::Retreat { ids } = command
+            && !ids
                 .iter()
                 .take(50.max(self.world.game.units.len()))
                 .any(|raw| {
                     self.eligible_command_unit(*raw, owner, command)
                         .is_some_and(|id| self.is_aircraft_command_unit(id))
                 })
-            {
-                return self.ground_retreat_command(owner, ids);
-            }
+        {
+            return self.ground_retreat_command(owner, ids);
         }
         if let Command::Destroy { ids, id } = command {
             return self.execute_destroy(owner, ids, *id);
