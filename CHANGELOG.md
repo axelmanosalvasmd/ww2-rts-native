@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Corrected the guard consumer's pending-count query to use its actual MatchCommands owner. Independent source review identified this method-owner mistake before any native build; the canonical queue remains private.
+
 - Source review caught a private command-queue access in the new aircraft guard consumer. It now uses the existing public pending-count and command-boundary checks with a real queued order, preserving command-owner privacy. The automatic-weapon refusal scene now carries an active patrol mission so it reaches the actual unsupported Source phase instead of legitimately returning home. Native checks remain unrun.
 
 - Added a pure complete-current aircraft runner boundary hook, rejecting orphan sortie/AA identities before queue or clock mutation. Shared canonical aircraft scene helpers now serve both component and actual-runner consumers. The new recorder retains ten unchanged Source full-step traces (4,972 steps, 9,965 observed AIR/AA calls); the new native consumer calls only advance_tick and compares every step without copying phase outputs into Match. The sole caller still awaits its owner's scheduling change, and native checks remain unrun.

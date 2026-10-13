@@ -206,7 +206,7 @@ fn aircraft_runner_admission_refuses_unrepresented_phases_before_queue_or_clock_
             m.world.game.units,
             m.aviation,
             m.commands.units,
-            m.pending_commands(),
+            m.commands.pending_commands(),
             m.start.random.snapshot(),
             m.start.economy.players,
             m.story,
@@ -224,7 +224,7 @@ fn aircraft_runner_admission_refuses_unrepresented_phases_before_queue_or_clock_
                 m.world.game.units,
                 m.aviation,
                 m.commands.units,
-                m.pending_commands(),
+                m.commands.pending_commands(),
                 m.start.random.snapshot(),
                 m.start.economy.players,
                 m.story,
@@ -232,7 +232,7 @@ fn aircraft_runner_admission_refuses_unrepresented_phases_before_queue_or_clock_
             )
         );
         assert!(m.tick_state.fault().is_none());
-        assert_eq!(m.pending_commands(), 1);
+        assert_eq!(m.commands.pending_commands(), 1);
         assert!(m.validate_command_tick(1).is_ok());
     }
 }
