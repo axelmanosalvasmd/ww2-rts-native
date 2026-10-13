@@ -391,7 +391,7 @@ pub struct BuildingCell {
 pub struct Match {
     pub combat: crate::match_combat::CombatState,
     pub environment: crate::environment::EnvironmentRuntime,
-    pub commands: crate::match_commands::CommandState,
+    pub commands: crate::match_commands::MatchCommands,
     pub world: World,
     pub start: StartPlan,
     pub options: MatchOptions,
@@ -442,7 +442,7 @@ impl Match {
         let mut result = Self {
             combat: crate::match_combat::CombatState::default(),
             environment: crate::environment::EnvironmentRuntime::default(),
-            commands: crate::match_commands::CommandState::default(),
+            commands: crate::match_commands::MatchCommands::new(4096),
             grid: SpatialGrid::new(&world.game.units, 16.0),
             world,
             start,
