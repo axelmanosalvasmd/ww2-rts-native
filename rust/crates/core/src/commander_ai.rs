@@ -483,6 +483,8 @@ fn plan_inner(
                     if !u.dig && !u.entrench && !u.garrison && !matches!(u.cover, 1 | 2) {
                         holder_commands.push(Command::Cover {
                             ids: vec![i64::from(u.id)],
+                            queue: false,
+                            at: None,
                         });
                     }
                 }

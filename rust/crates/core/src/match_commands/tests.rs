@@ -21,7 +21,7 @@ fn snapshot(m: &Match) -> Value {
     Value::Array(m.world.game.units.values().map(|u| {
  let c=&m.commands.units[&u.id];let f=&m.firing.units[&u.id];
  let mut row=json!({"id":u.id,"x":bits(u.x),"z":bits(u.z),"rot":bits(u.rot),"aim":bits(c.aim),"path":u.path.iter().map(|p|pt(Some(*p))).collect::<Vec<_>>(),"reverse":pt(u.reverse),"pace":bits(u.pace),"worldGoal":pt(u.world_goal),"amove":pt(u.amove),"attackId":c.attack_id,"targetId":f.target_id,"follow":c.follow,"holdFire":c.hold_fire,"holdPos":u.hold_pos,"auto":c.auto_cast,"autoRetreat":c.auto_retreat});
- let jobs=json!({"orders":c.orders.iter().map(|o|match o {Command::Move {orders,attack_move,face,..}=>json!({"t":if *attack_move {"amove"}else{"move"},"at":pt(orders.first().map(|o|o.at)),"face":face.map(bits)}),_=>panic!("unexpected waiting order")}).collect::<Vec<_>>(),"face":c.face.map(|f|json!({"angle":bits(f.angle),"at":pt(Some(f.at))})),"retreating":u.retreating,"stuck":bits(u.stuck),"repath":bits(u.repath),"drift":u.drift,"garrison":u.garrison.map_or(-1,|c|c as i64),"nade":pt(c.nade),"enter":c.enter.map_or(-1,|v|v as i64),"fireAt":c.fire_at.map_or(-1,|v|v as i64),"board":u.board,"build":u.build,"dig":u.dig,"entrench":u.entrench});
+ let jobs=json!({"orders":c.orders.iter().map(|o|match o {Command::Cover {at,..}=>json!({"t":"cover","at":pt(*at),"face":null}),Command::Move {orders,attack_move,face,..}=>json!({"t":if *attack_move {"amove"}else{"move"},"at":pt(orders.first().map(|o|o.at)),"face":face.map(bits)}),_=>panic!("unexpected waiting order")}).collect::<Vec<_>>(),"face":c.face.map(|f|json!({"angle":bits(f.angle),"at":pt(Some(f.at))})),"retreating":u.retreating,"stuck":bits(u.stuck),"repath":bits(u.repath),"drift":u.drift,"garrison":u.garrison.map_or(-1,|c|c as i64),"nade":pt(c.nade),"enter":c.enter.map_or(-1,|v|v as i64),"fireAt":c.fire_at.map_or(-1,|v|v as i64),"board":u.board,"build":u.build,"dig":u.dig,"entrench":u.entrench});
  let routing=json!({"traffic":u.traffic.is_some(),"trafficWait":bits(u.traffic_wait),"trafficEntered":u.traffic_entered,"trail":u.traffic_trail.len(),"outcome":c.outcome.map(|o|match o {MoveOutcome::Interrupted=>"interrupted",MoveOutcome::Moving=>"moving",MoveOutcome::Unreachable=>"unreachable",MoveOutcome::Arrived=>"completed"}),"outcomeTick":c.outcome_tick,"routeEnd":pt(c.route_end),"supplyHold":c.supply_hold,"supplyEscape":c.supply_escape,"forced":m.logistics.get(u.id).map(|r|json!({"forced":r.forced,"stranded":r.stranded}))});
  row.as_object_mut().unwrap().extend(jobs.as_object().unwrap().clone());
  row.as_object_mut().unwrap().extend(routing.as_object().unwrap().clone());
@@ -264,7 +264,7 @@ fn original_command_and_waiting_order_phases() {
             count += 1;
         }
     }
-    assert_eq!(count, 261);
+    assert_eq!(count, 312);
 }
 #[test]
 fn ordered_match_boundary_and_whole_command_rejection() {
@@ -383,7 +383,11 @@ fn immediate_cover_uses_the_recorded_queue_and_refuses_unrepresented_jobs() {
             issuer: 0,
             sequence: 1,
         },
-        Command::Cover { ids: vec![1] },
+        Command::Cover {
+            ids: vec![1],
+            queue: false,
+            at: None,
+        },
     )
     .unwrap();
     let results = m.apply_commands(1, false).unwrap();
@@ -394,14 +398,26 @@ fn immediate_cover_uses_the_recorded_queue_and_refuses_unrepresented_jobs() {
     m.world.game.units.get_mut(&1).unwrap().dig = true;
     let before = snapshot(&m);
     assert_eq!(
-        m.execute_command(0, &Command::Cover { ids: vec![1] }, false)
-            .unwrap(),
+        m.execute_command(
+            0,
+            &Command::Cover {
+                ids: vec![1],
+                queue: false,
+                at: None
+            },
+            false
+        )
+        .unwrap(),
         Some(Denial::Unsupported)
     );
     assert_eq!(snapshot(&m), before);
     assert_eq!(
         Command::from_json(&json!({"t":"cover","ids":[1],"queue":true})).unwrap(),
-        Command::Unsupported
+        Command::Cover {
+            ids: vec![1],
+            queue: true,
+            at: None
+        }
     );
 }
 
@@ -440,8 +456,16 @@ fn cover_refresh_preserves_moved_gameplay_bucket_order() {
     assert_eq!(before, (vec![2, 4, 1, 3], vec![4, 3]));
     m.world.game.tick += 1;
     assert_eq!(
-        m.execute_command(0, &Command::Cover { ids: vec![1, 2] }, false)
-            .unwrap(),
+        m.execute_command(
+            0,
+            &Command::Cover {
+                ids: vec![1, 2],
+                queue: false,
+                at: None
+            },
+            false
+        )
+        .unwrap(),
         None
     );
     assert_eq!(probe(&m), before);
@@ -460,7 +484,15 @@ fn cover_refresh_preserves_moved_gameplay_bucket_order() {
     untouched.world.game.tick += 1;
     assert_eq!(
         untouched
-            .execute_command(0, &Command::Cover { ids: vec![1, 2] }, false)
+            .execute_command(
+                0,
+                &Command::Cover {
+                    ids: vec![1, 2],
+                    queue: false,
+                    at: None
+                },
+                false
+            )
             .unwrap(),
         None
     );
@@ -488,8 +520,16 @@ fn cover_refresh_preserves_moved_gameplay_bucket_order() {
     assert!(!pending.as_ref().unwrap().is_empty());
     let fog = m.routing_fog.clone();
     assert!(
-        m.execute_command(0, &Command::Cover { ids: vec![1, 2] }, false)
-            .is_err()
+        m.execute_command(
+            0,
+            &Command::Cover {
+                ids: vec![1, 2],
+                queue: false,
+                at: None
+            },
+            false
+        )
+        .is_err()
     );
     assert_eq!(snapshot(&m), state);
     assert_eq!(m.world.game.units[&1].path_gen, generation);
@@ -530,5 +570,77 @@ fn cover_refresh_preserves_moved_gameplay_bucket_order() {
     assert_eq!(
         m.world.pending(crate::world::Recipient::Player(0)),
         untouched.world.pending(crate::world::Recipient::Player(0))
+    );
+}
+
+#[test]
+fn queued_cover_admission_keeps_live_routes_and_observations() {
+    let f: Value =
+        serde_json::from_slice(include_bytes!("../../tests/fixtures/match-commands.json")).unwrap();
+    let case = f["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == "cover-two-squads")
+        .unwrap();
+    let mut m = initial(case);
+    m.world.game.units.get_mut(&1).unwrap().path_gen = u64::MAX;
+    m.world.game.tick += 1;
+    m.world.set_cell(11 * 32 + 14, b'O').unwrap();
+    let pending = m.world.pending(Recipient::Player(0)).cloned();
+    let rows = m.recipients[0].remembered().to_vec();
+    let fog = m.routing_fog.clone();
+    let paths: Vec<_> = m
+        .world
+        .game
+        .units
+        .values()
+        .map(|u| u.path.clone())
+        .collect();
+    let cover = Command::from_json(&json!({"t":"cover","ids":[1,2],"queue":true})).unwrap();
+    assert_eq!(m.execute_command(0, &cover, false).unwrap(), None);
+    assert_eq!(m.world.game.units[&1].path_gen, u64::MAX);
+    assert_eq!(
+        m.world
+            .game
+            .units
+            .values()
+            .map(|u| u.path.clone())
+            .collect::<Vec<_>>(),
+        paths
+    );
+    assert_eq!(m.recipients[0].remembered(), rows.as_slice());
+    assert_eq!(m.world.pending(Recipient::Player(0)).cloned(), pending);
+    assert_eq!(m.routing_fog, fog);
+    let Some(Command::Cover {
+        queue: false,
+        at: Some(anchor),
+        ..
+    }) = m.commands.units[&1].orders.front()
+    else {
+        panic!("missing normalized Cover");
+    };
+    assert_eq!((anchor.x, anchor.z), (27.0, 23.0));
+    // An unrepresented later HUD anchor must not partly append the first squad.
+    m.commands
+        .units
+        .get_mut(&2)
+        .unwrap()
+        .orders
+        .push_back(Command::Unsupported);
+    let before: Vec<_> = m
+        .commands
+        .units
+        .iter()
+        .map(|(id, c)| (*id, c.orders.clone(), c.follow))
+        .collect();
+    assert!(m.execute_command(0, &cover, false).is_err());
+    assert_eq!(
+        m.commands
+            .units
+            .iter()
+            .map(|(id, c)| (*id, c.orders.clone(), c.follow))
+            .collect::<Vec<_>>(),
+        before
     );
 }

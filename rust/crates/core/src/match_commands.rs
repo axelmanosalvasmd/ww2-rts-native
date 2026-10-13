@@ -52,6 +52,9 @@ pub enum Command {
     },
     Cover {
         ids: Vec<i64>,
+        queue: bool,
+        /// Display anchor for a waiting order, never its eventual cover destination.
+        at: Option<Point>,
     },
     Stop {
         ids: Vec<i64>,
@@ -253,9 +256,11 @@ impl Command {
                     face,
                 })
             }
-            Some("cover") if object.get("queue").and_then(|v| v.as_bool()) != Some(true) => {
-                Ok(Self::Cover { ids })
-            }
+            Some("cover") => Ok(Self::Cover {
+                ids,
+                queue: object.get("queue").and_then(|v| v.as_bool()) == Some(true),
+                at: None,
+            }),
             Some("stop") => Ok(Self::Stop { ids }),
             Some("stance") => {
                 let stance = match object.get("key").and_then(|v| v.as_str()) {
@@ -285,6 +290,7 @@ impl Command {
                         && o.at.z.is_finite()
                 }) && face.is_none_or(|a| a.is_finite())
             }
+            Self::Cover { at, .. } => at.is_none_or(|p| p.x.is_finite() && p.z.is_finite()),
             _ => true,
         }
     }
@@ -372,8 +378,8 @@ impl crate::match_runtime::Match {
         if matches!(command, Command::Unsupported) {
             return Ok(Some(Denial::Unsupported));
         }
-        if let Command::Cover { ids } = command {
-            return self.execute_cover_command(owner, ids);
+        if let Command::Cover { ids, queue, .. } = command {
+            return self.execute_cover_command(owner, ids, *queue);
         }
         let limit = 50.max(self.world.game.units.len());
         let controlled: Vec<_> = match command {

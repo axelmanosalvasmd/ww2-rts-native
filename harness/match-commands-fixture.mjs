@@ -146,6 +146,62 @@ const coverCases=[
 ];
 for(const [name,map,initial,actions] of coverCases) trace('cover-'+name,map,initial,actions);
 
+// Queued Cover keeps a display anchor now and chooses terrain only when it starts.
+const queuedCoverCases=[
+ ['unit-anchor',maps[1],[{kind:'rifle',x:27,z:23}],[
+  {command:{t:'cover',ids:[1],queue:true}}, {pre:1},
+ ]],
+ ['path-anchor',maps[1],[{kind:'rifle',x:27,z:23,fields:{path:[{x:45,z:25}]}}],[
+  {command:{t:'cover',ids:[1],queue:true}}, {pre:1},
+  {set:[[1,{x:45,z:25,path:[]}]],pre:1},
+ ]],
+ ['order-anchor',maps[1],[{kind:'rifle',x:27,z:23,fields:{path:[{x:45,z:25}]}}],[
+  {command:{t:'move',orders:[[1,35,25]],queue:true}},
+  {command:{t:'cover',ids:[1],queue:true}},
+  {set:[[1,{path:[]}]],pre:1},
+  {set:[[1,{x:35,z:25,path:[],worldGoal:null,amove:null}]],pre:1},
+ ]],
+ ['lazy-added-terrain',maps[0],[{kind:'rifle',x:27,z:23}],[
+  {command:{t:'cover',ids:[1],queue:true}},
+  {cells:[[12+11*32,'T']],pre:1},
+ ]],
+ ['lazy-removed-terrain',maps[1],[{kind:'rifle',x:27,z:23}],[
+  {command:{t:'cover',ids:[1],queue:true}},
+  {cells:[[10+11*32,'.'],[11+11*32,'.'],[12+11*32,'.'],[10+12*32,'.'],[11+12*32,'.'],[12+12*32,'.']],pre:1},
+ ]],
+ ['capacity-eight',maps[1],[{kind:'rifle',x:27,z:23}],[
+  ...Array.from({length:9},()=>({command:{t:'cover',ids:[1],queue:true}})),
+ ]],
+ ['all-full',maps[1],[{kind:'rifle',x:27,z:23},{kind:'mg',x:27,z:25}],[
+  ...Array.from({length:8},()=>({command:{t:'cover',ids:[1,2],queue:true}})),
+  {command:{t:'cover',ids:[1,2],queue:true}},
+ ]],
+ ['mixed-full',maps[1],[{kind:'rifle',x:27,z:23},{kind:'mg',x:27,z:25}],[
+  ...Array.from({length:8},()=>({command:{t:'cover',ids:[1],queue:true}})),
+  {command:{t:'cover',ids:[1,2],queue:true}},
+ ]],
+ ['no-cover-drains-to-move',maps[0],[{kind:'rifle',x:27,z:23}],[
+  {command:{t:'cover',ids:[1],queue:true}},
+  {command:{t:'move',orders:[[1,45,25]],queue:true}}, {pre:1},
+ ]],
+ ['duplicate-selected',maps[1],[{kind:'rifle',x:27,z:23}],[
+  {command:{t:'cover',ids:[1,1],queue:true}}, {pre:1},
+ ]],
+ ['retreating',maps[1],[{kind:'rifle',x:27,z:23,fields:{retreating:true,follow:77}}],[
+  {command:{t:'cover',ids:[1],queue:true}},
+ ]],
+ ['mixed-retreat-no-cover',maps[0],[{kind:'rifle',x:25,z:23,fields:{retreating:true,follow:77}},{kind:'rifle',x:29,z:23,fields:{follow:77}}],[
+  {command:{t:'cover',ids:[1,2],queue:true}}, {pre:2},
+ ]],
+ ['wrong-kind-owner',maps[1],[{kind:'tank',x:25,z:23,fields:{follow:77}},{kind:'rifle',owner:1,x:29,z:23,fields:{follow:77}}],[
+  {command:{t:'cover',ids:[1,2],queue:true}},
+ ]],
+ ['mixed-kind-owner',maps[1],[{kind:'tank',x:25,z:23,fields:{follow:77}},{kind:'rifle',owner:1,x:29,z:23,fields:{follow:77}},{kind:'rifle',x:27,z:25,fields:{follow:77}}],[
+  {command:{t:'cover',ids:[1,2,3],queue:true}}, {pre:3},
+ ]],
+];
+for(const [name,map,initial,actions] of queuedCoverCases) trace('queued-cover-'+name,map,initial,actions);
+
 const movement=[];
 for(const kind of ['rifle','tank']) {
  const map=makeMap('disconnected',flat().map(r=>r.slice(0,16)+'B'+r.slice(17)));

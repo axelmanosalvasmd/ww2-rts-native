@@ -15,8 +15,13 @@ impl Match {
         &mut self,
         owner: usize,
         ids: &[i64],
+        queued: bool,
     ) -> Result<Option<Denial>, String> {
-        let command = Command::Cover { ids: ids.to_vec() };
+        let command = Command::Cover {
+            ids: ids.to_vec(),
+            queue: queued,
+            at: None,
+        };
         let controlled: Vec<_> = ids
             .iter()
             .take(50.max(self.world.game.units.len()))
@@ -44,6 +49,61 @@ impl Match {
         }) {
             return Ok(Some(Denial::Unsupported));
         }
+        if queued {
+            let mut queues = std::collections::BTreeMap::new();
+            let mut accepted = false;
+            let mut reason = Denial::NoCover;
+            for id in selected {
+                let u = &self.world.game.units[&id];
+                if u.retreating {
+                    reason = Denial::Retreating;
+                    continue;
+                }
+                let orders = queues
+                    .entry(id)
+                    .or_insert_with(|| self.commands.units[&id].orders.clone());
+                if orders.len() >= 8 {
+                    reason = Denial::QueueFull;
+                    continue;
+                }
+                let at = if let Some(last) = orders.back() {
+                    match last {
+                        Command::Move { orders, .. } => orders
+                            .first()
+                            .map(|r| r.at)
+                            .ok_or("missing queued move anchor")?,
+                        Command::Cover { at: Some(at), .. } => *at,
+                        _ => return Err("unrepresented queued cover anchor".into()),
+                    }
+                } else {
+                    u.path.last().copied().unwrap_or(u.at())
+                };
+                if !at.x.is_finite() || !at.z.is_finite() {
+                    return Err("nonfinite queued cover anchor".into());
+                }
+                orders.push_back(Command::Cover {
+                    ids: vec![i64::from(id)],
+                    queue: false,
+                    at: Some(at),
+                });
+                accepted = true;
+            }
+            for id in controlled {
+                self.commands
+                    .units
+                    .get_mut(&id)
+                    .expect("controlled unit")
+                    .follow = 0;
+            }
+            for (id, orders) in queues {
+                self.commands
+                    .units
+                    .get_mut(&id)
+                    .expect("queued control")
+                    .orders = orders;
+            }
+            return Ok((!accepted).then_some(reason));
+        }
         let radius = Catalog::compiled()
             .map_err(|e| e.to_string())?
             .table("CFG")
@@ -67,8 +127,8 @@ impl Match {
             owner,
             None,
         )?;
-        // Scratch belongs to this preview. Abort drops every provisional pointer.
-        let mut paths = crate::pathfinding::Pathfinding::new();
+        // Fork existing derived history. Abort drops only this preview and its cache copy.
+        let mut paths = self.commands.paths.clone();
         let mut searched = false;
         // Later squads see earlier prepared routes when choosing occupied spots.
         let mut staged = self.world.game.clone();

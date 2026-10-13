@@ -224,7 +224,7 @@ fn original_thinker_orders_aim_and_waypoint_draws_match() {
             .commands
             .iter()
             .filter_map(|c| match c {
-                Command::Cover { ids } => Some(serde_json::json!({"t":"cover","ids":ids})),
+                Command::Cover { ids, .. } => Some(serde_json::json!({"t":"cover","ids":ids})),
                 _ => None,
             })
             .collect();
