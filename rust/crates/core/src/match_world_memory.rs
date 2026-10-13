@@ -2,12 +2,11 @@
 use crate::{
     catalog::{Catalog, Value},
     game::{CELL, Game, LOCAL_DEFENDER_OWNER, Point, Unit, Wreck},
-    grid::SpatialGrid,
     match_runtime::Match,
     math,
     route_knowledge::{LiveRouting, RouteKnowledge, RouteQuery},
     rules::Rules,
-    vision::{airborne, los, vision_of},
+    vision::{airborne, los, team_sees as sees, vision_of},
     world_memory::{self, BoundUnit, KnownRegion, WorldLive, WorldRow},
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -34,27 +33,6 @@ fn seen(game: &Game, owner: usize, visible: &[u32], unit: &Unit) -> bool {
     game.reveal
         || game.allied(unit.owner, owner)
         || (visible.contains(&unit.id) && (unit.air.is_none() || airborne(unit)))
-}
-fn sees(game: &Game, rules: &Rules, grid: &SpatialGrid, team: i32, at: Point) -> bool {
-    let reach = game
-        .units
-        .values()
-        .filter(|u| game.team_of(u) == team)
-        .map(|u| vision_of(game, rules, u))
-        .fold(1.0, math::max);
-    grid.unordered(&game.units, (at.x, at.z), reach, |_, u| {
-        game.team_of(u) == team
-    })
-    .into_iter()
-    .any(|id| {
-        let u = &game.units[&id];
-        math::hypot(u.x - at.x, u.z - at.z) <= vision_of(game, rules, u)
-            && if u.air.is_some() {
-                airborne(u)
-            } else {
-                rules.kinds[u.kind].building || los(game, rules, (u.x, u.z), (at.x, at.z))
-            }
-    })
 }
 fn rounded(n: f64) -> f64 {
     math::round(n * 10.0) / 10.0
