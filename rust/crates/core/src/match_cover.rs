@@ -67,8 +67,8 @@ impl Match {
             owner,
             None,
         )?;
-        // Scratch belongs to this preview. Abort drops every provisional pointer.
-        let mut paths = crate::pathfinding::Pathfinding::new();
+        // Fork existing derived history. Abort drops only this preview and its cache copy.
+        let mut paths = self.commands.paths.clone();
         let mut searched = false;
         // Later squads see earlier prepared routes when choosing occupied spots.
         let mut staged = self.world.game.clone();

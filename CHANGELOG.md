@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Changed Cover transactions to fork the existing path cache through the shared 1400423 provider, preserving unrelated warmed graph history instead of replacing it with a blank cache. Consumed the provider lazy-Fog correction from 178b603. Native validation is pending.
+
 - Staged Cover recipient routing, Fog and terrain acknowledgments until the selected batch passes every path identity and publication check. Failed batches discard their own path scratch; successful actual path searches commit observations even when the resulting path is empty. Added a pending-terrain refusal and same-clock Move regression. Native proof remains pending.
 
 - Merged the canonical World recipient and staged observer prerequisites into the isolated Cover continuation. Provider bodies remain unchanged; combined native validation is pending.
