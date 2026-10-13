@@ -2,6 +2,8 @@
 
 ## Room-host output ownership regressions (2026-10-13, source checkpoint)
 
+Strict preflight at `02427d2` exposed two older fixture serializers accessing timeline fields before MatchSample became typed. The previously independently reviewed `456f64b` helper patch is applied unchanged: Default and Conquest constructors serialize Conquest fields in the original shape, while Territories explicitly refuses this ordinary fixture adapter. No runtime or fixture is changed.
+
 Strict preflight at `23b11ca` then found the quiet engineering fixture reading the old report Environment field. The caller now exposes a borrowed filtered iterator over its single owned event sequence, so the same no-Environment assertion uses that accessor. A read-only report-consumer audit found no other stale field use. The change does not remove or weaken the assertion, alter the original fixture or mutate the report.
 
 Strict all-target lint at `64cf6c5` reached all workspace packages and stopped at the new attachment admission method appearing after the snapshot test module. Moving that exact method body before the test module corrects the structural warning. Runtime logic and tests are byte-identical; the final native cycle remains pending.

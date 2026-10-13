@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Update the carrier and aircraft fixture serializers for typed MatchSample timelines. Their Default and Conquest scenes retain the same Conquest JSON, and incompatible Territories samples fail explicitly. Runtime, assertions and original fixtures are unchanged.
+
 - Update the quiet engineering consumer to use the ordered tick report's Environment iterator. It still checks that no Environment effects were emitted, while event ownership stays in the single report sequence. The original source fixture and runtime are unchanged.
 
 - Move read-only room attachment admission before the snapshot test module to satisfy strict Clippy item ordering. The method body and every test are unchanged; no lint allowance is added.
