@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Updated the movement parity note to the final source-only ground-order inventory: 28 cases, 48 commands, 30 full steps and 110 snapshots. GroundAttack caller and native proof remain pending.
+
 - Corrected ordinary Retreat to select its nearest HQ after the prepared physical garrison exit, matching the source exit-before-home order. Reused the existing home selector and expanded the original source capture with the two-HQ witness. The same native replay now includes garrison exits and preserves the canonical timeline enum; native verification and the sole GroundAttack hook remain pending.
 
 - Added genuine prepared garrison exits to ordinary ground Retreat. Existing actor sight replaces the original row once, group exits retain the first cached terrain/fog frame, and later routes see updated live actor poses. Publication keeps one validated source receipt and the existing retreat authority. A real warmed-cache group capture extends the unchanged earlier 26 cases to 27 cases, 47 commands, 29 full steps and 107 states; native verification and tick hookup remain pending.
