@@ -15,6 +15,16 @@ pub const CELL: f64 = 2.0;
 /// Internal World local actor. It is never a commander slot or a raw wire owner.
 pub const LOCAL_DEFENDER_OWNER: usize = u32::MAX as usize;
 
+/// Source projection of a validated canonical actor identity. The World local
+/// defender is an array property at -1, not a commander with a large slot number.
+pub(crate) fn source_owner_json(owner: usize) -> serde_json::Value {
+    if owner == LOCAL_DEFENDER_OWNER {
+        serde_json::json!(-1)
+    } else {
+        serde_json::json!(owner)
+    }
+}
+
 // Cell flag bits (`shared/sim.js`, the line after `CELL`), the ones the passes read.
 pub const MOVE: u16 = 1;
 pub const SIGHT: u16 = 2;
