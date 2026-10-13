@@ -140,6 +140,18 @@ The queue consumes exactly one numbered tick at a time, including empty ticks. C
 
 Focused tests compare SplitMix64 with values from the compiled C reference, isolate purpose streams, resume streams and queues, permute arrival order, and reject invalid state. Integration with the full match simulation remains pending.
 
+## Match deployment helpers (2026-10-13)
+
+`deployment.rs` provides `spawns_for`, `spawn_distances`, `spawn_slots` and `win_vp` without constructing a match. Terrain is an explicit borrowed view of flags from the original authoring rows and optional levels, before building footprints or later match edits. Spawn filtering retains authoring order and includes Assault-only spawns only for Assault. Distance matrices and selected layouts use indices relative to that filtered list; the caller maps them back to the authoring spawn list. The VP goal reads `CFG.vpToWin` from the compiled catalog and scales by average team size.
+
+Walking distances use east, west, south and north in source order. Entering a ford costs six cells, all other passable cells cost one; MOVE blocks entry, and adjacent levels may differ by at most one. Disconnected pairs use four times the straight-line distance through the core's deterministic `hypot`. Seven circular integer queues preserve the reference bucket insertion order while avoiding a separate queue for every possible accumulated distance. The input size bound keeps every reachable path below the reference's `1e9` infinity threshold.
+
+Layout selection preserves the source's recursive order and pairwise score accumulation: enemy distances add to the score, allied distances subtract, and the nearest enemy pair breaks the tie after the 3% score filter. Both comparisons keep the source's `1e-9` tolerance. Four scans find the best score, best nearest-enemy distance, eligible count and chosen layout without retaining all candidate layouts. At most six players and six spawns are accepted, including shared starts when players outnumber spawns; the largest search is `5^6 = 15,625` layouts. A caller supplies either the first-choice selection or one finite random fraction in `[0, 1)`, drawn from its recorded match stream. There is no hidden draw or global random state.
+
+Three focused tests compare all 33 authored maps plus eight constructed terrain cases, 957 layouts and 18 VP goals against the original JavaScript helpers at `e4e579a`. Cases include every six-player team partition, every supported player/spawn count, asymmetric ford distances, missing heights, cliffs, disconnected islands, shared starts and thresholds on either side of the tolerance. Invalid dimensions, buffer shapes, cells, indices, counts, non-finite/negative distances, score overflow and invalid random fractions return errors. Tiny maps are allowed for component fixtures; the authoring-map loader enforces the game's minimum dimensions.
+
+This is component evidence, not a completed match-start pipeline. The caller still normalizes mode settings, applies the Assault defender-spawn override and Horde/Tutorial shared starts, handles World home assignments, and creates starting units, buildings and wallets. The helpers do not change the map loader, `Game`, the ABI or wire messages.
+
 ## Rust lobby and session server (2026-10-12)
 
 `rust/crates/server` now provides `ww2-server`, a standalone HTTP/WebSocket process. Its first slice owns rooms, human and AI seats, observers, lobby settings, token reconnect/takeover, latency ping, a public room directory and cleanup. It does not start or simulate matches. Unsupported match commands return explicit denials, so clients cannot mistake a lobby for a running game.
