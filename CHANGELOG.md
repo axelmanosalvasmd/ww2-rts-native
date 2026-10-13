@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added versioned match random streams and a bounded tick-order queue. Terrain, weather, combat, off-map support and each AI seat have separate seeded streams; saved stream states resume exactly. Orders apply in tick, issuer and sequence order regardless of arrival order, with explicit duplicate, past-tick and capacity errors. These are core building blocks, not a full match loop or a new wire protocol.
+
 - Recorded embedded map delivery and its 96 live HTTP comparisons in the design and server parity inventory. NET-11 remains in progress: public projections are served, while raw editor reads, map writes and authoritative world loading are still missing.
 
 - Added read-only map delivery to `ww2-server`: both `/maps/<name>` and `/maps/<name>.json` serve all 33 advertised maps from embedded client-safe projections. `harness/map-assets.mjs` requires the clean pinned reference and regenerates those projections, their Rust include index and the lobby catalogue together through the reference's `mapForClient`. The HTTP harness passes 96 exact comparisons against the live Node server, including both URL forms, invalid names, missing maps, traversal paths, unsupported methods and credential refusal. Legacy and layered World projection checks cover hidden mines, their materials, triggers and scenario scripts. No raw authoring maps are embedded or available through credentials. Editor POST remains unimplemented (405), as do authoritative map loading, generated World matches and static browser hosting.
