@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added an optimized CI test profile with debug assertions and integer overflow checks retained. The same whole workspace test command uses that profile on Linux, Windows and macOS; formatting, strict all-target Clippy, release FFI and Linux C replay gates stay intact. Local duration and count verification are pending.
+
 - Joined the frozen World commander metadata provider, preserving its commander privacy filters and all-team cache rebinding after successful receipt. Migrated its pending-drop context to canonical Game strike timing and retained explicit malformed-row refusal. Extended the existing warmed-cache refusal witness without changing the original fixture. Updated stale ABI 2 status text to the verified merged six-call scope; broader contracts and Unreal adoption remain pending. Final combined gates remain pending.
 
 - Joined the frozen ordinary withdrawal provider into the consolidated candidate. Preserved staged startup and recipient receipts, combined paid-work cancellation with accepted-route failure reset, and retained canonical convoy metadata initialization, fresh-ID guards and retirement cleanup. The bounded provider is not whole-tick withdrawal scheduling; final combined verification remains pending.
