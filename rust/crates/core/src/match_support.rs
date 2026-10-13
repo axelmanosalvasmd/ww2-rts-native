@@ -533,23 +533,24 @@ impl Match {
             wind_angle,
             wind_strength,
         };
-        let effects = damage
-            .explosion_membership(
-                at,
-                number(def, "blast")?,
-                ExplosionSource::support(kind.name())
-                    .map_err(|e| SupportError::Actuation(e.to_string()))?,
-                owner as i32,
-                None,
-                None,
-                None,
-                unit_order,
-                &mut self.firing,
-            )
-            .map_err(|e| SupportError::Actuation(e.to_string()))?;
+        let mut effects = Vec::new();
+        let result = damage.explosion_membership_emitting(
+            at,
+            number(def, "blast")?,
+            ExplosionSource::support(kind.name())
+                .map_err(|e| SupportError::Actuation(e.to_string()))?,
+            owner as i32,
+            None,
+            None,
+            None,
+            unit_order,
+            &mut self.firing,
+            &mut |effect| effects.push(effect),
+        );
         self.support
             .events
             .extend(effects.into_iter().map(SupportEvent::Environment));
+        result.map_err(|e| SupportError::Actuation(e.to_string()))?;
         self.dig_support(at, number(def, "dig")?)
     }
     fn dent_support(&mut self, c: usize) -> Result<(), SupportError> {

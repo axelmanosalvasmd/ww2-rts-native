@@ -106,6 +106,7 @@ pub struct TickFailure {
     pub reason: String,
     pub tick: i64,
     pub events: Vec<TickEvent>,
+    pub retirement: crate::match_combat::RetirementProgress,
 }
 impl std::fmt::Display for TickFailure {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -188,16 +189,19 @@ impl crate::match_runtime::Match {
                 reason: format!("tick runner faulted: {fault}"),
                 tick: self.world.game.tick,
                 events: Vec::new(),
+                retirement: Default::default(),
             });
         }
         self.validate_tick_input().map_err(|reason| TickFailure {
             reason,
             tick: self.world.game.tick,
             events: Vec::new(),
+            retirement: Default::default(),
         })?;
         self.tick_state.started = true;
         let mut events = Vec::new();
-        match self.run_tick(&mut events) {
+        let mut retirement = crate::match_combat::RetirementProgress::default();
+        match self.run_tick(&mut events, &mut retirement) {
             Ok(mut report) => {
                 report.events = events;
                 Ok(report)
@@ -208,6 +212,7 @@ impl crate::match_runtime::Match {
                     reason,
                     tick: self.world.game.tick,
                     events,
+                    retirement,
                 })
             }
         }
@@ -225,6 +230,15 @@ impl crate::match_runtime::Match {
 
     fn take_firing_tick_events(&mut self, events: &mut Vec<TickEvent>) {
         events.extend(self.firing.take_events().into_iter().map(TickEvent::Firing));
+    }
+
+    fn observe_tick_command(
+        &self,
+        _command: &crate::match_commands::Command,
+    ) -> Result<(), String> {
+        // Represented commands publish state only. Any emitting command needs
+        // its owner to expose exact output order before this boundary admits it.
+        self.require_detached_tick_events()
     }
 
     fn validate_tick_input(&self) -> Result<(), String> {
@@ -329,16 +343,20 @@ impl crate::match_runtime::Match {
         Ok(())
     }
 
-    fn run_tick(&mut self, events: &mut Vec<TickEvent>) -> Result<TickReport, String> {
+    fn run_tick(
+        &mut self,
+        events: &mut Vec<TickEvent>,
+        retirement: &mut crate::match_combat::RetirementProgress,
+    ) -> Result<TickReport, String> {
         use crate::{movement, separation, vision, weather_runtime};
         let dt = self.rules.movement.tick;
         let winner_decided = self.finish.is_some();
         // Boundary orders carry the previous clock's timestamps and view keys.
         let boundary = self.world.game.tick as u64 + 1;
-        let commands = self.apply_commands(boundary, winner_decided)?;
-        // Represented boundary commands only publish state. A future emitting
-        // command needs its own ordered owner hook before joining this caller.
-        self.require_detached_tick_events()?;
+        let commands =
+            self.apply_commands_observing(boundary, winner_decided, &mut |m, command| {
+                m.observe_tick_command(command)
+            })?;
         // Boundary joins are included in prior poses and the same live unit loop.
         self.prepare_companion_tick()?;
         self.validate_aircraft_runner_state(boundary)
@@ -351,11 +369,7 @@ impl crate::match_runtime::Match {
         self.validate_support_tick_phases(&current_order, dt, boundary)
             .map_err(|error| format!("support published state: {error}"))?;
         self.validate_field_project_tick(&current_order)?;
-        events.extend(
-            self.tick_environment_phase(EnvironmentPhase::StructureSync)?
-                .into_iter()
-                .map(TickEvent::Environment),
-        );
+        self.tick_environment_phase(EnvironmentPhase::StructureSync, events)?;
         self.grid.rebuild(&self.world.game.units);
         self.capture_firing_prior()?;
         let prior = self
@@ -374,11 +388,7 @@ impl crate::match_runtime::Match {
         ];
         self.respawn_companions(winner_decided)?;
         phases.push(TickPhase::Operative);
-        events.extend(
-            self.tick_environment_phase(EnvironmentPhase::Debris)?
-                .into_iter()
-                .map(TickEvent::Environment),
-        );
+        self.tick_environment_phase(EnvironmentPhase::Debris, events)?;
         phases.push(TickPhase::Debris);
         self.sample_conquest_tick()?;
         phases.push(TickPhase::StorySample);
@@ -429,8 +439,9 @@ impl crate::match_runtime::Match {
             }
             let factor = movement::supp_speed(unit.supp);
             // Reserve adapters attach before this pre-timer order phase.
-            self.prepare_unit_commands(id, winner_decided)?;
-            self.require_detached_tick_events()?;
+            self.prepare_unit_commands_observing(id, winner_decided, &mut |m, command| {
+                m.observe_tick_command(command)
+            })?;
             let unit = self.world.game.units.get(&id).expect("current unit");
             let kind = &self.rules.kinds[unit.kind];
             if kind.building && (!kind.weapon || unit.built.is_some_and(|built| built < 1.0)) {
@@ -584,11 +595,7 @@ impl crate::match_runtime::Match {
         drop(smokes);
         phases.push(TickPhase::LivingWeather);
         // Expiring smoke still blocks ignition during the source fire phase.
-        events.extend(
-            self.tick_environment_phase(EnvironmentPhase::FireFlood(&unit_order))?
-                .into_iter()
-                .map(TickEvent::Environment),
-        );
+        self.tick_environment_phase(EnvironmentPhase::FireFlood(&unit_order), events)?;
         self.world
             .game
             .smokes
@@ -602,8 +609,7 @@ impl crate::match_runtime::Match {
         // Network refresh attaches between point supply and prepared reinforcement.
         self.reinforce(&recovery, dt)?;
         phases.push(TickPhase::Reinforcement);
-        let death = self.tick_retirement(&unit_order)?;
-        events.extend(death.shots.into_iter().map(TickEvent::Environment));
+        self.tick_retirement(&unit_order, retirement, events)?;
         phases.push(TickPhase::Death);
         self.apply_point_capture_income(&unit_order)?;
         phases.push(TickPhase::PointCaptureIncome);
@@ -618,7 +624,7 @@ impl crate::match_runtime::Match {
             commands,
             paths,
             events: Vec::new(),
-            retired: death.retired,
+            retired: std::mem::take(&mut retirement.removed),
             unavailable: vec![
                 TickPhase::Research,
                 TickPhase::UnitReserves,
@@ -637,7 +643,9 @@ impl crate::match_runtime::Match {
     fn tick_retirement(
         &mut self,
         unit_order: &[UnitId],
-    ) -> Result<crate::match_combat::DeathResult, String> {
+        progress: &mut crate::match_combat::RetirementProgress,
+        events: &mut Vec<TickEvent>,
+    ) -> Result<(), String> {
         // Building collapse can kill a later captured unit during cleanup, so
         // preflight every potential callback before the first removal.
         let facts = unit_order
@@ -664,11 +672,13 @@ impl crate::match_runtime::Match {
             .collect::<Result<Vec<_>, String>>()?;
         self.validate_story_for_deaths(&facts)?;
         self.prepare_companion_deaths(unit_order)?;
-        let result = self
-            .retire_dead(unit_order)
-            .map_err(|e| format!("death cleanup: {e:?}"))?;
-        for record in &result.retired {
+        self.retire_dead_emitting(unit_order, progress, &mut |effect| {
+            events.push(TickEvent::Environment(effect));
+        })
+        .map_err(|e| format!("death cleanup: {e:?}"))?;
+        for record in &progress.removed {
             self.companion_died(record.unit.id)?;
+            progress.companions_notified += 1;
             let kind = self.rules.kinds[record.unit.kind].name.clone();
             self.record_death(
                 crate::match_story::DeathRecord {
@@ -680,16 +690,19 @@ impl crate::match_runtime::Match {
                     .last_hit
                     .and_then(|owner| usize::try_from(owner).ok()),
             )?;
+            progress.stories_notified += 1;
             self.retain_removed_route_unit(&record.unit)?;
+            progress.routes_retained += 1;
         }
         // Active flights retain their removed source's combat XP metadata.
-        Ok(result)
+        Ok(())
     }
 
     fn tick_environment_phase(
         &mut self,
         phase: EnvironmentPhase<'_>,
-    ) -> Result<Vec<crate::environment::Effect>, String> {
+        events: &mut Vec<TickEvent>,
+    ) -> Result<(), String> {
         use crate::environment::Context;
         // Environment admission names every current unit. Late objective and
         // retirement consumers retain their separately captured source list.
@@ -708,7 +721,6 @@ impl crate::match_runtime::Match {
             wind_angle: self.start.wind.0,
             wind_strength: self.start.wind.1,
         };
-        let mut effects = Vec::new();
         match phase {
             EnvironmentPhase::StructureSync => {
                 for &id in &ids {
@@ -719,11 +731,22 @@ impl crate::match_runtime::Match {
                         .any(|s| s.entity_id == Some(id))
                     {
                         let owner = self.combat.get(id).and_then(|m| m.last_hit);
-                        effects.extend(
-                            self.environment
-                                .sync_building_sections(&mut self.world, id, owner, &mut context)
-                                .map_err(|e| format!("building section sync: {e}"))?,
-                        );
+                        let combat = &mut self.combat;
+                        self.environment
+                            .sync_building_sections_emitting(
+                                &mut self.world,
+                                id,
+                                owner,
+                                &mut context,
+                                &mut |effect| {
+                                    crate::match_combat::absorb_environment_effect(
+                                        combat,
+                                        effect,
+                                        &mut |effect| events.push(TickEvent::Environment(effect)),
+                                    )
+                                },
+                            )
+                            .map_err(|e| format!("building section sync: {e}"))?;
                     }
                 }
             }
@@ -737,16 +760,22 @@ impl crate::match_runtime::Match {
             }
             EnvironmentPhase::FireFlood(actor_order) if tick.is_multiple_of(10) => {
                 if !self.world.fires.is_empty() {
-                    effects.extend(
-                        self.environment
-                            .burn_captured(
-                                &mut self.world,
-                                self.rules.movement.tick * 10.0,
-                                &mut context,
-                                actor_order,
-                            )
-                            .map_err(|e| format!("burn: {e}"))?,
-                    );
+                    let combat = &mut self.combat;
+                    self.environment
+                        .burn_captured_emitting(
+                            &mut self.world,
+                            self.rules.movement.tick * 10.0,
+                            &mut context,
+                            actor_order,
+                            &mut |effect| {
+                                crate::match_combat::absorb_environment_effect(
+                                    combat,
+                                    effect,
+                                    &mut |effect| events.push(TickEvent::Environment(effect)),
+                                )
+                            },
+                        )
+                        .map_err(|e| format!("burn: {e}"))?;
                 }
                 if !self.world.soak().is_empty() {
                     self.environment
@@ -756,22 +785,6 @@ impl crate::match_runtime::Match {
             }
             EnvironmentPhase::FireFlood(_) => {}
         }
-        let mut damage = crate::match_combat::DamageWorld {
-            world: &mut self.world,
-            combat: &mut self.combat,
-            grid: &mut self.grid,
-            rules: &self.rules,
-            logistics: &self.logistics,
-            production: &self.production,
-            mode: self.options.mode,
-            tech_enabled: self.options.tech,
-            environment: &mut self.environment,
-            environment_seed: &mut self.start.environment_seed,
-            next_id: &mut self.next_unit_id,
-            unit_order: &ids,
-            wind_angle: self.start.wind.0,
-            wind_strength: self.start.wind.1,
-        };
-        Ok(damage.environment_effects(effects))
+        Ok(())
     }
 }

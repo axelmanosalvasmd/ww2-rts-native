@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Resumed the ordered tick output checkpoint with direct producer emission sinks, per-command dispatch observers and one caller-owned failure payload. Committed section, blast, burn and retirement effects remain available when a later operation fails; removal facts and completed wreck/bounty/lifecycle prefixes are reported separately. The new unchanged-source replay covers 3 complete traces, 375 steps and 103 chronological shots across firing, ground support, aircraft AA and late fire damage. Native compilation, failure regressions and host integration are pending; frozen AIR evidence and original fixtures are preserved.
+
 - Checkpointed unverified ordered tick output work at the user's pause. A transient TickEvent sequence and TickFailure payload are written, with AIR, ground-support and operative consumer migrations; no compile, native test or complete mixed-event Source replay has run for this branch. The late-failure ownership regression, per-command observer hooks, host bridge and complete emission-order audit are unfinished. Existing AIR proof and original fixtures remain preserved; this checkpoint is not integration-ready.
 
 - Restored the verified coherent support recorder and fixture together after the AIR union retained an older ground-only fixture schema. The actual AIR runner's three debug tests now pass, but all eight support tests failed in setup because their restored factory requires the coherent `units` array. This repair copies the checked provider's original files exactly; runtime, guards, RNG and the separate ground full-step fixture are unchanged. The failed log and 35 preceding debug passes are retained; final combined proof remains pending.

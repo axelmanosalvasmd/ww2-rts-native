@@ -80,6 +80,21 @@ impl EnvironmentRuntime {
         owner: Option<i32>,
         ctx: &mut Context<'_>,
     ) -> Result<Vec<Effect>, EnvironmentError> {
+        let mut out = Vec::new();
+        self.sync_building_sections_emitting(w, unit_id, owner, ctx, &mut |effect| {
+            out.push(effect)
+        })?;
+        Ok(out)
+    }
+    /// Emit each committed effect in source order, including the prefix before an error.
+    pub fn sync_building_sections_emitting(
+        &mut self,
+        w: &mut World,
+        unit_id: u32,
+        owner: Option<i32>,
+        ctx: &mut Context<'_>,
+        out: &mut dyn FnMut(Effect),
+    ) -> Result<(), EnvironmentError> {
         check(w, ctx)?;
         let unit = w
             .game
@@ -93,10 +108,10 @@ impl EnvironmentRuntime {
             .find(|s| s.entity_id == Some(unit_id))
             .cloned()
         else {
-            return Ok(Vec::new());
+            return Ok(());
         };
         if unit.hp <= 0. {
-            return Ok(Vec::new());
+            return Ok(());
         }
         let at = unit.hit_from.unwrap_or(unit.at());
         if ![at.x, at.z].iter().all(|v| v.is_finite())
@@ -108,7 +123,7 @@ impl EnvironmentRuntime {
         section_bounds(w, &structure)?;
         let mut loss = section_hp(w, &structure) - unit.hp;
         if loss <= 0.001 {
-            return Ok(Vec::new());
+            return Ok(());
         }
         let mut sections: Vec<_> = structure.section_ids.iter().zip(&structure.cells).collect();
         // Stable sorting preserves the structure's source order when distances tie.
@@ -130,7 +145,6 @@ impl EnvironmentRuntime {
             skip_buildings: &skip,
             memory: None,
         };
-        let mut out = Vec::new();
         for (id, cell) in sections {
             if loss <= 0.001 {
                 break;
@@ -139,14 +153,14 @@ impl EnvironmentRuntime {
             if amount <= 0. {
                 continue;
             }
-            self.damage_section_inner(w, *cell, amount, ctx, &hit, &mut out)?;
+            self.damage_section_inner(w, *cell, amount, ctx, &hit, out)?;
             loss -= amount;
         }
         let remaining = section_hp(w, &structure);
         let unit = w.game.units.get_mut(&unit_id).unwrap();
         unit.hp = math::min(unit.hp, remaining);
         self.reconcile_wreck_metadata(w);
-        Ok(out)
+        Ok(())
     }
 
     /// The caller removes the dead building from the current units before this operation.
@@ -157,6 +171,18 @@ impl EnvironmentRuntime {
         unit: &Unit,
         ctx: &mut Context<'_>,
     ) -> Result<Vec<Effect>, EnvironmentError> {
+        let mut out = Vec::new();
+        self.wreck_building_emitting(w, unit, ctx, &mut |effect| out.push(effect))?;
+        Ok(out)
+    }
+    /// Emit each committed effect in source order, including the prefix before an error.
+    pub fn wreck_building_emitting(
+        &mut self,
+        w: &mut World,
+        unit: &Unit,
+        ctx: &mut Context<'_>,
+        out: &mut dyn FnMut(Effect),
+    ) -> Result<(), EnvironmentError> {
         let t = check(w, ctx)?;
         detached_unit_bounds(unit, t)?;
         let footprint = unit
@@ -174,18 +200,9 @@ impl EnvironmentRuntime {
         if let Some(structure) = &structure {
             section_bounds(w, structure)?;
         }
-        let mut out = Vec::new();
         if let Some(structure) = structure {
             for (id, cell) in structure.section_ids.iter().zip(structure.cells) {
-                self.fail_section(
-                    w,
-                    id,
-                    cell,
-                    ctx,
-                    Some(Point { x: 0., z: 1. }),
-                    None,
-                    &mut out,
-                )?;
+                self.fail_section(w, id, cell, ctx, Some(Point { x: 0., z: 1. }), None, out)?;
             }
         }
         for &cell in footprint {
@@ -195,12 +212,12 @@ impl EnvironmentRuntime {
             }
         }
         self.reconcile_wreck_metadata(w);
-        out.push(Effect::BuildingCollapse {
+        out(Effect::BuildingCollapse {
             unit: unit.id,
             owner: unit.owner,
             position: unit.at(),
         });
-        Ok(out)
+        Ok(())
     }
 
     /// Create the dead vehicle's hull after the caller removes its unit from live state.
@@ -211,6 +228,19 @@ impl EnvironmentRuntime {
         impulse: Option<DeathImpulse>,
         ctx: &mut Context<'_>,
     ) -> Result<Vec<Effect>, EnvironmentError> {
+        let mut out = Vec::new();
+        self.spawn_vehicle_wreck_emitting(w, unit, impulse, ctx, &mut |effect| out.push(effect))?;
+        Ok(out)
+    }
+    /// Create a hull through the emitting API. Hull creation currently emits no effects.
+    pub fn spawn_vehicle_wreck_emitting(
+        &mut self,
+        w: &mut World,
+        unit: &Unit,
+        impulse: Option<DeathImpulse>,
+        ctx: &mut Context<'_>,
+        _emit: &mut dyn FnMut(Effect),
+    ) -> Result<(), EnvironmentError> {
         let t = check(w, ctx)?;
         detached_unit_bounds(unit, t)?;
         self.reconcile_wreck_metadata(w);
@@ -221,7 +251,7 @@ impl EnvironmentRuntime {
             || kind.speed <= 0.
             || w.game.flags_at(unit.x, unit.z) & MOVE != 0
         {
-            return Ok(Vec::new());
+            return Ok(());
         }
         if self.wreck_metadata.contains_key(&unit.id)
             || w.game.wrecks.iter().any(|wreck| wreck.id == Some(unit.id))
@@ -302,7 +332,7 @@ impl EnvironmentRuntime {
             }
         }
         self.reconcile_wreck_metadata(w);
-        Ok(Vec::new())
+        Ok(())
     }
 
     /// Call after `step_sections` to retain the source's section-then-wreck phase order.
