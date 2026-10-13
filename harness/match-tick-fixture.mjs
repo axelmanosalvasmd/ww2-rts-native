@@ -32,7 +32,7 @@ for(const spec of [...['standard','large','massive','endless'].map(army=>({army}
  try{g=sim.createGame(map,['A','B'],false,[0,0],[0,1],{army,weather:false,tech:true,logistics:false});}finally{Math.random=old;}
  const input={holdPosition:true,seed:0x12345678,wind:[.75,.4],paths:[[1,17,17],[2,23,17]],positions:[[1,13,17],[2,27,17]]};
  if(spec.commands)input.commands=[
-  {tick:1,issuer:0,sequence:2,command:{t:'move',orders:[[1,19,17]]}},
+  {tick:1,issuer:0,sequence:2,command:{t:'move',orders:[[1,13.05,17]]}},
   {tick:1,issuer:0,sequence:1,command:{t:'stop',ids:[1]}},
   {tick:2,issuer:0,sequence:3,command:{t:'move',orders:[[1,19,21]],queue:true}},
   {tick:5,issuer:0,sequence:4,command:{t:'stop',ids:[1]}},
@@ -55,6 +55,7 @@ for(const spec of [...['standard','large','massive','endless'].map(army=>({army}
  for(let i=0;i<ticks;i++){
   for(const row of (input.commands??[]).filter(c=>c.tick===g.tick+1).sort((a,b)=>a.issuer-b.issuer||a.sequence-b.sequence))sim.command(g,row.issuer,row.command);
   sim.step(g);
+  if(spec.commands&&g.tick===2&&(g.units.get(1).orders.length||g.units.get(1).moveOutcomeTick!==2))throw Error('Queued move must resume after completing its predecessor');
   if(spec.environment&&g.tick===10&&(g.fires.size<2||g.smokes.length))throw Error('Expiring smoke must suppress the first spreading fire cloud');
   if([1,2,3,4,5,40,80,160,161,200].includes(g.tick)||spec.environment&&[9,10,11,20].includes(g.tick)){
    const state=snapshot(g);

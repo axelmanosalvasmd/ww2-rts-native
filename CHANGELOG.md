@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Strengthened the actual-step command trace so its first short Move completes before a queued Move resumes inside tick two. The fixture now checks both previous-clock boundary timestamps and current-clock queued-order timestamps, alongside deterministic input-key ordering.
+
 - Attached early building-section reconciliation, section/wreck debris and late fire/flood phases to the staged tick, using the canonical environment seed, IDs, smoke lifetime and combat attribution. Expired smoke is removed after burning, so it still blocks a same-tick ignition cloud. A sixth actual-step trace exercises flame escape, spreading fire, smoke decay and the shared environment stream; the source fixture covers 1,020 ticks and 59 checkpoints. Combined native validation remains pending.
 
 - Attached recorded boundary commands, the path scheduler and per-unit waiting-order/attack-move phases to the staged tick. Orders keyed to T apply at clock T-1, with real recipient-bound movement recovery searches afterward. A fifth actual JavaScript `step` trace adds ordered Move, Stop, queued Move and attack-move input; the source recorder now covers 1,000 ticks and 50 checkpoints. Combined native validation is pending. Automatic reactions and recipient-memory traffic steering remain explicit unavailable phases.
