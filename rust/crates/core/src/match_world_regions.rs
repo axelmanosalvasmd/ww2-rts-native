@@ -4,9 +4,7 @@
 
 use crate::{
     catalog::{Catalog, Value},
-    economy::Mode,
-    economy_state as economy,
-    game::{CELL, LOCAL_DEFENDER_OWNER, ModeKind, Point},
+    game::{CELL, Point},
     match_runtime::Match,
     match_story::{StoryChange, StoryKey, prepare_story_updates},
     match_world_elimination::WorldRegionEffects,
@@ -55,7 +53,9 @@ impl Match {
         unit_order: &[u32],
         dt: f64,
     ) -> Result<Vec<WorldCapture>, String> {
-        Ok(self.world_region_phase(unit_order, None, dt)?.captures)
+        Ok(self
+            .world_region_phase(Some(unit_order), None, dt)?
+            .captures)
     }
     /// Run the bounded phase with actual administrative removals and building wrecks.
     /// The complete current order is distinct from the captured tick upkeep list.
@@ -66,154 +66,39 @@ impl Match {
         live_order: &[u32],
         dt: f64,
     ) -> Result<WorldRegionEffects, String> {
-        self.world_region_phase(tick_order, Some(live_order), dt)
+        self.world_region_phase(Some(tick_order), Some(live_order), dt)
+    }
+    /// Run the current region, home, elimination and finish phase without charging income.
+    /// Invoke this after the real intervening convoy phase. This bounded API still
+    /// refuses World logistics and unsupported consequences; it is not a tick runner.
+    pub fn apply_world_regions(
+        &mut self,
+        live_order: &[u32],
+        dt: f64,
+    ) -> Result<WorldRegionEffects, String> {
+        self.world_region_phase(None, Some(live_order), dt)
     }
     fn world_region_phase(
         &mut self,
-        unit_order: &[u32],
+        income_order: Option<&[u32]>,
         live_order: Option<&[u32]>,
         dt: f64,
     ) -> Result<WorldRegionEffects, String> {
         if let Some(order) = live_order {
             self.validate_world_live_order(order)?;
         }
-        if self.options.mode != Mode::World
-            || self.world.game.mode != Some(ModeKind::World)
-            || self.options.logistics
-            || self.finish.is_some()
-        {
-            return Err(
-                "World region phase requires undecided World with logistics disabled".into(),
-            );
-        }
-        if !dt.is_finite() || dt < 0.0 {
-            return Err("invalid World phase dt".into());
-        }
-        let economy_regions = self.world_economy_regions()?;
+        self.validate_world_phase_context(dt)?;
+        let mut wallets = if let Some(order) = income_order {
+            let captured = self.current_world_income_units(order)?;
+            self.prepare_world_income(&captured, dt)?
+        } else {
+            self.start.economy.clone()
+        };
+        let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
         let geography = self.world.geography().ok_or("missing World geography")?;
         let game = &self.world.game;
         let players = &self.start.economy.players;
-        if !(1..=6).contains(&players.len())
-            || players.len() != game.players.len()
-            || players.len() != self.start.players.len()
-            || players.len() != self.story.len()
-            || players.len() != self.options.players.len()
-            || game.tick < 0
-            || game.tick > 9_007_199_254_740_991
-        {
-            return Err("invalid World phase shape".into());
-        }
-        for (slot, p) in players.iter().enumerate() {
-            if !(0..6).contains(&p.team)
-                || game.players[slot].slot != slot
-                || p.team != game.players[slot].team
-                || p.team != self.start.players[slot].config.team
-                || p.team != self.options.players[slot].team
-                || !self.start.players[slot].spawn.x.is_finite()
-                || !self.start.players[slot].spawn.z.is_finite()
-            {
-                return Err("invalid World commander identity".into());
-            }
-        }
-        let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
-        for (&id, u) in &game.units {
-            if u.id != id
-                || u.kind >= self.rules.kinds.len()
-                || !u.hp.is_finite()
-                || !u.x.is_finite()
-                || !u.z.is_finite()
-                || (u.owner != LOCAL_DEFENDER_OWNER && u.owner >= players.len())
-            {
-                return Err("invalid World phase unit".into());
-            }
-        }
-        let mut seen = BTreeSet::new();
-        let mut list = Vec::with_capacity(unit_order.len());
-        for id in unit_order {
-            if !seen.insert(*id) {
-                return Err("duplicate World tick unit".into());
-            }
-            list.push(
-                game.units
-                    .get(id)
-                    .ok_or("unsupported World income: removed tick unit facts")?,
-            );
-        }
-        let queues: Vec<Vec<&str>> = list
-            .iter()
-            .map(|u| {
-                self.production
-                    .building(u.id)
-                    .map_or_else(Vec::new, |p| p.queue().collect())
-            })
-            .collect();
-        let income_units: Vec<_> = list
-            .iter()
-            .zip(&queues)
-            .map(|(u, queue)| economy::Unit {
-                id: u.id as u64,
-                owner: (u.owner != LOCAL_DEFENDER_OWNER).then_some(u.owner),
-                kind: &self.rules.kinds[u.kind].name,
-                hp: u.hp,
-                built: u.built.unwrap_or(0.0),
-                queue,
-            })
-            .collect();
-        let current_depots: Vec<_> = game
-            .units
-            .values()
-            .map(|u| economy::DepotFacts {
-                id: u.id as u64,
-                owner: (u.owner != LOCAL_DEFENDER_OWNER).then_some(u.owner),
-                hp: u.hp,
-                built: u.built.unwrap_or(0.0),
-            })
-            .collect();
         let runtime = self.world_runtime.as_ref().ok_or("missing World runtime")?;
-        let nodes = runtime
-            .nodes
-            .iter()
-            .map(|node| {
-                Ok(economy::Node {
-                    depot: node.depot.map(u64::from),
-                    rate: node.rate,
-                    fuel: node.fuel,
-                    region: self.world_region_index(node.at)?,
-                })
-            })
-            .collect::<Result<Vec<_>, String>>()?;
-        let mut wallets = self.start.economy.clone();
-        wallets
-            .advance_income_with_depots(
-                &economy::Context {
-                    mode: economy::ModeContext {
-                        kind: Mode::World,
-                        defender_team: None,
-                        income_excluded_slot: None,
-                    },
-                    army: self.options.army,
-                    units: &income_units,
-                    drops: &[],
-                    points: &[],
-                    nodes: &nodes,
-                    world: Some(economy::WorldContext {
-                        regions: &economy_regions,
-                    }),
-                },
-                &current_depots,
-                dt,
-                false,
-            )
-            .map_err(|e| e.to_string())?;
-        if wallets.players.iter().any(|p| {
-            [p.mp, p.mun, p.fuel, p.inc]
-                .into_iter()
-                .chain(p.fuel_inc)
-                .chain(p.upkeep)
-                .any(|v| !v.is_finite())
-        }) {
-            return Err("nonfinite World income result".into());
-        }
 
         let cfg = catalog.table("CFG").map_err(|e| e.to_string())?;
         let radius = n(cfg, "pointRadius")?;
