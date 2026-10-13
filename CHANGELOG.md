@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Applied detached search-cache publication to the public component recruit actuator too, so late transaction errors preserve canonical graph history through both purchase entry points. Native checks remain pending.
 - Preserved canonical path-cache history on aborted World training previews too. Only a detached derived-cache fork sees temporary memory buffers, and it joins the infallible success commit. Native follow-up verification remains pending.
 
 - Preserved warmed canonical path caches when a staged recruitment preview fails. Searches now run on the approved derived-cache fork and publish it only on success; the late-story regression also checks a same-clock reroute against a branch that never attempted the preview. Native checks remain pending.

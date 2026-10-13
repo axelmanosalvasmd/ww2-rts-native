@@ -328,14 +328,11 @@ impl Match {
     ) -> Result<CompletedRecruitUnit, RecruitError> {
         let mut parts = recruit_parts!(self);
         let mut staged = parts.stage(slot, kind, from, winner_decided)?;
-        route_recruit(
-            parts.game,
-            parts.rules,
-            &mut parts.commands.paths,
-            &mut staged,
-            routing,
-        )?;
-        parts.finish(staged)
+        let mut paths = parts.commands.paths.clone();
+        route_recruit(parts.game, parts.rules, &mut paths, &mut staged, routing)?;
+        let done = parts.finish(staged)?;
+        parts.commands.paths = paths;
+        Ok(done)
     }
 }
 impl RecruitParts<'_> {
