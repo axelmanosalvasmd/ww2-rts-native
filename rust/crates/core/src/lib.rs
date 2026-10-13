@@ -13,6 +13,8 @@ pub mod map;
 pub mod math;
 pub mod movement;
 pub mod navigation;
+pub mod path_requests;
+
 pub mod orders;
 pub mod pathfinding;
 pub mod projectiles;

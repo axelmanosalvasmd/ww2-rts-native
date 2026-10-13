@@ -197,13 +197,27 @@ Region edges and incoming IDs keep the reference insertion order. Dirty chunks r
 
 `NavigationLeg` borrows the cache's labels while owning its allowed-region list. Rust therefore prevents the caller from updating that cache while the fine search uses its filter. This replaces the reference's instruction to use a filter immediately with a lifetime rule.
 
-All 4,888 recorded queries match the reference's target, connectivity, limit flag, ordered region IDs and per-cell filter. The 35 scenarios include 277 terrain updates, 1,372 limited legs and 1,268 disconnected outcomes. The recorder rejects a wrong pin or dirty tracked source. No performance claim is made. Unit path queues and integration into movement remain pending.
+All 4,888 recorded queries match the reference's target, connectivity, limit flag, ordered region IDs and per-cell filter. The 35 scenarios include 277 terrain updates, 1,372 limited legs and 1,268 disconnected outcomes. The recorder rejects a wrong pin or dirty tracked source. No performance claim is made. Integration into movement remains pending; the standalone request scheduler is recorded below.
 
 ## Infantry and naval pathfinding (2026-10-12)
 
 The initial `pathfinding.rs` slice added fine grid A* and path smoothing over the coarse navigation planner. `PathTerrain` supplies the terrain view plus wall proximity, known mines, fires and live bunker positions; `PathRules` supplies wall and bunker costs. The search reads no `Game` and cannot substitute hidden world state for the supplied view. That slice supported infantry and shallow/deep naval profiles; ground vehicles, aircraft, rail units and structures returned `UnsupportedProfile`.
 
 The implementation preserves the reference's float32 path scores, score-only heap ties, neighbor order, diagonal corner checks, hazard costs, blocked-start escape and smoothing. An exhausted expansion budget has a distinct result from an unreachable route. Rust owns reusable search storage beside the navigation cache. The old undirected `regionsFor` rejection is unnecessary after the stronger directed coarse route has succeeded, so the fine search does not duplicate that cache.
+
+The original `findPath` produces 1,175 oracle searches across all 33 authored maps and crafted terrain cases: 914 found routes, 163 unreachable results and 98 budget exhaustions. Every waypoint and resolved endpoint matches bit for bit, as do expansion counts and outcomes. Repeated searches after mine, fire and bunker changes are included. The recorder verifies the exact reference pin and rejects tracked changes. Vehicle clearance, automatic recipient-view selection and movement integration remain separate work. The standalone request scheduler and retry policy are recorded below. No performance claim is made.
+
+
+
+## Path request scheduling (2026-10-12)
+
+`path_requests.rs` adds a deterministic scheduler around caller-supplied goal eligibility, path searches and unit updates. It owns the FIFO, the latest pending token per unit and retry counts. `current_goal` must apply the live-unit and per-order conditions from the reference; this module does not implement those combat and order rules or select terrain.
+
+Each tick supplies its budget, retry limit, tick number and tick duration. Defaults match the reference: 4,096 searches and 20 failures. Older queued work runs first. Dead, changed and superseded requests are removed before the budget check, and a replacement request takes its new FIFO position. Drained requests set the retry timer to one second plus the tick duration; immediate requests set it to one second.
+
+Retry identity includes request kind, numeric goal, knowledge version and unit incarnation. Direct path commands clear prior failures. Empty recovery results preserve the existing route and do not count toward dropping an order. A search can advance the failure statistics and still return a nonempty route after a fallback succeeds; that route is retained while the failure is counted, until the retry limit cancels the order. Callback errors are returned rather than treated as successful paths.
+
+The fixture executes the original private scheduling functions and uses the reference tick constant. Explicit adapters supply eligibility and bounded search outcomes. All 606 action checkpoints match: 207 searches and 22 order drops, with queue order, counters, routes, timers, cleared order values and movement outcomes checked after each action. The source recorder rejects a changed pin or tracked source edits. The fixture reaches every branch in the scheduling functions. Real movement integration, complete `currentPathGoal` eligibility, knowledge-view selection and full-match testing remain separate work; MOV-40 and MOV-41 stay in progress.
 
 The original `findPath` produces 1,175 oracle searches across all 33 authored maps and crafted terrain cases: 914 found routes, 163 unreachable results and 98 budget exhaustions. Every waypoint and resolved endpoint matches bit for bit, as do expansion counts and outcomes. Repeated searches after mine, fire and bunker changes are included. The recorder verifies the exact reference pin and rejects tracked changes. At that stage, vehicle clearance, automatic recipient-view selection, retry policy, request scheduling and movement integration remained separate work. No performance claim was made.
 

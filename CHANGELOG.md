@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Recorded the standalone request scheduler, its 606-action oracle and remaining integration work in the design and movement inventory. MOV-40 and MOV-41 remain in progress until live-order eligibility and actual movement use the scheduler.
+
+- Fixed path requests that return a usable route after an earlier fallback attempt increments the failure count. The scheduler now retains the route and applies the reference retry accounting independently. Two original-source cases cover route retention, retry-limit cancellation and recovery behavior; the fixture now matches 606 actions, 207 searches and 22 drops. Non-finite returned waypoints remain rejected.
+
+- Added a deterministic FIFO path-request scheduler with per-tick search budgets, stale/dead request removal, one pending request per unit and goal/version retry limits. Callback adapters supply current goals, real search results and unit updates; the scheduler has no hidden terrain or combat reads. An original-source oracle matches 594 actions, 201 searches and 20 order drops, including queue replacements, zero-budget stale removal, direct-command retry resets and empty recovery paths. Movement integration and full order eligibility remain separate work.
+
 - Added the internal Rust recipient view and reference protocol replay from PR #16 without its C interface. The decoder retains received units, raw terrain rows, fog masks and HUD messages, with bounded atomic validation and held-set resync checks. All 1,236 recorded Conquest and World message states have direct browser expectations. ABI 1 and its header remain unchanged; PR #16's six proposed C calls still await Axel's approval.
 
 - Connected movement recovery and traffic replans to caller-supplied route handlers, while retaining the existing frozen benchmark entry points. Four live-search reference recordings match infantry and tank movement over 48 ticks, including disconnected destinations. This does not enable full match scheduling, hidden-terrain selection, logistics or combat.
