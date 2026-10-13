@@ -158,6 +158,18 @@ fn actual_world_elimination_matches_original_order_collateral_and_overflow() {
     for case in f["cases"].as_array().unwrap() {
         let mut m = world_scene::make_match(&f, teams);
         let order = setup(&mut m, &f, case);
+        for raw in case["input"]["units"].as_array().unwrap() {
+            let kind = m.rules.kind(raw["type"].as_str().unwrap()).unwrap();
+            if m.rules.kinds[kind].air {
+                assert!(raw.get("air").is_none());
+                let id = raw["id"].as_u64().unwrap() as u32;
+                assert_eq!(
+                    m.world.game.units[&id].air,
+                    Some(ww2_core::game::PlaneState::Base)
+                );
+                assert_eq!(m.world.game.units[&id].hp, raw["hp"].as_f64().unwrap());
+            }
+        }
         for step in case["steps"].as_array().unwrap() {
             m.world.game.tick = step["tick"].as_i64().unwrap();
             assert_eq!(

@@ -239,6 +239,17 @@ fn invalid_inputs_and_air_base_placement_are_rejected() {
             Err(SpawnError::UnsupportedAir)
         );
     }
+    assert_eq!(
+        ww2_core::unit_spawn::initial_aircraft(
+            &rules,
+            catalog,
+            rules.kind("rifle").unwrap(),
+            1,
+            0,
+            at,
+        ),
+        Err(SpawnError::InvalidDefinition)
+    );
     let malformed = serde_json::json!({"tables": {"UNITS": {rules.kinds[0].name.clone(): {"models": -1, "hpPer": -1}}}});
     let malformed = Catalog::from_json(&malformed.to_string()).unwrap();
     assert_eq!(

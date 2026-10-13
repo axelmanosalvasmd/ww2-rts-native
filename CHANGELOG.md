@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed the first native World elimination fixture setup failure by restoring its original dead fighter through the reviewed pure AIR field constructor. Ordinary AIR refusal and the six source cases stay intact; the unused native Base normalization is explicit. The preceding head passed 35 affected debug tests; final release and strict gates remain pending. Formatted the shared fixture helper before those gates.
+
 - Exposed the existing physical aircraft field initializer through an explicit pure constructor for controlled scene restoration. It shares ordinary defaults once, preserves ordinary UnsupportedAir and does not create sortie metadata or admit World flight. The World elimination source's restored dead fighter has no air object; the consumer may normalize only that unused physical field to native Base while preserving kind, ID, owner, HP and pose. Constructor source review and native execution remain pending; no World startup, mission, movement or weapon support is added.
 
 - Fix native fixture compilation by retaining three route queries while their borrowed navigation views are read. Use the explicit World effect adapter in elimination comparisons, and scope the shared sorting helper lint to that one test helper.

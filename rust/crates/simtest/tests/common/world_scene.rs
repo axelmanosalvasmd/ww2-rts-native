@@ -41,10 +41,10 @@ fn army(v: &Value) -> ArmySize {
 }
 pub fn make_match(f: &Value, teams: &[Value]) -> Match {
     let defs = f["definitions"].as_array().unwrap();
-    let total=defs.len();
-    let height=total/8*64;
+    let total = defs.len();
+    let height = total / 8 * 64;
     let homes: Vec<_> = (0..teams.len())
-        .map(|i| if i + 1 == teams.len() { total-1 } else { i })
+        .map(|i| if i + 1 == teams.len() { total - 1 } else { i })
         .collect();
     let regions = defs
         .iter()
@@ -78,7 +78,11 @@ pub fn make_match(f: &Value, teams: &[Value]) -> Match {
             })
             .collect(),
         geography: WorldDefinition {
-            size: if total==64 {WorldSize::Huge} else {WorldSize::Massive},
+            size: if total == 64 {
+                WorldSize::Huge
+            } else {
+                WorldSize::Massive
+            },
             region_cells: 64,
             regions,
             region_map: Some(
@@ -122,10 +126,17 @@ pub fn update_unit(m: &mut Match, raw: &Value, new: bool) {
     let id = raw["id"].as_u64().unwrap() as u32;
     if new {
         let slot = raw["owner"].as_i64().unwrap();
-        let u = ww2_core::unit_spawn::initial_unit(
+        let kind = m.rules.kind(raw["type"].as_str().unwrap()).unwrap();
+        // Controlled source scenes can omit air state. Base is an unused native normalization.
+        let initialize = if m.rules.kinds[kind].air {
+            ww2_core::unit_spawn::initial_aircraft
+        } else {
+            ww2_core::unit_spawn::initial_unit
+        };
+        let u = initialize(
             &m.rules,
             Catalog::compiled().unwrap(),
-            m.rules.kind(raw["type"].as_str().unwrap()).unwrap(),
+            kind,
             id,
             if slot < 0 {
                 LOCAL_DEFENDER_OWNER
@@ -205,7 +216,9 @@ pub fn update_region(r: &mut RegionState, raw: &Value) {
     if let Some(v) = raw["progress"].as_f64() {
         r.progress = v;
     }
-    if let Some(v) = raw["capTick"].as_i64() { r.cap_tick=Some(v); }
+    if let Some(v) = raw["capTick"].as_i64() {
+        r.cap_tick = Some(v);
+    }
     if let Some(v) = raw["capper"].as_i64() {
         r.capper = (v >= 0).then_some(v as usize);
     }
@@ -237,8 +250,11 @@ pub fn reset(m: &mut Match, f: &Value, input: &Value) {
         m.options.players[slot].team = team;
         m.start.players[slot].config.team = team;
         m.world.game.players[slot].team = team;
-        m.start.players[slot].spawn =
-            at(&f["definitions"][if slot + 1 == teams.len() { f["definitions"].as_array().unwrap().len()-1 } else { slot }]);
+        m.start.players[slot].spawn = at(&f["definitions"][if slot + 1 == teams.len() {
+            f["definitions"].as_array().unwrap().len() - 1
+        } else {
+            slot
+        }]);
         let override_row = &input["players"][slot.to_string()];
         m.start.economy.players.push(PlayerEconomy {
             team,
@@ -262,7 +278,11 @@ pub fn reset(m: &mut Match, f: &Value, input: &Value) {
             };
             let mut r = RegionState {
                 team,
-                progress: if i == 0 || i + 1 == f["definitions"].as_array().unwrap().len() { 1.0 } else { 0.0 },
+                progress: if i == 0 || i + 1 == f["definitions"].as_array().unwrap().len() {
+                    1.0
+                } else {
+                    0.0
+                },
                 capper: None,
                 contested: false,
                 locked: None,
@@ -299,7 +319,10 @@ pub fn projection(m: &Match) -> Value {
         "units":m.world.game.units.values().map(|u|json!([u.id,owner(u.owner)])).collect::<Vec<_>>(),
         "winner":m.finish.map(|f|f.winner),"reason":m.finish.map(|f|f.reason.as_str()),"endAt":m.finish.map(|f|vec![bits(f.end_at.x),bits(f.end_at.z)])})
 }
-#[allow(dead_code, reason = "Shared sorting is used by sibling World fixture test crates.")]
+#[allow(
+    dead_code,
+    reason = "Shared sorting is used by sibling World fixture test crates."
+)]
 pub fn sorted_units(mut v: Value) -> Value {
     v["units"]
         .as_array_mut()
