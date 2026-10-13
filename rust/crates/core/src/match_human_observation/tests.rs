@@ -298,6 +298,121 @@ fn owner_hurt_projection_preserves_reset_append_and_raw_ordinals() {
         .is_empty()
     );
 }
+
+#[test]
+fn original_routes_keep_prewarmed_history_across_human_observations() {
+    let f = fixture();
+    for case in f["cacheCases"].as_array().unwrap() {
+        let mut m = instance(case);
+        let unit = m.world.game.units[&2].clone();
+        let peer = m.world.game.units[&3].clone();
+        let goal = point(&case["goal"]);
+        let peer_goal = point(&case["peerGoal"]);
+        let route = |m: &mut Match, owner, actor: &crate::game::Unit, at| {
+            let result = m.command_route(owner, actor, at).unwrap();
+            json!(
+                result
+                    .waypoints
+                    .iter()
+                    .map(|p| [
+                        format!("{:016x}", p.x.to_bits()),
+                        format!("{:016x}", p.z.to_bits())
+                    ])
+                    .collect::<Vec<_>>()
+            )
+        };
+        for read in case["peerReads"].as_array().unwrap() {
+            if !read["change"].is_null() {
+                m.world
+                    .set_cell(
+                        read["change"]["cell"].as_u64().unwrap() as usize,
+                        read["change"]["ch"].as_str().unwrap().as_bytes()[0],
+                    )
+                    .unwrap();
+            }
+            assert_eq!(
+                route(&mut m, 1, &peer, peer_goal),
+                read["path"],
+                "warm peer {}",
+                case["mode"]
+            );
+        }
+        let mut initial_version = None;
+        for read in case["reads"].as_array().unwrap() {
+            if !read["change"].is_null() {
+                m.world
+                    .set_cell(
+                        read["change"]["cell"].as_u64().unwrap() as usize,
+                        read["change"]["ch"].as_str().unwrap().as_bytes()[0],
+                    )
+                    .unwrap();
+            }
+            assert_eq!(
+                route(&mut m, 0, &unit, goal),
+                read["path"],
+                "warm {}",
+                case["mode"]
+            );
+            initial_version.get_or_insert(
+                m.recipient_routing(0)
+                    .unwrap()
+                    .query()
+                    .navigation()
+                    .versions
+                    .knowledge,
+            );
+        }
+        assert!(
+            m.recipient_routing(0)
+                .unwrap()
+                .query()
+                .navigation()
+                .versions
+                .knowledge
+                > initial_version.unwrap(),
+            "accepted edits must exercise incremental knowledge history"
+        );
+        let mut memory = HumanObservationMemory::new(0);
+        for expected in case["after"].as_array().unwrap() {
+            m.human_commander_observation(&mut memory).unwrap();
+            assert_eq!(
+                route(&mut m, 0, &unit, goal),
+                expected["path"],
+                "after observation {}",
+                case["mode"]
+            );
+            assert_eq!(
+                route(&mut m, 1, &peer, peer_goal),
+                expected["peerPath"],
+                "peer after observation {}",
+                case["mode"]
+            );
+        }
+        let prior = {
+            let query = m.recipient_routing(0).unwrap().query();
+            let buffers = query.navigation();
+            (buffers.flags.as_ptr(), buffers.heights.unwrap().as_ptr())
+        };
+        let memory_before = memory.clone();
+        m.world.game.units.get_mut(&2).unwrap().amove = Some(Point {
+            x: f64::NAN,
+            z: 10.,
+        });
+        assert!(m.human_commander_observation(&mut memory).is_err());
+        let after = {
+            let query = m.recipient_routing(0).unwrap().query();
+            let buffers = query.navigation();
+            (buffers.flags.as_ptr(), buffers.heights.unwrap().as_ptr())
+        };
+        assert_eq!(after, prior);
+        assert_eq!(memory, memory_before);
+        m.world.game.units.get_mut(&2).unwrap().amove = None;
+        let expected = case["after"].as_array().unwrap().last().unwrap();
+        assert_eq!(route(&mut m, 0, &unit, goal), expected["path"]);
+        assert_eq!(route(&mut m, 1, &peer, peer_goal), expected["peerPath"]);
+    }
+}
+
 fn canonical_projection(m: &Match) -> Value {
     let remembered: Vec<_> = m
         .recipient_routing(0)

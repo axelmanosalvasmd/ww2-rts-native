@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Normally consumed the independently reviewed human observer cache-identity correction in the bounded policy assembly. Original packet APIs and private state leaves remain intact; this complete source union still needs independent reanchor and its first native cycle.
+
 - Added a bounded native strategic callback on the ordinary human attention schedule. It rebuilds policy from detached camera-filtered facts, preserves minimal Move/Cover/Buy/Tech shapes, and stages private human and policy state together. Three real Source openings provide complete packets at seven actual deliveries and three raw planning calls outside scripted think beats. The new policy replay and RNG/refusal assertions are written but unrun; observation cache repair, canonical admission and full human AI remain pending.
 
 - Normally combined the resumed human state proof with the detached observation and checked bounded commander prerequisites in a separate policy assembly. Both parent histories and their distinct evidence remain intact; the observer cache-identity review finding and new native composition checks remain pending.
@@ -11,6 +13,7 @@
 - Checkpointed paused human commander development, preserving source-only timing/input/state components, original denial and cap/locality/resumption receipts, and unfinished shared proof tests. The cfg seam tests are not registered or compiled; the pre-pause allocator reset patch lacks its identity witness and review. All human native checks, complete policy/producer/runner integration and unavailable ground Attack/Retreat actuators remain pending. No tests or development continued after the pause.
 
 - Added the detached ordinary human commander state provider: camera attention, real owner alerts with shared identity, urgent interruption and resumption, fresh-view planning, input timing/caps/locality, and delayed raw attempts. Three opening traces and two real grenade-alert traces record 441 full Source steps, 12 delivered views and 12 physical inputs. Native component tests replay the actual facts and Source-collected policy output, but have not run. The native policy callback, observation producer, ground Attack/Retreat admission and Match scheduling remain pending; delayed attempts do not claim actuator acceptance.
+- Preserve canonical path-cache history when a human observation publishes prepared routing arrays. Rebind the selected recipient's storage only after packet and receipt validation, keeping other recipients' caches intact. The original-reader check adds two route-history scenes and 24 route queries; four native observer tests are written but remain unrun pending the coherent state and planner proof.
 
 - Pause the human observer at source checkpoint `e529409`. The original-reader check records four scenes, 48 views and three hurt batches; no native test or coherent build has run. The owner cleared the `404a948` producer repairs and navigation cleared its borrowed accessor; the final filtered-packet successor still needs independent review and native acceptance. Single-seat publication is implemented, while all-seat delivery coordination remains separate.
 

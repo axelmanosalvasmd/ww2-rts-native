@@ -120,9 +120,56 @@ const shots = [ { k: 'flight' }, { k: 'hurt', to: 1, t: 5, x: 38, z: 20 },
 const hurtFrames = [ { generation: 41, shots: shots.slice(0, 4) }, { generation: 41, shots },
   { generation: 42, shots: [shots[5]] } ].map(f => ({ ...f, expected: f.shots.flatMap((e, ordinal) =>
     admittedHurt(e, 0) ? [{ ordinal, id: e.t, at: { x: e.x, z: e.z } }] : []) }));
-const content = JSON.stringify({ reference: pin, cases, hurtFrames });
+// An observation must retain the routing history that accepted prior map edits.
+// Use the original owner's findPath before and after the unchanged AI reader.
+const bits = n => { const b = Buffer.alloc(8); b.writeDoubleBE(n); return b.toString('hex'); };
+const cacheCases = [];
+for (const mode of [undefined, 'conquest']) {
+  const cacheMap = { name: 'Human observation route history', w: 64, h: 64,
+    rows: Array(64).fill('.'.repeat(64)), spawns: [{ x: 4, y: 4 }, { x: 59, y: 59 }, { x: 8, y: 4 }],
+    points: [{ x: 32, y: 32 }] };
+  const cacheUnits = [{ id: 1, owner: 0, type: 'motorpool', x: 51, z: 51 },
+    { id: 2, owner: 0, type: 'tank', x: 9, z: 9 },
+    { id: 3, owner: 1, type: 'rifle', x: 109, z: 109 }];
+  const oldRandom = Math.random;
+  Math.random = () => 0.25;
+  let g;
+  try { g = sim.createGame(cacheMap, ['A', 'B', 'Ally'], false, [0, 1, 0], [0, 1, 2],
+    { ...(mode === undefined ? {} : { mode }), weather: false, tech: false, logistics: false, supply: false }); }
+  finally { Math.random = oldRandom; }
+  g.seed = 841; g.units.clear(); g.nextId = 1;
+  for (const spec of cacheUnits) {
+    sim.internals.spawnUnit(g, spec.owner, spec.type, g.units.size);
+    Object.assign(g.units.get(spec.id), spec);
+  }
+  rebuildGrid(g);
+  const goal = { x: 109, z: 59 }, reads = [], peerGoal = { x: 15, z: 109 }, peerReads = [];
+  for (const change of [null, { cell: 50 * 64 + 50, ch: 'B' },
+    { cell: 50 * 64 + 51, ch: 'B' }, { cell: 50 * 64 + 50, ch: 'T' }]) {
+    if (change) sim.internals.setCell(g, change.cell, change.ch);
+    const route = sim.findPath(g, g.units.get(3), peerGoal);
+    peerReads.push({ change, path: route.map(p => [bits(p.x), bits(p.z)]) });
+  }
+  for (const change of [null, { cell: 31 * 64 + 31, ch: 'B' },
+    { cell: 31 * 64 + 32, ch: 'B' }, { cell: 31 * 64 + 31, ch: 'T' }]) {
+    if (change) sim.internals.setCell(g, change.cell, change.ch);
+    const route = sim.findPath(g, g.units.get(2), goal);
+    reads.push({ change, path: route.map(p => [bits(p.x), bits(p.z)]) });
+  }
+  const after = [];
+  for (let i = 0; i < 2; i++) {
+    ai.observe(g, 0);
+    const route = sim.findPath(g, g.units.get(2), goal);
+    const peerRoute = sim.findPath(g, g.units.get(3), peerGoal);
+    after.push({ path: route.map(p => [bits(p.x), bits(p.z)]),
+      peerPath: peerRoute.map(p => [bits(p.x), bits(p.z)]) });
+  }
+  cacheCases.push({ mode: mode ?? 'default', tech: false, map: cacheMap, baseUnits: cacheUnits,
+    goal, reads, peerGoal, peerReads, after });
+}
+const content = JSON.stringify({ reference: pin, cases, hurtFrames, cacheCases });
 const output = `${root}/rust/crates/core/tests/fixtures/human-observation.json`;
 if (process.argv.includes('--check')) { if (readFileSync(output, 'utf8') !== content) throw Error('Human observation fixture differs'); }
 else writeFileSync(output, content);
 if (git(['status', '--porcelain', '--untracked-files=no'])) throw Error('Reference changed');
-console.log(`Human observations: ${cases.length} scenes, ${cases.reduce((n, c) => n + c.frames.length, 0)} frames, ${hurtFrames.length} hurt batches`);
+console.log(`Human observations: ${cases.length} scenes, ${cases.reduce((n, c) => n + c.frames.length, 0)} frames, ${hurtFrames.length} hurt batches, ${cacheCases.length} route-history scenes`);
