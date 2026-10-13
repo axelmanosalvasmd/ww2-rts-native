@@ -642,3 +642,22 @@ fn represented_recovery_phases_match_original_source() {
     assert_eq!(cases, 23);
     assert_eq!(count, 133);
 }
+
+#[test]
+fn medic_path_identity_capacity_rejects_before_health_or_wound_writes() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("fixtures/match-recovery.json")).unwrap();
+    let case = fixture["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == "medic-idle-pathseek-and-exclusions")
+        .unwrap();
+    let (mut m, order) = make(case);
+    m.world.game.units.get_mut(&1).unwrap().path_gen = u64::MAX;
+    let before = snapshot(&m, &order, None, &[]);
+    let error = m.heal_wounded(&order, 0.5).unwrap_err();
+    assert!(error.contains("medic path identity"), "{error}");
+    assert_eq!(snapshot(&m, &order, None, &[]), before);
+    assert_eq!(m.world.game.units[&1].path_gen, u64::MAX);
+}

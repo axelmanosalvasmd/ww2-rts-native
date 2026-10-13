@@ -8,7 +8,7 @@ use ww2_core::{
     catalog::Catalog,
     economy::{Faction, Mode},
     economy_state::ArmySize,
-    game::{Player, Point, TRENCH, Traffic},
+    game::{Player, Point, Smoke, TRENCH, Traffic},
     grid::SpatialGrid,
     logistics::{self, LogisticsState},
     map::AuthoritativeMap,
@@ -104,6 +104,7 @@ fn apply_inputs(m: &mut Match, id: u32, v: &Value) {
             "x" => u.x = value.as_f64().unwrap(),
             "z" => u.z = value.as_f64().unwrap(),
             "rot" => u.rot = value.as_f64().unwrap(),
+            "still" => u.still = Some(value.as_f64().unwrap()),
             "hp" => u.hp = value.as_f64().unwrap(),
             "supp" => u.supp = value.as_f64().unwrap(),
             "sprint" => u.sprint = value.as_f64().unwrap(),
@@ -346,7 +347,7 @@ fn snapshot(m: &Match, order: &[u32], shots: &[Value]) -> Value {
         let mut nade=c.nade.map(at).unwrap_or(Value::Null);if !nade.is_null(){if a.aimed_auto{nade["auto"]=json!(true);}if a.aimed_walked{nade["walked"]=json!(true);}}
         json!({"id":id,"hp":u.hp,"x":u.x,"z":u.z,"cd":a.cooldown,"buff":a.buff,"ap":a.ap,"sprint":u.sprint,"supp":u.supp,"nade":nade,"path":u.path.iter().copied().map(at).collect::<Vec<_>>(),"retreating":u.retreating,"logistics":m.logistics.get(*id).map(|r|json!({"ammo":r.ammo,"forced":r.forced,"stranded":r.stranded})),"control":{"follow":c.follow,"auto":c.auto_cast,"autoRetreat":c.auto_retreat,"holdFire":c.hold_fire,"holdPos":u.hold_pos,"attackId":c.attack_id,"targetId":f.target_id,"orders":orders(&c.orders),"face":c.face.is_some(),"entrench":u.entrench,"dig":u.dig,"build":u.build,"enter":c.enter.map_or(-1,|v|v as i64),"board":u.board,"amove":u.amove.map(at),"fireAt":c.fire_at.map_or(-1,|v|v as i64),"stuck":u.stuck,"drift":u.drift,"reverse":u.reverse.map(at),"repath":u.repath,"cooldown":f.cooldown,"retarget":f.retarget,"traffic":u.traffic.is_some(),"trafficWait":u.traffic_wait,"moveOutcome":outcome,"moveOutcomeTick":c.outcome_tick,"moveResult":if c.outcome==Some(MoveOutcome::Unreachable){json!(["unreachable",c.outcome_tick])}else{Value::Null},"worldGoal":u.world_goal.map(at),"garrison":u.garrison.map_or(-1,|v|v as i64),"shotAt":u.shot_at}})
     }).collect::<Vec<_>>();
-    let flights=m.firing.flights.values().map(|p|json!({"id":p.id,"owner":p.owner,"shooter":p.shooter,"kind":m.rules.kinds[p.source_kind].name,"x":p.solution.origin.x,"y":p.solution.origin.y,"z":p.solution.origin.z,"vx":p.solution.velocity.x,"vy":p.solution.velocity.y,"vz":p.solution.velocity.z,"gravity":p.solution.gravity,"launched":p.launched,"last":p.last,"expires":p.expires,"energy":p.energy,"sequence":p.sequence,"maxContacts":p.max_contacts,"near":p.near,"launchOrigin":{"x":p.launch_origin.x,"y":p.launch_origin.y,"z":p.launch_origin.z},"startCell":p.start_cell,"explosive":p.explosive,"blastRadius":p.blast_radius,"blastSource":p.blast_source.as_ref().map(blast),"effect":p.effect,"sent":p.sent})).collect::<Vec<_>>();
+    let flights=m.firing.flights.values().map(|p|json!({"id":p.id,"owner":p.owner,"shooter":p.shooter,"kind":m.rules.kinds[p.source_kind].name,"x":p.solution.origin.x,"y":p.solution.origin.y,"z":p.solution.origin.z,"vx":p.solution.velocity.x,"vy":p.solution.velocity.y,"vz":p.solution.velocity.z,"gravity":p.solution.gravity,"launched":p.launched,"last":p.last,"expires":p.expires,"energy":p.energy,"sequence":p.sequence,"maxContacts":p.max_contacts,"near":p.near,"launchOrigin":{"x":p.launch_origin.x,"y":p.launch_origin.y,"z":p.launch_origin.z},"startCell":p.start_cell,"explosive":p.explosive,"blastRadius":p.blast_radius,"blastSource":p.blast_source.as_ref().map(blast),"effect":p.effect,"sent":p.sent,"intended":p.intended,"damageScale":p.damage_scale,"ap":p.armor_piercing,"apMultiplier":p.ap_multiplier,"apNaval":p.ap_naval,"suppression":p.suppression,"suppressionScale":p.suppression_scale,"terrain":p.terrain,"scar":p.scar})).collect::<Vec<_>>();
     json!({"tick":g.tick,"units":units,"wallets":m.start.economy.players.iter().map(|p|json!({"mp":p.mp,"mun":p.mun,"fuel":p.fuel})).collect::<Vec<_>>(),"smokes":g.smokes.iter().map(|s|json!({"id":s.id,"x":s.x,"z":s.z,"r":s.r,"t":s.remaining})).collect::<Vec<_>>(),"shots":shots,"flights":flights,"salvos":m.firing.salvos.iter().map(|s|json!({"x":s.at.x,"z":s.at.z,"owner":s.owner,"left":s.left,"next":s.next,"spread":s.spread,"every":s.every})).collect::<Vec<_>>(),"nades":m.firing.grenades.iter().map(|s|json!({"x":s.at.x,"z":s.at.z,"t":s.remaining,"owner":s.owner,"flight":s.flight})).collect::<Vec<_>>(),"nextId":m.next_unit_id,"nextFlight":m.firing.next_flight,"combatSeed":701,"combatRandomState":state,"randomCalls":draws})
 }
 fn normalize(mut v: Value) -> Value {
@@ -361,6 +362,23 @@ fn normalize(mut v: Value) -> Value {
         }
     }
     for p in v["flights"].as_array_mut().unwrap() {
+        for (key, default) in [
+            ("intended", Value::Null),
+            ("damageScale", json!(1.)),
+            ("ap", json!(false)),
+            ("apMultiplier", json!(1.5)),
+            ("apNaval", json!(false)),
+            ("suppression", json!(0.)),
+            ("suppressionScale", json!(1.)),
+            ("terrain", json!(0.)),
+            ("scar", json!(0.)),
+            ("blastRadius", Value::Null),
+            ("effect", Value::Null),
+        ] {
+            if p.get(key).is_none() {
+                p[key] = default;
+            }
+        }
         let sent = p["sent"].as_bool().unwrap_or(false);
         p["sent"] = json!(sent);
         let b = &p["blastSource"];
@@ -493,6 +511,11 @@ fn conquest_abilities_match_original_source_phases() {
                         .unwrap()
                         .map_or(Value::Null, |d| json!(d.name()));
                 }
+                "weapon" => {
+                    m.begin_firing_tick(&order).unwrap();
+                    m.apply_unit_firing(a["id"].as_u64().unwrap() as u32, false, 0.05)
+                        .unwrap();
+                }
                 "target" => {
                     result = match m.autocast_target(a["id"].as_u64().unwrap() as u32).unwrap() {
                         None => Value::Null,
@@ -586,7 +609,30 @@ fn conquest_abilities_match_original_source_phases() {
             );
         }
     }
-    assert_eq!(cases, 28);
+    assert_eq!(cases, 33);
     assert_eq!(unsupported, 2);
-    assert_eq!(actions, 132);
+    assert_eq!(actions, 147);
+}
+
+#[test]
+fn smoke_identity_collision_rejects_before_selected_unit_writes() {
+    let fixture: Value = serde_json::from_str(include_str!("fixtures/match-ability.json")).unwrap();
+    let (mut m, order) = make(&fixture["cases"][0]);
+    m.world.game.smokes.push(Smoke {
+        id: m.next_unit_id,
+        x: 15.,
+        z: 15.,
+        r: 9.,
+        remaining: Some(14.),
+    });
+    let before = snapshot(&m, &order, &[]);
+    let command = Command::Ability {
+        ids: vec![1, 3],
+        at: None,
+        queue: false,
+        automatic: false,
+    };
+    let error = m.execute_command(0, &command, false).unwrap_err();
+    assert!(error.contains("smoke identity"), "{error}");
+    assert_eq!(snapshot(&m, &order, &[]), before);
 }
