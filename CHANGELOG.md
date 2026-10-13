@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed the browser oracle report to retain its latest held-set mismatch across ignored messages, until a snapshot updates it or a start resets it. All 1,236 committed browser reports remain unchanged.
+
 - Added deterministic in-process protocol recording and a direct browser client-view oracle. Four complete recipient streams cover Conquest (1,000 ticks, including 7 and 10 natural unit removals) and World Conquest (200 ticks, including terrain discovery), with one expected browser report per message. Captures and reports are gzip-compressed; reconnects, save/load and transport-level behavior remain outside these fixtures.
 
 - Issue #2 measured on the Vostro (i5-12400, Ubuntu 24.04, x64 Node 24.21.0, rustc 1.99.0; median of three 200-tick runs; load average 3.2 to 4.0, so not idle). Ported work per tick (movement, separation and a quarter of vision and fog) at 400, 1,000 and 2,000 units: Node 5.4, 14.6 and 35.7 ms; Rust on one thread 1.8, 6.7 and 18.9 ms; Rust with threads 1.6, 6.0 and 17.2 ms. At 2,000 units fog is 7.9 times faster threaded and vision 6.6 times, movement 2.1 times and separation 1.4 times on one thread. Full table and reading in `DESIGN.md` ("Sim test (#2)"); the confidence row for a native server is updated with it, and the README status no longer says no code exists.
