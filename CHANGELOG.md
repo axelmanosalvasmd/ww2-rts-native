@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Matched JavaScript JSON number spelling for endpoint wetness values in the shared birth replay projection and removed an unused test import. The first replay otherwise matched the cold-birth view exactly.
+
 - Corrected staged-observer cell validation and source fingerprints to use the canonical unit footprint index type. The first native compile exposed two integer-type mismatches.
 
 - Added a fourth original World birth case with a different team’s warmed vehicle history, four accepted prebirth changes and a postbirth reroute. The recorder now covers 14 births, 12 prebirth searches and one cross-team reroute; native success/abort cache-lifetime checks remain pending.
