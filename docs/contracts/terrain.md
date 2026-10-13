@@ -59,7 +59,7 @@ v0 keeps the map file format at the pin (MAP-04 to MAP-19): the row format, the 
 
 ## Fixtures
 
-The [maintained fixture lane](../fixtures/terrain/README.md) now contains original-source captures for all 33 maps (661,799 cell centres and 33,000 query points) and a recorded World scouting history (17 receipts, 273,678 complete cell rows). Native producers and comparison tests are written, but compilation, equality checks and native artifact export remain pending at this source checkpoint. The fixtures distinguish raw integer `levelAt`, its derived height in metres and interpolated `heightAt`; they do not establish rendered-mesh parity or whole World tick support.
+The [maintained fixture lane](../fixtures/terrain/README.md) now contains original-source captures for all 33 maps (661,799 cell centres and 33,000 query points) and a recorded World scouting history (17 receipts, 273,678 complete cell rows). Native equality and release export passed on macOS arm64 at `a81b4f2`, with an independent copied-binary and artifact audit. [The verification manifest](../fixtures/terrain/native-verification.json) records producing identity, counts, output hashes and refusal checks. Artifact publication and Unreal consumption remain separate. The fixtures distinguish raw integer `levelAt`, its derived height in metres and interpolated `heightAt`; they do not establish rendered-mesh parity or whole World tick support.
 
 ## Answered on #5 (2026-10-12)
 

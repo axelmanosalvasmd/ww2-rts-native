@@ -33,7 +33,7 @@ node harness/terrain-height-fixture.mjs --check
 node harness/terrain-world-scout-fixture.mjs --check
 ```
 
-The maintained `ww2-simtest` producers call existing core queries and collectors. The authored test compares every centre and point by IEEE number bits; the scouting test compares complete ordered rows, memory versions and omitted keys. Native compilation and execution are pending for this source checkpoint.
+The maintained `ww2-simtest` producers call existing core queries and collectors. The authored test compares every centre and point by IEEE number bits; the scouting test compares complete ordered rows, memory versions and omitted keys. Native compilation and both comparisons passed at the producing commit recorded below.
 
 After an assigned build lease validates the producing head, build `terrain-contract-export` in release mode and run that exact executable:
 
@@ -42,3 +42,9 @@ terrain-contract-export --out NEW_DIRECTORY --producing-commit EXACT_COMPILED_SH
 ```
 
 The exporter embeds its build checkout identity and clean status, then verifies both against the supplied clean producing checkout. An older copied executable cannot label output with a newer commit. It refuses an existing output directory, computes every result before writing, and emits 33 native height JSON files, full World scouting receipts and a manifest. It reads raw map, point and scene inputs; it never copies expected query heights or delivered rows into its native results. Files identify the actual producing commit and reference pin. Source reproduction, native equality, export read-back and host or Unreal adoption are separate evidence gates.
+
+## Native verification
+
+The native Mac arm64 cycle passed at producing commit `a81b4f2b03bfbbe0a19094bfd6e3efa00bf80f1b`: two focused tests in both debug and optimized profiles, all 367 optimized workspace tests, strict all-target Clippy, formatting and release FFI. Independent copied executables passed all four focused runs without another build.
+
+The release exporter generated 35 JSON files from that exact clean commit. Read-back matched every centre, sample and full scouting row against Source by IEEE number bits, array order and object keys. An incorrect producing commit and an existing output directory both returned failure before changing evidence. The native archive is `terrain-native-a81b4f2.tar.gz`, 4,308,253 bytes, with SHA256 `c1c54b5cdc4f39f49e781778abb712b4d45e810ed749a55f59322cb27ec0f6ca`. [The verification manifest](native-verification.json) records the producing identity, file hashes and gate results. Artifact publication and Unreal consumption remain separate.

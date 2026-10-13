@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified the terrain fixtures on macOS arm64 at `a81b4f2`: two focused debug tests, two optimized tests and all 367 optimized workspace tests pass, along with strict Clippy, formatting and release FFI. Independent copied binaries pass all four focused runs. The release exporter produced 33 map files and 17 complete World scouting receipts; every numeric bit, row order and omitted key matches Source. Wrong-commit and existing-output refusals preserve evidence. Record all output hashes and the 4.3 MB native archive identity; publication and Unreal adoption remain separate.
+
 - Add maintained original gameplay terrain fixtures requested for the Unreal ground port: all 33 authored maps, 661,799 cell centres and 33,000 deterministic query points. Record a real World scouting history with 398 actors, 32 actions, 17 receipts and 273,678 complete cell rows. Native query/collector consumers and an export tool are written but uncompiled. Bind export provenance to the actual build identity and clean status, refusing an older executable or foreign Source inputs. Keep integer levels, derived metres and interpolated metres distinct; no rendered mesh, whole World tick, ABI or wire change is claimed.
 
 - Record both owners' acceptance of the startup-table v1 content/schema candidate and its strict revision/refusal policy. Delivery remains unagreed, and the six ABI 2 calls, runtime producer and Unreal adoption are unchanged. No content, schema or inventory bytes changed.
