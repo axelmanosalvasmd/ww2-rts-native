@@ -18,6 +18,7 @@ pub mod separation;
 pub mod sort;
 pub mod terrain;
 pub mod traffic;
+pub mod unit_spawn;
 pub mod vehicle;
 mod vehicle_navigation;
 pub mod vision;

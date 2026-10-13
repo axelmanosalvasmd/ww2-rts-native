@@ -196,6 +196,16 @@ The extended original-JavaScript fixture has 1,529 searches: 1,108 found routes,
 Aircraft, trains and structures still return `UnsupportedProfile`. Automatic recipient-view selection, retry policy, request scheduling and movement integration remain separate work. MOV-27 and MOV-28 are in progress, since search fixtures alone do not verify vehicle driving or an end-to-end match. No ABI or wire interface changed, and no performance claim is made.
 
 
+## Spawn placement and current unit initialization (2026-10-12)
+
+`unit_spawn.rs` separates deterministic placement from constructing the fields that `Game::Unit` currently carries. `SpawnPlacer` takes a supplied terrain view and a scatter index. It uses the core's sine and cosine at `index * 2.4`, four metres from the player's spawn. Ground units stay in the origin's movement component; naval units bypass that restriction. The nearest-free search keeps the reference's east, west, south, north tie order and returns the clamped starting cell if no cell qualifies, even if it is blocked.
+
+Only component membership matters to origin-restricted placement. The implementation rebuilds that component from the supplied flags and heights, including symmetric diagonal corner connectivity, rather than copying the reference's global numeric region-label cache. Placement has no random draws and no hidden map reads. No performance claim is made for repeated component rebuilding.
+
+`initial_unit` resolves the supplied kind index through `Rules` and obtains `models * hpPer` from the catalog. It initializes every currently represented field, preserving zero-valued optional velocity/direction fields, absent caches, and NaN pace for the reference's undefined value. A fresh empty route starts with native `path_gen = 0`. The caller still owns ID allocation, owner validation and insertion into the unit table and spatial index.
+
+The original module's `internals.spawnUnit` and the original nearest-free/region function bodies provide the oracle: 769 spawn projections and 513 nearest-free queries, covering all 44 non-air definitions and all 33 maps. Every represented field is compared through the existing independent Unit loader. Air-base placement is explicitly unsupported. Logistics, unrepresented combat and ability fields, mode-specific starting forces and the complete spawn pipeline remain outside this slice; MOV-68 remains in progress.
+
 ## The core's math (2026-10-12)
 
 The core carries its own math (`rust/crates/core/src/math.rs`) instead of Rust's `f64` methods, which call each platform's C library. It ports V8's fdlibm (`src/base/ieee754.cc` as Node 24.21.0 compiles it) and V8's `Math.hypot`, plus JavaScript's `round`, `max`, `min` and `sign`, so every platform computes the same bits and they equal the JavaScript game's.
