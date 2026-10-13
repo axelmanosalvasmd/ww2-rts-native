@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed support oracle sampling that missed arrival events after repeated floating-point delay subtraction. The original-source recorder now captures every effect, strike activation/removal and cover expiry, with 60 traces and 1,400 checkpoints. Ground runtime code is unchanged from 8604e01; native verification is pending.
+
 - Added original-source support direction-fallback cases. The ground-support recorder now covers 60 traces and 900 checkpoints. Native verification remains queued.
 
 - Connected support to the single recorded command queue, with whole-command validation and source cooldown/manpower denials. Ground strike progression now accepts captured late actor subsets. The original-source oracle covers 54 traces and 810 checkpoints, including direct-hit exclusion, bridge failure and rubble spilling beside a fresh vehicle. A mixed Move/Support queue regression checks arrival-independent ordering, one payment and preserved movement. Native checks remain queued; aircraft support and complete tick integration remain unfinished.
