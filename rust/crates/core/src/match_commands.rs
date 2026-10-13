@@ -1349,6 +1349,13 @@ impl crate::match_runtime::Match {
         {
             return Err("unit path identity exhausted".into());
         }
+        // current_goal cannot report errors through the scheduler's Option API.
+        // Validate Board callbacks before observation or FIFO service can write.
+        for request in self.commands.requests.queued_requests() {
+            if request.kind == crate::path_requests::RequestKind::Board {
+                self.current_board_goal(request.unit)?;
+            }
+        }
         for owner in 0..self.start.players.len() {
             self.refresh_recipient_routing(owner)?;
         }
@@ -1583,6 +1590,9 @@ impl crate::match_runtime::Match {
             .is_some_and(|u| u.path_gen == u64::MAX)
         {
             return Err("unit path identity exhausted".into());
+        }
+        if kind == crate::path_requests::RequestKind::Board {
+            self.current_board_goal(id)?;
         }
         let shootable = self.command_shootable()?;
         let mut requests = std::mem::take(&mut self.commands.requests);

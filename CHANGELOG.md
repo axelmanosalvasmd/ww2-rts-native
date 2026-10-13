@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed deferred Board error handling found by independent review: queued callback facts now validate before recipient observation or scheduler mutation. A late malformed or unsupported carrier leaves both queued requests, represented memory/Fog, unit paths and retry/budget state intact on refusal. Native verification is pending.
+
 - Connected Board and Unload to the existing recorded command parser and dispatcher, and attached live carrier goals to the shared path scheduler. The pinned-source fixture now has 19 traces and 97 actions, including immediate searches, moved deferred goals, retry drops and paid-work refusal. Native replay and full tick attachment remain pending.
 
 - Joined the source-reviewed carrier component to corrected engineering input ancestry in a separate recorded-carrier tree. Existing command variants and canonical metadata remain intact; parser, scheduler and native proof follow on this isolated branch.

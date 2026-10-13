@@ -404,3 +404,79 @@ fn board_parser_preserves_explicit_unknown_target_and_whole_order_validation() {
         Err(Denial::Blocked)
     );
 }
+
+#[test]
+fn late_invalid_board_goal_rejects_before_observation_or_fifo_service() {
+    let fixture = fixture();
+    let mut case = fixture["traces"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == "immediate-board-route-search")
+        .unwrap()
+        .clone();
+    case["units"].as_array_mut().unwrap().extend([
+        json!({"id":3,"type":"rifle","x":30,"z":20}),
+        json!({"id":4,"type":"halftrack","x":50,"z":20}),
+    ]);
+    let guard = |m: &Match| {
+        let recipients: Vec<_> = m
+            .recipients
+            .iter()
+            .map(|r| {
+                let live = r.live();
+                format!(
+                    "{:?}{:?}{:?}{:?}{:?}{:?}",
+                    r.remembered(),
+                    r.query().navigation(),
+                    (0..m.world.game.flags.len())
+                        .map(|cell| r.knowledge().cell(cell).unwrap())
+                        .collect::<Vec<_>>(),
+                    (live.fires, live.bunkers, live.wetness, live.roads),
+                    r.wrecks(),
+                    r.remembered_wrecks(),
+                )
+            })
+            .collect();
+        format!(
+            "{}{:?}{:?}{:?}{recipients:?}",
+            atomic(m),
+            m.commands.requests,
+            m.commands.path_tick,
+            m.routing_fog,
+        )
+    };
+    for defect in ["duplicate cargo", "zero cargo", "unsupported carrier"] {
+        let mut m = make(&case);
+        for (actor, carrier) in [(1, 2), (3, 4)] {
+            let command =
+                Command::from_json(&json!({"t":"board","ids":[actor],"target":carrier})).unwrap();
+            assert_eq!(m.execute_command(0, &command, false).unwrap(), None);
+            let u = m.world.game.units.get_mut(&actor).unwrap();
+            u.path.clear();
+            u.repath = 0.0;
+        }
+        m.begin_path_tick(0, 20).unwrap();
+        for actor in [1, 3] {
+            assert!(matches!(
+                m.apply_unit_boarding_with_routes(actor).unwrap(),
+                BoardingOutcome::NeedsPath { .. }
+            ));
+        }
+        assert_eq!(m.commands.requests.queue_len(), 2);
+        assert_eq!(m.commands.requests.pending_len(), 2);
+        // A later queued actor must reject before the earlier valid search runs.
+        // This terrain change would also make an eager observation visible.
+        m.world.set_cell(10 * 40 + 9, b'B').unwrap();
+        match defect {
+            "duplicate cargo" => m.combat.get_mut(4).unwrap().cargo = vec![999, 999],
+            "zero cargo" => m.combat.get_mut(4).unwrap().cargo = vec![0],
+            "unsupported carrier" => m.world.game.units.get_mut(&4).unwrap().rail = true,
+            _ => unreachable!(),
+        }
+        m.world.game.tick += 1;
+        let before = guard(&m);
+        assert!(m.begin_path_tick(2, 1).is_err(), "{defect}");
+        assert_eq!(guard(&m), before, "{defect}");
+    }
+}
