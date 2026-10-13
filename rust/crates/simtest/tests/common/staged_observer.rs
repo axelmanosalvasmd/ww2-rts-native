@@ -147,6 +147,19 @@ pub(crate) fn setup(m: &mut Match, c: &Value) {
         .unwrap();
         m.world.game.units.insert(u.id, u);
     }
+    if !s["peer"].is_null() {
+        let peer = &s["peer"];
+        let u = unit_spawn::initial_unit(
+            &m.rules,
+            Catalog::compiled().unwrap(),
+            m.rules.kind(peer["kind"].as_str().unwrap()).unwrap(),
+            idx(&peer["id"]) as u32,
+            idx(&peer["owner"]),
+            point(&peer["at"]),
+        )
+        .unwrap();
+        m.world.game.units.insert(u.id, u);
+    }
     m.next_unit_id = idx(&c["id"]) as u32;
     m.grid.rebuild(&m.world.game.units);
     for change in s["changes"].as_array().unwrap() {

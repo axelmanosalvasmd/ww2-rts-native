@@ -847,3 +847,6 @@ The staged sight recorder calls the original ordinary buy command, which invokes
 
 
 Receipt preparation rechecks its captured World/Game observation facts and the affected pending set or journal cursor. Fire membership and mine ownership/discovery are included because their owners can change them without a terrain-version advance. Caller-owned context inputs such as ordinary building footprints and World rails, region/ghost tables, plus the draft's observation fields, must remain stable through commit. The receipt does not retain those external borrows or claim to validate subsequent changes to them. Path and publication metadata may be prepared separately without changing the admitted draft's sight facts.
+
+
+World preparation copies the entire memory component. On success, the flags and heights for all existing teams move to the prepared allocations, so its search fork maps every copied team pair, including teams not read by that transaction. This preserves a warmed other-team vehicle cache after another team's birth commit. The expanded recorder covers fourteen births, twelve prebirth searches across accepted changes and one original postbirth cross-team reroute. Native tests exercise the other team's unchanged allocation on abort and its mapped history on success; execution is still pending.
