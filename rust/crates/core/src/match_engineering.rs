@@ -69,6 +69,7 @@ impl Match {
         {
             return Err("field work requires canonical unit metadata".into());
         }
+        crate::match_construction::validate_build_activity(unit, &self.commands.units[&id])?;
         Ok(())
     }
 
@@ -112,9 +113,7 @@ impl Match {
         if !eligible {
             return Ok(Some(Denial::NoBuilders));
         }
-        if unit.build {
-            return Ok(Some(Denial::Unsupported));
-        }
+        crate::match_construction::validate_build_activity(unit, control)?;
         if unit.path_gen == u64::MAX {
             return Err("dig path identity exhausted".into());
         }
@@ -212,6 +211,7 @@ impl Match {
                     unit.entrench = false;
                     unit.dig = true;
                     unit.build = false;
+                    control.build_target = None;
                     unit.board = 0;
                     unit.amove = None;
                     unit.attack = false;
@@ -298,9 +298,7 @@ impl Match {
         if unit.hp <= 0. || unit.riding || self.commands.units[&id].operative {
             return Ok(());
         }
-        if unit.build {
-            return Err("unrepresented construction project".into());
-        }
+        crate::match_construction::validate_build_activity(unit, &self.commands.units[&id])?;
         let distance = math::hypot(unit.x - job.at.x, unit.z - job.at.z);
         if distance > job.reach.unwrap_or(3.) {
             if unit.repath <= 0. && unit.path.is_empty() {

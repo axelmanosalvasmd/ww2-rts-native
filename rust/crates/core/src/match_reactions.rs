@@ -90,24 +90,28 @@ impl Match {
         if u.air.is_some() || u.riding || u.garrison.is_some() {
             return Err("air, carrier or garrison retreat is unsupported".into());
         }
-        if u.build {
-            return Err("construction retreat is unsupported".into());
-        }
         if u.id != id
             || u.dig != self.field_works.is_active(id)
             || u.entrench != self.field_works.membership(id).is_some()
         {
             return Err("unrepresented or inconsistent retreat field work".into());
         }
-        if !self.commands.units.contains_key(&id) {
-            return Err("missing retreat control".into());
-        }
+        let control = self
+            .commands
+            .units
+            .get(&id)
+            .ok_or("missing retreat control")?;
+        crate::match_construction::validate_build_activity(&u, control)?;
         u.path_gen
             .checked_add(1)
             .ok_or("reaction path identity exhausted")?;
         let home = self.reaction_home(id)?;
         let route = self.command_route(u.owner, &u, home)?;
-        crate::match_runtime::cancel_field_work_state(&mut self.field_works, &mut u)?;
+        crate::match_runtime::cancel_owned_work_state(
+            &mut self.field_works,
+            &mut u,
+            self.commands.units.get_mut(&id).unwrap(),
+        )?;
         // The source retreat reset assigns targetId directly; its existing claim
         // remains until the next tick's claim rebuild.
         self.firing.initialize(id).target_id = 0;

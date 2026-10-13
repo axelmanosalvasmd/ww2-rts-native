@@ -171,7 +171,7 @@ struct Failure {
     count: u32,
 }
 
-#[derive(Default, Debug)]
+#[derive(Debug, Default)]
 pub struct PathRequests {
     queue: VecDeque<Pending>,
     pending: BTreeMap<UnitId, Pending>,
