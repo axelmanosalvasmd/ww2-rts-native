@@ -177,6 +177,14 @@ The original `findPath` produces 1,175 oracle searches across all 33 authored ma
 
 
 
+## Pure projectile flight and contact helpers (2026-10-12)
+
+`rust/crates/core/src/projectiles.rs` provides typed, standalone versions of all pure helpers in the pinned `shared/projectiles.js`: profile selection, flight position and velocity, launch solutions, box/body/naval-hull sweeps, segment distance, crossed-cell traversal and material ricochet response. The module has no game-state, renderer or networking dependency. Projectile and material constants stay beside these helpers for now; they are not part of the compiled catalog or the public rules hash.
+
+The port keeps source arithmetic, x/y/z slab order, corner-cell order, strict earliest-hit comparisons, box-before-cap ties and bounded rotational pieces. Trigonometry and two/three-argument hypot use the core's own math; square roots use the same hardware operation as the math module. The checked API rejects nonfinite inputs, reversed bounds, negative radii/lengths and nonpositive explicit flight durations. Grid dimensions are limited to 2^26 cells per side with an area fitting `usize`; hull angle wrapping allows at most 4,096 full-turn reductions. These limits prevent malformed input from overflowing indexing or keeping a tick in an unbounded loop.
+
+`harness/projectile-fixture.mjs` calls the original helpers with x64 Node 24.21.0, refuses a changed reference pin or tracked source tree, and records exact floating-point bits. Six focused tests pass in debug and release on the Mac, covering 941 oracle cases: all profile/material constants, precedence, zero/negative elapsed time, launch arcs, tangent and corner contacts, translating bodies, rotating naval hulls, grid-cell order and ricochet thresholds. Strict core Clippy and formatting checks pass. This is pure-helper evidence only. Combat firing, flight expiry, game-world contact selection, damage, terrain changes and random scatter are not connected yet; CMB-48, CMB-49, CMB-50 and CMB-160 remain in progress.
+
 ## The core's math (2026-10-12)
 
 The core carries its own math (`rust/crates/core/src/math.rs`) instead of Rust's `f64` methods, which call each platform's C library. It ports V8's fdlibm (`src/base/ieee754.cc` as Node 24.21.0 compiles it) and V8's `Math.hypot`, plus JavaScript's `round`, `max`, `min` and `sign`, so every platform computes the same bits and they equal the JavaScript game's.
