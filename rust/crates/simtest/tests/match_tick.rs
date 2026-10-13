@@ -88,6 +88,11 @@ fn connected_tick_phases_match_actual_reference_steps() {
                 control.auto_cast = false;
             }
         }
+        if input["disableRetreat"] == true {
+            for control in m.commands.units.values_mut() {
+                control.auto_retreat = false;
+            }
+        }
         m.start.environment_seed = input["seed"].as_u64().unwrap() as u32;
         m.start.wind = (
             input["wind"][0].as_f64().unwrap(),
@@ -158,8 +163,18 @@ fn connected_tick_phases_match_actual_reference_steps() {
             }
         }
         let mut expected = c["checkpoints"].as_array().unwrap().iter().peekable();
+        let mut deaths = Vec::new();
         for _ in 0..c["ticks"].as_u64().unwrap_or(200) {
             let report = m.advance_tick().unwrap();
+            for retired in &report.retired {
+                deaths.push(json!([
+                    report.tick,
+                    retired.unit.id,
+                    retired.unit.owner,
+                    m.rules.kinds[retired.unit.kind].name,
+                    retired.last_hit
+                ]));
+            }
             assert!(!report.unavailable.is_empty());
             assert!(
                 report
@@ -185,6 +200,18 @@ fn connected_tick_phases_match_actual_reference_steps() {
                         .unwrap()
                         .1;
                     state["combatState"] = json!(format!("{value:016x}"));
+                }
+                if c["retirement"] == true {
+                    state["deaths"] = json!(deaths);
+                    state["story"] = json!(
+                        m.story
+                            .iter()
+                            .map(|row| ww2_core::match_story::StoryKey::ALL
+                                .into_iter()
+                                .map(|key| bits(row.value(key)))
+                                .collect::<Vec<_>>())
+                            .collect::<Vec<_>>()
+                    );
                 }
                 if input["commands"].is_array() {
                     use ww2_core::match_commands::MoveOutcome;

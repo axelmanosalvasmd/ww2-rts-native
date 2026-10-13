@@ -69,6 +69,7 @@ pub struct TickReport {
     pub commands: Vec<crate::match_commands::CommandResult>,
     pub paths: crate::path_requests::TickReport,
     pub environment: Vec<crate::environment::Effect>,
+    pub retired: Vec<crate::match_combat::RetiredUnit>,
 }
 
 enum EnvironmentPhase {
@@ -278,7 +279,10 @@ impl crate::match_runtime::Match {
         phases.push(TickPhase::FireFlood);
         self.apply_point_supply(&unit_order)?;
         phases.push(TickPhase::PointSupply);
-        // Reinforcement and death adapters run between these two point phases.
+        // Recovery/network/reinforcement attach before this ordered retirement.
+        let death = self.tick_retirement(&unit_order)?;
+        environment.extend(death.shots);
+        phases.push(TickPhase::Death);
         self.apply_point_capture_income(&unit_order)?;
         phases.push(TickPhase::PointCaptureIncome);
         self.apply_conquest_victory()?;
@@ -292,6 +296,7 @@ impl crate::match_runtime::Match {
             commands,
             paths,
             environment,
+            retired: death.retired,
             unavailable: vec![
                 TickPhase::Research,
                 TickPhase::UnitReserves,
@@ -307,10 +312,59 @@ impl crate::match_runtime::Match {
                 TickPhase::Scenario,
                 TickPhase::SupplyNetwork,
                 TickPhase::Reinforcement,
-                TickPhase::Death,
                 TickPhase::Convoys,
             ],
         })
+    }
+
+    fn tick_retirement(
+        &mut self,
+        unit_order: &[UnitId],
+    ) -> Result<crate::match_combat::DeathResult, String> {
+        // Building collapse can kill a later captured unit during cleanup, so
+        // preflight every potential callback before the first removal.
+        let facts = unit_order
+            .iter()
+            .filter_map(|id| self.world.game.units.get(id))
+            .map(|unit| {
+                let kind = self
+                    .rules
+                    .kinds
+                    .get(unit.kind)
+                    .ok_or("invalid death kind")?;
+                let metadata = self.combat.get(unit.id).ok_or("missing death metadata")?;
+                Ok((
+                    crate::match_story::DeathRecord {
+                        owner: Some(unit.owner),
+                        kind: kind.name.as_str(),
+                        at: unit.at(),
+                    },
+                    metadata
+                        .last_hit
+                        .and_then(|owner| usize::try_from(owner).ok()),
+                ))
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        self.validate_story_for_deaths(&facts)?;
+        let result = self
+            .retire_dead(unit_order)
+            .map_err(|e| format!("death cleanup: {e:?}"))?;
+        for record in &result.retired {
+            let kind = self.rules.kinds[record.unit.kind].name.clone();
+            self.record_death(
+                crate::match_story::DeathRecord {
+                    owner: Some(record.unit.owner),
+                    kind: &kind,
+                    at: record.unit.at(),
+                },
+                record
+                    .last_hit
+                    .and_then(|owner| usize::try_from(owner).ok()),
+            )?;
+            self.retain_removed_route_unit(&record.unit)?;
+        }
+        // Active flights retain their removed source's combat XP metadata.
+        Ok(result)
     }
 
     fn tick_environment_phase(
