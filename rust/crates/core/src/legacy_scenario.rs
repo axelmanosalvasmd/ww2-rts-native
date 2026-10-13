@@ -425,7 +425,14 @@ mod tests {
         assert_eq!(result, Err(LegacyStepError::Emit("actuator failed")));
         assert_eq!(emitted.len(), 1);
         assert_eq!(scenario.state.triggers["first@match"].count, 1);
-        assert_eq!(scenario.state.triggers["second@match"].count, 0);
+        assert_eq!(
+            scenario
+                .state
+                .triggers
+                .get("second@match")
+                .map_or(0, |state| state.count),
+            0
+        );
         assert_eq!(scenario.state.next_execution, 2);
     }
 }
