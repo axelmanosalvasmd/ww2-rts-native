@@ -18,6 +18,10 @@
 
 - Connected ordinary ground and naval target acquisition, aim, cooldowns, per-model fire and physical salvo launches to Match. The Rust replay matches 66 original-source traces across 264 phases, including cover, moving fire, visibility, hold-fire, incoming threats and veterancy. Flights keep immutable launch solutions and shared volley identities. Contact stepping and damage hookup remain in progress; air, rail, operative, beam and active ability/terrain fire are explicitly unsupported by this phase.
 
+- Added the executable Conquest movement command phase over the canonical Match queue and control rows: Move, attack-move, Stop, stance validation, eight waiting orders and real recipient-bound route searches. The original JavaScript recorder supplies 56 traces and 246 steps, including malformed whole orders, forced supply holds, garrison exit and deferred retries. Three focused native tests pass in debug and release, including two original recovery/replan branches, ordering and counter-exhaustion guards. Empty replans retain the old route. Automatic reactions, aircraft, other command kinds, wire and C integration remain separate.
+
+
+- Added the shared combat metadata prerequisite for command recent-hit queries, matching the combat lane state at c5c1383. The command phase does not duplicate hit memory.
 - Added the current Match visibility, hull/footprint range and line-of-sight query used by attack-move. Weapon target selection, firing and projectile execution remain in progress.
 
 - Added one canonical Match control row for aim, ability and retreat switches, attack intent, facing and waiting orders. Startup prepares the rows from unit definitions; recruitment can stage them before charging. Command execution is the next part of this lane, and no wire or C interface changed.
