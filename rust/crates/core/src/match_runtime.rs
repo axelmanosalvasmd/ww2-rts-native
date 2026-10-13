@@ -414,6 +414,7 @@ pub struct Match {
     produced_placer: crate::produced_units::ProducedPlacer,
     pub scenario: Option<crate::legacy_scenario::LegacyScenario>,
     pub logistics: crate::logistics::LogisticsState,
+    pub firing: crate::match_firing::FiringState,
     pub capture_ticks: Vec<Option<i64>>,
     /// Capture story counts only. Combat and spending counters are not integrated yet.
     pub capture_counts: Vec<f64>,
@@ -476,6 +477,7 @@ impl Match {
             produced_placer: crate::produced_units::ProducedPlacer::new(),
             scenario,
             logistics: crate::logistics::LogisticsState::default(),
+            firing: crate::match_firing::FiringState::default(),
             capture_ticks: vec![None; map.points().len()],
             capture_counts: vec![0.0; player_count],
             finish: None,
@@ -490,6 +492,10 @@ impl Match {
             result.recovery.initialize(unit.id);
             let control = crate::match_commands::UnitControl::new(unit, &result.rules)?;
             result.commands.insert(unit.id, control);
+        }
+        for &id in result.world.game.units.keys() {
+            result.firing.initialize(id);
+            result.combat.initialize(id);
         }
         result.grid.rebuild(&result.world.game.units);
         result.initialize_recipient_routing()?;

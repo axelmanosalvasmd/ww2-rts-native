@@ -569,7 +569,7 @@ fn mined_line(terrain: PathTerrain<'_>, a: Point, b: Point) -> bool {
     }
     false
 }
-fn walkable(v: TerrainView<'_>, a: Point, b: Point, mask: u16, half: f64) -> bool {
+pub(crate) fn walkable(v: TerrainView<'_>, a: Point, b: Point, mask: u16, half: f64) -> bool {
     let d = distance(a, b);
     let d = if d != 0.0 { d } else { 1.0 };
     let ox = -(b.z - a.z) / d * half;
