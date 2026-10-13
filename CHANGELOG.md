@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Kept ordinary route fog reads lazy when there are no fires, matching the original filter callback. A prior empty-fire read leaves first birth sight eligible to build fog; a prior fire read retains its cached mask. Original produce-unit proof is being added; native replay remains pending.
 - Scoped the canceled-preview regression query borrows before extracting cache identity, preserving the actual RouteQuery lifetime and releasing recipient reads before the mutable transaction. Native execution remains pending.
 
 - Corrected the new canceled-preview regression to inspect actual TerrainView buffer/version fields and import its private field-split type. Source review found these compile-visible test defects before native checks.
