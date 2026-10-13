@@ -63,7 +63,7 @@ try {
  record('forced-logistics-and-stranded-admission',[U(1,'mg',15,15,{logistics:{ammo:2,forced:true,stranded:false}}),U(2,'mg',20,15,{logistics:{ammo:2,forced:true,stranded:true}})],[command([1]),command([2])]);
  record('classic-cost-admission-boundary',[U(1,'mg'),U(2,'rifle',20,15),U(3,'rocket',25,15)],[command([1]),{op:'player',slot:0,changes:{mun:10}},command([1]),command([2],30,15),command([3],45,15)],{mode:'classic'});
  const dirty={path:[{x:60,z:15}],orders:[{t:'move',x:70,z:15}],face:{x:1,z:0},entrench:{jobs:[]},dig:{x:9,z:9},build:9,enter:2,board:9,amove:{x:60,z:15},targetId:9,attackId:9,fireAt:5,drift:'rally',reverse:{x:1,z:1},worldGoal:{x:70,z:15},traffic:{id:8},stuck:3,repath:2};
- record('manual-aimed-clears-and-clamps',[U(1,'rifle',15,15,dirty)],[command([1]),command([1],-5,999),command([1],25,15),aimed([1])]);
+ record('manual-aimed-clears-and-clamps',[U(1,'rifle',15,15,{...dirty,entrench:null,dig:null,build:0})],[command([1]),command([1],-5,999),command([1],25,15),aimed([1])]);
  record('grenade-launch-and-ammo-recheck',[U(1,'rifle',15,15,{logistics:{ammo:5,forced:false,stranded:false}})],[command([1],25,15),aimed([1]),prime(1,{cd:0,logistics:{ammo:4,forced:false,stranded:false}}),command([1],25,15),prime(1,{logistics:{ammo:0,forced:false,stranded:false},nade:{x:25,z:15}}),aimed([1])]);
  record('satchel-launch-and-auto-path-retention',[U(1,'ranger',15,15,{path:[{x:40,z:15}],orders:[{t:'move',x:40,z:15}]})],[{...command([1],20,15),auto:true},aimed([1]),prime(1,{cd:0,nade:{x:20,z:15,auto:true,walked:true},path:[{x:40,z:15}]}),aimed([1])]);
  record('barrage-launch-partial-stock-and-delays',[U(1,'mortar',15,15,{logistics:{ammo:2,forced:false,stranded:false},path:[{x:50,z:15}]})],[command([1],40,15),aimed([1]),prime(1,{cd:0,logistics:{ammo:0,forced:false,stranded:false},nade:{x:40,z:15}}),aimed([1])]);
@@ -93,6 +93,7 @@ try {
  record('naval-ap-retained-for-land-target',[U(1,'gunboat',15,15,{still:20,targetId:2,attackId:2,retarget:100}),U(2,'tank',30,15,{owner:1}),U(3,'gunboat',45,15,{owner:1})],[command([1]),{op:'weapon',id:1},prime(1,{targetId:3,attackId:3,cooldown:0}),{op:'weapon',id:1}]);
  record('manual-ap-qualifies-against-concrete',[U(1,'at',15,15,{still:20,targetId:2,attackId:2,retarget:100}),U(2,'bunker',30,15,{owner:1})],[command([1]),{op:'weapon',id:1}]);
  record('empty-ammo-preserves-loaded-ap',[U(1,'at',15,15,{still:20,targetId:2,attackId:2,retarget:100,ap:true,logistics:{ammo:0,forced:false,stranded:false}}),U(2,'tank',30,15,{owner:1})],[{op:'weapon',id:1}]);
+ record('manual-aimed-unrepresented-project-boundary',[U(1,'rifle',15,15,dirty)],[command([1],25,15)]);
  const byName=name=>cases.find(c=>c.name===name),last=name=>byName(name).snapshots.at(-1);
  assert.deepEqual(byName('refusal-precedence-and-selection-success').results,['retreating','cooldown','ammo','cooldown','retreating','needs',null]);
  assert.equal(last('command-ownership-carrier-operative-structure-and-dead').units.find(u=>u.id===5).cd,40);

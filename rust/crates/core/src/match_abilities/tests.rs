@@ -473,7 +473,7 @@ fn conquest_abilities_match_original_source_phases() {
         "e4e579a838aabae3b1d9dadbc17a0a87147bc52d"
     );
     assert_eq!(fixture["node"], "v24.21.0");
-    let (mut cases, mut actions, mut unsupported) = (0, 0, 0);
+    let (mut cases, mut actions, mut unsupported, mut unsupported_work) = (0, 0, 0, 0);
     for case in fixture["cases"].as_array().unwrap() {
         let name = case["name"].as_str().unwrap();
         let (mut m, order) = make(case);
@@ -491,6 +491,37 @@ fn conquest_abilities_match_original_source_phases() {
             assert!(error.contains("Conquest"), "{name} mode rejection: {error}");
             assert_eq!(snapshot(&m, &order, &[]), before);
             unsupported += 1;
+            continue;
+        }
+        if name == "manual-aimed-unrepresented-project-boundary" {
+            let before = snapshot(&m, &order, &[]);
+            let action = &case["actions"][0];
+            assert_eq!(
+                m.execute_command(0, &command(&action["cmd"], false), false)
+                    .unwrap(),
+                Some(crate::match_commands::Denial::Unsupported)
+            );
+            assert_eq!(snapshot(&m, &order, &[]), before);
+            assert_eq!(
+                m.execute_command(
+                    0,
+                    &Command::Ability {
+                        ids: vec![1],
+                        at: Some(Point {
+                            x: f64::NAN,
+                            z: 15.
+                        }),
+                        queue: false,
+                        automatic: false,
+                    },
+                    false,
+                )
+                .unwrap(),
+                Some(crate::match_commands::Denial::Blocked),
+                "invalid typed aim retains coordinate refusal precedence",
+            );
+            assert_eq!(snapshot(&m, &order, &[]), before);
+            unsupported_work += 1;
             continue;
         }
         cases += 1;
@@ -620,6 +651,7 @@ fn conquest_abilities_match_original_source_phases() {
     }
     assert_eq!(cases, 33);
     assert_eq!(unsupported, 2);
+    assert_eq!(unsupported_work, 1);
     assert_eq!(actions, 147);
 }
 
@@ -645,4 +677,57 @@ fn smoke_identity_collision_rejects_before_selected_unit_writes() {
     let error = m.execute_command(0, &command, false).unwrap_err();
     assert!(error.contains("smoke identity"), "{error}");
     assert_eq!(snapshot(&m, &order, &[]), before);
+}
+
+#[test]
+fn manual_aimed_ability_cancels_real_paid_work_without_refund() {
+    use crate::field_works::{FortKind, StartRequest};
+    let fixture: Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/match-ability.json")).unwrap();
+    let case = fixture["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|v| v["name"] == "manual-aimed-clears-and-clamps")
+        .unwrap();
+    let (mut m, _) = make(case);
+    let initial_mp = m.start.economy.players[0].mp;
+    let prepared = m
+        .field_works
+        .prepare_start(
+            &m.world,
+            &mut m.start.economy.players[0],
+            StartRequest {
+                control_eligible: true,
+                owner: 0,
+                unit: 1,
+                kind: FortKind::Trench,
+                at: Point { x: 25., z: 15. },
+                direction: Some(0.),
+            },
+            |_| true,
+        )
+        .unwrap();
+    let cost = prepared.cost();
+    prepared.commit(&mut m.field_works);
+    m.world.game.units.get_mut(&1).unwrap().dig = true;
+    let terrain = m.world.game.chars.clone();
+    assert_eq!(
+        m.execute_command(
+            0,
+            &Command::Ability {
+                ids: vec![1],
+                at: Some(Point { x: 25., z: 15. }),
+                queue: false,
+                automatic: false
+            },
+            false
+        )
+        .unwrap(),
+        None
+    );
+    assert!(!m.field_works.is_active(1));
+    assert!(!m.world.game.units[&1].dig);
+    assert_eq!(m.start.economy.players[0].mp, initial_mp - cost);
+    assert_eq!(m.world.game.chars, terrain);
 }

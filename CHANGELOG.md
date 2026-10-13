@@ -3,6 +3,13 @@
 ## Unreleased
 
 - Joined the typed Dig dispatcher and canonical request/cancellation hooks into the engineering proof tree. Added unchanged-state checks for queued digs and excluded fort kinds at the parser boundary. Native execution remains queued.
+- Preserved invalid-coordinate refusal precedence for typed aimed abilities over the new unsupported-project preflight. The existing project-boundary regression now includes a nonfinite typed aim; raw JSON behavior is unchanged. Native proof remains pending.
+
+- Applied the ability owner’s narrow paid-work cancellation fix to the Dig integration. Accepted manual aimed abilities remove the canonical job without refund; unsupported project state rejects before selection writes. Updated the original-source fixture and retained focused paid-work and refusal regressions. Native proof remains pending.
+
+- Updated the command replay’s restored digging state to create a canonical field-work descriptor through real placement preparation. Its existing Move and Stop checkpoints now also require descriptor cancellation, replacing the stale activity-only test setup. Native replay remains pending.
+
+- Documented the ordinary Dig dispatcher and scheduler boundary with 12 reproducible source traces and 47 actions. Native execution and unit-loop integration remain pending.
 
 - Connected ordinary Dig to the single recorded command dispatcher and real path-request goal/drop hooks. Accepted Move and Stop cancel canonical field work synchronously; queued digs and excluded fort kinds remain explicit. Invalid cancellation state propagates through the existing checked path API. Source/native replay verification remains pending.
 

@@ -451,6 +451,38 @@ impl Match {
         row.aimed_auto = false;
         row.aimed_walked = false;
     }
+    pub(crate) fn unrepresented_ability_work(
+        &self,
+        selected: &[UnitId],
+        at: Option<Point>,
+        queue: bool,
+        automatic: bool,
+    ) -> Result<bool, String> {
+        if queue || automatic || !at.is_some_and(|p| p.x.is_finite() && p.z.is_finite()) {
+            return Ok(false);
+        }
+        for &id in selected {
+            let u = &self.world.game.units[&id];
+            let kind = self.ability_kind(id)?;
+            if !kind.aimed() || u.retreating || self.abilities.get(id).unwrap().cooldown > 0. {
+                continue;
+            }
+            let d = definition(self, id)?;
+            let per_model = d.get("w").is_some_and(|w| flag(w, "perModel"));
+            let count = if matches!(kind, AbilityKind::Grenade | AbilityKind::Satchel) && per_model
+            {
+                (u.hp / n(d, "hpPer", 1.)).ceil()
+            } else {
+                1.
+            };
+            if self.logistics.can_fire(id, count)
+                && (u.build || u.entrench || u.dig != self.field_works.is_active(id))
+            {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
     pub(crate) fn preflight_ability_selection(
         &self,
         selected: &[UnitId],
@@ -553,6 +585,9 @@ impl Match {
         automatic: bool,
     ) -> Result<Option<Denial>, String> {
         self.validate_abilities()?;
+        if self.unrepresented_ability_work(selected, at, queue, automatic)? {
+            return Ok(Some(Denial::Unsupported));
+        }
         let at = at
             .filter(|p| p.x.is_finite() && p.z.is_finite())
             .map(|p| Point {
@@ -617,6 +652,7 @@ impl Match {
                         unit.garrison = None;
                         self.grid.update(id, unit);
                     }
+                    self.cancel_field_work(id)?;
                     let u = self.world.game.units.get_mut(&id).unwrap();
                     u.traffic = None;
                     u.traffic_wait = 0.;
