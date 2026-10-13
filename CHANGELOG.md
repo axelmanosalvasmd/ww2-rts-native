@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Bind supplied World ground facts to their current canonical unit ID, owner and kind before route/home preparation, while permitting prepared existing-exit pose and health changes. Add same-ID foreign owner/kind refusal witnesses preserving actors, queue and memory. This source admission fix has not run native checks.
+
 - Isolate physical World route scenes with fresh native matches, preserving history within each original scene. Add two actual original walkRoute witnesses for deferred no-read and terrain-read publication, including cached object pose after motion. Update only existing cached World bound-unit facts after movement to preserve source object-reference semantics, without adding visibility membership or changing terrain/Fog/delivery cursors. Source checks pass; native execution remains pending.
 
 - Restore fresh derived path and request caches between independent World ground oracle scenes, matching their separate original Game instances while retaining incremental history within each scene. This test-only source correction has not run native checks.

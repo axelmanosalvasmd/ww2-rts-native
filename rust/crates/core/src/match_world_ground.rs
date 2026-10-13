@@ -20,6 +20,15 @@ impl Match {
         if !self.uses_world_routes() || self.options.logistics || self.convoys.is_some() {
             return Err("World ground routing requires disabled logistics".into());
         }
+        if self
+            .world
+            .game
+            .units
+            .get(&unit.id)
+            .is_none_or(|current| current.owner != unit.owner || current.kind != unit.kind)
+        {
+            return Err("World ground facts do not bind their current unit identity".into());
+        }
         self.validate_world_memory_context(unit.owner)?;
         self.world_runtime
             .as_ref()

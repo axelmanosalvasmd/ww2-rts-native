@@ -526,6 +526,15 @@ fn lazy_world_movement_and_refusal_preserve_memory_ledger_and_history() {
     let grid = m
         .grid
         .unordered(&m.world.game.units, (17., 17.), 50., |_, _| true);
+    let mut foreign = unit.clone();
+    foreign.owner = 0;
+    assert!(m.world_ground_home_for(&foreign).is_err());
+    foreign = unit.clone();
+    foreign.kind = m.rules.kind("tank").unwrap();
+    assert!(m.world_ground_home_for(&foreign).is_err());
+    assert_eq!(m.world.game.units[&7], unit);
+    assert_eq!(format!("{:?}", m.commands.requests), queue);
+    assert!(m.world_runtime.as_ref().unwrap().memory.teams.is_empty());
     m.options.logistics = true;
     assert!(m.begin_path_tick(4, 3).is_err());
     assert_eq!(format!("{:?}", m.commands.requests), queue);
