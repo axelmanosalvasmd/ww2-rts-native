@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Record six original World elimination transitions, including already-out armies, allied order, signed health, later-unit garrison eviction, building/depot cleanup and real 97-section debris overflow. Add native exact transition/effect/row and late-error rollback assertions; native execution remains pending.
+
 - Validate every source terrain-array shape before staged wreck calls, preventing malformed optional arrays from panicking before the later publication guard. Add draft cursor/revision refusal and allocation-preserving publication regressions, plus paid-work and rider admission checks.
 
 - Restore the complete World provider, design and changelog alongside additive observation APIs after a conflict resolver dropped existing bodies.
