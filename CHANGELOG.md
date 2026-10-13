@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Normal-merged both independently reviewed actual-runner consumers into the support/project composition: 12 Conquest support traces plus real Default refusal, and seven mass-project cases through 193 real ticks. Original fixtures remain unchanged. Combined native compilation and replay are pending.
+
 - Normal-merged the verified reaction closure into the support/project continuation. The 64 debug and 227 release Vostro results belong to that frozen predecessor; this broader caller still awaits native proof. No Rust or harness file changed in this evidence merge.
 
 - Wrote a native mass-project replay consumer for the frozen original-source full-step fixture: seven cases, 193 real runner steps and 215 checkpoints. It preserves startup actors, canonical project and paid-work identities, payments and income, queued joins, death cleanup, Stop, completion and route-drop facts. It uses the sole runner and fresh-scene clock/path configuration, preserving native random streams. Formatting and source-fixture checks pass; native execution remains pending.
@@ -16,6 +18,9 @@
 
 - Normal-merged the corrected source mass-project tick provider into a separate ground-support descendant, preserving the newer ability admission regression and actual operative/reaction caller. Canonical jobs and memberships remain singular; combined native proof is pending.
 
+- Fixed the source-visible Default-refusal comparison for the fresh unit's absent-pace NaN sentinel. A detached unit snapshot uses finite comparison values while checking original pace bits separately; live Match state is unchanged. The ground-support consumer explicitly restores recorded environment-seed and wind setup facts for its differential scenes, and makes no raw constructor-seed claim. Native verification remains pending.
+
+- Added a source-written full-step ground-support replay consumer for the actual composed Match runner. It compares 12 Conquest traces, 2,660 ticks and 144 checkpoints, protects source-silent health, pose, identity, story and random state plus captured unit membership, and verifies canonical timers/effects/terrain/story/IDs and OffMap draw state. The Source Default case remains an explicit read-only runner refusal; its lower-level support component evidence is retained. A read-only source observation audit confirms 5,104 quiet-tick health/pose/ID/story/OffMap-state checks across sampled and unsampled original runs. Fixtures, the sole caller and Match RNG are unchanged. Native verification remains pending.
 - Normal-merged the reviewed test-only reaction observation repairs into the separate ground-support continuation, preserving the actual support caller and aircraft refusal regression. Combined native proof remains pending.
 
 - Defined the old-clock command boundary once in the new ground-support caller, reusing it for dispatch and post-command validation. Source review caught the missing local variable before any native build.
