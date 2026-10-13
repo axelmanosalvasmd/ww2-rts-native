@@ -329,7 +329,7 @@ mod tests {
         }
         b.start.economy.players[1].mp = 9999.0;
         // A logged edit beyond all friendly eyes remains pending and cannot become cover.
-        b.world.set_cell(60 * 64 + 60, b'O').unwrap();
+        b.world.set_cell(60 * 64 + 40, b'O').unwrap();
         let va = a.opening_commander_observation(0).unwrap();
         let vb = b.opening_commander_observation(0).unwrap();
         assert_eq!(va.input(), vb.input());
@@ -435,6 +435,20 @@ mod tests {
         assert_eq!(seat, prior);
         assert_eq!(m.start.random.snapshot(), random);
         assert!(m.commands.queue.is_empty());
+        m.world.game.tick = i64::MAX;
+        let mut snapshot = m.commands.queue.snapshot();
+        snapshot.next_tick = Some(i64::MAX as u64 + 1);
+        m.commands.queue = OrderQueue::restore(snapshot).unwrap();
+        let queue = m.commands.queue.snapshot();
+        let prior = seat.clone();
+        assert!(
+            m.tick_opening_commander(&mut seat)
+                .unwrap_err()
+                .contains("tick exhausted")
+        );
+        assert_eq!(seat, prior);
+        assert_eq!(m.commands.queue.snapshot(), queue);
+        assert_eq!(m.start.random.snapshot(), random);
     }
 }
 fn point(p: Point) -> Point {
@@ -765,9 +779,7 @@ impl Match {
         {
             return Err("invalid or repeated commander tick".into());
         }
-        let next = (now as u64)
-            .checked_add(1)
-            .ok_or("commander tick exhausted")?;
+        let next = now.checked_add(1).ok_or("commander tick exhausted")? as u64;
         self.validate_command_tick(next)?;
         self.validate_opening_projection(seat.owner)?;
         if self.finish.is_some() || self.start.economy.players[seat.owner].out {

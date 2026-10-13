@@ -86,7 +86,8 @@ function record(name, options = {}) {
       return undefined;
     } });
   } finally { Math.random = oldRandom; }
-  if (otherCommands.some(c => ['build', 'assist', 'buy', 'support', 'attack', 'retreat', 'fireat', 'ability', 'board', 'rail'].includes(c.t))) throw Error(`Unsupported full-thinker branch in ${name}: ${JSON.stringify(otherCommands)}`);
+  // Holder behavior remains pending in native, but its actual source commands stay in the record.
+  if (otherCommands.some(c => !['cover', 'garrison'].includes(c.t))) throw Error(`Unsupported full-thinker branch in ${name}: ${JSON.stringify(otherCommands)}`);
   const emitted = commands.reduce((n, c) => n + c.orders.length, 0);
   if (draws !== emitted) throw Error(`Unexpected non-waypoint randomness in ${name}`);
   cases.push({ name, slot, level, startupDraws, frame: {
@@ -94,7 +95,7 @@ function record(name, options = {}) {
     players: view.players.map(p => ({ slot: p.slot, team: p.team, faction: p.faction, spawn: p.spawn, out: p.out })),
     points: view.points, units,
     me: { mp: 0, mun: 0, fuel: 0, visible: [], out: me.out },
-  }, memory, random: random.slice(0, draws), expected: { draws, commands, aim: mem.mind.aim } });
+  }, memory, random: random.slice(0, draws), expected: { draws, commands, pendingCommands: otherCommands, aim: mem.mind.aim } });
 }
 
 for (const level of ['easy', 'normal', 'hard']) for (let seats = 1; seats <= 6; seats++) {

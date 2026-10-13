@@ -156,7 +156,15 @@ fn original_thinker_orders_aim_and_waypoint_draws_match() {
     );
     assert_eq!(array(&records["cases"]).len(), 55);
     let mut draws = 0;
+    let mut pending = 0;
     for row in array(&records["cases"]) {
+        for command in array(&row["expected"]["pendingCommands"]) {
+            assert!(
+                matches!(command["t"].as_str(), Some("cover" | "garrison")),
+                "unrecorded pending AI branch"
+            );
+            pending += 1;
+        }
         let name = row["name"].as_str().unwrap();
         let observation = Observation::new(input(row)).unwrap();
         let before = observation.clone();
@@ -205,6 +213,10 @@ fn original_thinker_orders_aim_and_waypoint_draws_match() {
         draws += result.draws;
     }
     assert_eq!(draws, 270);
+    assert_eq!(
+        pending, 1,
+        "source holder cover remains explicitly unported"
+    );
 }
 
 #[test]

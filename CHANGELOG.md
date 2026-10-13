@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Reject an exhausted signed Match clock before the opening commander can queue an unrepresentable next tick or publish a delivered-view marker. The terminal-clock guard leaves policy memory, RNG and pending commands unchanged.
+
+- Retained the source holder's pending cover order in the AI fixture alongside the 55 movement cases and 270 waypoint draws. The comparator covers opening movement only; holder cover and garrison orders remain unported rather than disappearing from the recorded source log.
+
 - Kept the opening commander's fallback vision query on a fresh temporary spatial index, preserving the maintained gameplay index while applying the source vision phase. Recipient-routing index preservation is being verified in the FPS integration lane.
 
 - Added a bounded native Conquest opening commander: detached recipient observations, source point scores and cover waypoints, fixed per-seat scheduling, isolated seeded draws and typed movement orders through the canonical Match queue. Economic, combat, camera, World and complete-match AI behavior remain pending; no wire or C interface changed.
