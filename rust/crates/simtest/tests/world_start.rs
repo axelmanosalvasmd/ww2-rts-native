@@ -195,6 +195,14 @@ fn original_world_startup() {
                 expected.owner = LOCAL_DEFENDER_OWNER;
             }
             let actual = &game.units[&expected.id];
+            let firing = instance.firing.get(actual.id).unwrap();
+            assert_eq!(json!(firing.target_id), raw["targetId"]);
+            assert_eq!(bits(firing.cooldown), bits(raw["cooldown"].as_f64().unwrap()));
+            assert_eq!(bits(firing.retarget), bits(raw["retarget"].as_f64().unwrap()));
+            let combat = instance.combat.get(actual.id).unwrap();
+            assert_eq!(bits(combat.xp), bits(raw["xp"].as_f64().unwrap()));
+            assert_eq!(bits(combat.hit_at), bits(raw["hitAt"].as_f64().unwrap()));
+            assert_eq!(json!(combat.cargo), raw["cargo"]);
             assert_eq!(
                 simtest::replay::diff(actual, &expected),
                 None,
