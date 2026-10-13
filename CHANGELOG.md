@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added ground production door placement with ordered exit rings, vehicle clearance, occupancy checks, origin-region fallback, heading and spawn ghosts. Two focused tests compare 934 projections from the unchanged JavaScript on 43 terrains, including all 44 non-air kinds and 33 authored maps. Recruitment receives a placed Unit and an explicit rally routing request; wallet/ID changes, path execution, full unit-state initialization and air-base production remain outside the helper.
+
 - Added typed legacy map-trigger migration, startup state and once-only timed execution. Two focused tests match the original scenario engine over all five authored trigger maps and 17 boundary cases, with 100 steps covering action order, time jumps, point-owner history and stable execution IDs. Initialization emits nothing; ordered Say and Destroy requests are returned for a later match actuator. General scenarios, terrain destruction and match integration remain unfinished.
 
 - Added the twelve physical reserve helpers in `logistics.rs`, with optional per-unit state keyed by ID and borrowed definition/owner/movement facts. Exact JavaScript fixtures cover 60 enablement contexts, 118 weapon definitions, 708 initialization cases and 618 state/stock/query steps in 44 traces. Fractional ammo credit, fuel order, exhaustion, recovery and repeat initialization preserve source behavior. Match startup, powered-travel integration, withdrawal actions, convoys, territory supply and snapshots remain separate; no Game fields, ABI or rules hash changed.

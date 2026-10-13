@@ -22,6 +22,7 @@ pub mod path_requests;
 
 pub mod orders;
 pub mod pathfinding;
+pub mod produced_units;
 pub mod production;
 pub mod projectiles;
 
