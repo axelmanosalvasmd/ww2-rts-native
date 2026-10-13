@@ -426,27 +426,12 @@ fn supply_preflights_reject_invalid_shapes_orders_and_identity_without_publicati
     let mut instance = Match::new(&map, disabled).unwrap();
     instance.options.logistics = true;
     let hp = instance.world.game.cell_hp.pop().unwrap();
-    let wallets = instance
-        .start
-        .economy
-        .players
-        .iter()
-        .cloned()
-        .collect::<Vec<_>>();
+    let wallets = instance.start.economy.players.to_vec();
     assert!(instance.initialize_logistics().is_err());
     assert!(instance.convoys.is_none());
     assert!(instance.logistics.iter().next().is_none());
     assert!(instance.supply_net.teams.is_empty());
-    assert_eq!(
-        instance
-            .start
-            .economy
-            .players
-            .iter()
-            .cloned()
-            .collect::<Vec<_>>(),
-        wallets
-    );
+    assert_eq!(instance.start.economy.players.to_vec(), wallets);
     instance.world.game.cell_hp.push(hp);
     instance.initialize_logistics().unwrap();
     let baseline = runtime(&instance);
