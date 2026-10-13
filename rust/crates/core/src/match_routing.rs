@@ -278,7 +278,7 @@ impl Match {
                 .world
                 .mine_seen
                 .keys()
-                .chain(self.world.fires.keys())
+                .chain(self.world.fires.iter().map(|(c, _)| c))
                 .any(|&c| c >= g.w * g.h)
             || self.building_cells.iter().any(|(&c, b)| {
                 c >= g.w * g.h
@@ -310,14 +310,10 @@ impl Match {
     }
     fn refresh_memory(&mut self, owner: usize) -> Result<(), String> {
         self.validate_recipient(owner)?;
-        self.grid.rebuild(&self.world.game.units);
-        let mut facts = facts(
-            &self.world,
-            &self.rules,
-            &self.grid,
-            &self.building_cells,
-            owner,
-        )?;
+        // Observation needs current positions without sorting the gameplay index
+        // during a command between the source's explicit rebuild phases.
+        let grid = SpatialGrid::new(&self.world.game.units, 16.0);
+        let mut facts = facts(&self.world, &self.rules, &grid, &self.building_cells, owner)?;
         let team = self.world.game.players[owner].team;
         self.recipients[owner]
             .memory
@@ -350,7 +346,7 @@ impl Match {
         let g = &self.world.game;
         let fog = self.routing_fog.team(g, &self.rules, g.players[owner].team);
         state.fires.fill(false);
-        for &c in self.world.fires.keys() {
+        for (&c, _) in self.world.fires.iter() {
             state.fires[c] = fog.vis[c] != 0;
         }
         state.bound_units = g
@@ -405,7 +401,7 @@ impl Match {
         if !at.x.is_finite() || !at.z.is_finite() {
             return Err("invalid visibility point".into());
         }
-        self.grid.rebuild(&self.world.game.units);
+        let grid = SpatialGrid::new(&self.world.game.units, 16.0);
         let g = &self.world.game;
         let team = g.players[owner].team;
         let reach = g
@@ -414,7 +410,7 @@ impl Match {
             .filter(|u| g.team_of(u) == team)
             .map(|u| vision_of(g, &self.rules, u))
             .fold(1.0, math::max);
-        Ok(sees(g, &self.rules, &self.grid, team, reach, at))
+        Ok(sees(g, &self.rules, &grid, team, reach, at))
     }
 
     /// Query an already refreshed owner state without borrowing all of Match mutably.

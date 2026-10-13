@@ -33,7 +33,7 @@ registerHooks({ load(path, context, next) {
 } });
 const sim = await import(url);
 const { rebuildGrid, gridFor } = await import(pathToFileURL(`${reference}/shared/grid.js`));
-const map = { name: 'FPS phase fixture', w: 32, h: 32, rows: Array(32).fill('.'.repeat(32)), spawns: [{ x: 7, y: 16 }, { x: 24, y: 16 }], points: [] };
+const map = { name: 'FPS phase fixture', w: 32, h: 32, rows: Array(32).fill('.'.repeat(32)), spawns: [{ x: 7, y: 16 }, { x: 24, y: 16 }], points: [{ x: 16, y: 16 }] };
 const unitKeys = ['id','type','owner','x','z','rot','aim','moveSpeed','vx','vz','vy','jy','hp','supp','cooldown','crouch','operative','weapon','mags','reloadT','nades','nadeT','auto','autoRetreat','holdFire','holdPos','follow','riding','garrison','retreating','path','orders','amove','attackId','targetId','retarget','worldGoal','pace','moveOutcome','moveOutcomeTick','traffic','trafficWait','entrench','face'];
 const clone = value => JSON.parse(JSON.stringify(value));
 const projection = unit => Object.fromEntries(unitKeys.filter(k => unit[k] !== undefined).map(k => [k, unit[k]]));

@@ -209,7 +209,7 @@ fn named_world_actor_requires_explicit_world_policy() {
             },
             &m.rules,
             2,
-            Some(ModeKind::Conquest),
+            None,
             vec![draft]
         )
         .is_err()

@@ -410,7 +410,6 @@ pub struct Match {
     pub scenario: Option<crate::legacy_scenario::LegacyScenario>,
     pub firing: crate::match_firing::FiringState,
     pub logistics: crate::logistics::LogisticsState,
-    pub firing: crate::match_firing::FiringState,
     pub capture_ticks: Vec<Option<i64>>,
     /// Capture story counts only. Combat and spending counters are not integrated yet.
     pub capture_counts: Vec<f64>,
@@ -472,7 +471,6 @@ impl Match {
             scenario,
             firing: crate::match_firing::FiringState::default(),
             logistics: crate::logistics::LogisticsState::default(),
-            firing: crate::match_firing::FiringState::default(),
             capture_ticks: vec![None; map.points().len()],
             capture_counts: vec![0.0; player_count],
             finish: None,

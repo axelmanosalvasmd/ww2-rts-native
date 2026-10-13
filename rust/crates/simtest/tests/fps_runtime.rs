@@ -528,10 +528,10 @@ fn original_fps_phase_replay() {
                     for row in action["cells"].as_array().unwrap() {
                         let c = row[0].as_u64().unwrap() as usize;
                         m.world.game.flags[c] = n(&row[1]) as u16;
-                        if !row[2].is_null() {
-                            if let Some(h) = &mut m.world.game.height {
-                                h[c] = n(&row[2]) as i8;
-                            }
+                        if !row[2].is_null()
+                            && let Some(h) = &mut m.world.game.height
+                        {
+                            h[c] = n(&row[2]) as i8;
                         }
                     }
                 }
