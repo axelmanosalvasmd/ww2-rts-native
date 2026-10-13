@@ -124,6 +124,18 @@ Decided now so release stays cheap:
 3. Unreal game: terrain, units, effects, HUD, sound, then the FPS view, with the browser client still working alongside.
 4. Retire the JavaScript client and Node server in ww2-rts.
 
+## Rust lobby and session server (2026-10-12)
+
+`rust/crates/server` now provides `ww2-server`, a standalone HTTP/WebSocket process. Its first slice owns rooms, human and AI seats, observers, lobby settings, token reconnect/takeover, latency ping, a public room directory and cleanup. It does not start or simulate matches. Unsupported match commands return explicit denials, so clients cannot mistake a lobby for a running game.
+
+Axum and Tokio handle transport; pure lobby transitions take an explicit monotonic time and return recipient-specific messages. Each connection has a generation identity. A replaced socket can neither mutate the room nor disconnect its replacement. Tokens stay private and retain their UTF-16 code units during truncation, so two distinct tokens cannot collide through lossy Unicode conversion. Name display at a split surrogate remains a documented difference in the server README.
+
+Host authority follows the reference, including a spectator hosting an all-AI lobby. Directory entries require a listed room and a connected human seat. Disconnected seats remain for ten seconds; empty rooms expire after sixty. Each client has a 64-message output queue, with a slow client closed using 1013. Incoming messages are capped at 16 KiB; the current transport sends uncompressed JSON.
+
+The server accepts missing or zero `hello.proto` and refuses unsupported versions. It sends `lobby.proto: 0`; no rules hash is advertised before a rules core is linked. The pending in-match privacy proposals are unchanged. Binding keeps the reference `HOST`/`PORT` default of `127.0.0.1:3000`, with `WW2_BIND` and then `--bind` as explicit overrides.
+
+The live harness compares 38 lobby/directory checkpoints against the real Node server and checks all 33 map-catalog entries. It also checks version refusal, malformed input recovery, explicit start denial and oversized-message closure. Nine Rust tests cover settings, authority, identity, cleanup, limits and configuration. This is lobby compatibility for the tested cases, not full protocol or multiplayer-match completion. Static browser hosting, map contents/editing, compression, operatives, game simulation, snapshots and persistence are still missing.
+
 ## The core's math (2026-10-12)
 
 The core carries its own math (`rust/crates/core/src/math.rs`) instead of Rust's `f64` methods, which call each platform's C library. It ports V8's fdlibm (`src/base/ieee754.cc` as Node 24.21.0 compiles it) and V8's `Math.hypot`, plus JavaScript's `round`, `max`, `min` and `sign`, so every platform computes the same bits and they equal the JavaScript game's.

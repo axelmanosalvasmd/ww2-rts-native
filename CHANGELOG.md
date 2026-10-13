@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Documented the first Rust lobby/session server and its live reference checks. Relevant NET rows are in progress, with game simulation, snapshots, static hosting and persistence explicitly still missing.
+
 - Aligned the Rust lobby server with the reference address defaults: `127.0.0.1:3000`, configurable through `HOST` and `PORT`. `WW2_BIND` takes priority over those variables, and `--bind` takes priority over all environment settings. Port zero remains available for local tests. Added a deterministic configuration test for precedence, IPv6, hostnames and invalid ports without changing process environment variables.
 
 - Added the first standalone Rust `ww2-server` lobby slice for issue #19: configurable loopback binding, HTTP health, public room directory, and WebSocket hello, seats, spectator hosting, reconnect, duplicate-token takeover, map and lobby settings, AI roster controls and ping/pong. Eight Rust tests pass; a live harness matches 38 lobby and directory checkpoints against the pinned Node server and checks all 33 map metadata entries, malformed input recovery, protocol-version errors and the 16 KiB message limit. Full workspace tests, formatting and strict server Clippy pass on the Mac. The server does not run matches: start, gameplay, operative joins and saves fail explicitly. Compression, map contents/static hosting, a rules hash and match features remain unimplemented; no protocol or ABI contract is promoted. `rust/crates/server/README.md` records exact limits, including UTF-16 name-edge handling. Token truncation keeps the original UTF-16 units so distinct tokens cannot collide through replacement characters.
