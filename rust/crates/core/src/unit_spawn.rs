@@ -94,6 +94,30 @@ impl SpawnPlacer {
         if kind.air {
             return Err(SpawnError::UnsupportedAir);
         }
+        self.scatter_fields(view, kind, player_spawn, index)
+    }
+
+    /// Aircraft still run the source scatter before their air-base pose override.
+    pub(crate) fn scatter_aircraft_position(
+        &mut self,
+        view: TerrainView<'_>,
+        kind: &UnitKind,
+        player_spawn: Point,
+        index: u32,
+    ) -> Result<SpawnPlacement, SpawnError> {
+        if !kind.air {
+            return Err(SpawnError::InvalidDefinition);
+        }
+        self.scatter_fields(view, kind, player_spawn, index)
+    }
+
+    fn scatter_fields(
+        &mut self,
+        view: TerrainView<'_>,
+        kind: &UnitKind,
+        player_spawn: Point,
+        index: u32,
+    ) -> Result<SpawnPlacement, SpawnError> {
         let angle = f64::from(index) * 2.4;
         let at = Point {
             x: player_spawn.x + math::cos(angle) * 4.0,
@@ -222,6 +246,30 @@ pub fn initial_unit(
     owner: usize,
     at: Point,
 ) -> Result<Unit, SpawnError> {
+    initial_fields(rules, catalog, kind, id, owner, at, false)
+}
+
+pub(crate) fn initial_aircraft(
+    rules: &Rules,
+    catalog: &Catalog,
+    kind: usize,
+    id: UnitId,
+    owner: usize,
+    at: Point,
+) -> Result<Unit, SpawnError> {
+    initial_fields(rules, catalog, kind, id, owner, at, true)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn initial_fields(
+    rules: &Rules,
+    catalog: &Catalog,
+    kind: usize,
+    id: UnitId,
+    owner: usize,
+    at: Point,
+    aircraft: bool,
+) -> Result<Unit, SpawnError> {
     if id == 0 {
         return Err(SpawnError::InvalidId);
     }
@@ -229,8 +277,11 @@ pub fn initial_unit(
         return Err(SpawnError::InvalidPosition);
     }
     let profile = rules.kinds.get(kind).ok_or(SpawnError::UnknownKind)?;
-    if profile.air {
+    if profile.air && !aircraft {
         return Err(SpawnError::UnsupportedAir);
+    }
+    if !profile.air && aircraft {
+        return Err(SpawnError::InvalidDefinition);
     }
     let definition = catalog.unit(&profile.name)?;
     let models = definition
@@ -255,7 +306,7 @@ pub fn initial_unit(
         rot: 0.0,
         garrison: None,
         riding: false,
-        air: None,
+        air: aircraft.then_some(crate::game::PlaneState::Base),
         still: Some(0.0),
         shot_at: None,
         dust: None,

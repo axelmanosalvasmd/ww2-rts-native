@@ -25,6 +25,9 @@ pub enum TickPhase {
     FieldWork,
     FieldProjects,
     AirRail,
+    Aircraft,
+    AntiAir,
+    Rail,
     Riding,
     Reactions,
     TrafficKnowledge,
@@ -179,9 +182,6 @@ impl crate::match_runtime::Match {
         self.tick_state.paths.validate()?;
         let boundary = game.tick as u64 + 1;
         self.validate_command_tick(boundary)?;
-        self.validate_ground_support_tick(boundary)
-            .map_err(|error| format!("ground support admission: {error}"))?;
-        self.validate_tick_capabilities()?;
         if !self.rules.movement.tick.is_finite() || self.rules.movement.tick <= 0.0 {
             return Err("invalid tick duration".into());
         }
@@ -203,8 +203,15 @@ impl crate::match_runtime::Match {
         }
         self.validate_abilities()?;
         self.prepare_companion_tick()?;
-        self.validate_reaction_tick_actors()?;
+        self.validate_aircraft_runner_boundary(boundary)
+            .map_err(|error| format!("aircraft admission: {error}"))?;
         let current_order = game.units.keys().copied().collect::<Vec<_>>();
+        self.validate_support_metadata()
+            .map_err(|error| format!("support metadata admission: {error}"))?;
+        self.validate_support_tick_phases(&current_order, self.rules.movement.tick, boundary)
+            .map_err(|error| format!("support admission: {error}"))?;
+        self.validate_carrier_tick()?;
+        self.validate_reaction_tick_actors()?;
         self.validate_field_project_tick(&current_order)?;
         if self
             .field_works
@@ -227,15 +234,6 @@ impl crate::match_runtime::Match {
         Ok(())
     }
 
-    fn validate_tick_capabilities(&self) -> Result<(), String> {
-        if self.world.game.units.values().any(|unit| {
-            unit.air.is_some() || self.rules.kinds.get(unit.kind).is_some_and(|kind| kind.air)
-        }) {
-            return Err("aircraft tick actuator is not connected".into());
-        }
-        Ok(())
-    }
-
     fn validate_reaction_tick_actors(&self) -> Result<(), String> {
         for (&id, unit) in &self.world.game.units {
             if unit.hp <= 0.0 || self.commands.units.get(&id).is_some_and(|c| c.operative) {
@@ -246,8 +244,16 @@ impl crate::match_runtime::Match {
                 .kinds
                 .get(unit.kind)
                 .ok_or("invalid reaction kind")?;
-            if kind.rail || unit.riding {
-                return Err("rail or carrier tick actor is not connected".into());
+            if kind.air || unit.air.is_some() {
+                continue;
+            }
+            if kind.rail {
+                return Err("rail tick actor is not connected".into());
+            }
+            // The canonical carrier preflight admits riding; Source skips this
+            // ordinary reaction/timer block after the early pose update.
+            if unit.riding {
+                continue;
             }
             if unit.garrison.is_some() && self.automatic_retreat_candidate(id)? {
                 return Err("automatic garrison retreat tick exit is not connected".into());
@@ -268,11 +274,15 @@ impl crate::match_runtime::Match {
         let commands = self.apply_commands(boundary, winner_decided)?;
         // Boundary joins are included in prior poses and the same live unit loop.
         self.prepare_companion_tick()?;
-        self.validate_tick_capabilities()?;
+        self.validate_aircraft_runner_state(boundary)
+            .map_err(|error| format!("aircraft published state: {error}"))?;
+        self.validate_carrier_tick()?;
         self.validate_reaction_tick_actors()?;
-        self.validate_ground_support_tick(boundary)
-            .map_err(|error| format!("ground support boundary: {error}"))?;
         let current_order = self.world.game.units.keys().copied().collect::<Vec<_>>();
+        self.validate_support_metadata()
+            .map_err(|error| format!("support published metadata: {error}"))?;
+        self.validate_support_tick_phases(&current_order, dt, boundary)
+            .map_err(|error| format!("support published state: {error}"))?;
         self.validate_field_project_tick(&current_order)?;
         let mut environment = self.tick_environment_phase(EnvironmentPhase::StructureSync)?;
         self.grid.rebuild(&self.world.game.units);
@@ -344,6 +354,24 @@ impl crate::match_runtime::Match {
             // Reserve adapters attach before this pre-timer order phase.
             self.prepare_unit_commands(id, winner_decided)?;
             let unit = self.world.game.units.get(&id).expect("current unit");
+            let kind = &self.rules.kinds[unit.kind];
+            if kind.building && (!kind.weapon || unit.built.is_some_and(|built| built < 1.0)) {
+                continue;
+            }
+            if self
+                .step_aircraft_turn(id, dt)
+                .map_err(|error| format!("aircraft turn: {error}"))?
+            {
+                continue;
+            }
+            match self.apply_unit_riding(id, dt)? {
+                crate::match_carriers::RidingOutcome::Riding => continue,
+                crate::match_carriers::RidingOutcome::OnFoot => {}
+                crate::match_carriers::RidingOutcome::UnsupportedEjection => {
+                    return Err("thrown carrier ejection tick phase is not connected".into());
+                }
+            }
+            let unit = self.world.game.units.get(&id).expect("current unit");
             if !movement::reaches_block(&self.rules, unit) {
                 continue;
             }
@@ -367,6 +395,14 @@ impl crate::match_runtime::Match {
             self.apply_project_unit(id)?;
             self.apply_field_work_unit(id)?;
             self.step_aimed_ability(id)?;
+            // Entry-building execution remains excluded. Boarding uses its live
+            // owner-view goal and the one already-started path scheduler.
+            if matches!(
+                self.apply_unit_boarding_with_routes(id)?,
+                crate::match_carriers::BoardingOutcome::Boarded { .. }
+            ) {
+                continue;
+            }
             self.apply_attack_move(id)?;
             self.react_unit(id)?;
             let before = self.world.game.units[&id].at();
@@ -382,6 +418,8 @@ impl crate::match_runtime::Match {
             TickPhase::UnitOrders,
             TickPhase::Abilities,
             TickPhase::FieldWork,
+            TickPhase::Riding,
+            TickPhase::Aircraft,
             TickPhase::Reactions,
             TickPhase::Movement,
             TickPhase::Firing,
@@ -394,11 +432,19 @@ impl crate::match_runtime::Match {
         self.advance_firing_grenades(dt)?;
         self.advance_firing_salvos(dt)?;
         phases.push(TickPhase::Projectiles);
-        // Ground strikes consume captured actors; AIR admission makes anti-air inert.
-        // Covers and raw cooldowns decay once, reading radio before point updates.
-        self.step_ground_support_phase(&unit_order, dt)
-            .map_err(|error| format!("ground support phase: {error}"))?;
-        phases.extend([TickPhase::Support, TickPhase::SupportTimers]);
+        // Source strikes and AA share captured late shooters; current target/grid
+        // facts stay live. Radio is read before the later point update.
+        self.step_support_strikes(&unit_order, dt)
+            .map_err(|error| format!("support strikes: {error}"))?;
+        self.step_aircraft_anti_air(&unit_order, dt)
+            .map_err(|error| format!("aircraft anti-air: {error}"))?;
+        self.advance_support_timers(dt)
+            .map_err(|error| format!("support timers: {error}"))?;
+        phases.extend([
+            TickPhase::Support,
+            TickPhase::AntiAir,
+            TickPhase::SupportTimers,
+        ]);
 
         let game = &mut self.world.game;
         let mut smokes: Vec<_> = game
@@ -473,8 +519,7 @@ impl crate::match_runtime::Match {
                 TickPhase::Research,
                 TickPhase::UnitReserves,
                 TickPhase::Production,
-                TickPhase::AirRail,
-                TickPhase::Riding,
+                TickPhase::Rail,
                 TickPhase::TrafficKnowledge,
                 TickPhase::GroundEffects,
                 TickPhase::Construction,

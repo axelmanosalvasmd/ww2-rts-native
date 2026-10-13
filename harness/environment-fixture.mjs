@@ -58,6 +58,7 @@ try {
    else if(a.op==='prime'){
     if(a.rain!==undefined)g.wx.rain=a.rain;if(a.wet!==undefined)g.wx.wet=a.wet;if(a.wind)g.wind=a.wind;
     if(a.fire){if(a.fire[1]===null)g.fires.delete(a.fire[0]);else g.fires.set(...a.fire);}
+    if(a.height){g.height??=new Int8Array(g.w*g.h);for(const [c,h] of a.height)g.height[c]=h;}
     if(a.wear)g.wear[a.wear[0]]=a.wear[1];if(a.scar)g.scar[a.scar[0]]=a.scar[1];if(a.hp)g.cellHp[a.hp[0]]=a.hp[1];
    } else throw Error(a.op);
    results.push({value:result,shots:structuredClone(g.shots)});snapshots.push(structuredClone(snapshot(g)));
@@ -83,6 +84,13 @@ try {
  {const m=blank();cell(m,42,'H');record('captured-burn-after-real-paratrooper-arrival',m,[{op:'ignite',c:42},{op:'para_birth',tick:9},{op:'ignite_births'},{op:'burn_captured',actors:[7,8],dt:.5},{op:'burn',dt:.5}], [{id:7,type:'rifle',x:5,z:5,hp:100},{id:8,type:'rifle',x:20,z:20,hp:100}],['P0']);}
  {const m=blank();cell(m,42,'B');record('captured-burn-keeps-current-garrison-eviction',m,[{op:'ignite',c:42},{op:'burn_captured',actors:[7],dt:40}],[{id:7,type:'rifle',x:5,z:5,hp:200,garrison:42},{id:8,type:'rifle',x:5,z:5,hp:100,garrison:42}]);}
  {const m=blank();cell(m,42,'H');record('captured-burn-legacy-expiry',m,[{op:'ignite',c:42},{op:'burn_captured',actors:[7],dt:40}],[{id:7,type:'rifle',x:5,z:5,hp:500},{id:8,type:'rifle',x:5,z:5,hp:100,garrison:42}]);}
+ // Int8 terrain values use JavaScript Number arithmetic in the unchanged dent helper.
+ for(const [name,height] of [
+  ['dent-minimum-int8',[[42,-128]]],
+  ['dent-high-neighbour-int8',[[42,0],[43,127]]],
+  ['dent-low-neighbour-int8',[[42,4],[22,4],[62,4],[41,4],[43,-128]]],
+  ['dent-valid-upper-level',[[42,4],[22,4],[62,4],[41,4],[43,4]]],
+ ]){const m=blank();record(name,m,[{op:'prime',height},{op:'blast',at:{x:5,z:5},radius:0,damage:1000,scar:1}]);}
  // Compact expected states as path replacements. Every Rust comparison reconstructs the full state.
  function changes(a,b,path=[],out=[]){
   if(Object.is(a,b))return out;

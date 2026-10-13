@@ -196,6 +196,11 @@ impl PathRequests {
     pub fn pending_len(&self) -> usize {
         self.pending.len()
     }
+    /// Borrow FIFO requests, including stale entries, for adapter preflight.
+    /// This does not acknowledge pending work or change search budget.
+    pub(crate) fn queued_requests(&self) -> impl Iterator<Item = &Request> {
+        self.queue.iter().map(|pending| &pending.request)
+    }
     pub fn stats(&self) -> SchedulerStats {
         self.stats
     }
