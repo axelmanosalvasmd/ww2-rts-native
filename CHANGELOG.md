@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Connected base World geography to the agreed typed map-loader input, preserving terrain, home hints, regions, territory labels and waterway metadata. Native version 1 explicitly leaves biomes, landmark layers and rails absent.
+
 - Added pure seeded base World geography for Huge and Massive maps: relief, rivers and tributaries, lakes and crossings, regions, roads, woods, town blocks, homes, names and weighted territories. Ten bare-geography maps match pinned JavaScript fingerprints and metadata; 80 source stress settings reproduce twice and meet wide-route connectivity, channel and home-space checks. Generation consumes one recorded Terrain-stream seed and uses core math. Biomes, landmark dressing, rails, World match setup and client delivery remain unfinished.
 - Added typed World size, region, immutable geography and terrain inputs for the native generator-to-loader handoff. Validation and mutable World initialization follow separately; no wire or ABI interface changes.
 

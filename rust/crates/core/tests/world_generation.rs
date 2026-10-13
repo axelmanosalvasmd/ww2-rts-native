@@ -272,6 +272,54 @@ fn original_base_geography_and_source_acceptance_invariants() {
             assert_eq!(actual[key], row[key], "{size:?} seed{seed} {key}");
         }
         invariants(&g, &teams);
+        let input = g.into_world_map_input();
+        assert_eq!(hash(input.chars), row["charsHash"]);
+        assert_eq!(
+            hash(input.heights.unwrap().into_iter().map(|h| h as u8)),
+            row["heightsHash"]
+        );
+        assert_eq!(
+            hash(
+                input
+                    .geography
+                    .region_map
+                    .unwrap()
+                    .into_iter()
+                    .flat_map(i16::to_le_bytes)
+            ),
+            row["regionMapHash"]
+        );
+        assert_eq!(input.geography.seed, Some(seed));
+        assert_eq!(
+            input.geography.generator_version,
+            Some(world_generation::GENERATOR_VERSION)
+        );
+        assert_eq!(input.geography.regions.len(), size.region_count());
+        assert!(input.layers.is_none() && input.geography.biomes.is_none());
+        assert!(!input.geography.metadata.contains_key("rails"));
+        let water = &input.geography.metadata["waterways"];
+        assert_eq!(water["crossings"], row["crossings"]);
+        assert_eq!(water["lake"], row["lake"]);
+        for (river, source) in water["rivers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .zip(row["channels"].as_array().unwrap())
+        {
+            assert_eq!(river["id"], source["id"]);
+            assert_eq!(river["parent"], source["parent"]);
+            assert_eq!(
+                hash(
+                    river["path"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .flat_map(|p| ["x", "y", "radius"].map(|k| p[k].as_u64().unwrap() as u32))
+                        .flat_map(u32::to_le_bytes)
+                ),
+                source["pathHash"]
+            );
+        }
     }
 }
 #[test]

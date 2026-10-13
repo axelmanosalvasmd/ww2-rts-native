@@ -12,18 +12,8 @@ use crate::{
 pub const GENERATOR_VERSION: u32 = 1;
 pub const REGION_CELLS: usize = 64;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum WorldSize {
-    Huge,
-    Massive,
-}
+pub use crate::world_map::WorldSize;
 impl WorldSize {
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Huge => "huge",
-            Self::Massive => "massive",
-        }
-    }
     fn columns(self) -> usize {
         match self {
             Self::Huge => 8,
@@ -106,6 +96,80 @@ pub struct GeneratedGeography {
     pub spawns: Vec<CellPoint>,
     pub region_map: Vec<i16>,
     pub waterways: Waterways,
+}
+impl GeneratedGeography {
+    /// Transfer bare geography to the agreed loader input without rebuilding terrain from JSON.
+    /// Native version 1 leaves biomes, landmark layers and rails for later generation stages.
+    pub fn into_world_map_input(self) -> crate::world_map::WorldMapInput {
+        use crate::{
+            map::Spawn,
+            world_map::{WorldDefinition, WorldMapInput, WorldRegion},
+        };
+        use serde_json::json;
+        let rivers = self.waterways.rivers.into_iter().map(|r| json!({
+            "id": r.id, "kind": if r.parent.is_some() { "tributary" } else { "main" },
+            "parent": r.parent,
+            "path": r.path.into_iter().map(|p| json!({"x":p.x,"y":p.y,"radius":p.radius})).collect::<Vec<_>>()
+        })).collect::<Vec<_>>();
+        let crossings = self
+            .waterways
+            .crossings
+            .into_iter()
+            .map(|c| {
+                json!({
+                    "x":c.x,"y":c.y,"type":char::from(c.kind).to_string(),"river":c.river
+                })
+            })
+            .collect::<Vec<_>>();
+        let waterways = json!({"rivers":rivers,"crossings":crossings,
+            "lake":{"x":self.waterways.lake.x,"y":self.waterways.lake.y}});
+        WorldMapInput {
+            name: format!(
+                "World Conquest ({})",
+                match self.size {
+                    WorldSize::Huge => "Huge",
+                    WorldSize::Massive => "Massive",
+                }
+            ),
+            width: self.grid.width,
+            height: self.grid.height,
+            chars: self.grid.chars,
+            heights: Some(self.grid.heights),
+            layers: None,
+            spawns: self
+                .spawns
+                .into_iter()
+                .map(|p| Spawn {
+                    x: p.x,
+                    y: p.y,
+                    assault: false,
+                })
+                .collect(),
+            geography: WorldDefinition {
+                size: self.size,
+                region_cells: REGION_CELLS,
+                regions: self
+                    .regions
+                    .into_iter()
+                    .map(|r| WorldRegion {
+                        id: r.id as i32,
+                        x: r.x,
+                        y: r.y,
+                        bounds: r.bounds,
+                        home: r.home,
+                        team: r.team,
+                        kind: Some(r.kind.name().into()),
+                        name: Some(r.name),
+                    })
+                    .collect(),
+                region_map: Some(self.region_map),
+                biomes: None,
+                seed: Some(self.terrain_seed),
+                generator_version: Some(GENERATOR_VERSION),
+                metadata: std::collections::BTreeMap::from([("waterways".into(), waterways)]),
+            },
+        }
+    }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GenerationError {
