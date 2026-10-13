@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Applied detached search-cache publication to the public component recruit actuator too, so late transaction errors preserve canonical graph history through both purchase entry points. Native checks remain pending.
+
 - Preserved warmed canonical path caches when a staged recruitment preview fails. Searches now run on the approved derived-cache fork and publish it only on success; the late-story regression also checks a same-clock reroute against a branch that never attempted the preview. Native checks remain pending.
 
 - Added transactional copies of derived path-search history. Copies retain external terrain identities and rebind navigation graphs to their copied vehicle buffers; aborts can discard the copy while preserving canonical warmed caches. Native cache-history protection remains pending.
