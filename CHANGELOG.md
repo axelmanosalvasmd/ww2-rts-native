@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added a source-written full-step ground-support replay consumer for the actual composed Match runner. It compares 12 Conquest traces, 2,660 ticks and 144 checkpoints, protects source-silent ticks and captured unit membership, and verifies canonical timers/effects/terrain/story/IDs and OffMap draw state. The Source Default case remains an explicit read-only runner refusal; its lower-level support component evidence is retained. Fixtures, the sole caller and Match RNG are unchanged. Native verification remains pending.
+
 - Connected ground support admission and late strikes to the separate ordinary tick continuation. The actual captured actor list feeds strikes after projectiles; the canonical phase then decays covers and cooldowns once before living weather. Updated the earlier whole-admission regression to refuse aircraft support, while ordinary ground support is now represented. Combined native replay remains pending.
 
 - Normal-merged the reviewed ground-support tick provider into a separate continuation of frozen reaction source c22969b. Preserved its canonical strike, event and cooldown ownership; actual caller wiring and combined native proof remain pending.
