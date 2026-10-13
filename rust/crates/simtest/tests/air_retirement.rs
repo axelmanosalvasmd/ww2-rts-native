@@ -111,7 +111,6 @@ fn scene(f: &Value, case: &Value) -> Match {
             )
         }
         .unwrap();
-        draft.unit.hp = v["hp"].as_f64().unwrap();
         draft.unit.rot = v["rot"].as_f64().unwrap();
         draft.unit.still = Some(v["still"].as_f64().unwrap());
         let aircraft = (!v["air"].is_null()).then(|| {
@@ -153,6 +152,8 @@ fn scene(f: &Value, case: &Value) -> Match {
                 m.aviation.planes.insert(u.id, a);
             }
         });
+        // The prototype patches incoming corpse HP after spawning; negative HP is no birth.
+        m.world.game.units.get_mut(&id).unwrap().hp = v["hp"].as_f64().unwrap();
     }
     if case["aa"].as_bool().unwrap() {
         for p in &mut m.world.game.players {

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed the aircraft retirement replay's negative-HP scene construction after its first native failure. The consumer now publishes a valid fresh unit and then applies incoming corpse HP, matching the original spawn-then-patch sequence. The production publication guard and retirement fixture are unchanged; renewed coherent aircraft native gates remain pending.
+
 - Added aircraft phase hooks for the sole Match tick owner, pure next-clock turn/AA/retirement admission and shared AA prepare/apply arithmetic. The original full-step recorder captures 10 traces, 4,972 steps and 9,965 aircraft/AA calls; an unobserved replay agrees after every step. It retains complete source unit, player, event and projectile witnesses and verifies that aircraft skip ordinary suppression and general timers. Native phase consumers replay held commands on the existing queue and compare every owned phase without copying aircraft or AA results. Native execution and the sole tick owner's integration are pending; automatic, ground-target and area aircraft weapons remain explicit unsupported phases.
 
 - Admitted owned aircraft as ordinary firing context at their source off-map bases and during entry or return. Aircraft require canonical sortie, combat, firing and control metadata; ordinary actors keep their map bounds. Prior-pose capture now validates context before writing. The original whole-step recorder covers 12 aircraft cases and 24 before/after contexts with no generic flights or shots. Added focused context and atomic-refusal tests; native checks and tick integration remain pending.
