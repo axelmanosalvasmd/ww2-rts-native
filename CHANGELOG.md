@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Correct the new World firing-admission test to compare the actual public queue snapshot, controls and path requests. Independent source review caught Debug formatting of MatchCommands, which has no Debug implementation, before native compilation. Runtime, Source fixture and assertions are unchanged; native execution remains pending.
+
 - Retain the existing live-flight, grenade-ticket and weapon-metadata guards as shared read-only admission before World commands. Source review caught malformed firing timers and XP that otherwise failed after a queued payment; the new whole-boundary test preserves the real recorded input and wallet on refusal. Ground-only World admission also rejects restored queued naval/AIR/rail births before later publication. These source repairs and tests remain unrun.
 
 - Wire real World ground tick orchestration through canonical actor, routing, recovery and final-object owners. Research runs after vision, completed buildings train at their live turn, and final captured income precedes real convoys and current-region capture. Read-only admission refuses unrepresented logistics, AIR, rail, carrier, construction, shared work, explicit tactical and support capabilities before commands or clock. A near-complete neutral-region fort transfer refuses before the tick. Ordinary research is now connected through the same checked helper while ordinary restored training queues still refuse. Native verification remains pending.

@@ -375,7 +375,14 @@ fn world_firing_admission_refuses_before_a_recorded_technology_payment_or_bounda
             .collect::<Vec<_>>()
     };
     let metadata = firing_bits(&m);
-    let commands = format!("{:?}", m.commands);
+    let commands = format!(
+        "{:?}",
+        (
+            m.commands.queue.snapshot(),
+            &m.commands.units,
+            m.commands.path_requests()
+        )
+    );
     let production = format!("{:?}", m.production);
     let units = format!("{:?}", m.world.game.units);
     let grid = format!("{:?}", m.grid);
@@ -406,7 +413,14 @@ fn world_firing_admission_refuses_before_a_recorded_technology_payment_or_bounda
     assert_eq!(m.commands.next_tick(), Some(1));
     assert_eq!(m.commands.pending_commands(), 1);
     assert_eq!(
-        format!("{:?}", m.commands),
+        format!(
+            "{:?}",
+            (
+                m.commands.queue.snapshot(),
+                &m.commands.units,
+                m.commands.path_requests()
+            )
+        ),
         commands,
         "the actual queued Technology order remains pending"
     );
