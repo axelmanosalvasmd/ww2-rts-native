@@ -1,4 +1,5 @@
-//! Standalone lobby transport. There is no game simulation or core dependency in this slice.
+//! Lobby transport and private native match construction. Room simulation is not enabled.
+pub mod authoritative_maps;
 mod lobby;
 mod maps;
 

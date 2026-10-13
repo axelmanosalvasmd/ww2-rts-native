@@ -1,6 +1,7 @@
 //! The ww2-rts rules core. It holds no engine, networking or file-system code; the server and the
 //! Unreal client reach it as a library (`AGENTS.md`).
 
+pub mod assault_runtime;
 pub mod catalog;
 pub mod client_view;
 pub mod combat;
@@ -22,6 +23,7 @@ pub mod map;
 pub mod match_abilities;
 pub mod match_combat;
 pub mod match_commands;
+pub mod match_end;
 pub mod match_firing;
 pub mod match_recovery;
 
@@ -55,6 +57,7 @@ pub mod structures;
 pub mod supply_convoys;
 pub mod terrain;
 pub mod traffic;
+pub mod unit_publication;
 pub mod unit_spawn;
 pub mod vehicle;
 mod vehicle_navigation;
@@ -65,3 +68,6 @@ pub mod world;
 pub mod world_generation;
 
 pub mod world_map;
+
+pub mod match_world;
+pub mod match_world_rails;

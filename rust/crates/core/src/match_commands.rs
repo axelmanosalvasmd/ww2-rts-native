@@ -2,6 +2,7 @@
 
 use crate::{
     catalog::Catalog,
+    economy::{self, AbilityCost, Mode},
     game::{Point, Unit},
     grid::UnitId,
     orders::OrderQueue,
@@ -116,28 +117,42 @@ pub struct UnitControl {
     pub rally_drift: bool,
     /// Operatives reject ordinary squad orders.
     pub operative: bool,
+    /// World local guards return here in the guard phase, owned by tick scheduling.
+    pub guard_home: Option<Point>,
 }
 impl UnitControl {
     /// Prepare before publishing a spawned unit or charging a wallet.
     pub fn new(unit: &Unit, rules: &Rules) -> Result<Self, String> {
+        Self::new_for_mode(unit, rules, Mode::Default)
+    }
+    /// Paid construction-mode abilities start off; free abilities start on.
+    pub fn new_for_mode(unit: &Unit, rules: &Rules, mode: Mode) -> Result<Self, String> {
         let kind = rules
             .kinds
             .get(unit.kind)
             .ok_or("unknown control unit kind")?;
         let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
         let definition = catalog.unit(&kind.name).map_err(|e| e.to_string())?;
-        let ability = definition
-            .get("ab")
-            .and_then(|a| a.get("id"))
+        let ability = definition.get("ab").ok_or("missing unit ability")?;
+        let ability_id = ability
+            .get("id")
             .and_then(|v| v.string())
             .ok_or("missing unit ability")?;
+        let cost = economy::ab_cost(
+            mode,
+            AbilityCost {
+                id: ability_id,
+                munitions: ability.get("mun").and_then(|v| v.number()),
+            },
+        )
+        .map_err(|e| e.to_string())?;
         if !unit.rot.is_finite() {
             return Err("nonfinite unit aim".into());
         }
         Ok(Self {
             react: 0.0,
             aim: unit.rot,
-            auto_cast: ability != "none",
+            auto_cast: ability_id != "none" && cost == 0.0,
             auto_retreat: !kind.air,
             attack_id: 0,
             follow: 0,
@@ -155,6 +170,7 @@ impl UnitControl {
             nade: None,
             rally_drift: false,
             operative: false,
+            guard_home: None,
         })
     }
 }

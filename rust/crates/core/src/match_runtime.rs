@@ -89,16 +89,65 @@ fn number(v: &Value, name: &str) -> Result<f64, String> {
         .ok_or_else(|| format!("invalid startup number {name}"))
 }
 
+enum StartupProfile {
+    Conquest,
+    World(MatchRandom),
+    Assault { defender_team: i32 },
+}
+
 impl StartPlan {
     pub fn prepare(
         map: &crate::map::AuthoritativeMap,
         options: &MatchOptions,
         rules: &Rules,
     ) -> Result<Self, String> {
-        if map.geography().is_some() {
+        Self::prepare_mode(map, options, rules, StartupProfile::Conquest)
+    }
+
+    pub(crate) fn prepare_world(
+        map: &crate::map::AuthoritativeMap,
+        options: &MatchOptions,
+        rules: &Rules,
+        random: MatchRandom,
+    ) -> Result<Self, String> {
+        Self::prepare_mode(map, options, rules, StartupProfile::World(random))
+    }
+
+    pub(crate) fn prepare_assault(
+        map: &crate::map::AuthoritativeMap,
+        options: &MatchOptions,
+        rules: &Rules,
+        defender_team: i32,
+    ) -> Result<Self, String> {
+        Self::prepare_mode(
+            map,
+            options,
+            rules,
+            StartupProfile::Assault { defender_team },
+        )
+    }
+
+    fn prepare_mode(
+        map: &crate::map::AuthoritativeMap,
+        options: &MatchOptions,
+        rules: &Rules,
+        profile: StartupProfile,
+    ) -> Result<Self, String> {
+        let world_mode = matches!(&profile, StartupProfile::World(_));
+        let defender_team = match &profile {
+            StartupProfile::Assault { defender_team } => Some(*defender_team),
+            _ => None,
+        };
+        if map.geography().is_some() != world_mode || (world_mode && options.mode != Mode::World) {
             return Err("native startup does not yet initialize World matches".into());
         }
-        if !matches!(options.mode, Mode::Default | Mode::Conquest) {
+        if defender_team.is_some() && options.mode != Mode::Assault {
+            return Err("Assault startup requires explicit Assault mode".into());
+        }
+        if !world_mode
+            && defender_team.is_none()
+            && !matches!(options.mode, Mode::Default | Mode::Conquest)
+        {
             return Err("native startup currently supports Conquest".into());
         }
         if !options.living_weather && options.weather != WeatherChoice::Map {
@@ -160,16 +209,52 @@ impl StartPlan {
             flags: &flags,
             heights: heights.as_deref(),
         };
-        let distances = deployment::spawn_distances(&terrain, &spawns, &available)
-            .map_err(|e| format!("spawn distances: {e:?}"))?;
-        let mut random = MatchRandom::new(options.seed);
-        let selection = if options.shuffle {
+        let distances = if world_mode {
+            Vec::new()
+        } else {
+            deployment::spawn_distances(&terrain, &spawns, &available)
+                .map_err(|e| format!("spawn distances: {e:?}"))?
+        };
+        let mut random = match profile {
+            StartupProfile::World(random) => random,
+            _ => MatchRandom::new(options.seed),
+        };
+        let selection = if options.shuffle && !world_mode {
             LayoutSelection::RandomFraction(random.next_fraction(StreamId::Terrain))
         } else {
             LayoutSelection::First
         };
-        let slots = deployment::spawn_slots(available.len(), &teams, Some(&distances), selection)
-            .map_err(|e| format!("spawn allocation: {e:?}"))?;
+        let slots = if world_mode {
+            if spawns.len() < teams.len() {
+                return Err("World startup needs one authored spawn per commander".into());
+            }
+            (0..teams.len()).collect()
+        } else {
+            deployment::spawn_slots(available.len(), &teams, Some(&distances), selection)
+                .map_err(|e| format!("spawn allocation: {e:?}"))?
+        };
+        let mut authored_slots: Vec<_> = if world_mode {
+            slots.clone()
+        } else {
+            slots.iter().map(|&slot| available[slot]).collect()
+        };
+        if let (Some(defender), Some(defend)) = (defender_team, map.defend()) {
+            let attackers: Vec<_> = (0..spawns.len())
+                .filter(|slot| !defend.contains(slot))
+                .collect();
+            let (mut d, mut a) = (0, 0);
+            for (index, team) in teams.iter().enumerate() {
+                authored_slots[index] = if *team == defender {
+                    let slot = defend[d % defend.len()];
+                    d += 1;
+                    slot
+                } else {
+                    let slot = attackers[a % attackers.len()];
+                    a += 1;
+                    slot
+                };
+            }
+        }
         let support = catalog
             .table("SUPPORT_TYPES")
             .map_err(|e| e.to_string())?
@@ -180,7 +265,11 @@ impl StartPlan {
             .iter()
             .enumerate()
             .map(|(slot, config)| {
-                let s = &spawns[available[slots[slot]]];
+                let s = &spawns[if world_mode {
+                    slot
+                } else {
+                    authored_slots[slot]
+                }];
                 Ok(PlayerStart {
                     config: config.clone(),
                     spawn: Point {
@@ -205,23 +294,50 @@ impl StartPlan {
             ArmySize::Endless => "endless",
         };
         let income_scale = number(field(field(cfg, "armies")?, army_key)?, "income")?;
-        let initial_mp = number(cfg, "mpStart")? * income_scale;
+        let initial_mp = number(
+            if world_mode {
+                field(cfg, "classic")?
+            } else {
+                cfg
+            },
+            "mpStart",
+        )? * income_scale;
         let initial_inc = number(cfg, "mpBase")?;
         let economy = EconomyState {
             players: teams
                 .iter()
-                .map(|&team| PlayerEconomy {
-                    team,
-                    mp: initial_mp,
-                    inc: initial_inc,
-                    ..Default::default()
+                .map(|&team| {
+                    Ok(PlayerEconomy {
+                        team,
+                        mp: if let Some(defender) = defender_team {
+                            number(
+                                field(cfg, "assault")?,
+                                if team == defender {
+                                    "defenderMp"
+                                } else {
+                                    "attackerMp"
+                                },
+                            )? * income_scale
+                        } else {
+                            initial_mp
+                        },
+                        inc: initial_inc,
+                        ..Default::default()
+                    })
                 })
-                .collect(),
+                .collect::<Result<Vec<_>, String>>()?,
         };
+        let kept: Vec<_> = map
+            .points()
+            .iter()
+            .enumerate()
+            .filter_map(|(i, p)| (defender_team.is_none() || p.mp > 0.0).then_some(i))
+            .collect();
         let points = map
             .points()
             .iter()
             .enumerate()
+            .filter(|(i, _)| kept.contains(i))
             .map(|(i, p)| Objective {
                 id: match map.source()["points"][i].get("id") {
                     Some(id) if !id.is_null() => id.clone(),
@@ -234,7 +350,9 @@ impl StartPlan {
                 vp: p.vp,
                 mp: p.mp,
                 kind: p.kind.clone(),
-                needs: p.needs,
+                needs: p
+                    .needs
+                    .and_then(|needed| kept.iter().position(|i| *i == needed)),
                 owner: None,
                 capper: None,
                 progress: 0.0,
@@ -300,16 +418,23 @@ impl StartPlan {
             l.raining = weather.now == WeatherKind::Rain;
             l
         });
-        let starting_kinds = field(cfg, "startForce")?
-            .array()
-            .ok_or("invalid starting force")?
-            .iter()
-            .map(|t| {
-                rules
-                    .kind(t.string().ok_or("invalid starting type")?)
-                    .ok_or("unknown starting type".to_owned())
-            })
-            .collect::<Result<_, _>>()?;
+        let starting_kinds = field(
+            if world_mode {
+                field(cfg, "classic")?
+            } else {
+                cfg
+            },
+            "startForce",
+        )?
+        .array()
+        .ok_or("invalid starting force")?
+        .iter()
+        .map(|t| {
+            rules
+                .kind(t.string().ok_or("invalid starting type")?)
+                .ok_or("unknown starting type".to_owned())
+        })
+        .collect::<Result<_, _>>()?;
         Ok(Self {
             dimensions: (width, height),
             players,
@@ -392,12 +517,14 @@ pub struct BuildingCell {
     pub at: Point,
 }
 
-/// Authoritative Conquest startup state. Tick execution is added independently.
+/// Authoritative startup state. Each mode admits only its implemented phases.
 /// Live terrain and units have a single owner in `world.game`.
 pub struct Match {
     pub abilities: crate::match_abilities::AbilityState,
     pub recovery: crate::match_recovery::RecoveryState,
     pub support: crate::match_support::SupportState,
+    pub assault: Option<crate::assault_runtime::AssaultState>,
+    pub world_runtime: Option<crate::match_world::WorldRuntime>,
     pub combat: crate::match_combat::CombatState,
     pub environment: crate::environment::EnvironmentRuntime,
     pub commands: crate::match_commands::MatchCommands,
@@ -412,7 +539,7 @@ pub struct Match {
     pub building_rallies: BTreeMap<u32, Option<Point>>,
     pub player_rallies: Vec<Option<Point>>,
     pub recruit_metadata: BTreeMap<u32, RecruitMetadata>,
-    produced_placer: crate::produced_units::ProducedPlacer,
+    pub(crate) produced_placer: crate::produced_units::ProducedPlacer,
     pub scenario: Option<crate::legacy_scenario::LegacyScenario>,
     pub logistics: crate::logistics::LogisticsState,
     pub firing: crate::match_firing::FiringState,
@@ -421,8 +548,8 @@ pub struct Match {
     /// Canonical source counters. Event owners must record accepted effects exactly once.
     pub story: Vec<crate::match_story::PlayerStory>,
     pub fallen: crate::match_story::FallenLocations,
-    pub finish: Option<crate::conquest_end::ConquestFinish>,
-    pub timeline: Vec<crate::conquest_end::ConquestSample>,
+    pub finish: Option<crate::match_end::MatchFinish>,
+    pub timeline: Vec<crate::match_end::MatchSample>,
     pub next_unit_id: u32,
     pub rules: Rules,
 }
@@ -431,6 +558,17 @@ impl Match {
     pub fn new(map: &crate::map::AuthoritativeMap, options: MatchOptions) -> Result<Self, String> {
         let rules = Rules::compiled().map_err(|e| e.to_string())?;
         let start = StartPlan::prepare(map, &options, &rules)?;
+        let mut result = Self::skirmish_shell(map, options, rules, start)?;
+        result.complete_skirmish_start()?;
+        Ok(result)
+    }
+
+    pub(crate) fn skirmish_shell(
+        map: &crate::map::AuthoritativeMap,
+        options: MatchOptions,
+        rules: Rules,
+        start: StartPlan,
+    ) -> Result<Self, String> {
         let mut world = World::from_map(map).map_err(|e| e.to_string())?;
         let next_unit_id = start.spawn_initial_force(&mut world.game, &rules)?;
         for slot in 0..start.players.len() {
@@ -460,10 +598,13 @@ impl Match {
             crate::legacy_scenario::LegacyScenario::from_map(map, &owners)
         };
         let player_count = start.players.len();
-        let mut result = Self {
+        let point_count = start.points.len();
+        let result = Self {
             abilities: crate::match_abilities::AbilityState::default(),
             recovery: crate::match_recovery::RecoveryState::default(),
             support: crate::match_support::SupportState::default(),
+            assault: None,
+            world_runtime: None,
             combat: crate::match_combat::CombatState::default(),
             environment: crate::environment::EnvironmentRuntime::default(),
             commands: crate::match_commands::MatchCommands::new(4096),
@@ -482,7 +623,7 @@ impl Match {
             scenario,
             logistics: crate::logistics::LogisticsState::default(),
             firing: crate::match_firing::FiringState::default(),
-            capture_ticks: vec![None; map.points().len()],
+            capture_ticks: vec![None; point_count],
             tick_state: crate::match_tick::TickState::default(),
             story: vec![crate::match_story::PlayerStory::default(); player_count],
             fallen: crate::match_story::FallenLocations::default(),
@@ -491,21 +632,26 @@ impl Match {
             next_unit_id,
             rules,
         };
-        result.setup_bases()?;
-        for unit in result.world.game.units.values() {
-            result.combat.initialize(unit.id);
-            result.abilities.initialize(unit.id);
-            result.recovery.initialize(unit.id);
-            let control = crate::match_commands::UnitControl::new(unit, &result.rules)?;
-            result.commands.insert(unit.id, control);
-        }
-        for &id in result.world.game.units.keys() {
-            result.firing.initialize(id);
-            result.combat.initialize(id);
-        }
-        result.grid.rebuild(&result.world.game.units);
-        result.initialize_recipient_routing()?;
         Ok(result)
+    }
+
+    pub(crate) fn complete_skirmish_start(&mut self) -> Result<(), String> {
+        self.setup_bases()?;
+        for unit in self.world.game.units.values() {
+            self.combat.initialize(unit.id);
+            self.firing.initialize(unit.id);
+            self.abilities.initialize(unit.id);
+            self.recovery.initialize(unit.id);
+            if !self.commands.units.contains_key(&unit.id) {
+                let control = crate::match_commands::UnitControl::new(unit, &self.rules)?;
+                self.commands.insert(unit.id, control);
+            }
+        }
+        self.grid.rebuild(&self.world.game.units);
+        if self.world.game.mode.is_none() {
+            self.initialize_recipient_routing()?;
+        }
+        Ok(())
     }
 
     /// Run the source's late Conquest point-supply, capture and income phases.
@@ -730,7 +876,7 @@ impl Match {
                     }
                     cell
                 };
-                let at = self.place_starting_building(owner, name, cell, &mut placer)?;
+                let at = self.place_starting_building(owner, name, cell)?;
                 avoid.push((at, 12.0));
             }
         }
@@ -764,12 +910,11 @@ impl Match {
         Ok(())
     }
 
-    fn place_starting_building(
+    pub(crate) fn place_starting_building(
         &mut self,
         owner: usize,
         name: &str,
         cell: usize,
-        placer: &mut SpawnPlacer,
     ) -> Result<Point, String> {
         let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
         let definition = catalog.unit(name).map_err(|e| e.to_string())?;
@@ -790,26 +935,23 @@ impl Match {
             self.world.set_cell(c, b'K').map_err(|e| e.to_string())?;
         }
         let kind = self.rules.kind(name).ok_or("unknown building kind")?;
-        let at = placer
-            .scatter_position(
-                terrain_view(&self.world.game),
-                &self.rules.kinds[kind],
-                self.start.players[owner].spawn,
-                self.world.game.units.len() as u32,
-            )
-            .map_err(|e| format!("building spawn: {e:?}"))?
-            .point;
         let id = self.next_unit_id;
-        self.next_unit_id = id.checked_add(1).ok_or("unit ID capacity exhausted")?;
-        let mut unit = unit_spawn::initial_unit(&self.rules, catalog, kind, id, owner, at)
-            .map_err(|e| format!("building unit: {e:?}"))?;
         let at = foot_center(&self.world.game, cell, size);
-        unit.x = at.x;
-        unit.z = at.z;
-        unit.cells = Some(cells.iter().map(|&c| c as u32).collect());
-        unit.built = Some(1.0);
-        unit.hp = max_hp;
-        self.world.game.units.insert(id, unit);
+        let mut draft = crate::unit_publication::StagedUnit::ordinary(
+            &self.world.game,
+            &self.rules,
+            owner,
+            kind,
+            id,
+            self.world.game.units.len() as u32,
+            self.start.players[owner].spawn,
+            Some(at),
+        )
+        .map_err(|e| format!("building unit: {e:?}"))?;
+        draft.unit.cells = Some(cells.iter().map(|&c| c as u32).collect());
+        draft.unit.built = Some(1.0);
+        draft.unit.hp = max_hp;
+        self.publish_starting_unit(draft)?;
         self.production
             .initialize_building(id)
             .map_err(|e| e.to_string())?;
@@ -829,9 +971,35 @@ impl Match {
             .map_err(|e| e.to_string())?;
         Ok(at)
     }
+
+    pub(crate) fn publish_starting_unit(
+        &mut self,
+        draft: crate::unit_publication::StagedUnit,
+    ) -> Result<(), String> {
+        crate::unit_publication::prepare_publication(
+            crate::unit_publication::PublicationParts {
+                units: &mut self.world.game.units,
+                grid: &mut self.grid,
+                controls: &mut self.commands.units,
+                recruitment: &mut self.recruit_metadata,
+                next_id: &mut self.next_unit_id,
+            },
+            &self.rules,
+            self.start.players.len(),
+            vec![draft],
+        )
+        .map_err(|e| format!("starting unit publication: {e:?}"))?
+        .publish_with(|unit, _| {
+            self.combat.initialize(unit.id);
+            self.firing.initialize(unit.id);
+            self.abilities.initialize(unit.id);
+            self.recovery.initialize(unit.id);
+        });
+        Ok(())
+    }
 }
 
-fn terrain_view(game: &Game) -> TerrainView<'_> {
+pub(crate) fn terrain_view(game: &Game) -> TerrainView<'_> {
     TerrainView {
         width: game.w,
         height: game.h,
@@ -844,7 +1012,7 @@ fn terrain_view(game: &Game) -> TerrainView<'_> {
         changes: &[],
     }
 }
-fn footprint(game: &Game, cell: usize, size: usize) -> Option<Vec<usize>> {
+pub(crate) fn footprint(game: &Game, cell: usize, size: usize) -> Option<Vec<usize>> {
     let (x, y) = (cell % game.w, cell / game.w);
     (x + size <= game.w && y + size <= game.h).then(|| {
         (0..size)
@@ -852,7 +1020,7 @@ fn footprint(game: &Game, cell: usize, size: usize) -> Option<Vec<usize>> {
             .collect()
     })
 }
-fn foot_center(game: &Game, cell: usize, size: usize) -> Point {
+pub(crate) fn foot_center(game: &Game, cell: usize, size: usize) -> Point {
     Point {
         x: (cell % game.w) as f64 * CELL + size as f64 * CELL / 2.0,
         z: (cell / game.w) as f64 * CELL + size as f64 * CELL / 2.0,

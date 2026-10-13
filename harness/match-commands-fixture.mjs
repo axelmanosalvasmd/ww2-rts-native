@@ -29,7 +29,7 @@ const makeMap=(name,rows,height)=>({name,w:rows[0].length,h:rows.length,rows,spa
 const flat=()=>Array(24).fill('.'.repeat(32));
 const cover=flat();cover[11]='..........TTT...HH...OO.........';cover[12]='..........TTT...HH...OO.........';
 const wall=flat().map((r,y)=>r.slice(0,16)+(y<8||y>11?'B':'.')+r.slice(17));
-const cliff=flat();const heights=cliff.map((r,y)=>[...r].map((_,x)=>x>15?'2':'0').join('')); 
+const cliff=flat();const heights=cliff.map((r,y)=>[...r].map((_,x)=>x>15?'2':'0').join(''));
 const maps=[makeMap('flat',flat()),makeMap('cover',cover),makeMap('wall',wall),makeMap('cliff',cliff,heights)];
 const cases=[];
 function trace(name,map,initial,actions){
