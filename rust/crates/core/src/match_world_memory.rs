@@ -6,7 +6,7 @@ use crate::{
     math,
     route_knowledge::{LiveRouting, RouteKnowledge, RouteQuery},
     rules::Rules,
-    vision::{airborne, los, team_sees as sees, vision_of},
+    vision::{airborne, los, team_sees_with_observer, vision_of},
     world_memory::{self, BoundUnit, KnownRegion, WorldLive, WorldRow},
 };
 use std::collections::{BTreeMap, BTreeSet};
@@ -62,57 +62,20 @@ fn update_live(live: &mut WorldLive, game: &Game, rules: &Rules) {
 }
 impl Match {
     pub(crate) fn validate_world_memory_context(&self, owner: usize) -> Result<i32, String> {
-        let actor = self.world_actor_view(owner)?;
-        world_memory::validate(&self.world, &self.rules, actor.team)?;
-        let runtime = self.world_runtime.as_ref().unwrap();
-        let geography = self.world.geography().ok_or("missing World geography")?;
-        if self.start.dimensions != (self.world.game.w, self.world.game.h)
-            || runtime.regions.len() != geography.regions.len()
-            || self.start.players.len() != self.world.game.players.len()
-            || self
-                .world
-                .game
-                .players
-                .iter()
-                .enumerate()
-                .any(|(i, p)| p.slot != i || self.start.players[i].config.team != p.team)
-            || runtime.regions.iter().any(|r| {
-                !(-1..=5).contains(&r.team)
-                    || !r.progress.is_finite()
-                    || !(0.0..=1.0).contains(&r.progress)
-                    || r.capper.is_some_and(|s| s >= self.start.players.len())
-            })
-            || runtime.known_buildings.iter().any(|(t, rows)| {
-                !(-1..=5).contains(t)
-                    || rows.iter().any(|b| {
-                        b.kind >= self.rules.kinds.len()
-                            || !b.at.x.is_finite()
-                            || !b.at.z.is_finite()
-                            || (b.owner >= self.start.players.len()
-                                && b.owner != LOCAL_DEFENDER_OWNER)
-                    })
-            })
-            || runtime.memory.fog.teams.values().any(|f| {
-                f.vis.len() != self.world.game.chars.len()
-                    || f.next.len() != self.world.game.chars.len()
-                    || f.explored.len() != self.world.game.chars.len()
-            })
-        {
-            return Err("invalid World recipient binding or region facts".into());
-        }
-        let mut ids = BTreeSet::new();
-        if self
-            .world
-            .game
-            .wrecks
-            .iter()
-            .any(|w| w.id.is_none() || !ids.insert(w.id) || !w.x.is_finite() || !w.z.is_finite())
-        {
-            return Err(
-                "World wrecks require finite positions and unique source identities".into(),
-            );
-        }
-        Ok(actor.team)
+        let runtime = self.world_runtime.as_ref().ok_or("missing World runtime")?;
+        validate_world_context(
+            WorldRoutingContext {
+                world: &self.world,
+                rules: &self.rules,
+                start: &self.start,
+                rails: &runtime.rails,
+                regions: &runtime.regions,
+                known_buildings: &runtime.known_buildings,
+                local_defender: &runtime.local_defender,
+            },
+            &runtime.memory,
+            owner,
+        )
     }
     /// Explicit vision phase. Routing and delivery reads never advance this pass.
     pub fn refresh_world_visibility(&mut self) -> Result<(), String> {
@@ -222,48 +185,14 @@ impl Match {
     }
     fn refresh_world_wrecks(&mut self, owner: usize) -> Result<(), String> {
         let team = self.validate_world_memory_context(owner)?;
-        let game = &self.world.game;
-        let visible = |at| sees(game, &self.rules, &self.grid, team, at);
-        let memory = &mut self
-            .world_runtime
-            .as_mut()
-            .unwrap()
-            .memory
-            .team_mut(team)
-            .ok_or("World memory has not been refreshed")?
-            .wrecks;
-        for current in &game.wrecks {
-            if !game.reveal
-                && !visible(Point {
-                    x: current.x,
-                    z: current.z,
-                })
-            {
-                continue;
-            }
-            let row = Wreck {
-                id: current.id,
-                cell: None,
-                x: rounded(current.x),
-                z: rounded(current.z),
-                moving: current.moving,
-            };
-            if let Some(old) = memory.iter_mut().find(|r| r.id == current.id) {
-                *old = row;
-            } else {
-                memory.push(row);
-            }
-        }
-        // World reveal discovers wrecks, but source removal still asks current teamSees.
-        memory.retain(|row| {
-            game.wrecks.iter().any(|w| w.id == row.id) || !visible(Point { x: row.x, z: row.z })
-        });
-        for row in memory {
-            if row.moving && !(game.reveal || visible(Point { x: row.x, z: row.z })) {
-                row.moving = false;
-            }
-        }
-        Ok(())
+        let runtime = self.world_runtime.as_mut().unwrap();
+        refresh_wrecks_parts(
+            &self.world.game,
+            &self.rules,
+            &mut runtime.memory,
+            team,
+            None,
+        )
     }
     pub fn world_wrecks(&mut self, owner: usize) -> Result<Vec<Wreck>, String> {
         self.refresh_world_memory(owner)?;
@@ -280,64 +209,27 @@ impl Match {
             .to_vec())
     }
     pub fn refresh_world_routing(&mut self, owner: usize) -> Result<(), String> {
-        self.refresh_world_memory(owner)?;
-        let actor = self.world_actor_view(owner)?;
-        let team = actor.team;
-        let visible = actor.visible.to_vec();
-        let tick = self.world.game.tick;
-        self.world_runtime
-            .as_mut()
-            .unwrap()
-            .memory
-            .apply_routes(team)?;
-        let fresh = self
-            .world_runtime
-            .as_ref()
-            .unwrap()
-            .memory
-            .live_for(owner)
-            .is_none_or(|l| l.tick != Some(tick));
-        if fresh {
-            self.refresh_world_wrecks(owner)?;
-            let game = &self.world.game;
-            let memory = &mut self.world_runtime.as_mut().unwrap().memory;
-            let vis = &memory.fog.team(game, &self.rules, team).vis;
-            let mut fires = vec![false; game.chars.len()];
-            for (&c, _) in self.world.fires.iter() {
-                if vis[c] != 0 {
-                    fires[c] = true;
-                }
-            }
-            let mut live = WorldLive {
-                tick: Some(tick),
-                units: game
-                    .units
-                    .values()
-                    .filter(|u| seen(game, owner, &visible, u))
-                    .map(bound)
-                    .collect(),
-                fires,
-                bunkers: Vec::new(),
-                wrecks: memory.team(team).unwrap().remembered_wrecks().to_vec(),
-                wetness: game.wet.unwrap_or(0.0),
-                roads: self.world.roads,
-            };
-            update_live(&mut live, game, &self.rules);
-            memory.lives.insert(owner, live);
-        } else {
-            update_live(
-                self.world_runtime
-                    .as_mut()
-                    .unwrap()
-                    .memory
-                    .lives
-                    .get_mut(&owner)
-                    .unwrap(),
-                &self.world.game,
-                &self.rules,
-            );
-        }
-        Ok(())
+        let team = self.validate_world_memory_context(owner)?;
+        let visible = self.world_actor_view(owner)?.visible.to_vec();
+        let runtime = self.world_runtime.as_mut().unwrap();
+        let receipt = refresh_world_parts(
+            WorldRoutingContext {
+                world: &self.world,
+                rules: &self.rules,
+                start: &self.start,
+                rails: &runtime.rails,
+                regions: &runtime.regions,
+                known_buildings: &runtime.known_buildings,
+                local_defender: &runtime.local_defender,
+            },
+            &mut runtime.memory,
+            owner,
+            team,
+            &visible,
+            None,
+            false,
+        )?;
+        receipt.commit(&mut self.world)
     }
     /// Borrow after refresh, so consumers can split Match's other mutable fields.
     pub fn world_routing(&self, owner: usize) -> Result<WorldRouting<'_>, String> {
@@ -552,4 +444,314 @@ fn territory_runs(
             (id, runs)
         })
         .collect()
+}
+
+/// Canonical immutable World fields, split from its one memory owner.
+#[derive(Clone, Copy)]
+pub struct WorldRoutingContext<'a> {
+    pub world: &'a crate::world::World,
+    pub rules: &'a Rules,
+    pub start: &'a crate::match_runtime::StartPlan,
+    pub rails: &'a crate::match_world_rails::WorldRails,
+    pub regions: &'a [crate::match_world::RegionState],
+    pub known_buildings: &'a [(i32, Vec<crate::match_world::KnownBuilding>)],
+    pub local_defender: &'a crate::match_world::LocalDefender,
+}
+impl<'a> WorldRoutingContext<'a> {
+    fn actor(self, owner: usize) -> Result<crate::match_world::WorldActorView<'a>, String> {
+        if self.world.game.mode != Some(crate::game::ModeKind::World) {
+            return Err("World routing requires World mode".into());
+        }
+        if owner == LOCAL_DEFENDER_OWNER {
+            Ok(crate::match_world::WorldActorView {
+                owner,
+                team: -1,
+                faction: self.local_defender.faction,
+                spawn: self.local_defender.spawn,
+                visible: &self.local_defender.visible,
+            })
+        } else {
+            let player = self
+                .world
+                .game
+                .players
+                .get(owner)
+                .ok_or("invalid World actor")?;
+            let start = self
+                .start
+                .players
+                .get(owner)
+                .ok_or("invalid World commander")?;
+            Ok(crate::match_world::WorldActorView {
+                owner,
+                team: player.team,
+                faction: start.config.faction,
+                spawn: start.spawn,
+                visible: &player.visible,
+            })
+        }
+    }
+}
+fn validate_world_context(
+    context: WorldRoutingContext<'_>,
+    memory: &world_memory::WorldMemory,
+    owner: usize,
+) -> Result<i32, String> {
+    let actor = context.actor(owner)?;
+    world_memory::validate(context.world, context.rules, actor.team)?;
+    memory.fog.validate_shape(&context.world.game)?;
+    let geography = context.world.geography().ok_or("missing World geography")?;
+    if context.start.dimensions != (context.world.game.w, context.world.game.h)
+        || context.regions.len() != geography.regions.len()
+        || context.start.players.len() != context.world.game.players.len()
+        || context
+            .world
+            .game
+            .players
+            .iter()
+            .enumerate()
+            .any(|(i, p)| p.slot != i || context.start.players[i].config.team != p.team)
+        || context.regions.iter().any(|r| {
+            !(-1..=5).contains(&r.team)
+                || !r.progress.is_finite()
+                || !(0.0..=1.0).contains(&r.progress)
+                || r.capper.is_some_and(|s| s >= context.start.players.len())
+        })
+        || context.known_buildings.iter().any(|(t, rows)| {
+            !(-1..=5).contains(t)
+                || rows.iter().any(|b| {
+                    b.kind >= context.rules.kinds.len()
+                        || !b.at.x.is_finite()
+                        || !b.at.z.is_finite()
+                        || (b.owner >= context.start.players.len()
+                            && b.owner != LOCAL_DEFENDER_OWNER)
+                })
+        })
+        || memory.fog.teams.values().any(|f| {
+            f.vis.len() != context.world.game.chars.len()
+                || f.next.len() != context.world.game.chars.len()
+                || f.explored.len() != context.world.game.chars.len()
+        })
+    {
+        return Err("invalid World recipient binding or region facts".into());
+    }
+    let mut ids = BTreeSet::new();
+    if context
+        .world
+        .game
+        .wrecks
+        .iter()
+        .any(|w| w.id.is_none() || !ids.insert(w.id) || !w.x.is_finite() || !w.z.is_finite())
+    {
+        return Err("World wrecks require finite positions and unique source identities".into());
+    }
+    Ok(actor.team)
+}
+fn refresh_wrecks_parts(
+    game: &Game,
+    rules: &Rules,
+    memory: &mut world_memory::WorldMemory,
+    team: i32,
+    observer: Option<crate::staged_observer::StagedObserver<'_>>,
+) -> Result<(), String> {
+    let grid = crate::grid::SpatialGrid::new(&game.units, 16.0);
+    let visible = |at| team_sees_with_observer(game, rules, &grid, team, at, observer);
+    let wrecks = &mut memory
+        .team_mut(team)
+        .ok_or("World memory has not been refreshed")?
+        .wrecks;
+    for current in &game.wrecks {
+        if !game.reveal
+            && !visible(Point {
+                x: current.x,
+                z: current.z,
+            })
+        {
+            continue;
+        }
+        let row = Wreck {
+            id: current.id,
+            cell: None,
+            x: rounded(current.x),
+            z: rounded(current.z),
+            moving: current.moving,
+        };
+        if let Some(old) = wrecks.iter_mut().find(|r| r.id == current.id) {
+            *old = row;
+        } else {
+            wrecks.push(row);
+        }
+    }
+    // World reveal discovers wrecks, but removal still asks current teamSees.
+    wrecks.retain(|row| {
+        game.wrecks.iter().any(|w| w.id == row.id) || !visible(Point { x: row.x, z: row.z })
+    });
+    for row in wrecks {
+        if row.moving && !(game.reveal || visible(Point { x: row.x, z: row.z })) {
+            row.moving = false;
+        }
+    }
+    Ok(())
+}
+fn refresh_world_parts(
+    context: WorldRoutingContext<'_>,
+    memory: &mut world_memory::WorldMemory,
+    owner: usize,
+    team: i32,
+    visible: &[u32],
+    observer: Option<crate::staged_observer::StagedObserver<'_>>,
+    capture_frame: bool,
+) -> Result<crate::world::ObservationReceipt, String> {
+    let WorldRoutingContext {
+        world,
+        rules,
+        rails,
+        ..
+    } = context;
+    let (_, receipt) = memory.refresh_impl(world, rules, team, rails, observer, capture_frame)?;
+    memory.apply_routes(team)?;
+    let game = &world.game;
+    let tick = game.tick;
+    if memory.live_for(owner).is_none_or(|l| l.tick != Some(tick)) {
+        refresh_wrecks_parts(game, rules, memory, team, observer)?;
+        let vis = &memory
+            .fog
+            .team_with_observer(game, rules, team, observer)
+            .vis;
+        let mut fires = vec![false; game.chars.len()];
+        for (&c, _) in world.fires.iter() {
+            if vis[c] != 0 {
+                fires[c] = true;
+            }
+        }
+        let mut live = WorldLive {
+            tick: Some(tick),
+            units: game
+                .units
+                .values()
+                .chain(observer.map(|o| o.unit()))
+                .filter(|u| seen(game, owner, visible, u))
+                .map(bound)
+                .collect(),
+            fires,
+            bunkers: Vec::new(),
+            wrecks: memory.team(team).unwrap().remembered_wrecks().to_vec(),
+            wetness: game.wet.unwrap_or(0.0),
+            roads: world.roads,
+        };
+        update_live(&mut live, game, rules);
+        memory.lives.insert(owner, live);
+    } else {
+        update_live(memory.lives.get_mut(&owner).unwrap(), game, rules);
+    }
+    Ok(receipt)
+}
+/// A private prepared copy, never a second live memory owner. On abort, discard
+/// any search scratch that observed its temporary terrain-buffer addresses.
+#[must_use = "commit after every fallible check, or drop without changing World memory"]
+pub struct PreparedWorldRouting<'a> {
+    target: &'a mut world_memory::WorldMemory,
+    state: world_memory::WorldMemory,
+    owner: usize,
+    team: i32,
+    receipt: crate::world::ObservationReceipt,
+}
+impl PreparedWorldRouting<'_> {
+    /// Commit moves the copied arrays for every existing team, so all matching
+    /// histories follow those allocations, including teams not read by this guard.
+    pub fn fork_paths(
+        &self,
+        paths: &crate::pathfinding::Pathfinding,
+    ) -> crate::pathfinding::Pathfinding {
+        let mut fork = paths.clone();
+        for (team, memory) in &self.target.teams {
+            let prepared = self
+                .state
+                .team(*team)
+                .expect("preview retains existing teams");
+            fork.rebind_terrain(memory.query().navigation(), prepared.query().navigation());
+        }
+        fork
+    }
+
+    pub fn query(&self) -> RouteQuery<'_> {
+        self.state.team(self.team).unwrap().query()
+    }
+    pub fn knowledge(&self) -> &RouteKnowledge {
+        self.state.team(self.team).unwrap().knowledge()
+    }
+    pub fn live(&self) -> LiveRouting<'_> {
+        self.state.live_for(self.owner).unwrap().live()
+    }
+    pub fn wrecks(&self) -> &[Wreck] {
+        self.state.live_for(self.owner).unwrap().wrecks()
+    }
+}
+pub struct WorldRoutingCommit<'a, 'w> {
+    target: &'a mut world_memory::WorldMemory,
+    state: world_memory::WorldMemory,
+    ledger: crate::world::PreparedObservation<'w>,
+}
+impl WorldRoutingCommit<'_, '_> {
+    pub fn commit(self) {
+        *self.target = self.state;
+        self.ledger.commit();
+    }
+}
+impl<'a> PreparedWorldRouting<'a> {
+    pub fn prepare_publication<'w>(
+        self,
+        world: &'w mut crate::world::World,
+    ) -> Result<(&'w mut Game, WorldRoutingCommit<'a, 'w>), String> {
+        let Self {
+            target,
+            state,
+            receipt,
+            ..
+        } = self;
+        let (game, ledger) = receipt.prepare(world)?;
+        Ok((
+            game,
+            WorldRoutingCommit {
+                target,
+                state,
+                ledger,
+            },
+        ))
+    }
+}
+pub fn prepare_world_routing<'a>(
+    context: WorldRoutingContext<'_>,
+    target: &'a mut world_memory::WorldMemory,
+    owner: usize,
+    observer: Option<crate::staged_observer::StagedObserver<'_>>,
+) -> Result<PreparedWorldRouting<'a>, String> {
+    let team = validate_world_context(context, target, owner)?;
+    let actor = context.actor(owner)?;
+    if let Some(source) = observer {
+        crate::staged_observer::StagedObserver::new(
+            &context.world.game,
+            context.rules,
+            source.unit().id,
+            owner,
+            source.unit(),
+        )?;
+    }
+    let mut state = target.clone();
+    let receipt = refresh_world_parts(
+        context,
+        &mut state,
+        owner,
+        team,
+        actor.visible,
+        observer,
+        true,
+    )?;
+    Ok(PreparedWorldRouting {
+        target,
+        state,
+        owner,
+        team,
+        receipt,
+    })
 }

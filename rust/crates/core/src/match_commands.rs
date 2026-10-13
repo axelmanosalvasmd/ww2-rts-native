@@ -82,6 +82,12 @@ pub enum Command {
         together: bool,
         face: Option<f64>,
     },
+    Cover {
+        ids: Vec<i64>,
+        queue: bool,
+        /// Display anchor for a waiting order, never its eventual cover destination.
+        at: Option<Point>,
+    },
     Stop {
         ids: Vec<i64>,
     },
@@ -216,10 +222,11 @@ pub enum Denial {
     Blocked,
     Needs,
     QueueFull,
+    NoCover,
+    Retreating,
     Unsupported,
     Ammo,
     Cooldown,
-    Retreating,
     Munitions,
     Manpower,
     Tier,
@@ -238,10 +245,11 @@ impl Denial {
             Self::Blocked => "blocked",
             Self::Needs => "needs",
             Self::QueueFull => "queueFull",
+            Self::NoCover => "noCover",
+            Self::Retreating => "retreating",
             Self::Unsupported => "unsupported",
             Self::Ammo => "ammo",
             Self::Cooldown => "cooldown",
-            Self::Retreating => "retreating",
             Self::Munitions => "mun",
             Self::Manpower => "mp",
             Self::Tier => "tier",
@@ -470,6 +478,11 @@ impl Command {
                     face,
                 })
             }
+            Some("cover") => Ok(Self::Cover {
+                ids,
+                queue: object.get("queue").and_then(|v| v.as_bool()) == Some(true),
+                at: None,
+            }),
             Some("ability") => {
                 let at = object
                     .get("x")
@@ -536,6 +549,7 @@ impl Command {
                         && o.at.z.is_finite()
                 }) && face.is_none_or(|a| a.is_finite())
             }
+            Self::Cover { at, .. } => at.is_none_or(|p| p.x.is_finite() && p.z.is_finite()),
             _ => true,
         }
     }
@@ -581,7 +595,12 @@ impl crate::match_runtime::Match {
         }
         Ok(results)
     }
-    fn eligible_command_unit(&self, id: i64, owner: usize, command: &Command) -> Option<UnitId> {
+    pub(crate) fn eligible_command_unit(
+        &self,
+        id: i64,
+        owner: usize,
+        command: &Command,
+    ) -> Option<UnitId> {
         let id = u32::try_from(id).ok()?;
         let u = self.world.game.units.get(&id)?;
         let kind = self.rules.kinds.get(u.kind)?;
@@ -649,6 +668,9 @@ impl crate::match_runtime::Match {
         }
         if matches!(command, Command::Unsupported) {
             return Ok(Some(Denial::Unsupported));
+        }
+        if let Command::Cover { ids, queue, .. } = command {
+            return self.execute_cover_command(owner, ids, *queue);
         }
         if let Command::Entrench { ids, order, queue } = command {
             return self.execute_entrench(owner, ids, *order, *queue, winner_decided);
@@ -731,6 +753,7 @@ impl crate::match_runtime::Match {
             | Command::CompanionJoin { .. }
             | Command::CompanionInput { .. }
             | Command::Support { .. }
+            | Command::Cover { .. }
             | Command::Unsupported => unreachable!(),
         };
         if matches!(
@@ -892,6 +915,7 @@ impl crate::match_runtime::Match {
             | Command::CompanionJoin { .. }
             | Command::CompanionInput { .. }
             | Command::Support { .. }
+            | Command::Cover { .. }
             | Command::Unsupported => unreachable!(),
         }
         Ok(None)
@@ -1135,11 +1159,11 @@ impl crate::match_runtime::Match {
         search_route(&mut self.commands.paths, terrain, rules, kind, u, to).map(|r| r.result)
     }
 }
-struct CommandRoute {
-    result: crate::pathfinding::PathResult,
+pub(crate) struct CommandRoute {
+    pub(crate) result: crate::pathfinding::PathResult,
     failed: bool,
 }
-fn search_route(
+pub(crate) fn search_route(
     paths: &mut Pathfinding,
     terrain: crate::pathfinding::PathTerrain<'_>,
     rules: crate::pathfinding::PathRules,

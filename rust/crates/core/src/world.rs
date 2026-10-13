@@ -224,7 +224,193 @@ pub struct World {
     soak: Vec<i64>,
     soak_members: BTreeSet<i64>,
 }
+/// Deferred recipient effects, checked before an infallible publication.
+pub(crate) struct ObservationReceipt {
+    frame: Option<ObservationSource>,
+    action: ObservationAction,
+}
+#[derive(PartialEq)]
+struct ObservationSource {
+    initial: usize,
+    shape: (usize, usize),
+    key: (i64, Option<i64>, u32, bool),
+    weather: (Option<usize>, u64, Option<u64>),
+    log: usize,
+    journal: (u64, usize),
+    units: Vec<ObservationUnit>,
+    players: Vec<(usize, i32, Vec<u32>)>,
+    smokes: Vec<crate::game::Smoke>,
+    strikes: Vec<crate::game::Strike>,
+    wrecks: Vec<crate::game::Wreck>,
+    fires: Vec<usize>,
+    mines: BTreeMap<usize, i32>,
+    mine_seen: BTreeMap<usize, u32>,
+}
+#[derive(PartialEq)]
+struct ObservationUnit {
+    id: u32,
+    kind: usize,
+    owner: usize,
+    values: [u64; 3],
+    built: Option<u64>,
+    garrison: Option<usize>,
+    air: Option<crate::game::PlaneState>,
+    cells: Option<Vec<u32>>,
+}
+enum ObservationAction {
+    None,
+    Acknowledge {
+        recipient: Recipient,
+        indices: Vec<usize>,
+        prior: Option<BTreeSet<usize>>,
+    },
+    Trim {
+        prefix: usize,
+        at: u64,
+    },
+}
+/// Locks only the source delivery ledger, leaving Game available for unit publication.
+pub(crate) struct PreparedObservation<'a> {
+    pending: &'a mut BTreeMap<Recipient, BTreeSet<usize>>,
+    log_len: usize,
+    journal: &'a mut Vec<usize>,
+    base: &'a mut u64,
+    action: ObservationAction,
+}
+impl PreparedObservation<'_> {
+    pub(crate) fn commit(self) {
+        match self.action {
+            ObservationAction::None => {}
+            ObservationAction::Acknowledge {
+                recipient, indices, ..
+            } => {
+                let pending = self
+                    .pending
+                    .entry(recipient)
+                    .or_insert_with(|| (0..self.log_len).collect());
+                for index in indices {
+                    pending.remove(&index);
+                }
+            }
+            ObservationAction::Trim { prefix, at } => {
+                self.journal.drain(..prefix);
+                *self.base = at;
+            }
+        }
+    }
+}
+impl ObservationReceipt {
+    pub(crate) fn prepare(
+        self,
+        world: &mut World,
+    ) -> Result<(&mut Game, PreparedObservation<'_>), String> {
+        if self
+            .frame
+            .as_ref()
+            .is_some_and(|frame| *frame != world.observation_source())
+        {
+            return Err("observation source changed before publication".into());
+        }
+        if let ObservationAction::Acknowledge {
+            recipient, prior, ..
+        } = &self.action
+            && prior.as_ref() != world.pending(*recipient)
+        {
+            return Err("observation pending ledger changed before publication".into());
+        }
+        Ok((
+            &mut world.game,
+            PreparedObservation {
+                pending: &mut world.pending,
+                log_len: world.log.len(),
+                journal: &mut world.journal,
+                base: &mut world.journal_base,
+                action: self.action,
+            },
+        ))
+    }
+    /// Used only by the ordinary immediate wrappers after their existing validations.
+    pub(crate) fn commit(self, world: &mut World) -> Result<(), String> {
+        let (_, prepared) = self.prepare(world)?;
+        prepared.commit();
+        Ok(())
+    }
+}
 impl World {
+    fn observation_source(&self) -> ObservationSource {
+        let g = &self.game;
+        ObservationSource {
+            initial: self.initial.chars.as_ptr() as usize,
+            shape: (g.w, g.h),
+            key: (g.tick, g.vision_tick, g.terrain_version, g.reveal),
+            weather: (g.weather, g.rain.to_bits(), g.wet.map(f64::to_bits)),
+            log: self.log.len(),
+            journal: (self.journal_base, self.journal.len()),
+            units: g
+                .units
+                .values()
+                .map(|u| ObservationUnit {
+                    id: u.id,
+                    kind: u.kind,
+                    owner: u.owner,
+                    values: [u.x.to_bits(), u.z.to_bits(), u.hp.to_bits()],
+                    built: u.built.map(f64::to_bits),
+                    garrison: u.garrison,
+                    air: u.air,
+                    cells: u.cells.clone(),
+                })
+                .collect(),
+            players: g
+                .players
+                .iter()
+                .map(|p| (p.slot, p.team, p.visible.clone()))
+                .collect(),
+            smokes: g.smokes.clone(),
+            strikes: g.strikes.clone(),
+            wrecks: g.wrecks.clone(),
+            fires: self.fires.iter().map(|(&c, _)| c).collect(),
+            mines: self.mines.clone(),
+            mine_seen: self.mine_seen.clone(),
+        }
+    }
+    pub(crate) fn defer_observation(
+        &self,
+        ack: Option<(Recipient, Vec<usize>)>,
+        capture_frame: bool,
+    ) -> ObservationReceipt {
+        let action = ack.map_or(ObservationAction::None, |(recipient, indices)| {
+            ObservationAction::Acknowledge {
+                recipient,
+                indices,
+                prior: self.pending(recipient).cloned(),
+            }
+        });
+        ObservationReceipt {
+            frame: capture_frame.then(|| self.observation_source()),
+            action,
+        }
+    }
+    pub(crate) fn defer_journal_trim(
+        &self,
+        at: Option<u64>,
+        capture_frame: bool,
+    ) -> Result<ObservationReceipt, String> {
+        let action = if let Some(at) = at {
+            let end = self.journal_end().map_err(|e| e.to_string())?;
+            if at < self.journal_base || at > end {
+                return Err("invalid deferred World journal trim".into());
+            }
+            let prefix = usize::try_from(at - self.journal_base)
+                .map_err(|_| "invalid World journal prefix")?;
+            ObservationAction::Trim { prefix, at }
+        } else {
+            ObservationAction::None
+        };
+        Ok(ObservationReceipt {
+            frame: capture_frame.then(|| self.observation_source()),
+            action,
+        })
+    }
     /// Immutable authoring geography. Live team ownership belongs to a future mode state.
     pub fn geography(&self) -> Option<&crate::world_map::WorldDefinition> {
         self.geography.as_ref()

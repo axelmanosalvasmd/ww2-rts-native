@@ -5,6 +5,7 @@ pub mod catalog;
 pub mod client_view;
 pub mod combat;
 pub mod command_destinations;
+pub mod commander_ai;
 pub mod companion_ray;
 pub mod companions;
 pub mod conquest_end;
@@ -31,10 +32,13 @@ pub mod logistics;
 pub mod map;
 pub mod match_abilities;
 pub mod match_combat;
+pub mod match_commander;
 pub mod match_commands;
+pub mod match_cover;
 pub mod match_recovery;
 
 pub mod match_firing;
+pub mod match_human_observation;
 pub mod match_ground_support;
 pub mod match_logistics;
 pub mod match_reactions;
@@ -87,3 +91,5 @@ pub mod match_world_rails;
 
 pub mod match_world_memory;
 pub mod world_memory;
+
+pub mod staged_observer;
