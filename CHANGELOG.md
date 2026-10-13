@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Rebuilt command-control rows for the replacement actors in the original combat/death scene, using the same constructor as canonical startup. The combined workspace stopped with three combat tests passing and one missing-control refusal; the construction retirement guard and expected Source outputs remain unchanged. This test setup repair has not run natively.
+
 - Established the missing-Firing-row setup in the GroundAttack admission regression by explicitly removing actor 4's retained startup row before dispatch. The pure Ground/construction `ac2919c` workspace attempt passed 95 core tests and failed this first assertion; its six-order queued Cover test passed. Runtime guards, original fixtures and subsequent control/capacity refusal assertions are unchanged. Fresh native verification remains pending.
 
 - Prepare a pure Ground and construction candidate from source-cleared `bf293cc`, normally joined with final main `d1f2fb5`. Apply only the four reviewed Core lint edits from `64dd57d`: preserve short-circuit order in the Attack, Retreat and forced-row let-chains, and use the existing control map membership query. Retain the earlier combined `d9941e3` strict failure, which reported four diagnostics before any tests ran. Exact-head native and three-platform checks remain pending.

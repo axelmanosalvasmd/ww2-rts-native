@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## Combat retirement scene control repair (2026-10-13, source only)
+
+The frozen `c20175a` workspace run passes three combat integration tests and fails `ordered_damage_riders_terrain_and_death_match_original_source` at its retirement call with `InvalidInput("death construction control")`. The fixture factory replaces canonical startup World actors but retains only startup command rows. New construction-aware retirement correctly requires each captured actor's command control and checks its construction activity before any removal. Canonical startup already creates these rows with `UnitControl::new`; the earlier retirement provider did not consult them, so the old scene omitted required state unnoticed.
+
+The factory now clears the replaced startup control map and creates one canonical control per actual fixture unit using the same pure constructor. This adds no construction job, modifies no production guard and changes no recorder, fixture or expected snapshot. Pinned Source death still processes its actual unit objects in the supplied order. The original failed log remains tied to `c20175a`; this isolated successor needs source review and a later native rerun, with no inherited acceptance claim.
+
 ## Pure Ground and construction publication candidate (2026-10-13, source only)
 
 Axel acknowledgment 034 requires Ground and construction to have their own lint-clean, exact-head validation separate from host startup repair and RTI/Human delivery work. This candidate starts from source-cleared `bf293cc` and normally includes current main `d1f2fb5`. Its source receives only the four reviewed Core lint changes from `64dd57d`; the two affected files are byte-identical to that lint child. Variant matching and safe-ID conversion still precede actor reads, owned-actor checks still precede forced-reserve reads, and control membership is checked through the same canonical map. Queue ordering, staged publication, Cover anchors and the real six-command regression remain unchanged.
