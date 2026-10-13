@@ -41,7 +41,8 @@ struct OwnerRoutes {
     changed: Vec<usize>,
     changes: Vec<(u64, u64, Vec<usize>)>,
     version: u64,
-    paths: Pathfinding,
+    ordinary_paths: Pathfinding,
+    danger_paths: Pathfinding,
 }
 /// Scratch belongs to one Match and its stable recipient/world identities.
 /// Construct fresh scratch when replacing a Match or its equal-version terrain.
@@ -92,6 +93,7 @@ impl SupplyRouting {
             )
         {
             return Ok(Route {
+                route_end: None,
                 path: vec![to],
                 failure: None,
             });
@@ -112,6 +114,7 @@ impl SupplyRouting {
                 .any(|t| distance(to, t.at) <= t.range + 3.0)
         {
             return Ok(Route {
+                route_end: None,
                 path: vec![],
                 failure: Some(RouteFailure::Dangerous),
             });
@@ -157,16 +160,19 @@ impl SupplyRouting {
         let rules = PathRules::compiled().map_err(|e| e.to_string())?;
         let first = if danger {
             state
-                .paths
+                .danger_paths
                 .find_path(terrain, rules, profile, from, to, None)
                 .map_err(|e| format!("convoy path: {e:?}"))?
         } else {
-            observed_path(&mut state.paths, known, rules, profile, from, to)?
+            observed_path(&mut state.ordinary_paths, known, rules, profile, from, to)?
         };
+        let mut route_end_effect = first.route_end;
         let mut path = first.waypoints;
         if path.is_empty() {
             let failure = if danger {
-                let ordinary = observed_path(&mut state.paths, known, rules, profile, from, to)?;
+                let ordinary =
+                    observed_path(&mut state.ordinary_paths, known, rules, profile, from, to)?;
+                route_end_effect = ordinary.route_end;
                 if ordinary.waypoints.is_empty() {
                     RouteFailure::Unreachable
                 } else {
@@ -176,12 +182,14 @@ impl SupplyRouting {
                 RouteFailure::Unreachable
             };
             return Ok(Route {
+                route_end: Some(route_end_effect),
                 path,
                 failure: Some(failure),
             });
         }
         if distance(*path.last().unwrap(), to) <= 3.0 {
             return Ok(Route {
+                route_end: Some(route_end_effect),
                 path,
                 failure: None,
             });
@@ -189,18 +197,24 @@ impl SupplyRouting {
         let route_end = first.route_end;
         let mut at = *path.last().unwrap();
         for _ in 0..512 {
-            let leg = state
-                .paths
+            let paths = if danger {
+                &mut state.danger_paths
+            } else {
+                &mut state.ordinary_paths
+            };
+            let leg = paths
                 .find_path(terrain, rules, profile, at, to, None)
                 .map_err(|e| format!("convoy leg: {e:?}"))?;
             let Some(&end) = leg.waypoints.last() else {
                 return Ok(Route {
+                    route_end: Some(route_end_effect),
                     path: vec![],
                     failure: Some(RouteFailure::Unreachable),
                 });
             };
             if distance(at, end) < 0.05 {
                 return Ok(Route {
+                    route_end: Some(route_end_effect),
                     path: vec![],
                     failure: Some(RouteFailure::Unreachable),
                 });
@@ -208,6 +222,7 @@ impl SupplyRouting {
             path.extend(leg.waypoints);
             if distance(end, to) <= 3.0 || distance(end, route_end) <= 0.25 {
                 return Ok(Route {
+                    route_end: Some(route_end_effect),
                     path,
                     failure: None,
                 });
@@ -215,6 +230,7 @@ impl SupplyRouting {
             at = end;
         }
         Ok(Route {
+            route_end: Some(route_end_effect),
             path: vec![],
             failure: Some(RouteFailure::Unreachable),
         })
@@ -370,7 +386,7 @@ fn refresh_danger(
     let fresh = state.known_id != Some(identity) || state.flags.len() != v.flags.len();
     if fresh {
         state.known_id = Some(identity);
-        state.paths = Pathfinding::new();
+        state.danger_paths = Pathfinding::new();
         state.base = v.flags.to_vec();
         state.flags = v.flags.to_vec();
         state.heights = v
@@ -560,6 +576,7 @@ fn observed_path(
                 pathfinding::walkable(terrain.navigation, at, *p, profile.block(), 0.9)
             }) {
                 route.waypoints.insert(0, at);
+                route.route_end = initial.route_end;
                 return Ok(route);
             }
         }

@@ -167,6 +167,14 @@ fn real_safe_routes_continuation_and_physical_handoff_match_original() {
                     "case{i} query{j} path"
                 );
             }
+            assert_eq!(
+                actual.route_end.map(|p| [p.x.to_bits(), p.z.to_bits()]),
+                (!q["routeEnd"].is_null()).then(|| {
+                    let p = point_bits(&q["routeEnd"]);
+                    [p.x.to_bits(), p.z.to_bits()]
+                }),
+                "case{i} query{j} route endpoint effect"
+            );
             if let Some(reason) = q["failure"].as_str() {
                 assert_eq!(
                     actual.failure,

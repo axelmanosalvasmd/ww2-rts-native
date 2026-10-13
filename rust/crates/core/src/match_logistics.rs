@@ -586,6 +586,7 @@ impl ConvoyWorld<'_> {
         let name = self.rules.kinds[u.kind].name.as_str();
         let c = self.combat.get(u.id).unwrap();
         UnitView {
+            projected: false,
             id: u.id,
             owner: Some(u.owner),
             role: match name {
@@ -654,7 +655,8 @@ impl supply_convoys::World for ConvoyWorld<'_> {
             .path_terrain(recipient.live())
             .expect("validated recipient terrain");
         let threats = self.threats(owner);
-        self.routing
+        let route = self
+            .routing
             .route(
                 RouteRequest {
                     owner,
@@ -667,7 +669,14 @@ impl supply_convoys::World for ConvoyWorld<'_> {
                 &self.rules.kinds[kind],
                 &threats,
             )
-            .expect("validated convoy route inputs")
+            .expect("validated convoy route inputs");
+        if !u.projected
+            && let Some(end) = route.route_end
+        {
+            self.commands.units.get_mut(&u.id).unwrap().route_end = Some(end);
+            self.commands.requests.clear_failures(u.id);
+        }
+        route
     }
     fn continue_route(&mut self, u: &UnitView, _at: Point) -> bool {
         let kind = self.world.game.units[&u.id].kind;

@@ -13,8 +13,8 @@ for(let m=0;m<base.maps.length;m++){
   g.tick=i*40;g.players[0].visible=new Set();u.supplyRouteReason=null;
   if(safe&&i===1){const t={id:999,type:'rifle',owner:1,hp:100,x:targets[i].x,z:targets[i].z,air:null};g.units.set(t.id,t);g.players[0].visible.add(t.id);}
   const known=S.knownTerrainFor(g,0),input=terrain(known);const threats=[...g.players[0].visible].map(id=>g.units.get(id)).filter(t=>t.hp>0&&t.owner!==0&&!t.air&&S.UNITS[t.type].w?.range>0).map(t=>({at:{x:t.x,z:t.z},range:S.UNITS[t.type].w.range}));
-  const route=S.fullConvoyRoute(g,u,targets[i],safe);u.path=structuredClone(route);const continuation=S.supplyContinueRoute(g,u);u.stuck=1;const stuck=S.supplyContinueRoute(g,u);u.stuck=0;
-  queries.push({tick:g.tick,from:{x:u.x,z:u.z},to:targets[i],safe,input,threats,path:route.map(point),failure:u.supplyRouteReason??null,continuation,stuck});
+  const before=u.routeEnd;const route=S.fullConvoyRoute(g,u,targets[i],safe);u.path=structuredClone(route);const continuation=S.supplyContinueRoute(g,u);u.stuck=1;const stuck=S.supplyContinueRoute(g,u);u.stuck=0;
+  queries.push({tick:g.tick,from:{x:u.x,z:u.z},to:targets[i],safe,input,threats,routeEnd:u.routeEnd!==before?point(u.routeEnd):null,path:route.map(point),failure:u.supplyRouteReason??null,continuation,stuck});
  }
  // Reuse one danger view for multiple trucks, then record a visible terrain edit.
  const threat={id:1001,type:'rifle',owner:1,hp:100,x:(u.x+g.players[1].spawn.x)/2,z:(u.z+g.players[1].spawn.z)/2,air:null};g.units.set(threat.id,threat);g.players[0].visible=new Set([threat.id]);
@@ -23,8 +23,11 @@ for(let m=0;m<base.maps.length;m++){
   g.tick=400+k;u.x=original.x+k*2;u.z=original.z;
   if(k===2){const cell=Math.floor(original.z/2)*g.w+Math.floor(original.x/2)+3;S.internals.setCell(g,cell,g.chars[cell]==='.'?'F':'.');}
   u.supplyRouteReason=null;const known=S.knownTerrainFor(g,0),input=terrain(known),threats=[{at:{x:threat.x,z:threat.z},range:S.UNITS.rifle.w.range}];
-  const to=g.players[1].spawn,route=S.fullConvoyRoute(g,u,to,true);u.path=structuredClone(route);const continuation=S.supplyContinueRoute(g,u);u.stuck=1;const stuck=S.supplyContinueRoute(g,u);u.stuck=0;
-  const d=S.dangerViews.get(g)?.get(0);queries.push({tick:g.tick,from:{x:u.x,z:u.z},to,safe:true,input,threats,path:route.map(point),failure:u.supplyRouteReason??null,continuation,stuck,danger:d?{version:d.version,history:d.changes.length,changed:d.changes.reduce((n,v)=>n+v.cells.length,0)}:null});
+  const before=u.routeEnd;const to=g.players[1].spawn,route=S.fullConvoyRoute(g,u,to,true);u.path=structuredClone(route);const continuation=S.supplyContinueRoute(g,u);u.stuck=1;const stuck=S.supplyContinueRoute(g,u);u.stuck=0;
+  const d=S.dangerViews.get(g)?.get(0);queries.push({tick:g.tick,from:{x:u.x,z:u.z},to,safe:true,input,threats,routeEnd:u.routeEnd!==before?point(u.routeEnd):null,path:route.map(point),failure:u.supplyRouteReason??null,continuation,stuck,danger:d?{version:d.version,history:d.changes.length,changed:d.changes.reduce((n,v)=>n+v.cells.length,0)}:null});
+  // An ordinary search must retain the previous danger graph for the next truck.
+  if(k===0){u.supplyRouteReason=null;const before=u.routeEnd,route=S.fullConvoyRoute(g,u,to,false);u.path=structuredClone(route);const continuation=S.supplyContinueRoute(g,u);u.stuck=1;const stuck=S.supplyContinueRoute(g,u);u.stuck=0;queries.push({tick:g.tick,from:{x:u.x,z:u.z},to,safe:false,input,threats,routeEnd:u.routeEnd!==before?point(u.routeEnd):null,path:route.map(point),failure:u.supplyRouteReason??null,continuation,stuck});}
+
  }
  const handoffs=[];const store=[...g.units.values()].find(u=>u.type==='hq'&&u.owner===0)??{...g.players[0].spawn,cells:[]};
  const physical={...g,navigationObserved:true,worldKnown:true,worldNearWalls:S.nearWalls(g)};

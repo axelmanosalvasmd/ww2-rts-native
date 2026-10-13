@@ -241,6 +241,8 @@ pub enum UnitRole {
 }
 #[derive(Clone, Debug)]
 pub struct UnitView {
+    /// A temporary projected pose, rather than the live unit object.
+    pub projected: bool,
     pub id: UnitId,
     pub owner: Option<usize>,
     pub role: UnitRole,
@@ -367,6 +369,8 @@ pub enum RouteFailure {
 }
 #[derive(Clone, Debug)]
 pub struct Route {
+    /// A findPath effect. None retains the live unit's previous endpoint/history.
+    pub route_end: Option<Point>,
     pub path: Vec<Point>,
     pub failure: Option<RouteFailure>,
 }
@@ -2159,6 +2163,7 @@ impl ConvoyState {
                     return Ok(false);
                 };
                 let mut from = u.clone();
+                from.projected = true;
                 if queue
                     && (!u.path.is_empty()
                         || !u.orders.is_empty()

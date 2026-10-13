@@ -253,9 +253,11 @@ fn runtime(instance: &Match) -> Value {
                     RouteFailure::Dangerous => "dangerous",
                     RouteFailure::Unreachable => "unreachable",
                 }),
-                c.retry
-                    .as_ref()
-                    .map(|r| json!([format!("{},{}", r.key.0, r.key.1), r.wait, r.at])),
+                c.retry.as_ref().map(|r| json!([
+                    format!("{},{}", r.key.0, r.key.1),
+                    bits(r.wait),
+                    r.at
+                ])),
                 controls
                     .orders
                     .iter()
@@ -264,11 +266,12 @@ fn runtime(instance: &Match) -> Value {
                             json!([orders[0].unit, point(orders[0].at)]),
                         _ => panic!("unexpected waiting order"),
                     })
-                    .collect::<Vec<_>>()
+                    .collect::<Vec<_>>(),
+                controls.route_end.map(point)
             ])
         })
         .collect::<Vec<_>>();
-    json!({"reserves":reserves,"trucks":trucks,"stores":state.stores.iter().map(|s|json!([s.id.key(),s.buckets.iter().map(|(p,b)|json!([p,stock(*b)])).collect::<Vec<_>>()])).collect::<Vec<_>>(),"jobs":state.jobs.iter().map(|(p,n)|json!([p,n])).collect::<Vec<_>>(),"losses":state.losses.iter().map(|(p,ns)|json!([p,ns])).collect::<Vec<_>>(),"nextSpawn":state.next_spawn.iter().map(|(p,n)|json!([p,n])).collect::<Vec<_>>(),"nextSchedule":state.next_schedule,"refresh":state.refresh_queue,"schedule":state.schedule_queue,"scheduled":state.scheduled,"routed":state.routed,"events":state.events.iter().map(|e|json!([e.id,e.owner,e.kind,e.count,e.at.map(|p|bits(p.x)),e.at.map(|p|bits(p.z)),e.message,bits(e.seconds)])).collect::<Vec<_>>(),"alerts":state.alerts.iter().map(|((p,k),n)|json!([format!("{p}:{k}"),bits(*n)])).collect::<Vec<_>>()})
+    json!({"reserves":reserves,"trucks":trucks,"stores":state.stores.iter().map(|s|json!([s.id.key(),s.buckets.iter().map(|(p,b)|json!([p,stock(*b)])).collect::<Vec<_>>()])).collect::<Vec<_>>(),"jobs":state.jobs.iter().map(|(p,n)|json!([p,n])).collect::<Vec<_>>(),"losses":state.losses.iter().map(|(p,ns)|json!([p,ns.iter().map(|n|bits(*n)).collect::<Vec<_>>()])).collect::<Vec<_>>(),"nextSpawn":state.next_spawn.iter().map(|(p,n)|json!([p,bits(*n)])).collect::<Vec<_>>(),"nextSchedule":state.next_schedule,"refresh":state.refresh_queue,"schedule":state.schedule_queue,"scheduled":state.scheduled,"routed":state.routed,"events":state.events.iter().map(|e|json!([e.id,e.owner,e.kind,e.count,e.at.map(|p|bits(p.x)),e.at.map(|p|bits(p.z)),e.message,bits(e.seconds)])).collect::<Vec<_>>(),"alerts":state.alerts.iter().map(|((p,k),n)|json!([format!("{p}:{k}"),bits(*n)])).collect::<Vec<_>>()})
 }
 #[test]
 fn real_supply_hooks_spawn_route_service_and_retire_in_canonical_match() {
