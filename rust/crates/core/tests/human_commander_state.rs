@@ -1,109 +1,22 @@
 use serde_json::{Value, json};
-use ww2_core::{
+use ww2_core as core_api;
+use core_api::{
     game::Point,
-    human_commander::{HumanSighting, HumanUnit, HumanView, Hurt, OwnerHurtBatch, TickControl},
-    human_commander_inputs::{InputKind, Unit},
+    human_commander::{Hurt, OwnerHurtBatch, TickControl},
     human_commander_state::{Error, HumanState},
 };
-
-fn point(v: &Value) -> Point {
-    Point {
-        x: v["x"].as_f64().unwrap(),
-        z: v["z"].as_f64().unwrap(),
-    }
-}
-fn truthy(v: &Value) -> bool {
-    match v {
-        Value::Null => false,
-        Value::Bool(v) => *v,
-        Value::Number(v) => v.as_f64().unwrap() != 0.0,
-        Value::String(v) => !v.is_empty(),
-        _ => true,
-    }
-}
-fn view(v: &Value) -> HumanView<()> {
-    HumanView {
-        tick: v["tick"].as_u64().unwrap(),
-        spawn: (!v["spawn"].is_null()).then(|| point(&v["spawn"])),
-        units: v["units"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|u| HumanUnit {
-                motion: Unit {
-                    id: u["id"].as_u64().unwrap() as u32,
-                    at: point(u),
-                    world_goal: (!u["worldGoal"].is_null()).then(|| point(&u["worldGoal"])),
-                    amove: (!u["amove"].is_null()).then(|| point(&u["amove"])),
-                    target_id: u["targetId"].as_u64().unwrap_or(0) as u32,
-                    retreating: truthy(&u["retreating"]),
-                },
-                owner: u["owner"].as_u64().unwrap() as u32,
-                kind: u["type"].as_str().unwrap().to_owned(),
-                hp: u["hp"].as_f64().unwrap(),
-                air: truthy(&u["air"]),
-                build: truthy(&u["build"]),
-                dig: truthy(&u["dig"]),
-                entrench: truthy(&u["entrench"]),
-                garrison: u["garrison"].as_i64().is_some_and(|n| n >= 0),
-            })
-            .collect(),
-        visible: v["visible"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|n| n.as_u64().unwrap() as u32)
-            .collect(),
-        sightings: v["sightings"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|s| HumanSighting {
-                id: s["id"].as_u64().unwrap() as u32,
-                payload: s.clone(),
-            })
-            .collect(),
-        packet: (),
-    }
-}
-fn batch(v: &Value) -> OwnerHurtBatch {
-    OwnerHurtBatch {
-        generation: v["generation"].as_u64().unwrap(),
-        through_ordinal: v["through_ordinal"].as_u64().unwrap(),
-        events: v["events"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|e| Hurt {
-                ordinal: e["ordinal"].as_u64().unwrap(),
-                id: e["id"].as_u64().unwrap() as u32,
-                at: point(&e["at"]),
-            })
-            .collect(),
-    }
-}
-fn exact(a: &Value, b: &Value) -> bool {
-    match (a, b) {
-        (Value::Number(a), Value::Number(b)) => {
-            a.as_f64().unwrap().to_bits() == b.as_f64().unwrap().to_bits()
-        }
-        (Value::Array(a), Value::Array(b)) => {
-            a.len() == b.len() && a.iter().zip(b).all(|(a, b)| exact(a, b))
-        }
-        (Value::Object(a), Value::Object(b)) => {
-            a.len() == b.len() && a.iter().all(|(k, a)| b.get(k).is_some_and(|b| exact(a, b)))
-        }
-        _ => a == b,
-    }
-}
+#[path = "support/human_commander_facts.rs"]
+mod facts;
+use facts::{point, view, batch, exact, input_receipt};
 
 // Replay actual delivered facts and Source-collected policy output through this component.
-// Match execution and native planner policy are deliberately not replaced or claimed here.
+// The callback boundary supplies recorded Source policy output; native admission stays pending.
 #[test]
-fn ordinary_human_state_matches_actual_source_opening_and_real_hurt_traces() {
+fn ordinary_human_state_matches_actual_source_opening_hurts_and_denied_input() {
     for bytes in [
         include_str!("fixtures/human-commander-runtime.json"),
         include_str!("fixtures/human-commander-alerts.json"),
+        include_str!("fixtures/human-commander-denial.json"),
     ] {
         let f: Value = serde_json::from_str(bytes).unwrap();
         for case in f["cases"].as_array().unwrap() {
@@ -159,14 +72,7 @@ fn ordinary_human_state_matches_actual_source_opening_and_real_hurt_traces() {
                 actual_alerts.extend(result.new_alerts);
                 answers.extend(result.answered);
                 if let Some(i) = result.input {
-                    let mut value = json!({"tick":i.tick,"origin":i.origin,"kind":match i.kind {InputKind::Camera=>"camera",InputKind::Select=>"select",InputKind::Key=>"key",InputKind::Click=>"click"},"x":i.at.x,"z":i.at.z,"camera":{"x":i.camera.x,"z":i.camera.z}});
-                    if let Some(ids) = i.ids {
-                        value["ids"] = json!(ids);
-                    }
-                    if let Some(command) = i.command {
-                        value["cmd"] = command;
-                    }
-                    actual_inputs.push(value);
+                    actual_inputs.push(input_receipt(&i));
                 }
             }
             assert_eq!(plans, 1);
@@ -189,6 +95,11 @@ fn ordinary_human_state_matches_actual_source_opening_and_real_hurt_traces() {
                     answers.iter().find(|r| r.id == a.id).map(|r| r.tick),
                     expected["answered"].as_u64()
                 );
+            }
+            if case.get("lifecycleOverlays").is_some() {
+                assert_eq!(case["inputs"][1]["accepted"], false);
+                assert_eq!(case["final"]["away"], true);
+                assert_eq!(case["final"]["out"], false);
             }
             let s = human.snapshot().unwrap();
             assert_eq!(s.camera, point(&case["final"]["state"]["camera"]));

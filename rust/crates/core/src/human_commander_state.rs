@@ -128,6 +128,8 @@ pub struct HumanState {
     recorded_seed: u32,
     owner: u32,
     initial_spawn: Point,
+    // Subscriber identities remain distinct when the seat's private state resets.
+    alert_allocator: u64,
     runtime: Option<HumanRuntimeSnapshot>,
 }
 
@@ -243,6 +245,7 @@ impl HumanState {
             recorded_seed,
             owner,
             initial_spawn,
+            alert_allocator: 0,
             runtime: None,
         }
     }
@@ -307,7 +310,7 @@ impl HumanState {
                 pending: Vec::new(),
                 batch_generation: None,
                 batch_read: 0,
-                next_alert: 0,
+                next_alert: staged.alert_allocator,
                 last_place: None,
                 last_place_tick: None,
                 scan: 0,
@@ -346,6 +349,7 @@ impl HumanState {
         }
         state.run_input(self.owner, control, view, &mut planner, &mut result)?;
         state.release_unreferenced_alerts();
+        staged.alert_allocator = state.next_alert;
         *self = staged;
         Ok(result)
     }
