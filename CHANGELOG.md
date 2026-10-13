@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added internal ephemeral World publication drafts and maintained-grid copies for the approved administrative elimination boundary. Publication preserves authoritative terrain allocations, initial geography and ordered mutation history. No live elimination caller or native verification is claimed yet.
+
 - Prepared the World elimination branch with the shared finish successor and checked firing/supply dependencies. Preserved the shared skirmish completion helper, initializing ordinary Conquest logistics after recipient setup and retaining World-only refusal. The new combined ancestry awaits native checks.
 
 - Converged the World finish successor with the region provider's verified final ancestry. Provider changes since its import repair are declaration formatting and evidence prose; its runtime body is unchanged. The successor still needs its own combined native proof.
