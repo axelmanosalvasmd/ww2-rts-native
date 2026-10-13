@@ -90,10 +90,13 @@ impl Match {
         if u.air.is_some() || u.riding || u.garrison.is_some() {
             return Err("air, carrier or garrison retreat is unsupported".into());
         }
-        if u.build || u.entrench {
-            return Err("construction or mass-project retreat is unsupported".into());
+        if u.build {
+            return Err("construction retreat is unsupported".into());
         }
-        if u.id != id || u.dig != self.field_works.is_active(id) {
+        if u.id != id
+            || u.dig != self.field_works.is_active(id)
+            || u.entrench != self.field_works.membership(id).is_some()
+        {
             return Err("unrepresented or inconsistent retreat field work".into());
         }
         if !self.commands.units.contains_key(&id) {

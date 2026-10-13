@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Connected canonical mass-project admission, early recount and per-unit segment allocation immediately before paid field work in the separate continuation. Retirement and accepted retreat now validate both paid-job and project-membership parity before sole cancellation. Construction remains excluded; native full-step comparison is being written and no combined proof is claimed.
+
 - Normal-merged the corrected source mass-project tick provider into a separate ground-support descendant, preserving the newer ability admission regression and actual operative/reaction caller. Canonical jobs and memberships remain singular; combined native proof is pending.
 
 - Normal-merged the reviewed test-only reaction observation repairs into the separate ground-support continuation, preserving the actual support caller and aircraft refusal regression. Combined native proof remains pending.

@@ -23,6 +23,7 @@ pub enum TickPhase {
     Operative,
     Abilities,
     FieldWork,
+    FieldProjects,
     AirRail,
     Riding,
     Reactions,
@@ -137,6 +138,8 @@ impl crate::match_runtime::Match {
         self.validate_abilities()?;
         self.prepare_companion_tick()?;
         self.validate_reaction_tick_actors()?;
+        let current_order = game.units.keys().copied().collect::<Vec<_>>();
+        self.validate_field_project_tick(&current_order)?;
         if self
             .field_works
             .jobs()
@@ -183,10 +186,8 @@ impl crate::match_runtime::Match {
             if unit.garrison.is_some() && self.automatic_retreat_candidate(id)? {
                 return Err("automatic garrison retreat tick exit is not connected".into());
             }
-            if (unit.build || unit.entrench) && self.automatic_retreat_candidate(id)? {
-                return Err(
-                    "construction or mass-project retreat tick exit is not connected".into(),
-                );
+            if unit.build && self.automatic_retreat_candidate(id)? {
+                return Err("construction retreat tick exit is not connected".into());
             }
         }
         Ok(())
@@ -205,6 +206,8 @@ impl crate::match_runtime::Match {
         self.validate_reaction_tick_actors()?;
         self.validate_ground_support_tick(boundary)
             .map_err(|error| format!("ground support boundary: {error}"))?;
+        let current_order = self.world.game.units.keys().copied().collect::<Vec<_>>();
+        self.validate_field_project_tick(&current_order)?;
         let mut environment = self.tick_environment_phase(EnvironmentPhase::StructureSync)?;
         self.grid.rebuild(&self.world.game.units);
         self.capture_firing_prior()?;
@@ -235,6 +238,9 @@ impl crate::match_runtime::Match {
             vision::update_vision(&mut self.world.game, &self.rules, &self.grid);
             phases.push(TickPhase::Vision);
         }
+        // Source paid counts/crew sweep precede the path scheduler and unit queues.
+        self.recount_field_projects()?;
+        phases.push(TickPhase::FieldProjects);
         // These are the source defaults for an ordinary Conquest match.
         let paths = self.begin_path_tick(4096, 20)?;
         phases.push(TickPhase::Paths);
@@ -292,6 +298,7 @@ impl crate::match_runtime::Match {
             self.decrement_reaction_timer(id, dt)?;
             self.automatic_retreat_unit(id)?;
             self.apply_autocast(id)?;
+            self.apply_project_unit(id)?;
             self.apply_field_work_unit(id)?;
             self.step_aimed_ability(id)?;
             self.apply_attack_move(id)?;

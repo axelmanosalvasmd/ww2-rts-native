@@ -1137,6 +1137,7 @@ impl crate::match_runtime::Match {
                 || self.abilities.get(id).is_none()
                 || self.recovery.get(id).is_none()
                 || unit.dig != self.field_works.is_active(id)
+                || unit.entrench != self.field_works.membership(id).is_some()
             {
                 return Err(CombatError::InvalidInput("death sidecar state"));
             }

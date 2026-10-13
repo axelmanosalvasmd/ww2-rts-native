@@ -1,0 +1,13 @@
+# Mass projects in the sole tick runner
+
+This separate normal descendant combines the ground-support caller with corrected source provider `914efe7`. Frozen reaction and ground-support candidates retain their own evidence. The combined mass-project native replay is being written; this composition has not compiled yet.
+
+Before queue consumption, `validate_field_project_tick` receives the complete current numeric-ID collection. After boundary commands it validates the resulting current collection again, before prior poses and clock effects. This list validates admission; it does not replace the live unit iterator or the later captured strike/recovery/death membership.
+
+The actual early recount follows weather/vision at the source lab boundary and precedes `begin_path_tick`. Research remains an unavailable phase. Recount borrows the canonical listed projects, paid jobs, memberships and waiting command rows. It runs paid active counts each tick and the crew/sweep cadence on every twentieth tick. The ordinary live turn then calls `apply_project_unit` immediately before `apply_field_work_unit`, after retreat/autocast. A new paid segment can accrue that turn's interval through the existing scheduler.
+
+Retirement preflight checks both `Game.dig` against paid-job activity and `Game.entrench` against project membership for every potential captured removal, including later garrison casualties. Accepted retreat checks the same parity after excluding construction and before routing; sole cancellation remains after route/counter preflight. It removes job and membership before the derived flags, refunds nothing, and leaves cached project counts for the real early recount. Combat shooter metadata still survives while canonical flights reference it.
+
+The unchanged full-source provider oracle records seven cases, 25 actions, 193 actual steps and 215 snapshots. The new native consumer must call actual `advance_tick` for those steps and compare payment, job/member/queue, active/crew, route drops, terrain and retirement transitions. Fixture clock priming must retain the one recorded command queue; it cannot substitute manual unit phases or a second scheduler. Retry-budget configuration remains under the tick owner's control.
+
+Construction, fill/concrete work, logistics/convoys, aircraft, carriers, garrison exits and full room simulation retain their existing unsupported admission. The Default alias, project helper native proof and composed native result remain separate decisions/evidence. No public ABI, wire, privacy or reference pin changes.
