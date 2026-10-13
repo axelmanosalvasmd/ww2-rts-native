@@ -124,6 +124,14 @@ Decided now so release stays cheap:
 3. Unreal game: terrain, units, effects, HUD, sound, then the FPS view, with the browser client still working alongside.
 4. Retire the JavaScript client and Node server in ww2-rts.
 
+## World region capture and income ownership (2026-10-13)
+
+The next bounded actuator keeps live World ownership in `WorldRuntime.regions`, commander wallets in the existing economy, capture counts in story and relocated homes in the existing player start rows. Temporary staged copies allow the whole operation to reject before publication when a consequence is not represented. The ordinary constructor and tick guards remain unchanged.
+
+Source income precedes World capture. Ordered tick units determine upkeep, while an explicit current depot view determines node payment. `advance_income_with_depots` preserves that distinction without adding another Game lookup or economy table. The existing income wrapper derives current facts from its supplied unit view. The Match adapter refuses removed tick IDs until a producer can supply retained facts explicitly.
+
+The capture pass distinguishes guard locks from numeric team locks, uses live grid order, and preserves neutralization, capture, story timing and the half-cell centers used by the source. Canonical `contested`, optional `locked` and `cap_tick` fields carry source state. Recipient region locks continue to use seen/remembered buildings instead of authoritative flags. Fort transfer, army/building elimination, common World finish and logistics-enabled execution remain explicit unsupported preflight paths. Nineteen original-helper traces contain 38 transitions; independent source/oracle review passes, while native verification is pending. [Implementation boundaries](docs/runtime/world-regions.md) describe the producer inputs.
+
 ## World Match startup ownership (2026-10-13)
 
 The layered loader and full generator precede the executable World startup lane. `Match::new_world` accepts an explicit validated map and the generator's retained `MatchRandom`; ordinary construction keeps its World refusal. World homes resolve their ownership from actual commander teams rather than generator hints. HQs, local bases and guards, forts and starting commander forces follow the original setup order through the shared staged unit factory. No second unit factory or authoritative unit/health table is introduced.

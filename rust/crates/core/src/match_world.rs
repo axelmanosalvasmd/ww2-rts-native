@@ -22,6 +22,10 @@ pub struct RegionState {
     pub team: i32,
     pub progress: f64,
     pub capper: Option<usize>,
+    pub contested: bool,
+    /// Absent until the live source phase computes production locks.
+    pub locked: Option<bool>,
+    pub cap_tick: Option<i64>,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct ResourceNode {
@@ -250,6 +254,9 @@ impl Match {
                     team,
                     progress: if r.home.is_some() { 1.0 } else { 0.0 },
                     capper: None,
+                    contested: false,
+                    locked: None,
+                    cap_tick: None,
                 })
             })
             .collect::<Result<Vec<_>, String>>()?;

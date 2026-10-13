@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Recorded 19 original World capture/income traces with 38 transitions and added native comparison, current-depot and atomic-error tests. Independent source/oracle review passes; native verification is queued. Documented retained tick facts and the unsupported fort, elimination and finish consequences.
+
+- Corrected the live region and relocated home coordinates to the source's cell centers after independent source review caught the missing half-cell offset, before fixture or native acceptance.
+
+- Wrote the bounded authoritative World income and capture actuator, using canonical wallets and region state with source production locks, live infantry order, capture story and home relocation. Unsupported fort seizure, army elimination and World finishes reject before publishing any phase changes. The full World tick remains refused; source oracle and native verification follow.
+
+- Added canonical World region lock and capture-time fields, preserving the recipient producer's contested field. Added explicit current depot facts for income so tick-list upkeep and live node payments can use their distinct source views. Native checks are pending in the shared Cargo queue.
+
 - Verified the merged bounded World constructor with 160 locked release workspace tests, strict Clippy, formatting and release FFI. Five original startups cover 2,761 units, canonical combat/firing metadata, home ownership, visibility, terrain log order and rails; all 63 ordinary startup records remain unchanged. Parity rows stay in progress for live World and server integration.
 
 - Formatted the new World firing metadata assertions with the pinned Rust formatter.
