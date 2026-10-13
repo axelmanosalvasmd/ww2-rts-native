@@ -2,13 +2,7 @@
 
 ## Unreleased
 
-- Verified the new ground supply network, refill rates, real convoy routes and physical handoffs in 10 focused tests, plus 63 Match startup comparisons covering 663 reserve records. Fixed the observed-routing fire iterator integration and invalid canonical carrier/control checks; startup wiring and runtime traces remain in progress.
-
-- Prepared canonical Match supply phases, queue projection, truck placement/control actuation and death bookkeeping. New original-source recordings cover 63 logistics startups (663 reserve records), 288 convoy routes, 324 physical handoffs and 233 ground networks with 39,839 rate queries. Native comparisons remain pending the exclusive shared build slot; logistics startup stays refused until they pass.
-
-- Added source convoy-route and handoff helpers plus the initial canonical Match supply adapter. Recipient-routing and environment prerequisites are required before these phases can be verified or logistics startup can be enabled.
-
-- Added ordinary ground supply network and refill-rate code with a recorder executing 233 pinned JavaScript networks and 39,839 rate queries. Match convoy routing and initialization are still being integrated; Rust verification is pending the shared build slot.
+- Added canonical ordinary-Conquest ground supply, real safe convoy routes and physical handoff. The first native pass matches 233 networks, 39,839 refill rates, 288 routes, 324 handoffs and 63 logistics startups with 663 reserve records. Constructor wiring and three original-hook runtime traces (873 phases, 69 checkpoints) are awaiting the next native check. Independent review fixed route-clear identity changes, invalid initialization publication, lazy recipient reads and ordered danger-view updates. Actual runtime traces include Move, Stop, Resume and support spending. Forced withdrawal, World supply and the complete tick remain separate.
 - Added one canonical Match control row for aim, ability and retreat switches, attack intent, facing and waiting orders. Startup prepares the rows from unit definitions; recruitment can stage them before charging. Command execution is the next part of this lane, and no wire or C interface changed.
 - Added canonical chosen-target and weapon-timer state to Match for the firing integration. Unit health and position, command aim and combat hit history retain their existing owners; the firing phase is still in progress.
 - Reserved canonical Match combat metadata for XP, incoming-hit history, death impulse and ordered cargo/carrier identities, plus the existing environment runtime. Starting units and buildings receive the original empty/default metadata; Game continues to own health, suppression and positions. The firing lane owns retarget and resets it through a typed sink. Damage/death execution and verification follow in this component lane.

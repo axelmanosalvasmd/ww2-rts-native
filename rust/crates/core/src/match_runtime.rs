@@ -98,9 +98,6 @@ impl StartPlan {
         if !options.living_weather && options.weather != WeatherChoice::Map {
             return Err("disabled living weather requires the map weather choice".into());
         }
-        if options.logistics {
-            return Err("native startup does not yet initialize logistics".into());
-        }
         if !(1..=6).contains(&options.players.len())
             || options.players.iter().any(|p| p.team < 0 || p.team >= 6)
         {
@@ -476,6 +473,7 @@ impl Match {
         }
         result.grid.rebuild(&result.world.game.units);
         result.initialize_recipient_routing()?;
+        result.initialize_logistics()?;
         Ok(result)
     }
 

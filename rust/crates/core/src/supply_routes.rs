@@ -2,7 +2,7 @@
 use crate::{
     game::{CELL, MOVE, Point, VBLOCK},
     math,
-    navigation::{TerrainView, Versions},
+    navigation::{TerrainChange, TerrainView, Versions},
     pathfinding::{self, PathRules, PathTerrain, Pathfinding},
     rules::UnitKind,
     supply_convoys::{Route, RouteFailure},
@@ -33,10 +33,18 @@ struct OwnerRoutes {
     key: Option<(u64, u64)>,
     threats: Vec<Threat>,
     flags: Vec<u16>,
+    base: Vec<u16>,
+    cleared: Vec<usize>,
     heights: Vec<i8>,
+    known_id: Option<(u64, usize, usize)>,
+    changed_from: u64,
+    changed: Vec<usize>,
+    changes: Vec<(u64, u64, Vec<usize>)>,
     version: u64,
     paths: Pathfinding,
 }
+/// Scratch belongs to one Match and its stable recipient/world identities.
+/// Construct fresh scratch when replacing a Match or its equal-version terrain.
 #[derive(Default)]
 pub struct SupplyRouting {
     owners: BTreeMap<usize, OwnerRoutes>,
@@ -90,7 +98,8 @@ impl SupplyRouting {
         }
         let state = self.owners.entry(owner).or_default();
         let key = (tick / 40, known.navigation.versions.knowledge);
-        if safe && state.key != Some(key) {
+        let refreshed = safe && state.key != Some(key);
+        if refreshed {
             state.key = Some(key);
             state.threats = threats.to_vec();
         }
@@ -107,53 +116,20 @@ impl SupplyRouting {
                 failure: Some(RouteFailure::Dangerous),
             });
         }
+        if danger {
+            refresh_danger(state, known.navigation, from, refreshed)?;
+        }
+        let history = state
+            .changes
+            .iter()
+            .map(|(from, to, cells)| TerrainChange {
+                from: *from,
+                to: *to,
+                cells,
+            })
+            .collect::<Vec<_>>();
         let terrain = if danger {
             let v = known.navigation;
-            let mut flags = v.flags.to_vec();
-            for t in &state.threats {
-                let radius = t.range + 3.0;
-                for y in math::max(0.0, ((t.at.z - radius) / CELL).floor()) as usize
-                    ..math::min(v.height as f64, ((t.at.z + radius) / CELL).ceil()) as usize
-                {
-                    for x in math::max(0.0, ((t.at.x - radius) / CELL).floor()) as usize
-                        ..math::min(v.width as f64, ((t.at.x + radius) / CELL).ceil()) as usize
-                    {
-                        let p = Point {
-                            x: (x as f64 + 0.5) * CELL,
-                            z: (y as f64 + 0.5) * CELL,
-                        };
-                        if distance(p, t.at) <= radius {
-                            flags[y * v.width + x] |= MOVE | VBLOCK;
-                        }
-                    }
-                }
-            }
-            for y in math::max(0.0, ((from.z - 4.0) / CELL).floor()) as usize
-                ..math::min(v.height as f64, ((from.z + 4.0) / CELL).ceil()) as usize
-            {
-                for x in math::max(0.0, ((from.x - 4.0) / CELL).floor()) as usize
-                    ..math::min(v.width as f64, ((from.x + 4.0) / CELL).ceil()) as usize
-                {
-                    if distance(
-                        from,
-                        Point {
-                            x: (x as f64 + 0.5) * CELL,
-                            z: (y as f64 + 0.5) * CELL,
-                        },
-                    ) <= 4.0
-                    {
-                        flags[y * v.width + x] = v.flags[y * v.width + x];
-                    }
-                }
-            }
-            let heights = v
-                .heights
-                .map_or_else(|| vec![0; v.flags.len()], <[i8]>::to_vec);
-            if state.flags != flags || state.heights != heights {
-                state.heights = heights;
-                state.version = state.version.wrapping_add(1);
-                state.flags = flags;
-            }
             PathTerrain {
                 navigation: TerrainView {
                     flags: &state.flags,
@@ -165,8 +141,12 @@ impl SupplyRouting {
                         obstruction: state.version,
                         knowledge: state.version,
                     },
-                    changed: None,
-                    changes: &[],
+                    changed: Some(TerrainChange {
+                        from: state.changed_from,
+                        to: state.version,
+                        cells: &state.changed,
+                    }),
+                    changes: &history,
                     ..v
                 },
                 ..known
@@ -368,6 +348,131 @@ impl SupplyRouting {
     }
 }
 
+// One source danger-view object belongs to one fixed Match recipient. Preserve
+// insertion order for changed cells because region graph updates consume it.
+fn refresh_danger(
+    state: &mut OwnerRoutes,
+    v: TerrainView<'_>,
+    from: Point,
+    refreshed: bool,
+) -> Result<(), String> {
+    let identity = (v.knowledge_id, v.width, v.height);
+    let fresh = state.known_id != Some(identity) || state.flags.len() != v.flags.len();
+    if fresh {
+        state.known_id = Some(identity);
+        state.base = v.flags.to_vec();
+        state.flags = v.flags.to_vec();
+        state.heights = v
+            .heights
+            .map_or_else(|| vec![0; v.flags.len()], <[i8]>::to_vec);
+        state.cleared.clear();
+        state.changes.clear();
+        state.version = 0;
+    }
+    let mut candidates = state.cleared.clone();
+    let mut candidate_set = candidates
+        .iter()
+        .copied()
+        .collect::<std::collections::BTreeSet<_>>();
+    let mut height_changed = Vec::new();
+    if fresh || refreshed {
+        let mut next = v.flags.to_vec();
+        for t in &state.threats {
+            let radius = t.range + 3.0;
+            for y in math::max(0.0, ((t.at.z - radius) / CELL).floor()) as usize
+                ..math::min(v.height as f64, ((t.at.z + radius) / CELL).ceil()) as usize
+            {
+                for x in math::max(0.0, ((t.at.x - radius) / CELL).floor()) as usize
+                    ..math::min(v.width as f64, ((t.at.x + radius) / CELL).ceil()) as usize
+                {
+                    if distance(
+                        Point {
+                            x: (x as f64 + 0.5) * CELL,
+                            z: (y as f64 + 0.5) * CELL,
+                        },
+                        t.at,
+                    ) <= radius
+                    {
+                        next[y * v.width + x] |= MOVE | VBLOCK;
+                    }
+                }
+            }
+        }
+        for (c, &want) in next.iter().enumerate() {
+            if want != state.base[c] {
+                state.base[c] = want;
+                if candidate_set.insert(c) {
+                    candidates.push(c);
+                }
+            }
+            let height = v.heights.map_or(0, |h| h[c]);
+            if state.heights[c] != height {
+                state.heights[c] = height;
+                height_changed.push(c);
+            }
+        }
+    }
+    let mut cleared = Vec::new();
+    for y in math::max(0.0, ((from.z - 4.0) / CELL).floor()) as usize
+        ..math::min(v.height as f64, ((from.z + 4.0) / CELL).ceil()) as usize
+    {
+        for x in math::max(0.0, ((from.x - 4.0) / CELL).floor()) as usize
+            ..math::min(v.width as f64, ((from.x + 4.0) / CELL).ceil()) as usize
+        {
+            let c = y * v.width + x;
+            if distance(
+                from,
+                Point {
+                    x: (x as f64 + 0.5) * CELL,
+                    z: (y as f64 + 0.5) * CELL,
+                },
+            ) <= 4.0
+            {
+                cleared.push(c);
+                if candidate_set.insert(c) {
+                    candidates.push(c);
+                }
+            }
+        }
+    }
+    let open = cleared
+        .iter()
+        .copied()
+        .collect::<std::collections::BTreeSet<_>>();
+    let mut changed = height_changed;
+    let mut changed_set = changed
+        .iter()
+        .copied()
+        .collect::<std::collections::BTreeSet<_>>();
+    for c in candidates {
+        let want = if open.contains(&c) {
+            v.flags[c]
+        } else {
+            state.base[c]
+        };
+        if state.flags[c] != want {
+            state.flags[c] = want;
+            if changed_set.insert(c) {
+                changed.push(c);
+            }
+        }
+    }
+    state.cleared = cleared;
+    state.changed_from = state.version;
+    if !changed.is_empty() {
+        let next = state
+            .version
+            .checked_add(1)
+            .ok_or("danger version exhausted")?;
+        state.changes.push((state.version, next, changed.clone()));
+        state.version = next;
+        if state.changes.len() > 32 {
+            state.changes.remove(0);
+        }
+    }
+    state.changed = changed;
+    Ok(())
+}
 fn validate(t: PathTerrain<'_>, a: Point, b: Point) -> Result<(), String> {
     let v = t.navigation;
     let n = v

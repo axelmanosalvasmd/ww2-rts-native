@@ -377,6 +377,9 @@ impl crate::match_runtime::Match {
                 }
             }
         }
+        if !self.intercept_convoy_movement(owner, command, &controlled)? {
+            return Ok(Some(Denial::Blocked));
+        }
         // The source applies forced supply holds before ordinary ownership filtering.
         for raw in &controlled {
             if let Ok(id) = u32::try_from(*raw)

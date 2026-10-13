@@ -55,7 +55,7 @@ fn facts<'a>(u: &Unit, rules: &'a Rules) -> UnitFacts<'a> {
     }
 }
 impl Match {
-    /// Initialize after troop/base/scenario setup and metadata registration. No runtime rejection is removed by this method alone.
+    /// Initialize after troop/base/scenario setup and metadata registration. The constructor invokes this after base and recipient setup.
     pub fn initialize_logistics(&mut self) -> Result<(), String> {
         if !self.options.logistics {
             return Ok(());
@@ -64,6 +64,9 @@ impl Match {
             return Err("logistics already initialized".into());
         }
         self.validate_supply()?;
+        for owner in 0..self.start.players.len() {
+            self.validate_recipient(owner)?;
+        }
         let mut initialized = self.logistics.clone();
         for u in self.world.game.units.values() {
             let def = Definition::from_catalog(&self.rules.kinds[u.kind].name)
@@ -205,6 +208,119 @@ impl Match {
         }
         Ok(())
     }
+    /// Spend from nearby real stores first, then the current unit's own provisions.
+    pub fn spend_support_provisions(
+        &mut self,
+        unit: u32,
+        owner: usize,
+        amount: f64,
+    ) -> Result<bool, String> {
+        if !amount.is_finite() || amount < 0.0 || owner >= self.start.players.len() {
+            return Err("invalid support provisions request".into());
+        }
+        if self.convoys.is_none() {
+            return Ok(true);
+        }
+        self.with_supply_world(|ctx, state, reserves, world| {
+            state.support_provision(ctx, unit, owner, amount, reserves, world)
+        })
+    }
+    /// Manual supply uses canonical stores, reserves and the owner's remembered routes.
+    pub fn supply_convoys(
+        &mut self,
+        owner: usize,
+        ids: &[u32],
+        target: u32,
+    ) -> Result<bool, String> {
+        self.reserve_convoy_path_changes(ids, 2)?;
+        if self.convoys.is_none() {
+            return Ok(false);
+        }
+        if owner >= self.start.players.len() {
+            return Err("invalid convoy owner".into());
+        }
+        self.with_supply_world(|ctx, state, reserves, world| {
+            state.supply(ctx, owner, ids, target, reserves, world)
+        })
+    }
+    /// Resume retains source duplicate-ID order and clears waiting movement before rerouting.
+    pub fn resume_convoys(&mut self, owner: usize, ids: &[u32]) -> Result<bool, String> {
+        self.reserve_convoy_path_changes(ids, 3)?;
+        if self.convoys.is_none() {
+            return Ok(false);
+        }
+        if owner >= self.start.players.len() {
+            return Err("invalid convoy owner".into());
+        }
+        self.with_supply_world(|ctx, state, _, world| Ok(state.resume(ctx, owner, ids, world)))
+    }
+    fn reserve_convoy_path_changes(&self, ids: &[u32], changes: u64) -> Result<(), String> {
+        let mut needed = std::collections::BTreeMap::<u32, u64>::new();
+        for id in ids {
+            let count = needed.entry(*id).or_default();
+            *count = count
+                .checked_add(changes)
+                .ok_or("convoy path identity exhausted")?;
+        }
+        for (id, count) in needed {
+            if self
+                .world
+                .game
+                .units
+                .get(&id)
+                .is_some_and(|u| u.path_gen.checked_add(count).is_none())
+            {
+                return Err("convoy path identity exhausted".into());
+            }
+        }
+        Ok(())
+    }
+    pub(crate) fn intercept_convoy_movement(
+        &mut self,
+        owner: usize,
+        command: &crate::match_commands::Command,
+        raw_ids: &[i64],
+    ) -> Result<bool, String> {
+        if self.convoys.is_none() {
+            return Ok(true);
+        }
+        use crate::{match_commands::Command, supply_convoys::MovementCommand};
+        let movement = match command {
+            Command::Move {
+                orders,
+                attack_move,
+                queue,
+                ..
+            } => {
+                let rows = orders
+                    .iter()
+                    .filter_map(|r| u32::try_from(r.unit).ok().map(|id| (id, r.at)))
+                    .collect();
+                if *attack_move {
+                    MovementCommand::AttackMove {
+                        at: None,
+                        orders: rows,
+                        queue: *queue,
+                    }
+                } else {
+                    MovementCommand::Move {
+                        at: None,
+                        orders: rows,
+                        queue: *queue,
+                    }
+                }
+            }
+            Command::Stop { .. } => MovementCommand::Stop,
+            _ => return Ok(true),
+        };
+        let ids = raw_ids
+            .iter()
+            .filter_map(|id| u32::try_from(*id).ok())
+            .collect::<Vec<_>>();
+        self.with_supply_world(|ctx, state, _, world| {
+            state.prepare_movement(ctx, owner, &ids, &movement, world)
+        })
+    }
     /// Late source phase, after capture and income. The caller owns clock advancement and winner state.
     pub fn step_supply_convoys(&mut self, winner_decided: bool) -> Result<(), String> {
         self.step_supply_convoys_with_dt(winner_decided, self.rules.movement.tick)
@@ -291,6 +407,7 @@ impl Match {
                 || !u.z.is_finite()
                 || !u.hp.is_finite()
                 || !u.stuck.is_finite()
+                || u.path_gen.checked_add(4).is_none()
                 || u.built.is_some_and(|v| !v.is_finite())
                 || u.still.is_some_and(|v| !v.is_finite())
                 || u.path.iter().any(|p| !p.x.is_finite() || !p.z.is_finite())
@@ -325,9 +442,20 @@ impl Match {
         if self.convoys.is_none() || winner_decided {
             return Ok(());
         }
+        self.with_supply_world(|ctx, state, reserves, world| state.step(ctx, reserves, world, dt))
+    }
+    fn with_supply_world<R>(
+        &mut self,
+        action: impl FnOnce(
+            supply_convoys::Context<'_>,
+            &mut ConvoyState,
+            &mut logistics::LogisticsState,
+            &mut ConvoyWorld<'_>,
+        ) -> Result<R, supply_convoys::ConvoyError>,
+    ) -> Result<R, String> {
         self.validate_supply()?;
         for owner in 0..self.start.players.len() {
-            self.refresh_recipient_routing(owner)?;
+            self.validate_recipient(owner)?;
         }
         let players = self
             .start
@@ -394,7 +522,9 @@ impl Match {
             commands: &mut self.commands,
             firing: &mut self.firing,
             combat: &mut self.combat,
-            recipients: &self.recipients,
+            recipients: &mut self.recipients,
+            routing_fog: &mut self.routing_fog,
+            buildings: &self.building_cells,
             routing: &mut self.supply_routes,
             network: &self.supply_net,
             rules: &self.rules,
@@ -402,11 +532,13 @@ impl Match {
             next_id: &mut self.next_unit_id,
             placer: SpawnPlacer::new(),
         };
-        self.convoys
-            .as_mut()
-            .unwrap()
-            .step(ctx, &mut self.logistics, &mut adapter, dt)
-            .map_err(|e| format!("Match convoys: {e:?}"))
+        action(
+            ctx,
+            self.convoys.as_mut().unwrap(),
+            &mut self.logistics,
+            &mut adapter,
+        )
+        .map_err(|e| format!("Match convoys: {e:?}"))
     }
 }
 struct ConvoyWorld<'a> {
@@ -415,7 +547,9 @@ struct ConvoyWorld<'a> {
     commands: &'a mut MatchCommands,
     firing: &'a mut FiringState,
     combat: &'a mut CombatState,
-    recipients: &'a [RecipientRouting],
+    recipients: &'a mut [RecipientRouting],
+    routing_fog: &'a mut crate::fog::Fog,
+    buildings: &'a std::collections::BTreeMap<usize, crate::match_runtime::BuildingCell>,
     routing: &'a mut SupplyRouting,
     network: &'a GroundSupplyNetwork,
     rules: &'a Rules,
@@ -424,6 +558,18 @@ struct ConvoyWorld<'a> {
     placer: SpawnPlacer,
 }
 impl ConvoyWorld<'_> {
+    fn refresh_route_recipient(&mut self, owner: usize) {
+        crate::match_routing::refresh_recipient_parts(
+            self.world,
+            self.rules,
+            self.grid,
+            self.buildings,
+            self.routing_fog,
+            &mut self.recipients[owner],
+            owner,
+        )
+        .expect("validated recipient routing parts");
+    }
     fn unit_view(&self, u: &Unit) -> UnitView {
         let name = self.rules.kinds[u.kind].name.as_str();
         let c = self.combat.get(u.id).unwrap();
@@ -487,8 +633,9 @@ impl supply_convoys::World for ConvoyWorld<'_> {
         self.world.game.units.get(&id).map(|u| self.unit_view(u))
     }
     fn route(&mut self, u: &UnitView, at: Point, safe: bool) -> supply_convoys::Route {
-        let native = &self.world.game.units[&u.id];
+        let kind = self.world.game.units[&u.id].kind;
         let owner = u.owner.unwrap();
+        self.refresh_route_recipient(owner);
         let recipient = &self.recipients[owner];
         let query = recipient.query();
         let known = query
@@ -505,17 +652,18 @@ impl supply_convoys::World for ConvoyWorld<'_> {
                     safe,
                 },
                 known,
-                &self.rules.kinds[native.kind],
+                &self.rules.kinds[kind],
                 &threats,
             )
             .expect("validated convoy route inputs")
     }
     fn continue_route(&mut self, u: &UnitView, _at: Point) -> bool {
-        let native = &self.world.game.units[&u.id];
+        let kind = self.world.game.units[&u.id].kind;
+        self.refresh_route_recipient(u.owner.unwrap());
         let recipient = &self.recipients[u.owner.unwrap()];
         SupplyRouting::continue_route(
             recipient.query().navigation(),
-            &self.rules.kinds[native.kind],
+            &self.rules.kinds[kind],
             u.at,
             &u.path,
             u.stuck,
@@ -722,25 +870,28 @@ impl supply_convoys::World for ConvoyWorld<'_> {
                 repath,
             } => {
                 u.path = path;
-                u.path_gen = u.path_gen.wrapping_add(1);
+                u.path_gen += 1;
                 u.world_goal = Some(world_goal);
                 u.repath = repath;
                 u.retreating = false;
+                u.attack = false;
                 c.attack_id = 0;
                 self.firing.get_mut(id).unwrap().target_id = 0;
             }
             UnitOperation::ClearRoute => {
+                u.path_gen += 1;
                 u.path.clear();
                 u.world_goal = None;
             }
             UnitOperation::ResumeClear => {
+                u.path_gen += 1;
                 u.path.clear();
                 u.world_goal = None;
                 c.orders.clear();
             }
             UnitOperation::RepairRoute(path) => {
                 u.path = path;
-                u.path_gen = u.path_gen.wrapping_add(1);
+                u.path_gen += 1;
                 u.stuck = 0.0;
             }
             UnitOperation::NewTruck => c.auto_retreat = false,
@@ -753,12 +904,22 @@ fn queued_points(control: &UnitControl, id: u32) -> Result<Vec<Point>, String> {
         .orders
         .iter()
         .map(|command| match command {
-            crate::match_commands::Command::Move { orders, .. } => {
+            crate::match_commands::Command::Move {
+                orders,
+                control_ids,
+                queue,
+                together,
+                ..
+            } => {
                 let matches = orders
                     .iter()
-                    .filter(|order| order.unit == id)
+                    .filter(|order| order.unit == i64::from(id))
                     .collect::<Vec<_>>();
-                if matches.len() != 1
+                if orders.len() != 1
+                    || control_ids.is_some()
+                    || *queue
+                    || *together
+                    || matches.len() != 1
                     || !matches[0].at.x.is_finite()
                     || !matches[0].at.z.is_finite()
                 {
