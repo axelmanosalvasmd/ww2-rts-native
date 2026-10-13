@@ -1,6 +1,7 @@
 //! Ephemeral administrative World transaction. One canonical World remains live.
 //! Preserve terrain allocations and ordered history when publishing the prepared draft.
-use super::{RegionVersions, World, WorldError};
+use super::{Recipient, RegionVersions, World, WorldError};
+use std::collections::{BTreeMap, BTreeSet};
 
 pub(crate) struct WorldTransaction {
     pub(crate) world: World,
@@ -9,6 +10,9 @@ pub(crate) struct WorldTransaction {
     versions: RegionVersions,
     tick: i64,
     journal_end: u64,
+    journal_base: u64,
+    terrain_version: u32,
+    pending: BTreeMap<Recipient, BTreeSet<usize>>,
 }
 #[must_use = "commit after every phase guard succeeds, or drop without changing World"]
 pub(crate) struct PreparedWorldPublication<'a> {
@@ -60,11 +64,16 @@ impl World {
             versions: self.versions,
             tick: self.game.tick,
             journal_end,
+            journal_base: self.journal_base,
+            terrain_version: self.game.terrain_version,
+            pending: self.pending.clone(),
         })
     }
 }
 impl WorldTransaction {
-    /// Bind the draft back to its unchanged source before the caller publishes any owner.
+    /// Bind the draft to its original structural context before publication.
+    /// The caller holds exclusive source ownership throughout preparation; HP, materials and
+    /// recipient writes without structural revisions are outside this binding check.
     pub(crate) fn prepare_publication(
         self,
         target: &mut World,
@@ -81,6 +90,9 @@ impl WorldTransaction {
             || self.versions != target.versions
             || self.tick != target.game.tick
             || self.journal_end != target.journal_end()?
+            || self.journal_base != target.journal_base
+            || self.terrain_version != target.game.terrain_version
+            || self.pending != target.pending
             || !terrain_shape(target, n)
             || !terrain_shape(&self.world, n)
             || !preserves_optional(&target.game.height, &g.height)

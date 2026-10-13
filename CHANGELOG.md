@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Bind administrative World drafts to journal trims, recipient pending cursors and terrain revisions, preventing stale draft publication from restoring those ledgers.
+
+- Wrote ordered World elimination preparation over ephemeral drafts: delete all selected units regardless of health, wreck buildings immediately, stage collapse effects and final removed snapshots, clear only matching depots, and retain active-flight combat sources. Metadata cleanup uses owner-approved non-refunding hooks. The phase caller, original fixtures and native checks follow.
+
 - Integrated source-only canonical ability, recovery and field-work metadata into the elimination consumer, preserving the shared startup shell and one per-unit metadata initialization. These owner-approved rows can now retire without paid-work refunds; combined native validation is pending.
 
 - Integrated the source-only shared post-wreck finish facts API into the separate World elimination branch. It validates complete survivor/removal coverage and prepares source samples before any canonical wreck publication; native acceptance remains pending.
