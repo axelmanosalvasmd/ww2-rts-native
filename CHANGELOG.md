@@ -18,6 +18,8 @@
 
 - Keep Rust JSON files in LF format on Windows checkouts. Windows CI found that converting the generated catalog's final newline to CRLF changed its byte fingerprint; the exact expected and observed hashes reproduce with that one-byte conversion.
 
+- Corrected IF-01 to the current 46 compiled tables and labeled the earlier 42-table, 26.6 KB catalog as the initial version in DESIGN.md.
+
 - Documented compiled-table ownership and the 11 bounded economy helpers, with 56,400 reference damage cases. IF-01 and IF-03 remain in progress because C table export, full availability and purchase execution are not implemented.
 
 - Added the compiled rules catalog and bounded economy/research queries for #17. The catalog retains 42 post-initialization tables and all 47 unit definitions from reference `e4e579a`, including explicit non-finite number tags, and loads once without runtime file access. Price, faction compatibility, population weights, support and ability costs, builder lists, HQ tiers and armory multipliers match recorded JavaScript helper outputs across 10 mode inputs, 640 ability cases, 480 research cases and 56,400 damage cases. The 304 KB fixture uses grouped hashes plus direct samples. This does not add purchasing, income, production availability, a new FFI contract or broader rules-hash coverage.
