@@ -390,6 +390,8 @@ pub struct BuildingCell {
 /// Live terrain and units have a single owner in `world.game`.
 pub struct Match {
     pub commands: crate::match_commands::MatchCommands,
+    pub combat: crate::match_combat::CombatState,
+    pub environment: crate::environment::EnvironmentRuntime,
     pub world: World,
     pub start: StartPlan,
     pub options: MatchOptions,
@@ -439,6 +441,8 @@ impl Match {
         };
         let mut result = Self {
             commands: crate::match_commands::MatchCommands::new(4096),
+            combat: crate::match_combat::CombatState::default(),
+            environment: crate::environment::EnvironmentRuntime::default(),
             grid: SpatialGrid::new(&world.game.units, 16.0),
             world,
             start,
@@ -458,6 +462,7 @@ impl Match {
             let control = crate::match_commands::UnitControl::new(unit, &result.rules)?;
             result.commands.insert(unit.id, control);
             result.firing.initialize(unit.id);
+            result.combat.initialize(unit.id);
         }
         result.grid.rebuild(&result.world.game.units);
         Ok(result)
