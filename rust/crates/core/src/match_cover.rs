@@ -78,7 +78,8 @@ impl Match {
                             .first()
                             .map(|r| r.at)
                             .ok_or("missing queued move anchor")?,
-                        Command::Cover { at: Some(at), .. } => *at,
+                        Command::Cover { at: Some(at), .. }
+                        | Command::Ability { at: Some(at), .. } => *at,
                         _ => return Err("unrepresented queued cover anchor".into()),
                     }
                 } else {
@@ -258,6 +259,7 @@ impl Match {
                 &mut self.commands,
                 &mut self.firing,
                 &mut self.field_works,
+                &mut self.abilities,
                 controlled,
                 prepared,
             );
@@ -271,6 +273,7 @@ impl Match {
                 &mut self.commands,
                 &mut self.firing,
                 &mut self.field_works,
+                &mut self.abilities,
                 controlled,
                 prepared,
             );
@@ -284,6 +287,7 @@ fn publish(
     commands: &mut crate::match_commands::MatchCommands,
     firing: &mut crate::match_firing::FiringState,
     field_works: &mut crate::field_works::FieldWorksRuntime,
+    abilities: &mut crate::match_abilities::AbilityState,
     controlled: Vec<u32>,
     prepared: Vec<(u32, crate::game::Unit, Option<Point>)>,
 ) {
@@ -304,6 +308,10 @@ fn publish(
         c.face = None;
         c.attack_id = 0;
         c.nade = None;
+        if let Some(ability) = abilities.get_mut(id) {
+            ability.aimed_auto = false;
+            ability.aimed_walked = false;
+        }
         c.enter = None;
         c.fire_at = None;
         c.rally_drift = false;

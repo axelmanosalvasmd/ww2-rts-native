@@ -244,6 +244,11 @@ trace('cover-mixed-paid-dig-and-no-spot',maps[1],[{kind:'rifle',x:27,z:23},{kind
  {auditWork:true,command:{t:'cover',ids:[1,2]}},
 ]);
 
+trace('queued-cover-ability-anchor',maps[1],[{kind:'rifle',x:27,z:23}],[
+ {command:{t:'ability',ids:[1],x:39,z:23,queue:true}},
+ {command:{t:'cover',ids:[1],queue:true}},
+]);
+
 const movement=[];
 for(const kind of ['rifle','tank']) {
  const map=makeMap('disconnected',flat().map(r=>r.slice(0,16)+'B'+r.slice(17)));

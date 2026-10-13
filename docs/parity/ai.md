@@ -128,3 +128,5 @@ Cover now uses the canonical staged recipient guard for whole-batch failure atom
 Queued Cover is now implemented for the same supported inactive, nongarrison squads, using the existing eight-order queue and lazy cover selection. The original command oracle has 85 traces and 312 steps. Native comparison remains pending; active-job and garrison cancellation and the broader commander still keep AI-11 and AI-49 in progress.
 
 The isolated Cover field cleanup checkpoint additionally carries actual paid Dig cancellation without refund and house-preserving garrison cleanup. Queued admission and no-spot holds retain work. Its original-source fixture has 90 command traces and 329 steps, including real Dig commands and source-produced house entry baselines. Native proof is pending; garrison entry, construction and mass projects and full commander behavior remain outside this extension.
+
+The merged aimed-ability queue is covered by an additional original-source ability-then-Cover trace. Cover inherits that waiting point, bringing this isolated command fixture to 91 traces and 331 steps; native execution remains pending.

@@ -21,7 +21,7 @@ fn snapshot(m: &Match) -> Value {
     Value::Array(m.world.game.units.values().map(|u| {
  let c=&m.commands.units[&u.id];let f=&m.firing.units[&u.id];
  let mut row=json!({"id":u.id,"x":bits(u.x),"z":bits(u.z),"rot":bits(u.rot),"aim":bits(c.aim),"path":u.path.iter().map(|p|pt(Some(*p))).collect::<Vec<_>>(),"reverse":pt(u.reverse),"pace":bits(u.pace),"worldGoal":pt(u.world_goal),"amove":pt(u.amove),"attackId":c.attack_id,"targetId":f.target_id,"follow":c.follow,"holdFire":c.hold_fire,"holdPos":u.hold_pos,"auto":c.auto_cast,"autoRetreat":c.auto_retreat});
- let jobs=json!({"orders":c.orders.iter().map(|o|match o {Command::Cover {at,..}=>json!({"t":"cover","at":pt(*at),"face":null}),Command::Move {orders,attack_move,face,..}=>json!({"t":if *attack_move {"amove"}else{"move"},"at":pt(orders.first().map(|o|o.at)),"face":face.map(bits)}),_=>panic!("unexpected waiting order")}).collect::<Vec<_>>(),"face":c.face.map(|f|json!({"angle":bits(f.angle),"at":pt(Some(f.at))})),"retreating":u.retreating,"stuck":bits(u.stuck),"repath":bits(u.repath),"drift":u.drift,"garrison":u.garrison.map_or(-1,|c|c as i64),"nade":pt(c.nade),"enter":c.enter.map_or(-1,|v|v as i64),"fireAt":c.fire_at.map_or(-1,|v|v as i64),"board":u.board,"build":u.build,"dig":u.dig,"entrench":u.entrench});
+ let jobs=json!({"orders":c.orders.iter().map(|o|match o {Command::Cover {at,..}=>json!({"t":"cover","at":pt(*at),"face":null}),Command::Ability {at,..}=>json!({"t":"ability","at":pt(*at),"face":null}),Command::Move {orders,attack_move,face,..}=>json!({"t":if *attack_move {"amove"}else{"move"},"at":pt(orders.first().map(|o|o.at)),"face":face.map(bits)}),_=>panic!("unexpected waiting order")}).collect::<Vec<_>>(),"face":c.face.map(|f|json!({"angle":bits(f.angle),"at":pt(Some(f.at))})),"retreating":u.retreating,"stuck":bits(u.stuck),"repath":bits(u.repath),"drift":u.drift,"garrison":u.garrison.map_or(-1,|c|c as i64),"nade":pt(c.nade),"enter":c.enter.map_or(-1,|v|v as i64),"fireAt":c.fire_at.map_or(-1,|v|v as i64),"board":u.board,"build":u.build,"dig":u.dig,"entrench":u.entrench});
  let routing=json!({"traffic":u.traffic.is_some(),"trafficWait":bits(u.traffic_wait),"trafficEntered":u.traffic_entered,"trail":u.traffic_trail.len(),"outcome":c.outcome.map(|o|match o {MoveOutcome::Interrupted=>"interrupted",MoveOutcome::Moving=>"moving",MoveOutcome::Unreachable=>"unreachable",MoveOutcome::Arrived=>"completed"}),"outcomeTick":c.outcome_tick,"routeEnd":pt(c.route_end),"supplyHold":c.supply_hold,"supplyEscape":c.supply_escape,"forced":m.logistics.get(u.id).map(|r|json!({"forced":r.forced,"stranded":r.stranded}))});
  row.as_object_mut().unwrap().extend(jobs.as_object().unwrap().clone());
  row.as_object_mut().unwrap().extend(routing.as_object().unwrap().clone());
@@ -364,7 +364,7 @@ fn original_command_and_waiting_order_phases() {
             count += 1;
         }
     }
-    assert_eq!(count, 329);
+    assert_eq!(count, 331);
 }
 #[test]
 fn ordered_match_boundary_and_whole_command_rejection() {
