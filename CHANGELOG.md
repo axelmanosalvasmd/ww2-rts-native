@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add two room-host regressions using actual rifle Flight and building-section Hurt events. They check retained failure output, refusal after a tick fault, Current capture without delivery, Scheduled delivery once and empty scheduled discard. Source review is clear; native verification is pending.
+
 - Compose the trusted room host with chronological tick output and ordinary recipient shot projection. Preserve successful scheduled batches, current-frame catch-up isolation and typed late-failure event/retirement prefixes. Unsupported AIR, persistent flight/falling actors and ambiguous throws remain explicit frame refusals. The combined native proof is pending.
 
 - Wire trusted room reconnect, abort-safe shutdown, canonical ending results and connection-scoped write accounting. Read-only attachment now validates every seat's ordinary lists before publication. Expected send and enqueue loss disconnects the affected seat instead of faulting the match. The old enqueue-fault regression is replaced with healthy-peer delivery, drop pause and full reconnect coverage. Original Source roster replay passes 3 traces and 11 operations; 7 Hub and 3 socket tests are written, with native verification pending.

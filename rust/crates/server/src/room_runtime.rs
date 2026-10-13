@@ -343,3 +343,7 @@ impl RoomRuntime {
         self.held
     }
 }
+
+#[cfg(test)]
+#[path = "room_runtime_tests.rs"]
+mod tests;
