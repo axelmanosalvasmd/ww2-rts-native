@@ -55,12 +55,15 @@ fn prime(m: &mut Match, id: u32, fields: &Value) {
     m.grid.update(id, u);
 }
 fn make(case: &Value) -> Match {
+    make_mode(case, Mode::Conquest)
+}
+fn make_mode(case: &Value, mode: Mode) -> Match {
     let map = AuthoritativeMap::from_json(&serde_json::to_vec(&case["map"]).unwrap()).unwrap();
     let mut m = Match::new(
         &map,
         MatchOptions {
             seed: 701,
-            mode: Mode::Conquest,
+            mode,
             players: (0..2)
                 .map(|slot| PlayerConfig {
                     name: format!("p{slot}"),
@@ -285,4 +288,70 @@ fn admission_guards_reject_before_payment_or_cancellation() {
     );
     m.story[0].mp_spent = 30.;
     assert_eq!(snapshot(&m), before);
+}
+
+#[test]
+fn ordinary_default_dig_matches_real_source_payment_and_preserves_refused_work() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("../tests/fixtures/match-engineering.json")).unwrap();
+    let case = &fixture["traces"][0];
+    let row = &case["rows"][0];
+    let command = Command::from_json(&row["action"]["cmd"]).unwrap();
+    let mut default = make_mode(case, Mode::Default);
+    let mut conquest = make_mode(case, Mode::Conquest);
+    assert!(default.world.game.mode.is_none() && conquest.world.game.mode.is_none());
+    for m in [&mut default, &mut conquest] {
+        assert_eq!(snapshot(m), case["initial"]);
+        let mp = m.start.economy.players[0].mp;
+        let result = m.execute_command(0, &command, false).unwrap();
+        assert_eq!(
+            encode(result.map(|d| json!(d.name())).unwrap_or(Value::Null)),
+            row["result"]
+        );
+        assert_eq!(snapshot(m), row["snapshot"]);
+        assert!(m.field_works.is_active(1));
+        assert!(m.world.game.units[&1].dig);
+        assert!(m.start.economy.players[0].mp < mp);
+        assert_eq!(mp - m.start.economy.players[0].mp, m.story[0].mp_spent);
+    }
+    assert_eq!(snapshot(&default), snapshot(&conquest));
+    assert_eq!(
+        default.start.random.snapshot(),
+        conquest.start.random.snapshot()
+    );
+    // A refused mode context cannot replace paid work or acknowledge terrain reads.
+    for (mode, game_mode) in [
+        (Mode::World, None),
+        (Mode::Default, Some(crate::game::ModeKind::Assault)),
+        (Mode::Conquest, Some(crate::game::ModeKind::Classic)),
+    ] {
+        default.options.mode = mode;
+        default.world.game.mode = game_mode;
+        let before = snapshot(&default);
+        let memory = default
+            .recipients
+            .iter()
+            .map(|r| r.remembered().to_vec())
+            .collect::<Vec<_>>();
+        let fog = default.routing_fog.clone();
+        let pending = default
+            .world
+            .pending(crate::world::Recipient::Player(0))
+            .cloned();
+        assert!(default.execute_command(0, &command, false).is_err());
+        assert_eq!(snapshot(&default), before);
+        assert_eq!(
+            default
+                .recipients
+                .iter()
+                .map(|r| r.remembered().to_vec())
+                .collect::<Vec<_>>(),
+            memory
+        );
+        assert_eq!(default.routing_fog, fog);
+        assert_eq!(
+            default.world.pending(crate::world::Recipient::Player(0)),
+            pending.as_ref()
+        );
+    }
 }

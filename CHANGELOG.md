@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Normal-merged the reviewed ordinary Default provider aliases into a separate successor of the verified support/project closure. Existing Source configuration and canonical state remain unchanged; the sole caller guard and actual Default replay are separate source changes with native proof pending.
+
 - Corrected the inherited ground-support scope note to acknowledge the mass-project phase in this coherent head. Rust and harness trees remain identical to tested 0f7850d.
 
 - Verified the combined ground-support and mass-project tick assembly on the Mac (arm64): all 239 workspace release tests, 78 affected debug tests at the same runtime, strict Clippy, formatting and release FFI pass. Independent hash-checked copies pass 28 debug/release tests. Actual runner replay covers 12 Conquest support traces (2,660 ticks, 144 checkpoints), real Default refusal and seven project cases (193 ticks, 215 snapshots). Recorded two consumer-only compile repairs; Default alias, carriers, aircraft and full match start remain separate.
@@ -21,6 +23,9 @@
 - Added a source-written whole-scene admission test for configured tick 18 and the next real runner boundary. It checks empty-queue restoration, unchanged RNG/wallet, running/primed/pending-input refusal and invalid-clock atomicity; native execution is pending.
 
 - Added deterministic initial tick path configuration with the unchanged 4,096/20 defaults. Trusted fresh scenes stage an empty command-queue restore and clock together before any writes; pending, running or faulted queues cannot be rewound. The actual mass retry-one source scene can now use the sole scheduler without manual phase calls. Combined native proof remains pending.
+- Extend the separately reviewed ordinary Default alias to typed Dig admission, requiring absent Game mode and preserving real job, wallet and terrain-read checks. The new regression replays an actual source paid Dig command against both canonical aliases and protects existing paid work on refused mode contexts. Native execution remains pending.
+
+- Accept the existing ordinary Default alias in canonical ability, recovery and shared-project guards when Game has no mode object. Three original-source mode cases execute three accepted commands and six full steps, including capture, income and VP victory; omitted mode and explicit Conquest match. Literal empty-string mode retains its distinct optional Tech and Logistics boundary. A real paid-job provider admission test is written; native and combined caller checks remain pending.
 
 - Connected canonical mass-project admission, early recount and per-unit segment allocation immediately before paid field work in the separate continuation. Retirement and accepted retreat now validate both paid-job and project-membership parity before sole cancellation. Construction remains excluded; native full-step comparison is being written and no combined proof is claimed.
 
