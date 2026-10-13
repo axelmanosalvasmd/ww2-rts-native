@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Verify engineering snapshots and scuttling at compiled `09d79ab` on Mac arm64: 26 focused debug tests, all 272 locked release workspace tests, strict Clippy, formatting and release FFI pass. Independent hash-checked copies pass 52 debug/release executions. The replay covers five original cases, 481 full ticks and 513 states with focused works, worker rows/plans/orders, paid bindings and wallets. Full snapshots, transport and other platforms remain separate. Normally merge the published selected-delivery evidence without changing tested Rust or harness files.
+
+- Verified selected recipient delivery and its canonical prerequisite union on Vostro Linux x86_64 at compiled `70f420a`: five changed consumer debug tests, all 270 locked/offline release workspace tests, strict all-target Clippy, formatting and release FFI pass. All four selected-seat and inherited admission regressions execute in release. Three current-source core compilations and the separate Clippy check confirm source provenance. Earlier runtime-identical checks passed 34 focused debug tests at `8f32198` and one support consumer at `0420c51`. This evidence delivery preserves all tested code and fixtures; server transport and broader actor/mode integration remain separate.
+
 - Correct the scuttling atomicity regression to use the recorded startup scene with two live owned units. The first engineering native check passed the orphan-membership guard, then found that the original selected scene contained only one owned unit before the actuator ran. Runtime and Source fixtures are unchanged; fresh combined gates remain pending.
 
 - Converge the engineering replay with the three reviewed timeline test adapters. Preserve both parents' runtime, recorded Source fixtures and strict comparisons; fresh verification of this combined head is pending.
