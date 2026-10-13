@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Merged the captured fire and damage actor prerequisites into a separate staged tick assembly. Frozen PR #134 is unchanged; provider integration and combined native checks remain pending.
+
 - Verified the staged Conquest command, route, environment, weapon and retirement assembly on the Mac: 17 focused debug tests, all 155 workspace release tests, strict Clippy, formatting and release FFI build pass. Eight original-source traces cover 1,825 ticks and 79 checkpoints, including contact damage, a casualty at tick 483, bounty/story and continued simulation. Independent source re-review is clear. Remaining actuators stay explicit and server match start remains refused.
 
 - Replaced the unsigned fire/flood cadence expression with the standard multiple-of check required by strict Clippy, preserving its every-tenth-tick timing. Removed repeated routing and command design sections introduced by the staged ancestry merge.
@@ -35,6 +37,9 @@
 - Added one canonical Match control row for aim, ability and retreat switches, attack intent, facing and waiting orders. Startup prepares the rows from unit definitions; recruitment can stage them before charging. Command execution is the next part of this lane, and no wire or C interface changed.
 
 - Added canonical chosen-target and weapon-timer state to Match for the firing integration. Unit health and position, command aim and combat hit history retain their existing owners; the firing phase is still in progress.
+- Added captured-list burning so late-born units miss the current direct fire beat, while complete live context still validates every unit and handles garrison eviction. Structural and legacy rubble effects receive the same captured actors. The source fixture now records 47 traces and 262 actions, with all 44 prior traces unchanged; new cases include an actual Para arrival, current garrison eviction and legacy fire expiry. Native verification remains pending the shared build slot.
+
+- Added explicit captured actor membership for blast damage and source-list terrain casualties while keeping full canonical environment validation and ordinary projectile defaults. Bridge casualties and legacy rubble/blocked-cell checks use captured actors; garrison eviction still uses current units. Independent source review passes; native checks are queued.
 
 - Verified the complete command/firing ancestry after recruitment metadata integration: 155 workspace tests, five focused debug/release tests, strict Clippy, formatting and release FFI build pass. The diff against the reviewed command branch contains only weapon-phase code, publication defaults, fixtures and documentation.
 
