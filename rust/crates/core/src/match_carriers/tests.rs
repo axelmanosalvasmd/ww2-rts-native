@@ -229,7 +229,7 @@ fn source_commands_boarding_riding_and_unload_match_each_checkpoint() {
             actions += 1;
         }
     }
-    assert_eq!(actions, 55);
+    assert_eq!(actions, 61);
 }
 fn atomic(m: &Match) -> String {
     format!(

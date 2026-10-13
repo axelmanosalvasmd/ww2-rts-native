@@ -52,6 +52,7 @@ try{
  record('blocked-boarding',[unit(1,'rifle',20,20),unit(2,'halftrack',24,20)],[board([1],2),{op:'mutate',cell:10*40+11,ch:'B'},{op:'prime',id:1,fields:{path:[]}},phase(1)]);
  record('carrier-missing-or-full-clears',[unit(1,'rifle',20,20,{board:999}),unit(2,'tank',24,20),unit(3,'rifle',24,20,{riding:2}),unit(4,'rifle',24,20,{riding:2})],[phase(1),{op:'prime',id:1,fields:{board:2}},{op:'prime',id:2,fields:{cargo:[3,4]}},phase(1)]);
  record('stale-cargo-cleanup-and-unload',[unit(1,'rifle',24,20,{riding:2}),unit(2,'halftrack',24,20,{cargo:[1,999]}),unit(3,'rifle',20,20)],[early(2),unload([2]),early(2)]);
+ record('missing-cargo-unload-defers-pruning',[unit(1,'rifle',20,20),unit(2,'halftrack',24,20,{cargo:[999]})],[board([1],2),unload([2]),board([1],2),early(2),board([1],2),phase(1)]);
  record('boarding-cancels-paid-real-dig',[unit(1,'rifle',20,23),unit(2,'halftrack',24,23)],[{op:'command',cmd:{t:'dig',ids:[1],kind:'trench',x:20,z:20,dir:0}},board([1],2),phase(1),unload([2])]);
  record('hidden-obstacle-owner-route',[unit(1,'rifle',20,20),unit(2,'halftrack',170,20)],[{op:'mutate',cell:10*100+45,ch:'B'},board([1],2)],map(100,40));
  record('duplicate-inputs-do-not-reserve-twice',[unit(1,'rifle',20,20),unit(2,'halftrack',24,20)],[board([1,1,2,2]),phase(1),early(1),unload([2,2])]);

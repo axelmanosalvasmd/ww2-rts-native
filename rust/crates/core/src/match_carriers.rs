@@ -493,7 +493,8 @@ impl Match {
             }
             for &id in &self.combat.get(carrier).unwrap().cargo {
                 let Some(u) = self.world.game.units.get(&id) else {
-                    drops.push((carrier, id, None));
+                    // Source leaveCarrier filters against u?.id. An absent unit
+                    // leaves numeric cargo IDs for the later early-loop prune.
                     continue;
                 };
                 if self.carrier_boundary(id)
