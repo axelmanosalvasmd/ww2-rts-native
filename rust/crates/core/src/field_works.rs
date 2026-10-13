@@ -10,10 +10,20 @@ use crate::{
 };
 #[path = "match_engineering.rs"]
 mod match_engineering;
+#[path = "match_projects.rs"]
+mod match_projects;
+#[path = "field_project_tick.rs"]
+mod project_tick;
 
 use std::{
     collections::{BTreeMap, BTreeSet},
     sync::OnceLock,
+};
+#[path = "field_projects.rs"]
+mod projects;
+pub use projects::{
+    Pattern, PreparedProject, PreparedSegment, Project, ProjectId, ProjectMaterial, ProjectOrder,
+    ProjectRequest, Segment, SegmentPreparation, entrench_plan, line_fort, segment_cost,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -102,6 +112,7 @@ pub struct WorkCell {
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct Dig {
+    pub project: Option<ProjectId>,
     pub kind: FortKind,
     pub at: Point,
     pub direction: f64,
@@ -128,6 +139,7 @@ pub struct StartRequest {
 pub struct FieldWorksRuntime {
     jobs: BTreeMap<u32, Dig>,
     pits: BTreeSet<usize>,
+    projects: projects::ProjectState,
 }
 /// Preparation borrows the canonical wallet and changes nothing until the infallible commit.
 /// Caller stages its control/garrison changes, cancels prior work, then publishes this job.
@@ -356,6 +368,12 @@ impl FieldWorksRuntime {
     }
     /// Accepted replacement commands, retreat and retirement call this. Paid work has no refund.
     pub fn cancel(&mut self, unit: u32) -> Option<Dig> {
+        self.projects.members.remove(&unit);
+        self.drop_paid_job(unit)
+    }
+    /// A failed Dig route drops its paid segment, retaining the shared project membership.
+    /// The source cached active counter changes at the next recount, without a refund.
+    pub fn drop_paid_job(&mut self, unit: u32) -> Option<Dig> {
         self.jobs.remove(&unit)
     }
     pub fn prepare_start<'a>(
@@ -417,6 +435,7 @@ impl FieldWorksRuntime {
             unit: request.unit,
             cost: d.cost,
             job: Dig {
+                project: None,
                 kind: request.kind,
                 at,
                 direction,
@@ -462,6 +481,12 @@ impl FieldWorksRuntime {
         let Some(mut job) = self.jobs.get(&unit_id).cloned() else {
             return Ok(StepResult::default());
         };
+        if let Some(id) = job.project {
+            let project = self.projects.records.get(&id).ok_or(Error::InvalidInput)?;
+            if self.membership(unit_id) != Some(id) || project.active <= -9_007_199_254_740_991 {
+                return Err(Error::InvalidInput);
+            }
+        }
         let unit = w.game.units.get(&unit_id).ok_or(Error::InvalidInput)?;
         if !position(unit.at())
             || !unit.hp.is_finite()
@@ -551,6 +576,14 @@ impl FieldWorksRuntime {
             }
         }
         if job.cells.is_empty() {
+            if let Some(project) = job.project {
+                let p = self
+                    .projects
+                    .records
+                    .get_mut(&project)
+                    .ok_or(Error::InvalidInput)?;
+                p.active -= 1;
+            }
             self.jobs.remove(&unit_id);
             Ok(StepResult {
                 completed: Some(owner),

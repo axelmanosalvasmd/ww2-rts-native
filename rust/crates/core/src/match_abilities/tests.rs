@@ -314,8 +314,7 @@ fn make(case: &Value) -> (Match, Vec<u32>) {
         m.world
             .register_recipient(crate::world::Recipient::Player(slot));
     }
-    m.initialize_recipient_routing()
-        .unwrap_or_else(|e| panic!("{} routing: {e}", case["name"]));
+    m.initialize_recipient_routing().unwrap();
     (m, order)
 }
 fn combat_random(m: &Match) -> (String, Vec<f64>) {

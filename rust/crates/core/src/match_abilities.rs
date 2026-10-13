@@ -115,7 +115,10 @@ impl Match {
         )
     }
     pub(crate) fn validate_abilities(&self) -> Result<(), String> {
-        if self.options.mode != crate::economy::Mode::Conquest
+        if !matches!(
+            self.options.mode,
+            crate::economy::Mode::Default | crate::economy::Mode::Conquest
+        ) || self.world.game.mode.is_some()
             || self.world.game.tick < 0
             || self.world.game.tick as u64
                 > 9_007_199_254_740_991u64
@@ -476,7 +479,9 @@ impl Match {
                 1.
             };
             if self.logistics.can_fire(id, count)
-                && (u.build || u.entrench || u.dig != self.field_works.is_active(id))
+                && (u.build
+                    || u.entrench != self.field_works.membership(id).is_some()
+                    || u.dig != self.field_works.is_active(id))
             {
                 return Ok(true);
             }

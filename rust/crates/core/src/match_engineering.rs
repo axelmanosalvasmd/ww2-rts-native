@@ -25,7 +25,11 @@ fn denial(reason: Reason) -> Denial {
 }
 impl Match {
     fn validate_field_work_state(&self) -> Result<(), String> {
-        if self.options.mode != crate::economy::Mode::Conquest {
+        if !matches!(
+            self.options.mode,
+            crate::economy::Mode::Default | crate::economy::Mode::Conquest
+        ) || self.world.game.mode.is_some()
+        {
             return Err("Match field works support Conquest only".into());
         }
         if self.world.game.tick < 0 || self.world.game.tick > 9_007_199_254_740_991 {
@@ -53,7 +57,9 @@ impl Match {
                 Ok(())
             };
         };
-        if unit.dig != self.field_works.is_active(id) {
+        if unit.dig != self.field_works.is_active(id)
+            || unit.entrench != self.field_works.membership(id).is_some()
+        {
             return Err("unrepresented or inconsistent field-work activity".into());
         }
         if !self.commands.units.contains_key(&id)
@@ -106,7 +112,7 @@ impl Match {
         if !eligible {
             return Ok(Some(Denial::NoBuilders));
         }
-        if unit.build || unit.entrench {
+        if unit.build {
             return Ok(Some(Denial::Unsupported));
         }
         if unit.path_gen == u64::MAX {
@@ -276,6 +282,14 @@ impl Match {
 
     /// The ordinary digging phase in one unit's source loop, at the fixed simulation interval.
     pub fn apply_field_work_unit(&mut self, id: UnitId) -> Result<(), String> {
+        self.apply_field_work_unit_dt(id, 0.05)
+    }
+
+    /// Same source work phase at a supplied component interval. The Match runner uses the fixed wrapper.
+    pub fn apply_field_work_unit_dt(&mut self, id: UnitId, dt: f64) -> Result<(), String> {
+        if !dt.is_finite() || !(0.0..=7200.0).contains(&dt) {
+            return Err("invalid field-work interval".into());
+        }
         self.validate_field_work_unit(id)?;
         let Some(job) = self.field_works.jobs.get(&id) else {
             return Ok(());
@@ -284,8 +298,8 @@ impl Match {
         if unit.hp <= 0. || unit.riding || self.commands.units[&id].operative {
             return Ok(());
         }
-        if unit.build || unit.entrench {
-            return Err("unrepresented construction or mass entrenchment".into());
+        if unit.build {
+            return Err("unrepresented construction project".into());
         }
         let distance = math::hypot(unit.x - job.at.x, unit.z - job.at.z);
         if distance > job.reach.unwrap_or(3.) {
@@ -308,7 +322,7 @@ impl Match {
             return Ok(());
         }
         let completes = job.cells.len() == 1
-            && job.elapsed + 0.05
+            && job.elapsed + dt
                 >= self
                     .field_works
                     .span(&self.world, id, job.kind)
@@ -325,7 +339,7 @@ impl Match {
         let story = prepare_story_updates(&mut self.story, self.finish.is_some(), &updates)?;
         let result = self
             .field_works
-            .step_unit(&mut self.world, id, 0.05)
+            .step_unit(&mut self.world, id, dt)
             .map_err(|e| format!("field work step: {e}"))?;
         if result.completed.is_some() {
             self.world.game.units.get_mut(&id).unwrap().dig = false;

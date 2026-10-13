@@ -11,6 +11,26 @@ use ww2_core::{
     random::{MatchRandom, StreamId},
     weather::WeatherChoice,
 };
+fn assert_birth_metadata(instance: &Match, id: u32) {
+    assert!(
+        instance.combat.get(id).is_some(),
+        "unit {id} combat metadata"
+    );
+    assert!(
+        instance.firing.get(id).is_some(),
+        "unit {id} firing metadata"
+    );
+    assert_eq!(
+        instance.abilities.get(id),
+        Some(&ww2_core::match_abilities::AbilityUnit::default()),
+        "unit {id} ability birth metadata"
+    );
+    assert_eq!(
+        instance.recovery.get(id),
+        Some(&ww2_core::match_recovery::RecoveryUnit::default()),
+        "unit {id} recovery birth metadata"
+    );
+}
 fn bits(n: f64) -> Value {
     json!(format!("{:016x}", n.to_bits()))
 }
@@ -213,6 +233,7 @@ fn original_world_startup() {
             assert_eq!(bits(combat.xp), bits(raw["xp"].as_f64().unwrap()));
             assert_eq!(bits(combat.hit_at), bits(raw["hitAt"].as_f64().unwrap()));
             assert_eq!(json!(combat.cargo), raw["cargo"]);
+            assert_birth_metadata(&instance, actual.id);
             assert_eq!(
                 simtest::replay::diff(actual, &expected),
                 None,
@@ -417,6 +438,9 @@ fn incomplete_world_inputs_are_explicit_and_do_not_mutate_the_map() {
     assert!(Match::new_world(&invalid, o.clone(), MatchRandom::new(o.seed)).is_err());
 
     let mut instance = Match::new_world(&m, o.clone(), MatchRandom::new(o.seed)).unwrap();
+    for id in instance.world.game.units.keys() {
+        assert_birth_metadata(&instance, *id);
+    }
     let log = instance.world.cell_log().to_vec();
     let new = instance.world.new_cells().to_vec();
     let start = new.len() - 2;

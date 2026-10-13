@@ -371,7 +371,7 @@ impl Match {
             || self.abilities.get(id).is_some()
             || self.recovery.get(id).is_some()
         {
-            return Err("World birth metadata identity occupied".into());
+            return Err("World publication metadata identity already exists".into());
         }
         let mode = self.world.game.mode;
         prepare_world_publication(

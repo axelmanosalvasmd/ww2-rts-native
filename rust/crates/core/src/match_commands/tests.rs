@@ -134,6 +134,35 @@ fn point(v: &Value) -> Option<Point> {
     })
 }
 fn set(m: &mut Match, id: u32, fields: &Value) {
+    if let Some(project) = fields.get("entrench") {
+        if let Some(at) = project["jobs"]
+            .as_array()
+            .and_then(|v| v.first())
+            .and_then(point)
+        {
+            let unit = &m.world.game.units[&id];
+            let prepared = m
+                .field_works
+                .prepare_project(
+                    &m.world,
+                    &m.start.economy.players[unit.owner],
+                    crate::field_works::ProjectRequest {
+                        owner: unit.owner,
+                        pattern: crate::field_works::Pattern::Line,
+                        fort: crate::field_works::FortKind::Trench,
+                        from: at,
+                        to: at,
+                        back: unit.at(),
+                    },
+                    |_| true,
+                )
+                .expect("canonical fixture project placement");
+            let project = prepared.commit(&mut m.field_works).unwrap();
+            m.field_works.join_project(project, &[id]).unwrap();
+        } else {
+            m.field_works.cancel(id);
+        }
+    }
     if let Some(dig) = fields.get("dig") {
         if let Some(at) = point(dig) {
             let owner = m.world.game.units[&id].owner;

@@ -73,6 +73,21 @@ impl<T> OrderQueue<T> {
         self.pending.is_empty()
     }
 
+    /// Inspect one boundary without consuming its ordered inputs.
+    pub fn pending_tick(&self, tick: u64) -> impl Iterator<Item = (&OrderKey, &T)> {
+        let first = OrderKey {
+            tick,
+            issuer: 0,
+            sequence: 0,
+        };
+        let last = OrderKey {
+            tick,
+            issuer: u32::MAX,
+            sequence: u64::MAX,
+        };
+        self.pending.range(first..=last)
+    }
+
     pub fn enqueue(&mut self, key: OrderKey, value: T) -> Result<(), QueueError> {
         let tick = self.next_tick.ok_or(QueueError::Exhausted)?;
         if key.tick < tick {
