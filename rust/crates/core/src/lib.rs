@@ -9,6 +9,8 @@ pub mod game;
 pub mod grid;
 pub mod math;
 pub mod movement;
+pub mod navigation;
+pub mod pathfinding;
 pub mod rules;
 pub mod separation;
 pub mod sort;
