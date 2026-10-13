@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Integrated source-only ability, recovery and shared field-work ownership into the withdrawal branch, retaining staged recruitment publication and every canonical metadata initializer. Queued ability presence is projected separately from exact movement destinations, so the first forced turn can cancel both without inventing waypoints. Detailed work cancellation calls the engineering owner's shared helper. Combined native checks are pending.
+- Integrated source-only ability, recovery and shared field-work ownership into the withdrawal branch, retaining staged recruitment publication and every canonical metadata initializer. Queued ability presence is projected separately from exact movement destinations, so the first forced turn can cancel both without inventing waypoints. Detailed work cancellation calls the engineering owner's shared helper. The original oracle now has nine traces and 103 transitions, including three real paid field admissions that cancel without refunds. Combined native checks are pending.
 
 - Prepared the ordinary-Conquest forced-withdrawal phase over canonical unit controls and reserves. The original source recorder covers six rifle/tank traces and 100 transitions, including retry/escape/hold boundaries, real routes and handoffs, recovery and four house exits. Added source-owned started/retry control fields and preserved live home-search endpoint/failure effects through projected bank probes. Detailed field-work cancellation uses the shared engineering owner; build targets and mass projects remain explicit unsupported inputs. Native verification and final field-owner integration are pending.
 

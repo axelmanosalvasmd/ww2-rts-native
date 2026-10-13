@@ -70,7 +70,8 @@ function row(u) {
   };
 }
 const traces = [];
-for (const sourceCase of [5, 27, 60]) for (const kind of ['rifle', 'tank']) {
+for (const sourceCase of [5, 27, 60]) for (const profile of ['rifle', 'tank', 'field']) {
+  const kind = profile === 'field' ? 'rifle' : profile;
   const g = create(sourceCase), u = S.internals.spawnUnit(g, 0, kind);
   const initial = { id: u.id, kind, x: u.x, z: u.z };
   const stores = [...g.convoys.stores.values()], active = stores.map(s => s.active);
@@ -86,6 +87,27 @@ for (const sourceCase of [5, 27, 60]) for (const kind of ['rifle', 'tank']) {
     S.supplyWithdrawal(g, u);
     steps.push({ input, expected: row(u) });
   }
+  if (profile === 'field') {
+    g.tick = 10;
+    let command;
+    for (const dx of [-8, -4, 0, 4, 8]) for (const dz of [-8, -4, 0, 4, 8]) {
+      if (command) continue;
+      const candidate = { t: 'dig', ids: [u.id], kind: 'trench', x: u.x + dx, z: u.z + dz, dir: 0 };
+      if (S.command(g, 0, candidate) === undefined) command = candidate;
+    }
+    assert.ok(command, 'No visible trench site for original field admission');
+    const visibility = [];
+    const placement = S.placementCheck(g, { ...command, team: g.players[0].team }, at => {
+      const seen = S.teamSees(g, g.players[0].team, at); visibility.push({ ...at, seen }); return seen;
+    });
+    assert.ok(placement.ok);
+    const fieldStart = { tick: g.tick, command, visibility, mpAfter: bits(g.players[0].mp), initial: row(u) };
+    step('first forced cancels paid detailed field work', 20, {}, { forced: true }, 'none');
+    assert.equal(u.dig, null);
+    assert.equal(bits(g.players[0].mp), fieldStart.mpAfter);
+    traces.push({ sourceCase, initial, fieldStart, steps });
+    continue;
+  }
   const one = [{ x: u.x + 4, z: u.z }], goal = one[0];
   step('unforced no-op', 10);
   step('first forced cancels intents without a store', 20,
@@ -97,7 +119,8 @@ for (const sourceCase of [5, 27, 60]) for (const kind of ['rifle', 'tank']) {
   step('existing path, stuck above boundary', 22, { stuck: 1.0001 });
   step('escape path', 23, { supplyEscape: true, stuck: 0 });
   step('escape goal without path', 24, { path: [], worldGoal: goal });
-  step('recovered clears withdrawal', 25, {}, { forced: false });
+  step('recovered clears withdrawal', 25,
+    { orders: [{ t: 'move', orders: [[u.id, goal.x, goal.z]], queue: false }] }, { forced: false });
   step('forced hold', 26, { supplyHold: true, path: one, worldGoal: goal }, { forced: true });
   step('repeated hold', 27);
   if (kind === 'tank') {
