@@ -2,6 +2,7 @@
 //! Wallets, story and other unit systems remain with their single owners.
 use crate::{
     catalog::Catalog,
+    economy::Mode,
     game::{Game, LOCAL_DEFENDER_OWNER, ModeKind, Point, Unit},
     grid::{SpatialGrid, UnitId},
     match_commands::{Command, UnitControl},
@@ -164,7 +165,17 @@ impl StagedUnit {
             unit.x = at.x;
             unit.z = at.z;
         }
-        let control = UnitControl::new(&unit, rules).map_err(PublicationError::Control)?;
+        let mode = match game.mode {
+            None => Mode::Default,
+            Some(ModeKind::Annihilation) => Mode::Annihilation,
+            Some(ModeKind::Assault) => Mode::Assault,
+            Some(ModeKind::Classic) => Mode::Classic,
+            Some(ModeKind::Horde) => Mode::Horde,
+            Some(ModeKind::Tutorial) => Mode::Tutorial,
+            Some(ModeKind::World) => Mode::World,
+        };
+        let control =
+            UnitControl::new_for_mode(&unit, rules, mode).map_err(PublicationError::Control)?;
         Ok(Self {
             unit,
             control,
