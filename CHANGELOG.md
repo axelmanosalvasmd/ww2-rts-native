@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added the existing flight-fixture comparison path to numeric mismatch diagnostics so the coupled native proof can identify missing represented values directly. Core release tests passed before the inherited simtest comparison stopped.
+
 - Corrected the inherited non-finite aimed-command guard to retain the source follow reset on a blocked command. Its full snapshot still verifies unchanged work, wallet, terrain and random state; the valid unsupported-project refusal remains unchanged.
 
 - Joined the checked ordinary-launch buff/AP provider dependency after the coupled release replay found the missing flight payload adjustment. The source multiplier, suppression, rate, naval AP restriction and deferred AP consumption retain their reviewed behavior and launch-refusal guard.
