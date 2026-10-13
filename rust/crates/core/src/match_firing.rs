@@ -1291,6 +1291,19 @@ impl Match {
         {
             return Err("invalid canonical weapon unit".into());
         }
+        if self
+            .firing
+            .get(id)
+            .is_some_and(|r| !r.cooldown.is_finite() || !r.retarget.is_finite())
+            || self
+                .combat
+                .get(id)
+                .is_some_and(|r| !r.xp.is_finite() || r.xp < 0.0 || !r.hit_at.is_finite())
+            || u.hit_from
+                .is_some_and(|p| !p.x.is_finite() || !p.z.is_finite())
+        {
+            return Err("invalid canonical weapon metadata".into());
+        }
         let kind = &self.rules.kinds[u.kind];
         let control = self
             .commands
@@ -1593,8 +1606,9 @@ impl Match {
         if self.world.game.tick < 0 || self.world.game.tick > 9_007_199_254_740_351 {
             return Err("invalid firing tick".into());
         }
-        for u in self.world.game.units.values() {
-            if u.kind >= self.rules.kinds.len()
+        for (&id, u) in &self.world.game.units {
+            if u.id != id
+                || u.kind >= self.rules.kinds.len()
                 || u.owner >= self.world.game.players.len()
                 || ![u.x, u.z, u.hp, u.rot, u.supp]
                     .iter()
@@ -1663,6 +1677,13 @@ impl Match {
         }
         if kind.building && (!kind.weapon || u.built.is_none_or(|n| n < 1.0)) {
             return Ok(());
+        }
+        if self
+            .firing
+            .get(id)
+            .is_some_and(|r| !r.cooldown.is_finite() || !r.retarget.is_finite())
+        {
+            return Err("invalid canonical weapon timers".into());
         }
         let row = self.firing.initialize(id);
         row.cooldown -= dt;

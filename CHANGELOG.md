@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Expanded the firing source fixture to explicit area-weapon orders and limited/empty ammunition, covering every represented shooter kind. Rejects malformed timer and XP facts before unit firing changes. Native verification remains queued.
+
 - Connected the Conquest flight driver to canonical suppression, unit/section damage and terminal terrain/blast effects, preserving contact order, launch delays and retained shooter XP. Added defined lower-ID collision ties, unsupported-mode guards and malformed-flight admission. Weapon updates now retain only scalar facts instead of cloning a unit and its route. The original-source recorder now covers 114 traces and 588 checkpoints with a 64,006-byte compressed fixture. Native differential, expiry and collision-tie checks are queued.
 
 - Exposed the canonical target setter inside the core so reaction phases keep shared volley claims consistent when intercepting rally movement.
