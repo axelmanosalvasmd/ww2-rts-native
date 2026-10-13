@@ -421,3 +421,116 @@ fn world_income_facts_keep_captured_order_and_refuse_missing_or_incomplete_facts
     assert_eq!(format!("{:?}", m.grid), grid);
     assert_eq!(m.world.game.tick, tick);
 }
+
+#[test]
+fn idle_local_world_reaction_uses_actor_policy_without_routing_or_mutation() {
+    let mut m = scene();
+    let id = m
+        .world
+        .game
+        .units
+        .values()
+        .find(|u| u.owner == LOCAL_DEFENDER_OWNER && m.rules.kinds[u.kind].name == "rifle")
+        .unwrap()
+        .id;
+    let unit = m.world.game.units.get_mut(&id).unwrap();
+    // Reach the actual idle reaction body rather than the constructor's hold-position exit.
+    unit.hold_pos = false;
+    assert!(unit.path.is_empty() && unit.world_goal.is_none() && unit.hit_from.is_none());
+    assert!(!unit.retreating && !unit.build && !unit.dig && !unit.entrench && !unit.riding);
+    let control = m.commands.units.get_mut(&id).unwrap();
+    control.react = 2.0;
+    assert!(control.orders.is_empty());
+    assert_eq!(control.attack_id, 0);
+    assert!(control.nade.is_none() && control.enter.is_none() && control.fire_at.is_none());
+    assert_eq!(m.firing.get(id).unwrap().target_id, 0);
+    let before = m.world.game.units[&id].clone();
+    let control = m.commands.units[&id].clone();
+    let grid = format!("{:?}", m.grid);
+    let requests = format!("{:?}", m.commands.path_requests());
+    let wallets = m.start.economy.clone();
+    let rng = m.start.random.snapshot();
+    let environment_seed = m.start.environment_seed;
+    let tick = m.world.game.tick;
+    m.react_unit(id).unwrap();
+    same_unit(&m.world.game.units[&id], &before);
+    assert_eq!(m.commands.units[&id], control);
+    assert_eq!(m.firing.get(id).unwrap().target_id, 0);
+    assert_eq!(format!("{:?}", m.grid), grid);
+    assert_eq!(format!("{:?}", m.commands.path_requests()), requests);
+    assert_eq!(m.start.economy, wallets);
+    assert_eq!(m.start.random.snapshot(), rng);
+    assert_eq!(m.start.environment_seed, environment_seed);
+    assert_eq!(m.world.game.tick, tick);
+}
+
+#[test]
+fn physical_local_threat_uses_canonical_visibility_and_implicit_lookup_refuses() {
+    use std::collections::BTreeMap;
+    use ww2_core::command_destinations::{Context, Error, threat_for, threat_for_with_visibility};
+    let mut m = scene();
+    let id = m
+        .world
+        .game
+        .units
+        .values()
+        .find(|u| u.owner == LOCAL_DEFENDER_OWNER && m.rules.kinds[u.kind].name == "rifle")
+        .unwrap()
+        .id;
+    let enemy = m
+        .world
+        .game
+        .units
+        .values()
+        .find(|u| u.owner == 0 && m.rules.kinds[u.kind].infantry && m.rules.kinds[u.kind].weapon)
+        .expect("actual World constructor publishes an armed commander squad")
+        .id;
+    let at = m.world.game.units[&id].at();
+    assert!(m.world.game.units[&id].hit_from.is_none());
+    let enemy_at = Point {
+        x: at.x + 3.0,
+        z: at.z + 4.0,
+    };
+    let enemy_unit = m.world.game.units.get_mut(&enemy).unwrap();
+    enemy_unit.x = enemy_at.x;
+    enemy_unit.z = enemy_at.z;
+    m.grid.update(enemy, enemy_unit);
+    // Declared canonical actor visibility. No callback manufactures a hit or enemy.
+    m.world_runtime.as_mut().unwrap().local_defender.visible = vec![enemy];
+    let rng = m.start.random.snapshot();
+    let environment_seed = m.start.environment_seed;
+    let units = format!("{:?}", m.world.game.units);
+    let controls = format!("{:?}", m.commands.units);
+    let grid = format!("{:?}", m.grid);
+    let wallets = m.start.economy.clone();
+    let query = |m: &Match| {
+        let hit_at: BTreeMap<_, _> = m.combat.iter().map(|(id, c)| (id, c.hit_at)).collect();
+        let points: Vec<_> = m.start.points.iter().map(|p| p.at).collect();
+        let context = Context {
+            game: &m.world.game,
+            rules: &m.rules,
+            grid: &m.grid,
+            points: &points,
+            hit_at: &hit_at,
+        };
+        let actor = m.actor_policy(LOCAL_DEFENDER_OWNER).unwrap();
+        assert_eq!(actor.source_owner, -1);
+        assert_eq!(actor.economy_slot, None);
+        assert_eq!(threat_for(&context, id, at), Err(Error::UnsupportedWorld));
+        threat_for_with_visibility(&context, id, at, actor.visible).unwrap()
+    };
+    assert_eq!(query(&m), Some(enemy_at));
+    m.world_runtime
+        .as_mut()
+        .unwrap()
+        .local_defender
+        .visible
+        .clear();
+    assert_eq!(query(&m), None, "an unseen armed actor is not a threat");
+    assert_eq!(format!("{:?}", m.world.game.units), units);
+    assert_eq!(format!("{:?}", m.commands.units), controls);
+    assert_eq!(format!("{:?}", m.grid), grid);
+    assert_eq!(m.start.economy, wallets);
+    assert_eq!(m.start.random.snapshot(), rng);
+    assert_eq!(m.start.environment_seed, environment_seed);
+}

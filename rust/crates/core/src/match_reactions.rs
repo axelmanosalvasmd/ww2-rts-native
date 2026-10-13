@@ -231,12 +231,16 @@ impl Match {
         if ![u.x, u.z, u.hp, u.rot, c.react]
             .iter()
             .all(|v| v.is_finite())
-            || u.owner >= self.world.game.players.len()
+            || (self.options.mode != crate::economy::Mode::World
+                && u.owner >= self.world.game.players.len())
             || u.hit_from
                 .is_some_and(|p| !p.x.is_finite() || !p.z.is_finite())
             || self.combat.get(id).is_some_and(|h| !h.hit_at.is_finite())
         {
             return Err("invalid canonical reaction state".into());
+        }
+        if self.options.mode == crate::economy::Mode::World {
+            self.actor_policy(u.owner)?;
         }
         if kind.structure || self.logistics.get(id).is_some_and(|r| r.forced) {
             return Ok(());
@@ -457,8 +461,13 @@ impl Match {
             points: &points,
             hit_at: &hit_at,
         };
-        let from = command_destinations::threat_for(&context, id, u.at())
-            .map_err(|e| format!("spacing threat: {e:?}"))?;
+        let from = if self.options.mode == crate::economy::Mode::World {
+            let actor = self.actor_policy(u.owner)?;
+            command_destinations::threat_for_with_visibility(&context, id, u.at(), actor.visible)
+        } else {
+            command_destinations::threat_for(&context, id, u.at())
+        }
+        .map_err(|e| format!("spacing threat: {e:?}"))?;
         let rank = terrain::cover_rank(&self.world.game, &self.rules, u.at(), from);
         let radius = number(behavior, "coverSeek")?;
         if let Some(spot) = self.reaction_spot(&u, radius, from, (rank + 1).min(3), rank >= 3)? {

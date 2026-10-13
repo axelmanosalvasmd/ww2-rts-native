@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Extend the existing physical destination and reaction helpers to validated World actors without adding a player seat or choosing a remembered routing view. World spacing threat selection borrows the canonical local visibility vector; the implicit local lookup refuses instead of indexing a missing commander. Keep ordinary owner bounds and Player visibility checks unchanged. Add two real-World-constructor witnesses for idle local reactions and visible armed threats, bringing this continuation to seven source-written tests. Whole World admission and native verification remain pending.
+
 - Connect canonical World sampling and commander/local visibility at the existing early tick beats in the still-guarded caller. Ordinary death records now borrow the canonical actor economy slot, omitting the local defender from commander losses, and World removals retain actual cached object facts through the existing World route owner. Ordinary sampling, visibility and route retention remain on their existing paths. Full World actor runtime, admission and native verification remain pending.
 
 - Normally include the canonical borrowed World actor policy, including unsorted local visibility membership, in the separate caller continuation. Commander economy remains singular and local defenders gain no lobby or wallet row. Reached phase adapters and whole World admission remain under development, with no native claim.
