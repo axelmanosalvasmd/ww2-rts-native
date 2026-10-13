@@ -26,7 +26,7 @@ fn make(c: &Value) -> Match {
                 },
                 PlayerConfig {
                     name: "B".into(),
-                    team: 0,
+                    team: if c["enemy"] == true { 1 } else { 0 },
                     faction: Faction::Germany,
                 },
             ],
@@ -63,6 +63,9 @@ fn connected_tick_phases_match_actual_friendly_reference_steps() {
     for c in fixture["cases"].as_array().unwrap() {
         let mut m = make(c);
         let input = &c["input"];
+        for unit in m.world.game.units.values_mut() {
+            unit.hold_pos = true;
+        }
         m.start.environment_seed = input["seed"].as_u64().unwrap() as u32;
         m.start.wind = (
             input["wind"][0].as_f64().unwrap(),
@@ -93,7 +96,7 @@ fn connected_tick_phases_match_actual_friendly_reference_steps() {
         }
         let mut expected = c["checkpoints"].as_array().unwrap().iter().peekable();
         for _ in 0..200 {
-            let report = m.advance_tick(false).unwrap();
+            let report = m.advance_tick().unwrap();
             assert!(!report.unavailable.is_empty());
             if expected
                 .peek()
@@ -117,7 +120,38 @@ fn rejected_clock_does_not_consume_a_tick() {
     let mut m = make(&fixture["cases"][0]);
     m.world.game.tick = i64::MAX;
     let before = snapshot(&m);
-    assert!(m.advance_tick(false).is_err());
+    assert!(m.advance_tick().is_err());
     assert_eq!(snapshot(&m), before);
     assert!(m.tick_state.fault().is_none());
+}
+
+#[test]
+fn late_terrain_change_does_not_recompute_the_earlier_supply_beat() {
+    let fixture: Value = serde_json::from_str(include_str!("fixtures/match-tick.json")).unwrap();
+    let mut c = fixture["ordering"].clone();
+    c["enemy"] = json!(true);
+    let mut m = make(&c);
+    m.start.points[0].owner = Some(0);
+    m.start.points[0].capper = Some(0);
+    m.start.points[0].progress = 1.0;
+    for step in c["steps"].as_array().unwrap() {
+        m.world.game.tick = step["tick"].as_i64().unwrap();
+        let ids: Vec<_> = m.world.game.units.keys().copied().collect();
+        m.apply_point_supply(&ids).unwrap();
+        for change in step["changes"].as_array().unwrap() {
+            m.world
+                .set_cell(
+                    change[0].as_u64().unwrap() as usize,
+                    change[1].as_str().unwrap().as_bytes()[0],
+                )
+                .unwrap();
+        }
+        m.apply_point_capture_income(&ids).unwrap();
+        let state = snapshot(&m);
+        assert_eq!(
+            json!({"players":state["players"],"points":state["points"]}),
+            step["expected"]
+        );
+    }
+    assert!(m.start.points[0].cut);
 }

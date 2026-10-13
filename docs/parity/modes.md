@@ -178,6 +178,12 @@ The canonical Match now has a Conquest victory phase, first-result finish state,
 
 This covers the ordinary-Conquest parts of MODE-27, MODE-87, MODE-88, MODE-91 and MODE-93. Other-mode endings, combat/spending story counters, command refusal, result delivery, server ending hold and the full playable tick loop remain incomplete. The rows remain in progress; no other-mode or networking completion is implied.
 
+## Staged Conquest tick integration
+
+`Match::advance_tick` now connects the clock, grid, weather plan and live weather, vision cadence, movement/crowd progress, point supply/capture/income and Conquest sample/finish phases. Four actual pinned `step` traces cover 800 ticks and 40 checkpoints across all armies. Friendly idle units hold position so this evidence does not stand in for the missing automatic reaction phase. A separate original-source case changes wreck terrain between supply and capture/income and verifies that only the next supply beat changes the cut flag.
+
+The tick report names the remaining unavailable actuators. Commands, research/production, route scheduling, reserves, reactions, firing/projectiles, construction, environment effects, reinforcement/death, convoys and scenario actions still require their real Match adapters. These rows remain in progress, and the server continues to refuse match start. Neither full-match behavior nor a client-visible interface is completed by this staged runner.
+
 ## Rust objective phase evidence
 
 `objectives.rs` provides sequential capture updates and point-supply connectivity from explicit live-unit, player and terrain facts. The original JavaScript oracle covers 214 capture traces (1,165 checkpoints) and 223 supply states, comparing progress bits, qualifying unit order, contest status, capture events, enemy-control/reached masks and cut flags. All unit kinds, allied ownership, ordered prerequisites, forced reserves, bridges, height changes, control/free-zone boundaries and naval blockers are included. Four focused tests pass in debug and release on the Mac.

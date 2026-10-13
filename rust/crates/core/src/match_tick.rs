@@ -20,6 +20,7 @@ pub enum TickPhase {
     UnitReserves,
     UnitOrders,
     Production,
+    Reactions,
     Movement,
     Firing,
     Construction,
@@ -43,26 +44,10 @@ pub enum TickPhase {
 #[derive(Clone, Debug, Default)]
 pub struct TickState {
     pub(crate) fault: Option<String>,
-    /// The existing vision cloud retains its ID; its duration lives beside it.
-    pub(crate) smoke_remaining: BTreeMap<UnitId, f64>,
 }
 impl TickState {
     pub fn fault(&self) -> Option<&str> {
         self.fault.as_deref()
-    }
-    /// Register the lifetime when an actuator creates a cloud in Game::smokes.
-    pub fn register_smoke(&mut self, id: UnitId, remaining: f64) -> Result<(), String> {
-        if !remaining.is_finite() || remaining < 0.0 {
-            return Err("invalid smoke duration".into());
-        }
-        if self.smoke_remaining.contains_key(&id) {
-            return Err("duplicate smoke identity".into());
-        }
-        self.smoke_remaining.insert(id, remaining);
-        Ok(())
-    }
-    pub fn smoke_remaining(&self, id: UnitId) -> Option<f64> {
-        self.smoke_remaining.get(&id).copied()
     }
 }
 
@@ -71,7 +56,7 @@ pub struct TickReport {
     pub tick: i64,
     /// Positions from before the increment, used by swept flight contacts.
     pub prior: BTreeMap<UnitId, Pose>,
-    /// The late unit list is captured after movement and crowd separation.
+    /// The late unit list is captured after the unit loop, before crowd separation.
     pub unit_order: Vec<UnitId>,
     pub phases: Vec<TickPhase>,
     pub unavailable: Vec<TickPhase>,
@@ -81,12 +66,12 @@ pub struct TickReport {
 impl crate::match_runtime::Match {
     /// Run the connected phase foundation. The returned unavailable list is part
     /// of the result until every actuator required by a playable tick is wired.
-    pub fn advance_tick(&mut self, winner_decided: bool) -> Result<TickReport, String> {
+    pub fn advance_tick(&mut self) -> Result<TickReport, String> {
         if let Some(fault) = self.tick_state.fault() {
             return Err(format!("tick runner faulted: {fault}"));
         }
         self.validate_tick_input()?;
-        match self.run_tick(winner_decided) {
+        match self.run_tick() {
             Ok(report) => Ok(report),
             Err(error) => {
                 self.tick_state.fault = Some(error.clone());
@@ -97,7 +82,7 @@ impl crate::match_runtime::Match {
 
     fn validate_tick_input(&self) -> Result<(), String> {
         let game = &self.world.game;
-        if game.tick < 0 || game.tick == i64::MAX {
+        if game.tick < 0 || game.tick >= 9_007_199_254_740_991 {
             return Err("invalid tick clock".into());
         }
         if !self.rules.movement.tick.is_finite() || self.rules.movement.tick <= 0.0 {
@@ -121,16 +106,14 @@ impl crate::match_runtime::Match {
         }
         let mut identities = std::collections::BTreeSet::new();
         for smoke in &game.smokes {
-            if !identities.insert(smoke.id)
-                || !self.tick_state.smoke_remaining.contains_key(&smoke.id)
-            {
-                return Err("smoke lacks a unique registered duration".into());
+            if !identities.insert(smoke.id) || smoke.remaining.is_none_or(|v| !v.is_finite()) {
+                return Err("invalid runtime smoke lifetime or identity".into());
             }
         }
         Ok(())
     }
 
-    fn run_tick(&mut self, winner_decided: bool) -> Result<TickReport, String> {
+    fn run_tick(&mut self) -> Result<TickReport, String> {
         use crate::{movement, separation, vision, weather_runtime};
         let dt = self.rules.movement.tick;
         self.grid.rebuild(&self.world.game.units);
@@ -144,6 +127,8 @@ impl crate::match_runtime::Match {
         self.world.game.tick += 1;
         let tick = self.world.game.tick;
         let mut phases = vec![TickPhase::Clock];
+        self.sample_conquest_tick()?;
+        phases.push(TickPhase::StorySample);
         self.start.weather.step(tick as u64);
         self.world.game.weather = Some(self.start.weather.now as usize);
         phases.push(TickPhase::WeatherPlan);
@@ -167,21 +152,14 @@ impl crate::match_runtime::Match {
         movement::infantry_progress(&mut self.world.game, &self.rules, &moved);
         phases.push(TickPhase::Separation);
 
-        let state = &mut self.tick_state;
         let game = &mut self.world.game;
-        let mut durations: Vec<_> = game
-            .smokes
-            .iter()
-            .map(|s| (s.id, state.smoke_remaining[&s.id]))
-            .collect();
         let mut smokes: Vec<_> = game
             .smokes
             .iter_mut()
-            .zip(&mut durations)
-            .map(|(cloud, (_, remaining))| weather_runtime::Smoke {
+            .map(|cloud| weather_runtime::Smoke {
                 x: &mut cloud.x,
                 z: &mut cloud.z,
-                remaining,
+                remaining: cloud.remaining.as_mut().expect("validated smoke lifetime"),
             })
             .collect();
         weather_runtime::advance(
@@ -210,17 +188,15 @@ impl crate::match_runtime::Match {
         )
         .map_err(|e| format!("living weather: {e:?}"))?;
         drop(smokes);
-        for (id, remaining) in durations {
-            state.smoke_remaining.insert(id, remaining);
-        }
-        game.smokes
-            .retain(|s| state.smoke_remaining.get(&s.id).is_some_and(|t| *t > 0.0));
-        state
-            .smoke_remaining
-            .retain(|id, _| game.smokes.iter().any(|s| s.id == *id));
+        game.smokes.retain(|s| s.remaining.is_some_and(|t| t > 0.0));
         phases.push(TickPhase::LivingWeather);
-        self.apply_point_economy(&unit_order, winner_decided)?;
+        self.apply_point_supply(&unit_order)?;
+        phases.push(TickPhase::PointSupply);
+        // Reinforcement and death adapters run between these two point phases.
+        self.apply_point_capture_income(&unit_order)?;
         phases.push(TickPhase::PointCaptureIncome);
+        self.apply_conquest_victory()?;
+        phases.push(TickPhase::Victory);
         Ok(TickReport {
             tick,
             prior,
@@ -231,12 +207,12 @@ impl crate::match_runtime::Match {
                 TickPhase::Commands,
                 TickPhase::StructureSync,
                 TickPhase::Debris,
-                TickPhase::StorySample,
                 TickPhase::Research,
                 TickPhase::Paths,
                 TickPhase::UnitReserves,
                 TickPhase::UnitOrders,
                 TickPhase::Production,
+                TickPhase::Reactions,
                 TickPhase::Firing,
                 TickPhase::Construction,
                 TickPhase::Projectiles,
@@ -247,7 +223,6 @@ impl crate::match_runtime::Match {
                 TickPhase::Reinforcement,
                 TickPhase::Death,
                 TickPhase::Convoys,
-                TickPhase::Victory,
             ],
         })
     }
