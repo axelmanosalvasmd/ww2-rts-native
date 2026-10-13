@@ -127,6 +127,16 @@ struct AircraftStep {
     runtime: AircraftRuntime,
     firing: FiringUnit,
 }
+struct AntiAirStep {
+    hp: BTreeMap<UnitId, f64>,
+    xp: BTreeMap<UnitId, f64>,
+    ammo: BTreeMap<UnitId, f64>,
+    cadence: BTreeMap<UnitId, AntiAirRuntime>,
+    attribution: BTreeMap<UnitId, i32>,
+    down: BTreeMap<UnitId, bool>,
+    events: Vec<AviationEvent>,
+    tallies: Vec<StoryChange>,
+}
 impl Match {
     pub(crate) fn validate_aviation(&self) -> Result<(), AviationError> {
         let g = &self.world.game;
@@ -632,12 +642,11 @@ impl Match {
         self.grid.update(id, &self.world.game.units[&id]);
         Ok(())
     }
-    /// Captured shooters choose fresh current airborne targets in maintained grid order.
-    pub fn step_aircraft_anti_air(
-        &mut self,
+    fn prepare_aircraft_anti_air(
+        &self,
         actors: &[UnitId],
         dt: f64,
-    ) -> Result<(), AviationError> {
+    ) -> Result<AntiAirStep, AviationError> {
         self.validate_aviation()?;
         if !dt.is_finite()
             || !(0.0..=3600.0).contains(&dt)
@@ -783,6 +792,45 @@ impl Match {
             }
             cadence.insert(id, a);
         }
+        Ok(AntiAirStep {
+            hp,
+            xp,
+            ammo,
+            cadence,
+            attribution,
+            down,
+            events,
+            tallies,
+        })
+    }
+    /// Pure admission of the actual current-grid AA arithmetic, including staged dead shooters.
+    pub fn validate_aircraft_anti_air(
+        &self,
+        actors: &[UnitId],
+        dt: f64,
+    ) -> Result<(), AviationError> {
+        let next = self.prepare_aircraft_anti_air(actors, dt)?;
+        let mut story = self.story.clone();
+        prepare_story_updates(&mut story, self.finish.is_some(), &next.tallies)
+            .map_err(AviationError::Actuation)?;
+        Ok(())
+    }
+    /// Captured shooters choose fresh current airborne targets in maintained grid order.
+    pub fn step_aircraft_anti_air(
+        &mut self,
+        actors: &[UnitId],
+        dt: f64,
+    ) -> Result<(), AviationError> {
+        let AntiAirStep {
+            hp,
+            xp,
+            ammo,
+            cadence,
+            attribution,
+            down,
+            events,
+            tallies,
+        } = self.prepare_aircraft_anti_air(actors, dt)?;
         let story = prepare_story_updates(&mut self.story, self.finish.is_some(), &tallies)
             .map_err(AviationError::Actuation)?;
         for (id, value) in hp {

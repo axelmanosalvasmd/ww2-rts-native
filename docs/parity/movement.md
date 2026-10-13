@@ -303,3 +303,5 @@ The combat adapter removes dead units through the maintained grid without rebuil
 
 
 The bounded aircraft retirement follow-up uses the actual aviation registry and the existing ordinary death consumer. Its seven-case original recorder includes finite off-map Base aircraft and a real AA kill followed by retirement without a hull or a second plane-down tally. The prospective-clock guard is read only. Two native tests and independent review remain pending; no full aviation or tick row is marked done.
+
+Aircraft tick hooks expose read-only next-clock turn/AA/retirement admission and the source early-continue boundary, without owning the scheduler. The unchanged full source step recorder passes 10 traces, 4,972 steps and 9,965 observed aircraft/AA calls, with an unobserved replay comparison on every step. Written native consumers compare only owned phases and replay held inputs through the single queue; upstream vision/setup inputs and complete source witnesses remain explicit. Native execution, sole tick consumption and automatic/ground/area weapons are pending. MOV-83 through MOV-86 remain unfinished.

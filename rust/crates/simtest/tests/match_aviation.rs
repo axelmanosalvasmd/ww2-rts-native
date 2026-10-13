@@ -219,10 +219,20 @@ fn patch(m: &mut Match, id: u32, value: &Value) {
         ("z", &mut u.z),
         ("hp", &mut u.hp),
         ("rot", &mut u.rot),
+        ("supp", &mut u.supp),
+        ("repath", &mut u.repath),
+        ("sprint", &mut u.sprint),
     ] {
         if let Some(v) = value[name].as_f64() {
             *field = v;
         }
+    }
+    let firing = m.firing.get_mut(id).unwrap();
+    if let Some(v) = value["cooldown"].as_f64() {
+        firing.cooldown = v;
+    }
+    if let Some(v) = value["retarget"].as_f64() {
+        firing.retarget = v;
     }
     if let Some(v) = value["still"].as_f64() {
         u.still = Some(v);
@@ -736,4 +746,206 @@ fn aircraft_commands_replay_on_the_single_recorded_boundary_queue() {
         assert_eq!(m.commands.pending_commands(), 0);
         assert_eq!(m.commands.path_requests().used(), 0);
     }
+}
+
+fn aircraft_tick_fixture() -> Value {
+    let mut text = String::new();
+    flate2::read::GzDecoder::new(&include_bytes!("fixtures/match-aircraft-tick.json.gz")[..])
+        .read_to_string(&mut text)
+        .unwrap();
+    serde_json::from_str(&text).unwrap()
+}
+fn aircraft_phase_snapshot(m: &Match) -> Value {
+    let all = snapshot(m, &m.aviation.events);
+    let planes = all["units"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|u| !u["air"].is_null())
+        .cloned()
+        .collect::<Vec<_>>();
+    let ground = all["units"].as_array().unwrap().iter()
+        .filter(|u| u["air"].is_null() && matches!(u["kind"].as_str(), Some("flak" | "flaktrack" | "flakpos" | "mg")))
+        .map(|u| json!({"id":u["id"],"hp":u["hp"],"xp":u["xp"],"lastHit":u["lastHit"],"aaShot":u["aaShot"],"aaReserve":u["aaReserve"]})).collect::<Vec<_>>();
+    json!({"planes":planes,"ground":ground,"story":all["story"],"events":all["events"]})
+}
+#[test]
+fn aircraft_tick_hooks_match_observed_original_full_step_phases() {
+    use ww2_core::{match_commands::Command, match_story::DeathRecord, orders::OrderKey};
+    let f = aircraft_tick_fixture();
+    let mut steps = 0;
+    let mut calls = 0;
+    for trace in f["traces"].as_array().unwrap() {
+        let mut m = scene(trace);
+        assert_json(
+            &aircraft_phase_snapshot(&m),
+            &trace["initial"],
+            "full-step initial",
+        );
+        for (index, frame) in trace["frames"].as_array().unwrap().iter().enumerate() {
+            let tick = frame["fullStep"]["tick"].as_u64().unwrap();
+            assert_eq!(tick, index as u64 + 1);
+            let dt = frame["phases"][0]["dt"].as_f64().unwrap();
+            m.aviation.take_events();
+            // Replay real held inputs on the sole queue. This consumer owns no production clock.
+            for (sequence, input) in frame["inputs"].as_array().unwrap().iter().enumerate() {
+                m.enqueue_command(
+                    OrderKey {
+                        tick,
+                        issuer: input["owner"].as_u64().unwrap() as u32,
+                        sequence: sequence as u64 + 1,
+                    },
+                    Command::from_json(&input["command"]).unwrap(),
+                )
+                .unwrap();
+            }
+            assert!(
+                m.apply_commands(tick, false)
+                    .unwrap()
+                    .iter()
+                    .all(|r| r.denial.is_none())
+            );
+            let ids = m.world.game.units.keys().copied().collect::<Vec<_>>();
+            m.validate_aircraft_tick_phases(&ids, dt, tick).unwrap();
+            m.grid.rebuild(&m.world.game.units);
+            m.capture_firing_prior().unwrap();
+            m.world.game.tick = tick as i64;
+            for phase in frame["phases"].as_array().unwrap() {
+                // Inputs from the already-observed vision/setup owners, never aircraft/AA results.
+                for (player, visible) in m
+                    .world
+                    .game
+                    .players
+                    .iter_mut()
+                    .zip(phase["visible"].as_array().unwrap())
+                {
+                    player.visible = visible
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|id| id.as_u64().unwrap() as u32)
+                        .collect();
+                }
+                for row in phase["groundInputs"].as_array().unwrap() {
+                    let u = m
+                        .world
+                        .game
+                        .units
+                        .get_mut(&(row["id"].as_u64().unwrap() as u32))
+                        .unwrap();
+                    u.still = row["still"].as_f64();
+                    u.built = row["built"].as_f64();
+                }
+                let path = format!("{} tick {tick} {}", trace["name"], phase["op"]);
+                assert_json(
+                    &aircraft_phase_snapshot(&m),
+                    &phase["before"],
+                    &format!("{path} before"),
+                );
+                let actors = phase["actors"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|id| id.as_u64().unwrap() as u32)
+                    .collect::<Vec<_>>();
+                let dt = phase["dt"].as_f64().unwrap();
+                match phase["op"].as_str().unwrap() {
+                    "plane" => {
+                        let id = actors[0];
+                        let u = &m.world.game.units[&id];
+                        let general = [u.supp.to_bits(), u.repath.to_bits(), u.sprint.to_bits()];
+                        assert!(m.step_aircraft_turn(id, dt).unwrap());
+                        let u = &m.world.game.units[&id];
+                        assert_eq!(
+                            general,
+                            [u.supp.to_bits(), u.repath.to_bits(), u.sprint.to_bits()],
+                            "AIR must skip ordinary timers"
+                        );
+                    }
+                    "aa" => m.step_aircraft_anti_air(&actors, dt).unwrap(),
+                    _ => panic!("unknown aircraft phase"),
+                }
+                assert_json(
+                    &aircraft_phase_snapshot(&m),
+                    &phase["after"],
+                    &format!("{path} after"),
+                );
+                calls += 1;
+            }
+            // Actual canonical removal provider, with its single returned story consumer.
+            let deaths = m.retire_dead(&ids).unwrap();
+            for death in deaths.retired {
+                let kind = m.rules.kinds[death.unit.kind].name.clone();
+                m.record_death(
+                    DeathRecord {
+                        owner: Some(death.unit.owner),
+                        kind: &kind,
+                        at: death.unit.at(),
+                    },
+                    death.enemy_killer,
+                )
+                .unwrap();
+            }
+            assert_json(
+                &aircraft_phase_snapshot(&m),
+                &frame["after"],
+                "full-step owned final",
+            );
+            assert_eq!(m.commands.pending_commands(), 0);
+            assert_eq!(m.commands.path_requests().used(), 0);
+            steps += 1;
+        }
+    }
+    assert_eq!(steps, f["steps"].as_u64().unwrap());
+    assert_eq!(calls, f["phaseCalls"].as_u64().unwrap());
+}
+
+#[test]
+fn aircraft_tick_preflight_rejects_unrepresented_phases_before_mutation() {
+    use ww2_core::match_aviation::AviationError;
+    let f = aircraft_tick_fixture();
+    let mut m = scene(&f["traces"][0]);
+    let before = aircraft_phase_snapshot(&m);
+    m.validate_aircraft_turns(0.05).unwrap();
+    m.validate_aircraft_anti_air(&[1000], 0.05).unwrap();
+    m.validate_aircraft_tick_phases(&[1000], 0.05, 1).unwrap();
+    assert!(m.validate_aircraft_tick_phases(&[1000], 0.05, 2).is_err());
+    assert_json(&aircraft_phase_snapshot(&m), &before, "pure admission");
+    assert!(m.validate_aircraft_turns(f64::NAN).is_err());
+    assert!(m.validate_aircraft_anti_air(&[1000, 1000], 0.05).is_err());
+    m.world.game.units.get_mut(&1000).unwrap().air = Some(PlaneState::Out);
+    m.aviation.planes.get_mut(&1000).unwrap().mission =
+        Some(mission(&json!({"kind":"patrol","id":0,"x":40,"z":40})));
+    m.commands.units.get_mut(&1000).unwrap().hold_fire = false;
+    let before = aircraft_phase_snapshot(&m);
+    assert!(matches!(
+        m.validate_aircraft_turns(0.05),
+        Err(AviationError::Unsupported(_))
+    ));
+    assert_json(
+        &aircraft_phase_snapshot(&m),
+        &before,
+        "automatic weapon guard",
+    );
+    m.commands.units.get_mut(&1000).unwrap().hold_fire = true;
+    m.commands.units.get_mut(&1000).unwrap().orders.push_back(
+        ww2_core::match_commands::Command::from_json(&json!({"t":"move","orders":[[1000,30,30]]}))
+            .unwrap(),
+    );
+    assert!(matches!(
+        m.validate_aircraft_turns(0.05),
+        Err(AviationError::Unsupported(_))
+    ));
+    m.world.game.units.get_mut(&1000).unwrap().hp = 0.0;
+    let dead = aircraft_phase_snapshot(&m);
+    m.validate_aircraft_turns(0.05).unwrap();
+    assert!(m.step_aircraft_turn(1000, 0.05).unwrap());
+    assert_json(&aircraft_phase_snapshot(&m), &dead, "dead AIR skipped turn");
+    m.world.game.units.get_mut(&1000).unwrap().hp = 200.0;
+    m.commands.units.get_mut(&1000).unwrap().orders.clear();
+    m.world.game.units.get_mut(&1000).unwrap().x = 1_073_741_825.0;
+    assert!(m.validate_aircraft_turns(0.05).is_err());
+    m.world.game.units.get_mut(&1000).unwrap().x = 40.0;
+    m.aviation.planes.remove(&1000);
+    assert!(m.validate_aircraft_turns(0.05).is_err());
 }
