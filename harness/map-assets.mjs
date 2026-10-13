@@ -1,4 +1,4 @@
-// Embed only the pinned reference's public map projection. Never copy raw map files into the server.
+// Generate only public HTTP map projections. Private native authoring assets have a separate generator.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';

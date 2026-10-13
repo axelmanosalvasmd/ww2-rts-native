@@ -63,6 +63,8 @@ pub enum Command {
 /// Only fields absent from Unit live here. Routes, positions and hold_pos remain in Unit.
 #[derive(Clone, Debug, PartialEq)]
 pub struct UnitControl {
+    /// Seconds until another idle reaction may choose a destination (`u.react`).
+    pub react: f64,
     pub aim: f64,
     pub auto_cast: bool,
     pub auto_retreat: bool,
@@ -83,6 +85,8 @@ pub struct UnitControl {
     pub rally_drift: bool,
     /// Operatives reject ordinary squad orders.
     pub operative: bool,
+    /// World local guards return here in the guard phase, owned by tick scheduling.
+    pub guard_home: Option<Point>,
 }
 impl UnitControl {
     /// Prepare before publishing a spawned unit or charging a wallet.
@@ -102,6 +106,7 @@ impl UnitControl {
             return Err("nonfinite unit aim".into());
         }
         Ok(Self {
+            react: 0.0,
             aim: unit.rot,
             auto_cast: ability != "none",
             auto_retreat: !kind.air,
@@ -120,6 +125,7 @@ impl UnitControl {
             nade: None,
             rally_drift: false,
             operative: false,
+            guard_home: None,
         })
     }
 }
