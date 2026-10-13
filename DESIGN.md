@@ -197,6 +197,14 @@ The original `findPath` produces 1,175 oracle searches across all 33 authored ma
 
 
 
+## Pure projectile flight and contact helpers (2026-10-12)
+
+`rust/crates/core/src/projectiles.rs` provides typed, standalone versions of all pure helpers in the pinned `shared/projectiles.js`: profile selection, flight position and velocity, launch solutions, box/body/naval-hull sweeps, segment distance, crossed-cell traversal and material ricochet response. The module has no game-state, renderer or networking dependency. Projectile and material constants stay beside these helpers for now; they are not part of the compiled catalog or the public rules hash.
+
+The port keeps source arithmetic, x/y/z slab order, corner-cell order, strict earliest-hit comparisons, box-before-cap ties and bounded rotational pieces. Trigonometry and two/three-argument hypot use the core's own math; square roots use the same hardware operation as the math module. The checked API rejects nonfinite inputs, reversed bounds, negative radii/lengths and nonpositive explicit flight durations. Grid dimensions are limited to 2^26 cells per side with an area fitting `usize`; hull angle wrapping allows at most 4,096 full-turn reductions. These limits prevent malformed input from overflowing indexing or keeping a tick in an unbounded loop.
+
+`harness/projectile-fixture.mjs` calls the original helpers with x64 Node 24.21.0, refuses a changed reference pin or tracked source tree, and records exact floating-point bits. Six focused tests pass in debug and release on the Mac, covering 941 oracle cases: all profile/material constants, precedence, zero/negative elapsed time, launch arcs, tangent and corner contacts, translating bodies, rotating naval hulls, grid-cell order and ricochet thresholds. Strict core Clippy and formatting checks pass. This is pure-helper evidence only. Combat firing, flight expiry, game-world contact selection, damage, terrain changes and random scatter are not connected yet; CMB-48, CMB-49, CMB-50 and CMB-160 remain in progress.
+
 ## Ground-vehicle pathfinding (2026-10-12)
 
 Issue #34 extends the initial infantry/naval search to all 12 non-rail ground types, including the lorry and Kaiju fallback profiles. A private vehicle navigation cache expands blocked cells by the hull's turning radius and rejects destinations without that clearance. `PathTerrain` adds explicit observed wear, public wetness and road presence; `PathRules` adds ground-speed constants. Road, mud, wood, ford and churn costs refresh for each search, as do mines, fires and bunkers. Road-aware estimates and smoothing preserve the chosen road route. The caller still supplies the entire terrain view; no `Game`, hidden world or automatic knowledge selection is consulted.
