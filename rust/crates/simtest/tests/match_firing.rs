@@ -150,7 +150,7 @@ fn unsupported_modes_and_later_bad_payloads_leave_firing_unchanged() {
     let before = m.firing.clone();
     let combat = m.combat.clone();
     let logistics = m.logistics.clone();
-    let commands = m.commands.clone();
+    let commands = m.commands.units.clone();
     let random = m.start.random.snapshot();
     let unsupported = [
         Mode::Classic,
@@ -197,7 +197,7 @@ fn unsupported_modes_and_later_bad_payloads_leave_firing_unchanged() {
         assert_eq!(m.firing, before);
         assert_eq!(m.combat, combat);
         assert_eq!(m.logistics, logistics);
-        assert_eq!(m.commands, commands);
+        assert_eq!(m.commands.units, commands);
         assert_eq!(m.start.random.snapshot(), random);
         assert_eq!(format!("{:?}", m.world.game), world);
     }

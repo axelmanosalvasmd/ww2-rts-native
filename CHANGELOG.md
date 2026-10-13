@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed the shared alias rejection test to snapshot canonical command rows rather than require Clone and PartialEq on the command dispatcher. Guard ordering and whole represented actor-state checks are unchanged.
+
 - Added the ordinary Default alias to FPS grenade admission through the shared firing guard and aligned fire admission with internal mode consistency. Rewrote the earlier artificial Default-refusal regression: both aliases replay the same source shots and 11 grenade launches/77 samples, while World and inconsistent internal mode state refuse without changing counters, flights, events or randomness. The dependency and combined FPS changes are source reviewed; native checks remain pending.
 
 - Integrated the checked typed ability-flight dependency into the FPS grenade follow-up, retaining canonical generic hurt and the separate observation grid. The combined FPS fire/grenade tree still awaits its own native checks.
