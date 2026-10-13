@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Captured 24 mixed recorded gameplay operations with 23 unchanged original JavaScript handler calls, including same-batch purchase/ability, research, support, movement and trusted companion inputs. The fixed-seed 328,556-byte fixture regenerates exactly on x64 Node 24.21.0. Host ownership checks are labeled separately; native replay remains pending.
+
 - Documented the single recorded gameplay dispatcher, source command boundary, canonical transaction ownership and safe internal companion journal binding. Combined native and room integration remain unfinished.
 
 - Routed source Tech inputs (tier, inf, guns and armor) through canonical research admission in the recorded command dispatcher. Lab, wallet and MP-spent publication share the production guard; denied research uses the existing exact source reasons. Source and native mixed-input proof remain pending.
