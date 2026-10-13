@@ -344,6 +344,12 @@ fn detached_recovery_and_empty_immediate_replan_preserve_routes() {
         );
         let generation = m.world.game.units[&1].path_gen;
         m.begin_path_tick(4096, 20).unwrap();
+        m.world.game.units.get_mut(&1).unwrap().path_gen = u64::MAX - 1;
+        let exhausted = snapshot(&m);
+        assert!(m.move_unit_with_command_routes(1, 1.0).is_err());
+        assert_eq!(snapshot(&m), exhausted);
+        assert_eq!(m.world.game.units[&1].path_gen, u64::MAX - 1);
+        m.world.game.units.get_mut(&1).unwrap().path_gen = generation;
         m.move_unit_with_command_routes(1, 1.0).unwrap();
         let u = &m.world.game.units[&1];
         let c = &m.commands.units[&1];
