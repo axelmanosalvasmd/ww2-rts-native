@@ -14,6 +14,7 @@ use ww2_core::{
     match_runtime::{Match, MatchOptions, PlayerConfig},
     match_tick::{TickEvent, TickPathConfig, TickPhase},
     orders::OrderKey,
+    recipient_snapshot::{DeliveryState, SelectedSeat},
     weather::WeatherChoice,
 };
 
@@ -128,9 +129,13 @@ fn original_five_maps_run_early_research_and_ordered_legacy_scenario() {
     );
     assert_eq!(fixture["callerTraces"].as_array().unwrap().len(), 5);
     let mut checkpoints = 0;
+    let mut recipients = 0;
+    let mut public_say = 0;
     for trace in fixture["callerTraces"].as_array().unwrap() {
         let name = trace["name"].as_str().unwrap();
         let mut state = make(trace);
+        let world_identity = std::ptr::from_ref(state.world.initial());
+        let mut delivery = DeliveryState::new(&state).unwrap();
         let frames = trace["steps"].as_array().unwrap();
         let last = frames.last().unwrap()["tick"].as_u64().unwrap();
         let mut selected = 0;
@@ -221,12 +226,60 @@ fn original_five_maps_run_early_research_and_ordered_legacy_scenario() {
                     TickEvent::Environment(ww2_core::environment::Effect::Collapse(_))
                 )));
             }
+            assert_eq!(std::ptr::from_ref(state.world.initial()), world_identity);
+            assert_eq!(
+                state.environment.falling_sections().len() as u64,
+                expected["recipientInputs"]["fallingCount"]
+                    .as_u64()
+                    .unwrap(),
+                "{name}:{tick}: actual canonical body count"
+            );
+            let seats: Vec<_> = expected["recipients"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|row| SelectedSeat {
+                    slot: row["slot"].as_u64().unwrap() as usize,
+                    full: false,
+                    omit: false,
+                })
+                .collect();
+            let random = state.start.random.snapshot();
+            {
+                let captured = delivery
+                    .capture_selected_with_tick_events(&mut state, &seats, &report.events)
+                    .unwrap_or_else(|error| panic!("{name}:{tick}: selected delivery: {error:?}"))
+                    .unwrap();
+                assert_eq!(
+                    captured.slots().collect::<Vec<_>>(),
+                    seats.iter().map(|s| s.slot).collect::<Vec<_>>()
+                );
+                for expected_seat in expected["recipients"].as_array().unwrap() {
+                    let slot = expected_seat["slot"].as_u64().unwrap() as usize;
+                    let actual = captured.recipient(slot).unwrap().into_json();
+                    for field in ["scenario", "shots", "falling"] {
+                        assert_json(
+                            &actual[field],
+                            &expected_seat[field],
+                            &format!("{name}:{tick}: seat{slot} full {field}"),
+                        );
+                    }
+                    public_say += actual["shots"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .filter(|row| row["k"] == "say")
+                        .count();
+                    recipients += 1;
+                }
+            }
+            assert_eq!(state.start.random.snapshot(), random);
             selected += 1;
             checkpoints += 1;
         }
         assert_eq!(selected, frames.len());
     }
-    assert_eq!(checkpoints, 21);
+    assert_eq!((checkpoints, recipients, public_say), (21, 42, 14));
 }
 
 #[test]

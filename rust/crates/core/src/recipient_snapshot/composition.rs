@@ -187,9 +187,9 @@ pub(super) fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(
     if !state.aviation.events.is_empty() || !state.aviation.planes.is_empty() {
         return Err(refused(SnapshotCapability::Air));
     }
-    if state.scenario.is_some() {
-        return Err(refused(SnapshotCapability::Scenario));
-    }
+    state
+        .preflight_legacy_scenario()
+        .map_err(|_| refused(SnapshotCapability::Scenario))?;
     if state.options.logistics || state.logistics.iter().next().is_some() || state.convoys.is_some()
     {
         return Err(refused(SnapshotCapability::Logistics));

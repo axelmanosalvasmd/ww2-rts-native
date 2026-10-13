@@ -1,5 +1,14 @@
 # Three Crossroads Native: design decisions
 
+## Ordinary legacy recipient composition (2026-10-13, source successor)
+
+The separate normal union includes the real ordinary Research/Scenario caller, the public Say projection and the canonical falling-section reader. Its fifth TickEvent family borrows into ShotRef without another buffer or producer drain. Complete snapshot admission now uses the provider's exact legacy-state preflight rather than refusing every represented legacy map. The original Source public Say row and `scenario:{version:1,objectives:[]}` remain the selected commander output. General authored scenarios, spectators, operative starts, public start/restart and pending privacy policies remain outside this admission.
+
+The existing five-map caller test advances the same Match continuously from tick zero through each scene's end. It retains every raw emission, accumulated Scenario state, timer/weather/terrain and 516-section assertion, and now compares actual selected Scenario, shot and falling fields at all 21 recorded boundaries (42 seat results and 14 messages). Great Bridge ticks 8400/8401 retain 84 actual canonical bodies; their lists are genuinely unseen by both original seats, while the separately preserved falling fixture checks visible, moved and settled whole lists. No expected body, shot, mask, queue or random snapshot is installed. Selected capture must preserve the same World identity and normal MatchRandom state. The earlier 19-boundary input-only projector consumer remains a separate bounded component check.
+
+The staged public message order/refusal regression and the companion serializer's exhaustive Scenario arm are retained without enabling new operative behavior. Human projection preserves Scenario as Other at its raw ordinal. This source composition has no native acceptance or host adoption yet. The startup owner must replace the obsolete El Alamein refusal with actual supported start/Say delivery and a genuine map-binding rollback before coherent proof and Root's concrete consumer review.
+
+
 ## Legacy public Say recipient projection (2026-10-13, source checkpoint)
 
 The existing Source `snapshotFor` applies Scenario recipient permission before ordinary shot geometry. Migrated legacy Say messages use `scenarioRecipients:"public"`, side zero, their original text/localized fields, execution identity and emission tick. They have no position. The borrowed native adapter validates the producer-owned typed row, preserves its place in the caller's chronological batch and sends it unchanged to selected ordinary commander seats. It permits older buffered emission ticks and refuses future ticks or malformed public metadata before any receipt, memory or fog publication. Ordinary Firing, Support and Environment visibility, hidden-identity removal and signed-zero normalization remain unchanged.

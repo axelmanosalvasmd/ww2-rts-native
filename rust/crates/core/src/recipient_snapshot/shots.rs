@@ -29,6 +29,7 @@ impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
             TickEvent::Firing(value) => Ok(Self::Firing(value)),
             TickEvent::Support(value) => Ok(Self::Support(value)),
             TickEvent::Environment(value) => Ok(Self::Environment(value)),
+            TickEvent::Scenario(value) => Ok(Self::Scenario(value)),
             TickEvent::Aviation(_) => Err(SnapshotError::Unsupported {
                 unit: 0,
                 capability: SnapshotCapability::Air,
