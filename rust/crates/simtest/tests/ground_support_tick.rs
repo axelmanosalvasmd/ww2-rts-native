@@ -1,4 +1,5 @@
 //! Full original Source steps compared with the sole composed Match runner.
+#![recursion_limit = "256"]
 #[path = "common/ground_support_tick.rs"]
 mod common;
 

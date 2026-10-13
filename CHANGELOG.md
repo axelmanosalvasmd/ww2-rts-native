@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Raised the ground-support test crate's macro expansion limit for its complete canonical unit projection after the first native compiler reached serde_json's default recursion ceiling. All observed fields and runtime behavior remain unchanged; native checks continue at the repaired source.
+
 - Corrected the mass full-tick consumer to read path-request statistics through the existing command owner. The first composed Mac run passed all 42 affected core debug tests, then stopped on the missing Match-level accessor before simtest execution. Runtime, scheduler, RNG and original fixtures are unchanged; final native gates are restarting.
 
 - Normal-merged both independently reviewed actual-runner consumers into the support/project composition: 12 Conquest support traces plus real Default refusal, and seven mass-project cases through 193 real ticks. Original fixtures remain unchanged. Combined native compilation and replay are pending.
