@@ -11,6 +11,12 @@ pub fn row(r: &ww2_core::world::CellRow) -> Value {
             data["mineMaterial"] = json!(m);
         }
     }
+    if let Some(rail) = d.rail {
+        data["rail"] = json!(rail);
+    }
+    if let Some(station) = d.station {
+        data["station"] = json!(station);
+    }
     if let Some(s) = &d.section {
         data["section"] = json!({"id":s.id,"structureId":s.structure_id,"state":s.state,"hp":s.hp,"maxHp":s.max_hp,"material":s.material,"anchor":s.anchor});
     }

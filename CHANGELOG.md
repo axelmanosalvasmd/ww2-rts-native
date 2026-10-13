@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Brought the proven World rail annotation/inference repair and coordinated region accessors into the Assault prerequisite chain, retaining its explicit startup profile and canonical story fields. Combined native checks remain pending.
+
 - Added an explicit Assault startup constructor and canonical defender, attacker, clock and bunker-count state. It normalizes attacker teams, cycles reserved defender spawns, drops VP-only objectives with remapped prerequisites, builds ordered trenches, sandbags, command bunkers and flak before ordinary bases, and preserves source MP and army/weather choices. A pinned original-JavaScript recorder covers 43 starts and 702 units on all 33 authored maps and six synthetic terrains. Native checks are pending. Generic startup and Conquest phases still refuse Assault; Assault tick, recruitment, finish, scenarios and server delivery remain unfinished.
 
 - Integrated the reviewed explicit World startup feature ancestry into the isolated Assault branch so both mode-specific constructors share one startup plan and publication policy. Combined native verification remains pending.
@@ -12,6 +14,9 @@
 
 - Added the native Match Conquest victory phase and finish bookkeeping: team VP in slot order, latest still-held capture location, 0.1 m end rounding, first-winner preservation, reveal and exact Conquest timeline fields. Canonical point accounting now freezes VP and capture story counts after the winner while ownership and manpower can continue. Three focused tests compare 12 original-JavaScript traces (24 assembled-match checkpoints) and invalid-state atomicity; existing startup and point-income tests pass. Other modes, command refusal, remaining story counters, result transport and the full battle loop remain unfinished.
 - Added a bounded World startup constructor with canonical home ownership, wallets, HQs, local defenders, fortifications, resource nodes, empty production and rail state, and actual initial visibility. The shared unit factory preserves source order and canonical guard controls; generator random history is retained. Five original-source records cover 2,761 units. Native checks are pending. Logistics-enabled startup, World terrain memory, mode tick phases, commands, trains and server hosting remain explicit boundaries.
+- Fixed the missing rail track-position type annotation found by the first World native compile. Added checked World region/economy projections and optional rail/station snapshot fields with atomic post-rails row annotation after the original startup oracle found missing metadata. Mutable-terrain callers still need to invoke the explicit projection hook. Updated the crafted source case to test floating-column lookup on nonmultiple dimensions; full native acceptance remains pending.
+
+- Added a bounded World startup constructor with canonical home ownership, wallets, HQs, local defenders, fortifications, resource nodes, empty production and rail state, and actual initial visibility. The shared unit factory preserves source order and canonical guard controls; generator random history is retained. Five original-source records cover 2,761 units and commander research initialization. Native checks are pending. Logistics-enabled startup, World terrain memory, mode tick phases, commands, trains and server hosting remain explicit boundaries.
 
 - Reserved a fixed internal World local-defender actor identity outside commander slots. World team and alliance queries recognize that actor without adding a player seat or wallet; ordinary invalid owner behavior is unchanged. Native World construction and guarded publication remain pending.
 
@@ -31,13 +36,21 @@
 - Connected Conquest point supply, capture and income to the assembled Match, using the tick's ordered unit list and one canonical objective/reserve state. Eight original-source traces compare 72 phases across all armies, allied and enemy teams, disconnection, supply obstruction, post-decision VP freezing and units spawned during a tick. Capture timestamps follow source winner gating; malformed input leaves objectives and wallets unchanged. This phase does not advance the clock or implement the remaining match systems.
 
 - Added canonical objective state and standalone capture-point and point-supply phases. Four focused tests compare 214 original-JavaScript capture traces (1,165 checkpoints) and 223 supply states, including exact capture progress, event order and control/reached masks. Preserved allied ownership, sequential prerequisites, forced-reserve guards, circular safe zones, MOVE-only supply seeds and square point-connectivity checks. Inputs are validated before objective mutation. Match scheduling, story application, income, refill networks and win/loss integration remain unfinished; no ABI or wire interface changed.
+- Verified shared unit publication with 130 workspace tests, five release transaction/recruitment tests, strict Clippy/formatting and independent review. Original JavaScript regeneration matches six traces and 33 buys, including the negative-HP casualty regression; World/FPS execution and training remain separate integrations.
+
+- Simplified publication pose validation to satisfy strict Clippy after debug and release transaction checks passed. The validation condition and rejection behavior remain the same.
+
+- Corrected the publication regression map to include the required authoring name. Its first native run rejected the incomplete fixture before reaching the transaction checks.
+
 - Added the canonical optional World guard home to UnitControl and checked it before publication. The World actor regression checks invalid home rejection and preserved staged home; the source guard return phase still needs tick integration.
 
 - Fixed publication validation rejecting unrelated casualties with negative HP before source death removal. Existing units accept finite negative health, while new drafts and staged squad HP stay nonnegative. An added original-source buy trace protects the admission behavior.
 
-- Added explicit World actor staging and publication policy to the shared unit guard while keeping ordinary commander checks strict. Three focused regressions now cover refused/aborted batches, ordered HP/payment publication and the World-only neutral identity; native verification is pending.
+- Added explicit World actor staging and publication policy to the shared unit guard while keeping ordinary commander checks strict. Three focused regressions cover refused/aborted batches, ordered HP/payment publication and the World-only neutral identity.
 
-- Add a shared prepared unit publication guard for source-ordered batches, canonical controls/grid/IDs and staged squad HP updates. Ordinary staging reuses scatter before pose overrides; recruitment delegates its final insertion to this primitive. This source-only prerequisite still needs Rust verification and regression review before public merge.
+- Added a shared prepared unit publication guard for source-ordered batches, canonical controls/grid/IDs and staged squad HP updates. Ordinary staging reuses scatter before pose overrides; recruitment delegates its final insertion to this primitive.
+
+- Reserved a fixed internal World local-defender actor identity outside commander slots. World team and alliance queries recognize that actor without adding a player seat or wallet; ordinary invalid owner behavior is unchanged. Native World construction and guard tick execution remain pending.
 
 
 - Connected immediate Conquest ground/naval recruitment to Match with staged placement, owner-observed rally routes, exact MP charges, monotonic IDs, canonical control rows and maintained spatial indexing. Five original-source traces cover 32 buy commands; failed routes still buy, while malformed placement/routing leaves full wallet, unit, control, metadata and ID state untouched. Air, ambiguous pending support kinds and later Match systems remain explicit boundaries.

@@ -2,12 +2,18 @@
 import {readFileSync,writeFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {resolve} from 'node:path';
+import {registerHooks} from 'node:module';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 if(process.arch!=='x64'||process.version!=='v24.21.0')throw Error('Use x64 Node v24.21.0');
 const ref=resolve(process.env.WW2_REFERENCE??fileURLToPath(new URL('../reference/ww2-rts/',import.meta.url)));
 const pin='e4e579a838aabae3b1d9dadbc17a0a87147bc52d';
 const git=a=>execFileSync('git',['-C',ref,...a],{encoding:'utf8'}).trim();
 if(git(['rev-parse','HEAD'])!==pin||git(['status','--porcelain','--untracked-files=no']))throw Error('Use clean pinned reference');
+registerHooks({load(url,context,next){
+ const result=next(url,context);
+ if(url!==pathToFileURL(resolve(ref,'shared/sim.js')).href)return result;
+ return {...result,source:String(result.source)+'\nexport {worldRegionAt as __worldRegionAt};\n'};
+}});
 const {generateWorldMap}=await import(pathToFileURL(resolve(ref,'shared/world-conquest.js')));
 const sim=await import(pathToFileURL(resolve(ref,'shared/sim.js')));
 const mask=(1n<<64n)-1n,gamma=0x9e3779b97f4a7c15n;
@@ -27,9 +33,11 @@ function record(map,settings){
  const actor=g.players[-1];const expected={
   players:g.players.map(p=>({spawn:[bits(p.spawn.x),bits(p.spawn.z)],mp:bits(p.mp),inc:bits(p.inc),mun:bits(p.mun),fuel:bits(p.fuel),visible:[...p.visible]})),
   world:g.world.regions.map(r=>[r.team,bits(r.progress),r.capper]),
+  regionQueries:[...g.world.regions.map(r=>[r.x,r.z]),...g.nodes.map(n=>[n.x,n.z]),[-1,1],[0,0],[g.w*sim.CELL,1],[g.w*sim.CELL+10,1],[1,g.h*sim.CELL],[1,128],[128,1]].map(([x,z])=>{const r=sim.__worldRegionAt(g,{x,z});return [x,z,r?g.world.regions.indexOf(r):null,r?.id??null];}),
   nodes:g.nodes.map(n=>[n.c,bits(n.x),bits(n.z),n.depot,bits(n.rate),n.fuel]),
   actor:{faction:actor.faction,spawn:[bits(actor.spawn.x),bits(actor.spawn.z)],visible:[...actor.visible]},
   units:[...g.units.values()],
+  tech:g.players.map(p=>p.tier===undefined?null:[p.tier,p.armory,p.lab]),
   ghostTeams:[...g.ghosts].map(([team,rows])=>[team,[...rows.values()]]),
   rails:g.world.stations?{stations:g.world.stations,lines:g.world.lines,railAt:[...g.world.railAt],stationAt:[...g.world.stationAt],yard:[...g.world.railYard]}:null,
   environmentSeed:g.seed>>>0,wind:[bits(g.wind.a),bits(g.wind.v)],weather:g.weather,
@@ -56,6 +64,7 @@ map.world.regions.forEach((r,i)=>{r.id=i*2-50;r.x=20+(i%8)*50;r.y=20+Math.floor(
 const homes=map.world.regions.filter(r=>r.home!==undefined);homes.forEach(r=>{map.spawns[r.home]={x:r.x,y:r.y};});
 const near=map.world.regions.find(r=>r.home===undefined);near.x=homes[0].x+12;near.y=homes[0].y+2;
 map.world.rails={stations:[{region:0,x:0,y:0},{region:1,x:0,y:0},{region:2,x:2,y:0}],lines:[{a:0,b:1,cells:[0,1,2,1,513,1027],regions:[0,1,1]},{a:1,b:2,cells:[2,1,0],regions:[1,2]}]};
+delete map.world.regionMap;map.w=513;map.h=513;map.rows=Array(513).fill('.'.repeat(513));map.heights=Array(513).fill('0'.repeat(513));
 record(map,{size:'huge',scenery:false,teams:[3,1],army:'standard',weather:'clear',living:true,tech:true,shuffle:true,synthetic:true});
 const output=JSON.stringify({reference:pin,node:process.version,arch:process.arch,cases})+'\n';
 const path=fileURLToPath(new URL('../rust/crates/simtest/tests/fixtures/world-start.json',import.meta.url));
