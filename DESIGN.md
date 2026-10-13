@@ -1,5 +1,17 @@
 # Three Crossroads Native: design decisions
 
+## Startup-table content review agreement (2026-10-13)
+
+Axel's [explicit review](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6156314777) accepts PR #195's v1 content/schema candidate, strict missing/null/tag handling and separate formation/content identities. Julio agrees with those limits and the policy that every schema-file change increments the version. Inert authoring metadata and packed-field conformance constants enable no editor or second Unreal decoder. Transport remains unagreed; runtime production and actual published Unreal cache consumption remain separate outcomes. The accepted content, schema and inventory bytes are unchanged by this acknowledgment.
+
+## Public startup-table schema proposal (2026-10-13, unagreed)
+
+[The proposal](docs/contracts/startup-tables/README.md) records deterministic public static content separately from match startup and transport. It retains all 47 embedded catalog tables and adds 17 source-derived constants needed for RTS presentation, snapshot-column names and map/editor metadata. It excludes seeds, recipients, private match state, live actors, authored map instances and deferred operative tables. Static definitions do not enable unsupported runtime capabilities.
+
+The proposed schema version 1 is a review artifact, not an authoritative interface. Exact JSON data, a pinned structural schema, comparison inventory and manifest allow the consumer owner to inspect complete fields before choosing delivery. A portable Python generator checks pinned source, all existing table values, addition count, ordered name arrays and hash identity without executing the game. Full Draft 2020-12 schema/content validation also passed during preparation.
+
+The approved formation-only FNV-1a64 value remains `ed0ee23d32a621d1`; it does not cover the catalog. The proposed full-content identity is SHA256 of exact received UTF-8 bytes, supplied outside the content it hashes. Number tags retain source Infinity/NaN/negative-zero conventions and missing fields remain distinct from null. Rust should own one static producer; transport, memory lifetime, errors, recovery, version transitions and the Unreal consumer parser still require explicit agreement. No FFI, wire, runtime producer or current Unreal adoption is implemented by these documents.
+
 ## Ordered tick output and partial failures (2026-10-13, verified component)
 
 The first native cycle at `625705e` passes all 105 focused debug tests and all 270 release workspace tests, including both failure-prefix witnesses and the complete chronological replay. Strict Clippy then reports the old buffer-reading aircraft test wrapper as unused in the migrated actual-runner test crate. The wrapper remains used by the component test crate. A function-level allowance documents that split without changing either projection body, native runtime or original fixture. The annotation successor `ad90eac` passes final strict Clippy, formatting and locked release FFI. Independent source-hashed copies pass all 105 selected tests in both profiles, with every executable reporting nonzero tests. The full 270-test release result is verified separately from those copied executions.
