@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified the staged Conquest command, route, environment, weapon and retirement assembly on the Mac: 17 focused debug tests, all 155 workspace release tests, strict Clippy, formatting and release FFI build pass. Eight original-source traces cover 1,825 ticks and 79 checkpoints, including contact damage, a casualty at tick 483, bounty/story and continued simulation. Independent source re-review is clear. Remaining actuators stay explicit and server match start remains refused.
+
 - Replaced the unsigned fire/flood cadence expression with the standard multiple-of check required by strict Clippy, preserving its every-tenth-tick timing. Removed repeated routing and command design sections introduced by the staged ancestry merge.
 
 - Attached ordered ordinary Conquest retirement to the staged tick through the reviewed combat adapter, followed by canonical death story and removed-route retention before capture/income. Eight actual-source traces now cover 1,825 ticks and 79 checkpoints, including a rifle casualty at tick 483, exact bounty and continued simulation. Combined native validation is pending; recovery, convoy and operative lifecycle integration remain explicit.
