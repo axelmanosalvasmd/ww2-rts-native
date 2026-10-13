@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Correct the detached Human observation document's stale native status after Axel's acknowledgment 042. All four component tests passed in the 401-test Linux, Windows and macOS run for merged PR #196. Broader Human behavior approval and actual host scheduler integration remain pending; runtime and fixtures are unchanged.
+
 - Publish the bounded trusted-room commander input candidate after `17179f2` passes all 405 optimized workspace tests, strict Clippy, formatting and release FFI. All 401 inherited test names remain, alongside four ingress regressions. Normally join main `92fb7fe` with no Rust, harness, reference or CI file changes from the tested head, and correct the README trusted-host status. Final-head platform checks and Axel input review remain pending.
 
 - Remove two redundant formatting borrows in the ingress refusal test after `40a778b` passed all four focused admission/lobby/socket tests and formatting, then strict Clippy stopped on those expressions. The same Debug comparison and every assertion remain intact; runtime and fixtures are unchanged. Remaining full native gates need the new head.

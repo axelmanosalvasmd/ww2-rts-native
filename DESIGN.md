@@ -1,5 +1,9 @@
 # Three Crossroads Native: design decisions
 
+## Detached Human observation verification status (2026-10-13)
+
+Axel's acknowledgment 042 identified a stale pending-native statement in the current Human observation document. The exact `ccfa017` final-head CI logs contain successful replay, alert ordinal, detached refusal and route-history tests on all three platforms, within each 401-test workspace run. PR #196 merged that source at `92fb7fe`. Correct the component status without rewriting historical pause records or claiming Human behavior approval, live scheduler integration or Unreal adoption. This follow-up changes documentation only and preserves the verified commander-ingress source.
+
 ## Trusted startup publication proof (2026-10-13)
 
 Exact `3b84f7c` passes all 401 optimized workspace tests, formatting, strict all-target Clippy and the release FFI build on macOS arm64. The full workspace takes 459.96 seconds including compilation. This is test timing, not game performance. Actual raw name comparison retains every one of the 399 room/Human baseline tests and adds the safe-identity exhaustion and real decoder/socket lifecycle regressions. All 95 test profile rows preserve optimization level 2, debug assertions and overflow checks. An independent audit verifies seven raw logs and 97 copied artifacts, then passes 14 affected server checks. Sandbox socket denials and authorized reruns of the same binary are preserved separately.
