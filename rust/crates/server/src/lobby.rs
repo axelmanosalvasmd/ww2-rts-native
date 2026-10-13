@@ -450,9 +450,6 @@ impl Hub {
             public_url,
         }
     }
-    pub fn maps(&self) -> Value {
-        json!(self.maps.as_object().unwrap().keys().collect::<Vec<_>>())
-    }
     pub fn directory(&self) -> Value {
         json!({"rooms":self.room_order.iter().filter_map(|code| self.rooms.get(code)).filter(|r| r.listed && r.players.iter().any(|p| !p.ai && p.connection.is_some()))
             .map(|r| r.directory(&self.maps)).collect::<Vec<_>>()})
