@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Corrected the World region test import to the canonical world-map typed input module after the first native compile. No phase behavior changed.
+
 - Integrated the checked World recipient-memory dependency into the live-region branch, preserving its sole memory owner, journal reset and private region projection alongside canonical lock and capture-time fields. Combined native checks are queued.
 
 - Added an original World nations-finish transition to the region phase oracle, proving its atomic refusal separately from World-share and draw finishes. The expanded recorder covers 20 traces and 39 transitions; native checks remain queued.
