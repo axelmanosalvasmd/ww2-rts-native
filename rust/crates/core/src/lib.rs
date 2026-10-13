@@ -50,6 +50,7 @@ pub mod structures;
 pub mod supply_convoys;
 pub mod terrain;
 pub mod traffic;
+pub mod traffic_knowledge;
 pub mod unit_publication;
 pub mod unit_spawn;
 pub mod vehicle;
