@@ -21,6 +21,7 @@ pub mod map;
 pub mod match_runtime;
 pub mod match_tick;
 pub mod match_routing;
+pub mod match_commands;
 pub mod math;
 pub mod movement;
 pub mod navigation;
