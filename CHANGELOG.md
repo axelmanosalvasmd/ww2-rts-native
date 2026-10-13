@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Clarified that the new split World phase fixture leaves the existing controller fixture unchanged. Runtime and checked test bytes are unchanged.
+
 - Verified the split World phase provider at `4ba02e9`: all 34 affected debug tests and 211 locked release workspace tests pass, with strict Clippy, formatting and release FFI. Six original scenes compare 20 final captured objects. No repairs were needed; full World ticking, convoy execution and historical retirement tracking remain separate.
 
 - Added a pinned original-source comparison for the split World phases: six restored scenes and 20 captured objects cover final health after removal, current depot payments, an intervening birth and current-order elimination. Three native tests protect those outputs and phase refusal atomicity; native execution is pending. The existing seven-trace World tick fixture remains unchanged.
