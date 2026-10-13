@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Bound detached recruitment search history to the routing owner’s preview buffers before search. Exact recipient identities retain incremental graph history, while failed previews still leave canonical caches unchanged. Native and birth-oracle checks remain pending.
+
+- Restricted preview graph rebinding to the selected recipient's exact flags allocation or its matching owned vehicle-clearance arrays. Unmatched and authoritative cache identities remain untouched. Native transaction witnesses follow.
+
+- Added routing-guard search forks that rebind existing recipient terrain identities to preview buffers while preserving prior graph versions and traversal history. Vehicle source identities follow the same mapping. Source recorder and native cache-history checks remain pending.
 - Applied detached search-cache publication to the public component recruit actuator too, so late transaction errors preserve canonical graph history through both purchase entry points. Native checks remain pending.
 - Preserved canonical path-cache history on aborted World training previews too. Only a detached derived-cache fork sees temporary memory buffers, and it joins the infallible success commit. Native follow-up verification remains pending.
 

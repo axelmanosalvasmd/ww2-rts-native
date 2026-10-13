@@ -258,7 +258,6 @@ impl Match {
         if staged.placed.rally.is_none() {
             return recruit_parts!(self).finish(staged);
         }
-        let mut paths = self.commands.paths.clone();
         let result = (|| {
             let versions = Versions {
                 infantry: self.world.versions.infantry,
@@ -291,6 +290,7 @@ impl Match {
                 Some(observer),
             )
             .map_err(RecruitError::Routing)?;
+            let mut paths = preview.fork_paths(&self.commands.paths);
             let query = preview.query();
             let routing = RecruitRouting {
                 slot,
@@ -310,12 +310,12 @@ impl Match {
                 .map_err(RecruitError::Routing)?;
             let done = recruit_parts!(self, game, versions).finish(staged)?;
             routing_commit.commit();
-            Ok(done)
+            Ok((done, paths))
         })();
-        if result.is_ok() {
+        result.map(|(done, paths)| {
             self.commands.paths = paths;
-        }
-        result
+            done
+        })
     }
     /// Public component actuator retaining explicit winner and recipient inputs.
     pub fn recruit(

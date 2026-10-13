@@ -657,6 +657,18 @@ pub struct PreparedWorldRouting<'a> {
     receipt: crate::world::ObservationReceipt,
 }
 impl PreparedWorldRouting<'_> {
+    /// Existing team history follows the copied recipient arrays. A first team
+    /// read has no previous terrain allocation to rebind.
+    pub fn fork_paths(
+        &self,
+        paths: &crate::pathfinding::Pathfinding,
+    ) -> crate::pathfinding::Pathfinding {
+        self.target.team(self.team).map_or_else(
+            || paths.clone(),
+            |team| paths.fork_for_terrain(team.query().navigation(), self.query().navigation()),
+        )
+    }
+
     pub fn query(&self) -> RouteQuery<'_> {
         self.state.team(self.team).unwrap().query()
     }
