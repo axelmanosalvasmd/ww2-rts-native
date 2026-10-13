@@ -459,7 +459,7 @@ fn free_truck_retirement_removes_all_canonical_metadata_and_reserves() {
         ),
         input["reserves"]
     );
-    assert!(instance.commands.units.get(&id).is_none());
+    assert!(!instance.commands.units.contains_key(&id));
     assert!(instance.firing.get(id).is_none());
     assert!(instance.combat.get(id).is_none());
     assert!(instance.abilities.get(id).is_none());

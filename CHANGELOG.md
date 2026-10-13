@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Replaced the withdrawal retirement replay's redundant map lookup with a key-presence assertion after strict Clippy reported it. This is a test-only expression change; the full release workspace passed before it, and the touched consumer plus strict gates are rerunning.
+
 - Fixed the inherited recovery replay's restored scene after the release suite caught stale startup ability rows at future convoy IDs. Scene reset now clears ability metadata and restored actors receive their canonical defaults. The convoy freshness guard, recovery runtime and original fixture are unchanged.
 
 - Fixed the withdrawal replay's truck setup after native execution caught an unconditional reserve unwrap. Source logistics excludes trucks, so test publication now inserts the prepared reserve row only when eligible. Withdrawal runtime and original expectations are unchanged; combined gates are rerunning.
