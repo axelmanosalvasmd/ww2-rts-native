@@ -7,6 +7,30 @@
 - Tightened public combat-event admission after independent review: negative suppression and unknown nonnegative last-hit owners reject the whole batch before health mutation. The expanded atomicity regression passes in debug and release.
 
 - Fixed expired sprint timers below zero rejecting real Match damage and suppression. The canonical timer remains unchanged; only the pure helper projection clamps its inactive value. Added an original-source negative-timer trace. The expanded original-source fixture and combined native checks pass.
+- Connected immediate Conquest ground/naval recruitment to Match with staged placement, owner-observed rally routes, exact MP charges, monotonic IDs, canonical control rows and maintained spatial indexing. Five original-source traces cover 32 buy commands; failed routes still buy, while malformed placement/routing leaves full wallet, unit, control, metadata and ID state untouched. Air, ambiguous pending support kinds and later Match systems remain explicit boundaries.
+
+- Added one canonical Match control row for aim, ability and retreat switches, attack intent, facing and waiting orders. Startup prepares the rows from unit definitions; recruitment can stage them before charging. Command execution is the next part of this lane, and no wire or C interface changed.
+- Adapted recipient routing fire reads to the current ordered fire container during integration, preserving insertion order and visibility masks. Routing fixtures now explicitly omit smoke lifetimes introduced by the environment phase.
+
+- Added Match-owned observed terrain and remembered wreck routing for ordinary Conquest. Current-position discovery, cached fire fog, row revisions, outbox order, same-key bunker fields and live wetness match 162 original-source actions, 44 route views, eight searches and four wreck cover queries. Fixed same-key wetness staleness found in independent review. Debug/release tests, startup regressions, strict Clippy and formatting pass. Lifecycle callers retain a removed unit before another route read; wrecks require canonical IDs. Command/tick/convoy integration, World memory and wire/ABI changes remain separate; MOV-29 and MAP-100 stay in progress.
+
+- Added optional durable wreck IDs to query state, preserving absent identity in older query fixtures. The authoritative wreck producer uses the dead unit ID; remembered-routing consumers can reject missing identity explicitly. No wire or C layout changed.
+
+
+- Connected full generator output to typed World map inputs, retaining authored landmark tags, region and cell biomes and ordered rail metadata. The generated-to-loader test compares physical terrain flags, house kinds, health and wear against original static initialization.
+
+- Added pure World biome dressing, towns, church/factory/mine-head landmarks and ordered rail overlays after base geography. Scenery uses independent recorded-seed streams; rails draw nothing. Original source fixtures record 20 Huge/Massive cases with scenery enabled and disabled, including 741 landmarks, 1,032 stations and 1,238 lines containing 140,906 raster cells. All 20 cases and 80 dressed seed/settings replays pass the debug and release generator checks, including geography isolation, wide connectivity and home-space invariants. Match setup, visibility delivery and rail operations remain separate.
+- Corrected the base World geography design date to the local development date, October 12.
+
+- Adapted bare World geography to the agreed landmark and region-biome input fields, supplying empty landmarks and absent biome hints for this partial generator stage.
+
+- Connected base World geography to the agreed typed map-loader input, preserving terrain, home hints, regions, territory labels and waterway metadata. Native version 1 explicitly leaves biomes, landmark layers and rails absent.
+
+- Added pure seeded base World geography for Huge and Massive maps: relief, rivers and tributaries, lakes and crossings, regions, roads, woods, town blocks, homes, names and weighted territories. Ten bare-geography maps match pinned JavaScript fingerprints and metadata; 80 source stress settings reproduce twice and meet wide-route connectivity, channel and home-space checks. Generation consumes one recorded Terrain-stream seed and uses core math. Biomes, landmark dressing, rails, World match setup and client delivery remain unfinished.
+
+- Added generated World map validation and loading through the authoritative map path and typed generator handoff, with immutable ordered geography beside canonical mutable terrain. The existing oracle now has 138 cases and 58 static states, preserves 105 earlier records, and adds bare/dressed Huge/Massive worlds plus malformed region/home/layer/connectivity cases. Empty World metadata now returns Invalid, and defensive numeric/text/bounds/biome checks reject malformed source values. Ordinary Match startup refuses World maps; bounded external file loading stays in simtest. World mode startup, rail algorithms, scenarios, wire and ABI changes remain separate.
+
+- Added typed World size, region, immutable geography and terrain inputs for the native generator-to-loader handoff. Validation and mutable World initialization follow separately; no wire or ABI interface changes. Region biome labels and explicit landmark building tags now accompany the typed handoff.
 
 - Added the native Match Conquest victory phase and finish bookkeeping: team VP in slot order, latest still-held capture location, 0.1 m end rounding, first-winner preservation, reveal and exact Conquest timeline fields. Canonical point accounting now freezes VP and capture story counts after the winner while ownership and manpower can continue. Three focused tests compare 12 original-JavaScript traces (24 assembled-match checkpoints) and invalid-state atomicity; existing startup and point-income tests pass. Other modes, command refusal, remaining story counters, result transport and the full battle loop remain unfinished.
 
