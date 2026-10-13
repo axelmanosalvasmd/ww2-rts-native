@@ -80,7 +80,7 @@ fn update_live(live: &mut WorldLive, game: &Game, rules: &Rules) {
         .map(|u| u.at)
         .collect();
     // Source wx is rebound every read, even when the per-tick live cache is reused.
-    live.wetness = game.wet;
+    live.wetness = game.wet.unwrap_or(0.0);
 }
 impl Match {
     pub(crate) fn validate_world_memory_context(&self, owner: usize) -> Result<i32, String> {
@@ -340,7 +340,7 @@ impl Match {
                 fires,
                 bunkers: Vec::new(),
                 wrecks: memory.team(team).unwrap().remembered_wrecks().to_vec(),
-                wetness: game.wet,
+                wetness: game.wet.unwrap_or(0.0),
                 roads: self.world.roads,
             };
             update_live(&mut live, game, &self.rules);

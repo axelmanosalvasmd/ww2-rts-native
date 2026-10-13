@@ -275,7 +275,7 @@ fn original_world_memory_producers() {
                     }
                 }
                 "reveal" => m.world.game.reveal = a["value"].as_bool().unwrap(),
-                "wet" => m.world.game.wet = a["value"].as_f64().unwrap(),
+                "wet" => m.world.game.wet = a["value"].as_f64(),
                 "fire" => {
                     if a["value"].as_bool().unwrap() {
                         m.world.fires.insert(idx(&a["c"]), 20.);

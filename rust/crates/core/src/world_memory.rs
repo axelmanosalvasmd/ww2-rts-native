@@ -552,8 +552,8 @@ pub(crate) fn validate(world: &World, rules: &Rules, team: i32) -> Result<(), St
                 || !u.hp.is_finite()
                 || (u.owner >= g.players.len() && u.owner != crate::game::LOCAL_DEFENDER_OWNER)
         })
-        || !g.wet.is_finite()
-        || !(0.0..=1.0).contains(&g.wet)
+        || g.wet
+            .is_some_and(|wet| !wet.is_finite() || !(0.0..=1.0).contains(&wet))
     {
         return Err("invalid World knowledge shape or facts".into());
     }
