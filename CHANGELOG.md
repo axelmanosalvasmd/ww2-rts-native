@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Connected ground support admission and late strikes to the separate ordinary tick continuation. The actual captured actor list feeds strikes after projectiles; the canonical phase then decays covers and cooldowns once before living weather. Updated the earlier whole-admission regression to refuse aircraft support, while ordinary ground support is now represented. Combined native replay remains pending.
+
 - Normal-merged the reviewed ground-support tick provider into a separate continuation of frozen reaction source c22969b. Preserved its canonical strike, event and cooldown ownership; actual caller wiring and combined native proof remain pending.
 
 - Updated the inherited operative design note to reflect its completed coherent Mac proof. Reaction composition still awaits its own native cycle.

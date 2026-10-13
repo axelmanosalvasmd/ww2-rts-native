@@ -112,15 +112,8 @@ impl crate::match_runtime::Match {
         }
         let boundary = game.tick as u64 + 1;
         self.validate_command_tick(boundary)?;
-        // Reject an unactuated paid input before consuming any boundary key.
-        if self
-            .commands
-            .queue
-            .pending_tick(boundary)
-            .any(|(_, command)| matches!(command, crate::match_commands::Command::Support { .. }))
-        {
-            return Err("support strike tick actuator is not connected".into());
-        }
+        self.validate_ground_support_tick(boundary)
+            .map_err(|error| format!("ground support admission: {error}"))?;
         self.validate_tick_capabilities()?;
         if !self.rules.movement.tick.is_finite() || self.rules.movement.tick <= 0.0 {
             return Err("invalid tick duration".into());
@@ -166,9 +159,6 @@ impl crate::match_runtime::Match {
     }
 
     fn validate_tick_capabilities(&self) -> Result<(), String> {
-        if !self.support.strikes.is_empty() || !self.world.game.strikes.is_empty() {
-            return Err("support strike tick actuator is not connected".into());
-        }
         if self.world.game.units.values().any(|unit| {
             unit.air.is_some() || self.rules.kinds.get(unit.kind).is_some_and(|kind| kind.air)
         }) {
@@ -212,6 +202,8 @@ impl crate::match_runtime::Match {
         self.prepare_companion_tick()?;
         self.validate_tick_capabilities()?;
         self.validate_reaction_tick_actors()?;
+        self.validate_ground_support_tick(boundary)
+            .map_err(|error| format!("ground support boundary: {error}"))?;
         let mut environment = self.tick_environment_phase(EnvironmentPhase::StructureSync)?;
         self.grid.rebuild(&self.world.game.units);
         self.capture_firing_prior()?;
@@ -328,10 +320,11 @@ impl crate::match_runtime::Match {
         self.advance_firing_grenades(dt)?;
         self.advance_firing_salvos(dt)?;
         phases.push(TickPhase::Projectiles);
-        // Source cooldowns decay even at zero and read radio before point updates.
-        self.advance_support_timers(dt)
-            .map_err(|error| format!("support timers: {error}"))?;
-        phases.push(TickPhase::SupportTimers);
+        // Ground strikes consume captured actors; AIR admission makes anti-air inert.
+        // Covers and raw cooldowns decay once, reading radio before point updates.
+        self.step_ground_support_phase(&unit_order, dt)
+            .map_err(|error| format!("ground support phase: {error}"))?;
+        phases.extend([TickPhase::Support, TickPhase::SupportTimers]);
 
         let game = &mut self.world.game;
         let mut smokes: Vec<_> = game
@@ -411,7 +404,6 @@ impl crate::match_runtime::Match {
                 TickPhase::TrafficKnowledge,
                 TickPhase::GroundEffects,
                 TickPhase::Construction,
-                TickPhase::Support,
                 TickPhase::Scenario,
                 TickPhase::SupplyNetwork,
                 TickPhase::Convoys,
