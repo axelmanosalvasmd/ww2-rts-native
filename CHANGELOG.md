@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Preserve eight original recipient replay and expected-report gzip files in this paused core checkpoint. They are byte-identical to recorder `c906788`; no runtime edit or new native verification is included.
+
 - Added a regression that compares every recorded message against the pinned browser view for both Conquest and World recipients. Clarified that the client view reports initial missing-mask fog lifting; it does not track the renderer lifting fog at match end.
 
 - Added the recipient-owned Rust client view: typed unit rows with raw fields retained, full and delta unit updates, held-set resync checks, fog XOR and exploration, remembered terrain, and changed cells retained until read. Invalid messages leave the view unchanged. `simtest --view` replays raw or gzip server JSON lines and prints stable state hashes for browser comparison. Lobby, pause and denial messages remain available without resetting the match, and readers can distinguish absent fog masks from dark cells. Five focused view tests cover lifecycle, delta recovery, fog and terrain updates, and invalid input; no existing tests were replaced.
