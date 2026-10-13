@@ -81,6 +81,7 @@ pub enum LaunchEvent {
         count: u32,
         spread: f64,
     },
+    SmallArms(SmallArmsEvent),
     Environment(crate::environment::Effect),
     Contact(ContactEvent),
     Expiry {
@@ -89,6 +90,22 @@ pub enum LaunchEvent {
         time: f64,
         at: projectiles::Point3,
     },
+}
+
+/// Existing ordinary shot fields used by the operative producer.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SmallArmsEvent {
+    pub effect: &'static str,
+    pub shooter: UnitId,
+    pub owner: usize,
+    pub at: projectiles::Point3,
+    pub hit: Option<SmallArmsHit>,
+}
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SmallArmsHit {
+    pub target: UnitId,
+    pub owner: usize,
+    pub man: Option<u32>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -163,6 +180,18 @@ impl LaunchEvent {
                 spread,
             } => {
                 json!({"f":shooter,"fo":owner,"x":at.x,"z":at.z,"k":"salvo","n":count,"r":spread,"physical":true,"local":true})
+            }
+            Self::SmallArms(e) => {
+                let mut value = json!({"k":e.effect,"f":e.shooter,"fo":e.owner,"x":e.at.x,"y":e.at.y,"z":e.at.z});
+                if let Some(hit) = e.hit {
+                    value["t"] = json!(hit.target);
+                    value["to"] = json!(hit.owner);
+                    value["hit"] = json!(true);
+                    if let Some(man) = hit.man {
+                        value["m"] = json!(man);
+                    }
+                }
+                value
             }
             Self::Environment(e) => e.to_json(),
             Self::Expiry {
