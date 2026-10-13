@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Normally join the cleared ordinary production and research provider `dd62df3` into verified startup publication `ccfa017` in a separate caller worktree. Preserve the real research and immediate recruitment source recorder and the ordinary nonempty training queue refusal. Actual caller hookup and combined native validation remain pending.
+
 - Verify trusted ordinary startup at `3b84f7c`: all 401 optimized workspace tests, strict Clippy, formatting and release FFI pass. An independent audit retains all 399 prior test names and passes 14 copied affected server checks. Normally incorporate schema-documentation main `4867984` without changing runtime, test, harness, header or reference source; fresh platform and Axel host review remain required.
 
 - Replace the startup privacy test's one-element rows loop with the same direct assertion. The real socket and ClientView lifecycle passes at `81cd1ef`, then strict Clippy stops on that loop; this successor retains every privacy and lifecycle assertion and needs the remaining native and platform checks.
@@ -110,6 +112,9 @@
 - Record both owners' acceptance of the startup-table v1 content/schema candidate and its strict revision/refusal policy. Delivery remains unagreed, and the six ABI 2 calls, runtime producer and Unreal adoption are unchanged. No content, schema or inventory bytes changed.
 
 - Add an unagreed startup-table content/schema proposal for consumer review: all 47 compiled tables plus 17 source-derived public constants, a portable generator, exact field inventory and independent table/formation hashes. Table transport, additional FFI calls and Unreal adoption remain pending explicit agreement.
+- Recorded four complete original ordinary tick traces with 2,429 steps, 4,810 research observations, seven commands and two immediate recruitment births. Added an actual-runner consumer and two original restored-queue failure witnesses. Observed and unobserved Source replay agree; native execution awaits the sole tick owner's research hookup. Retained unsupported restored queues rather than inventing a Conquest mode object.
+
+- Added read-only admission for canonical research and live-building production phases, including actual World context, foreign queue rows and prospective numeric overflow. Ordinary Conquest keeps immediate purchases and refuses nonempty restored training queues. World queued AIR and logistics publication remain unsupported. Training publication also checks the canonical Aviation and reserve owners before using an ID. Full tick hookup and native proof are pending.
 
 - Prepared a separate normal union of frozen ordered-event PR #194 and the consolidated original-source frontier `dfcc0bf`. Preserved the one TickEvent/TickFailure result, producer emission sinks, original World component bodies, approved ABI 2 and the optimized test profile with debug assertions and overflow checks. Migrated the inherited quiet engineering consumer to require empty owned events, and report accepted recipient traffic once rather than unavailable. Published parents remain unchanged; exact union source review and the full optimized native cycle are pending.
 
