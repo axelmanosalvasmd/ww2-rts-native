@@ -269,7 +269,9 @@ fn raw_counters_round_only_in_the_finished_report() {
     assert_eq!(m.story[0].mp_spent, -0.5);
     assert_eq!(r.story[0].built, 1.0);
     assert_eq!(r.story[0].planes_downed, 1.0);
-    let ww2_core::match_end::MatchSample::Conquest {vp, ..} = &mut m.timeline[0] else { panic!("Conquest sample") };
+    let ww2_core::match_end::MatchSample::Conquest { vp, .. } = &mut m.timeline[0] else {
+        panic!("Conquest sample")
+    };
     vp[0] = f64::NAN;
     assert!(m.conquest_result().is_err());
 }

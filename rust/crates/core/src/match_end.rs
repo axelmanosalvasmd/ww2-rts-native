@@ -134,14 +134,13 @@ impl Match {
             };
             if !ok { return Err("invalid Match timeline".into()); }
         }
-        if let Some(finish) = self.finish {
-            if !(-1..6).contains(&finish.winner)
+        if let Some(finish) = self.finish
+            && (!(-1..6).contains(&finish.winner)
                 || (finish.winner >= 0 && !players.iter().any(|p| p.team == finish.winner))
                 || !finish.end_at.x.is_finite() || !finish.end_at.z.is_finite()
                 || !(0..=9_007_199_254_740_991).contains(&finish.end_tick)
-                || ((finish.winner == -1) != (finish.reason == EndReason::Draw))
-            { return Err("invalid Match report finish".into()); }
-        }
+                || ((finish.winner == -1) != (finish.reason == EndReason::Draw)))
+        { return Err("invalid Match report finish".into()); }
         Ok(())
     }
     pub(crate) fn validate_sample_units(&self) -> Result<(), String> {

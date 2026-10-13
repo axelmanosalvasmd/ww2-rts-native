@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Converged verified Assault finish ancestry into the separate World facts successor, preserving World and staged-survivor sampling behavior. The shared validation style repair is retained; World combined native proof remains pending.
+
+- Verified shared finish and the explicit Assault timer/bunker phase: 17 affected debug tests and all 165 locked release workspace tests pass, along with strict workspace Clippy, formatting and release FFI. The original recorder retains 11 traces and 22 phases, with 20 represented checkpoints and two neutral-actor refusals. Full Assault ticking, server admission and three-platform CI remain pending.
+
+- Collapsed the shared finish validation condition after strict Clippy flagged its nested form during the first native gates. Validation order and outcome are unchanged.
+
+- Formatted the independently reviewed Assault finish and actor-rejection checkpoint with the pinned workspace formatter before its scheduled native gates. Source behavior and original fixtures are unchanged; native verification is in progress.
+
 - Added owned World finish preparation from exact staged post-wreck survivors and ordered removals. Complete unit coverage, unchanged owners/kinds and finite HP validate before any canonical publication; final samples use the existing shared timeline. The original recorder now includes actual Map deletion order and surviving HP/kind facts for the elimination consumer. Native checks and complete elimination/wreck integration remain pending.
 
 - Converged the World finish successor with the region provider's verified final ancestry. Provider changes since its import repair are declaration formatting and evidence prose; its runtime body is unchanged. The successor still needs its own combined native proof.

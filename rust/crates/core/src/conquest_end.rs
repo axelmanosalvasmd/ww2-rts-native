@@ -64,7 +64,8 @@ impl Match {
             x: self.world.game.w as f64 * CELL / 2.0,
             z: self.world.game.h as f64 * CELL / 2.0,
         });
-        let prepared = self.prepare_match_finish(winner, ConquestEndReason::VictoryPoints, Some(at))?;
+        let prepared =
+            self.prepare_match_finish(winner, ConquestEndReason::VictoryPoints, Some(at))?;
         Ok(Some(self.publish_match_finish(prepared)))
     }
 
