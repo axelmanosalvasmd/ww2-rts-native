@@ -12,7 +12,6 @@ use ww2_core::{
         CombatState, ContactTarget, DamageWorld, ExplosionSource, FlightSource, RetargetSink,
     },
     match_runtime::{Match, MatchOptions, PlayerConfig},
-    rules::Rules,
     unit_spawn::initial_unit,
     weather::WeatherChoice,
     world::{CellChange, World},
@@ -70,7 +69,10 @@ fn row(v: &ww2_core::world::CellRow) -> Value {
 fn snapshot(m: &Match, timers: &Timers, groups: &BTreeMap<u32, BTreeSet<u32>>) -> Value {
     let w = &m.world;
     let g = &w.game;
-    let structures=w.structures.iter().map(|s|json!([s.id,s.kind,s.section_ids.iter().map(|id|{let (meta,h)=w.section_by_id(id).unwrap();let mut v=json!({"id":id,"hp":h.hp,"state":if h.failed{"failed"}else{match meta.appearance{ww2_core::world::Appearance::Intact=>"intact",ww2_core::world::Appearance::Damaged=>"damaged",ww2_core::world::Appearance::Burning=>"burning"}},"rubble":meta.rubble});if let Some(i)=meta.failure.impulse{v["impulse"]=json!(i);}if let Some(t)=meta.failure.failed_at{v["failedAt"]=json!(t);}if let Some(d)=meta.failure.direction{v["direction"]=json!({"x":d.x,"z":d.z});}if let Some(t)=meta.failure.settled_at{v["settledAt"]=json!(t);}v}).collect::<Vec<_>>()])).collect::<Vec<_>>();
+    let structures=w.structures.iter().map(|s|json!([s.id,s.kind,s.section_ids.iter().map(|id|{let (meta,h)=w.section_by_id(id).unwrap();let mut v=json!({"id":id,"hp":h.hp,"state":if h.failed{"failed"}else{match meta.appearance{ww2_core::world::Appearance::Intact=>"intact",ww2_core::world::Appearance::Damaged=>"damaged",ww2_core::world::Appearance::Burning=>"burning"}},"rubble":meta.rubble});if let Some(i)=meta.failure.impulse{v["impulse"]=json!(i);}
+if let Some(t)=meta.failure.failed_at{v["failedAt"]=json!(t);}
+if let Some(d)=meta.failure.direction{v["direction"]=json!({"x":d.x,"z":d.z});}
+if let Some(t)=meta.failure.settled_at{v["settledAt"]=json!(t);}v}).collect::<Vec<_>>()])).collect::<Vec<_>>();
     let wrecks = g
         .wrecks
         .iter()
@@ -107,7 +109,7 @@ fn snapshot(m: &Match, timers: &Timers, groups: &BTreeMap<u32, BTreeSet<u32>>) -
             b
         })
         .collect::<Vec<_>>();
-    json!({"units":g.units.iter().map(|(id,u)|{let c=m.combat.get(*id).unwrap();json!([id,u.hp,u.supp,u.x,u.z,c.carrier.unwrap_or(0),c.cargo,c.xp,c.last_hit,c.death_impulse.map(|v|json!({"dir":v.direction,"impulse":v.magnitude})),c.hit_by.unwrap_or(0),c.hit_at,u.hit_from.map(|v|json!({"x":v.x,"z":v.z})),c.at_hit,timers.0[id]])}).collect::<Vec<_>>(),"retained":m.combat.iter().map(|(id,m)|json!([id,m.xp])).collect::<Vec<_>>(),"suppressed":groups.iter().map(|(id,s)|json!([id,s])).collect::<Vec<_>>(),"wallets":m.start.economy.players.iter().map(|p|p.mp).collect::<Vec<_>>(),"chars":String::from_utf8(g.chars.clone()).unwrap(),"hp":bits(&g.cell_hp),"flags":runs(g.flags.iter().map(|v|json!(v))),"height":g.height.as_ref().map(|v|runs(v.iter().map(|v|json!(v)))),"wear":bits(g.wear.as_ref().unwrap()),"burnt":runs(w.burnt.iter().map(|v|json!(v))),"structures":structures,"wrecks":wrecks,"falling":falling,"contacts":m.environment.contacts(),"fires":w.fires.iter().map(|(c,t)|json!([c,t])).collect::<Vec<_>>(),"smokes":g.smokes.iter().map(|s|json!({"id":s.id,"x":s.x,"z":s.z,"r":s.r,"t":s.remaining})).collect::<Vec<_>>(),"log":w.cell_log().iter().map(row).collect::<Vec<_>>(),"journal":w.journal(),"versions":[g.terrain_version as u64,w.versions.obstruction,w.versions.infantry,w.versions.vehicle,w.versions.naval],"seed":m.start.environment_seed,"nextId":m.next_unit_id})
+    json!({"units":g.units.iter().map(|(id,u)|{let c=m.combat.get(*id).unwrap();json!([id,u.hp,u.supp,u.x,u.z,c.carrier.unwrap_or(0),c.cargo,c.xp,c.last_hit,c.death_impulse.map(|v|json!({"dir":v.direction,"impulse":v.magnitude})),c.hit_by.unwrap_or(0),c.hit_at,u.hit_from.map(|v|json!({"x":v.x,"z":v.z})),c.at_hit,timers.0[id],u.sprint])}).collect::<Vec<_>>(),"retained":m.combat.iter().map(|(id,m)|json!([id,m.xp])).collect::<Vec<_>>(),"suppressed":groups.iter().map(|(id,s)|json!([id,s])).collect::<Vec<_>>(),"wallets":m.start.economy.players.iter().map(|p|p.mp).collect::<Vec<_>>(),"chars":String::from_utf8(g.chars.clone()).unwrap(),"hp":bits(&g.cell_hp),"flags":runs(g.flags.iter().map(|v|json!(v))),"height":g.height.as_ref().map(|v|runs(v.iter().map(|v|json!(v)))),"wear":bits(g.wear.as_ref().unwrap()),"burnt":runs(w.burnt.iter().map(|v|json!(v))),"structures":structures,"wrecks":wrecks,"falling":falling,"contacts":m.environment.contacts(),"fires":w.fires.iter().map(|(c,t)|json!([c,t])).collect::<Vec<_>>(),"smokes":g.smokes.iter().map(|s|json!({"id":s.id,"x":s.x,"z":s.z,"r":s.r,"t":s.remaining})).collect::<Vec<_>>(),"log":w.cell_log().iter().map(row).collect::<Vec<_>>(),"journal":w.journal(),"versions":[g.terrain_version as u64,w.versions.obstruction,w.versions.infantry,w.versions.vehicle,w.versions.naval],"seed":m.start.environment_seed,"nextId":m.next_unit_id})
 }
 fn equal(a: &Value, b: &Value) -> bool {
     match (a, b) {
@@ -534,7 +536,7 @@ fn ordered_damage_riders_terrain_and_death_match_original_source() {
             );
         }
     }
-    assert_eq!(count, 33);
+    assert_eq!(count, 35);
 }
 
 #[test]
@@ -572,7 +574,6 @@ fn event_and_death_preflight_preserve_canonical_state_on_invalid_input() {
         view.apply_events(&events, &mut timers, &mut BTreeSet::new())
             .is_err()
     );
-    drop(view);
     assert_eq!(snapshot(&m, &timers, &groups), before);
     m.world.game.units.get_mut(&1).unwrap().hp = 0.;
     m.world.game.units.get_mut(&2).unwrap().hp = 0.;

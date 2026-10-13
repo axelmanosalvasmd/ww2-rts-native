@@ -403,6 +403,10 @@ pub struct Match {
     pub logistics: crate::logistics::LogisticsState,
     pub firing: crate::match_firing::FiringState,
     pub capture_ticks: Vec<Option<i64>>,
+    /// Capture story counts only. Combat and spending counters are not integrated yet.
+    pub capture_counts: Vec<f64>,
+    pub finish: Option<crate::conquest_end::ConquestFinish>,
+    pub timeline: Vec<crate::conquest_end::ConquestSample>,
     pub next_unit_id: u32,
     pub rules: Rules,
 }
@@ -439,6 +443,7 @@ impl Match {
                 .collect::<Result<Vec<_>, String>>()?;
             crate::legacy_scenario::LegacyScenario::from_map(map, &owners)
         };
+        let player_count = start.players.len();
         let mut result = Self {
             combat: crate::match_combat::CombatState::default(),
             environment: crate::environment::EnvironmentRuntime::default(),
@@ -454,6 +459,9 @@ impl Match {
             logistics: crate::logistics::LogisticsState::default(),
             firing: crate::match_firing::FiringState::default(),
             capture_ticks: vec![None; map.points().len()],
+            capture_counts: vec![0.0; player_count],
+            finish: None,
+            timeline: Vec::new(),
             next_unit_id,
             rules,
         };
@@ -477,6 +485,8 @@ impl Match {
         winner_decided: bool,
     ) -> Result<Vec<crate::objectives::Captured>, String> {
         use crate::{economy_state as economy, objectives};
+        self.validate_conquest_finish_state()?;
+        let winner_decided = winner_decided || self.finish.is_some();
         let dt = self.rules.movement.tick;
         let game = &self.world.game;
         if game.tick < 0
@@ -587,6 +597,7 @@ impl Match {
         if !winner_decided {
             for event in &captured {
                 self.capture_ticks[event.objective_index] = Some(game.tick);
+                self.capture_counts[event.owner] += 1.0;
             }
         }
         Ok(captured)

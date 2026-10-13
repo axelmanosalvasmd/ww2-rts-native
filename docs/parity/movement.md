@@ -192,7 +192,7 @@ The standalone `path_requests.rs` scheduler matches 606 original-source action c
 
 | ID | Behavior / content | Evidence | Rust (Julio) | Unreal (Axel) | Depends on | Acceptance check | Status |
 |---|---|---|---|---|---|---|---|
-| MOV-106 | A knocked-out vehicle off MOVE-blocked ground becomes a debris body (last blast's direction and impulse, mass by type), stepped in 0.05 s pieces (gravity 9.81, drag 3.2, at most 2 m travel, 2.5 s, 8 contacts) against cells and vehicles; settled on open, crater, road or mud with no vehicle there it becomes a Q cell (blocks vehicles); over 96 moving bodies settle at once; oldest of 40 wrecks is cleared | shared/debris-motion.js:1-58; sim.js:5125-5183, 5679-5692, 4739 | port | Wreck slide and final hull | ENG | Port test.js "Wrecks settle near the knocked-out tank and cover infantry behind their final hull" (914-932), "A wreck plugs a causeway for vehicles, not for infantry, until it is blown apart" (940-944) | todo |
+| MOV-106 | A knocked-out vehicle off MOVE-blocked ground becomes a debris body (last blast's direction and impulse, mass by type), stepped in 0.05 s pieces (gravity 9.81, drag 3.2, at most 2 m travel, 2.5 s, 8 contacts) against cells and vehicles; settled on open, crater, road or mud with no vehicle there it becomes a Q cell (blocks vehicles); over 96 moving bodies settle at once; oldest of 40 wrecks is cleared | shared/debris-motion.js:1-58; sim.js:5125-5183, 5679-5692, 4739 | canonical wreck body lifecycle and maintained grid removal ported; live scheduling pending | Wreck slide and final hull | ENG | Port test.js "Wrecks settle near the knocked-out tank and cover infantry behind their final hull" (914-932), "A wreck plugs a causeway for vehicles, not for infantry, until it is blown apart" (940-944) | in progress |
 
 ## Client-only movement presentation
 
@@ -294,3 +294,7 @@ Wall clock and scheduling
 6. Are the Troop Truck and Kaiju meant to use the fallback profile (tracked, 4 m/s² acceleration)?
 7. Wreck debris motion decides which cell becomes a vehicle obstacle. Does it belong in the Rust core under ENG or MOV?
 8. Route hashes in test-path-performance.mjs and tools/bench-move.mjs hash `JSON.stringify` output; the Rust comparison needs JS-identical number formatting (shortest round-trip, same exponent style).
+
+## Retirement and wreck lifecycle evidence
+
+The combat adapter removes dead units through the maintained grid without rebuilding surviving buckets. A focused mid-tick removal regression preserves the surviving query order. Its original-source fixture covers vehicle wreck initialization, motion, final Q cells, scorch and the oldest-hull cap among nine traces with 35 actions. MOV-106 remains in progress pending full tick scheduling and client presentation. Thrown carrier escape in MOV-76 remains outside this slice.
