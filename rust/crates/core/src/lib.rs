@@ -34,3 +34,4 @@ pub mod vehicle;
 mod vehicle_navigation;
 pub mod vision;
 pub mod weather;
+pub mod world;

@@ -623,6 +623,10 @@ pub fn load_game(g: &Value, rules: &Rules) -> Result<Loaded> {
             .iter()
             .map(|w| {
                 Ok(Wreck {
+                    cell: w
+                        .get("c")
+                        .and_then(serde_json::Value::as_u64)
+                        .map(|c| c as usize),
                     x: num(w, "x")?,
                     z: num(w, "z")?,
                     moving: flag(w, "motion"),
