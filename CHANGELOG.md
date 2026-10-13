@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Exposed the canonical immutable current-position team visibility predicate for support and recipient producers. Renamed the private visible-enemy-unit collector to distinguish it from point visibility; terrain/fog/range semantics and maintained grid order are unchanged. Caller validation remains required. Native point-predicate acceptance is pending.
+
 - Extended internal ordinary Conquest recipient projections with owner plans, waiting movement orders, production queues and original paid-job identities/status. Added terrain full/delta reads and per-seat fog delivery acknowledgments over canonical observed memory and team fog, collected before the immutable cache. Original JavaScript fixtures record 56 cached states with 168 recipients and 13 delivery steps with 39 recipients. Native verification is pending the shared Rust test lane. Active engineering, aircraft, other modes and remaining snapshot families stay explicit boundaries; no complete message envelope or transport integration was added.
 
 - Reject mismatched or zero canonical unit identities before building recipient snapshot rows.
