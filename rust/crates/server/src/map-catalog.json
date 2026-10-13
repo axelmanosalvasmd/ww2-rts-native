@@ -1,0 +1,167 @@
+{
+  "ardennes-crossing": {
+    "normal": 4,
+    "assault": 4,
+    "horde": false
+  },
+  "bastogne": {
+    "normal": 5,
+    "assault": 6,
+    "horde": true
+  },
+  "bocage": {
+    "normal": 4,
+    "assault": 4,
+    "horde": true
+  },
+  "crater-field": {
+    "normal": 4,
+    "assault": 4,
+    "horde": false
+  },
+  "crossroads-village": {
+    "normal": 2,
+    "assault": 2,
+    "horde": false
+  },
+  "default": {
+    "normal": 3,
+    "assault": 3,
+    "horde": false
+  },
+  "el-alamein": {
+    "normal": 4,
+    "assault": 4,
+    "horde": true
+  },
+  "helms-deep": {
+    "normal": 3,
+    "assault": 4,
+    "horde": true
+  },
+  "hill-112-xl": {
+    "normal": 6,
+    "assault": 6,
+    "horde": true
+  },
+  "hill-112": {
+    "normal": 4,
+    "assault": 4,
+    "horde": true
+  },
+  "hot-gates": {
+    "normal": 4,
+    "assault": 4,
+    "horde": true
+  },
+  "hurtgen-forest": {
+    "normal": 4,
+    "assault": 4,
+    "horde": false
+  },
+  "island-towns": {
+    "normal": 6,
+    "assault": 6,
+    "horde": false
+  },
+  "kasserine-pass": {
+    "normal": 6,
+    "assault": 6,
+    "horde": true
+  },
+  "king-of-the-hill": {
+    "normal": 6,
+    "assault": 6,
+    "horde": false
+  },
+  "monte-cassino-xl": {
+    "normal": 6,
+    "assault": 6,
+    "horde": true
+  },
+  "monte-cassino": {
+    "normal": 4,
+    "assault": 4,
+    "horde": true
+  },
+  "no-mans-land": {
+    "normal": 4,
+    "assault": 4,
+    "horde": false
+  },
+  "pegasus-bridge-xl": {
+    "normal": 6,
+    "assault": 6,
+    "horde": true
+  },
+  "pegasus-bridge": {
+    "normal": 4,
+    "assault": 4,
+    "horde": true
+  },
+  "prokhorovka": {
+    "normal": 4,
+    "assault": 4,
+    "horde": false
+  },
+  "river-towns": {
+    "normal": 3,
+    "assault": 3,
+    "horde": false
+  },
+  "seawall-xl": {
+    "normal": 6,
+    "assault": 6,
+    "horde": true
+  },
+  "seawall": {
+    "normal": 4,
+    "assault": 4,
+    "horde": true
+  },
+  "seelow-heights": {
+    "normal": 4,
+    "assault": 4,
+    "horde": true
+  },
+  "six-fronts": {
+    "normal": 6,
+    "assault": 6,
+    "horde": false
+  },
+  "stalingrad-factory": {
+    "normal": 4,
+    "assault": 5,
+    "horde": true
+  },
+  "test-arena": {
+    "normal": 3,
+    "assault": 3,
+    "horde": false
+  },
+  "the-great-bridge": {
+    "normal": 4,
+    "assault": 4,
+    "horde": true
+  },
+  "the-polder": {
+    "normal": 4,
+    "assault": 4,
+    "horde": false
+  },
+  "three-islands": {
+    "normal": 6,
+    "assault": 6,
+    "horde": false
+  },
+  "tutorial": {
+    "normal": 2,
+    "assault": 2,
+    "horde": false
+  },
+  "twin-valleys": {
+    "normal": 4,
+    "assault": 4,
+    "horde": false
+  }
+}
