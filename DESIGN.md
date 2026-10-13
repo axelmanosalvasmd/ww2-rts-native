@@ -607,3 +607,7 @@ The recorder exports the unchanged pinned JavaScript functions and compares 934 
 ## Match Conquest recruitment (2026-10-13)
 
 The native Match now stages immediate Conquest ground/naval recruitment through canonical production, wallets, IDs, unit insertion, grid updates and shared command controls. Owner-bound remembered routing is required for rallies; unreachable searches still admit an empty path as in the source. Air placement and pending supports without exact kind metadata fail explicitly before payment. [Recruitment design and evidence](docs/runtime/recruitment.md) records the transaction, control ownership, original-source fixture and remaining boundaries. No public interface or server match admission changed.
+
+## Prepared unit publication (2026-10-13)
+
+[Prepared publication](docs/runtime/unit-publication.md) gives recruitment, FPS and later unit actuators one disjoint-field transaction for units, spatial index, controls and IDs. Whole batches and optional existing HP changes validate before payment, then publish with no fallible operation. Metadata owners supply only infallible publication callbacks after their own checks. The source-only prerequisite is pending verification.
