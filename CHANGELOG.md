@@ -2,15 +2,17 @@
 
 ## Unreleased
 
-- Fixed the firing oracle retaining consumed ammo in its input record and moving a synthetic target outside the arena. The atomicity assertion compares the existing NaN pace sentinel by bits. Internal shot JSON now matches JavaScript zero serialization while retaining trajectory signs. All three focused native tests pass across 114 source traces and 588 checkpoints; release and workspace checks follow.
+- Verified the ordinary Conquest weapon/contact phase: three focused tests pass in debug and release against 114 original-source traces and 588 checkpoints, including lower-ID ties and invalid-input atomicity. All 136 workspace tests, strict Clippy, formatting and release FFI build pass. Air, rail, FPS, support, beams and active ability/terrain fire remain separate; wire, ABI and the reference pin are unchanged.
+
+- Fixed the firing oracle retaining consumed ammo in its input record and moving a synthetic target outside the arena. The atomicity assertion compares the existing NaN pace sentinel by bits. Internal shot JSON now matches JavaScript zero serialization while retaining trajectory signs. All three focused native tests pass across 114 source traces and 588 checkpoints; release and workspace checks pass.
 
 - Integrated the reviewed routing and executable command prerequisites for weapon-phase checks. Movement fixtures explicitly leave the newer territorial reserve fields absent. No production rule changed.
 
 - Preflight canonical unit identities, coordinates and terrain indices before projectile iteration, so malformed later contact targets reject before earlier rounds advance.
 
-- Expanded the firing source fixture to explicit area-weapon orders and limited/empty ammunition, covering every represented shooter kind. Rejects malformed timer and XP facts before unit firing changes. Native verification remains queued.
+- Expanded the firing source fixture to explicit area-weapon orders and limited/empty ammunition, covering every represented shooter kind. Rejects malformed timer and XP facts before unit firing changes. Native verification passes.
 
-- Connected the Conquest flight driver to canonical suppression, unit/section damage and terminal terrain/blast effects, preserving contact order, launch delays and retained shooter XP. Added defined lower-ID collision ties, unsupported-mode guards and malformed-flight admission. Weapon updates now retain only scalar facts instead of cloning a unit and its route. The original-source recorder now covers 114 traces and 588 checkpoints with a 64,006-byte compressed fixture. Native differential, expiry and collision-tie checks are queued.
+- Connected the Conquest flight driver to canonical suppression, unit/section damage and terminal terrain/blast effects, preserving contact order, launch delays and retained shooter XP. Added defined lower-ID collision ties, unsupported-mode guards and malformed-flight admission. Weapon updates now retain only scalar facts instead of cloning a unit and its route. The original-source recorder now covers 114 traces and 588 checkpoints with a 64,008-byte compressed fixture. Native differential, expiry and collision-tie checks pass.
 
 - Exposed the canonical target setter inside the core so reaction phases keep shared volley claims consistent when intercepting rally movement.
 - Preserved terminal projectile blast direction through terrain damage so section debris receives the source impulse direction. Added explicit direction admission and an original-source directed-blast regression.
