@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Converged the World finish successor with the region provider's verified final ancestry. Provider changes since its import repair are declaration formatting and evidence prose; its runtime body is unchanged. The successor still needs its own combined native proof.
+
 - Joined the independently reviewed narrow Assault actor correction into the World finish successor ancestry. The shared guard and retained source observations were already identical; runtime behavior is unchanged and combined native checks remain pending.
 
 - Tightened the shared sample actor guard after independent review: the hidden local-defender sentinel is accepted only in World. The controlled Assault neutral-bunker source trace remains recorded but is explicitly outside represented native actors; its native checks now require atomic refusal. A malformed-actor regression protects the ordinary publication boundary. Valid commander behavior is unchanged; native checks remain pending.
@@ -35,6 +37,10 @@
 
 - Added the native Match Conquest victory phase and finish bookkeeping: team VP in slot order, latest still-held capture location, 0.1 m end rounding, first-winner preservation, reveal and exact Conquest timeline fields. Canonical point accounting now freezes VP and capture story counts after the winner while ownership and manpower can continue. Three focused tests compare 12 original-JavaScript traces (24 assembled-match checkpoints) and invalid-state atomicity; existing startup and point-income tests pass. Other modes, command refusal, remaining story counters, result transport and the full battle loop remain unfinished.
 - Added a bounded World startup constructor with canonical home ownership, wallets, HQs, local defenders, fortifications, resource nodes, empty production and rail state, and actual initial visibility. The shared unit factory preserves source order and canonical guard controls; generator random history is retained. Five original-source records cover 2,761 units. Native checks are pending. Logistics-enabled startup, World terrain memory, mode tick phases, commands, trains and server hosting remain explicit boundaries.
+- Verified the bounded World region phase: nine affected debug tests and all 167 locked release workspace tests pass, alongside strict Clippy, formatting, release FFI and 20 original-source traces with 39 transitions. Independent source/oracle review and a copied release-binary replay are clear. Fort seizure, army removal, World finish, logistics and the full World tick remain separate.
+
+- Sorted the additive World module declarations with the pinned formatter after the strict check found their order. The 167 release workspace tests and strict Clippy already pass; the format and FFI gates follow on this formatting-only correction.
+
 - Corrected the World region test import to the canonical world-map typed input module after the first native compile. No phase behavior changed.
 
 - Integrated the checked World recipient-memory dependency into the live-region branch, preserving its sole memory owner, journal reset and private region projection alongside canonical lock and capture-time fields. Combined native checks are queued.
