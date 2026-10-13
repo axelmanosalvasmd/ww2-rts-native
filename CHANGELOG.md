@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified the coherent off-map provider on Mac Apple Silicon at code `eaf358c`: all 223 locked release workspace tests, strict workspace/all-target Clippy, formatting and release FFI build pass. Affected debug evidence is split: 25 tests at `e5a954a` plus the corrected coupled replay at `eaf358c`, with unchanged production code. The replay matches 4 original scenes, 1,603 checkpoints and 432 read-only preclock guards. Native fixes concerned test macro compilation and absent/numeric readback only. Full AIR caller and current mass-support migration remain separate.
+
 - Corrected the coupled replay's source-number encoding after the labelled native failure reached a present traffic wait value. Present traffic wait and optional shot/anti-tank-hit ticks now use the same exact-bit comparison as their native fields; absent optional ticks stay absent. Runtime and original Source fixtures are unchanged.
 
 - Added the field path and native value to the coupled replay's numeric type failure, after the next native run reached an unlabelled comparison unwrap. All bit comparisons and Source expectations remain unchanged.
