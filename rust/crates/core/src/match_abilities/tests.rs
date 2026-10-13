@@ -498,6 +498,32 @@ fn conquest_abilities_match_original_source_phases() {
             continue;
         }
         if name == "manual-aimed-unrepresented-project-boundary" {
+            let invalid = Command::Ability {
+                ids: vec![1],
+                at: Some(Point {
+                    x: f64::NAN,
+                    z: 15.,
+                }),
+                queue: false,
+                automatic: false,
+            };
+            let work = (
+                m.world.game.units[&1].dig,
+                m.world.game.units[&1].build,
+                m.world.game.units[&1].entrench,
+            );
+            assert_eq!(
+                m.execute_command(0, &invalid, false).unwrap(),
+                Some(crate::match_commands::Denial::Blocked)
+            );
+            assert_eq!(
+                (
+                    m.world.game.units[&1].dig,
+                    m.world.game.units[&1].build,
+                    m.world.game.units[&1].entrench
+                ),
+                work
+            );
             let before = snapshot(&m, &order, &[]);
             let action = &case["actions"][0];
             assert_eq!(

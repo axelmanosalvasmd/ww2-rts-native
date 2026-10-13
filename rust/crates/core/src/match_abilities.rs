@@ -458,7 +458,7 @@ impl Match {
         queue: bool,
         automatic: bool,
     ) -> Result<bool, String> {
-        if queue || automatic || at.is_none() {
+        if queue || automatic || !at.is_some_and(|p| p.x.is_finite() && p.z.is_finite()) {
             return Ok(false);
         }
         for &id in selected {

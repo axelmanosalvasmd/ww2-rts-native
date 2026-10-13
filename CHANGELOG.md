@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Preserved Blocked precedence for a typed nonfinite aimed point before unsupported-project checks. The existing project-boundary replay now verifies that invalid aim preserves work activity, while valid replacement still refuses unrepresented projects.
+
 - Corrected replay setup to represent visibility membership as sorted unique IDs while preserving the original actor/grid insertion order for tie cases. This satisfies canonical routing validation without changing target membership. Native comparisons are rerunning.
 
 - Fixed the first native ability differential: ineligible or missing selected IDs retain their position in per-unit refusal order, so a trailing missing ID returns Needs when no prior unit succeeded. Resource/control preflight still uses only eligible units. Native checks are rerunning.
