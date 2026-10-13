@@ -1,0 +1,220 @@
+use serde_json::{Value, json};
+use std::io::Read;
+use ww2_core::{
+    catalog::Catalog,
+    economy::{Faction, Mode},
+    economy_state::ArmySize,
+    game::Point,
+    map::AuthoritativeMap,
+    match_combat::CombatState,
+    match_commands::UnitControl,
+    match_firing::FiringState,
+    match_runtime::{Match, MatchOptions, PlayerConfig},
+    match_support::{SupportDenial, SupportEvent, SupportState},
+    random::StreamId,
+    unit_spawn,
+    weather::WeatherChoice,
+};
+fn bits(n: f64) -> Value {
+    json!(format!("{:016x}", n.to_bits()))
+}
+fn fixture() -> Value {
+    let mut text = String::new();
+    flate2::read::GzDecoder::new(&include_bytes!("fixtures/match-support.json.gz")[..])
+        .read_to_string(&mut text)
+        .unwrap();
+    serde_json::from_str(&text).unwrap()
+}
+fn make(t: &Value) -> Match {
+    let map = AuthoritativeMap::from_json(&serde_json::to_vec(&t["map"]).unwrap()).unwrap();
+    let mut m = Match::new(
+        &map,
+        MatchOptions {
+            seed: 701,
+            mode: Mode::Conquest,
+            players: vec![
+                PlayerConfig {
+                    name: "A".into(),
+                    team: 0,
+                    faction: Faction::try_from(t["faction"].as_u64().unwrap() as u8).unwrap(),
+                },
+                PlayerConfig {
+                    name: "B".into(),
+                    team: 1,
+                    faction: Faction::Germany,
+                },
+            ],
+            shuffle: false,
+            army: ArmySize::Standard,
+            weather: WeatherChoice::Map,
+            weather_seed: Some(1),
+            living_weather: false,
+            map_key: None,
+            tech: false,
+            supply: false,
+            logistics: false,
+            sandbox: false,
+        },
+    )
+    .unwrap();
+    m.world.game.units.clear();
+    m.start.environment_seed = 123;
+    m.start.wind = (0.0, 0.5);
+    m.next_unit_id = 1000;
+    m.world.game.rain = 0.0;
+    m.world.game.wet = Some(0.0);
+    m.combat = CombatState::default();
+    m.firing = FiringState::default();
+    m.commands.units.clear();
+    let kind = m.rules.kind("rifle").unwrap();
+    let mut u = unit_spawn::initial_unit(
+        &m.rules,
+        Catalog::compiled().unwrap(),
+        kind,
+        1,
+        1,
+        Point { x: 41.0, z: 41.0 },
+    )
+    .unwrap();
+    u.still = Some(20.0);
+    m.commands
+        .insert(1, UnitControl::new(&u, &m.rules).unwrap());
+    m.combat.initialize(1).hit_by = Some(0);
+    m.firing.initialize(1).retarget = 0.5;
+    m.world.game.units.insert(1, u);
+    m.grid.rebuild(&m.world.game.units);
+    for p in &mut m.start.economy.players {
+        p.mp = if t["variation"] == "poor" { 0.0 } else { 500.0 };
+    }
+    if t["variation"] == "cooldown" {
+        m.start.players[0]
+            .support
+            .insert(t["kind"].as_str().unwrap().into(), 1.0);
+    }
+    if t["variation"] == "radio" || t["variation"] == "cut" {
+        m.start.points[0].owner = Some(0);
+        m.start.points[0].cut = t["variation"] == "cut";
+    }
+    m
+}
+fn snapshot(m: &mut Match) -> Value {
+    let sparse = |a: &[f32]| {
+        a.iter()
+            .enumerate()
+            .filter(|(_, v)| **v != 0.0)
+            .map(|(i, v)| json!([i, bits(f64::from(*v))]))
+            .collect::<Vec<_>>()
+    };
+    let shots = m
+        .support
+        .take_events()
+        .into_iter()
+        .map(|e| match e {
+            SupportEvent::Shell(p) => json!({"x":p.x,"z":p.z,"k":"shell","pub":true}),
+            SupportEvent::SmokeShells(p) => json!({"x":p.x,"z":p.z,"k":"smokeshells","pub":true}),
+            SupportEvent::Environment(e) => e.to_json(),
+        })
+        .collect::<Vec<_>>();
+    let random = m
+        .start
+        .random
+        .snapshot()
+        .streams
+        .into_iter()
+        .find(|(k, _)| *k == StreamId::OffMap)
+        .map(|(_, v)| format!("{v:016x}"));
+    // An unused purpose has the same initial state as the original fixture's untouched stream.
+    let initial = "89c878576e39a642".to_owned();
+    json!({"mp":m.start.economy.players.iter().map(|p|bits(p.mp)).collect::<Vec<_>>(),"cooldowns":m.start.players.iter().map(|p|p.support.iter().map(|(k,v)|(k.clone(),bits(*v))).collect::<serde_json::Map<String,Value>>()).collect::<Vec<_>>(),"strikes":m.support.strikes.iter().map(|s|json!({"kind":s.kind.name(),"owner":s.owner,"x":bits(s.at.x),"z":bits(s.at.z),"dir":bits(s.direction),"t":bits(s.delay),"left":bits(s.left),"next":bits(s.next),"live":s.live})).collect::<Vec<_>>(),"covers":m.support.covers.iter().map(|c|json!({"team":c.team,"owner":c.owner,"x":bits(c.at.x),"z":bits(c.at.z),"r":bits(c.radius),"t":bits(c.remaining)})).collect::<Vec<_>>(),"smokes":m.world.game.smokes.iter().map(|s|json!({"id":s.id,"x":bits(s.x),"z":bits(s.z),"r":bits(s.r),"t":bits(s.remaining.unwrap())})).collect::<Vec<_>>(),"units":m.world.game.units.values().map(|u|{let c=m.combat.get(u.id).unwrap();json!({"id":u.id,"hp":bits(u.hp),"supp":bits(u.supp),"lastHit":c.last_hit,"hitBy":c.hit_by,"hitAt":bits(c.hit_at),"retarget":bits(m.firing.get(u.id).unwrap().retarget)})}).collect::<Vec<_>>(),"terrain":{"chars":String::from_utf8(m.world.game.chars.clone()).unwrap(),"height":m.world.game.height.clone().unwrap_or_else(||vec![0;m.world.game.w*m.world.game.h]),"hp":sparse(&m.world.game.cell_hp),"wear":sparse(m.world.game.wear.as_deref().unwrap()),"scar":sparse(&m.world.scar),"versions":[m.world.game.terrain_version as u64,m.world.versions.obstruction,m.world.versions.infantry,m.world.versions.vehicle,m.world.versions.naval]},"environment":[m.start.environment_seed,m.next_unit_id],"story":m.story.iter().map(|s|[bits(s.support_calls),bits(s.mp_spent)]).collect::<Vec<_>>(),"shots":shots,"random":random.unwrap_or(initial)})
+}
+fn compare(a: &Value, b: &Value, path: &str) {
+    match b {
+        Value::Number(b) => assert_eq!(a.as_f64(), b.as_f64(), "{path}"),
+        Value::Array(b) => {
+            let a = a.as_array().unwrap();
+            assert_eq!(a.len(), b.len(), "{path}");
+            for (i, (a, b)) in a.iter().zip(b).enumerate() {
+                compare(a, b, &format!("{path}[{i}]"));
+            }
+        }
+        Value::Object(b) => {
+            let a = a.as_object().unwrap();
+            assert_eq!(a.len(), b.len(), "{path}");
+            for (k, b) in b {
+                compare(a.get(k).unwrap(), b, &format!("{path}.{k}"));
+            }
+        }
+        _ => assert_eq!(a, b, "{path}"),
+    }
+}
+#[test]
+fn actual_support_admission_strikes_and_timers_match_source() {
+    let fixture = fixture();
+    let mut count = 0;
+    for t in fixture["traces"].as_array().unwrap() {
+        let mut m = make(t);
+        let mut last = 0;
+        for (i, frame) in t["frames"].as_array().unwrap().iter().enumerate() {
+            let action = &frame["action"];
+            let denial = if action["op"] == "admit" {
+                let r = &action["request"];
+                m.admit_support(
+                    0,
+                    r["kind"].as_str().unwrap(),
+                    Point {
+                        x: r["x"].as_f64().unwrap(),
+                        z: r["z"].as_f64().unwrap(),
+                    },
+                    r["dir"].as_f64(),
+                )
+                .unwrap()
+                .map(|d| match d {
+                    SupportDenial::Blocked => "blocked",
+                    SupportDenial::Cooldown => "cooldown",
+                    SupportDenial::Manpower => "mp",
+                })
+            } else {
+                let tick = action["tick"].as_i64().unwrap();
+                for current in last + 1..=tick {
+                    m.world.game.tick = current;
+                    m.support.events.clear();
+                    m.step_support_strikes(&[1], 0.05).unwrap();
+                    m.advance_support_timers(0.05).unwrap();
+                }
+                last = tick;
+                None
+            };
+            assert_eq!(json!(denial), frame["denial"]);
+            compare(
+                &snapshot(&mut m),
+                &frame["expected"],
+                &format!("{} {} {} frame{i}", t["kind"], t["faction"], t["variation"]),
+            );
+            count += 1;
+        }
+    }
+    assert_eq!(count, 540);
+}
+#[test]
+fn unsupported_air_and_invalid_membership_do_not_charge_or_publish() {
+    let f = fixture();
+    let mut m = make(&f["traces"][0]);
+    let wallet = m.start.economy.players[0].mp;
+    let cooldowns = m.start.players[0].support.clone();
+    for name in ["recon", "strafe", "bombing", "dive", "para"] {
+        assert!(
+            m.admit_support(0, name, Point { x: 41.0, z: 41.0 }, None)
+                .is_err()
+        );
+        assert_eq!(m.start.economy.players[0].mp, wallet);
+        assert_eq!(m.start.players[0].support, cooldowns);
+        assert_eq!(m.support, SupportState::default());
+    }
+    m.admit_support(0, "artillery", Point { x: 41.0, z: 41.0 }, None)
+        .unwrap();
+    let before = m.support.clone();
+    let random = m.start.random.snapshot();
+    assert!(m.step_support_strikes(&[], 0.05).is_err());
+    assert_eq!(m.support, before);
+    assert_eq!(m.start.random.snapshot(), random);
+}

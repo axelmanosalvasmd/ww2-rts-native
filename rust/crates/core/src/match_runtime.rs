@@ -395,6 +395,7 @@ pub struct BuildingCell {
 /// Authoritative Conquest startup state. Tick execution is added independently.
 /// Live terrain and units have a single owner in `world.game`.
 pub struct Match {
+    pub support: crate::match_support::SupportState,
     pub combat: crate::match_combat::CombatState,
     pub environment: crate::environment::EnvironmentRuntime,
     pub commands: crate::match_commands::MatchCommands,
@@ -458,6 +459,7 @@ impl Match {
         };
         let player_count = start.players.len();
         let mut result = Self {
+            support: crate::match_support::SupportState::default(),
             combat: crate::match_combat::CombatState::default(),
             environment: crate::environment::EnvironmentRuntime::default(),
             commands: crate::match_commands::MatchCommands::new(4096),

@@ -733,3 +733,13 @@ The pinned original command bodies currently provide 56 traces and 246 recorded 
 ## Match Conquest recruitment (2026-10-13)
 
 The native Match now stages immediate Conquest ground/naval recruitment through canonical production, wallets, IDs, unit insertion, grid updates and shared command controls. Owner-bound remembered routing is required for rallies; unreachable searches still admit an empty path as in the source. Air placement and pending supports without exact kind metadata fail explicitly before payment. [Recruitment design and evidence](docs/runtime/recruitment.md) records the transaction, control ownership, original-source fixture and remaining boundaries. No public interface or server match admission changed.
+
+## Off-map support runtime (2026-10-13, bounded checkpoint)
+
+`match_support.rs` owns ordered ground-support strikes and fighter-cover zones on Match. Player support cooldowns remain in PlayerStart, wallets in the existing economy state, smoke in canonical Game and identities in `next_unit_id`. Admission clamps target coordinates as the source does, rejects insufficient manpower or cooldown, and records accepted spending and calls once. Plane kinds return an explicit unsupported result before payment. This slice creates no second command queue or wire contract.
+
+Artillery applies the existing support-class blast adapter before source dig=0 dent/crater behavior. Smoke consumes one OffMap draw per cloud and allocates canonical identities. Covers activate before cover timers decay. Support cooldowns decay without clamping; an allied uncut radio applies `CFG.radioCd`. Purpose-specific OffMap randomness replaces the prototype global stream, while each support effect keeps the source draw order.
+
+The original-source loader records 36 traces and 540 checkpoints for three ground supports, two faction doctrines, radio/cut effects, insufficient funds, existing cooldowns and clamped targets. It calls unchanged command, strike and timer code and compares wallets, cooldowns, strikes, covers, smoke, unit damage, terrain bits/versions, environment seed, IDs, story, effects and random state. Source regeneration passes with x64 Node 24.21.0 at the pin. Native verification is queued.
+
+The current damage adapter requires the captured late unit list to equal the complete current list and returns an explicit unsupported result when those differ. A follow-up will separate captured blast membership from complete environment validation, preserving fresh projectile callers. Recorded command dispatch, plane interception, recon visibility and paratrooper spawning remain integration work. No full match or complete support claim is made.
