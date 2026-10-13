@@ -117,6 +117,7 @@ impl From<KnowledgeError> for ObservedError {
 
 /// Keep this producer with its player across snapshots and reconnects. Recreate
 /// it and the corresponding RouteKnowledge when a new initial map is installed.
+#[derive(Clone)]
 pub struct ObservedMemory {
     slot: usize,
     identity: u64,
@@ -199,6 +200,19 @@ impl ObservedMemory {
         frame: ObservationFrame,
         facts: &mut F,
     ) -> Result<usize, ObservedError> {
+        let (count, receipt) = self.refresh_impl(world, frame, facts, false)?;
+        receipt
+            .commit(world)
+            .map_err(|_| ObservedError::RecipientMismatch)?;
+        Ok(count)
+    }
+    pub(crate) fn refresh_impl<F: ObservationFacts>(
+        &mut self,
+        world: &World,
+        frame: ObservationFrame,
+        facts: &mut F,
+        capture_frame: bool,
+    ) -> Result<(usize, crate::world::ObservationReceipt), ObservedError> {
         self.validate_binding(world)?;
         let key = (
             world.game.terrain_version,
@@ -210,11 +224,13 @@ impl ObservedMemory {
             |p| p.iter().copied().collect(),
         );
         if pending.is_empty() {
-            world.register_recipient(recipient);
-            return Ok(0);
+            return Ok((
+                0,
+                world.defer_observation(Some((recipient, Vec::new())), capture_frame),
+            ));
         }
         if self.key == Some(key) {
-            return Ok(0);
+            return Ok((0, world.defer_observation(None, capture_frame)));
         }
         let mut ack = Vec::new();
         let mut accepted = Vec::new();
@@ -303,10 +319,11 @@ impl ObservedMemory {
             self.outbox.retain(|old| old.row.cell != c);
             self.outbox.push(entry);
         }
-        world.register_recipient(recipient);
-        world.acknowledge(recipient, &ack);
         self.key = Some(key);
-        Ok(increment as usize)
+        Ok((
+            increment as usize,
+            world.defer_observation(Some((recipient, ack)), capture_frame),
+        ))
     }
 
     /// Forward full remembered rows in canonical order. Snapshot drain order

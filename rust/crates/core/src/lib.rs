@@ -79,3 +79,7 @@ pub mod match_world_regions;
 
 pub mod match_world_memory;
 pub mod world_memory;
+
+pub mod staged_observer;
+
+pub mod world_route_retention;
