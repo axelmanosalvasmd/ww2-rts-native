@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Converged the existing test-only observer wetness projection repair after the World elimination release gate found JSON `0.0` versus `0` and an unused import. The 46 affected debug tests passed at the preceding head; release and strict final gates require the repaired source.
+
 - Fixed the first native World elimination fixture setup failure by restoring its original dead fighter through the reviewed pure AIR field constructor. Ordinary AIR refusal and the six source cases stay intact; the unused native Base normalization is explicit. The preceding head passed 35 affected debug tests; final release and strict gates remain pending. Formatted the shared fixture helper before those gates.
 
 - Exposed the existing physical aircraft field initializer through an explicit pure constructor for controlled scene restoration. It shares ordinary defaults once, preserves ordinary UnsupportedAir and does not create sortie metadata or admit World flight. The World elimination source's restored dead fighter has no air object; the consumer may normalize only that unused physical field to native Base while preserving kind, ID, owner, HP and pose. Constructor source review and native execution remain pending; no World startup, mission, movement or weapon support is added.
@@ -128,6 +130,9 @@
 - Recorded two original World recipient views holding two removed cached unit objects. Added focused retention drop, invalid-final-fact and success tests that preserve route allocation identities and World ledgers. Original x64 recorder equality passes; native execution remains pending.
 
 - Added prepared World cached-unit retention for ordered removal transactions. The guard validates current IDs/owners/kinds and finite final HP/pose, then updates only matching cached rows after deletion. Drop preserves memory, route buffers, visibility and cursors; elimination/wreck integration and native checks remain pending.
+- Matched JavaScript JSON number spelling for endpoint wetness values in the shared birth replay projection and removed an unused test import. The first replay otherwise matched the cold-birth view exactly.
+
+- Corrected staged-observer cell validation and source fingerprints to use the canonical unit footprint index type. The first native compile exposed two integer-type mismatches.
 
 - Added a fourth original World birth case with a different team’s warmed vehicle history, four accepted prebirth changes and a postbirth reroute. The recorder now covers 14 births, 12 prebirth searches and one cross-team reroute; native success/abort cache-lifetime checks remain pending.
 

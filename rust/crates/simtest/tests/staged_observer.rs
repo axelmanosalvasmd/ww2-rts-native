@@ -6,7 +6,7 @@ use ww2_core::{
     catalog::Catalog,
     economy::Mode,
     fog::Fog,
-    game::{Point, Wreck},
+    game::Point,
     match_routing::{RecipientContext, prepare_recipient_routing},
     match_runtime::Match,
     match_world_memory::{WorldRoutingContext, prepare_world_routing},
