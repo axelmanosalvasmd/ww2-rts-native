@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Recorded infantry and naval fine-search evidence and remaining scope in the design and movement parity inventory. Relevant rows remain in progress until vehicle clearance, knowledge-view selection, scheduling and movement integration are complete.
+
+- Added fine grid A* and smoothed paths for infantry and shallow/deep naval units over caller-supplied terrain, walls, known mines, fires and live bunkers. All 1,175 searches match original `findPath` waypoint and endpoint bits, outcomes and expansion counts, including all 33 authored maps and changing hazards. Float32 search costs and score-only heap ties preserve reference choices. Ground vehicles, aircraft, rail units and structures return an unsupported-profile error. Vehicle footprints, recipient-view selection, scheduling, movement integration and performance measurements remain separate work.
+
 - Recorded the coarse navigation port and its 4,888 reference-query checks in DESIGN.md. MOV-37 and MOV-38 remain in progress until fine pathfinding and movement integration use the planner.
 
 - The navigation fixture generator now verifies the reference's exact pinned commit and rejects tracked changes before importing its source. Untracked and ignored files, including `node_modules`, do not invalidate the fixture run.
