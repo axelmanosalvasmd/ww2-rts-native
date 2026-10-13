@@ -389,6 +389,8 @@ pub struct BuildingCell {
 /// Authoritative Conquest startup state. Tick execution is added independently.
 /// Live terrain and units have a single owner in `world.game`.
 pub struct Match {
+    pub combat: crate::match_combat::CombatState,
+    pub environment: crate::environment::EnvironmentRuntime,
     pub commands: crate::match_commands::MatchCommands,
     pub world: World,
     pub start: StartPlan,
@@ -399,6 +401,7 @@ pub struct Match {
     pub building_rallies: BTreeMap<u32, Option<Point>>,
     pub scenario: Option<crate::legacy_scenario::LegacyScenario>,
     pub logistics: crate::logistics::LogisticsState,
+    pub firing: crate::match_firing::FiringState,
     pub capture_ticks: Vec<Option<i64>>,
     pub next_unit_id: u32,
     pub rules: Rules,
@@ -437,6 +440,8 @@ impl Match {
             crate::legacy_scenario::LegacyScenario::from_map(map, &owners)
         };
         let mut result = Self {
+            combat: crate::match_combat::CombatState::default(),
+            environment: crate::environment::EnvironmentRuntime::default(),
             commands: crate::match_commands::MatchCommands::new(4096),
             grid: SpatialGrid::new(&world.game.units, 16.0),
             world,
@@ -447,12 +452,15 @@ impl Match {
             building_rallies: BTreeMap::new(),
             scenario,
             logistics: crate::logistics::LogisticsState::default(),
+            firing: crate::match_firing::FiringState::default(),
             capture_ticks: vec![None; map.points().len()],
             next_unit_id,
             rules,
         };
         result.setup_bases()?;
         for unit in result.world.game.units.values() {
+            result.firing.initialize(unit.id);
+            result.combat.initialize(unit.id);
             let control = crate::match_commands::UnitControl::new(unit, &result.rules)?;
             result.commands.insert(unit.id, control);
         }

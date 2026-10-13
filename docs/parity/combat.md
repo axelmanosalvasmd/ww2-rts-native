@@ -230,3 +230,7 @@ These rows remain in progress. Launch heights and expiry in `addFlight`, world/t
 6. Does the server keep using only the line shape of `facingSpots`, so Rust ports the line case and Unreal owns the full Formation menu?
 7. Fog packing and snapshot filtering (CMB-131 to CMB-134): CMB or NET owns the wire format sign-off?
 8. Corpses are client-only in JS; does Unreal keep the 200 cap and fade, or does Axel want a different budget?
+
+### Integrated ordinary Match firing
+
+`match_firing.rs` now runs ordinary ground/naval target choice and weapon launching against canonical Match state. The original-source recorder and Rust replay cover 66 traces and 264 phases, including visibility, LOS, cover, movement, claims, threats, setup, cooldown and direct/salvo launch fields. Projectile contact/damage execution and full Match outcomes remain in progress, as do abilities, air, support and FPS integration. Existing CMB status rows retain their broader acceptance scope.

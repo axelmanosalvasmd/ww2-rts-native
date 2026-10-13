@@ -248,6 +248,8 @@ impl Player {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Smoke {
     pub id: u32,
+    /// Remaining lifetime (`t`); absent on vision-only fixture clouds.
+    pub remaining: Option<f64>,
     pub x: f64,
     pub z: f64,
     pub r: f64,
@@ -285,6 +287,8 @@ pub struct Section {
 /// A burnt-out vehicle (`g.wrecks`): cover for infantry once it has settled.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Wreck {
+    /// Durable unit identity, absent in query-only fixtures.
+    pub id: Option<u32>,
     /// Settled obstruction cell (`w.c`), absent for unregistered or moving wrecks.
     pub cell: Option<usize>,
     pub x: f64,
