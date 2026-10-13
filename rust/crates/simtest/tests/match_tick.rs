@@ -628,7 +628,7 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
             .collect::<Vec<_>>();
         let error = m.advance_tick().unwrap_err();
         assert!(
-            error.contains(match actor {
+            error.reason.contains(match actor {
                 "garrison" => "automatic garrison retreat tick exit",
                 "logistics" | "convoys" => "reserve and convoy tick phases",
                 "mode" => "ordinary Conquest",

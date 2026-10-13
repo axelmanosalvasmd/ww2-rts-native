@@ -206,16 +206,17 @@ fn cell_row(row: &CellRow) -> Value {
     ])
 }
 
-pub fn events(m: &mut Match) -> Value {
+pub fn events(events: &[ww2_core::match_tick::TickEvent]) -> Value {
     json!(
-        m.support
-            .take_events()
-            .into_iter()
+        events
+            .iter()
             .map(|event| match event {
-                SupportEvent::Shell(p) => json!({"x":p.x,"z":p.z,"k":"shell","pub":true}),
-                SupportEvent::SmokeShells(p) =>
+                ww2_core::match_tick::TickEvent::Support(SupportEvent::Shell(p)) =>
+                    json!({"x":p.x,"z":p.z,"k":"shell","pub":true}),
+                ww2_core::match_tick::TickEvent::Support(SupportEvent::SmokeShells(p)) =>
                     json!({"x":p.x,"z":p.z,"k":"smokeshells","pub":true}),
-                SupportEvent::Environment(effect) => effect.to_json(),
+                ww2_core::match_tick::TickEvent::Support(SupportEvent::Environment(effect)) =>
+                    effect.to_json(),
                 other => panic!("unexpected nonground support event: {other:?}"),
             })
             .collect::<Vec<_>>()

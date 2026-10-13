@@ -314,7 +314,14 @@ pub fn snapshot(m: &Match, events: &[ww2_core::match_aviation::AviationEvent]) -
 }
 
 pub fn aircraft_phase_snapshot(m: &Match) -> Value {
-    let all = snapshot(m, &m.aviation.events);
+    aircraft_phase_snapshot_with_events(m, &m.aviation.events)
+}
+
+pub fn aircraft_phase_snapshot_with_events(
+    m: &Match,
+    events: &[ww2_core::match_aviation::AviationEvent],
+) -> Value {
+    let all = snapshot(m, events);
     let planes = all["units"]
         .as_array()
         .unwrap()

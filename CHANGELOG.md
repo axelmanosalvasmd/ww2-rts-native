@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Checkpointed unverified ordered tick output work at the user's pause. A transient TickEvent sequence and TickFailure payload are written, with AIR, ground-support and operative consumer migrations; no compile, native test or complete mixed-event Source replay has run for this branch. The late-failure ownership regression, per-command observer hooks, host bridge and complete emission-order audit are unfinished. Existing AIR proof and original fixtures remain preserved; this checkpoint is not integration-ready.
+
 - Restored the verified coherent support recorder and fixture together after the AIR union retained an older ground-only fixture schema. The actual AIR runner's three debug tests now pass, but all eight support tests failed in setup because their restored factory requires the coherent `units` array. This repair copies the checked provider's original files exactly; runtime, guards, RNG and the separate ground full-step fixture are unchanged. The failed log and 35 preceding debug passes are retained; final combined proof remains pending.
 
 - Corrected the AIR replay's seed readback to the JavaScript signed 32-bit representation, found at its first full-step comparison. Native and source seeds already had identical bits; runtime random state, authored setup and fixtures are unchanged. Removed seven unused aviation-test imports reported by the same build. The candidate passed 57 core debug tests and 18 earlier simtest checks before this failure, with two AIR admission checks also passing; combined final proof remains pending.

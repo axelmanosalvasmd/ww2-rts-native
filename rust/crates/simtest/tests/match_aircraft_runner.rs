@@ -2,12 +2,15 @@
 #[path = "common/aviation.rs"]
 mod common;
 
-use common::{aircraft_phase_snapshot, assert_json, bits, scene};
+use common::{aircraft_phase_snapshot_with_events, assert_json, bits, scene};
 use serde_json::{Value, json};
 use std::io::Read;
 use ww2_core::{
-    match_commands::Command, match_runtime::Match, match_story::StoryKey,
-    match_tick::TickPathConfig, orders::OrderKey,
+    match_commands::Command,
+    match_runtime::Match,
+    match_story::StoryKey,
+    match_tick::{TickEvent, TickPathConfig},
+    orders::OrderKey,
 };
 
 fn fixture() -> Value {
@@ -39,9 +42,16 @@ fn make(trace: &Value) -> Match {
         .unwrap();
     m
 }
-fn snapshot(m: &Match) -> Value {
+fn snapshot(m: &Match, events: &[TickEvent]) -> Value {
     let g = &m.world.game;
-    let aircraft = aircraft_phase_snapshot(m);
+    let aviation = events
+        .iter()
+        .map(|event| match event {
+            TickEvent::Aviation(event) => event.clone(),
+            other => panic!("unexpected non-Aviation output in the AIR fixture: {other:?}"),
+        })
+        .collect::<Vec<_>>();
+    let aircraft = aircraft_phase_snapshot_with_events(m, &aviation);
     json!({"tick":g.tick,"nextId":m.next_unit_id,"aircraft":aircraft,
         "generic":g.units.values().map(|u| {
             let a=m.abilities.get(u.id).unwrap(); let c=&m.commands.units[&u.id];
@@ -65,7 +75,7 @@ fn actual_aircraft_runner_matches_original_whole_steps_without_output_injection(
         let name = trace["name"].as_str().unwrap();
         let mut m = make(trace);
         let random = m.start.random.snapshot();
-        assert_json(&snapshot(&m), &trace["initialRunner"], name);
+        assert_json(&snapshot(&m, &[]), &trace["initialRunner"], name);
         let mut sequences = [0u64; 2];
         for (i, frame) in trace["frames"].as_array().unwrap().iter().enumerate() {
             let tick = i as u64 + 1;
@@ -110,15 +120,17 @@ fn actual_aircraft_runner_matches_original_whole_steps_without_output_injection(
                 "{name}:{tick}: late captured membership"
             );
             assert!(
-                report.environment.is_empty(),
+                report.environment().next().is_none(),
                 "{name}:{tick}: unexpected environment output"
             );
             assert!(
-                m.firing.events.is_empty() && m.support.events.is_empty(),
+                m.firing.events.is_empty()
+                    && m.support.events.is_empty()
+                    && m.aviation.events.is_empty(),
                 "{name}:{tick}: undrained global launch/support output"
             );
             assert_json(
-                &snapshot(&m),
+                &snapshot(&m, &report.events),
                 &frame["expectedRunner"],
                 &format!("{name}:{tick}"),
             );
@@ -142,7 +154,6 @@ fn actual_aircraft_runner_matches_original_whole_steps_without_output_injection(
                 assert!(!m.aviation.planes.contains_key(&id));
                 assert!(m.combat.get(id).is_some() && m.firing.get(id).is_some());
             }
-            m.aviation.take_events();
             ticks += 1;
         }
     }
