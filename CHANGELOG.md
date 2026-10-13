@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified the ordinary reaction tick assembly on Vostro (Linux x86_64): 64 affected debug tests, all 227 workspace release tests, strict Clippy, formatting and release FFI pass at e14cde9. Independent source review and 19 original-step traces (2,474 ticks, 354 checkpoints) pass, including paid-work cancellation and repaired retreat completion. Ground support and mass-project descendants retain separate pending native proof; server match start remains refused.
+
 - Normal-merged the operative documentation closure into reaction evidence. No Rust, harness or fixture changed from tested reaction head e14cde9.
 
 - Repaired two reaction consumer checks exposed by the first Vostro debug run: observe the lazy Combat stream through a test-only clone before the first real draw, and compare the absent pace NaN sentinel by bits before whole-unit equality. Runtime, fixtures and live RNG remain unchanged; full native gates are pending.
