@@ -161,8 +161,12 @@ mod tests {
         state.world.game.strikes[0].runtime = Some(timing);
         state.world.game.strikes[0].owner = usize::MAX;
         assert!(matches!(
-            SnapshotCache::new(&state),
+            capture(&state),
             Err(SnapshotError::InvalidRecipient)
+        ));
+        assert!(matches!(
+            SnapshotCache::new(&state),
+            Err(SnapshotError::Rules)
         ));
         state.world.game.strikes[0].owner = 2;
         state.finish = Some(crate::match_end::MatchFinish {

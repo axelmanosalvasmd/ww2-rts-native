@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Update the support refusal regression after canonical strike ownership moved into routing admission. Assert the direct support InvalidRecipient refusal and the earlier complete-snapshot Rules refusal separately; retain every delivery rollback assertion. The prior run passed 19 snapshot tests and failed this outdated expected error. Runtime behavior is unchanged.
+
 - Correct the room lifecycle fixture to use Map weather when living weather is disabled, as Match admission requires. The first two real-event host tests pass; six Hub cases stopped at fixture construction before reaching their assertions. Runtime guards and test assertions are retained.
 
 - Fix the first room-host compile errors by using fixed clear weather and explicit player story slots in the lifecycle tests. Use the pinned Rust toolchain's `try_update` atomic alias with the same ordering and overflow check. The failed compile ran no tests; native verification remains pending.

@@ -2,6 +2,8 @@
 
 ## Room-host output ownership regressions (2026-10-13, source checkpoint)
 
+The `c73096f` native continuation passes all seven Hub tests and three socket tests. Socket binds required the reviewed local-listener sandbox escalation; the denied attempt is kept separately. Snapshot checks pass 19 cases, then an older error expectation fails for a corrupt canonical strike owner. Direct support projection still refuses it as InvalidRecipient, while complete snapshot admission reaches the existing routing Rules guard first. Both boundaries are now asserted, with no runtime or fixture change. The final coherent cycle is still pending.
+
 At `412c5df`, both real-event tests pass. The Hub group then stops six cases at the common Match constructor because disabled living weather requires the Map choice. The fixture now uses that canonical disabled-weather input, preserving the public admission guard and all lifecycle assertions. The earlier typed fixed-clear repair compiled but did not satisfy this runtime admission rule. Complete native checks remain pending.
 
 The first `7b0f5a8` native attempt stopped at server test compilation: the weather choice requires `Fixed(WeatherKind::Clear)`, and per-player story tallies require `Some(slot)`. The corrections retain the intended clear weather and player ownership. The compiler also reports `AtomicU64::fetch_update` as deprecated in Rust 1.99. Its documented alias `try_update` retains the same relaxed orderings and checked identity increment. No tests passed in that failed attempt.
