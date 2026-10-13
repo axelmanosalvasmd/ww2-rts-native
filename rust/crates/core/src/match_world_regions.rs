@@ -388,6 +388,7 @@ impl Match {
             let retention = prepare_world_route_retention(
                 WorldRoutingContext {
                     world: &self.world,
+                    environment: &self.environment,
                     rules: &self.rules,
                     start: &self.start,
                     rails: &runtime.rails,

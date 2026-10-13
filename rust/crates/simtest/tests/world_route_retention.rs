@@ -16,6 +16,7 @@ fn context(m: &Match) -> WorldRoutingContext<'_> {
     let w = m.world_runtime.as_ref().unwrap();
     WorldRoutingContext {
         world: &m.world,
+        environment: &m.environment,
         rules: &m.rules,
         start: &m.start,
         rails: &w.rails,
