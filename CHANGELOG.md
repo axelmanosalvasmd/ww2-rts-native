@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Correct the room lifecycle fixture to use Map weather when living weather is disabled, as Match admission requires. The first two real-event host tests pass; six Hub cases stopped at fixture construction before reaching their assertions. Runtime guards and test assertions are retained.
+
 - Fix the first room-host compile errors by using fixed clear weather and explicit player story slots in the lifecycle tests. Use the pinned Rust toolchain's `try_update` atomic alias with the same ordering and overflow check. The failed compile ran no tests; native verification remains pending.
 
 - Add two room-host regressions using actual rifle Flight and building-section Hurt events. They check retained failure output, refusal after a tick fault, Current capture without delivery, Scheduled delivery once and empty scheduled discard. Source review is clear; native verification is pending.

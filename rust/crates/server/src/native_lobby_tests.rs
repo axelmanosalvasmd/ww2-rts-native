@@ -3,7 +3,7 @@ use ww2_core::{
     economy::{Faction, Mode},
     economy_state::ArmySize,
     match_runtime::{MatchOptions, PlayerConfig},
-    weather::{WeatherChoice, WeatherKind},
+    weather::WeatherChoice,
 };
 
 pub(crate) fn native_match() -> Match {
@@ -21,7 +21,7 @@ pub(crate) fn native_match() -> Match {
                 .collect(),
             shuffle: false,
             army: ArmySize::Standard,
-            weather: WeatherChoice::Fixed(WeatherKind::Clear),
+            weather: WeatherChoice::Map,
             weather_seed: Some(1),
             living_weather: false,
             map_key: Some("default".into()),

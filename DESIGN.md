@@ -2,6 +2,8 @@
 
 ## Room-host output ownership regressions (2026-10-13, source checkpoint)
 
+At `412c5df`, both real-event tests pass. The Hub group then stops six cases at the common Match constructor because disabled living weather requires the Map choice. The fixture now uses that canonical disabled-weather input, preserving the public admission guard and all lifecycle assertions. The earlier typed fixed-clear repair compiled but did not satisfy this runtime admission rule. Complete native checks remain pending.
+
 The first `7b0f5a8` native attempt stopped at server test compilation: the weather choice requires `Fixed(WeatherKind::Clear)`, and per-player story tallies require `Some(slot)`. The corrections retain the intended clear weather and player ownership. The compiler also reports `AtomicU64::fetch_update` as deprecated in Rust 1.99. Its documented alias `try_update` retains the same relaxed orderings and checked identity increment. No tests passed in that failed attempt.
 
 Two focused host tests exercise the real Match constructor, staged unit publication, ordinary rifle firing and registered building-section reconciliation. They do not insert expected events. An earlier rifle emits committed Flight events before a later mover exhausts its path identity. The host retains that typed failure prefix once and refuses another tick or capture, without consuming a future queued command. A successful section Hurt stays pending through Current captures, appears once in Scheduled output, and is discarded at an empty Scheduled boundary.
