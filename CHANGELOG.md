@@ -2,9 +2,24 @@
 
 ## Unreleased
 
+- Normal-merged the verified operative runtime, fixture repairs and documentation into the separate reaction source assembly. Preserved the new reaction sites and original added traces; native proof of this reaction composition remains pending.
+
 - Added source-written ordinary reaction tick sites: timer decay, automatic retreat before autocast and reaction before movement. Factored the existing pure retreat predicate for pre-clock unsupported exit admission and consumed the canonical paid-work cancellation provider. Seven new actual-source cases expand the recorder to 18 traces, 2,274 ticks and 154 checkpoints; combined native proof remains pending.
 
 - Accepted ground retreat now cancels the canonical paid field-work descriptor after route preflight, without refund; refused routes retain the job. Construction and unrepresented mass projects remain explicit refusals.
+- Normal-merged the checked engineering evidence into the operative closure. Only documentation changed from compiled head 3a40f7b; all Rust and harness trees remain identical.
+
+- Verified the coherent Conquest engineering, ability/recovery and operative tick assembly on the Mac: all 225 workspace release tests, 73 affected debug tests at the same runtime, strict Clippy, formatting and release FFI pass. Independent hash-checked debug/release binaries pass 42 tests. Original replays cover 2,185 ordinary ticks and 506 operative ticks. Recorded the retained operative owner cleanup and concrete fixture/oracle repairs; ordinary reactions, supply orchestration, operative geometry/settlement interoperability and full match start remain separate.
+
+- Restored the routing fixture's `Smoke.remaining: None` initializer after equivalent parent fixes merged without that required field. Both checked parents retain the same vision-only lifetime value. The coherent proof passed all 73 focused debug tests before the release compiler exposed this fixture-only omission; runtime and original recorder outputs are unchanged.
+
+- Released retained operative control, firing and path-request state at the existing no-flight Combat cleanup boundary. The first full operative replay reached tick three after death and found stranded owner rows whose Combat backing had been collected. All shooter metadata remains while any canonical flight references it; strict orphan admission, the recorded queue and allocator remain unchanged. The death-delay regression now covers collection and continued ticks, with complete gates pending.
+
+- Fixed the full-step Dig recorder to copy remaining cell tuples at each checkpoint. The live source deque later emptied earlier saved arrays, falsely recording zero cells at tick one. Regeneration now retains four, three, two and one cells before completion; all ten other traces and the ordering case remain unchanged. Runtime work, payment and timing are unchanged, and native gates are restarting against the corrected oracle.
+
+- Aligned the tick consumer's optional control projection with the original recorder's observed fields. Ability and Dig cases enqueue commands but do not record control rows; the first native run added those extra rows and failed an otherwise exact tick-one comparison. Dedicated command traces still compare every recorded control row. Runtime scheduling and original fixtures are unchanged; full gates are restarting.
+
+- Fixed the ordered-retirement regression's snapshot setup to supply every live unit's canonical firing timer. The first composed native run passed 30 library and two field-work tests, then the new regression panicked on its empty timer map before exercising retirement. Runtime retirement and source fixtures are unchanged; complete gates are restarting at the corrected checkpoint.
 
 - Updated the operative tick replay after central control state gained the reaction timer. Trusted fixture patches now set canonical `UnitControl.react`, and operative rows compare its exact preserved value. Ordinary reaction execution remains unavailable and its timer remains outside this bounded projection. No runtime phase or gameplay state was added; native verification is pending.
 
@@ -165,6 +180,8 @@
 - Rejected smoke allocator collisions with current live units before any selected-unit effect, extending the existing mixed-selection identity regression. Native proof remains pending.
 
 - Connected manual aimed replacement to real paid field-work cancellation without a refund, and rejected unrepresented build or mass-entrench projects before control writes. The original ability recorder now has 36 traces (157 actions), with a separate unsupported-project boundary and a written cancellation regression. Native proof remains pending.
+- Verified the ordinary Match digging provider on macOS arm64: seven focused debug tests, all 206 release workspace tests, strict workspace/all-target Clippy, formatting and the release FFI build pass. Independent copied-binary replay passes both Match digging tests and both primitive tests. Actual unit-loop/server integration remains a separate pending proof.
+
 - Resolved strict compiler-lint findings in the engineering proof tree: redundant copies, casts and reference layers, independent ability fixture flags, and the existing optional delivery-cursor branch. The full release workspace suite passed before this cleanup; all required gates are rerunning at the final code checkpoint.
 
 - Fixed the inherited World memory recorder to collect remembered-wreck iterators as arrays before JSON serialization. Source regeneration verifies four traces and 119 actions; only the collection projections changed. Runtime memory and cache behavior are unchanged.

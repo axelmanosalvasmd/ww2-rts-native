@@ -288,7 +288,10 @@ fn connected_tick_phases_match_actual_reference_steps() {
                         ])).collect::<Vec<_>>()
                     });
                 }
-                if input["commands"].is_array() {
+                if expected
+                    .peek()
+                    .is_some_and(|row| row.get("control").is_some())
+                {
                     use ww2_core::match_commands::MoveOutcome;
                     state["control"] = json!(
                         m.world

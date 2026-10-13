@@ -97,6 +97,7 @@ for(const spec of [...['standard','large','massive','endless'].map(army=>({army}
    checkpoints.push(state);
   }
  }
+ if(spec.field&&checkpoints[0].field.jobs[0][7].length!==4)throw Error('First work checkpoint must retain its own four-cell queue');
  if(spec.retirement&&!deaths.length)throw Error('Retirement trace must remove a projectile casualty');
  cases.push({map,army,ticks,input,checkpoints,...(opposing?{enemy:true}:{}),...(spec.retirement||spec.abilities||spec.recovery||spec.field?{retirement:true}:{}),...(spec.abilities||spec.recovery||spec.field?{abilityRecovery:true}:{}),...(spec.field?{field:true}:{})});
 }

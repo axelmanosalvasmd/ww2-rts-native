@@ -881,6 +881,14 @@ impl Match {
             })
             .collect();
         for id in released {
+            // Operative admission retains this identity only while its source
+            // metadata backs a live flight. Release the other retained owners
+            // together once the same flight predicate releases Combat.
+            if self.commands.units.get(&id).is_some_and(|c| c.operative) {
+                self.commands.requests.retire_unit(id);
+                self.commands.units.remove(&id);
+                self.firing.remove(id);
+            }
             self.combat.remove(id);
         }
         Ok(())

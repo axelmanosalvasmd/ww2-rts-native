@@ -256,8 +256,21 @@ fn retirement_preflights_living_sidecars_and_cancels_paid_work_before_drop() {
     m.world.game.units.get_mut(&1).unwrap().hp = 0.;
     m.combat.get_mut(1).unwrap().xp = 7.;
     let recovery = m.recovery.remove(2).unwrap();
+    let timers = Timers(
+        m.world
+            .game
+            .units
+            .keys()
+            .map(|id| {
+                (
+                    *id,
+                    m.firing.get(*id).expect("canonical firing row").retarget,
+                )
+            })
+            .collect(),
+    );
     let before = (
-        snapshot(&m, &Timers::default(), &BTreeMap::new()),
+        snapshot(&m, &timers, &BTreeMap::new()),
         m.abilities.clone(),
         m.recovery.clone(),
         m.field_works.clone(),
@@ -265,7 +278,7 @@ fn retirement_preflights_living_sidecars_and_cancels_paid_work_before_drop() {
     assert!(m.retire_dead(&[1, 2, 3]).is_err());
     assert_eq!(
         (
-            snapshot(&m, &Timers::default(), &BTreeMap::new()),
+            snapshot(&m, &timers, &BTreeMap::new()),
             m.abilities.clone(),
             m.recovery.clone(),
             m.field_works.clone(),
