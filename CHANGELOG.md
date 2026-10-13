@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Staged the source-reviewed ground Support admission and shared command variant in recorded input integration. Its actuator source fixture is verified; exact combined native proof remains pending.
+
 - Kept the full remembered-wreck getter on a local observation index too, preserving gameplay bucket order when snapshots read wreck memory between simulation phases.
 
 - Combined FPS identities with the checked Match state and kept the newer remembered-routing fast path. Observation and wreck discovery use a fresh local spatial index so command reads retain gameplay bucket order. Exact combined native checks remain pending.
@@ -9,6 +11,13 @@
 - Combined the prepared unit-publication transaction with canonical combat and firing initialization, retaining both stale-metadata checks before recruitment charges. Recorded gameplay input integration consumes this shared factory.
 
 - Initialized canonical weapon targets and timers when Match recruitment publishes a unit, and rejects a stale firing row before payment. The existing recruitment source replay checks default rows immediately after each admitted buy; invalid staging snapshots include firing state.
+- Added original-source support direction-fallback cases. The ground-support recorder now covers 60 traces and 900 checkpoints. Native verification remains queued.
+
+- Connected support to the single recorded command queue, with whole-command validation and source cooldown/manpower denials. Ground strike progression now accepts captured late actor subsets. The original-source oracle covers 54 traces and 810 checkpoints, including direct-hit exclusion, bridge failure and rubble spilling beside a fresh vehicle. A mixed Move/Support queue regression checks arrival-independent ordering, one payment and preserved movement. Native checks remain queued; aircraft support and complete tick integration remain unfinished.
+
+- Added explicit captured actor membership for blast damage and source-list terrain casualties while keeping full canonical environment validation and ordinary projectile defaults. Bridge casualties and legacy rubble/blocked-cell checks use captured actors; garrison eviction still uses current units. Independent source review passes; native checks are queued.
+
+- Added a bounded Conquest support actuator for paid artillery, smoke and fighter-cover calls, using canonical wallets, cooldowns, story counters and the OffMap random stream. The original-source recorder checks 36 traces and 540 admission/progression checkpoints. Native checks are queued. Aircraft support, captured-list damage membership and recorded-command integration remain pending.
 
 - Verified the ordinary Conquest weapon/contact phase: three focused tests pass in debug and release against 114 original-source traces and 588 checkpoints, including lower-ID ties and invalid-input atomicity. All 136 workspace tests, strict Clippy, formatting and release FFI build pass. Air, rail, FPS, support, beams and active ability/terrain fire remain separate; wire, ABI and the reference pin are unchanged.
 

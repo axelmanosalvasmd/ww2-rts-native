@@ -41,6 +41,11 @@ pub enum Stance {
 /// Internal recorded input. This is not a WebSocket or C interface.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Command {
+    Support {
+        kind: String,
+        at: Point,
+        direction: Option<f64>,
+    },
     Move {
         orders: Vec<MoveOrder>,
         control_ids: Option<Vec<i64>>,
@@ -159,6 +164,8 @@ pub enum Denial {
     Needs,
     QueueFull,
     Unsupported,
+    Cooldown,
+    Manpower,
 }
 impl Denial {
     pub fn name(self) -> &'static str {
@@ -167,6 +174,8 @@ impl Denial {
             Self::Needs => "needs",
             Self::QueueFull => "queueFull",
             Self::Unsupported => "unsupported",
+            Self::Cooldown => "cooldown",
+            Self::Manpower => "mp",
         }
     }
 }
@@ -215,6 +224,29 @@ impl Command {
                 rows.iter().map(|v| safe_id(v).unwrap_or(-1)).collect()
             });
         match object.get("t").and_then(|v| v.as_str()) {
+            Some("support") => Ok(Self::Support {
+                kind: object
+                    .get("kind")
+                    .and_then(|v| v.as_str())
+                    .ok_or(Denial::Blocked)?
+                    .into(),
+                at: Point {
+                    x: object
+                        .get("x")
+                        .and_then(|v| v.as_f64())
+                        .filter(|v| v.is_finite())
+                        .ok_or(Denial::Blocked)?,
+                    z: object
+                        .get("z")
+                        .and_then(|v| v.as_f64())
+                        .filter(|v| v.is_finite())
+                        .ok_or(Denial::Blocked)?,
+                },
+                direction: object
+                    .get("dir")
+                    .and_then(|v| v.as_f64())
+                    .filter(|v| v.is_finite()),
+            }),
             Some("move" | "amove") if object.contains_key("orders") => {
                 let face = object
                     .get("face")
@@ -255,6 +287,9 @@ impl Command {
     }
     fn valid(&self) -> bool {
         match self {
+            Self::Support { at, direction, .. } => {
+                at.x.is_finite() && at.z.is_finite() && direction.is_none_or(|v| v.is_finite())
+            }
             Self::Move { orders, face, .. } => {
                 orders.iter().all(|o| {
                     o.unit.unsigned_abs() <= 9007199254740991
@@ -344,6 +379,24 @@ impl crate::match_runtime::Match {
         if matches!(command, Command::Unsupported) {
             return Ok(Some(Denial::Unsupported));
         }
+        if let Command::Support {
+            kind,
+            at,
+            direction,
+        } = command
+        {
+            return match self.admit_support(owner, kind, *at, *direction) {
+                Ok(denial) => Ok(denial.map(|d| match d {
+                    crate::match_support::SupportDenial::Blocked => Denial::Blocked,
+                    crate::match_support::SupportDenial::Cooldown => Denial::Cooldown,
+                    crate::match_support::SupportDenial::Manpower => Denial::Manpower,
+                })),
+                Err(crate::match_support::SupportError::Unsupported(_)) => {
+                    Ok(Some(Denial::Unsupported))
+                }
+                Err(e) => Err(e.to_string()),
+            };
+        }
         let limit = 50.max(self.world.game.units.len());
         let controlled: Vec<_> = match command {
             Command::Move {
@@ -354,7 +407,7 @@ impl crate::match_runtime::Match {
                 .clone()
                 .unwrap_or_else(|| orders.iter().map(|o| o.unit).collect()),
             Command::Stop { ids } | Command::Stance { ids, .. } => ids.clone(),
-            Command::Unsupported => unreachable!(),
+            Command::Support { .. } | Command::Unsupported => unreachable!(),
         };
         if matches!(
             command,
@@ -458,7 +511,7 @@ impl crate::match_runtime::Match {
             } => {
                 return self.move_command(owner, orders, *attack_move, *queue, *together, *face);
             }
-            Command::Unsupported => unreachable!(),
+            Command::Support { .. } | Command::Unsupported => unreachable!(),
         }
         Ok(None)
     }
