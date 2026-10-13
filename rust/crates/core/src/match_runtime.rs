@@ -1,5 +1,8 @@
 //! Native match startup. The setup plan is shared by the authoritative constructor.
 pub use crate::objectives::Objective;
+#[path = "match_recruitment.rs"]
+mod recruitment;
+pub use recruitment::{CompletedRecruitUnit, RecruitError, RecruitMetadata, RecruitRouting};
 use std::collections::BTreeMap;
 
 use crate::{
@@ -389,6 +392,7 @@ pub struct BuildingCell {
 /// Authoritative Conquest startup state. Tick execution is added independently.
 /// Live terrain and units have a single owner in `world.game`.
 pub struct Match {
+    pub commands: crate::match_commands::MatchCommands,
     pub world: World,
     pub start: StartPlan,
     pub options: MatchOptions,
@@ -396,6 +400,9 @@ pub struct Match {
     pub building_cells: BTreeMap<usize, BuildingCell>,
     pub production: crate::production::ProductionState,
     pub building_rallies: BTreeMap<u32, Option<Point>>,
+    pub player_rallies: Vec<Option<Point>>,
+    pub recruit_metadata: BTreeMap<u32, RecruitMetadata>,
+    produced_placer: crate::produced_units::ProducedPlacer,
     pub scenario: Option<crate::legacy_scenario::LegacyScenario>,
     pub logistics: crate::logistics::LogisticsState,
     pub capture_ticks: Vec<Option<i64>>,
@@ -442,6 +449,7 @@ impl Match {
         };
         let player_count = start.players.len();
         let mut result = Self {
+            commands: crate::match_commands::MatchCommands::new(4096),
             grid: SpatialGrid::new(&world.game.units, 16.0),
             world,
             start,
@@ -449,6 +457,9 @@ impl Match {
             building_cells: BTreeMap::new(),
             production,
             building_rallies: BTreeMap::new(),
+            player_rallies: vec![None; player_count],
+            recruit_metadata: BTreeMap::new(),
+            produced_placer: crate::produced_units::ProducedPlacer::new(),
             scenario,
             logistics: crate::logistics::LogisticsState::default(),
             capture_ticks: vec![None; map.points().len()],
@@ -460,6 +471,10 @@ impl Match {
             rules,
         };
         result.setup_bases()?;
+        for unit in result.world.game.units.values() {
+            let control = crate::match_commands::UnitControl::new(unit, &result.rules)?;
+            result.commands.insert(unit.id, control);
+        }
         result.grid.rebuild(&result.world.game.units);
         Ok(result)
     }
