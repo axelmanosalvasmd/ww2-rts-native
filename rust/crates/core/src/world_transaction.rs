@@ -209,13 +209,16 @@ mod tests {
         assert!(draft.prepare_publication(&mut w).is_err());
         assert_eq!(w.journal_base(), 1);
         assert_eq!(w.journal(), &[2]);
+        w.set_cell(3, b'R').unwrap();
         let draft = w.begin_transaction().unwrap();
         w.register_recipient(Recipient::Player(0));
         let pending = w.pending(Recipient::Player(0)).cloned();
         assert!(draft.prepare_publication(&mut w).is_err());
         assert_eq!(w.pending(Recipient::Player(0)), pending.as_ref());
+        assert!(w.pending(Recipient::Player(0)).unwrap().contains(&0));
         let draft = w.begin_transaction().unwrap();
         w.acknowledge(Recipient::Player(0), &[0]);
+        assert!(!w.pending(Recipient::Player(0)).unwrap().contains(&0));
         let pending = w.pending(Recipient::Player(0)).cloned();
         assert!(draft.prepare_publication(&mut w).is_err());
         assert_eq!(w.pending(Recipient::Player(0)), pending.as_ref());

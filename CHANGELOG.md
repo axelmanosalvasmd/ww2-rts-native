@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Seed an actual logged terrain mutation in the recipient draft guard regression, so acknowledgement changes a real pending index rather than an empty set.
+
 - Document the bounded World elimination API, ephemeral staging tradeoff, owner cleanup and exact exclusions. Strengthen metadata proof with real charged production queues, a preserved survivor queue/control and an imported source-compared active flight; native execution remains pending.
 
 - Record six original World elimination transitions, including already-out armies, allied order, signed health, later-unit garrison eviction, building/depot cleanup and real 97-section debris overflow. Add native exact transition/effect/row and late-error rollback assertions; native execution remains pending.
