@@ -20,4 +20,5 @@ pub mod sort;
 pub mod terrain;
 pub mod traffic;
 pub mod vehicle;
+mod vehicle_navigation;
 pub mod vision;
