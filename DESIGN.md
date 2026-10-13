@@ -177,6 +177,12 @@ The original `findPath` produces 1,175 oracle searches across all 33 authored ma
 
 
 
+## Routing inside movement (2026-10-13)
+
+The movement block now has `move_unit_with_routes` and `move_units_with_routes` entry points. They invoke the caller's route handler at the reference's actual recovery point, after traffic has selected its steering goal. Infantry stalls request budgeted recovery; vehicle stalls and traffic replans request an immediate search. The handler owns terrain selection, scheduling, errors and path replacement. A replaced path advances `path_gen`, preserving the identity checks used by lane and clearance caches. Existing entry points retain the disabled-search behavior needed by the frozen benchmark.
+
+Four original-JavaScript recordings run real fine searches inside movement for infantry and tanks on passable and disconnected maps. Across 48 ticks, all movement fields, separation and infantry progress match. The recorder restores the three disabled search hooks in the existing workload and supplies an explicit observed terrain view; other workload exclusions remain. This verifies the fine-search-to-movement connection, not a full match loop, recipient knowledge selection, logistics or combat. The standalone scheduler is a separate integration step.
+
 ## The core's math (2026-10-12)
 
 The core carries its own math (`rust/crates/core/src/math.rs`) instead of Rust's `f64` methods, which call each platform's C library. It ports V8's fdlibm (`src/base/ieee754.cc` as Node 24.21.0 compiles it) and V8's `Math.hypot`, plus JavaScript's `round`, `max`, `min` and `sign`, so every platform computes the same bits and they equal the JavaScript game's.

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Connected movement recovery and traffic replans to caller-supplied route handlers, while retaining the existing frozen benchmark entry points. Four live-search reference recordings match infantry and tank movement over 48 ticks, including disconnected destinations. This does not enable full match scheduling, hidden-terrain selection, logistics or combat.
+
 - Added ground-vehicle fine pathfinding for all 12 non-rail vehicle types. The search uses conservative turning clearance, exact destination clearance, road-aware costs and smoothing, and current wear, wetness and hazards from the supplied terrain. The existing oracle suite now matches 1,529 pinned JavaScript searches, including all 1,175 previous infantry/naval results and 354 vehicle cases. A cache regression checks reuse, direct and historical terrain edits in their original order, missing-history rebuilds, recipient changes and source replacement at unchanged versions. Aircraft, trains, structures, automatic recipient-view selection, request scheduling and movement integration remain outside this slice. No ABI or wire interface changed.
 
 - Recorded embedded map delivery and its 96 live HTTP comparisons in the design and server parity inventory. NET-11 remains in progress: public projections are served, while raw editor reads, map writes and authoritative world loading are still missing.

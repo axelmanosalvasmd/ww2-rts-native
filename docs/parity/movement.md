@@ -27,6 +27,8 @@ Current fine-search slice: `pathfinding.rs` supports explicit infantry and naval
 | MOV-12 | Infantry pass a waypoint within 1 m when the next one is walkable with WIRE added, so crowds keep terrain corners and the exact end spot | movement.js:76-79 | port | none | MOV-13 | Port test.js "Jam recovery keeps terrain corners when the next waypoint is obstructed" (246-249) | in progress |
 | MOV-13 | `walkable`: three parallel grid rays (default 0.9 m apart) blocked by the mask, end cell included, plus `noCliffs`; ray walker `blocker` (Amanatides-Woo, stops advancing an axis once it reaches the end cell) | sim.js:2787-2809, 2851-2862 | port | none | MAP | Port test.js "Sight rays ending on a cell border must stop at the destination, including mixed-sign diagonals" (65) | in progress |
 
+Live-routing evidence: four focused recordings now run real fine searches inside the movement block for infantry recovery and immediate tank replans. All movement fields, separation and progress match across 48 ticks, including disconnected destinations. The caller supplies the observed terrain and handles route results; complete request scheduling, remembered-view selection and full-match integration remain pending. MOV-24 stays in progress.
+
 ## Ground vehicles
 
 | ID | Behavior / content | Evidence | Rust (Julio) | Unreal (Axel) | Depends on | Acceptance check | Status |
