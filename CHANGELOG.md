@@ -2,11 +2,17 @@
 
 ## Unreleased
 
+- Normally merged the independently source-reviewed engineering snapshot collector into the separate replay consumer. Existing recorder and consumer bodies are unchanged; the combined native gate and scoped Destroy continuation remain pending.
+
 - Corrected the engineering replay draft to retain the original snapshotFor fog reads. Its focused payload comparison still covers engineering rows; no native proof is claimed.
 
 - Added a source-written engineering snapshot consumer using canonical staged actors, actual command admission, the single tick runner and recipient collectors. It covers 509 recorded states and 479 full ticks, preserves actual Default options and leaves the two unrepresented Destroy witnesses source-only. Native verification awaits the collector dependency and CI lease.
 
 - Added an original-source engineering snapshot recorder with five cases, 481 full ticks and 1,539 recipient results. It records mixed project segment kinds, allied paid work, queued join anchors after project deletion, unrounded work coordinates, progress tails and dead-worker omission after an actual destroy command. Native replay remains pending.
+- Keep common snapshot actor admission independent of unselected private wallets. Delivery preflight still validates every selected recipient before writes. Add an orphan project-membership regression proving no terrain, fog, list or receipt owner changes on refusal.
+
+- Add real paid and shared engineering work to ordinary recipient snapshots: allied unrounded work rows, activity flags, digging progress, current plans and queued project anchors. Validate all canonical project/member/job bindings before delivery. Preserve quiet-frame refusal of active work; original Source replay and combined native verification are pending.
+- Admit the actual typed Default alias in ordinary snapshots without rewriting mode state. Genuine mode objects remain refused. The invalid bare Dig flag test now checks canonical activity refusal.
 
 - Combine the actual Default tick and typed snapshot prerequisites for active engineering recipient views. Preserve the single startup initialization, staged observer receipt and canonical unit/job owners; the combined native proof is pending.
 

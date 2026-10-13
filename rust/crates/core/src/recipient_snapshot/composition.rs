@@ -94,14 +94,14 @@ impl GroundListDeliveryFrame<'_> {
         Ok(complete(projection, Some(lists)))
     }
 }
-fn complete(
+pub(super) fn complete(
     mut projection: RecipientProjection,
     lists: Option<&RecipientLists>,
 ) -> SupportedSeatSnapshot {
     projection.fields.insert("t".into(), json!("s"));
     // Admission inspected each actual canonical actor/list owner. Their
     // absent output is a represented source result for this bounded frame.
-    for name in ["air", "works", "falling", "flights", "shots"] {
+    for name in ["air", "falling", "flights", "shots"] {
         projection.fields.insert(name.into(), json!([]));
     }
     projection.fields.insert(
@@ -134,6 +134,17 @@ fn admit(state: &Match, outside_events: &[Effect]) -> Result<(), SnapshotError> 
         capability: SnapshotCapability::WrecksAndFoundMines,
     };
     let g = &state.world.game;
+    // The quiet API retains empty work actors. The list composition supports
+    // real canonical jobs and project rows through SnapshotCache admission.
+    if !state.field_works.jobs().is_empty()
+        || state.field_works.projects().next().is_some()
+        || g.units.values().any(|unit| unit.dig || unit.entrench)
+    {
+        return Err(SnapshotError::Unsupported {
+            unit: 0,
+            capability: SnapshotCapability::Engineering,
+        });
+    }
     if !g.wrecks.is_empty() {
         return Err(refused());
     }
@@ -153,11 +164,9 @@ fn admit(state: &Match, outside_events: &[Effect]) -> Result<(), SnapshotError> 
     }
     Ok(())
 }
-fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(), SnapshotError> {
-    let cache = SnapshotCache::new(state)?;
-    for slot in 0..state.world.game.players.len() {
-        cache.recipient(slot)?;
-    }
+pub(super) fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(), SnapshotError> {
+    // Recipient projections belong to delivery preflight. This common actor
+    // guard must not read a skipped seat's private wallet or lazy producers.
     let refused = |capability| SnapshotError::Unsupported {
         unit: 0,
         capability,
@@ -178,13 +187,6 @@ fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(), Snapshot
         .any(|s| !s.body.settled)
     {
         return Err(refused(SnapshotCapability::TeamEffects));
-    }
-    // This verified ancestry has no mass-project provider. Active dig/build/
-    // entrench units already refuse in SnapshotCache; the sole paid job owner
-    // must also be empty, including orphaned jobs. Future project integration
-    // must inspect its canonical listed jobs before broadening this admission.
-    if !state.field_works.jobs().is_empty() {
-        return Err(refused(SnapshotCapability::Engineering));
     }
     if state.scenario.is_some() {
         return Err(refused(SnapshotCapability::Scenario));

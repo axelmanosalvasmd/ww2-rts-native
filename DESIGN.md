@@ -1263,3 +1263,12 @@ Active-list publication uses the real published quiet provider `a876721` as its 
 ## Active engineering snapshot prerequisite union
 
 The engineering recipient work starts from the actual Default runner head `07250fdfcdf8cab07b8a9a42e53b027ca9951056` and normal-merges the typed snapshot, list and receipt head `1ab2314d235825a2de548f885fd17ade6efb0118`. Both runtime owners remain canonical. Conflict resolution preserves the shell/completion startup split so bases, unit sidecars, recipient routing and logistics initialize once, the Default alias guards, and the newer typed wreck rows and deferred observation receipt. The existing native evidence belongs to its original heads; this combined source has not been compiled yet. No public wire or C ABI changes.
+
+
+## Active ordinary engineering recipient snapshots
+
+The ordinary snapshot cache accepts the actual typed Default and Conquest aliases with no internal mode object. The projection keeps the current Match mode intact. Listed canonical project segments precede paid jobs in live unit order, and allies receive work coordinates and direction without rounding. Each mixed segment uses its own kind. Paid jobs name their retained project only while that exact object still has queued segments; otherwise their visible work id is -1.
+
+A read-only field-work admission method checks every listed/referenced project, membership and paid job against current unit identities and activity before any list, terrain, fog or receipt publication. It does not recount counters, advance a clock, reserve future crew capacity or clone the Match. Unit rows carry independent public Dig and membership bits; non-ground-vehicle digging progress uses the canonical progress helper rounded to hundredths. Current plans preserve Source priority and queued Join orders keep their stored anchor, including after a project leaves the listed map.
+
+The existing quiet-frame API continues to refuse active work. The ordinary list composition carries actual works and does not replace them with an empty placeholder. Building-site, aircraft, shots and other unsupported actors remain explicit until their corresponding canonical producer is represented. New original Source replay, independent review and exact combined native proof are pending. No C ABI, transport, privacy policy or player rule changes.
