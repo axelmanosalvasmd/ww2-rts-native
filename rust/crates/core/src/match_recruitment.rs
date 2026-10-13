@@ -189,6 +189,7 @@ impl Match {
             .ok_or(RecruitError::InvalidState("unit ID capacity exhausted"))?;
         if self.recruit_metadata.contains_key(&self.next_unit_id)
             || self.commands.units.contains_key(&self.next_unit_id)
+            || self.firing.get(self.next_unit_id).is_some()
         {
             return Err(RecruitError::InvalidState(
                 "recruit metadata ID already exists",
