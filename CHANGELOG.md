@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added owned World finish preparation from exact staged post-wreck survivors and ordered removals. Complete unit coverage, unchanged owners/kinds and finite HP validate before any canonical publication; final samples use the existing shared timeline. The original recorder now includes actual Map deletion order and surviving HP/kind facts for the elimination consumer. Native checks and complete elimination/wreck integration remain pending.
+
 - Converged the World finish successor with the region provider's verified final ancestry. Provider changes since its import repair are declaration formatting and evidence prose; its runtime body is unchanged. The successor still needs its own combined native proof.
 
 - Joined the independently reviewed narrow Assault actor correction into the World finish successor ancestry. The shared guard and retained source observations were already identical; runtime behavior is unchanged and combined native checks remain pending.
