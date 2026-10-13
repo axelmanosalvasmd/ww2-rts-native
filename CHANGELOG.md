@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added pure World biome dressing, towns, church/factory/mine-head landmarks and ordered rail overlays after base geography. Scenery uses independent recorded-seed streams; rails draw nothing. Original source fixtures record 20 Huge/Massive cases with scenery enabled and disabled. Match setup, visibility delivery and rail operations remain separate.
+
 - Connected base World geography to the agreed typed map-loader input, preserving terrain, home hints, regions, territory labels and waterway metadata. Native version 1 explicitly leaves biomes, landmark layers and rails absent.
 
 - Added pure seeded base World geography for Huge and Massive maps: relief, rivers and tributaries, lakes and crossings, regions, roads, woods, town blocks, homes, names and weighted territories. Ten bare-geography maps match pinned JavaScript fingerprints and metadata; 80 source stress settings reproduce twice and meet wide-route connectivity, channel and home-space checks. Generation consumes one recorded Terrain-stream seed and uses core math. Biomes, landmark dressing, rails, World match setup and client delivery remain unfinished.

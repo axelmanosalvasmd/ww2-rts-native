@@ -366,3 +366,213 @@ fn recorded_terrain_seed_isolated_and_invalid_requests_do_not_draw() {
             .unwrap()
     );
 }
+
+fn full_metadata(world: &world_generation::GeneratedWorld) -> Value {
+    let mut actual = metadata(&world.geography);
+    if let Some(scenery) = &world.scenery {
+        for (r, biome) in actual["regions"]
+            .as_array_mut()
+            .unwrap()
+            .iter_mut()
+            .zip(&scenery.regions)
+        {
+            r["biome"] = json!(biome.name());
+        }
+        actual["biomesHash"] = json!(hash(scenery.cells.iter().copied()));
+        actual["buildings"] = json!(
+            scenery
+                .buildings
+                .iter()
+                .map(|b| json!({"x":b.x,"y":b.y,"kind":b.kind}))
+                .collect::<Vec<_>>()
+        );
+    } else {
+        actual["biomesHash"] = Value::Null;
+        actual["buildings"] = json!([]);
+    }
+    actual["rails"] = json!({"stations":world.rails.stations.iter().map(|s|json!({"region":s.region,"x":s.x,"y":s.y})).collect::<Vec<_>>(),
+        "lines":world.rails.lines.iter().map(|l|json!({"a":l.a,"b":l.b,"regions":l.regions,"length":l.cells.len(),"cellsHash":hash(l.cells.iter().flat_map(|&c|(c as u32).to_le_bytes()))})).collect::<Vec<_>>()});
+    actual
+}
+fn full_invariants(world: &world_generation::GeneratedWorld, bare: &GeneratedGeography) {
+    use world_generation::{Biome, RegionKind};
+    let g = &world.geography;
+    assert_eq!(g.regions, bare.regions);
+    assert_eq!(g.spawns, bare.spawns);
+    assert_eq!(g.region_map, bare.region_map);
+    assert_eq!(g.waterways, bare.waterways);
+    assert_eq!(g.road_mask, bare.road_mask);
+    assert_eq!(g.grid.heights, bare.grid.heights);
+    let w = g.grid.width;
+    for (c, &ch) in g.grid.chars.iter().enumerate() {
+        if ch != bare.grid.chars[c] {
+            assert!(matches!(bare.grid.chars[c], b'.' | b'O'));
+            assert!(matches!(ch, b'B' | b'R' | b'D' | b'H' | b'O' | b'M'));
+            assert_eq!(g.road_mask[c], 0, "dressing changed road reserve");
+        }
+    }
+    for wide in [false, true] {
+        let seen = reachable(g, true, wide);
+        assert!(
+            g.regions.iter().all(|r| seen[r.y * w + r.x]),
+            "dressed seed {} disconnected",
+            g.terrain_seed
+        );
+    }
+    if let Some(scenery) = &world.scenery {
+        assert_eq!(scenery.regions.len(), g.regions.len());
+        assert_eq!(scenery.cells.len(), w * g.grid.height);
+        for (r, &biome) in g.regions.iter().zip(&scenery.regions) {
+            if r.home.is_some() {
+                assert_ne!(biome, Biome::Marsh);
+            }
+        }
+        for (c, &b) in scenery.cells.iter().enumerate() {
+            assert!(b < 6 || b == 255);
+            assert_eq!(b == 255, g.region_map[c] < 0);
+        }
+        for b in &scenery.buildings {
+            assert!(matches!(
+                b.kind.as_str(),
+                "church" | "factory" | "mine head"
+            ));
+            assert_eq!(g.grid.chars[b.y * w + b.x], b'B');
+        }
+    } else {
+        assert_eq!(g, bare);
+    }
+    let mut stations = BTreeSet::new();
+    for s in &world.rails.stations {
+        assert!(stations.insert(s.region));
+        let r = &g.regions[s.region];
+        assert!(r.home.is_some() || matches!(r.kind, RegionKind::City | RegionKind::Industrial));
+        assert_eq!(g.region_map[s.y * w + s.x], s.region as i16);
+        let level = g.grid.heights[s.y * w + s.x];
+        for y in s.y - 2..=s.y + 2 {
+            for x in s.x - 2..=s.x + 2 {
+                assert!(matches!(g.grid.chars[y * w + x], b'.' | b'O' | b'D'));
+                assert_eq!(g.grid.heights[y * w + x], level);
+            }
+        }
+    }
+    for l in &world.rails.lines {
+        assert!(stations.contains(&l.a) && stations.contains(&l.b));
+        assert!(!l.cells.is_empty());
+        assert!(l.cells.iter().all(|&c| c < w * g.grid.height));
+        let a = world
+            .rails
+            .stations
+            .iter()
+            .find(|s| s.region == l.a)
+            .unwrap();
+        let b = world
+            .rails
+            .stations
+            .iter()
+            .find(|s| s.region == l.b)
+            .unwrap();
+        assert_eq!(l.cells.first(), Some(&(a.y * w + a.x)));
+        assert_eq!(l.cells.last(), Some(&(b.y * w + b.x)));
+        for pair in l.cells.windows(2) {
+            assert_ne!(pair[0], pair[1]);
+            assert!((pair[0] % w).abs_diff(pair[1] % w) <= 1);
+            assert!((pair[0] / w).abs_diff(pair[1] / w) <= 1);
+        }
+        let mut known = BTreeSet::new();
+        let order: Vec<_> = l
+            .cells
+            .iter()
+            .filter_map(|&c| {
+                let id = g.region_map[c];
+                (id >= 0 && known.insert(id)).then_some(id as usize)
+            })
+            .collect();
+        assert_eq!(l.regions, order);
+    }
+}
+#[test]
+fn original_dressed_geography_and_ordered_rail_paths() {
+    let fixture: Value = serde_json::from_str(include_str!("fixtures/world-scenery.json")).unwrap();
+    assert_eq!(
+        fixture["reference"],
+        "e4e579a838aabae3b1d9dadbc17a0a87147bc52d"
+    );
+    assert_eq!(fixture["cases"].as_array().unwrap().len(), 20);
+    for row in fixture["cases"].as_array().unwrap() {
+        let size = if row["size"] == "huge" {
+            WorldSize::Huge
+        } else {
+            WorldSize::Massive
+        };
+        let seed = row["seed"].as_u64().unwrap() as u32;
+        let teams: Vec<_> = row["teams"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| v.as_i64().unwrap() as i32)
+            .collect();
+        let dressed = row["scenery"].as_bool().unwrap();
+        let world = world_generation::generate_world_from_terrain_seed(seed, size, &teams, dressed)
+            .unwrap();
+        assert_eq!(
+            hash(world.geography.grid.chars.iter().copied()),
+            row["charsHash"],
+            "{size:?}/{seed} scenery{dressed} characters"
+        );
+        assert_eq!(
+            hash(world.geography.grid.heights.iter().map(|&h| h as u8)),
+            row["heightsHash"]
+        );
+        assert_eq!(
+            hash(
+                world
+                    .geography
+                    .region_map
+                    .iter()
+                    .flat_map(|n| n.to_le_bytes())
+            ),
+            row["regionMapHash"]
+        );
+        let actual = full_metadata(&world);
+        for key in ["regions", "spawns", "buildings", "biomesHash", "rails"] {
+            assert_eq!(
+                actual[key], row[key],
+                "{size:?}/{seed} scenery{dressed} {key}"
+            );
+        }
+        let bare = world_generation::generate_from_terrain_seed(seed, size, &teams).unwrap();
+        full_invariants(&world, &bare);
+    }
+}
+#[test]
+fn scenery_isolated_across_seeded_sizes_and_seats() {
+    for i in 0u32..24 {
+        let seed = (i + 1).wrapping_mul(2654435761);
+        let size = if i % 2 == 0 {
+            WorldSize::Massive
+        } else {
+            WorldSize::Huge
+        };
+        let teams: Vec<_> = (0..1 + i % 6)
+            .map(|j| if i % 3 == 0 { (j % 2) as i32 } else { j as i32 })
+            .collect();
+        let bare = world_generation::generate_from_terrain_seed(seed, size, &teams).unwrap();
+        let a =
+            world_generation::generate_world_from_terrain_seed(seed, size, &teams, true).unwrap();
+        let b =
+            world_generation::generate_world_from_terrain_seed(seed, size, &teams, true).unwrap();
+        assert_eq!(a, b);
+        full_invariants(&a, &bare);
+    }
+    let mut random = MatchRandom::new(20261003);
+    let mut expected = random.clone();
+    let seed = expected.next_u64(StreamId::Terrain) as u32;
+    let world =
+        world_generation::generate_world(&mut random, WorldSize::Huge, &[0, 1], true).unwrap();
+    assert_eq!(random.snapshot(), expected.snapshot());
+    assert_eq!(
+        world,
+        world_generation::generate_world_from_terrain_seed(seed, WorldSize::Huge, &[0, 1], true)
+            .unwrap()
+    );
+}
