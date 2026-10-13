@@ -298,13 +298,19 @@ fn connected_tick_phases_match_actual_reference_steps() {
             {
                 let mut state = snapshot(&m);
                 if c["enemy"] == true {
-                    let random = m.start.random.snapshot();
-                    let value = random
+                    // A stream is absent until its first real draw. Advance only a
+                    // clone, then undo SplitMix64's state increment to observe the
+                    // exact current state even on a pre-contact checkpoint.
+                    let mut observed = m.start.random.clone();
+                    observed.next_u64(ww2_core::random::StreamId::Combat);
+                    let value = observed
+                        .snapshot()
                         .streams
                         .iter()
                         .find(|(stream, _)| *stream == ww2_core::random::StreamId::Combat)
                         .unwrap()
-                        .1;
+                        .1
+                        .wrapping_sub(0x9e37_79b9_7f4a_7c15);
                     state["combatState"] = json!(format!("{value:016x}"));
                 }
                 if expected
@@ -540,7 +546,17 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
             "{actor}: {error}"
         );
         assert_eq!(snapshot(&m), before, "{actor}");
-        assert_eq!(m.world.game.units, units, "{actor}");
+        // The absent pace sentinel is NaN, so PartialEq cannot prove equality.
+        // Check its bits separately, then compare every remaining Unit field.
+        let mut after_units = m.world.game.units.clone();
+        let mut before_units = units;
+        for (&id, unit) in &mut after_units {
+            let before = before_units.get_mut(&id).expect("same admitted unit set");
+            assert_eq!(unit.pace.to_bits(), before.pace.to_bits(), "{actor} pace");
+            unit.pace = 0.0;
+            before.pace = 0.0;
+        }
+        assert_eq!(after_units, before_units, "{actor}");
         assert_eq!(m.commands.units, controls, "{actor}");
         assert_eq!(m.firing, firing, "{actor}");
         assert_eq!(m.abilities, abilities, "{actor}");
