@@ -47,6 +47,10 @@ impl Match {
             .units
             .get(&id)
             .ok_or("missing retreat unit")?;
+        self.reaction_home_for(unit)
+    }
+
+    pub(crate) fn reaction_home_for(&self, unit: &Unit) -> Result<Point, String> {
         let mut home = self
             .start
             .players
@@ -80,7 +84,7 @@ impl Match {
 
     /// Source retreat reset. Air, carrier and building exit need their own actuator.
     pub fn retreat_unit(&mut self, id: UnitId) -> Result<(), String> {
-        let mut u = self
+        let u = self
             .world
             .game
             .units
@@ -107,6 +111,19 @@ impl Match {
             .ok_or("reaction path identity exhausted")?;
         let home = self.reaction_home(id)?;
         let route = self.command_route(u.owner, &u, home)?;
+        self.apply_retreat_route(u, home, route)?;
+        Ok(())
+    }
+
+    /// Commit a preflighted route through the sole retreat reset authority.
+    /// A manual command may supply an already prepared physical building exit.
+    pub(crate) fn apply_retreat_route(
+        &mut self,
+        mut u: Unit,
+        home: Point,
+        route: crate::pathfinding::PathResult,
+    ) -> Result<(), String> {
+        let id = u.id;
         crate::match_runtime::cancel_owned_work_state(
             &mut self.field_works,
             &mut u,
@@ -147,6 +164,7 @@ impl Match {
         c.outcome = Some(MoveOutcome::Interrupted);
         c.outcome_tick = Some(self.world.game.tick);
         self.world.game.units.insert(id, u);
+        self.commands.requests.clear_failures(id);
         Ok(())
     }
 

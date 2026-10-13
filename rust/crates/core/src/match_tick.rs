@@ -29,6 +29,7 @@ pub enum TickPhase {
     AntiAir,
     Rail,
     Riding,
+    GroundAttack,
     Reactions,
     TrafficKnowledge,
     Movement,
@@ -289,6 +290,7 @@ impl crate::match_runtime::Match {
             .map_err(|error| format!("support admission: {error}"))?;
         self.validate_carrier_tick()?;
         self.validate_construction_tick()?;
+        self.validate_ground_attacks()?;
         self.validate_reaction_tick_actors()?;
         self.validate_field_project_tick(&current_order)?;
         if self
@@ -360,6 +362,7 @@ impl crate::match_runtime::Match {
         self.validate_aircraft_runner_state(boundary)
             .map_err(|error| format!("aircraft published state: {error}"))?;
         self.validate_carrier_tick()?;
+        self.validate_ground_attacks()?;
         self.validate_reaction_tick_actors()?;
         let current_order = self.world.game.units.keys().copied().collect::<Vec<_>>();
         self.validate_support_metadata()
@@ -496,6 +499,7 @@ impl crate::match_runtime::Match {
                 continue;
             }
             self.apply_attack_move(id)?;
+            self.apply_ground_attack(id)?;
             self.react_unit(id)?;
             let before = self.world.game.units[&id].at();
             if let Some(result) = self.move_unit_with_command_routes(id, factor)? {
@@ -514,6 +518,7 @@ impl crate::match_runtime::Match {
             TickPhase::FieldWork,
             TickPhase::Riding,
             TickPhase::Aircraft,
+            TickPhase::GroundAttack,
             TickPhase::Reactions,
             TickPhase::Movement,
             TickPhase::Firing,

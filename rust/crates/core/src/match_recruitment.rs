@@ -517,9 +517,9 @@ impl RecruitParts<'_> {
         let purchase = prepared.commit();
         let _published = publication.publish_with(|unit, _| {
             self.combat.initialize(unit.id);
-            self.firing.initialize(unit.id);
             self.abilities.initialize(unit.id);
             self.recovery.initialize(unit.id);
+            self.firing.initialize(unit.id);
         });
         story.commit();
         Ok(CompletedRecruitUnit {

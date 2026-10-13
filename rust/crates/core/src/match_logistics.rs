@@ -530,6 +530,7 @@ impl Match {
         };
         let mut adapter = ConvoyWorld {
             world: &mut self.world,
+            environment: &self.environment,
             grid: &mut self.grid,
             commands: &mut self.commands,
             firing: &mut self.firing,
@@ -555,6 +556,7 @@ impl Match {
 }
 struct ConvoyWorld<'a> {
     world: &'a mut World,
+    environment: &'a crate::environment::EnvironmentRuntime,
     grid: &'a mut SpatialGrid,
     commands: &'a mut MatchCommands,
     firing: &'a mut FiringState,
@@ -571,16 +573,21 @@ struct ConvoyWorld<'a> {
 }
 impl ConvoyWorld<'_> {
     fn refresh_route_recipient(&mut self, owner: usize) {
-        crate::match_routing::refresh_recipient_parts(
-            self.world,
-            self.rules,
-            self.grid,
-            self.buildings,
+        let receipt = crate::match_routing::refresh_recipient_parts(
+            crate::match_routing::RecipientObservation {
+                world: self.world,
+                rules: self.rules,
+                building_cells: self.buildings,
+                environment: self.environment,
+            },
             self.routing_fog,
             &mut self.recipients[owner],
             owner,
         )
         .expect("validated recipient routing parts");
+        receipt
+            .commit(self.world)
+            .expect("unchanged convoy observation source");
     }
     fn unit_view(&self, u: &Unit) -> UnitView {
         let name = self.rules.kinds[u.kind].name.as_str();

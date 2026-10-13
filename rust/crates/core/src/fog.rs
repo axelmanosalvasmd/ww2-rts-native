@@ -14,6 +14,7 @@
 
 use std::collections::BTreeMap;
 
+use crate::existing_observers::ObserverOverlay;
 use crate::game::{CELL, Game, SIGHT, Smoke, StrikeKind, Team, Unit};
 use crate::grid::UnitId;
 use crate::math;
@@ -248,11 +249,12 @@ impl TeamFog {
         rules: &Rules,
         terrain: &FogTerrain,
         kept: &mut BTreeMap<UnitId, KeptSource>,
-        team: Team,
-        key: i64,
+        team_key: (Team, i64),
+        overlay: ObserverOverlay<'_, '_>,
     ) {
+        let (team, key) = team_key;
         self.next.fill(0);
-        team_cells(g, rules, terrain, kept, team, &mut self.next);
+        team_cells(g, rules, terrain, kept, team, &mut self.next, overlay);
         self.key = Some(key);
         // one sweep: the cells that flipped since the last version (packed as packRuns does) and the
         // explored ones
@@ -301,17 +303,79 @@ pub struct Fog {
 }
 
 impl Fog {
+    pub(crate) fn validate_shape(&self, game: &Game) -> Result<(), String> {
+        let n = game.w.checked_mul(game.h).ok_or("invalid fog dimensions")?;
+        let sat_w = game.w.checked_add(1).ok_or("invalid fog dimensions")?;
+        let sat_len = sat_w
+            .checked_mul(game.h.checked_add(1).ok_or("invalid fog dimensions")?)
+            .ok_or("invalid fog dimensions")?;
+        let bw = (game.w >> FOG_BLOCK) + 1;
+        let blocks = bw
+            .checked_mul((game.h >> FOG_BLOCK) + 1)
+            .ok_or("invalid fog dimensions")?;
+        if self
+            .teams
+            .values()
+            .any(|f| f.vis.len() != n || f.next.len() != n || f.explored.len() != n)
+            || self.terrain.as_ref().is_some_and(|t| {
+                t.sight.len() != n
+                    || t.sat_w != sat_w
+                    || t.sat.len() != sat_len
+                    || t.bw != bw
+                    || t.top.len() != blocks
+                    || t.stamp.len() != blocks
+                    || t.height.as_ref().is_some_and(|h| h.len() != n)
+            })
+            || self.kept.values().any(|k| {
+                !k.x.is_finite()
+                    || !k.z.is_finite()
+                    || k.garrison.is_some_and(|c| c >= n)
+                    || k.seen.as_ref().is_some_and(|s| {
+                        !s.range.is_finite()
+                            || !s.reach.is_finite()
+                            || s.cells.iter().any(|c| *c as usize >= n)
+                    })
+            })
+        {
+            return Err("invalid owned fog cache shape".into());
+        }
+        Ok(())
+    }
     /// A team's fog for the last vision pass, worked out the first time it is asked for after that pass
     /// (`teamFog`).
     pub fn team(&mut self, g: &Game, rules: &Rules, team: Team) -> &TeamFog {
+        self.team_with_observer(g, rules, team, None)
+    }
+    /// The draft contributes only to a missing or stale team cache. Stage these
+    /// component changes until publication; an existing key is never invalidated.
+    pub fn team_with_observer(
+        &mut self,
+        g: &Game,
+        rules: &Rules,
+        team: Team,
+        observer: Option<crate::staged_observer::StagedObserver<'_>>,
+    ) -> &TeamFog {
+        let overlay = observer.map_or(ObserverOverlay::None, |s| ObserverOverlay::Added(s.unit()));
+        self.team_with_overlay(g, rules, team, overlay)
+    }
+
+    /// Existing exits replace their canonical sight rows only during a cold pass.
+    /// A same-key team cache retains the source's original frame unchanged.
+    pub(crate) fn team_with_overlay(
+        &mut self,
+        g: &Game,
+        rules: &Rules,
+        team: Team,
+        overlay: ObserverOverlay<'_, '_>,
+    ) -> &TeamFog {
         let key = g.vision_tick.unwrap_or(-1);
         let n = g.w * g.h;
         let fresh = self.teams.get(&team).is_some_and(|f| f.key == Some(key));
         if !fresh {
-            self.prepare(g, rules);
+            self.prepare(g, rules, overlay);
             let terrain = self.terrain.as_ref().expect("prepared");
             let f = self.teams.entry(team).or_insert_with(|| TeamFog::new(n));
-            f.refresh(g, rules, terrain, &mut self.kept, team, key);
+            f.refresh(g, rules, terrain, &mut self.kept, (team, key), overlay);
         }
         self.teams.entry(team).or_insert_with(|| TeamFog::new(n))
     }
@@ -332,7 +396,7 @@ impl Fog {
         if todo.is_empty() {
             return;
         }
-        self.prepare(g, rules);
+        self.prepare(g, rules, ObserverOverlay::None);
         let mut parts: Vec<BTreeMap<UnitId, KeptSource>> = vec![BTreeMap::new(); todo.len()];
         let mut rest = BTreeMap::new();
         for (id, e) in std::mem::take(&mut self.kept) {
@@ -349,7 +413,9 @@ impl Fog {
         let terrain = self.terrain.as_ref().expect("prepared");
         std::thread::scope(|scope| {
             for ((fog, kept), &team) in fogs.iter_mut().zip(parts.iter_mut()).zip(&todo) {
-                scope.spawn(move || fog.refresh(g, rules, terrain, kept, team, key));
+                scope.spawn(move || {
+                    fog.refresh(g, rules, terrain, kept, (team, key), ObserverOverlay::None)
+                });
             }
         });
         for ((fog, kept), team) in fogs.into_iter().zip(parts).zip(todo) {
@@ -361,9 +427,11 @@ impl Fog {
 
     /// Brings the terrain tables up to date and forgets the kept cells of units that are gone (the start of
     /// `teamCells`).
-    fn prepare(&mut self, g: &Game, rules: &Rules) {
+    fn prepare(&mut self, g: &Game, rules: &Rules, overlay: ObserverOverlay<'_, '_>) {
         self.terrain = Some(FogTerrain::current(self.terrain.take(), g, rules));
-        self.kept.retain(|id, _| g.units.contains_key(id));
+        self.kept.retain(|id, _| {
+            g.units.contains_key(id) || overlay.added().is_some_and(|u| u.id == *id)
+        });
     }
 }
 
@@ -375,13 +443,14 @@ fn team_cells(
     kept: &mut BTreeMap<UnitId, KeptSource>,
     team: Team,
     vis: &mut [u8],
+    overlay: ObserverOverlay<'_, '_>,
 ) {
     let (w, h) = (g.w as i64, g.h as i64);
     let mut moving: Vec<&Unit> = Vec::new();
     // A ground source standing still since the last pass keeps its seen cells until sight changes in its
     // box (a terrain edit or a smoke cloud coming or going) or its range does (rain). Moving ones skip the
     // cells the team already sees.
-    for u in g.units.values() {
+    for u in overlay.units(g) {
         if g.team_of(u) != team || (u.air.is_some() && !airborne(u)) {
             continue;
         }
@@ -464,7 +533,9 @@ fn team_cells(
         .find(|p| p.team == team)
         .map(|p| &p.visible);
     for id in seen.into_iter().flatten() {
-        let Some(t) = g.units.get(id) else { continue };
+        let Some(t) = g.units.get(id).map(|u| overlay.replace(u)) else {
+            continue;
+        };
         if t.air.is_some() {
             continue;
         }

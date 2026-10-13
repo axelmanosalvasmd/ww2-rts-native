@@ -25,6 +25,31 @@ pub enum MoveOutcome {
     Unreachable,
     Arrived,
 }
+impl MoveOutcome {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Interrupted => "interrupted",
+            Self::Moving => "moving",
+            Self::Unreachable => "unreachable",
+            Self::Arrived => "completed",
+        }
+    }
+}
+/// The optional source result tail survives later moving/interrupted intents.
+/// Only the actual terminal path/completion operations replace it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MoveResult {
+    Unreachable { tick: i64 },
+    Completed { tick: i64 },
+}
+impl MoveResult {
+    pub fn parts(self) -> (&'static str, i64) {
+        match self {
+            Self::Unreachable { tick } => ("unreachable", tick),
+            Self::Completed { tick } => ("completed", tick),
+        }
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct MoveOrder {
@@ -54,6 +79,10 @@ pub enum Command {
         target: i64,
         at: Option<Point>,
         queue: bool,
+    },
+    Destroy {
+        ids: Vec<i64>,
+        id: Option<i64>,
     },
     Board {
         ids: Vec<i64>,
@@ -109,6 +138,8 @@ pub enum Command {
         ids: Vec<i64>,
         target: i64,
         queue: bool,
+        /// Waiting display anchor, never the current attack destination.
+        at: Option<Point>,
     },
     Escort {
         ids: Vec<i64>,
@@ -150,6 +181,7 @@ pub struct UnitControl {
     pub orders: VecDeque<Command>,
     pub outcome: Option<MoveOutcome>,
     pub outcome_tick: Option<i64>,
+    pub move_result: Option<MoveResult>,
     pub route_end: Option<Point>,
     pub supply_hold: bool,
     pub supply_escape: bool,
@@ -206,6 +238,7 @@ impl UnitControl {
             orders: VecDeque::new(),
             outcome: None,
             outcome_tick: None,
+            move_result: None,
             route_end: None,
             supply_hold: false,
             supply_escape: false,
@@ -394,6 +427,10 @@ impl Command {
                 }
             }
 
+            Some("destroy") => Ok(Self::Destroy {
+                ids,
+                id: object.get("id").and_then(safe_id),
+            }),
             Some("board") => Ok(Self::Board {
                 ids,
                 target: object
@@ -581,6 +618,7 @@ impl Command {
                 ids,
                 target: object.get("target").and_then(safe_id).unwrap_or(-1),
                 queue: object.get("queue").and_then(|v| v.as_bool()) == Some(true),
+                at: None,
             }),
             Some("escort") => Ok(Self::Escort {
                 ids,
@@ -608,6 +646,7 @@ impl Command {
     }
     fn valid(&self) -> bool {
         match self {
+            Self::Attack { at, .. } => at.is_none_or(|p| p.x.is_finite() && p.z.is_finite()),
             Self::Dig {
                 ids, at, direction, ..
             } => {
@@ -774,6 +813,36 @@ impl crate::match_runtime::Match {
         {
             return self.execute_assist(owner, ids, *target, *queue);
         }
+        if let Command::Attack {
+            ids, target, queue, ..
+        } = command
+        {
+            if !ids
+                .iter()
+                .take(50.max(self.world.game.units.len()))
+                .any(|raw| {
+                    self.eligible_command_unit(*raw, owner, command)
+                        .is_some_and(|id| self.is_aircraft_command_unit(id))
+                })
+            {
+                return self.ground_attack_command(owner, ids, *target, *queue);
+            }
+        }
+        if let Command::Retreat { ids } = command {
+            if !ids
+                .iter()
+                .take(50.max(self.world.game.units.len()))
+                .any(|raw| {
+                    self.eligible_command_unit(*raw, owner, command)
+                        .is_some_and(|id| self.is_aircraft_command_unit(id))
+                })
+            {
+                return self.ground_retreat_command(owner, ids);
+            }
+        }
+        if let Command::Destroy { ids, id } = command {
+            return self.execute_destroy(owner, ids, *id);
+        }
         if let Command::Board { ids, target } = command {
             return self.carrier_board_command(owner, ids, *target, winner_decided);
         }
@@ -861,6 +930,7 @@ impl crate::match_runtime::Match {
             | Command::Retreat { ids } => ids.clone(),
             Command::Build { .. }
             | Command::Assist { .. }
+            | Command::Destroy { .. }
             | Command::Board { .. }
             | Command::Unload { .. }
             | Command::Entrench { .. }
@@ -1215,6 +1285,7 @@ impl crate::match_runtime::Match {
             }
             Command::Build { .. }
             | Command::Assist { .. }
+            | Command::Destroy { .. }
             | Command::Board { .. }
             | Command::Unload { .. }
             | Command::Entrench { .. }
@@ -1475,7 +1546,7 @@ impl crate::match_runtime::Match {
 }
 pub(crate) struct CommandRoute {
     pub(crate) result: crate::pathfinding::PathResult,
-    failed: bool,
+    pub(crate) failed: bool,
 }
 pub(crate) fn search_route(
     paths: &mut Pathfinding,
@@ -1531,7 +1602,7 @@ pub(crate) fn search_route(
     }
     Ok(CommandRoute { result, failed })
 }
-fn physical_navigation(game: &crate::game::Game) -> crate::navigation::TerrainView<'_> {
+pub(crate) fn physical_navigation(game: &crate::game::Game) -> crate::navigation::TerrainView<'_> {
     crate::navigation::TerrainView {
         width: game.w,
         height: game.h,
@@ -1570,6 +1641,15 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
         }
         if kind == RequestKind::Build {
             return match self.match_state.current_build_goal(id) {
+                Ok(goal) => goal,
+                Err(error) => {
+                    self.error = Some(error);
+                    None
+                }
+            };
+        }
+        if kind == RequestKind::AttackId {
+            return match self.match_state.current_attack_goal(id) {
                 Ok(goal) => goal,
                 Err(error) => {
                     self.error = Some(error);
@@ -1693,6 +1773,15 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
                 crate::path_requests::RequestKind::World => u.world_goal = None,
                 crate::path_requests::RequestKind::Amove => u.amove = None,
                 crate::path_requests::RequestKind::Board => u.board = 0,
+                crate::path_requests::RequestKind::AttackId => {
+                    u.attack = false;
+                    self.match_state
+                        .commands
+                        .units
+                        .get_mut(&u.id)
+                        .unwrap()
+                        .attack_id = 0
+                }
                 crate::path_requests::RequestKind::Nade => {
                     self.match_state.commands.units.get_mut(&u.id).unwrap().nade = None;
                     let ability = self.match_state.abilities.get_mut(u.id).unwrap();
@@ -1705,6 +1794,9 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
             if let Some(c) = self.match_state.commands.units.get_mut(&u.id) {
                 c.outcome = Some(MoveOutcome::Unreachable);
                 c.outcome_tick = Some(drop.tick as i64);
+                c.move_result = Some(MoveResult::Unreachable {
+                    tick: drop.tick as i64,
+                });
             }
         }
     }
@@ -1740,8 +1832,11 @@ impl crate::match_runtime::Match {
             return Err("unit path identity exhausted".into());
         }
         // current_goal cannot report errors through the scheduler's Option API.
-        // Validate Board callbacks before observation or FIFO service can write.
+        // Validate Board and Attack callbacks before observation or FIFO service can write.
         for request in self.commands.requests.queued_requests() {
+            if request.kind == crate::path_requests::RequestKind::AttackId {
+                self.current_attack_goal(request.unit)?;
+            }
             if request.kind == crate::path_requests::RequestKind::Board {
                 self.current_board_goal(request.unit)?;
             }
@@ -1823,6 +1918,9 @@ impl crate::match_runtime::Match {
                     .ok_or("missing completion control")?;
                 c.outcome = Some(MoveOutcome::Arrived);
                 c.outcome_tick = Some(self.world.game.tick);
+                c.move_result = Some(MoveResult::Completed {
+                    tick: self.world.game.tick,
+                });
             } else if u.path.is_empty()
                 && crate::math::hypot(u.x - goal.x, u.z - goal.z) > 0.25
                 && u.repath <= 0.0
@@ -2000,6 +2098,7 @@ impl crate::match_runtime::Match {
                 | crate::path_requests::RequestKind::Dig
                 | crate::path_requests::RequestKind::Build
                 | crate::path_requests::RequestKind::Board
+                | crate::path_requests::RequestKind::AttackId
         ) {
             return Err("unsupported command path request".into());
         }
@@ -2014,6 +2113,9 @@ impl crate::match_runtime::Match {
             .is_some_and(|u| u.path_gen == u64::MAX)
         {
             return Err("unit path identity exhausted".into());
+        }
+        if kind == crate::path_requests::RequestKind::AttackId {
+            self.current_attack_goal(id)?;
         }
         if kind == crate::path_requests::RequestKind::Board {
             self.current_board_goal(id)?;

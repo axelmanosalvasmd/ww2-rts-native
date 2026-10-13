@@ -85,7 +85,7 @@ fn snapshot(m: &Match) -> Value {
             fallen.insert(name.into(), json!({"x":p.x,"z":p.z}));
         }
     }
-    let report=m.conquest_result().unwrap().map(|r|json!({"winner":r.winner,"teams":r.teams,"names":r.names,"reason":r.reason.as_str(),"at":{"x":r.at.x,"z":r.at.z},"endTick":r.end_tick,"story":r.story.into_iter().map(story_row).collect::<Vec<_>>(),"timeline":r.timeline.into_iter().map(|s|json!({"t":s.t,"vp":s.vp})).collect::<Vec<_>>(),"winVp":r.win_vp,"mode":r.mode}));
+    let report=m.conquest_result().unwrap().map(|r|json!({"winner":r.winner,"teams":r.teams,"names":r.names,"reason":r.reason.as_str(),"at":{"x":r.at.x,"z":r.at.z},"endTick":r.end_tick,"story":r.story.into_iter().map(story_row).collect::<Vec<_>>(),"timeline":r.timeline.into_iter().map(|s|match s { ww2_core::match_end::MatchSample::Conquest {t,vp} => json!({"t":t,"vp":vp}), _ => panic!("Conquest report must retain source shape") }).collect::<Vec<_>>(),"winVp":r.win_vp,"mode":r.mode}));
     encode(
         json!({"story":m.story.iter().copied().map(story_row).collect::<Vec<_>>(),"fallen":fallen,"captureTicks":m.capture_ticks,"report":report}),
     )
@@ -269,7 +269,10 @@ fn raw_counters_round_only_in_the_finished_report() {
     assert_eq!(m.story[0].mp_spent, -0.5);
     assert_eq!(r.story[0].built, 1.0);
     assert_eq!(r.story[0].planes_downed, 1.0);
-    m.timeline[0].vp[0] = f64::NAN;
+    let ww2_core::match_end::MatchSample::Conquest { vp, .. } = &mut m.timeline[0] else {
+        panic!("Conquest sample")
+    };
+    vp[0] = f64::NAN;
     assert!(m.conquest_result().is_err());
 }
 
