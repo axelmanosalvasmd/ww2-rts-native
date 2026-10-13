@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Used a stable descending group-count key for idle human camera scans, preserving equal-group order and fixing the strict Clippy gate. All 17 focused debug and 280 workspace release tests passed before this lint repair; final exact-head gates remain pending.
+
 - Corrected the human observer refusal snapshot helper to read existing canonical rows directly in deliberately unsupported contexts. The first focused human library run passed nine tests and exposed this helper's guarded-getter unwrap; runtime mode admission and actual fixtures remain unchanged. Complete native checks are still pending.
 
 - Fixed the first human proof compiler errors: retain a reference to the delivered victim before consuming the filtered unit vector, and name the packet type in two no-view assertions. No policy, ordering, timing or RNG behavior changes; the original failed compile log is preserved and native checks remain pending.

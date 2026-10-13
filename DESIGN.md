@@ -2,6 +2,8 @@
 
 ## Human policy source assembly (2026-10-13)
 
+At `c7cf54a`, all seventeen focused human debug tests and 280 locked workspace release tests pass. Strict Clippy then finds one descending-sort style lint in idle camera group selection. The successor uses the same stable order with `Reverse(count)` as its key; equal-size groups retain first insertion order, with no RNG or selection change. The original comparator agrees with Source's descending group count. Debug and release binaries and the complete logs are copied outside the cache before rebuilding. Final exact-head checks remain pending.
+
 The first focused human library run passes nine tests and fails one refusal assertion because its snapshot helper invokes the ordinary routing getter after deliberately making the context unsupported. The owner repairs only the test helper: it reads the existing canonical recipient rows and navigation buffer directly. No mode is remapped, and the runtime refusal guard remains unchanged. This exposes the intended before/after state for the real atomic-refusal assertion. The failed log is preserved; complete focused and final native gates remain pending.
 
 The first native inventory compile found two missing generic packet annotations in no-view assertions and a borrowed-vector ownership error in fightResponse. The narrow successor copies the existing delivered-unit reference before the vector is consumed and names the test packet as `()`. It preserves victim selection, unit iteration, command and timing order. The failed command and compiler diagnostics are retained outside the cache; no human test had executed at that point.

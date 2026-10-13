@@ -515,7 +515,7 @@ impl HumanRuntimeSnapshot {
                     groups.push((key, u.motion.at, 1));
                 }
             }
-            groups.sort_by(|a, b| b.2.cmp(&a.2));
+            groups.sort_by_key(|group| std::cmp::Reverse(group.2));
             let mut places: Vec<_> = groups
                 .into_iter()
                 .map(|(_, sum, n)| Point {
