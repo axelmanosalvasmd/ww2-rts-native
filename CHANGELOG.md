@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Extracted canonical single-target generic hurt for FPS and other direct effects, retaining source damage reductions and rider disembarkation without projectile armor, shooter XP or radial impulse. Hurt records keep the contact position before rider movement; explosions add radial impulse afterward. The shared source diff is independently reviewed; native regression verification is pending.
+
 - Integrated the checked ordinary firing and combat ancestry into the FPS effects lane, retaining shared batch publication and initializing canonical firing/combat metadata in its callback. Recipient observation retains its separate index. Native validation of this combined follow-up is pending.
 - Added explicit captured actor membership for blast damage and source-list terrain casualties while keeping full canonical environment validation and ordinary projectile defaults. Bridge casualties and legacy rubble/blocked-cell checks use captured actors; garrison eviction still uses current units. Independent source review passes; native checks are queued.
 

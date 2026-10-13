@@ -783,6 +783,140 @@ impl DamageWorld<'_> {
             ))
         }
     }
+    /// Apply source generic hurt without projectile armor, XP or radial impulse.
+    /// The returned Hurt event describes contact before carried units disembark.
+    pub fn hurt(
+        &mut self,
+        id: UnitId,
+        profile: ExplosionSource,
+        fall: f64,
+        owner: i32,
+        retarget: &mut dyn RetargetSink,
+    ) -> Result<environment::Hurt, CombatError> {
+        self.validate()?;
+        profile.checked()?;
+        if !fall.is_finite()
+            || !(0.0..=1.0).contains(&fall)
+            || owner < -1
+            || owner >= 0 && owner as usize >= self.world.game.players.len()
+            || profile
+                .weapon_kind
+                .is_some_and(|k| k >= self.rules.kinds.len())
+        {
+            return Err(CombatError::InvalidInput("hurt source/falloff"));
+        }
+        let u = self
+            .world
+            .game
+            .units
+            .get(&id)
+            .ok_or(CombatError::InvalidInput("hurt target"))?;
+        let def = definition(u.kind, self.rules)?;
+        let carrier = self
+            .combat
+            .get(id)
+            .ok_or(CombatError::InvalidInput("hurt metadata"))?
+            .carrier;
+        let cfg = Catalog::compiled()
+            .map_err(|_| CombatError::Rules)?
+            .table("CFG")
+            .map_err(|_| CombatError::Rules)?;
+        let target = self.target(id)?;
+        let context = self.context(owner, u.owner);
+        let base = if flag(def, "structure") {
+            profile.terrain.unwrap_or(profile.vehicle)
+        } else if flag(def, "infantry") {
+            profile.infantry
+        } else {
+            profile.vehicle
+        };
+        let shrug = if self.rules.kinds[u.kind].name == "bunker" && profile.off_map_support {
+            number(cfg.get("assault").ok_or(CombatError::Rules)?, "supportMul")?
+        } else {
+            1.
+        };
+        let cover = if u.garrison.is_some() {
+            profile
+                .anti_garrison
+                .unwrap_or(number(cfg, "trenchBlastMul")?)
+        } else if target.in_trench {
+            number(cfg, "trenchBlastMul")?
+        } else {
+            1.
+        };
+        let vet = combat::veterancy(target.kind, target.xp)?;
+        let tech = if self.tech_enabled {
+            crate::economy::tech_mul(
+                context.attacker_tech,
+                profile
+                    .weapon_kind
+                    .map(|k| self.rules.kinds[k].name.as_str()),
+                context.defender_tech,
+                target.kind,
+            )
+            .map_err(|_| CombatError::Rules)?
+        } else {
+            1.
+        };
+        let damage = base
+            * shrug
+            * fall
+            * if combat::retreat_protected(target.retreat)? {
+                number(cfg, "retreatDamage")?
+            } else {
+                1.
+            }
+            * cover
+            * (1. - number(cfg, "vetArmor")? * f64::from(vet))
+            * tech;
+        let mut events = Vec::new();
+        if owner >= 0 {
+            events.push(CombatEvent::LastHit { unit: id, owner });
+        }
+        events.push(CombatEvent::Health {
+            unit: id,
+            value: target.hp - damage,
+        });
+        if flag(def, "infantry") {
+            events.push(CombatEvent::Suppression {
+                unit: id,
+                value: math::min(
+                    100.,
+                    target.suppression
+                        + profile.suppression * (1. - number(cfg, "vetSupp")? * f64::from(vet)),
+                ),
+            });
+        }
+        let jump = carrier.unwrap_or(id);
+        if self
+            .world
+            .game
+            .units
+            .get(&jump)
+            .is_some_and(|c| definition(c.kind, self.rules).is_ok_and(|d| flag(d, "riders")))
+            && owner >= 0
+            && !self.alliance(owner, self.world.game.units[&jump].owner)
+        {
+            for &rider in &self.combat.get(jump).unwrap().cargo {
+                events.push(CombatEvent::DisembarkRider {
+                    carrier: jump,
+                    rider,
+                    minimum_suppression: number(cfg, "riderShock")?,
+                });
+            }
+        }
+        let hurt = environment::Hurt {
+            unit: id,
+            owner: u.owner,
+            at: u.at(),
+            killed: target.hp - damage <= 0.0,
+            from: Some(owner),
+            local: false,
+        };
+        self.apply_events(&events, retarget, &mut BTreeSet::new())?;
+        Ok(hurt)
+    }
+
     /// Terminal blast damages the supplied source-order live unit collection, then terrain.
     #[allow(clippy::too_many_arguments)]
     pub fn explosion(
@@ -846,6 +980,7 @@ impl DamageWorld<'_> {
         if profile
             .weapon_kind
             .is_some_and(|k| k >= self.rules.kinds.len())
+            || owner < -1
             || owner >= 0 && owner as usize >= self.world.game.players.len()
         {
             return Err(CombatError::InvalidInput("blast identity"));
@@ -853,10 +988,6 @@ impl DamageWorld<'_> {
         if ![at.x, at.z, radius].iter().all(|v| v.is_finite()) || radius <= 0. || radius > 4096. {
             return Err(CombatError::InvalidInput("blast geometry"));
         }
-        let cfg = Catalog::compiled()
-            .map_err(|_| CombatError::Rules)?
-            .table("CFG")
-            .map_err(|_| CombatError::Rules)?;
         let mut effects = Vec::new();
         let mut skip = BTreeSet::new();
         let ids = actor_order.to_vec();
@@ -929,107 +1060,18 @@ impl DamageWorld<'_> {
                 skip.insert(id);
                 continue;
             }
-            let target = self.target(id)?;
-            let context = self.context(owner, u.owner);
-            let base = if flag(def, "structure") {
-                profile.terrain.unwrap_or(profile.vehicle)
-            } else if flag(def, "infantry") {
-                profile.infantry
-            } else {
-                profile.vehicle
-            };
-            let shrug = if self.rules.kinds[u.kind].name == "bunker" && profile.off_map_support {
-                number(cfg.get("assault").ok_or(CombatError::Rules)?, "supportMul")?
-            } else {
-                1.
-            };
-            let cover = if u.garrison.is_some() {
-                profile
-                    .anti_garrison
-                    .unwrap_or(number(cfg, "trenchBlastMul")?)
-            } else if target.in_trench {
-                number(cfg, "trenchBlastMul")?
-            } else {
-                1.
-            };
-            let vet = combat::veterancy(target.kind, target.xp)?;
-            let tech = if self.tech_enabled {
-                crate::economy::tech_mul(
-                    context.attacker_tech,
-                    profile
-                        .weapon_kind
-                        .map(|k| self.rules.kinds[k].name.as_str()),
-                    context.defender_tech,
-                    target.kind,
-                )
-                .map_err(|_| CombatError::Rules)?
-            } else {
-                1.
-            };
-            let damage = base
-                * shrug
-                * fall
-                * if combat::retreat_protected(target.retreat)? {
-                    number(cfg, "retreatDamage")?
-                } else {
-                    1.
-                }
-                * cover
-                * (1. - number(cfg, "vetArmor")? * f64::from(vet))
-                * tech;
-            let mut events = Vec::new();
-            if owner >= 0 {
-                events.push(CombatEvent::LastHit { unit: id, owner });
-            }
-            events.push(CombatEvent::Health {
-                unit: id,
-                value: target.hp - damage,
-            });
-            if flag(def, "infantry") {
-                events.push(CombatEvent::Suppression {
-                    unit: id,
-                    value: math::min(
-                        100.,
-                        target.suppression
-                            + profile.suppression * (1. - number(cfg, "vetSupp")? * f64::from(vet)),
-                    ),
-                });
-            }
-            let jump = carrier.unwrap_or(id);
-            if self
-                .world
-                .game
-                .units
-                .get(&jump)
-                .is_some_and(|c| definition(c.kind, self.rules).is_ok_and(|d| flag(d, "riders")))
-                && owner >= 0
-                && !self.alliance(owner, self.world.game.units[&jump].owner)
-            {
-                for &rider in &self.combat.get(jump).unwrap().cargo {
-                    events.push(CombatEvent::DisembarkRider {
-                        carrier: jump,
-                        rider,
-                        minimum_suppression: number(cfg, "riderShock")?,
-                    });
-                }
-            }
-            events.push(CombatEvent::DeathImpulse {
+            let mut hurt = self.hurt(id, profile, fall, owner, retarget)?;
+            hurt.local = contact_id.is_some_and(|id| !id.is_empty());
+            effects.push(environment::Effect::Hurt(hurt));
+            let u = &self.world.game.units[&id];
+            let impulse = CombatEvent::DeathImpulse {
                 unit: id,
                 value: DeathImpulse {
                     direction: math::atan2(u.z - at.z, u.x - at.x),
                     magnitude: math::max(0.25, math::min(4., profile.vehicle / 100.)),
                 },
-            });
-            self.apply_events(&events, retarget, &mut BTreeSet::new())?;
-            let u = &self.world.game.units[&id];
-            effects.push(environment::Effect::Hurt(environment::Hurt {
-                unit: id,
-                owner: u.owner,
-                at: u.at(),
-                killed: u.hp <= 0.,
-                from: Some(owner),
-                local: contact_id.is_some_and(|id| !id.is_empty()),
-            }));
+            };
+            self.apply_events(&[impulse], retarget, &mut BTreeSet::new())?;
         }
         if let Some(damage) = profile.terrain.filter(|d| *d != 0.) {
             let mut hit = DamageContext::plain(&skip);
