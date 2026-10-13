@@ -399,8 +399,9 @@ pub struct Match {
     pub scenario: Option<crate::legacy_scenario::LegacyScenario>,
     pub logistics: crate::logistics::LogisticsState,
     pub capture_ticks: Vec<Option<i64>>,
-    /// Capture story counts only. Combat and spending counters are not integrated yet.
-    pub capture_counts: Vec<f64>,
+    /// Canonical source counters. Event owners must record accepted effects exactly once.
+    pub story: Vec<crate::match_story::PlayerStory>,
+    pub fallen: crate::match_story::FallenLocations,
     pub finish: Option<crate::conquest_end::ConquestFinish>,
     pub timeline: Vec<crate::conquest_end::ConquestSample>,
     pub next_unit_id: u32,
@@ -451,7 +452,8 @@ impl Match {
             scenario,
             logistics: crate::logistics::LogisticsState::default(),
             capture_ticks: vec![None; map.points().len()],
-            capture_counts: vec![0.0; player_count],
+            story: vec![crate::match_story::PlayerStory::default(); player_count],
+            fallen: crate::match_story::FallenLocations::default(),
             finish: None,
             timeline: Vec::new(),
             next_unit_id,
@@ -578,12 +580,22 @@ impl Match {
                 winner_decided,
             )
             .map_err(|e| e.to_string())?;
+        let changes: Vec<_> = captured
+            .iter()
+            .map(|event| crate::match_story::StoryChange {
+                slot: Some(event.owner),
+                key: crate::match_story::StoryKey::Captures,
+                amount: 1.0,
+            })
+            .collect();
+        let story_updates =
+            crate::match_story::prepare_story_updates(&mut self.story, winner_decided, &changes)?;
         self.start.points = points;
         self.start.economy = wallets;
+        story_updates.commit();
         if !winner_decided {
             for event in &captured {
                 self.capture_ticks[event.objective_index] = Some(game.tick);
-                self.capture_counts[event.owner] += 1.0;
             }
         }
         Ok(captured)
