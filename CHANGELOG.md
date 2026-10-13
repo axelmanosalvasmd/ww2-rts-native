@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Ordered the added companion modules consistently with the core formatter. Module contents and public interfaces are unchanged.
+
 - Removed a duplicated smoke lifetime field from the inherited routing replay fixture so the complete release workspace test build compiles. Its smoke state is unchanged.
 
 - Fixed two remembered-wreck observation sites that sorted the live gameplay grid during squad-follow routing. They now use a separate current-position index, preserving the recorded maintained bucket order and the same visibility facts.

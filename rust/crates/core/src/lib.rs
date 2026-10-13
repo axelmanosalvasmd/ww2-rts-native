@@ -7,8 +7,6 @@ pub mod combat;
 pub mod companion_ray;
 pub mod companions;
 pub mod conquest_end;
-pub mod match_companion_effects;
-pub mod match_companions;
 pub mod deployment;
 pub mod economy;
 pub mod economy_state;
@@ -19,6 +17,8 @@ pub mod formation;
 pub mod game;
 pub mod grid;
 pub mod legacy_scenario;
+pub mod match_companion_effects;
+pub mod match_companions;
 
 pub mod command_destinations;
 pub mod logistics;
