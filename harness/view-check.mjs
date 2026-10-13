@@ -91,14 +91,13 @@ function browserTerrain(m) {
 
 export function createViewCheck() {
   const world = createWorldState(), cells = new Map();
-  let units = [], fog = null, applyCells = null;
+  let units = [], fog = null, applyCells = null, resync = false;
   return {
     apply(message) {
       // Browser apply mutates snapshots to include all held rows. Keep input raw.
       const m = structuredClone(message);
-      let resync = false;
       if (m.t === 'start') {
-        world.reset(); units = []; cells.clear(); fog?.dispose();
+        world.reset(); units = []; cells.clear(); fog?.dispose(); resync = false;
         fog = createFog(m.map.w, m.map.h, m.fog, false, !!m.map.world);
         applyCells = browserTerrain(m);
         for (const row of m.cells ?? []) cells.set(row[0], row);
