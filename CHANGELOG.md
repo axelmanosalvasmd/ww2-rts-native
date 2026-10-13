@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reserved shared command denial names for source manpower, maximum, missing-builder and visibility refusals, allowing the separate ordinary-dig actuator to use the single dispatcher enum. No gameplay handler or queue changes are included; native actuator proof remains pending.
+
 - Added one shared field-work cancellation helper for staged transactions borrowing wallet/story and unit state separately. Match delegates to the same implementation, including identity and activity checks before mutation. Native checks remain pending.
 
 - Added the approved canonical Match field-work owner and startup default, plus synchronous cancellation that removes a real descriptor before clearing its activity flag without a refund. Missing or inconsistent activity rejects before writes. Component and combined native proof remain pending.

@@ -170,6 +170,10 @@ pub enum Denial {
     Cooldown,
     Retreating,
     Munitions,
+    Manpower,
+    Maximum,
+    NoBuilders,
+    NotVisible,
 }
 impl Denial {
     pub fn name(self) -> &'static str {
@@ -182,6 +186,10 @@ impl Denial {
             Self::Cooldown => "cooldown",
             Self::Retreating => "retreating",
             Self::Munitions => "mun",
+            Self::Manpower => "mp",
+            Self::Maximum => "max",
+            Self::NoBuilders => "noBuilders",
+            Self::NotVisible => "notVisible",
         }
     }
 }
