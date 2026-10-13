@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified bounded Conquest ground support against 60 original-source traces and 1,400 checkpoints, including every effect/lifetime transition and unsampled-tick silence checks. Three support, three combat and three firing debug regressions pass; all 158 locked release workspace tests, strict workspace Clippy, formatting and release FFI build pass. Aircraft support and complete tick integration remain separate.
+
 - Fixed the captured-membership prerequisite's building-wreck lifecycle call to pass explicit full-current membership. The original source wreckBuilding uses current units; captured support blast actors remain separate. This closes the first native compile failure, with the 60-trace/1,400-checkpoint source fixture unchanged. Native gates are in progress.
 
 - Closed the support replay consumer gap on unsampled ticks: unexpected effects or premature strike/cover lifetime transitions now fail immediately. This strengthens the same 60-trace, 1,400-checkpoint source fixture without changing runtime code; native proof is pending.
