@@ -19,6 +19,10 @@ const hurtGuard = humanSource.match(/if \((e\.k !== 'hurt'.*?)\) continue;/)?.[1
 if (!hurtGuard) throw Error('Original hurt admission guard not found');
 // Execute the unchanged original guard expression, before camera/area policy.
 const admittedHurt = new Function('e', 'slot', `return !(${hurtGuard});`);
+const exportedHuman = humanSource.replace("from './sim.js'", `from '${pathToFileURL(`${reference}/shared/sim.js`)}'`)
+  .replace("from './ai.js'", `from '${pathToFileURL(`${reference}/shared/ai.js`)}'`)
+  + '\nexport { remember, screenView };';
+const humanReaders = await import(`data:text/javascript;base64,${Buffer.from(exportedHuman).toString('base64')}`);
 const map = { name: 'Human detached observations', w: 48, h: 48,
   rows: Array.from({ length: 48 }, (_, z) => '.'.repeat(48).split('').map((c, x) => z === 15 && x === 15 ? 'N' : c).join('')),
   spawns: [{ x: 3, y: 3 }, { x: 42, y: 42 }, { x: 8, y: 3 }],
@@ -55,7 +59,7 @@ const runs = values => {
   }
   return out;
 };
-function capture(view, slot, tech, memory) {
+function capture(view, slot, tech, memory, screen) {
   const own = [...view.units.values()].filter(u => u.owner === slot && sim.UNITS[u.type].structure);
   const ready = kind => own.filter(u => u.type === kind && u.hp > 0 && (u.built ?? 1) >= 1).length;
   return { tick: view.tick, spawn: view.players[slot].spawn,
@@ -65,6 +69,7 @@ function capture(view, slot, tech, memory) {
       supp: u.supp, cover: u.cover, path: u.path, attack: !!u.attackId, enter: u.enter >= 0, fire: u.fireAt >= 0, nade: !!u.nade })),
     visible: [...view.players[slot].visible], sightings: view.sightings,
     still: [...memory.still].map(([id, s]) => ({ id, x: s.x, z: s.z, since: s.since })),
+    screen: { ids: [...screen.units.keys()], visible: [...screen.players[slot].visible], sightings: screen.sightings.map(s => s.id) },
     packet: { w: view.w, h: view.h, tick: view.tick, mp: view.players[slot].mp,
       players: view.players.map(p => [p.team, p.out, p.spawn]),
       points: view.points.map(p => [p.x, p.z, p.vp, p.mp, p.owner, p.cut, p.locked]),
@@ -90,6 +95,7 @@ for (const mode of [undefined, 'conquest']) for (const tech of [false, true]) {
     Object.assign(g.units.get(spec.id), spec);
   }
   const frames = [];
+  const cameraState = { camera: { x: -12, z: 20 }, seen: new Map(), viewTick: -1 };
   for (const action of tape) {
     for (const patch of action.units ?? []) Object.assign(g.units.get(patch.id), structuredClone(patch));
     if (action.mp !== undefined) g.players[0].mp = action.mp;
@@ -102,7 +108,9 @@ for (const mode of [undefined, 'conquest']) for (const tech of [false, true]) {
     aiTick(g, [{ slot: 0, brain: { observe: ai.observe, wantsView: () => true, act: () => {} } }], delivered);
     const view = delivered[0];
     if (!view) throw Error('Original snapshot delivery did not admit the recorded frame');
-    frames.push({ action, expected: capture(view, 0, tech, ai.aiMemories(g)[0]) });
+    humanReaders.remember(cameraState, view, 0);
+    const screen = humanReaders.screenView(cameraState, view, 0);
+    frames.push({ action, expected: capture(view, 0, tech, ai.aiMemories(g)[0], screen) });
   }
   cases.push({ name: `${mode ?? 'default'}-tech-${tech}`, mode: mode ?? 'default', tech, map, baseUnits, frames });
 }

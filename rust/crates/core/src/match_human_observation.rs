@@ -6,7 +6,9 @@ use crate::{
     commander_ai::{Input, Observation},
     environment,
     game::Point,
-    human_commander::{HumanSighting, HumanUnit, HumanView, Hurt, OwnerHurtBatch, TickControl},
+    human_commander::{
+        HumanSighting, HumanUnit, HumanView, Hurt, OwnerHurtBatch, ScreenView, TickControl,
+    },
     human_commander_inputs,
     match_firing::LaunchEvent,
     match_routing::{RecipientContext, prepare_recipient_routing},
@@ -103,6 +105,83 @@ fn finite(at: Point) -> bool {
     at.x.is_finite() && at.z.is_finite()
 }
 
+/// Rebuild the current strategic packet only from the camera-filtered detached rows.
+/// No policy callback needs to consult Match or recover a filtered-out unit.
+pub fn human_screen_observation(
+    screen: &ScreenView<'_, Observation>,
+) -> Result<Observation, String> {
+    let mut input = screen.packet.input().clone();
+    if screen.tick != input.tick as u64
+        || screen
+            .spawn
+            .is_some_and(|spawn| spawn != input.players[input.slot].spawn)
+        || screen
+            .units
+            .windows(2)
+            .any(|rows| rows[0].motion.id >= rows[1].motion.id)
+    {
+        return Err("inconsistent human filtered frame".into());
+    }
+    let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
+    let mut ids = std::collections::BTreeSet::new();
+    for human in &screen.units {
+        let index = input
+            .units
+            .binary_search_by_key(&human.motion.id, |u| u.id)
+            .map_err(|_| "human filtered unit is absent from strategic packet")?;
+        let row = &input.units[index];
+        let definition = catalog.unit(&row.kind).map_err(|e| e.to_string())?;
+        if human.owner as usize != row.owner
+            || human.kind != row.kind
+            || human.motion.at != row.at
+            || human.hp != row.hp
+            || human.motion.target_id != row.target_id
+            || human.motion.retreating != row.retreating
+            || human.build != row.build
+            || human.dig != row.dig
+            || human.entrench != row.entrench
+            || human.garrison != row.garrison
+            || human.air
+                != definition
+                    .get("air")
+                    .and_then(RuleValue::boolean)
+                    .unwrap_or(false)
+            || human.motion.world_goal.is_some_and(|p| !finite(p))
+            || human.motion.amove.is_some_and(|p| !finite(p))
+            || (row.owner != input.slot
+                && (human.motion.world_goal.is_some() || human.motion.amove.is_some()))
+            || (human.motion.world_goal.is_some() && human.motion.amove.is_some())
+            || ((row.retreating
+                || row.attack_id
+                || row.enter
+                || row.fire_at
+                || row.nade
+                || row.dig
+                || definition
+                    .get("structure")
+                    .and_then(RuleValue::boolean)
+                    .unwrap_or(false))
+                && (human.motion.world_goal.is_some() || human.motion.amove.is_some()))
+        {
+            return Err("human filtered unit differs from delivered strategic facts".into());
+        }
+        ids.insert(row.id);
+    }
+    let expected_visible: Vec<_> = input
+        .units
+        .iter()
+        .filter(|u| {
+            ids.contains(&u.id) && input.players[u.owner].team != input.players[input.slot].team
+        })
+        .map(|u| u.id)
+        .collect();
+    if screen.visible != expected_visible {
+        return Err("human filtered visibility differs from delivered unit facts".into());
+    }
+    input.units.retain(|u| ids.contains(&u.id));
+    Observation::new(input).map_err(|e| format!("human filtered strategic observation: {e:?}"))
+}
+
 impl Match {
     /// Live stop controls are independent of the age of a delivered observation.
     pub fn human_commander_control<'a>(
@@ -189,7 +268,8 @@ impl Match {
             || (g.tick % 2 != 0 && self.finish.is_none())
         {
             return Err(
-                "human commander requires an ordinary two-tick observation boundary".into(),
+                "human commander requires an ordinary delivery or final observation boundary"
+                    .into(),
             );
         }
         let expected = (g.tick > 0).then(|| g.tick - (g.tick - 1) % 4);

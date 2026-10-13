@@ -142,8 +142,46 @@ fn runs(values: &[u16]) -> Vec<[u16; 2]> {
     }
     out
 }
-fn projection(view: &HumanView<Observation>, memory: &HumanObservationMemory) -> Value {
+fn projection(
+    view: &HumanView<Observation>,
+    memory: &HumanObservationMemory,
+    expected_screen: &Value,
+) -> Value {
     let input = view.packet.input();
+    let wanted: Vec<u32> = expected_screen["ids"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|id| id.as_u64().unwrap() as u32)
+        .collect();
+    let sighted: Vec<u32> = expected_screen["sightings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|id| id.as_u64().unwrap() as u32)
+        .collect();
+    let screen = ScreenView {
+        tick: view.tick,
+        spawn: view.spawn,
+        units: view
+            .units
+            .iter()
+            .filter(|u| wanted.contains(&u.motion.id))
+            .collect(),
+        visible: expected_screen["visible"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|id| id.as_u64().unwrap() as u32)
+            .collect(),
+        sightings: view
+            .sightings
+            .iter()
+            .filter(|s| sighted.contains(&s.id))
+            .collect(),
+        packet: &view.packet,
+    };
+    let filtered = human_screen_observation(&screen).unwrap();
     let units: Vec<_> = view.units.iter().zip(&input.units).map(|(human, u)| json!({
         "id":human.motion.id,"owner":human.owner,"type":human.kind,"x":human.motion.at.x,"z":human.motion.at.z,
         "hp":human.hp,"worldGoal":human.motion.world_goal.map(|p|json!({"x":p.x,"z":p.z})),
@@ -160,6 +198,8 @@ fn projection(view: &HumanView<Observation>, memory: &HumanObservationMemory) ->
     json!({"tick":view.tick,"spawn":view.spawn.map(|p|json!({"x":p.x,"z":p.z})),"units":units,
         "visible":view.visible,"sightings":view.sightings.iter().map(|s|&s.payload).collect::<Vec<_>>(),
         "still":memory.still.iter().map(|s|json!({"id":s.id,"x":s.at.x,"z":s.at.z,"since":s.since})).collect::<Vec<_>>(),
+        "screen":{"ids":filtered.input().units.iter().map(|u|u.id).collect::<Vec<_>>(),"visible":screen.visible,
+            "sightings":screen.sightings.iter().map(|s|s.id).collect::<Vec<_>>()},
         "packet":{"w":input.width,"h":input.height,"tick":input.tick,"mp":input.manpower,
             "players":input.players.iter().map(|p|json!([p.team,p.out,{"x":p.spawn.x,"z":p.spawn.z}])).collect::<Vec<_>>(),
             "points":input.points.iter().map(|p|json!([p.at.x,p.at.z,p.vp,p.mp,p.owner.map_or(-1,|o|o as i64),p.cut,p.locked])).collect::<Vec<_>>(),
@@ -187,7 +227,7 @@ fn original_observations_preserve_own_goals_visibility_sightings_and_complete_pa
         for frame in case["frames"].as_array().unwrap() {
             action(&mut m, &frame["action"]);
             let view = m.human_commander_observation(&mut memory).unwrap();
-            let actual = projection(&view, &memory);
+            let actual = projection(&view, &memory, &frame["expected"]["screen"]);
             assert!(
                 equal(&actual, &frame["expected"]),
                 "{} tick{}\nactual{actual}\nexpected{}",
@@ -293,6 +333,20 @@ fn detached_views_hide_private_facts_and_refusal_preserves_canonical_observation
     let va = a.human_commander_observation(&mut ma).unwrap();
     let vb = b.human_commander_observation(&mut mb).unwrap();
     assert_eq!(va, vb);
+    let mut bad = va.units[0].clone();
+    bad.hp -= 1.;
+    let forged = ScreenView {
+        tick: va.tick,
+        spawn: va.spawn,
+        units: vec![&bad],
+        visible: vec![],
+        sightings: vec![],
+        packet: &va.packet,
+    };
+    assert!(
+        human_screen_observation(&forged).is_err(),
+        "filtered rows cannot replace delivered facts"
+    );
     let saved = va.clone();
     a.world.game.units.get_mut(&1).unwrap().hp = 1.;
     a.commands.units.get_mut(&1).unwrap().nade = Some(Point { x: 40., z: 30. });

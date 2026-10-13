@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Rebuild the human commander's strategic packet from validated camera-filtered detached rows, with original screen memory in the observation oracle. Keep current packet facts and research intact, and refuse forged rows without reading Game.
+
 - Add a complete existing strategic packet producer for the ordinary human commander, with decoded own move goals, delivered visibility and ordered 60-second sightings. Stage recipient memory before publication and filter real owner hurt frames without losing reset/append ordinals. Four original-reader scenes record 48 views and three hurt batches; native checks are pending.
 
 - Bring source-reviewed human commander timing, raw input helpers and detached common view types into the isolated observation producer branch. Native acceptance remains pending.
