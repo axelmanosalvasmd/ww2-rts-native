@@ -74,7 +74,7 @@ The standalone `path_requests.rs` scheduler matches 606 original-source action c
 
 ## Match ground traffic component
 
-Match now feeds its owner's remembered terrain and settled wreck projection to voluntary steering and waypoint skips. Physical speed, infantry step acceptance, hull contact and live spatial positions retain the source inputs. The original-source fixture has 12 traces, 63 steps and 65 movement calls. It checks the component at recorded before-states, with persistent recipient memory, rather than claiming a whole autonomous match. Native checks are pending the shared Cargo lane. World traffic, terrain effects and later full-tick acceptance remain open.
+Match now feeds its owner's remembered terrain and settled wreck projection to voluntary steering and waypoint skips. Physical speed, infantry step acceptance, hull contact and live spatial positions retain the source inputs. The original-source fixture has 12 traces, 63 steps and 65 movement calls. It checks the component at recorded before-states, with persistent recipient memory, rather than claiming a whole autonomous match. Vostro Linux x86_64 verification at runtime head `8e812fe` passes 13 focused debug tests, 143 release workspace tests, strict Clippy, formatting and release FFI. World traffic, terrain effects and later full-tick acceptance remain open.
 
 ## Orders that move units
 

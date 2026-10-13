@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified recipient terrain traffic steering on the Vostro Linux x86_64 lane: 13 focused debug tests, 143 release workspace tests, strict Clippy, formatting and release FFI pass at runtime head 8e812fe. Recorded exact archive/log hashes in DESIGN; World and full match acceptance remain separate.
+
 - Corrected the inherited command fixture’s reserve initializer to include absent supply-rate and cutoff state. The fresh Vostro traffic compile exposed the missing fields before tests; runtime traffic and source captures are unchanged.
 
 - Added borrowed recipient terrain to Match ground traffic steering and waypoint skipping while retaining physical speed and collision checks. The original-source recorder supplies 12 traces, 63 steps and 65 movement calls, including queues, passes, remembered edits and hidden physical contacts. Unit remains the sole owner of traffic and path-cache state; invalid knowledge errors propagate without losing the moving unit. World traffic, terrain effects and full match integration remain separate.
