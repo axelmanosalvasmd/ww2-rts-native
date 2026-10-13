@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Merged the published engineering evidence ancestry into the verified carrier stack. Rust sources, test fixtures and harnesses are unchanged from the Vostro-tested carrier checkpoint.
+
 - Verified the coherent ground-carrier component on Vostro at 8ef9c7e: nine focused debug tests, all 208 release workspace tests, strict Clippy, formatting and the release FFI build pass. The 14-trace, 66-action original-source oracle is unchanged. Recorded Board/Unload dispatch and tick attachment remain separate.
 
 - Merged the checked engineering dependency into a separate carrier source successor, preserving the carrier component and its 14-trace, 66-action oracle. Carrier native and recorded-command consumer checks remain pending; the frozen original checkpoint is unchanged.
@@ -15,6 +17,8 @@
 - Kept carrier per-unit validation local to its actor, carrier and live cargo while command admission still preflights all current units. Added a 4,096-entry cargo resource bound without changing ground-carrier seat rules or the source fixture.
 
 - Added a bounded ordinary Match carrier component using canonical board/cargo/riding state, own-seat reservations, recipient-aware routes, paid Dig cancellation, physical ground boarding, riding pose updates and manual unload. The pinned-source recorder covers 14 traces and 66 actions, including stable selection ties, a hidden obstacle and carrier/grid flag receipts. Boats, rail, garrison exits, unrepresented building/entrench work and wrecked-carrier ejection remain explicit unsupported boundaries; command parser/scheduler attachment and native verification are pending.
+- Verified the ordinary Match digging provider on macOS arm64: seven focused debug tests, all 206 release workspace tests, strict workspace/all-target Clippy, formatting and the release FFI build pass. Independent copied-binary replay passes both Match digging tests and both primitive tests. Actual unit-loop/server integration remains a separate pending proof.
+
 - Resolved strict compiler-lint findings in the engineering proof tree: redundant copies, casts and reference layers, independent ability fixture flags, and the existing optional delivery-cursor branch. The full release workspace suite passed before this cleanup; all required gates are rerunning at the final code checkpoint.
 
 - Fixed the inherited World memory recorder to collect remembered-wreck iterators as arrays before JSON serialization. Source regeneration verifies four traces and 119 actions; only the collection projections changed. Runtime memory and cache behavior are unchanged.
