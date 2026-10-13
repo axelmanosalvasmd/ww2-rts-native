@@ -276,6 +276,13 @@ impl Match {
         let initial_tech =
             TechState::new(1, 0, 0, 0).map_err(|e| format!("World research: {e:?}"))?;
         let mut result = Self {
+            combat: crate::match_combat::CombatState::default(),
+            environment: crate::environment::EnvironmentRuntime::default(),
+            firing: crate::match_firing::FiringState::default(),
+            recipients: Vec::new(),
+            routing_fog: crate::fog::Fog::default(),
+            tick_state: crate::match_tick::TickState::default(),
+            fallen: crate::match_story::FallenLocations::default(),
             world_runtime: Some(runtime),
             commands: crate::match_commands::MatchCommands::new(4096),
             grid: SpatialGrid::new(&world.game.units, 16.0),
@@ -292,7 +299,7 @@ impl Match {
             scenario: None,
             logistics: crate::logistics::LogisticsState::default(),
             capture_ticks: Vec::new(),
-            capture_counts: vec![0.0; count],
+            story: vec![crate::match_story::PlayerStory::default(); count],
             finish: None,
             timeline: Vec::new(),
             next_unit_id: 1,
@@ -359,7 +366,10 @@ impl Match {
             vec![draft],
         )
         .map_err(|e| format!("World publication: {e:?}"))?
-        .publish();
+        .publish_with(|unit, _| {
+            self.combat.initialize(unit.id);
+            self.firing.initialize(unit.id);
+        });
         Ok(id)
     }
     fn stage_world_unit(
