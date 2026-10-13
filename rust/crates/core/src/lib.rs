@@ -11,6 +11,7 @@ pub mod fog;
 pub mod formation;
 pub mod game;
 pub mod grid;
+pub mod logistics;
 pub mod map;
 pub mod math;
 pub mod movement;

@@ -124,6 +124,14 @@ Decided now so release stays cheap:
 3. Unreal game: terrain, units, effects, HUD, sound, then the FPS view, with the browser client still working alongside.
 4. Retire the JavaScript client and Node server in ww2-rts.
 
+## Physical unit reserves (2026-10-13)
+
+`logistics.rs` ports all twelve exported reserve helpers from `shared/logistics.js`. `LogisticsState` stores only the optional reserve record in a `BTreeMap` keyed by unit ID. Owners, type names, positions, hit points and movement remain in their existing state; calls borrow the few unit facts they need. Definition metadata comes from the compiled unit catalog. Reserve constants retain the pinned source values and are checked directly against its `LOGISTICS` export.
+
+Initialization preserves the source eligibility checks and never refills an existing reserve record. Ammo is spent in whole projectiles; supply stores hold ammo credits, including paid fractional credit until a complete projectile can be issued. Provisions, ordinary fuel, emergency fuel, warning time and shortage/recovery latches follow the original operation order. Non-finite or negative count/time/stock inputs receive the source's zero-clamping behavior where its helpers apply that rule. Metadata lookup errors occur before callers mutate reserve state. The numeric definition adapter and owner-controlled reserve access are not arbitrary JavaScript coercion or untrusted-save validation; a persistence loader must validate its own records.
+
+The original JavaScript functions provide 60 enablement contexts, 118 weapon definitions, 708 initialization cases and 44 traces containing 618 exact reserve/stock/query steps. Tests include all 47 unit definitions, fractional volleys and credit, the credit epsilon, exhaustion and recovery boundaries, zero/invalid quantities, riding, actual powered travel time, repeat initialization and stable unit-ID ordering. Convoy routing, stores in the world, territory supply, retreat/path actions, persistence and private snapshot delivery are separate work. This module does not enable logistics in a match or change `Game`, the ABI or the rules hash.
+
 ## Weather planning and public helpers (2026-10-13)
 
 `weather.rs` ports map mood/default selection, seeded weather plans, the single planned transition, warning rows, effect descriptions, AI caution and the presentation road mask from `shared/weather.js`. Weather multipliers, their ordering and the warning interval come from the compiled catalog. Existing movement speed and sight functions are unchanged. Plan state is separate from `Game` and can be held by a future match aggregate.

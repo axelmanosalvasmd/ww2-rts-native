@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added the twelve physical reserve helpers in `logistics.rs`, with optional per-unit state keyed by ID and borrowed definition/owner/movement facts. Exact JavaScript fixtures cover 60 enablement contexts, 118 weapon definitions, 708 initialization cases and 618 state/stock/query steps in 44 traces. Fractional ammo credit, fuel order, exhaustion, recovery and repeat initialization preserve source behavior. Match startup, powered-travel integration, withdrawal actions, convoys, territory supply and snapshots remain separate; no Game fields, ABI or rules hash changed.
+
 - Added idempotent explicit initialization for production buildings so Match startup can expose empty canonical queues and zero progress immediately. Reinitializing a building preserves paid jobs; player research rows already start with empty lab lists.
 
 - Added canonical production queues and player research outside `Game`. Construction-mode recruitment uses the existing wallets and population rules; paid job IDs, original-charge refunds, one-unit-per-step training, ordered lab capacity and pause/resume match 12 original-JavaScript traces (114 actions, 922 advance calls). Typed completion requests leave unit creation and placement to the match runner. Empty building state initializes lazily; malformed inputs and duplicate IDs fail before mutation. Instant recruitment, placement/rally orders, building lifecycle, statistics, persistence and public wire/ABI integration remain separate.
