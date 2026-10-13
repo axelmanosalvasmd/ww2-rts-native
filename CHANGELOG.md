@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Strengthened companion stale-metadata regression snapshots to include full represented units, controls, companion registry, metadata, wallets and random-stream state, plus ordered, unordered, heavy and owner spatial queries. Native checks remain pending.
+
 - Reserved canonical ability/recovery identities before companion Join or any respawn batch publishes, and initialized their exact source defaults in both publication callbacks. Added recorded-queue ownership and away-seat checks plus stale metadata atomicity coverage. Native checks remain pending.
 
 - Added recorded Buy and trusted companion Join/Input dispatch to the existing command queue. Journal identities are nonzero integers with fixed safe registry keys; raw JSON cannot create companion bindings. Purchase denials retain production precedence, including invalid explicit makers. Combined source fixtures and native verification remain in progress.

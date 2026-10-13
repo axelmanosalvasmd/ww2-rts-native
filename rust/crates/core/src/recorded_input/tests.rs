@@ -53,15 +53,42 @@ fn input(seq: u64) -> Value {
     json!({"seq":seq,"forward":0.5,"strafe":0,"yaw":0.2,"pitch":0,
         "fire":false,"jump":0,"reload":0,"nade":0,"squad":0})
 }
-fn guard(m: &Match) -> Value {
-    json!({"units":m.world.game.units.values().map(|u|(u.id,u.hp)).collect::<Vec<_>>(),
-        "next":m.next_unit_id,"wallets":m.start.economy.players.iter().map(|p|p.mp).collect::<Vec<_>>(),
-        "companions":m.companions.records.values().map(|o|(o.id,o.owner,o.unit_id,o.respawn_at)).collect::<Vec<_>>(),
-        "controls":m.commands.units.keys().collect::<Vec<_>>(),
-        "firing":m.firing.units.keys().collect::<Vec<_>>(),
-        "combat":m.combat.iter().map(|(id,_)|id).collect::<Vec<_>>(),
-        "abilities":m.abilities.iter().collect::<Vec<_>>().len(),
-        "recovery":m.recovery.iter().collect::<Vec<_>>().len()})
+fn guard(m: &Match) -> String {
+    let units = &m.world.game.units;
+    let grid: Vec<_> = units
+        .values()
+        .flat_map(|u| {
+            [0.0, 16.0, 128.0].map(|r| {
+                (
+                    m.grid.in_order(units, (u.x, u.z), r, |_, _| true),
+                    m.grid.unordered(units, (u.x, u.z), r, |_, _| true),
+                    m.grid.heavy(units, (u.x, u.z), r, |_, _| true),
+                )
+            })
+        })
+        .collect();
+    let owned: Vec<_> = (0..m.start.players.len())
+        .map(|owner| m.grid.owned_by(units, owner as i32))
+        .collect();
+    format!(
+        "{:?} {:?} {:?}",
+        (
+            units,
+            &m.commands.units,
+            &m.firing,
+            &m.combat,
+            &m.abilities,
+            &m.recovery
+        ),
+        (
+            &m.companions,
+            &m.recruit_metadata,
+            m.next_unit_id,
+            &m.start.economy,
+            m.start.random.snapshot()
+        ),
+        (grid, owned)
+    )
 }
 #[test]
 fn journal_binding_and_raw_buy_validation() {
