@@ -746,3 +746,5 @@ The original-source loader now records 60 traces and 900 checkpoints for three g
 
 
 The ground support recorder now samples every actual effect and activation/removal transition, including fighter-cover expiry. Earlier fixed tick samples missed arrival events just after nominal delay boundaries. The strengthened unchanged-source oracle covers 60 traces and 1,400 checkpoints and records 200 shell events, 16 smoke-wall events, 10 hurts and four collapses. This is a fixture/consumer correction: ground runtime remains byte-identical to 8604e01, and native differential verification is pending.
+
+The replay consumer also asserts that every intermediate source-silent tick emits no event and preserves the strike live/list and cover-count signature. Unexpected effects or premature expiry therefore cannot disappear before the next sampled checkpoint.

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Closed the support replay consumer gap on unsampled ticks: unexpected effects or premature strike/cover lifetime transitions now fail immediately. This strengthens the same 60-trace, 1,400-checkpoint source fixture without changing runtime code; native proof is pending.
+
 - Fixed support oracle sampling that missed arrival events after repeated floating-point delay subtraction. The original-source recorder now captures every effect, strike activation/removal and cover expiry, with 60 traces and 1,400 checkpoints. Ground runtime code is unchanged from 8604e01; native verification is pending.
 
 - Added original-source support direction-fallback cases. The ground-support recorder now covers 60 traces and 900 checkpoints. Native verification remains queued.
