@@ -1,9 +1,9 @@
-//! Authoritative ordinary-map authoring data, supplied as JSON by a trusted caller.
+//! Authoritative ordinary and generated World map data supplied by a trusted caller.
 //!
 //! This is not a client-map importer or a match constructor. Client projections erase mines,
 //! triggers and scenarios irreversibly. Callers must supply the original authoritative document;
 //! the format has no provenance marker that could distinguish a stripped projection.
-//! World Conquest and scenarios have separate validators and return `Unsupported` here. Unknown authoring properties are retained in `source()` for later systems.
+//! Authored scenarios remain unsupported. Unknown authoring properties stay in `source()` for later systems.
 use std::{collections::BTreeMap, fmt};
 
 use serde_json::Value;
@@ -146,6 +146,7 @@ pub struct AuthoritativeMap {
     naval: bool,
     trench_facing: bool,
     structures: Vec<crate::structures::StructureDefinition>,
+    geography: Option<crate::world_map::WorldDefinition>,
 }
 impl AuthoritativeMap {
     /// Validate original server authoring JSON. Never pass a `mapForClient` projection here.
@@ -156,6 +157,9 @@ impl AuthoritativeMap {
         }
         let source: Value =
             serde_json::from_slice(bytes).map_err(|e| invalid("document", &e.to_string()))?;
+        Self::from_value(source)
+    }
+    pub(crate) fn from_value(source: Value) -> Result<Self> {
         if !source.is_object() {
             return Err(invalid("document", "expected a map object"));
         }
@@ -183,11 +187,13 @@ impl AuthoritativeMap {
             .transpose()?;
         let layers = normalize_layers(&source, w, h, &chars)?;
         let structures = crate::structures::parse(source.get("structures"), w, h, &layers)?;
-        for feature in ["scenario", "world"] {
-            if source.get(feature).is_some() {
-                return Err(MapError::Unsupported { feature });
-            }
+        if source.get("scenario").is_some() {
+            return Err(MapError::Unsupported {
+                feature: "scenario",
+            });
         }
+        let is_world = source.get("world").is_some();
+        let minimum_spawns = if is_world { 1 } else { 2 };
         let pos = |v: &Value, field: &str| -> Result<(usize, usize)> {
             Ok((
                 integer(&v["x"], 0, w - 1, field)?,
@@ -202,8 +208,15 @@ impl AuthoritativeMap {
             Ok((x, y))
         };
         let raw_spawns = array(&source["spawns"], "spawns")?;
-        if !(2..=6).contains(&raw_spawns.len()) {
-            return Err(invalid("spawns", "needs 2-6 spawns"));
+        if !(minimum_spawns..=6).contains(&raw_spawns.len()) {
+            return Err(invalid(
+                "spawns",
+                if is_world {
+                    "needs 1-6 spawns"
+                } else {
+                    "needs 2-6 spawns"
+                },
+            ));
         }
         let spawns = raw_spawns
             .iter()
@@ -216,8 +229,15 @@ impl AuthoritativeMap {
                 })
             })
             .collect::<Result<Vec<_>>>()?;
-        if spawns.iter().filter(|s| !s.assault).count() < 2 {
-            return Err(invalid("spawns", "needs two non-assault spawns"));
+        if spawns.iter().filter(|s| !s.assault).count() < minimum_spawns {
+            return Err(invalid(
+                "spawns",
+                if is_world {
+                    "needs a non-assault spawn"
+                } else {
+                    "needs two non-assault spawns"
+                },
+            ));
         }
         let assault_time = source
             .get("assaultTime")
@@ -244,8 +264,19 @@ impl AuthoritativeMap {
         let naval = optional_bool(&source, "naval")?;
         let trench_facing = optional_bool(&source, "trenchFacing")?;
         let raw_points = array(&source["points"], "points")?;
-        if !(1..=9).contains(&raw_points.len()) {
-            return Err(invalid("points", "needs 1-9 capture points"));
+        if if is_world {
+            !raw_points.is_empty()
+        } else {
+            !(1..=9).contains(&raw_points.len())
+        } {
+            return Err(invalid(
+                "points",
+                if is_world {
+                    "World maps need zero capture points"
+                } else {
+                    "needs 1-9 capture points"
+                },
+            ));
         }
         let sequence = source
             .get("pointSequence")
@@ -428,6 +459,10 @@ impl AuthoritativeMap {
                 return Err(invalid("triggers", "scenario work exceeds 4096"));
             }
         }
+        let geography = source
+            .get("world")
+            .map(|v| crate::world_map::parse(v, w, h, &chars, height.as_deref(), spawns.len()))
+            .transpose()?;
         Ok(Self {
             source,
             name,
@@ -445,7 +480,12 @@ impl AuthoritativeMap {
             naval,
             trench_facing,
             structures,
+            geography,
         })
+    }
+    /// Immutable generated geography, in source region order. No ownership or capture state is inferred.
+    pub fn geography(&self) -> Option<&crate::world_map::WorldDefinition> {
+        self.geography.as_ref()
     }
     /// Authored structural definitions, in source order. Implicit sections are built later.
     pub fn structures(&self) -> &[crate::structures::StructureDefinition] {

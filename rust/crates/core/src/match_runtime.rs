@@ -1,5 +1,8 @@
 //! Native match startup. The setup plan is shared by the authoritative constructor.
 pub use crate::objectives::Objective;
+#[path = "match_recruitment.rs"]
+mod recruitment;
+pub use recruitment::{CompletedRecruitUnit, RecruitError, RecruitMetadata, RecruitRouting};
 use std::collections::BTreeMap;
 
 use crate::{
@@ -92,6 +95,9 @@ impl StartPlan {
         options: &MatchOptions,
         rules: &Rules,
     ) -> Result<Self, String> {
+        if map.geography().is_some() {
+            return Err("native startup does not yet initialize World matches".into());
+        }
         if !matches!(options.mode, Mode::Default | Mode::Conquest) {
             return Err("native startup currently supports Conquest".into());
         }
@@ -389,19 +395,28 @@ pub struct BuildingCell {
 /// Authoritative Conquest startup state. Tick execution is added independently.
 /// Live terrain and units have a single owner in `world.game`.
 pub struct Match {
+    pub combat: crate::match_combat::CombatState,
+    pub environment: crate::environment::EnvironmentRuntime,
+    pub commands: crate::match_commands::MatchCommands,
     pub world: World,
     pub start: StartPlan,
     pub options: MatchOptions,
     pub grid: SpatialGrid,
+    pub(crate) recipients: Vec<crate::match_routing::RecipientRouting>,
+    pub(crate) routing_fog: crate::fog::Fog,
     pub building_cells: BTreeMap<usize, BuildingCell>,
     pub production: crate::production::ProductionState,
     pub building_rallies: BTreeMap<u32, Option<Point>>,
+    pub player_rallies: Vec<Option<Point>>,
+    pub recruit_metadata: BTreeMap<u32, RecruitMetadata>,
+    produced_placer: crate::produced_units::ProducedPlacer,
     pub scenario: Option<crate::legacy_scenario::LegacyScenario>,
     pub logistics: crate::logistics::LogisticsState,
     pub capture_ticks: Vec<Option<i64>>,
     pub tick_state: crate::match_tick::TickState,
-    /// Capture story counts only. Combat and spending counters are not integrated yet.
-    pub capture_counts: Vec<f64>,
+    /// Canonical source counters. Event owners must record accepted effects exactly once.
+    pub story: Vec<crate::match_story::PlayerStory>,
+    pub fallen: crate::match_story::FallenLocations,
     pub finish: Option<crate::conquest_end::ConquestFinish>,
     pub timeline: Vec<crate::conquest_end::ConquestSample>,
     pub next_unit_id: u32,
@@ -442,25 +457,40 @@ impl Match {
         };
         let player_count = start.players.len();
         let mut result = Self {
+            combat: crate::match_combat::CombatState::default(),
+            environment: crate::environment::EnvironmentRuntime::default(),
+            commands: crate::match_commands::MatchCommands::new(4096),
             grid: SpatialGrid::new(&world.game.units, 16.0),
+            recipients: Vec::new(),
+            routing_fog: crate::fog::Fog::default(),
             world,
             start,
             options,
             building_cells: BTreeMap::new(),
             production,
             building_rallies: BTreeMap::new(),
+            player_rallies: vec![None; player_count],
+            recruit_metadata: BTreeMap::new(),
+            produced_placer: crate::produced_units::ProducedPlacer::new(),
             scenario,
             logistics: crate::logistics::LogisticsState::default(),
             capture_ticks: vec![None; map.points().len()],
             tick_state: crate::match_tick::TickState::default(),
-            capture_counts: vec![0.0; player_count],
+            story: vec![crate::match_story::PlayerStory::default(); player_count],
+            fallen: crate::match_story::FallenLocations::default(),
             finish: None,
             timeline: Vec::new(),
             next_unit_id,
             rules,
         };
         result.setup_bases()?;
+        for unit in result.world.game.units.values() {
+            result.combat.initialize(unit.id);
+            let control = crate::match_commands::UnitControl::new(unit, &result.rules)?;
+            result.commands.insert(unit.id, control);
+        }
         result.grid.rebuild(&result.world.game.units);
+        result.initialize_recipient_routing()?;
         Ok(result)
     }
 
@@ -611,12 +641,22 @@ impl Match {
         } else {
             Vec::new()
         };
+        let changes: Vec<_> = captured
+            .iter()
+            .map(|event| crate::match_story::StoryChange {
+                slot: Some(event.owner),
+                key: crate::match_story::StoryKey::Captures,
+                amount: 1.0,
+            })
+            .collect();
+        let story_updates =
+            crate::match_story::prepare_story_updates(&mut self.story, winner_decided, &changes)?;
         self.start.points = points;
         self.start.economy = wallets;
+        story_updates.commit();
         if !winner_decided {
             for event in &captured {
                 self.capture_ticks[event.objective_index] = Some(game.tick);
-                self.capture_counts[event.owner] += 1.0;
             }
         }
         Ok(captured)
