@@ -3,6 +3,7 @@
 
 pub mod catalog;
 pub mod client_view;
+pub mod combat;
 pub mod deployment;
 pub mod economy;
 pub mod economy_state;
@@ -34,3 +35,4 @@ mod vehicle_navigation;
 pub mod vision;
 pub mod weather;
 pub mod world;
+pub mod weather_runtime;
