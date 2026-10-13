@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Formatted the new World firing metadata assertions with the pinned Rust formatter.
+
 - Compared every World startup unit's canonical combat and firing metadata with the original source, including local defenders. Removed only duplicate notes introduced by the dependency merge; existing entries remain intact.
 
 - Preserved reviewed canonical combat, firing, environment, routing, tick and story defaults when integrating World startup. World publication initializes combat and firing metadata for every actor; ordinary execution guards remain unchanged.
