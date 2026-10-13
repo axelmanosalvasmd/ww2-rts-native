@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added the detached ordinary human commander state provider: camera attention, real owner alerts with shared identity, urgent interruption and resumption, fresh-view planning, input timing/caps/locality, and delayed raw attempts. Three opening traces and two real grenade-alert traces record 441 full Source steps, 12 delivered views and 12 physical inputs. Native component tests replay the actual facts and Source-collected policy output, but have not run. The native policy callback, observation producer, ground Attack/Retreat admission and Match scheduling remain pending; delayed attempts do not claim actuator acceptance.
+
 - Defined the detached ordinary human commander facts used by the independent observation producer and runtime: ordered visibility, own motion plans, sightings, current public stop controls and owner hurt batches with original event ordinals. No Match, transport or queue interface changes; the complete human-state runtime and producer remain in progress.
 
 - Added detached ordinary human input helpers for duplicate-order filtering, first matching formation groups, camera and selection changes, keys and clicks. The unchanged Source oracle covers 31 cases and 79 emitted input rows, including raw command extensions, duplicate and missing IDs, minimap moves and exact screen boundaries. Native tests are written but not run; alert scheduling, timed input execution, policy and Match hookup remain pending.
