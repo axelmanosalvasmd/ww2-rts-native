@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add a local-defender garrison to the actual World collapse oracle. Its canonical actor and damaged survivor remain present; the test uses an explicit source-only owner adapter for the internal sentinel, without adding a transport or ordinary-owner fallback.
+
 - Refuse selected mass-work and construction activity when only Boolean projections exist in this ancestry. Their canonical project membership cleanup remains with the later owner; add atomic refusal witnesses instead of silently dropping unrepresented work.
 
 - Include a registered building whose current HP is negative in the ordered wreck oracle, proving administrative removal still runs its wreck path regardless of current health.

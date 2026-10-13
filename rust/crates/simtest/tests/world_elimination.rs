@@ -34,6 +34,14 @@ fn unit(u: &Unit) -> Value {
         u.garrison.map_or(-1, |c| c as i64)
     ])
 }
+// Explicit reference adapter: native World keeps the named local actor sentinel internally.
+fn effect(value: &ww2_core::environment::Effect) -> Value {
+    let mut value = value.to_json();
+    if value["to"].as_u64() == Some(LOCAL_DEFENDER_OWNER as u64) {
+        value["to"] = json!(-1);
+    }
+    value
+}
 fn snapshot(m: &Match, order: &[u32]) -> Value {
     let base = world_scene::projection(m);
     let mut value = json!({"regions":base["regions"],"players":base["players"],
