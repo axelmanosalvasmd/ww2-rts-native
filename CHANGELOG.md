@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added a canonical mutable World with terrain edits, material/mine cleanup, packed state, region invalidation, stable cell logs, journals and independent recipient pending indices (issue #62). Six original-source traces cover 78 actions, including four authored maps. Building section registration preserves displaced section values without duplicating health; live terrain vectors move into Game while the initial snapshot remains separate. Building registration rejects exhausted counters before changing any section. Wrecks now retain an optional settled cell for cleanup, and runtime building footprints use their movement/sight flags. Active destruction, fire simulation and full match startup remain separate work.
+
 - Added recipient routing terrain from public authored inputs or ordered remembered rows, preserving row identity, mine knowledge, wall proximity and navigation change order. The original-helper oracle matches 93 snapshots, 270 paths and 48 cover query sets. Cover queries report unknown World cells or missing house/toughness inputs explicitly. Automatic recipient selection, memory collection, scheduling and movement integration remain pending; no ABI changed.
 
 - Added compiled pathfinding rules from the existing catalog, removing caller JSON and copied constants from native route initialization. The 1,529-search oracle now runs with these compiled costs and checks every cost bit against JavaScript.
