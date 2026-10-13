@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Strengthened aircraft oracle sampling to capture actual arrival, payload, interception and removal events, continuing through recon and fighter-cover expiry. The source recorder passes 188 traces and 4,212 checkpoints. Native proof remains pending.
+- Exposed the canonical immutable current-position team visibility predicate for support and recipient producers. Renamed the private visible-enemy-unit collector to distinguish it from point visibility; terrain/fog/range semantics and maintained grid order are unchanged. Caller validation remains required. Native point-predicate acceptance is pending.
+
 
 - Integrated the source-stable canonical reserve preparation prerequisite for paratrooper publication. The aircraft continuation and this combined ancestry remain native-pending; existing ground proof remains frozen separately.
 
