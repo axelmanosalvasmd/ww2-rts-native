@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Added host tick catch-up with the source's four-tick cap and backlog drop, plus snapshot cadence from rolling timing percentiles. Snapshot phases are recorded only on scheduled snapshot ticks; sustained spare capacity recovers the interval. Timing inputs and counter capacity are checked before mutation. The original-source recorder covers 8 meter traces with 747 samples and 7 clock traces with 34 polls. Native checks and actual room-loop wiring remain pending; AI keeps its recorded schedule.
+- Added host tick catch-up with the source's four-tick cap and backlog drop, plus snapshot cadence from rolling timing percentiles. Snapshot phases are recorded only on scheduled snapshot ticks; sustained spare capacity recovers the interval. Timing inputs and counter capacity are checked before mutation. The original-source recorder covers 8 meter traces with 747 samples and 7 clock traces with 34 polls. The combined server checkpoint passes 23 debug tests, 173 release workspace tests, strict Clippy, formatting and release FFI at 315f46a. Actual room-loop wiring remains pending; AI keeps its recorded schedule.
 
 - Integrated the server delta, list and socket backpressure checkpoints with the reviewed core ancestry. All original server tests and source fixtures are retained; final native checks remain pending.
 
