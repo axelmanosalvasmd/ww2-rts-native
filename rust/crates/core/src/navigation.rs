@@ -139,13 +139,20 @@ pub struct Navigation {
 }
 
 impl Navigation {
-    pub(crate) fn rebind_terrain(&mut self, source: TerrainView<'_>, prepared: TerrainView<'_>) {
+    pub(crate) fn rebind_terrain(
+        &mut self,
+        source: TerrainView<'_>,
+        prepared: TerrainView<'_>,
+        vehicle_buffers: &[usize],
+    ) {
         for graph in self.graphs.values_mut() {
             let id = &mut graph.identity;
             if id.width == source.width
                 && id.height == source.height
                 && id.knowledge_id == source.knowledge_id
                 && id.heights == source.heights.map(|v| v.as_ptr() as usize)
+                && (id.flags == source.flags.as_ptr() as usize
+                    || vehicle_buffers.contains(&id.flags))
             {
                 id.heights = prepared.heights.map(|v| v.as_ptr() as usize);
                 if id.flags == source.flags.as_ptr() as usize {
