@@ -4,6 +4,7 @@
 pub mod catalog;
 pub mod client_view;
 pub mod combat;
+pub mod commander_ai;
 pub mod conquest_end;
 pub mod deployment;
 pub mod economy;
@@ -20,6 +21,7 @@ pub mod command_destinations;
 pub mod logistics;
 pub mod map;
 pub mod match_combat;
+pub mod match_commander;
 pub mod match_commands;
 pub mod match_firing;
 pub mod match_routing;
