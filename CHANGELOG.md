@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed a strict Clippy assertion in the snapshot delivery regression by using is_empty. All focused debug and release workspace tests passed on the prior frozen head; the fresh head still needs the remaining native gates.
+
 - Added canonical optional movement-result tails to UnitControl and the owner-only snapshot reader. Actual path failure and completion operations record their tick; later move, stop and reaction intents preserve the previous tail. Extended the original command oracle to 58 traces and 259 steps, including 518 recipient movement observations and two retained recovery/replan branches. All 246 prior steps are unchanged apart from added result/recipient observations. Cached snapshot fixtures remain 70 states and 210 recipients. Native verification is pending the managed Rust lane; no complete envelope, wire or ABI change was added.
 
 - Added internal recipient projection of canonical capture-point contest/cut/prerequisite rows, army presets, live support cooldowns and weather values, plus current-position filtered smoke and fire rows. Reused the source-reviewed team visibility helper with an ephemeral observation index, preserving the maintained match grid. The original cached-source fixture now records 70 states and 210 recipient projections. Native verification remains queued; movement result tails, live strikes/covers and the remaining snapshot families stay explicit boundaries.

@@ -276,11 +276,10 @@ mod tests {
             .capture(&mut state, &[false; 3], &[false; 3])
             .unwrap();
         assert!(
-            frame.recipient(0).unwrap().fields["cells"]
+            !frame.recipient(0).unwrap().fields["cells"]
                 .as_array()
                 .unwrap()
-                .len()
-                > 0
+                .is_empty()
         );
     }
 }
