@@ -139,6 +139,7 @@ impl Person {
 struct AttachedRuntime {
     epoch: u64,
     runtime: RoomRuntime,
+    startup: crate::native_startup::NativeStartup,
 }
 
 struct RoomResult {
@@ -324,7 +325,7 @@ impl Room {
             .iter()
             .position(|p| p.connection.as_ref().is_some_and(|c| c.id == id));
         let mut result = json!({
-            "t":"lobby", "proto":0, "code": self.code, "state":"lobby",
+            "t":"lobby", "proto":0, "code": self.code, "state":if self.native.is_some() { "play" } else { "lobby" },
             "role":"commander", "operatives":[], "spectator":you.is_none(),
             "amHost":self.is_host(id), "spectators":self.spectators.iter().map(|p| &p.name).collect::<Vec<_>>(),
             "listed":self.listed, "saves":[], "hordeBest":null,
@@ -361,7 +362,7 @@ impl Room {
     fn directory(&self, maps: &Value) -> Value {
         let mut v = json!({
             "code":self.code,"title":self.title,"mode":self.mode,
-            "map":if self.mode == "world" { "world" } else { &self.map },"state":"lobby",
+            "map":if self.mode == "world" { "world" } else { &self.map },"state":if self.native.is_some() { "play" } else { "lobby" },
             "humans":self.players.iter().filter(|p| !p.ai && p.connection.is_some()).count(),
             "ai":self.players.iter().filter(|p| p.ai).count(),"occupied":self.players.len(),
             "capacity":self.capacity(maps),"joinable":self.native.is_none() && self.players.len() < self.capacity(maps)
@@ -413,7 +414,7 @@ impl Room {
             }
             return false;
         }
-        // This slice never enters play. Known, unavailable commands fail explicitly.
+        // Public gameplay and setup admission remain unavailable in this trusted-host slice.
         if UNAVAILABLE.contains(&t) {
             let reason = match t {
                 "start" | "restart" => "scenario",
@@ -725,22 +726,44 @@ impl Hub {
         let epoch = self
             .next_epoch
             .checked_add(1)
+            .filter(|epoch| *epoch <= crate::native_startup::MAX_MATCH_ID)
             .ok_or("native runtime epoch exhausted")?;
+        let startup = crate::native_startup::NativeStartup::prepare(
+            &state,
+            crate::native_startup::StartupSettings {
+                map: &room.map,
+                mode: &room.mode,
+                army: &room.army,
+                weather: &room.weather,
+                sandbox: room.sandbox,
+            },
+        )?;
         // Canonical runtime admission completes before changing the room or accounts.
         let mut runtime = RoomRuntime::new(state, now)?;
-        let mut pauses = Vec::new();
+        let resume = runtime.resume(now);
         for (slot, person) in room.players.iter().enumerate() {
             if person
                 .connection
                 .as_ref()
                 .is_none_or(|connection| !connection.ready())
-                && let Some(message) = runtime.auto_pause(slot, &person.name, now)?
             {
-                pauses.push(message);
+                runtime.auto_pause(slot, &person.name, now)?;
             }
         }
+        let slots = (0..room.players.len()).collect::<Vec<_>>();
+        let names = room
+            .players
+            .iter()
+            .map(|p| p.name.clone())
+            .collect::<Vec<_>>();
+        let starts = runtime.collect_starts(&slots, &startup, &names, epoch)?;
+        let pause = runtime.paused().then(|| runtime.pause_message(now));
         let room = self.rooms.get_mut(code).unwrap();
-        room.native = Some(AttachedRuntime { epoch, runtime });
+        room.native = Some(AttachedRuntime {
+            epoch,
+            runtime,
+            startup,
+        });
         room.result = None;
         self.next_epoch = epoch;
         for (slot, person) in room.players.iter().enumerate() {
@@ -748,11 +771,19 @@ impl Hub {
                 SnapshotAccount::start_stream(&mut self.accounts, connection.id, code, epoch, slot);
             }
         }
-        for message in pauses {
-            for person in room.people() {
-                if let Some(connection) = &person.connection {
-                    connection.send(message.clone());
+        for person in room.people() {
+            if let Some(connection) = &person.connection {
+                connection.send(resume.clone());
+            }
+        }
+        room.broadcast(&self.maps, &self.public_url);
+        for (slot, start) in starts {
+            if let Some(connection) = &room.players[slot].connection {
+                connection.send(start);
+                if let Some(pause) = &pause {
+                    connection.send(pause.clone());
                 }
+                self.accounts.get_mut(&connection.id).unwrap().full_terrain = false;
             }
         }
         Ok(epoch)
@@ -1250,6 +1281,21 @@ impl Hub {
             return;
         }
         if *joined {
+            if msg["t"] == "resync"
+                && let Some(room) = self.rooms.get(code)
+                && let Some(native) = &room.native
+                && let Some(slot) = room
+                    .players
+                    .iter()
+                    .position(|p| p.connection.as_ref().is_some_and(|c| c.id == connection.id))
+                && let Some(account) = self
+                    .accounts
+                    .get_mut(&connection.id)
+                    .filter(|a| a.room == code && a.epoch == native.epoch && a.slot == slot)
+            {
+                account.delivery.request_full();
+                return;
+            }
             if let Some(room) = self.rooms.get_mut(code)
                 && room.command(connection.id, &msg, &self.maps, now)
             {
@@ -1310,6 +1356,43 @@ impl Hub {
             .take(40)
             .collect();
         let name = clean(msg["name"].as_str().unwrap(), 16, "Soldier", false);
+        // Prepare the returning seat before replacing its socket or transport ledgers.
+        let returning = room
+            .players
+            .iter()
+            .position(|p| !token.is_empty() && p.token == token);
+        let mut prepared_start = None;
+        if let Some(slot) = returning
+            && let Some(native) = &mut room.native
+        {
+            let mut names = room
+                .players
+                .iter()
+                .map(|p| p.name.clone())
+                .collect::<Vec<_>>();
+            names[slot] = name.clone();
+            match native
+                .runtime
+                .collect_starts(&[slot], &native.startup, &names, native.epoch)
+            {
+                Ok(mut starts) => {
+                    let (_, start) = starts.pop().expect("one admitted returning seat");
+                    prepared_start = Some((
+                        start,
+                        native
+                            .runtime
+                            .paused()
+                            .then(|| native.runtime.pause_message(now)),
+                    ));
+                }
+                Err(error) => {
+                    native.runtime.fault_stop(error);
+                    connection.send(json!({"t":"deny","cmd":"join","reason":"blocked"}));
+                    connection.close(1008, "native start unavailable");
+                    return;
+                }
+            }
+        }
         if let Some(p) = room
             .players
             .iter_mut()
@@ -1364,6 +1447,17 @@ impl Hub {
                 native.epoch,
                 slot,
             );
+        }
+        *joined = true;
+        room.empty_since = None;
+        if let Some((start, pause)) = prepared_start {
+            connection.send(start);
+            if let Some(pause) = pause {
+                connection.send(pause);
+            }
+            self.accounts.get_mut(&connection.id).unwrap().full_terrain = false;
+            let slot = returning.expect("admitted returning commander");
+            let native = room.native.as_mut().unwrap();
             match native.runtime.resume_drop(slot, now) {
                 Ok(Some(resume)) => {
                     for person in &room.players {
@@ -1376,8 +1470,8 @@ impl Hub {
                 Err(error) => native.runtime.fault_stop(error),
             }
         }
-        *joined = true;
-        room.empty_since = None;
+        // Source hello does not await lobby's map-list read, so reconnect start
+        // and drop-resume are emitted before the later lobby broadcast.
         room.broadcast(&self.maps, &self.public_url);
         if msg["listing"]["tutorial"] == true && room.mode == "tutorial" {
             connection.send(json!({"t":"deny","cmd":"start","reason":"scenario"}));
@@ -1664,3 +1758,7 @@ mod tests {
 #[cfg(test)]
 #[path = "native_lobby_tests.rs"]
 pub(crate) mod native_tests;
+
+#[cfg(test)]
+#[path = "native_startup_tests.rs"]
+mod native_startup_tests;

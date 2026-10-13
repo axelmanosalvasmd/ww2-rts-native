@@ -2,6 +2,7 @@
 pub mod authoritative_maps;
 mod lobby;
 mod maps;
+mod native_startup;
 pub mod room_runtime;
 pub mod snapshot_backpressure;
 pub mod snapshot_delta;
@@ -70,7 +71,7 @@ impl Server {
 }
 
 /// Trusted host access to the same Hub used by HTTP, sockets and maintenance.
-/// Attachment does not enable a public start command or create a start handshake.
+/// Attachment validates the lobby setup and sends its ordinary commander start handshake.
 #[derive(Clone)]
 pub struct NativeRoomControl {
     server: Server,

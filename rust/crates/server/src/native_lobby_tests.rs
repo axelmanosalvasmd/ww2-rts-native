@@ -72,9 +72,26 @@ fn write(rx: &mut mpsc::Receiver<Output>) -> SnapshotWrite {
         }
     }
 }
+fn initial_start(rx: &mut mpsc::Receiver<Output>) {
+    for kind in ["pause", "lobby", "start"] {
+        let Output::Json(message) = rx.try_recv().unwrap() else {
+            panic!("initial setup precedes snapshots")
+        };
+        assert_eq!(message["t"], kind);
+        match kind {
+            "pause" => assert_eq!(message["paused"], false),
+            "lobby" => assert_eq!(message["state"], "play"),
+            "start" => {
+                assert!(message["fog"].is_object());
+                assert!(message["cells"].is_array());
+            }
+            _ => unreachable!(),
+        }
+    }
+}
 #[test]
 fn native_attachment_admits_before_roster_or_account_publication() {
-    let (mut h, _, _, _, _) = room();
+    let (mut h, _, mut ra, _, mut rb) = room();
     let mut invalid = native_match();
     invalid.world.game.units.values_mut().next().unwrap().kind = usize::MAX;
     assert!(h.attach_native("ABC", invalid, 0).is_err());
@@ -85,6 +102,20 @@ fn native_attachment_admits_before_roster_or_account_publication() {
     mismatch.options.players[1].faction = Faction::Uk;
     assert!(h.attach_native("ABC", mismatch, 0).is_err());
     assert!(h.accounts.is_empty());
+    let mut wrong_map = native_match();
+    wrong_map.options.map_key = Some("el-alamein".into());
+    assert!(h.attach_native("ABC", wrong_map, 0).is_err());
+    let mut wrong_layout = native_match();
+    wrong_layout.start.players[0].spawn.x += 2.;
+    assert!(h.attach_native("ABC", wrong_layout, 0).is_err());
+    let mut wrong_settings = native_match();
+    wrong_settings.options.army = ArmySize::Large;
+    assert!(h.attach_native("ABC", wrong_settings, 0).is_err());
+    assert!(h.rooms["ABC"].native.is_none());
+    assert!(h.accounts.is_empty());
+    assert_eq!(h.next_epoch, 0);
+    assert!(ra.try_recv().is_err());
+    assert!(rb.try_recv().is_err());
     assert_eq!(h.attach_native("ABC", native_match(), 0).unwrap(), 1);
     assert!(h.attach_native("ABC", native_match(), 0).is_err());
     assert_eq!(h.accounts.len(), 2);
@@ -112,6 +143,17 @@ fn native_attachment_admits_before_roster_or_account_publication() {
         tick
     );
     assert!(h.native_status("ABC").is_err());
+}
+#[test]
+fn startup_identity_exhaustion_does_not_publish_an_unsafe_client_number() {
+    let (mut h, _, mut ra, _, mut rb) = room();
+    h.next_epoch = crate::native_startup::MAX_MATCH_ID;
+    assert!(h.attach_native("ABC", native_match(), 0).is_err());
+    assert!(h.rooms["ABC"].native.is_none());
+    assert!(h.accounts.is_empty());
+    assert_eq!(h.next_epoch, crate::native_startup::MAX_MATCH_ID);
+    assert!(ra.try_recv().is_err());
+    assert!(rb.try_recv().is_err());
 }
 #[test]
 fn attached_roster_reconnects_in_place_and_stale_writes_only_drain_old_accounts() {
@@ -143,7 +185,7 @@ fn attached_roster_reconnects_in_place_and_stale_writes_only_drain_old_accounts(
     assert_eq!(h.accounts[&1].pressure.inflight(), 0);
     assert_eq!(h.accounts[&4].delivery, new_history);
     assert_eq!(h.accounts[&4].pressure.inflight(), 0);
-    assert!(h.accounts[&4].full_terrain);
+    assert!(!h.accounts[&4].full_terrain);
     assert!(!matches!(rr.try_recv(), Ok(Output::Snapshot(_))));
     h.complete_snapshot(&other, true, 52);
     h.disconnected("ABC", 1, 53);
@@ -159,6 +201,8 @@ fn attached_roster_reconnects_in_place_and_stale_writes_only_drain_old_accounts(
 fn refused_enqueue_drops_one_connection_and_old_epoch_completions_only_drain() {
     let (mut h, a, mut ra, _, mut rb) = room();
     h.attach_native("ABC", native_match(), 0).unwrap();
+    initial_start(&mut ra);
+    initial_start(&mut rb);
     for _ in 0..64 {
         a.send(json!({"t":"pong"}));
     }
@@ -177,7 +221,7 @@ fn refused_enqueue_drops_one_connection_and_old_epoch_completions_only_drain() {
     let (replacement, mut replacement_rx) = client(3);
     join(&mut h, &replacement, "a", 52);
     assert!(!h.native_status("ABC").unwrap().paused);
-    assert!(h.accounts[&3].full_terrain);
+    assert!(!h.accounts[&3].full_terrain);
     h.poll_native(100, 100_000_000);
     h.poll_native(150, 150_000_000);
     let full = write(&mut replacement_rx);
@@ -230,7 +274,7 @@ fn absent_and_unready_connections_are_distinct_and_expiry_precedes_callbacks() {
             .all(|player| !player.away)
     );
     assert_eq!(h.accounts[&1].delivery, before);
-    assert!(h.accounts[&1].full_terrain);
+    assert!(!h.accounts[&1].full_terrain);
     assert_eq!(h.accounts[&1].pressure.inflight(), 0);
     // An expired native room must not run a pause callback or any due tick.
     h.rooms.get_mut("ABC").unwrap().empty_since = Some(0);
@@ -343,6 +387,8 @@ fn final_hold_frame_precedes_result_and_old_tickets_survive_new_attachment() {
     let outstanding = h.accounts[&1].pressure.inflight();
     assert!(outstanding > 0);
     let new_epoch = h.attach_native("ABC", native_match(), 6000).unwrap();
+    initial_start(&mut ra);
+    initial_start(&mut rb);
     assert!(new_epoch > old_epoch);
     assert_eq!(h.accounts[&1].pressure.inflight(), outstanding);
     let history = h.accounts[&1].delivery.clone();
@@ -351,7 +397,7 @@ fn final_hold_frame_precedes_result_and_old_tickets_survive_new_attachment() {
     }
     assert_eq!(h.accounts[&1].pressure.inflight(), 0);
     assert_eq!(h.accounts[&1].delivery, history);
-    assert!(h.accounts[&1].full_terrain);
+    assert!(!h.accounts[&1].full_terrain);
     assert_eq!(h.native_status("ABC").unwrap().tick, 0);
     assert!(ra.try_recv().is_err());
     h.poll_native(6000, 6_000_000_000);

@@ -64,6 +64,40 @@ pub struct RoomRuntime {
     held: u16,
 }
 impl RoomRuntime {
+    /// Establish full start baselines on the existing receipt owner without shot previews.
+    pub(crate) fn collect_starts(
+        &mut self,
+        slots: &[usize],
+        startup: &crate::native_startup::NativeStartup,
+        names: &[String],
+        match_id: u64,
+    ) -> Result<Vec<(usize, Value)>, String> {
+        self.running()?;
+        let envelope = startup.envelope(&self.state, names, match_id)?;
+        let selected = slots
+            .iter()
+            .map(|&slot| SelectedSeat {
+                slot,
+                full: true,
+                omit: false,
+            })
+            .collect::<Vec<_>>();
+        let frame = self
+            .delivery
+            .capture_selected_with_lists(&mut self.state, &selected, &[])
+            .map_err(|e| format!("native startup delivery: {e:?}"))?
+            .ok_or("native startup has no seats")?;
+        Ok(slots
+            .iter()
+            .map(|&slot| {
+                let snapshot = frame
+                    .recipient(slot)
+                    .expect("admitted startup seat")
+                    .into_json();
+                (slot, envelope.message(slot, snapshot))
+            })
+            .collect())
+    }
     pub fn new(state: Match, now_ms: u64) -> Result<Self, String> {
         state.validate_tick_state()?;
         state
