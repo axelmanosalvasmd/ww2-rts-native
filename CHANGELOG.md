@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Cover now cancels real paid Dig through the sole field-work owner without refunds and clears a garrison squad's orders while keeping it in its house. Queued admission and unsuccessful cover holds retain jobs. Five original-source traces bring the command fixture to 90 traces and 329 steps; native proof is pending. Construction and mass-entrenchment projects remain explicitly refused.
+
 - Combined the checked ability and recovery cancellation hooks with the Cover field extension. Recruitment keeps its existing guarded publication; native checks of this combined ancestry remain pending.
 
 - Combined the checked engineering and recorded-input ancestry with queued Cover in its separate field cleanup checkpoint. The canonical command union retains both Cover and Dig; staged observation and cache provider bodies remain unchanged. New integration native checks are pending.

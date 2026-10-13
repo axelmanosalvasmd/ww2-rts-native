@@ -96,6 +96,8 @@ fn initial(c: &Value) -> Match {
         m.commands.insert(id, control);
         m.firing.initialize(id);
         m.combat.initialize(id);
+        m.abilities.initialize(id);
+        m.recovery.initialize(id);
         m.world.game.units.insert(id, u);
         if row["fields"].is_object() {
             set(&mut m, id, &row["fields"]);
@@ -111,6 +113,16 @@ fn initial(c: &Value) -> Match {
             .filter(|u| u.owner != owner)
             .map(|u| u.id)
             .collect();
+    }
+    if c["steps"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|s| s["work"].is_object())
+    {
+        for player in &mut m.start.economy.players {
+            player.mp = 150.0;
+        }
     }
     m.world.game.tick = 1;
     m.grid.rebuild(&m.world.game.units);
@@ -155,6 +167,38 @@ fn set(m: &mut Match, id: u32, fields: &Value) {
     let c = m.commands.units.get_mut(&id).unwrap();
     for (key, value) in fields.as_object().unwrap() {
         match key.as_str() {
+            "orders" => {
+                assert!(value.as_array().unwrap().is_empty());
+                c.orders.clear();
+            }
+            "routeEnd" => c.route_end = point(value),
+            "moveOutcome" => {
+                c.outcome = value.as_str().map(|v| match v {
+                    "interrupted" => MoveOutcome::Interrupted,
+                    _ => panic!("fixture outcome"),
+                })
+            }
+            "moveOutcomeTick" => c.outcome_tick = value.as_i64(),
+            "garrisonEntry" => {} // Source setup provenance; Cover neither reads nor changes this coordinate.
+            "face" => {
+                c.face = value.as_object().map(|_| Facing {
+                    angle: value["a"].as_f64().unwrap(),
+                    at: point(value).unwrap(),
+                })
+            }
+            "traffic" => {
+                u.traffic = (!value.is_null() && value.as_bool() != Some(false)).then(|| {
+                    crate::game::Traffic {
+                        goal: u.at(),
+                        legs: vec![],
+                        passing: false,
+                        by: 0,
+                        until: 0.0,
+                    }
+                })
+            }
+            "trafficWait" => u.traffic_wait = value.as_f64().unwrap(),
+            "stuck" => u.stuck = value.as_f64().unwrap(),
             "retreating" => u.retreating = value.as_bool().unwrap(),
             "holdPos" => u.hold_pos = value.as_bool().unwrap(),
             "x" => u.x = value.as_f64().unwrap(),
@@ -291,6 +335,26 @@ fn original_command_and_waiting_order_phases() {
             if let Some(id) = a["amove"].as_u64() {
                 m.apply_attack_move(id as u32).unwrap();
             }
+            if let Some(id) = a["digPhase"].as_u64() {
+                let id = id as u32;
+                let result = m
+                    .field_works
+                    .step_unit(&mut m.world, id, a["dt"].as_f64().unwrap())
+                    .unwrap();
+                assert!(
+                    result.route.is_none(),
+                    "fixture only executes genuine in-reach work"
+                );
+                m.world.game.units.get_mut(&id).unwrap().dig = m.field_works.is_active(id);
+            }
+            if step["work"].is_object() {
+                assert_eq!(
+                    work_snapshot(&m),
+                    step["work"],
+                    "{} step{index} paid work",
+                    case["name"]
+                );
+            }
             assert_eq!(
                 snapshot(&m),
                 step["expected"],
@@ -300,7 +364,7 @@ fn original_command_and_waiting_order_phases() {
             count += 1;
         }
     }
-    assert_eq!(count, 312);
+    assert_eq!(count, 329);
 }
 #[test]
 fn ordered_match_boundary_and_whole_command_rejection() {
@@ -443,8 +507,8 @@ fn immediate_cover_uses_the_recorded_queue_and_refuses_unrepresented_jobs() {
             },
             false
         )
-        .unwrap(),
-        Some(Denial::Unsupported)
+        .unwrap_err(),
+        "unrepresented or inconsistent cover field work"
     );
     assert_eq!(snapshot(&m), before);
     assert_eq!(
@@ -536,6 +600,30 @@ fn cover_refresh_preserves_moved_gameplay_bucket_order() {
     untouched
         .recipient_sees(0, Point { x: 27.0, z: 23.0 })
         .unwrap();
+    // A late route refusal must also preserve a real paid descriptor and its wallet.
+    for candidate in [&mut m, &mut untouched] {
+        let mp = candidate.start.economy.players[0].mp;
+        assert_eq!(
+            candidate
+                .execute_command(
+                    0,
+                    &Command::Dig {
+                        ids: vec![1],
+                        kind: crate::field_works::FortKind::Trench,
+                        at: Point { x: 29.0, z: 27.0 },
+                        direction: Some(0.0),
+                        queue: false,
+                    },
+                    false
+                )
+                .unwrap(),
+            None
+        );
+        assert_eq!(candidate.start.economy.players[0].mp, mp - 30.0);
+        assert!(candidate.field_works.is_active(1));
+    }
+    let paid_jobs = m.field_works.clone();
+    let paid_wallet = m.start.economy.players[0].mp;
     untouched.world.game.units.get_mut(&2).unwrap().path_gen = u64::MAX;
     untouched.world.game.tick += 1;
     let witness = 11 * 32 + 14;
@@ -568,6 +656,8 @@ fn cover_refresh_preserves_moved_gameplay_bucket_order() {
         .is_err()
     );
     assert_eq!(snapshot(&m), state);
+    assert_eq!(m.field_works, paid_jobs);
+    assert_eq!(m.start.economy.players[0].mp, paid_wallet);
     assert_eq!(m.world.game.units[&1].path_gen, generation);
     assert_eq!(m.world.game.units[&2].path_gen, u64::MAX);
     assert_eq!(probe(&m), before);
@@ -679,4 +769,20 @@ fn queued_cover_admission_keeps_live_routes_and_observations() {
             .collect::<Vec<_>>(),
         before
     );
+}
+
+fn work_snapshot(m: &Match) -> Value {
+    let dig:Vec<_> = m.world.game.units.keys().map(|id| {
+        let d = m.field_works.jobs().get(id).map(|d| {
+            let mut row=json!({"x":d.at.x,"z":d.at.z,"cells":d.cells.iter().map(|c|json!([c.cell,(c.ch as char).to_string()])).collect::<Vec<_>>(),"t":d.elapsed,"kind":d.kind.as_str(),"dir":d.direction});
+            let object=row.as_object_mut().unwrap();
+            if let Some(n)=d.original_cells {object.insert("n".into(),json!(n));}
+            if let Some(reach)=d.reach {object.insert("reach".into(),json!(reach));}
+            if let Some(front)=d.front {object.insert("front".into(),json!(front));}
+            if let Some(from)=d.from {object.insert("from".into(),json!({"x":from.x,"z":from.z}));}
+            row
+        });
+        json!({"id":id,"dig":d})
+    }).collect();
+    json!({"players":m.start.economy.players.iter().enumerate().map(|(slot,p)|json!({"slot":slot,"mp":bits(p.mp)})).collect::<Vec<_>>(),"dig":dig})
 }

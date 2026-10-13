@@ -15,11 +15,15 @@ registerHooks({load(url,context,next){const out=next(url,context);if(url!==pathT
  const preBegin='    if (u.worldGoal && (u.retreating',preEnd='    if (def.building)';
  const amoveBegin='    // attack-move: halt while something is in range',amoveEnd='    // shelling a structure:';
  const replanBegin='    const stalledRoute =',replanEnd='    const route = traffic.goal ?';
- for(const marker of [preBegin,preEnd,amoveBegin,amoveEnd,replanBegin,replanEnd])if(source.split(marker).length!==2)throw Error('Phase anchors changed');
+ const digBegin='    // digging: walk to the spot, then turn one cell into trench every digTime seconds',digEnd='    // grenade order:';
+ const enterBegin='    // heading into a building: walk up to it, then step inside',enterEnd='    // boarding:';
+ for(const marker of [preBegin,preEnd,amoveBegin,amoveEnd,replanBegin,replanEnd,digBegin,digEnd,enterBegin,enterEnd])if(source.split(marker).length!==2)throw Error('Phase anchors changed');
  const pre=source.slice(source.indexOf(preBegin),source.indexOf(preEnd));
  const amove=source.slice(source.indexOf(amoveBegin),source.indexOf(amoveEnd));
  const replan=source.slice(source.indexOf(replanBegin),source.indexOf(replanEnd));
- return {...out,source:source+'\nexport {placeUnit as __placeUnit,beginPathTick as __beginPathTick,startQueuedOrders as __startQueuedOrders,endSpots as __endSpots,observedPathView as __observedPathView,setCell as __setCell};\nexport function __commandPre(g,u){const def=UNITS[u.type];\n'+pre+'}\nexport function __amove(g,u){\n'+amove+'}\nexport function __replan(g,u,shouldReplan){const def=UNITS[u.type],groundVehicle=isGroundVehicle(def),traffic={blocked:false,yielding:false,waiting:false,replan:shouldReplan};\n'+replan+'}\n'};
+ const dig=source.slice(source.indexOf(digBegin),source.indexOf(digEnd));
+ const enter=source.slice(source.indexOf(enterBegin),source.indexOf(enterEnd));
+ return {...out,source:source+'\nexport {placeUnit as __placeUnit,beginPathTick as __beginPathTick,startQueuedOrders as __startQueuedOrders,endSpots as __endSpots,observedPathView as __observedPathView,setCell as __setCell};\nexport function __commandPre(g,u){const def=UNITS[u.type];\n'+pre+'}\nexport function __amove(g,u){\n'+amove+'}\nexport function __replan(g,u,shouldReplan){const def=UNITS[u.type],groundVehicle=isGroundVehicle(def),traffic={blocked:false,yielding:false,waiting:false,replan:shouldReplan};\n'+replan+'}\nexport function __dig(g,u,dt){\n'+dig+'}\nexport function __enter(g,u){\n'+enter+'}\n'};
 }});
 const sim=await import(pathToFileURL(resolve(reference,'shared/sim.js')));
 const bitsBuffer=new DataView(new ArrayBuffer(8));const bits=n=>{bitsBuffer.setFloat64(0,n);return bitsBuffer.getBigUint64(0).toString(16).padStart(16,'0');};
@@ -32,12 +36,22 @@ const wall=flat().map((r,y)=>r.slice(0,16)+(y<8||y>11?'B':'.')+r.slice(17));
 const cliff=flat();const heights=cliff.map((r,y)=>[...r].map((_,x)=>x>15?'2':'0').join('')); 
 const maps=[makeMap('flat',flat()),makeMap('cover',cover),makeMap('wall',wall),makeMap('cliff',cliff,heights)];
 const cases=[];
-function trace(name,map,initial,actions){
+function trace(name,map,initial,actions,sourceSetup){
  if(sim.validateMap(map)!==null)throw Error(`Invalid fixture map: ${name}`);
  const save=Math.random;Math.random=()=>.5;let g,players;try {g=sim.createGame(map,[],false,[],[],{weather:false});players=sim.createGame(map,['A','B'],false,[0,1],[0,1],{weather:false}).players;}finally{Math.random=save;}
  g.players=players;g.units=new Map();g.nextId=1;g.tick=1;g.pathBudget=4096;g.winner=null;g.supply=false;g.logistics=false;
  for(const row of initial){const u=sim.internals.spawnUnit(g,row.owner??0,row.kind);Object.assign(u,{x:row.x,z:row.z,...row.fields});sim.__placeUnit(g,u,{x:u.x,z:u.z});}
  for(const p of g.players)p.visible=new Set([...g.units.values()].filter(u=>u.owner!==p.slot).map(u=>u.id));
+ let setup;
+ if(sourceSetup){
+  setup={initial,actions:sourceSetup};
+  for(const action of sourceSetup){
+   if(action.command){const denial=sim.command(g,action.owner??0,action.command);if(denial)throw Error(`Source setup refused: ${name}: ${denial}`);}
+   if(action.enterPhase)sim.__enter(g,g.units.get(action.enterPhase));
+  }
+  const fields=['garrison','enter','board','path','repath','routeEnd','worldGoal','orders','attackId','targetId','follow','nade','dig','amove','fireAt','build','entrench','face','traffic','trafficWait','moveOutcome','moveOutcomeTick','garrisonEntry'];
+  initial=initial.map((row,i)=>{const u=g.units.get(i+1);return {...row,x:u.x,z:u.z,fields:JSON.parse(JSON.stringify(Object.fromEntries(fields.map(k=>[k,u[k]]))))};});
+ }
  const steps=[];
  for(const action of actions){g.tick=action.tick??g.tick;g.winner=action.winner?0:null;
   for(const [id,fields]of action.set??[]){const u=g.units.get(id);Object.assign(u,fields);sim.__placeUnit(g,u,{x:u.x,z:u.z});}
@@ -48,9 +62,11 @@ function trace(name,map,initial,actions){
   if(action.begin){g.pathBudget=action.budget??4096;g.pathRetryLimit=action.retryLimit??20;sim.__beginPathTick(g);}
   if(action.pre)sim.__commandPre(g,g.units.get(action.pre));
   if(action.amove)sim.__amove(g,g.units.get(action.amove));
-  steps.push({action,denial,expected:snapshot(g)});
+  if(action.digPhase)sim.__dig(g,g.units.get(action.digPhase),action.dt);
+  if(action.enterPhase)sim.__enter(g,g.units.get(action.enterPhase));
+  steps.push({action,denial,expected:snapshot(g),...(action.auditWork?{work:{players:g.players.map(p=>({slot:p.slot,mp:bits(p.mp)})),dig:[...g.units.values()].map(u=>({id:u.id,dig:u.dig?JSON.parse(JSON.stringify(u.dig)):null}))}}:{})});
  }
- cases.push({name,map,initial,steps});
+ cases.push({name,map,initial,steps,...(setup?{sourceSetup:setup}:{})});
 }
 const base=[{kind:'rifle',x:9,z:23},{kind:'mg',x:11,z:25},{kind:'tank',x:13,z:23},{kind:'rifle',owner:1,x:53,z:23}];
 for(const map of maps)trace(map.name,map,base,[
@@ -201,6 +217,32 @@ const queuedCoverCases=[
  ]],
 ];
 for(const [name,map,initial,actions] of queuedCoverCases) trace('queued-cover-'+name,map,initial,actions);
+
+// Paid work and house entry use their original command and execution phases.
+const paidDig=id=>({auditWork:true,command:{t:'dig',ids:[id],x:29,z:27,dir:0}});
+trace('cover-cancels-paid-dig',maps[1],[{kind:'rifle',x:27,z:23}],[
+ paidDig(1), {auditWork:true,command:{t:'cover',ids:[1]}},
+]);
+trace('cover-no-spot-keeps-paid-dig',maps[0],[{kind:'rifle',x:27,z:23}],[
+ paidDig(1), {auditWork:true,command:{t:'cover',ids:[1]}},
+]);
+trace('queued-cover-keeps-paid-dig-until-completion',maps[0],[{kind:'rifle',x:27,z:23}],[
+ paidDig(1), {auditWork:true,command:{t:'cover',ids:[1],queue:true}},
+ {auditWork:true,pre:1},
+ {auditWork:true,set:[[1,{x:29,z:27,path:[]}]],digPhase:1,dt:3},
+ ...Array.from({length:3},()=>({auditWork:true,digPhase:1,dt:3})),
+ {auditWork:true,pre:1},
+]);
+const houseRows=flat();houseRows[11]=houseRows[11].slice(0,14)+'B'+houseRows[11].slice(15);
+trace('cover-garrison-clears-orders-stays-inside',makeMap('cover-house',houseRows),[{kind:'rifle',x:27,z:23}],[
+ {command:{t:'cover',ids:[1],queue:true}},
+ {set:[[1,{follow:77,targetId:99,attackId:99,stuck:5.25,traffic:true,trafficWait:4,worldGoal:{x:45,z:23},path:[{x:45,z:23}],amove:{x:45,z:23},face:{a:1,x:45,z:23},drift:'cover'}]],command:{t:'cover',ids:[1]}},
+],[{command:{t:'garrison',ids:[1],x:29,z:23}},{enterPhase:1}]);
+trace('cover-mixed-paid-dig-and-no-spot',maps[1],[{kind:'rifle',x:27,z:23},{kind:'rifle',x:3,z:3}],[
+ paidDig(1),
+ {auditWork:true,command:{t:'dig',ids:[2],x:5,z:7,dir:0}},
+ {auditWork:true,command:{t:'cover',ids:[1,2]}},
+]);
 
 const movement=[];
 for(const kind of ['rifle','tank']) {

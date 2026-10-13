@@ -1,5 +1,4 @@
-//! Immediate ordinary Take Cover. Active field jobs and garrison cancellation
-//! require their canonical owner callbacks and are refused before any mutation.
+//! Ordinary Take Cover with canonical paid-job cancellation and house-preserving cleanup.
 use crate::{
     catalog::Catalog,
     command_destinations::{self, Context},
@@ -45,9 +44,16 @@ impl Match {
         // Do not clear a job flag while leaving its owning descriptor alive.
         if selected.iter().any(|id| {
             let u = &self.world.game.units[id];
-            !u.retreating && (u.dig || u.entrench || u.build || u.garrison.is_some())
+            !u.retreating && (u.entrench || u.build)
         }) {
             return Ok(Some(Denial::Unsupported));
+        }
+        // Validate the sole job owner before any queue, path or observation mutation.
+        for id in &selected {
+            let unit = &self.world.game.units[id];
+            if !unit.retreating && (unit.id != *id || unit.dig != self.field_works.is_active(*id)) {
+                return Err("unrepresented or inconsistent cover field work".into());
+            }
         }
         if queued {
             let mut queues = std::collections::BTreeMap::new();
@@ -140,6 +146,19 @@ impl Match {
                 reason = Denial::Retreating;
                 continue;
             }
+            if u.garrison.is_some() {
+                // The source keeps the squad in its house and retains its stuck counter.
+                let next_identity = u
+                    .path_gen
+                    .checked_add(1)
+                    .ok_or("cover path identity exhausted")?;
+                cleanup_unit(&mut u, false);
+                u.path.clear();
+                u.path_gen = next_identity;
+                staged.units.insert(id, u.clone());
+                prepared.push((id, u, None));
+                continue;
+            }
             let context = Context {
                 game: &staged,
                 rules: &self.rules,
@@ -214,17 +233,7 @@ impl Match {
             } else {
                 None
             };
-            u.traffic = None;
-            u.traffic_wait = 0.0;
-            u.world_goal = None;
-            u.entrench = false;
-            u.attack = false;
-            u.stuck = 0.0;
-            u.dig = false;
-            u.board = 0;
-            u.amove = None;
-            u.build = false;
-            u.drift = false;
+            cleanup_unit(&mut u, true);
             u.path = route
                 .as_ref()
                 .map_or_else(Vec::new, |r| r.waypoints.clone());
@@ -248,6 +257,7 @@ impl Match {
                 game,
                 &mut self.commands,
                 &mut self.firing,
+                &mut self.field_works,
                 controlled,
                 prepared,
             );
@@ -260,6 +270,7 @@ impl Match {
                 &mut self.world.game,
                 &mut self.commands,
                 &mut self.firing,
+                &mut self.field_works,
                 controlled,
                 prepared,
             );
@@ -272,6 +283,7 @@ fn publish(
     game: &mut crate::game::Game,
     commands: &mut crate::match_commands::MatchCommands,
     firing: &mut crate::match_firing::FiringState,
+    field_works: &mut crate::field_works::FieldWorksRuntime,
     controlled: Vec<u32>,
     prepared: Vec<(u32, crate::game::Unit, Option<Point>)>,
 ) {
@@ -279,6 +291,13 @@ fn publish(
         commands.units.get_mut(&id).expect("controlled unit").follow = 0;
     }
     for (id, u, end) in prepared {
+        // All activity/identity checks preceded route preparation. Cancellation is
+        // now infallible and removes the real descriptor before its derived flag.
+        crate::match_runtime::cancel_field_work_state(
+            field_works,
+            game.units.get_mut(&id).expect("prepared cover unit"),
+        )
+        .expect("prevalidated cover field work");
         let c = commands.units.get_mut(&id).expect("prepared cover control");
         c.follow = 0;
         c.orders.clear();
@@ -299,4 +318,20 @@ fn publish(
         }
         game.units.insert(id, u);
     }
+}
+
+fn cleanup_unit(u: &mut crate::game::Unit, reset_stuck: bool) {
+    u.traffic = None;
+    u.traffic_wait = 0.0;
+    u.world_goal = None;
+    u.entrench = false;
+    u.attack = false;
+    if reset_stuck {
+        u.stuck = 0.0;
+    }
+    u.dig = false;
+    u.board = 0;
+    u.amove = None;
+    u.build = false;
+    u.drift = false;
 }
