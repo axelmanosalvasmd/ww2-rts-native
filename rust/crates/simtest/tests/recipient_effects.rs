@@ -1,3 +1,4 @@
+#![recursion_limit = "256"]
 //! Pure ordinary RTS projection from original Source boundary inputs and events.
 //! This test does not replay gameplay, restore MatchRandom, or adopt transport policy.
 //! Only complete `shots` rows are compared. Other snapshot fields, dormant ordinary

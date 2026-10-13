@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Set the recipient-effects test crate's macro recursion limit to 256 for its complete existing unit snapshot. The compiler reached the default expansion limit; every field, assertion and original fixture is retained. Production runtime and stack limits are unchanged.
+
 - Update the carrier and aircraft fixture serializers for typed MatchSample timelines. Their Default and Conquest scenes retain the same Conquest JSON, and incompatible Territories samples fail explicitly. Runtime, assertions and original fixtures are unchanged.
 
 - Update the quiet engineering consumer to use the ordered tick report's Environment iterator. It still checks that no Environment effects were emitted, while event ownership stays in the single report sequence. The original source fixture and runtime are unchanged.

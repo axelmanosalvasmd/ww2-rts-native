@@ -2,6 +2,8 @@
 
 ## Room-host output ownership regressions (2026-10-13, source checkpoint)
 
+Strict preflight at `8a6f418` reached the complete companion unit JSON helper used by the ordinary effects consumer and exceeded that test crate's default macro expansion limit. The crate now uses the same explicit 256 limit as existing complete companion fixture consumers. No field is removed, and no production code or runtime stack limit changes.
+
 Strict preflight at `02427d2` exposed two older fixture serializers accessing timeline fields before MatchSample became typed. The previously independently reviewed `456f64b` helper patch is applied unchanged: Default and Conquest constructors serialize Conquest fields in the original shape, while Territories explicitly refuses this ordinary fixture adapter. No runtime or fixture is changed.
 
 Strict preflight at `23b11ca` then found the quiet engineering fixture reading the old report Environment field. The caller now exposes a borrowed filtered iterator over its single owned event sequence, so the same no-Environment assertion uses that accessor. A read-only report-consumer audit found no other stale field use. The change does not remove or weaken the assertion, alter the original fixture or mutate the report.
