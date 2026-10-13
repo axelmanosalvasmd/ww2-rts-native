@@ -24,6 +24,23 @@
 - Initialized canonical weapon targets and timers when Match recruitment publishes a unit, and rejects a stale firing row before payment. The existing recruitment source replay checks default rows immediately after each admitted buy; invalid staging snapshots include firing state.
 
 - Verified the ordinary Conquest weapon/contact phase: three focused tests pass in debug and release against 114 original-source traces and 588 checkpoints, including lower-ID ties and invalid-input atomicity. All 155 workspace tests, strict Clippy, formatting and release FFI build pass. Air, rail, FPS, support, beams and active ability/terrain fire remain separate; wire, ABI and the reference pin are unchanged.
+- Verified bounded Conquest ground support against 60 original-source traces and 1,400 checkpoints, including every effect/lifetime transition and unsampled-tick silence checks. Three support, three combat and three firing debug regressions pass; all 158 locked release workspace tests, strict workspace Clippy, formatting and release FFI build pass. Aircraft support and complete tick integration remain separate.
+
+- Fixed the captured-membership prerequisite's building-wreck lifecycle call to pass explicit full-current membership. The original source wreckBuilding uses current units; captured support blast actors remain separate. This closes the first native compile failure, with the 60-trace/1,400-checkpoint source fixture unchanged. Native gates are in progress.
+
+- Closed the support replay consumer gap on unsampled ticks: unexpected effects or premature strike/cover lifetime transitions now fail immediately. This strengthens the same 60-trace, 1,400-checkpoint source fixture without changing runtime code; native proof is pending.
+
+- Fixed support oracle sampling that missed arrival events after repeated floating-point delay subtraction. The original-source recorder now captures every effect, strike activation/removal and cover expiry, with 60 traces and 1,400 checkpoints. Ground runtime code is unchanged from 8604e01; native verification is pending.
+
+- Added original-source support direction-fallback cases. The ground-support recorder now covers 60 traces and 900 checkpoints. Native verification remains queued.
+
+- Connected support to the single recorded command queue, with whole-command validation and source cooldown/manpower denials. Ground strike progression now accepts captured late actor subsets. The original-source oracle covers 54 traces and 810 checkpoints, including direct-hit exclusion, bridge failure and rubble spilling beside a fresh vehicle. A mixed Move/Support queue regression checks arrival-independent ordering, one payment and preserved movement. Native checks remain queued; aircraft support and complete tick integration remain unfinished.
+
+- Added explicit captured actor membership for blast damage and source-list terrain casualties while keeping full canonical environment validation and ordinary projectile defaults. Bridge casualties and legacy rubble/blocked-cell checks use captured actors; garrison eviction still uses current units. Independent source review passes; native checks are queued.
+
+- Added a bounded Conquest support actuator for paid artillery, smoke and fighter-cover calls, using canonical wallets, cooldowns, story counters and the OffMap random stream. The original-source recorder checks 36 traces and 540 admission/progression checkpoints. Native checks are queued. Aircraft support, captured-list damage membership and recorded-command integration remain pending.
+
+- Verified the ordinary Conquest weapon/contact phase: three focused tests pass in debug and release against 114 original-source traces and 588 checkpoints, including lower-ID ties and invalid-input atomicity. All 136 workspace tests, strict Clippy, formatting and release FFI build pass. Air, rail, FPS, support, beams and active ability/terrain fire remain separate; wire, ABI and the reference pin are unchanged.
 
 - Fixed the firing oracle retaining consumed ammo in its input record and moving a synthetic target outside the arena. The atomicity assertion compares the existing NaN pace sentinel by bits. Internal shot JSON now matches JavaScript zero serialization while retaining trajectory signs. All three focused native tests pass across 114 source traces and 588 checkpoints; release and workspace checks pass.
 
