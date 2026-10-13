@@ -2,11 +2,13 @@
 
 ## Unreleased
 
+- Added four-owner birth metadata checks to the existing bounded World startup guard fixture, so focused debug protection covers the new publication callback while the complete release suite covers every original World case.
+
 - Extended the existing original World startup replay to require canonical ability and recovery birth defaults for every source unit, alongside combat and firing metadata.
 
 - Integrated canonical ability and recovery state with checked World startup, memory and ground supply. World publication now initializes all four combat, firing, ability and recovery metadata owners, with fresh-identity preflight before insertion; final combined native checks are pending.
 
-- Integrated the typed ability-flight launcher with checked World startup, recipient memory and ground supply ancestry. Both source implementations and their publication guards are retained; final combined native validation is pending.
+- Integrated the typed ability-flight launcher with checked World startup, recipient memory and ground supply ancestry. Both source implementations and their publication guards are retained. Final combined checks pass: 13 focused debug tests, all 179 locked release workspace tests, strict Clippy, formatting and release FFI.
 
 - Restored the World-only logistics preflight lost while integrating the Conquest supply adapter. Ordinary Conquest still initializes logistics; World rejects it before creating state, as the existing startup regression requires.
 
