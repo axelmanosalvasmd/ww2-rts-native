@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified prepared routing sight and cache transactions against 14 original births, 12 prebirth searches and one cross-team reroute. All three provider tests, focused routing and World memory debug tests, 167 release workspace tests, strict Clippy, formatting and release FFI pass. Actual recruitment wallet/story and World training integration remain separate.
+
 - Matched JavaScript JSON number spelling for endpoint wetness values in the shared birth replay projection and removed an unused test import. The first replay otherwise matched the cold-birth view exactly.
 
 - Corrected staged-observer cell validation and source fingerprints to use the canonical unit footprint index type. The first native compile exposed two integer-type mismatches.
