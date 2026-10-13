@@ -397,6 +397,7 @@ pub struct BuildingCell {
 pub struct Match {
     pub combat: crate::match_combat::CombatState,
     pub environment: crate::environment::EnvironmentRuntime,
+    pub companions: crate::companions::Companions,
     pub commands: crate::match_commands::MatchCommands,
     pub world: World,
     pub start: StartPlan,
@@ -411,8 +412,8 @@ pub struct Match {
     pub recruit_metadata: BTreeMap<u32, RecruitMetadata>,
     produced_placer: crate::produced_units::ProducedPlacer,
     pub scenario: Option<crate::legacy_scenario::LegacyScenario>,
-    pub logistics: crate::logistics::LogisticsState,
     pub firing: crate::match_firing::FiringState,
+    pub logistics: crate::logistics::LogisticsState,
     pub capture_ticks: Vec<Option<i64>>,
     pub tick_state: crate::match_tick::TickState,
     /// Canonical source counters. Event owners must record accepted effects exactly once.
@@ -460,6 +461,7 @@ impl Match {
         let mut result = Self {
             combat: crate::match_combat::CombatState::default(),
             environment: crate::environment::EnvironmentRuntime::default(),
+            companions: crate::companions::Companions::default(),
             commands: crate::match_commands::MatchCommands::new(4096),
             grid: SpatialGrid::new(&world.game.units, 16.0),
             recipients: Vec::new(),
@@ -474,8 +476,8 @@ impl Match {
             recruit_metadata: BTreeMap::new(),
             produced_placer: crate::produced_units::ProducedPlacer::new(),
             scenario,
-            logistics: crate::logistics::LogisticsState::default(),
             firing: crate::match_firing::FiringState::default(),
+            logistics: crate::logistics::LogisticsState::default(),
             capture_ticks: vec![None; map.points().len()],
             tick_state: crate::match_tick::TickState::default(),
             story: vec![crate::match_story::PlayerStory::default(); player_count],
