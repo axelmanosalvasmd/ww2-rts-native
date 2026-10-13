@@ -173,7 +173,7 @@ fn recorded_buys_publish_original_birth_observations_and_four_metadata_rows() {
 fn legal_world_training_publishes_original_produce_helper_birth_views() {
     let mut count = 0;
     for c in fixture()["cases"].as_array().unwrap() {
-        if c["mode"] != "world" || c["setup"]["warm"] == "fog" {
+        if c["mode"] != "world" || c["setup"]["warm"] == "fog" || !c["setup"]["peer"].is_null() {
             continue;
         }
         let mut m = load(c);

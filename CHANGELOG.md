@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Carried the routing owner’s all-team World buffer mapping repair and 14-case original birth fixture into both consumers. The real training replay keeps its three-case scope; provider cross-team success/history coverage remains separately labeled, with native checks pending.
+
+- Added a fourth original World birth case with a different team’s warmed vehicle history, four accepted prebirth changes and a postbirth reroute. The recorder now covers 14 births, 12 prebirth searches and one cross-team reroute; native success/abort cache-lifetime checks remain pending.
+
+- Kept World search histories bound to every team array moved by a successful preview, including teams not read in that transaction. Consumer source review found the selected-team-only mapping could discard other warmed incremental histories.
 - Added actual Match birth-observation replay using the shared 13-case original recorder. It covers recorded Conquest buys, prewarmed incremental routes and legal World training completion, checking observation, wallet/story and all four metadata defaults. Fog-only warming stays in provider checks; native consumer execution remains pending.
 
 - Corrected the new birth replay to call the canonical byte-based World cell setter. Source recording remains unchanged; native compilation and replay are still pending.

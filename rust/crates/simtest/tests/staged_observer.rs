@@ -165,6 +165,31 @@ fn original_produce_unit_sees_birth_only_at_source_lazy_cache_boundaries() {
         let mut paths = Pathfinding::new();
         if c["mode"] == "world" {
             let mut memory = std::mem::take(&mut m.world_runtime.as_mut().unwrap().memory);
+            for h in c["setup"]["peerReads"].as_array().unwrap() {
+                if !h["change"].is_null() {
+                    m.world
+                        .set_cell(
+                            idx(&h["change"]["c"]),
+                            h["change"]["ch"].as_str().unwrap().as_bytes()[0],
+                        )
+                        .unwrap();
+                }
+                let p = prepare_world_routing(world_context(&m), &mut memory, 1, None).unwrap();
+                assert_eq!(
+                    view(p.knowledge(), p.query(), p.live(), p.wrecks()),
+                    h["view"],
+                    "peer view {label}"
+                );
+                let mut fork = p.fork_paths(&paths);
+                let peer = &m.world.game.units[&(idx(&c["setup"]["peer"]["id"]) as u32)];
+                let found = route(&mut fork, p.query(), p.live(), &m, peer, point(&h["goal"]));
+                assert_eq!(found["path"], h["path"], "peer path {label}");
+                assert_eq!(found["routeEnd"], h["routeEnd"], "peer end {label}");
+                let (_, commit) = p.prepare_publication(&mut m.world).unwrap();
+                commit.commit();
+                paths = fork;
+            }
+
             if warm != "cold" {
                 let p = prepare_world_routing(world_context(&m), &mut memory, 0, None).unwrap();
                 if !c["prior"].is_null() {
@@ -184,6 +209,53 @@ fn original_produce_unit_sees_birth_only_at_source_lazy_cache_boundaries() {
             let born = placement(&m, c);
             let observer =
                 StagedObserver::new(&m.world.game, &m.rules, born.unit.id, 0, &born.unit).unwrap();
+            if !c["setup"]["peer"].is_null() {
+                let team = m.world.game.players[1].team;
+                let before = memory
+                    .team(team)
+                    .unwrap()
+                    .query()
+                    .navigation()
+                    .flags
+                    .as_ptr();
+                let p = prepare_world_routing(world_context(&m), &mut memory, 0, Some(observer))
+                    .unwrap();
+                let mut fork = p.fork_paths(&paths);
+                route(
+                    &mut fork,
+                    p.query(),
+                    p.live(),
+                    &m,
+                    &born.unit,
+                    born.rally.unwrap().destination,
+                );
+                drop(p);
+                drop(fork);
+                assert_eq!(
+                    memory
+                        .team(team)
+                        .unwrap()
+                        .query()
+                        .navigation()
+                        .flags
+                        .as_ptr(),
+                    before
+                );
+                let peer = &m.world.game.units[&(idx(&c["setup"]["peer"]["id"]) as u32)];
+                let found = route(
+                    &mut paths,
+                    memory.team(team).unwrap().query(),
+                    memory.live_for(1).unwrap().live(),
+                    &m,
+                    peer,
+                    point(&c["setup"]["peerReads"].as_array().unwrap().last().unwrap()["goal"]),
+                );
+                assert_eq!(
+                    found["path"],
+                    c["setup"]["peerReads"].as_array().unwrap().last().unwrap()["path"],
+                    "peer route after dropped preview"
+                );
+            }
             let p =
                 prepare_world_routing(world_context(&m), &mut memory, 0, Some(observer)).unwrap();
             assert_eq!(
@@ -260,6 +332,32 @@ fn original_produce_unit_sees_birth_only_at_source_lazy_cache_boundaries() {
                 found["path"], c["expected"]["path"],
                 "committed World reroute {label}"
             );
+            if !c["setup"]["peer"].is_null() {
+                let team = memory.team(m.world.game.players[1].team).unwrap();
+                let live = memory.live_for(1).unwrap();
+                assert_eq!(
+                    view(team.knowledge(), team.query(), live.live(), live.wrecks()),
+                    c["peerAfter"]["view"],
+                    "peer committed view {label}"
+                );
+                let peer = &m.world.game.units[&(idx(&c["setup"]["peer"]["id"]) as u32)];
+                let found = route(
+                    &mut paths,
+                    team.query(),
+                    live.live(),
+                    &m,
+                    peer,
+                    point(&c["setup"]["peerReads"].as_array().unwrap().last().unwrap()["goal"]),
+                );
+                assert_eq!(
+                    found["path"], c["peerAfter"]["path"],
+                    "peer after other-team success {label}"
+                );
+                assert_eq!(
+                    found["routeEnd"], c["peerAfter"]["routeEnd"],
+                    "peer after other-team success end {label}"
+                );
+            }
         } else {
             let mut state = m.recipient_routing(0).unwrap().clone();
             let mut f = Fog::default();
