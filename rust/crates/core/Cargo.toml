@@ -10,4 +10,5 @@ description = "The ww2-rts rules core: no engine, networking or file-system code
 name = "ww2_core"
 
 [dependencies]
+# Parse numbers exactly; source iteration order is explicit in catalog arrays.
 serde_json = { version = "1.0.154", default-features = false, features = ["alloc", "float_roundtrip"] }

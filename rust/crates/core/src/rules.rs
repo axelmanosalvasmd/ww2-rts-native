@@ -1,19 +1,22 @@
-//! Rules data the ported passes read: unit kinds, the vision numbers from `CFG` and `SUPPORT`, the movement
-//! numbers from `CFG`, `TRAFFIC`, `LANE` and the vehicle profiles, and the weather kinds. For now they are
-//! loaded from the reference game's own tables (`harness/tables.mjs`); the core will own them later
-//! (`docs/parity/interface.md`, IF-01).
+//! Typed rules used by the movement, vision and fog passes. `Rules::compiled` constructs them
+//! from the embedded catalog, with no caller JSON or runtime file access. The independent
+//! harness loader remains a fixture oracle.
 //!
-//! `RULES_HASH` covers the rules compiled into the core instead, so a client and a server built from
-//! different rules can tell.
+//! `RULES_HASH` still covers only formation constants. Compiling the catalog and typed rules
+//! does not extend that public hash; its scope changes only with a separate interface agreement.
 
 use crate::formation;
 
+#[path = "rules_catalog.rs"]
+mod compiled;
+
 /// FNV-1a 64 of the rules data compiled into the core. The C interface returns it from
 /// `ww2_rules_hash`, and the Rust server is to send the same number in `lobby.rules`
-/// (`docs/contracts/rust-unreal-abi.md`). Today the compiled rules are the formation constants
+/// (`docs/contracts/rust-unreal-abi.md`). Today the hashed data consists of the formation constants
 /// only: each name in `formation::SHAPES` followed by a zero byte, then the little-endian bits of
-/// each number in `formation::RULE_NUMBERS`. The tables below are loaded at run time and not
-/// covered. Rules compiled in later join the hash, which then changes.
+/// each number in `formation::RULE_NUMBERS`. The tables below and the compiled catalog are not
+/// covered. The catalog and typed rules now have compiled constructors, but remain outside this
+/// hash until a separate interface agreement changes its scope.
 pub const RULES_HASH: u64 = {
     let mut hash = 0xCBF2_9CE4_8422_2325;
     let mut i = 0;
