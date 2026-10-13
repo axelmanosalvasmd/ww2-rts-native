@@ -779,7 +779,7 @@ fn source_number(n: f64) -> Value {
 fn work_snapshot(m: &Match) -> Value {
     let dig:Vec<_> = m.world.game.units.keys().map(|id| {
         let d = m.field_works.jobs().get(id).map(|d| {
-            let mut row=json!({"x":source_number(d.at.x),"z":source_number(d.at.z),"cells":d.cells.iter().map(|c|json!([c.cell,(c.ch as char).to_string()])).collect::<Vec<_>>(),"t":source_number(d.elapsed),"kind":d.kind.as_str(),"dir":d.direction.map(source_number)});
+            let mut row=json!({"x":source_number(d.at.x),"z":source_number(d.at.z),"cells":d.cells.iter().map(|c|json!([c.cell,(c.ch as char).to_string()])).collect::<Vec<_>>(),"t":source_number(d.elapsed),"kind":d.kind.as_str(),"dir":source_number(d.direction)});
             let object=row.as_object_mut().unwrap();
             if let Some(n)=d.original_cells {object.insert("n".into(),json!(n));}
             if let Some(reach)=d.reach {object.insert("reach".into(),source_number(reach));}
