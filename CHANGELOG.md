@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Clarified that the new prepared garrison exit provider serves manual Retreat only. Automatic retreat still uses its existing explicit garrison refusal; caller integration must not infer that capability or add manual follow clearing.
+
 - Updated the movement parity note to the final source-only ground-order inventory: 28 cases, 48 commands, 30 full steps and 110 snapshots. GroundAttack caller and native proof remain pending.
 
 - Corrected ordinary Retreat to select its nearest HQ after the prepared physical garrison exit, matching the source exit-before-home order. Reused the existing home selector and expanded the original source capture with the two-HQ witness. The same native replay now includes garrison exits and preserves the canonical timeline enum; native verification and the sole GroundAttack hook remain pending.
