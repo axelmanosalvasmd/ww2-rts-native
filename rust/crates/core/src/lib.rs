@@ -45,3 +45,5 @@ pub mod weather;
 pub mod weather_runtime;
 pub mod world;
 pub mod world_generation;
+
+pub mod world_map;
