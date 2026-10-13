@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified canonical recipient lists and bounded ordinary active-list snapshots on the Mac at compiled 48c7e15: 12 affected snapshot debug tests, all 213 release workspace tests, strict Clippy, formatting and release FFI pass. Runtime-identical 4140ae0 also passed 25 focused debug tests. Source evidence covers five list traces and 92 actions, 11 active frames and 33 full recipient results, alongside the existing quiet and delivery fixtures. World full envelopes, active actors and transport remain separate.
+
 - Rewrote the active-list rejection regression's indexed wreck loop as an enumerated iterator after strict Clippy flagged it. Assertions and runtime behavior are unchanged; the first combined candidate passed all 25 focused debug and 213 release workspace tests before that lint failure.
 
 - Adapted the convoy routing consumer to the recipient observation context and sole Environment metadata owner, preserving its immediate receipt commit. Static list/snapshot readiness review found the old helper signature still in that caller; convoy behavior and source fixtures are unchanged. Combined native verification remains pending.
