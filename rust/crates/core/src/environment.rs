@@ -143,6 +143,8 @@ pub struct Blast {
 }
 /// A caller can reuse memory for overlapping circles in one beam/breath.
 pub struct DamageContext<'a> {
+    /// Captured source list for casualty and legacy rubble loops. None uses all current units.
+    pub actor_order: Option<&'a [u32]>,
     pub owner: Option<i32>,
     pub contact_id: Option<&'a str>,
     pub direction: Option<Point>,
@@ -153,6 +155,7 @@ pub struct DamageContext<'a> {
 impl<'a> DamageContext<'a> {
     pub fn plain(skip_buildings: &'a BTreeSet<u32>) -> Self {
         Self {
+            actor_order: None,
             owner: None,
             contact_id: None,
             direction: None,
@@ -301,6 +304,15 @@ fn material(name: &str) -> (f64, f64, f64, f64) {
         "water" => (0., 0., 1., 0.),
         _ => (1., 0., 0.9, 0.02),
     }
+}
+fn check_damage_actors(w: &World, hit: &DamageContext<'_>) -> Result<(), EnvironmentError> {
+    if let Some(ids) = hit.actor_order {
+        let unique: BTreeSet<_> = ids.iter().copied().collect();
+        if unique.len() != ids.len() || ids.iter().any(|id| !w.game.units.contains_key(id)) {
+            return Err(EnvironmentError::InvalidInput("damage actor membership"));
+        }
+    }
+    Ok(())
 }
 fn center(w: &World, c: usize) -> Point {
     Point {
@@ -459,6 +471,7 @@ impl EnvironmentRuntime {
         hit: &DamageContext<'_>,
     ) -> Result<(f64, Vec<Effect>), EnvironmentError> {
         check(w, ctx)?;
+        check_damage_actors(w, hit)?;
         if c >= w.game.chars.len() || damage.is_nan() || damage == f64::NEG_INFINITY {
             return Err(EnvironmentError::InvalidInput("section damage"));
         }
@@ -559,7 +572,7 @@ impl EnvironmentRuntime {
             w.log_cell(c, true)?;
             return Ok(taken);
         }
-        self.fail_section(w, &meta.id, c, ctx, hit.direction, out)?;
+        self.fail_section(w, &meta.id, c, ctx, hit.direction, hit.actor_order, out)?;
         let supported = self.supported(w, &structure.section_ids);
         for (id, &cell) in structure.section_ids.iter().zip(&structure.cells) {
             let (m, s) = w.section_by_id(id).unwrap();
@@ -576,7 +589,7 @@ impl EnvironmentRuntime {
                 4.,
                 impulse * if material_same { 1. } else { 0.7 },
             ));
-            self.fail_section(w, id, cell, ctx, hit.direction, out)?;
+            self.fail_section(w, id, cell, ctx, hit.direction, hit.actor_order, out)?;
         }
         if let Some(entity) = entity {
             let alive = structure.section_ids.iter().any(|id| {
@@ -630,6 +643,7 @@ impl EnvironmentRuntime {
         }
         seen
     }
+    #[allow(clippy::too_many_arguments)]
     fn fail_section(
         &mut self,
         w: &mut World,
@@ -637,6 +651,7 @@ impl EnvironmentRuntime {
         c: usize,
         ctx: &mut Context<'_>,
         direction: Option<Point>,
+        actor_order: Option<&[u32]>,
         out: &mut Vec<Effect>,
     ) -> Result<(), EnvironmentError> {
         if w.section_by_id(id).unwrap().1.failed {
@@ -728,7 +743,7 @@ impl EnvironmentRuntime {
             }
         }
         if was == b'=' {
-            for &uid in ctx.unit_order {
+            for &uid in actor_order.unwrap_or(ctx.unit_order) {
                 let u = &w.game.units[&uid];
                 if u.hp > 0.
                     && u.air.is_none()
@@ -756,7 +771,7 @@ impl EnvironmentRuntime {
             return Err(EnvironmentError::InvalidInput("wreck cell"));
         }
         let mut out = Vec::new();
-        self.wreck_inner(w, c, into, ctx, &mut out)?;
+        self.wreck_inner(w, c, into, ctx, None, &mut out)?;
         Ok(out)
     }
     fn wreck_inner(
@@ -765,11 +780,14 @@ impl EnvironmentRuntime {
         c: usize,
         into: Option<u8>,
         ctx: &mut Context<'_>,
+        actor_order: Option<&[u32]>,
         out: &mut Vec<Effect>,
     ) -> Result<(), EnvironmentError> {
         if w.game.sections.get(&(c as u32)).is_some_and(|s| !s.failed) {
             let skip = BTreeSet::new();
-            self.damage_section_inner(w, c, f64::INFINITY, ctx, &DamageContext::plain(&skip), out)?;
+            let mut hit = DamageContext::plain(&skip);
+            hit.actor_order = actor_order;
+            self.damage_section_inner(w, c, f64::INFINITY, ctx, &hit, out)?;
             return Ok(());
         }
         let t = tuning()?;
@@ -812,7 +830,7 @@ impl EnvironmentRuntime {
                 {
                     continue;
                 }
-                if ctx.unit_order.iter().any(|id| {
+                if actor_order.unwrap_or(ctx.unit_order).iter().any(|id| {
                     let u = &w.game.units[id];
                     u.hp > 0.
                         && u.air.is_none()
@@ -833,7 +851,7 @@ impl EnvironmentRuntime {
             }
         }
         if crate::map::flags(into) & MOVE != 0 {
-            for &id in ctx.unit_order {
+            for &id in actor_order.unwrap_or(ctx.unit_order) {
                 let u = &w.game.units[&id];
                 if u.hp > 0. && u.air.is_none() && w.game.cell_of(u.x, u.z) == Some(c) {
                     w.game.units.get_mut(&id).unwrap().hp = 0.;
@@ -851,6 +869,7 @@ impl EnvironmentRuntime {
         hit: &mut DamageContext<'_>,
     ) -> Result<Vec<Effect>, EnvironmentError> {
         let t = check(w, ctx)?;
+        check_damage_actors(w, hit)?;
         let Blast {
             at,
             radius,
@@ -962,7 +981,7 @@ impl EnvironmentRuntime {
                         f64::from(w.game.wear.as_ref().unwrap()[c]) + amount / t.trench_hp;
                     w.game.wear.as_mut().unwrap()[c] = next_wear as f32;
                     if next_wear >= 1. {
-                        self.wreck_inner(w, c, Some(b'+'), ctx, &mut out)?;
+                        self.wreck_inner(w, c, Some(b'+'), ctx, hit.actor_order, &mut out)?;
                         continue;
                     }
                 }
@@ -998,7 +1017,7 @@ impl EnvironmentRuntime {
                     let next_hp = f64::from(w.game.cell_hp[c]) - amount;
                     w.game.cell_hp[c] = next_hp as f32;
                     if next_hp <= 0. {
-                        self.wreck_inner(w, c, None, ctx, &mut out)?;
+                        self.wreck_inner(w, c, None, ctx, hit.actor_order, &mut out)?;
                     } else {
                         w.touch(c)?;
                     }
@@ -1167,7 +1186,7 @@ impl EnvironmentRuntime {
                 w.append_journal(c);
             }
             if ch == b'H' || ch == b'O' {
-                self.wreck_inner(w, c, Some(b'.'), ctx, &mut out)?;
+                self.wreck_inner(w, c, Some(b'.'), ctx, None, &mut out)?;
             } else {
                 w.touch(c)?;
             }
