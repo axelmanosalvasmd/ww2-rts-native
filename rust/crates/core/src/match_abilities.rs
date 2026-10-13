@@ -565,9 +565,16 @@ impl Match {
         if self
             .world
             .game
-            .smokes
-            .iter()
-            .any(|s| (self.next_unit_id..smoke_end).contains(&s.id))
+            .units
+            .range(self.next_unit_id..smoke_end)
+            .next()
+            .is_some()
+            || self
+                .world
+                .game
+                .smokes
+                .iter()
+                .any(|s| (self.next_unit_id..smoke_end).contains(&s.id))
             || self.world.game.wrecks.iter().any(|w| {
                 w.id.is_some_and(|id| (self.next_unit_id..smoke_end).contains(&id))
             })

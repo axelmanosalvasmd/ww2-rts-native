@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Rejected smoke allocator collisions with current live units before any selected-unit effect, extending the existing mixed-selection identity regression. Native proof remains pending.
+
 - Connected manual aimed replacement to real paid field-work cancellation without a refund, and rejected unrepresented build or mass-entrench projects before control writes. The original ability recorder now has 36 traces (157 actions), with a separate unsupported-project boundary and a written cancellation regression. Native proof remains pending.
 
 - Added one shared field-work cancellation helper for staged transactions borrowing wallet/story and unit state separately. Match delegates to the same implementation, including identity and activity checks before mutation. Native checks remain pending.

@@ -640,24 +640,30 @@ fn conquest_abilities_match_original_source_phases() {
 fn smoke_identity_collision_rejects_before_selected_unit_writes() {
     let fixture: Value =
         serde_json::from_str(include_str!("../../tests/fixtures/match-ability.json")).unwrap();
-    let (mut m, order) = make(&fixture["cases"][0]);
-    m.world.game.smokes.push(Smoke {
-        id: m.next_unit_id,
-        x: 15.,
-        z: 15.,
-        r: 9.,
-        remaining: Some(14.),
-    });
-    let before = snapshot(&m, &order, &[]);
-    let command = Command::Ability {
-        ids: vec![1, 3],
-        at: None,
-        queue: false,
-        automatic: false,
-    };
-    let error = m.execute_command(0, &command, false).unwrap_err();
-    assert!(error.contains("smoke identity"), "{error}");
-    assert_eq!(snapshot(&m, &order, &[]), before);
+    for live_unit_collision in [false, true] {
+        let (mut m, order) = make(&fixture["cases"][0]);
+        if live_unit_collision {
+            m.next_unit_id = 3;
+        } else {
+            m.world.game.smokes.push(Smoke {
+                id: m.next_unit_id,
+                x: 15.,
+                z: 15.,
+                r: 9.,
+                remaining: Some(14.),
+            });
+        }
+        let before = snapshot(&m, &order, &[]);
+        let command = Command::Ability {
+            ids: vec![1, 3],
+            at: None,
+            queue: false,
+            automatic: false,
+        };
+        let error = m.execute_command(0, &command, false).unwrap_err();
+        assert!(error.contains("smoke identity"), "{error}");
+        assert_eq!(snapshot(&m, &order, &[]), before);
+    }
 }
 
 #[test]
