@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Corrected the coupled replay's source-number encoding after the labelled native failure reached a present traffic wait value. Present traffic wait and optional shot/anti-tank-hit ticks now use the same exact-bit comparison as their native fields; absent optional ticks stay absent. Runtime and original Source fixtures are unchanged.
+
 - Added the field path and native value to the coupled replay's numeric type failure, after the next native run reached an unlabelled comparison unwrap. All bit comparisons and Source expectations remain unchanged.
 
 - Corrected the coupled replay's unset-pace readback after its first native execution. The shared unit factory deliberately uses NaN for the prototype's undefined pace; the comparison now preserves that absence while keeping exact bits for present values. Production code and the original Source fixture remain unchanged.

@@ -385,8 +385,9 @@ fn expected_projection(source: &Value) -> Value {
         if u["follow"].is_null() {
             u["follow"] = json!(0);
         }
-        if u["trafficWait"].is_null() {
-            u["trafficWait"] = bits(0.0);
+        u["trafficWait"] = bits(u["trafficWait"].as_f64().unwrap_or(0.0));
+        if !u["shotAt"].is_null() {
+            u["shotAt"] = bits(u["shotAt"].as_f64().unwrap());
         }
         let mut rest = select(
             &u["sourceRest"],
@@ -423,6 +424,9 @@ fn expected_projection(source: &Value) -> Value {
         }
         // The shared factory deliberately uses NaN for Source's undefined pace.
         // Preserve absence; a present Source pace still compares its exact floating bits.
+        if !rest["atHit"].is_null() {
+            rest["atHit"] = bits(rest["atHit"].as_f64().unwrap());
+        }
         if !rest["pace"].is_null() {
             rest["pace"] = bits(rest["pace"].as_f64().unwrap());
         }
