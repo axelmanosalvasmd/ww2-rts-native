@@ -157,7 +157,6 @@ impl<'a> SnapshotCache<'a> {
         Ok(RecipientProjection {
             fields,
             missing: vec![
-                SnapshotCapability::MovementOutcomes,
                 SnapshotCapability::WrecksAndFoundMines,
                 SnapshotCapability::Terrain,
                 SnapshotCapability::Fog,
@@ -176,6 +175,10 @@ fn seen_by(state: &Match, slot: usize, id: u32) -> bool {
     g.reveal && u.is_some()
         || u.is_some_and(|u| g.allied(u.owner, slot))
         || g.players[slot].sees(id) && u.is_none_or(|u| u.air.is_none() || vision::airborne(u))
+}
+
+pub(crate) fn movement_for(state: &Match, slot: usize) -> Result<Value, SnapshotError> {
+    owners::movement_rows(state, slot)
 }
 
 fn r(n: f64) -> f64 {

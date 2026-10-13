@@ -24,6 +24,31 @@ pub enum MoveOutcome {
     Unreachable,
     Arrived,
 }
+impl MoveOutcome {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Interrupted => "interrupted",
+            Self::Moving => "moving",
+            Self::Unreachable => "unreachable",
+            Self::Arrived => "completed",
+        }
+    }
+}
+/// The optional source result tail survives later moving/interrupted intents.
+/// Only the actual terminal path/completion operations replace it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MoveResult {
+    Unreachable { tick: i64 },
+    Completed { tick: i64 },
+}
+impl MoveResult {
+    pub fn parts(self) -> (&'static str, i64) {
+        match self {
+            Self::Unreachable { tick } => ("unreachable", tick),
+            Self::Completed { tick } => ("completed", tick),
+        }
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct MoveOrder {
@@ -75,6 +100,7 @@ pub struct UnitControl {
     pub orders: VecDeque<Command>,
     pub outcome: Option<MoveOutcome>,
     pub outcome_tick: Option<i64>,
+    pub move_result: Option<MoveResult>,
     pub route_end: Option<Point>,
     pub supply_hold: bool,
     pub supply_escape: bool,
@@ -115,6 +141,7 @@ impl UnitControl {
             orders: VecDeque::new(),
             outcome: None,
             outcome_tick: None,
+            move_result: None,
             route_end: None,
             supply_hold: false,
             supply_escape: false,
@@ -881,6 +908,9 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
             if let Some(c) = self.match_state.commands.units.get_mut(&u.id) {
                 c.outcome = Some(MoveOutcome::Unreachable);
                 c.outcome_tick = Some(drop.tick as i64);
+                c.move_result = Some(MoveResult::Unreachable {
+                    tick: drop.tick as i64,
+                });
             }
         }
     }
@@ -977,6 +1007,9 @@ impl crate::match_runtime::Match {
                     .ok_or("missing completion control")?;
                 c.outcome = Some(MoveOutcome::Arrived);
                 c.outcome_tick = Some(self.world.game.tick);
+                c.move_result = Some(MoveResult::Completed {
+                    tick: self.world.game.tick,
+                });
             } else if u.path.is_empty()
                 && crate::math::hypot(u.x - goal.x, u.z - goal.z) > 0.25
                 && u.repath <= 0.0

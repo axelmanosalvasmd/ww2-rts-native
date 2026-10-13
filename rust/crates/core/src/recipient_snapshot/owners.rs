@@ -8,6 +8,9 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
             owner.insert(name.into(), Value::Array(Vec::new()));
         }
     }
+    for (slot, owner) in owners.iter_mut().enumerate() {
+        owner.insert("movement".into(), super::movement_for(state, slot)?);
+    }
     let catalog = Catalog::compiled().map_err(|_| SnapshotError::Rules)?;
     for u in state.world.game.units.values() {
         let own = &mut owners[u.owner];
@@ -85,6 +88,39 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
     }
     Ok(owners)
 }
+pub(super) fn movement_rows(state: &Match, slot: usize) -> Result<Value, SnapshotError> {
+    let g = &state.world.game;
+    if slot >= g.players.len() {
+        return Err(SnapshotError::InvalidRecipient);
+    }
+    let mut rows = Vec::new();
+    for u in g.units.values().filter(|u| u.owner == slot) {
+        let control = state
+            .commands
+            .units
+            .get(&u.id)
+            .ok_or(SnapshotError::MissingState {
+                unit: u.id,
+                owner: "control",
+            })?;
+        if let Some(outcome) = control.outcome {
+            let tick = control.outcome_tick.unwrap_or(g.tick);
+            if tick < 0 {
+                return Err(SnapshotError::InvalidNumber);
+            }
+            let mut row = vec![json!(u.id), json!(outcome.name()), json!(tick)];
+            if let Some(result) = control.move_result {
+                let (kind, tick) = result.parts();
+                if tick < 0 {
+                    return Err(SnapshotError::InvalidNumber);
+                }
+                row.extend([json!(kind), json!(tick)]);
+            }
+            rows.push(Value::Array(row));
+        }
+    }
+    Ok(Value::Array(rows))
+}
 fn push(owner: &mut Map<String, Value>, name: &str, row: Value) {
     owner
         .get_mut(name)
@@ -140,4 +176,45 @@ fn plan(state: &Match, u: &Unit) -> Result<(u8, Point), SnapshotError> {
     Ok(u.world_goal
         .or_else(|| u.path.last().copied())
         .map_or((0, Point { x: 0., z: 0. }), |at| (1, at)))
+}
+
+#[cfg(test)]
+mod movement_tests {
+    use super::*;
+    use crate::match_commands::{MoveOutcome, MoveResult};
+    #[test]
+    fn owner_rows_preserve_absence_fallback_and_recorded_result_tail() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/recipient-snapshot.json"))
+                .unwrap();
+        let mut state = super::super::tests::initialize(&fixture["cases"][0]);
+        assert_eq!(movement_rows(&state, 0).unwrap(), json!([]));
+        let id = state
+            .world
+            .game
+            .units
+            .values()
+            .find(|u| u.owner == 0)
+            .unwrap()
+            .id;
+        let c = state.commands.units.get_mut(&id).unwrap();
+        c.outcome = Some(MoveOutcome::Moving);
+        c.outcome_tick = None;
+        c.move_result = Some(MoveResult::Unreachable { tick: 3 });
+        assert_eq!(
+            movement_rows(&state, 0).unwrap(),
+            json!([[id, "moving", state.world.game.tick, "unreachable", 3]])
+        );
+        assert_eq!(movement_rows(&state, 1).unwrap(), json!([]));
+        state.commands.units.get_mut(&id).unwrap().move_result =
+            Some(MoveResult::Completed { tick: -1 });
+        assert!(matches!(
+            movement_rows(&state, 0),
+            Err(SnapshotError::InvalidNumber)
+        ));
+        assert!(matches!(
+            movement_rows(&state, 3),
+            Err(SnapshotError::InvalidRecipient)
+        ));
+    }
 }

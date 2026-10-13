@@ -24,7 +24,7 @@ registerHooks({load(url,context,next){const out=next(url,context);if(url!==pathT
 const sim=await import(pathToFileURL(resolve(reference,'shared/sim.js')));
 const bitsBuffer=new DataView(new ArrayBuffer(8));const bits=n=>{bitsBuffer.setFloat64(0,n);return bitsBuffer.getBigUint64(0).toString(16).padStart(16,'0');};
 const pt=p=>p?[bits(p.x),bits(p.z)]:null;
-const snapshot=g=>[...g.units.values()].map(u=>({id:u.id,x:bits(u.x),z:bits(u.z),rot:bits(u.rot),aim:bits(u.aim),path:u.path.map(pt),reverse:pt(u.reverse),pace:bits(u.pace??NaN),worldGoal:pt(u.worldGoal),amove:pt(u.amove),attackId:u.attackId,targetId:u.targetId,follow:u.follow??0,holdFire:!!u.holdFire,holdPos:!!u.holdPos,auto:!!u.auto,autoRetreat:!!u.autoRetreat,orders:(u.orders??[]).map(o=>({t:o.t,at:pt(o),face:o.face===undefined?null:bits(o.face)})),face:u.face?{angle:bits(u.face.a),at:pt(u.face)}:null,retreating:!!u.retreating,stuck:bits(u.stuck),repath:bits(u.repath),drift:!!u.drift,garrison:u.garrison,nade:pt(u.nade),enter:u.enter,fireAt:u.fireAt,board:u.board,build:!!u.build,dig:!!u.dig,entrench:!!u.entrench,traffic:!!u.traffic,trafficWait:bits(u.trafficWait??0),trafficEntered:!!u.trafficEntered,trail:(u.trafficTrail??[]).length,outcome:u.moveOutcome??null,outcomeTick:u.moveOutcomeTick??null,routeEnd:pt(u.routeEnd),supplyHold:!!u.supplyHold,supplyEscape:!!u.supplyEscape,forced:u.logistics?{forced:!!u.logistics.forced,stranded:!!u.logistics.stranded}:null}));
+const snapshot=g=>[...g.units.values()].map(u=>({id:u.id,x:bits(u.x),z:bits(u.z),rot:bits(u.rot),aim:bits(u.aim),path:u.path.map(pt),reverse:pt(u.reverse),pace:bits(u.pace??NaN),worldGoal:pt(u.worldGoal),amove:pt(u.amove),attackId:u.attackId,targetId:u.targetId,follow:u.follow??0,holdFire:!!u.holdFire,holdPos:!!u.holdPos,auto:!!u.auto,autoRetreat:!!u.autoRetreat,orders:(u.orders??[]).map(o=>({t:o.t,at:pt(o),face:o.face===undefined?null:bits(o.face)})),face:u.face?{angle:bits(u.face.a),at:pt(u.face)}:null,retreating:!!u.retreating,stuck:bits(u.stuck),repath:bits(u.repath),drift:!!u.drift,garrison:u.garrison,nade:pt(u.nade),enter:u.enter,fireAt:u.fireAt,board:u.board,build:!!u.build,dig:!!u.dig,entrench:!!u.entrench,traffic:!!u.traffic,trafficWait:bits(u.trafficWait??0),trafficEntered:!!u.trafficEntered,trail:(u.trafficTrail??[]).length,outcome:u.moveOutcome??null,outcomeTick:u.moveOutcomeTick??null,result:u.moveResult??null,routeEnd:pt(u.routeEnd),supplyHold:!!u.supplyHold,supplyEscape:!!u.supplyEscape,forced:u.logistics?{forced:!!u.logistics.forced,stranded:!!u.logistics.stranded}:null}));
 const makeMap=(name,rows,height)=>({name,w:rows[0].length,h:rows.length,rows,spawns:[{x:0,y:0},{x:rows[0].length-1,y:rows.length-1}],points:[{id:'p',x:12,y:12}],...(height?{heights:height}:{})});
 const flat=()=>Array(24).fill('.'.repeat(32));
 const cover=flat();cover[11]='..........TTT...HH...OO.........';cover[12]='..........TTT...HH...OO.........';
@@ -39,7 +39,7 @@ function trace(name,map,initial,actions){
  for(const row of initial){const u=sim.internals.spawnUnit(g,row.owner??0,row.kind);Object.assign(u,{x:row.x,z:row.z,...row.fields});sim.__placeUnit(g,u,{x:u.x,z:u.z});}
  for(const p of g.players)p.visible=new Set([...g.units.values()].filter(u=>u.owner!==p.slot).map(u=>u.id));
  const steps=[];
- for(const action of actions){g.tick=action.tick??g.tick;g.winner=action.winner?0:null;
+ for(const action of actions){g.tick=action.tick??g.tick;g.winner=action.winner?0:null;if(action.winner){g.endAt={x:0,z:0};g.endReason="vp";}
   for(const [id,fields]of action.set??[]){const u=g.units.get(id);Object.assign(u,fields);sim.__placeUnit(g,u,{x:u.x,z:u.z});}
   for(const [cell,ch]of action.cells??[])sim.__setCell(g,cell,ch);
   for(const [slot,fields]of action.players??[])Object.assign(g.players[slot],fields);
@@ -48,7 +48,7 @@ function trace(name,map,initial,actions){
   if(action.begin){g.pathBudget=action.budget??4096;g.pathRetryLimit=action.retryLimit??20;sim.__beginPathTick(g);}
   if(action.pre)sim.__commandPre(g,g.units.get(action.pre));
   if(action.amove)sim.__amove(g,g.units.get(action.amove));
-  steps.push({action,denial,expected:snapshot(g)});
+  steps.push({action,denial,expected:snapshot(g),movement:g.players.map((_,slot)=>sim.snapshotFor(g,slot,[]).movement)});
  }
  cases.push({name,map,initial,steps});
 }
@@ -124,6 +124,25 @@ trace('hidden-physical-change',maps[0],[{kind:'rifle',x:5,z:5},{kind:'rifle',own
  {set:[[1,{x:45,z:5,path:[],worldGoal:null}]],tick:2,command:{t:'move',orders:[[1,55,5]]}},
 ]);
 for(const [kind,def]of Object.entries(sim.UNITS).filter(([,d])=>!d.air))trace('type-'+kind,maps[0],[{kind,x:13,z:23},{kind:'rifle',owner:1,x:53,z:23}],[{command:{t:'move',orders:[[1,25,23]]}},{command:{t:'amove',orders:[[1,35,23]]}},{command:{t:'stop',ids:[1]}}]);
+
+const disconnected=makeMap('result-disconnected',flat().map(r=>r.slice(0,16)+'B'+r.slice(17)));
+trace('unreachable-result-retention',disconnected,[{kind:'rifle',x:9,z:23},{kind:'rifle',owner:1,x:55,z:23}],[
+ {command:{t:'move',orders:[[1,55,23]]}},
+ {tick:2,begin:true,budget:1,retryLimit:2,set:[[1,{repath:0}]],pre:1},
+ {tick:3,begin:true,budget:1,retryLimit:2,set:[[1,{repath:0}]],pre:1},
+ {tick:4,command:{t:'stop',ids:[1]}},
+ {tick:5,command:{t:'move',orders:[[1,7,23]]}},
+ {tick:6,set:[[1,{x:7,z:23,path:[],moveSpeed:0,routeEnd:{x:7,z:23}}]],pre:1},
+ {tick:7,command:{t:'stop',ids:[1]}},
+]);
+trace('completed-result-retention',maps[0],[{kind:'rifle',x:9,z:23},{kind:'rifle',owner:1,x:55,z:23}],[
+ {command:{t:'move',orders:[[1,20,20]]}},
+ {tick:8,set:[[1,{x:20,z:20,path:[],moveSpeed:0,routeEnd:{x:20,z:20}}]],pre:1},
+ {tick:9,command:{t:'stop',ids:[1]}},
+ {tick:10,command:{t:'move',orders:[[1,23,23]]}},
+ {tick:11,command:{t:'move',orders:[[1,31,31]],queue:true}},
+ {tick:12,set:[[1,{x:23,z:23,path:[],moveSpeed:0,routeEnd:{x:23,z:23}}]],pre:1},
+]);
 const movement=[];
 for(const kind of ['rifle','tank']) {
  const map=makeMap('disconnected',flat().map(r=>r.slice(0,16)+'B'+r.slice(17)));
