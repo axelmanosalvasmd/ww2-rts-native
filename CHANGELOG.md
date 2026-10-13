@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Update the quiet engineering consumer to use the ordered tick report's Environment iterator. It still checks that no Environment effects were emitted, while event ownership stays in the single report sequence. The original source fixture and runtime are unchanged.
+
 - Move read-only room attachment admission before the snapshot test module to satisfy strict Clippy item ordering. The method body and every test are unchanged; no lint allowance is added.
 
 - Update the support refusal regression after canonical strike ownership moved into routing admission. Assert the direct support InvalidRecipient refusal and the earlier complete-snapshot Rules refusal separately; retain every delivery rollback assertion. The prior run passed 19 snapshot tests and failed this outdated expected error. Runtime behavior is unchanged.

@@ -2,6 +2,8 @@
 
 ## Room-host output ownership regressions (2026-10-13, source checkpoint)
 
+Strict preflight at `23b11ca` then found the quiet engineering fixture reading the old report Environment field. The caller now exposes a borrowed filtered iterator over its single owned event sequence, so the same no-Environment assertion uses that accessor. A read-only report-consumer audit found no other stale field use. The change does not remove or weaken the assertion, alter the original fixture or mutate the report.
+
 Strict all-target lint at `64cf6c5` reached all workspace packages and stopped at the new attachment admission method appearing after the snapshot test module. Moving that exact method body before the test module corrects the structural warning. Runtime logic and tests are byte-identical; the final native cycle remains pending.
 
 The `c73096f` native continuation passes all seven Hub tests and three socket tests. Socket binds required the reviewed local-listener sandbox escalation; the denied attempt is kept separately. Snapshot checks pass 19 cases, then an older error expectation fails for a corrupt canonical strike owner. Direct support projection still refuses it as InvalidRecipient, while complete snapshot admission reaches the existing routing Rules guard first. Both boundaries are now asserted, with no runtime or fixture change. The final coherent cycle is still pending.
