@@ -3,6 +3,10 @@
 ## Unreleased
 
 
+- Added `Rules::compiled` and `Rules::from_catalog` so movement, vision and fog can use the embedded rules without Node, caller JSON or runtime file access. Unit and weather indices keep the reference order. The catalog now holds 46 tables, including traffic and lane constants and 13 ground-vehicle profiles resolved by the JavaScript helper, with its private fallback preserved. One equivalence test reuses the existing vision recording and compares every typed field and floating-point bit with the independent fixture loader. The FFI, ABI and formation-only rules hash are unchanged.
+
+
+
 - Keep Rust JSON files in LF format on Windows checkouts. Windows CI found that converting the generated catalog's final newline to CRLF changed its byte fingerprint; the exact expected and observed hashes reproduce with that one-byte conversion.
 
 - Documented compiled-table ownership and the 11 bounded economy helpers, with 56,400 reference damage cases. IF-01 and IF-03 remain in progress because C table export, full availability and purchase execution are not implemented.

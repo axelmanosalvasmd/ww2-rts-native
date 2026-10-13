@@ -135,6 +135,15 @@ The recorded expectations call the JavaScript helpers themselves. Tests cover 10
 
 The existing movement/vision `Rules` loader still accepts harness data. This catalog does not change the C interface or its formation-only `RULES_HASH`. Purchase execution, income, full army population counting, availability and placement remain separate work; these helpers alone do not validate an order.
 
+
+## Compiled simulation rules (2026-10-12)
+
+`Rules::compiled()` now constructs the existing movement, vision and fog rule structs from the embedded catalog, without Node, caller JSON or filesystem access. `Rules::from_catalog()` accepts an already decoded catalog. The catalog parser still runs once through `OnceLock`; the constructor returns owned typed rules that callers can hold independently.
+
+The catalog now contains 46 tables. Four additions provide `TRAFFIC`, `LANE`, `CORNER_BULGE` and resolved `MOVEMENT_PROFILES`. The recorder calls the original `movementProfile(type, UNITS[type])` for every unit, so profiles for 13 ground unit types include the source's private fallback without copied constants. Unit and weather indices follow the recorded `UNIT_TYPES` and `WEATHER_KINDS` arrays. Terrain hit-point entries keep the lexical key order used by the existing fixture loader.
+
+One equivalence test reuses the existing vision recording and its independent `load_rules` parser. It compares every typed field, optional value, list order and floating-point bit for all 47 unit types, all five weather kinds and the movement/vision settings. The existing movement and vision replay tests remain unchanged. This does not connect the server to the core, implement a full simulation or change the ABI. `RULES_HASH` remains limited to formation constants; compiling these additional tables does not expand its agreed scope.
+
 ## Terrain navigation regions (2026-10-12)
 
 `navigation.rs` ports `shared/navigation.js`: chunk-local connected regions, directed portals, region routes and limited next-leg selection. It is the coarse prerequisite for fine A*, not a complete unit pathfinder. A `TerrainView` supplies only borrowed flags, heights and version/change information; the planner cannot consult hidden terrain through another game object.
@@ -152,6 +161,7 @@ All 4,888 recorded queries match the reference's target, connectivity, limit fla
 The implementation preserves the reference's float32 path scores, score-only heap ties, neighbor order, diagonal corner checks, hazard costs, blocked-start escape and smoothing. An exhausted expansion budget has a distinct result from an unreachable route. Rust owns reusable search storage beside the navigation cache. The old undirected `regionsFor` rejection is unnecessary after the stronger directed coarse route has succeeded, so the fine search does not duplicate that cache.
 
 The original `findPath` produces 1,175 oracle searches across all 33 authored maps and crafted terrain cases: 914 found routes, 163 unreachable results and 98 budget exhaustions. Every waypoint and resolved endpoint matches bit for bit, as do expansion counts and outcomes. Repeated searches after mine, fire and bunker changes are included. The recorder verifies the exact reference pin and rejects tracked changes. Vehicle clearance, automatic recipient-view selection, retry policy, request scheduling and movement integration remain separate work. No performance claim is made.
+
 
 
 ## The core's math (2026-10-12)
