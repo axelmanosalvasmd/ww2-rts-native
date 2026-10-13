@@ -201,6 +201,16 @@ impl Match {
             geography,
         };
         receipt.commit(&mut self.world)?;
+        // Publication moves copied arrays for every team. Keep each matching
+        // derived graph bound to those buffers without changing its history.
+        for (team, memory) in &runtime.memory.teams {
+            let prepared = candidate
+                .team(*team)
+                .expect("preview retains existing teams");
+            self.commands
+                .paths
+                .rebind_terrain(memory.query().navigation(), prepared.query().navigation());
+        }
         self.world_runtime.as_mut().unwrap().memory = candidate;
         Ok(result)
     }

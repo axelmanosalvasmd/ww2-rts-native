@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed World metadata publication losing prewarmed path-cache terrain identities when its accepted component copy moves team buffers. Rebind every existing team through the canonical path/vehicle helper only after all fallible checks. Added one original-source owner/peer route-history trace, bringing the oracle to 12 scenes, 182 actions, 37 captures and 14 exact route queries, plus a late-refusal buffer/memory/history witness. Native checks are pending.
+
 - Refreshed the bounded World commander metadata stack in PR #182 onto main `13a8d1f`, preserving its checked core/test bytes and the approved ABI 2 header. Resolved only additive changelog history. Commander knowledge filters retain their source scope; fresh combined-head platform checks and warm-route cache identity integration remain separate evidence.
 
 - Clarify the World metadata documentation's admission order: wreck display validation and the staged collector/selectors all complete before publication. Runtime and fixtures remain identical to verified `2471c2c`.

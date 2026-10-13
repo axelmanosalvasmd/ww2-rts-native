@@ -138,6 +138,55 @@ fn digest(value: &Value) -> String {
     visit(&mut h, value);
     format!("{h:016x}")
 }
+fn bits(value: f64) -> String {
+    value
+        .to_le_bytes()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+fn route(m: &mut Match, id: u32, goal: Point) -> Value {
+    let u = &m.world.game.units[&id];
+    let owner = u.owner;
+    m.refresh_world_routing(owner).unwrap();
+    search_route_history(
+        &m.world.game,
+        &m.rules,
+        &m.world_runtime.as_ref().unwrap().memory,
+        &mut m.commands.paths,
+        id,
+        goal,
+    )
+}
+fn search_route_history(
+    game: &crate::game::Game,
+    rules: &crate::rules::Rules,
+    memory: &crate::world_memory::WorldMemory,
+    paths: &mut crate::pathfinding::Pathfinding,
+    id: u32,
+    goal: Point,
+) -> Value {
+    let u = &game.units[&id];
+    let (owner, kind, from) = (u.owner, u.kind, u.at());
+    let query = memory.team(game.players[owner].team).unwrap().query();
+    let version = query.navigation().versions.knowledge;
+    let terrain = query
+        .path_terrain(memory.live_for(owner).unwrap().live())
+        .unwrap();
+    let result = paths
+        .find_path(
+            terrain,
+            crate::pathfinding::PathRules::compiled().unwrap(),
+            &rules.kinds[kind],
+            from,
+            goal,
+            None,
+        )
+        .unwrap();
+    json!({"version":version,
+        "path":result.waypoints.iter().map(|p|[bits(p.x),bits(p.z)]).collect::<Vec<_>>(),
+        "end":[bits(result.route_end.x),bits(result.route_end.z)]})
+}
 fn equal(a: &Value, b: &Value) -> bool {
     match (a, b) {
         (Value::Number(a), Value::Number(b)) => a.as_f64() == b.as_f64(),
@@ -164,6 +213,8 @@ fn original_world_metadata_readers_preserve_privacy_and_optional_fields() {
     for case in fixture["cases"].as_array().unwrap() {
         let mut m = load(case);
         let mut ids = BTreeMap::new();
+        let mut versions = BTreeMap::<String, Vec<u64>>::new();
+        let mut refusal_checked = false;
         for row in case["rows"].as_array().unwrap() {
             let a = &row["action"];
             let mut result = Value::Null;
@@ -343,7 +394,29 @@ fn original_world_metadata_readers_preserve_privacy_and_optional_fields() {
                         .retain(|w| w.id != Some(index(&a["id"]) as u32));
                     m.environment.reconcile_wreck_metadata(&m.world);
                 }
+                "route" => {
+                    let id = ids[a["alias"].as_str().unwrap()];
+                    result = route(
+                        &mut m,
+                        id,
+                        Point {
+                            x: a["goal"]["x"].as_f64().unwrap(),
+                            z: a["goal"]["z"].as_f64().unwrap(),
+                        },
+                    );
+                    versions
+                        .entry(a["alias"].as_str().unwrap().into())
+                        .or_default()
+                        .push(result["version"].as_u64().unwrap());
+                }
                 "capture" => {
+                    if case["name"] == "metadata-preserves-all-team-route-history"
+                        && !refusal_checked
+                    {
+                        assert_warm_refusal(&mut m, &ids);
+                        refusal_checked = true;
+                    }
+
                     captures += 1;
                     result = m
                         .world_recipient_metadata(index(&a["slot"]), a["map"].as_bool().unwrap())
@@ -363,8 +436,86 @@ fn original_world_metadata_readers_preserve_privacy_and_optional_fields() {
             );
             steps += 1;
         }
+        if case["name"] == "metadata-preserves-all-team-route-history" {
+            for values in versions.values() {
+                assert!(values.last().unwrap() > values.first().unwrap());
+            }
+            assert!(refusal_checked);
+        }
     }
-    assert_eq!((steps, captures), (153, 34));
+    assert_eq!((steps, captures), (182, 37));
+}
+fn assert_warm_refusal(m: &mut Match, ids: &BTreeMap<String, u32>) {
+    let mut baseline = m.commands.paths.clone();
+    let old = &m.world_runtime.as_ref().unwrap().memory;
+    let buffers: Vec<_> = old
+        .teams
+        .iter()
+        .map(|(team, memory)| {
+            let query = memory.query();
+            let view = query.navigation();
+            (
+                *team,
+                view.flags.as_ptr(),
+                view.heights.unwrap().as_ptr(),
+                memory.rows().to_vec(),
+                memory.version(),
+            )
+        })
+        .collect();
+    let cell = old.team(m.world.game.players[0].team).unwrap().rows()[0]
+        .observed
+        .row
+        .cell;
+    let fog = old.fog.clone();
+    let journal = m.world.journal().to_vec();
+    let base = m.world.journal_base();
+    let pending = m.world.pending(Recipient::Player(0)).cloned();
+    m.world_runtime.as_mut().unwrap().nodes.push(ResourceNode {
+        cell,
+        at: Point {
+            x: f64::MAX,
+            z: 1.0,
+        },
+        depot: None,
+        rate: 1.0,
+        fuel: false,
+    });
+    assert!(
+        m.world_recipient_metadata(0, false)
+            .unwrap_err()
+            .contains("rounded")
+    );
+    m.world_runtime.as_mut().unwrap().nodes.pop();
+    let memory = &m.world_runtime.as_ref().unwrap().memory;
+    assert_eq!(memory.fog, fog);
+    for (team, flags, heights, rows, version) in buffers {
+        let accepted = memory.team(team).unwrap();
+        let query = accepted.query();
+        let view = query.navigation();
+        assert_eq!(view.flags.as_ptr(), flags);
+        assert_eq!(view.heights.unwrap().as_ptr(), heights);
+        assert_eq!(accepted.rows(), rows);
+        assert_eq!(accepted.version(), version);
+    }
+    assert_eq!(m.world.journal(), journal);
+    assert_eq!(m.world.journal_base(), base);
+    assert_eq!(m.world.pending(Recipient::Player(0)), pending.as_ref());
+    for alias in ["own", "peer"] {
+        let id = ids[alias];
+        let goal = Point { x: 433.0, z: 367.0 };
+        let expected =
+            search_route_history(&m.world.game, &m.rules, memory, &mut baseline, id, goal);
+        let actual = search_route_history(
+            &m.world.game,
+            &m.rules,
+            memory,
+            &mut m.commands.paths,
+            id,
+            goal,
+        );
+        assert_eq!(actual, expected);
+    }
 }
 #[test]
 fn late_invalid_projection_preserves_memory_fog_journal_pending_and_send_cursor() {
