@@ -19,6 +19,8 @@ pub struct WorldRow {
     pub initial: (u8, i8),
     pub biome: Option<u8>,
     pub landmark: Option<String>,
+    pub rail: Option<u8>,
+    pub station: Option<usize>,
     /// Captured only when the source accepts a replacement row.
     pub cover: CoverBasis,
 }
@@ -29,6 +31,8 @@ impl WorldRow {
             && self.initial == other.initial
             && self.biome == other.biome
             && self.landmark == other.landmark
+            && self.rail == other.rail
+            && self.station == other.station
     }
     fn route_row(&self) -> Result<crate::route_knowledge::RememberedCell, String> {
         let mut row = self
@@ -95,7 +99,7 @@ impl TeamMemory {
 }
 #[derive(Default)]
 struct Sent {
-    revisions: BTreeMap<usize, u64>,
+    revisions: BTreeMap<usize, (i32, u64)>,
     at: Option<u64>,
 }
 #[derive(Clone, Copy)]
@@ -136,6 +140,7 @@ pub struct WorldMemory {
     pub(crate) lives: BTreeMap<usize, WorldLive>,
     pub(crate) fog: Fog,
     binding: Option<(usize, usize, usize)>,
+    visible_cells: BTreeMap<i32, (Option<i64>, Vec<usize>)>,
 }
 impl WorldMemory {
     pub fn team(&self, team: i32) -> Option<&TeamMemory> {
@@ -155,31 +160,67 @@ impl WorldMemory {
         world: &mut World,
         rules: &Rules,
         team: i32,
+        rails: &crate::match_world_rails::WorldRails,
     ) -> Result<usize, String> {
         validate(world, rules, team)?;
+        if rails
+            .rail_at
+            .iter()
+            .any(|(c, _)| *c >= world.game.chars.len())
+            || rails
+                .station_at
+                .iter()
+                .any(|(c, _)| *c >= world.game.chars.len())
+        {
+            return Err("invalid World rail observation cells".into());
+        }
+        let rail_at = rails.rail_at.iter().copied().collect::<BTreeMap<_, _>>();
+        let station_at = rails.station_at.iter().copied().collect::<BTreeMap<_, _>>();
         let g = &world.game;
         let binding = (g.w, g.h, world.initial().chars.as_ptr() as usize);
         if self.binding.is_some_and(|b| b != binding) {
             return Err("World memory belongs to another terrain".into());
         }
         let end = world.journal_end().map_err(|e| e.to_string())?;
-        let vis = self.fog.team(g, rules, team).vis.clone();
         let key = (g.vision_tick, g.terrain_version, g.reveal);
-        if self.team(team).is_some_and(|m| m.key == Some(key)) {
+        let same_key = self.team(team).is_some_and(|m| m.key == Some(key));
+        let fog = self.fog.team(g, rules, team);
+        if same_key {
             return Ok(0);
         }
+        let vis = fog.vis.clone();
+        let fog_key = fog.key;
+        if self
+            .visible_cells
+            .get(&team)
+            .is_none_or(|(k, _)| *k != fog_key)
+        {
+            self.visible_cells.insert(
+                team,
+                (
+                    fog_key,
+                    vis.iter()
+                        .enumerate()
+                        .filter_map(|(c, v)| (*v != 0).then_some(c))
+                        .collect(),
+                ),
+            );
+        }
+        let visible_cells = &self.visible_cells[&team].1;
         let base = world.journal_base();
         let old = self.team(team);
         let full = g.reveal
             || old.is_none_or(|m| m.seen.is_none() || m.journal_at.is_none_or(|a| a < base));
         let mut visit = Vec::new();
         let mut visited = BTreeSet::new();
-        for (c, &visible) in vis.iter().enumerate() {
-            if (g.reveal || visible != 0)
-                && (full || old.is_none_or(|m| m.seen.as_ref().unwrap()[c] == 0))
-            {
-                visited.insert(c);
-                visit.push(c);
+        if full && g.reveal {
+            visit.extend(0..g.chars.len());
+        } else {
+            for &c in visible_cells {
+                if full || old.is_none_or(|m| m.seen.as_ref().unwrap()[c] == 0) {
+                    visited.insert(c);
+                    visit.push(c);
+                }
             }
         }
         if !full {
@@ -196,7 +237,13 @@ impl WorldMemory {
         }
         let mut updates = Vec::new();
         for c in visit {
-            let row = seen_row(world, c, team)?;
+            let row = seen_row(
+                world,
+                c,
+                team,
+                rail_at.get(&c).copied(),
+                station_at.get(&c).copied(),
+            )?;
             if old
                 .and_then(|m| m.positions.get(&c).map(|i| &m.rows[*i]))
                 .is_none_or(|r| !r.same_content(&row))
@@ -311,9 +358,9 @@ impl WorldMemory {
         for i in indexes {
             let row = &m.rows[i];
             let c = row.observed.row.cell;
-            if full || revisions.get(&c) != Some(&row.observed.revision) {
+            if full || revisions.get(&c) != Some(&(team, row.observed.revision)) {
                 out.push(row.clone());
-                revisions.insert(c, row.observed.revision);
+                revisions.insert(c, (team, row.observed.revision));
             }
         }
         let trim = m.log.len() > threshold;
@@ -360,7 +407,13 @@ impl WorldMemory {
 fn compose(ground: u8, object: u8) -> u8 {
     if object == b'.' { ground } else { object }
 }
-fn seen_row(world: &World, c: usize, team: i32) -> Result<WorldRow, String> {
+fn seen_row(
+    world: &World,
+    c: usize,
+    team: i32,
+    rail: Option<u8>,
+    station: Option<usize>,
+) -> Result<WorldRow, String> {
     let mut row = world.cell_row(c).map_err(|e| e.to_string())?;
     let owner = world.mines.get(&c).copied().unwrap_or(-1);
     let owned = owner >= 0
@@ -413,6 +466,8 @@ fn seen_row(world: &World, c: usize, team: i32) -> Result<WorldRow, String> {
             .map(|v| v[c])
             .filter(|v| *v < 255),
         landmark,
+        rail,
+        station,
         cover: CoverBasis {
             house_kind: Some(world.game.house[c]),
             toughness: world.game.tough.as_ref().map_or(1.0, |v| v[c]),
@@ -472,11 +527,24 @@ pub(crate) fn validate(world: &World, rules: &Rules, team: i32) -> Result<(), St
                             .any(|i| *i < -1 || (*i >= 0 && *i as usize >= w.regions.len()))
                 })
         })
+        || g.house
+            .iter()
+            .any(|k| usize::from(*k) >= rules.movement.house_hp.len())
         || world.journal().iter().any(|c| *c >= n)
         || world.fires.iter().any(|(c, _)| *c >= n)
-        || g.players.iter().any(|p| {
-            !(0..=5).contains(&p.team) || p.visible.iter().any(|id| !g.units.contains_key(id))
+        || world.mines.iter().any(|(c, owner)| {
+            *c >= n || *owner < -1 || (*owner >= 0 && *owner as usize >= g.players.len())
         })
+        || world.mine_seen.keys().any(|c| *c >= n)
+        || world
+            .materials
+            .keys()
+            .chain(world.base_materials.keys())
+            .chain(world.object_materials.keys())
+            .chain(world.mine_materials.keys())
+            .any(|c| *c >= n)
+        || g.weather.is_some_and(|w| w >= rules.weather.len())
+        || g.players.iter().any(|p| !(0..=5).contains(&p.team))
         || g.units.values().any(|u| {
             u.kind >= rules.kinds.len()
                 || !u.x.is_finite()
@@ -491,4 +559,58 @@ pub(crate) fn validate(world: &World, rules: &Rules, team: i32) -> Result<(), St
     }
     world.journal_end().map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn exhausted_revision_and_log_cursor_preserve_memory() {
+        let map=crate::map::AuthoritativeMap::from_json(br#"{"name":"memory","w":3,"h":3,"rows":["...","...","..."],"spawns":[{"x":0,"y":0},{"x":2,"y":2}],"points":[]}"#).unwrap();
+        let mut world = World::from_map(&map).unwrap();
+        world.game.mode = Some(ModeKind::World);
+        world.game.reveal = true;
+        let rules = Rules::compiled().unwrap();
+        let mut memory = WorldMemory::default();
+        memory
+            .refresh(
+                &mut world,
+                &rules,
+                0,
+                &crate::match_world_rails::WorldRails::default(),
+            )
+            .unwrap();
+        memory.team_mut(0).unwrap().version = u64::MAX;
+        world.set_cell(0, b'T').unwrap();
+        let before = memory.team(0).unwrap().rows.clone();
+        let key = memory.team(0).unwrap().key;
+        let journal = world.journal().to_vec();
+        assert!(
+            memory
+                .refresh(
+                    &mut world,
+                    &rules,
+                    0,
+                    &crate::match_world_rails::WorldRails::default()
+                )
+                .is_err()
+        );
+        assert_eq!(memory.team(0).unwrap().rows, before);
+        assert_eq!(memory.team(0).unwrap().key, key);
+        assert_eq!(world.journal(), journal);
+        memory.team_mut(0).unwrap().version = 9;
+        memory.team_mut(0).unwrap().log_base = u64::MAX;
+        assert!(
+            memory
+                .refresh(
+                    &mut world,
+                    &rules,
+                    0,
+                    &crate::match_world_rails::WorldRails::default()
+                )
+                .is_err()
+        );
+        assert_eq!(memory.team(0).unwrap().rows, before);
+        assert_eq!(world.journal(), journal);
+    }
 }

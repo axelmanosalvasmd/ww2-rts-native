@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added original-source World recipient knowledge records for three traces and 111 actions, including 6,200 accepted changes, journal and memory-log trimming, teammate delivery cursors, hidden mines, reveal, signed region IDs, remembered wrecks and per-tick route caches. The explicit World visibility phase updates canonical building ghosts and local-defender visibility. Discovered rows borrow existing rail/station metadata. Native checks and review remain pending; full World tick, snapshots and commands remain separate.
+
 - Added checked absolute World journal cursors and prefix trimming, with an explicit zero-epoch startup reset that preserves ordinary journal drains. World runtime now owns lazy shared team terrain memory, stable accepted-row revisions, separate commander delivery and route cursors, and canonical region contested state. Native integration and original-source verification are pending.
 
 - Added a bounded World startup constructor with canonical home ownership, wallets, HQs, local defenders, fortifications, resource nodes, empty production and rail state, and actual initial visibility. The shared unit factory preserves source order and canonical guard controls; generator random history is retained. Five original-source records cover 2,761 units. Native checks are pending. Logistics-enabled startup, World terrain memory, mode tick phases, commands, trains and server hosting remain explicit boundaries.

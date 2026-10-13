@@ -1041,3 +1041,34 @@ impl World {
         Ok(Mutation { logged_index })
     }
 }
+
+#[cfg(test)]
+mod journal_tests {
+    use super::*;
+    #[test]
+    fn checked_prefix_and_epoch_reset() {
+        let map = AuthoritativeMap::from_json(br#"{"name":"journal","w":3,"h":3,"rows":["...","...","..."],"spawns":[{"x":0,"y":0},{"x":2,"y":2}],"points":[]}"#).unwrap();
+        let mut world = World::from_map(&map).unwrap();
+        world.reset_journal();
+        world.touch(1).unwrap();
+        world.touch(2).unwrap();
+        world.trim_journal_before(1).unwrap();
+        assert_eq!(world.journal_base(), 1);
+        assert_eq!(world.journal(), &[2]);
+        assert_eq!(world.journal_end(), Ok(2));
+        assert_eq!(
+            world.trim_journal_before(0),
+            Err(WorldError::InvalidJournalCursor)
+        );
+        world.journal_base = u64::MAX;
+        assert_eq!(
+            world.trim_journal_before(u64::MAX),
+            Err(WorldError::VersionExhausted)
+        );
+        assert_eq!(world.journal(), &[2]);
+        assert_eq!(world.journal_base(), u64::MAX);
+        assert_eq!(world.take_journal(), vec![2]);
+        assert_eq!(world.journal_base(), 0);
+        assert_eq!(world.journal_end(), Ok(0));
+    }
+}

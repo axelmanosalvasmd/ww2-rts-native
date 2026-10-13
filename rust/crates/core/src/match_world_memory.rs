@@ -31,7 +31,9 @@ impl WorldRouting<'_> {
     }
 }
 fn seen(game: &Game, owner: usize, visible: &[u32], unit: &Unit) -> bool {
-    game.reveal || game.allied(unit.owner, owner) || visible.contains(&unit.id)
+    game.reveal
+        || game.allied(unit.owner, owner)
+        || (visible.contains(&unit.id) && (unit.air.is_none() || airborne(unit)))
 }
 fn sees(game: &Game, rules: &Rules, grid: &SpatialGrid, team: i32, at: Point) -> bool {
     let reach = game
@@ -101,11 +103,6 @@ impl Match {
                     || !(0.0..=1.0).contains(&r.progress)
                     || r.capper.is_some_and(|s| s >= self.start.players.len())
             })
-            || runtime
-                .local_defender
-                .visible
-                .iter()
-                .any(|id| !self.world.game.units.contains_key(id))
             || runtime.known_buildings.iter().any(|(t, rows)| {
                 !(-1..=5).contains(t)
                     || rows.iter().any(|b| {
@@ -138,13 +135,97 @@ impl Match {
         }
         Ok(actor.team)
     }
+    /// Explicit vision phase. Routing and delivery reads never advance this pass.
+    pub fn refresh_world_visibility(&mut self) -> Result<(), String> {
+        self.validate_world_memory_context(LOCAL_DEFENDER_OWNER)?;
+        crate::vision::update_vision(&mut self.world.game, &self.rules, &self.grid);
+        let game = &self.world.game;
+        let runtime = self.world_runtime.as_mut().unwrap();
+        let mut teams = BTreeSet::new();
+        for player in &game.players {
+            if !teams.insert(player.team) {
+                continue;
+            }
+            let at = runtime
+                .known_buildings
+                .iter()
+                .position(|(t, _)| *t == player.team);
+            let index = at.unwrap_or_else(|| {
+                runtime.known_buildings.push((player.team, Vec::new()));
+                runtime.known_buildings.len() - 1
+            });
+            let rows = &mut runtime.known_buildings[index].1;
+            for id in &player.visible {
+                let Some(u) = game
+                    .units
+                    .get(id)
+                    .filter(|u| self.rules.kinds[u.kind].building)
+                else {
+                    continue;
+                };
+                let row = crate::match_world::KnownBuilding {
+                    id: u.id,
+                    kind: u.kind,
+                    owner: u.owner,
+                    at: u.at(),
+                    built: u.built,
+                };
+                if let Some(old) = rows.iter_mut().find(|r| r.id == *id) {
+                    *old = row;
+                } else {
+                    rows.push(row);
+                }
+            }
+            rows.retain(|row| {
+                player.visible.contains(&row.id)
+                    || game.units.contains_key(&row.id)
+                    || !game
+                        .units
+                        .values()
+                        .filter(|u| game.team_of(u) == player.team)
+                        .any(|u| {
+                            let d = math::hypot(u.x - row.at.x, u.z - row.at.z);
+                            (u.air.is_none() || airborne(u))
+                                && d <= vision_of(game, &self.rules, u)
+                                && (u.air.is_some()
+                                    || self.rules.kinds[u.kind].building
+                                    || los(game, &self.rules, (u.x, u.z), (row.at.x, row.at.z))
+                                    || d < 8.0)
+                        })
+            });
+        }
+        let mut seen = BTreeSet::new();
+        runtime.local_defender.visible.clear();
+        for guard in game.units.values() {
+            let k = &self.rules.kinds[guard.kind];
+            if guard.owner != LOCAL_DEFENDER_OWNER
+                || (k.building && !k.weapon && !k.lookout)
+                || guard.built.is_some_and(|b| b < 1.0)
+            {
+                continue;
+            }
+            for id in self.grid.in_order(
+                &game.units,
+                (guard.x, guard.z),
+                vision_of(game, &self.rules, guard),
+                |_, u| u.owner != LOCAL_DEFENDER_OWNER && u.hp > 0.0,
+            ) {
+                let enemy = &game.units[&id];
+                if (k.building || los(game, &self.rules, (guard.x, guard.z), (enemy.x, enemy.z)))
+                    && seen.insert(id)
+                {
+                    runtime.local_defender.visible.push(id);
+                }
+            }
+        }
+        Ok(())
+    }
     pub fn refresh_world_memory(&mut self, owner: usize) -> Result<(), String> {
         let team = self.validate_world_memory_context(owner)?;
-        self.world_runtime
-            .as_mut()
-            .unwrap()
+        let runtime = self.world_runtime.as_mut().unwrap();
+        runtime
             .memory
-            .refresh(&mut self.world, &self.rules, team)?;
+            .refresh(&mut self.world, &self.rules, team, &runtime.rails)?;
         Ok(())
     }
     /// Shared team memory, independent commander send cursor. The local actor has no seat.
@@ -199,9 +280,7 @@ impl Match {
             game.wrecks.iter().any(|w| w.id == row.id) || !visible(Point { x: row.x, z: row.z })
         });
         for row in memory {
-            if row.moving
-                && !(game.reveal || game.skip_fog || visible(Point { x: row.x, z: row.z }))
-            {
+            if row.moving && !(game.reveal || visible(Point { x: row.x, z: row.z })) {
                 row.moving = false;
             }
         }
