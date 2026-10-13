@@ -35,6 +35,7 @@ use crate::{
     catalog::{Catalog, Value},
     game::{CELL, Point},
     match_runtime::Match,
+    match_story::{StoryChange, StoryKey, prepare_story_updates},
     math,
     world::{Appearance, CellChange, WorldStructure},
 };
@@ -284,7 +285,7 @@ impl RecoveryFrame {
         &self.units
     }
 }
-/// An immediate source `findPath` request. Apply before another match phase runs.
+/// A medic route installed during this recovery pass, in source order.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MedicRoute {
     pub unit: UnitId,
@@ -428,7 +429,7 @@ impl Match {
         }
         Ok(frame)
     }
-    /// The source's cadence-ten healing and mine discovery. Returned routes require immediate application.
+    /// The source's cadence-ten healing and mine discovery, including immediate medic routes.
     pub fn heal_and_sweep(
         &mut self,
         frame: &RecoveryFrame,
@@ -457,6 +458,19 @@ impl Match {
                 flag(def(self, *id).unwrap(), "medic") && u.hp > 0. && !u.retreating && !u.riding
             })
             .collect::<Vec<_>>();
+        // Route identities must have headroom before any healing or wound metadata changes.
+        if medics.iter().any(|id| {
+            let u = &self.world.game.units[id];
+            let c = &self.commands.units[id];
+            u.path_gen == u64::MAX
+                && u.path.is_empty()
+                && u.amove.is_none()
+                && u.garrison.is_none()
+                && c.enter.is_none()
+                && u.board == 0
+        }) {
+            return Err("medic path identity exhausted".into());
+        }
         let seek = number(aid, "seek")?;
         let reach = number(aid, "medic")?;
         let calm = number(aid, "calm")?;
@@ -553,10 +567,14 @@ impl Match {
                     row.hp_was = Some(u.hp);
                     row.heal_at = Some(self.world.game.tick);
                 } else if idle && let Some(far) = far {
-                    routes.push(MedicRoute {
-                        unit: id,
-                        goal: self.world.game.units[&far].at(),
-                    });
+                    let goal = self.world.game.units[&far].at();
+                    let medic = self.world.game.units[&id].clone();
+                    let result = self.command_route(medic.owner, &medic, goal)?;
+                    let unit = self.world.game.units.get_mut(&id).unwrap();
+                    unit.path = result.waypoints;
+                    unit.path_gen += 1;
+                    self.commands.units.get_mut(&id).unwrap().route_end = Some(result.route_end);
+                    routes.push(MedicRoute { unit: id, goal });
                 }
             }
         }
@@ -566,6 +584,116 @@ impl Match {
         let frame = self.prepare_recovery(ids)?;
         self.check_recovery_frame(&frame, 0.)?;
         self.sweep_prepared_mines(&frame)
+    }
+    /// Run after point supply and network refresh, using the earlier captured base/aid membership.
+    pub fn reinforce(&mut self, frame: &RecoveryFrame, dt: f64) -> Result<(), String> {
+        self.check_recovery_frame(frame, dt)?;
+        self.validate_conquest_finish_state()?;
+        self.validate_support_provisions()?;
+        if self.start.economy.players.iter().any(|p| !p.mp.is_finite()) {
+            return Err("invalid recovery wallet".into());
+        }
+        let cfg = config()?;
+        let every = number(cfg, "reinforceEvery")?;
+        let aid = cfg.get("aid").ok_or("missing recovery aid rules")?;
+        let slow = number(aid, "slow")?;
+        let home_radius = number(cfg, "reinforceRadius")?;
+        let aid_radius = number(aid, "radius")?;
+        let carrier_radius = number(aid, "carrier")?;
+        // Provision hooks can decline a charge. Simulate the positive upper bounds on only
+        // the small story vector, so later accepted spending cannot fail after stock changes.
+        let mut changes = Vec::new();
+        for &id in &frame.units {
+            let u = &self.world.game.units[&id];
+            let d = def(self, id)?;
+            let models = number(d, "models")?;
+            let full = models * number(d, "hpPer")?;
+            let cost = if self.rules.kinds[u.kind].infantry {
+                number(d, "cost")? / models * 0.5
+            } else {
+                math::max(0., full - u.hp) * 0.5
+            };
+            if !full.is_finite()
+                || !cost.is_finite()
+                || cost < 0.
+                || !(self.recovery.get(id).unwrap().reinforcement
+                    + dt * self.logistics.recovery_rate(id))
+                .is_finite()
+            {
+                return Err("invalid recovery result".into());
+            }
+            changes.push(StoryChange {
+                slot: Some(u.owner),
+                key: StoryKey::MpSpent,
+                amount: cost,
+            });
+        }
+        let mut story = self.story.clone();
+        prepare_story_updates(&mut story, self.finish.is_some(), &changes)?.commit();
+        for &id in &frame.units {
+            let u = &self.world.game.units[&id];
+            if self.commands.units[&id].operative {
+                continue;
+            }
+            let d = def(self, id)?;
+            let models = number(d, "models")?;
+            let hp_per = number(d, "hpPer")?;
+            let full = models * hp_per;
+            let infantry = self.rules.kinds[u.kind].infantry;
+            let home = !flag(d, "structure")
+                && !flag(d, "air")
+                && u.hp > 0.
+                && u.hp < full
+                && (frame.bases.iter().any(|base| {
+                    let b = &self.world.game.units[base];
+                    b.owner == u.owner && dist(u.at(), b.at()) <= home_radius
+                }) || frame.depots.iter().any(|(owner, at)| {
+                    self.world.game.allied(*owner, u.owner) && dist(u.at(), *at) <= home_radius
+                }));
+            let forward = infantry
+                && (frame.tents.iter().any(|(owner, at)| {
+                    self.world.game.allied(*owner, u.owner) && dist(u.at(), *at) <= aid_radius
+                }) || frame.tracks.iter().any(|track| {
+                    let h = &self.world.game.units[track];
+                    self.world.game.allied(h.owner, u.owner)
+                        && dist(u.at(), h.at()) <= carrier_radius
+                }));
+            if !home && !(u.hp > 0. && u.hp < full && forward) {
+                self.recovery.get_mut(id).unwrap().reinforcement = 0.;
+                continue;
+            }
+            let owner = u.owner;
+            let hp = u.hp;
+            let rate = self.logistics.recovery_rate(id);
+            if infantry {
+                let cost = number(d, "cost")? / models * 0.5;
+                let timer = &mut self.recovery.get_mut(id).unwrap().reinforcement;
+                *timer += dt * rate;
+                if *timer >= every * if home { 1. } else { slow }
+                    && self.start.economy.players[owner].mp >= cost
+                    && self.spend_support_provisions(id, owner, 5.)?
+                {
+                    self.recovery.get_mut(id).unwrap().reinforcement = 0.;
+                    self.start.economy.players[owner].mp -= cost;
+                    self.record_spending(owner, cost)?;
+                    self.world.game.units.get_mut(&id).unwrap().hp =
+                        math::min(full, ((hp / hp_per).ceil() + 1.) * hp_per);
+                }
+            } else {
+                let add = math::min(full - hp, 18. * dt * rate);
+                let cost = add * 0.5;
+                if add > 0.
+                    && self.start.economy.players[owner].mp >= cost
+                    && self.spend_support_provisions(id, owner, add / 5.)?
+                {
+                    self.world.game.units.get_mut(&id).unwrap().hp += add;
+                    self.start.economy.players[owner].mp -= cost;
+                    self.recovery.get_mut(id).unwrap().reinforcement = 1.;
+                    self.record_spending(owner, cost)?;
+                }
+            }
+        }
+        Ok(())
     }
     fn sweep_prepared_mines(&mut self, frame: &RecoveryFrame) -> Result<(), String> {
         if self.world.mines.is_empty() {
