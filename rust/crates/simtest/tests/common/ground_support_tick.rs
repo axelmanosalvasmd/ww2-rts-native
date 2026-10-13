@@ -13,6 +13,7 @@ use ww2_core::{
     match_abilities::AbilityState,
     match_combat::CombatState,
     match_commands::{MatchCommands, UnitControl},
+    match_end::MatchSample,
     match_firing::FiringState,
     match_recovery::RecoveryState,
     match_runtime::{Match, MatchOptions, PlayerConfig},
@@ -261,7 +262,7 @@ pub fn compare(
         "strikes":m.support.strikes.iter().map(|s|json!({"kind":s.kind.name(),"owner":s.owner,"x":s.at.x,"z":s.at.z,"dir":s.direction,"t":s.delay,"left":s.left,"next":s.next,"live":s.live})).collect::<Vec<_>>(),
         "covers":m.support.covers.iter().map(|c|json!({"team":c.team,"owner":c.owner,"x":c.at.x,"z":c.at.z,"r":c.radius,"t":c.remaining})).collect::<Vec<_>>(),
         "smokes":g.smokes.iter().map(|s|json!({"id":s.id,"x":s.x,"z":s.z,"r":s.r,"t":s.remaining})).collect::<Vec<_>>(),"shots":shots,
-        "timeline":m.timeline.iter().map(|s|json!({"t":s.t,"vp":s.vp})).collect::<Vec<_>>(),"flights":[],"nades":[],"salvos":[],
+        "timeline":m.timeline.iter().map(|s|match s { MatchSample::Conquest {t,vp}=>json!({"t":t,"vp":vp}), MatchSample::Territories {..}=>panic!("ground-support fixture cannot represent a Territories timeline") }).collect::<Vec<_>>(),"flights":[],"nades":[],"salvos":[],
         "environment":{"fires":m.world.fires.iter().map(|(c,t)|json!([c,t])).collect::<Vec<_>>(),"soak":m.world.soak(),"mines":m.world.mines.iter().map(|(c,o)|json!([c,o])).collect::<Vec<_>>(),"aid":m.world.aid.iter().map(|(c,o)|json!([c,o])).collect::<Vec<_>>(),"claims":m.firing.target_claims().map(|((target,team),v)|json!([u64::from(target)*8+team as u64,v])).collect::<Vec<_>>(),"wrecks":[],"newCells":m.world.new_cells().iter().map(cell_row).collect::<Vec<_>>(),"cellLog":m.world.cell_log().iter().map(cell_row).collect::<Vec<_>>()},
         "terrain":{"chars":runs(g.chars.iter().map(|c|json!(char::from(*c).to_string()))),"flags":runs(g.flags.iter().map(|c|json!(c))),"height":g.height.as_ref().map(|h|runs(h.iter().map(|n|json!(n)))),"cellHp":runs(g.cell_hp.iter().map(|n|json!(f64::from(*n)))),"wear":runs(g.wear.as_ref().unwrap().iter().map(|n|json!(f64::from(*n)))),"scar":runs(m.world.scar.iter().map(|n|json!(f64::from(*n)))),"burnt":runs(m.world.burnt.iter().map(|n|json!(n))),"cellState":runs(m.world.cell_state.iter().map(|n|json!(n))),"versions":[g.terrain_version,m.world.versions.obstruction,m.world.versions.infantry,m.world.versions.vehicle,m.world.versions.naval]}});
     for (key, value) in encoded["raw"].as_object().unwrap() {

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Converge the engineering replay with the three reviewed timeline test adapters. Preserve both parents' runtime, recorded Source fixtures and strict comparisons; fresh verification of this combined head is pending.
+
+- Adapted the two remaining obsolete timeline test serializers after full release compilation found the mass-project helper still reading struct fields. A repository-wide audit also found the same access in the companion-tick helper. Both now serialize actual Conquest samples and explicitly refuse Territories. Runtime, fixtures and strict assertions are unchanged. The changed ground-support debug consumer passed at `0420c51`; no release tests ran there. Original checks reproduce seven mass-project cases (193 steps, 215 snapshots) and fifteen companion traces (506 steps). Fresh combined gates remain pending.
+
+- Adapted the inherited ground-support test helper to the canonical timeline enum. Actual Conquest samples retain the original `{t, vp}` shape; Territories samples explicitly refuse in this Default/Conquest recorder. Runtime and Source fixtures are unchanged. The fresh `8f32198` check passed all 34 focused debug tests, then full release compilation found the obsolete struct-field accesses before any release tests ran. The unchanged original recorder reproduces 13 traces, 2,705 ticks and 153 checkpoints. Fresh release and strict gates remain pending.
+
 - Add the complete original engineering snapshot replay to the selected-delivery/scuttle union: five cases, 481 actual ticks and 513 states. Runtime and frozen Source consumer bodies are retained; the coherent native cycle is pending.
 
 - Converge real selected-recipient delivery with engineering projections and recorded scuttling. Preserve the exact shared compile fixes and original Source works-field fixture extension; this combined native proof is pending.
