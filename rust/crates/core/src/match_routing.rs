@@ -404,11 +404,11 @@ impl Match {
                 .map_err(|e| format!("observed refresh: {e:?}"))?;
             return Ok(());
         }
-        self.grid.rebuild(&self.world.game.units);
+        let observation_grid = SpatialGrid::new(&self.world.game.units, 16.0);
         let mut facts = facts(
             &self.world,
             &self.rules,
-            &self.grid,
+            &observation_grid,
             &self.building_cells,
             owner,
         )?;
@@ -437,14 +437,14 @@ impl Match {
             return Ok(());
         }
         self.refresh_memory(owner)?;
-        self.grid.rebuild(&self.world.game.units);
+        let observation_grid = SpatialGrid::new(&self.world.game.units, 16.0);
         let state = &mut self.recipients[owner];
         state
             .memory
             .apply_routes(&mut state.routes)
             .map_err(|e| format!("observed projection: {e:?}"))?;
         let g = &self.world.game;
-        refresh_wrecks(state, g, &self.rules, &self.grid, owner);
+        refresh_wrecks(state, g, &self.rules, &observation_grid, owner);
         state.wrecks = state.wreck_memory.clone();
         let fog = self.routing_fog.team(g, &self.rules, g.players[owner].team);
         state.fires.fill(false);

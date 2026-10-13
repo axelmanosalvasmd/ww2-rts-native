@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed refused recorded buys with rallies sorting maintained gameplay grid buckets during recipient refresh. Visibility and remembered-wreck queries now use a separate current-position observation index, following the checked FPS correction. A focused denial regression preserves both ordinary and heavy moved-bucket order. Removed the stale claim that recruitment spending still needed integration; native checks remain pending.
+
 - Exposed the canonical owner-bound recorded-buy actuator through the Rust API so it can be verified before input-dispatch integration. Its gate, routing and transaction behavior is unchanged; the C ABI and wire interfaces are unchanged.
 
 - Fixed crate-local recorded-buy test imports found by independent source review before the first native compile. Combat, firing and path-status assertions now resolve within the core crate. Native verification remains pending.
