@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Consumed the independently reviewed building-wreck lifecycle compile repair: this caller explicitly passes full-current membership, as the original source does. Ground support gates passed on the provider; this aviation/command continuation still awaits its own native proof.
+
 - Fixed the pending aviation consumer's raw JSON number comparison: integral source numbers and Rust floating representations now compare exact f64 bits, with only JSON zero normalization. Canonical state bit strings remain exact. Runtime and the 18-constructor/42-trace/3,410-checkpoint fixture are unchanged; native proof remains pending.
 
 - Added a bounded on-map aviation actuator with canonical staged aircraft publication, held patrol/escort and fighter air-target missions, flight/orbit/home/rearm transitions, and continuous AA over captured shooters and fresh grid targets. The unchanged prototype oracle records 18 constructors, 42 traces and 3,410 checkpoints, including exact grid-order ties and every effect call. Independent review fixed a killed fighter firing later in the same AA phase. Native validation, automatic/ground aircraft weapons, retirement and tick/recorded-command integration remain pending.
