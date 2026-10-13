@@ -111,10 +111,12 @@ fn strip(s: &SupportStrike, along: f64, side: f64) -> Point {
     }
 }
 impl Match {
-    fn validate_support(&self) -> Result<(), SupportError> {
-        if self.options.mode != Mode::Conquest {
+    pub(crate) fn validate_support(&self) -> Result<(), SupportError> {
+        if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
+            || self.world.game.mode.is_some()
+        {
             return Err(SupportError::Unsupported(
-                "support currently requires Conquest",
+                "support requires ordinary Conquest mode",
             ));
         }
         let n = self.world.game.players.len();

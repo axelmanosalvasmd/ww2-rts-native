@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added source-written ground-support tick preparation over the checked component. Read-only boundary checks preserve ordinary admission denials and refuse unsupported aircraft/coarse strike contexts before clock changes. The late helper preserves captured membership and strike-before-timer ordering; Default and Conquest share only the absent-mode ordinary context. The unchanged full-step recorder reproduces 13 traces, 2,705 ticks and 153 checkpoints, including raw timers/effects and source draw accounting. Native preflight regressions await separate tick composition and native proof.
+
 - Integrated the checked ground-support component into a separate source-only tick-provider tree. Frozen tick behavior remains unchanged; the future support phase caller and native composition checks remain pending.
 
 - Verified bounded Conquest ground support against 60 original-source traces and 1,400 checkpoints, including every effect/lifetime transition and unsampled-tick silence checks. Three support, three combat and three firing debug regressions pass; all 158 locked release workspace tests, strict workspace Clippy, formatting and release FFI build pass. Aircraft support and complete tick integration remain separate.
