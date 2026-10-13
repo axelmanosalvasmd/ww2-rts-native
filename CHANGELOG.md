@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added the field path and native value to the coupled replay's numeric type failure, after the next native run reached an unlabelled comparison unwrap. All bit comparisons and Source expectations remain unchanged.
+
 - Corrected the coupled replay's unset-pace readback after its first native execution. The shared unit factory deliberately uses NaN for the prototype's undefined pace; the comparison now preserves that absence while keeping exact bits for present values. Production code and the original Source fixture remain unchanged.
 
 - Set the support-coherence integration test's macro recursion limit to 256, as recommended by the actual compiler failure. Restored the exact original flat projection after two insufficient factoring attempts; the limit affects test compilation only, with no production, Source fixture or assertion changes.

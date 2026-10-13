@@ -35,7 +35,12 @@ fn point(at: Point) -> Value {
 fn compare(actual: &Value, expected: &Value, path: &str) {
     match expected {
         Value::Number(_) => assert_eq!(
-            actual.as_f64().unwrap().to_bits(),
+            actual
+                .as_f64()
+                .unwrap_or_else(|| panic!(
+                    "{path}: expected numeric Source value, Native was {actual}"
+                ))
+                .to_bits(),
             expected.as_f64().unwrap().to_bits(),
             "{path}"
         ),
