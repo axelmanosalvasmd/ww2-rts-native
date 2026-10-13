@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified the repaired quiet Conquest snapshot assembly on Vostro Linux x86_64 at `5efaf17`: 21 focused debug tests, all 201 locked release workspace tests, strict Clippy, formatting and release FFI pass. Original-source checks cover 73 states, 219 partial and 219 full snapshots, plus 13 delivery steps and 39 recipient reads. Active actor/list integration and server transport remain separate.
+
 - Restored the ordinary Conquest logistics initialization call after the shared startup refactor. The native supply regressions exposed empty reserves and an absent convoy service. Initialization again runs after bases, metadata and recipient routing; disabled logistics and other modes keep their existing limits. Combined native verification is pending.
 
 - Fixed two snapshot dependency compilation omissions: initialized the seven canonical World Match owners and supplied the recovery fixture's full-current actor-order argument. Restored the World-only refusal for unrepresented logistics startup. Existing publication callbacks and snapshot mode limits are preserved. Combined native verification is pending.
