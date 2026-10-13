@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added `Rules::compiled` and `Rules::from_catalog` so movement, vision and fog can use the embedded rules without Node, caller JSON or runtime file access. Unit and weather indices keep the reference order. The catalog now holds 46 tables, including traffic and lane constants and 13 ground-vehicle profiles resolved by the JavaScript helper, with its private fallback preserved. One equivalence test reuses the existing vision recording and compares every typed field and floating-point bit with the independent fixture loader. The FFI, ABI and formation-only rules hash are unchanged.
+
 - Documented compiled-table ownership and the 11 bounded economy helpers, with 56,400 reference damage cases. IF-01 and IF-03 remain in progress because C table export, full availability and purchase execution are not implemented.
 
 - Added the compiled rules catalog and bounded economy/research queries for #17. The catalog retains 42 post-initialization tables and all 47 unit definitions from reference `e4e579a`, including explicit non-finite number tags, and loads once without runtime file access. Price, faction compatibility, population weights, support and ability costs, builder lists, HQ tiers and armory multipliers match recorded JavaScript helper outputs across 10 mode inputs, 640 ability cases, 480 research cases and 56,400 damage cases. The 304 KB fixture uses grouped hashes plus direct samples. This does not add purchasing, income, production availability, a new FFI contract or broader rules-hash coverage.

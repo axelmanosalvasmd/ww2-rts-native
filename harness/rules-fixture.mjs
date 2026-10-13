@@ -16,7 +16,7 @@ const pin = 'e4e579a838aabae3b1d9dadbc17a0a87147bc52d';
 if (execFileSync('git', ['rev-parse', 'HEAD'], { cwd: reference, encoding: 'utf8' }).trim() !== pin) throw new Error('Wrong reference pin');
 execFileSync('git', ['diff', '--exit-code', pin, '--', 'shared'], { cwd: reference, stdio: 'pipe' });
 const load = name => import(pathToFileURL(`${reference}/shared/${name}.js`));
-const [sim, tech, weather, formation, men] = await Promise.all(['sim', 'tech', 'weather', 'formation', 'squad-men'].map(load));
+const [sim, tech, weather, formation, men, vehicle, traffic] = await Promise.all(['sim', 'tech', 'weather', 'formation', 'squad-men', 'vehicle-motion', 'local-traffic'].map(load));
 
 // Preserve all values. JSON's default conversion silently replaces NaN and Infinity with null.
 function encode(value) {
@@ -44,6 +44,11 @@ for (const key of ['UNITS', 'UNIT_TYPES', 'CFG', 'SUPPORT', 'SUPPORT_TYPES', 'FO
 for (const key of ['TIER', 'TECH', 'TIER_NAMES']) tables[key] = tech[key];
 for (const key of ['WEATHER', 'WEATHER_KINDS', 'WEATHER_CHOICES', 'WEATHER_WARN']) tables[key] = weather[key];
 tables.SHAPES = formation.SHAPES;
+tables.TRAFFIC = traffic.TRAFFIC;
+tables.LANE = traffic.LANE;
+tables.CORNER_BULGE = vehicle.CORNER_BULGE;
+// Resolve the private fallback through the source helper, including null for nonground types.
+tables.MOVEMENT_PROFILES = Object.fromEntries(sim.UNIT_TYPES.map(type => [type, vehicle.movementProfile(type, sim.UNITS[type])]));
 for (const key of ['SLOTS', 'GUN_SLOTS', 'SLOT_SCALE']) tables[key] = men[key];
 if (sim.UNIT_TYPES.length !== 47) throw new Error('Expected all 47 unit definitions');
 const catalog = { format: 1, reference: pin, tables };

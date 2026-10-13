@@ -134,6 +134,14 @@ The recorded expectations call the JavaScript helpers themselves. Tests cover 10
 
 The existing movement/vision `Rules` loader still accepts harness data. This catalog does not change the C interface or its formation-only `RULES_HASH`. Purchase execution, income, full army population counting, availability and placement remain separate work; these helpers alone do not validate an order.
 
+## Compiled simulation rules (2026-10-12)
+
+`Rules::compiled()` now constructs the existing movement, vision and fog rule structs from the embedded catalog, without Node, caller JSON or filesystem access. `Rules::from_catalog()` accepts an already decoded catalog. The catalog parser still runs once through `OnceLock`; the constructor returns owned typed rules that callers can hold independently.
+
+The catalog now contains 46 tables. Four additions provide `TRAFFIC`, `LANE`, `CORNER_BULGE` and resolved `MOVEMENT_PROFILES`. The recorder calls the original `movementProfile(type, UNITS[type])` for every unit, so profiles for 13 ground unit types include the source's private fallback without copied constants. Unit and weather indices follow the recorded `UNIT_TYPES` and `WEATHER_KINDS` arrays. Terrain hit-point entries keep the lexical key order used by the existing fixture loader.
+
+One equivalence test reuses the existing vision recording and its independent `load_rules` parser. It compares every typed field, optional value, list order and floating-point bit for all 47 unit types, all five weather kinds and the movement/vision settings. The existing movement and vision replay tests remain unchanged. This does not connect the server to the core, implement a full simulation or change the ABI. `RULES_HASH` remains limited to formation constants; compiling these additional tables does not expand its agreed scope.
+
 ## The core's math (2026-10-12)
 
 The core carries its own math (`rust/crates/core/src/math.rs`) instead of Rust's `f64` methods, which call each platform's C library. It ports V8's fdlibm (`src/base/ieee754.cc` as Node 24.21.0 compiles it) and V8's `Math.hypot`, plus JavaScript's `round`, `max`, `min` and `sign`, so every platform computes the same bits and they equal the JavaScript game's.
