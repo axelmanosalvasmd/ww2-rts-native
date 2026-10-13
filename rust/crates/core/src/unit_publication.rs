@@ -146,7 +146,6 @@ fn valid_unit(u: &Unit, rules: &Rules, players: usize, world: bool) -> bool {
         && finite(u.at())
         && u.rot.is_finite()
         && u.hp.is_finite()
-        && u.hp >= 0.0
         && u.supp.is_finite()
         && u.path.iter().all(|p| finite(*p))
         && u.world_goal.is_none_or(finite)
@@ -215,6 +214,7 @@ fn prepare<'a>(
     for draft in &staged {
         if draft.unit.id != next
             || !valid_unit(&draft.unit, rules, players, world)
+            || draft.unit.hp < 0.0
             || !valid_control(&draft.control)
             || parts.units.contains_key(&next)
             || parts.controls.contains_key(&next)
