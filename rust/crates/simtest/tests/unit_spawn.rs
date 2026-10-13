@@ -121,6 +121,25 @@ fn spawn_projection_and_region_placement_match_original_source() {
                     place.point,
                 )
                 .unwrap();
+                let mode = match scenario["mode"].as_str() {
+                    None => ww2_core::economy::Mode::Default,
+                    Some("classic") => ww2_core::economy::Mode::Classic,
+                    Some("world") => ww2_core::economy::Mode::World,
+                    _ => panic!("unknown fixture mode"),
+                };
+                let control =
+                    ww2_core::match_commands::UnitControl::new_for_mode(&actual, &rules, mode)
+                        .unwrap();
+                assert_eq!(
+                    control.aim.to_bits(),
+                    raw["aim"].as_f64().unwrap().to_bits()
+                );
+                assert_eq!(
+                    control.auto_cast,
+                    raw["auto"].as_bool().unwrap(),
+                    "{name}, action {index}"
+                );
+                assert_eq!(control.auto_retreat, raw["autoRetreat"].as_bool().unwrap());
                 let mut expected =
                     simtest::load::unit(raw, &rules, spawns.len(), width * height).unwrap();
                 assert_eq!(
@@ -153,7 +172,7 @@ fn spawn_projection_and_region_placement_match_original_source() {
             map_count,
             fixture["supported"].as_array().unwrap().len()
         ),
-        (769, 513, 33, 44)
+        (775, 513, 33, 44)
     );
 }
 
