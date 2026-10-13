@@ -675,13 +675,6 @@ Door placement tests 30 candidates in the source order: six spots per ring, with
 A building rally takes precedence over a player rally when choosing the exit heading. The result carries an explicit building/player rally request and sets the represented world goal and rally drift. The caller must route from the placed unit and replace its path, even if the route is empty. The helper does not execute pathfinding or silently discard the rally order. Player rallies apply only in the source's skirmish base modes and not to structures; building rallies still apply in construction modes.
 
 The recorder exports the unchanged pinned JavaScript functions and compares 934 door/production projections on 43 terrains, including all 44 non-air unit kinds, all 33 authored maps, live/dead/carried/air occupancy, crowded exits, occupied production buildings, river and cliff separation, blocked fallbacks and one-cell maps. The suite compares position, heading, aim, ghost, health and rally state; it does not claim the resulting route waypoints, wallet admission, full unit initialization or spatial insertion are integrated.
-## Match command state
-
-`Match.commands.units` owns the fields absent from `Game::Unit`: aim, automatic ability/retreat switches, attack intent, following, facing and waiting orders. Existing routes, positions and hold-position state remain on Unit. Dynamically selected target and firing timers belong to firing state; hit memory and XP belong to combat state. A prepared `UnitControl` can be inserted without failure after recruitment commits its wallet transaction. Conquest ability switches use the source free-ability default; Classic ability costs remain outside the Conquest constructor. The typed command enum is an internal recorded input, not a new wire schema.
-
-## Canonical combat metadata (2026-10-13)
-
-`Match.combat` owns XP, last-hit owner, death impulse, incoming shooter/time, anti-tank hit time and ordered cargo/carrier identities. Health, suppression, position, path and garrison stay in `World.game`. `Game.riding` is the query flag kept in sync with the canonical carrier identity. Starting units and bases initialize the source defaults. Removed shooter metadata may remain until the firing producer releases its last projectile reference, preserving source XP after shooter removal. Firing keeps target/cooldown/retarget and supplies an infallible `RetargetSink`; aim and command switches belong to the separate canonical UnitControl. `Match.environment` owns the reviewed terrain/fire/debris runtime. These fields reserve internal producer ownership; they do not establish combat phase completion or change the ABI.
 
 ## Private authored maps for native matches (2026-10-12)
 
