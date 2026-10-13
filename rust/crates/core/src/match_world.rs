@@ -370,7 +370,7 @@ impl Match {
         pose: Option<Point>,
     ) -> Result<StagedUnit, String> {
         let kind = self.rules.kind(name).ok_or("unknown World unit kind")?;
-        let mut draft = StagedUnit::ordinary_with_actor(
+        let draft = StagedUnit::ordinary_with_actor(
             &self.world.game,
             &self.rules,
             self.world_actor(owner)?,
@@ -380,23 +380,6 @@ impl Match {
             pose,
         )
         .map_err(|e| format!("World spawn: {e:?}"))?;
-        let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
-        let ability = catalog
-            .unit(name)
-            .map_err(|e| e.to_string())?
-            .get("ab")
-            .ok_or("missing World ability")?;
-        let ability_id = ability
-            .get("id")
-            .and_then(Value::string)
-            .ok_or("missing ability identity")?;
-        let ability_costs = catalog.table("AB_MUN").map_err(|e| e.to_string())?;
-        let cost = ability
-            .get("mun")
-            .and_then(Value::number)
-            .or_else(|| ability_costs.get(ability_id).and_then(Value::number))
-            .unwrap_or(0.0);
-        draft.control.auto_cast = ability_id != "none" && cost == 0.0;
         Ok(draft)
     }
     fn world_building(&mut self, owner: usize, name: &str, cell: usize) -> Result<u32, String> {
