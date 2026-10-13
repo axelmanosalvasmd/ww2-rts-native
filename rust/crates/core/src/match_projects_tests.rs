@@ -128,7 +128,8 @@ fn snapshot(m: &Match) -> Value {
         values
             .iter()
             .enumerate()
-            .filter_map(|(c, v)| (!v.is_nan()).then(|| json!([c, v.to_bits()])))
+            .filter(|(_, v)| !v.is_nan())
+            .map(|(c, v)| json!([c, v.to_bits()]))
             .collect()
     });
     json!({"tick":g.tick,"projectSeq":m.field_works.project_sequence(),"projects":m.field_works.projects().map(project).collect::<Vec<_>>(),"retainedProjects":m.field_works.retained_projects().filter(|p|referenced.contains(&p.id)).map(project).collect::<Vec<_>>(),"units":units,"wallets":m.start.economy.players.iter().map(|p|bits(p.mp)).collect::<Vec<_>>(),"story":m.story.iter().map(|s|json!({"mpSpent":bits(s.mp_spent),"built":bits(s.built)})).collect::<Vec<_>>(),"chars":String::from_utf8(g.chars.clone()).unwrap(),"journal":m.world.journal(),"versions":[g.terrain_version,m.world.versions.obstruction,m.world.versions.infantry,m.world.versions.vehicle,m.world.versions.naval],"frontBits":fronts,"mines":m.world.mines.iter().map(|(c,p)|json!([c,p])).collect::<Vec<_>>(),"mineSeen":m.world.mine_seen.iter().map(|(c,p)|json!([c,p])).collect::<Vec<_>>(),"aid":m.world.aid.iter().map(|(c,p)|json!([c,p])).collect::<Vec<_>>()})
@@ -243,7 +244,7 @@ fn make(case: &Value) -> Match {
             players: (0..3)
                 .map(|slot| PlayerConfig {
                     name: format!("p{slot}"),
-                    team: if slot == 2 { 0 } else { slot as i32 },
+                    team: if slot == 2 { 0 } else { slot },
                     faction: Faction::try_from((slot % 2) as u8).unwrap(),
                 })
                 .collect(),

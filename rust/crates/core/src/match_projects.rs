@@ -116,7 +116,7 @@ impl Match {
             .checked_add(1)
             .ok_or("project path identity exhausted")?;
         let mut control = self.commands.units[&id].clone();
-        let mut firing = self.firing.units[&id].clone();
+        let mut firing = self.firing.units[&id];
         let mut ability = *self.abilities.get(id).unwrap();
         if unit.garrison.is_some() {
             let g = &self.world.game;
@@ -288,14 +288,14 @@ impl Match {
                 }
             }
         }
-        if !queue && let Some(project) = existing.and_then(|id| self.field_works.project(id)) {
-            if project
+        if !queue
+            && let Some(project) = existing.and_then(|id| self.field_works.project(id))
+            && project
                 .crew
                 .checked_add(staged.len())
                 .is_none_or(|n| n as u64 > 9_007_199_254_740_991)
-            {
-                return Err("project crew capacity exhausted".into());
-            }
+        {
+            return Err("project crew capacity exhausted".into());
         }
         // Ordinary refusals publish source follow clearing; defensive errors publish no controls.
         let request = match order {

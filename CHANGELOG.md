@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The first shared-project native proof passed 13 focused debug checks and all 210 release workspace tests. Strict Clippy then found five style-only issues in the new runtime/tests; these were corrected before the fresh final gates.
+
 - The existing command replay now restores its directly recorded entrenchment fields through the real project owner before Move/Stop cancellation. This preserves the source fixture while protecting the new membership validation; unused project imports found during compilation were removed.
 
 - Shared project segment prices now accept source cell counts beyond six; the first native source replay exposed an unsupported cap, including the existing seven-cell and eight-cell price fixtures.

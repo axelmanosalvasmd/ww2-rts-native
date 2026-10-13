@@ -622,7 +622,7 @@ pub fn entrench_plan(
             );
         }
     } else {
-        let h = seg / 2. - 2. / 2.;
+        let h = seg / 2. - 1.;
         let px = -dz;
         let pz = dx;
         push(
