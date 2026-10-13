@@ -47,7 +47,7 @@ fn response(path: &str, method: &Method, editor_header: bool) -> Response<Body> 
         return text(StatusCode::METHOD_NOT_ALLOWED, "method not allowed");
     }
     if editor_header {
-        // There is no editor password in this process and no raw map data to unlock.
+        // Editor requests cannot select the private native match catalogue.
         return text(StatusCode::FORBIDDEN, "wrong password");
     }
     match data::MAPS.iter().find(|(key, _)| *key == name) {
@@ -133,6 +133,11 @@ mod tests {
             serde_json::from_str(include_str!("map-catalog.json")).unwrap();
         assert_eq!(data::MAPS.len(), catalog.as_object().unwrap().len());
         for (name, text) in data::MAPS {
+            let private = crate::authoritative_maps::load(name).unwrap();
+            assert_eq!(
+                Some(private.name()),
+                serde_json::from_str::<serde_json::Value>(text).unwrap()["name"].as_str()
+            );
             assert!(catalog.get(name).is_some());
             let map: serde_json::Value = serde_json::from_str(text).unwrap();
             assert!(map.get("triggers").is_none() && map.get("scenario").is_none());
