@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Consume all 13 unchanged original-source ground-support traces through the actual typed mode, including the 45-step Default case. The complete consumer checks 2,705 ticks and 153 recorded checkpoints; the obsolete Default-refusal test is removed. Provider and sole caller aliases are integrated separately; this new combined native proof is pending.
+
 - Verified the combined ground-support and mass-project tick assembly on the Mac (arm64): all 239 workspace release tests, 78 affected debug tests at the same runtime, strict Clippy, formatting and release FFI pass. Independent hash-checked copies pass 28 debug/release tests. Actual runner replay covers 12 Conquest support traces (2,660 ticks, 144 checkpoints), real Default refusal and seven project cases (193 ticks, 215 snapshots). Recorded two consumer-only compile repairs; Default alias, carriers, aircraft and full match start remain separate.
 
 - Raised the ground-support test crate's macro expansion limit for its complete canonical unit projection after the first native compiler reached serde_json's default recursion ceiling. All observed fields and runtime behavior remain unchanged; native checks continue at the repaired source.

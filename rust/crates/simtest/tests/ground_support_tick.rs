@@ -16,23 +16,6 @@ fn quiet_state(m: &ww2_core::match_runtime::Match) -> Value {
     })
 }
 
-fn detached_units(
-    m: &ww2_core::match_runtime::Match,
-) -> (BTreeMap<u32, ww2_core::game::Unit>, Vec<(u32, u64)>) {
-    let mut units = m.world.game.units.clone();
-    let pace = units
-        .values_mut()
-        .map(|unit| {
-            let bits = unit.pace.to_bits();
-            // Normalize only the detached comparison value. The live absent-pace
-            // sentinel remains unchanged and is checked independently by bits.
-            unit.pace = 0.0;
-            (unit.id, bits)
-        })
-        .collect();
-    (units, pace)
-}
-
 #[test]
 fn actual_ground_support_ticks_match_source_effects_and_lifetimes() {
     let fixture = common::fixture();
@@ -40,11 +23,15 @@ fn actual_ground_support_ticks_match_source_effects_and_lifetimes() {
     let mut ticks = 0;
     let mut checkpoints = 0;
     for trace in fixture["traces"].as_array().unwrap() {
-        if trace["setup"]["nativeMode"] == "Default" {
-            continue;
-        }
         let name = trace["name"].as_str().unwrap();
         let mut m = common::make(trace);
+        let expected_mode = match trace["setup"]["nativeMode"].as_str().unwrap() {
+            "Default" => ww2_core::economy::Mode::Default,
+            "Conquest" => ww2_core::economy::Mode::Conquest,
+            _ => panic!("unsupported source fixture mode"),
+        };
+        assert_eq!(m.options.mode, expected_mode);
+        assert!(m.world.game.mode.is_none());
         let initial_rng = m.start.random.snapshot();
         let frames: BTreeMap<_, _> = trace["frames"]
             .as_array()
@@ -153,57 +140,5 @@ fn actual_ground_support_ticks_match_source_effects_and_lifetimes() {
         assert!(m.tick_state.fault().is_none());
         traces += 1;
     }
-    assert_eq!((traces, ticks, checkpoints), (12, 2660, 144));
-}
-
-#[test]
-fn default_support_case_remains_a_read_only_runner_refusal() {
-    let fixture = common::fixture();
-    let trace = fixture["traces"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .find(|t| t["setup"]["nativeMode"] == "Default")
-        .unwrap();
-    let mut m = common::make(trace);
-    m.enqueue_command(
-        OrderKey {
-            tick: 1,
-            issuer: 0,
-            sequence: 1,
-        },
-        Command::from_json(&trace["request"]).unwrap(),
-    )
-    .unwrap();
-    let before = (
-        detached_units(&m),
-        m.start.economy.players.clone(),
-        m.story.clone(),
-        m.start.players[0].support.clone(),
-        m.support.clone(),
-        m.next_unit_id,
-        m.start.random.snapshot(),
-        m.commands.next_tick(),
-        m.commands.pending_commands(),
-    );
-    assert!(m.advance_tick().is_err());
-    assert_eq!(m.world.game.tick, 0);
-    assert_eq!(
-        before,
-        (
-            detached_units(&m),
-            m.start.economy.players.clone(),
-            m.story.clone(),
-            m.start.players[0].support.clone(),
-            m.support.clone(),
-            m.next_unit_id,
-            m.start.random.snapshot(),
-            m.commands.next_tick(),
-            m.commands.pending_commands()
-        )
-    );
-    assert!(m.tick_state.fault().is_none());
-    // The lower-level Default support component has its own original-source
-    // activation/timer evidence. Broader tick providers still require Conquest.
-    m.validate_ground_support_tick(1).unwrap();
+    assert_eq!((traces, ticks, checkpoints), (13, 2705, 153));
 }
