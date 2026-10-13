@@ -176,6 +176,20 @@ impl ObservedMemory {
         Ok(())
     }
 
+    /// Whether pending rows can be replayed at this collector key. The caller
+    /// still invokes refresh on an empty first read to register future updates.
+    pub(crate) fn needs_replay(&self, world: &World) -> bool {
+        let pending = world
+            .pending(Recipient::Player(self.slot))
+            .map_or(!world.cell_log().is_empty(), |v| !v.is_empty());
+        pending
+            && self.key
+                != Some((
+                    world.game.terrain_version,
+                    world.game.vision_tick.unwrap_or(-1),
+                ))
+    }
+
     /// Replay sorted pending log indices at most once per terrain/vision key.
     /// Accepted updates are staged, including revision capacity, before memory
     /// or the World's pending set changes. Hidden cells remain pending.
