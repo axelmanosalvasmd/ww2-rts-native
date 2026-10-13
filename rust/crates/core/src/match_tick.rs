@@ -51,13 +51,40 @@ pub enum TickPhase {
 
 /// Persistent simulation state, never wall-clock state. A phase failure poisons
 /// the runner because some earlier canonical phases may already have committed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TickPathConfig {
+    pub budget: usize,
+    pub retry_limit: u32,
+}
+impl Default for TickPathConfig {
+    fn default() -> Self {
+        Self {
+            budget: 4096,
+            retry_limit: 20,
+        }
+    }
+}
+impl TickPathConfig {
+    fn validate(self) -> Result<(), String> {
+        if self.budget as u64 > 9_007_199_254_740_991 {
+            return Err("path budget exceeds exact source integer range".into());
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct TickState {
     pub(crate) fault: Option<String>,
+    started: bool,
+    paths: TickPathConfig,
 }
 impl TickState {
     pub fn fault(&self) -> Option<&str> {
         self.fault.as_deref()
+    }
+    pub fn path_config(&self) -> TickPathConfig {
+        self.paths
     }
 }
 
@@ -84,6 +111,39 @@ enum EnvironmentPhase<'a> {
 }
 
 impl crate::match_runtime::Match {
+    /// Prime a trusted initial scene without executing inputs or simulation phases.
+    /// A running/faulted match or any pending recorded input cannot be rewound.
+    pub fn initialize_tick_scene(
+        &mut self,
+        clock: u64,
+        paths: TickPathConfig,
+    ) -> Result<(), String> {
+        if self.world.game.tick != 0
+            || self.commands.queue.next_tick() != Some(1)
+            || !self.commands.queue.is_empty()
+            || self.tick_state.started
+            || self.tick_state.fault.is_some()
+        {
+            return Err("tick scene requires a fresh empty command queue".into());
+        }
+        if clock >= 9_007_199_254_740_351 {
+            return Err("invalid initial tick clock".into());
+        }
+        paths.validate()?;
+        let existing = self.commands.queue.snapshot();
+        let queue = crate::orders::OrderQueue::restore(crate::orders::OrderSnapshot {
+            version: crate::orders::ORDER_QUEUE_VERSION,
+            next_tick: Some(clock + 1),
+            capacity: existing.capacity,
+            pending: vec![],
+        })
+        .map_err(|error| format!("initial command boundary: {error:?}"))?;
+        self.commands.queue = queue;
+        self.world.game.tick = clock as i64;
+        self.tick_state.paths = paths;
+        Ok(())
+    }
+
     /// Run the connected phase foundation. The returned unavailable list is part
     /// of the result until every actuator required by a playable tick is wired.
     pub fn advance_tick(&mut self) -> Result<TickReport, String> {
@@ -91,6 +151,7 @@ impl crate::match_runtime::Match {
             return Err(format!("tick runner faulted: {fault}"));
         }
         self.validate_tick_input()?;
+        self.tick_state.started = true;
         match self.run_tick() {
             Ok(report) => Ok(report),
             Err(error) => {
@@ -111,6 +172,7 @@ impl crate::match_runtime::Match {
         if self.options.logistics || self.convoys.is_some() {
             return Err("reserve and convoy tick phases are not connected".into());
         }
+        self.tick_state.paths.validate()?;
         let boundary = game.tick as u64 + 1;
         self.validate_command_tick(boundary)?;
         self.validate_ground_support_tick(boundary)
@@ -241,8 +303,8 @@ impl crate::match_runtime::Match {
         // Source paid counts/crew sweep precede the path scheduler and unit queues.
         self.recount_field_projects()?;
         phases.push(TickPhase::FieldProjects);
-        // These are the source defaults for an ordinary Conquest match.
-        let paths = self.begin_path_tick(4096, 20)?;
+        let config = self.tick_state.paths;
+        let paths = self.begin_path_tick(config.budget, config.retry_limit)?;
         phases.push(TickPhase::Paths);
         let claim_order = self.world.game.units.keys().copied().collect::<Vec<_>>();
         self.begin_firing_tick(&claim_order)?;
