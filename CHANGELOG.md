@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Incorporated the World provider's first native test import repair into the extracted shared scene fixture, using the actual world-map module for WorldMapInput. Runtime behavior is unchanged; combined native checks remain pending.
+
 - Enabled eligible World endings through canonical Match finish, story, timeline and reveal after staged region capture, income and home updates. Territory thresholds take priority over last-nation victory; draws and the first region captured this tick use source location rules. An actual-constructor JavaScript recorder covers 15 traces and 16 phases on Huge and Massive maps, and three earlier finish-refusal fixtures now test acceptance. Fort/gate seizure, owned-army/building removal and retired tick facts still reject the whole operation before mutation; native checks are pending the managed slot.
 
 - Integrated the immutable World region and memory provider into the separate canonical World finish branch, preserving its capture, income, home and unsupported-side-effect preflights. Shared World finish implementation and native verification remain pending.
@@ -28,6 +30,8 @@
 
 - Added the native Match Conquest victory phase and finish bookkeeping: team VP in slot order, latest still-held capture location, 0.1 m end rounding, first-winner preservation, reveal and exact Conquest timeline fields. Canonical point accounting now freezes VP and capture story counts after the winner while ownership and manpower can continue. Three focused tests compare 12 original-JavaScript traces (24 assembled-match checkpoints) and invalid-state atomicity; existing startup and point-income tests pass. Other modes, command refusal, remaining story counters, result transport and the full battle loop remain unfinished.
 - Added a bounded World startup constructor with canonical home ownership, wallets, HQs, local defenders, fortifications, resource nodes, empty production and rail state, and actual initial visibility. The shared unit factory preserves source order and canonical guard controls; generator random history is retained. Five original-source records cover 2,761 units. Native checks are pending. Logistics-enabled startup, World terrain memory, mode tick phases, commands, trains and server hosting remain explicit boundaries.
+- Corrected the World region test import to the canonical world-map typed input module after the first native compile. No phase behavior changed.
+
 - Integrated the checked World recipient-memory dependency into the live-region branch, preserving its sole memory owner, journal reset and private region projection alongside canonical lock and capture-time fields. Combined native checks are queued.
 
 - Added an original World nations-finish transition to the region phase oracle, proving its atomic refusal separately from World-share and draw finishes. The expanded recorder covers 20 traces and 39 transitions; native checks remain queued.

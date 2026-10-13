@@ -6,12 +6,12 @@ use ww2_core::{
     economy_state::{ArmySize, PlayerEconomy},
     game::{LOCAL_DEFENDER_OWNER, Point},
     grid::SpatialGrid,
-    map::{AuthoritativeMap, Spawn, WorldMapInput},
+    map::{AuthoritativeMap, Spawn},
     match_runtime::{Match, MatchOptions, PlayerConfig},
     match_world::{RegionState, ResourceNode},
     random::MatchRandom,
     weather::WeatherChoice,
-    world_map::{WorldDefinition, WorldRegion, WorldSize},
+    world_map::{WorldDefinition, WorldMapInput, WorldRegion, WorldSize},
 };
 
 fn bits(v: f64) -> Value {
