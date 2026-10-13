@@ -132,7 +132,15 @@ Region edges and incoming IDs keep the reference insertion order. Dirty chunks r
 
 `NavigationLeg` borrows the cache's labels while owning its allowed-region list. Rust therefore prevents the caller from updating that cache while the fine search uses its filter. This replaces the reference's instruction to use a filter immediately with a lifetime rule.
 
-All 4,888 recorded queries match the reference's target, connectivity, limit flag, ordered region IDs and per-cell filter. The 35 scenarios include 277 terrain updates, 1,372 limited legs and 1,268 disconnected outcomes. The recorder rejects a wrong pin or dirty tracked source. No performance claim is made. Fine A*, unit path queues and integration into movement remain pending.
+All 4,888 recorded queries match the reference's target, connectivity, limit flag, ordered region IDs and per-cell filter. The 35 scenarios include 277 terrain updates, 1,372 limited legs and 1,268 disconnected outcomes. The recorder rejects a wrong pin or dirty tracked source. No performance claim is made. Unit path queues and integration into movement remain pending.
+
+## Infantry and naval pathfinding (2026-10-12)
+
+`pathfinding.rs` adds fine grid A* and path smoothing over the coarse navigation planner. `PathTerrain` supplies the terrain view plus wall proximity, known mines, fires and live bunker positions; `PathRules` supplies wall and bunker costs. The search reads no `Game` and cannot substitute hidden world state for the supplied view. Infantry and shallow/deep naval profiles are supported. Ground vehicles, aircraft, rail units and structures return `UnsupportedProfile`.
+
+The implementation preserves the reference's float32 path scores, score-only heap ties, neighbor order, diagonal corner checks, hazard costs, blocked-start escape and smoothing. An exhausted expansion budget has a distinct result from an unreachable route. Rust owns reusable search storage beside the navigation cache. The old undirected `regionsFor` rejection is unnecessary after the stronger directed coarse route has succeeded, so the fine search does not duplicate that cache.
+
+The original `findPath` produces 1,175 oracle searches across all 33 authored maps and crafted terrain cases: 914 found routes, 163 unreachable results and 98 budget exhaustions. Every waypoint and resolved endpoint matches bit for bit, as do expansion counts and outcomes. Repeated searches after mine, fire and bunker changes are included. The recorder verifies the exact reference pin and rejects tracked changes. Vehicle clearance, automatic recipient-view selection, retry policy, request scheduling and movement integration remain separate work. No performance claim is made.
 
 ## The core's math (2026-10-12)
 
