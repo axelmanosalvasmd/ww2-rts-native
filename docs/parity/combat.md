@@ -177,6 +177,8 @@ These rows remain in progress. The pure component does not apply its events. The
 
 The fixture now records nine original-JavaScript traces with 35 actions, including expired negative sprint timers. Three focused tests pass in debug and release, comparing the expanded fixture and protecting atomic invalid-input rejection plus mid-tick removal order. The combined head passes 131 workspace tests, strict Clippy and formatting. The recorder runs the pinned source functions and original late death block; its `--check` reproduces the fixture. Removed shooter XP, missing/repeated cargo, zero-damage unloading, suppression identities, building synchronization, terrain demolition, out-player bounty exclusion and hull limits are covered.
 
+The fixture now records nine original-JavaScript traces with 35 actions, including expired negative sprint timers. Three focused tests passed the prior eight-trace fixture and protect atomic invalid-input rejection plus mid-tick removal order; the expanded native comparison is queued. The recorder runs the pinned source functions and original late death block; its `--check` reproduces the fixture. Removed shooter XP, missing/repeated cargo, zero-damage unloading, suppression identities, building synchronization, terrain demolition, out-player bounty exclusion and hull limits are covered.
+
 CMB-51, CMB-53, CMB-54, CMB-56, CMB-63, CMB-68, CMB-69 and CMB-70 remain in progress. The adapter is limited to Conquest and represented ground entities. Firing/contact selection, full scheduling, story/FPS/convoy/command retirement hooks, remembered-route retention, thrown rider escape, air and other modes require their owning integration lanes. No complete match-outcome or presentation claim follows from these component tests.
 
 ## Rust projectile helper evidence
@@ -239,4 +241,9 @@ These rows remain in progress. Launch heights and expiry in `addFlight`, world/t
 7. Fog packing and snapshot filtering (CMB-131 to CMB-134): CMB or NET owns the wire format sign-off?
 8. Corpses are client-only in JS; does Unreal keep the 200 cap and fade, or does Axel want a different budget?
 
+
+
+### Integrated ordinary Match firing
+
+`match_firing.rs` now runs ordinary ground/naval target choice and weapon launching against canonical Match state. The original-source recorder and Rust replay cover 66 traces and 264 phases, including visibility, LOS, cover, movement, claims, threats, setup, cooldown and direct/salvo launch fields. The flight driver now calls canonical contact/suppression/blast adapters. Its extended source fixture records 114 traces and 588 checkpoints, including moving contact bodies, terrain obstruction, rebound and expiry; native verification remains queued. Exact equal-fraction unit ties use lower IDs, a deliberate internal ordering choice rather than exact prototype bucket equality. Full Match outcomes, abilities, air, support and FPS integration remain in progress. Existing CMB status rows retain their broader acceptance scope.
 The Match command phase stores and validates the three stance switches and executes the bounded ground attack-move branch using the canonical firing target and current `can_shoot_target` query. Stance snapshots, automatic reactions, ability execution, aircraft and the complete firing/tick integration are separate work. The source command recorder includes 56 traces and 246 steps; three focused native tests pass in debug and release, including every checkpoint and two movement replan branches.
