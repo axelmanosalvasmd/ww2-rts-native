@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added source convoy-route and handoff helpers plus the initial canonical Match supply adapter. Recipient-routing and environment prerequisites are required before these phases can be verified or logistics startup can be enabled.
+
 - Added ordinary ground supply network and refill-rate code with a recorder executing 233 pinned JavaScript networks and 39,839 rate queries. Match convoy routing and initialization are still being integrated; Rust verification is pending the shared build slot.
 - Added one canonical Match control row for aim, ability and retreat switches, attack intent, facing and waiting orders. Startup prepares the rows from unit definitions; recruitment can stage them before charging. Command execution is the next part of this lane, and no wire or C interface changed.
 - Added canonical chosen-target and weapon-timer state to Match for the firing integration. Unit health and position, command aim and combat hit history retain their existing owners; the firing phase is still in progress.
