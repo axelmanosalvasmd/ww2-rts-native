@@ -216,7 +216,9 @@ pub fn compare(a: &Value, b: &Value, path: &str) {
             return;
         }
         assert_eq!(
-            a.as_f64().unwrap().to_bits(),
+            a.as_f64()
+                .unwrap_or_else(|| panic!("{path}: expected number {b}, got {a}"))
+                .to_bits(),
             b.as_f64().unwrap().to_bits(),
             "{path}"
         );
