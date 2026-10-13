@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified the ordinary AIR/support caller on Mac arm64 at db3da8d: 56 final focused simulation debug tests, all 267 release workspace tests, strict Clippy, formatting and release FFI pass. The unchanged core's 57 debug passes remain attributed to 2d3b860. Independent hashed copies pass 38 debug and 38 release tests. Recorded both actual test dependency repairs and preserved their failing logs; the full-source AIR replay covers 10 traces and 4,972 steps. Logistics, unsupported aircraft weapons, later construction/event output, hosted platform checks and full room startup remain separate.
+
 - Restored the verified coherent support recorder and fixture together after the AIR union retained an older ground-only fixture schema. The actual AIR runner's three debug tests now pass, but all eight support tests failed in setup because their restored factory requires the coherent `units` array. This repair copies the checked provider's original files exactly; runtime, guards, RNG and the separate ground full-step fixture are unchanged. The failed log and 35 preceding debug passes are retained; final combined proof remains pending.
 
 - Corrected the AIR replay's seed readback to the JavaScript signed 32-bit representation, found at its first full-step comparison. Native and source seeds already had identical bits; runtime random state, authored setup and fixtures are unchanged. Removed seven unused aviation-test imports reported by the same build. The candidate passed 57 core debug tests and 18 earlier simtest checks before this failure, with two AIR admission checks also passing; combined final proof remains pending.
