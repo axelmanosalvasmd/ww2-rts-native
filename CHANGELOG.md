@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added canonical Match ground reactions, automatic retreat and idle spacing using shared command destinations, owner-known routes, firing targets and combat hit history. Three focused tests pass in debug and release, comparing 51 unchanged-source reaction/retreat cases and checking atomic rejection. Only the missing reaction timer is added to UnitControl. Air, carrier and garrison retreat exits remain explicit unsupported paths. Complete tick hookup remains separate. Adapted routing to canonical ordered-fire iteration and filled absent reserve defaults in the merged command fixture. Strict Clippy remains blocked by two unused helpers in the inherited firing milestone.
+
+
 - Reserved two path-identity increments before a movement block, covering a replacement route followed by a physical obstruction. Exhaustion rejects before unit mutation instead of risking a debug overflow or release wrap.
 
 - Exposed the canonical target setter inside the core so reaction phases keep shared volley claims consistent when intercepting rally movement.

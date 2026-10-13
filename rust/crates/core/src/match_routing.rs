@@ -278,7 +278,7 @@ impl Match {
                 .world
                 .mine_seen
                 .keys()
-                .chain(self.world.fires.keys())
+                .chain(self.world.fires.iter().map(|(cell, _)| cell))
                 .any(|&c| c >= g.w * g.h)
             || self.building_cells.iter().any(|(&c, b)| {
                 c >= g.w * g.h
@@ -350,7 +350,7 @@ impl Match {
         let g = &self.world.game;
         let fog = self.routing_fog.team(g, &self.rules, g.players[owner].team);
         state.fires.fill(false);
-        for &c in self.world.fires.keys() {
+        for (&c, _) in self.world.fires.iter() {
             state.fires[c] = fog.vis[c] != 0;
         }
         state.bound_units = g
