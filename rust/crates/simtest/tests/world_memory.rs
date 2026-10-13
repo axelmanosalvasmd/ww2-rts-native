@@ -163,6 +163,19 @@ fn load(index: usize, shape: Option<&Value>) -> Match {
         c["map"]["rows"] = json!(vec![".".repeat(idx(&shape["w"])); idx(&shape["h"])]);
         c["map"]["heights"] = json!(vec!["0".repeat(idx(&shape["w"])); idx(&shape["h"])]);
         c["map"]["world"]["regionMapRuns"] = shape["regionMapRuns"].clone();
+        if let Some(mines) = shape["authoredMines"].as_array() {
+            let w = idx(&shape["w"]);
+            for mine in mines {
+                let cell = idx(mine);
+                let mut row = c["map"]["rows"][cell / w]
+                    .as_str()
+                    .unwrap()
+                    .as_bytes()
+                    .to_vec();
+                row[cell % w] = b'N';
+                c["map"]["rows"][cell / w] = String::from_utf8(row).unwrap().into();
+            }
+        }
     }
     let m = map(&c);
     let o = options(&c);
@@ -428,7 +441,7 @@ fn original_world_memory_producers() {
             count += 1;
         }
     }
-    assert_eq!(count, 119);
+    assert_eq!(count, 120);
 }
 fn query_cell(knowledge: &ww2_core::route_knowledge::RouteKnowledge, c: usize) -> Value {
     let v = knowledge.cell(c).unwrap();
