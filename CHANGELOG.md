@@ -12,6 +12,8 @@
 
 - Normally merge the verified host timing, snapshot delta, list-version and socket-accounting providers into the engineering delivery branch. Preserve each provider's original fixtures and existing code; the new room integration and combined native proof are pending.
 
+- Refreshed the consolidated server delta, list, backpressure and timing frontier in PR #137 onto ABI 2 main `13a8d1f`. Preserved both changelog histories and all server source, original-source recorders and fixtures. Only additive changelog entries conflicted; fresh combined-head platform checks remain pending.
+
 - Added host tick catch-up with the source's four-tick cap and backlog drop, plus snapshot cadence from rolling timing percentiles. Snapshot phases are recorded only on scheduled snapshot ticks; sustained spare capacity recovers the interval. Timing inputs and counter capacity are checked before mutation. The original-source recorder covers 8 meter traces with 747 samples and 7 clock traces with 34 polls. The combined server checkpoint passes 23 debug tests, 173 release workspace tests, strict Clippy, formatting and release FFI at 315f46a. Actual room-loop wiring remains pending; AI keeps its recorded schedule.
 
 - Integrated the server delta, list and socket backpressure checkpoints with the reviewed core ancestry. All original server tests and source fixtures are retained; final native checks remain pending.
@@ -306,6 +308,9 @@
 - Added an internal send-scoped Conquest projection for represented unit rows and recipient-owned economy, technology, rally, weather and finish fields. It reads canonical control, ability, recovery, firing and combat state, preserves the reference cached non-owner flag mask and hides unseen target IDs. An original-source fixture records 44 states and 132 recipient projections, including ally privacy, vehicles, cover, rounding and the distinct weapon/ability cooldowns. Missing canonical metadata returns a typed error; active air, engineering, gates and operatives remain unsupported. Plans, queued orders, terrain/fog, effects, points and the complete snapshot envelope remain pending. Native checks are pending the shared build lane.
 
 - Stacked the checked Conquest command actuator on the reviewed recruitment and recipient-routing checkpoint, retaining its complete command behavior and canonical shared control state. Combined integration checks belong to the shared CI lane.
+
+- Refreshed the consolidated Rust frontier in PR #119 onto merged ABI 2 main `d88ef6d`. Preserved all core behavior, both changelog histories, the six approved recipient-view calls and the exact header. Only additive changelog entries conflicted; combined-tree platform checks are rerun on the refreshed head.
+
 - Added canonical Match ground reactions, automatic retreat and idle spacing using shared command destinations, owner-known routes, firing targets and combat hit history. Three focused tests pass in debug and release, comparing 51 unchanged-source reaction/retreat cases and checking atomic rejection. Only the missing reaction timer is added to UnitControl. Air, carrier and garrison retreat exits remain explicit unsupported paths. Complete tick hookup remains separate. Adapted routing to canonical ordered-fire iteration and filled absent reserve defaults in the merged command fixture. At checkpoint ab0394d, strict Clippy stopped on two unused helpers in its inherited firing milestone. Final merged checks are pending.
 
 - Verified the complete command/firing ancestry after recruitment metadata integration: 155 workspace tests, five focused debug/release tests, strict Clippy, formatting and release FFI build pass. The diff against the reviewed command branch contains only weapon-phase code, publication defaults, fixtures and documentation.
@@ -1128,6 +1133,13 @@
 
 
 - Added complete event-adapter preflight for canonical retreat velocities, pose, suppression and sprint values so malformed later blast targets fail before earlier unit damage. Focused native checks pass.
+
+- Refreshed PR #16 onto main `242997f` with the approved ABI 2 header and six view calls unchanged. Recorded Axel's reported Linux UE 5.8.3 guard, build, replay and live shadow checks on `03a49ac`: 1,236 replay messages, 7,650 rows, 61 edge checks, 18 formation tests and 2,230 live snapshots passed. The consumer source is unpublished; packaged Linux, Windows and macOS builds and authoritative decoder adoption remain pending. Earlier pending-verification entries describe their original checkpoints.
+
+- Documented the ABI mismatch path for the staged consumer update: the Rust export returns version 2 directly, and an ABI 1 consumer must reject it against its own version constant before making other calls. No library version-mismatch error code or current Unreal guard verification is claimed.
+
+- Refreshed PR #16 against the landed Rust recipient decoder and current main, retaining the exact ABI 2 header, six view calls and formation signatures. Recorded Axel's explicit client-consumption approval and Julio's Rust-side approval for staged adoption. PR merge and current Unreal build/link/runtime verification remain pending; no broader interface, gameplay or privacy decision is changed.
+- Added the native Match Conquest victory phase and finish bookkeeping: team VP in slot order, latest still-held capture location, 0.1 m end rounding, first-winner preservation, reveal and exact Conquest timeline fields. Canonical point accounting now freezes VP and capture story counts after the winner while ownership and manpower can continue. Three focused tests compare 12 original-JavaScript traces (24 assembled-match checkpoints) and invalid-state atomicity; existing startup and point-income tests pass. Other modes, command refusal, remaining story counters, result transport and the full battle loop remain unfinished.
 
 - Added one canonical Match control row for aim, ability and retreat switches, attack intent, facing and waiting orders. Startup prepares the rows from unit definitions; recruitment can stage them before charging. Command execution is the next part of this lane, and no wire or C interface changed.
 - Added canonical chosen-target and weapon-timer state to Match for the firing integration. Unit health and position, command aim and combat hit history retain their existing owners; the firing phase is still in progress.

@@ -55,13 +55,15 @@ As at the pin (field reference, section 6):
 
 ## Fixtures and verification
 
-Pending. The plan, part of the headless test client issue #4 asks for:
+The first recorder and receiver replay are implemented in `harness/protocol-record.mjs`, `harness/view-check.mjs` and `simtest --view`. They cover Conquest and World Conquest messages to two human clients, with two AI seats in Conquest, movement, full and delta snapshots, held-set checks, resync and World discovery. Complete sanitized messages and browser-derived expected reports are committed as gzip fixtures. The replay compares unit rows, raw terrain-row caches and raw fog masks after each message; it does not prove every composed terrain or gameplay query.
 
-1. A recorder in this repo runs the pinned Node server in process, as the reference tests do, drives scripted clients, and writes sanitized transcripts (one JSON object per line, tokens replaced) for: hello and lobby, every lobby setting, start, 200 ticks of snapshots, a refused command of each kind, `resync`, reconnect with the same token, a drop pause, `leave`, a spectator, a companion, save and load.
+The remaining headless-client work from issue #4 is:
+
+1. Extend the existing recorder to every lobby setting and refusal reason, reconnect with the same token, drop pause, `leave`, spectators, companions, save and load. The current streams cover hello/lobby/start, snapshots, one refusal and resync.
 2. The Rust server replays the client side of each transcript and must produce the same server messages, field for field, except where a correction above applies.
 3. The pinned browser client plays a short match against the Rust server as a smoke test.
 
-The transcripts also settle the field reference's unverified items (close codes, subprotocols, deflate parameters).
+The in-process recorder does not exercise WebSocket framing, close codes, subprotocols or deflate negotiation. Those field-reference items still need transport tests. The Rust server and live browser-to-Rust tests are also pending.
 
 ## Answered on #5 (2026-10-12)
 
