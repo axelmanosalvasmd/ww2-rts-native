@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added idempotent explicit initialization for production buildings so Match startup can expose empty canonical queues and zero progress immediately. Reinitializing a building preserves paid jobs; player research rows already start with empty lab lists.
+
+- Added canonical production queues and player research outside `Game`. Construction-mode recruitment uses the existing wallets and population rules; paid job IDs, original-charge refunds, one-unit-per-step training, ordered lab capacity and pause/resume match 12 original-JavaScript traces (114 actions, 922 advance calls). Typed completion requests leave unit creation and placement to the match runner. Empty building state initializes lazily; malformed inputs and duplicate IDs fail before mutation. Instant recruitment, placement/rally orders, building lifecycle, statistics, persistence and public wire/ABI integration remain separate.
+
 - Added a borrowed live-weather phase with the pinned environment RNG, wind drift, smoke decay, showers and wet-ground updates. Three focused tests cover 59 original-JavaScript sequences (386 steps) and 400 RNG draws, including disabled weather and planned transitions. The phase reports fire/flood timing but leaves terrain effects and final smoke removal to the match integrator.
 
 - Added a canonical mutable World with terrain edits, material/mine cleanup, packed state, region invalidation, stable cell logs, journals and independent recipient pending indices (issue #62). Six original-source traces cover 78 actions, including four authored maps. Building section registration preserves displaced section values without duplicating health; live terrain vectors move into Game while the initial snapshot remains separate. Building registration rejects exhausted counters before changing any section. Wrecks now retain an optional settled cell for cleanup, and runtime building footprints use their movement/sight flags. Active destruction, fire simulation and full match startup remain separate work.
