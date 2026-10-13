@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Connected movement recovery and traffic replans to caller-supplied route handlers, while retaining the existing frozen benchmark entry points. Four live-search reference recordings match infantry and tank movement over 48 ticks, including disconnected destinations. This does not enable full match scheduling, hidden-terrain selection, logistics or combat.
+
 - Recorded wallet/population ownership, source-order arithmetic, typed input errors and 37-trace evidence in the design and economy/mode parity rows, and updated IF-01 to the current 47-table catalog. Full economy and mode acceptance remains in progress; the catalog now has 47 tables, with earlier counts retained as historical steps.
 
 - Fixed World regional income accumulation to add each region and city bonus in the reference order. An original-source regression with one player and two ordinary regions followed by a city now returns exactly `5.550000000000001` per second; regrouping those additions returned `5.55`. The income fixture now covers 37 traces and 217 steps.
