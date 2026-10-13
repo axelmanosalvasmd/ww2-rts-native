@@ -406,13 +406,21 @@ impl crate::match_runtime::Match {
         phases.push(TickPhase::Operative);
         self.tick_environment_phase(EnvironmentPhase::Debris, events)?;
         phases.push(TickPhase::Debris);
-        self.sample_conquest_tick()?;
+        if self.options.mode == crate::economy::Mode::World {
+            self.sample_match_tick()?;
+        } else {
+            self.sample_conquest_tick()?;
+        }
         phases.push(TickPhase::StorySample);
         self.start.weather.step(tick as u64);
         self.world.game.weather = Some(self.start.weather.now as usize);
         phases.push(TickPhase::WeatherPlan);
         if tick % 4 == 1 {
-            vision::update_vision(&mut self.world.game, &self.rules, &self.grid);
+            if self.options.mode == crate::economy::Mode::World {
+                self.refresh_world_visibility()?;
+            } else {
+                vision::update_vision(&mut self.world.game, &self.rules, &self.grid);
+            }
             phases.push(TickPhase::Vision);
         }
         // Source paid counts/crew sweep precede the path scheduler and unit queues.
@@ -699,7 +707,7 @@ impl crate::match_runtime::Match {
                 let metadata = self.combat.get(unit.id).ok_or("missing death metadata")?;
                 Ok((
                     crate::match_story::DeathRecord {
-                        owner: Some(unit.owner),
+                        owner: self.actor_policy(unit.owner)?.economy_slot,
                         kind: kind.name.as_str(),
                         at: unit.at(),
                     },
@@ -721,7 +729,7 @@ impl crate::match_runtime::Match {
             let kind = self.rules.kinds[record.unit.kind].name.clone();
             self.record_death(
                 crate::match_story::DeathRecord {
-                    owner: Some(record.unit.owner),
+                    owner: self.actor_policy(record.unit.owner)?.economy_slot,
                     kind: &kind,
                     at: record.unit.at(),
                 },
@@ -730,7 +738,11 @@ impl crate::match_runtime::Match {
                     .and_then(|owner| usize::try_from(owner).ok()),
             )?;
             progress.stories_notified += 1;
-            self.retain_removed_route_unit(&record.unit)?;
+            if self.options.mode == crate::economy::Mode::World {
+                self.retain_removed_world_route_unit(&record.unit)?;
+            } else {
+                self.retain_removed_route_unit(&record.unit)?;
+            }
             progress.routes_retained += 1;
         }
         // Active flights retain their removed source's combat XP metadata.

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Connect canonical World sampling and commander/local visibility at the existing early tick beats in the still-guarded caller. Ordinary death records now borrow the canonical actor economy slot, omitting the local defender from commander losses, and World removals retain actual cached object facts through the existing World route owner. Ordinary sampling, visibility and route retention remain on their existing paths. Full World actor runtime, admission and native verification remain pending.
+
 - Normally include the canonical borrowed World actor policy, including unsorted local visibility membership, in the separate caller continuation. Commander economy remains singular and local defenders gain no lobby or wallet row. Reached phase adapters and whole World admission remain under development, with no native claim.
 
 - Preserve final captured World income facts through completed ordinary retirement and wire the accepted income, real convoy and current-region tail in the still-guarded caller branch. Reject incomplete callback prefixes, duplicate or conflicting identities and missing objects. Keep administrative removal records separate from ordinary death callbacks and move committed region effects once into chronological output. A fifth real-World-constructor test checks captured order and read-only fact refusals; native World tick admission and verification remain pending.
