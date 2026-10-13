@@ -228,3 +228,91 @@ fn real_safe_routes_continuation_and_physical_handoff_match_original() {
         }
     }
 }
+
+#[test]
+fn invalid_routing_shapes_and_nonfinite_continuation_return_denials() {
+    let fixture: Value = serde_json::from_str(include_str!("fixtures/supply-routes.json")).unwrap();
+    let mut input = Input::read(&fixture["terrains"][0]);
+    let rules = Rules::compiled().unwrap();
+    let truck = rules.kinds.iter().find(|k| k.name == "truck").unwrap();
+    let rifle = rules.kinds.iter().find(|k| k.name == "rifle").unwrap();
+    let at = Point { x: 1.0, z: 1.0 };
+    let end = Point { x: 9.0, z: 1.0 };
+    let path = [end];
+    assert!(!SupplyRouting::continue_route(
+        input.terrain().navigation,
+        truck,
+        at,
+        &path,
+        f64::NAN,
+        &[]
+    ));
+    assert!(!SupplyRouting::continue_route(
+        input.terrain().navigation,
+        truck,
+        at,
+        &[Point {
+            x: f64::NAN,
+            z: 1.0
+        }],
+        0.0,
+        &[]
+    ));
+    let mut state = SupplyRouting::default();
+    assert!(
+        state
+            .route(
+                RouteRequest {
+                    owner: 32,
+                    tick: 0,
+                    from: at,
+                    to: end,
+                    safe: true
+                },
+                input.terrain(),
+                truck,
+                &[]
+            )
+            .is_err()
+    );
+    input.flags.pop();
+    assert!(!SupplyRouting::continue_route(
+        input.terrain().navigation,
+        truck,
+        at,
+        &path,
+        0.0,
+        &[]
+    ));
+    assert!(
+        state
+            .route(
+                RouteRequest {
+                    owner: 0,
+                    tick: 0,
+                    from: at,
+                    to: end,
+                    safe: true
+                },
+                input.terrain(),
+                truck,
+                &[]
+            )
+            .is_err()
+    );
+    assert!(
+        state
+            .handoff(
+                Handoff {
+                    tick: 0,
+                    start: at,
+                    store: end,
+                    radius: 15.0
+                },
+                input.terrain(),
+                rifle,
+                &[]
+            )
+            .is_err()
+    );
+}

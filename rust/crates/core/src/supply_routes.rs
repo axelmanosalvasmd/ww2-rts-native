@@ -227,7 +227,17 @@ impl SupplyRouting {
         stuck: f64,
         threats: &[Threat],
     ) -> bool {
-        if path.is_empty() || stuck > 0.5 {
+        if path.is_empty()
+            || stuck > 0.5
+            || !stuck.is_finite()
+            || validate_navigation(known).is_err()
+            || !from.x.is_finite()
+            || !from.z.is_finite()
+            || path.iter().any(|p| !p.x.is_finite() || !p.z.is_finite())
+            || threats.iter().any(|t| {
+                !t.at.x.is_finite() || !t.at.z.is_finite() || !t.range.is_finite() || t.range < 0.0
+            })
+        {
             return false;
         }
         let mut from = from;
@@ -474,8 +484,7 @@ fn refresh_danger(
     state.changed = changed;
     Ok(())
 }
-fn validate(t: PathTerrain<'_>, a: Point, b: Point) -> Result<(), String> {
-    let v = t.navigation;
+fn validate_navigation(v: TerrainView<'_>) -> Result<usize, String> {
     let n = v
         .width
         .checked_mul(v.height)
@@ -484,7 +493,14 @@ fn validate(t: PathTerrain<'_>, a: Point, b: Point) -> Result<(), String> {
         || n > i32::MAX as usize
         || v.flags.len() != n
         || v.heights.is_some_and(|h| h.len() != n)
-        || t.near_walls.len() != n
+    {
+        return Err("invalid routing shape".into());
+    }
+    Ok(n)
+}
+fn validate(t: PathTerrain<'_>, a: Point, b: Point) -> Result<(), String> {
+    let n = validate_navigation(t.navigation)?;
+    if t.near_walls.len() != n
         || t.known_mines.len() != n
         || t.fires.len() != n
         || t.wear.is_some_and(|w| w.len() != n)
