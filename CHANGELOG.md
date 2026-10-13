@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Integrated the coordinated mode-aware control initializer and World usage into Assault prerequisites. Ordinary deployment uses the shared ability-cost policy without enabling mode tick dispatch. Native combined verification remains pending.
+
 - Brought the proven World rail annotation/inference repair and coordinated region accessors into the Assault prerequisite chain, retaining its explicit startup profile and canonical story fields. Combined native checks remain pending.
 
 - Added an explicit Assault startup constructor and canonical defender, attacker, clock and bunker-count state. It normalizes attacker teams, cycles reserved defender spawns, drops VP-only objectives with remapped prerequisites, builds ordered trenches, sandbags, command bunkers and flak before ordinary bases, and preserves source MP and army/weather choices. A pinned original-JavaScript recorder covers 43 starts and 702 units on all 33 authored maps and six synthetic terrains. Native checks are pending. Generic startup and Conquest phases still refuse Assault; Assault tick, recruitment, finish, scenarios and server delivery remain unfinished.
@@ -14,11 +16,13 @@
 
 - Added the native Match Conquest victory phase and finish bookkeeping: team VP in slot order, latest still-held capture location, 0.1 m end rounding, first-winner preservation, reveal and exact Conquest timeline fields. Canonical point accounting now freezes VP and capture story counts after the winner while ownership and manpower can continue. Three focused tests compare 12 original-JavaScript traces (24 assembled-match checkpoints) and invalid-state atomicity; existing startup and point-income tests pass. Other modes, command refusal, remaining story counters, result transport and the full battle loop remain unfinished.
 - Added a bounded World startup constructor with canonical home ownership, wallets, HQs, local defenders, fortifications, resource nodes, empty production and rail state, and actual initial visibility. The shared unit factory preserves source order and canonical guard controls; generator random history is retained. Five original-source records cover 2,761 units. Native checks are pending. Logistics-enabled startup, World terrain memory, mode tick phases, commands, trains and server hosting remain explicit boundaries.
+- Documented the checked regional lookup and explicit post-rails snapshot projection boundaries, including the first native log failure and remaining mutable-terrain hook consumers.
+
+- Reused the shared mode-aware control initializer for World startup and removed its private ability-cost lookup. Guard overrides stay canonical. Native proof of this updated startup dependency is pending.
+
 - Fixed the missing rail track-position type annotation found by the first World native compile. Added checked World region/economy projections and optional rail/station snapshot fields with atomic post-rails row annotation after the original startup oracle found missing metadata. Mutable-terrain callers still need to invoke the explicit projection hook. Updated the crafted source case to test floating-column lookup on nonmultiple dimensions; full native acceptance remains pending.
 
 - Added a bounded World startup constructor with canonical home ownership, wallets, HQs, local defenders, fortifications, resource nodes, empty production and rail state, and actual initial visibility. The shared unit factory preserves source order and canonical guard controls; generator random history is retained. Five original-source records cover 2,761 units and commander research initialization. Native checks are pending. Logistics-enabled startup, World terrain memory, mode tick phases, commands, trains and server hosting remain explicit boundaries.
-
-- Reserved a fixed internal World local-defender actor identity outside commander slots. World team and alliance queries recognize that actor without adding a player seat or wallet; ordinary invalid owner behavior is unchanged. Native World construction and guarded publication remain pending.
 
 - Connected full generator output to typed World map inputs, retaining authored landmark tags, region and cell biomes and ordered rail metadata. The generated-to-loader test compares physical terrain flags, house kinds, health and wear against original static initialization.
 
@@ -36,6 +40,9 @@
 - Connected Conquest point supply, capture and income to the assembled Match, using the tick's ordered unit list and one canonical objective/reserve state. Eight original-source traces compare 72 phases across all armies, allied and enemy teams, disconnection, supply obstruction, post-decision VP freezing and units spawned during a tick. Capture timestamps follow source winner gating; malformed input leaves objectives and wallets unchanged. This phase does not advance the clock or implement the remaining match systems.
 
 - Added canonical objective state and standalone capture-point and point-supply phases. Four focused tests compare 214 original-JavaScript capture traces (1,165 checkpoints) and 223 supply states, including exact capture progress, event order and control/reached masks. Preserved allied ownership, sequential prerequisites, forced-reserve guards, circular safe zones, MOVE-only supply seeds and square point-connectivity checks. Inputs are validated before objective mutation. Match scheduling, story application, income, refill networks and win/loss integration remain unfinished; no ABI or wire interface changed.
+- Added shared mode-aware UnitControl initialization using compiled ability costs, and selected it from the staged factory's actual Game mode. The original spawn oracle preserves all 55 earlier scenarios and adds six Classic/World spawns for absent, paid and free abilities. This source-only prerequisite still awaits native verification; World startup can remove its private cost lookup.
+
+- Preserved canonical recruited combat defaults through the shared publication callback when integrating the reviewed combat ancestry. Fresh combat identities reject before payment; production stepping remains under implementation.
 - Verified shared unit publication with 130 workspace tests, five release transaction/recruitment tests, strict Clippy/formatting and independent review. Original JavaScript regeneration matches six traces and 33 buys, including the negative-HP casualty regression; World/FPS execution and training remain separate integrations.
 
 - Simplified publication pose validation to satisfy strict Clippy after debug and release transaction checks passed. The validation condition and rejection behavior remain the same.
