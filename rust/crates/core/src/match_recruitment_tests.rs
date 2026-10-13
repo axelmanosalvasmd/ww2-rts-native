@@ -416,8 +416,11 @@ fn rejected_final_preflight_discards_staged_sight_and_purchase() {
     // Exercise a final story rejection after admission and before publication.
     m.story[0].mp_spent = f64::NAN;
     let before = unchanged(&m);
-    let view = m.recipients[0].query().navigation();
-    let identity = (view.flags.as_ptr(), view.versions.knowledge);
+    let identity = {
+        let query = m.recipients[0].query();
+        let view = query.navigation();
+        (view.flags.as_ptr(), view.versions.knowledge)
+    };
     let rows = m.recipients[0].remembered().to_vec();
     let pending = m.world.pending(crate::world::Recipient::Player(0)).cloned();
     let fog = m.routing_fog.clone();
@@ -426,8 +429,12 @@ fn rejected_final_preflight_discards_staged_sight_and_purchase() {
         Err(RecruitError::Story(_))
     ));
     assert_eq!(unchanged(&m), before);
-    let view = m.recipients[0].query().navigation();
-    assert_eq!((view.flags.as_ptr(), view.versions.knowledge), identity);
+    let after_identity = {
+        let query = m.recipients[0].query();
+        let view = query.navigation();
+        (view.flags.as_ptr(), view.versions.knowledge)
+    };
+    assert_eq!(after_identity, identity);
     assert_eq!(m.recipients[0].remembered(), rows);
     assert_eq!(
         m.world.pending(crate::world::Recipient::Player(0)),
