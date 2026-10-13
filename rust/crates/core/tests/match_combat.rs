@@ -12,7 +12,6 @@ use ww2_core::{
         CombatState, ContactTarget, DamageWorld, ExplosionSource, FlightSource, RetargetSink,
     },
     match_runtime::{Match, MatchOptions, PlayerConfig},
-    rules::Rules,
     unit_spawn::initial_unit,
     weather::WeatherChoice,
     world::{CellChange, World},
@@ -70,7 +69,10 @@ fn row(v: &ww2_core::world::CellRow) -> Value {
 fn snapshot(m: &Match, timers: &Timers, groups: &BTreeMap<u32, BTreeSet<u32>>) -> Value {
     let w = &m.world;
     let g = &w.game;
-    let structures=w.structures.iter().map(|s|json!([s.id,s.kind,s.section_ids.iter().map(|id|{let (meta,h)=w.section_by_id(id).unwrap();let mut v=json!({"id":id,"hp":h.hp,"state":if h.failed{"failed"}else{match meta.appearance{ww2_core::world::Appearance::Intact=>"intact",ww2_core::world::Appearance::Damaged=>"damaged",ww2_core::world::Appearance::Burning=>"burning"}},"rubble":meta.rubble});if let Some(i)=meta.failure.impulse{v["impulse"]=json!(i);}if let Some(t)=meta.failure.failed_at{v["failedAt"]=json!(t);}if let Some(d)=meta.failure.direction{v["direction"]=json!({"x":d.x,"z":d.z});}if let Some(t)=meta.failure.settled_at{v["settledAt"]=json!(t);}v}).collect::<Vec<_>>()])).collect::<Vec<_>>();
+    let structures=w.structures.iter().map(|s|json!([s.id,s.kind,s.section_ids.iter().map(|id|{let (meta,h)=w.section_by_id(id).unwrap();let mut v=json!({"id":id,"hp":h.hp,"state":if h.failed{"failed"}else{match meta.appearance{ww2_core::world::Appearance::Intact=>"intact",ww2_core::world::Appearance::Damaged=>"damaged",ww2_core::world::Appearance::Burning=>"burning"}},"rubble":meta.rubble});if let Some(i)=meta.failure.impulse{v["impulse"]=json!(i);}
+if let Some(t)=meta.failure.failed_at{v["failedAt"]=json!(t);}
+if let Some(d)=meta.failure.direction{v["direction"]=json!({"x":d.x,"z":d.z});}
+if let Some(t)=meta.failure.settled_at{v["settledAt"]=json!(t);}v}).collect::<Vec<_>>()])).collect::<Vec<_>>();
     let wrecks = g
         .wrecks
         .iter()
@@ -572,7 +574,6 @@ fn event_and_death_preflight_preserve_canonical_state_on_invalid_input() {
         view.apply_events(&events, &mut timers, &mut BTreeSet::new())
             .is_err()
     );
-    drop(view);
     assert_eq!(snapshot(&m, &timers, &groups), before);
     m.world.game.units.get_mut(&1).unwrap().hp = 0.;
     m.world.game.units.get_mut(&2).unwrap().hp = 0.;
