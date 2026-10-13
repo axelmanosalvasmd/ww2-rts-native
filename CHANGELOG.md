@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed the consolidated candidate's first compile failures: the ordinary snapshot now reads verified ground strikes from canonical Game timing, and World route retention receives its current environment owner. Migrated existing snapshot tests without changing their fixture values and added atomic refusal checks for unrepresented strike rows. The initial native and hosted checks failed before tests; repaired verification is pending.
+
 - Joined the frozen AIR, server and World frontiers in one main candidate. Preserved canonical startup, commands, recipient receipts and typed World endings while resolving older shared routing definitions. Combined native and platform checks remain pending; the World envelope and FPS milestone stay deferred.
 
 - Combined the frozen AIR and server frontiers, retaining Destroy with carrier and aircraft commands, and one startup path with canonical aviation state. Combined native checks remain pending.
