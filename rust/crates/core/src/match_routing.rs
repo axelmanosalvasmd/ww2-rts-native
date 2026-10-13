@@ -108,8 +108,8 @@ impl ObservationFacts for Facts {
     }
 }
 fn sees(game: &Game, rules: &Rules, grid: &SpatialGrid, team: i32, reach: f64, at: Point) -> bool {
-    // The reference's eyesFor builds a fresh team bucket index. Match rebuilds
-    // its index first; the exact-distance check removes extra square candidates.
+    // The reference eyesFor builds a fresh team bucket index. The caller supplies
+    // a local observation index; exact distance removes extra square candidates.
     grid.unordered(&game.units, (at.x, at.z), reach, |_, u| {
         game.team_of(u) == team
     })
@@ -404,11 +404,11 @@ impl Match {
                 .map_err(|e| format!("observed refresh: {e:?}"))?;
             return Ok(());
         }
-        self.grid.rebuild(&self.world.game.units);
+        let observation_grid = SpatialGrid::new(&self.world.game.units, 16.0);
         let mut facts = facts(
             &self.world,
             &self.rules,
-            &self.grid,
+            &observation_grid,
             &self.building_cells,
             owner,
         )?;
@@ -437,14 +437,14 @@ impl Match {
             return Ok(());
         }
         self.refresh_memory(owner)?;
-        self.grid.rebuild(&self.world.game.units);
+        let observation_grid = SpatialGrid::new(&self.world.game.units, 16.0);
         let state = &mut self.recipients[owner];
         state
             .memory
             .apply_routes(&mut state.routes)
             .map_err(|e| format!("observed projection: {e:?}"))?;
         let g = &self.world.game;
-        refresh_wrecks(state, g, &self.rules, &self.grid, owner);
+        refresh_wrecks(state, g, &self.rules, &observation_grid, owner);
         state.wrecks = state.wreck_memory.clone();
         let fog = self.routing_fog.team(g, &self.rules, g.players[owner].team);
         state.fires.fill(false);
@@ -503,7 +503,7 @@ impl Match {
         if !at.x.is_finite() || !at.z.is_finite() {
             return Err("invalid visibility point".into());
         }
-        self.grid.rebuild(&self.world.game.units);
+        let observation_grid = SpatialGrid::new(&self.world.game.units, 16.0);
         let g = &self.world.game;
         let team = g.players[owner].team;
         let reach = g
@@ -512,7 +512,7 @@ impl Match {
             .filter(|u| g.team_of(u) == team)
             .map(|u| vision_of(g, &self.rules, u))
             .fold(1.0, math::max);
-        Ok(sees(g, &self.rules, &self.grid, team, reach, at))
+        Ok(sees(g, &self.rules, &observation_grid, team, reach, at))
     }
 
     /// Query an already refreshed owner state without borrowing all of Match mutably.
@@ -524,12 +524,12 @@ impl Match {
     /// Hidden moving wrecks become static remembered cover; removal waits until seen.
     pub fn observed_wrecks(&mut self, owner: usize) -> Result<Vec<Wreck>, String> {
         self.validate_recipient(owner)?;
-        self.grid.rebuild(&self.world.game.units);
+        let observation_grid = SpatialGrid::new(&self.world.game.units, 16.0);
         refresh_wrecks(
             &mut self.recipients[owner],
             &self.world.game,
             &self.rules,
-            &self.grid,
+            &observation_grid,
             owner,
         );
         Ok(self.recipients[owner].wreck_memory.clone())
