@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added a regression that compares every recorded message against the pinned browser view for both Conquest and World recipients. Clarified that the client view reports initial missing-mask fog lifting; it does not track the renderer lifting fog at match end.
+
 - Added the recipient-owned Rust client view: typed unit rows with raw fields retained, full and delta unit updates, held-set resync checks, fog XOR and exploration, remembered terrain, and changed cells retained until read. Invalid messages leave the view unchanged. `simtest --view` replays raw or gzip server JSON lines and prints stable state hashes for browser comparison. Lobby, pause and denial messages remain available without resetting the match, and readers can distinguish absent fog masks from dark cells. Five focused view tests cover lifecycle, delta recovery, fog and terrain updates, and invalid input; no existing tests were replaced.
 - Added deterministic in-process protocol recording and a direct browser client-view oracle. Four complete recipient streams cover Conquest (1,000 ticks, including 7 and 10 natural unit removals) and World Conquest (200 ticks, including terrain discovery), with one expected browser report per message. Captures and reports are gzip-compressed; reconnects, save/load and transport-level behavior remain outside these fixtures.
 

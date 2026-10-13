@@ -47,3 +47,38 @@ fn view_replay_accepts_gzip_and_stdin_and_rejects_bad_input() {
     assert!(!bad.status.success());
     assert!(String::from_utf8_lossy(&bad.stderr).contains(":1:"));
 }
+
+#[test]
+fn every_recorded_message_matches_the_pinned_browser_view() {
+    use std::io::{BufRead, BufReader};
+    use ww2_core::client_view::ClientView;
+    let fixtures = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../core/tests/fixtures");
+    for mode in ["conquest", "world"] {
+        for slot in 0..2 {
+            let stem = format!("protocol-{mode}-p{slot}");
+            let open = |suffix: &str| {
+                let file = std::fs::File::open(fixtures.join(format!("{stem}{suffix}"))).unwrap();
+                BufReader::new(flate2::read::MultiGzDecoder::new(file)).lines()
+            };
+            let mut expected = open(".expected.jsonl.gz");
+            let mut view = ClientView::new();
+            let mut lines = 0;
+            for (index, raw) in open(".jsonl.gz").enumerate() {
+                let raw = raw.unwrap();
+                view.apply(&raw)
+                    .unwrap_or_else(|e| panic!("{stem}:{}: {e}", index + 1));
+                let want = expected
+                    .next()
+                    .unwrap_or_else(|| panic!("{stem}: missing expected line {}", index + 1))
+                    .unwrap();
+                assert_eq!(simtest::view::report(&view), want, "{stem}:{}", index + 1);
+                lines += 1;
+            }
+            assert!(lines > 0, "{stem}: empty recording");
+            assert!(
+                expected.next().is_none(),
+                "{stem}: unconsumed expected lines"
+            );
+        }
+    }
+}
