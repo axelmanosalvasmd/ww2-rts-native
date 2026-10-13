@@ -231,7 +231,7 @@ fn actual_support_admission_strikes_and_timers_match_source() {
             count += 1;
         }
     }
-    assert_eq!(count, 2820);
+    assert_eq!(count, 4212);
 }
 #[test]
 fn unsupported_air_and_invalid_membership_do_not_charge_or_publish() {

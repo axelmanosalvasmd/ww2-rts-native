@@ -39,9 +39,10 @@ for(const kind of ['artillery','smoke','cover','recon','strafe','bombing','dive'
  const request={t:'support',kind,x:variation==='clamp'?-20:41,z:variation==='clamp'?95:41,dir:variation==='fallback'?'bad':0.3};
  let denial=sim.command(g,0,request)??null;frames.push({action:{op:'admit',request},denial,expected:snapshot(g,random)});
  denial=sim.command(g,0,request)??null;frames.push({action:{op:'admit',request},denial,expected:snapshot(g,random)});
- for(let tick=1;tick<=240;tick++){
+ for(let tick=1;tick<=1280;tick++){
+  const prior=JSON.stringify([g.strikes.map(s=>s.live),(g.covers??[]).length]);
   g.tick=tick;g.shots=[];const old=Math.random;Math.random=()=>random.next();try{sim.stepStrikes(g,variation.startsWith('late-')?capturedEmpty:[...g.units.values()],.05);sim.__supportTimers(g,.05);}finally{Math.random=old;}
-  if([1,39,40,59,60,99,100,109,119,159,199,239,240].includes(tick))frames.push({action:{op:'step',tick},denial:null,expected:snapshot(g,random)});
+  if(g.shots.length||prior!==JSON.stringify([g.strikes.map(s=>s.live),(g.covers??[]).length])||[1,39,40,59,60,99,100,109,119,159,199,239,240,360,400,480,1240,1280].includes(tick))frames.push({action:{op:'step',tick},denial:null,expected:snapshot(g,random)});
  }
  traces.push({kind,faction,variation,map:arena,unit:{kind:u.type,owner:u.owner,x:u.x,z:u.z,still:u.still,holdFire:u.holdFire},weakened:variation==='late-house'||variation==='late-bridge'?cell:null,frames});
 }

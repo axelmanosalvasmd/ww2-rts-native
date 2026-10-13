@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Strengthened aircraft oracle sampling to capture actual arrival, payload, interception and removal events, continuing through recon and fighter-cover expiry. The source recorder passes 188 traces and 4,212 checkpoints. Native proof remains pending.
+
 - Integrated the source-stable canonical reserve preparation prerequisite for paratrooper publication. The aircraft continuation and this combined ancestry remain native-pending; existing ground proof remains frozen separately.
 
 - Added source-work aircraft payloads for recon, strafing, bombing and dive strikes through canonical combat, flak ammunition and crater mutation. The unchanged prototype oracle passes 188 traces and 2,820 checkpoints, including interception and actual visibility readbacks. Native differential checks, paratrooper publication and complete tick hookup remain pending.

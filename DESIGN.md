@@ -774,3 +774,6 @@ The original-source loader now records 60 traces and 900 checkpoints for three g
 
 
 The aircraft payload source checkpoint covers recon corridors, single-pass strafing through generic hurt, sequential bombing with one side-scatter draw per bomb, and precise dive blasts. Fighter cover is checked before captured flak shooters and is consumed even when the incoming strike retains a partial bombing payload. Recon bypasses fighter cover; an intercepted recon retains a random fraction of its duration. Ground flak consumes one canonical round before each chance draw. The original source oracle currently records 188 traces and 2,820 checkpoints, including actual visibility pass readbacks and plane-down tallies. Native differential proof and paratrooper admission/publication are pending.
+
+
+Aircraft transition sampling now records every effect tick and strike/cover lifetime transition rather than nominal delay ticks. The original-source fixture passes 188 traces and 4,212 checkpoints, including recon expiry and actual plane, flak, shotdown, bomb and hurt events. Native replay is still pending.
