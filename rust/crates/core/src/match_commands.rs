@@ -131,6 +131,12 @@ pub enum Command {
         together: bool,
         face: Option<f64>,
     },
+    Cover {
+        ids: Vec<i64>,
+        queue: bool,
+        /// Display anchor for a waiting order, never its eventual cover destination.
+        at: Option<Point>,
+    },
     Stop {
         ids: Vec<i64>,
     },
@@ -183,6 +189,8 @@ pub struct UnitControl {
     pub outcome_tick: Option<i64>,
     pub move_result: Option<MoveResult>,
     pub route_end: Option<Point>,
+    pub supply_started: bool,
+    pub supply_retry: Option<u64>,
     pub supply_hold: bool,
     pub supply_escape: bool,
     pub enter: Option<usize>,
@@ -240,6 +248,8 @@ impl UnitControl {
             outcome_tick: None,
             move_result: None,
             route_end: None,
+            supply_started: false,
+            supply_retry: None,
             supply_hold: false,
             supply_escape: false,
             enter: None,
@@ -284,10 +294,11 @@ pub enum Denial {
     Blocked,
     Needs,
     QueueFull,
+    NoCover,
+    Retreating,
     Unsupported,
     Ammo,
     Cooldown,
-    Retreating,
     Munitions,
     Manpower,
     Tier,
@@ -306,10 +317,11 @@ impl Denial {
             Self::Blocked => "blocked",
             Self::Needs => "needs",
             Self::QueueFull => "queueFull",
+            Self::NoCover => "noCover",
+            Self::Retreating => "retreating",
             Self::Unsupported => "unsupported",
             Self::Ammo => "ammo",
             Self::Cooldown => "cooldown",
-            Self::Retreating => "retreating",
             Self::Munitions => "mun",
             Self::Manpower => "mp",
             Self::Tier => "tier",
@@ -587,6 +599,11 @@ impl Command {
                     face,
                 })
             }
+            Some("cover") => Ok(Self::Cover {
+                ids,
+                queue: object.get("queue").and_then(|v| v.as_bool()) == Some(true),
+                at: None,
+            }),
             Some("ability") => {
                 let at = object
                     .get("x")
@@ -665,6 +682,7 @@ impl Command {
                         && o.at.z.is_finite()
                 }) && face.is_none_or(|a| a.is_finite())
             }
+            Self::Cover { at, .. } => at.is_none_or(|p| p.x.is_finite() && p.z.is_finite()),
             _ => true,
         }
     }
@@ -852,6 +870,9 @@ impl crate::match_runtime::Match {
         if let Command::Entrench { ids, order, queue } = command {
             return self.execute_entrench(owner, ids, *order, *queue, winner_decided);
         }
+        if let Command::Cover { ids, queue, .. } = command {
+            return self.execute_cover_command(owner, ids, *queue);
+        }
         if let Command::Dig {
             ids,
             kind,
@@ -940,6 +961,7 @@ impl crate::match_runtime::Match {
             | Command::CompanionJoin { .. }
             | Command::CompanionInput { .. }
             | Command::Support { .. }
+            | Command::Cover { .. }
             | Command::Unsupported => unreachable!(),
         };
         let selected_ids: Vec<_> = match command {
@@ -1295,6 +1317,7 @@ impl crate::match_runtime::Match {
             | Command::CompanionJoin { .. }
             | Command::CompanionInput { .. }
             | Command::Support { .. }
+            | Command::Cover { .. }
             | Command::Unsupported => unreachable!(),
         }
         Ok(None)
@@ -1559,6 +1582,7 @@ pub(crate) fn search_route(
     let mut result = paths
         .find_path(terrain, rules, kind, u.at(), to, None)
         .map_err(|e| format!("command path: {e:?}"))?;
+    let live_route_end = result.route_end;
     let mut failed = result.status == crate::pathfinding::PathStatus::Unreachable;
     if result.waypoints.first().is_some_and(|p| {
         !crate::pathfinding::walkable(terrain.navigation, u.at(), *p, kind.block(), 0.9)
@@ -1595,6 +1619,7 @@ pub(crate) fn search_route(
                 .is_some_and(|p| crate::pathfinding::walkable(nav, at, *p, kind.block(), 0.9))
             {
                 result = next;
+                result.route_end = live_route_end;
                 result.waypoints.insert(0, at);
                 break;
             }

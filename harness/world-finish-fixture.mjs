@@ -1,0 +1,70 @@
+// Actual World constructor and unchanged World income/region/finish/story functions.
+import {readFileSync,writeFileSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import {resolve} from 'node:path';
+import {registerHooks} from 'node:module';
+import {fileURLToPath,pathToFileURL} from 'node:url';
+const root=fileURLToPath(new URL('../',import.meta.url));
+const ref=resolve(process.env.WW2_REFERENCE??`${root}/reference/ww2-rts`);
+const pin='e4e579a838aabae3b1d9dadbc17a0a87147bc52d';
+const clean=()=>{if(execFileSync('git',['rev-parse','HEAD'],{cwd:ref,encoding:'utf8'}).trim()!==pin||execFileSync('git',['status','--porcelain','--untracked-files=no'],{cwd:ref,encoding:'utf8'}).trim())throw Error('Pinned tracked-clean reference required');};
+if(process.arch!=='x64'||process.version!=='v24.21.0')throw Error('Use x64 Node v24.21.0');clean();
+registerHooks({load(url,ctx,next){const out=next(url,ctx);if(url!==pathToFileURL(`${ref}/shared/sim.js`).href)return out;const source=String(out.source);
+ const periodic='  if (g.winner === null && (g.tick === 1 || g.tick % SAMPLE_EVERY === 0)) sample(g, isStructure(g));';
+ if(source.split(periodic).length!==2)throw Error('Sample source anchor moved');
+ return {...out,source:source+`\nexport {stepWorld as __stepWorld,worldIncome as __worldIncome,validateWorldMap as __validateWorldMap};\nexport function __periodic(g){${periodic}}\n`};}});
+const sim=await import(pathToFileURL(`${ref}/shared/sim.js`));
+const {rebuildGrid}=await import(pathToFileURL(`${ref}/shared/grid.js`));
+const {STORY_KEYS,storyResult}=await import(pathToFileURL(`${ref}/shared/story.js`));
+let definitions=Array.from({length:64},(_,i)=>({id:i*2-100,x:(i%8)*64+32,y:Math.floor(i/8)*64+32,kind:['rural','city','industrial','resource'][i%4]}));
+const at=i=>({x:(definitions[i].x+.5)*sim.CELL,z:(definitions[i].y+.5)*sim.CELL});
+const unit=(id,owner,type,region,extra={})=>({id,owner,type,...at(region),hp:sim.UNITS[type].hpPer*(sim.UNITS[type].count??1),retreating:false,riding:0,cells:[],built:1,...extra});
+const bits=n=>{const b=Buffer.alloc(8);b.writeDoubleBE(n);return b.toString('hex');};
+const encode=v=>typeof v==='number'?bits(v):Array.isArray(v)?v.map(encode):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).map(([k,v])=>[k,encode(v)])):v;
+let cases=[];
+function record(name,{teams=[5,1,5],regions={},players={},units=[],steps,supported=true}){
+ const total=definitions.length,height=total/8*64;const homes=[0,1,total-1];const membership=Array.from({length:512*height},(_,c)=>Math.floor(Math.floor(c/512)/64)*8+Math.floor(c%512/64));
+ const map={name:'World finish constructor',w:512,h:height,rows:Array(height).fill('.'.repeat(512)),spawns:homes.map(i=>({x:definitions[i].x,y:definitions[i].y})),points:[],world:{size:total===64?'huge':'massive',total,regionCells:64,regionMap:membership,regions:definitions.map((r,i)=>({...r,bounds:[i%8*64,Math.floor(i/8)*64,i%8*64+64,Math.floor(i/8)*64+64],...(homes.includes(i)?{home:homes.indexOf(i)}:{})}))}};
+ const invalid=sim.__validateWorldMap(map);if(invalid!==null)throw Error(`Invalid World finish map: ${invalid}`);
+ let g;const old=Math.random;Math.random=()=>.5;try{g=sim.createGame(map,teams.map((_,i)=>`Commander ${i}`),false,teams,teams.map(()=>0),{mode:'world',tech:false,weather:false,logistics:false,supply:true});}finally{Math.random=old;}
+ g.units=new Map(units.map(u=>[u.id,structuredClone(u)]));g.nodes=[];g.tick=40;g.winner=null;g.timeline=[];g.reveal=false;
+ g.story=g.players.map(()=>Object.fromEntries(STORY_KEYS.map(k=>[k,0])));
+ g.players.forEach((p,slot)=>Object.assign(p,{mp:100,mun:4,fuel:2,vp:0,inc:0,away:false,out:false,spawn:at(slot===2?total-1:slot),...players[slot]}));
+ g.world.regions.forEach((r,i)=>Object.assign(r,{team:i===0?teams[0]:i===total-1?teams[2]:-1,progress:i===0||i===total-1?1:0,capper:-1,contested:false,...regions[i]}));
+ const snapshot=()=>encode({regions:g.world.regions.map(r=>[r.team,r.progress,r.capper<0?null:r.capper,!!r.contested,r.locked??null,r.capTick??null]),players:g.players.map(p=>[p.mp,p.mun,p.fuel,p.inc,p.fuelInc??null,p.upkeep??null,p.out,[p.spawn.x,p.spawn.z]]),units:[...g.units.values()].map(u=>[u.id,u.owner]),story:g.story,finish:g.winner===null?null:{winner:g.winner,reason:g.endReason,endAt:g.endAt,endTick:g.endTick},timeline:g.timeline,reveal:!!g.reveal,report:g.winner===null?null:storyResult(g)});
+ const records=[];for(const step of steps){
+  g.tick=step.tick??g.tick+1;
+  for(const change of step.changeRegions??[])Object.assign(g.world.regions[change.index],change);
+  rebuildGrid(g);const order=step.order??[...g.units.keys()],list=order.map(id=>g.units.get(id));
+  const before=snapshot();if(step.periodic)sim.__periodic(g);
+  const removed=[];const sourceDelete=g.units.delete;
+  g.units.delete=function(id){removed.push(id);return sourceDelete.call(this,id);};
+  for(const p of g.players)sim.__worldIncome(g,p,list,step.dt);
+  sim.__stepWorld(g,list,step.dt);
+  g.units.delete=sourceDelete;
+  const postWreckUnits=[...g.units.values()].map(u=>({id:u.id,owner:u.owner,type:u.type,hp:u.hp}));
+  records.push({...step,tick:g.tick,order,before,after:snapshot(),removed,postWreckUnits});
+ }
+ cases.push({name,input:{teams,army:'standard',regions,players,units,nodes:[]},supported,steps:records});
+}
+const owned=(team,n,start=0)=>Object.fromEntries(Array.from({length:n},(_,i)=>[start+i,{team,progress:1}]));
+record('rival threshold wins World',{regions:{...owned(5,39),63:{team:1,progress:1}},steps:[{dt:0,tick:200,periodic:true}]});
+record('below threshold remains undecided',{regions:{...owned(5,38),63:{team:1,progress:1}},steps:[{dt:0,tick:1,periodic:true}]});
+record('last nation below goal',{regions:{63:{team:-1,progress:0}},steps:[{dt:0,tick:41}]});
+record('threshold outranks last nation',{regions:{...owned(5,39),63:{team:-1,progress:0}},steps:[{dt:0,tick:41}]});
+record('single team needs every region',{teams:[3,3,3],regions:{...owned(3,63),63:{team:-1,progress:0}},steps:[{dt:0,tick:1,periodic:true},{dt:0,tick:200,changeRegions:[{index:63,team:3,progress:1,capTick:200}]}]});
+record('all out draw retains owned armies',{regions:{63:{team:1,progress:1},2:{team:5,progress:1,capTick:200}},players:{0:{out:true},1:{out:true},2:{out:true}},units:[unit(11,0,'hq',0),unit(12,1,'flakpos',63),unit(13,-1,'worldbase',4)],steps:[{dt:0,tick:200,periodic:true}]});
+record('empty armies and territory draw',{regions:{0:{team:-1,progress:0},63:{team:-1,progress:0}},units:[unit(11,-1,'worldbase',4)],steps:[{dt:0,tick:1,periodic:true}]});
+record('first capture may belong to another team',{regions:{...owned(1,38,1),0:{team:-1,progress:0},63:{team:5,progress:1}},units:[unit(1,0,'rifle',0),unit(2,1,'rifle',40)],steps:[{dt:8,tick:200,periodic:true}]});
+record('stale capture falls back to center',{regions:{...owned(5,39),0:{team:5,progress:1,capTick:199},63:{team:1,progress:1}},steps:[{dt:0,tick:200}]});
+record('construction structures include unfinished and out commanders',{regions:{...owned(5,39),63:{team:1,progress:1}},players:{0:{out:true}},units:[unit(1,0,'hq',0,{built:0}),unit(2,2,'barracks',0),unit(3,1,'flakpos',63),unit(4,1,'hq',63,{hp:0}),unit(5,-1,'worldbase',4),unit(6,2,'bunker',0)],steps:[{dt:0,tick:200,periodic:true}]});
+record('owned army elimination remains whole phase refusal',{regions:{0:{team:-1,progress:0},63:{team:1,progress:1}},units:[unit(1,0,'rifle',2)],supported:false,steps:[{dt:.05,tick:200}]});
+record('owned building elimination remains whole phase refusal',{regions:{0:{team:-1,progress:0},63:{team:1,progress:1}},units:[unit(1,0,'hq',2)],supported:false,steps:[{dt:.05,tick:200}]});
+record('winning capture needing fort transfer remains refusal',{regions:{...owned(5,38),38:{team:-1,progress:0},63:{team:1,progress:1}},units:[unit(1,0,'rifle',38),unit(2,-1,'gate',38,{open:true,gateT:4})],supported:false,steps:[{dt:8,tick:200}]});
+const huge={definitions,cases};
+definitions=Array.from({length:128},(_,i)=>({id:i*2-100,x:(i%8)*64+32,y:Math.floor(i/8)*64+32,kind:['rural','city','industrial','resource'][i%4]}));cases=[];
+record('Massive below threshold remains undecided',{regions:{...owned(5,76),127:{team:1,progress:1}},steps:[{dt:0,tick:1,periodic:true}]});
+record('Massive threshold and original location',{regions:{...owned(5,77),127:{team:1,progress:1}},steps:[{dt:0,tick:200,periodic:true,changeRegions:[{index:76,capTick:200}]}]});
+const massive={definitions,cases};definitions=huge.definitions;cases=huge.cases;
+clean();const output=JSON.stringify({format:1,reference:pin,node:process.version,arch:process.arch,definitions,cases,massive})+'\n';const path=`${root}/rust/crates/simtest/tests/fixtures/world-finish.json`;
+if(process.argv.includes('--check')){if(readFileSync(path,'utf8')!==output)throw Error('World finish fixture differs');}else writeFileSync(path,output);console.log(`Verified ${cases.length+massive.cases.length} World finish traces, ${[...cases,...massive.cases].reduce((n,c)=>n+c.steps.length,0)} phases`);

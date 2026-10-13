@@ -37,7 +37,7 @@ fn seen(game: &Game, owner: usize, visible: &[u32], unit: &Unit) -> bool {
 fn rounded(n: f64) -> f64 {
     math::round(n * 10.0) / 10.0
 }
-fn bound(u: &Unit) -> BoundUnit {
+pub(crate) fn bound(u: &Unit) -> BoundUnit {
     BoundUnit {
         id: u.id,
         kind: u.kind,
@@ -300,6 +300,24 @@ impl Match {
             return Err("local defender has no region snapshot seat".into());
         }
         self.refresh_world_memory(owner)?;
+        let rows =
+            self.project_world_regions(owner, &self.world_runtime.as_ref().unwrap().memory)?;
+        let team = self.world.game.players[owner].team;
+        self.world_runtime
+            .as_mut()
+            .unwrap()
+            .memory
+            .team_mut(team)
+            .unwrap()
+            .regions = rows.clone();
+        Ok(rows)
+    }
+    /// Reuse the canonical source selector against an uncommitted memory candidate.
+    pub(crate) fn project_world_regions(
+        &self,
+        owner: usize,
+        candidate: &world_memory::WorldMemory,
+    ) -> Result<Vec<KnownRegion>, String> {
         let game = &self.world.game;
         let team = game.players[owner].team;
         let visible = &game.players[owner].visible;
@@ -324,7 +342,7 @@ impl Match {
             })
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| e.to_string())?;
-        let memory = runtime.memory.team(team).unwrap();
+        let memory = candidate.team(team).ok_or("missing World region memory")?;
         let runs = geography
             .region_map
             .as_ref()
@@ -345,7 +363,7 @@ impl Match {
                     .map(|b| (b.kind, b.owner, b.at)),
             )
             .collect::<Vec<_>>();
-        let vis = &runtime.memory.fog.teams[&team].vis;
+        let vis = &candidate.fog.teams[&team].vis;
         for (i, r) in geography.regions.iter().enumerate() {
             let live = &runtime.regions[i];
             let at = Point {
@@ -429,13 +447,6 @@ impl Match {
                 row.runs = runs.get(&row.id).cloned().unwrap_or_default();
             }
         }
-        self.world_runtime
-            .as_mut()
-            .unwrap()
-            .memory
-            .team_mut(team)
-            .unwrap()
-            .regions = rows.clone();
         Ok(rows)
     }
 }
@@ -517,7 +528,7 @@ impl<'a> WorldRoutingContext<'a> {
         }
     }
 }
-fn validate_world_context(
+pub(crate) fn validate_world_context(
     context: WorldRoutingContext<'_>,
     memory: &world_memory::WorldMemory,
     owner: usize,
@@ -572,7 +583,7 @@ fn validate_world_context(
     }
     Ok(actor.team)
 }
-fn collect_world_wrecks(
+pub(crate) fn collect_world_wrecks(
     game: &Game,
     rules: &Rules,
     team: i32,
@@ -603,7 +614,7 @@ fn collect_world_wrecks(
         })
         .collect()
 }
-fn staged_world_wreck_memory(
+pub(crate) fn staged_world_wreck_memory(
     prior: &[crate::recipient_lists::RememberedWreck],
     game: &Game,
     rules: &Rules,

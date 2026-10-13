@@ -256,9 +256,17 @@ pub struct UnitView {
     pub path: Vec<Point>,
     pub world_goal: Option<Point>,
     pub orders: Vec<Point>,
+    /// Presence includes supported nonmovement orders; destinations above remain exact.
+    pub orders_pending: bool,
     pub amove: Option<Point>,
     pub stuck: f64,
 }
+impl UnitView {
+    fn has_orders(&self) -> bool {
+        self.orders_pending || !self.orders.is_empty()
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Player {
     pub slot: usize,
@@ -1369,7 +1377,7 @@ impl ConvoyState {
                     || quantity(c.cargo) > 0.0
                     || !u.path.is_empty()
                     || u.world_goal.is_some()
-                    || !u.orders.is_empty()
+                    || u.has_orders()
                 {
                     continue;
                 }
@@ -1777,7 +1785,7 @@ impl ConvoyState {
                 continue;
             }
             if c.state == TruckState::Manual {
-                if u.path.is_empty() && u.world_goal.is_none() && u.orders.is_empty() {
+                if u.path.is_empty() && u.world_goal.is_none() && !u.has_orders() {
                     c.manual = false;
                     c.state = TruckState::Idle;
                 }
@@ -2166,7 +2174,7 @@ impl ConvoyState {
                 from.projected = true;
                 if queue
                     && (!u.path.is_empty()
-                        || !u.orders.is_empty()
+                        || u.has_orders()
                         || u.world_goal.is_some()
                         || u.amove.is_some())
                 {

@@ -453,6 +453,7 @@ impl World {
             action,
         })
     }
+
     /// Immutable authoring geography. Live team ownership belongs to a future mode state.
     pub fn geography(&self) -> Option<&crate::world_map::WorldDefinition> {
         self.geography.as_ref()

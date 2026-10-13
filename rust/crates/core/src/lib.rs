@@ -6,6 +6,7 @@ pub mod catalog;
 pub mod client_view;
 pub mod combat;
 pub mod command_destinations;
+pub mod commander_ai;
 pub mod companion_ray;
 pub mod companions;
 pub mod conquest_end;
@@ -34,8 +35,10 @@ pub mod match_aviation;
 mod match_carrier_tick;
 pub mod match_carriers;
 pub mod match_combat;
+pub mod match_commander;
 pub mod match_commands;
 pub mod match_construction;
+pub mod match_cover;
 mod match_destroy;
 pub mod match_end;
 pub mod match_firing;
@@ -49,6 +52,9 @@ pub mod match_runtime;
 pub mod match_story;
 pub mod match_support;
 pub mod match_tick;
+pub mod match_withdrawal;
+pub mod match_world_elimination;
+pub mod match_world_end;
 pub mod math;
 pub mod movement;
 pub mod navigation;
@@ -92,9 +98,14 @@ pub mod world_generation;
 pub mod world_map;
 
 pub mod match_world;
+pub mod match_world_phases;
 pub mod match_world_rails;
+pub mod match_world_regions;
 
 pub mod match_world_memory;
 pub mod world_memory;
+pub mod world_recipient_metadata;
 
 pub mod staged_observer;
+
+pub mod world_route_retention;

@@ -1,4 +1,4 @@
-//! Canonical finish and source timeline. Explicit Conquest and Assault phases use this state;
+//! Canonical finish and source timeline. Explicit Conquest, Assault and bounded World phases use this state;
 //! other mode reasons reserve their source meaning without enabling those runtime modes.
 use crate::{
     economy::Mode,
@@ -74,10 +74,10 @@ impl Match {
     }
     pub(crate) fn validate_story_mode(&self) -> Result<(), String> {
         match (self.options.mode, self.world.game.mode) {
-            (Mode::Default | Mode::Conquest, None) | (Mode::Assault, Some(ModeKind::Assault)) => {
-                Ok(())
-            }
-            _ => Err("finish/story supports represented Conquest and Assault only".into()),
+            (Mode::Default | Mode::Conquest, None)
+            | (Mode::Assault, Some(ModeKind::Assault))
+            | (Mode::World, Some(ModeKind::World)) => Ok(()),
+            _ => Err("finish/story supports represented Conquest, Assault and World only".into()),
         }
     }
     pub(crate) fn validate_match_finish_state(&self) -> Result<(), String> {
@@ -156,6 +156,29 @@ impl Match {
         } else if self.assault.is_some() {
             return Err("unexpected Assault state in Conquest".into());
         }
+        if self.options.mode == Mode::World {
+            let regions = self.world_economy_regions()?;
+            let runtime = self.world_runtime.as_ref().ok_or("missing World runtime")?;
+            if regions.len()
+                != self
+                    .world
+                    .geography()
+                    .ok_or("missing World geography")?
+                    .size
+                    .region_count()
+                || runtime.regions.iter().any(|r| {
+                    !(-1..6).contains(&r.team)
+                        || !r.progress.is_finite()
+                        || !(0.0..=1.0).contains(&r.progress)
+                        || r.capper.is_some_and(|slot| slot >= players.len())
+                        || r.cap_tick.is_some_and(|tick| {
+                            !(-9_007_199_254_740_991..=9_007_199_254_740_991).contains(&tick)
+                        })
+                })
+            {
+                return Err("invalid canonical World finish regions".into());
+            }
+        }
         for at in [self.fallen.structure, self.fallen.bunker, self.fallen.hq]
             .into_iter()
             .flatten()
@@ -198,7 +221,7 @@ impl Match {
         }
         Ok(())
     }
-    pub(crate) fn validate_assault_sample_units(&self) -> Result<(), String> {
+    pub(crate) fn validate_sample_units(&self) -> Result<(), String> {
         let players = &self.start.economy.players;
         for unit in self.world.game.units.values() {
             if unit.kind >= self.rules.kinds.len()
@@ -212,6 +235,23 @@ impl Match {
         Ok(())
     }
     pub(crate) fn match_sample(&self) -> Result<MatchSample, String> {
+        if self.world.game.mode.is_some() {
+            self.validate_sample_units()?;
+        }
+        self.match_sample_with_units(
+            self.world
+                .game
+                .units
+                .values()
+                .map(|u| (u.owner, u.kind, u.hp)),
+        )
+    }
+    /// A staged World wreck may change surviving HP before its final sample is published.
+    /// This is the same source sampler, using checked post-effect unit facts.
+    pub(crate) fn match_sample_with_units(
+        &self,
+        units: impl IntoIterator<Item = (usize, usize, f64)>,
+    ) -> Result<MatchSample, String> {
         let players = &self.start.economy.players;
         let n = players
             .iter()
@@ -233,7 +273,6 @@ impl Match {
             }
             Ok(MatchSample::Conquest { t, vp })
         } else {
-            self.validate_assault_sample_units()?;
             let mut points = vec![0.0; n];
             let mut structures = vec![0.0; n];
             for p in &self.start.points {
@@ -241,11 +280,18 @@ impl Match {
                     points[players[owner].team as usize] += 1.0;
                 }
             }
-            for u in self.world.game.units.values() {
-                if u.hp > 0.0
-                    && self.rules.kinds[u.kind].structure
-                    && self.rules.kinds[u.kind].name == "bunker"
-                    && let Some(owner) = players.get(u.owner)
+            for (owner, kind, hp) in units {
+                if kind >= self.rules.kinds.len()
+                    || !hp.is_finite()
+                    || (owner >= players.len()
+                        && !(self.options.mode == Mode::World && owner == LOCAL_DEFENDER_OWNER))
+                {
+                    return Err("invalid Match sample unit".into());
+                }
+                if hp > 0.0
+                    && self.rules.kinds[kind].structure
+                    && (self.options.mode == Mode::World || self.rules.kinds[kind].name == "bunker")
+                    && let Some(owner) = players.get(owner)
                 {
                     structures[owner.team as usize] += 1.0;
                 }
@@ -264,6 +310,15 @@ impl Match {
         winner: i32,
         reason: EndReason,
         at: Option<Point>,
+    ) -> Result<(MatchFinish, MatchSample), String> {
+        self.prepare_match_finish_using(winner, reason, at, || self.match_sample())
+    }
+    pub(crate) fn prepare_match_finish_using(
+        &self,
+        winner: i32,
+        reason: EndReason,
+        at: Option<Point>,
+        sample: impl FnOnce() -> Result<MatchSample, String>,
     ) -> Result<(MatchFinish, MatchSample), String> {
         if winner != -1 && !self.start.economy.players.iter().any(|p| p.team == winner) {
             return Err("unknown winning team".into());
@@ -290,7 +345,7 @@ impl Match {
                 end_at,
                 end_tick: self.world.game.tick,
             },
-            self.match_sample()?,
+            sample()?,
         ))
     }
     pub(crate) fn publish_match_finish(
