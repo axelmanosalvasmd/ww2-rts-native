@@ -48,7 +48,7 @@ impl Match {
         }
 
         // Every fallible shape/binding check precedes cancellation or latch changes.
-        self.validate_supply_with_exit(Some(id))?;
+        self.validate_withdrawal_supply()?;
         for owner in 0..self.start.players.len() {
             self.validate_recipient(owner)?;
         }

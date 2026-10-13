@@ -16,9 +16,10 @@ execFileSync('git', ['diff', '--exit-code', pin, '--', 'shared'], { cwd: ref });
 const simUrl = pathToFileURL(`${ref}/shared/sim.js`).href;
 registerHooks({ load(url, context, next) {
   const result = next(url, context);
-  return url === simUrl ? { ...result, source: String(result.source) + '\nexport {supplyWithdrawal,updateGrid};\n' } : result;
+  return url === simUrl ? { ...result, source: String(result.source) + '\nexport {supplyWithdrawal,supplyHooks,updateGrid};\n' } : result;
 } });
 const S = await import(simUrl);
+const C = await import(pathToFileURL(`${ref}/shared/supply-convoys.js`));
 const base = JSON.parse(readFileSync(`${root}/rust/crates/simtest/tests/fixtures/match-start.json`, 'utf8'));
 const mask = (1n << 64n) - 1n, gamma = 0x9e3779b97f4a7c15n;
 function mix(x) {
@@ -77,13 +78,14 @@ for (const sourceCase of [5, 27, 60]) for (const profile of ['rifle', 'tank', 'f
   const stores = [...g.convoys.stores.values()], active = stores.map(s => s.active);
   const home = stores.find(s => s.owner === 0 && s.source);
   const steps = [];
-  function step(name, tick, patch = {}, reserve = {}, storeMode = null) {
+  function step(name, tick, patch = {}, reserve = {}, storeMode = null, others = []) {
     g.tick = tick;
     Object.assign(u, patch);
+    for (const patch of others) { const other = g.units.get(patch.id); Object.assign(other, patch); S.updateGrid(g, other); }
     if (u.logistics) Object.assign(u.logistics, reserve);
     if (storeMode) stores.forEach((s, i) => { s.active = storeMode === 'restore' ? active[i] : false; });
     S.updateGrid(g, u);
-    const input = { name, tick, patch: structuredClone(patch), reserve, storeMode };
+    const input = { name, tick, patch: structuredClone(patch), reserve, storeMode, others };
     S.supplyWithdrawal(g, u);
     steps.push({ input, expected: row(u) });
   }
@@ -133,15 +135,30 @@ for (const sourceCase of [5, 27, 60]) for (const profile of ['rifle', 'tank', 'f
   step('nearby source uses real handoff', 140,
     { x: home.x + 12, z: home.z, path: [], worldGoal: null, supplyRetry: 0 });
   const house = g.chars.indexOf('H');
-  if (house >= 0) step('first forced exits a house', 180,
-    { x: (house % g.w + .5) * 2, z: (Math.floor(house / g.w) + .5) * 2,
-      garrison: house, supplyStarted: false, path: [], worldGoal: null, supplyRetry: 0 });
+  if (house >= 0) {
+    const other = [...g.units.values()].find(t => t.owner === 0 && t.type === 'rifle' && t.id !== u.id);
+    assert.ok(other);
+    const occupancy = { id: other.id, garrison: house, x: (house % g.w + .5) * 2, z: (Math.floor(house / g.w) + .5) * 2 };
+    step('first forced exits a house while another squad remains inside', 180,
+      { x: occupancy.x, z: occupancy.z, garrison: house, supplyStarted: false, path: [], worldGoal: null, supplyRetry: 0 },
+      {}, null, [occupancy]);
+    assert.equal(other.garrison, house);
+  }
   step('riding forced unit is left to carrier', 200, { riding: [...g.units.values()].find(t => t.owner === 0 && t.id !== u.id).id, supplyStarted: false });
   step('riding recovered unit clears prior withdrawal', 201, { supplyStarted: true }, { forced: false });
   traces.push({ sourceCase, initial, steps });
 }
+// Explicit incoming idle truck state isolates free retirement from placement.
+const g = create(5), home = [...g.convoys.stores.values()].find(s => s.owner === 0 && s.source);
+const truck = C.addTruck(g, 0, home, S.supplyHooks(g));
+const retirement = { sourceCase: 5, initial: { id: truck.id, kind: 'truck', x: truck.x, z: truck.z }, origin: home.id };
+g.tick = 40;
+C.stepConvoys(g, .05, S.supplyHooks(g));
+assert.ok(!g.units.has(truck.id), 'actual source must retire the free idle truck');
+retirement.units = [...g.units.keys()];
+retirement.reserves = [...g.units.values()].filter(u => u.logistics).map(u => u.id);
 const path = `${root}/rust/crates/simtest/tests/fixtures/supply-withdrawal.json`;
-const data = JSON.stringify({ reference: pin, traces }) + '\n';
+const data = JSON.stringify({ reference: pin, traces, retirement }) + '\n';
 if (process.argv.includes('--check')) assert.equal(readFileSync(path, 'utf8'), data);
 else writeFileSync(path, data);
 console.log(`${process.argv.includes('--check') ? 'Checked' : 'Recorded'} ${traces.length} original withdrawal traces, ${traces.reduce((n,t)=>n+t.steps.length,0)} transitions`);

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Shared the actual physical handoff between convoys and withdrawal, allowing another unit to remain garrisoned while the withdrawing unit exits. Recipient observation uses local grids and preserves gameplay grid ordering. Automatic truck publication initializes canonical ability and recovery rows after fresh-ID admission; free-truck retirement removes them and its canonical reserve record. The existing original-hook trace checks birth defaults, and a direct original-source retirement checks cleanup. Four source house exits now keep another squad inside. Native checks remain pending.
+
 - Kept the withdrawal recorder's waiting ability input on rifle squads, whose aimed ability can actually be queued; tank cases retain movement orders. The nine-trace, 103-transition source fixture remains reproducible.
 
 - Integrated source-only ability, recovery and shared field-work ownership into the withdrawal branch, retaining staged recruitment publication and every canonical metadata initializer. Queued ability presence is projected separately from exact movement destinations, so the first forced turn can cancel both without inventing waypoints. Detailed work cancellation calls the engineering owner's shared helper. The original oracle now has nine traces and 103 transitions, including three real paid field admissions that cancel without refunds. Combined native checks are pending.

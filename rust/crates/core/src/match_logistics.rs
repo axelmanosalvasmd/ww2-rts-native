@@ -4,9 +4,11 @@ use crate::{
     game::{CELL, Game, MOVE, Point, Pose, Unit, VBLOCK},
     grid::SpatialGrid,
     logistics::{self, Definition, UnitFacts},
+    match_abilities::AbilityState,
     match_combat::CombatState,
     match_commands::{MatchCommands, UnitControl},
     match_firing::FiringState,
+    match_recovery::RecoveryState,
     match_routing::RecipientRouting,
     match_runtime::Match,
     math,
@@ -338,9 +340,12 @@ impl Match {
         self.step_supply_convoys_with_dt(winner_decided, self.rules.movement.tick)
     }
     pub(crate) fn validate_supply(&self) -> Result<(), String> {
-        self.validate_supply_with_exit(None)
+        self.validate_supply_context(false)
     }
-    pub(crate) fn validate_supply_with_exit(&self, exiting: Option<u32>) -> Result<(), String> {
+    pub(crate) fn validate_withdrawal_supply(&self) -> Result<(), String> {
+        self.validate_supply_context(true)
+    }
+    fn validate_supply_context(&self, garrisons: bool) -> Result<(), String> {
         if !matches!(
             self.options.mode,
             crate::economy::Mode::Default | crate::economy::Mode::Conquest
@@ -348,11 +353,12 @@ impl Match {
             return Err("supply adapter supports ordinary Conquest only".into());
         }
         let g = &self.world.game;
+        let birth_slots = u32::try_from(g.players.len()).map_err(|_| "invalid supply roster")?;
         if g.tick < 0
             || g.tick as u64 > 9_007_199_254_740_351
             || self.start.players.len() != g.players.len()
             || g.players.len() != self.start.economy.players.len()
-            || self.next_unit_id.checked_add(24).is_none()
+            || self.next_unit_id.checked_add(birth_slots).is_none()
         {
             return Err("invalid supply Match state".into());
         }
@@ -406,6 +412,19 @@ impl Match {
         {
             return Err("invalid canonical supply network".into());
         }
+        // Source fleet growth publishes at most one truck per player in each pass.
+        // Admit every possible fresh ID before the first birth.
+        for id in self.next_unit_id..self.next_unit_id + birth_slots {
+            if self.commands.units.contains_key(&id)
+                || self.firing.get(id).is_some()
+                || self.combat.get(id).is_some()
+                || self.abilities.get(id).is_some()
+                || self.recovery.get(id).is_some()
+                || self.logistics.get(id).is_some()
+            {
+                return Err("stale convoy birth metadata".into());
+            }
+        }
         for (i, p) in g.players.iter().enumerate() {
             if i != p.slot
                 || !(0..32).contains(&p.team)
@@ -433,6 +452,8 @@ impl Match {
                 || !self.commands.units.contains_key(&u.id)
                 || self.firing.get(u.id).is_none()
                 || self.combat.get(u.id).is_none()
+                || self.abilities.get(u.id).is_none()
+                || self.recovery.get(u.id).is_none()
             {
                 return Err("invalid canonical supply unit".into());
             }
@@ -440,7 +461,7 @@ impl Match {
                 .map_err(|e| e.to_string())?
                 .unit(&self.rules.kinds[u.kind].name)
                 .map_err(|e| e.to_string())?;
-            if u.garrison.is_some() && exiting != Some(u.id) {
+            if u.garrison.is_some_and(|c| !garrisons || c >= n) {
                 return Err("supply garrison entry is not represented".into());
             }
             queued_points(
@@ -464,11 +485,18 @@ impl Match {
         at: Point,
         entity: Option<u32>,
     ) -> Result<bool, String> {
-        self.with_supply_world(|_, _, _, world| {
-            use supply_convoys::World;
-            let unit = world.unit(id).expect("withdrawal unit preflight");
-            Ok(world.handoff(&unit, at, entity, 15.0))
-        })
+        Ok(physical_handoff(
+            &self.world,
+            &self.rules,
+            &self.combat,
+            &mut self.supply_routes,
+            PhysicalHandoff {
+                unit: id,
+                at,
+                entity,
+                radius: 15.0,
+            },
+        ))
     }
     fn step_supply_convoys_with_dt(&mut self, winner_decided: bool, dt: f64) -> Result<(), String> {
         if self.convoys.is_none() || winner_decided {
@@ -554,6 +582,8 @@ impl Match {
             commands: &mut self.commands,
             firing: &mut self.firing,
             combat: &mut self.combat,
+            abilities: &mut self.abilities,
+            recovery: &mut self.recovery,
             recipients: &mut self.recipients,
             routing_fog: &mut self.routing_fog,
             buildings: &self.building_cells,
@@ -563,14 +593,18 @@ impl Match {
             players: &players,
             next_id: &mut self.next_unit_id,
             placer: SpawnPlacer::new(),
+            retired: Vec::new(),
         };
-        action(
+        let result = action(
             ctx,
             self.convoys.as_mut().unwrap(),
             &mut self.logistics,
             &mut adapter,
-        )
-        .map_err(|e| format!("Match convoys: {e:?}"))
+        );
+        for id in adapter.retired {
+            self.logistics.remove(id);
+        }
+        result.map_err(|e| format!("Match convoys: {e:?}"))
     }
 }
 struct ConvoyWorld<'a> {
@@ -579,6 +613,8 @@ struct ConvoyWorld<'a> {
     commands: &'a mut MatchCommands,
     firing: &'a mut FiringState,
     combat: &'a mut CombatState,
+    abilities: &'a mut AbilityState,
+    recovery: &'a mut RecoveryState,
     recipients: &'a mut [RecipientRouting],
     routing_fog: &'a mut crate::fog::Fog,
     buildings: &'a std::collections::BTreeMap<usize, crate::match_runtime::BuildingCell>,
@@ -588,6 +624,7 @@ struct ConvoyWorld<'a> {
     players: &'a [Player],
     next_id: &'a mut u32,
     placer: SpawnPlacer,
+    retired: Vec<u32>,
 }
 impl ConvoyWorld<'_> {
     fn refresh_route_recipient(&mut self, owner: usize) {
@@ -713,88 +750,18 @@ impl supply_convoys::World for ConvoyWorld<'_> {
         )
     }
     fn handoff(&mut self, u: &UnitView, at: Point, entity: Option<u32>, radius: f64) -> bool {
-        let g = &self.world.game;
-        let native = &g.units[&u.id];
-        let start = self
-            .combat
-            .get(u.id)
-            .and_then(|c| c.carrier)
-            .and_then(|id| g.units.get(&id))
-            .unwrap_or(native)
-            .at();
-        let mut near = vec![0u8; g.flags.len()];
-        for (c, &f) in g.flags.iter().enumerate() {
-            if f & (MOVE | crate::game::SIGHT) == (MOVE | crate::game::SIGHT) {
-                let x = c % g.w;
-                let y = c / g.w;
-                for row in y.saturating_sub(1)..=(y + 1).min(g.h - 1) {
-                    for col in x.saturating_sub(1)..=(x + 1).min(g.w - 1) {
-                        near[row * g.w + col] = 1;
-                    }
-                }
-            }
-        }
-        let fires = (0..g.flags.len())
-            .map(|c| self.world.fires.contains_key(&c))
-            .collect::<Vec<_>>();
-        let owner = u.owner.unwrap();
-        let team = self.players[owner].team;
-        let mines = (0..g.flags.len())
-            .map(|c| {
-                self.world.mines.get(&c).is_some_and(|o| *o != team)
-                    && self
-                        .world
-                        .mine_seen
-                        .get(&c)
-                        .is_some_and(|mask| mask & (1u32 << team) != 0)
-            })
-            .collect::<Vec<_>>();
-        let bunkers = g
-            .units
-            .values()
-            .filter(|t| t.hp > 0.0 && self.rules.kinds[t.kind].name == "bunker")
-            .map(Unit::at)
-            .collect::<Vec<_>>();
-        let terrain = PathTerrain {
-            navigation: TerrainView {
-                versions: Versions {
-                    infantry: self.world.versions.infantry,
-                    obstruction: self.world.versions.obstruction,
-                    ..Versions::default()
-                },
-                ..view(g)
+        physical_handoff(
+            self.world,
+            self.rules,
+            self.combat,
+            self.routing,
+            PhysicalHandoff {
+                unit: u.id,
+                at,
+                entity,
+                radius,
             },
-            near_walls: &near,
-            known_mines: &mines,
-            fires: &fires,
-            bunkers: &bunkers,
-            wear: g.wear.as_deref(),
-            wetness: g.wet.unwrap_or(0.0),
-            roads: self.world.roads,
-        };
-        let cells = entity
-            .and_then(|id| g.units.get(&id))
-            .and_then(|b| b.cells.as_deref())
-            .unwrap_or(&[]);
-        let rifle = &self.rules.kinds[self
-            .rules
-            .kinds
-            .iter()
-            .position(|k| k.name == "rifle")
-            .unwrap()];
-        self.routing
-            .handoff(
-                Handoff {
-                    tick: g.tick as u64,
-                    start,
-                    store: at,
-                    radius,
-                },
-                terrain,
-                rifle,
-                cells,
-            )
-            .expect("validated physical handoff")
+        )
     }
     fn supply_rate(&mut self, owner: usize, at: Point) -> Option<f64> {
         Some(
@@ -890,16 +857,21 @@ impl supply_convoys::World for ConvoyWorld<'_> {
         self.commands.insert(id, control);
         self.firing.initialize(id);
         self.combat.initialize(id);
+        self.abilities.initialize(id);
+        self.recovery.initialize(id);
         self.world.game.units.insert(id, unit);
         self.grid.update(id, &self.world.game.units[&id]);
         *self.next_id += 1;
         id
     }
     fn retire(&mut self, id: u32) {
+        self.retired.push(id);
         self.world.game.units.remove(&id);
         self.commands.units.remove(&id);
         self.firing.remove(id);
         self.combat.remove(id);
+        self.abilities.remove(id);
+        self.recovery.remove(id);
         self.grid.rebuild(&self.world.game.units);
     }
     fn apply(&mut self, id: u32, operation: UnitOperation) {
@@ -978,4 +950,100 @@ fn queued_points(control: &UnitControl, id: u32, abilities: bool) -> Result<Vec<
         }
     }
     Ok(points)
+}
+
+struct PhysicalHandoff {
+    unit: u32,
+    at: Point,
+    entity: Option<u32>,
+    radius: f64,
+}
+fn physical_handoff(
+    world: &World,
+    rules: &Rules,
+    combat: &CombatState,
+    routing: &mut SupplyRouting,
+    request: PhysicalHandoff,
+) -> bool {
+    let PhysicalHandoff {
+        unit: id,
+        at,
+        entity,
+        radius,
+    } = request;
+    let g = &world.game;
+    let native = &g.units[&id];
+    let start = combat
+        .get(id)
+        .and_then(|c| c.carrier)
+        .and_then(|id| g.units.get(&id))
+        .unwrap_or(native)
+        .at();
+    let mut near = vec![0u8; g.flags.len()];
+    for (c, &f) in g.flags.iter().enumerate() {
+        if f & (MOVE | crate::game::SIGHT) == (MOVE | crate::game::SIGHT) {
+            let x = c % g.w;
+            let y = c / g.w;
+            for row in y.saturating_sub(1)..=(y + 1).min(g.h - 1) {
+                for col in x.saturating_sub(1)..=(x + 1).min(g.w - 1) {
+                    near[row * g.w + col] = 1;
+                }
+            }
+        }
+    }
+    let fires = (0..g.flags.len())
+        .map(|c| world.fires.contains_key(&c))
+        .collect::<Vec<_>>();
+    let owner = native.owner;
+    let team = g.players[owner].team;
+    let mines = (0..g.flags.len())
+        .map(|c| {
+            world.mines.get(&c).is_some_and(|o| *o != team)
+                && world
+                    .mine_seen
+                    .get(&c)
+                    .is_some_and(|mask| mask & (1u32 << team) != 0)
+        })
+        .collect::<Vec<_>>();
+    let bunkers = g
+        .units
+        .values()
+        .filter(|t| t.hp > 0.0 && rules.kinds[t.kind].name == "bunker")
+        .map(Unit::at)
+        .collect::<Vec<_>>();
+    let terrain = PathTerrain {
+        navigation: TerrainView {
+            versions: Versions {
+                infantry: world.versions.infantry,
+                obstruction: world.versions.obstruction,
+                ..Versions::default()
+            },
+            ..view(g)
+        },
+        near_walls: &near,
+        known_mines: &mines,
+        fires: &fires,
+        bunkers: &bunkers,
+        wear: g.wear.as_deref(),
+        wetness: g.wet.unwrap_or(0.0),
+        roads: world.roads,
+    };
+    let cells = entity
+        .and_then(|id| g.units.get(&id))
+        .and_then(|b| b.cells.as_deref())
+        .unwrap_or(&[]);
+    let rifle = &rules.kinds[rules.kinds.iter().position(|k| k.name == "rifle").unwrap()];
+    routing
+        .handoff(
+            Handoff {
+                tick: g.tick as u64,
+                start,
+                store: at,
+                radius,
+            },
+            terrain,
+            rifle,
+            cells,
+        )
+        .expect("validated physical handoff")
 }

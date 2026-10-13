@@ -498,7 +498,7 @@ impl Match {
 fn refresh_recipient_memory_parts(
     world: &mut World,
     rules: &Rules,
-    grid: &mut SpatialGrid,
+    _grid: &mut SpatialGrid,
     buildings: &BTreeMap<usize, BuildingCell>,
     state: &mut RecipientRouting,
     owner: usize,
@@ -518,8 +518,8 @@ fn refresh_recipient_memory_parts(
             .map_err(|e| format!("observed refresh: {e:?}"))?;
         return Ok(());
     }
-    grid.rebuild(&world.game.units);
-    let mut facts = facts(world, rules, grid, buildings, owner)?;
+    let observation_grid = SpatialGrid::new(&world.game.units, 16.0);
+    let mut facts = facts(world, rules, &observation_grid, buildings, owner)?;
     let team = world.game.players[owner].team;
     state
         .memory
@@ -552,14 +552,14 @@ pub(crate) fn refresh_recipient_parts(
         return Ok(());
     }
     refresh_recipient_memory_parts(world, rules, grid, buildings, state, owner)?;
-    grid.rebuild(&world.game.units);
+    let observation_grid = SpatialGrid::new(&world.game.units, 16.0);
 
     state
         .memory
         .apply_routes(&mut state.routes)
         .map_err(|e| format!("observed projection: {e:?}"))?;
     let g = &world.game;
-    refresh_wrecks(state, g, rules, grid, owner);
+    refresh_wrecks(state, g, rules, &observation_grid, owner);
     state.wrecks = state.wreck_memory.clone();
     let fog = fog.team(g, rules, g.players[owner].team);
     state.fires.fill(false);

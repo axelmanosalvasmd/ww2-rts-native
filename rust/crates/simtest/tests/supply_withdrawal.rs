@@ -148,6 +148,14 @@ fn setup(base: &Value, trace: &Value) -> (Match, u32) {
 }
 fn patch(instance: &mut Match, id: u32, input: &Value) {
     instance.world.game.tick = input["tick"].as_i64().unwrap();
+    for other in input["others"].as_array().unwrap() {
+        let other_id = other["id"].as_u64().unwrap() as u32;
+        let unit = instance.world.game.units.get_mut(&other_id).unwrap();
+        unit.garrison = Some(other["garrison"].as_u64().unwrap() as usize);
+        unit.x = other["x"].as_f64().unwrap();
+        unit.z = other["z"].as_f64().unwrap();
+        instance.grid.update(other_id, unit);
+    }
     let unit = instance.world.game.units.get_mut(&id).unwrap();
     let control = instance.commands.units.get_mut(&id).unwrap();
     for (key, v) in input["patch"].as_object().unwrap() {
@@ -293,6 +301,13 @@ fn forced_withdrawal_matches_original_source_transitions_and_home_search_effects
                 }
             }
             instance.advance_supply_withdrawal(id).unwrap();
+            for other in input["others"].as_array().unwrap() {
+                let other_id = other["id"].as_u64().unwrap() as u32;
+                assert_eq!(
+                    instance.world.game.units[&other_id].garrison,
+                    Some(other["garrison"].as_u64().unwrap() as usize)
+                );
+            }
             if let Some(field) = trace.get("fieldStart") {
                 assert!(
                     !instance.field_works.is_active(id),
@@ -367,8 +382,85 @@ fn malformed_later_dependencies_cannot_publish_withdrawal_metadata_or_cancel_wor
     assert!(instance.advance_supply_withdrawal(id).is_err());
     assert_eq!(row(&instance, id), before);
     instance.world.game.tick = 0;
+    let fresh = instance.next_unit_id;
+    instance.abilities.initialize(fresh);
+    let before = row(&instance, id);
+    assert!(instance.advance_supply_withdrawal(id).is_err());
+    assert_eq!(row(&instance, id), before);
+    instance.abilities.remove(fresh);
+    instance.recovery.initialize(fresh);
+    assert!(instance.advance_supply_withdrawal(id).is_err());
+    assert_eq!(row(&instance, id), before);
+    instance.recovery.remove(fresh);
     instance.world.game.units.get_mut(&id).unwrap().path_gen = u64::MAX;
     let before = row(&instance, id);
     assert!(instance.advance_supply_withdrawal(id).is_err());
     assert_eq!(row(&instance, id), before);
+}
+
+#[test]
+fn free_truck_retirement_removes_all_canonical_metadata_and_reserves() {
+    use ww2_core::{
+        logistics::Stock,
+        supply_convoys::{StoreId, Truck, TruckState},
+    };
+    let base: Value = serde_json::from_str(include_str!("fixtures/match-start.json")).unwrap();
+    let fixture: Value =
+        serde_json::from_str(include_str!("fixtures/supply-withdrawal.json")).unwrap();
+    let input = &fixture["retirement"];
+    let (mut instance, id) = setup(&base, input);
+    instance.commands.units.get_mut(&id).unwrap().auto_retreat = false;
+    let origin = input["origin"]
+        .as_str()
+        .unwrap()
+        .strip_prefix("source:")
+        .unwrap()
+        .parse()
+        .unwrap();
+    instance.convoys.as_mut().unwrap().trucks.insert(
+        id,
+        Truck {
+            state: TruckState::Idle,
+            cargo: Stock::default(),
+            target: None,
+            origin: StoreId::Source(origin),
+            timer: 0.0,
+            manual: false,
+            hold: false,
+            route: Vec::new(),
+            destination: None,
+            route_failure: None,
+            retry: None,
+        },
+    );
+    instance.world.game.tick = 40;
+    instance.step_supply_convoys(false).unwrap();
+    assert_eq!(
+        json!(
+            instance
+                .world
+                .game
+                .units
+                .keys()
+                .copied()
+                .collect::<Vec<_>>()
+        ),
+        input["units"]
+    );
+    assert_eq!(
+        json!(
+            instance
+                .logistics
+                .iter()
+                .map(|(id, _)| id)
+                .collect::<Vec<_>>()
+        ),
+        input["reserves"]
+    );
+    assert!(instance.commands.units.get(&id).is_none());
+    assert!(instance.firing.get(id).is_none());
+    assert!(instance.combat.get(id).is_none());
+    assert!(instance.abilities.get(id).is_none());
+    assert!(instance.recovery.get(id).is_none());
+    assert!(!instance.convoys.as_ref().unwrap().trucks.contains_key(&id));
 }
