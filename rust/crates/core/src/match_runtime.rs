@@ -1,4 +1,5 @@
 //! Native match startup. The setup plan is shared by the authoritative constructor.
+pub use crate::objectives::Objective;
 use std::collections::BTreeMap;
 
 use crate::{
@@ -47,20 +48,6 @@ pub struct PlayerStart {
     pub config: PlayerConfig,
     pub spawn: Point,
     pub support: BTreeMap<String, f64>,
-}
-
-#[derive(Clone, Debug)]
-pub struct Objective {
-    pub id: serde_json::Value,
-    pub at: Point,
-    pub vp: f64,
-    pub mp: f64,
-    pub kind: Option<String>,
-    pub needs: Option<usize>,
-    pub owner: Option<usize>,
-    pub capper: Option<usize>,
-    pub progress: f64,
-    pub cut: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -246,6 +233,8 @@ impl StartPlan {
                 capper: None,
                 progress: 0.0,
                 cut: false,
+                on_point: Vec::new(),
+                contested: false,
             })
             .collect();
         let mut living_seed = random.next_u64(StreamId::Weather) as u32;
@@ -408,6 +397,8 @@ pub struct Match {
     pub production: crate::production::ProductionState,
     pub building_rallies: BTreeMap<u32, Option<Point>>,
     pub scenario: Option<crate::legacy_scenario::LegacyScenario>,
+    pub logistics: crate::logistics::LogisticsState,
+    pub capture_ticks: Vec<Option<i64>>,
     pub next_unit_id: u32,
     pub rules: Rules,
 }
@@ -453,12 +444,138 @@ impl Match {
             production,
             building_rallies: BTreeMap::new(),
             scenario,
+            logistics: crate::logistics::LogisticsState::default(),
+            capture_ticks: vec![None; map.points().len()],
             next_unit_id,
             rules,
         };
         result.setup_bases()?;
         result.grid.rebuild(&result.world.game.units);
         Ok(result)
+    }
+
+    /// Run the source's late Conquest point-supply, capture and income phases.
+    /// `unit_order` is the tick's captured list, so newly spawned units wait until the next tick.
+    /// This phase does not advance the clock, apply combat or decide a winner.
+    pub fn apply_point_economy(
+        &mut self,
+        unit_order: &[u32],
+        winner_decided: bool,
+    ) -> Result<Vec<crate::objectives::Captured>, String> {
+        use crate::{economy_state as economy, objectives};
+        let dt = self.rules.movement.tick;
+        let game = &self.world.game;
+        if game.tick < 0
+            || game.players.len() != self.start.economy.players.len()
+            || self.start.players.len() != self.start.economy.players.len()
+            || self.capture_ticks.len() != self.start.points.len()
+        {
+            return Err("invalid Conquest phase state".into());
+        }
+        let mut seen = std::collections::BTreeSet::new();
+        if unit_order.iter().any(|id| !seen.insert(*id)) {
+            return Err("duplicate unit in tick order".into());
+        }
+        let list: Vec<_> = unit_order
+            .iter()
+            .filter_map(|id| game.units.get(id))
+            .collect();
+        if list.iter().any(|u| u.kind >= self.rules.kinds.len()) {
+            return Err("unknown kind in tick unit list".into());
+        }
+        let players: Vec<_> = self
+            .start
+            .players
+            .iter()
+            .zip(&self.start.economy.players)
+            .map(|(p, e)| objectives::ObjectivePlayer {
+                team: e.team,
+                out: e.out,
+                spawn: p.spawn,
+            })
+            .collect();
+        let units: Vec<_> = list
+            .iter()
+            .map(|u| {
+                objectives::ObjectiveUnit::from_unit(
+                    u,
+                    &self.rules.kinds[u.kind].name,
+                    self.logistics.get(u.id).is_some_and(|r| r.forced),
+                )
+            })
+            .collect();
+        let mut points = self.start.points.clone();
+        let mut wallets = self.start.economy.clone();
+        let mut placer = SpawnPlacer::new();
+        let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
+        let cfg = catalog.table("CFG").map_err(|e| e.to_string())?;
+        let supply_beat = number(field(cfg, "supply")?, "every")? as i64;
+        if self.options.supply && game.tick % supply_beat == 1 {
+            objectives::supply_lines(
+                terrain_view(game),
+                &mut points,
+                &units,
+                &players,
+                &mut placer,
+            )
+            .map_err(|e| format!("point supply: {e:?}"))?;
+        }
+        let captured = objectives::capture_points(&mut points, &units, &players, dt)
+            .map_err(|e| format!("point capture: {e:?}"))?;
+        let queues: Vec<Vec<&str>> = list
+            .iter()
+            .map(|u| {
+                self.production
+                    .building(u.id)
+                    .map_or_else(Vec::new, |p| p.queue().collect())
+            })
+            .collect();
+        let income_units: Vec<_> = list
+            .iter()
+            .zip(&queues)
+            .map(|(u, queue)| economy::Unit {
+                id: u.id as u64,
+                owner: Some(u.owner),
+                kind: &self.rules.kinds[u.kind].name,
+                hp: u.hp,
+                // Missing built never passes the source's >= 1 check. This finite projection
+                // is equivalent for income and leaves the canonical unit field absent.
+                built: u.built.unwrap_or(0.0),
+                queue,
+            })
+            .collect();
+        let income_points: Vec<_> = points
+            .iter()
+            .map(|p| economy::Point {
+                owner: p.owner,
+                cut: p.cut,
+                mp: p.mp,
+                vp: p.vp,
+            })
+            .collect();
+        wallets
+            .advance_income(
+                &economy::Context {
+                    mode: economy::ModeContext::default(),
+                    army: self.options.army,
+                    units: &income_units,
+                    drops: &[],
+                    points: &income_points,
+                    nodes: &[],
+                    world: None,
+                },
+                dt,
+                winner_decided,
+            )
+            .map_err(|e| e.to_string())?;
+        self.start.points = points;
+        self.start.economy = wallets;
+        if !winner_decided {
+            for event in &captured {
+                self.capture_ticks[event.objective_index] = Some(game.tick);
+            }
+        }
+        Ok(captured)
     }
 
     fn setup_bases(&mut self) -> Result<(), String> {
