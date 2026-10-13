@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added native fixture consumers for 28 Conquest ability traces (132 actions), two explicit paid-mode refusals and all 23 recovery traces (133 actions), including canonical cache-first provisions. Consumers are source-written and formatted; they have not yet run against incoming runtime prerequisites.
+
 - Fixed recovery recorder input aliasing: source provision spending now mutates cloned stock, preserving the recorded cache action's five provisions for independent native replay. Output snapshots retain the actual source mutations.
 
 - Used a canonical cache identity in the recovery stock fixture, retaining the original cache-first provision behavior so its native consumer can use the real convoy state. Native replay remains pending.
