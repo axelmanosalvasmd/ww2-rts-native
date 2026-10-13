@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified the read-only mass-project tick helper at `914efe7`: four focused debug guards, all 214 locked release workspace tests, strict Clippy, formatting and release FFI passed after both-profile package cleans. Independent copied debug and release binaries each passed the four guards. The seven-case, 193-step source oracle is verified; its native sole-runner replay remains separate.
+
 - Source review closed two preclock gaps: paid descriptors now enforce the existing six-cell executor bound, and potential queued new members reserve cached crew capacity except when the next tick performs the source twentieth-tick recount. Added source-counter and malformed-descriptor guard coverage; native execution remains pending.
 
 - Added an unmodified full-step source oracle for shared projects: seven cases, 25 actions, 193 steps and 215 snapshots verify payment once, joins/sweep timing, late dead-worker removal, Stop without refund, completion and real retry-limit-one route failure. Four native admission guards and the sole-runner replay specification are written; native execution and full tick composition remain pending.
