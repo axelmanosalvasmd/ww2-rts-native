@@ -295,8 +295,8 @@ fn actual_engineering_commands_ticks_and_recipient_reads() {
                         .unwrap_or_else(|e| panic!("{name}: {e}"));
                     assert!(report.commands.is_empty());
                     assert!(
-                        report.environment.is_empty(),
-                        "{name}: unexpected outside effects"
+                        report.events.is_empty(),
+                        "{name}: unexpected committed tick events"
                     );
                     assert!(report.phases.contains(&TickPhase::FieldProjects));
                     assert!(report.phases.contains(&TickPhase::FieldWork));

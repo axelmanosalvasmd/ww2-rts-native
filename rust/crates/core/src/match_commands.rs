@@ -650,6 +650,15 @@ impl crate::match_runtime::Match {
         tick: u64,
         winner_decided: bool,
     ) -> Result<Vec<CommandResult>, String> {
+        self.apply_commands_observing(tick, winner_decided, &mut |_, _| Ok(()))
+    }
+    /// Observe each real dispatch before its result leaves the sole input boundary.
+    pub(crate) fn apply_commands_observing(
+        &mut self,
+        tick: u64,
+        winner_decided: bool,
+        observer: &mut impl FnMut(&mut Self, &Command) -> Result<(), String>,
+    ) -> Result<Vec<CommandResult>, String> {
         self.validate_command_tick(tick)?;
         if self.world.game.tick < 0 || (self.world.game.tick as u64).checked_add(1) != Some(tick) {
             return Err("command tick differs from Match clock".into());
@@ -661,8 +670,10 @@ impl crate::match_runtime::Match {
             .map_err(|e| format!("command queue: {e:?}"))?;
         let mut results = Vec::with_capacity(batch.orders.len());
         for order in batch.orders {
-            let denial =
-                self.execute_command(order.key.issuer as usize, &order.value, winner_decided)?;
+            let result =
+                self.execute_command(order.key.issuer as usize, &order.value, winner_decided);
+            observer(self, &order.value)?;
+            let denial = result?;
             results.push(CommandResult {
                 key: order.key,
                 denial,
@@ -1740,6 +1751,14 @@ impl crate::match_runtime::Match {
         id: UnitId,
         winner_decided: bool,
     ) -> Result<(), String> {
+        self.prepare_unit_commands_observing(id, winner_decided, &mut |_, _| Ok(()))
+    }
+    pub(crate) fn prepare_unit_commands_observing(
+        &mut self,
+        id: UnitId,
+        winner_decided: bool,
+        observer: &mut impl FnMut(&mut Self, &Command) -> Result<(), String>,
+    ) -> Result<(), String> {
         let Some(u) = self.world.game.units.get(&id) else {
             return Ok(());
         };
@@ -1786,9 +1805,17 @@ impl crate::match_runtime::Match {
                 self.request_command_path(id, goal, crate::path_requests::RequestKind::World)?;
             }
         }
-        self.start_queued_orders(id, winner_decided)
+        self.start_queued_orders_observing(id, winner_decided, observer)
     }
     pub fn start_queued_orders(&mut self, id: UnitId, winner_decided: bool) -> Result<(), String> {
+        self.start_queued_orders_observing(id, winner_decided, &mut |_, _| Ok(()))
+    }
+    fn start_queued_orders_observing(
+        &mut self,
+        id: UnitId,
+        winner_decided: bool,
+        observer: &mut impl FnMut(&mut Self, &Command) -> Result<(), String>,
+    ) -> Result<(), String> {
         let Some(u) = self.world.game.units.get(&id) else {
             return Ok(());
         };
@@ -1849,6 +1876,7 @@ impl crate::match_runtime::Match {
             let remaining = std::mem::take(&mut c.orders);
             let result = self.execute_command(owner, &order, winner_decided);
             self.commands.units.get_mut(&id).expect("control").orders = remaining;
+            observer(self, &order)?;
             result?;
         }
         Ok(())

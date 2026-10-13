@@ -25,6 +25,7 @@ use ww2_core::{
     match_firing::{FiringState, LiveFlight},
     match_recovery::RecoveryState,
     match_runtime::{Match, MatchOptions, PlayerConfig},
+    match_tick::TickEvent,
     random::{MatchRandom, StreamId},
     weather::WeatherChoice,
     world::CellRow,
@@ -537,24 +538,34 @@ fn flight_row(m: &Match, p: &LiveFlight) -> Value {
 
 #[derive(Default)]
 pub struct Projection {
-    events_seen: usize,
     shots: Vec<Value>,
 }
 impl Projection {
     pub fn new() -> Self {
         Self::default()
     }
+    pub fn record_events(&mut self, m: &Match, events: Vec<TickEvent>) {
+        for event in events {
+            let shot = match event {
+                TickEvent::Firing(event) => event.to_json(&m.rules),
+                TickEvent::Environment(ww2_core::environment::Effect::LastHit { .. }) => {
+                    panic!("operative fixture cannot represent LastHit as a shot")
+                }
+                TickEvent::Environment(event) => event.to_json(),
+                TickEvent::Support(_) | TickEvent::Aviation(_) => {
+                    panic!("operative fixture cannot represent Support or Aviation shot events")
+                }
+            };
+            self.shots.push(shot);
+        }
+    }
     pub fn compare(&mut self, m: &mut Match, expected: &Value, context: &str) {
         assert!(
-            m.firing.events.len() >= self.events_seen,
-            "{context}: events were dropped between checkpoints"
+            m.firing.events.is_empty()
+                && m.support.events.is_empty()
+                && m.aviation.events.is_empty(),
+            "{context}: report must detach all emitted producer events"
         );
-        self.shots.extend(
-            m.firing.events[self.events_seen..]
-                .iter()
-                .map(|e| e.to_json(&m.rules)),
-        );
-        self.events_seen = m.firing.events.len();
         exact(
             &json!(self.shots),
             &expected["shots"],

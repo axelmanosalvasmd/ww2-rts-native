@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- Prepared a separate normal union of frozen ordered-event PR #194 and the consolidated original-source frontier `dfcc0bf`. Preserved the one TickEvent/TickFailure result, producer emission sinks, original World component bodies, approved ABI 2 and the optimized test profile with debug assertions and overflow checks. Migrated the inherited quiet engineering consumer to require empty owned events, and report accepted recipient traffic once rather than unavailable. Published parents remain unchanged; exact union source review and the full optimized native cycle are pending.
+
+- Retained the newly published AIR frontier by normal merge so the event closure has one accepted parent instead of a misleading crisscross comparison. Runtime, event source fixtures and the approved ABI 2 header are unchanged; exact combined platform checks remain pending.
+
+- Verified ordered tick outputs on the Mac (arm64): 105 focused debug tests and all 270 release workspace tests pass at `625705e`; final strict Clippy, formatting and release FFI pass at the annotation-only `ad90eac`. Independent hashed copies pass 105 tests in each profile. Three original complete traces reproduce 375 steps and 103 chronological shots, including real launch/route-failure and section/later-origin failure witnesses. The publication closure normally retains current main, approved ABI 2 and the central 40-minute CI budget; its fresh combined platform and host checks remain separate from the earlier ABI 1 branch library proof.
+
+- Normally incorporated the current main server-helper frontier into the ordered-event closure. Core event code and fixtures remain unchanged; complete combined platform verification is pending, and component evidence does not establish an attached room loop.
+
+- Normally joined the published AIR parent and approved ABI 2 ancestry into a separate ordered-event closure. Core event bodies and original fixtures remain the verified event predecessor; the combined publication head awaits fresh platform checks. The earlier event static-library result remains ABI 1 branch evidence, not ABI 2 consumer proof.
+
+- Marked the shared aircraft component snapshot wrapper as intentionally unused by the detached-event runner test, fixing its strict-lint failure after all 105 focused debug tests and 270 release workspace tests passed at `625705e`. The annotation changes no helper body, runtime, input or fixture. Final lint, formatting and release FFI checks remain pending; the original failure is preserved.
+
+- Resumed the ordered tick output checkpoint with direct producer emission sinks, per-command dispatch observers and one caller-owned failure payload. Committed section, blast, burn and retirement effects remain available when a later operation fails; removal facts and completed wreck/bounty/lifecycle prefixes are reported separately. The new unchanged-source replay covers 3 complete traces, 375 steps and 103 chronological shots across firing, ground support, aircraft AA and late fire damage. Native compilation, failure regressions and host integration are pending; frozen AIR evidence and original fixtures are preserved.
+
+- Checkpointed unverified ordered tick output work at the user's pause. A transient TickEvent sequence and TickFailure payload are written, with AIR, ground-support and operative consumer migrations; no compile, native test or complete mixed-event Source replay has run for this branch. The late-failure ownership regression, per-command observer hooks, host bridge and complete emission-order audit are unfinished. Existing AIR proof and original fixtures remain preserved; this checkpoint is not integration-ready.
 - Added an optimized CI test profile with debug assertions and integer overflow checks retained. The same whole workspace test command uses that profile on Linux, Windows and macOS; formatting, strict all-target Clippy, release FFI and Linux C replay gates stay intact. On the Mac with two build jobs, all 362 tests passed in 491.76 seconds including new-profile compilation; executed test names matched the prior 362-test suite exactly. All 90 test executables report debug assertions and overflow checks enabled. Formatting, strict Clippy and release FFI also passed.
 
 - Joined the frozen World commander metadata provider, preserving its commander privacy filters and all-team cache rebinding after successful receipt. Migrated its pending-drop context to canonical Game strike timing and retained explicit malformed-row refusal. Extended the existing warmed-cache refusal witness without changing the original fixture. Updated stale ABI 2 status text to the verified merged six-call scope; broader contracts and Unreal adoption remain pending. Final combined gates remain pending.
@@ -814,6 +829,7 @@
 - Added shared mode-aware UnitControl initialization using compiled ability costs, and selected it from the staged factory's actual Game mode. The original spawn oracle preserves all 55 earlier scenarios and adds six Classic/World spawns for absent, paid and free abilities. The merged native checks verify all 775 spawn rows; World startup uses this shared initializer.
 
 - Preserved canonical recruited combat defaults through the shared publication callback when integrating the reviewed combat ancestry. Fresh combat identities reject before payment; production stepping remains under implementation.
+
 - Allow 40 minutes for the full three-platform Rust CI job. The combined snapshot frontier reached World-memory tests with no assertion failures before its previous 20-minute limit cancelled all three jobs. Formatting, strict Clippy, the complete debug suite, release FFI build and Linux C replay remain required.
 
 - Refreshed the consolidated server delta, list, backpressure and timing frontier in PR #137 onto ABI 2 main `13a8d1f`. Preserved both changelog histories and all server source, original-source recorders and fixtures. Only additive changelog entries conflicted; fresh combined-head platform checks remain pending.
@@ -829,6 +845,8 @@
 - Added recipient-local unit delta ledgers for changed rows, ordered removals, held fingerprints, full resync and start/reconnect resets. The original source oracle matches 68 traces and 409 frames, including actual recipient snapshots from all 33 authored maps. The ledger accepts already filtered rows and rejects malformed or duplicate rows before changing state. Independent source review is clear; native checks, snapshot production and room simulation remain pending.
 
 - Embedded all 33 original authored maps (1,349,980 JSON bytes) in a separate private server catalogue and added native match construction without Node, filesystem map reads or a reference checkout. Cached validated maps remain immutable; each match gets independent mutable world state. Original mines, materials and triggers are retained. Public map routes still use their filtered assets and refuse editor credential access to private data. Room simulation and generated World startup remain unfinished.
+
+
 - Allow 40 minutes for the full three-platform Rust CI job. The combined snapshot frontier reached World-memory tests with no assertion failures before its previous 20-minute limit cancelled all three jobs. Formatting, strict Clippy, the complete debug suite, release FFI build and Linux C replay remain required.
 
 - Refreshed the consolidated Rust frontier in PR #119 onto merged ABI 2 main `d88ef6d`. Preserved all core behavior, both changelog histories, the six approved recipient-view calls and the exact header. Only additive changelog entries conflicted; combined-tree platform checks are rerun on the refreshed head.

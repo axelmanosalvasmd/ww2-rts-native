@@ -272,6 +272,19 @@ fn connected_tick_phases_match_actual_reference_steps() {
                 ]));
             }
             assert!(!report.unavailable.is_empty());
+            assert_eq!(
+                report
+                    .phases
+                    .iter()
+                    .filter(|phase| **phase == ww2_core::match_tick::TickPhase::TrafficKnowledge)
+                    .count(),
+                1
+            );
+            assert!(
+                !report
+                    .unavailable
+                    .contains(&ww2_core::match_tick::TickPhase::TrafficKnowledge)
+            );
             assert!(
                 report
                     .phases
@@ -628,7 +641,7 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
             .collect::<Vec<_>>();
         let error = m.advance_tick().unwrap_err();
         assert!(
-            error.contains(match actor {
+            error.reason.contains(match actor {
                 "garrison" => "automatic garrison retreat tick exit",
                 "logistics" | "convoys" => "reserve and convoy tick phases",
                 "mode" => "ordinary Conquest",
