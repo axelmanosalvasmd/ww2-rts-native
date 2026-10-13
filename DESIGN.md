@@ -1,5 +1,9 @@
 # Three Crossroads Native: design decisions
 
+## Borrowed World ground actors (source checkpoint)
+
+Ground providers borrow one actor policy from the existing commander or World local-defender owner. Source owner -1 remains distinct from commander indices; an absent economy slot means the Source local actor's zero MP, Munitions and fuel, not a fabricated wallet. Game retains health, pose and alliances, while WorldRuntime retains local visibility and faction. The new lookup validates matching mode/runtime facts but does not admit a complete World tick. Native checks and the sole caller's phase admission remain separate.
+
 ## Final internal runtime source bundle (2026-10-13)
 
 The final normal merge explicitly includes main `d1f2fb5`. That main tree is identical to already incorporated ordered-event head `a068dd8`; the merge adds ancestry without changing runtime source, approved header, original fixtures or the optimized test profile.

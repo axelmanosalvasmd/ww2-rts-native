@@ -40,6 +40,7 @@ pub(crate) mod existing_observers;
 pub mod logistics;
 pub mod map;
 pub mod match_abilities;
+pub mod match_actor;
 pub mod match_aircraft_commands;
 pub mod match_aircraft_ticks;
 pub mod match_aviation;
