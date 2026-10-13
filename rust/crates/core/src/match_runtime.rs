@@ -545,8 +545,8 @@ pub struct Match {
     /// Canonical source counters. Event owners must record accepted effects exactly once.
     pub story: Vec<crate::match_story::PlayerStory>,
     pub fallen: crate::match_story::FallenLocations,
-    pub finish: Option<crate::conquest_end::ConquestFinish>,
-    pub timeline: Vec<crate::conquest_end::ConquestSample>,
+    pub finish: Option<crate::match_end::MatchFinish>,
+    pub timeline: Vec<crate::match_end::MatchSample>,
     pub next_unit_id: u32,
     pub rules: Rules,
 }
