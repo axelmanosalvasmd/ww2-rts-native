@@ -95,6 +95,9 @@ impl StartPlan {
         options: &MatchOptions,
         rules: &Rules,
     ) -> Result<Self, String> {
+        if map.geography().is_some() {
+            return Err("native startup does not yet initialize World matches".into());
+        }
         if !matches!(options.mode, Mode::Default | Mode::Conquest) {
             return Err("native startup currently supports Conquest".into());
         }
@@ -397,6 +400,8 @@ pub struct Match {
     pub start: StartPlan,
     pub options: MatchOptions,
     pub grid: SpatialGrid,
+    pub(crate) recipients: Vec<crate::match_routing::RecipientRouting>,
+    pub(crate) routing_fog: crate::fog::Fog,
     pub building_cells: BTreeMap<usize, BuildingCell>,
     pub production: crate::production::ProductionState,
     pub building_rallies: BTreeMap<u32, Option<Point>>,
@@ -450,6 +455,8 @@ impl Match {
         let mut result = Self {
             commands: crate::match_commands::MatchCommands::new(4096),
             grid: SpatialGrid::new(&world.game.units, 16.0),
+            recipients: Vec::new(),
+            routing_fog: crate::fog::Fog::default(),
             world,
             start,
             options,
@@ -474,6 +481,7 @@ impl Match {
             result.commands.insert(unit.id, control);
         }
         result.grid.rebuild(&result.world.game.units);
+        result.initialize_recipient_routing()?;
         Ok(result)
     }
 

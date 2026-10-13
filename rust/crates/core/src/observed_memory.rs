@@ -165,6 +165,31 @@ impl ObservedMemory {
         self.revision
     }
 
+    pub(crate) fn validate_binding(&self, world: &World) -> Result<(), ObservedError> {
+        validate_world(world)?;
+        if world.game.w != self.width
+            || world.game.h != self.height
+            || world.initial().chars.as_ptr() as usize != self.initial_ptr
+        {
+            return Err(ObservedError::InitialChanged);
+        }
+        Ok(())
+    }
+
+    /// Whether pending rows can be replayed at this collector key. The caller
+    /// still invokes refresh on an empty first read to register future updates.
+    pub(crate) fn needs_replay(&self, world: &World) -> bool {
+        let pending = world
+            .pending(Recipient::Player(self.slot))
+            .map_or(!world.cell_log().is_empty(), |v| !v.is_empty());
+        pending
+            && self.key
+                != Some((
+                    world.game.terrain_version,
+                    world.game.vision_tick.unwrap_or(-1),
+                ))
+    }
+
     /// Replay sorted pending log indices at most once per terrain/vision key.
     /// Accepted updates are staged, including revision capacity, before memory
     /// or the World's pending set changes. Hidden cells remain pending.
@@ -174,13 +199,7 @@ impl ObservedMemory {
         frame: ObservationFrame,
         facts: &mut F,
     ) -> Result<usize, ObservedError> {
-        validate_world(world)?;
-        if world.game.w != self.width
-            || world.game.h != self.height
-            || world.initial().chars.as_ptr() as usize != self.initial_ptr
-        {
-            return Err(ObservedError::InitialChanged);
-        }
+        self.validate_binding(world)?;
         let key = (
             world.game.terrain_version,
             world.game.vision_tick.unwrap_or(-1),
@@ -346,7 +365,7 @@ fn validate_row(row: &CellRow) -> Result<(), ObservedError> {
     }
     Ok(())
 }
-fn validate_world(world: &World) -> Result<(), ObservedError> {
+pub(crate) fn validate_world(world: &World) -> Result<(), ObservedError> {
     let g = &world.game;
     if g.mode == Some(ModeKind::World) {
         return Err(ObservedError::UnsupportedWorld);
