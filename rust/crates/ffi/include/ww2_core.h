@@ -10,7 +10,7 @@
 
 // The interface version. It changes whenever a function signature or a struct layout in this header
 // changes. The Unreal plugin refuses to start when `ww2_abi_version()` differs from this.
-#define WW2_ABI_VERSION 1
+#define WW2_ABI_VERSION 2
 
 // Success.
 #define WW2_OK 0
@@ -27,6 +27,15 @@
 // The caller's buffer is too small.
 #define WW2_ERR_CAPACITY -4
 
+// The message is not valid UTF-8, JSON, or a valid server message.
+#define WW2_ERR_PARSE -5
+
+// The message cannot be applied before the view receives a start message.
+#define WW2_ERR_WRONG_STATE -6
+
+// A previous panic poisoned this handle. Only ww2_view_free is allowed.
+#define WW2_ERR_POISONED -7
+
 // Formation shapes, in the Formation menu's order (`SHAPES` in `shared/formation.js`). Ranks of up to
 // ten, or as many as fit the drag.
 #define WW2_SHAPE_LINE 0
@@ -39,6 +48,11 @@
 
 // An arrowhead, one unit at the tip.
 #define WW2_SHAPE_WEDGE 3
+
+// An opaque recipient view. Create it with ww2_view_new and release it exactly once with
+// ww2_view_free. Use one thread at a time for each handle; different handles are independent.
+// Never copy, inspect, or allocate this type in C. A panic poisons it; only free is then allowed.
+typedef struct ww2_view ww2_view;
 
 // A unit to place in a formation.
 typedef struct ww2_formation_item {
@@ -60,6 +74,30 @@ typedef struct ww2_formation_spot {
   double x;
   double z;
 } ww2_formation_spot;
+
+// A complete fixed-column unit row, sorted by id in ww2_view_units. Values use the server's
+// simulation units: metres (x east, z south), radians, and seconds. Flag bits are copied unchanged.
+// Wire tail fields are not exposed in ABI 2. This struct's layout is versioned by WW2_ABI_VERSION.
+typedef struct ww2_view_unit {
+  uint32_t id;
+  int32_t owner;
+  // UTF-8 wire type name, terminated with zero and zero padded. At most 63 bytes plus terminator.
+  // A longer name or embedded zero makes ww2_view_units fail, without writing any rows.
+  char kind[64];
+  double x;
+  double z;
+  double rot;
+  double aim;
+  double hp;
+  double supp;
+  double cd;
+  double built;
+  // Target unit id, or zero when there is no target.
+  uint32_t target;
+  uint32_t cover;
+  uint32_t flags;
+  uint32_t stars;
+} ww2_view_unit;
 
 #ifdef __cplusplus
 extern "C" {
@@ -124,6 +162,62 @@ int32_t ww2_formation_spots(const struct ww2_formation_item *items,
                             struct ww2_formation_spot *out,
                             size_t out_capacity,
                             size_t *out_len);
+
+// Creates an empty recipient view and writes its handle to *out. On failure *out is null.
+// The view contains no match until a valid start message arrives. Free it exactly once.
+//
+// # Safety
+// out must be null or point to writable pointer storage.
+int32_t ww2_view_new(struct ww2_view **out);
+
+// Releases a view, including a poisoned view. A null pointer succeeds. The pointer is invalid
+// afterward and must never be used or freed again.
+//
+// # Safety
+// view must be null or a live handle returned by ww2_view_new, with no concurrent users.
+int32_t ww2_view_free(struct ww2_view *view);
+
+// Applies one UTF-8 JSON server message (not a JSONL batch). len counts bytes, without a required
+// trailing zero. Unknown message types are ignored. Start replaces the view; snapshots before
+// start return WW2_ERR_WRONG_STATE. Invalid UTF-8, JSON or message shape returns WW2_ERR_PARSE
+// without changing the view. Messages over 16 MiB return WW2_ERR_BAD_ARGUMENT before any read.
+// A held-set mismatch
+// succeeds and sets needs_resync; the caller sends resync and feeds the resulting full snapshot.
+//
+// # Safety
+// view must be null or a live exclusively owned handle. json must be null with len zero or point
+// to len readable bytes, which must not overlap view. A zero-byte message fails parsing.
+int32_t ww2_view_apply(struct ww2_view *view, const char *json, size_t len);
+
+// Writes the number of current unit rows to *out. An empty view has zero units.
+//
+// # Safety
+// view must be null or a live exclusively owned handle; out must be null or writable size_t
+// storage outside the handle.
+int32_t ww2_view_unit_count(struct ww2_view *view, size_t *out);
+
+// Copies all fixed-column unit rows in ascending id order into caller-owned out storage. Writes
+// the required row count to *out_len, including on WW2_ERR_CAPACITY. capacity counts rows, not
+// bytes. Call with null out and capacity zero to query the count (CAPACITY for a nonempty view).
+// Any failure leaves the row array unchanged. Unrepresentable type names return BAD_ARGUMENT.
+// For other failures, out_len is unchanged unless the row count has already been reported.
+//
+// # Safety
+// view must be null or a live exclusively owned handle; out must be null or point to capacity
+// writable rows; out_len must be null or writable size_t storage. These must not overlap.
+int32_t ww2_view_units(struct ww2_view *view,
+                       struct ww2_view_unit *out,
+                       size_t capacity,
+                       size_t *out_len);
+
+// Writes 1 when the held unit count or id XOR differs from the server, otherwise 0. The caller
+// handles resync requests and throttling; the view performs no I/O. A matching full snapshot
+// clears the flag. An empty view does not need resync.
+//
+// # Safety
+// view must be null or a live exclusively owned handle; out must be null or writable uint8_t
+// storage outside the handle.
+int32_t ww2_view_needs_resync(struct ww2_view *view, uint8_t *out);
 
 #ifdef __cplusplus
 }  // extern "C"
