@@ -159,6 +159,9 @@ pub struct CellData {
     pub mine: bool,
     pub mine_material: Option<String>,
     pub section: Option<SectionRow>,
+    /// Optional World rail facts captured when this row was logged or observed.
+    pub rail: Option<u8>,
+    pub station: Option<usize>,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct CellRow {
@@ -468,6 +471,60 @@ impl World {
     pub fn take_new_cells(&mut self) -> Vec<CellRow> {
         std::mem::take(&mut self.new_cells)
     }
+    /// Attach explicit World facts to only the new rows in this source operation.
+    /// Validate the complete ordered projection before updating any snapshot.
+    /// Live rail state remains caller-owned. Later terrain writers must use this
+    /// projection hook as well if their logged rows need World rail metadata.
+    pub fn annotate_recent_rows(
+        &mut self,
+        start: usize,
+        fields: &[(usize, Option<u8>, Option<usize>)],
+    ) -> Result<(), WorldError> {
+        let regions = self
+            .geography
+            .as_ref()
+            .ok_or(WorldError::InvalidChange)?
+            .regions
+            .len();
+        let count = self
+            .game
+            .w
+            .checked_mul(self.game.h)
+            .ok_or(WorldError::InvalidChange)?;
+        if count == 0
+            || count != self.game.flags.len()
+            || count != self.cell_state.len()
+            || count != self.game.chars.len()
+            || start > self.new_cells.len()
+            || fields.len() != self.new_cells.len() - start
+        {
+            return Err(WorldError::InvalidChange);
+        }
+        let mut plan = Vec::with_capacity(fields.len());
+        for (offset, &(cell, rail, station)) in fields.iter().enumerate() {
+            let row = &self.new_cells[start + offset];
+            let index = self
+                .log_indexes
+                .get(&cell)
+                .copied()
+                .ok_or(WorldError::InvalidChange)?;
+            if cell >= count
+                || row.cell != cell
+                || station.is_some_and(|station| station >= regions)
+                || self.log.get(index).is_none_or(|row| row.cell != cell)
+            {
+                return Err(WorldError::InvalidChange);
+            }
+            plan.push((start + offset, index, rail, station));
+        }
+        for (row, index, rail, station) in plan {
+            self.new_cells[row].data.rail = rail;
+            self.new_cells[row].data.station = station;
+            self.log[index].data.rail = rail;
+            self.log[index].data.station = station;
+        }
+        Ok(())
+    }
     pub fn journal(&self) -> &[usize] {
         &self.journal
     }
@@ -648,6 +705,8 @@ impl World {
                     None
                 },
                 section,
+                rail: None,
+                station: None,
             },
         })
     }
