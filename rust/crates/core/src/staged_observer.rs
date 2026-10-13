@@ -41,7 +41,7 @@ impl<'a> StagedObserver<'a> {
             || unit
                 .cells
                 .as_ref()
-                .is_some_and(|cs| cs.iter().any(|c| *c >= game.chars.len()))
+                .is_some_and(|cs| cs.iter().any(|c| *c as usize >= game.chars.len()))
         {
             return Err("invalid staged sight observer".into());
         }

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Combined the checked staged observer footprint and birth replay repairs with the coherent commander proof successor. Policy and source scenario files remain unchanged; native checks of this combined consumer are pending.
+
 - Combined the checked engineering provider fixes with the separate commander proof successor while retaining the staged Buy body and existing Cover, research and shopping policy fixtures. Combined source review and native checks are pending.
 
 - Added a bounded Germany commander MG purchase through the real typed Buy and canonical publication provider. Two original-source scenarios cover four delivered frames and seven waypoint draws, including actual newborn movement and refusal after the seat becomes away. Native checks are pending; broader shopping, construction and full AI remain outside this checkpoint.
@@ -43,6 +45,12 @@
 - Kept the opening commander's fallback vision query on a fresh temporary spatial index, preserving the maintained gameplay index while applying the source vision phase. Recipient-routing index preservation is being verified in the FPS integration lane.
 
 - Added a bounded native Conquest opening commander: detached recipient observations, source point scores and cover waypoints, fixed per-seat scheduling, isolated seeded draws and typed movement orders through the canonical Match queue. Economic, combat, camera, World and complete-match AI behavior remain pending; no wire or C interface changed.
+- Verified prepared routing sight and cache transactions against 14 original births, 12 prebirth searches and one cross-team reroute. All three provider tests, focused routing and World memory debug tests, 167 release workspace tests, strict Clippy, formatting and release FFI pass. Actual recruitment wallet/story and World training integration remain separate.
+
+- Matched JavaScript JSON number spelling for endpoint wetness values in the shared birth replay projection and removed an unused test import. The first replay otherwise matched the cold-birth view exactly.
+
+- Corrected staged-observer cell validation and source fingerprints to use the canonical unit footprint index type. The first native compile exposed two integer-type mismatches.
+
 - Added a fourth original World birth case with a different team’s warmed vehicle history, four accepted prebirth changes and a postbirth reroute. The recorder now covers 14 births, 12 prebirth searches and one cross-team reroute; native success/abort cache-lifetime checks remain pending.
 
 - Kept World search histories bound to every team array moved by a successful preview, including teams not read in that transaction. Consumer source review found the selected-team-only mapping could discard other warmed incremental histories.

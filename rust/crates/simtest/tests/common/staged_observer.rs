@@ -115,7 +115,14 @@ pub(crate) fn view(
 ) -> Value {
     let n = q.navigation();
     let count = n.width * n.height;
-    json!({"version":n.versions.knowledge,"chars":runs((0..count).map(|c|json!(char::from(knowledge.cell(c).unwrap().character).to_string()))),"flags":runs(n.flags.iter().map(|v|json!(v))),"height":runs(n.heights.unwrap().iter().map(|v|json!(v))),"fires":live.fires.iter().enumerate().filter_map(|(c,v)|v.then_some(c)).collect::<Vec<_>>(),"bunkers":live.bunkers.iter().map(|p|[bits(p.x),bits(p.z)]).collect::<Vec<_>>(),"wrecks":wrecks.iter().map(|w|json!([w.id.unwrap(),bits(w.x),bits(w.z),w.moving])).collect::<Vec<_>>(),"wet":live.wetness})
+    let wet = if live.wetness == 0. {
+        json!(0)
+    } else if live.wetness == 1. {
+        json!(1)
+    } else {
+        json!(live.wetness)
+    };
+    json!({"version":n.versions.knowledge,"chars":runs((0..count).map(|c|json!(char::from(knowledge.cell(c).unwrap().character).to_string()))),"flags":runs(n.flags.iter().map(|v|json!(v))),"height":runs(n.heights.unwrap().iter().map(|v|json!(v))),"fires":live.fires.iter().enumerate().filter_map(|(c,v)|v.then_some(c)).collect::<Vec<_>>(),"bunkers":live.bunkers.iter().map(|p|[bits(p.x),bits(p.z)]).collect::<Vec<_>>(),"wrecks":wrecks.iter().map(|w|json!([w.id.unwrap(),bits(w.x),bits(w.z),w.moving])).collect::<Vec<_>>(),"wet":wet})
 }
 pub(crate) fn setup(m: &mut Match, c: &Value) {
     let s = &c["setup"];
