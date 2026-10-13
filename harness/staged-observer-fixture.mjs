@@ -26,7 +26,7 @@ const mask=(1n<<64n)-1n,gamma=0x9e3779b97f4a7c15n;
 const mix=x=>{x=((x^(x>>30n))*0xbf58476d1ce4e5b9n)&mask;x=((x^(x>>27n))*0x94d049bb133111ebn)&mask;return x^(x>>31n);};
 const environmentSeed=seed=>Number(mix((mix(BigInt(seed)^((2n*gamma)&mask))+gamma)&mask)&0xffffffffn);
 const cases = [];
-function record(mode, warm, kind='rifle', advance=false, history=false) {
+function record(mode, warm, kind='rifle', advance=false, history=false, peerHistory=false) {
  const ordinary = { name:'Birth sight', w:64, h:64, rows:Array(64).fill('.'.repeat(64)), spawns:[{x:4,y:4},{x:59,y:59}], points:[{x:32,y:32}] };
  const startIndex=4, c=starts.cases[startIndex], map=structuredClone(mode==='world'?c.map:ordinary);
  if (map.world?.regionMapRuns) { map.world.regionMap=map.world.regionMapRuns.flatMap(([v,n])=>Array(n).fill(v)); delete map.world.regionMapRuns; }
@@ -43,7 +43,7 @@ function record(mode, warm, kind='rifle', advance=false, history=false) {
  const changes=[{c:25*g.w+42,ch:'T'},{c:26*g.w+43,ch:'M'},{c:27*g.w+44,ch:'B'}];
  for(const change of changes)sim.internals.setCell(g,change.c,change.ch);
  g.wrecks.push({id:900001,type:'tank',owner:1,x:85.14,z:51.26,rot:0});
- let scout=null;const historyReads=[];
+ let scout=null,peer=null;const historyReads=[],peerReads=[];
  if(history){scout=sim.internals.spawnUnit(g,0,kind);Object.assign(scout,{x:9,z:9});sim.rebuildGrid(g);}
  const fireCell=25*g.w+42;
  if(warm==='fire')g.fires.set(fireCell,20);
@@ -65,6 +65,18 @@ function record(mode, warm, kind='rifle', advance=false, history=false) {
  if(advance)g.tick++;
  g.fires.set(fireCell,20);
  const fog=()=>{const f=g.fog?.get(g.players[0].team);return f?{key:f.key,version:f.version,vis:runs(f.vis)}:null;};
+ if(peerHistory){
+  peer=sim.internals.spawnUnit(g,1,'medium');Object.assign(peer,{x:351,z:351});sim.rebuildGrid(g);
+  const goal=point(433,367);
+  for(const change of [null,{c:175*g.w+191,ch:'B'},{c:175*g.w+192,ch:'B'},{c:175*g.w+191,ch:'T'}]){
+   if(change)sim.internals.setCell(g,change.c,change.ch);
+   let selected;sim.setPathProbe((_g,_from,_to,v)=>{selected=project(v)});
+   const route=sim.findPath(g,peer,goal);
+   peerReads.push({change,goal,view:selected,path:route.map(p=>[bits(p.x),bits(p.z)]),routeEnd:[bits(peer.routeEnd.x),bits(peer.routeEnd.z)]});
+  }
+  assert.ok(peerReads.at(-1).view.version>peerReads[0].view.version);
+  sim.setPathProbe(()=>{});
+ }
  const beforeFog=fog(), views=[];
  sim.setPathProbe((_g,from,to,v)=>views.push({id:from.id,to,view:project(v)}));
  const scatterIndex=g.units.size;
@@ -76,14 +88,16 @@ function record(mode, warm, kind='rifle', advance=false, history=false) {
  const afterWallet={mp:g.players[0].mp,fuel:g.players[0].fuel??null};
  assert.equal(views.length,1);
  const memory=mode==='world'?g.world.memory.get(g.players[0].team).cells:g.players[0].terrainMemory;
- cases.push({name:`${mode}:${kind}:${warm}:${advance?'next-tick':'same-tick'}${history?':history':''}`,mode,startIndex:mode==='world'?startIndex:null,map:mode==='world'?null:ordinary,setup:{mp:1000,building:{id:building.id,kind:buildingKind,built:1,at:point(51,51),rally:building.rally},changes,wreck:{id:900001,x:85.14,z:51.26},fireCell,warm,advance,scatterIndex,scout:scout?{id:scout.id,kind,at:point(9,9)}:null,historyReads},buy:{slot:0,type:kind,b:building.id,command:{t:'buy',unit:kind,from:building.id},admission,beforeWallet,afterWallet},id:unit.id,prior,beforeFog,view:views[0].view,expected:{pose:[unit.x,unit.z,unit.rot,unit.aim,unit.ghost].map(bits),hp:bits(unit.hp),path:unit.path.map(p=>[bits(p.x),bits(p.z)]),routeEnd:unit.routeEnd?[bits(unit.routeEnd.x),bits(unit.routeEnd.z)]:null,worldGoal:unit.worldGoal,drift:unit.drift,rows:[...memory.values()].map(r=>r.slice(0,4)),fog:fog()}});
+ cases.push({name:`${mode}:${kind}:${warm}:${advance?'next-tick':'same-tick'}${history?':history':''}${peerHistory?':peer-history':''}`,mode,startIndex:mode==='world'?startIndex:null,map:mode==='world'?null:ordinary,setup:{mp:1000,building:{id:building.id,kind:buildingKind,built:1,at:point(51,51),rally:building.rally},changes,wreck:{id:900001,x:85.14,z:51.26},fireCell,warm,advance,scatterIndex,peer:peer?{id:peer.id,kind:'medium',owner:1,at:point(351,351)}:null,peerReads,scout:scout?{id:scout.id,kind,at:point(9,9)}:null,historyReads},buy:{slot:0,type:kind,b:building.id,command:{t:'buy',unit:kind,from:building.id},admission,beforeWallet,afterWallet},id:unit.id,prior,beforeFog,view:views[0].view,expected:{pose:[unit.x,unit.z,unit.rot,unit.aim,unit.ghost].map(bits),hp:bits(unit.hp),path:unit.path.map(p=>[bits(p.x),bits(p.z)]),routeEnd:unit.routeEnd?[bits(unit.routeEnd.x),bits(unit.routeEnd.z)]:null,worldGoal:unit.worldGoal,drift:unit.drift,rows:[...memory.values()].map(r=>r.slice(0,4)),fog:fog()}});
  sim.setPathProbe(()=>{});
+ if(peerHistory){let selected;sim.setPathProbe((_g,_from,_to,v)=>{selected=project(v)});const route=sim.findPath(g,peer,peerReads.at(-1).goal);cases.at(-1).peerAfter={view:selected,path:route.map(p=>[bits(p.x),bits(p.z)]),routeEnd:[bits(peer.routeEnd.x),bits(peer.routeEnd.z)]};sim.setPathProbe(()=>{});}
 }
 for(const warm of ['cold','route','fire','fog'])record('conquest',warm);
 for(const warm of ['route','fire'])record('conquest',warm,'rifle',true);
 record('conquest','route','rifle',false,true);record('conquest','route','tank',false,true);
 record('conquest','cold','sniper');record('conquest','cold','tank');
 for(const warm of ['cold','route','fire'])record('world',warm);
+record('world','cold','rifle',false,false,true);
 const out=JSON.stringify({reference:pin,node:process.version,arch:process.arch,cases})+'\n';
 const destination=`${root}/rust/crates/simtest/tests/fixtures/staged-observer.json`;
 if(process.argv.includes('--check'))assert.equal(readFileSync(destination,'utf8'),out);else writeFileSync(destination,out);
