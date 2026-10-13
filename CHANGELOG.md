@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added optional durable wreck IDs to query state, preserving absent identity in older query fixtures. The authoritative wreck producer uses the dead unit ID; remembered-routing consumers can reject missing identity explicitly. No wire or C layout changed.
+
 - Corrected World routing wetness to preserve the canonical optional weather state, using source zero wetness when absent. Independent source review caught the scalar/optional type mismatch before native checks.
 
 - Added original-source World recipient knowledge records for three traces and 111 actions, including 6,200 accepted changes, journal and memory-log trimming, teammate delivery cursors, hidden mines, reveal, signed region IDs, remembered wrecks and per-tick route caches. The explicit World visibility phase updates canonical building ghosts and local-defender visibility. Discovered rows borrow existing rail/station metadata. Native checks and review remain pending; full World tick, snapshots and commands remain separate.
