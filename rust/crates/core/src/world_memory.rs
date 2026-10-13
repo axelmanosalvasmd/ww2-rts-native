@@ -562,7 +562,7 @@ mod tests {
     use super::*;
     #[test]
     fn exhausted_revision_and_log_cursor_preserve_memory() {
-        let input = serde_json::json!({"name":"guard map","w":20,"h":20,"rows":vec![".".repeat(20);20],"spawns":[{"x":0,"y":0},{"x":19,"y":19}],"points":[]});
+        let input = serde_json::json!({"name":"guard map","w":20,"h":20,"rows":vec![".".repeat(20);20],"spawns":[{"x":0,"y":0},{"x":19,"y":19}],"points":[{"x":10,"y":10}]});
         let map =
             crate::map::AuthoritativeMap::from_json(&serde_json::to_vec(&input).unwrap()).unwrap();
         let mut world = World::from_map(&map).unwrap();

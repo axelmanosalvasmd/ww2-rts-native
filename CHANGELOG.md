@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Completed the atomic guard fixture setup with the ordinary loader's required capture point. The World source recorder also retains signed-label membership maps and adds a nonmultiple-dimension region-lock trace after the startup fixture changed shape. Native checks remain in progress.
+
 - Integrated the coordinated startup rail/station row projection and canonical region lookup into World memory. Focused atomic guard fixtures now use valid minimum map dimensions. Recipient rows populate the existing CellData fields from borrowed WorldRails, without a second rail representation. Native verification continues.
 
 - Carried the startup lane's explicit World rail-position map type into the recipient-memory dependency tree, fixing the compiler's ambiguous index type without changing rail traversal or values. Native verification remains in progress.
