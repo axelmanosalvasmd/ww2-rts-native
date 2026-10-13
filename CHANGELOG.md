@@ -13,6 +13,18 @@
 
 - Added canonical objective state and standalone capture-point and point-supply phases. Four focused tests compare 214 original-JavaScript capture traces (1,165 checkpoints) and 223 supply states, including exact capture progress, event order and control/reached masks. Preserved allied ownership, sequential prerequisites, forced-reserve guards, circular safe zones, MOVE-only supply seeds and square point-connectivity checks. Inputs are validated before objective mutation. Match scheduling, story application, income, refill networks and win/loss integration remain unfinished; no ABI or wire interface changed.
 
+- Fixed publication validation rejecting unrelated casualties with negative HP before source death removal. Existing units accept finite negative health, while new drafts and staged squad HP stay nonnegative. An added original-source buy trace protects the admission behavior.
+
+- Added explicit World actor staging and publication policy to the shared unit guard while keeping ordinary commander checks strict. Three focused regressions now cover refused/aborted batches, ordered HP/payment publication and the World-only neutral identity; native verification is pending.
+
+- Add a shared prepared unit publication guard for source-ordered batches, canonical controls/grid/IDs and staged squad HP updates. Ordinary staging reuses scatter before pose overrides; recruitment delegates its final insertion to this primitive. This source-only prerequisite still needs Rust verification and regression review before public merge.
+
+- Reserved a fixed internal World local-defender actor identity outside commander slots. World team and alliance queries recognize that actor without adding a player seat or wallet; ordinary invalid owner behavior is unchanged. Native World construction and guarded publication remain pending.
+
+
+- Connected immediate Conquest ground/naval recruitment to Match with staged placement, owner-observed rally routes, exact MP charges, monotonic IDs, canonical control rows and maintained spatial indexing. Five original-source traces cover 32 buy commands; failed routes still buy, while malformed placement/routing leaves full wallet, unit, control, metadata and ID state untouched. Air, ambiguous pending support kinds and later Match systems remain explicit boundaries.
+
+- Added one canonical Match control row for aim, ability and retreat switches, attack intent, facing and waiting orders. Startup prepares the rows from unit definitions; recruitment can stage them before charging. Command execution is the next part of this lane, and no wire or C interface changed.
 
 - Connected Conquest point supply, capture and income to the assembled Match, using the tick's ordered unit list and one canonical objective/reserve state. Eight original-source traces compare 72 phases across all armies, allied and enemy teams, disconnection, supply obstruction, post-decision VP freezing and units spawned during a tick. Capture timestamps follow source winner gating; malformed input leaves objectives and wallets unchanged. This phase does not advance the clock or implement the remaining match systems.
 
