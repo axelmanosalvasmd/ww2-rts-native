@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added an original-source engineering snapshot recorder with five cases, 481 full ticks and 1,539 recipient results. It records mixed project segment kinds, allied paid work, queued join anchors after project deletion, unrounded work coordinates, progress tails and dead-worker omission after an actual destroy command. Native replay remains pending.
+
 - Combine the actual Default tick and typed snapshot prerequisites for active engineering recipient views. Preserve the single startup initialization, staged observer receipt and canonical unit/job owners; the combined native proof is pending.
 
 - Normal-merged the sole tick owner's immutable Default guard and reviewed provider aliases into the separate actual-source consumer. The checked support/project ancestry and all provider bodies are preserved; combined native checks are pending.
