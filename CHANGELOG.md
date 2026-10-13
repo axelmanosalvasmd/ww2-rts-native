@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix the coherent commander proof union by keeping one copy of the paid-work cancellation and AP refusal tests, and importing the routing version type used by recruitment tests.
+
 - Combined the checked staged observer footprint and birth replay repairs with the coherent commander proof successor. Policy and source scenario files remain unchanged; native checks of this combined consumer are pending.
 
 - Combined the checked engineering provider fixes with the separate commander proof successor while retaining the staged Buy body and existing Cover, research and shopping policy fixtures. Combined source review and native checks are pending.
