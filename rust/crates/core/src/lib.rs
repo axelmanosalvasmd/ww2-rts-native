@@ -19,6 +19,7 @@ pub mod match_firing;
 pub mod match_combat;
 pub mod match_runtime;
 pub mod match_commands;
+pub mod match_routing;
 pub mod math;
 pub mod movement;
 pub mod navigation;
