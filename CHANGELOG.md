@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified the canonical World continuation provider at `e84ed4b`: all 37 affected debug tests and 214 locked release workspace tests pass, with strict Clippy, formatting and release FFI. Original checks cover six closing scenes with 12 transition pairs and the unchanged playing-state split. No repairs were needed; the sole World controller and server ending hold remain separate.
+
 - Clarified that the existing convoy call takes an explicit decided argument, which the sole runner must derive from its canonical finish at that source site. No runtime or fixture change.
 
 - Compare continuing World phases with six original-source closing scenes and 12 tail transitions, including recapture with old timestamps, relocated homes, depot payments, ordered elimination and frozen terminal history. Add malformed terminal, incomplete current-order and late fort atomic checks. Independent review caught a zero-ID actor guard bypass after finish; the shared validator now rejects it before either phase publishes. Native checks are pending. Documented the sole runner's final captured/current tail contract and the original convoy guard.
