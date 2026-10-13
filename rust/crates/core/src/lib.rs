@@ -26,6 +26,7 @@ pub mod path_requests;
 
 pub mod orders;
 pub mod pathfinding;
+pub mod produced_units;
 pub mod production;
 pub mod projectiles;
 
@@ -35,6 +36,7 @@ pub mod rules;
 pub mod separation;
 pub mod sort;
 pub mod structures;
+pub mod supply_convoys;
 pub mod terrain;
 pub mod traffic;
 pub mod unit_spawn;
