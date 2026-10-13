@@ -186,6 +186,29 @@ impl crate::match_runtime::Match {
         Ok(())
     }
 
+    /// Apply a declared finish input to a trusted fresh scene through the canonical actuator.
+    /// This setup hook never rewinds a running match or consumes recorded commands.
+    pub fn initialize_tick_scene_finish(
+        &mut self,
+        winner: i32,
+        reason: crate::match_end::EndReason,
+        at: Option<crate::game::Point>,
+    ) -> Result<crate::match_end::MatchFinish, String> {
+        if self.world.game.tick != 0
+            || self.commands.queue.next_tick() != Some(1)
+            || !self.commands.queue.is_empty()
+            || self.tick_state.started
+            || self.tick_state.fault.is_some()
+            || self.finish.is_some()
+        {
+            return Err("scene finish requires a fresh unfinished empty command queue".into());
+        }
+        self.require_detached_tick_events()?;
+        self.validate_match_finish_state()?;
+        let prepared = self.prepare_match_finish(winner, reason, at)?;
+        Ok(self.publish_match_finish(prepared))
+    }
+
     /// Run the connected phase foundation. The returned unavailable list is part
     /// of the result until every actuator required by a playable tick is wired.
     pub fn advance_tick(&mut self) -> Result<TickReport, TickFailure> {
@@ -261,12 +284,15 @@ impl crate::match_runtime::Match {
         if game.tick < 0 || game.tick >= 9_007_199_254_740_351 {
             return Err("invalid tick clock".into());
         }
-        if !matches!(
-            self.options.mode,
-            crate::economy::Mode::Default | crate::economy::Mode::Conquest
-        ) || game.mode.is_some()
+        let world = self.options.mode == crate::economy::Mode::World
+            && game.mode == Some(crate::game::ModeKind::World);
+        if !(world
+            || matches!(
+                self.options.mode,
+                crate::economy::Mode::Default | crate::economy::Mode::Conquest
+            ) && game.mode.is_none())
         {
-            return Err("tick execution currently requires ordinary Conquest".into());
+            return Err("tick execution requires represented ordinary or World mode".into());
         }
         if self.options.logistics || self.convoys.is_some() {
             return Err("reserve and convoy tick phases are not connected".into());
@@ -289,24 +315,33 @@ impl crate::match_runtime::Match {
             return Err("invalid living weather state".into());
         }
         for u in game.units.values() {
-            if u.kind >= self.rules.kinds.len() || u.owner >= game.players.len() {
+            if u.kind >= self.rules.kinds.len()
+                || (!world && u.owner >= game.players.len())
+                || (world && self.actor_policy(u.owner).is_err())
+            {
                 return Err("invalid tick unit".into());
             }
         }
         self.validate_abilities()?;
+        self.validate_production_phases(self.rules.movement.tick)
+            .map_err(|error| format!("production admission: {error:?}"))?;
         self.prepare_companion_tick()?;
-        self.validate_aircraft_runner_boundary(boundary)
-            .map_err(|error| format!("aircraft admission: {error}"))?;
-        let current_order = game.units.keys().copied().collect::<Vec<_>>();
-        self.validate_support_metadata()
-            .map_err(|error| format!("support metadata admission: {error}"))?;
-        self.validate_support_tick_phases(&current_order, self.rules.movement.tick, boundary)
-            .map_err(|error| format!("support admission: {error}"))?;
-        self.validate_carrier_tick()?;
-        self.validate_construction_tick()?;
-        self.validate_ground_attacks()?;
-        self.validate_reaction_tick_actors()?;
-        self.validate_field_project_tick(&current_order)?;
+        if self.options.mode == crate::economy::Mode::World {
+            self.validate_world_tick_adapters(boundary)?;
+        } else {
+            self.validate_aircraft_runner_boundary(boundary)
+                .map_err(|error| format!("aircraft admission: {error}"))?;
+            let current_order = game.units.keys().copied().collect::<Vec<_>>();
+            self.validate_support_metadata()
+                .map_err(|error| format!("support metadata admission: {error}"))?;
+            self.validate_support_tick_phases(&current_order, self.rules.movement.tick, boundary)
+                .map_err(|error| format!("support admission: {error}"))?;
+            self.validate_carrier_tick()?;
+            self.validate_construction_tick()?;
+            self.validate_ground_attacks()?;
+            self.validate_reaction_tick_actors()?;
+            self.validate_field_project_tick(&current_order)?;
+        }
         if self
             .field_works
             .jobs()
@@ -371,20 +406,26 @@ impl crate::match_runtime::Match {
             self.apply_commands_observing(boundary, winner_decided, &mut |m, command| {
                 m.observe_tick_command(command)
             })?;
+        self.validate_production_phases(dt)
+            .map_err(|error| format!("production published state: {error:?}"))?;
         // Boundary joins are included in prior poses and the same live unit loop.
         self.prepare_companion_tick()?;
-        self.validate_aircraft_runner_state(boundary)
-            .map_err(|error| format!("aircraft published state: {error}"))?;
-        self.validate_carrier_tick()?;
-        self.validate_ground_attacks()?;
-        self.validate_reaction_tick_actors()?;
-        let current_order = self.world.game.units.keys().copied().collect::<Vec<_>>();
-        self.validate_support_metadata()
-            .map_err(|error| format!("support published metadata: {error}"))?;
-        self.validate_support_tick_phases(&current_order, dt, boundary)
-            .map_err(|error| format!("support published state: {error}"))?;
-        self.validate_field_project_tick(&current_order)?;
-        self.validate_construction_tick()?;
+        if self.options.mode == crate::economy::Mode::World {
+            self.validate_world_tick_adapters(boundary)?;
+        } else {
+            self.validate_aircraft_runner_state(boundary)
+                .map_err(|error| format!("aircraft published state: {error}"))?;
+            self.validate_carrier_tick()?;
+            self.validate_ground_attacks()?;
+            self.validate_reaction_tick_actors()?;
+            let current_order = self.world.game.units.keys().copied().collect::<Vec<_>>();
+            self.validate_support_metadata()
+                .map_err(|error| format!("support published metadata: {error}"))?;
+            self.validate_support_tick_phases(&current_order, dt, boundary)
+                .map_err(|error| format!("support published state: {error}"))?;
+            self.validate_field_project_tick(&current_order)?;
+            self.validate_construction_tick()?;
+        }
         self.tick_environment_phase(EnvironmentPhase::StructureSync, events)?;
         self.grid.rebuild(&self.world.game.units);
         self.capture_firing_prior()?;
@@ -402,8 +443,10 @@ impl crate::match_runtime::Match {
             TickPhase::StructureSync,
             TickPhase::Clock,
         ];
-        self.respawn_companions(winner_decided)?;
-        phases.push(TickPhase::Operative);
+        if self.options.mode != crate::economy::Mode::World {
+            self.respawn_companions(winner_decided)?;
+            phases.push(TickPhase::Operative);
+        }
         self.tick_environment_phase(EnvironmentPhase::Debris, events)?;
         phases.push(TickPhase::Debris);
         if self.options.mode == crate::economy::Mode::World {
@@ -423,15 +466,24 @@ impl crate::match_runtime::Match {
             }
             phases.push(TickPhase::Vision);
         }
+        self.step_research(dt)
+            .map_err(|error| format!("research turn: {error:?}"))?;
+        phases.push(TickPhase::Research);
         // Source paid counts/crew sweep precede the path scheduler and unit queues.
-        self.recount_field_projects()?;
-        phases.push(TickPhase::FieldProjects);
+        if self.options.mode != crate::economy::Mode::World {
+            self.recount_field_projects()?;
+            phases.push(TickPhase::FieldProjects);
+        }
         let config = self.tick_state.paths;
         let paths = self.begin_path_tick(config.budget, config.retry_limit)?;
         phases.push(TickPhase::Paths);
         let claim_order = self.world.game.units.keys().copied().collect::<Vec<_>>();
         self.begin_firing_tick(&claim_order)?;
-        let mut construction = self.begin_construction_tick()?;
+        let mut construction = if self.options.mode == crate::economy::Mode::World {
+            None
+        } else {
+            Some(self.begin_construction_tick()?)
+        };
         let mut moved = Vec::new();
         let mut last_id = None;
         loop {
@@ -472,20 +524,31 @@ impl crate::match_runtime::Match {
             })?;
             let unit = self.world.game.units.get(&id).expect("current unit");
             let kind = &self.rules.kinds[unit.kind];
-            if kind.building && (!kind.weapon || unit.built.is_some_and(|built| built < 1.0)) {
+            let building = kind.building;
+            let building_complete = unit.built.is_some_and(|built| built >= 1.0);
+            let skip_ground =
+                building && (!kind.weapon || unit.built.is_some_and(|built| built < 1.0));
+            // Source advances a completed building's queue before its building continue.
+            if self.options.mode == crate::economy::Mode::World && building && building_complete {
+                self.step_training(id, dt)
+                    .map_err(|error| format!("training turn: {error:?}"))?;
+            }
+            if skip_ground {
                 continue;
             }
-            if self
-                .step_aircraft_turn(id, dt)
-                .map_err(|error| format!("aircraft turn: {error}"))?
-            {
-                continue;
-            }
-            match self.apply_unit_riding(id, dt)? {
-                crate::match_carriers::RidingOutcome::Riding => continue,
-                crate::match_carriers::RidingOutcome::OnFoot => {}
-                crate::match_carriers::RidingOutcome::UnsupportedEjection => {
-                    return Err("thrown carrier ejection tick phase is not connected".into());
+            if self.options.mode != crate::economy::Mode::World {
+                if self
+                    .step_aircraft_turn(id, dt)
+                    .map_err(|error| format!("aircraft turn: {error}"))?
+                {
+                    continue;
+                }
+                match self.apply_unit_riding(id, dt)? {
+                    crate::match_carriers::RidingOutcome::Riding => continue,
+                    crate::match_carriers::RidingOutcome::OnFoot => {}
+                    crate::match_carriers::RidingOutcome::UnsupportedEjection => {
+                        return Err("thrown carrier ejection tick phase is not connected".into());
+                    }
                 }
             }
             let unit = self.world.game.units.get(&id).expect("current unit");
@@ -509,22 +572,28 @@ impl crate::match_runtime::Match {
             self.decrement_reaction_timer(id, dt)?;
             self.automatic_retreat_unit(id)?;
             self.apply_autocast(id)?;
-            self.step_construction_worker(id, &mut construction)?;
-            self.apply_project_unit(id)?;
-            self.apply_field_work_unit(id)?;
+            if let Some(frame) = &mut construction {
+                self.step_construction_worker(id, frame)?;
+                self.apply_project_unit(id)?;
+                self.apply_field_work_unit(id)?;
+            }
             let result = self.step_aimed_ability(id);
             self.take_firing_tick_events(events);
             result?;
             // Entry-building execution remains excluded. Boarding uses its live
             // owner-view goal and the one already-started path scheduler.
-            if matches!(
-                self.apply_unit_boarding_with_routes(id)?,
-                crate::match_carriers::BoardingOutcome::Boarded { .. }
-            ) {
+            if self.options.mode != crate::economy::Mode::World
+                && matches!(
+                    self.apply_unit_boarding_with_routes(id)?,
+                    crate::match_carriers::BoardingOutcome::Boarded { .. }
+                )
+            {
                 continue;
             }
             self.apply_attack_move(id)?;
-            self.apply_ground_attack(id)?;
+            if self.options.mode != crate::economy::Mode::World {
+                self.apply_ground_attack(id)?;
+            }
             self.react_unit(id)?;
             let before = self.world.game.units[&id].at();
             if let Some(result) = self.move_unit_with_command_routes(id, factor)? {
@@ -537,20 +606,28 @@ impl crate::match_runtime::Match {
             self.take_firing_tick_events(events);
             result?;
         }
+        phases.extend([TickPhase::UnitOrders, TickPhase::Abilities]);
+        if self.options.mode != crate::economy::Mode::World {
+            phases.extend([
+                TickPhase::FieldWork,
+                TickPhase::Riding,
+                TickPhase::Aircraft,
+                TickPhase::GroundAttack,
+            ]);
+        }
         phases.extend([
-            TickPhase::UnitOrders,
-            TickPhase::Abilities,
-            TickPhase::FieldWork,
-            TickPhase::Riding,
-            TickPhase::Aircraft,
-            TickPhase::GroundAttack,
             TickPhase::Reactions,
             TickPhase::TrafficKnowledge,
             TickPhase::Movement,
             TickPhase::Firing,
         ]);
-        self.finish_construction_tick(construction)?;
-        phases.push(TickPhase::Construction);
+        if self.options.mode == crate::economy::Mode::World {
+            phases.push(TickPhase::Production);
+        }
+        if let Some(frame) = construction {
+            self.finish_construction_tick(frame)?;
+            phases.push(TickPhase::Construction);
+        }
         let unit_order: Vec<_> = self.world.game.units.keys().copied().collect();
         separation::separate_crowds(&mut self.world.game, &self.rules, &mut self.grid);
         movement::infantry_progress(&mut self.world.game, &self.rules, &moved);
@@ -567,29 +644,35 @@ impl crate::match_runtime::Match {
         phases.push(TickPhase::Projectiles);
         // Source strikes and AA share captured late shooters; current target/grid
         // facts stay live. Radio is read before the later point update.
-        let result = self.step_support_strikes(&unit_order, dt);
-        events.extend(
-            self.support
-                .take_events()
-                .into_iter()
-                .map(TickEvent::Support),
-        );
-        result.map_err(|error| format!("support strikes: {error}"))?;
-        let result = self.step_aircraft_anti_air(&unit_order, dt);
-        events.extend(
-            self.aviation
-                .take_events()
-                .into_iter()
-                .map(TickEvent::Aviation),
-        );
-        result.map_err(|error| format!("aircraft anti-air: {error}"))?;
-        self.advance_support_timers(dt)
-            .map_err(|error| format!("support timers: {error}"))?;
-        phases.extend([
-            TickPhase::Support,
-            TickPhase::AntiAir,
-            TickPhase::SupportTimers,
-        ]);
+        if self.options.mode == crate::economy::Mode::World {
+            self.advance_world_support_timers(dt)
+                .map_err(|error| format!("World support timers: {error}"))?;
+            phases.push(TickPhase::SupportTimers);
+        } else {
+            let result = self.step_support_strikes(&unit_order, dt);
+            events.extend(
+                self.support
+                    .take_events()
+                    .into_iter()
+                    .map(TickEvent::Support),
+            );
+            result.map_err(|error| format!("support strikes: {error}"))?;
+            let result = self.step_aircraft_anti_air(&unit_order, dt);
+            events.extend(
+                self.aviation
+                    .take_events()
+                    .into_iter()
+                    .map(TickEvent::Aviation),
+            );
+            result.map_err(|error| format!("aircraft anti-air: {error}"))?;
+            self.advance_support_timers(dt)
+                .map_err(|error| format!("support timers: {error}"))?;
+            phases.extend([
+                TickPhase::Support,
+                TickPhase::AntiAir,
+                TickPhase::SupportTimers,
+            ]);
+        }
 
         let game = &mut self.world.game;
         let mut smokes: Vec<_> = game
@@ -638,8 +721,10 @@ impl crate::match_runtime::Match {
         let recovery = self.prepare_recovery(&unit_order)?;
         self.heal_and_sweep(&recovery, dt)?;
         phases.push(TickPhase::Recovery);
-        self.apply_point_supply(&unit_order)?;
-        phases.push(TickPhase::PointSupply);
+        if self.options.mode != crate::economy::Mode::World {
+            self.apply_point_supply(&unit_order)?;
+            phases.push(TickPhase::PointSupply);
+        }
         // Network refresh attaches between point supply and prepared reinforcement.
         self.reinforce(&recovery, dt)?;
         phases.push(TickPhase::Reinforcement);
@@ -674,16 +759,35 @@ impl crate::match_runtime::Match {
             events: Vec::new(),
             retired: std::mem::take(&mut retirement.removed),
             world_removed,
-            unavailable: vec![
-                TickPhase::Research,
-                TickPhase::UnitReserves,
-                TickPhase::Production,
-                TickPhase::Rail,
-                TickPhase::GroundEffects,
-                TickPhase::Scenario,
-                TickPhase::SupplyNetwork,
-                TickPhase::Convoys,
-            ],
+            unavailable: if self.options.mode == crate::economy::Mode::World {
+                vec![
+                    TickPhase::UnitReserves,
+                    TickPhase::Operative,
+                    TickPhase::FieldWork,
+                    TickPhase::FieldProjects,
+                    TickPhase::Construction,
+                    TickPhase::Riding,
+                    TickPhase::Aircraft,
+                    TickPhase::GroundAttack,
+                    TickPhase::Support,
+                    TickPhase::AntiAir,
+                    TickPhase::PointSupply,
+                    TickPhase::Rail,
+                    TickPhase::GroundEffects,
+                    TickPhase::Scenario,
+                    TickPhase::SupplyNetwork,
+                ]
+            } else {
+                vec![
+                    TickPhase::UnitReserves,
+                    TickPhase::Production,
+                    TickPhase::Rail,
+                    TickPhase::GroundEffects,
+                    TickPhase::Scenario,
+                    TickPhase::SupplyNetwork,
+                    TickPhase::Convoys,
+                ]
+            },
         })
     }
 

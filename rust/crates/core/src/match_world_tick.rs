@@ -11,6 +11,218 @@ use crate::{
 };
 
 impl Match {
+    /// Admit only the World ground actuators represented by this caller composition.
+    /// No ordinary-mode component error is treated as an inert World phase.
+    pub(crate) fn validate_world_tick_adapters(&self, boundary: u64) -> Result<(), String> {
+        self.validate_world_phase_context(self.rules.movement.tick)?;
+        self.validate_world_path_service()?;
+        self.validate_firing_tick_state()?;
+        self.validate_firing_grenade_step(self.rules.movement.tick)?;
+        if !self.firing.salvos.is_empty() {
+            return Err("World physical salvo tick actuator is not connected".into());
+        }
+        self.validate_world_support_timers(self.rules.movement.tick)
+            .map_err(|error| format!("World support timers: {error}"))?;
+        self.validate_building_activity_rows()?;
+        self.validate_match_finish_state()?;
+        if self.scenario.is_some()
+            || !self.start.points.is_empty()
+            || !self.companions.records.is_empty()
+            || !self.companions.soldiers.is_empty()
+            || !self.aviation.planes.is_empty()
+            || !self.aviation.anti_air.is_empty()
+            || !self.field_works.jobs().is_empty()
+            || self.field_works.projects().next().is_some()
+        {
+            return Err(
+                "World tick has unrepresented scenario, operative, aircraft or work state".into(),
+            );
+        }
+        let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
+        for (&id, unit) in &self.world.game.units {
+            self.validate_world_command_prelude(id)?;
+            if unit.hp > 0.0 {
+                self.validate_firing_weapon_metadata(unit)?;
+            }
+            let control = &self.commands.units[&id];
+            let metadata = self
+                .combat
+                .get(id)
+                .ok_or("missing World tick combat metadata")?;
+            if !metadata.cargo.is_empty() || metadata.carrier.is_some() {
+                return Err("World carrier tick phases are not connected".into());
+            }
+            let kind = &self.rules.kinds[unit.kind];
+            if kind.naval {
+                return Err("World naval tick phase is not connected".into());
+            }
+            let definition = catalog.unit(&kind.name).map_err(|e| e.to_string())?;
+            if kind.building
+                && unit.hp > 0.0
+                && (unit.built.is_none_or(|built| built < 1.0)
+                    || definition
+                        .get("gate")
+                        .is_some_and(|gate| !matches!(gate, Value::Null | Value::Bool(false))))
+            {
+                return Err("World construction or gate tick phase is not connected".into());
+            }
+            if !control.hold_fire
+                && definition
+                    .get("w")
+                    .and_then(|weapon| weapon.get("salvo"))
+                    .is_some_and(|salvo| !matches!(salvo, Value::Null | Value::Bool(false)))
+            {
+                return Err("World automatic salvo tick actuator is not connected".into());
+            }
+            if !control.react.is_finite()
+                || !(control.react - self.rules.movement.tick).is_finite()
+                || !metadata.hit_at.is_finite()
+                || unit
+                    .hit_from
+                    .is_some_and(|at| !at.x.is_finite() || !at.z.is_finite())
+            {
+                return Err("invalid World reaction tick facts".into());
+            }
+            if control.auto_cast
+                && matches!(
+                    self.ability_kind(id)?,
+                    crate::match_abilities::AbilityKind::Grenade
+                        | crate::match_abilities::AbilityKind::Satchel
+                        | crate::match_abilities::AbilityKind::Smoke
+                        | crate::match_abilities::AbilityKind::Barrage
+                )
+            {
+                return Err("World aimed autocast routing is not connected".into());
+            }
+            for waiting in &control.orders {
+                self.validate_world_tick_command(waiting)?;
+            }
+        }
+        for (_, command) in self.commands.queue.pending_tick(boundary) {
+            self.validate_world_tick_command(command)?;
+        }
+        // The generic producer admits mode-consistent jobs; this caller connects
+        // only ground births and must refuse unsupported future actor kinds now.
+        for (_, building) in self.production.buildings() {
+            for job in building.jobs() {
+                let kind = self
+                    .rules
+                    .kind(&job.kind)
+                    .ok_or("invalid World queued birth kind")?;
+                let kind = &self.rules.kinds[kind];
+                if kind.air || kind.rail || kind.naval {
+                    return Err("World queued birth requires an unrepresented actor phase".into());
+                }
+            }
+        }
+        self.validate_world_tick_region_consequences()?;
+        let ids = self.world.game.units.keys().copied().collect::<Vec<_>>();
+        self.validate_dead_retirement(&ids, boundary)
+            .map_err(|error| format!("World retirement admission: {error:?}"))?;
+        self.prepare_recovery(&ids)?;
+        Ok(())
+    }
+
+    /// A region can advance by at most one capture increment in this tick.
+    /// Refuse an unrepresented fort transfer before commands, even if the fort dies later.
+    fn validate_world_tick_region_consequences(&self) -> Result<(), String> {
+        let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
+        let span = catalog
+            .table("CFG")
+            .map_err(|e| e.to_string())?
+            .get("captureTime")
+            .and_then(Value::number)
+            .filter(|time| time.is_finite() && *time > 0.0)
+            .ok_or("invalid World capture duration")?;
+        let rate = self.rules.movement.tick / span;
+        if !rate.is_finite() || !(0.0..1.0).contains(&rate) {
+            return Err("World capture interval exceeds the bounded tick admission".into());
+        }
+        let runtime = self
+            .world_runtime
+            .as_ref()
+            .ok_or("missing World tick runtime")?;
+        for (index, region) in runtime.regions.iter().enumerate() {
+            if !region.progress.is_finite()
+                || !(0.0..=1.0).contains(&region.progress)
+                || !(-1..6).contains(&region.team)
+                || region
+                    .capper
+                    .is_some_and(|slot| slot >= self.world.game.players.len())
+            {
+                return Err("invalid World tick region progress".into());
+            }
+            // Owned regions only neutralize this step. A new or changed capper resets
+            // progress to zero, so only this retained capper can complete at the limit.
+            let Some(owner) = region
+                .capper
+                .filter(|_| region.team < 0 && region.progress + rate >= 1.0)
+            else {
+                continue;
+            };
+            for unit in self.world.game.units.values() {
+                if unit.hp > 0.0
+                    && ["pillbox", "tower", "wall", "gate"]
+                        .contains(&self.rules.kinds[unit.kind].name.as_str())
+                    && !self.world.game.allied(unit.owner, owner)
+                    && self.world_region_index(unit.at())? == Some(index)
+                {
+                    return Err("World fort capture tick actuator is not connected".into());
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_world_tick_command(
+        &self,
+        command: &crate::match_commands::Command,
+    ) -> Result<(), String> {
+        use crate::match_commands::Command;
+        match command {
+            Command::Move { .. }
+            | Command::Stop { .. }
+            | Command::Stance { .. }
+            | Command::Destroy { .. }
+            | Command::Technology { .. } => Ok(()),
+            Command::Autocast { ids, on }
+                if !*on
+                    || ids.iter().all(|raw| {
+                        u32::try_from(*raw)
+                            .ok()
+                            .filter(|id| self.world.game.units.contains_key(id))
+                            .is_none_or(|id| {
+                                self.ability_kind(id).is_ok_and(|kind| {
+                                    !matches!(
+                                        kind,
+                                        crate::match_abilities::AbilityKind::Grenade
+                                            | crate::match_abilities::AbilityKind::Satchel
+                                            | crate::match_abilities::AbilityKind::Smoke
+                                            | crate::match_abilities::AbilityKind::Barrage
+                                    )
+                                })
+                            })
+                    }) =>
+            {
+                Ok(())
+            }
+            Command::Ability {
+                at: None,
+                queue: false,
+                ..
+            } => Ok(()),
+            Command::Buy { kind, .. }
+                if self.rules.kind(kind).is_some_and(|index| {
+                    let kind = &self.rules.kinds[index];
+                    !kind.air && !kind.rail && !kind.naval
+                }) =>
+            {
+                Ok(())
+            }
+            _ => Err("World command requires an unrepresented tick actuator".into()),
+        }
+    }
+
     /// Final upkeep facts retain the captured order even after actual ordinary removal.
     /// An incomplete removal/callback prefix cannot advance the World economy.
     pub fn world_tick_income_facts(

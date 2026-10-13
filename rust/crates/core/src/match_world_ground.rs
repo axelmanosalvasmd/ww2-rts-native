@@ -89,7 +89,7 @@ impl Match {
                 || unit.dig
                 || unit.entrench
                 || unit.build
-                || self.firing.get(unit.id).is_none_or(|f| f.target_id != 0)
+                || self.firing.get(unit.id).is_none()
             {
                 return Err("World tactical route branch is not connected".into());
             }

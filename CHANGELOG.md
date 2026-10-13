@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Retain the existing live-flight, grenade-ticket and weapon-metadata guards as shared read-only admission before World commands. Source review caught malformed firing timers and XP that otherwise failed after a queued payment; the new whole-boundary test preserves the real recorded input and wallet on refusal. Ground-only World admission also rejects restored queued naval/AIR/rail births before later publication. These source repairs and tests remain unrun.
+
+- Wire real World ground tick orchestration through canonical actor, routing, recovery and final-object owners. Research runs after vision, completed buildings train at their live turn, and final captured income precedes real convoys and current-region capture. Read-only admission refuses unrepresented logistics, AIR, rail, carrier, construction, shared work, explicit tactical and support capabilities before commands or clock. A near-complete neutral-region fort transfer refuses before the tick. Ordinary research is now connected through the same checked helper while ordinary restored training queues still refuse. Native verification remains pending.
+
+- Add a trusted fresh-scene finish hook that stages the existing canonical finish/sample before publication. Fresh queue, clock, runner, output and finish guards prevent replay rollback or input consumption. The real World finish witness covers declared Nations input and atomic refusals without resetting native random state; tests remain unrun.
+
+- Preserve all eight original World traces and add one separately authored wind/wallet scene with real tier research and a paid HQ rifle queue. Pinned x64 Source check passes nine scenes, 118 steps and 1,538 phase entries, with pristine replay agreement and byte-identical old case bodies. The new complete-state consumer intends 58 actual native steps and two logistics constructor refusals. Original constructor wind correspondence remains unproven; source-fixed random input is not a native constructor RNG claim.
+
+
 - Normally include the source-reviewed production admission and original research recorder in the separate World caller. Preserve ordinary restored-queue refusals and existing World publication ownership. Actual phase wiring and coherent native verification remain pending.
 
 - Preserve the actual findPath endpoint when a spacing or cover reaction publishes its accepted route. The existing canonical control is admitted before routing; endpoint publication occurs with the final Unit/control commit, with no inferred outcome or second route store. A real World spacing reaction now checks cold-to-warm memory, the authored cover endpoint and unchanged random state, bringing the continuation to eight source-written tests. Native execution remains pending.

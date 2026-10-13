@@ -1812,13 +1812,6 @@ impl crate::match_runtime::Match {
     fn command_shootable(&self) -> Result<BTreeMap<UnitId, bool>, String> {
         if self.uses_world_routes() {
             self.validate_world_path_service()?;
-            return Ok(self
-                .world
-                .game
-                .units
-                .keys()
-                .map(|&id| (id, false))
-                .collect());
         }
         self.world
             .game

@@ -738,9 +738,8 @@ impl Match {
         }
         Ok(true)
     }
-    /// Advance every live round after the source unit loop and crowd separation.
-    /// New rounds born at this tick have no traveled interval until the next tick.
-    pub fn step_firing_flights(&mut self) -> Result<(), String> {
+    /// Read-only unit and active-flight admission shared by the caller and actuator.
+    pub(crate) fn validate_firing_tick_state(&self) -> Result<(), String> {
         self.supported_firing_mode()?;
         if !(0..=9_007_199_254_740_351).contains(&self.world.game.tick) {
             return Err("invalid flight tick".into());
@@ -807,6 +806,13 @@ impl Match {
                 }
             }
         }
+        Ok(())
+    }
+
+    /// Advance every live round after the source unit loop and crowd separation.
+    /// New rounds born at this tick have no traveled interval until the next tick.
+    pub fn step_firing_flights(&mut self) -> Result<(), String> {
+        self.validate_firing_tick_state()?;
         let now = self.world.game.tick as f64 * 0.05;
         let tick_start = now - 0.05;
         let ids: Vec<_> = self.firing.flights.keys().copied().collect();
@@ -1372,6 +1378,24 @@ impl Match {
     }
     /// Run one unit's source targeting/firing block after its movement and grid update.
     /// Timer decay is caller-owned through advance_firing_timers before movement.
+    /// The same metadata guard used at the real weapon turn, without any mutation.
+    pub(crate) fn validate_firing_weapon_metadata(&self, u: &Unit) -> Result<(), String> {
+        if self
+            .firing
+            .get(u.id)
+            .is_some_and(|r| !r.cooldown.is_finite() || !r.retarget.is_finite())
+            || self
+                .combat
+                .get(u.id)
+                .is_some_and(|r| !r.xp.is_finite() || r.xp < 0.0 || !r.hit_at.is_finite())
+            || u.hit_from
+                .is_some_and(|p| !p.x.is_finite() || !p.z.is_finite())
+        {
+            return Err("invalid canonical weapon metadata".into());
+        }
+        Ok(())
+    }
+
     pub fn apply_unit_firing(&mut self, id: UnitId, moving: bool, dt: f64) -> Result<(), String> {
         self.supported_firing_mode()?;
         if !dt.is_finite() || dt < 0.0 {
@@ -1391,19 +1415,7 @@ impl Match {
         {
             return Err("invalid canonical weapon unit".into());
         }
-        if self
-            .firing
-            .get(id)
-            .is_some_and(|r| !r.cooldown.is_finite() || !r.retarget.is_finite())
-            || self
-                .combat
-                .get(id)
-                .is_some_and(|r| !r.xp.is_finite() || r.xp < 0.0 || !r.hit_at.is_finite())
-            || u.hit_from
-                .is_some_and(|p| !p.x.is_finite() || !p.z.is_finite())
-        {
-            return Err("invalid canonical weapon metadata".into());
-        }
+        self.validate_firing_weapon_metadata(u)?;
         let kind = &self.rules.kinds[u.kind];
         let control = self
             .commands
@@ -2403,9 +2415,8 @@ impl Match {
         });
         Ok((first..end).collect())
     }
-    /// Run after step_firing_flights, before the salvo timer phase. Linked tickets
-    /// expire/prune with source timing and never apply a second grenade blast.
-    pub fn advance_firing_grenades(&mut self, dt: f64) -> Result<(), String> {
+    /// Read-only linked-ticket admission without a timer write or effect emission.
+    pub(crate) fn validate_firing_grenade_step(&self, dt: f64) -> Result<(), String> {
         self.supported_firing_mode()?;
         if !dt.is_finite()
             || !(0.0..=640.0).contains(&dt)
@@ -2419,6 +2430,13 @@ impl Match {
         {
             return Err("invalid grenade timer step".into());
         }
+        Ok(())
+    }
+
+    /// Run after step_firing_flights, before the salvo timer phase. Linked tickets
+    /// expire/prune with source timing and never apply a second grenade blast.
+    pub fn advance_firing_grenades(&mut self, dt: f64) -> Result<(), String> {
+        self.validate_firing_grenade_step(dt)?;
         for n in &mut self.firing.grenades {
             n.remaining -= dt;
         }

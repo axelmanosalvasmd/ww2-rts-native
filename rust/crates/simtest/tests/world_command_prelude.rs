@@ -1,11 +1,12 @@
-//! World pre-timer command facts on an actual native World constructor.
-//! These component witnesses do not advance a World tick or service a path scheduler.
+//! World command, finish and retirement facts on an actual native World constructor.
+//! Component witnesses accompany one quiet turn through the sole tick runner.
 use serde_json::{Value, json};
 use ww2_core::{
     economy::Mode,
     game::{LOCAL_DEFENDER_OWNER, ModeKind, Point, Unit},
     logistics::Reserves,
     match_commands::{MoveOutcome, MoveResult},
+    match_end::{EndReason, MatchFinish, MatchSample},
     match_runtime::Match,
 };
 // This file uses only the shared real constructor, not restored phase scenes.
@@ -20,6 +21,413 @@ fn scene() -> Match {
     assert_eq!(m.world.game.mode, Some(ModeKind::World));
     assert!(m.world_runtime.is_some());
     m
+}
+
+#[test]
+fn fresh_world_scene_finish_publishes_one_terminal_sample_and_refuses_reinitialization() {
+    fn retained(m: &Match) -> String {
+        format!(
+            "{:?}",
+            (
+                m.world.game.tick,
+                m.commands.next_tick(),
+                m.commands.pending_commands(),
+                &m.start.economy,
+                m.start.random.snapshot(),
+                m.start.environment_seed,
+                &m.world.game.units,
+                &m.commands.units,
+                &m.grid,
+                &m.tick_state,
+            )
+        )
+    }
+    fn terminal(m: &Match) -> String {
+        format!("{:?}", (m.finish, &m.timeline, m.world.game.reveal))
+    }
+
+    let mut m = scene();
+    assert_eq!(m.world.game.tick, 0);
+    assert_eq!(m.commands.next_tick(), Some(1));
+    assert_eq!(m.commands.pending_commands(), 0);
+    assert!(m.finish.is_none() && !m.world.game.reveal && m.timeline.is_empty());
+    let mut structures = vec![0.0; 2];
+    for unit in m.world.game.units.values() {
+        if unit.hp > 0.0 && m.rules.kinds[unit.kind].structure && unit.owner != LOCAL_DEFENDER_OWNER
+        {
+            structures[m.start.economy.players[unit.owner].team as usize] += 1.0;
+        }
+    }
+    assert!(structures.iter().all(|n| *n > 0.0));
+    let mut points = vec![0.0; 2];
+    for point in &m.start.points {
+        if let Some(owner) = point.owner {
+            points[m.start.economy.players[owner].team as usize] += 1.0;
+        }
+    }
+    let before = retained(&m);
+    let at = Point { x: 512.0, z: 512.0 };
+    let finish = m
+        .initialize_tick_scene_finish(0, EndReason::Nations, Some(at))
+        .unwrap();
+    assert_eq!(
+        finish,
+        MatchFinish {
+            winner: 0,
+            reason: EndReason::Nations,
+            end_at: at,
+            end_tick: 0
+        }
+    );
+    assert_eq!(m.finish, Some(finish));
+    assert!(m.world.game.reveal);
+    assert_eq!(
+        m.timeline,
+        vec![MatchSample::Territories {
+            t: 0.0,
+            points,
+            structures
+        }]
+    );
+    assert_eq!(
+        retained(&m),
+        before,
+        "finishing does not advance or consume the scene"
+    );
+    let terminal_before = terminal(&m);
+    assert!(
+        m.initialize_tick_scene_finish(1, EndReason::Nations, Some(at))
+            .is_err()
+    );
+    assert_eq!(retained(&m), before);
+    assert_eq!(
+        terminal(&m),
+        terminal_before,
+        "repeat finish cannot append another sample"
+    );
+
+    for refusal in ["winner", "position", "queued", "clock"] {
+        let mut m = scene();
+        let (winner, end_at, reason) = match refusal {
+            "winner" => (9, at, "unknown winning team"),
+            "position" => (
+                0,
+                Point {
+                    x: f64::NAN,
+                    z: at.z,
+                },
+                "invalid Match end position",
+            ),
+            "queued" => {
+                let id = m
+                    .world
+                    .game
+                    .units
+                    .values()
+                    .find(|u| u.owner == 0 && m.rules.kinds[u.kind].infantry)
+                    .unwrap()
+                    .id;
+                m.enqueue_command(
+                    ww2_core::orders::OrderKey {
+                        tick: 1,
+                        issuer: 0,
+                        sequence: 0,
+                    },
+                    ww2_core::match_commands::Command::Stop {
+                        ids: vec![i64::from(id)],
+                    },
+                )
+                .unwrap();
+                assert_eq!(m.commands.pending_commands(), 1);
+                (0, at, "fresh unfinished empty command queue")
+            }
+            "clock" => {
+                m.initialize_tick_scene(1, Default::default()).unwrap();
+                assert_eq!(m.world.game.tick, 1);
+                assert_eq!(m.commands.next_tick(), Some(2));
+                (0, at, "fresh unfinished empty command queue")
+            }
+            _ => unreachable!(),
+        };
+        let before = retained(&m);
+        let terminal_before = terminal(&m);
+        let error = m
+            .initialize_tick_scene_finish(winner, EndReason::Nations, Some(end_at))
+            .unwrap_err();
+        assert!(error.contains(reason), "{refusal}: {error}");
+        assert_eq!(retained(&m), before, "{refusal} must preserve scene state");
+        assert_eq!(
+            terminal(&m),
+            terminal_before,
+            "{refusal} must not publish a finish"
+        );
+    }
+}
+
+#[test]
+fn world_tick_retires_a_real_casualty_before_income_and_refuses_scene_finish_after_start() {
+    let mut m = scene();
+    for (&id, unit) in &mut m.world.game.units {
+        unit.hold_pos = true;
+        let control = m.commands.units.get_mut(&id).unwrap();
+        control.hold_fire = true;
+        control.auto_cast = false;
+    }
+    let id = m
+        .world
+        .game
+        .units
+        .values()
+        .find(|u| {
+            let kind = &m.rules.kinds[u.kind];
+            let combat = m.combat.get(u.id).unwrap();
+            u.owner == 0
+                && u.hp > 0.0
+                && kind.infantry
+                && !kind.structure
+                && !kind.air
+                && !kind.rail
+                && u.garrison.is_none()
+                && !u.riding
+                && combat.cargo.is_empty()
+                && combat.carrier.is_none()
+        })
+        .expect("the actual World constructor supplies a commander ground infantry actor")
+        .id;
+    assert!(!m.world.game.allied(0, 1));
+    m.world.game.units.get_mut(&id).unwrap().hp = 0.0;
+    m.combat.get_mut(id).unwrap().last_hit = Some(1);
+    let casualty = m.world.game.units[&id].clone();
+    let catalog = ww2_core::catalog::Catalog::compiled().unwrap();
+    let cost = catalog
+        .unit(&m.rules.kinds[casualty.kind].name)
+        .unwrap()
+        .get("cost")
+        .unwrap()
+        .number()
+        .unwrap();
+    let bounty = catalog
+        .table("CFG")
+        .unwrap()
+        .get("bounty")
+        .unwrap()
+        .number()
+        .unwrap();
+    let wallets = m.start.economy.clone();
+    let stories = m.story.clone();
+    let rng = m.start.random.snapshot();
+    let dt = m.rules.movement.tick;
+    let report = m
+        .advance_tick()
+        .expect("actual quiet World turn must finish all admitted phases");
+    assert_eq!(report.tick, 1);
+    assert_eq!(m.world.game.tick, 1);
+    assert_eq!(m.commands.next_tick(), Some(2));
+    assert!(
+        report.unit_order.contains(&id),
+        "the late captured list contains the actual casualty"
+    );
+    assert!(!m.world.game.units.contains_key(&id));
+    assert_eq!(
+        report.retired.len(),
+        1,
+        "only the authored casualty was retired"
+    );
+    let retired = &report.retired[0];
+    same_unit(&retired.unit, &casualty);
+    assert_eq!(retired.last_hit, Some(1));
+    assert_eq!(retired.enemy_killer, Some(1));
+    assert!(
+        report.world_removed.is_empty(),
+        "ordinary death is not administrative elimination"
+    );
+    for (slot, before) in stories.iter().enumerate() {
+        let mut expected = *before;
+        expected.losses += if slot == 0 { 1.0 } else { 0.0 };
+        expected.kills += if slot == 1 { 1.0 } else { 0.0 };
+        assert_eq!(
+            m.story[slot], expected,
+            "exactly one commander loss and enemy kill"
+        );
+    }
+    for (slot, before) in wallets.players.iter().enumerate() {
+        let after = &m.start.economy.players[slot];
+        let expected = (before.mp + if slot == 1 { cost * bounty } else { 0.0 }) + after.inc * dt;
+        assert_eq!(
+            after.mp.to_bits(),
+            expected.to_bits(),
+            "commander {slot}: bounty is paid once before actual World income"
+        );
+    }
+    use ww2_core::match_tick::TickPhase;
+    let phase = |wanted| {
+        assert_eq!(report.phases.iter().filter(|p| **p == wanted).count(), 1);
+        report.phases.iter().position(|p| *p == wanted).unwrap()
+    };
+    assert!(phase(TickPhase::Death) < phase(TickPhase::WorldIncome));
+    assert!(phase(TickPhase::WorldIncome) < phase(TickPhase::Convoys));
+    assert!(phase(TickPhase::Convoys) < phase(TickPhase::WorldRegions));
+    assert!(m.tick_state.fault().is_none());
+    assert_eq!(m.start.random.snapshot(), rng);
+    assert!(m.finish.is_none());
+    let state = |m: &Match| {
+        format!(
+            "{:?}",
+            (
+                (
+                    m.world.game.tick,
+                    m.commands.next_tick(),
+                    m.commands.pending_commands(),
+                    m.finish,
+                    &m.timeline,
+                    m.world.game.reveal,
+                    &m.start.economy,
+                ),
+                (
+                    m.start.random.snapshot(),
+                    m.start.environment_seed,
+                    &m.story,
+                    &m.world.game.units,
+                    &m.commands.units,
+                    &m.grid,
+                    &m.tick_state,
+                ),
+            )
+        )
+    };
+    let before = state(&m);
+    assert!(
+        m.initialize_tick_scene_finish(0, EndReason::Nations, Some(Point { x: 512.0, z: 512.0 }))
+            .unwrap_err()
+            .contains("fresh unfinished empty command queue")
+    );
+    assert_eq!(
+        state(&m),
+        before,
+        "a genuinely started World turn cannot be reinitialized with a scene finish"
+    );
+}
+
+#[test]
+fn world_firing_admission_refuses_before_a_recorded_technology_payment_or_boundary() {
+    use ww2_core::{economy::Technology, match_commands::Command, orders::OrderKey};
+    let mut m = scene();
+    // Declared technology input enables the actual command's existing purchase gate.
+    m.options.tech = true;
+    for (&id, unit) in &mut m.world.game.units {
+        unit.hold_pos = true;
+        let control = m.commands.units.get_mut(&id).unwrap();
+        control.hold_fire = true;
+        control.auto_cast = false;
+    }
+    let research = m.production.player(0).unwrap();
+    assert!(research.jobs().is_empty());
+    let cost = ww2_core::economy::tech_cost(research.tech(), Technology::Tier, Mode::World)
+        .unwrap()
+        .expect("the real constructor has a purchasable next tier");
+    assert!(cost.mp > 0.0);
+    m.start.economy.players[0].mp = cost.mp + 100.0;
+    m.start.economy.players[0].mun = cost.mun + 100.0;
+    assert!(!m.start.economy.players[0].out && !m.start.economy.players[0].away);
+    assert!(
+        m.world.game.units.values().any(|unit| {
+            unit.owner == 0
+                && unit.hp > 0.0
+                && unit.built.is_some_and(|built| built >= 1.0)
+                && m.rules.kinds[unit.kind].name == "hq"
+        }),
+        "the real World constructor supplies the required tier laboratory"
+    );
+    m.enqueue_command(
+        OrderKey {
+            tick: 1,
+            issuer: 0,
+            sequence: 0,
+        },
+        Command::Technology {
+            kind: Technology::Tier,
+        },
+    )
+    .unwrap();
+    assert_eq!(m.commands.pending_commands(), 1);
+    assert_eq!(m.commands.next_tick(), Some(1));
+    let id = m
+        .world
+        .game
+        .units
+        .values()
+        .find(|u| u.owner == 0 && m.rules.kinds[u.kind].infantry)
+        .unwrap()
+        .id;
+    m.firing.get_mut(id).unwrap().cooldown = f64::from_bits(0x7ff8_0000_0000_0123);
+    let firing_bits = |m: &Match| {
+        m.firing
+            .units
+            .iter()
+            .map(|(&id, row)| {
+                (
+                    id,
+                    row.target_id,
+                    row.cooldown.to_bits(),
+                    row.retarget.to_bits(),
+                )
+            })
+            .collect::<Vec<_>>()
+    };
+    let metadata = firing_bits(&m);
+    let commands = format!("{:?}", m.commands);
+    let production = format!("{:?}", m.production);
+    let units = format!("{:?}", m.world.game.units);
+    let grid = format!("{:?}", m.grid);
+    let firing = format!("{:?}", m.firing);
+    let tick_state = format!("{:?}", m.tick_state);
+    let wallets = m.start.economy.clone();
+    let story = m.story.clone();
+    let rng = m.start.random.snapshot();
+    let seed = m.start.environment_seed;
+    assert!(
+        m.firing.events.is_empty() && m.support.events.is_empty() && m.aviation.events.is_empty()
+    );
+    let failure = m
+        .advance_tick()
+        .expect_err("canonical firing admission must reject the whole boundary");
+    assert!(
+        failure.reason.contains("invalid canonical firing unit"),
+        "{}",
+        failure.reason
+    );
+    assert_eq!(failure.tick, 0);
+    assert!(failure.events.is_empty());
+    assert_eq!(
+        failure.retirement,
+        ww2_core::match_combat::RetirementProgress::default()
+    );
+    assert_eq!(m.world.game.tick, 0);
+    assert_eq!(m.commands.next_tick(), Some(1));
+    assert_eq!(m.commands.pending_commands(), 1);
+    assert_eq!(
+        format!("{:?}", m.commands),
+        commands,
+        "the actual queued Technology order remains pending"
+    );
+    assert_eq!(format!("{:?}", m.production), production);
+    assert_eq!(format!("{:?}", m.world.game.units), units);
+    assert_eq!(format!("{:?}", m.grid), grid);
+    assert_eq!(format!("{:?}", m.firing), firing);
+    assert_eq!(
+        firing_bits(&m),
+        metadata,
+        "the NaN payload and every firing row retain their exact bits"
+    );
+    assert_eq!(format!("{:?}", m.tick_state), tick_state);
+    assert!(m.tick_state.fault().is_none());
+    assert_eq!(m.start.economy, wallets);
+    assert_eq!(m.story, story);
+    assert_eq!(m.start.random.snapshot(), rng);
+    assert_eq!(m.start.environment_seed, seed);
+    assert!(
+        m.firing.events.is_empty() && m.support.events.is_empty() && m.aviation.events.is_empty()
+    );
 }
 
 fn same_unit(actual: &Unit, expected: &Unit) {

@@ -6,7 +6,7 @@ import {execFileSync} from 'node:child_process';
 import {registerHooks} from 'node:module';
 import {resolve} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
-import {gzipSync} from 'node:zlib';
+import {gzipSync,gunzipSync} from 'node:zlib';
 const root=fileURLToPath(new URL('../',import.meta.url));
 const ref=resolve(process.env.WW2_REFERENCE??`${root}/reference/ww2-rts`);
 const pin='e4e579a838aabae3b1d9dadbc17a0a87147bc52d';
@@ -49,6 +49,9 @@ const pristine=await import(`${simURL}?world-tick-pristine`);
 const regions=Array.from({length:64},(_,i)=>({id:i,x:i%8*64+32,y:Math.floor(i/8)*64+32,kind:'rural',bounds:[i%8*64,Math.floor(i/8)*64,i%8*64+64,Math.floor(i/8)*64+64],...(i===0?{home:0}:i===63?{home:1}:{})}));
 const map={name:'World controller ordering',w:512,h:512,rows:Array(512).fill('.'.repeat(512)),spawns:[{x:32,y:32},{x:480,y:480}],points:[],world:{size:'huge',total:64,regionCells:64,regionMap:Array.from({length:512*512},(_,c)=>Math.floor(Math.floor(c/512)/64)*8+Math.floor(c%512/64)),regions}};
 const cases=[];
+const path=`${root}/rust/crates/simtest/tests/fixtures/world-tick.json.gz`;
+const originalCases=JSON.parse(gunzipSync(readFileSync(path))).cases.slice(0,8);
+assert.equal(originalCases.length,8,'Preserve all eight predecessor scenes');
 const buffer=new DataView(new ArrayBuffer(8));
 const bits=n=>{buffer.setFloat64(0,n);return buffer.getBigUint64(0).toString(16).padStart(16,'0');};
 const copy=v=>v instanceof Map?[...v].map(([k,v])=>[copy(k),copy(v)]):v instanceof Set?[...v].map(copy):ArrayBuffer.isView(v)?[...v]:Array.isArray(v)?v.map(copy):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).filter(([,v])=>v!==undefined&&typeof v!=='function').map(([k,v])=>[k,copy(v)])):v;
@@ -71,7 +74,7 @@ const incomeFacts=u=>({id:u.id,owner:u.owner,type:u.type,hp:u.hp});
 const wallet=p=>({slot:p.slot,team:p.team,mp:p.mp,inc:p.inc,upkeep:p.upkeep??null,
  mun:p.mun??null,fuel:p.fuel??null,fuelInc:p.fuelInc??null,away:!!p.away,out:!!p.out,spawn:copy(p.spawn)});
 function canonical(g){
- return exact({tick:g.tick,visionTick:g.visionTick,nextId:g.nextId,nextFlight:g.nextFlight,seed:g.seed,wind:g.wind,wx:g.wx??null,
+ return exact({tick:g.tick,visionTick:g.visionTick,nextId:g.nextId,nextFlight:g.nextFlight,...(g.nextProductionJob!==undefined?{nextProductionJob:g.nextProductionJob}:{}),seed:g.seed,wind:g.wind,wx:g.wx??null,
   mode:g.mode,army:g.army,pointSupply:g.supply,logisticsEnabled:g.logisticsEnabled,
   units:[...g.units.values()],commanders:g.players.map(copy),localDefender:copy(g.players[-1]),
   regions:g.world.regions,nodes:g.nodes,points:g.points,story:g.story??null,timeline:g.timeline??null,fallen:g.fallen??null,
@@ -122,10 +125,12 @@ function sourceRandom(){
   sites.set(site,(sites.get(site)??0)+1);return .5;
  },snapshot:()=>({count,sites:[...sites].map(([site,count])=>({site,count}))})};
 }
-function setup(module,{supply,logistics,lose,death,capture,shortage,decided,guardSnap},observed){
+function setup(module,{supply,logistics,lose,death,capture,shortage,decided,guardSnap,wind,commanderWallet},observed){
  const g=module.createGame(map,['A','B'],false,[0,1],[0,0],{mode:'world',tech:true,weather:false,supply,logistics});
  for(const u of g.units.values()){u.holdPos=true;u.holdFire=true;u.auto=false;}
  const authored=[];
+ if(wind)g.wind={a:wind.a,v:wind.s};
+ if(commanderWallet){Object.assign(g.players[commanderWallet.commander],{mp:commanderWallet.mp,mun:commanderWallet.mun});authored.push(copy(commanderWallet));}
  if(lose)for(const r of g.world.regions)if(r.team===0){r.team=-1;r.progress=0;authored.push({region:r.id,team:-1,progress:0});}
  const corpse=death?[...g.units.values()].find(u=>u.owner===0&&u.type==='rifle'):null;
  if(corpse){corpse.hp=0;corpse.lastHit=1;authored.push({unit:corpse.id,hp:0,lastHit:1});}
@@ -145,9 +150,9 @@ function setup(module,{supply,logistics,lose,death,capture,shortage,decided,guar
  if(observed)g.__worldTickTrace=[];
  return {g,corpse,capturedRegion,guardId,authored,finishInput};
 }
-function record(name,{until=1,supply=false,logistics=false,lose=false,death=false,capture=false,shortage=false,decided=false,guardSnap=false}={}){
+function record(name,{until=1,supply=false,logistics=false,lose=false,death=false,capture=false,shortage=false,decided=false,guardSnap=false,wind,commanderWallet,commands}={}){
  const save=Math.random,observedRandom=sourceRandom(),plainRandom=sourceRandom();
- const options={supply,logistics,lose,death,capture,shortage,decided,guardSnap};
+ const options={supply,logistics,lose,death,capture,shortage,decided,guardSnap,wind,commanderWallet};
  try{
   Math.random=()=>observedRandom.next();const observed=setup(sim,options,true);
   Math.random=()=>plainRandom.next();const unobserved=setup(pristine,options,false);
@@ -175,6 +180,18 @@ function record(name,{until=1,supply=false,logistics=false,lose=false,death=fals
     return Array.prototype.push.apply(this,shots);
    }});
    observedRandom.setStage(`tick${tick}`);plainRandom.setStage(`tick${tick}`);
+   if(commands){
+    const receipts=[],commandState=game=>({commanders:game.players.map(p=>({slot:p.slot,mp:p.mp,mun:p.mun,tier:p.tier,lab:copy(p.lab)})),production:[...game.units.values()].filter(u=>u.productionJobs!==undefined).map(u=>({id:u.id,queue:copy(u.queue),prog:u.prog,jobs:copy(u.productionJobs)})),nextProductionJob:game.nextProductionJob??null});
+    for(const[index,input]of commands.entries())if(input.tick===tick){
+     const before=commandState(g);
+     Math.random=()=>observedRandom.next();const result=sim.command(g,input.slot,copy(input.command));
+     Math.random=()=>plainRandom.next();const plainResult=pristine.command(baseline,input.slot,copy(input.command));
+     assert.equal(result,plainResult,`${name}:${tick}: original command receipt`);assert.equal(result,undefined,`${name}:${tick}: actual command admission`);
+     assert.deepEqual(canonical(g),canonical(baseline),`${name}:${tick}: observer changed original command state`);
+     receipts.push({index,slot:input.slot,result:result??null,before,after:commandState(g)});
+    }
+    currentFrame.commandReceipts=exact(receipts);
+   }
    Math.random=()=>observedRandom.next();sim.step(g);
    Math.random=()=>plainRandom.next();pristine.step(baseline);
    assert.deepEqual(appended,g.shots.slice(start),`${name}:${tick}: chronological original append order`);
@@ -218,10 +235,23 @@ function record(name,{until=1,supply=false,logistics=false,lose=false,death=fals
   assert.equal(guard.x,input.guardHome.x);assert.equal(guard.z,input.guardHome.z);assert.deepEqual(guard.path,[],'Original guardHome snap clears its route before movement');
   for(const key of ['cooldown','retarget','repath','cd','buff','sprint','react'])assert.equal(bits(guard[key]),bits(input[key]-sim.TICK),`Neutral guard executes its real ${key} timer`);
  }
+ if(commands){
+  assert.deepEqual(initial.raw.wind,{a:wind.a,v:wind.s},'Declared wind is applied before the original steps');
+  const receipts=frames[0].commandReceipts.raw;assert.equal(receipts.length,2);assert.deepEqual(frames[1].commandReceipts.raw,[]);
+  assert.equal(receipts[0].before.commanders[0].mp,400);assert.equal(receipts[0].before.commanders[0].mun,50);
+  assert.equal(receipts[0].after.commanders[0].mp,150);assert.equal(receipts[0].after.commanders[0].mun,0);
+  assert.deepEqual(receipts[0].after.commanders[0].lab,[{kind:'tier',prog:0,time:60}]);
+  assert.equal(receipts[1].after.commanders[0].mp,50);assert.equal(receipts[1].after.nextProductionJob,1);
+  assert.deepEqual(receipts[1].after.production.find(b=>b.id===1),{id:1,queue:['rifle'],prog:0,jobs:[{id:1,type:'rifle',status:'active',mp:100,fuel:0}]});
+  assert.deepEqual(receipts[1].after.production.filter(b=>b.id!==1),receipts[1].before.production.filter(b=>b.id!==1),'Paid admission changes only the chosen HQ queue');
+  assert.deepEqual(g.players[0].lab,[{kind:'tier',prog:2*sim.TICK,time:60}]);
+  const hq=g.units.get(commands[1].command.from);assert.deepEqual(hq.queue,['rifle']);assert.equal(bits(hq.prog),bits(2*sim.TICK));
+  assert.equal(g.nextProductionJob,1);assert.equal(g.nextId,initial.raw.nextId,'Two full steps advance paid training without inventing a birth');
+ }
  const legacy={name,input:{until,supply,logistics,lose,death,capture,capturedRegion,shortage},phases,deleted,final:{tick:g.tick,winner:g.winner,reason:g.endReason??null,out:g.players.map(p=>!!p.out),timeline:g.timeline??null,regions:g.world.regions.map(r=>[r.team,r.progress,r.capper,r.capTick??null]),story:g.story??null,units:[...g.units.values()].map(u=>[u.id,u.owner,u.type,u.hp])}};
  cases.push({...legacy,...(decided?{decided:true,guardSnap:true}:{}),setup:{map:'fixture.map',options:{mode:'world',tech:true,weather:false,supply,logistics},teams:[0,1],factions:[0,0],
   controls:{allUnits:{holdPos:true,holdFire:true,auto:false}},authored:observed.authored,environmentSeed:123456789,finishInput:observed.finishInput,
-  sourceRandom:{fixed:.5,construction:constructionRandom,nativeEquivalent:false}},initial,frames,legacyProjectionHash:createHash('sha256').update(JSON.stringify(legacy)).digest('hex')});
+  sourceRandom:{fixed:.5,construction:constructionRandom,nativeEquivalent:false},...(wind?{wind:copy(wind)}:{}),...(commands?{commands:copy(commands)}:{})},initial,frames,legacyProjectionHash:createHash('sha256').update(JSON.stringify(legacy)).digest('hex')});
  console.log(`${name}: ${until} original/pristine steps agree`);
  }finally{Math.random=save;}
 }
@@ -233,6 +263,8 @@ record('region capture occurs after income',{capture:true});
 record('last-region elimination follows final income',{lose:true});
 record('ordinary retirement leaves captured facts for income',{death:true});
 record('already-decided World income and physical capture with frozen story',{until:2,capture:true,decided:true,guardSnap:true});
+record('authored wind with real World research and queued ground training',{until:2,wind:{a:0,s:.5},commanderWallet:{commander:0,mp:400,mun:50},commands:[{tick:1,slot:0,command:{t:'tech',kind:'tier'}},{tick:1,slot:0,command:{t:'buy',unit:'rifle',from:1}}]});
+assert.deepEqual(cases.slice(0,8),originalCases,'All eight predecessor scenes must remain unchanged');
 clean();
 const preserved=[
  'e28775de62ca2c8bf84ed1ab3f5b12252ed25c746bfb2f9bf882eb1a51ca3e77',
@@ -250,6 +282,5 @@ const output=gzipSync(Buffer.from(JSON.stringify({format:2,reference:pin,node:pr
  scope:'Original complete World steps with passive chronological output and owned-state reads, compared after every step with a separately imported pristine sim.js. Source-only fixed Math.random and explicit environment seed do not claim native RNG equivalence or recipient/privacy behavior.',
  stateEncoding:'Full canonical initial raw image, followed by ordered lossless set/delete patches. Patch Number values retain explicit non-integral, non-finite and signed-zero bits; safe integer bits are exactly derivable from raw. Every serialized patch sequence is decoded and checked against the actual original state before recording.',
  preservation:{source:'6822056',cases:7,steps:114,phaseEntries:1486,projectionHashes:preserved},map,steps,phaseEntries,cases})+'\n'));
-const path=`${root}/rust/crates/simtest/tests/fixtures/world-tick.json.gz`;
 if(process.argv.includes('--check')){if(!readFileSync(path).equals(output))throw Error('World tick fixture differs');}else writeFileSync(path,output);
-console.log(`Verified ${cases.length} original World controller traces, ${steps} ticks, ${phaseEntries} phase entries; original7/114/1486 projections preserved; pristine replay agrees after every step; fixture SHA256 ${createHash('sha256').update(output).digest('hex')}`);
+console.log(`Verified ${cases.length} original World controller traces, ${steps} ticks, ${phaseEntries} phase entries; original8 complete scenes and original7/114/1486 projections preserved; pristine replay agrees after every step; fixture SHA256 ${createHash('sha256').update(output).digest('hex')}`);
