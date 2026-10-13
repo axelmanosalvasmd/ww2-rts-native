@@ -9,7 +9,6 @@ use ww2_core::{
     route_knowledge::{LiveRouting, RouteKnowledge, RouteQuery},
     unit_spawn,
     weather::WeatherChoice,
-    world::CellChange,
 };
 pub(crate) fn idx(v: &Value) -> usize {
     v.as_u64().unwrap() as usize
@@ -154,11 +153,7 @@ pub(crate) fn setup(m: &mut Match, c: &Value) {
         m.world
             .set_cell(
                 idx(&change["c"]),
-                CellChange {
-                    ch: change["ch"].as_str().unwrap().as_bytes()[0],
-                    height: None,
-                    state: None,
-                },
+                change["ch"].as_str().unwrap().as_bytes()[0],
             )
             .unwrap();
     }
