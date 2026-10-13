@@ -3,6 +3,7 @@
 
 pub mod catalog;
 pub mod client_view;
+pub mod combat;
 pub mod deployment;
 pub mod economy;
 pub mod economy_state;

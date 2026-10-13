@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added a standalone combat damage and suppression component with catalog-backed role, armor, veterancy, retreat and threat rules. Six focused tests compare 3,828 original JavaScript cases and actual mutation order, including health, XP, death impulse, hit memory and rider requests. The component returns ordered effects for later integration; it does not fire weapons, sample terrain cover, place riders, remove dead units or change the ABI. Documented the source's zero-damage effects, building modifier replacement and missing-rider cargo behavior, with the affected combat rows still in progress.
+
 - Added deterministic spawn scatter, origin-restricted nearest-free placement and construction of every field currently represented by `Game::Unit`. The oracle matches 769 original spawn projections and 513 nearest-free queries across all 44 non-air unit types and all 33 maps, including blocked fallbacks, disconnected regions and naval placement. HP comes from the catalog; absent caches and NaN pace retain reference defaults. Air-base placement is rejected. ID allocation, owner validation, spatial insertion, logistics and the full spawn pipeline remain with later integration; MOV-68 stays in progress.
 
 - Added recipient routing terrain from public authored inputs or ordered remembered rows, preserving row identity, mine knowledge, wall proximity and navigation change order. The original-helper oracle matches 93 snapshots, 270 paths and 48 cover query sets. Cover queries report unknown World cells or missing house/toughness inputs explicitly. Automatic recipient selection, memory collection, scheduling and movement integration remain pending; no ABI changed.
