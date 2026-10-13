@@ -87,6 +87,25 @@ fn context<'a>(
         world: regions.map(|regions| WorldContext { regions }),
     }
 }
+macro_rules! training_parts {
+    ($m:expr, $game:expr) => {
+        TrainingParts {
+            game: $game,
+            rules: &$m.rules,
+            options: &$m.options,
+            production: &mut $m.production,
+            economy: &$m.start.economy,
+            commands: &mut $m.commands,
+            grid: &mut $m.grid,
+            recruitment: &mut $m.recruit_metadata,
+            next_id: &mut $m.next_unit_id,
+            combat: &mut $m.combat,
+            firing: &mut $m.firing,
+            abilities: &mut $m.abilities,
+            recovery: &mut $m.recovery,
+        }
+    };
+}
 impl Match {
     fn production_step_context(&self) -> Result<usize, ProductionStepError> {
         let count = self.start.players.len();
@@ -288,7 +307,7 @@ impl Match {
             obstruction: self.world.versions.obstruction,
             knowledge: 0,
         };
-        let mut placed = self
+        let placed = self
             .produced_placer
             .produce(
                 &self.rules,
@@ -313,83 +332,160 @@ impl Match {
                 },
             )
             .map_err(ProductionStepError::Placement)?;
-        if placed.rally.is_some() {
-            if self.options.mode == Mode::World {
-                self.refresh_world_routing(owner)
-                    .map_err(ProductionStepError::Routing)?;
-            } else {
-                self.refresh_recipient_routing(owner)
-                    .map_err(ProductionStepError::Routing)?;
-            }
+        let mut draft = TrainingDraft {
+            building,
+            dt,
+            count,
+            regions,
+            completion,
+            kind,
+            placed,
+            route_status: None,
+            route_end: None,
+        };
+        if draft.placed.rally.is_none() {
+            return training_parts!(self, &mut self.world.game)
+                .finish(draft)
+                .map(Some);
         }
-        let mut status = None;
-        let mut route_end = None;
-        if let Some(rally) = placed.rally {
-            let (query, live) = if self.options.mode == Mode::World {
-                let memory = &self
-                    .world_runtime
-                    .as_ref()
-                    .ok_or(ProductionStepError::InvalidState("training World runtime"))?
-                    .memory;
-                let team = self.world.game.players[owner].team;
-                let remembered = memory
-                    .team(team)
-                    .ok_or(ProductionStepError::InvalidState("training World memory"))?;
-                let live = memory
-                    .live_for(owner)
-                    .ok_or(ProductionStepError::InvalidState(
-                        "training World live routing",
-                    ))?;
-                (remembered.query(), live.live())
-            } else {
-                let recipient =
-                    self.recipients
-                        .get(owner)
-                        .ok_or(ProductionStepError::InvalidState(
-                            "training routing recipient",
-                        ))?;
-                (recipient.query(), recipient.live())
-            };
-            let path = self
-                .commands
-                .paths
-                .find_path(
-                    query
-                        .path_terrain(live)
-                        .map_err(ProductionStepError::Knowledge)?,
-                    PathRules::compiled().map_err(|e| ProductionStepError::Production(e.into()))?,
-                    &self.rules.kinds[kind],
-                    placed.unit.at(),
-                    rally.destination,
-                    None,
-                )
-                .map_err(ProductionStepError::Path)?;
-            placed.unit.path = path.waypoints;
-            placed.unit.path_gen = 1;
-            route_end = Some(path.route_end);
-            status = Some(path.status);
+        let result = (|| {
+            let observer = crate::staged_observer::StagedObserver::new(
+                &self.world.game,
+                &self.rules,
+                id,
+                owner,
+                &draft.placed.unit,
+            )
+            .map_err(ProductionStepError::Routing)?;
+            // Paid queues are admitted only by the represented World constructor.
+            let runtime = self
+                .world_runtime
+                .as_mut()
+                .ok_or(ProductionStepError::InvalidState("training World runtime"))?;
+            let preview = crate::match_world_memory::prepare_world_routing(
+                crate::match_world_memory::WorldRoutingContext {
+                    world: &self.world,
+                    rules: &self.rules,
+                    start: &self.start,
+                    rails: &runtime.rails,
+                    regions: &runtime.regions,
+                    known_buildings: &runtime.known_buildings,
+                    local_defender: &runtime.local_defender,
+                },
+                &mut runtime.memory,
+                owner,
+                Some(observer),
+            )
+            .map_err(ProductionStepError::Routing)?;
+            route_training(
+                &self.rules,
+                &mut self.commands.paths,
+                &mut draft,
+                preview.query(),
+                preview.live(),
+            )?;
+            let (game, routing_commit) = preview
+                .prepare_publication(&mut self.world)
+                .map_err(ProductionStepError::Routing)?;
+            let done = training_parts!(self, game).finish(draft)?;
+            routing_commit.commit();
+            Ok(Some(done))
+        })();
+        if result.is_err() {
+            self.commands.paths = crate::pathfinding::Pathfinding::new();
         }
-        let mut control = UnitControl::new_for_mode(&placed.unit, &self.rules, self.options.mode)
+        result
+    }
+}
+struct TrainingDraft {
+    building: u32,
+    dt: f64,
+    count: usize,
+    regions: Option<Vec<Region>>,
+    completion: production::CompletedUnit,
+    kind: usize,
+    placed: crate::produced_units::ProducedPlacement,
+    route_status: Option<PathStatus>,
+    route_end: Option<crate::game::Point>,
+}
+fn route_training(
+    rules: &Rules,
+    paths: &mut crate::pathfinding::Pathfinding,
+    draft: &mut TrainingDraft,
+    query: crate::route_knowledge::RouteQuery<'_>,
+    live: crate::route_knowledge::LiveRouting<'_>,
+) -> Result<(), ProductionStepError> {
+    let rally = draft.placed.rally.expect("staged rally");
+    let path = paths
+        .find_path(
+            query
+                .path_terrain(live)
+                .map_err(ProductionStepError::Knowledge)?,
+            PathRules::compiled().map_err(|e| ProductionStepError::Production(e.into()))?,
+            &rules.kinds[draft.kind],
+            draft.placed.unit.at(),
+            rally.destination,
+            None,
+        )
+        .map_err(ProductionStepError::Path)?;
+    draft.placed.unit.path = path.waypoints;
+    draft.placed.unit.path_gen = 1;
+    draft.route_end = Some(path.route_end);
+    draft.route_status = Some(path.status);
+    Ok(())
+}
+struct TrainingParts<'a> {
+    game: &'a mut Game,
+    rules: &'a Rules,
+    options: &'a super::MatchOptions,
+    production: &'a mut production::ProductionState,
+    economy: &'a crate::economy_state::EconomyState,
+    commands: &'a mut crate::match_commands::MatchCommands,
+    grid: &'a mut crate::grid::SpatialGrid,
+    recruitment: &'a mut std::collections::BTreeMap<u32, super::RecruitMetadata>,
+    next_id: &'a mut u32,
+    combat: &'a mut crate::match_combat::CombatState,
+    firing: &'a mut crate::match_firing::FiringState,
+    abilities: &'a mut crate::match_abilities::AbilityState,
+    recovery: &'a mut crate::match_recovery::RecoveryState,
+}
+
+impl TrainingParts<'_> {
+    fn finish(self, draft: TrainingDraft) -> Result<CompletedTrainingUnit, ProductionStepError> {
+        let TrainingDraft {
+            building,
+            dt,
+            count,
+            regions,
+            completion: expected,
+            placed,
+            route_status,
+            route_end,
+            ..
+        } = draft;
+        let mut control = UnitControl::new_for_mode(&placed.unit, self.rules, self.options.mode)
             .map_err(ProductionStepError::Control)?;
         control.aim = placed.aim;
         control.rally_drift = placed.rally.is_some();
         control.route_end = route_end;
-        let units = units(&self.world.game, &self.rules, count)?;
-        let context = context(
-            &self.options,
-            self.world.game.naval,
-            &units,
-            regions.as_deref(),
-        );
+        let id = placed.unit.id;
+        let units = units(self.game, self.rules, count)?;
+        let context = context(self.options, self.game.naval, &units, regions.as_deref());
         let prepared =
             self.production
-                .prepare_building_step(&context, &self.start.economy, building, dt)?;
+                .prepare_building_step(&context, self.economy, building, dt)?;
+        if prepared.completed() != Some(&expected) {
+            return Err(ProductionStepError::InvalidState(
+                "training facts changed during routing preparation",
+            ));
+        }
+        let mode = self.game.mode;
         let parts = PublicationParts {
-            units: &mut self.world.game.units,
-            grid: &mut self.grid,
+            units: &mut self.game.units,
+            grid: self.grid,
             controls: &mut self.commands.units,
-            recruitment: &mut self.recruit_metadata,
-            next_id: &mut self.next_unit_id,
+            recruitment: self.recruitment,
+            next_id: self.next_id,
         };
         let staged = vec![StagedUnit {
             unit: placed.unit,
@@ -397,22 +493,22 @@ impl Match {
             recruitment: None,
         }];
         let publication = if self.options.mode == Mode::World {
-            prepare_world_publication(parts, &self.rules, count, self.world.game.mode, staged)
+            prepare_world_publication(parts, self.rules, count, mode, staged)
         } else {
-            prepare_publication(parts, &self.rules, count, staged)
+            prepare_publication(parts, self.rules, count, staged)
         }
         .map_err(ProductionStepError::Publication)?;
-        let completion = prepared.commit().expect("staged training completion");
+        let completion = prepared.commit().expect("checked training completion");
         publication.publish_with(|unit, _| {
             self.combat.initialize(unit.id);
             self.firing.initialize(unit.id);
             self.abilities.initialize(unit.id);
             self.recovery.initialize(unit.id);
         });
-        Ok(Some(CompletedTrainingUnit {
+        Ok(CompletedTrainingUnit {
             unit: id,
             completion,
-            route_status: status,
-        }))
+            route_status,
+        })
     }
 }

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Staged legal World training rally observations through the canonical borrowed birth preview, then revalidated the same queue completion before unit and memory publication. Four canonical metadata owners publish together; no-rally births skip observation, and aborted previews reset path scratch. Source birth and native proof remain pending.
+
 - Kept ordinary route fog reads lazy when there are no fires, matching the original filter callback. A prior empty-fire read leaves first birth sight eligible to build fog; a prior fire read retains its cached mask. Original produce-unit proof is being added; native replay remains pending.
 - Scoped the canceled-preview regression query borrows before extracting cache identity, preserving the actual RouteQuery lifetime and releasing recipient reads before the mutable transaction. Native execution remains pending.
 
