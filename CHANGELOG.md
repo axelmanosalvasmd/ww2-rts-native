@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Adapt the existing route-retention test's prepared publication call to the required immutable Environment argument. All eight metadata/memory/list debug tests passed on the preceding runtime-identical head; the retention target stopped at this test-call compile error. Final native gates continue on the repaired test head.
+
 - Repair the first fresh World metadata compile: the existing World region retention caller and its test now borrow the sole canonical Environment owner required by the recipient context. No retention or selector algorithm changes. The preceding head compiled no tests; combined native gates require this successor.
 
 - Fix the new World panel's station presence after independent source review: absent or source-falsy authored rails omit the field, while present empty rails emit an empty list. Add six original-reader cases; the fixture now contains 11 scenes, 153 actions and 34 captures. Native execution remains pending.

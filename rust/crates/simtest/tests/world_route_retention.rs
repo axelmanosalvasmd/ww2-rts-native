@@ -58,7 +58,7 @@ fn prepared_removed_objects_match_original_cached_world_views_without_refreshing
     let mut memory = std::mem::take(&mut m.world_runtime.as_mut().unwrap().memory);
     for owner in 0..2 {
         let p = prepare_world_routing(context(&m), &mut memory, owner, None).unwrap();
-        let (_, commit) = p.prepare_publication(&mut m.world).unwrap();
+        let (_, commit) = p.prepare_publication(&mut m.world, &m.environment).unwrap();
         commit.commit();
         assert_eq!(
             json!(
