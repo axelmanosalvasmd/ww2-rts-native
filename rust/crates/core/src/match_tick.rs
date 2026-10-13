@@ -72,10 +72,10 @@ pub struct TickReport {
     pub retired: Vec<crate::match_combat::RetiredUnit>,
 }
 
-enum EnvironmentPhase {
+enum EnvironmentPhase<'a> {
     StructureSync,
     Debris,
-    FireFlood,
+    FireFlood(&'a [UnitId]),
 }
 
 impl crate::match_runtime::Match {
@@ -271,7 +271,7 @@ impl crate::match_runtime::Match {
         drop(smokes);
         phases.push(TickPhase::LivingWeather);
         // Expiring smoke still blocks ignition during the source fire phase.
-        environment.extend(self.tick_environment_phase(EnvironmentPhase::FireFlood)?);
+        environment.extend(self.tick_environment_phase(EnvironmentPhase::FireFlood(&unit_order))?);
         self.world
             .game
             .smokes
@@ -369,7 +369,7 @@ impl crate::match_runtime::Match {
 
     fn tick_environment_phase(
         &mut self,
-        phase: EnvironmentPhase,
+        phase: EnvironmentPhase<'_>,
     ) -> Result<Vec<crate::environment::Effect>, String> {
         use crate::environment::Context;
         // Environment admission names every current unit. Late objective and
@@ -416,14 +416,15 @@ impl crate::match_runtime::Match {
                     .step_wrecks(&mut self.world, self.rules.movement.tick, &mut context)
                     .map_err(|e| format!("wreck debris: {e}"))?;
             }
-            EnvironmentPhase::FireFlood if tick.is_multiple_of(10) => {
+            EnvironmentPhase::FireFlood(actor_order) if tick.is_multiple_of(10) => {
                 if !self.world.fires.is_empty() {
                     effects.extend(
                         self.environment
-                            .burn(
+                            .burn_captured(
                                 &mut self.world,
                                 self.rules.movement.tick * 10.0,
                                 &mut context,
+                                actor_order,
                             )
                             .map_err(|e| format!("burn: {e}"))?,
                     );
@@ -434,7 +435,7 @@ impl crate::match_runtime::Match {
                         .map_err(|e| format!("flood: {e}"))?;
                 }
             }
-            EnvironmentPhase::FireFlood => {}
+            EnvironmentPhase::FireFlood(_) => {}
         }
         let mut damage = crate::match_combat::DamageWorld {
             world: &mut self.world,

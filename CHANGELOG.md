@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Connected staged tick burning to its captured late actor list while retaining complete current-unit environment validation. Later births will miss that direct fire beat; garrison eviction still reads current units. Combined provider integration and native checks remain pending.
+
 - Merged the captured fire and damage actor prerequisites into a separate staged tick assembly. Frozen PR #134 is unchanged; provider integration and combined native checks remain pending.
 
 - Verified the staged Conquest command, route, environment, weapon and retirement assembly on the Mac: 17 focused debug tests, all 155 workspace release tests, strict Clippy, formatting and release FFI build pass. Eight original-source traces cover 1,825 ticks and 79 checkpoints, including contact damage, a casualty at tick 483, bounty/story and continued simulation. Independent source re-review is clear. Remaining actuators stay explicit and server match start remains refused.
