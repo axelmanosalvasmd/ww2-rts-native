@@ -38,7 +38,7 @@ impl Match {
                 .all(|v| v.is_finite())
             || g.cell_of(u.x, u.z).is_none()
             || u.garrison.is_some_and(|c| c >= g.chars.len())
-            || self.commands.units.get(&id).is_none()
+            || !self.commands.units.contains_key(&id)
             || self.firing.get(id).is_none()
             || self.combat.get(id).is_none()
             || self.abilities.get(id).is_none()
@@ -297,20 +297,19 @@ impl Match {
         self.ground_order_capacity(&selected)?;
         let mut forced = Vec::new();
         for raw in ids {
-            if let Ok(id) = u32::try_from(*raw) {
-                if self
+            if let Ok(id) = u32::try_from(*raw)
+                && self
                     .world
                     .game
                     .units
                     .get(&id)
                     .is_some_and(|u| u.owner == owner)
-                    && self.logistics.get(id).is_some_and(|r| r.forced)
-                {
-                    if !self.commands.units.contains_key(&id) {
-                        return Err("missing forced retreat control".into());
-                    }
-                    forced.push(id);
+                && self.logistics.get(id).is_some_and(|r| r.forced)
+            {
+                if !self.commands.units.contains_key(&id) {
+                    return Err("missing forced retreat control".into());
                 }
+                forced.push(id);
             }
         }
         if selected.is_empty() {
@@ -546,6 +545,9 @@ mod tests {
         }
         let before = format!("{:?}", (&m.world.game.units, &m.commands.units));
         let attack = Command::from_json(&json!({"t":"attack","ids":[1,4],"target":3})).unwrap();
+        // The snapshot scene retains startup metadata after replacing its units.
+        m.firing.remove(4);
+        assert!(m.firing.get(4).is_none());
         assert!(m.execute_command(0, &attack, false).is_err());
         assert_eq!(
             format!("{:?}", (&m.world.game.units, &m.commands.units)),

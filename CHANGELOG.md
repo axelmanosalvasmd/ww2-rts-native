@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Normally retain the reviewed Ground diagnostic closure and exact missing-Firing test setup repair in the separate World caller. The same inherited setup still retained startup row 4; remove that row explicitly before the intended malformed-metadata dispatch, preserving all refusal assertions. Four source-reviewed lint forms keep short-circuit evaluation order. This avoids carrying known diagnostic and test failures into the first World workspace gate; combined native execution remains pending.
+
 - Align the inherited ordinary research consumer with its approved phase scope. It now requires Research connected and Production still unavailable, since ordinary Buy is an immediate boundary operation and restored ordinary queues refuse. Keep all 2,429 complete Source steps, real boundary births, outputs and setup unchanged. World queued training retains its separate live-building receipt; native execution remains pending.
 
 - Remove private queue-field access from the new cross-crate World admission test after exact source recheck. Compare the public next boundary, pending count, controls and path requests; preserve the separately recorded Technology setup and all wallet, lab, event and fault assertions. No queue API or runtime changes are added, and native compilation is still pending.
@@ -161,6 +163,11 @@
 - Bring source-reviewed human commander timing, raw input helpers and detached common view types into the isolated observation producer branch. Native acceptance remains pending.
 
 - Prepare a separate human commander observation branch by normally combining checked commander `be1cb2c` with ordinary Default `262926e`. Retain both Cover and Entrench dispatch and canonical owners; this new union has no native acceptance yet.
+
+- Established the missing-Firing-row setup in the GroundAttack admission regression by explicitly removing actor 4's retained startup row before dispatch. The pure Ground/construction `ac2919c` workspace attempt passed 95 core tests and failed this first assertion; its six-order queued Cover test passed. Runtime guards, original fixtures and subsequent control/capacity refusal assertions are unchanged. Fresh native verification remains pending.
+
+- Prepare a pure Ground and construction candidate from source-cleared `bf293cc`, normally joined with final main `d1f2fb5`. Apply only the four reviewed Core lint edits from `64dd57d`: preserve short-circuit order in the Attack, Retreat and forced-row let-chains, and use the existing control map membership query. Retain the earlier combined `d9941e3` strict failure, which reported four diagnostics before any tests ran. Exact-head native and three-platform checks remain pending.
+
 - Fixed queued Cover after accepted waiting Attack, Assist and shared-project Join orders in the combined construction/GroundAttack caller. Cover now inherits the stored waiting anchor with the existing finite-coordinate check, rather than failing the boundary or querying a changed target. A real recorded-batch regression is written; native execution remains pending.
 
 - Normally joined the source-reviewed construction and GroundAttack continuation with the final ordered-event frontier and consolidated original providers. Retained canonical paid-work cancellation, command observers, original source fixtures, approved ABI 2 and the optimized test profile. Resolved shared command, World transaction and typed timeline conflicts without adding mode capabilities, and removed a duplicate route endpoint assignment introduced by automatic merge. This new combined source requires owner review and its own native proof; earlier parent results remain separate.
