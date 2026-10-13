@@ -12,6 +12,27 @@
 
 - Added the first standalone Rust `ww2-server` lobby slice for issue #19: configurable loopback binding, HTTP health, public room directory, and WebSocket hello, seats, spectator hosting, reconnect, duplicate-token takeover, map and lobby settings, AI roster controls and ping/pong. Eight Rust tests pass; a live harness matches 38 lobby and directory checkpoints against the pinned Node server and checks all 33 map metadata entries, malformed input recovery, protocol-version errors and the 16 KiB message limit. Full workspace tests, formatting and strict server Clippy pass on the Mac. The server does not run matches: start, gameplay, operative joins and saves fail explicitly. Compression, map contents/static hosting, a rules hash and match features remain unimplemented; no protocol or ABI contract is promoted. `rust/crates/server/README.md` records exact limits, including UTF-16 name-edge handling. Token truncation keeps the original UTF-16 units so distinct tokens cannot collide through replacement characters.
 
+- Added `Rules::compiled` and `Rules::from_catalog` so movement, vision and fog can use the embedded rules without Node, caller JSON or runtime file access. Unit and weather indices keep the reference order. The catalog now holds 46 tables, including traffic and lane constants and 13 ground-vehicle profiles resolved by the JavaScript helper, with its private fallback preserved. One equivalence test reuses the existing vision recording and compares every typed field and floating-point bit with the independent fixture loader. The FFI, ABI and formation-only rules hash are unchanged.
+
+
+
+- Keep Rust JSON files in LF format on Windows checkouts. Windows CI found that converting the generated catalog's final newline to CRLF changed its byte fingerprint; the exact expected and observed hashes reproduce with that one-byte conversion.
+
+- Documented compiled-table ownership and the 11 bounded economy helpers, with 56,400 reference damage cases. IF-01 and IF-03 remain in progress because C table export, full availability and purchase execution are not implemented.
+
+- Added the compiled rules catalog and bounded economy/research queries for #17. The catalog retains 42 post-initialization tables and all 47 unit definitions from reference `e4e579a`, including explicit non-finite number tags, and loads once without runtime file access. Price, faction compatibility, population weights, support and ability costs, builder lists, HQ tiers and armory multipliers match recorded JavaScript helper outputs across 10 mode inputs, 640 ability cases, 480 research cases and 56,400 damage cases. The 304 KB fixture uses grouped hashes plus direct samples. This does not add purchasing, income, production availability, a new FFI contract or broader rules-hash coverage.
+
+- Recorded infantry and naval fine-search evidence and remaining scope in the design and movement parity inventory. Relevant rows remain in progress until vehicle clearance, knowledge-view selection, scheduling and movement integration are complete.
+
+- Added fine grid A* and smoothed paths for infantry and shallow/deep naval units over caller-supplied terrain, walls, known mines, fires and live bunkers. All 1,175 searches match original `findPath` waypoint and endpoint bits, outcomes and expansion counts, including all 33 authored maps and changing hazards. Float32 search costs and score-only heap ties preserve reference choices. Ground vehicles, aircraft, rail units and structures return an unsupported-profile error. Vehicle footprints, recipient-view selection, scheduling, movement integration and performance measurements remain separate work.
+
+- Recorded the coarse navigation port and its 4,888 reference-query checks in DESIGN.md. MOV-37 and MOV-38 remain in progress until fine pathfinding and movement integration use the planner.
+
+- The navigation fixture generator now verifies the reference's exact pinned commit and rejects tracked changes before importing its source. Untracked and ignored files, including `node_modules`, do not invalidate the fixture run.
+
+- Added the Rust terrain region and directed portal planner behind a borrowed, caller-supplied terrain view. It preserves insertion-order ties, incremental chunk updates and bounded route caching from `shared/navigation.js`. All 4,888 recorded x64 Node 24.21.0 queries match the target, connection status, leg limit, allowed regions and cell filter, including 277 terrain updates, directed cliffs and map edges. Invalid shapes and cell indices return errors. This is the coarse prerequisite for fine A*, not full pathfinding; movement and FFI remain unchanged and performance is unmeasured.
+
+
 - Run branch verification through pull requests and main verification after merge, avoiding duplicate push and pull-request CI jobs for the same change.
 
 - Added Rust CI on Ubuntu 24.04, Windows 2025 and macOS 15 for the pinned toolchain: formatting, strict Clippy, workspace tests and the release C library. Linux also links the existing C caller and replays the formation fixture. Rust and workflow changes trigger the checks; manual runs are available.

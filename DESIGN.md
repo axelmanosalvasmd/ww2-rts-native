@@ -138,6 +138,45 @@ The live harness compares 38 lobby/directory checkpoints against the real Node s
 
 The server also embeds the client-safe projection of all 33 authored maps. The generator calls the pinned reference's `mapForClient` and refuses a changed source tree. The binary serves those JSON bytes without Node or a reference checkout; it contains no raw authoring map route. Mines and their hidden material rows, triggers and scenario scripts are excluded. These projections cannot initialize an authoritative match. All editor-header map reads return 403, and map writes return 405 until the editor and full-world loader are built. A second live harness matches 96 HTTP responses against Node, including both URL forms, invalid paths, methods and credential refusal; two focused Rust tests check the embedded data and routing. Static browser hosting, map editing, authoritative world loading, compression, operatives, game simulation, snapshots and persistence remain missing.
 
+## Compiled catalog and economy helpers (2026-10-12)
+
+`catalog.rs` embeds 42 post-initialization reference tables, including all 47 unit definitions, using `include_str!` and a single `OnceLock` parse. Access needs no files, network or engine. Explicit number tags preserve Infinity, NaN and negative zero. `harness/rules-fixture.mjs` verifies the reference commit and tracked source before generating the catalog, and a fingerprint checks every compiled field.
+
+`economy.rs` provides 11 stateless helpers: recruitment prices, faction compatibility, per-unit population weight, support drop population, building and builder lists, support and ability prices, required tiers, research prices and technology damage multipliers. Typed inputs admit the game's four factions and valid technology levels; unknown units/supports or impossible research states return errors. Ability overrides retain the reference's numeric values, including non-finite ones. Technology multipliers use the core's deterministic `pow`, consistent with the existing math decision.
+
+The recorded expectations call the JavaScript helpers themselves. Tests cover 10 mode inputs, every unit/faction, 80 support cases, 640 ability cases, 480 research cases and 56,400 damage multipliers. Grouped fingerprints plus 3,600 direct bit comparisons keep the fixture at 304 KB. The catalog is 26.6 KB.
+
+The existing movement/vision `Rules` loader still accepts harness data. This catalog does not change the C interface or its formation-only `RULES_HASH`. Purchase execution, income, full army population counting, availability and placement remain separate work; these helpers alone do not validate an order.
+
+
+## Compiled simulation rules (2026-10-12)
+
+`Rules::compiled()` now constructs the existing movement, vision and fog rule structs from the embedded catalog, without Node, caller JSON or filesystem access. `Rules::from_catalog()` accepts an already decoded catalog. The catalog parser still runs once through `OnceLock`; the constructor returns owned typed rules that callers can hold independently.
+
+The catalog now contains 46 tables. Four additions provide `TRAFFIC`, `LANE`, `CORNER_BULGE` and resolved `MOVEMENT_PROFILES`. The recorder calls the original `movementProfile(type, UNITS[type])` for every unit, so profiles for 13 ground unit types include the source's private fallback without copied constants. Unit and weather indices follow the recorded `UNIT_TYPES` and `WEATHER_KINDS` arrays. Terrain hit-point entries keep the lexical key order used by the existing fixture loader.
+
+One equivalence test reuses the existing vision recording and its independent `load_rules` parser. It compares every typed field, optional value, list order and floating-point bit for all 47 unit types, all five weather kinds and the movement/vision settings. The existing movement and vision replay tests remain unchanged. This does not connect the server to the core, implement a full simulation or change the ABI. `RULES_HASH` remains limited to formation constants; compiling these additional tables does not expand its agreed scope.
+
+## Terrain navigation regions (2026-10-12)
+
+`navigation.rs` ports `shared/navigation.js`: chunk-local connected regions, directed portals, region routes and limited next-leg selection. It is the coarse prerequisite for fine A*, not a complete unit pathfinder. A `TerrainView` supplies only borrowed flags, heights and version/change information; the planner cannot consult hidden terrain through another game object.
+
+Region edges and incoming IDs keep the reference insertion order. Dirty chunks reuse freed region IDs in the same order, and route ties use region IDs. This matters because route choices can depend on update history. Direct changes or up to 32 retained changes update the affected chunks; missing continuity or a new terrain identity causes a rebuild. The route cache keeps the reference's 128-entry bound.
+
+`NavigationLeg` borrows the cache's labels while owning its allowed-region list. Rust therefore prevents the caller from updating that cache while the fine search uses its filter. This replaces the reference's instruction to use a filter immediately with a lifetime rule.
+
+All 4,888 recorded queries match the reference's target, connectivity, limit flag, ordered region IDs and per-cell filter. The 35 scenarios include 277 terrain updates, 1,372 limited legs and 1,268 disconnected outcomes. The recorder rejects a wrong pin or dirty tracked source. No performance claim is made. Unit path queues and integration into movement remain pending.
+
+## Infantry and naval pathfinding (2026-10-12)
+
+`pathfinding.rs` adds fine grid A* and path smoothing over the coarse navigation planner. `PathTerrain` supplies the terrain view plus wall proximity, known mines, fires and live bunker positions; `PathRules` supplies wall and bunker costs. The search reads no `Game` and cannot substitute hidden world state for the supplied view. Infantry and shallow/deep naval profiles are supported. Ground vehicles, aircraft, rail units and structures return `UnsupportedProfile`.
+
+The implementation preserves the reference's float32 path scores, score-only heap ties, neighbor order, diagonal corner checks, hazard costs, blocked-start escape and smoothing. An exhausted expansion budget has a distinct result from an unreachable route. Rust owns reusable search storage beside the navigation cache. The old undirected `regionsFor` rejection is unnecessary after the stronger directed coarse route has succeeded, so the fine search does not duplicate that cache.
+
+The original `findPath` produces 1,175 oracle searches across all 33 authored maps and crafted terrain cases: 914 found routes, 163 unreachable results and 98 budget exhaustions. Every waypoint and resolved endpoint matches bit for bit, as do expansion counts and outcomes. Repeated searches after mine, fire and bunker changes are included. The recorder verifies the exact reference pin and rejects tracked changes. Vehicle clearance, automatic recipient-view selection, retry policy, request scheduling and movement integration remain separate work. No performance claim is made.
+
+
+
 ## The core's math (2026-10-12)
 
 The core carries its own math (`rust/crates/core/src/math.rs`) instead of Rust's `f64` methods, which call each platform's C library. It ports V8's fdlibm (`src/base/ieee754.cc` as Node 24.21.0 compiles it) and V8's `Math.hypot`, plus JavaScript's `round`, `max`, `min` and `sign`, so every platform computes the same bits and they equal the JavaScript game's.
