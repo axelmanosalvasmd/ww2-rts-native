@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified bounded ordinary-Conquest withdrawal on macOS arm64: 28 affected debug checks, all 215 locked release workspace tests, strict workspace/all-target Clippy, formatting and release FFI pass. Original withdrawal replay covers nine traces and 103 transitions plus free-truck cleanup. Runtime is unchanged from the source-reviewed convergence; two restored-scene fixes and one equivalent test assertion were required. Full unit-loop integration and other modes remain separate.
+
 - Replaced the withdrawal retirement replay's redundant map lookup with a key-presence assertion after strict Clippy reported it. This is a test-only expression change; the full release workspace passed before it, and the touched consumer plus strict gates are rerunning.
 
 - Fixed the inherited recovery replay's restored scene after the release suite caught stale startup ability rows at future convoy IDs. Scene reset now clears ability metadata and restored actors receive their canonical defaults. The convoy freshness guard, recovery runtime and original fixture are unchanged.
