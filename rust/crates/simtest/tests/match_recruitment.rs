@@ -243,6 +243,16 @@ fn original_match_buy_placement_path_and_grid() {
                                 "recruits must enter combat with canonical default metadata"
                             );
                             assert_eq!(
+                                m.abilities.get(done.unit),
+                                Some(&ww2_core::match_abilities::AbilityUnit::default()),
+                                "recruits must enter with canonical default ability state"
+                            );
+                            assert_eq!(
+                                m.recovery.get(done.unit),
+                                Some(&ww2_core::match_recovery::RecoveryUnit::default()),
+                                "recruits must enter with canonical default recovery state"
+                            );
+                            assert_eq!(
                                 m.firing.get(done.unit),
                                 Some(&ww2_core::match_firing::FiringUnit::default()),
                                 "recruits must publish canonical target and timer defaults"
