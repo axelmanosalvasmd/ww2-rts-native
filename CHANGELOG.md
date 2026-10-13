@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Adapted the three remaining construction, aircraft and carrier replay timeline readers to the shared MatchSample enum after independent source review found their obsolete struct-field accesses in the normal union. Each preserves the original Conquest `{t, vp}` projection and explicitly refuses Territories. Runtime, inputs, original fixtures and every state comparison are unchanged; this combined head still awaits native compilation.
+
 - Migrated the inherited quiet engineering snapshot consumer to require an empty owned TickEvent result, preserving its original source fixture and state comparisons. Ground full-step checks now require exactly one typed GroundAttack receipt instead of matching a planned Debug name. These integration consumers have not run on this combined source head.
 
 - Normally joined the source-reviewed ground Attack/Retreat provider with the separate construction and ordered-event caller. Both parents retain their single command queue, path scheduler, paired work cancellation, immutable placement drafts and prepared observation receipts. GroundAttack now validates before input and after publication, executes after attack-move before reactions, and reports one typed receipt. The original ground capture covers 28 cases, 48 commands, 30 full steps and 110 snapshots; combined construction/ground native compilation and tests remain pending. Automatic garrison retreat, logistics and unrepresented modes remain refused.
