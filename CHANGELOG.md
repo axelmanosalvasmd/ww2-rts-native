@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added compiled pathfinding rules from the existing catalog, removing caller JSON and copied constants from native route initialization. The 1,529-search oracle now runs with these compiled costs and checks every cost bit against JavaScript.
+
 - Added validated spawn filtering, walking-distance matrices, team layout selection and compiled VP goals to the Rust core. An original-JavaScript oracle compares 41 terrain cases (all 33 authored maps), 957 layouts and 18 VP goals, including fords, cliffs, disconnected spawns, shared starts and selection-threshold edges. Layout selection takes an explicit random fraction, uses no global randomness and bounds inputs to six players/spawns. Match initialization, mode-specific spawn overrides and unit creation remain separate work.
 
 - Added authored structural validation and separate static structural initialization to the Rust core. All 33 authored maps match 574 structures and 11,955 sections from the reference, including IDs, order, supports, anchors, materials and health. The new fixture covers 59 accepted maps, 36 rejected maps and eight support traversals. Structured query state now fills `Game.sections`; damage, collapse, falling bodies, repairs and playable match startup remain unimplemented. Updated the former empty-structures rejection test and fixture to accept it, while world and scenario properties remain explicitly unsupported.
