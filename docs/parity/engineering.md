@@ -210,3 +210,6 @@ The Match recorder was extended to 12 traces and 47 actions. It now uses origina
 
 
 The coordinated source proof tree includes the typed Dig dispatcher and canonical request/drop and Move/Stop cancellation hooks. The native fixture consumer uses that parser and dispatcher directly. Compilation and execution are still unverified; actual unit-loop binding remains pending.
+
+
+The ordinary Match digging provider passed native checks at `00b6448003639fd876df07f5f29c49f19b387d08` on macOS arm64: seven focused debug tests, 206 release workspace tests, strict Clippy, formatting and release FFI. Independent copied release binaries pass two Match digging tests and two primitive tests. The source recorder remains twelve traces and 47 actions; the primitive recorder remains 22 traces and 367 actions. Actual unit-loop/server composition and presentation remain pending, so the engineering parity rows stay in progress.

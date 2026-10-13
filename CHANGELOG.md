@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Combined the checked engineering provider fixes with the separate commander proof successor while retaining the staged Buy body and existing Cover, research and shopping policy fixtures. Combined source review and native checks are pending.
+
 - Added a bounded Germany commander MG purchase through the real typed Buy and canonical publication provider. Two original-source scenarios cover four delivered frames and seven waypoint draws, including actual newborn movement and refusal after the seat becomes away. Native checks are pending; broader shopping, construction and full AI remain outside this checkpoint.
 
 - Combined the immutable staged Buy and observer provider ancestry with the isolated commander shopping follow-up. Buy/publication and observer bodies remain unchanged; field work and the single command queue retain their current owners. Combined native checks are pending.
@@ -91,6 +93,35 @@
 - Made the World delivery cursor branch explicit after strict Clippy rejected an unnecessary unwrap; full and incremental read ordering is unchanged. The corrected wreck oracle reproduces four traces and 119 actions.
 
 - Fixed the World oracle's remembered-wreck iterator projection to record actual rows instead of an empty iterator object. Native replay already matched the first terrain, identity and route fingerprints; corrected wreck records are being replayed next.
+- Verified the ordinary Match digging provider on macOS arm64: seven focused debug tests, all 206 release workspace tests, strict workspace/all-target Clippy, formatting and the release FFI build pass. Independent copied-binary replay passes both Match digging tests and both primitive tests. Actual unit-loop/server integration remains a separate pending proof.
+
+- Resolved strict compiler-lint findings in the engineering proof tree: redundant copies, casts and reference layers, independent ability fixture flags, and the existing optional delivery-cursor branch. The full release workspace suite passed before this cleanup; all required gates are rerunning at the final code checkpoint.
+
+- Fixed the inherited World memory recorder to collect remembered-wreck iterators as arrays before JSON serialization. Source regeneration verifies four traces and 119 actions; only the collection projections changed. Runtime memory and cache behavior are unchanged.
+- Restored the World-only logistics preflight lost while integrating the Conquest supply adapter. Ordinary Conquest still initializes logistics; World rejects it before creating state, as the existing startup regression requires.
+
+- Integrated the ground supply adapter with checked World startup and memory. World keeps empty convoy/network defaults and its explicit logistics refusal; final combined native checks remain pending.
+
+- Carried the checked ability-flight recorder prerequisites: direct-launch cases use the actual catalog ability range, and actor inputs preserve the source incoming-hit sentinel. The old inputs placed short-range abilities outside the unchanged source phase guard and replaced the hit sentinel with null. Runtime defaults and geometry are unchanged.
+- Fixed the production differential fixture’s paid-job cost projection to compare MP and Fuel by IEEE bits on both sides. This removes the JSON integer-versus-float mismatch found in the coupled engineering release run without changing production arithmetic or runtime behavior.
+
+- Carried the routing owner’s all-team World buffer mapping repair and 14-case original birth fixture into both consumers. The real training replay keeps its three-case scope; provider cross-team success/history coverage remains separately labeled, with native checks pending.
+
+- Added the existing flight-fixture comparison path to numeric mismatch diagnostics so the coupled native proof can identify missing represented values directly. Core release tests passed before the inherited simtest comparison stopped.
+
+- Corrected the inherited non-finite aimed-command guard to retain the source follow reset on a blocked command. Its full snapshot still verifies unchanged work, wallet, terrain and random state; the valid unsupported-project refusal remains unchanged.
+
+- Joined the checked ordinary-launch buff/AP provider dependency after the coupled release replay found the missing flight payload adjustment. The source multiplier, suppression, rate, naval AP restriction and deferred AP consumption retain their reviewed behavior and launch-refusal guard.
+
+- Carried the verified provider repair for ordered ability refusal results into the engineering union after its release replay exposed lost ineligible selections. Fixture visibility lists now meet the canonical sorted recipient contract. The existing field-work cancellation remains singular and unchanged.
+
+- Removed a duplicated smoke-duration field from an inherited routing fixture. The release workspace compiler exposed the duplicate after the focused engineering and command tests passed.
+
+- Updated inherited native fixture consumers for the complete damage ordering context and ordered pending-cell set. The recovery fixture keeps the existing full actor list, and recruitment snapshots preserve the same cell contents. Native proof is restarting after these test compiler errors.
+
+- Split the existing ability fixture control projection into a local JSON value to fit the macro recursion limit when the engineering library tests compile. The represented fields and expected fixture values are unchanged.
+
+- Repaired the engineering union compiler boundaries: recruitment errors use the existing public re-export, section retirement supplies the source full-list ordering option, and recovery validates optional section maxima before arithmetic. The first native compile exposed these inherited mismatches; the coupled proof is restarting at the repaired checkpoint.
 
 - Corrected the engineering replay to the coordinated command constructor and checked excluded work through parse plus dispatch. Queued digs and known excluded forts are represented inputs whose dispatcher returns unsupported. Native execution remains pending.
 

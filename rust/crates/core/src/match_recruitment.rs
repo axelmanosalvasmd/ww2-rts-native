@@ -414,7 +414,7 @@ impl RecruitParts<'_> {
         let placed = self
             .produced_placer
             .produce(
-                &self.rules,
+                self.rules,
                 catalog,
                 view,
                 &game.units,
@@ -524,10 +524,10 @@ impl RecruitParts<'_> {
                 units: &mut self.game.units,
                 grid: &mut self.grid,
                 controls: &mut self.commands.units,
-                recruitment: &mut self.recruit_metadata,
+                recruitment: self.recruit_metadata,
                 next_id: self.next_unit_id,
             },
-            &self.rules,
+            self.rules,
             count,
             vec![crate::unit_publication::StagedUnit {
                 unit: placed.unit,

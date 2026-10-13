@@ -64,7 +64,7 @@ fn make(case: &Value) -> Match {
             players: (0..2)
                 .map(|slot| PlayerConfig {
                     name: format!("p{slot}"),
-                    team: slot as i32,
+                    team: slot,
                     faction: Faction::try_from(slot as u8).unwrap(),
                 })
                 .collect(),

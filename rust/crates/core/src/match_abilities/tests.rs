@@ -533,6 +533,28 @@ fn conquest_abilities_match_original_source_phases() {
                 Some(crate::match_commands::Denial::Unsupported)
             );
             assert_eq!(snapshot(&m, &order, &[]), before);
+            assert_eq!(
+                m.execute_command(
+                    0,
+                    &Command::Ability {
+                        ids: vec![1],
+                        at: Some(Point {
+                            x: f64::NAN,
+                            z: 15.
+                        }),
+                        queue: false,
+                        automatic: false,
+                    },
+                    false,
+                )
+                .unwrap(),
+                Some(crate::match_commands::Denial::Blocked),
+                "invalid typed aim retains coordinate refusal precedence",
+            );
+            // Source mine releases follow before refusing a non-finite aimed command.
+            let mut invalid_expected = before.clone();
+            invalid_expected["units"][0]["control"]["follow"] = json!(0);
+            assert_eq!(snapshot(&m, &order, &[]), invalid_expected);
             unsupported_work += 1;
             continue;
         }
@@ -830,4 +852,33 @@ fn manual_aimed_ability_cancels_real_paid_work_without_refund() {
     assert!(!m.world.game.units[&1].dig);
     assert_eq!(m.start.economy.players[0].mp, initial_mp - cost);
     assert_eq!(m.world.game.chars, terrain);
+}
+
+#[test]
+fn rejected_ap_launch_preserves_loaded_round_ammunition_and_random_stream() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/match-ability.json")).unwrap();
+    let case = fixture["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|v| v["name"] == "loaded-ap-consumed-after-qualifying-fire")
+        .unwrap();
+    let (mut m, order) = make(case);
+    let command = command(&case["actions"][0]["cmd"], false);
+    assert_eq!(m.execute_command(0, &command, false).unwrap(), None);
+    assert!(m.abilities.get(1).unwrap().ap);
+    m.begin_firing_tick(&order).unwrap();
+    m.firing.next_flight = 9_007_199_254_740_991;
+    let ability = *m.abilities.get(1).unwrap();
+    let ammo = m.logistics.get(1).cloned();
+    let random = m.start.random.snapshot();
+    let error = m.apply_unit_firing(1, false, 0.05).unwrap_err();
+    assert!(error.contains("flight ID exhausted"), "{error}");
+    assert_eq!(m.abilities.get(1), Some(&ability));
+    assert_eq!(m.logistics.get(1), ammo.as_ref());
+    assert_eq!(m.start.random.snapshot(), random);
+    assert_eq!(m.firing.next_flight, 9_007_199_254_740_991);
+    assert!(m.firing.flights.is_empty());
+    assert!(m.firing.take_events().is_empty());
 }
