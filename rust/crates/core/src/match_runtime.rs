@@ -95,17 +95,33 @@ impl StartPlan {
         options: &MatchOptions,
         rules: &Rules,
     ) -> Result<Self, String> {
-        if map.geography().is_some() {
+        Self::prepare_mode(map, options, rules, None)
+    }
+
+    pub(crate) fn prepare_world(
+        map: &crate::map::AuthoritativeMap,
+        options: &MatchOptions,
+        rules: &Rules,
+        random: MatchRandom,
+    ) -> Result<Self, String> {
+        Self::prepare_mode(map, options, rules, Some(random))
+    }
+
+    fn prepare_mode(
+        map: &crate::map::AuthoritativeMap,
+        options: &MatchOptions,
+        rules: &Rules,
+        world_random: Option<MatchRandom>,
+    ) -> Result<Self, String> {
+        let world_mode = world_random.is_some();
+        if map.geography().is_some() != world_mode || (world_mode && options.mode != Mode::World) {
             return Err("native startup does not yet initialize World matches".into());
         }
-        if !matches!(options.mode, Mode::Default | Mode::Conquest) {
+        if !world_mode && !matches!(options.mode, Mode::Default | Mode::Conquest) {
             return Err("native startup currently supports Conquest".into());
         }
         if !options.living_weather && options.weather != WeatherChoice::Map {
             return Err("disabled living weather requires the map weather choice".into());
-        }
-        if options.logistics {
-            return Err("native startup does not yet initialize logistics".into());
         }
         if !(1..=6).contains(&options.players.len())
             || options.players.iter().any(|p| p.team < 0 || p.team >= 6)
@@ -160,16 +176,27 @@ impl StartPlan {
             flags: &flags,
             heights: heights.as_deref(),
         };
-        let distances = deployment::spawn_distances(&terrain, &spawns, &available)
-            .map_err(|e| format!("spawn distances: {e:?}"))?;
-        let mut random = MatchRandom::new(options.seed);
-        let selection = if options.shuffle {
+        let distances = if world_mode {
+            Vec::new()
+        } else {
+            deployment::spawn_distances(&terrain, &spawns, &available)
+                .map_err(|e| format!("spawn distances: {e:?}"))?
+        };
+        let mut random = world_random.unwrap_or_else(|| MatchRandom::new(options.seed));
+        let selection = if options.shuffle && !world_mode {
             LayoutSelection::RandomFraction(random.next_fraction(StreamId::Terrain))
         } else {
             LayoutSelection::First
         };
-        let slots = deployment::spawn_slots(available.len(), &teams, Some(&distances), selection)
-            .map_err(|e| format!("spawn allocation: {e:?}"))?;
+        let slots = if world_mode {
+            if spawns.len() < teams.len() {
+                return Err("World startup needs one authored spawn per commander".into());
+            }
+            (0..teams.len()).collect()
+        } else {
+            deployment::spawn_slots(available.len(), &teams, Some(&distances), selection)
+                .map_err(|e| format!("spawn allocation: {e:?}"))?
+        };
         let support = catalog
             .table("SUPPORT_TYPES")
             .map_err(|e| e.to_string())?
@@ -180,7 +207,11 @@ impl StartPlan {
             .iter()
             .enumerate()
             .map(|(slot, config)| {
-                let s = &spawns[available[slots[slot]]];
+                let s = &spawns[if world_mode {
+                    slot
+                } else {
+                    available[slots[slot]]
+                }];
                 Ok(PlayerStart {
                     config: config.clone(),
                     spawn: Point {
@@ -205,7 +236,14 @@ impl StartPlan {
             ArmySize::Endless => "endless",
         };
         let income_scale = number(field(field(cfg, "armies")?, army_key)?, "income")?;
-        let initial_mp = number(cfg, "mpStart")? * income_scale;
+        let initial_mp = number(
+            if world_mode {
+                field(cfg, "classic")?
+            } else {
+                cfg
+            },
+            "mpStart",
+        )? * income_scale;
         let initial_inc = number(cfg, "mpBase")?;
         let economy = EconomyState {
             players: teams
@@ -300,16 +338,23 @@ impl StartPlan {
             l.raining = weather.now == WeatherKind::Rain;
             l
         });
-        let starting_kinds = field(cfg, "startForce")?
-            .array()
-            .ok_or("invalid starting force")?
-            .iter()
-            .map(|t| {
-                rules
-                    .kind(t.string().ok_or("invalid starting type")?)
-                    .ok_or("unknown starting type".to_owned())
-            })
-            .collect::<Result<_, _>>()?;
+        let starting_kinds = field(
+            if world_mode {
+                field(cfg, "classic")?
+            } else {
+                cfg
+            },
+            "startForce",
+        )?
+        .array()
+        .ok_or("invalid starting force")?
+        .iter()
+        .map(|t| {
+            rules
+                .kind(t.string().ok_or("invalid starting type")?)
+                .ok_or("unknown starting type".to_owned())
+        })
+        .collect::<Result<_, _>>()?;
         Ok(Self {
             dimensions: (width, height),
             players,
@@ -392,12 +437,13 @@ pub struct BuildingCell {
     pub at: Point,
 }
 
-/// Authoritative Conquest startup state. Tick execution is added independently.
+/// Authoritative startup state. Each mode admits only its implemented phases.
 /// Live terrain and units have a single owner in `world.game`.
 pub struct Match {
+    pub commands: crate::match_commands::MatchCommands,
+    pub world_runtime: Option<crate::match_world::WorldRuntime>,
     pub combat: crate::match_combat::CombatState,
     pub environment: crate::environment::EnvironmentRuntime,
-    pub commands: crate::match_commands::MatchCommands,
     pub world: World,
     pub start: StartPlan,
     pub options: MatchOptions,
@@ -409,9 +455,12 @@ pub struct Match {
     pub building_rallies: BTreeMap<u32, Option<Point>>,
     pub player_rallies: Vec<Option<Point>>,
     pub recruit_metadata: BTreeMap<u32, RecruitMetadata>,
-    produced_placer: crate::produced_units::ProducedPlacer,
+    pub(crate) produced_placer: crate::produced_units::ProducedPlacer,
     pub scenario: Option<crate::legacy_scenario::LegacyScenario>,
     pub logistics: crate::logistics::LogisticsState,
+    pub convoys: Option<crate::supply_convoys::ConvoyState>,
+    pub supply_net: crate::supply_network::GroundSupplyNetwork,
+    pub(crate) supply_routes: crate::supply_routes::SupplyRouting,
     pub firing: crate::match_firing::FiringState,
     pub capture_ticks: Vec<Option<i64>>,
     pub tick_state: crate::match_tick::TickState,
@@ -458,9 +507,10 @@ impl Match {
         };
         let player_count = start.players.len();
         let mut result = Self {
+            commands: crate::match_commands::MatchCommands::new(4096),
+            world_runtime: None,
             combat: crate::match_combat::CombatState::default(),
             environment: crate::environment::EnvironmentRuntime::default(),
-            commands: crate::match_commands::MatchCommands::new(4096),
             grid: SpatialGrid::new(&world.game.units, 16.0),
             recipients: Vec::new(),
             routing_fog: crate::fog::Fog::default(),
@@ -475,6 +525,9 @@ impl Match {
             produced_placer: crate::produced_units::ProducedPlacer::new(),
             scenario,
             logistics: crate::logistics::LogisticsState::default(),
+            convoys: None,
+            supply_net: crate::supply_network::GroundSupplyNetwork::default(),
+            supply_routes: crate::supply_routes::SupplyRouting::default(),
             firing: crate::match_firing::FiringState::default(),
             capture_ticks: vec![None; map.points().len()],
             tick_state: crate::match_tick::TickState::default(),
@@ -490,13 +543,12 @@ impl Match {
             result.combat.initialize(unit.id);
             let control = crate::match_commands::UnitControl::new(unit, &result.rules)?;
             result.commands.insert(unit.id, control);
-        }
-        for &id in result.world.game.units.keys() {
-            result.firing.initialize(id);
-            result.combat.initialize(id);
+            result.firing.initialize(unit.id);
+            result.combat.initialize(unit.id);
         }
         result.grid.rebuild(&result.world.game.units);
         result.initialize_recipient_routing()?;
+        result.initialize_logistics()?;
         Ok(result)
     }
 
@@ -823,7 +875,7 @@ impl Match {
     }
 }
 
-fn terrain_view(game: &Game) -> TerrainView<'_> {
+pub(crate) fn terrain_view(game: &Game) -> TerrainView<'_> {
     TerrainView {
         width: game.w,
         height: game.h,
@@ -836,7 +888,7 @@ fn terrain_view(game: &Game) -> TerrainView<'_> {
         changes: &[],
     }
 }
-fn footprint(game: &Game, cell: usize, size: usize) -> Option<Vec<usize>> {
+pub(crate) fn footprint(game: &Game, cell: usize, size: usize) -> Option<Vec<usize>> {
     let (x, y) = (cell % game.w, cell / game.w);
     (x + size <= game.w && y + size <= game.h).then(|| {
         (0..size)
@@ -844,7 +896,7 @@ fn footprint(game: &Game, cell: usize, size: usize) -> Option<Vec<usize>> {
             .collect()
     })
 }
-fn foot_center(game: &Game, cell: usize, size: usize) -> Point {
+pub(crate) fn foot_center(game: &Game, cell: usize, size: usize) -> Point {
     Point {
         x: (cell % game.w) as f64 * CELL + size as f64 * CELL / 2.0,
         z: (cell / game.w) as f64 * CELL + size as f64 * CELL / 2.0,
