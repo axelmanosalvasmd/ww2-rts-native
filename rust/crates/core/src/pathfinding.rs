@@ -4,6 +4,7 @@
 //! Automatic recipient-view selection and request scheduling are separate work.
 //! No game state is read behind the caller's view.
 
+use crate::catalog::{Catalog, CatalogError, Value};
 use crate::game::{CELL, FORD, MOVE, MUD, Point, ROAD, WIRE, WOOD};
 use crate::math;
 use crate::navigation::{Navigation, NavigationError, Options, TerrainView};
@@ -22,6 +23,76 @@ pub struct PathRules {
     pub churn: f64,
     pub wet_ford: f64,
     pub wet_ground: f64,
+}
+
+impl PathRules {
+    /// Load canonical path costs without runtime files or caller-provided JSON.
+    pub fn compiled() -> Result<Self, CatalogError> {
+        Self::from_catalog(Catalog::compiled()?)
+    }
+
+    /// Read path costs from the same catalog as the unit and movement rules.
+    /// Reject unusable costs before a native match starts.
+    pub fn from_catalog(catalog: &Catalog) -> Result<Self, CatalogError> {
+        let cfg = catalog.table("CFG")?;
+        let weather = cfg
+            .get("weather")
+            .ok_or_else(|| CatalogError("missing CFG.weather".into()))?;
+        let wood = cfg
+            .get("wood")
+            .ok_or_else(|| CatalogError("missing CFG.wood".into()))?;
+        let rules = Self {
+            wall_hug: path_number(cfg, "wallHug")?,
+            bunker_radius: path_number(catalog.unit("bunker")?, "radius")?,
+            road_speed: path_number(cfg, "roadSpeed")?,
+            ford_speed: path_pair(cfg, "fordSpeed")?,
+            mud_speed: path_pair(cfg, "mudSpeed")?,
+            wood_speed: path_number(wood, "speed")?,
+            churn: path_number(cfg, "churn")?,
+            wet_ford: path_number(weather, "wetFord")?,
+            wet_ground: path_number(weather, "wetGround")?,
+        };
+        if rules.wall_hug < 0.0
+            || rules.bunker_radius < 0.0
+            || [
+                rules.road_speed,
+                rules.wood_speed,
+                rules.ford_speed[0],
+                rules.ford_speed[1],
+                rules.mud_speed[0],
+                rules.mud_speed[1],
+            ]
+            .iter()
+            .any(|v| *v <= 0.0)
+            || [rules.churn, rules.wet_ford, rules.wet_ground]
+                .iter()
+                .any(|v| !(0.0..1.0).contains(v))
+        {
+            return Err(CatalogError("invalid path cost or ground speed".into()));
+        }
+        Ok(rules)
+    }
+}
+
+fn path_number(value: &Value, key: &str) -> Result<f64, CatalogError> {
+    value
+        .get(key)
+        .and_then(Value::number)
+        .filter(|n| n.is_finite())
+        .ok_or_else(|| CatalogError(format!("path rule {key} must be a finite number")))
+}
+fn path_pair(value: &Value, key: &str) -> Result<[f64; 2], CatalogError> {
+    let Some([a, b]) = value.get(key).and_then(Value::array) else {
+        return Err(CatalogError(format!(
+            "path rule {key} must have two numbers"
+        )));
+    };
+    match (a.number(), b.number()) {
+        (Some(a), Some(b)) if a.is_finite() && b.is_finite() => Ok([a, b]),
+        _ => Err(CatalogError(format!(
+            "path rule {key} must have finite numbers"
+        ))),
+    }
 }
 
 /// Each slice belongs to the same authoritative or recipient-owned terrain.
