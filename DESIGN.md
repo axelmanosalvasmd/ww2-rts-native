@@ -784,6 +784,8 @@ The native Match now stages immediate Conquest ground/naval recruitment through 
 
 ## Conquest ability and recovery component (2026-10-13)
 
+The canonical World constructor also creates empty field-work, ability and recovery stores. Its private publication boundary preflights combat, firing, ability and recovery identities, then initializes all four rows after canonical insertion. Neutral World actors use the same owner-independent defaults; World ability/recovery execution remains outside this component. The merged World/supply ancestry passes 17 focused debug tests and all 187 release workspace tests, strict Clippy, formatting and release FFI. Focused World debug checks the callback defaults in the bounded startup guard fixture; every original World case runs in the release suite.
+
 `Match.abilities` owns source ability cooldown, buff and AP state, plus automatic/walked flags for an aimed order. `UnitControl.nade` is the only aimed point; Game owns sprint and health. `Match.recovery` owns previous health, wound/heal ticks and reinforcement progress. Logistics retains physical provisions. Startup and shared recruitment publication initialize these rows; stale metadata refuses admission before payment.
 
 Recovery uses a captured late-list frame: prepare HQ/depot/aid membership, perform cadence-ten healing and mine sweeping, allow supply/network refresh, then reinforce against the prepared membership. It excludes later births and preserves earlier depot access on a beat that changes cut-off status. Medic choices retain maintained grid order. Firing owns flight geometry, IDs and random draws and borrows canonical buff/AP; the ability actuator creates no second projectile registry. These APIs are internal and add no ABI or wire contract.
