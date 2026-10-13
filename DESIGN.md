@@ -1,5 +1,13 @@
 # Three Crossroads Native: design decisions
 
+## El Alamein trusted startup lifecycle (2026-10-13, source successor)
+
+The startup test now descends from the actual ordinary Research/legacy caller and selected recipient composition at `63ea2ed9`. Validated legacy Scenario state is admitted through the canonical provider preflight. The complete real WebSocket lifecycle therefore returns to authored El Alamein, keeping the exact public map, all 13 start fields, full start baselines, later Fog deltas, held checks, real terrain and unit changes, resync, paused reconnect ordering and replacement identity.
+
+The former blanket Scenario-refusal assertion is obsolete. Rollback instead uses a complete valid Default Match while the actual room remains bound to El Alamein. Existing map/settings admission must reject it before any runtime/account/epoch publication, preserve the actual lobby roster/settings/result and emit no partial start or snapshot. No Scenario, map, random stream or expected outgoing state is altered to make the scene admissible.
+
+Both actual commander sockets must receive the original public intro emitted at tick 60 and decode its enclosing snapshot. Direct unchanged pinned `createGame`, `step` and `snapshotFor` retain `k`, text, English localized text, `scenarioRecipients:"public"`, `scenarioSide:0`, `pub:true`, `execution:"scenario:1"` and `atTick:60`; no metadata is stripped. The represented durable HUD is `scenario:{version:1,objectives:[]}`. Later reconnect and final hold must not repeat that original intro. The private authored mine/material/trigger exclusions remain complete. Public start/restart, new roles, spectator policy, general scenarios, ABI 2 and table transport remain outside this test migration. This isolated consumer changes no production or core source and needs independent source reanchor plus a fresh coherent native cycle before host acceptance.
+
 ## Ordinary legacy recipient composition (2026-10-13, source successor)
 
 The separate normal union includes the real ordinary Research/Scenario caller, the public Say projection and the canonical falling-section reader. Its fifth TickEvent family borrows into ShotRef without another buffer or producer drain. Complete snapshot admission now uses the provider's exact legacy-state preflight rather than refusing every represented legacy map. The original Source public Say row and `scenario:{version:1,objectives:[]}` remain the selected commander output. General authored scenarios, spectators, operative starts, public start/restart and pending privacy policies remain outside this admission.

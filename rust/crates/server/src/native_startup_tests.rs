@@ -169,7 +169,7 @@ impl SetupExpected {
                 .map(|player| player.spawn)
                 .collect(),
             weather: state.start.weather.now.name(),
-            public_map: serde_json::from_str(include_str!("maps/default.json")).unwrap(),
+            public_map: serde_json::from_str(include_str!("maps/el-alamein.json")).unwrap(),
         }
     }
     fn check(&self, start: &Value, slot: usize, identity: u64) {
@@ -312,8 +312,13 @@ async fn actual_socket_start_decode_mutations_resync_reconnect_and_new_match() {
                 &hub.public_url,
             )
         });
-        let refusal = host.block_on(control.attach("ABC", scripted)).unwrap_err();
-        assert!(refusal.contains("capability: Scenario"), "{refusal}");
+        let refusal = host
+            .block_on(control.attach("ABC", setup("default")))
+            .unwrap_err();
+        assert!(
+            refusal.contains("settings disagree with the lobby"),
+            "{refusal}"
+        );
         host.block_on(async {
             let hub = control.server.hub.lock().await;
             assert!(hub.rooms["ABC"].native.is_none());
@@ -330,16 +335,15 @@ async fn actual_socket_start_decode_mutations_resync_reconnect_and_new_match() {
                 "refused attachment preserves actual lobby roster, settings and result"
             );
         });
-        // The next actual packet is the requested default lobby, not a partial
-        // start or snapshot from the refused scripted attachment.
-        a.send(json!({"t":"map","name":"default"}));
+        // A genuine name command makes the next packet an El lobby, not a
+        // partial start or snapshot from the misbound trusted attachment.
+        a.send(json!({"t":"name","name":"a"}));
         for receiver in [&mut a, &mut b] {
             let message = receiver.receive();
             assert_eq!(message["t"], "lobby");
-            assert_eq!(message["mapName"], "default");
+            assert_eq!(message["mapName"], "el-alamein");
         }
-        let state = setup("default");
-        assert!(state.scenario.is_none());
+        let state = scripted;
         let expected = SetupExpected::new(&state);
         let victim = state
             .world
@@ -360,6 +364,9 @@ async fn actual_socket_start_decode_mutations_resync_reconnect_and_new_match() {
         let start_b = b.until(|message| message["t"] == "start");
         expected.check(&start_b, 1, identity);
         let first = a.until(|message| message["t"] == "s");
+        assert_eq!(first["scenario"], json!({"version":1,"objectives":[]}));
+        let first_b = b.until(|message| message["t"] == "s");
+        assert_eq!(first_b["scenario"], json!({"version":1,"objectives":[]}));
         assert!(a.view.unit(victim).is_some());
         assert!(
             first.get("all").is_none(),
@@ -373,6 +380,38 @@ async fn actual_socket_start_decode_mutations_resync_reconnect_and_new_match() {
             Err(ViewError::WrongState(_))
         ));
         assert_eq!(missing_start.unit_count(), 0);
+        // Original createGame/step/snapshotFor emits this public intro once at
+        // tick60. The actual host must retain its complete commander row.
+        let intro = authored.triggers()[0].say.as_deref().unwrap();
+        let expected_say = json!({"k":"say","text":intro,"localized":{"en":intro},
+            "scenarioRecipients":"public","scenarioSide":0,"pub":true,
+            "execution":"scenario:1","atTick":60});
+        let has_intro = |message: &Value| {
+            message["t"] == "s"
+                && message["shots"]
+                    .as_array()
+                    .is_some_and(|shots| shots.iter().any(|shot| shot["k"] == "say"))
+        };
+        for receiver in [&mut a, &mut b] {
+            let observed = receiver
+                .messages
+                .iter()
+                .find(|message| has_intro(message))
+                .cloned();
+            let delivered = match observed {
+                Some(message) => message,
+                None => receiver.until(has_intro),
+            };
+            assert!(delivered["tick"].as_u64().unwrap() >= 60);
+            assert_eq!(delivered["scenario"], json!({"version":1,"objectives":[]}));
+            let sayings = delivered["shots"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|shot| shot["k"] == "say")
+                .collect::<Vec<_>>();
+            assert_eq!(sayings, vec![&expected_say]);
+        }
         let accepted_start = a.view.start().unwrap().clone();
         let held = a.view.unit_count();
         a.send(json!({"t":"name","name":"a"}));
@@ -519,6 +558,14 @@ async fn actual_socket_start_decode_mutations_resync_reconnect_and_new_match() {
             peer.get("all").is_none(),
             "one seat's resync cannot reset another socket ledger"
         );
+        assert_eq!(
+            a.messages
+                .iter()
+                .filter(|message| has_intro(message))
+                .count(),
+            1,
+            "resync must not repeat the original public intro"
+        );
         // Real drop pauses the current stable seat. Replacing another seat must
         // deliver its start and paused state without resuming the dropped seat.
         drop(a);
@@ -567,7 +614,15 @@ async fn actual_socket_start_decode_mutations_resync_reconnect_and_new_match() {
                 .unwrap()
                 .ending_complete
         );
-        let next = setup("default");
+        assert_eq!(
+            a.messages
+                .iter()
+                .filter(|message| has_intro(message))
+                .count(),
+            0,
+            "reconnect and final hold must not replay the completed intro"
+        );
+        let next = setup("el-alamein");
         let next_expected = SetupExpected::new(&next);
         let new_identity = host.block_on(control.attach("ABC", next)).unwrap();
         assert!(new_identity > identity);
