@@ -389,6 +389,8 @@ pub struct BuildingCell {
 /// Authoritative Conquest startup state. Tick execution is added independently.
 /// Live terrain and units have a single owner in `world.game`.
 pub struct Match {
+    pub combat: crate::match_combat::CombatState,
+    pub environment: crate::environment::EnvironmentRuntime,
     pub commands: crate::match_commands::CommandState,
     pub world: World,
     pub start: StartPlan,
@@ -438,6 +440,8 @@ impl Match {
             crate::legacy_scenario::LegacyScenario::from_map(map, &owners)
         };
         let mut result = Self {
+            combat: crate::match_combat::CombatState::default(),
+            environment: crate::environment::EnvironmentRuntime::default(),
             commands: crate::match_commands::CommandState::default(),
             grid: SpatialGrid::new(&world.game.units, 16.0),
             world,
@@ -456,6 +460,7 @@ impl Match {
         result.setup_bases()?;
         for unit in result.world.game.units.values() {
             result.firing.initialize(unit.id);
+            result.combat.initialize(unit.id);
             let control = crate::match_commands::UnitControl::new(unit, &result.rules)?;
             result.commands.insert(unit.id, control);
         }
