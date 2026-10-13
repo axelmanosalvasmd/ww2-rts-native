@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added the internal Rust recipient view and reference protocol replay from PR #16 without its C interface. The decoder retains received units, raw terrain rows, fog masks and HUD messages, with bounded atomic validation and held-set resync checks. All 1,236 recorded Conquest and World message states have direct browser expectations. ABI 1 and its header remain unchanged; PR #16's six proposed C calls still await Axel's approval.
+
 - Added versioned match random streams and a bounded tick-order queue. Terrain, weather, combat, off-map support and each AI seat have separate seeded streams; saved stream states resume exactly. Orders apply in tick, issuer and sequence order regardless of arrival order, with explicit duplicate, past-tick and capacity errors. These are core building blocks, not a full match loop or a new wire protocol.
 
 - Recorded embedded map delivery and its 96 live HTTP comparisons in the design and server parity inventory. NET-11 remains in progress: public projections are served, while raw editor reads, map writes and authoritative world loading are still missing.
