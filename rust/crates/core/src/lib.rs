@@ -2,7 +2,10 @@
 //! Unreal client reach it as a library (`AGENTS.md`).
 
 pub mod catalog;
+pub mod client_view;
+pub mod deployment;
 pub mod economy;
+pub mod economy_state;
 pub mod fog;
 pub mod formation;
 pub mod game;
@@ -11,15 +14,22 @@ pub mod map;
 pub mod math;
 pub mod movement;
 pub mod navigation;
+pub mod path_requests;
+
 pub mod orders;
 pub mod pathfinding;
+pub mod projectiles;
+
 pub mod random;
+pub mod route_knowledge;
 pub mod rules;
 pub mod separation;
 pub mod sort;
+pub mod structures;
 pub mod terrain;
 pub mod traffic;
 pub mod unit_spawn;
 pub mod vehicle;
 mod vehicle_navigation;
 pub mod vision;
+pub mod weather;

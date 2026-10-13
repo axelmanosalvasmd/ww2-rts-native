@@ -1,12 +1,13 @@
 //! Loads the issue #2 harness's game states into the rules core and checks the core against the reference
 //! JavaScript: the vision and fog passes line for line (`harness/vision-check.mjs`), movement and crowd
 //! separation call by call (`harness/movement-trace.mjs`), and the Rust side of the frozen workload's timings
-//! (`harness/sim-workload.mjs`). Kept out of `ww2-core`, which reads no files and parses no JSON.
+//! (`harness/sim-workload.mjs`). Kept out of `ww2-core`, which reads no files.
 
 pub mod check;
 pub mod codec;
 pub mod load;
 pub mod replay;
+pub mod view;
 pub mod workload;
 
 use serde_json::Value;
