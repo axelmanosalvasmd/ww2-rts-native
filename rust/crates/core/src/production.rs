@@ -154,6 +154,42 @@ pub struct CompletedUnit {
     pub kind: String,
     pub job_id: u64,
 }
+/// An admitted Conquest purchase, ready for the caller's staged placement.
+#[derive(Clone, Debug, PartialEq)]
+pub struct RecruitRequest {
+    pub building: u32,
+    pub owner: usize,
+    pub kind: String,
+    pub spend: Price,
+}
+/// A recruitment purchase whose MP has been paid after successful placement.
+#[derive(Clone, Debug, PartialEq)]
+pub struct CompletedRecruit {
+    pub request: RecruitRequest,
+}
+/// Preparation reserves exclusive access to the wallet without charging it. Drop
+/// this token if placement fails. Commit once after staging the unit successfully,
+/// before publishing the caller's transaction. Authoritative facts must stay stable
+/// between preparation and commit; the match processes purchases serially.
+#[must_use = "place the recruit and commit, or drop without payment"]
+pub struct PreparedRecruit<'a, 'facts> {
+    request: RecruitRequest,
+    wallets: &'a mut EconomyState,
+    _production: &'a ProductionState,
+    _context: &'a Context<'facts>,
+}
+impl PreparedRecruit<'_, '_> {
+    pub fn request(&self) -> &RecruitRequest {
+        &self.request
+    }
+    /// The caller has already completed placement on its staged match state.
+    pub fn commit(self) -> CompletedRecruit {
+        self.wallets.players[self.request.owner].mp -= self.request.spend.mp;
+        CompletedRecruit {
+            request: self.request,
+        }
+    }
+}
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct StepEvents {
     pub units: Vec<CompletedUnit>,
@@ -441,6 +477,86 @@ impl ProductionState {
             wallets.population(&context, slot)?,
             wallets.population_cap(&context, slot)?,
         ))
+    }
+    /// Prepare instant Conquest recruitment without changing wallets or queues.
+    /// Default represents the absent mode object of ordinary Conquest. Other
+    /// modes are outside this API. Winner/away/out/rate admission stays with Match.
+    pub fn prepare_recruit<'a, 'facts>(
+        &'a self,
+        c: &'a Context<'facts>,
+        wallets: &'a mut EconomyState,
+        slot: usize,
+        faction: Faction,
+        kind: &str,
+        from: Option<u32>,
+    ) -> Result<PreparedRecruit<'a, 'facts>, Error> {
+        self.validate(c, wallets)?;
+        self.slot(slot)?;
+        if !matches!(c.mode.kind, Mode::Default | Mode::Conquest) {
+            return Err(Error::InvalidInput("recruitment supports Conquest only"));
+        }
+        let cat = Catalog::compiled()?;
+        let Ok(def) = cat.unit(kind) else {
+            return denial(Denial::Blocked);
+        };
+        if kind == "worldbase" || !economy::can_build(kind, faction)? {
+            return denial(Denial::Blocked);
+        }
+        if flag(def, "classic") || (flag(def, "naval") && !c.naval) {
+            return denial(Denial::Needs);
+        }
+        if c.tech_enabled && economy::tier_of(kind)? > self.players[slot].tech.tier() {
+            return denial(Denial::Tier);
+        }
+        let price = economy::price_of(c.mode.kind, kind)?;
+        let (pop, cap) = self.population(c, wallets, slot)?;
+        let mut have = c
+            .units
+            .iter()
+            .filter(|u| u.owner == Some(slot) && u.kind == kind)
+            .count();
+        for u in c.units.iter().filter(|u| u.owner == Some(slot)) {
+            have += self
+                .buildings
+                .get(&u.id)
+                .map_or(0, |b| b.jobs.iter().filter(|j| j.kind == kind).count());
+        }
+        if wallets.players[slot].mp < price.mp {
+            return denial(Denial::Mp);
+        }
+        if price.fuel != 0.0 && wallets.players[slot].fuel < price.fuel {
+            return denial(Denial::Fuel);
+        }
+        if pop + economy::pop_use(kind)? > cap {
+            return denial(Denial::Pop);
+        }
+        if def
+            .get("max")
+            .and_then(Value::number)
+            .is_some_and(|max| have as f64 >= max)
+        {
+            return denial(Denial::Max);
+        }
+        let makers = self.production_buildings(c, wallets, slot, Some(kind))?;
+        let building = if let Some(id) = from {
+            makers.into_iter().find(|n| *n == id)
+        } else {
+            makers.first().copied()
+        };
+        let Some(building) = building else {
+            return denial(Denial::Needs);
+        };
+        Ok(PreparedRecruit {
+            request: RecruitRequest {
+                building,
+                owner: slot,
+                kind: kind.into(),
+                spend: price,
+            },
+            wallets,
+            _production: self,
+            _context: c,
+        })
     }
     /// Construction-mode recruitment with the source denial order. Command-level
     /// winner/away/out and rate-limit admission belongs to the caller.
