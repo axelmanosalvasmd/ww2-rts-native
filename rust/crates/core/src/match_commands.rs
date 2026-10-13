@@ -1557,14 +1557,10 @@ impl crate::match_runtime::Match {
         u: &Unit,
         to: Point,
     ) -> Result<crate::pathfinding::PathResult, String> {
-        self.refresh_recipient_routing(owner)?;
-        let query = self.recipients[owner].query();
-        let terrain = query
-            .path_terrain(self.recipients[owner].live())
-            .map_err(|e| format!("recipient path: {e:?}"))?;
-        let rules = crate::pathfinding::PathRules::compiled().map_err(|e| e.to_string())?;
-        let kind = &self.rules.kinds[u.kind];
-        search_route(&mut self.commands.paths, terrain, rules, kind, u, to).map(|r| r.result)
+        if owner != u.owner {
+            return Err("route owner mismatch".into());
+        }
+        self.search_unit_route(u, to).map(|route| route.result)
     }
 }
 pub(crate) struct CommandRoute {
@@ -1725,33 +1721,19 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
             .then_some(u64::from(id))
     }
     fn knowledge_version(&self, id: UnitId) -> u64 {
-        self.match_state.world.game.units.get(&id).map_or(0, |u| {
-            self.match_state.recipients[u.owner]
-                .query()
-                .navigation()
-                .versions
-                .knowledge
-        })
+        self.match_state
+            .world
+            .game
+            .units
+            .get(&id)
+            .map_or(0, |u| self.match_state.route_failure_version(u.owner))
     }
     fn search(
         &mut self,
         r: crate::path_requests::Request,
     ) -> Result<crate::path_requests::SearchOutcome, String> {
         let u = self.match_state.world.game.units[&r.unit].clone();
-        self.match_state.refresh_recipient_routing(u.owner)?;
-        let query = self.match_state.recipients[u.owner].query();
-        let terrain = query
-            .path_terrain(self.match_state.recipients[u.owner].live())
-            .map_err(|e| format!("recipient path: {e:?}"))?;
-        let path_rules = crate::pathfinding::PathRules::compiled().map_err(|e| e.to_string())?;
-        let outcome = search_route(
-            &mut self.match_state.commands.paths,
-            terrain,
-            path_rules,
-            &self.match_state.rules.kinds[u.kind],
-            &u,
-            r.goal,
-        )?;
+        let outcome = self.match_state.search_unit_route(&u, r.goal)?;
         let route = outcome.result;
         self.match_state
             .commands
@@ -1828,6 +1810,16 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
 }
 impl crate::match_runtime::Match {
     fn command_shootable(&self) -> Result<BTreeMap<UnitId, bool>, String> {
+        if self.uses_world_routes() {
+            self.validate_world_path_service()?;
+            return Ok(self
+                .world
+                .game
+                .units
+                .keys()
+                .map(|&id| (id, false))
+                .collect());
+        }
         self.world
             .game
             .units
@@ -1843,7 +1835,11 @@ impl crate::match_runtime::Match {
         budget: usize,
         retry_limit: u32,
     ) -> Result<crate::path_requests::TickReport, String> {
-        self.validate_building_activity_rows()?;
+        if self.uses_world_routes() {
+            self.validate_world_path_service()?;
+        } else {
+            self.validate_building_activity_rows()?;
+        }
         if self.world.game.tick < 0 {
             return Err("negative path tick".into());
         }
@@ -1866,8 +1862,10 @@ impl crate::match_runtime::Match {
                 self.current_board_goal(request.unit)?;
             }
         }
-        for owner in 0..self.start.players.len() {
-            self.refresh_recipient_routing(owner)?;
+        if !self.uses_world_routes() {
+            for owner in 0..self.start.players.len() {
+                self.refresh_recipient_routing(owner)?;
+            }
         }
         let shootable = self.command_shootable()?;
         let config = crate::path_requests::TickConfig {
@@ -2114,6 +2112,9 @@ impl crate::match_runtime::Match {
         goal: Point,
         kind: crate::path_requests::RequestKind,
     ) -> Result<crate::path_requests::Disposition, String> {
+        if self.uses_world_routes() {
+            Self::validate_world_request_kind(kind)?;
+        }
         if !matches!(
             kind,
             crate::path_requests::RequestKind::Recovery
@@ -2172,13 +2173,15 @@ impl crate::match_runtime::Match {
 #[cfg(test)]
 mod tests;
 
-struct MovingRequestContext<'a, 'terrain> {
-    unit: &'a mut Unit,
-    control: &'a mut UnitControl,
-    paths: &'a mut Pathfinding,
-    terrain: crate::pathfinding::PathTerrain<'terrain>,
-    profile: &'a crate::rules::UnitKind,
-    rules: crate::pathfinding::PathRules,
+pub(crate) struct MovingRequestContext<'a, 'terrain> {
+    pub(crate) unit: &'a mut Unit,
+    pub(crate) control: &'a mut UnitControl,
+    pub(crate) paths: &'a mut Pathfinding,
+    pub(crate) terrain: crate::pathfinding::PathTerrain<'terrain>,
+    pub(crate) profile: &'a crate::rules::UnitKind,
+    pub(crate) rules: crate::pathfinding::PathRules,
+    pub(crate) failure_version: u64,
+    pub(crate) terrain_read: Option<&'a std::cell::Cell<bool>>,
 }
 impl crate::path_requests::PathRequestContext for MovingRequestContext<'_, '_> {
     type Error = String;
@@ -2201,12 +2204,15 @@ impl crate::path_requests::PathRequestContext for MovingRequestContext<'_, '_> {
         (id == self.unit.id).then_some(u64::from(id))
     }
     fn knowledge_version(&self, _id: UnitId) -> u64 {
-        self.terrain.navigation.versions.knowledge
+        self.failure_version
     }
     fn search(
         &mut self,
         request: crate::path_requests::Request,
     ) -> Result<crate::path_requests::SearchOutcome, String> {
+        if let Some(read) = self.terrain_read {
+            read.set(true);
+        }
         let route = search_route(
             self.paths,
             self.terrain,
@@ -2249,6 +2255,9 @@ impl crate::match_runtime::Match {
         if unit.path_gen.checked_add(2).is_none() {
             return Err("unit path identity exhausted".into());
         }
+        if self.uses_world_routes() {
+            return self.move_world_unit_with_routes(id, suppression_speed);
+        }
         let owner = unit.owner;
         let kind = unit.kind;
         self.refresh_recipient_routing(owner)?;
@@ -2289,6 +2298,8 @@ impl crate::match_runtime::Match {
                             terrain,
                             profile,
                             rules: path_rules,
+                            failure_version: terrain.navigation.versions.knowledge,
+                            terrain_read: None,
                         };
                         if let Err(e) = self.commands.requests.request(
                             crate::path_requests::Request {

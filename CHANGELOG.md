@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Join the reviewed World routing provider with the ground actor and captured recovery checkpoint. Preserve the stronger canonical team/economy checks and all existing source fixtures. Far medic movement now reaches the real World memory route owner; native compilation and whole-caller replay remain pending.
+
 - Record ten original World ground-actor traces with 49 actions and 59 snapshots, preserving all 399 startup actors, 616 structures and 3,012 sections. Add an uncompiled native component consumer for neutral visibility, firing, damage, ordinary retirement, Munitions abilities and expired timers. The fixture explicitly restores a recorded component boundary and does not claim constructor or full-tick parity.
 
 - Port captured World recovery through the existing frame and actor owners. World bases include finished production buildings; local troops retain zero-resource reinforcement behavior, local medics heal and route through the actual owner route entrypoint, and neutral mine discovery preserves bit 31. Six original-source traces with 30 actions and independent source review pass; native component checks remain pending.
@@ -11,6 +13,15 @@
 - Project the canonical World local owner as Source -1 in existing firing and Environment event JSON helpers. Internal owner identity, effect order, sinks and ABI 2 stay unchanged; the previous unsigned projection exposed the internal sentinel as 4,294,967,295. Native event projection checks remain pending.
 
 - Permit a canonical World local actor in the shared read-only construction activity check used before generic commands. Keep paired build/control validation and every paid construction capability guard; this fixes the unrelated local-owner rejection before a commander ability without enabling World construction.
+- Bind supplied World ground facts to their current canonical unit ID, owner and kind before route/home preparation, while permitting prepared existing-exit pose and health changes. Add same-ID foreign owner/kind refusal witnesses preserving actors, queue and memory. This source admission fix has not run native checks.
+
+- Isolate physical World route scenes with fresh native matches, preserving history within each original scene. Add two actual original walkRoute witnesses for deferred no-read and terrain-read publication, including cached object pose after motion. Update only existing cached World bound-unit facts after movement to preserve source object-reference semantics, without adding visibility membership or changing terrain/Fog/delivery cursors. Source checks pass; native execution remains pending.
+
+- Restore fresh derived path and request caches between independent World ground oracle scenes, matching their separate original Game instances while retaining incremental history within each scene. This test-only source correction has not run native checks.
+
+- Validate World ground actor team binding through the shared game-only actor helper before path preparation, retaining one canonical actor policy and using the complete coordinated prerequisite. This source-only follow-up has not run native checks.
+
+- Add source-backed World ground route, home, march and traffic adapters over the existing actor policy and scheduler. Retry failures use the full accepted team-memory version, unknown World cover uses its remembered open baseline, and neutral traffic reads the existing local actor visibility without a commander seat. Deferred movement observations publish memory, Fog, ledger and rebound path history only when traffic or a search actually reads terrain. Replace the earlier test that deliberately refused unknown World cover. Original x64 recordings cover 58 policy/contact cases, 24 route-history reads and five retry attempts; native checks and whole World caller integration are pending. Active AIR, rail, enabled logistics and unconnected tactical paths remain refused.
 
 - Keep borrowed actor visibility membership independent of order. The canonical World local defender records maintained-grid order, so a binary search could miss visible targets. Add an unsorted-membership witness without sorting or changing the canonical vector; native execution is pending.
 
