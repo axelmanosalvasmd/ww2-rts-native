@@ -362,8 +362,7 @@ impl Command {
                         direction: object
                             .get("dir")
                             .and_then(|v| v.as_f64())
-                            .filter(|v| v.is_finite())
-                            .and_then(crate::formation::normalize_face),
+                            .filter(|v| v.is_finite()),
                         queue,
                     })
                 } else {

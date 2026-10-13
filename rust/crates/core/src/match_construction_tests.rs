@@ -307,3 +307,28 @@ fn queued_site_does_not_query_routes_and_actual_queries_preserve_same_key_fog() 
         }
     }
 }
+
+#[test]
+fn target_level_denials_and_unlisted_builds_retain_follow_and_slits_keep_finite_angles() {
+    let (mut m, id) = scene();
+    m.commands.units.get_mut(&id).unwrap().follow = 77;
+    assert_eq!(
+        m.execute_assist(0, &[i64::from(id)], 0, false).unwrap(),
+        Some(crate::match_commands::Denial::Unseen)
+    );
+    assert_eq!(m.commands.units[&id].follow, 77);
+    assert_eq!(
+        m.execute_build(0, &[i64::from(id)], "unknown", None, None, false)
+            .unwrap(),
+        Some(crate::match_commands::Denial::Blocked)
+    );
+    assert_eq!(m.commands.units[&id].follow, 77);
+    let site = m.next_unit_id;
+    let command =
+        Command::from_json(&json!({"t":"build","kind":"pillbox","ids":[id],"x":32,"z":24,"dir":7}))
+            .unwrap();
+    assert_eq!(m.execute_command(0, &command, false).unwrap(), None);
+    assert_eq!(m.world.game.units[&site].rot, 7.0);
+    assert_eq!(m.commands.units[&site].aim, 0.0);
+    assert_eq!(m.commands.units[&id].follow, 0);
+}

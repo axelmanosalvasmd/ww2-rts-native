@@ -855,5 +855,5 @@ fn original_paid_construction_replays_full_match_ticks() {
         }
         assert_eq!(next + 1, c["snapshots"].as_u64().unwrap() as usize);
     }
-    assert_eq!((actions, steps, snapshots), (108, 1917, 2006));
+    assert_eq!((actions, steps, snapshots), (113, 1919, 2013));
 }

@@ -694,7 +694,7 @@ impl Match {
             .ok()
             .filter(|id| self.world.game.units.contains_key(id))
         else {
-            return self.construction_denial(&selected, Denial::Unseen);
+            return Ok(Some(Denial::Unseen));
         };
         let site = &self.world.game.units[&target];
         let definition = Catalog::compiled()
@@ -706,7 +706,7 @@ impl Match {
             || !self.world.game.allied(site.owner, owner)
             || (site.built.unwrap_or(0.0) >= 1.0 && site.hp >= number(definition, "hpPer")?)
         {
-            return self.construction_denial(&selected, Denial::Unseen);
+            return Ok(Some(Denial::Unseen));
         }
         if site
             .built
@@ -773,9 +773,6 @@ impl Match {
             match_runtime::{foot_center, footprint},
             unit_publication::StagedUnit,
         };
-        if matches!(name, "depot" | "shipyard" | "supplycache") {
-            return Ok(Some(Denial::Unsupported));
-        }
         let command = Command::Build {
             ids: ids.to_vec(),
             kind: name.into(),
@@ -788,10 +785,10 @@ impl Match {
             .map_err(|e| e.to_string())?
             .contains(&name)
         {
-            for &id in &selected {
-                self.commands.units.get_mut(&id).unwrap().follow = 0;
-            }
-            return Ok(None);
+            return Ok(Some(Denial::Blocked));
+        }
+        if matches!(name, "depot" | "shipyard" | "supplycache") {
+            return Ok(Some(Denial::Unsupported));
         }
         let types = crate::economy::builder_types(self.options.mode).map_err(|e| e.to_string())?;
         let builders = selected
@@ -988,16 +985,19 @@ impl Match {
         staged.unit.cells = Some(cells.iter().map(|&c| c as u32).collect());
         staged.unit.built = Some(0.0);
         staged.unit.hp = full * 0.25;
-        if definition.get("slit").and_then(Value::boolean) == Some(true) {
-            staged.unit.rot = direction
-                .filter(|v| v.is_finite())
-                .and_then(crate::formation::normalize_face)
-                .unwrap_or_else(|| {
-                    math::atan2(
-                        center.z - self.start.players[owner].spawn.z,
-                        center.x - self.start.players[owner].spawn.x,
-                    )
-                });
+        if definition.get("slit").is_some_and(|v| match v {
+            Value::Null => false,
+            Value::Bool(v) => *v,
+            Value::Number(v) => *v != 0.0 && !v.is_nan(),
+            Value::String(v) => !v.is_empty(),
+            _ => true,
+        }) {
+            staged.unit.rot = direction.filter(|v| v.is_finite()).unwrap_or_else(|| {
+                math::atan2(
+                    center.z - self.start.players[owner].spawn.z,
+                    center.x - self.start.players[owner].spawn.x,
+                )
+            });
         }
         let mut empty_metadata = BTreeMap::new();
         let mut allocator = id;
