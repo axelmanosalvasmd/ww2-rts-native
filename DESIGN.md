@@ -753,3 +753,9 @@ Rally interception uses the firing owner's claim-aware target setter. Retreat fo
 ## Prepared unit publication (2026-10-13)
 
 [Prepared publication](docs/runtime/unit-publication.md) gives recruitment, FPS and later unit actuators one disjoint-field transaction for units, spatial index, controls and IDs. Whole batches and optional existing HP changes validate before payment, then publish with no fallible operation. Metadata owners supply only infallible publication callbacks after their own checks. An explicit World actor factory and publication policy admit the fixed local defender without weakening ordinary commander checks or creating a wallet. Three publication regressions and six original-source traces with 33 buys pass, alongside workspace/release checks and independent review. Source casualties can retain negative HP before removal; existing-unit validation preserves that state instead of blocking unrelated spawns.
+
+## Rust CI duration limit (2026-10-13)
+
+The combined snapshot frontier at 6a5d4d6 ran the full debug workspace suite on GitHub-hosted Ubuntu 24.04, Windows 2025 and macOS 15. Run 38443050411 reached the World-memory tests while earlier tests were still passing, then all three jobs were cancelled by the workflow's 20-minute limit. The preserved logs contain no assertion failure. A timeout is not evidence that the remaining tests pass.
+
+The job limit is now 40 minutes so the expanded suite can finish. The platform matrix, pinned toolchain, commands, failure policy and release C-link gate are unchanged. New heads still need fresh checks. GitHub's job timeout setting cancels work at its limit; it does not impose a minimum run duration (https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idtimeout-minutes).
