@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added read-only ordinary recipient-list batch preparation and checked publication. All requested seats validate before any remembered wreck row changes; stale hull, display, mode or recipient-memory inputs reject without publication. Source replay now exercises the prepared path, with a focused late-seat failure regression written. Native verification remains pending.
+
 - Merged the checked staged-routing provider footprint and test projection corrections into the recipient-list source successor. The provider evidence remains scoped to its recorded head; list and batch consumer native checks remain pending.
 
 - Added an actual-source World neutral wreck row and negative-zero rounding witness to the list replay. The fixture now covers five traces and 92 actions, including the internal neutral-owner sentinel projected as source owner -1; native proof remains pending.

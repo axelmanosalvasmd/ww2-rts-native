@@ -261,10 +261,14 @@ fn original_recipient_lists_retain_display_privacy_order_and_world_nodes() {
                     }
                 }
                 "read" => {
-                    result = m
-                        .recipient_snapshot_lists(index(&a["slot"]))
-                        .unwrap()
-                        .to_json()
+                    let owner = index(&a["slot"]);
+                    if world {
+                        result = m.recipient_snapshot_lists(owner).unwrap().to_json();
+                    } else {
+                        let prepared = m.prepare_ordinary_recipient_lists(&[owner]).unwrap();
+                        result = prepared.results()[0].1.to_json();
+                        m.publish_ordinary_recipient_lists(prepared).unwrap();
+                    }
                 }
                 op => panic!("unknown action {op}"),
             }
@@ -462,4 +466,79 @@ fn malformed_wrecks_and_changed_prepared_facts_do_not_publish_observation() {
     m.environment.wreck_metadata.remove(&9001);
     assert!(m.recipient_snapshot_lists(0).is_err());
     assert_eq!(before, observation_state(&m));
+}
+
+#[test]
+fn ordinary_batch_rejects_late_missing_facts_and_stale_publication_atomically() {
+    let f = fixture();
+    let mut m = load(&f["cases"][0]);
+    eye(&mut m, &json!({"id":777,"owner":0,"x":41.,"z":41.}));
+    eye(&mut m, &json!({"id":778,"owner":1,"x":181.,"z":101.}));
+    m.world.game.tick = 1;
+    crate::vision::update_vision(&mut m.world.game, &m.rules, &m.grid);
+    wreck(&mut m, &json!({"id":9001,"x":43.,"z":41.,"moving":false}));
+    wreck(&mut m, &json!({"id":9002,"x":183.,"z":101.,"moving":false}));
+    m.environment.wreck_metadata.remove(&9002);
+    let before = observation_state(&m);
+    assert!(m.prepare_ordinary_recipient_lists(&[0, 1]).is_err());
+    assert_eq!(before, observation_state(&m));
+    wreck(&mut m, &json!({"id":9002,"x":183.,"z":101.,"moving":false}));
+    let prepared = m.prepare_ordinary_recipient_lists(&[0, 1]).unwrap();
+    assert_eq!(
+        prepared
+            .results()
+            .iter()
+            .map(|(owner, _)| *owner)
+            .collect::<Vec<_>>(),
+        vec![0, 1]
+    );
+    assert_eq!(
+        prepared.results()[0]
+            .1
+            .wrecks
+            .iter()
+            .map(|w| w.id)
+            .collect::<Vec<_>>(),
+        vec![9001]
+    );
+    assert_eq!(
+        prepared.results()[1]
+            .1
+            .wrecks
+            .iter()
+            .map(|w| w.id)
+            .collect::<Vec<_>>(),
+        vec![9002]
+    );
+    assert_eq!(before, observation_state(&m));
+    drop(prepared);
+    assert_eq!(before, observation_state(&m));
+    let prepared = m.prepare_ordinary_recipient_lists(&[0, 1]).unwrap();
+    m.world.game.wrecks[0].x = 43.2;
+    assert!(m.publish_ordinary_recipient_lists(prepared).is_err());
+    assert_eq!(before, observation_state(&m));
+    m.world.game.wrecks[0].x = 43.;
+    let prepared = m.prepare_ordinary_recipient_lists(&[0, 1]).unwrap();
+    m.environment
+        .wreck_metadata
+        .get_mut(&9001)
+        .unwrap()
+        .rotation = 0.7;
+    assert!(m.publish_ordinary_recipient_lists(prepared).is_err());
+    assert_eq!(before, observation_state(&m));
+    m.environment
+        .wreck_metadata
+        .get_mut(&9001)
+        .unwrap()
+        .rotation = -0.26;
+    let prior = m.recipients[0].clone();
+    let prepared = m.prepare_ordinary_recipient_lists(&[0, 1]).unwrap();
+    m.publish_ordinary_recipient_lists(prepared).unwrap();
+    assert_eq!(m.recipients[0].remembered_wrecks()[0].id, Some(9001));
+    assert_eq!(m.recipients[1].remembered_wrecks()[0].id, Some(9002));
+    let prepared = m.prepare_ordinary_recipient_lists(&[0, 1]).unwrap();
+    m.recipients[0] = prior;
+    let changed_memory = observation_state(&m);
+    assert!(m.publish_ordinary_recipient_lists(prepared).is_err());
+    assert_eq!(changed_memory, observation_state(&m));
 }

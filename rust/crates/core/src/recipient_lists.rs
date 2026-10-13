@@ -1,5 +1,9 @@
 //! Observed wreck display facts and private recipient snapshot lists.
 //! Live hulls stay in Game and display/physics metadata stay in EnvironmentRuntime.
+pub use crate::match_routing::{
+    OrdinaryListPublication, OrdinaryListsCommit, PreparedOrdinaryLists,
+    prepare_ordinary_recipient_lists,
+};
 use crate::{
     environment::{EnvironmentRuntime, WreckMetadata},
     environment_debris::DebrisRow,
