@@ -33,7 +33,7 @@ impl Match {
     }
 
     /// Validate identity and numeric state before any movement, timer or press mutation.
-    fn check_companion(&self, id: u32) -> Result<CompanionId, String> {
+    pub(crate) fn check_companion(&self, id: u32) -> Result<CompanionId, String> {
         let g = &self.world.game;
         let cells =
             g.w.checked_mul(g.h)

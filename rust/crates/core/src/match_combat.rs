@@ -147,7 +147,7 @@ fn flag(v: &Value, key: &str) -> bool {
     v.get(key).and_then(Value::boolean).unwrap_or(false)
 }
 impl DamageWorld<'_> {
-    fn validate(&self) -> Result<(), CombatError> {
+    pub(crate) fn validate(&self) -> Result<(), CombatError> {
         let g = &self.world.game;
         if g.tick < 0
             || g.tick as u64 > 9_007_199_254_740_941
@@ -559,6 +559,10 @@ pub struct ExplosionSource {
     pub weapon_kind: Option<usize>,
     pub off_map_support: bool,
 }
+pub(crate) struct PreparedHurt {
+    pub events: Vec<CombatEvent>,
+    pub hurt: environment::Hurt,
+}
 impl ExplosionSource {
     pub fn weapon(kind: usize, rules: &Rules) -> Result<Self, CombatError> {
         let v = definition(kind, rules)?
@@ -793,6 +797,17 @@ impl DamageWorld<'_> {
         owner: i32,
         retarget: &mut dyn RetargetSink,
     ) -> Result<environment::Hurt, CombatError> {
+        let prepared = self.prepare_hurt(id, profile, fall, owner)?;
+        self.apply_events(&prepared.events, retarget, &mut BTreeSet::new())?;
+        Ok(prepared.hurt)
+    }
+    pub(crate) fn prepare_hurt(
+        &self,
+        id: UnitId,
+        profile: ExplosionSource,
+        fall: f64,
+        owner: i32,
+    ) -> Result<PreparedHurt, CombatError> {
         self.validate()?;
         profile.checked()?;
         if !fall.is_finite()
@@ -913,8 +928,7 @@ impl DamageWorld<'_> {
             from: Some(owner),
             local: false,
         };
-        self.apply_events(&events, retarget, &mut BTreeSet::new())?;
-        Ok(hurt)
+        Ok(PreparedHurt { events, hurt })
     }
 
     /// Terminal blast damages the supplied source-order live unit collection, then terrain.

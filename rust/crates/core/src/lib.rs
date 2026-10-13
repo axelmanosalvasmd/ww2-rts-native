@@ -4,9 +4,10 @@
 pub mod catalog;
 pub mod client_view;
 pub mod combat;
+pub mod companion_ray;
 pub mod companions;
 pub mod conquest_end;
-pub mod companions;
+pub mod match_companion_effects;
 pub mod match_companions;
 pub mod deployment;
 pub mod economy;
@@ -18,7 +19,6 @@ pub mod formation;
 pub mod game;
 pub mod grid;
 pub mod legacy_scenario;
-pub mod match_companions;
 
 pub mod command_destinations;
 pub mod logistics;
@@ -49,6 +49,7 @@ pub mod route_knowledge;
 pub mod rules;
 pub mod separation;
 pub mod sort;
+pub mod squad_men;
 pub mod structures;
 pub mod supply_convoys;
 pub mod terrain;
