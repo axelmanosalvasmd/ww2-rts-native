@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Refreshed PR #16 onto main `242997f` with the approved ABI 2 header and six view calls unchanged. Recorded Axel's reported Linux UE 5.8.3 guard, build, replay and live shadow checks on `03a49ac`: 1,236 replay messages, 7,650 rows, 61 edge checks, 18 formation tests and 2,230 live snapshots passed. The consumer source is unpublished; packaged Linux, Windows and macOS builds and authoritative decoder adoption remain pending. Earlier pending-verification entries describe their original checkpoints.
+
+- Documented the ABI mismatch path for the staged consumer update: the Rust export returns version 2 directly, and an ABI 1 consumer must reject it against its own version constant before making other calls. No library version-mismatch error code or current Unreal guard verification is claimed.
+
+- Refreshed PR #16 against the landed Rust recipient decoder and current main, retaining the exact ABI 2 header, six view calls and formation signatures. Recorded Axel's explicit client-consumption approval and Julio's Rust-side approval for staged adoption. PR merge and current Unreal build/link/runtime verification remain pending; no broader interface, gameplay or privacy decision is changed.
 - Added the native Match Conquest victory phase and finish bookkeeping: team VP in slot order, latest still-held capture location, 0.1 m end rounding, first-winner preservation, reveal and exact Conquest timeline fields. Canonical point accounting now freezes VP and capture story counts after the winner while ownership and manpower can continue. Three focused tests compare 12 original-JavaScript traces (24 assembled-match checkpoints) and invalid-state atomicity; existing startup and point-income tests pass. Other modes, command refusal, remaining story counters, result transport and the full battle loop remain unfinished.
 
 - Connected Conquest point supply, capture and income to the assembled Match, using the tick's ordered unit list and one canonical objective/reserve state. Eight original-source traces compare 72 phases across all armies, allied and enemy teams, disconnection, supply obstruction, post-decision VP freezing and units spawned during a tick. Capture timestamps follow source winner gating; malformed input leaves objectives and wallets unchanged. This phase does not advance the clock or implement the remaining match systems.
