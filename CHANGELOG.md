@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Wrote a native mass-project replay consumer for the frozen original-source full-step fixture: seven cases, 193 real runner steps and 215 checkpoints. It preserves startup actors, canonical project and paid-work identities, payments and income, queued joins, death cleanup, Stop, completion and route-drop facts. It uses the sole runner and fresh-scene clock/path configuration, preserving native random streams. Formatting and source-fixture checks pass; native execution remains pending.
+
 - Normal-merged the mass-project admission helper's checked documentation handoff. Its four debug guards and 214 release workspace tests establish the helper, not the new full tick composition; caller/runtime and recorder files are unchanged by this evidence merge.
 
 - Added a source-written whole-scene admission test for configured tick 18 and the next real runner boundary. It checks empty-queue restoration, unchanged RNG/wallet, running/primed/pending-input refusal and invalid-clock atomicity; native execution is pending.
