@@ -2,7 +2,7 @@
 
 The native rebuild of Three Crossroads, the WW2 RTS in [ww2-rts](https://github.com/axelmanosalvasmd/ww2-rts): an Unreal Engine 5.8 game client and a Rust server, sharing one Rust rules core.
 
-**Status: step 1.** The Rust core has its math, spatial grid, vision, fog, movement and crowd separation ported and checked against the JavaScript, and the first C calls for Unreal; Axel's Unreal client runs against the Node server. An internal Rust recipient view is checked against recorded browser state; its six ABI 2 C calls are approved for staged adoption in PR #16, with merge and current Unreal verification pending. A first standalone Rust server now hosts lobbies and reconnectable sessions; it cannot run matches yet. Step 1 is two measuring tests that decide whether the plan goes ahead:
+**Status: step 1.** The Rust core has its math, spatial grid, vision, fog, movement and crowd separation ported and checked against the JavaScript, and the first C calls for Unreal; Axel's Unreal client runs against the Node server. An internal Rust recipient view is checked against recorded browser state; its six ABI 2 C calls are approved for staged adoption in PR #16, with merge pending and Axel's Linux Editor build, guard, replay and live shadow checks reported on `03a49ac`. A first standalone Rust server now hosts lobbies and reconnectable sessions; it cannot run matches yet. Step 1 is two measuring tests that decide whether the plan goes ahead:
 
 - #1: the plan, the measured limits and the decision.
 - #2: sim test, the hot path in Rust against Node at 400, 1,000 and 2,000 units.

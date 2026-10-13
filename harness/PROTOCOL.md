@@ -1,6 +1,6 @@
 # Protocol recorder and browser oracle
 
-This harness verifies the internal Rust recipient decoder against the pinned reference protocol. PR #16 wraps the same decoder with six ABI 2 C calls, approved by both owners for staged adoption. PR merge and actual current-checkout Unreal verification remain pending. The harness does not establish Unreal integration or packaged-client completion.
+This harness verifies the internal Rust recipient decoder against the pinned reference protocol. PR #16 wraps the same decoder with six ABI 2 C calls, approved by both owners for staged adoption. PR merge remains pending. Axel reported separate Linux Editor build, guard, replay and live shadow checks on `03a49ac`; see `docs/contracts/rust-unreal-abi.md` for that evidence and its limits. This harness alone does not establish Unreal integration or packaged-client completion.
 
 The baseline is reference commit `e4e579a838aabae3b1d9dadbc17a0a87147bc52d` and x64 Node 24.21.0. `WW2_REFERENCE` may point at another initialized checkout of that pin. Install its existing Node dependencies before running; the harness resolves `three` and `ws` from the reference checkout.
 

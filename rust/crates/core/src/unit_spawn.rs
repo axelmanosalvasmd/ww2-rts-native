@@ -64,6 +64,23 @@ impl SpawnPlacer {
         Ok(self.search(view, at, block, origin.is_some()))
     }
 
+    /// Membership in the origin's exact movement region, used by door placement.
+    /// When no free origin cell exists, all blocked cells share source label -1.
+    pub(crate) fn region_membership(
+        &mut self,
+        view: TerrainView<'_>,
+        origin: Point,
+        block: u16,
+    ) -> Result<Vec<bool>, SpawnError> {
+        validate(view, origin)?;
+        let home = self.search(view, origin, block, false);
+        if view.flags[home] & block != 0 {
+            return Ok(view.flags.iter().map(|flags| flags & block != 0).collect());
+        }
+        self.fill_component(view, home, block);
+        Ok(self.component.clone())
+    }
+
     /// `index` is the caller's scatter slot (the reference defaults to unit count).
     /// Naval units may use another water region; all other supported kinds stay
     /// in the player's spawn region. Air-base placement is not implemented here.
