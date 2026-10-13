@@ -187,6 +187,39 @@ pub struct GeneratedWorld {
     pub scenery: Option<Scenery>,
     pub rails: RailNetwork,
 }
+impl GeneratedWorld {
+    /// Preserve authored landmark tags and biome hints for source-equivalent terrain initialization.
+    /// Rail metadata is authoritative input. Recipient delivery is a separate operation.
+    pub fn into_world_map_input(self) -> crate::world_map::WorldMapInput {
+        use serde_json::json;
+        let mut input = self.geography.into_world_map_input();
+        input.geography.generator_version = Some(WORLD_GENERATOR_VERSION);
+        if let Some(scenery) = self.scenery {
+            for (region, biome) in input.geography.regions.iter_mut().zip(scenery.regions) {
+                region.biome = Some(biome.name().into());
+            }
+            input.geography.biomes = Some(scenery.cells);
+            input.buildings = scenery.buildings;
+        }
+        let stations = self
+            .rails
+            .stations
+            .into_iter()
+            .map(|s| json!({"region":s.region,"x":s.x,"y":s.y}))
+            .collect::<Vec<_>>();
+        let lines = self
+            .rails
+            .lines
+            .into_iter()
+            .map(|l| json!({"a":l.a,"b":l.b,"cells":l.cells,"regions":l.regions}))
+            .collect::<Vec<_>>();
+        input
+            .geography
+            .metadata
+            .insert("rails".into(), json!({"stations":stations,"lines":lines}));
+        input
+    }
+}
 /// Consume exactly the same single Terrain draw as base geography generation.
 pub fn generate_world(
     random: &mut MatchRandom,

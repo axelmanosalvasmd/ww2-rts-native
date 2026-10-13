@@ -124,13 +124,13 @@ Decided now so release stays cheap:
 3. Unreal game: terrain, units, effects, HUD, sound, then the FPS view, with the browser client still working alongside.
 4. Retire the JavaScript client and Node server in ww2-rts.
 
-## World dressing and rail generation (2026-10-13)
+## World dressing and rail generation (2026-10-12)
 
-`generate_world` extends the base geography stage with optional `dressWorld` behavior and the source rail overlay. Biome selection follows terrain statistics and seeded provinces. Town placement preserves objective reserves, roads, region membership and one-cell building lanes; authored church, factory and mine-head tags remain typed data. Coordinate hashing and separate pick/town Mulberry32 streams keep dressing isolated from relief, channels, territories, homes and names. Heights remain unchanged. Rail station search and route costs use core math, float32 coarse costs, score-only heap ties and insertion order. Rails never consume random draws or mutate terrain.
+`generate_world` extends the base geography stage with optional `dressWorld` behavior and the source rail overlay. Biome selection follows terrain statistics and seeded provinces. Town placement preserves objective reserves, roads, region membership and one-cell building lanes; authored church, factory and mine-head tags remain typed data. Full output transfers these tags, optional region/cell biomes and rail metadata through the agreed World map input; layers remain absent to use the source rows-only migration. Coordinate hashing and separate pick/town Mulberry32 streams keep dressing isolated from relief, channels, territories, homes and names. Heights remain unchanged. Rail station search and route costs use core math, float32 coarse costs, score-only heap ties and insertion order. Rails never consume random draws or mutate terrain.
 
 The source rail router blocks water, fords and houses at sampled two-cell nodes, then rasterizes between them without checking every intermediate cell. The native port preserves this known behavior. It does not invent a rail repair or balance rule. Native full generator version 2 identifies the extension, separate from base version 1 and the prototype full generator version 3. Generated-map validation, World Match startup, recipient projection and live rail operations are separate integrations.
 
-An independent source recorder captures 20 Huge/Massive maps across five seeds with scenery both enabled and disabled, including cell and region biomes, landmark tags and every ordered rail-path fingerprint. Tests compare the original records and check seeded replay, geography isolation, wide corridors, flat stations and rail continuity. Compiled checks are pending the exclusive shared Cargo slot.
+An independent source recorder captures 20 Huge/Massive maps across five seeds with scenery both enabled and disabled, including cell and region biomes, landmark tags and every ordered rail-path fingerprint. Tests compare the original records and check the source stress tool's 80 settings for seeded replay, geography isolation, wide corridors, neutral spacing, flat home reserves, flat stations and rail continuity. Compiled checks are pending the exclusive shared Cargo slot.
 
 ## Base World geography generation (2026-10-13)
 

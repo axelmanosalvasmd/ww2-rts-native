@@ -394,9 +394,14 @@ fn full_metadata(world: &world_generation::GeneratedWorld) -> Value {
         "lines":world.rails.lines.iter().map(|l|json!({"a":l.a,"b":l.b,"regions":l.regions,"length":l.cells.len(),"cellsHash":hash(l.cells.iter().flat_map(|&c|(c as u32).to_le_bytes()))})).collect::<Vec<_>>()});
     actual
 }
-fn full_invariants(world: &world_generation::GeneratedWorld, bare: &GeneratedGeography) {
+fn full_invariants(
+    world: &world_generation::GeneratedWorld,
+    bare: &GeneratedGeography,
+    teams: &[i32],
+) {
     use world_generation::{Biome, RegionKind};
     let g = &world.geography;
+    invariants(g, teams);
     assert_eq!(g.regions, bare.regions);
     assert_eq!(g.spawns, bare.spawns);
     assert_eq!(g.region_map, bare.region_map);
@@ -541,12 +546,71 @@ fn original_dressed_geography_and_ordered_rail_paths() {
             );
         }
         let bare = world_generation::generate_from_terrain_seed(seed, size, &teams).unwrap();
-        full_invariants(&world, &bare);
+        full_invariants(&world, &bare, &teams);
+        let input = world.into_world_map_input();
+        assert_eq!(hash(input.chars), row["charsHash"]);
+        assert_eq!(
+            input.geography.generator_version,
+            Some(world_generation::WORLD_GENERATOR_VERSION)
+        );
+        assert_eq!(
+            input
+                .geography
+                .biomes
+                .map(hash)
+                .map_or(Value::Null, |s| json!(s)),
+            row["biomesHash"]
+        );
+        assert_eq!(
+            json!(
+                input
+                    .buildings
+                    .iter()
+                    .map(|b| json!({"x":b.x,"y":b.y,"kind":b.kind}))
+                    .collect::<Vec<_>>()
+            ),
+            row["buildings"]
+        );
+        let hints: Vec<_> = input
+            .geography
+            .regions
+            .iter()
+            .map(|r| r.biome.clone())
+            .collect();
+        let expected: Vec<_> = row["regions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|r| r.get("biome").map(|b| b.as_str().unwrap().to_owned()))
+            .collect();
+        assert_eq!(hints, expected);
+        assert_eq!(
+            input.geography.metadata["rails"]["stations"],
+            row["rails"]["stations"]
+        );
+        let lines = input.geography.metadata["rails"]["lines"]
+            .as_array()
+            .unwrap();
+        for (line, expected) in lines.iter().zip(row["rails"]["lines"].as_array().unwrap()) {
+            assert_eq!(line["a"], expected["a"]);
+            assert_eq!(line["b"], expected["b"]);
+            assert_eq!(line["regions"], expected["regions"]);
+            assert_eq!(
+                hash(
+                    line["cells"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .flat_map(|c| (c.as_u64().unwrap() as u32).to_le_bytes())
+                ),
+                expected["cellsHash"]
+            );
+        }
     }
 }
 #[test]
 fn scenery_isolated_across_seeded_sizes_and_seats() {
-    for i in 0u32..24 {
+    for i in 0u32..80 {
         let seed = (i + 1).wrapping_mul(2654435761);
         let size = if i % 2 == 0 {
             WorldSize::Massive
@@ -562,7 +626,7 @@ fn scenery_isolated_across_seeded_sizes_and_seats() {
         let b =
             world_generation::generate_world_from_terrain_seed(seed, size, &teams, true).unwrap();
         assert_eq!(a, b);
-        full_invariants(&a, &bare);
+        full_invariants(&a, &bare, &teams);
     }
     let mut random = MatchRandom::new(20261003);
     let mut expected = random.clone();
