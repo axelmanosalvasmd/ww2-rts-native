@@ -3,6 +3,7 @@
 
 pub mod catalog;
 pub mod client_view;
+pub mod combat;
 pub mod deployment;
 pub mod economy;
 pub mod economy_state;
@@ -28,6 +29,7 @@ pub mod sort;
 pub mod structures;
 pub mod terrain;
 pub mod traffic;
+pub mod unit_spawn;
 pub mod vehicle;
 mod vehicle_navigation;
 pub mod vision;
