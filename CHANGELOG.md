@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Adopt the central 40-minute CI budget in the snapshot frontier after all three first-run jobs reached the 20-minute limit during World memory replay. Each completed 272 test executions with no failed or ignored tests before cancellation. Every original check and test remains enabled; the fresh combined run is pending.
+
 - Refresh the consolidated server and recipient-snapshot frontier onto main `13a8d1f`, retaining the verified engineering and selected-delivery consumers and the approved ABI 2 interface. Only changelog history required conflict resolution; fresh combined platform checks remain pending.
 
 - Verify engineering snapshots and scuttling at compiled `09d79ab` on Mac arm64: 26 focused debug tests, all 272 locked release workspace tests, strict Clippy, formatting and release FFI pass. Independent hash-checked copies pass 52 debug/release executions. The replay covers five original cases, 481 full ticks and 513 states with focused works, worker rows/plans/orders, paid bindings and wallets. Full snapshots, transport and other platforms remain separate. Normally merge the published selected-delivery evidence without changing tested Rust or harness files.
@@ -203,6 +205,8 @@
 - Added an internal send-scoped Conquest projection for represented unit rows and recipient-owned economy, technology, rally, weather and finish fields. It reads canonical control, ability, recovery, firing and combat state, preserves the reference cached non-owner flag mask and hides unseen target IDs. An original-source fixture records 44 states and 132 recipient projections, including ally privacy, vehicles, cover, rounding and the distinct weapon/ability cooldowns. Missing canonical metadata returns a typed error; active air, engineering, gates and operatives remain unsupported. Plans, queued orders, terrain/fog, effects, points and the complete snapshot envelope remain pending. Native checks are pending the shared build lane.
 
 - Stacked the checked Conquest command actuator on the reviewed recruitment and recipient-routing checkpoint, retaining its complete command behavior and canonical shared control state. Combined integration checks belong to the shared CI lane.
+- Allow 40 minutes for the full three-platform Rust CI job. The combined snapshot frontier reached World-memory tests with no assertion failures before its previous 20-minute limit cancelled all three jobs. Formatting, strict Clippy, the complete debug suite, release FFI build and Linux C replay remain required.
+
 - Refreshed the consolidated Rust frontier in PR #119 onto merged ABI 2 main `d88ef6d`. Preserved all core behavior, both changelog histories, the six approved recipient-view calls and the exact header. Only additive changelog entries conflicted; combined-tree platform checks are rerun on the refreshed head.
 
 - Added canonical Match ground reactions, automatic retreat and idle spacing using shared command destinations, owner-known routes, firing targets and combat hit history. Three focused tests pass in debug and release, comparing 51 unchanged-source reaction/retreat cases and checking atomic rejection. Only the missing reaction timer is added to UnitControl. Air, carrier and garrison retreat exits remain explicit unsupported paths. Complete tick hookup remains separate. Adapted routing to canonical ordered-fire iteration and filled absent reserve defaults in the merged command fixture. At checkpoint ab0394d, strict Clippy stopped on two unused helpers in its inherited firing milestone. Final merged checks are pending.
