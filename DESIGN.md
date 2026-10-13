@@ -1,5 +1,15 @@
 # Three Crossroads Native: design decisions
 
+## Internal startup-table producer (2026-10-13, source checkpoint)
+
+The core's `startup_tables` module derives one immutable compiled buffer from the complete canonical Catalog, 17 source-recorded additions and the canonical formation constants. It uses no Match, recipient, engine, filesystem or network state. It does not export reduced typed Rules or introduce client-side copies. The original catalog and economy fixture remain unchanged; the same maintained Node recorder records the additional initialized exports into a separate compiled catalog and writes a complete startup fixture plus all 1,743 numeric leaf bits.
+
+Encoding v1 traverses ordered object keys and source-order arrays, emits compact UTF-8 JSON with exactly one final LF, preserves absent/null/false/zero, and uses the four agreed special-number tags. Finite values use the locked serde_json number formatter, removing the integral `.0` suffix. The producer validates the complete pinned schema before returning bytes; unknown version/reference, missing or unknown fields, malformed tags and incompatible catalog metadata refuse without a partial result. This is an internal Rust API, not an additional FFI call or transport choice.
+
+The actual Node recorder output is 30,618 bytes and matches accepted content SHA256 `5de90a7990ec5e8a2903436ac4809302464be29b546d79591a2adc08c68a2efd`. Source-derived formation identity remains `ed0ee23d32a621d1`. The Rust consumer tests require full byte equality to both Node and accepted content, compare every recorded IEEE754 leaf, exercise all four tags and strict schema refusal, and retain one immutable compiled buffer. They are written but have not compiled or run at this checkpoint. Native equality must be measured before asserting the Rust hash; any mismatch needs explicit review rather than a compatibility claim.
+
+After source freeze, exact-head focused native checks and matching full-payload byte assertions on Linux x86_64, Win64 MSVC and macOS arm64 provide the planned producer proof. Transport, hash negotiation, memory/freeing adapters and Unreal parser/cache adoption remain pending their separate agreement and published consumer evidence. The six ABI 2 calls, header, websocket startup and public routes are unchanged. Proposal acceptance/status edits remain on the documentation owner's branch.
+
 ## Public startup-table schema proposal (2026-10-13, unagreed)
 
 [The proposal](docs/contracts/startup-tables/README.md) records deterministic public static content separately from match startup and transport. It retains all 47 embedded catalog tables and adds 17 source-derived constants needed for RTS presentation, snapshot-column names and map/editor metadata. It excludes seeds, recipients, private match state, live actors, authored map instances and deferred operative tables. Static definitions do not enable unsupported runtime capabilities.

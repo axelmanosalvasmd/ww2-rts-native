@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add an internal Rust startup-table producer from the full canonical Catalog and 17 maintained source-export additions, with pinned schema validation and exact missing/null/number-tag preservation. Extend the existing Node recorder with the complete 64-table payload and 1,743 numeric IEEE754 leaf values; its bytes match accepted candidate hash `5de90a79...2efd` while the original 47 tables and economy fixture stay unchanged. Three written Rust correspondence/refusal tests and platform byte proof await a compile lease. No transport or ABI change.
+
 - Add an unagreed startup-table content/schema proposal for consumer review: all 47 compiled tables plus 17 source-derived public constants, a portable generator, exact field inventory and independent table/formation hashes. Table transport, additional FFI calls and Unreal adoption remain pending explicit agreement.
 
 - Prepared a separate normal union of frozen ordered-event PR #194 and the consolidated original-source frontier `dfcc0bf`. Preserved the one TickEvent/TickFailure result, producer emission sinks, original World component bodies, approved ABI 2 and the optimized test profile with debug assertions and overflow checks. Migrated the inherited quiet engineering consumer to require empty owned events, and report accepted recipient traffic once rather than unavailable. Published parents remain unchanged; exact union source review and the full optimized native cycle are pending.
