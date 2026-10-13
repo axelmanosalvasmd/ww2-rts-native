@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Require the engineering replay runner to return no outside environment effects before passing an empty effect batch to the snapshot collector. This protects the focused quiet scene boundary; native execution is pending.
+
 - Normally merged the independently source-reviewed engineering snapshot collector into the separate replay consumer. Existing recorder and consumer bodies are unchanged; the combined native gate and scoped Destroy continuation remain pending.
 
 - Corrected the engineering replay draft to retain the original snapshotFor fog reads. Its focused payload comparison still covers engineering rows; no native proof is claimed.
