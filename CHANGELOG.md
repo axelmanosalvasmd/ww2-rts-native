@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Recorded four complete original ordinary tick traces with 2,429 steps, 4,810 research observations, seven commands and two immediate recruitment births. Added an actual-runner consumer and two original restored-queue failure witnesses. Observed and unobserved Source replay agree; native execution awaits the sole tick owner's research hookup. Retained unsupported restored queues rather than inventing a Conquest mode object.
+
 - Added read-only admission for canonical research and live-building production phases, including actual World context, foreign queue rows and prospective numeric overflow. Ordinary Conquest keeps immediate purchases and refuses nonempty restored training queues. World queued AIR and logistics publication remain unsupported. Training publication also checks the canonical Aviation and reserve owners before using an ID. Full tick hookup and native proof are pending.
 
 - Prepared a separate normal union of frozen ordered-event PR #194 and the consolidated original-source frontier `dfcc0bf`. Preserved the one TickEvent/TickFailure result, producer emission sinks, original World component bodies, approved ABI 2 and the optimized test profile with debug assertions and overflow checks. Migrated the inherited quiet engineering consumer to require empty owned events, and report accepted recipient traffic once rather than unavailable. Published parents remain unchanged; exact union source review and the full optimized native cycle are pending.
