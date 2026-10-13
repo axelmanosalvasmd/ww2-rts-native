@@ -95,6 +95,9 @@ impl StartPlan {
         options: &MatchOptions,
         rules: &Rules,
     ) -> Result<Self, String> {
+        if map.geography().is_some() {
+            return Err("native startup does not yet initialize World matches".into());
+        }
         if !matches!(options.mode, Mode::Default | Mode::Conquest) {
             return Err("native startup currently supports Conquest".into());
         }
@@ -392,11 +395,15 @@ pub struct BuildingCell {
 /// Authoritative Conquest startup state. Tick execution is added independently.
 /// Live terrain and units have a single owner in `world.game`.
 pub struct Match {
+    pub combat: crate::match_combat::CombatState,
+    pub environment: crate::environment::EnvironmentRuntime,
     pub commands: crate::match_commands::MatchCommands,
     pub world: World,
     pub start: StartPlan,
     pub options: MatchOptions,
     pub grid: SpatialGrid,
+    pub(crate) recipients: Vec<crate::match_routing::RecipientRouting>,
+    pub(crate) routing_fog: crate::fog::Fog,
     pub building_cells: BTreeMap<usize, BuildingCell>,
     pub production: crate::production::ProductionState,
     pub building_rallies: BTreeMap<u32, Option<Point>>,
@@ -405,7 +412,14 @@ pub struct Match {
     produced_placer: crate::produced_units::ProducedPlacer,
     pub scenario: Option<crate::legacy_scenario::LegacyScenario>,
     pub logistics: crate::logistics::LogisticsState,
+    pub firing: crate::match_firing::FiringState,
     pub capture_ticks: Vec<Option<i64>>,
+    pub tick_state: crate::match_tick::TickState,
+    /// Canonical source counters. Event owners must record accepted effects exactly once.
+    pub story: Vec<crate::match_story::PlayerStory>,
+    pub fallen: crate::match_story::FallenLocations,
+    pub finish: Option<crate::conquest_end::ConquestFinish>,
+    pub timeline: Vec<crate::conquest_end::ConquestSample>,
     pub next_unit_id: u32,
     pub rules: Rules,
 }
@@ -444,8 +458,12 @@ impl Match {
         };
         let player_count = start.players.len();
         let mut result = Self {
+            combat: crate::match_combat::CombatState::default(),
+            environment: crate::environment::EnvironmentRuntime::default(),
             commands: crate::match_commands::MatchCommands::new(4096),
             grid: SpatialGrid::new(&world.game.units, 16.0),
+            recipients: Vec::new(),
+            routing_fog: crate::fog::Fog::default(),
             world,
             start,
             options,
@@ -457,16 +475,28 @@ impl Match {
             produced_placer: crate::produced_units::ProducedPlacer::new(),
             scenario,
             logistics: crate::logistics::LogisticsState::default(),
+            firing: crate::match_firing::FiringState::default(),
             capture_ticks: vec![None; map.points().len()],
+            tick_state: crate::match_tick::TickState::default(),
+            story: vec![crate::match_story::PlayerStory::default(); player_count],
+            fallen: crate::match_story::FallenLocations::default(),
+            finish: None,
+            timeline: Vec::new(),
             next_unit_id,
             rules,
         };
         result.setup_bases()?;
         for unit in result.world.game.units.values() {
+            result.combat.initialize(unit.id);
             let control = crate::match_commands::UnitControl::new(unit, &result.rules)?;
             result.commands.insert(unit.id, control);
         }
+        for &id in result.world.game.units.keys() {
+            result.firing.initialize(id);
+            result.combat.initialize(id);
+        }
         result.grid.rebuild(&result.world.game.units);
+        result.initialize_recipient_routing()?;
         Ok(result)
     }
 
@@ -478,7 +508,35 @@ impl Match {
         unit_order: &[u32],
         winner_decided: bool,
     ) -> Result<Vec<crate::objectives::Captured>, String> {
+        self.staged_point_phase(unit_order, winner_decided, true, true)
+    }
+
+    /// Run point connectivity before reinforcement and dead-unit terrain effects.
+    /// The tick runner calls capture/income afterward without recomputing this beat.
+    pub fn apply_point_supply(&mut self, unit_order: &[u32]) -> Result<(), String> {
+        self.staged_point_phase(unit_order, self.finish.is_some(), true, false)?;
+        Ok(())
+    }
+
+    /// Run capture and income against the cut flags computed in the earlier phase.
+    /// Canonical finish state controls VP and capture-story freezing.
+    pub fn apply_point_capture_income(
+        &mut self,
+        unit_order: &[u32],
+    ) -> Result<Vec<crate::objectives::Captured>, String> {
+        self.staged_point_phase(unit_order, self.finish.is_some(), false, true)
+    }
+
+    fn staged_point_phase(
+        &mut self,
+        unit_order: &[u32],
+        winner_decided: bool,
+        supply: bool,
+        capture_income: bool,
+    ) -> Result<Vec<crate::objectives::Captured>, String> {
         use crate::{economy_state as economy, objectives};
+        self.validate_conquest_finish_state()?;
+        let winner_decided = winner_decided || self.finish.is_some();
         let dt = self.rules.movement.tick;
         let game = &self.world.game;
         if game.tick < 0
@@ -526,7 +584,7 @@ impl Match {
         let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
         let cfg = catalog.table("CFG").map_err(|e| e.to_string())?;
         let supply_beat = number(field(cfg, "supply")?, "every")? as i64;
-        if self.options.supply && game.tick % supply_beat == 1 {
+        if supply && self.options.supply && game.tick % supply_beat == 1 {
             objectives::supply_lines(
                 terrain_view(game),
                 &mut points,
@@ -536,56 +594,72 @@ impl Match {
             )
             .map_err(|e| format!("point supply: {e:?}"))?;
         }
-        let captured = objectives::capture_points(&mut points, &units, &players, dt)
-            .map_err(|e| format!("point capture: {e:?}"))?;
-        let queues: Vec<Vec<&str>> = list
+        let captured = if capture_income {
+            let captured = objectives::capture_points(&mut points, &units, &players, dt)
+                .map_err(|e| format!("point capture: {e:?}"))?;
+            let queues: Vec<Vec<&str>> = list
+                .iter()
+                .map(|u| {
+                    self.production
+                        .building(u.id)
+                        .map_or_else(Vec::new, |p| p.queue().collect())
+                })
+                .collect();
+            let income_units: Vec<_> = list
+                .iter()
+                .zip(&queues)
+                .map(|(u, queue)| economy::Unit {
+                    id: u.id as u64,
+                    owner: Some(u.owner),
+                    kind: &self.rules.kinds[u.kind].name,
+                    hp: u.hp,
+                    // Missing built never passes the source's >= 1 check. This finite projection
+                    // is equivalent for income and leaves the canonical unit field absent.
+                    built: u.built.unwrap_or(0.0),
+                    queue,
+                })
+                .collect();
+            let income_points: Vec<_> = points
+                .iter()
+                .map(|p| economy::Point {
+                    owner: p.owner,
+                    cut: p.cut,
+                    mp: p.mp,
+                    vp: p.vp,
+                })
+                .collect();
+            wallets
+                .advance_income(
+                    &economy::Context {
+                        mode: economy::ModeContext::default(),
+                        army: self.options.army,
+                        units: &income_units,
+                        drops: &[],
+                        points: &income_points,
+                        nodes: &[],
+                        world: None,
+                    },
+                    dt,
+                    winner_decided,
+                )
+                .map_err(|e| e.to_string())?;
+            captured
+        } else {
+            Vec::new()
+        };
+        let changes: Vec<_> = captured
             .iter()
-            .map(|u| {
-                self.production
-                    .building(u.id)
-                    .map_or_else(Vec::new, |p| p.queue().collect())
+            .map(|event| crate::match_story::StoryChange {
+                slot: Some(event.owner),
+                key: crate::match_story::StoryKey::Captures,
+                amount: 1.0,
             })
             .collect();
-        let income_units: Vec<_> = list
-            .iter()
-            .zip(&queues)
-            .map(|(u, queue)| economy::Unit {
-                id: u.id as u64,
-                owner: Some(u.owner),
-                kind: &self.rules.kinds[u.kind].name,
-                hp: u.hp,
-                // Missing built never passes the source's >= 1 check. This finite projection
-                // is equivalent for income and leaves the canonical unit field absent.
-                built: u.built.unwrap_or(0.0),
-                queue,
-            })
-            .collect();
-        let income_points: Vec<_> = points
-            .iter()
-            .map(|p| economy::Point {
-                owner: p.owner,
-                cut: p.cut,
-                mp: p.mp,
-                vp: p.vp,
-            })
-            .collect();
-        wallets
-            .advance_income(
-                &economy::Context {
-                    mode: economy::ModeContext::default(),
-                    army: self.options.army,
-                    units: &income_units,
-                    drops: &[],
-                    points: &income_points,
-                    nodes: &[],
-                    world: None,
-                },
-                dt,
-                winner_decided,
-            )
-            .map_err(|e| e.to_string())?;
+        let story_updates =
+            crate::match_story::prepare_story_updates(&mut self.story, winner_decided, &changes)?;
         self.start.points = points;
         self.start.economy = wallets;
+        story_updates.commit();
         if !winner_decided {
             for event in &captured {
                 self.capture_ticks[event.objective_index] = Some(game.tick);

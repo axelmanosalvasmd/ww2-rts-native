@@ -236,6 +236,7 @@ fn recipient_projection_matches_original_helpers() {
                 .unwrap()
                 .iter()
                 .map(|w| Wreck {
+                    id: None,
                     cell: None,
                     x: number(&w["x"]),
                     z: number(&w["z"]),
