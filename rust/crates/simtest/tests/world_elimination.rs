@@ -189,13 +189,7 @@ fn actual_world_elimination_matches_original_order_collateral_and_overflow() {
                 encode(step["removedUnits"].clone())
             );
             assert_eq!(
-                encode(json!(
-                    result
-                        .effects
-                        .iter()
-                        .map(|e| e.to_json())
-                        .collect::<Vec<_>>()
-                )),
+                encode(json!(result.effects.iter().map(effect).collect::<Vec<_>>())),
                 step["shots"],
                 "{} effects",
                 case["name"]

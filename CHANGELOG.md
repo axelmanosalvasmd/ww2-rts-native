@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix native fixture compilation by retaining three route queries while their borrowed navigation views are read. Use the explicit World effect adapter in elimination comparisons, and scope the shared sorting helper lint to that one test helper.
+
 - Fix the first native World elimination compile: observation receipts retain canonical `u32` footprint indices, and staged sight validates their checked conversion to bounded terrain indices. No cell data or observation ordering changes.
 
 - Restore explicit flat source/native scene terrain before registering elimination fixtures. This prevents unrelated bootstrap geometry from contaminating debris comparisons when the transition harness does not claim matched startup random streams.

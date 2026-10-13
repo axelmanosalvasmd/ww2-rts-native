@@ -79,7 +79,8 @@ fn prepared_removed_objects_match_original_cached_world_views_without_refreshing
         .players
         .iter()
         .map(|p| {
-            let n = memory.team(p.team).unwrap().query().navigation();
+            let query = memory.team(p.team).unwrap().query();
+            let n = query.navigation();
             (
                 n.flags.as_ptr(),
                 n.heights.unwrap().as_ptr(),
@@ -121,7 +122,8 @@ fn prepared_removed_objects_match_original_cached_world_views_without_refreshing
     }
     assert!(prepare_world_route_retention(context(&other), &mut memory, &refs).is_err());
     for (p, expected) in m.world.game.players.iter().zip(&buffers) {
-        let n = memory.team(p.team).unwrap().query().navigation();
+        let query = memory.team(p.team).unwrap().query();
+        let n = query.navigation();
         assert_eq!(
             (
                 n.flags.as_ptr(),
@@ -168,7 +170,8 @@ fn prepared_removed_objects_match_original_cached_world_views_without_refreshing
     }
     guard.commit();
     for (p, expected) in m.world.game.players.iter().zip(&buffers) {
-        let n = memory.team(p.team).unwrap().query().navigation();
+        let query = memory.team(p.team).unwrap().query();
+        let n = query.navigation();
         assert_eq!(
             (
                 n.flags.as_ptr(),

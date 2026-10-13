@@ -299,6 +299,7 @@ pub fn projection(m: &Match) -> Value {
         "units":m.world.game.units.values().map(|u|json!([u.id,owner(u.owner)])).collect::<Vec<_>>(),
         "winner":m.finish.map(|f|f.winner),"reason":m.finish.map(|f|f.reason.as_str()),"endAt":m.finish.map(|f|vec![bits(f.end_at.x),bits(f.end_at.z)])})
 }
+#[allow(dead_code, reason = "Shared sorting is used by sibling World fixture test crates.")]
 pub fn sorted_units(mut v: Value) -> Value {
     v["units"]
         .as_array_mut()
