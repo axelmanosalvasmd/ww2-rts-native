@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added read-only map delivery to `ww2-server`: both `/maps/<name>` and `/maps/<name>.json` serve all 33 advertised maps from embedded client-safe projections. `harness/map-assets.mjs` requires the clean pinned reference and regenerates those projections, their Rust include index and the lobby catalogue together through the reference's `mapForClient`. The HTTP harness passes 96 exact comparisons against the live Node server, including both URL forms, invalid names, missing maps, traversal paths, unsupported methods and credential refusal. Legacy and layered World projection checks cover hidden mines, their materials, triggers and scenario scripts. No raw authoring maps are embedded or available through credentials. Editor POST remains unimplemented (405), as do authoritative map loading, generated World matches and static browser hosting.
+
 - Documented the first Rust lobby/session server and its live reference checks. Relevant NET rows are in progress, with game simulation, snapshots, static hosting and persistence explicitly still missing.
 
 - Aligned the Rust lobby server with the reference address defaults: `127.0.0.1:3000`, configurable through `HOST` and `PORT`. `WW2_BIND` takes priority over those variables, and `--bind` takes priority over all environment settings. Port zero remains available for local tests. Added a deterministic configuration test for precedence, IPv6, hostnames and invalid ports without changing process environment variables.
