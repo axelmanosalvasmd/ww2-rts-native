@@ -285,6 +285,8 @@ pub struct Section {
 /// A burnt-out vehicle (`g.wrecks`): cover for infantry once it has settled.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Wreck {
+    /// Settled obstruction cell (`w.c`), absent for unregistered or moving wrecks.
+    pub cell: Option<usize>,
     pub x: f64,
     pub z: f64,
     /// Still sliding or tumbling (`motion` is truthy): no cover yet.

@@ -20,6 +20,7 @@ pub mod path_requests;
 
 pub mod orders;
 pub mod pathfinding;
+pub mod production;
 pub mod projectiles;
 
 pub mod random;
@@ -35,3 +36,5 @@ pub mod vehicle;
 mod vehicle_navigation;
 pub mod vision;
 pub mod weather;
+pub mod weather_runtime;
+pub mod world;
