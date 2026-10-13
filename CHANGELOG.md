@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Pause the human observer at source checkpoint `e529409`. The original-reader check records four scenes, 48 views and three hurt batches; no native test or coherent build has run. The owner cleared the `404a948` producer repairs and navigation cleared its borrowed accessor; the final filtered-packet successor still needs independent review and native acceptance. Single-seat publication is implemented, while all-seat delivery coordination remains separate.
+
 - Rebuild the human commander's strategic packet from validated camera-filtered detached rows, with original screen memory in the observation oracle. Keep current packet facts and research intact, and refuse forged rows without reading Game.
 
 - Add a complete existing strategic packet producer for the ordinary human commander, with decoded own move goals, delivered visibility and ordered 60-second sightings. Stage recipient memory before publication and filter real owner hurt frames without losing reset/append ordinals. Four original-reader scenes record 48 views and three hurt batches; native checks are pending.
