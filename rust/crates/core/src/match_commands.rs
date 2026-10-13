@@ -42,6 +42,13 @@ pub enum Stance {
 /// Internal recorded input. This is not a WebSocket or C interface.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Command {
+    Dig {
+        ids: Vec<i64>,
+        kind: crate::field_works::FortKind,
+        at: Point,
+        direction: Option<f64>,
+        queue: bool,
+    },
     Technology {
         kind: crate::economy::Technology,
     },
@@ -306,6 +313,41 @@ impl Command {
                 rows.iter().map(|v| safe_id(v).unwrap_or(-1)).collect()
             });
         match object.get("t").and_then(|v| v.as_str()) {
+            Some("dig") => {
+                let at = Point {
+                    x: object
+                        .get("x")
+                        .and_then(|v| v.as_f64())
+                        .filter(|n| n.is_finite())
+                        .ok_or(Denial::Blocked)?,
+                    z: object
+                        .get("z")
+                        .and_then(|v| v.as_f64())
+                        .filter(|n| n.is_finite())
+                        .ok_or(Denial::Blocked)?,
+                };
+                let name = match object.get("kind") {
+                    None | Some(serde_json::Value::Null) => "trench",
+                    Some(value) => value.as_str().ok_or(Denial::Blocked)?,
+                };
+                let kind = match crate::field_works::FortKind::parse(name) {
+                    Ok(kind) => kind,
+                    Err(crate::field_works::Error::UnsupportedKind) => {
+                        return Ok(Self::Unsupported);
+                    }
+                    Err(_) => return Err(Denial::Blocked),
+                };
+                Ok(Self::Dig {
+                    ids,
+                    kind,
+                    at,
+                    direction: object
+                        .get("dir")
+                        .and_then(|v| v.as_f64())
+                        .filter(|n| n.is_finite()),
+                    queue: object.get("queue").and_then(|v| v.as_bool()) == Some(true),
+                })
+            }
             Some("tech") => Ok(Self::Technology {
                 kind: match object.get("kind").and_then(|v| v.as_str()) {
                     Some("tier") => crate::economy::Technology::Tier,
@@ -422,6 +464,14 @@ impl Command {
     }
     fn valid(&self) -> bool {
         match self {
+            Self::Dig {
+                ids, at, direction, ..
+            } => {
+                ids.iter().all(|id| id.unsigned_abs() <= 9007199254740991)
+                    && at.x.is_finite()
+                    && at.z.is_finite()
+                    && direction.is_none_or(|v| v.is_finite())
+            }
             Self::Support { at, direction, .. } => {
                 at.x.is_finite() && at.z.is_finite() && direction.is_none_or(|v| v.is_finite())
             }
@@ -546,6 +596,19 @@ impl crate::match_runtime::Match {
         if matches!(command, Command::Unsupported) {
             return Ok(Some(Denial::Unsupported));
         }
+        if let Command::Dig {
+            ids,
+            kind,
+            at,
+            direction,
+            queue,
+        } = command
+        {
+            if *queue {
+                return Ok(Some(Denial::Unsupported));
+            }
+            return self.execute_dig(owner, ids, *kind, *at, *direction, winner_decided);
+        }
         if let Command::Technology { kind } = command {
             return match self.request_research(owner, *kind) {
                 Ok(_) => Ok(None),
@@ -604,7 +667,8 @@ impl crate::match_runtime::Match {
             | Command::Stance { ids, .. }
             | Command::Ability { ids, .. }
             | Command::Autocast { ids, .. } => ids.clone(),
-            Command::Technology { .. }
+            Command::Dig { .. }
+            | Command::Technology { .. }
             | Command::Buy { .. }
             | Command::CompanionJoin { .. }
             | Command::CompanionInput { .. }
@@ -622,6 +686,9 @@ impl crate::match_runtime::Match {
             let mut advances: BTreeMap<UnitId, u64> = BTreeMap::new();
             for raw in rows {
                 if let Some(id) = self.eligible_command_unit(raw, owner, command) {
+                    if self.world.game.units[&id].dig != self.field_works.is_active(id) {
+                        return Err("unrepresented or inconsistent field-work activity".into());
+                    }
                     *advances.entry(id).or_default() += 1;
                 }
             }
@@ -697,6 +764,7 @@ impl crate::match_runtime::Match {
                     return Ok(Some(Denial::Needs));
                 }
                 for id in selected {
+                    self.cancel_field_work(id)?;
                     self.stop_command_unit(id);
                 }
             }
@@ -746,7 +814,8 @@ impl crate::match_runtime::Match {
                     self.commands.units.get_mut(&id).unwrap().auto_cast = *on;
                 }
             }
-            Command::Technology { .. }
+            Command::Dig { .. }
+            | Command::Technology { .. }
             | Command::Buy { .. }
             | Command::CompanionJoin { .. }
             | Command::CompanionInput { .. }
@@ -902,6 +971,7 @@ impl crate::match_runtime::Match {
             .and_then(|v| v.number())
             .ok_or("missing reverse distance")?;
         for r in destinations {
+            self.cancel_field_work(r.id)?;
             let mut u = self.world.game.units[&r.id].clone();
             let engaged = self
                 .firing
@@ -1075,6 +1145,7 @@ fn cell_at(v: crate::navigation::TerrainView<'_>, at: Point) -> Option<usize> {
 struct RequestContext<'a> {
     match_state: &'a mut crate::match_runtime::Match,
     shootable: BTreeMap<UnitId, bool>,
+    error: Option<String>,
 }
 impl crate::path_requests::PathRequestContext for RequestContext<'_> {
     type Error = String;
@@ -1084,6 +1155,9 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
         kind: crate::path_requests::RequestKind,
     ) -> Option<Point> {
         use crate::path_requests::RequestKind;
+        if kind == RequestKind::Dig {
+            return self.match_state.current_dig_goal(id);
+        }
         let u = self.match_state.world.game.units.get(&id)?;
         if u.hp <= 0.0 {
             return None;
@@ -1158,6 +1232,13 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
         })
     }
     fn apply(&mut self, update: crate::path_requests::PathUpdate) {
+        if update.dropped.is_some()
+            && update.request.kind == crate::path_requests::RequestKind::Dig
+            && let Err(error) = self.match_state.cancel_field_work(update.request.unit)
+        {
+            self.error = Some(error);
+            return;
+        }
         let u = self
             .match_state
             .world
@@ -1230,14 +1311,17 @@ impl crate::match_runtime::Match {
             tick_seconds: self.rules.movement.tick,
         };
         let mut requests = std::mem::take(&mut self.commands.requests);
-        let result = requests.begin_tick(
-            config,
-            &mut RequestContext {
-                match_state: self,
-                shootable,
-            },
-        );
+        let mut context = RequestContext {
+            match_state: self,
+            shootable,
+            error: None,
+        };
+        let result = requests.begin_tick(config, &mut context);
+        let error = context.error.take();
         self.commands.requests = requests;
+        if let Some(error) = error {
+            return Err(error);
+        }
         if result.is_ok() {
             self.commands.path_tick = Some(self.world.game.tick);
         }
@@ -1382,6 +1466,7 @@ impl crate::match_runtime::Match {
                 | crate::path_requests::RequestKind::World
                 | crate::path_requests::RequestKind::Amove
                 | crate::path_requests::RequestKind::Nade
+                | crate::path_requests::RequestKind::Dig
         ) {
             return Err("unsupported command path request".into());
         }
@@ -1399,18 +1484,24 @@ impl crate::match_runtime::Match {
         }
         let shootable = self.command_shootable()?;
         let mut requests = std::mem::take(&mut self.commands.requests);
+        let mut context = RequestContext {
+            match_state: self,
+            shootable,
+            error: None,
+        };
         let result = requests.request(
             crate::path_requests::Request {
                 unit: id,
                 goal,
                 kind,
             },
-            &mut RequestContext {
-                match_state: self,
-                shootable,
-            },
+            &mut context,
         );
+        let error = context.error.take();
         self.commands.requests = requests;
+        if let Some(error) = error {
+            return Err(error);
+        }
         result.map_err(|e| format!("command path request: {e:?}"))
     }
 }

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Connected ordinary Dig to the single recorded command dispatcher and real path-request goal/drop hooks. Accepted Move and Stop cancel canonical field work synchronously; queued digs and excluded fort kinds remain explicit. Invalid cancellation state propagates through the existing checked path API. Source/native replay verification remains pending.
+
 - Staged ordinary field-work admission beside the existing recorded input ancestry. Shared routing-part helpers retain local observation indexes, constructor state remains singular, and the initial input proof head stays unchanged. Combined source/native verification remains pending.
 
 - Joined canonical ability/recovery defaults and stale identity guards to World construction and training publication, with the owning production agent’s approval. Existing source-constructor and training regressions check fresh rows and aborted completions. Combined native proof remains pending; World gameplay dispatch is not claimed.
