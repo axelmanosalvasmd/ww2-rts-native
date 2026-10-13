@@ -19,6 +19,7 @@ pub mod match_runtime;
 pub mod math;
 pub mod movement;
 pub mod navigation;
+pub mod objectives;
 pub mod path_requests;
 
 pub mod orders;
