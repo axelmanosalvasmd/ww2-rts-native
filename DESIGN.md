@@ -4,6 +4,10 @@
 
 Ground providers borrow one actor policy from the existing commander or World local-defender owner. Source owner -1 remains distinct from commander indices; an absent economy slot means the Source local actor's zero MP, Munitions and fuel, not a fabricated wallet. Game retains health, pose and alliances, while WorldRuntime retains local visibility and faction. The new lookup validates matching mode/runtime facts but does not admit a complete World tick. Native checks and the sole caller's phase admission remain separate.
 
+The ground firing and damage adapters now resolve team claims, visible targets and alliances without indexing the local actor into Game.players. Projectile and Combat metadata remain their existing owners; all Environment calls still validate complete current membership and publish committed effects through the existing ordered sinks. Ordinary combat retirement keeps final removed objects for the captured World income list, rewards only actual enemy commanders and preserves retained shooter XP. Administrative territory elimination remains the separate accepted World provider and receives no ordinary death, bounty or hull callback.
+
+World ability use follows the existing construction-mode price table. Command selection checks affordability without paying an aimed order early; an actual aimed launch pays only after its checked flight commits. Instant ability use pays the canonical commander Munitions wallet after its effect preparation. The local actor's zero resources can deny use without a new mutable wallet. This source checkpoint is still awaiting component fixtures, independent review and native verification. It does not enable World logistics, aircraft, rail, construction, the sole tick caller, transport or client fields.
+
 ## Final internal runtime source bundle (2026-10-13)
 
 The final normal merge explicitly includes main `d1f2fb5`. That main tree is identical to already incorporated ordered-event head `a068dd8`; the merge adds ancestry without changing runtime source, approved header, original fixtures or the optimized test profile.

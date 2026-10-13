@@ -61,13 +61,27 @@ impl Match {
     pub fn actor_policy(&self, owner: usize) -> Result<ActorPolicy<'_>, String> {
         self.validate_actor_mode()?;
         let source_owner = checked_game_owner(&self.world.game, owner)?;
+        let team = checked_game_team(&self.world.game, owner)?;
+        if source_owner >= 0
+            && self
+                .start
+                .economy
+                .players
+                .get(owner)
+                .is_none_or(|player| player.team != self.world.game.players[owner].team)
+        {
+            return Err("actor commander economy identity is missing or inconsistent".into());
+        }
         if self.options.mode == Mode::World {
             let actor = self.world_actor_view(owner)?;
+            if actor.team != team {
+                return Err("World actor team differs from canonical Game team".into());
+            }
             Ok(ActorPolicy {
                 owner,
                 source_owner,
                 economy_slot: (source_owner >= 0).then_some(owner),
-                team: actor.team,
+                team,
                 faction: actor.faction,
                 spawn: actor.spawn,
                 visible: actor.visible,
@@ -83,7 +97,7 @@ impl Match {
                 owner,
                 source_owner,
                 economy_slot: Some(owner),
-                team: player.team,
+                team,
                 faction: actor.config.faction,
                 spawn: actor.spawn,
                 visible: &player.visible,

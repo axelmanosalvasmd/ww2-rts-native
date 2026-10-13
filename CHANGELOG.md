@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Adapt ground weapon targeting, team claims, projectile source checks and damage to canonical World actors. Permit matching World mode and its existing local defender while preserving complete Environment membership, ordered event sinks and ordinary mode guards. Ordinary retirement now resolves enemy bounty through canonical alliances and keeps actual removed unit facts without indexing a neutral wallet. World ability timers and visibility use the same actor policy; instant abilities and actual aimed launches charge the existing Munitions wallet at the Source boundary. Component oracles, independent source review and native checks are still pending, and no World caller is enabled.
+
+- Project the canonical World local owner as Source -1 in existing firing and Environment event JSON helpers. Internal owner identity, effect order, sinks and ABI 2 stay unchanged; the previous unsigned projection exposed the internal sentinel as 4,294,967,295. Native event projection checks remain pending.
+
+- Permit a canonical World local actor in the shared read-only construction activity check used before generic commands. Keep paired build/control validation and every paid construction capability guard; this fixes the unrelated local-owner rejection before a commander ability without enabling World construction.
+
 - Keep borrowed actor visibility membership independent of order. The canonical World local defender records maintained-grid order, so a binary search could miss visible targets. Add an unsorted-membership witness without sorting or changing the canonical vector; native execution is pending.
 
 - Add a borrowed actor policy for ordinary and World ground providers. Preserve the existing local defender's owner -1, team, visibility and zero resources without adding a commander seat or mutable actor store. This internal source prerequisite does not enable the World tick and has not run native checks.
