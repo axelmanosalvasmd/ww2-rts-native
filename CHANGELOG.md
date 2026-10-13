@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Repaired the engineering union compiler boundaries: recruitment errors use the existing public re-export, section retirement supplies the source full-list ordering option, and recovery validates optional section maxima before arithmetic. The first native compile exposed these inherited mismatches; the coupled proof is restarting at the repaired checkpoint.
+
 - Corrected the engineering replay to the coordinated command constructor and checked excluded work through parse plus dispatch. Queued digs and known excluded forts are represented inputs whose dispatcher returns unsupported. Native execution remains pending.
 
 - Joined the typed Dig dispatcher and canonical request/cancellation hooks into the engineering proof tree. Added unchanged-state checks for queued digs and excluded fort kinds at the parser boundary. Native execution remains queued.
