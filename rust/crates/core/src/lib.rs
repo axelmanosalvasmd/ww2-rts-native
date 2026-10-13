@@ -38,6 +38,7 @@ pub mod math;
 pub mod movement;
 pub mod navigation;
 pub mod observed_memory;
+pub mod recipient_lists;
 
 pub mod objectives;
 pub mod path_requests;
@@ -74,3 +75,8 @@ pub mod world_map;
 
 pub mod match_world;
 pub mod match_world_rails;
+
+pub mod match_world_memory;
+pub mod world_memory;
+
+pub mod staged_observer;
