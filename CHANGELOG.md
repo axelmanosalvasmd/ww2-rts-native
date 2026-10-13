@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Updated the inherited operative design note to reflect its completed coherent Mac proof, preserving the pending platform and transport boundaries. Rust and harness trees are unchanged.
+
 - Normal-merged the checked engineering evidence into the operative closure. Only documentation changed from compiled head 3a40f7b; all Rust and harness trees remain identical.
 
 - Verified the coherent Conquest engineering, ability/recovery and operative tick assembly on the Mac: all 225 workspace release tests, 73 affected debug tests at the same runtime, strict Clippy, formatting and release FFI pass. Independent hash-checked debug/release binaries pass 42 tests. Original replays cover 2,185 ordinary ticks and 506 operative ticks. Recorded the retained operative owner cleanup and concrete fixture/oracle repairs; ordinary reactions, supply orchestration, operative geometry/settlement interoperability and full match start remain separate.
