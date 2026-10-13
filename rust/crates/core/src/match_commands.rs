@@ -476,6 +476,9 @@ impl crate::match_runtime::Match {
             ..
         } = command
         {
+            if self.unrepresented_ability_work(&selected, *at, *queue, *automatic)? {
+                return Ok(Some(Denial::Unsupported));
+            }
             self.preflight_ability_selection(&selected, *at, *queue, *automatic)?;
         }
         for id in &selected {
