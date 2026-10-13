@@ -1,4 +1,4 @@
-//! Explicit authority-to-observation boundary for the opening Conquest policy.
+//! Explicit authority-to-observation boundary for bounded quiet Conquest policies.
 //! The policy receives owned recipient facts and never borrows Game or routing state.
 use std::collections::BTreeSet;
 
@@ -305,6 +305,131 @@ mod tests {
         assert!(advance(&mut m).iter().all(|r| r.denial.is_none()));
     }
     #[test]
+    fn later_research_attempts_use_delivered_labs_and_real_typed_admission() {
+        use crate::{
+            economy::{TechState, Technology},
+            production::ProductionState,
+        };
+        for (tier, mp, tick, denial, time) in [
+            (1, 250.0, 3600, None, 60.0),
+            (2, 400.0, 7800, None, 90.0),
+            (1, 250.75, 3600, None, 60.0),
+            (
+                3,
+                100.0,
+                3600,
+                Some(crate::match_commands::Denial::Needs),
+                0.0,
+            ),
+        ] {
+            let mut m = instance(1001 + tier as u64);
+            m.options.tech = true;
+            m.production = ProductionState::new(vec![
+                TechState::new(tier, 0, 0, 0).unwrap(),
+                TechState::new(1, 0, 0, 0).unwrap(),
+            ])
+            .unwrap();
+            for unit in m
+                .world
+                .game
+                .units
+                .values()
+                .filter(|u| m.rules.kinds[u.kind].building)
+            {
+                m.production.initialize_building(unit.id).unwrap();
+            }
+            m.start.economy.players[0].mp = mp;
+            // The source fixture begins at a later clock without advancing simulation.
+            // Keep the sole order clock in step while reproducing that component boundary.
+            while m.world.game.tick < tick {
+                advance(&mut m);
+            }
+            m.world.game.vision_tick = Some(tick - 3);
+            let mut seat = OpeningCommander::new(0, Level::Normal);
+            let mut capacity_probe = m.commands.queue.snapshot();
+            let full_capacity = capacity_probe.capacity;
+            capacity_probe.capacity = 1;
+            m.commands.queue = OrderQueue::restore(capacity_probe).unwrap();
+            let before_seat = seat.clone();
+            let before_random = m.start.random.clone();
+            assert!(
+                m.tick_opening_commander(&mut seat).is_err(),
+                "two-command frame must fit as a whole"
+            );
+            assert_eq!(seat, before_seat);
+            assert_eq!(m.start.random, before_random);
+            assert!(m.commands.queue.is_empty());
+            assert_eq!(m.start.economy.players[0].mp, mp);
+            assert!(m.production.player(0).unwrap().jobs().is_empty());
+            let mut retry = m.commands.queue.snapshot();
+            retry.capacity = full_capacity;
+            m.commands.queue = OrderQueue::restore(retry).unwrap();
+            let outcome = m.tick_opening_commander(&mut seat).unwrap();
+            assert!(
+                matches!(outcome, OpeningTick::Queued(_)),
+                "{tier}: {outcome:?}"
+            );
+            let queued = m.commands.queue.snapshot();
+            assert!(matches!(
+                queued.pending.first().map(|r| &r.value),
+                Some(Command::Technology { .. })
+            ));
+            let random = m.start.random.snapshot();
+            let results = advance(&mut m);
+            assert_eq!(results[0].denial, denial);
+            assert!(results[1..].iter().all(|r| r.denial.is_none()));
+            assert_eq!(
+                m.start.random.snapshot(),
+                random,
+                "dispatch does not draw from AI stream"
+            );
+            assert_eq!(
+                m.production.player(0).unwrap().tech().tier(),
+                tier,
+                "admission is not completion"
+            );
+            if denial.is_none() {
+                assert_eq!(
+                    m.start.economy.players[0].mp,
+                    mp - if tier == 1 { 250.0 } else { 400.0 }
+                );
+                let jobs = m.production.player(0).unwrap().jobs();
+                assert_eq!(jobs.len(), 1);
+                assert_eq!(jobs[0].kind, Technology::Tier);
+                assert_eq!((jobs[0].progress, jobs[0].time), (0.0, time));
+            } else {
+                assert_eq!(m.start.economy.players[0].mp, mp);
+                assert!(m.production.player(0).unwrap().jobs().is_empty());
+            }
+            while m.world.game.tick < tick + 40 {
+                assert_eq!(
+                    m.tick_opening_commander(&mut seat).unwrap(),
+                    OpeningTick::Waiting
+                );
+                advance(&mut m);
+            }
+            let next = m.tick_opening_commander(&mut seat).unwrap();
+            assert!(matches!(next, OpeningTick::Queued(_)));
+            let delivered = seat.delivered().unwrap().input();
+            assert_eq!(delivered.tick, tick + 40);
+            assert_eq!(delivered.manpower, if denial.is_none() { 0.0 } else { mp });
+            assert_eq!(
+                delivered.research.as_ref().unwrap().busy,
+                if denial.is_none() {
+                    vec![Technology::Tier]
+                } else {
+                    vec![]
+                }
+            );
+            let next_results = advance(&mut m);
+            assert_eq!(next_results.len(), usize::from(denial.is_some()));
+            if let Some(result) = next_results.first() {
+                assert_eq!(result.denial, denial);
+            }
+            assert_eq!(m.production.player(0).unwrap().tech().tier(), tier);
+        }
+    }
+    #[test]
     fn hidden_facts_and_opponent_plans_cannot_change_the_opening() {
         let mut a = instance(901);
         let mut b = instance(901);
@@ -570,7 +695,7 @@ impl Match {
         Ok(())
     }
     /// Snapshot only the fields consumed by this bounded policy, at source public precision.
-    /// Job destination, economy, aircraft and strategic-memory projections are later slices.
+    /// Includes own research kinds and ready-base facts, but no opponent economy or labs.
     pub fn opening_commander_observation(&mut self, owner: usize) -> Result<Observation, String> {
         self.validate_opening_projection(owner)?;
         let g = &self.world.game;
@@ -719,6 +844,36 @@ impl Match {
             }
             units.push(row);
         }
+        let research = if self.options.tech {
+            let player = self
+                .production
+                .player(owner)
+                .ok_or("missing commander research owner")?;
+            let own_structures: Vec<_> = g
+                .units
+                .values()
+                .filter(|u| u.owner == owner && self.rules.kinds[u.kind].structure)
+                .collect();
+            let ready = |kind: &str| {
+                own_structures
+                    .iter()
+                    .filter(|u| {
+                        self.rules.kinds[u.kind].name == kind
+                            && u.hp > 0.0
+                            && u.built.unwrap_or(1.0) >= 1.0
+                    })
+                    .count()
+            };
+            Some(commander_ai::ResearchObservation {
+                faction: self.options.players[owner].faction,
+                tech: player.tech(),
+                busy: player.jobs().iter().map(|j| j.kind).collect(),
+                stock_base: own_structures.len() == 2 && ready("hq") == 1 && ready("barracks") == 1,
+                armory_ready: ready("armory") != 0,
+            })
+        } else {
+            None
+        };
         Observation::new(Input {
             width: g.w,
             height: g.h,
@@ -729,7 +884,8 @@ impl Match {
             points,
             flags,
             chars,
-            manpower: self.start.economy.players[owner].mp,
+            manpower: self.start.economy.players[owner].mp.floor(),
+            research,
         })
         .map_err(|e| format!("commander observation: {e:?}"))
     }

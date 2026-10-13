@@ -102,6 +102,7 @@ fn input(row: &Value) -> Input {
             })
             .collect(),
         manpower: number(&frame["me"]["mp"]),
+        research: None,
         flags: array(&frame["flags"])
             .iter()
             .flat_map(|run| {
@@ -416,4 +417,167 @@ fn production_randomness_is_confined_to_one_ai_seat() {
         Err(PolicyError::NotOpening)
     );
     assert_eq!((left_state, left.snapshot()), before);
+}
+
+fn technology(value: &Value) -> ww2_core::economy::Technology {
+    use ww2_core::economy::Technology;
+    match value.as_str().unwrap() {
+        "tier" => Technology::Tier,
+        "inf" => Technology::Infantry,
+        "guns" => Technology::Guns,
+        "armor" => Technology::Armor,
+        _ => panic!("unknown source research kind"),
+    }
+}
+fn research_input(case: &Value, frame: &Value) -> Input {
+    use ww2_core::{
+        commander_ai::ResearchObservation,
+        economy::{Faction, TechState},
+    };
+    let mut delivered = frame["delivered"].clone();
+    let slot = integer(&case["slot"]);
+    let me = delivered["players"][slot].clone();
+    delivered["me"] = me.clone();
+    delivered["chars"] = Value::Array(
+        array(&delivered["chars"])
+            .iter()
+            .map(|v| serde_json::json!([v, 1]))
+            .collect(),
+    );
+    delivered["flags"] = Value::Array(
+        array(&delivered["flags"])
+            .iter()
+            .map(|v| serde_json::json!([v, 1]))
+            .collect(),
+    );
+    let row = serde_json::json!({"slot":slot,"frame":delivered});
+    let mut input = input(&row);
+    let own: Vec<_> = array(&frame["delivered"]["units"])
+        .iter()
+        .filter(|u| {
+            integer(&u["owner"]) == slot
+                && ["hq", "barracks", "armory"].contains(&u["type"].as_str().unwrap())
+        })
+        .collect();
+    let ready = |kind: &str| {
+        own.iter()
+            .filter(|u| u["type"] == kind && number(&u["hp"]) > 0.0 && number(&u["built"]) >= 1.0)
+            .count()
+    };
+    let tech = &me["tech"];
+    input.research = Some(ResearchObservation {
+        faction: Faction::try_from(integer(&me["faction"]) as u8).unwrap(),
+        tech: TechState::new(
+            integer(&tech["tier"]) as u8,
+            integer(&tech["armory"]["inf"]) as u8,
+            integer(&tech["armory"]["guns"]) as u8,
+            integer(&tech["armory"]["armor"]) as u8,
+        )
+        .unwrap(),
+        busy: array(&tech["lab"])
+            .iter()
+            .map(|j| technology(&j[0]))
+            .collect(),
+        stock_base: own.len() == 2 && ready("hq") == 1 && ready("barracks") == 1,
+        armory_ready: ready("armory") != 0,
+    });
+    input
+}
+#[test]
+fn original_live_research_then_movement_across_delivered_frames() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("fixtures/commander-research.json")).unwrap();
+    let mut frames = 0;
+    for case in array(&fixture["cases"]) {
+        let mut state = SourceState::default();
+        for frame in array(&case["frames"]) {
+            let observation = Observation::new(research_input(case, frame)).unwrap();
+            let before = observation.clone();
+            let fractions: Vec<_> = array(&frame["random"]).iter().map(number).collect();
+            let planned = commander_ai::plan_with_fractions(
+                &observation,
+                &mut state,
+                Level::Normal,
+                &fractions,
+            )
+            .unwrap();
+            let attempts = array(&frame["expected"]["attempts"]);
+            let expected_tech: Vec<_> = attempts
+                .iter()
+                .filter(|a| a["command"]["t"] == "tech")
+                .map(|a| technology(&a["command"]["kind"]))
+                .collect();
+            let actual_tech: Vec<_> = planned
+                .commands
+                .iter()
+                .filter_map(|c| match c {
+                    Command::Technology { kind } => Some(*kind),
+                    _ => None,
+                })
+                .collect();
+            assert_eq!(actual_tech, expected_tech, "{} tech prefix", case["name"]);
+            if !actual_tech.is_empty() {
+                assert!(matches!(
+                    planned.commands.first(),
+                    Some(Command::Technology { .. })
+                ));
+            }
+            let movements: Vec<_> = planned
+                .commands
+                .iter()
+                .filter(|c| matches!(c, Command::Move { .. }))
+                .cloned()
+                .collect();
+            let expected: Value = Value::Array(
+                attempts
+                    .iter()
+                    .filter(|a| a["command"]["t"] == "move" || a["command"]["t"] == "amove")
+                    .map(|a| a["command"].clone())
+                    .collect(),
+            );
+            assert_eq!(
+                command_bits(&movements),
+                command_bits(
+                    &array(&expected)
+                        .iter()
+                        .map(|v| Command::from_json(v).unwrap())
+                        .collect::<Vec<_>>()
+                ),
+                "{} movement",
+                case["name"]
+            );
+            assert_eq!(planned.commands.len(), attempts.len());
+            assert_eq!(planned.draws, integer(&frame["expected"]["draws"]));
+            assert_eq!(
+                aim_bits(state.aim),
+                aim_bits(aim(&frame["expected"]["mind"]["aim"]))
+            );
+            assert_eq!(
+                observation, before,
+                "policy owns no mutable delivered facts"
+            );
+            frames += 1;
+        }
+    }
+    assert_eq!(frames, 8);
+}
+
+#[test]
+fn unsupported_research_budget_preserves_state_and_rng() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("fixtures/commander-research.json")).unwrap();
+    let case = &fixture["cases"][0];
+    let mut input = research_input(case, &case["frames"][0]);
+    input.manpower += 1.0;
+    let observation = Observation::new(input).unwrap();
+    let mut state = SourceState::default();
+    let before = state.clone();
+    let mut rng = MatchRandom::new(551);
+    let before_rng = rng.clone();
+    assert_eq!(
+        commander_ai::plan(&observation, &mut state, Level::Normal, &mut rng).unwrap_err(),
+        PolicyError::UnsupportedResearch
+    );
+    assert_eq!(state, before);
+    assert_eq!(rng, before_rng);
 }

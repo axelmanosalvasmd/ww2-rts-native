@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added a bounded later commander research prefix through the existing typed command queue. Four actual-source scenarios span eight delivered frames and 12 waypoint draws, covering pending HQ labs, repeated missing-Armory refusal and fractional-wallet snapshot precision. Native execution remains pending; construction, shopping and full AI remain outside this checkpoint.
+
 - Applied the canonical engineering owner's compiler boundary repairs in the isolated Cover union: public recruitment error paths, optional damage actor context and ordered pending-cell fixture projection. The newer checked recovery health and ability fixture bodies were retained. Native proof of this combined checkpoint is pending.
 
 - Fixed duplicate retreat-denial definitions introduced by the Cover dependency merge and let queued Cover inherit a preceding aimed ability's HUD anchor. A real rifle ability trace raises the command fixture to 91 traces and 331 steps. Accepted Cover also clears inert aimed-action metadata with its cancelled aim. Source review caught these integration defects before native testing.

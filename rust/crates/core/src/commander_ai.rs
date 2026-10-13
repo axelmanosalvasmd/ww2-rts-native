@@ -1,8 +1,9 @@
-//! A slot-bound, quiet Conquest opening policy fed only by an owned observation.
-//! Combat, shopping, fortification and staged operations require later policies.
+//! A slot-bound quiet Conquest policy fed only by an owned observation.
+//! Includes a bounded later research prefix; combat, shopping and fortification remain separate.
 pub use crate::game::Point;
 use crate::{
     catalog::{Catalog, Value},
+    economy::{Faction, Mode, TechState, Technology},
     game::{CELL, COVER, MOVE},
     match_commands::{Command, MoveOrder},
     math,
@@ -93,6 +94,15 @@ pub struct PointObservation {
     pub locked: bool,
 }
 #[derive(Clone, Debug, PartialEq)]
+pub struct ResearchObservation {
+    pub faction: Faction,
+    pub tech: TechState,
+    pub busy: Vec<Technology>,
+    /// Delivered own HQ and Barracks are complete, with no other own structures.
+    pub stock_base: bool,
+    pub armory_ready: bool,
+}
+#[derive(Clone, Debug, PartialEq)]
 pub struct Input {
     pub width: usize,
     pub height: usize,
@@ -104,6 +114,7 @@ pub struct Input {
     pub flags: Vec<u16>,
     pub chars: Vec<u8>,
     pub manpower: f64,
+    pub research: Option<ResearchObservation>,
 }
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Kind {
@@ -140,6 +151,7 @@ pub enum PolicyError {
     UnsupportedHealth,
     UnsupportedSuppression,
     UnsupportedHolder,
+    UnsupportedResearch,
     InvalidFraction,
     ExhaustedFractions,
 }
@@ -353,7 +365,10 @@ fn plan_inner(
     if me.out {
         return Ok(Plan::default());
     }
-    if input.tick >= 3600 || !input.points.iter().any(|p| p.owner.is_none()) {
+    let research_commands = research_prefix(observation)?;
+    if (input.tick >= 3600 && input.research.is_none())
+        || !input.points.iter().any(|p| p.owner.is_none())
+    {
         return Err(PolicyError::NotOpening);
     }
     if input
@@ -550,7 +565,8 @@ fn plan_inner(
             }
         }
     }
-    let mut commands = holder_commands;
+    let mut commands = research_commands;
+    commands.extend(holder_commands);
     if !normal.is_empty() {
         commands.push(move_command(normal, false));
     }
@@ -587,4 +603,85 @@ fn spot_near(observation: &Observation, at: Point, fraction: f64) -> Point {
         x: at.x + math::cos(angle) * 4.0,
         z: at.z + math::sin(angle) * 4.0,
     }
+}
+
+/// A bounded later quiet frame. Prefix attempts still use the canonical dispatcher.
+/// Only the exercised stock USA roster/budgets are admitted; shopping is separate.
+fn research_prefix(observation: &Observation) -> Result<Vec<Command>, PolicyError> {
+    let input = &observation.input;
+    let Some(research) = &input.research else {
+        return Ok(Vec::new());
+    };
+    let own: Vec<_> = input
+        .units
+        .iter()
+        .zip(&observation.kinds)
+        .filter(|(u, k)| u.owner == input.slot && k.combat)
+        .collect();
+    let count = |kind: &str| own.iter().filter(|(u, _)| u.kind == kind).count();
+    let owned: Vec<_> = input
+        .units
+        .iter()
+        .zip(&observation.kinds)
+        .filter(|(u, _)| u.owner == input.slot)
+        .collect();
+    let lines = [Technology::Infantry, Technology::Guns, Technology::Armor];
+    if owned.len() != 5
+        || owned.iter().any(|(u, k)| {
+            u.hp != k.health || !["rifle", "mg", "hq", "barracks"].contains(&u.kind.as_str())
+        })
+        || owned.iter().filter(|(u, _)| u.kind == "hq").count() != 1
+        || owned.iter().filter(|(u, _)| u.kind == "barracks").count() != 1
+        || research.faction != Faction::Usa
+        || !research.stock_base
+        || research.armory_ready
+        || own.len() != 3
+        || count("rifle") != 2
+        || count("mg") != 1
+        || lines.iter().any(|&k| research.tech.level(k) != 0)
+        || research.busy.len() > 4
+        || research
+            .busy
+            .iter()
+            .enumerate()
+            .any(|(i, k)| research.busy[..i].contains(k))
+        || input
+            .points
+            .iter()
+            .any(|p| p.owner.is_some() || p.cut || p.locked)
+    {
+        return Err(PolicyError::UnsupportedResearch);
+    }
+    let busy = |kind| research.busy.contains(&kind);
+    let tier = research.tech.tier();
+    let tier_due = match tier {
+        1 => input.tick >= 2400,
+        2 => input.tick >= 7800,
+        _ => false,
+    };
+    let kind = if tier_due && !busy(Technology::Tier) {
+        Some(Technology::Tier)
+    } else {
+        lines
+            .into_iter()
+            .filter(|&k| !busy(k) && research.tech.level(k) < tier)
+            .min_by_key(|&k| research.tech.level(k))
+    };
+    let supported_budget = input.manpower == 0.0
+        || (tier == 1 && kind == Some(Technology::Tier) && input.manpower == 250.0)
+        || (tier == 2 && kind == Some(Technology::Tier) && input.manpower == 400.0)
+        || (tier == 3 && kind == Some(Technology::Infantry) && input.manpower == 100.0);
+    if !supported_budget {
+        return Err(PolicyError::UnsupportedResearch);
+    }
+    let Some(kind) = kind else {
+        return Ok(Vec::new());
+    };
+    let cost = crate::economy::tech_cost(research.tech, kind, Mode::Conquest)
+        .map_err(|_| PolicyError::Catalog)?;
+    Ok(cost
+        .filter(|c| input.manpower >= c.mp)
+        .map(|_| Command::Technology { kind })
+        .into_iter()
+        .collect())
 }
