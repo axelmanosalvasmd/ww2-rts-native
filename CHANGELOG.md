@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added internal recipient projection of canonical capture-point contest/cut/prerequisite rows, army presets, live support cooldowns and weather values, plus current-position filtered smoke and fire rows. Reused the source-reviewed team visibility helper with an ephemeral observation index, preserving the maintained match grid. The original cached-source fixture now records 70 states and 210 recipient projections. Native verification remains queued; movement result tails, live strikes/covers and the remaining snapshot families stay explicit boundaries.
+
 - Exposed the canonical immutable current-position team visibility predicate for support and recipient producers. Renamed the private visible-enemy-unit collector to distinguish it from point visibility; terrain/fog/range semantics and maintained grid order are unchanged. Caller validation remains required. Native point-predicate acceptance is pending.
 
 - Extended internal ordinary Conquest recipient projections with owner plans, waiting movement orders, production queues and original paid-job identities/status. Added terrain full/delta reads and per-seat fog delivery acknowledgments over canonical observed memory and team fog, collected before the immutable cache. Original JavaScript fixtures record 56 cached states with 168 recipients and 13 delivery steps with 39 recipients. Native verification is pending the shared Rust test lane. Active engineering, aircraft, other modes and remaining snapshot families stay explicit boundaries; no complete message envelope or transport integration was added.

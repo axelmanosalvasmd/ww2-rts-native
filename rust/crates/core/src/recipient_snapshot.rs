@@ -14,6 +14,8 @@ use serde_json::{Map, Value, json};
 mod delivery;
 #[path = "recipient_snapshot/owners.rs"]
 mod owners;
+#[path = "recipient_snapshot/public_state.rs"]
+mod public_state;
 pub use delivery::{DeliveryFrame, DeliveryState};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -67,6 +69,7 @@ pub struct SnapshotCache<'a> {
     state: &'a Match,
     rows: Vec<Value>,
     owners: Vec<Map<String, Value>>,
+    public: Vec<Map<String, Value>>,
 }
 impl<'a> SnapshotCache<'a> {
     pub fn new(state: &'a Match) -> Result<Self, SnapshotError> {
@@ -116,10 +119,12 @@ impl<'a> SnapshotCache<'a> {
             .map(|u| unit_row(state, u))
             .collect::<Result<_, _>>()?;
         let owners = owners::capture(state)?;
+        let public = public_state::capture(state)?;
         Ok(Self {
             state,
             rows,
             owners,
+            public,
         })
     }
     pub fn recipient(&self, slot: usize) -> Result<RecipientProjection, SnapshotError> {
@@ -127,13 +132,7 @@ impl<'a> SnapshotCache<'a> {
         if slot >= g.players.len() || slot >= self.state.start.economy.players.len() {
             return Err(SnapshotError::InvalidRecipient);
         }
-        let seen = |id| {
-            let u = g.units.get(&id);
-            g.reveal && u.is_some()
-                || u.is_some_and(|u| g.allied(u.owner, slot))
-                || g.players[slot].sees(id)
-                    && u.is_none_or(|u| u.air.is_none() || vision::airborne(u))
-        };
+        let seen = |id| seen_by(self.state, slot, id);
         let units = self
             .rows
             .iter()
@@ -154,11 +153,11 @@ impl<'a> SnapshotCache<'a> {
         let mut fields = economy_fields(self.state, slot)?;
         fields.insert("units".into(), json!(units));
         fields.extend(self.owners[slot].clone());
+        fields.extend(self.public[slot].clone());
         Ok(RecipientProjection {
             fields,
             missing: vec![
                 SnapshotCapability::MovementOutcomes,
-                SnapshotCapability::ArmyAndSupport,
                 SnapshotCapability::WrecksAndFoundMines,
                 SnapshotCapability::Terrain,
                 SnapshotCapability::Fog,
@@ -166,10 +165,17 @@ impl<'a> SnapshotCache<'a> {
                 SnapshotCapability::TeamEffects,
                 SnapshotCapability::Scenario,
                 SnapshotCapability::Logistics,
-                SnapshotCapability::Points,
             ],
         })
     }
+}
+
+fn seen_by(state: &Match, slot: usize, id: u32) -> bool {
+    let g = &state.world.game;
+    let u = g.units.get(&id);
+    g.reveal && u.is_some()
+        || u.is_some_and(|u| g.allied(u.owner, slot))
+        || g.players[slot].sees(id) && u.is_none_or(|u| u.air.is_none() || vision::airborne(u))
 }
 
 fn r(n: f64) -> f64 {
@@ -678,6 +684,65 @@ mod tests {
         for p in &mut m.world.game.players {
             p.visible.sort_unstable();
         }
+        if let Some(public) = case["publicState"].as_object() {
+            m.options.army = match public["army"].as_str().unwrap() {
+                "standard" => ArmySize::Standard,
+                "large" => ArmySize::Large,
+                "massive" => ArmySize::Massive,
+                "endless" => ArmySize::Endless,
+                _ => panic!("invalid fixture army"),
+            };
+            m.start.wind = (n(&public["wind"], "a"), n(&public["wind"], "v"));
+            m.world.game.rain = optional(&public["wx"], "rain").unwrap_or(0.);
+            m.world.game.wet = optional(&public["wx"], "wet");
+            for (slot, support) in public["support"].as_array().unwrap().iter().enumerate() {
+                m.start.players[slot].support = support
+                    .as_object()
+                    .unwrap()
+                    .iter()
+                    .map(|(name, n)| (name.clone(), n.as_f64().unwrap()))
+                    .collect();
+            }
+            let template = m.start.points[0].clone();
+            m.start.points = public["points"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|v| {
+                    let mut p = template.clone();
+                    p.owner = v["owner"].as_i64().filter(|n| *n >= 0).map(|n| n as usize);
+                    p.capper = v["capper"].as_i64().filter(|n| *n >= 0).map(|n| n as usize);
+                    p.needs = v["needs"].as_i64().filter(|n| *n >= 0).map(|n| n as usize);
+                    p.progress = n(v, "progress");
+                    p.cut = v["cut"].as_bool().unwrap_or(false);
+                    p.contested = v["contested"].as_bool().unwrap_or(false);
+                    p.on_point = v["onPoint"].as_array().map_or_else(Vec::new, |ids| {
+                        ids.iter().map(|id| id.as_u64().unwrap() as u32).collect()
+                    });
+                    p
+                })
+                .collect();
+            m.world.game.smokes = public["smokes"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|s| crate::game::Smoke {
+                    id: s["id"].as_u64().unwrap() as u32,
+                    x: n(s, "x"),
+                    z: n(s, "z"),
+                    r: n(s, "r"),
+                    remaining: optional(s, "t"),
+                })
+                .collect();
+            m.world.fires.clear();
+            for fire in public["fires"].as_array().unwrap() {
+                m.world.fires.insert(
+                    fire[0].as_u64().unwrap() as usize,
+                    fire[1].as_f64().unwrap(),
+                );
+            }
+        }
+        m.world.game.reveal = case["reveal"].as_bool().unwrap_or(false);
         let elapsed = case["inputs"]
             .as_array()
             .unwrap()
