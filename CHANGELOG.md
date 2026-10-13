@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Kept the full remembered-wreck getter on a local observation index too, preserving gameplay bucket order when snapshots read wreck memory between simulation phases.
+
 - Combined FPS identities with the checked Match state and kept the newer remembered-routing fast path. Observation and wreck discovery use a fresh local spatial index so command reads retain gameplay bucket order. Exact combined native checks remain pending.
 
 - Combined the prepared unit-publication transaction with canonical combat and firing initialization, retaining both stale-metadata checks before recruitment charges. Recorded gameplay input integration consumes this shared factory.

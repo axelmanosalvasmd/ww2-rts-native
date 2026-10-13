@@ -518,12 +518,12 @@ impl Match {
     /// Hidden moving wrecks become static remembered cover; removal waits until seen.
     pub fn observed_wrecks(&mut self, owner: usize) -> Result<Vec<Wreck>, String> {
         self.validate_recipient(owner)?;
-        self.grid.rebuild(&self.world.game.units);
+        let grid = SpatialGrid::new(&self.world.game.units, 16.0);
         refresh_wrecks(
             &mut self.recipients[owner],
             &self.world.game,
             &self.rules,
-            &self.grid,
+            &grid,
             owner,
         );
         Ok(self.recipients[owner].wreck_memory.clone())
