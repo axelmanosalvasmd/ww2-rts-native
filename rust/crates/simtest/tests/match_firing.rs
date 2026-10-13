@@ -1,4 +1,5 @@
 use serde_json::{Value, json};
+use std::io::Read;
 use ww2_core::{
     economy::{Faction, Mode},
     economy_state::ArmySize,
@@ -12,6 +13,13 @@ use ww2_core::{
     unit_spawn,
     weather::WeatherChoice,
 };
+fn fixture() -> Value {
+    let mut text = String::new();
+    flate2::read::GzDecoder::new(&include_bytes!("fixtures/match-firing.json.gz")[..])
+        .read_to_string(&mut text)
+        .unwrap();
+    serde_json::from_str(&text).unwrap()
+}
 fn bits(n: f64) -> Value {
     json!(format!("{:016x}", n.to_bits()))
 }
@@ -52,6 +60,11 @@ fn make(c: &Value) -> Match {
     )
     .unwrap();
     m.world.game.units.clear();
+    m.start.environment_seed = 123;
+    m.start.wind = (0.0, 0.5);
+    m.next_unit_id = 1000;
+    m.world.game.rain = 0.0;
+    m.world.game.wet = Some(0.0);
     m.firing = FiringState::default();
     m.combat = CombatState::default();
     m.commands.units.clear();
@@ -92,6 +105,27 @@ fn make(c: &Value) -> Match {
         meta.xp = v["xp"].as_f64().unwrap();
         meta.hit_at = v["hitAt"].as_f64().unwrap();
         meta.hit_by = v["hitBy"].as_u64().map(|n| n as u32);
+        if !v["logistics"].is_null() {
+            let r = &v["logistics"];
+            m.logistics.insert(
+                id,
+                ww2_core::logistics::Reserves {
+                    ammo: r["ammo"].as_f64().unwrap(),
+                    ammo_max: 20.0,
+                    ammo_price: 1.0,
+                    ammo_credit: Some(0.0),
+                    provisions: 120.0,
+                    fuel: None,
+                    emergency: None,
+                    warning: None,
+                    forced: false,
+                    stranded: false,
+                    exhausted: false,
+                    supply_rate: None,
+                    cut_for: None,
+                },
+            );
+        }
         m.world.game.units.insert(id, u);
     }
     for v in c["cells"].as_array().unwrap() {
@@ -113,35 +147,7 @@ fn make(c: &Value) -> Match {
     m
 }
 fn launch(e: LaunchEvent, m: &Match) -> Value {
-    match e {
-        LaunchEvent::Flight {
-            id,
-            kind,
-            effect,
-            shooter,
-            owner,
-            at,
-            velocity,
-            gravity,
-            time,
-            expires,
-        } => {
-            let mut v = json!({"k":"flight","kind":m.rules.kinds[kind].name,"flight":id,"seq":0,"f":shooter,"fo":owner,"x":at.x,"y":at.y,"z":at.z,"v":[velocity.x,velocity.y,velocity.z],"gravity":gravity,"time":time,"expires":expires,"local":true});
-            if let Some(effect) = effect {
-                v["effect"] = json!(effect);
-            }
-            v
-        }
-        LaunchEvent::Salvo {
-            shooter,
-            owner,
-            at,
-            count,
-            spread,
-        } => {
-            json!({"f":shooter,"fo":owner,"x":at.x,"z":at.z,"k":"salvo","n":count,"r":spread,"physical":true,"local":true})
-        }
-    }
+    e.to_json(&m.rules)
 }
 fn snapshot(m: &mut Match) -> Value {
     let units = m
@@ -158,7 +164,19 @@ fn snapshot(m: &mut Match) -> Value {
                 bits(s.retarget),
                 bits(m.commands.units[&u.id].aim),
                 bits(u.rot),
-                u.shot_at
+                u.shot_at,
+                bits(u.hp),
+                bits(u.supp),
+                bits(m.combat.get(u.id).unwrap().xp),
+                m.combat.get(u.id).unwrap().hit_by,
+                bits(m.combat.get(u.id).unwrap().hit_at),
+                m.combat.get(u.id).unwrap().last_hit,
+                u.hit_from.map(|p| json!({"x":p.x,"z":p.z})),
+                m.combat
+                    .get(u.id)
+                    .unwrap()
+                    .death_impulse
+                    .map(|p| json!({"dir":p.direction,"impulse":p.magnitude}))
             ])
         })
         .collect::<Vec<_>>();
@@ -175,7 +193,31 @@ fn snapshot(m: &mut Match) -> Value {
         .map(|e| launch(e, m))
         .collect::<Vec<_>>();
     let salvos=m.firing.salvos.iter().map(|s|json!({"owner":s.owner,"at":[bits(s.at.x),bits(s.at.z)],"left":s.left,"next":bits(s.next),"every":bits(s.every),"spread":bits(s.spread)})).collect::<Vec<_>>();
-    json!({"units":units,"claims":claims,"flights":flights,"shots":shots,"salvos":salvos})
+    let sparse = |a: &[f32]| {
+        a.iter()
+            .enumerate()
+            .filter(|(_, v)| **v != 0.0)
+            .map(|(i, v)| json!([i, bits(f64::from(*v))]))
+            .collect::<Vec<_>>()
+    };
+    let terrain = json!({"chars":String::from_utf8(m.world.game.chars.clone()).unwrap(),"hp":sparse(&m.world.game.cell_hp),"wear":sparse(m.world.game.wear.as_deref().unwrap()),"scar":sparse(&m.world.scar),"burnt":m.world.burnt.iter().enumerate().filter(|(_,v)|**v!=0).map(|(i,v)|json!([i,v])).collect::<Vec<_>>(),"versions":[m.world.game.terrain_version as u64,m.world.versions.obstruction,m.world.versions.infantry,m.world.versions.vehicle,m.world.versions.naval]});
+    let retained = m
+        .combat
+        .iter()
+        .filter(|(id, _)| {
+            !m.world.game.units.contains_key(id)
+                && m.firing.flights.values().any(|p| p.shooter == *id)
+        })
+        .map(|(id, c)| json!([id, bits(c.xp)]))
+        .collect::<Vec<_>>();
+    let ammo = m
+        .world
+        .game
+        .units
+        .keys()
+        .filter_map(|id| m.logistics.get(*id).map(|r| json!([id, bits(r.ammo)])))
+        .collect::<Vec<_>>();
+    json!({"ammo":ammo,"retained":retained,"environment":[m.start.environment_seed,m.next_unit_id],"terrain":terrain,"units":units,"claims":claims,"flights":flights,"shots":shots,"salvos":salvos})
 }
 fn compare(a: &Value, b: &Value, path: &str) {
     if b.is_number() {
@@ -210,16 +252,67 @@ fn compare(a: &Value, b: &Value, path: &str) {
 }
 #[test]
 fn assembled_match_targeting_and_launches_match_original_source() {
-    let fixture: Value = serde_json::from_str(include_str!("fixtures/match-firing.json")).unwrap();
+    let fixture: Value = fixture();
     let mut phases = 0;
     for c in fixture["cases"].as_array().unwrap() {
         let mut m = make(c);
+        let run = c["variation"].as_str().unwrap().starts_with("flight");
+        let mut last = 0;
         for s in c["steps"].as_array().unwrap() {
-            m.world.game.tick = s["tick"].as_i64().unwrap();
-            m.begin_firing_tick(&[1, 2, 3]).unwrap();
-            m.advance_firing_timers(1, 0.05).unwrap();
-            m.apply_unit_firing(1, c["variation"] == "moving", 0.05)
-                .unwrap();
+            let tick = s["tick"].as_i64().unwrap();
+            for current in if run { last + 1..=tick } else { tick..=tick } {
+                m.world.game.tick = current - 1;
+                m.capture_firing_prior().unwrap();
+                m.world.game.tick = current;
+                if run && current == 2 {
+                    if c["variation"] == "flight-wall" {
+                        m.world
+                            .set_cell(c["lateWall"].as_u64().unwrap() as usize, b'B')
+                            .unwrap();
+                    }
+                    if c["variation"] == "flight-bounce" {
+                        let z = m.world.game.units[&1].z;
+                        let t = m.world.game.units.get_mut(&2).unwrap();
+                        t.x = 35.0;
+                        t.z = z + 1.18;
+                        m.world.game.tick = current - 1;
+                        m.capture_firing_prior().unwrap();
+                        m.world.game.tick = current;
+                        m.grid.rebuild(&m.world.game.units);
+                        for p in m.firing.flights.values_mut() {
+                            p.solution.velocity.y = 0.0;
+                        }
+                    }
+                    if c["variation"] == "flight-dead-shooter" {
+                        m.world.game.units.remove(&1);
+                        m.firing.remove(1);
+                        m.commands.units.remove(&1);
+                        m.grid.rebuild(&m.world.game.units);
+                    }
+                    if c["variation"] == "flight-expiry" {
+                        for p in m.firing.flights.values_mut() {
+                            p.solution.velocity.y = 80.0;
+                        }
+                    }
+                }
+                if c["variation"] == "flight-motion" && current > 1 {
+                    let t = m.world.game.units.get_mut(&2).unwrap();
+                    t.z += 0.15;
+                    t.rot += 0.025;
+                    m.grid.rebuild(&m.world.game.units);
+                }
+                m.begin_firing_tick(&[1, 2, 3]).unwrap();
+                m.advance_firing_timers(1, 0.05).unwrap();
+                if !run || current == 1 {
+                    m.apply_unit_firing(1, c["variation"] == "moving", 0.05)
+                        .unwrap();
+                }
+                if run {
+                    m.step_firing_flights().unwrap();
+                    m.advance_firing_salvos(0.05).unwrap();
+                }
+            }
+            last = tick;
             compare(
                 &snapshot(&mut m),
                 &s["expected"],
@@ -239,5 +332,92 @@ fn assembled_match_targeting_and_launches_match_original_source() {
             phases += 1;
         }
     }
-    assert_eq!(phases, 264);
+    assert_eq!(phases, 588);
+}
+
+#[test]
+fn unsupported_modes_and_later_bad_payloads_leave_firing_unchanged() {
+    let fixture: Value = fixture();
+    let c = &fixture["cases"][0];
+    let mut m = make(c);
+    m.world.game.tick = 1;
+    m.begin_firing_tick(&[1, 2, 3]).unwrap();
+    m.advance_firing_timers(1, 0.05).unwrap();
+    m.apply_unit_firing(1, false, 0.05).unwrap();
+    assert!(!m.firing.flights.is_empty());
+    let first = m.firing.flights.values().next().unwrap().clone();
+    let mut invalid = first.clone();
+    invalid.id = 100;
+    invalid.near = -1.0;
+    m.firing.flights.insert(100, invalid);
+    let before = m.firing.clone();
+    let world = m.world.game.clone();
+    let combat = m.combat.clone();
+    let random = m.start.random.snapshot();
+    m.world.game.tick = 2;
+    assert!(m.step_firing_flights().is_err());
+    assert_eq!(m.firing, before);
+    assert_eq!(m.combat, combat);
+    assert_eq!(m.start.random.snapshot(), random);
+    m.world.game.tick = 1;
+    assert_eq!(m.world.game.units, world.units);
+    assert_eq!(m.world.game.chars, world.chars);
+    m.options.mode = Mode::World;
+    m.world.game.units.get_mut(&1).unwrap().owner = u32::MAX as usize;
+    let before = m.firing.clone();
+    assert!(m.begin_firing_tick(&[1, 2, 3]).is_err());
+    assert!(m.advance_firing_timers(1, 0.05).is_err());
+    assert!(m.apply_unit_firing(1, false, 0.05).is_err());
+    assert!(m.can_shoot_target(1, 2).is_err());
+    assert_eq!(m.firing, before);
+}
+
+#[test]
+fn equal_fraction_contacts_use_lower_id_despite_grid_history() {
+    let fixture = fixture();
+    let c = &fixture["cases"][0];
+    for reverse in [false, true] {
+        let mut m = make(c);
+        m.world.game.tick = 1;
+        m.begin_firing_tick(&[1, 2, 3]).unwrap();
+        m.apply_unit_firing(1, false, 0.05).unwrap();
+        let first = *m.firing.flights.keys().next().unwrap();
+        m.firing.flights.retain(|id, _| *id == first);
+        let p = m.firing.flights.get_mut(&first).unwrap();
+        p.solution.velocity = ww2_core::projectiles::Point3::new(230.0, 0.0, 0.0);
+        p.near = 0.0;
+        let kind = m.world.game.units[&2].kind;
+        for id in [2, 3] {
+            let t = m.world.game.units.get_mut(&id).unwrap();
+            t.kind = kind;
+            t.x = 35.0;
+            t.z = 15.0;
+            t.rot = 0.0;
+            t.hp = 100.0;
+        }
+        m.grid.rebuild(&m.world.game.units);
+        if reverse {
+            m.grid.remove_unit(2);
+            m.grid.update(2, &m.world.game.units[&2]);
+        }
+        let order = m
+            .grid
+            .in_order(&m.world.game.units, (35.0, 15.0), 1.0, |id, _| id != 1);
+        assert_eq!(order, if reverse { vec![3, 2] } else { vec![2, 3] });
+        m.capture_firing_prior().unwrap();
+        m.world.game.tick = 2;
+        m.step_firing_flights().unwrap();
+        let contact = m
+            .firing
+            .take_events()
+            .into_iter()
+            .find_map(|e| match e {
+                LaunchEvent::Contact(c) => Some(c),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(contact.target, Some(2));
+        assert!(m.world.game.units[&2].hp < 100.0);
+        assert_eq!(m.world.game.units[&3].hp, 100.0);
+    }
 }
