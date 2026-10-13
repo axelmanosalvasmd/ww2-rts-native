@@ -132,7 +132,7 @@ fn actual_ability_and_fps_launches_and_blasts_match_source() {
             checkpoints += 1;
         }
     }
-    assert_eq!(checkpoints, 203);
+    assert_eq!(checkpoints, 210);
 }
 #[test]
 fn invalid_launches_are_atomic_and_only_success_returns_a_flight() {

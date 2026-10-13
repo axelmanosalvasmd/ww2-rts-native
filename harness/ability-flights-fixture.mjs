@@ -40,8 +40,8 @@ function projection(g){const state=snapshot(g);state.blasts=[...g.flights.values
 const cases=[];
 const grenades=Object.entries(sim.UNITS).filter(([,d])=>['grenade','satchel'].includes(d.ab?.id));
 const barrages=Object.entries(sim.UNITS).filter(([,d])=>d.ab?.id==='barrage');
-for(const [kind,def] of [...grenades,...barrages])for(const variation of ['plain','garrison','ammo-low']){
- if(variation==='garrison'&&def.naval)continue;
+for(const [kind,def] of [...grenades,...barrages])for(const variation of ['plain','garrison','ammo-low','edge']){
+ if(variation==='garrison'&&def.naval||variation==='edge'&&kind!=='rifle')continue;
  const naval=def.naval,map={name:'Ability flights',w:80,h:24,rows:Array(24).fill('.'.repeat(80)),spawns:[{x:0,y:0},{x:79,y:0}],points:[{x:70,y:3}]};
  if(naval)map.rows=map.rows.map((v,i)=>i<8?v:'W'.repeat(80));
  const old=Math.random;Math.random=()=>.5;let g;try{g=sim.createGame(map,['A','B'],false,[0,1],[0,1],{weather:false,logistics:false,tech:false});}finally{Math.random=old;}
@@ -49,12 +49,13 @@ for(const [kind,def] of [...grenades,...barrages])for(const variation of ['plain
  const u=sim.internals.spawnUnit(g,0,kind),t=sim.internals.spawnUnit(g,1,naval?'gunboat':'rifle'),other=sim.internals.spawnUnit(g,1,naval?'gunboat':'tank');
  Object.assign(u,{x:25,z:naval?30:15,rot:0,aim:0,still:20,cooldown:0,retarget:0,targetId:0,holdFire:false,attackId:0,auto:false,buff:0,ap:false});
  Object.assign(t,{x:35,z:u.z,rot:Math.PI,still:20});Object.assign(other,{x:34,z:u.z+3,rot:0,still:20});
+ if(variation==='edge'){Object.assign(u,{x:145,z:45});Object.assign(t,{x:153,z:45});Object.assign(other,{x:154,z:47});}
  if(variation==='garrison')u.garrison=Math.floor(u.z/2)*g.w+Math.floor(u.x/2);
  if(variation==='ammo-low'&&def.w?.perModel)u.hp=def.hpPer*2;
  if(variation==='ammo-low')u.logistics={ammo:2,ammoMax:20,ammoPrice:1,ammoCredit:0,provisions:120,forced:false,stranded:false,exhausted:false};
  g.players[0].visible=new Set([2,3]);g.players[1].visible=new Set([1]);grid.rebuildGrid(g);g.nextId=1000;
  const input=[...g.units.values()].map(u=>({id:u.id,kind:u.type,owner:u.owner,x:u.x,z:u.z,rot:u.rot,hp:u.hp,still:u.still,supp:u.supp,xp:u.xp,hitBy:null,hitAt:u.hitAt,hitFrom:null,target:0,shotAt:null,logistics:u.logistics?structuredClone(u.logistics):null,hold:false,attack:0,aim:u.aim,cooldown:0,retarget:0}));
- const at={x:35,z:u.z},random=combatRandom(701);g.tick=1;const saved=Math.random;Math.random=()=>random.next();try{
+ const at=variation==='edge'?{x:160,z:48}:{x:35,z:u.z},random=combatRandom(701);g.tick=1;const saved=Math.random;Math.random=()=>random.next();try{
   if(def.ab.id==='barrage')sim.launchSalvo(g,u,at,def.ab.shells);
   else{u.nade=at;sim.__abilityLaunch(g,u);}
  }finally{Math.random=saved;}

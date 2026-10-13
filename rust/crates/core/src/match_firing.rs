@@ -2049,7 +2049,8 @@ impl Match {
             || flag(self.definition(u)?, "air")
             || u.riding
             || ![at.x, at.z].iter().all(|v| v.is_finite())
-            || self.world.game.cell_of(at.x, at.z).is_none()
+            || !(0.0..=self.world.game.w as f64 * CELL).contains(&at.x)
+            || !(0.0..=self.world.game.h as f64 * CELL).contains(&at.z)
             || !(0..9_007_199_254_740_351).contains(&self.world.game.tick)
             || count == 0
             || count > 4096
