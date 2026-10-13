@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Applied the canonical engineering owner's compiler boundary repairs in the isolated Cover union: public recruitment error paths, optional damage actor context and ordered pending-cell fixture projection. The newer checked recovery health and ability fixture bodies were retained. Native proof of this combined checkpoint is pending.
+
 - Fixed duplicate retreat-denial definitions introduced by the Cover dependency merge and let queued Cover inherit a preceding aimed ability's HUD anchor. A real rifle ability trace raises the command fixture to 91 traces and 331 steps. Accepted Cover also clears inert aimed-action metadata with its cancelled aim. Source review caught these integration defects before native testing.
 
 - Cover now cancels real paid Dig through the sole field-work owner without refunds and clears a garrison squad's orders while keeping it in its house. Queued admission and unsuccessful cover holds retain jobs. Five original-source traces bring the command fixture to 90 traces and 329 steps; native proof is pending. Construction and mass-entrenchment projects remain explicitly refused.
