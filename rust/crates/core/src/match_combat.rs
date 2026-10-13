@@ -297,12 +297,17 @@ impl DamageWorld<'_> {
         let mut placer = SpawnPlacer::new();
         for event in events {
             let (id, finite) = match event {
-                CombatEvent::Health { unit, value } | CombatEvent::Suppression { unit, value } => {
-                    (*unit, value.is_finite())
+                CombatEvent::Health { unit, value } => (*unit, value.is_finite()),
+                CombatEvent::Suppression { unit, value } => {
+                    (*unit, value.is_finite() && *value >= 0.)
                 }
-                CombatEvent::LastHit { unit, .. }
-                | CombatEvent::ResetRetarget { unit }
-                | CombatEvent::SuppressionRecord { unit } => (*unit, true),
+                CombatEvent::LastHit { unit, owner } => (
+                    *unit,
+                    *owner < 0 || (*owner as usize) < self.world.game.players.len(),
+                ),
+                CombatEvent::ResetRetarget { unit } | CombatEvent::SuppressionRecord { unit } => {
+                    (*unit, true)
+                }
                 CombatEvent::DeathImpulse { unit, value } => (
                     *unit,
                     value.direction.is_finite() && value.magnitude.is_finite(),

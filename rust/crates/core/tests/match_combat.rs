@@ -574,6 +574,25 @@ fn event_and_death_preflight_preserve_canonical_state_on_invalid_input() {
         view.apply_events(&events, &mut timers, &mut BTreeSet::new())
             .is_err()
     );
+    for invalid in [
+        ww2_core::combat::CombatEvent::Suppression {
+            unit: 2,
+            value: -1.,
+        },
+        ww2_core::combat::CombatEvent::LastHit {
+            unit: 2,
+            owner: 999,
+        },
+    ] {
+        let batch = [
+            ww2_core::combat::CombatEvent::Health { unit: 2, value: 0. },
+            invalid,
+        ];
+        assert!(
+            view.apply_events(&batch, &mut timers, &mut BTreeSet::new())
+                .is_err()
+        );
+    }
     assert_eq!(snapshot(&m, &timers, &groups), before);
     m.world.game.units.get_mut(&1).unwrap().hp = 0.;
     m.world.game.units.get_mut(&2).unwrap().hp = 0.;
