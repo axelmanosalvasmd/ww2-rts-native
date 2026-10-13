@@ -143,7 +143,23 @@ pub struct Pathfinding {
     vehicles: VehicleNavigation,
 }
 
-#[derive(Default)]
+impl Clone for Pathfinding {
+    /// Fork derived search history for a transaction. External terrain buffers
+    /// keep their identities; owned vehicle buffers are rebound to this copy.
+    /// Publish this value with the terrain preview on success, or drop on error.
+    fn clone(&self) -> Self {
+        let vehicles = self.vehicles.clone();
+        let mut navigation = self.navigation.clone();
+        navigation.rebind_flags(&self.vehicles.cloned_buffers(&vehicles));
+        Self {
+            navigation,
+            scratch: self.scratch.clone(),
+            vehicles,
+        }
+    }
+}
+
+#[derive(Clone, Default)]
 struct Scratch {
     scores: Vec<f32>,
     came: Vec<usize>,
@@ -719,7 +735,7 @@ fn cliff_clear(v: TerrainView<'_>, a: Point, b: Point) -> bool {
     x == ex && y == ey
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct Heap(Vec<(f64, usize)>);
 impl Heap {
     fn push(&mut self, score: f64, cell: usize) {
