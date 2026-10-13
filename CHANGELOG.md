@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Flatten the startup-schema anyOf refusal condition to satisfy strict Clippy without changing short-circuit validation or output bytes. Exact predecessor `b9e9bb7` passes all 3 debug and 3 optimized startup-table tests, 7 economy tests and formatting; strict checks stop on this single style finding. Fresh successor gates remain pending.
+
 - Add an internal Rust startup-table producer from the full canonical Catalog and 17 maintained source-export additions, with pinned schema validation and exact missing/null/number-tag preservation. Extend the existing Node recorder with the complete 64-table payload and 1,743 numeric IEEE754 leaf values; its bytes match accepted candidate hash `5de90a79...2efd` while the original 47 tables and economy fixture stay unchanged. Three written Rust correspondence/refusal tests and platform byte proof await a compile lease. No transport or ABI change.
 
 - Add an unagreed startup-table content/schema proposal for consumer review: all 47 compiled tables plus 17 source-derived public constants, a portable generator, exact field inventory and independent table/formation hashes. Table transport, additional FFI calls and Unreal adoption remain pending explicit agreement.

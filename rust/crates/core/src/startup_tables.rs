@@ -175,13 +175,12 @@ fn validate(schema: &Json, value: &Json, path: &str) -> Result<(), TableError> {
     {
         return Err(error(path, "value outside the agreed enum"));
     }
-    if let Some(options) = shape.get("anyOf").and_then(Json::as_array) {
-        if !options
+    if let Some(options) = shape.get("anyOf").and_then(Json::as_array)
+        && !options
             .iter()
             .any(|option| validate(option, value, path).is_ok())
-        {
-            return Err(error(path, "no agreed schema alternative matches"));
-        }
+    {
+        return Err(error(path, "no agreed schema alternative matches"));
     }
     if let Some(kind) = shape.get("type").and_then(Json::as_str) {
         let matches = match kind {
