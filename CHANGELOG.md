@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Connect ordinary research and the bounded legacy map scenario to the canonical tick caller. Validate research/production and scenario state before the clock and after boundary commands; reject foreign live point-owner slots while preserving neutral None; run research after optional vision, and emit typed Say plus actual Destroy terrain effects after support timers and before weather while undecided. Keep one event/failure prefix owner and ordinary queued Production unavailable. Add contiguous five-map caller, Great Bridge tick-8400 structural HP, winner-gate, preclock refusal and late-failure tests. Preserve Human event ordinals and exact original four-family output fixtures. Native validation and dependent Say/falling projection remain pending.
+
 - Normally consume cleared legacy scenario runtime `b31f8f7` into the separate ordinary caller. Preserve its five-map complete Source replay, Great Bridge tick-8400 section transition and real post-commit failure prefix. Provider bodies are unchanged; ordered caller hookup and native validation remain pending.
 
 - Normally join the cleared ordinary production and research provider `dd62df3` into verified startup publication `ccfa017` in a separate caller worktree. Preserve the real research and immediate recruitment source recorder and the ordinary nonempty training queue refusal. Actual caller hookup and combined native validation remain pending.
@@ -119,6 +121,8 @@
 - Recorded four complete original ordinary tick traces with 2,429 steps, 4,810 research observations, seven commands and two immediate recruitment births. Added an actual-runner consumer and two original restored-queue failure witnesses. Observed and unobserved Source replay agree; native execution awaits the sole tick owner's research hookup. Retained unsupported restored queues rather than inventing a Conquest mode object.
 
 - Added read-only admission for canonical research and live-building production phases, including actual World context, foreign queue rows and prospective numeric overflow. Ordinary Conquest keeps immediate purchases and refuses nonempty restored training queues. World queued AIR and logistics publication remain unsupported. Training publication also checks the canonical Aviation and reserve owners before using an ID. Full tick hookup and native proof are pending.
+- Added a separate paired caller oracle for the same five legacy-trigger maps. It applies the declared seed 123 and wind before the first original `sim.step`, records actual per-seat `snapshotFor.falling` rows across 21 complete-step checkpoints, and retains the prior projection traces and failure prefix exactly. The Great Bridge checkpoint preserves all 516 structural rows and confirms 84 failed bridge sections at zero HP. The pinned x64 regeneration and original-field retention checks pass; native comparison remains pending.
+
 - Added recorder assertions for the exact Great Bridge structure list at tick 8400: 84 bridge sections begin intact at 2,400 HP and finish failed at 0 HP. The pinned x64 source fixture remains byte-identical after regeneration.
 
 - Extended the pinned x64 complete-step oracle with an observed legacy phase timeline. It records actual Say, Destroy callback and emitted-shot order, support cooldowns at scenario entry, and wind state before and after living weather; the Great Bridge witness confirms cooldown advancement precedes scenario actions and weather advances afterward.

@@ -29,16 +29,17 @@ const specs=[
   ['the-great-bridge',[5999,6000,6001,7999,8000,8001,8399,8400,8401]],
 ];
 function load(name){return JSON.parse(readFileSync(resolve(reference,'maps',`${name}.json`),'utf8'));}
-function recipientProjection(g){return [0,1].map(slot=>{const snapshot=sim.snapshotFor(g,slot,g.shots);return{slot,scenario:structuredClone(snapshot.scenario??null),shots:structuredClone(snapshot.shots)};});}
+function recipientProjection(g,includeFalling=false){return [0,1].map(slot=>{const snapshot=sim.snapshotFor(g,slot,g.shots);const row={slot,scenario:structuredClone(snapshot.scenario??null),shots:structuredClone(snapshot.shots)};if(includeFalling)row.falling=structuredClone(snapshot.falling??[]);return row;});}
 function supportTimers(g){return g.players.map((p,slot)=>({slot,support:Object.fromEntries(Object.entries(p.sup??{}).sort(([a],[b])=>a.localeCompare(b)))}));}
 function phaseObservation(g){return{tick:g.tick,winner:g.winner,supportTimers:supportTimers(g),wind:structuredClone(g.wind),livingWeather:g.wx?structuredClone(g.wx):null};}
 function recipientInputs(g){const falling=(g.fallingSections??[]).filter(section=>!section.settled);return{reveal:!!g.reveal,mode:g.mode?.kind??null,weather:g.weather?.now??null,players:g.players.map((p,slot)=>({slot,team:p.team,out:!!p.out,visible:[...p.visible].sort((a,b)=>a-b)})),units:[...g.units.values()].map(u=>({id:u.id,type:u.type,owner:u.owner,x:u.x,z:u.z,air:u.air?{state:u.air.state}:null,garrison:u.garrison,riding:!!u.riding,built:u.built??null,hp:u.hp})),fallingCount:falling.length,fallingSections:falling.map(s=>({id:s.id,kind:s.kind,section:s.section,c:s.c,x:s.x,z:s.z,y:s.y,dir:s.dir,time:s.time,until:s.until,impulse:s.impulse,mass:s.mass,material:s.material,radius:s.radius})),terrain:{w:g.w,h:g.h,flags:Array.from(g.flags),height:g.height?Array.from(g.height):null},smokes:g.smokes.map(s=>({x:s.x,z:s.z,r:s.r,id:s.id})),strikes:g.strikes.map(s=>({kind:s.kind,x:s.x,z:s.z,dir:s.dir,t:s.t,owner:s.owner}))};}
 function structureSections(g){return[...new Set(g.structuralCells?.values()??[])].map(s=>({id:s.id,c:s.c,structureId:s.structureId,hp:s.hp,maxHp:s.maxHp,state:s.state,material:s.material,anchor:s.anchor,supports:structuredClone(s.supports??[]),rubble:structuredClone(s.rubble??[]),failedAt:s.failedAt,direction:structuredClone(s.direction),impulse:s.impulse,entityId:s.entityId})).sort((a,b)=>a.c-b.c);}
-function run(name,ticks,failAfterExecution=null){
+function run(name,ticks,failAfterExecution=null,callerInputs=null){
   const map=load(name), callbacks=[];let scenarioTimeline=[],damageActive=false,activeDamageExecution=null;
   const saved=Math.random;Math.random=()=>0.5;
   let g;try{g=sim.createGame(map,['A','B'],false,[0,1],[0,1],{mode:'conquest',weather:false,tech:false,supply:false,logistics:false,mapKey:name});}
   finally{Math.random=saved;}
+  if(callerInputs){g.seed=callerInputs.environmentSeed;g.wind=structuredClone(callerInputs.wind);}
   const damage=sim.__scenarioTools.damage;
   sim.__scenarioTools.damage=(state,action,execution)=>{
     callbacks.push({kind:'damage.begin',execution,action:structuredClone(action)});
@@ -72,7 +73,7 @@ function run(name,ticks,failAfterExecution=null){
     assert.equal(g.tick,target,`${name}: source step clock`);
     if(ticks.includes(g.tick)){
       const state=g.scenario?structuredClone(g.scenario):null;
-      const frame={tick:g.tick,shots:appended,recipientInputs:recipientInputs(g),recipients:recipientProjection(g),callbacks:structuredClone(callbacks),scenario:state,
+      const frame={tick:g.tick,shots:appended,recipientInputs:recipientInputs(g),recipients:recipientProjection(g,callerInputs!==null),callbacks:structuredClone(callbacks),scenario:state,
         cellChanges:structuredClone(g.cellLog.slice(previousCellLog)),failure,phase:{beforeStep:beforeStepPhase,scenarioTimeline:structuredClone(scenarioTimeline),afterStep:phaseObservation(g)}};
       if(beforeBridgeSections){frame.structureSectionsBefore=beforeBridgeSections;frame.structureSectionsAfter=structureSections(g);}
       selected.push(frame);
@@ -81,9 +82,11 @@ function run(name,ticks,failAfterExecution=null){
     if(failure){assert.equal(target,ticks.at(-1),`${name}: unexpected callback failure tick`);break;}
   }
   sim.__scenarioTools.damage=damage;
-  return {name,map,steps:selected};
+  return callerInputs?{name,map,inputs:structuredClone(callerInputs),steps:selected}:{name,map,steps:selected};
 }
 const traces=specs.map(([name,ticks])=>run(name,ticks));
+const callerInputs={environmentSeed:123,wind:{a:0,v:0.5}};
+const callerTraces=specs.map(([name,ticks])=>run(name,ticks,null,callerInputs));
 const bridge8400=traces.find(trace=>trace.name==='the-great-bridge').steps.find(step=>step.tick===8400);
 assert.equal(bridge8400.recipientInputs.fallingCount,84,'Great Bridge tick 8400 unsettled Source falling sections');
 assert.equal(bridge8400.structureSectionsBefore.length,516,'Great Bridge structural section count before collapse');
@@ -119,12 +122,22 @@ assert.equal(failedTimeline[1]?.kind,'destroy.begin');
 assert.equal(failedTimeline.at(-2)?.kind,'destroy.commit');
 assert.equal(failedTimeline.at(-1)?.kind,'failure.after-destroy-commit');
 assert.equal(failedTimeline.filter(row=>row.kind==='destroy.output'&&row.shotKind==='collapse').length,84);
+assert.equal(callerTraces.length,specs.length,'caller oracle includes the same five shipped maps');
+for(const trace of callerTraces){
+  assert.deepEqual(trace.inputs,callerInputs,'caller oracle declares its paired pre-step literals');
+  assert.equal(trace.steps.at(-1).tick,specs.find(([name])=>name===trace.name)[1].at(-1),`${trace.name}: contiguous caller reaches its last selected tick`);
+  assert(trace.steps.every(step=>step.recipients.every(recipient=>Array.isArray(recipient.falling))),'caller recipient frames retain actual snapshotFor falling rows');
+}
+const callerBridge=callerTraces.find(trace=>trace.name==='the-great-bridge').steps.find(step=>step.tick===8400);
+assert.equal(callerBridge.recipientInputs.fallingCount,84,'caller Great Bridge tick 8400 has 84 unsettled source bodies');
+assert.equal(callerBridge.structureSectionsAfter.length,516,'caller Great Bridge retains all structural sections');
+assert.equal(callerBridge.structureSectionsAfter.filter(section=>section.structureId==='map:bridge:5573'&&section.state==='failed'&&section.hp===0).length,84,'caller Great Bridge records all 84 failed zero-HP bridge sections');
 clean();
 const out={reference:pin,node:process.version,arch:process.arch,
-  scope:'Pinned complete createGame and sim.step callbacks, source-phase observations for support timers, scenario Say/destroy and living weather, actual SCENARIO_TOOLS.damage execution, chronological mixed Say/destroy output, and selected per-seat snapshotFor scenario/shot projections; no replacement rules or custom trigger evaluator. The failure frame injects an error only after the original damage callback commits, to record its real output/state prefix.',
-  traces,failureTrace};
+  scope:'Pinned complete createGame and sim.step callbacks, source-phase observations for support timers, scenario Say/destroy and living weather, actual SCENARIO_TOOLS.damage execution, chronological mixed Say/destroy output, and selected per-seat snapshotFor scenario/shot projections; no replacement rules or custom trigger evaluator. The failure frame injects an error only after the original damage callback commits, to record its real output/state prefix. Separate callerTraces apply declared environment seed and wind literals before the first complete sim.step and add actual per-seat snapshotFor falling rows; the original traces and failureTrace remain unchanged.',
+  traces,failureTrace,callerTraces};
 const path=resolve(root,'rust/crates/simtest/tests/fixtures/legacy-scenario-runtime.json.gz');
 const bytes=gzipSync(JSON.stringify(out)+'\n',{level:9});
 if(process.argv.includes('--check'))assert.deepEqual(readFileSync(path),bytes);
 else writeFileSync(path,bytes);
-console.log(`${traces.length} shipped maps, ${traces.reduce((n,t)=>n+t.steps.length,0)} selected complete-step frames plus one post-commit failure-prefix frame`);
+console.log(`${traces.length} original shipped maps, ${traces.reduce((n,t)=>n+t.steps.length,0)} original frames plus one failure-prefix frame; ${callerTraces.length} paired caller traces, ${callerTraces.reduce((n,t)=>n+t.steps.length,0)} full-step frames`);

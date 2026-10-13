@@ -193,7 +193,12 @@ impl Match {
             .collect::<Result<BTreeSet<_>, _>>()?;
         let scenario_state = scenario.state();
         let player_count = self.world.game.players.len();
-        if point_ids.len() != self.start.points.len()
+        if self
+            .start
+            .points
+            .iter()
+            .any(|point| point.owner.is_some_and(|owner| owner >= player_count))
+            || point_ids.len() != self.start.points.len()
             || scenario_state
                 .owners
                 .keys()
