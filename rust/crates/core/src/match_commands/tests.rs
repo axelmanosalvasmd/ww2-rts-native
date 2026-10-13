@@ -402,3 +402,61 @@ fn immediate_cover_uses_the_recorded_queue_and_refuses_unrepresented_jobs() {
         Command::Unsupported
     );
 }
+
+#[test]
+fn cover_refresh_preserves_moved_gameplay_bucket_order() {
+    let f: Value =
+        serde_json::from_slice(include_bytes!("../../tests/fixtures/match-commands.json")).unwrap();
+    let mut case = f["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == "cover-two-squads")
+        .unwrap()
+        .clone();
+    case["initial"].as_array_mut().unwrap().extend([
+        json!({"kind":"tank","x":27,"z":24}),
+        json!({"kind":"tank","x":27,"z":26}),
+    ]);
+    let mut m = initial(&case);
+    for id in [1, 3] {
+        let low = m.world.game.units.get_mut(&id).unwrap();
+        low.x = 49.0;
+        m.grid.update(id, low);
+        low.x = 27.0;
+        m.grid.update(id, low);
+    }
+    let probe = |m: &Match| {
+        (
+            m.grid
+                .unordered(&m.world.game.units, (27.0, 23.0), 4.0, |_, _| true),
+            m.grid
+                .heavy(&m.world.game.units, (27.0, 23.0), 4.0, |_, _| true),
+        )
+    };
+    let before = probe(&m);
+    assert_eq!(before, (vec![2, 4, 1, 3], vec![4, 3]));
+    m.world.game.tick += 1;
+    assert_eq!(
+        m.execute_command(0, &Command::Cover { ids: vec![1, 2] }, false)
+            .unwrap(),
+        None
+    );
+    assert_eq!(probe(&m), before);
+    m.observed_wrecks(0).unwrap();
+    assert_eq!(probe(&m), before);
+    m.recipient_sees(0, Point { x: 27.0, z: 23.0 }).unwrap();
+    assert_eq!(probe(&m), before);
+    m.world.game.units.get_mut(&2).unwrap().path_gen = u64::MAX;
+    let state = snapshot(&m);
+    let generation = m.world.game.units[&1].path_gen;
+    m.world.game.tick += 1;
+    assert!(
+        m.execute_command(0, &Command::Cover { ids: vec![1, 2] }, false)
+            .is_err()
+    );
+    assert_eq!(snapshot(&m), state);
+    assert_eq!(m.world.game.units[&1].path_gen, generation);
+    assert_eq!(m.world.game.units[&2].path_gen, u64::MAX);
+    assert_eq!(probe(&m), before);
+}

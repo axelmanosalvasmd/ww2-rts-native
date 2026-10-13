@@ -113,6 +113,10 @@ impl Match {
             if spot.is_none() && rank == 3 {
                 continue;
             }
+            let next_identity = u
+                .path_gen
+                .checked_add(1)
+                .ok_or("cover path identity exhausted")?;
             let route = spot
                 .map(|at| self.command_route(owner, &u, at))
                 .transpose()?;
@@ -130,10 +134,7 @@ impl Match {
             u.path = route
                 .as_ref()
                 .map_or_else(Vec::new, |r| r.waypoints.clone());
-            u.path_gen = u
-                .path_gen
-                .checked_add(1)
-                .ok_or("cover path identity exhausted")?;
+            u.path_gen = next_identity;
             staged.units.insert(id, u.clone());
             prepared.push((id, u, route.map(|r| r.route_end)));
         }
