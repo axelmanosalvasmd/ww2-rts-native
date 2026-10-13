@@ -656,9 +656,9 @@ fn normalize_layers(source: &Value, w: usize, h: usize, chars: &[u8]) -> Result<
         mine_materials,
     })
 }
-fn flags(ch: u8) -> u16 {
+pub(crate) fn flags(ch: u8) -> u16 {
     let bits = match ch {
-        b'B' => MOVE | SIGHT,
+        b'B' | b'K' => MOVE | SIGHT,
         b'H' => SIGHT | COVER,
         b'#' | b'+' => COVER,
         b'T' => COVER | TRENCH,
@@ -755,7 +755,7 @@ fn component(chars: &[u8], w: usize, start: usize, seen: &mut [bool]) -> Vec<usi
     }
     queue
 }
-fn start_wear(ch: u8, c: usize) -> f32 {
+pub(crate) fn start_wear(ch: u8, c: usize) -> f32 {
     let mut h = (c as u32).wrapping_add(1).wrapping_mul(0x9e37_79b1);
     h ^= h >> 15;
     h = h.wrapping_mul(0x85eb_ca6b);
