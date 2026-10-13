@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Adapted the convoy routing consumer to the recipient observation context and sole Environment metadata owner, preserving its immediate receipt commit. Static list/snapshot readiness review found the old helper signature still in that caller; convoy behavior and source fixtures are unchanged. Combined native verification remains pending.
+
 - Extended the bounded Conquest seat snapshot with canonical remembered wrecks and discovered mines. The original-source fixture adds 11 frames and 33 complete recipient results covering visibility, removal, rediscovery, moving debris and discovery order. Every seat's actor, terrain and list producer admits before remembered state or delivery changes; regressions cover a later seat's missing wreck metadata and invalid terrain. Adapted the recovery mine writer to the sole ordered discovery owner. Combined native verification remains pending.
 
 - Integrated the coordinated source-only ordinary list batch preparation API into active snapshot prerequisites. All-seat list replacements remain unpublished until producer/source/prior-memory checks finish; independent review and native verification remain pending for this union.
