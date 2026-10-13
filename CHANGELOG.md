@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Move read-only room attachment admission before the snapshot test module to satisfy strict Clippy item ordering. The method body and every test are unchanged; no lint allowance is added.
+
 - Update the support refusal regression after canonical strike ownership moved into routing admission. Assert the direct support InvalidRecipient refusal and the earlier complete-snapshot Rules refusal separately; retain every delivery rollback assertion. The prior run passed 19 snapshot tests and failed this outdated expected error. Runtime behavior is unchanged.
 
 - Correct the room lifecycle fixture to use Map weather when living weather is disabled, as Match admission requires. The first two real-event host tests pass; six Hub cases stopped at fixture construction before reaching their assertions. Runtime guards and test assertions are retained.

@@ -546,6 +546,26 @@ fn economy_fields(state: &Match, slot: usize) -> Result<Map<String, Value>, Snap
     Ok(fields)
 }
 
+impl Match {
+    /// Read-only admission of the currently supported ordinary actor frame.
+    /// Trusted attachment validates every seat before installing the match.
+    pub fn preflight_ordinary_snapshot(&self) -> Result<(), SnapshotError> {
+        composition::admit_actors(self, &[])?;
+        let cache = SnapshotCache::new(self)?;
+        let owners = (0..self.world.game.players.len()).collect::<Vec<_>>();
+        for &slot in &owners {
+            cache.recipient(slot)?;
+            self.preflight_observed_terrain(slot)
+                .map_err(|_| SnapshotError::Rules)?;
+        }
+        // Prepare the same ordered lists as delivery without publishing their
+        // remembered rows or acknowledging any World observations.
+        self.prepare_ordinary_recipient_lists(&owners)
+            .map_err(|_| SnapshotError::Rules)?;
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use super::*;
@@ -1040,25 +1060,5 @@ pub(crate) mod tests {
                 capability: SnapshotCapability::Engineering
             })
         ));
-    }
-}
-
-impl Match {
-    /// Read-only admission of the currently supported ordinary actor frame.
-    /// Trusted attachment validates every seat before installing the match.
-    pub fn preflight_ordinary_snapshot(&self) -> Result<(), SnapshotError> {
-        composition::admit_actors(self, &[])?;
-        let cache = SnapshotCache::new(self)?;
-        let owners = (0..self.world.game.players.len()).collect::<Vec<_>>();
-        for &slot in &owners {
-            cache.recipient(slot)?;
-            self.preflight_observed_terrain(slot)
-                .map_err(|_| SnapshotError::Rules)?;
-        }
-        // Prepare the same ordered lists as delivery without publishing their
-        // remembered rows or acknowledging any World observations.
-        self.prepare_ordinary_recipient_lists(&owners)
-            .map_err(|_| SnapshotError::Rules)?;
-        Ok(())
     }
 }
