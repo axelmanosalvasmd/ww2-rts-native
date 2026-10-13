@@ -7,6 +7,8 @@ pub mod combat;
 pub mod deployment;
 pub mod economy;
 pub mod economy_state;
+pub mod environment;
+pub mod environment_debris;
 pub mod fog;
 pub mod formation;
 pub mod game;
@@ -26,6 +28,7 @@ pub mod path_requests;
 
 pub mod orders;
 pub mod pathfinding;
+pub mod produced_units;
 pub mod production;
 pub mod projectiles;
 
@@ -35,6 +38,7 @@ pub mod rules;
 pub mod separation;
 pub mod sort;
 pub mod structures;
+pub mod supply_convoys;
 pub mod terrain;
 pub mod traffic;
 pub mod unit_spawn;

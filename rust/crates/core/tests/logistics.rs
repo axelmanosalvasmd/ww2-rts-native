@@ -49,6 +49,8 @@ fn reserves(v: &Value) -> Reserves {
         forced: v["forced"].as_bool().unwrap(),
         stranded: v["stranded"].as_bool().unwrap(),
         exhausted: v["exhausted"].as_bool().unwrap(),
+        supply_rate: None,
+        cut_for: None,
     }
 }
 fn reserve_json(r: Option<&Reserves>) -> Value {
