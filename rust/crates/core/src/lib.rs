@@ -18,6 +18,7 @@ pub mod game;
 pub mod grid;
 pub mod legacy_scenario;
 pub mod match_companion_effects;
+mod match_companion_tick;
 pub mod match_companions;
 
 pub mod command_destinations;

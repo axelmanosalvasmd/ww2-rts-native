@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added a source-written operative turn provider for the sole Match tick runner: registry and next-clock preflight, one movement/timer turn, then immediate canonical fire or grenade request consumption. Tick placement, death/respawn consumer hooks, full-step fixtures and native verification are pending; no second timer or runtime state was added.
+
 - Verified combined first-person ray, damage and typed grenade phase methods: 20 focused debug tests, all 174 locked release workspace tests, strict Clippy, formatting and release FFI build pass. Independent copied binaries pass 15 tests in each profile; original recorders pass 49 effects traces/66 operations and 17 lifecycle traces/536 operations. Both ordinary aliases are covered; tick dispatch, grenade settlement and client acceptance remain pending.
 
 - Ordered the added companion modules consistently with the core formatter. Module contents and public interfaces are unchanged.

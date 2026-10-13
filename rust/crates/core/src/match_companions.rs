@@ -531,7 +531,7 @@ fn can_stand(g: &crate::game::Game, rules: &crate::rules::Rules, from: Point, to
 }
 
 impl Match {
-    fn check_companion_lifecycle(&self) -> Result<(), String> {
+    pub(crate) fn check_companion_lifecycle(&self) -> Result<(), String> {
         let g = &self.world.game;
         if !(0..=SAFE_INTEGER - RESPAWN_TICKS).contains(&g.tick)
             || self.start.economy.players.len() != self.start.players.len()
