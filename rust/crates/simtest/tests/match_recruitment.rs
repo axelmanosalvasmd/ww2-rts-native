@@ -262,7 +262,7 @@ fn original_match_buy_placement_path_and_grid() {
     assert!(admitted > 0 && failed_paths > 0);
 }
 fn unchanged(m: &Match) -> Value {
-    json!({"next":m.next_unit_id,"money":m.start.economy.players.iter().map(|p|bits(p.mp)).collect::<Vec<_>>(),"units":m.world.game.units.keys().collect::<Vec<_>>(),"metadata":m.recruit_metadata.len(),"controls":m.commands.units.len(),"grid":m.grid.in_order(&m.world.game.units,(0.0,0.0),1000.0,|_,_|true)})
+    json!({"next":m.next_unit_id,"money":m.start.economy.players.iter().map(|p|bits(p.mp)).collect::<Vec<_>>(),"units":m.world.game.units.keys().collect::<Vec<_>>(),"metadata":format!("{:?}",m.recruit_metadata),"controls":format!("{:?}",m.commands.units),"unit_state":format!("{:?}",m.world.game.units),"wallets":format!("{:?}",m.start.economy),"grid":m.grid.in_order(&m.world.game.units,(0.0,0.0),1000.0,|_,_|true)})
 }
 #[test]
 fn malformed_or_unsupported_staging_never_publishes() {
