@@ -5,6 +5,8 @@
 //! `tables.json` beside the state file (`harness/tables.mjs` writes it to `harness/out/`). `--threads` works
 //! the fog out one team per thread. `--bench N` adds timings, as `vision-check.mjs --bench N` does.
 //!
+//! `simtest --view <messages.jsonl[.gz]|->` prints one client-view summary per raw server message.
+//!
 //! `simtest --replay <trace.json>`
 //!
 //! Replays a recording from `harness/movement-trace.mjs` call by call against the movement port and prints
@@ -47,6 +49,27 @@ fn run() -> Result<(), String> {
             .and_then(|i| args.get(i + 1))
     };
     let threads = args.iter().any(|a| a == "--threads");
+    if let Some(file) = opt("--view") {
+        use std::io::{BufRead, BufReader};
+        let input: Box<dyn std::io::Read> = if file == "-" {
+            Box::new(std::io::stdin())
+        } else {
+            Box::new(std::fs::File::open(file).map_err(|e| format!("{file}: {e}"))?)
+        };
+        let input: Box<dyn std::io::Read> = if file.ends_with(".gz") {
+            Box::new(flate2::read::MultiGzDecoder::new(input))
+        } else {
+            input
+        };
+        let mut view = ww2_core::client_view::ClientView::new();
+        for (index, line) in BufReader::new(input).lines().enumerate() {
+            let line = line.map_err(|e| format!("{file}:{}: {e}", index + 1))?;
+            view.apply(&line)
+                .map_err(|e| format!("{file}:{}: {e}", index + 1))?;
+            println!("{}", simtest::view::report(&view));
+        }
+        return Ok(());
+    }
     if let Some(file) = opt("--replay") {
         let trace = simtest::parse(&read(Path::new(file))?)?;
         let report = replay(&trace)?;

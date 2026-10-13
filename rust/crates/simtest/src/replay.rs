@@ -14,7 +14,7 @@ use std::collections::BTreeMap;
 use serde_json::Value;
 use ww2_core::game::{Game, Unit};
 use ww2_core::grid::{SpatialGrid, UnitId};
-use ww2_core::movement::{Moved, infantry_progress, move_unit};
+use ww2_core::movement::{Moved, RouteRequest, infantry_progress, move_unit_with_routes};
 use ww2_core::rules::Rules;
 use ww2_core::separation::separate_crowds;
 
@@ -190,6 +190,14 @@ fn compare_all(
 
 /// Replays a recording from `harness/movement-trace.mjs`, stopping at the first mismatch.
 pub fn replay(trace: &Value) -> Result<Report> {
+    replay_with_routes(trace, &mut |_, _, u, _, _| u.repath = 1.0)
+}
+
+/// Replays movement with a caller's route implementation at the live replan point.
+pub fn replay_with_routes(
+    trace: &Value,
+    routes: &mut impl FnMut(&Game, &Rules, &mut Unit, ww2_core::game::Point, RouteRequest),
+) -> Result<Report> {
     let rules = load_rules(trace.get("tables").ok_or("the recording has no tables")?)?;
     let start = trace.get("game").ok_or("the recording has no game")?;
     let mut g = load_game(start, &rules)?.game;
@@ -257,8 +265,8 @@ pub fn replay(trace: &Value) -> Result<Report> {
                 continue;
             }
             let supp_speed = number(&event[3]).ok_or("a move has no suppression speed")?;
-            let m =
-                move_unit(&mut g, &rules, &mut grid, id, supp_speed).ok_or("the unit vanished")?;
+            let m = move_unit_with_routes(&mut g, &rules, &mut grid, id, supp_speed, routes)
+                .ok_or("the unit vanished")?;
             report.calls += 1;
             rec.apply(&event[1], &event[4])?;
             let expected = rec.unit(&rules, id)?;
