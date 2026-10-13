@@ -40,6 +40,43 @@ fn authoritative_maps_match_pinned_validation_and_static_terrain() {
     assert_eq!(fixture["arch"], "x64");
     let (mut authored, mut terrain_count, mut rejected, mut unsupported) = (0, 0, 0, 0);
     for case in fixture["cases"].as_array().unwrap() {
+        let mut case = case.clone();
+        if case["encoding"] == "world-runs" {
+            fn expand(v: &Value) -> Vec<Value> {
+                v.as_array()
+                    .unwrap()
+                    .iter()
+                    .flat_map(|r| {
+                        std::iter::repeat_n(r[0].clone(), r[1].as_u64().unwrap() as usize)
+                    })
+                    .collect()
+            }
+            let width = case["map"]["w"].as_u64().unwrap() as usize;
+            for key in ["rows", "heights"] {
+                if !case["map"][key].is_null() {
+                    let chars = expand(&case["map"][key]);
+                    case["map"][key] = json!(
+                        chars
+                            .chunks(width)
+                            .map(|r| r.iter().map(|v| v.as_str().unwrap()).collect::<String>())
+                            .collect::<Vec<_>>()
+                    );
+                }
+            }
+            for key in ["regionMap", "biomes"] {
+                if !case["map"]["world"][key].is_null() {
+                    case["map"]["world"][key] = json!(expand(&case["map"]["world"][key]));
+                }
+            }
+            for key in ["chars", "ground", "objects"] {
+                case["terrain"][key] = json!(
+                    expand(&case["terrain"][key])
+                        .iter()
+                        .map(|v| v.as_str().unwrap())
+                        .collect::<String>()
+                );
+            }
+        }
         let name = case["name"].as_str().unwrap();
         let result = AuthoritativeMap::from_json(&serde_json::to_vec(&case["map"]).unwrap());
         if let Some(feature) = case["unsupported"].as_str() {
@@ -104,6 +141,38 @@ fn authoritative_maps_match_pinned_validation_and_static_terrain() {
             );
             assert_eq!(point.needs, source["needs"].as_u64().map(|v| v as usize));
         }
+        if let Some(g) = definition.geography() {
+            let source = &case["map"]["world"];
+            assert_eq!(g.region_cells, 64);
+            assert_eq!(g.regions.len(), source["total"].as_u64().unwrap() as usize);
+            for (r, v) in g.regions.iter().zip(source["regions"].as_array().unwrap()) {
+                assert_eq!(
+                    (r.id, r.x, r.y, r.home),
+                    (
+                        v["id"].as_i64().unwrap() as i32,
+                        v["x"].as_u64().unwrap() as usize,
+                        v["y"].as_u64().unwrap() as usize,
+                        v["home"].as_u64().map(|v| v as usize)
+                    )
+                );
+                assert_eq!(json!(r.bounds), v["bounds"]);
+                assert_eq!(r.biome.as_deref(), v["biome"].as_str());
+            }
+            if let Some(m) = &g.region_map {
+                assert_eq!(json!(m), source["regionMap"]);
+            }
+            if let Some(b) = &g.biomes {
+                assert_eq!(json!(b), source["biomes"]);
+            }
+            assert_eq!(g.seed, source["seed"].as_u64().map(|v| v as u32));
+            assert_eq!(
+                g.generator_version,
+                source["generatorVersion"].as_u64().map(|v| v as u32)
+            );
+            for (key, value) in &g.metadata {
+                assert_eq!(value, &source[key]);
+            }
+        }
         let t = definition.initialize_terrain().unwrap();
         let actual = json!({
             "chars": String::from_utf8(t.chars.clone()).unwrap(),
@@ -124,6 +193,21 @@ fn authoritative_maps_match_pinned_validation_and_static_terrain() {
                 actual[field] == *expected,
                 "{name}: {field} differs from the reference"
             );
+        }
+        if name.starts_with("boundary:world-generated") {
+            let loaded = ww2_core::world::World::from_map(&definition).unwrap();
+            assert_eq!(loaded.geography(), definition.geography());
+            assert_eq!(loaded.game.chars, t.chars);
+            assert_eq!(loaded.game.flags, t.flags);
+            assert_eq!(loaded.game.height, t.height);
+            assert_eq!(loaded.mine_layer, t.layers.mines);
+            assert!(loaded.game.players.is_empty() && loaded.game.units.is_empty());
+            for structure in &loaded.structures {
+                for &cell in &structure.cells {
+                    assert!(cell < t.w * t.h);
+                    assert!(loaded.game.sections[&(cell as u32)].hp.is_finite());
+                }
+            }
         }
         let game = t.query_game();
         assert!(game.players.is_empty() && game.units.is_empty() && game.sections.is_empty());
@@ -159,7 +243,7 @@ fn authoritative_maps_match_pinned_validation_and_static_terrain() {
     }
     assert_eq!(
         (authored, terrain_count, rejected, unsupported),
-        (33, 49, 55, 2)
+        (33, 58, 79, 1)
     );
 }
 

@@ -1,5 +1,8 @@
 //! Native match startup. The setup plan is shared by the authoritative constructor.
 pub use crate::objectives::Objective;
+#[path = "match_recruitment.rs"]
+mod recruitment;
+pub use recruitment::{CompletedRecruitUnit, RecruitError, RecruitMetadata, RecruitRouting};
 use std::collections::BTreeMap;
 
 use crate::{
@@ -92,6 +95,9 @@ impl StartPlan {
         options: &MatchOptions,
         rules: &Rules,
     ) -> Result<Self, String> {
+        if map.geography().is_some() {
+            return Err("native startup does not yet initialize World matches".into());
+        }
         if !matches!(options.mode, Mode::Default | Mode::Conquest) {
             return Err("native startup currently supports Conquest".into());
         }
@@ -401,6 +407,9 @@ pub struct Match {
     pub building_cells: BTreeMap<usize, BuildingCell>,
     pub production: crate::production::ProductionState,
     pub building_rallies: BTreeMap<u32, Option<Point>>,
+    pub player_rallies: Vec<Option<Point>>,
+    pub recruit_metadata: BTreeMap<u32, RecruitMetadata>,
+    produced_placer: crate::produced_units::ProducedPlacer,
     pub scenario: Option<crate::legacy_scenario::LegacyScenario>,
     pub logistics: crate::logistics::LogisticsState,
     pub firing: crate::match_firing::FiringState,
@@ -461,6 +470,9 @@ impl Match {
             building_cells: BTreeMap::new(),
             production,
             building_rallies: BTreeMap::new(),
+            player_rallies: vec![None; player_count],
+            recruit_metadata: BTreeMap::new(),
+            produced_placer: crate::produced_units::ProducedPlacer::new(),
             scenario,
             logistics: crate::logistics::LogisticsState::default(),
             firing: crate::match_firing::FiringState::default(),
@@ -475,12 +487,10 @@ impl Match {
         };
         result.setup_bases()?;
         for unit in result.world.game.units.values() {
+            result.combat.initialize(unit.id);
+            result.firing.initialize(unit.id);
             let control = crate::match_commands::UnitControl::new(unit, &result.rules)?;
             result.commands.insert(unit.id, control);
-        }
-        for &id in result.world.game.units.keys() {
-            result.firing.initialize(id);
-            result.combat.initialize(id);
         }
         result.grid.rebuild(&result.world.game.units);
         result.initialize_recipient_routing()?;
