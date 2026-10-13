@@ -12,6 +12,8 @@
 
 - Added the mixed aircraft and dead tank regression for the shared terrain admission repair. Four malformed terrain cases now protect the clock, actors, wallets, metadata, World, environment seed and next ID before either prospective admission or retirement can write. Original retirement regeneration still checks seven cases; native execution is pending.
 
+- Widened crater height and neighbor-slope subtraction before storing terrain, fixing Int8 overflow at minimum height and extreme neighboring levels. Four unchanged-source traces cover both overflow paths and ordinary upper-level digging; all 44 existing traces remain unchanged. Source replay now checks 48 traces and 261 actions. Native regression execution remains queued.
+
 - Reject malformed live terrain shapes in shared environment admission before retirement removes actors or debris changes terrain. Present optional arrays must match the grid; flat height remains supported. Added a focused rejection test covering 21 shape failures and absent optional layers. Source review and formatting are checked; native execution is pending.
 
 - Prepared ordinary retirement for registered aircraft and sparse ground AA metadata, replacing the blanket aircraft refusal that also rejected living actors. Added a read-only prospective-clock admission using the real aviation registry and copied environment seed/ID values. Dead aircraft create no hull, preserve queued AA events and retain Combat/Firing source rows; the existing death-story consumer remains singular. Seven original retirement cases include finite off-map Base aircraft and a real AA kill followed by one bounty/death tally. Two focused native tests are written; execution remains pending. No tick or interface changes.

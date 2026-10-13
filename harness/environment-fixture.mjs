@@ -41,6 +41,7 @@ try {
    else if(a.op==='prime'){
     if(a.rain!==undefined)g.wx.rain=a.rain;if(a.wet!==undefined)g.wx.wet=a.wet;if(a.wind)g.wind=a.wind;
     if(a.fire){if(a.fire[1]===null)g.fires.delete(a.fire[0]);else g.fires.set(...a.fire);}
+    if(a.height){g.height??=new Int8Array(g.w*g.h);for(const [c,h] of a.height)g.height[c]=h;}
     if(a.wear)g.wear[a.wear[0]]=a.wear[1];if(a.scar)g.scar[a.scar[0]]=a.scar[1];if(a.hp)g.cellHp[a.hp[0]]=a.hp[1];
    } else throw Error(a.op);
    results.push({value:result,shots:structuredClone(g.shots)});snapshots.push(structuredClone(snapshot(g)));
@@ -63,6 +64,13 @@ try {
  {const m=blank();for(const c of [42,43,44,45])cell(m,c,'+');cell(m,41,'W');record('flood-one-wave-and-slope',m,[{op:'prime',wear:[42,.65]},{op:'flood'},{op:'flood'},{op:'flood'},{op:'flood'},{op:'flood'}]);}
  {const m=blank();m.structures=[];for(let c=40;c<160;c++)cell(m,c,'B');record('debris-overflow',m,[{op:'blast',at:{x:20,z:10},radius:20,damage:100000},{op:'debris',dt:2.5}]);}
  {const m=blank();cell(m,42,'T');cell(m,43,'Y');record('float32-assignment-expression-boundaries',m,[{op:'prime',wear:[42,0.99999994]},{op:'blast',at:{x:5,z:5},radius:0,damage:0.000016},{op:'prime',scar:[44,0.99999994]},{op:'blast',at:{x:9,z:5},radius:0,damage:0.000024,scar:1},{op:'prime',hp:[43,1.401298464324817e-45]},{op:'blast',at:{x:7,z:5},radius:0,damage:1e-45}]);}
+ // Int8 terrain values use JavaScript Number arithmetic in the unchanged dent helper.
+ for(const [name,height] of [
+  ['dent-minimum-int8',[[42,-128]]],
+  ['dent-high-neighbour-int8',[[42,0],[43,127]]],
+  ['dent-low-neighbour-int8',[[42,4],[22,4],[62,4],[41,4],[43,-128]]],
+  ['dent-valid-upper-level',[[42,4],[22,4],[62,4],[41,4],[43,4]]],
+ ]){const m=blank();record(name,m,[{op:'prime',height},{op:'blast',at:{x:5,z:5},radius:0,damage:1000,scar:1}]);}
  // Compact expected states as path replacements. Every Rust comparison reconstructs the full state.
  function changes(a,b,path=[],out=[]){
   if(Object.is(a,b))return out;
