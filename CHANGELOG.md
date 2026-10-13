@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Bound the Cover path-cache fork to its selected recipient preview through the shared 6d5f1e4 guard, preserving both unrelated warmed graph history and matching selected terrain identities. Native checks are pending.
+
 - Added queued infantry Cover to the existing unit order queue, keeping the last waiting order, path endpoint or current unit position as its display anchor. Cover terrain is chosen only when the order starts. Added 14 original-command traces and 51 steps, bringing the oracle to 85 traces and 312 steps. Native checks are pending. Active job and garrison handling remain unsupported.
 
 - Staged Cover recipient routing, Fog and terrain acknowledgments until the selected batch passes every path identity and publication check. Failed batches discard their own path scratch; successful actual path searches commit observations even when the resulting path is empty. Added a pending-terrain refusal and same-clock Move regression. Native proof remains pending.

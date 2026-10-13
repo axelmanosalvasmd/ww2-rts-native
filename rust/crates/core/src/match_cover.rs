@@ -128,7 +128,7 @@ impl Match {
             None,
         )?;
         // Fork existing derived history. Abort drops only this preview and its cache copy.
-        let mut paths = self.commands.paths.clone();
+        let mut paths = preview.fork_paths(&self.commands.paths);
         let mut searched = false;
         // Later squads see earlier prepared routes when choosing occupied spots.
         let mut staged = self.world.game.clone();
