@@ -290,7 +290,7 @@ impl Match {
             && shooter.is_some_and(|s| self.world.game.units.contains_key(&s))
             && self.can_shoot_target(id, shooter.unwrap_or(0))?;
         if !u.path.is_empty() {
-            if c.rally_drift && answer {
+            if u.drift && c.rally_drift && answer {
                 self.set_firing_target(id, shooter.expect("answer has shooter"))?;
                 let live = self.world.game.units.get_mut(&id).expect("reaction unit");
                 live.amove = u.path.last().copied();
@@ -514,11 +514,13 @@ impl Match {
                 }
             }
         }
-        self.commands
+        let control = self
+            .commands
             .units
             .get_mut(&u.id)
-            .expect("admitted reaction control")
-            .route_end = Some(route_end);
+            .expect("admitted reaction control");
+        control.route_end = Some(route_end);
+        control.rally_drift = false;
         self.world.game.units.insert(u.id, u);
         Ok(())
     }

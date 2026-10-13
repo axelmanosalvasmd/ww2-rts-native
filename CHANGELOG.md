@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Normally compose the source-reviewed rally drift presence correction with the World caller. Preserve actual movement retirement and require both drift presence and its rally subtype when a later reaction reads it. A new reaction route clears the retired subtype; the mixed-order reader follows the same presence rule. Original 129-step Source history is retained, with native verification pending.
+
 - Correct the new World firing-admission test to compare the actual public queue snapshot, controls and path requests. Independent source review caught Debug formatting of MatchCommands, which has no Debug implementation, before native compilation. Runtime, Source fixture and assertions are unchanged; native execution remains pending.
 
 - Retain the existing live-flight, grenade-ticket and weapon-metadata guards as shared read-only admission before World commands. Source review caught malformed firing timers and XP that otherwise failed after a queued payment; the new whole-boundary test preserves the real recorded input and wallet on refusal. Ground-only World admission also rejects restored queued naval/AIR/rail births before later publication. These source repairs and tests remain unrun.
@@ -14,6 +16,8 @@
 
 
 - Normally include the source-reviewed production admission and original research recorder in the separate World caller. Preserve ordinary restored-queue refusals and existing World publication ownership. Actual phase wiring and coherent native verification remain pending.
+
+- Require active Unit drift before interpreting its rally subtype, and clear that subtype when an actual cover, spacing or back-off reaction installs a replacement route. Fix the mixed-input projection to respect drift presence. A pinned original-source history records a real Buy, 129 movement calls, rally completion and a cover route that remains intact when the squad can answer fire. The native differential test is authored; execution remains pending.
 
 - Preserve the actual findPath endpoint when a spacing or cover reaction publishes its accepted route. The existing canonical control is admitted before routing; endpoint publication occurs with the final Unit/control commit, with no inferred outcome or second route store. A real World spacing reaction now checks cold-to-warm memory, the authored cover endpoint and unchanged random state, bringing the continuation to eight source-written tests. Native execution remains pending.
 
