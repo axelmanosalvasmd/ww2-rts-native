@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Retained the newly published AIR frontier by normal merge so the event closure has one accepted parent instead of a misleading crisscross comparison. Runtime, event source fixtures and the approved ABI 2 header are unchanged; exact combined platform checks remain pending.
+
 - Verified ordered tick outputs on the Mac (arm64): 105 focused debug tests and all 270 release workspace tests pass at `625705e`; final strict Clippy, formatting and release FFI pass at the annotation-only `ad90eac`. Independent hashed copies pass 105 tests in each profile. Three original complete traces reproduce 375 steps and 103 chronological shots, including real launch/route-failure and section/later-origin failure witnesses. The publication closure normally retains current main, approved ABI 2 and the central 40-minute CI budget; its fresh combined platform and host checks remain separate from the earlier ABI 1 branch library proof.
 
 - Normally incorporated the current main server-helper frontier into the ordered-event closure. Core event code and fixtures remain unchanged; complete combined platform verification is pending, and component evidence does not establish an attached room loop.
@@ -13,6 +15,10 @@
 - Resumed the ordered tick output checkpoint with direct producer emission sinks, per-command dispatch observers and one caller-owned failure payload. Committed section, blast, burn and retirement effects remain available when a later operation fails; removal facts and completed wreck/bounty/lifecycle prefixes are reported separately. The new unchanged-source replay covers 3 complete traces, 375 steps and 103 chronological shots across firing, ground support, aircraft AA and late fire damage. Native compilation, failure regressions and host integration are pending; frozen AIR evidence and original fixtures are preserved.
 
 - Checkpointed unverified ordered tick output work at the user's pause. A transient TickEvent sequence and TickFailure payload are written, with AIR, ground-support and operative consumer migrations; no compile, native test or complete mixed-event Source replay has run for this branch. The late-failure ownership regression, per-command observer hooks, host bridge and complete emission-order audit are unfinished. Existing AIR proof and original fixtures remain preserved; this checkpoint is not integration-ready.
+
+- Applied the published 40-minute CI job limit from PR #192 to AIR PR #188. Its prior run `38442565009` passed formatting and strict Clippy on all platforms before all three jobs exceeded 20 minutes during workspace tests; no assertion failure appears in the preserved logs. Remaining tests and release builds still require fresh completion. Runtime, gates and approved ABI 2 remain unchanged.
+
+- Refreshed AIR PR #188 onto the landed server-provider main `a173dc7`, retaining unchanged AIR/core/tick code and canonical server provider bytes. Both additive documentation histories are preserved; fresh combined checks are required.
 
 - Refreshed the published AIR and ordinary-tick frontier in PR #188 onto main `13a8d1f`, preserving checked aircraft, support, carrier and Default caller code. Retained both additive changelog histories and the approved ABI 2 header. No future ordered-event or construction code was imported; fresh platform checks cover the combined head.
 
@@ -320,6 +326,7 @@
 
 - Preserved canonical recruited combat defaults through the shared publication callback when integrating the reviewed combat ancestry. Fresh combat identities reject before payment; production stepping remains under implementation.
 
+
 - Refreshed the consolidated server delta, list, backpressure and timing frontier in PR #137 onto ABI 2 main `13a8d1f`. Preserved both changelog histories and all server source, original-source recorders and fixtures. Only additive changelog entries conflicted; fresh combined-head platform checks remain pending.
 
 - Added host tick catch-up with the source's four-tick cap and backlog drop, plus snapshot cadence from rolling timing percentiles. Snapshot phases are recorded only on scheduled snapshot ticks; sustained spare capacity recovers the interval. Timing inputs and counter capacity are checked before mutation. The original-source recorder covers 8 meter traces with 747 samples and 7 clock traces with 34 polls. The combined server checkpoint passes 23 debug tests, 173 release workspace tests, strict Clippy, formatting and release FFI at 315f46a. Actual room-loop wiring remains pending; AI keeps its recorded schedule.
@@ -333,6 +340,7 @@
 - Added recipient-local unit delta ledgers for changed rows, ordered removals, held fingerprints, full resync and start/reconnect resets. The original source oracle matches 68 traces and 409 frames, including actual recipient snapshots from all 33 authored maps. The ledger accepts already filtered rows and rejects malformed or duplicate rows before changing state. Independent source review is clear; native checks, snapshot production and room simulation remain pending.
 
 - Embedded all 33 original authored maps (1,349,980 JSON bytes) in a separate private server catalogue and added native match construction without Node, filesystem map reads or a reference checkout. Cached validated maps remain immutable; each match gets independent mutable world state. Original mines, materials and triggers are retained. Public map routes still use their filtered assets and refuse editor credential access to private data. Room simulation and generated World startup remain unfinished.
+
 
 - Allow 40 minutes for the full three-platform Rust CI job. The combined snapshot frontier reached World-memory tests with no assertion failures before its previous 20-minute limit cancelled all three jobs. Formatting, strict Clippy, the complete debug suite, release FFI build and Linux C replay remain required.
 
