@@ -237,6 +237,9 @@ pub fn patch(m: &mut Match, id: u32, value: &Value) {
 }
 pub fn scene(trace: &Value) -> Match {
     let mut m = make(&trace["map"]);
+    for id in m.world.game.units.keys().copied().collect::<Vec<_>>() {
+        m.production.remove_building(id);
+    }
     m.world.game.units.clear();
     m.commands.units.clear();
     m.recruit_metadata.clear();

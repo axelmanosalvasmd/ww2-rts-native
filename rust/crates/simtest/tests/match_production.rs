@@ -484,3 +484,36 @@ fn aborted_completion_and_research_publish_nothing() {
     ));
     assert_eq!(unchanged(&m), before);
 }
+
+#[test]
+fn production_phase_admission_is_read_only_and_rejects_foreign_rows() {
+    let f = fixture();
+    let mut m = make(&f["cases"][0]);
+    m.request_research(0, Technology::Tier).unwrap();
+    let before = unchanged(&m);
+    m.validate_production_phases(0.05).unwrap();
+    assert_eq!(unchanged(&m), before);
+    m.production.initialize_building(u32::MAX - 1).unwrap();
+    let before = unchanged(&m);
+    assert!(m.validate_production_phases(0.05).is_err());
+    assert_eq!(unchanged(&m), before);
+}
+
+#[test]
+fn ordinary_training_refusal_precedes_research_progress() {
+    let f = fixture();
+    let mut m = make(&f["cases"][0]);
+    m.request_research(0, Technology::Tier).unwrap();
+    let barracks = resolve(&m, 0, "barracks");
+    m.production
+        .record_paid(barracks, "rifle", Price { mp: 0.0, fuel: 0.0 })
+        .unwrap();
+    let before = unchanged(&m);
+    assert_eq!(
+        m.validate_production_phases(0.05),
+        Err(ProductionStepError::InvalidState(
+            "nonempty Conquest training queue"
+        ))
+    );
+    assert_eq!(unchanged(&m), before);
+}
