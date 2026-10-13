@@ -124,6 +124,14 @@ Decided now so release stays cheap:
 3. Unreal game: terrain, units, effects, HUD, sound, then the FPS view, with the browser client still working alongside.
 4. Retire the JavaScript client and Node server in ww2-rts.
 
+## Deterministic match inputs (2026-10-13)
+
+The core now has versioned random-stream state and a bounded order queue for the future match loop. The seed is recorded once. Terrain, weather, combat, off-map support and each AI seat derive a separate stream from that seed and a stable purpose key. Additional draws by one AI cannot consume another purpose's draws. Version 1 uses the wrapping integer operations in [Sebastiano Vigna's SplitMix64 reference](https://prng.di.unimi.it/splitmix64.c). It generates a 53-bit fraction for game probabilities and uses rejection sampling for bounded integers. This is simulation randomness, not a source for authentication tokens. Unknown snapshot versions and duplicate or unordered stream entries are rejected.
+
+The queue consumes exactly one numbered tick at a time, including empty ticks. Callers assign an authoritative tick, issuer and sequence; accepted orders for that tick apply in issuer/sequence order, independent of their network arrival order. Admission policy is the caller's responsibility; a full queue rejects the next offered order. Capacity is caller-selected, and a rejected duplicate, past-tick or over-capacity order does not alter queued state. Snapshot data preserves the next tick and ordered pending commands. This replaces incidental arrival ordering inside the core; network admission and the complete command schema remain separate work. Neither component exposes a new C or WebSocket interface, and neither is a complete game loop.
+
+Focused tests compare SplitMix64 with values from the compiled C reference, isolate purpose streams, resume streams and queues, permute arrival order, and reject invalid state. Integration with the full match simulation remains pending.
+
 ## Rust lobby and session server (2026-10-12)
 
 `rust/crates/server` now provides `ww2-server`, a standalone HTTP/WebSocket process. Its first slice owns rooms, human and AI seats, observers, lobby settings, token reconnect/takeover, latency ping, a public room directory and cleanup. It does not start or simulate matches. Unsupported match commands return explicit denials, so clients cannot mistake a lobby for a running game.
@@ -169,7 +177,7 @@ All 4,888 recorded queries match the reference's target, connectivity, limit fla
 
 ## Infantry and naval pathfinding (2026-10-12)
 
-`pathfinding.rs` adds fine grid A* and path smoothing over the coarse navigation planner. `PathTerrain` supplies the terrain view plus wall proximity, known mines, fires and live bunker positions; `PathRules` supplies wall and bunker costs. The search reads no `Game` and cannot substitute hidden world state for the supplied view. Infantry and shallow/deep naval profiles are supported. Ground vehicles, aircraft, rail units and structures return `UnsupportedProfile`.
+The initial `pathfinding.rs` slice added fine grid A* and path smoothing over the coarse navigation planner. `PathTerrain` supplies the terrain view plus wall proximity, known mines, fires and live bunker positions; `PathRules` supplies wall and bunker costs. The search reads no `Game` and cannot substitute hidden world state for the supplied view. That slice supported infantry and shallow/deep naval profiles; ground vehicles, aircraft, rail units and structures returned `UnsupportedProfile`.
 
 The implementation preserves the reference's float32 path scores, score-only heap ties, neighbor order, diagonal corner checks, hazard costs, blocked-start escape and smoothing. An exhausted expansion budget has a distinct result from an unreachable route. Rust owns reusable search storage beside the navigation cache. The old undirected `regionsFor` rejection is unnecessary after the stronger directed coarse route has succeeded, so the fine search does not duplicate that cache.
 
@@ -186,6 +194,21 @@ Each tick supplies its budget, retry limit, tick number and tick duration. Defau
 Retry identity includes request kind, numeric goal, knowledge version and unit incarnation. Direct path commands clear prior failures. Empty recovery results preserve the existing route and do not count toward dropping an order. A search can advance the failure statistics and still return a nonempty route after a fallback succeeds; that route is retained while the failure is counted, until the retry limit cancels the order. Callback errors are returned rather than treated as successful paths.
 
 The fixture executes the original private scheduling functions and uses the reference tick constant. Explicit adapters supply eligibility and bounded search outcomes. All 606 action checkpoints match: 207 searches and 22 order drops, with queue order, counters, routes, timers, cleared order values and movement outcomes checked after each action. The source recorder rejects a changed pin or tracked source edits. The fixture reaches every branch in the scheduling functions. Real movement integration, complete `currentPathGoal` eligibility, knowledge-view selection and full-match testing remain separate work; MOV-40 and MOV-41 stay in progress.
+
+The original `findPath` produces 1,175 oracle searches across all 33 authored maps and crafted terrain cases: 914 found routes, 163 unreachable results and 98 budget exhaustions. Every waypoint and resolved endpoint matches bit for bit, as do expansion counts and outcomes. Repeated searches after mine, fire and bunker changes are included. The recorder verifies the exact reference pin and rejects tracked changes. At that stage, vehicle clearance, automatic recipient-view selection, retry policy, request scheduling and movement integration remained separate work. No performance claim was made.
+
+
+
+## Ground-vehicle pathfinding (2026-10-12)
+
+Issue #34 extends the initial infantry/naval search to all 12 non-rail ground types, including the lorry and Kaiju fallback profiles. A private vehicle navigation cache expands blocked cells by the hull's turning radius and rejects destinations without that clearance. `PathTerrain` adds explicit observed wear, public wetness and road presence; `PathRules` adds ground-speed constants. Road, mud, wood, ford and churn costs refresh for each search, as do mines, fires and bunkers. Road-aware estimates and smoothing preserve the chosen road route. The caller still supplies the entire terrain view; no `Game`, hidden world or automatic knowledge selection is consulted.
+
+The footprint cache uses the block mask and radius, source storage and recipient identity, and explicit terrain versions. Direct changes or a complete history expand only the affected cells. Missing history or changed source identity rebuilds the footprint. Expanded cells retain first-encounter order from the supplied changes and each row-major neighborhood, because the coarse planner's region reuse and tied routes can depend on that order. A private update counter also invalidates the coarse cache when a source array is replaced at unchanged versions, even if the footprint allocation is reused. Storage addresses serve only as cache identity, never as an ordering key.
+
+The extended original-JavaScript fixture has 1,529 searches: 1,108 found routes, 299 unreachable results and 122 expansion limits. All 1,175 earlier infantry/naval query records are unchanged; 354 vehicle cases add road and terrain costs, bridge and narrow-gap clearance, elevation, blocked goals, dynamic terrain, source replacement and reverse-order distant edits. Waypoints and resolved destinations match bit for bit, with identical expansion counts and outcomes. Cache regression checks also cover unchanged reuse, direct and historical changes, a missing-history rebuild and recipient identity changes. The recorder checks the exact reference pin and rejects tracked source changes. Core/simtest tests, strict Clippy, formatting and fixture regeneration pass on macOS; cross-platform CI remains the delivery gate.
+
+Aircraft, trains and structures still return `UnsupportedProfile`. Automatic recipient-view selection, retry policy, request scheduling and movement integration remain separate work. MOV-27 and MOV-28 are in progress, since search fixtures alone do not verify vehicle driving or an end-to-end match. No ABI or wire interface changed, and no performance claim is made.
+
 
 ## The core's math (2026-10-12)
 

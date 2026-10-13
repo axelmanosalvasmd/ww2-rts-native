@@ -11,11 +11,15 @@ pub mod math;
 pub mod movement;
 pub mod navigation;
 pub mod path_requests;
+
+pub mod orders;
 pub mod pathfinding;
+pub mod random;
 pub mod rules;
 pub mod separation;
 pub mod sort;
 pub mod terrain;
 pub mod traffic;
 pub mod vehicle;
+mod vehicle_navigation;
 pub mod vision;
