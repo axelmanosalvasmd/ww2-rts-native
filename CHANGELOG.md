@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Integrated the captured-membership prerequisite's building-wreck lifecycle correction, passing explicit full-current membership as the original wreckBuilding does. Carrier behavior and its source fixture are unchanged; native verification remains pending.
+
 - Kept carrier per-unit validation local to its actor, carrier and live cargo while command admission still preflights all current units. Added a 4,096-entry cargo resource bound without changing ground-carrier seat rules or the source fixture.
 
 - Added a bounded ordinary Match carrier component using canonical board/cargo/riding state, own-seat reservations, recipient-aware routes, paid Dig cancellation, physical ground boarding, riding pose updates and manual unload. The pinned-source recorder covers 12 traces and 55 actions, including stable selection ties, a hidden obstacle and carrier/grid flag receipts. Boats, rail, garrison exits, unrepresented building/entrench work and wrecked-carrier ejection remain explicit unsupported boundaries; command parser/scheduler attachment and native verification are pending.
