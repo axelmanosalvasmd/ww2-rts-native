@@ -21,6 +21,7 @@ pub mod pathfinding;
 pub mod projectiles;
 
 pub mod random;
+pub mod route_knowledge;
 pub mod rules;
 pub mod separation;
 pub mod sort;

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added recipient routing terrain from public authored inputs or ordered remembered rows, preserving row identity, mine knowledge, wall proximity and navigation change order. The original-helper oracle matches 93 snapshots, 270 paths and 48 cover query sets. Cover queries report unknown World cells or missing house/toughness inputs explicitly. Automatic recipient selection, memory collection, scheduling and movement integration remain pending; no ABI changed.
+
 - Added compiled pathfinding rules from the existing catalog, removing caller JSON and copied constants from native route initialization. The 1,529-search oracle now runs with these compiled costs and checks every cost bit against JavaScript.
 
 - Added validated spawn filtering, walking-distance matrices, team layout selection and compiled VP goals to the Rust core. An original-JavaScript oracle compares 41 terrain cases (all 33 authored maps), 957 layouts and 18 VP goals, including fords, cliffs, disconnected spawns, shared starts and selection-threshold edges. Layout selection takes an explicit random fraction, uses no global randomness and bounds inputs to six players/spawns. Match initialization, mode-specific spawn overrides and unit creation remain separate work.
