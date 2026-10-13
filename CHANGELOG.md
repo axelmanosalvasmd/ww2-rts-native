@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Carried the checked ability-flight recorder prerequisites: direct-launch cases use the actual catalog ability range, and actor inputs preserve the source incoming-hit sentinel. The old inputs placed short-range abilities outside the unchanged source phase guard and replaced the hit sentinel with null. Runtime defaults and geometry are unchanged.
+
 - Added the existing flight-fixture comparison path to numeric mismatch diagnostics so the coupled native proof can identify missing represented values directly. Core release tests passed before the inherited simtest comparison stopped.
 
 - Corrected the inherited non-finite aimed-command guard to retain the source follow reset on a blocked command. Its full snapshot still verifies unchanged work, wallet, terrain and random state; the valid unsupported-project refusal remains unchanged.
