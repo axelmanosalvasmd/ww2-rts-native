@@ -2,11 +2,13 @@
 
 ## Unreleased
 
+- Verified typed ability flights on compiled head e1e74ad: five focused debug/release tests, all 162 locked workspace release tests, strict Clippy, formatting and release FFI build pass. The source oracles reproduce 30 ability-flight traces with 210 checkpoints and 114 ordinary firing traces with 588 checkpoints. Conquest-only launch admission and caller-owned ability/FPS state remain explicit.
+
 - Removed a literal-None lifetime fallback left after ordinary salvos moved into the shared launcher, preserving the existing direct-round expiry calculation and satisfying strict Clippy.
 
 - Fixed the ability-flight oracle input recording to retain the source zero incoming-shooter sentinel, and made replay comparison errors name the mismatched field. No launch rule changed.
 
-- Integrated the checked shared-publication firing base into typed ability-flight work, preserving both combat/firing fresh-ID guards and publication defaults. Typed launch behavior and fixtures are unchanged; native verification of the combined head is pending.
+- Integrated the checked shared-publication firing base into typed ability-flight work, preserving both combat/firing fresh-ID guards and publication defaults. Typed launch behavior and fixtures are unchanged; the combined code is verified by the checks recorded above.
 
 - Kept satchel oracle targets within each ability's actual range and corrected the design description of Commando satchels. Launcher admission remains the caller's responsibility.
 
@@ -16,9 +18,9 @@
 
 - Preflighted canonical shooter metadata and finite ammunition before ability/salvo launches, and reject malformed retained blast identities before stepping any flight. Timer input bounds keep physical grenade pruning safe.
 
-- Fixed physical ability launch admission at the inclusive map edge, which the source ability command permits. Added an unchanged-source grenade edge case before native verification.
+- Fixed physical ability launch admission at the inclusive map edge, which the source ability command permits. Added an unchanged-source grenade edge case.
 
-- Added typed grenade/satchel launch requests, retained ability blast profiles in canonical flights, and shared the physical salvo launcher with ordinary fire and barrage. Flight-linked grenade tickets keep source late-phase pruning without a second blast. The new pinned-source oracle records 30 traces and 210 checkpoints; native verification is pending the shared build slot.
+- Added typed grenade/satchel launch requests, retained ability blast profiles in canonical flights, and shared the physical salvo launcher with ordinary fire and barrage. Flight-linked grenade tickets keep source late-phase pruning without a second blast. The new pinned-source oracle records 30 traces and 210 checkpoints; the native replay and launch guards pass the checks recorded above.
 - Preserved both combat and firing defaults in the shared recruitment publication callback, including fresh-ID guards before charging.
 
 - Verified the complete command/firing ancestry after recruitment metadata integration: 155 workspace tests, five focused debug/release tests, strict Clippy, formatting and release FFI build pass. The diff against the reviewed command branch contains only weapon-phase code, publication defaults, fixtures and documentation.
