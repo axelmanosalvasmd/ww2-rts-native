@@ -88,6 +88,11 @@ impl SpatialGrid {
         }
     }
 
+    /// Remove a retired unit without rebuilding or reordering surviving buckets.
+    pub fn remove_unit(&mut self, id: UnitId) {
+        self.drop_unit(id);
+    }
+
     fn drop_unit(&mut self, id: UnitId) {
         if let Some(record) = self.records.remove(&id) {
             self.unlink(&record);
