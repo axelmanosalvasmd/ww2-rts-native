@@ -909,10 +909,11 @@ pub fn prepare_recipient_routing<'a>(
     })
 }
 
+type OrdinaryListResults = Vec<(usize, crate::recipient_lists::RecipientLists)>;
 /// Read-only ordinary list preparation. Replacements are transient and become
 /// canonical only after every producer and recipient has passed its preflight.
 pub struct PreparedOrdinaryLists {
-    results: Vec<(usize, crate::recipient_lists::RecipientLists)>,
+    results: OrdinaryListResults,
     replacements: Vec<ListReplacement>,
     source: crate::world::ObservationReceipt,
     environment: crate::recipient_lists::WreckSourceFrame,
@@ -946,6 +947,17 @@ impl OrdinaryListsCommit<'_, '_> {
 impl PreparedOrdinaryLists {
     pub fn results(&self) -> &[(usize, crate::recipient_lists::RecipientLists)] {
         &self.results
+    }
+    /// Move ordered payloads only after the existing publication validation.
+    /// The returned commit retains the sole canonical remembered-memory owner.
+    pub fn prepare_publication_with_results<'a, 'e>(
+        mut self,
+        source: OrdinaryListPublication<'e>,
+        targets: &'a mut [RecipientRouting],
+    ) -> Result<(OrdinaryListResults, OrdinaryListsCommit<'a, 'e>), String> {
+        let results = std::mem::take(&mut self.results);
+        let commit = self.prepare_publication(source, targets)?;
+        Ok((results, commit))
     }
     /// Validate all sources before acquiring the one canonical memory owner.
     /// Publication holds source owners immutable and performs no terrain/Fog acknowledgment.

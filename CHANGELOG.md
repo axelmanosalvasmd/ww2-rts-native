@@ -2,7 +2,21 @@
 
 ## Unreleased
 
+- Converge real selected-recipient delivery with engineering projections and recorded scuttling. Preserve the exact shared compile fixes and original Source works-field fixture extension; this combined native proof is pending.
+
 - Add recorded Source scuttling through the canonical command path. Owned live non-riding selections get zero HP and an own-owner last hit, while work, controls and wallets stay unchanged until the next retirement phase. Preflight the complete selection before writes; add an atomic missing-metadata regression.
+
+- Extended the original snapshot recorder's partial-field boundary to include the newly represented canonical `works` field. Fresh `244931d` native checks compiled and passed all four selected-delivery tests, then two older exact-key tests rejected that added field. Regenerated 219 partial results from unchanged pinned Source; every prior fixture byte remains identical after removing only the new recorded fields. Runtime and strict equality assertions are unchanged; fresh combined native proof remains pending.
+
+- Fixed two inherited compile errors found by the fresh selected-delivery Vostro check at `4071c71`, before any tests ran. Snapshot admission now uses the canonical listed-project getter without exposing private state; the recovery fixture keeps one `actor_order: None`. Removed an unused snapshot test import. Source reanchor and a fresh combined native cycle remain pending.
+
+- Normally merged the canonical engineering and common actor-admission prerequisite into selected delivery. Shared actor checks no longer project skipped private wallets; selected preflight owns those recipient-local checks. Preserved both parents' source fixtures and admission regressions. Combined source review and native proof remain pending.
+
+- Added a selected-delivery regression for a skipped malformed private wallet. Global cache admission accepts the represented actor frame; only a selected recipient's private projection may reject it. The existing all-seat API still validates every private recipient. The shared actor helper now preserves that boundary; combined native proof remains pending.
+
+- Added ordered selected-seat snapshot delivery. Empty selection bypasses caches and collectors; invalid or duplicate seats refuse before publication. Only selected seats collect terrain, fog and remembered lists, while skipped seats retain pending cells, outboxes, fog acknowledgments and wreck memory. The original room callback and full/omitted-mask collectors reproduce 11 actions with 16 recipient results. Native verification remains pending.
+
+- Verified the normally merged quiet and active recipient snapshot consumers on Vostro Linux x86_64 at compiled `1ab2314`: 29 focused debug tests, all 215 locked/offline release workspace tests, strict Clippy, formatting and release FFI pass. Both the deferred receipt-action regression and quiet/active whole-admission guards pass. This evidence update preserves all tested Rust and harness files; transport and unsupported actor/mode projections remain separate.
 
 - Keep common snapshot actor admission independent of unselected private wallets. Delivery preflight still validates every selected recipient before writes. Add an orphan project-membership regression proving no terrain, fog, list or receipt owner changes on refusal.
 

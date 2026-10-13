@@ -15,7 +15,7 @@ pub struct DeliveryState {
 }
 pub struct DeliveryFrame<'a> {
     cache: SnapshotCache<'a>,
-    updates: Vec<Map<String, Value>>,
+    updates: Vec<(usize, Map<String, Value>)>,
 }
 impl DeliveryState {
     pub fn new(state: &Match) -> Result<Self, SnapshotError> {
@@ -32,6 +32,10 @@ impl DeliveryState {
             ],
         })
     }
+    #[cfg(test)]
+    pub(super) fn seat_fog_for_test(&self, slot: usize) -> (u32, Vec<u8>) {
+        (self.seats[slot].version, self.seats[slot].base.clone())
+    }
     /// Collect mutable recipient memories before borrowing the immutable cache.
     /// Full is the source match-start/reconnect read. Omit only suppresses the
     /// browser mask for an AI seat; it never changes authoritative visibility.
@@ -42,38 +46,51 @@ impl DeliveryState {
         omit: &[bool],
     ) -> Result<DeliveryFrame<'a>, SnapshotError> {
         self.preflight(state, full, omit)?;
-        let count = state.world.game.players.len();
-        let remembered = (0..count)
-            .map(|slot| {
+        let selected = all_seats(full, omit);
+        self.capture_admitted(state, &selected)
+    }
+    // Every caller admits these exact owners against the same immutable frame
+    // before publication. Selected list publication changes only wreck memory.
+    pub(super) fn capture_admitted<'a>(
+        &mut self,
+        state: &'a mut Match,
+        selected: &[super::selected::SelectedSeat],
+    ) -> Result<DeliveryFrame<'a>, SnapshotError> {
+        let remembered = selected
+            .iter()
+            .map(|seat| {
                 state
-                    .observed_terrain(slot, true)
+                    .observed_terrain(seat.slot, true)
                     .map_err(|_| SnapshotError::Rules)
             })
             .collect::<Result<Vec<_>, _>>()?;
-        let mut seats = self.seats.clone();
-        let mut updates = vec![Map::new(); count];
-        for slot in 0..count {
-            let rows = if full[slot] {
-                remembered[slot].clone()
+        let mut acknowledgments = Vec::with_capacity(selected.len());
+        let mut updates = Vec::with_capacity(selected.len());
+        for (requested, remembered) in selected.iter().zip(remembered) {
+            let slot = requested.slot;
+            let mut update = Map::new();
+            let rows = if requested.full {
+                remembered
             } else {
                 state
                     .observed_terrain(slot, false)
                     .map_err(|_| SnapshotError::Rules)?
             };
-            updates[slot].insert(
+            update.insert(
                 "cells".into(),
                 Value::Array(rows.iter().map(cell_json).collect()),
             );
-            if omit[slot] {
+            if requested.omit {
+                updates.push((slot, update));
                 continue;
             }
             let g = &state.world.game;
             let f = state
                 .routing_fog
                 .team(g, &state.rules, g.players[slot].team);
-            let seat = &mut seats[slot];
-            if full[slot] {
-                updates[slot].insert(
+            let mut seat = self.seats[slot].clone();
+            if requested.full {
+                update.insert(
                     "fog".into(),
                     json!({"v":pack(&f.vis,None),"e":pack(&f.explored,None)}),
                 );
@@ -92,19 +109,22 @@ impl DeliveryState {
                         .push((seat.version, delta.clone()));
                     delta
                 };
-                updates[slot].insert("fog".into(), json!(delta));
+                update.insert("fog".into(), json!(delta));
             } else {
+                updates.push((slot, update));
                 continue;
             }
             let f = &state.routing_fog.teams[&g.players[slot].team];
             seat.version = f.version;
             seat.base.clone_from(&f.vis);
+            updates.push((slot, update));
+            acknowledgments.push((slot, seat));
         }
-        self.seats = seats;
-        Ok(DeliveryFrame {
-            cache: SnapshotCache::new(state)?,
-            updates,
-        })
+        let cache = SnapshotCache::new(state)?;
+        for (slot, seat) in acknowledgments {
+            self.seats[slot] = seat;
+        }
+        Ok(DeliveryFrame { cache, updates })
     }
     /// All-seat admission shared by complete and partial frame capture. The
     /// terrain preview exercises lazy value/revision checks without publishing.
@@ -122,24 +142,54 @@ impl DeliveryState {
         {
             return Err(SnapshotError::InvalidRecipient);
         }
-        // All represented rows and routing contexts must pass before an outbox
-        // is drained or a delivery acknowledgment is advanced.
+        self.preflight_selected(state, &all_seats(full, omit))
+    }
+    pub(super) fn preflight_selected(
+        &self,
+        state: &Match,
+        selected: &[super::selected::SelectedSeat],
+    ) -> Result<(), SnapshotError> {
+        let count = state.world.game.players.len();
+        if self.dimensions != (state.world.game.w, state.world.game.h) || self.seats.len() != count
         {
-            let cache = SnapshotCache::new(state)?;
-            for slot in 0..count {
-                cache.recipient(slot)?;
-                state
-                    .preflight_observed_terrain(slot)
-                    .map_err(|_| SnapshotError::Rules)?;
+            return Err(SnapshotError::InvalidRecipient);
+        }
+        let mut unique = std::collections::BTreeSet::new();
+        for seat in selected {
+            if seat.slot >= count || !unique.insert(seat.slot) {
+                return Err(SnapshotError::InvalidRecipient);
             }
+        }
+        let cache = SnapshotCache::new(state)?;
+        for seat in selected {
+            cache.recipient(seat.slot)?;
+            state
+                .preflight_observed_terrain(seat.slot)
+                .map_err(|_| SnapshotError::Rules)?;
         }
         Ok(())
     }
 }
+fn all_seats(full: &[bool], omit: &[bool]) -> Vec<super::selected::SelectedSeat> {
+    full.iter()
+        .zip(omit)
+        .enumerate()
+        .map(|(slot, (&full, &omit))| super::selected::SelectedSeat { slot, full, omit })
+        .collect()
+}
 impl DeliveryFrame<'_> {
+    /// Slots in the caller's delivery order. Unselected slots have no result.
+    pub fn slots(&self) -> impl Iterator<Item = usize> + '_ {
+        self.updates.iter().map(|(slot, _)| *slot)
+    }
     pub fn recipient(&self, slot: usize) -> Result<RecipientProjection, SnapshotError> {
+        let update = self
+            .updates
+            .iter()
+            .find(|(owner, _)| *owner == slot)
+            .ok_or(SnapshotError::InvalidRecipient)?;
         let mut result = self.cache.recipient(slot)?;
-        result.fields.extend(self.updates[slot].clone());
+        result.fields.extend(update.1.clone());
         result
             .missing
             .retain(|c| !matches!(c, SnapshotCapability::Terrain | SnapshotCapability::Fog));
