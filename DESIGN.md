@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## Ordinary human commander timing (2026-10-13)
+
+Ordinary rooms select `shared/ai-human.js`, which uses `ai.js` for decisions and independently schedules camera attention and inputs. The fixed scripted planner is not a replacement for that brain. `human_commander_timing` ports the complete private timing leaf: the source's slot-derived Mulberry32 seed, difficulty values, two-draw lognormal samples, reaction floor, load-adjusted scans, tick rounding and view demand. The recorded match seed is supplied explicitly; this private stream does not borrow the simulation or policy stream. Core math supplies the original log, cosine, exponential and square-root behavior.
+
+The recorder appends four private exports in memory to unchanged Source bytes and also calls the original public opening, camera, demand and reset functions. Its 48 profiles compare 336 sequential sample values and rounded ticks, with 14 private draws per profile. Eight public openings confirm demand one tick before the opening deadline; two records confirm that difficulty changes preserve an existing deadline and reset reseeds it. Those public records corroborate Source behavior, rather than proving an implemented native camera/reset runtime. Native tests are pending an independent source review and CI lease. Camera, alert ownership, input queues and caps enforcement, screen-limited policy, command feedback, transport delivery and Match call sites remain unfinished. No AI parity row is marked complete.
+
 ## Companion fire and grenade effects (2026-10-13, native component checks)
 
 `companion_ray::trace` retains drawn squad slots and the original visibility-filtered fixed-distance ray. `Match::fire_companion` stages exactly two Combat-stream draws and generic hurt before publishing ammo, cooldown, shot time and companion counters. It uses canonical health, suppression, attribution and disembarkation, without introducing projectile armor, shooter XP or radial death impulse. Hurt retains the contact position before rider movement; the existing small-arms projection follows it. The pending hit-direction representation is unchanged.

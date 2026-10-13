@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added the ordinary human commander's private timing provider: slot-seeded timing, difficulty medians and caps, lognormal opening/reaction/input/scan delays, and view-demand checks. The unchanged Source recorder covers 48 profiles, 336 sequential samples, eight public openings and two reset/level-change records. Native tests are written but not run; camera, alerts, input queues, policy and runner integration remain separate.
+
 - Independently replayed the Default proof's copied core, support and mass-project binaries in both profiles: all 80 test executions pass, with seven artifact hashes, 13 compiled-source hashes and 13 gate-log hashes verified. This documentation closure changes no Rust or harness file.
 
 - Verified the ordinary Default caller and provider assembly on the Mac at `07250fdf`: all 240 locked workspace release tests, 40 distinct focused debug tests, strict all-target Clippy, formatting and the release FFI build pass without source repairs. All 13 original support traces now run unchanged through 2,705 ticks and 153 checkpoints, including Default's 45 ticks and nine checkpoints; the seven mass-project cases also pass. Raw empty-string feature defaults, unsupported modes, AIR/logistics scope and hosted or Unreal acceptance remain separate.

@@ -18,6 +18,7 @@ pub mod fog;
 pub mod formation;
 pub mod game;
 pub mod grid;
+pub mod human_commander_timing;
 pub mod legacy_scenario;
 pub mod match_companion_effects;
 mod match_companion_tick;
