@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Normal-merged the final source-reviewed carrier admission repair into the actual-runner consumer. Idle ground actor checks now precede clock and input changes; original source captures and consumer bodies remain unchanged. Combined native proof is pending.
+
 - Corrected the full-step carrier consumer’s absent-pace check after reading the actual native factory: source absence maps to the canonical NaN sentinel, while received numeric pace still compares exactly. No runtime or original fixture changed; native execution is pending.
 
 - Added a native actual-runner consumer for all 11 original full-step carrier cases. Both recorded arrival permutations enqueue 44 commands through 40 real tick calls and compare 62 initial/post-step projections. The source omitted mode stays native Default; no seed reset or expected-state injection is used. Source checks and formatting pass; native execution remains pending.
@@ -9,6 +11,8 @@
 - Normal-merged the source-reviewed carrier tick owner and checked Default runner into the full-step oracle tree. Existing queue variants and provider bodies are preserved; the new carrier composition awaits native replay.
 
 - Recorded unchanged full source carrier steps: 11 cases, 22 commands, 20 steps and 57 snapshots. Passive grid observations and genuine failed/deferred routes replace observation rebuilds and post-command setup primes. Native actual-runner replay awaits the sole tick owner's transport hooks; no broader transport claim is made.
+- Matched carrier pre-clock admission to the actual early actuator for idle ordinary ground actors. Independent review confirmed finite negative suppression could otherwise fail only after clock/input mutation. The regression now preserves queued boundaries, all unit fields and timers for that case; idle operative and skipped building turns retain their source gates. Native composition remains pending.
+
 - Fixed a carrier tick admission shortcut found by independent review: a nonriding Game unit with a retained carrier relation now reaches canonical parity validation before commands, clock or timers mutate. The whole-admission regression preserves both queued boundaries and all canonical timers on refusal. Native execution remains pending.
 
 - Normal-merged the checked ordinary Default runner into the separate carrier integration, preserving the new riding/boarding sites and canonical command siblings. The 240-test predecessor proof remains distinct from the uncompiled carrier composition; no frozen proof branch changed.

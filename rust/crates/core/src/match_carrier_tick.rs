@@ -12,10 +12,32 @@ impl Match {
         }
         for (&id, unit) in &self.world.game.units {
             let meta = self.combat.get(id).ok_or("missing carrier tick metadata")?;
+            let kind = self
+                .rules
+                .kinds
+                .get(unit.kind)
+                .ok_or("unknown carrier tick kind")?;
+            let reaches_riding = unit.hp > 0.0
+                && !self
+                    .commands
+                    .units
+                    .get(&id)
+                    .is_some_and(|control| control.operative)
+                && !(kind.building
+                    && (!kind.weapon || unit.built.is_some_and(|built| built < 1.0)))
+                && !kind.air
+                && !kind.rail;
+            // OnFoot also validates its actor before pruning cargo. Admit those
+            // exact facts now, even when no transport relation is currently active.
+            if reaches_riding {
+                self.validate_carrier_unit(id)?;
+            }
             if !unit.riding && meta.carrier.is_none() && unit.board == 0 && meta.cargo.is_empty() {
                 continue;
             }
-            self.validate_carrier_unit(id)?;
+            if !reaches_riding {
+                self.validate_carrier_unit(id)?;
+            }
             if unit.hp <= 0.0 {
                 continue;
             }
