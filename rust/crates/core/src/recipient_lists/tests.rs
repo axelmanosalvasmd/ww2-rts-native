@@ -377,6 +377,18 @@ fn malformed_wrecks_and_changed_prepared_facts_do_not_publish_observation() {
             .wreck_metadata
             .get_mut(&9001)
             .unwrap()
+            .rotation = f64::MAX;
+        assert!(m.recipient_snapshot_lists(0).is_err());
+        assert_eq!(before, observation_state(&m));
+        m.environment
+            .wreck_metadata
+            .get_mut(&9001)
+            .unwrap()
+            .rotation = -0.26;
+        m.environment
+            .wreck_metadata
+            .get_mut(&9001)
+            .unwrap()
             .motion
             .as_mut()
             .unwrap()

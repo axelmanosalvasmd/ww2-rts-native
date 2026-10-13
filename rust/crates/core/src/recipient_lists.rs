@@ -66,6 +66,9 @@ impl RememberedWreck {
             z: rounded(hull.z),
             moving: hull.moving,
         };
+        if ![query.x, query.z].iter().all(|n| n.is_finite()) {
+            return Err("unrepresentable rounded wreck position".into());
+        }
         let display = metadata
             .map(|m| {
                 let kind = rules
@@ -79,7 +82,7 @@ impl RememberedWreck {
                 } else {
                     return Err("invalid wreck display owner");
                 };
-                if !m.rotation.is_finite() {
+                if !m.rotation.is_finite() || !rounded(m.rotation).is_finite() {
                     return Err("invalid wreck rotation");
                 }
                 let motion = m
@@ -191,7 +194,9 @@ impl crate::match_runtime::Match {
                     .ok_or("missing World list owner")?;
                 if runtime.nodes.iter().any(|n| {
                     n.cell >= g.chars.len()
-                        || ![n.at.x, n.at.z, n.rate].iter().all(|v| v.is_finite())
+                        || ![n.at.x, n.at.z, n.rate, rounded(n.at.x), rounded(n.at.z)]
+                            .iter()
+                            .all(|v| v.is_finite())
                 }) {
                     return Err("invalid World node display facts".into());
                 }
