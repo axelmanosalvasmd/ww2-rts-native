@@ -105,6 +105,9 @@ impl StructureState {
             .get(&cell)
             .map(|(s, c)| &self.structures[*s].sections[*c])
     }
+    pub(crate) fn into_structures(self) -> Vec<Structure> {
+        self.structures
+    }
     fn add(&mut self, structure: Structure) {
         let index = self.structures.len();
         self.by_id.insert(structure.id.clone(), index);
