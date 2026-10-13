@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Prepared canonical Match supply phases, queue projection, truck placement/control actuation and death bookkeeping. New original-source recordings cover 63 logistics startups (663 reserve records), 288 convoy routes, 324 physical handoffs and 233 ground networks with 39,839 rate queries. Native comparisons remain pending the exclusive shared build slot; logistics startup stays refused until they pass.
+
 - Added source convoy-route and handoff helpers plus the initial canonical Match supply adapter. Recipient-routing and environment prerequisites are required before these phases can be verified or logistics startup can be enabled.
 
 - Added ordinary ground supply network and refill-rate code with a recorder executing 233 pinned JavaScript networks and 39,839 rate queries. Match convoy routing and initialization are still being integrated; Rust verification is pending the shared build slot.

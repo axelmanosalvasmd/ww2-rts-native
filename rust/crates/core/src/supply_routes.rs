@@ -8,6 +8,21 @@ use crate::{
     supply_convoys::{Route, RouteFailure},
 };
 use std::collections::BTreeMap;
+#[derive(Clone, Copy, Debug)]
+pub struct RouteRequest {
+    pub owner: usize,
+    pub tick: u64,
+    pub from: Point,
+    pub to: Point,
+    pub safe: bool,
+}
+#[derive(Clone, Copy, Debug)]
+pub struct Handoff {
+    pub tick: u64,
+    pub start: Point,
+    pub store: Point,
+    pub radius: f64,
+}
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Threat {
     pub at: Point,
@@ -35,15 +50,18 @@ fn distance(a: Point, b: Point) -> f64 {
 impl SupplyRouting {
     pub fn route(
         &mut self,
-        owner: usize,
-        tick: u64,
+        request: RouteRequest,
         known: PathTerrain<'_>,
         profile: &UnitKind,
-        from: Point,
-        to: Point,
-        safe: bool,
         threats: &[Threat],
     ) -> Result<Route, String> {
+        let RouteRequest {
+            owner,
+            tick,
+            from,
+            to,
+            safe,
+        } = request;
         validate(known, from, to)?;
         if profile.air || profile.structure || profile.rail {
             return Err("unsupported convoy profile".into());
@@ -69,7 +87,7 @@ impl SupplyRouting {
         }
         let state = self.owners.entry(owner).or_default();
         let key = (tick / 40, known.navigation.versions.knowledge);
-        if state.key != Some(key) {
+        if safe && state.key != Some(key) {
             state.key = Some(key);
             state.threats = threats.to_vec();
         }
@@ -154,17 +172,18 @@ impl SupplyRouting {
             known
         };
         let rules = PathRules::compiled().map_err(|e| e.to_string())?;
-        let first = state
-            .paths
-            .find_path(terrain, rules, profile, from, to, None)
-            .map_err(|e| format!("convoy path: {e:?}"))?;
+        let first = if danger {
+            state
+                .paths
+                .find_path(terrain, rules, profile, from, to, None)
+                .map_err(|e| format!("convoy path: {e:?}"))?
+        } else {
+            observed_path(&mut state.paths, known, rules, profile, from, to)?
+        };
         let mut path = first.waypoints;
         if path.is_empty() {
             let failure = if danger {
-                let ordinary = state
-                    .paths
-                    .find_path(known, rules, profile, from, to, None)
-                    .map_err(|e| format!("ordinary convoy path: {e:?}"))?;
+                let ordinary = observed_path(&mut state.paths, known, rules, profile, from, to)?;
                 if ordinary.waypoints.is_empty() {
                     RouteFailure::Unreachable
                 } else {
@@ -261,14 +280,17 @@ impl SupplyRouting {
     }
     pub fn handoff(
         &mut self,
-        tick: u64,
+        request: Handoff,
         terrain: PathTerrain<'_>,
         rifle: &UnitKind,
-        start: Point,
-        store: Point,
         cells: &[u32],
-        radius: f64,
     ) -> Result<bool, String> {
+        let Handoff {
+            tick,
+            start,
+            store,
+            radius,
+        } = request;
         validate(terrain, start, store)?;
         if !radius.is_finite() || radius < 0.0 {
             return Err("invalid handoff radius".into());
@@ -368,4 +390,54 @@ fn validate(t: PathTerrain<'_>, a: Point, b: Point) -> Result<(), String> {
         return Err("invalid routing position or wetness".into());
     }
     Ok(())
+}
+
+fn observed_path(
+    paths: &mut Pathfinding,
+    terrain: PathTerrain<'_>,
+    rules: PathRules,
+    profile: &UnitKind,
+    from: Point,
+    to: Point,
+) -> Result<crate::pathfinding::PathResult, String> {
+    let initial = paths
+        .find_path(terrain, rules, profile, from, to, None)
+        .map_err(|e| format!("observed convoy path: {e:?}"))?;
+    if !terrain.navigation.world_known
+        && initial.waypoints.first().is_some_and(|p| {
+            !pathfinding::walkable(terrain.navigation, from, *p, profile.block(), 0.9)
+        })
+    {
+        let center = Point {
+            x: (from.x / CELL).floor() * CELL + CELL / 2.0,
+            z: (from.z / CELL).floor() * CELL + CELL / 2.0,
+        };
+        for at in [
+            Point {
+                x: center.x,
+                z: from.z,
+            },
+            Point {
+                x: from.x,
+                z: center.z,
+            },
+            center,
+        ] {
+            if distance(from, at) < 0.05
+                || !pathfinding::walkable(terrain.navigation, from, at, profile.block(), 0.9)
+            {
+                continue;
+            }
+            let mut route = paths
+                .find_path(terrain, rules, profile, at, to, None)
+                .map_err(|e| format!("observed convoy backout: {e:?}"))?;
+            if route.waypoints.first().is_some_and(|p| {
+                pathfinding::walkable(terrain.navigation, at, *p, profile.block(), 0.9)
+            }) {
+                route.waypoints.insert(0, at);
+                return Ok(route);
+            }
+        }
+    }
+    Ok(initial)
 }

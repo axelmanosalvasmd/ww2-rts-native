@@ -1854,16 +1854,18 @@ impl ConvoyState {
         Ok(())
     }
     pub fn convoy_death(&mut self, tick: u64, u: &UnitView) {
-        if u.role == UnitRole::Truck
-            && let Some(owner) = u.owner
-        {
+        self.retire_unit(tick, u.id, u.owner, u.role == UnitRole::Truck);
+    }
+    /// Death needs identity and truck eligibility only; positions and cargo remain caller-owned.
+    pub fn retire_unit(&mut self, tick: u64, id: UnitId, owner: Option<usize>, truck: bool) {
+        if truck && let Some(owner) = owner {
             self.losses
                 .entry(owner)
                 .or_default()
                 .push(tick as f64 / 20.0 + 30.0);
-            self.trucks.remove(&u.id);
+            self.trucks.remove(&id);
         }
-        self.stores.retain(|s| s.entity != Some(u.id));
+        self.stores.retain(|s| s.entity != Some(id));
     }
     pub fn support_provision<W: World>(
         &mut self,

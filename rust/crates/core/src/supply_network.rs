@@ -72,18 +72,27 @@ pub struct GroundSupplyNetwork {
     pub teams: Vec<TeamNetwork>,
 }
 
+pub struct SupplyInput<'a> {
+    pub view: TerrainView<'a>,
+    pub chars: &'a [u8],
+    pub initial_chars: &'a [u8],
+    pub initial_heights: Option<&'a [i8]>,
+    pub points: &'a [Objective],
+    pub units: &'a [SupplyUnit<'a>],
+    pub players: &'a [ObjectivePlayer],
+}
 impl GroundSupplyNetwork {
     /// Build a new network, leaving the caller's previous network intact on invalid inputs.
-    pub fn compute(
-        view: TerrainView<'_>,
-        chars: &[u8],
-        initial_chars: &[u8],
-        initial_heights: Option<&[i8]>,
-        points: &[Objective],
-        units: &[SupplyUnit<'_>],
-        players: &[ObjectivePlayer],
-        placer: &mut SpawnPlacer,
-    ) -> Result<Self, String> {
+    pub fn compute(input: SupplyInput<'_>, placer: &mut SpawnPlacer) -> Result<Self, String> {
+        let SupplyInput {
+            view,
+            chars,
+            initial_chars,
+            initial_heights,
+            points,
+            units,
+            players,
+        } = input;
         let n = view
             .width
             .checked_mul(view.height)
@@ -248,6 +257,13 @@ impl GroundSupplyNetwork {
         let Some(net) = team.and_then(|t| self.teams.iter().find(|n| n.team == t)) else {
             return Ok(0.0);
         };
+        let n = self
+            .width
+            .checked_mul(self.height)
+            .ok_or("invalid supply network shape")?;
+        if net.steps.len() != n || net.closed.len() != n {
+            return Err("invalid supply network shape".into());
+        }
         let (x, y) = (x as usize, y as usize);
         if net.closed[y * self.width + x] != 0 {
             return Ok(0.0);

@@ -3,7 +3,7 @@ use ww2_core::{
     game::Point,
     navigation::{TerrainView, Versions},
     objectives::{Objective, ObjectivePlayer, ObjectiveUnit},
-    supply_network::{GroundSupplyNetwork, SupplyUnit},
+    supply_network::{GroundSupplyNetwork, SupplyInput, SupplyUnit},
     unit_spawn::SpawnPlacer,
 };
 fn point(v: &Value) -> Point {
@@ -129,13 +129,15 @@ fn ground_network_and_refill_rates_match_original_functions() {
             changes: &[],
         };
         let result = GroundSupplyNetwork::compute(
-            view,
-            &chars,
-            &initial_chars,
-            initial_heights.as_deref(),
-            &points,
-            &units,
-            &players,
+            SupplyInput {
+                view,
+                chars: &chars,
+                initial_chars: &initial_chars,
+                initial_heights: initial_heights.as_deref(),
+                points: &points,
+                units: &units,
+                players: &players,
+            },
             &mut SpawnPlacer::new(),
         )
         .unwrap();
@@ -178,4 +180,55 @@ fn ground_network_and_refill_rates_match_original_functions() {
             }
         }
     }
+}
+
+#[test]
+fn malformed_network_queries_and_input_shapes_return_errors() {
+    let mut net = GroundSupplyNetwork::default();
+    assert_eq!(net.rate_at(None, Point { x: 1.0, z: 1.0 }).unwrap(), 0.0);
+    assert!(
+        net.rate_at(
+            None,
+            Point {
+                x: f64::NAN,
+                z: 1.0
+            }
+        )
+        .is_err()
+    );
+    net.width = 1;
+    net.height = 1;
+    net.teams.push(ww2_core::supply_network::TeamNetwork {
+        team: 0,
+        steps: vec![],
+        closed: vec![],
+    });
+    assert!(net.rate_at(Some(0), Point { x: 1.0, z: 1.0 }).is_err());
+    let flags = [];
+    let view = TerrainView {
+        width: 1,
+        height: 1,
+        flags: &flags,
+        heights: None,
+        world_known: false,
+        knowledge_id: 0,
+        versions: Versions::default(),
+        changed: None,
+        changes: &[],
+    };
+    assert!(
+        GroundSupplyNetwork::compute(
+            SupplyInput {
+                view,
+                chars: &[],
+                initial_chars: &[],
+                initial_heights: None,
+                points: &[],
+                units: &[],
+                players: &[]
+            },
+            &mut SpawnPlacer::new()
+        )
+        .is_err()
+    );
 }
