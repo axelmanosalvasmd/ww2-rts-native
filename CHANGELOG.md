@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Removed a duplicated smoke-duration field from an inherited routing fixture. The release workspace compiler exposed the duplicate after the focused engineering and command tests passed.
+
 - Updated inherited native fixture consumers for the complete damage ordering context and ordered pending-cell set. The recovery fixture keeps the existing full actor list, and recruitment snapshots preserve the same cell contents. Native proof is restarting after these test compiler errors.
 
 - Split the existing ability fixture control projection into a local JSON value to fit the macro recursion limit when the engineering library tests compile. The represented fields and expected fixture values are unchanged.
