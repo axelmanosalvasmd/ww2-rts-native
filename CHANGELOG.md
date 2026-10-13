@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added the internal Rust recipient view and reference protocol replay from PR #16 without its C interface. The decoder retains received units, raw terrain rows, fog masks and HUD messages, with bounded atomic validation and held-set resync checks. All 1,236 recorded Conquest and World message states have direct browser expectations. ABI 1 and its header remain unchanged; PR #16's six proposed C calls still await Axel's approval.
+
 - Connected movement recovery and traffic replans to caller-supplied route handlers, while retaining the existing frozen benchmark entry points. Four live-search reference recordings match infantry and tank movement over 48 ticks, including disconnected destinations. This does not enable full match scheduling, hidden-terrain selection, logistics or combat.
 
 - Recorded wallet/population ownership, source-order arithmetic, typed input errors and 37-trace evidence in the design and economy/mode parity rows, and updated IF-01 to the current 47-table catalog. Full economy and mode acceptance remains in progress; the catalog now has 47 tables, with earlier counts retained as historical steps.

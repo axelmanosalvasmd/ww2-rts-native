@@ -209,6 +209,16 @@ The original `findPath` produces 1,175 oracle searches across all 33 authored ma
 
 
 
+## Internal Rust recipient view (2026-10-12)
+
+`rust/crates/core/src/client_view.rs` is an internal Rust decoder of the pinned reference protocol. It holds one recipient's received knowledge, resets on each start, applies held-unit deltas and fog XOR updates, and retains raw terrain rows and HUD messages. Inputs are validated before mutation, with limits of 16 MiB per message, four million map cells and 100,000 held units. Pending terrain-cell changes accumulate until drained. The transport owns resync requests and their rate limit.
+
+The view exposes typed unit rows and retains complete raw rows and extra fields. Its terrain cache is the latest received row per cell, not composed terrain or placement-query parity. Raw seen and explored masks exclude rendering effects such as fading, temporary unit illumination and lifting fog after a match. Unknown message types leave the view unchanged.
+
+`harness/protocol-record.mjs` captures complete, sanitized reference messages. `harness/view-check.mjs` reads back the pinned browser's unit state and fog masks and exercises its cell-application functions with rendering dependencies stubbed. All 1,236 expected reports cover two recipients in Conquest and World Conquest. `simtest --view` compares these received-state reports, including raw terrain-row caches. Gzip belongs to simtest, not the core. Reconnects, operative sessions, save/load and transport behavior remain outside these recordings.
+
+This extraction adds no C functions or consumer contract. ABI 1, the generated header and the formation-only rules hash remain unchanged. PR #16 retains the six proposed C view calls and ABI 2 transition pending Axel's explicit approval. Pure Rust callers can use the internal view independently of that review; Unreal integration and the remaining terrain and availability queries are separate work.
+
 ## Pure projectile flight and contact helpers (2026-10-12)
 
 `rust/crates/core/src/projectiles.rs` provides typed, standalone versions of all pure helpers in the pinned `shared/projectiles.js`: profile selection, flight position and velocity, launch solutions, box/body/naval-hull sweeps, segment distance, crossed-cell traversal and material ricochet response. The module has no game-state, renderer or networking dependency. Projectile and material constants stay beside these helpers for now; they are not part of the compiled catalog or the public rules hash.

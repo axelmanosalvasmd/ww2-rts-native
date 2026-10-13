@@ -2,6 +2,7 @@
 //! Unreal client reach it as a library (`AGENTS.md`).
 
 pub mod catalog;
+pub mod client_view;
 pub mod economy;
 pub mod economy_state;
 pub mod fog;
