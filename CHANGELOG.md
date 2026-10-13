@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add a borrowed actor policy for ordinary and World ground providers. Preserve the existing local defender's owner -1, team, visibility and zero resources without adding a commander seat or mutable actor store. This internal source prerequisite does not enable the World tick and has not run native checks.
+
 - Normally include final main `d1f2fb5` in the separate internal runtime bundle. Its tree is identical to the already incorporated ordered-event head `a068dd8`, so provider, ABI 2 and CI source bytes are unchanged. Combined native verification and interface review before publication remain pending.
 
 - Normally join source-cleared Ground and construction successor `bf293cc` with the trusted room and Human bundle `32670c2` in a separate checkout. Keep the accepted six-command Cover regression, canonical queues, chronological event receipts, private recipient projections and immutable parent evidence. Source files merge without conflicts; combined native verification and publication remain pending.
