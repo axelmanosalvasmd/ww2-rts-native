@@ -7,6 +7,9 @@
 - Added explicit World actor staging and publication policy to the shared unit guard while keeping ordinary commander checks strict. Three focused regressions now cover refused/aborted batches, ordered HP/payment publication and the World-only neutral identity; native verification is pending.
 
 - Added the native Match Conquest victory phase and finish bookkeeping: team VP in slot order, latest still-held capture location, 0.1 m end rounding, first-winner preservation, reveal and exact Conquest timeline fields. Canonical point accounting now freezes VP and capture story counts after the winner while ownership and manpower can continue. Three focused tests compare 12 original-JavaScript traces (24 assembled-match checkpoints) and invalid-state atomicity; existing startup and point-income tests pass. Other modes, command refusal, remaining story counters, result transport and the full battle loop remain unfinished.
+- Reserved two path-identity increments before a movement block, covering a replacement route followed by a physical obstruction. Exhaustion rejects before unit mutation instead of risking a debug overflow or release wrap.
+
+
 - Added the executable Conquest movement command phase over the canonical Match queue and control rows: Move, attack-move, Stop, stance validation, eight waiting orders and real recipient-bound route searches. The original JavaScript recorder supplies 56 traces and 246 steps, including malformed whole orders, forced supply holds, garrison exit and deferred retries. Three focused native tests pass in debug and release, including two original recovery/replan branches, ordering and counter-exhaustion guards. Empty replans retain the old route. Automatic reactions, aircraft, other command kinds, wire and C integration remain separate.
 
 

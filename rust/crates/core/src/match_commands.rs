@@ -1183,7 +1183,7 @@ impl crate::match_runtime::Match {
         let Some(unit) = self.world.game.units.get(&id) else {
             return Ok(None);
         };
-        if unit.path_gen == u64::MAX {
+        if unit.path_gen.checked_add(2).is_none() {
             return Err("unit path identity exhausted".into());
         }
         let owner = unit.owner;
