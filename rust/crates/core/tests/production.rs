@@ -132,155 +132,173 @@ fn snapshot(
 fn production_research_and_refunds_match_original_source_traces() {
     let fixture: Value = serde_json::from_str(include_str!("fixtures/production.json")).unwrap();
     assert_eq!(a(&fixture["scenarios"]).len(), 12);
-    for scenario in a(&fixture["scenarios"]) {
-        let mut config = scenario["input"].clone();
-        let tech = a(&config["players"])
-            .iter()
-            .map(|p| {
-                TechState::new(
-                    n(&p["tier"]) as u8,
-                    n(&p["armory"]["inf"]) as u8,
-                    n(&p["armory"]["guns"]) as u8,
-                    n(&p["armory"]["armor"]) as u8,
-                )
-                .unwrap()
-            })
-            .collect();
-        let mut state = ProductionState::new(tech).unwrap();
-        for unit in a(&config["units"]) {
-            state.initialize_building(n(&unit["id"]) as u32).unwrap();
-        }
-        let mut wallets = EconomyState {
-            players: a(&config["players"])
+    for split in [false, true] {
+        for scenario in a(&fixture["scenarios"]) {
+            let mut config = scenario["input"].clone();
+            let tech = a(&config["players"])
                 .iter()
-                .map(|p| PlayerEconomy {
-                    team: p["team"].as_i64().unwrap() as i32,
-                    mp: f(&p["mp"]),
-                    mun: f(&p["mun"]),
-                    fuel: f(&p["fuel"]),
-                    ..Default::default()
+                .map(|p| {
+                    TechState::new(
+                        n(&p["tier"]) as u8,
+                        n(&p["armory"]["inf"]) as u8,
+                        n(&p["armory"]["guns"]) as u8,
+                        n(&p["armory"]["armor"]) as u8,
+                    )
+                    .unwrap()
                 })
-                .collect(),
-        };
-        for (tick, row) in a(&scenario["trace"]).iter().enumerate() {
-            let action = &row["action"];
-            let mut result = Value::Null;
-            let mut completed = vec![];
-            match action["op"].as_str().unwrap() {
-                "unit" => {
-                    let id = n(&action["id"]);
-                    let u = config["units"]
-                        .as_array_mut()
-                        .unwrap()
-                        .iter_mut()
-                        .find(|u| n(&u["id"]) == id)
-                        .unwrap();
-                    for (k, v) in action["fields"].as_object().unwrap() {
-                        u[k] = v.clone();
-                    }
-                }
-                "config" => {
-                    for (k, v) in action["fields"].as_object().unwrap() {
-                        config[k] = v.clone();
-                    }
-                }
-                "player" => {
-                    let slot = n(&action["slot"]);
-                    let p = &mut wallets.players[slot];
-                    for (k, v) in action["fields"].as_object().unwrap() {
-                        match k.as_str() {
-                            "mp" => p.mp = f(v),
-                            "mun" => p.mun = f(v),
-                            "fuel" => p.fuel = f(v),
-                            "away" => p.away = b(v),
-                            "out" => p.out = b(v),
-                            _ => panic!("field {k}"),
-                        }
-                    }
-                }
-                "queue" => {
-                    state
-                        .reconcile_queue(
-                            n(&action["id"]) as u32,
-                            &a(&action["types"])
-                                .iter()
-                                .map(|s| s.as_str().unwrap())
-                                .collect::<Vec<_>>(),
-                        )
-                        .unwrap();
-                }
-                "paid" => {
-                    state
-                        .record_paid(
-                            n(&action["id"]) as u32,
-                            action["kind"].as_str().unwrap(),
-                            Price {
-                                mp: f(&action["charge"]["mp"]),
-                                fuel: f(&action["charge"]["fuel"]),
-                            },
-                        )
-                        .unwrap();
-                }
-                "clear" => state.clear_queues(),
-                op => context(&config, |c| {
-                    result = match op {
-                        "buy" => apply(
-                            state
-                                .queue_unit(
-                                    c,
-                                    &mut wallets,
-                                    n(&action["slot"]),
-                                    Faction::try_from(n(
-                                        &config["players"][n(&action["slot"])]["faction"],
-                                    ) as u8)
-                                    .unwrap(),
-                                    action["kind"].as_str().unwrap(),
-                                    action["from"].as_u64().map(|i| i as u32),
-                                )
-                                .map(|_| ()),
-                        ),
-                        "tech" => apply(
-                            state
-                                .request_research(
-                                    c,
-                                    &mut wallets,
-                                    n(&action["slot"]),
-                                    kind(&action["kind"]),
-                                )
-                                .map(|_| ()),
-                        ),
-                        "cancel" => apply(
-                            state
-                                .cancel(
-                                    c,
-                                    &mut wallets,
-                                    n(&action["slot"]),
-                                    n(&action["id"]) as u32,
-                                    action["job"].as_u64().unwrap(),
-                                )
-                                .map(|_| ()),
-                        ),
-                        "step" => {
-                            for _ in 0..action["repeat"].as_u64().unwrap_or(1) {
-                                completed.extend(state.advance(c, &wallets, f(&action["dt"])).unwrap().units.into_iter().map(|u| json!({"building":u.building,"owner":u.owner,"kind":u.kind,"job_id":u.job_id})));
-                            }
-                            Value::Null
-                        }
-                        _ => panic!("op {op}"),
-                    };
-                }),
+                .collect();
+            let mut state = ProductionState::new(tech).unwrap();
+            for unit in a(&config["units"]) {
+                state.initialize_building(n(&unit["id"]) as u32).unwrap();
             }
-            assert_eq!(
-                result, row["result"],
-                "{} action {tick}: {action}",
-                scenario["name"]
-            );
-            assert_eq!(
-                snapshot(&state, &wallets, &config, completed),
-                row["expected"],
-                "{} action {tick}: {action}",
-                scenario["name"]
-            );
+            let mut wallets = EconomyState {
+                players: a(&config["players"])
+                    .iter()
+                    .map(|p| PlayerEconomy {
+                        team: p["team"].as_i64().unwrap() as i32,
+                        mp: f(&p["mp"]),
+                        mun: f(&p["mun"]),
+                        fuel: f(&p["fuel"]),
+                        ..Default::default()
+                    })
+                    .collect(),
+            };
+            for (tick, row) in a(&scenario["trace"]).iter().enumerate() {
+                let action = &row["action"];
+                let mut result = Value::Null;
+                let mut completed = vec![];
+                match action["op"].as_str().unwrap() {
+                    "unit" => {
+                        let id = n(&action["id"]);
+                        let u = config["units"]
+                            .as_array_mut()
+                            .unwrap()
+                            .iter_mut()
+                            .find(|u| n(&u["id"]) == id)
+                            .unwrap();
+                        for (k, v) in action["fields"].as_object().unwrap() {
+                            u[k] = v.clone();
+                        }
+                    }
+                    "config" => {
+                        for (k, v) in action["fields"].as_object().unwrap() {
+                            config[k] = v.clone();
+                        }
+                    }
+                    "player" => {
+                        let slot = n(&action["slot"]);
+                        let p = &mut wallets.players[slot];
+                        for (k, v) in action["fields"].as_object().unwrap() {
+                            match k.as_str() {
+                                "mp" => p.mp = f(v),
+                                "mun" => p.mun = f(v),
+                                "fuel" => p.fuel = f(v),
+                                "away" => p.away = b(v),
+                                "out" => p.out = b(v),
+                                _ => panic!("field {k}"),
+                            }
+                        }
+                    }
+                    "queue" => {
+                        state
+                            .reconcile_queue(
+                                n(&action["id"]) as u32,
+                                &a(&action["types"])
+                                    .iter()
+                                    .map(|s| s.as_str().unwrap())
+                                    .collect::<Vec<_>>(),
+                            )
+                            .unwrap();
+                    }
+                    "paid" => {
+                        state
+                            .record_paid(
+                                n(&action["id"]) as u32,
+                                action["kind"].as_str().unwrap(),
+                                Price {
+                                    mp: f(&action["charge"]["mp"]),
+                                    fuel: f(&action["charge"]["fuel"]),
+                                },
+                            )
+                            .unwrap();
+                    }
+                    "clear" => state.clear_queues(),
+                    op => context(&config, |c| {
+                        result = match op {
+                            "buy" => apply(
+                                state
+                                    .queue_unit(
+                                        c,
+                                        &mut wallets,
+                                        n(&action["slot"]),
+                                        Faction::try_from(n(
+                                            &config["players"][n(&action["slot"])]["faction"]
+                                        )
+                                            as u8)
+                                        .unwrap(),
+                                        action["kind"].as_str().unwrap(),
+                                        action["from"].as_u64().map(|i| i as u32),
+                                    )
+                                    .map(|_| ()),
+                            ),
+                            "tech" => apply(
+                                state
+                                    .request_research(
+                                        c,
+                                        &mut wallets,
+                                        n(&action["slot"]),
+                                        kind(&action["kind"]),
+                                    )
+                                    .map(|_| ()),
+                            ),
+                            "cancel" => apply(
+                                state
+                                    .cancel(
+                                        c,
+                                        &mut wallets,
+                                        n(&action["slot"]),
+                                        n(&action["id"]) as u32,
+                                        action["job"].as_u64().unwrap(),
+                                    )
+                                    .map(|_| ()),
+                            ),
+                            "step" => {
+                                for _ in 0..action["repeat"].as_u64().unwrap_or(1) {
+                                    let dt = f(&action["dt"]);
+                                    let units = if split {
+                                        state.advance_research(c, &wallets, dt).unwrap();
+                                        c.units
+                                            .iter()
+                                            .filter_map(|u| {
+                                                state
+                                                    .prepare_building_step(c, &wallets, u.id, dt)
+                                                    .unwrap()
+                                                    .commit()
+                                            })
+                                            .collect()
+                                    } else {
+                                        state.advance(c, &wallets, dt).unwrap().units
+                                    };
+                                    completed.extend(units.into_iter().map(|u| json!({"building":u.building,"owner":u.owner,"kind":u.kind,"job_id":u.job_id})));
+                                }
+                                Value::Null
+                            }
+                            _ => panic!("op {op}"),
+                        };
+                    }),
+                }
+                assert_eq!(
+                    result, row["result"],
+                    "{} action {tick}: {action}",
+                    scenario["name"]
+                );
+                assert_eq!(
+                    snapshot(&state, &wallets, &config, completed),
+                    row["expected"],
+                    "{} action {tick}: {action}",
+                    scenario["name"]
+                );
+            }
         }
     }
 }
@@ -358,4 +376,46 @@ fn invalid_inputs_do_not_change_canonical_jobs_or_wallets() {
     );
     assert_eq!(funds, wallets);
     assert_eq!(state, initial);
+}
+
+#[test]
+fn aborted_research_and_training_guards_preserve_canonical_state() {
+    let fixture: Value = serde_json::from_str(include_str!("fixtures/production.json")).unwrap();
+    let config = &fixture["scenarios"][0]["input"];
+    let mut state = ProductionState::new(vec![TechState::new(1, 0, 0, 0).unwrap(); 3]).unwrap();
+    state
+        .record_paid(
+            1,
+            "rifle",
+            Price {
+                mp: 123.5,
+                fuel: 7.25,
+            },
+        )
+        .unwrap();
+    let mut wallets = EconomyState {
+        players: (0..3)
+            .map(|slot| PlayerEconomy {
+                team: if slot == 2 { 1 } else { 0 },
+                mp: 4000.0,
+                mun: 400.0,
+                fuel: 400.0,
+                ..Default::default()
+            })
+            .collect(),
+    };
+    let before = state.clone();
+    let money = wallets.clone();
+    context(config, |c| {
+        let research = state
+            .prepare_research(c, &mut wallets, 0, Technology::Tier)
+            .unwrap();
+        assert!(research.cost().mp > 0.0);
+        drop(research);
+        let training = state.prepare_building_step(c, &wallets, 1, 100.0).unwrap();
+        assert_eq!(training.completed().unwrap().kind, "rifle");
+        drop(training);
+    });
+    assert_eq!(state, before);
+    assert_eq!(wallets, money);
 }
