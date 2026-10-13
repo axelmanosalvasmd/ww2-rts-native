@@ -47,6 +47,10 @@ impl Match {
             .units
             .get(&id)
             .ok_or("missing retreat unit")?;
+        self.reaction_home_for(unit)
+    }
+
+    pub(crate) fn reaction_home_for(&self, unit: &Unit) -> Result<Point, String> {
         let mut home = self
             .start
             .players

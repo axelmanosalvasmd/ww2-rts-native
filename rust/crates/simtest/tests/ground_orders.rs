@@ -6,16 +6,18 @@
 //! reconstruct read-only JSON. Constructor RNG, wallets and startup actors remain
 //! native; declared scene primes are the sole setup overrides.
 //!
-//! Two mixed rail/partial-reserve scenes lack represented factory metadata. The
-//! garrison Retreat scene needs an existing-observer exit overlay. They remain
-//! explicit exclusions. Dead-target retirement with allowEffects contributes its
-//! command prefix but is excluded from exact quiet full-step parity. AIR Needs
-//! uses actual spawn_aircraft and its canonical sortie metadata.
+//! Two mixed rail/partial-reserve scenes lack represented factory metadata and
+//! remain explicit exclusions. Garrison Retreat uses the routing owner's actual
+//! prepared existing exits, including the warm-cache group with repeated IDs.
+//! Dead-target retirement with allowEffects contributes its command prefix but is
+//! excluded from exact quiet full-step parity. AIR Needs uses actual spawn_aircraft
+//! and its canonical sortie metadata.
 //!
 //! moveResult retention, auxiliary motionClearance/lane objects, full terrain
 //! journals/versions, detailed capture-point state and private scheduler totals
-//! are outside the projection. Deferred/dropped public counters, visible IDs,
-//! physical groundFlags, ordered paths/queues, paid work/project membership,
+//! are outside the projection. Source pathViewKey remains read-only evidence; no
+//! native private-cache key is synthesized. Deferred/dropped public counters,
+//! visible IDs, physical groundFlags, ordered paths/queues, paid work/project membership,
 //! timers, wallets and story are compared. No complete damage, ground-effects,
 //! rail, naval or operative tick result is claimed. Full-step checks require the
 //! sole runner's planned GroundAttack receipt and fail while it is absent.
@@ -27,6 +29,7 @@ use ww2_core::{
     game::Point,
     map::AuthoritativeMap,
     match_commands::{Command, Denial, MoveOutcome},
+    match_end::MatchSample,
     match_runtime::{Match, MatchOptions, PlayerConfig},
     match_tick::{TickPathConfig, TickPhase},
     orders::OrderKey,
@@ -68,9 +71,9 @@ fn fixture() -> Value {
     assert_eq!(f["reference"], "e4e579a838aabae3b1d9dadbc17a0a87147bc52d");
     assert_eq!(f["node"], "v24.21.0");
     assert_eq!(f["arch"], "x64");
-    assert_eq!(f["cases"].as_array().unwrap().len(), 26);
-    assert_eq!(f["commands"], 44);
-    assert_eq!(f["steps"], 28);
+    assert_eq!(f["cases"].as_array().unwrap().len(), 28);
+    assert_eq!(f["commands"], 48);
+    assert_eq!(f["steps"], 30);
     assert_eq!(
         f["cases"]
             .as_array()
@@ -78,7 +81,7 @@ fn fixture() -> Value {
             .iter()
             .map(|c| c["snapshots"].as_u64().unwrap())
             .sum::<u64>(),
-        102
+        110
     );
     f
 }
@@ -685,7 +688,12 @@ fn compare(
             tagged(json!(
                 m.timeline
                     .iter()
-                    .map(|s| json!({"t":s.t,"vp":s.vp}))
+                    .map(|s| match s {
+                        MatchSample::Conquest { t, vp } => json!({"t":t,"vp":vp}),
+                        MatchSample::Territories { .. } => panic!(
+                            "{context}: Territories timeline is outside the ground-order fixture"
+                        ),
+                    })
                     .collect::<Vec<_>>()
             )),
             expected["timeline"],
@@ -725,9 +733,6 @@ fn component_exclusion(name: &str) -> Option<&'static str> {
         "mixed-selection-follow-and-admission" | "retreat-selection-repeats-forced-and-riders" => {
             Some("rail factory and partial reserve setup have no represented scene provider")
         }
-        "retreat-garrison-physical-exit" => {
-            Some("real existing-observer garrison exit overlay is pending")
-        }
         _ => None,
     }
 }
@@ -748,7 +753,7 @@ fn assert_inventory(f: &Value) {
                 .map(|why| (c["name"].as_str().unwrap(), why))
         })
         .collect::<Vec<_>>();
-    assert_eq!(excluded.len(), 3, "explicit component exclusion inventory");
+    assert_eq!(excluded.len(), 2, "explicit component exclusion inventory");
     assert_eq!(
         cases
             .iter()
@@ -841,8 +846,8 @@ fn actual_dispatch_matches_ground_order_command_prefixes() {
         );
         compared_cases += 1;
     }
-    assert_eq!(compared_cases, 23);
-    assert_eq!(command_records, 37);
+    assert_eq!(compared_cases, 26);
+    assert_eq!(command_records, 42);
 }
 #[test]
 fn queued_ground_orders_match_original_full_steps_and_arrival_order() {
@@ -980,11 +985,11 @@ fn queued_ground_orders_match_original_full_steps_and_arrival_order() {
             compared_cases += 1;
         }
     }
-    assert_eq!(compared_cases, 40);
-    assert_eq!(steps, 52);
-    assert_eq!(command_records, 70);
+    assert_eq!(compared_cases, 46);
+    assert_eq!(steps, 58);
+    assert_eq!(command_records, 80);
     assert_eq!(
-        receipt_count, 68,
+        receipt_count, 78,
         "two parser-rejected payloads never enter the queue"
     );
 }

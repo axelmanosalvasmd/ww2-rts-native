@@ -319,10 +319,6 @@ impl Match {
             }
             return Ok(Some(Denial::Needs));
         }
-        let homes = selected
-            .iter()
-            .map(|id| self.reaction_home(*id))
-            .collect::<Result<Vec<_>, _>>()?;
         let mut exits = Vec::new();
         let mut unique = std::collections::BTreeSet::new();
         let mut prefixes = Vec::new();
@@ -336,6 +332,12 @@ impl Match {
             }
             prefixes.push(exits.len());
         }
+        let homes = selected
+            .iter()
+            .map(|id| {
+                self.reaction_home_for(exits.iter().find(|exit| exit.id() == *id).unwrap().unit())
+            })
+            .collect::<Result<Vec<_>, _>>()?;
         let context = RecipientContext {
             world: &self.world,
             rules: &self.rules,

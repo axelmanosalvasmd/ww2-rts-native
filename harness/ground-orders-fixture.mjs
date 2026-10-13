@@ -145,6 +145,24 @@ try {
   assert.equal(states[2].players[0].mp,states[3].players[0].mp,'Retreat neither spends nor refunds');
   assert.equal(states[0].actorOrder.length,13,'ten startup actors plus exactly three existing observers');
  }});
+ // Source chooses home after the physical exit, which changes the nearest HQ.
+ record('retreat-nearest-HQ-after-garrison-exit',[
+  U('attacker','rifle',31,31),U('beforeExitHQ','hq',27,31),U('afterExitHQ','hq',36,31),
+ ],[retreat(),step()],{terrain:house,unitPrime:{
+  attacker:{garrison:15*80+15},beforeExitHQ:{built:1},afterExitHQ:{built:1},
+ },check:({states,records,unit})=>{
+  assert.equal(records[0].result,null);
+  const before=unit(states[0],'attacker'),exited=unit(states[1],'attacker'),after=unit(states[2],'attacker');
+  assert.deepEqual([before.x,before.z],[bits(31),bits(31)]);
+  assert.deepEqual([exited.x,exited.z],[bits(35),bits(31)],'actual nearest-free physical exit');
+  assert.equal(exited.controls.garrison.f64,bits(-1));assert.equal(exited.controls.retreating,true);
+  assert.deepEqual(exited.controls.worldGoal,{x:{f64:bits(36)},z:{f64:bits(31)}},'nearest finished own HQ must use the exited pose');
+  assert.deepEqual(after.controls.worldGoal,exited.controls.worldGoal);
+  assert.equal(after.controls.garrison.f64,bits(-1));assert.equal(after.controls.retreating,true);
+  assert.equal(states[0].players[0].mp,states[1].players[0].mp,'Retreat neither spends nor refunds');
+  assert.ok(exited.path.length,'actual source home route');
+  assert.equal(states[0].actorOrder.length,13,'ten startup actors plus one rifle and two finished HQs');
+ }});
  const changes=(a,b,path=[],out=[])=>{if(Object.is(a,b))return out;if(Array.isArray(a)&&Array.isArray(b)&&a.length===b.length){for(let i=0;i<a.length;i++)changes(a[i],b[i],[...path,i],out);return out;}if(a&&b&&typeof a==='object'&&typeof b==='object'&&!Array.isArray(a)&&!Array.isArray(b)){for(const k of new Set([...Object.keys(a),...Object.keys(b)]))if(!Object.hasOwn(b,k))out.push([[...path,k]]);else changes(a[k],b[k],[...path,k],out);return out;}out.push([path,b]);return out;};
  for(const c of cases){c.initial=c.states[0];c.patches=c.states.slice(1).map((s,i)=>changes(c.states[i],s));c.snapshots=c.states.length;delete c.states;}
  clean();const content=JSON.stringify({reference:pin,node:process.version,arch:process.arch,boundary:'unchanged createGame + ordered command + full step, with explicit boundary-only unsupported scenes',scope:{damageParity:false,rawFlags:false,privateScheduler:false},steps:totalSteps,commands:totalCommands,cases})+'\n';
