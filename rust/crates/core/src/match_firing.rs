@@ -1061,7 +1061,7 @@ impl Match {
         } else {
             1.0
         };
-        let rate = if u.supp >= 90.0 {
+        let mut rate = if u.supp >= 90.0 {
             3.0
         } else if u.supp >= 50.0 {
             1.5
@@ -1092,7 +1092,7 @@ impl Match {
         let xp = self.combat.get(id).map_or(0.0, |m| m.xp);
         let veterancy = crate::combat::veterancy(&self.rules.kinds[u.kind].name, xp)
             .map_err(|e| format!("{e:?}"))?;
-        let accuracy = n(w, if inf { "accInf" } else { "accVeh" }, 0.0)
+        let mut accuracy = n(w, if inf { "accInf" } else { "accVeh" }, 0.0)
             * suppression_accuracy
             * if moving {
                 n(w, "moveFire", f64::NAN)
@@ -1102,6 +1102,24 @@ impl Match {
             * cover
             * hg
             * (1.0 + n(cfg, "vetAcc", 0.1) * f64::from(veterancy));
+        let ability = self
+            .abilities
+            .get(id)
+            .ok_or("missing firing ability state")?;
+        if !ability.buff.is_finite() {
+            return Err("invalid firing ability buff".into());
+        }
+        let ab = definition.get("ab").ok_or("missing ability definition")?;
+        let damage_scale = if ability.buff > 0.0 { 0.5 } else { 1.0 };
+        let mut suppression = n(w, "supp", 0.0);
+        if ability.buff > 0.0 {
+            suppression *= 2.5;
+            rate *= 0.5;
+        }
+        let ap = ability.ap && !inf && (!flag(ab, "naval") || self.rules.kinds[t.kind].naval);
+        if ap {
+            accuracy = 1.0;
+        }
         let aim = self.aim_point(u, t);
         let bearing = math::atan2(aim.z - u.z, aim.x - u.x);
         let from = projectiles::Point3::new(
@@ -1117,7 +1135,6 @@ impl Match {
             flag(w, "shellTerrain"),
         )
         .map_err(|e| format!("projectile profile: {e:?}"))?;
-        let duration = None;
         let mut random = self.start.random.clone();
         let mut flights = Vec::with_capacity(count as usize);
         let first_id = self.firing.next_flight;
@@ -1153,18 +1170,16 @@ impl Match {
                 at,
                 profile.speed.unwrap_or(1.0),
                 profile.gravity,
-                duration,
+                None,
             )
             .map_err(|e| format!("launch solution: {e:?}"))?;
             let delay = 0.0;
             let born = g.tick as f64 * 0.05 + delay;
             let expires = born
-                + duration.unwrap_or_else(|| {
-                    math::max(
-                        solution.duration + 0.15,
-                        n(w, "range", 20.0) / profile.speed.unwrap_or(1.0),
-                    )
-                });
+                + math::max(
+                    solution.duration + 0.15,
+                    n(w, "range", 20.0) / profile.speed.unwrap_or(1.0),
+                );
             if !born.is_finite() || !expires.is_finite() {
                 return Err("invalid flight lifetime".into());
             }
@@ -1191,15 +1206,15 @@ impl Match {
                 near: profile.near,
                 start_cell: g.cell_of(u.x, u.z).ok_or("shooter outside battlefield")?,
                 intended: Some(target),
-                damage_scale: 1.0,
-                armor_piercing: false,
+                damage_scale,
+                armor_piercing: ap,
                 ap_multiplier: n(
                     definition.get("ab").ok_or("missing ability definition")?,
                     "mult",
                     1.5,
                 ),
                 ap_naval: definition.get("ab").is_some_and(|a| flag(a, "naval")),
-                suppression: n(w, "supp", 0.0),
+                suppression,
                 suppression_scale: if per_model {
                     f64::from(count) / n(definition, "models", 1.0)
                 } else {
@@ -1219,6 +1234,11 @@ impl Match {
             });
         }
         self.logistics.consume_ammo(id, requested);
+        // Health/profile geometry and ID capacity have all passed. AP is spent on
+        // a committed qualifying launch, keeping refusal paths unchanged.
+        if ap && count > 0 {
+            self.abilities.get_mut(id).unwrap().ap = false;
+        }
         self.start.random = random;
         self.firing.next_flight = end_id;
         for flight in flights {

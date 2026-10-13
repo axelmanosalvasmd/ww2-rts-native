@@ -565,9 +565,16 @@ impl Match {
         if self
             .world
             .game
-            .smokes
-            .iter()
-            .any(|s| (self.next_unit_id..smoke_end).contains(&s.id))
+            .units
+            .range(self.next_unit_id..smoke_end)
+            .next()
+            .is_some()
+            || self
+                .world
+                .game
+                .smokes
+                .iter()
+                .any(|s| (self.next_unit_id..smoke_end).contains(&s.id))
             || self.world.game.wrecks.iter().any(|w| {
                 w.id.is_some_and(|id| (self.next_unit_id..smoke_end).contains(&id))
             })
@@ -579,13 +586,14 @@ impl Match {
     pub(crate) fn apply_ability_selection(
         &mut self,
         owner: usize,
-        selected: &[UnitId],
+        selected: &[Option<UnitId>],
         at: Option<Point>,
         queue: bool,
         automatic: bool,
     ) -> Result<Option<Denial>, String> {
         self.validate_abilities()?;
-        if self.unrepresented_ability_work(selected, at, queue, automatic)? {
+        let eligible: Vec<_> = selected.iter().flatten().copied().collect();
+        if self.unrepresented_ability_work(&eligible, at, queue, automatic)? {
             return Ok(Some(Denial::Unsupported));
         }
         let at = at
@@ -594,10 +602,14 @@ impl Match {
                 x: math::min(self.world.game.w as f64 * CELL, math::max(0., p.x)),
                 z: math::min(self.world.game.h as f64 * CELL, math::max(0., p.z)),
             });
-        let exits = self.preflight_ability_selection(selected, at, queue, automatic)?;
+        let exits = self.preflight_ability_selection(&eligible, at, queue, automatic)?;
         let mut used = false;
         let mut reason = Denial::Needs;
         for &id in selected {
+            let Some(id) = id else {
+                reason = Denial::Needs;
+                continue;
+            };
             let kind = self.ability_kind(id)?;
             let ab = ability(self, id)?;
             let u = &self.world.game.units[&id];

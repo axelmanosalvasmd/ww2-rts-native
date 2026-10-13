@@ -74,11 +74,8 @@ fn supported(m: &Match, structure: &WorldStructure) -> Result<BTreeSet<String>, 
     let mut queue = Vec::new();
     for id in &structure.section_ids {
         let (meta, hp) = m.world.section_by_id(id).ok_or("missing repair section")?;
-        if !hp.hp.is_finite()
-            || !hp.max_hp.is_finite()
-            || hp.max_hp <= 0.
-            || hp.hp < 0.
-            || hp.hp > hp.max_hp
+        let max_hp = hp.max_hp.ok_or("missing authoritative section maximum")?;
+        if !hp.hp.is_finite() || !max_hp.is_finite() || max_hp <= 0. || hp.hp < 0. || hp.hp > max_hp
         {
             return Err("invalid repair section health".into());
         }
@@ -223,7 +220,7 @@ impl Match {
                     continue;
                 }
             }
-            let add = math::min(left, hp.max_hp - hp.hp);
+            let add = math::min(left, hp.max_hp.unwrap() - hp.hp);
             if add <= 0. {
                 continue;
             }
@@ -248,7 +245,7 @@ impl Match {
                 hp.hp += add;
                 meta.appearance = if burning {
                     Appearance::Burning
-                } else if hp.hp >= hp.max_hp {
+                } else if hp.hp >= hp.max_hp.unwrap() {
                     Appearance::Intact
                 } else {
                     Appearance::Damaged
@@ -263,7 +260,7 @@ impl Match {
         self.world.game.units.get_mut(&id).unwrap().hp += repaired;
         if structure.section_ids.iter().all(|id| {
             let (_, hp) = self.world.section_by_id(id).unwrap();
-            hp.hp >= hp.max_hp
+            hp.hp >= hp.max_hp.unwrap()
         }) {
             self.world.game.units.get_mut(&id).unwrap().hp = full;
         }
@@ -339,7 +336,7 @@ impl Match {
             {
                 return Err("invalid recovery provisions".into());
             }
-            if self.commands.units.get(&id).is_none() {
+            if !self.commands.units.contains_key(&id) {
                 return Err("missing recovery control".into());
             }
             let definition = def(self, id)?;

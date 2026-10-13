@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Combined the checked ability and recovery cancellation hooks with the Cover field extension. Recruitment keeps its existing guarded publication; native checks of this combined ancestry remain pending.
+
 - Combined the checked engineering and recorded-input ancestry with queued Cover in its separate field cleanup checkpoint. The canonical command union retains both Cover and Dig; staged observation and cache provider bodies remain unchanged. New integration native checks are pending.
 
 - Bound the Cover path-cache fork to its selected recipient preview through the shared 6d5f1e4 guard, preserving both unrelated warmed graph history and matching selected terrain identities. Native checks are pending.
@@ -186,6 +188,30 @@
 
 - Reserved shared command denial names for source manpower, maximum, missing-builder and visibility refusals, allowing the separate ordinary-dig actuator to use the single dispatcher enum. No gameplay handler or queue changes are included; native actuator proof remains pending.
 
+- Verified the bounded Conquest ability/recovery provider at exact runtime/test head `1f9a16b`: 13 core debug checks (four ability, two recovery), three firing and two recruitment debug checks, all 177 locked release workspace tests, strict Clippy, formatting and release FFI. Independent source and debug/release replay checks pass. Added phase API documentation and kept full tick/engineering/other-mode/ABI/transport parity in progress; final evidence commits preserve Rust/harness trees.
+
+- Resolved strict Clippy findings in the native recovery validation and replay helpers without changing their behavior. The release workspace suite passed 177 tests before this cleanup; exact final checks are rerunning.
+
+- Preserved Blocked precedence for a typed nonfinite aimed point before unsupported-project checks. The existing project-boundary replay now verifies that invalid aim preserves work activity, while valid replacement still refuses unrepresented projects.
+
+- Corrected replay setup to represent visibility membership as sorted unique IDs while preserving the original actor/grid insertion order for tie cases. This satisfies canonical routing validation without changing target membership. Native comparisons are rerunning.
+
+- Fixed the first native ability differential: ineligible or missing selected IDs retain their position in per-unit refusal order, so a trailing missing ID returns Needs when no prior unit succeeded. Resource/control preflight still uses only eligible units. Native checks are rerunning.
+
+- Fixed the first native compiler findings: authoritative repair preflight now requires the canonical optional maximum HP before arithmetic, and the test snapshot builds control data separately within the JSON macro limit, and replay controls use the actual bounded command constructor. Native checks are rerunning.
+
+- Consumed the typed-flight source convergence repair while preserving the canonical buff/AP borrow. Direct launch lifetime uses the same explicit unbounded-flight formula, and source inputs preserve zero-valued hit attribution. Final combined native proof remains pending.
+
+- Extended the original recruitment replay to verify ability and recovery defaults at the shared publication boundary, preserving same-batch buy-to-ability admission. Combined native execution remains pending.
+
+- Connected canonical ability buff and AP state to committed ordinary weapon launches: suppressive fire uses half damage, 2.5 times suppression and half the firing interval; qualifying AP uses perfect launch accuracy and is spent after successful launch preflight. Salvos keep their existing path. Five original-source firing cases and native consumers cover the payload, AP retention and no-ammo behavior; native execution remains pending.
+
+- Merged the byte-identical typed-flight convergence and checked publication prerequisite, retaining ability/recovery defaults inside the infallible recruitment publication callback. The combined ability proof remains pending.
+
+- Rejected smoke allocator collisions with current live units before any selected-unit effect, extending the existing mixed-selection identity regression. Native proof remains pending.
+
+- Connected manual aimed replacement to real paid field-work cancellation without a refund, and rejected unrepresented build or mass-entrench projects before control writes. The original ability recorder now has 36 traces (157 actions), with a separate unsupported-project boundary and a written cancellation regression. Native proof remains pending.
+
 - Added one shared field-work cancellation helper for staged transactions borrowing wallet/story and unit state separately. Match delegates to the same implementation, including identity and activity checks before mutation. Native checks remain pending.
 
 - Added the approved canonical Match field-work owner and startup default, plus synchronous cancellation that removes a real descriptor before clearing its activity flag without a refund. Missing or inconsistent activity rejects before writes. Component and combined native proof remain pending.
@@ -220,6 +246,15 @@
 
 - Wrote typed Conquest Ability/Autocast dispatch, canonical instant abilities, all ground autocast judgments and the existing FIFO aimed-path binding. Ability cooldown/buff timers remain separate from weapon timers; smoke IDs use the shared unit counter. The ability recorder now pairs the canonical Combat purpose stream at seed 701. Aimed launches, reinforcement and native differential consumers remain unfinished; no passing native execution claim is made.
 - Reserved a fixed internal World local-defender actor identity outside commander slots. World team and alliance queries recognize that actor without adding a player seat or wallet; ordinary invalid owner behavior is unchanged. Native World construction and guard tick execution remain pending.
+- Verified typed ability flights on compiled head e1e74ad: five focused debug/release tests, all 162 locked workspace release tests, strict Clippy, formatting and release FFI build pass. The source oracles reproduce 30 ability-flight traces with 210 checkpoints and 114 ordinary firing traces with 588 checkpoints. Conquest-only launch admission and caller-owned ability/FPS state remain explicit.
+
+- Removed a literal-None lifetime fallback left after ordinary salvos moved into the shared launcher, preserving the existing direct-round expiry calculation and satisfying strict Clippy.
+
+- Fixed the ability-flight oracle input recording to retain the source zero incoming-shooter sentinel, and made replay comparison errors name the mismatched field. No launch rule changed.
+
+- Integrated the checked shared-publication firing base into typed ability-flight work, preserving both combat/firing fresh-ID guards and publication defaults. Typed launch behavior and fixtures are unchanged; the combined code is verified by the checks recorded above.
+
+- Kept satchel oracle targets within each ability's actual range and corrected the design description of Commando satchels. Launcher admission remains the caller's responsibility.
 
 - Removed the obsolete local weapon-blast import after flights began retaining their own typed blast source.
 
@@ -227,9 +262,10 @@
 
 - Preflighted canonical shooter metadata and finite ammunition before ability/salvo launches, and reject malformed retained blast identities before stepping any flight. Timer input bounds keep physical grenade pruning safe.
 
-- Fixed physical ability launch admission at the inclusive map edge, which the source ability command permits. Added an unchanged-source grenade edge case before native verification.
+- Fixed physical ability launch admission at the inclusive map edge, which the source ability command permits. Added an unchanged-source grenade edge case.
 
-- Added typed grenade/satchel launch requests, retained ability blast profiles in canonical flights, and shared the physical salvo launcher with ordinary fire and barrage. Flight-linked grenade tickets keep source late-phase pruning without a second blast. The new pinned-source oracle records 30 traces and 210 checkpoints; native verification is pending the shared build slot.
+- Added typed grenade/satchel launch requests, retained ability blast profiles in canonical flights, and shared the physical salvo launcher with ordinary fire and barrage. Flight-linked grenade tickets keep source late-phase pruning without a second blast. The new pinned-source oracle records 30 traces and 210 checkpoints; the native replay and launch guards pass the checks recorded above.
+- Preserved both combat and firing defaults in the shared recruitment publication callback, including fresh-ID guards before charging.
 
 - Verified the complete command/firing ancestry after recruitment metadata integration: 155 workspace tests, five focused debug/release tests, strict Clippy, formatting and release FFI build pass. The diff against the reviewed command branch contains only weapon-phase code, publication defaults, fixtures and documentation.
 
@@ -368,6 +404,8 @@
 - Added generated World map validation and loading through the authoritative map path and typed generator handoff, with immutable ordered geography beside canonical mutable terrain. The existing oracle now has 138 cases and 58 static states, preserves 105 earlier records, and adds bare/dressed Huge/Massive worlds plus malformed region/home/layer/connectivity cases. Empty World metadata now returns Invalid, and defensive numeric/text/bounds/biome checks reject malformed source values. Ordinary Match startup refuses World maps; bounded external file loading stays in simtest. World mode startup, rail algorithms, scenarios, wire and ABI changes remain separate.
 
 - Added typed World size, region, immutable geography and terrain inputs for the native generator-to-loader handoff. Validation and mutable World initialization follow separately; no wire or ABI interface changes. Region biome labels and explicit landmark building tags now accompany the typed handoff.
+- Fixed the field-work recorder route projection to compare the requested Point coordinates. The source ordinary dig goal aliases its full job object; copying that object had incorrectly compared job metadata with the typed route point. Job snapshots and source motion remain unchanged.
+
 - Added ordinary paid field-work placement and timed terrain execution for trenches, sandbags, wire, traps, Gun Pits, mines, known-mine clearing and Field Hospitals. Canonical dig records retain source cell order, visibility masking, engineer pace, per-cell ground checks and float32 trench fronts; prepared admission spends once and refused replacements preserve paid work. The original JavaScript recorder covers 22 traces and 367 actions. Dispatcher, routing and story integration, queues/shared projects, bridges, concrete buildings and fill work remain pending.
 
 - Added the native Match Conquest victory phase and finish bookkeeping: team VP in slot order, latest still-held capture location, 0.1 m end rounding, first-winner preservation, reveal and exact Conquest timeline fields. Canonical point accounting now freezes VP and capture story counts after the winner while ownership and manpower can continue. Three focused tests compare 12 original-JavaScript traces (24 assembled-match checkpoints) and invalid-state atomicity; existing startup and point-income tests pass. Other modes, command refusal, remaining story counters, result transport and the full battle loop remain unfinished.
