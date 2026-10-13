@@ -10,6 +10,7 @@ pub mod economy;
 pub mod economy_state;
 pub mod environment;
 pub mod environment_debris;
+pub mod field_works;
 pub mod fog;
 pub mod formation;
 pub mod game;

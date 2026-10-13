@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added ordinary paid field-work placement and timed terrain execution for trenches, sandbags, wire, traps, Gun Pits, mines, known-mine clearing and Field Hospitals. Canonical dig records retain source cell order, visibility masking, engineer pace, per-cell ground checks and float32 trench fronts; prepared admission spends once and refused replacements preserve paid work. The original JavaScript recorder covers 22 traces and 367 actions. Dispatcher, routing and story integration, queues/shared projects, bridges, concrete buildings and fill work remain pending.
+
 - Added the native Match Conquest victory phase and finish bookkeeping: team VP in slot order, latest still-held capture location, 0.1 m end rounding, first-winner preservation, reveal and exact Conquest timeline fields. Canonical point accounting now freezes VP and capture story counts after the winner while ownership and manpower can continue. Three focused tests compare 12 original-JavaScript traces (24 assembled-match checkpoints) and invalid-state atomicity; existing startup and point-income tests pass. Other modes, command refusal, remaining story counters, result transport and the full battle loop remain unfinished.
 
 - Connected Conquest point supply, capture and income to the assembled Match, using the tick's ordered unit list and one canonical objective/reserve state. Eight original-source traces compare 72 phases across all armies, allied and enemy teams, disconnection, supply obstruction, post-decision VP freezing and units spawned during a tick. Capture timestamps follow source winner gating; malformed input leaves objectives and wallets unchanged. This phase does not advance the clock or implement the remaining match systems.

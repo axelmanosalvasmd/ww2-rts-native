@@ -124,6 +124,16 @@ Decided now so release stays cheap:
 3. Unreal game: terrain, units, effects, HUD, sound, then the FPS view, with the browser client still working alongside.
 4. Retire the JavaScript client and Node server in ww2-rts.
 
+## Ordinary paid field works (2026-10-13)
+
+`field_works.rs` owns one detailed dig record per unit and the Gun Pit membership set. Unit position, health and paths stay in `World.game`; terrain, mine owners, hospitals and trench fronts stay in `World`; balances stay in the canonical `PlayerEconomy`. Fort costs, cell counts, work times, reach and builder names come from the compiled catalog. No seed or entity ID is consumed.
+
+The first slice covers trench, sandbags, wire, tank traps, Gun Pit, minefield, known-mine clearing and Field Hospital. Placement checks every planned visible cell before filtering ground, preserves stamp order and deduplicates cells. An owned, eligible builder pays the full ordinary dig charge at commit. `PreparedStart` borrows only the wallet and writes nothing during preparation, so the caller can stage its control and garrison changes and synchronously cancel prior work before publishing the replacement. Dropping the guard spends nothing. Refused replacements preserve paid work; accepted cancellation has no refund.
+
+Work retains the source's lazy initial cell count, engineer half-time, fixed-time accumulation and at-most-one cell per call, including large time steps. Every cell is rechecked at completion. Trap occupancy follows the original test over all non-infantry units, including units not currently alive. Mine placement preserves its underlying layers; mine clearing restores them. Dug fronts use the core math and float32 assignment. A completed paid job returns the exact owner's built counter request, even when its last cell was skipped. Canonical activity derives from the dig record, not a second control boolean.
+
+The original-source recorder captures 22 traces and 367 actions, including twenty-hertz progress, skipped cells, hidden plans, mine knowledge, hospital limits, cancellation, cached distant approaches and placement boundaries. Its path and sight callbacks are explicit hooks. Dispatcher and tick integration, actual Dig scheduler eligibility, garrison exit and story commits remain pending. Queued digs, shared entrenchment projects, bridge support, concrete buildings and fill operations remain separate; requesting those kinds does not substitute an ordinary terrain job. Existing transitional command truth markers must become projections of this canonical record when integrated.
+
 ## Supply stores and convoy runtime (2026-10-13)
 
 `supply_convoys.rs` ports the pinned `shared/supply-convoys.js` store, fleet, scheduler, service, delivery, command and recipient-projection functions as a standalone component. `ConvoyState` owns ordered store inventories, payer buckets and donation grants, truck jobs and cargo, scheduling queues, losses and events. Unit positions, owners, hit points, movement and wallets remain caller-owned. `LogisticsState` is still the single reserve authority; territorial service adds optional `supply_rate` and `cut_for` to that record, initially absent. Store locations are the source's explicit 40-tick synchronization cache.
