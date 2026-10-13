@@ -32,6 +32,7 @@ pub mod match_recovery;
 
 pub mod match_firing;
 pub mod match_logistics;
+pub mod match_reactions;
 pub mod match_routing;
 pub mod match_runtime;
 pub mod match_story;
