@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Applied the ability owner’s narrow paid-work cancellation fix to the Dig integration. Accepted manual aimed abilities remove the canonical job without refund; unsupported project state rejects before selection writes. Updated the original-source fixture and retained focused paid-work and refusal regressions. Native proof remains pending.
+
 - Updated the command replay’s restored digging state to create a canonical field-work descriptor through real placement preparation. Its existing Move and Stop checkpoints now also require descriptor cancellation, replacing the stale activity-only test setup. Native replay remains pending.
 
 - Documented the ordinary Dig dispatcher and scheduler boundary with 12 reproducible source traces and 47 actions. Native execution and unit-loop integration remain pending.

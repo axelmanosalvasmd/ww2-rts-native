@@ -860,3 +860,5 @@ The unchanged source command and timed-work block produce eight Match traces wit
 
 
 The Match engineering recorder now includes the original path scheduler rather than a route stub. Twelve traces with 47 actions cover immediate requests, deferred FIFO service, cancellation before a deferred request is served, and a real failed search that drops the paid job at the retry limit. The native consumer now calls the typed parser and real dispatcher with the integrated Dig current-goal and drop hooks. Source regeneration passes all 12 traces and 47 actions; native execution remains pending the scheduled lease.
+
+Manual aimed ability replacement shares the ordinary field-work cancellation boundary. Read-only preflight checks readiness and represented project activity before follow or garrison mutation; only the accepted replacement removes the descriptor without refund. The ability owner’s focused paid-work and unsupported-project regressions accompany this narrow integration. Native proof remains pending.
