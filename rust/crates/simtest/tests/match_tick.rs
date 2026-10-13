@@ -768,7 +768,7 @@ fn unsupported_air_support_boundary_preserves_all_pending_input_and_timers() {
             .collect::<Vec<_>>(),
         timers
     );
-    assert!(m.support.strikes.is_empty());
+    assert!(m.world.game.strikes.is_empty());
     assert!(m.tick_state.fault().is_none());
 
     let mut future = make(&fixture["cases"][0]);

@@ -704,7 +704,9 @@ impl Projection {
         let tickets=json!(m.firing.grenades.iter().map(|n|json!({"x":n.at.x,"z":n.at.z,"t":n.remaining,
             "owner":n.owner,"flight":n.flight,"ab":ability_profile(m,&m.firing.flights[&n.flight])})).collect::<Vec<_>>());
         exact(&tickets, &expected["nades"], &path(context, "nades"));
-        assert!(m.firing.salvos.is_empty() && m.support.strikes.is_empty() && g.smokes.is_empty());
+        assert!(
+            m.firing.salvos.is_empty() && m.world.game.strikes.is_empty() && g.smokes.is_empty()
+        );
         for k in ["salvos", "strikes", "smokes"] {
             exact(&json!([]), &expected[k], &path(context, k));
         }

@@ -795,6 +795,23 @@ impl crate::match_runtime::Match {
             .take(limit)
             .filter_map(|&id| self.eligible_command_unit(id, owner, command))
             .collect();
+        if matches!(command, Command::Ability { .. } | Command::Autocast { .. })
+            && selected.iter().any(|id| self.is_aircraft_command_unit(*id))
+        {
+            return Ok(Some(Denial::Unsupported));
+        }
+        if let Command::Ability {
+            at,
+            queue,
+            automatic,
+            ..
+        } = command
+        {
+            if self.unrepresented_ability_work(&selected, *at, *queue, *automatic)? {
+                return Ok(Some(Denial::Unsupported));
+            }
+            self.preflight_ability_selection(&selected, *at, *queue, *automatic)?;
+        }
         // New variants currently actuate their aircraft branches only.
         match command {
             Command::Attack { target, .. } => {
