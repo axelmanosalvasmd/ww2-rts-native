@@ -22,11 +22,14 @@ mod owners;
 mod public_state;
 #[path = "recipient_snapshot/selected.rs"]
 mod selected;
+#[path = "recipient_snapshot/shots.rs"]
+mod shots;
 #[path = "recipient_snapshot/support.rs"]
 mod support;
 pub use composition::{GroundListDeliveryFrame, QuiescentDeliveryFrame, SupportedSeatSnapshot};
 pub use delivery::{DeliveryFrame, DeliveryState};
 pub use selected::{SelectedDeliveryFrame, SelectedGroundListFrame, SelectedSeat};
+pub use shots::{SelectedGroundShotFrame, ShotRef};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SnapshotCapability {

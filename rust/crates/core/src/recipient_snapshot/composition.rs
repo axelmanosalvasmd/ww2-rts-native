@@ -15,6 +15,10 @@ impl SupportedSeatSnapshot {
     pub fn into_json(self) -> Value {
         Value::Object(self.fields)
     }
+    pub(super) fn with_shots(mut self, shots: Value) -> Self {
+        self.fields.insert("shots".into(), shots);
+        self
+    }
 }
 pub struct QuiescentDeliveryFrame<'a> {
     frame: DeliveryFrame<'a>,

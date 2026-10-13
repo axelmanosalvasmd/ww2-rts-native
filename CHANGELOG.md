@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add a borrowed ordinary ground shot projector that stages the whole selected batch before recipient publication, preserves Source regular/local visibility and identity rules, and computes launch-event fog bounds with canonical geometry. Reuse the existing JSON zero normalizer for every producer type; source review caught and fixed its earlier Environment/Support bypass and a missing Point import. Add whole-batch metadata refusal protection. Independent original checks pass ten traces, 337 full ticks and 835 recipient results; the ordered runner consumer and native verification remain pending.
+
 - Record original ground effect delivery in 10 traces: 337 complete Source ticks, 835 seat results, 36 emitted events and 37 seeded draws. Check event order, hidden identity filtering, fog limits on launch extrapolation and scheduled batch reset with no selected recipients. Preserve live-flight, falling and aircraft snapshots as refusal witnesses; native replay remains pending.
 
 - Correct the scuttling atomicity regression to use the recorded startup scene with two live owned units. The first engineering native check passed the orphan-membership guard, then found that the original selected scene contained only one owned unit before the actuator ran. Runtime and Source fixtures are unchanged; fresh combined gates remain pending.
