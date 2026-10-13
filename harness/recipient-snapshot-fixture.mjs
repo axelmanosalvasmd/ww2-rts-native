@@ -11,6 +11,7 @@ const git=a=>execFileSync('git',['-C',reference,...a],{encoding:'utf8'}).trim();
 const clean=()=>{assert.equal(git(['rev-parse','HEAD']),pin);assert.equal(git(['status','--porcelain','--untracked-files=no']),'');};
 assert.equal(process.arch,'x64');assert.equal(process.version,'v24.21.0');clean();
 const sim=await import(pathToFileURL(resolve(reference,'shared/sim.js')));
+const {rebuildGrid}=await import(pathToFileURL(resolve(reference,'shared/grid.js')));
 const rows=Array(20).fill('.'.repeat(20));
 rows[5]=rows[5].slice(0,5)+'T'+rows[5].slice(6);
 rows[7]=rows[7].slice(0,7)+'#'+rows[7].slice(8);
@@ -91,7 +92,41 @@ for (const name of ['standard','large','massive','endless','visible-contest','hi
  const outputs=g.players.map((_,slot)=>{const result=sim.snapshotFor(g,slot,[],[],cache);return Object.fromEntries(fields.filter(k=>result[k]!==undefined).map(k=>[k,result[k]]));});
  cases.push({fullOutputs:fullFor(g),name:'public:'+name,map,tick:g.tick,chars:g.chars.join(''),inputs,publicState:publicState(g,army),reveal:g.reveal,players:g.players.map(p=>({team:p.team,visible:[...p.visible],mp:p.mp,inc:p.inc,vp:p.vp,rally:p.rally})),outputs});
 }
+// Retain one canonical game across list observations. Full snapshots come from
+// the original reader, including its hidden/removal memory and mine order.
+const listMap={name:'Active snapshot lists',w:100,h:60,rows:Array(60).fill('.'.repeat(100)),spawns:[{x:2,y:2},{x:2,y:57},{x:97,y:57}],points:[{x:50,y:30}]};
+const originalRandom=Math.random;Math.random=()=>.5;let listsGame;try{listsGame=sim.createGame(listMap,['A','Ally','Enemy'],false,[0,0,1],[0,1,2],{mode:'conquest',weather:'clear',tech:true,logistics:false});}finally{Math.random=originalRandom;}
+listsGame.units.clear();listsGame.nextId=1;
+for(const [owner,x,z]of [[0,41,41],[1,181,101],[2,181,101]])Object.assign(sim.internals.spawnUnit(listsGame,owner,'rifle'),{x,z});
+const inputKeys=['id','type','owner','x','z','rot','aim','hp','supp','cd','cooldown','targetId','still','shotAt','dust','buff','ap','reinf','healAt','retreating','holdFire','holdPos','autoRetreat','auto','xp','built','moveSpeed','vx','vz','travelDir','cargo','riding','garrison','amove','path','worldGoal','attackId','board','fireAt','nade','enter','orders','queue','productionJobs','prog','rally'];
+const initial={map:listMap,tick:listsGame.tick,chars:listsGame.chars.join(''),inputs:[...listsGame.units.values()].map(u=>Object.fromEntries(inputKeys.filter(k=>u[k]!==undefined).map(k=>[k,u[k]]))),publicState:publicState(listsGame),players:listsGame.players.map(p=>({team:p.team,visible:[...p.visible],mp:p.mp,inc:p.inc,vp:p.vp,rally:p.rally}))};
+const listActions=[
+ {name:'visible-wreck-insertion-order',tick:1,vision:true,wrecks:[{id:9002,type:'tank',owner:2,x:43.14,z:41.26,rot:-.26,moving:true},{id:9001,type:'halftrack',owner:1,x:45.15,z:41.34,rot:.35}]},
+ {name:'visible-motion-and-owner-change',wrecks:[{id:9002,type:'halftrack',owner:0,x:43.44,z:41.56,rot:1.36,moving:true}]},
+ {name:'hidden-motion-retains-observed-metadata',tick:5,vision:true,move:[{id:1,x:181,z:101}],wrecks:[{id:9002,type:'tank',owner:2,x:43.74,z:41.86,rot:2.35,moving:true}]},
+ {name:'hidden-removal-keeps-memory',remove:[9001]},
+ {name:'team-mine-discovery-order',mines:[{cell:422,value:true},{cell:420,value:true},{cell:421,value:true}],seen:[{cell:422,bits:1},{cell:420,bits:2},{cell:421,bits:1}]},
+ {name:'update-mine-bits-retains-order',seen:[{cell:422,bits:3}]},
+ {name:'mine-reinsert-moves-to-end',forget:[422],seen:[{cell:422,bits:1}]},
+ {name:'removed-mine-is-omitted',mines:[{cell:421,value:false}]},
+ {name:'reveal-updates-hidden-lists',reveal:true},
+ {name:'visible-removal-prunes-memory',tick:9,vision:true,reveal:false,move:[{id:1,x:41,z:41}],remove:[9002]},
+ {name:'reused-wreck-id-appends-after-removal',wrecks:[{id:9001,type:'tank',owner:2,x:44.14,z:42.24,rot:-.26}]},
+];
+for(const action of listActions){
+ if(action.tick!==undefined)listsGame.tick=action.tick;
+ if(action.move)for(const u of action.move)Object.assign(listsGame.units.get(u.id),{x:u.x,z:u.z});
+ if(action.wrecks)for(const input of action.wrecks){const {moving,...w}=input;const motion=moving?{id:`wreck:${w.id}`,kind:'wreck',x:w.x,y:.08,z:w.z,dir:.35,material:'steel',mass:8500,vx:.13,vy:-.02,vz:.27,gravity:9.81,drag:3.2,stamp:1.25,born:.5,tilt:.007,settled:false}:undefined;const old=listsGame.wrecks.find(q=>q.id===w.id);if(old)Object.assign(old,w,{motion});else listsGame.wrecks.push({...w,motion});}
+ if(action.remove)listsGame.wrecks=listsGame.wrecks.filter(w=>!action.remove.includes(w.id));
+ if(action.mines)for(const mine of action.mines)sim.mutateWorldCell(listsGame,mine.cell,{mine:mine.value});
+ if(action.forget)for(const cell of action.forget)listsGame.mineSeen.delete(cell);
+ if(action.seen)for(const mine of action.seen)listsGame.mineSeen.set(mine.cell,mine.bits);
+ if(action.reveal!==undefined)listsGame.reveal=action.reveal;
+ if(action.vision){rebuildGrid(listsGame);sim.internals.updateVision(listsGame);}
+ action.outputs=fullFor(listsGame);
+}
+const listTraces=[{name:'ordinary-active-lists',initial,actions:listActions}];
 clean();
-const content=JSON.stringify({pin,cases})+'\n',target=resolve(root,'rust/crates/core/tests/fixtures/recipient-snapshot.json');
+const content=JSON.stringify({pin,cases,listTraces})+'\n',target=resolve(root,'rust/crates/core/tests/fixtures/recipient-snapshot.json');
 if(process.argv.includes('--check'))assert.equal(readFileSync(target,'utf8'),content);else writeFileSync(target,content);
-console.log(`${cases.length} actual cached snapshots, ${cases.length*3} partial and ${cases.length*3} complete quiet seat projections`);
+console.log(`${cases.length} actual cached snapshots, ${cases.length*3} partial and ${cases.length*3} complete quiet seat projections; ${listActions.length} active-list frames, ${listActions.length*3} full recipient results`);

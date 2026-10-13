@@ -41,25 +41,8 @@ impl DeliveryState {
         full: &[bool],
         omit: &[bool],
     ) -> Result<DeliveryFrame<'a>, SnapshotError> {
+        self.preflight(state, full, omit)?;
         let count = state.world.game.players.len();
-        if self.dimensions != (state.world.game.w, state.world.game.h)
-            || self.seats.len() != count
-            || full.len() != count
-            || omit.len() != count
-        {
-            return Err(SnapshotError::InvalidRecipient);
-        }
-        // All represented rows and routing contexts must pass before an outbox
-        // is drained or a delivery acknowledgment is advanced.
-        {
-            let cache = SnapshotCache::new(state)?;
-            for slot in 0..count {
-                cache.recipient(slot)?;
-                state
-                    .recipient_routing(slot)
-                    .map_err(|_| SnapshotError::Rules)?;
-            }
-        }
         let remembered = (0..count)
             .map(|slot| {
                 state
@@ -122,6 +105,35 @@ impl DeliveryState {
             cache: SnapshotCache::new(state)?,
             updates,
         })
+    }
+    /// All-seat admission shared by complete and partial frame capture. The
+    /// terrain preview exercises lazy value/revision checks without publishing.
+    pub(super) fn preflight(
+        &self,
+        state: &Match,
+        full: &[bool],
+        omit: &[bool],
+    ) -> Result<(), SnapshotError> {
+        let count = state.world.game.players.len();
+        if self.dimensions != (state.world.game.w, state.world.game.h)
+            || self.seats.len() != count
+            || full.len() != count
+            || omit.len() != count
+        {
+            return Err(SnapshotError::InvalidRecipient);
+        }
+        // All represented rows and routing contexts must pass before an outbox
+        // is drained or a delivery acknowledgment is advanced.
+        {
+            let cache = SnapshotCache::new(state)?;
+            for slot in 0..count {
+                cache.recipient(slot)?;
+                state
+                    .preflight_observed_terrain(slot)
+                    .map_err(|_| SnapshotError::Rules)?;
+            }
+        }
+        Ok(())
     }
 }
 impl DeliveryFrame<'_> {

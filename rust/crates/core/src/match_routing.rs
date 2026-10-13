@@ -497,6 +497,23 @@ impl Match {
         Ok(display)
     }
 
+    /// Exercise the existing lazy row/revision admission on a component preview.
+    /// The discarded receipt never acknowledges World or publishes an outbox.
+    pub fn preflight_observed_terrain(&self, owner: usize) -> Result<(), String> {
+        self.validate_recipient(owner)?;
+        let mut preview = self.recipients[owner].clone();
+        refresh_memory_parts(
+            &self.world,
+            &self.rules,
+            &self.building_cells,
+            &mut preview,
+            owner,
+            None,
+            false,
+        )?;
+        Ok(())
+    }
+
     /// Full/reconnect reads preserve memory order; delta reads drain only its outbox.
     pub fn observed_terrain(
         &mut self,

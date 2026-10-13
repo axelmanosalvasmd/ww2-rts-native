@@ -1,7 +1,11 @@
 use super::*;
 use crate::environment::Effect;
+use crate::recipient_lists::RecipientLists;
+#[cfg(test)]
+#[path = "composition/active_lists_tests.rs"]
+mod active_list_tests;
 
-/// Complete internal seat result for the explicitly admitted quiet Conquest
+/// Complete internal seat result for the explicitly admitted Conquest
 /// frame. It does not implement a transport, spectator or unit delta policy.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SupportedSeatSnapshot {
@@ -16,7 +20,47 @@ pub struct QuiescentDeliveryFrame<'a> {
     frame: DeliveryFrame<'a>,
     _outside_events: &'a [Effect],
 }
+pub struct GroundListDeliveryFrame<'a> {
+    frame: DeliveryFrame<'a>,
+    lists: Vec<RecipientLists>,
+    _outside_events: &'a [Effect],
+}
 impl DeliveryState {
+    /// Collect real ordinary list results after every row, actor and lazy
+    /// terrain producer has admitted. Canonical batch publication is the sole
+    /// wreck-memory writer; network list versions/acknowledgments stay separate.
+    pub fn capture_with_lists<'a>(
+        &mut self,
+        state: &'a mut Match,
+        full: &[bool],
+        omit: &[bool],
+        outside_events: &'a [Effect],
+    ) -> Result<GroundListDeliveryFrame<'a>, SnapshotError> {
+        admit_actors(state, outside_events)?;
+        self.preflight(state, full, omit)?;
+        let count = state.world.game.players.len();
+        let prepared = state
+            .prepare_ordinary_recipient_lists(&(0..count).collect::<Vec<_>>())
+            .map_err(|_| SnapshotError::Rules)?;
+        let mut lists = Vec::with_capacity(count);
+        if prepared.results().len() != count {
+            return Err(SnapshotError::InvalidRecipient);
+        }
+        for (slot, (owner, list)) in prepared.results().iter().enumerate() {
+            if slot != *owner || list.nodes.is_some() {
+                return Err(SnapshotError::UnsupportedMode);
+            }
+            lists.push(list.clone());
+        }
+        state
+            .publish_ordinary_recipient_lists(prepared)
+            .map_err(|_| SnapshotError::Rules)?;
+        Ok(GroundListDeliveryFrame {
+            frame: self.capture(state, full, omit)?,
+            lists,
+            _outside_events: outside_events,
+        })
+    }
     /// `outside_events` is the caller's current environment effect batch, not
     /// an invented per-seat event store. No global owner collection is drained.
     /// Persistent actors and every recipient's remembered lists also admit
@@ -37,27 +81,79 @@ impl DeliveryState {
 }
 impl QuiescentDeliveryFrame<'_> {
     pub fn recipient(&self, slot: usize) -> Result<SupportedSeatSnapshot, SnapshotError> {
-        let mut projection = self.frame.recipient(slot)?;
-        projection.fields.insert("t".into(), json!("s"));
-        // Admission inspected each actual canonical actor/list owner. Their
-        // absent output is a represented source result for this bounded frame.
-        for name in [
-            "air",
-            "works",
-            "wrecks",
-            "foundMines",
-            "falling",
-            "flights",
-            "shots",
-        ] {
-            projection.fields.insert(name.into(), json!([]));
-        }
-        Ok(SupportedSeatSnapshot {
-            fields: projection.fields,
-        })
+        Ok(complete(self.frame.recipient(slot)?, None))
+    }
+}
+impl GroundListDeliveryFrame<'_> {
+    pub fn recipient(&self, slot: usize) -> Result<SupportedSeatSnapshot, SnapshotError> {
+        let projection = self.frame.recipient(slot)?;
+        let lists = self
+            .lists
+            .get(slot)
+            .ok_or(SnapshotError::InvalidRecipient)?;
+        Ok(complete(projection, Some(lists)))
+    }
+}
+fn complete(
+    mut projection: RecipientProjection,
+    lists: Option<&RecipientLists>,
+) -> SupportedSeatSnapshot {
+    projection.fields.insert("t".into(), json!("s"));
+    // Admission inspected each actual canonical actor/list owner. Their
+    // absent output is a represented source result for this bounded frame.
+    for name in ["air", "works", "falling", "flights", "shots"] {
+        projection.fields.insert(name.into(), json!([]));
+    }
+    projection.fields.insert(
+        "wrecks".into(),
+        lists.map_or_else(
+            || json!([]),
+            |lists| {
+                json!(
+                    lists
+                        .wrecks
+                        .iter()
+                        .map(crate::recipient_lists::WreckRow::to_json)
+                        .collect::<Vec<_>>()
+                )
+            },
+        ),
+    );
+    projection.fields.insert(
+        "foundMines".into(),
+        lists.map_or_else(|| json!([]), |lists| json!(lists.found_mines)),
+    );
+    SupportedSeatSnapshot {
+        fields: projection.fields,
     }
 }
 fn admit(state: &Match, outside_events: &[Effect]) -> Result<(), SnapshotError> {
+    admit_actors(state, outside_events)?;
+    let refused = || SnapshotError::Unsupported {
+        unit: 0,
+        capability: SnapshotCapability::WrecksAndFoundMines,
+    };
+    let g = &state.world.game;
+    if !g.wrecks.is_empty() {
+        return Err(refused());
+    }
+    for slot in 0..g.players.len() {
+        let routing = state
+            .recipient_routing(slot)
+            .map_err(|_| SnapshotError::Rules)?;
+        if !routing.remembered_wrecks().is_empty()
+            || state
+                .world
+                .mine_seen
+                .iter()
+                .any(|(cell, bits)| bits >> g.players[slot].team & 1 != 0 && g.chars[*cell] == b'N')
+        {
+            return Err(refused());
+        }
+    }
+    Ok(())
+}
+fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(), SnapshotError> {
     let cache = SnapshotCache::new(state)?;
     for slot in 0..state.world.game.players.len() {
         cache.recipient(slot)?;
@@ -96,24 +192,6 @@ fn admit(state: &Match, outside_events: &[Effect]) -> Result<(), SnapshotError> 
     if state.options.logistics || state.logistics.iter().next().is_some() || state.convoys.is_some()
     {
         return Err(refused(SnapshotCapability::Logistics));
-    }
-    let g = &state.world.game;
-    if !g.wrecks.is_empty() {
-        return Err(refused(SnapshotCapability::WrecksAndFoundMines));
-    }
-    for slot in 0..g.players.len() {
-        let routing = state
-            .recipient_routing(slot)
-            .map_err(|_| SnapshotError::Rules)?;
-        if !routing.remembered_wrecks().is_empty()
-            || state
-                .world
-                .mine_seen
-                .iter()
-                .any(|(cell, bits)| bits >> g.players[slot].team & 1 != 0 && g.chars[*cell] == b'N')
-        {
-            return Err(refused(SnapshotCapability::WrecksAndFoundMines));
-        }
     }
     Ok(())
 }

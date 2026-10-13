@@ -20,7 +20,7 @@ mod owners;
 mod public_state;
 #[path = "recipient_snapshot/support.rs"]
 mod support;
-pub use composition::{QuiescentDeliveryFrame, SupportedSeatSnapshot};
+pub use composition::{GroundListDeliveryFrame, QuiescentDeliveryFrame, SupportedSeatSnapshot};
 pub use delivery::{DeliveryFrame, DeliveryState};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
