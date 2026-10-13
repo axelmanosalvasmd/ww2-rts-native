@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Adapted the inherited ground-support test helper to the canonical timeline enum. Actual Conquest samples retain the original `{t, vp}` shape; Territories samples explicitly refuse in this Default/Conquest recorder. Runtime and Source fixtures are unchanged. The fresh `8f32198` check passed all 34 focused debug tests, then full release compilation found the obsolete struct-field accesses before any release tests ran. The unchanged original recorder reproduces 13 traces, 2,705 ticks and 153 checkpoints. Fresh release and strict gates remain pending.
+
 - Extended the original snapshot recorder's partial-field boundary to include the newly represented canonical `works` field. Fresh `244931d` native checks compiled and passed all four selected-delivery tests, then two older exact-key tests rejected that added field. Regenerated 219 partial results from unchanged pinned Source; every prior fixture byte remains identical after removing only the new recorded fields. Runtime and strict equality assertions are unchanged; fresh combined native proof remains pending.
 
 - Fixed two inherited compile errors found by the fresh selected-delivery Vostro check at `4071c71`, before any tests ran. Snapshot admission now uses the canonical listed-project getter without exposing private state; the recovery fixture keeps one `actor_order: None`. Removed an unused snapshot test import. Source reanchor and a fresh combined native cycle remain pending.
