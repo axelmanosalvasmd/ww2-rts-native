@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## Research and production phase admission (2026-10-13, source candidate)
+
+`Match::validate_production_phases(dt)` checks the canonical ProductionState, borrowed units and wallets before the caller advances its clock. Prospective research and individual building rows reuse the existing progression algorithms without publishing them. No Match, unit registry or wallet is cloned. Actual placement, observed rally routing and metadata publication remain at each later building turn. The guard accepts the existing World context and refuses queued AIR and enabled logistics until their actual publication consumers are connected. It does not replace full World terrain, actor or routing admission.
+
+The pinned ordinary Conquest constructor has no mode object and its normal Buy path produces units immediately. A nonempty restored queue reaches `g.mode.suddenDeath` in the original building phase and cannot execute as ordinary Conquest. Inventing a mode object also changes the later income branch. The native ordinary guard therefore retains its explicit queue refusal. This is an architecture refusal of an unsupported restored scene, not completed training parity. Research advances after vision and before paid project recounting; real World or Classic queued training belongs at the completed building's live turn. The sole tick owner will wire those consumers separately. Original full-tick evidence and native execution are pending.
+
 ## Ordered tick output and partial failures (2026-10-13, verified component)
 
 The first native cycle at `625705e` passes all 105 focused debug tests and all 270 release workspace tests, including both failure-prefix witnesses and the complete chronological replay. Strict Clippy then reports the old buffer-reading aircraft test wrapper as unused in the migrated actual-runner test crate. The wrapper remains used by the component test crate. A function-level allowance documents that split without changing either projection body, native runtime or original fixture. The annotation successor `ad90eac` passes final strict Clippy, formatting and locked release FFI. Independent source-hashed copies pass all 105 selected tests in both profiles, with every executable reporting nonzero tests. The full 270-test release result is verified separately from those copied executions.

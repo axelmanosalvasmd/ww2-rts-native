@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added read-only admission for canonical research and live-building production phases, including actual World context, foreign queue rows and prospective numeric overflow. Ordinary Conquest keeps immediate purchases and refuses nonempty restored training queues. World queued AIR and logistics publication remain unsupported. Training publication also checks the canonical Aviation and reserve owners before using an ID. Full tick hookup and native proof are pending.
+
 - Prepared a separate normal union of frozen ordered-event PR #194 and the consolidated original-source frontier `dfcc0bf`. Preserved the one TickEvent/TickFailure result, producer emission sinks, original World component bodies, approved ABI 2 and the optimized test profile with debug assertions and overflow checks. Migrated the inherited quiet engineering consumer to require empty owned events, and report accepted recipient traffic once rather than unavailable. Published parents remain unchanged; exact union source review and the full optimized native cycle are pending.
 
 - Retained the newly published AIR frontier by normal merge so the event closure has one accepted parent instead of a misleading crisscross comparison. Runtime, event source fixtures and the approved ABI 2 header are unchanged; exact combined platform checks remain pending.
