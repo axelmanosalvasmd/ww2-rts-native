@@ -8,3 +8,6 @@ description = "The ww2-rts rules core: no engine, networking or file-system code
 
 [lib]
 name = "ww2_core"
+
+[dependencies]
+serde_json = { version = "1.0.154", default-features = false, features = ["alloc", "float_roundtrip"] }

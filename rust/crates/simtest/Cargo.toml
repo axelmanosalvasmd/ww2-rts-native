@@ -18,3 +18,5 @@ ww2-core = { path = "../core" }
 # float_roundtrip parses every number to the nearest double, as JavaScript does; the default parser can be off by
 # one in the last bit, which would break exact comparisons.
 serde_json = { version = "1.0.154", features = ["float_roundtrip"] }
+
+flate2 = { version = "1.1.10", default-features = false, features = ["rust_backend"] }
