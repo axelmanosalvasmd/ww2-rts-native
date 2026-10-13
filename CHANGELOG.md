@@ -24,6 +24,8 @@
 
 - Added a bounded native Conquest opening commander: detached recipient observations, source point scores and cover waypoints, fixed per-seat scheduling, isolated seeded draws and typed movement orders through the canonical Match queue. Economic, combat, camera, World and complete-match AI behavior remain pending; no wire or C interface changed.
 
+- Added routing-guard search forks that rebind existing recipient terrain identities to preview buffers while preserving prior graph versions and traversal history. Vehicle source identities follow the same mapping. Source recorder and native cache-history checks remain pending.
+
 - Added transactional copies of derived path-search history. Copies retain external terrain identities and rebind navigation graphs to their copied vehicle buffers; aborts can discard the copy while preserving canonical warmed caches. Native cache-history protection remains pending.
 
 - Kept ordinary route fog reads lazy when there are no fires, matching the original filter callback. A prior empty-fire read leaves first birth sight eligible to build fog; a prior fire read retains its cached mask. Original produce-unit proof is being added; native replay remains pending.
