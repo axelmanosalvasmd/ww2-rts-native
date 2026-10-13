@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified the bounded on-map aviation component on Vostro Linux x86_64 at code head d159ca0: nine focused debug tests, all 174 release workspace tests, strict workspace/all-target Clippy, formatting and release FFI build pass after both profile cleans. Native replay matches all 18 aircraft constructors and 42 traces with 3,410 checkpoints. The proof required two test-literal fixes and two equivalent supply-test wallet-copy fixes, with no runtime or fixture changes. Recorded-command, aircraft retirement and sole tick integration are separate native-pending continuations; automatic, ground-target and area aircraft weapons remain unsupported.
+
 - Replaced two inherited supply-test wallet copies with equivalent to_vec calls after Vostro's strict Clippy rejected the iterator spelling. Runtime and fixtures are unchanged. The prior aviation checkpoint passed nine debug tests and every release workspace test; renewed Clippy, formatting and FFI gates remain pending.
 
 - Fixed two aircraft AA test duration literals rejected by the first Vostro compilation. They now use Rust's required 0.05 spelling. Runtime and source fixtures are unchanged; no native tests ran before that compiler failure, and the renewed native proof remains pending.

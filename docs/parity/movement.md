@@ -300,3 +300,5 @@ Wall clock and scheduling
 ## Retirement and wreck lifecycle evidence
 
 The combat adapter removes dead units through the maintained grid without rebuilding surviving buckets. A focused mid-tick removal regression preserves the surviving query order. Its original-source fixture covers vehicle wreck initialization, motion, final Q cells, scorch and the oldest-hull cap among nine traces with 35 actions. MOV-106 remains in progress pending full tick scheduling and client presentation. Thrown carrier escape in MOV-76 remains outside this slice.
+
+The bounded on-map aircraft component matches 18 original constructors and 42 helper traces with 3,410 checkpoints, covering held missions, movement/orbit/home/rearm and continuous AA including grid-order ties, canonical rounds, XP and dead later shooters. Exact code d159ca0 passes nine focused debug tests, all 174 release workspace tests, strict Clippy, formatting and release FFI build on Vostro Linux x86_64. Recorded-command, retirement and sole tick continuations remain native-pending; automatic, ground-target and area weapons are unsupported. MOV-83 through MOV-86 remain unfinished.
