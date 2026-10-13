@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Corrected the new canceled-preview regression to inspect actual TerrainView buffer/version fields and import its private field-split type. Source review found these compile-visible test defects before native checks.
+
 - Connected admitted Conquest rally purchases to the canonical prepared birth observer. Receipt and Fog publication now follow wallet/unit/story preflight, while rejected previews discard derived path scratch. A late-story regression checks observation and four-metadata atomicity; native and birth-oracle proof remain pending.
 
 - Joined the source-written prepared-observer dependency to recorded recruitment while retaining canonical combat, firing, ability and recovery ownership. This consumer checkpoint awaits source and native proof.

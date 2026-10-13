@@ -1,3 +1,4 @@
+use super::RecruitParts;
 use crate::{
     economy::{Faction, Mode},
     economy_state::ArmySize,
@@ -416,7 +417,7 @@ fn rejected_final_preflight_discards_staged_sight_and_purchase() {
     m.story[0].mp_spent = f64::NAN;
     let before = unchanged(&m);
     let view = m.recipients[0].query().navigation();
-    let identity = (view.chars.as_ptr(), view.knowledge_version);
+    let identity = (view.flags.as_ptr(), view.versions.knowledge);
     let rows = m.recipients[0].remembered().to_vec();
     let pending = m.world.pending(crate::world::Recipient::Player(0)).cloned();
     let fog = m.routing_fog.clone();
@@ -426,7 +427,7 @@ fn rejected_final_preflight_discards_staged_sight_and_purchase() {
     ));
     assert_eq!(unchanged(&m), before);
     let view = m.recipients[0].query().navigation();
-    assert_eq!((view.chars.as_ptr(), view.knowledge_version), identity);
+    assert_eq!((view.flags.as_ptr(), view.versions.knowledge), identity);
     assert_eq!(m.recipients[0].remembered(), rows);
     assert_eq!(
         m.world.pending(crate::world::Recipient::Player(0)),
