@@ -64,6 +64,13 @@ pub struct TickReport {
     pub route_requests: Vec<(UnitId, crate::game::Point, RouteRequest)>,
     pub commands: Vec<crate::match_commands::CommandResult>,
     pub paths: crate::path_requests::TickReport,
+    pub environment: Vec<crate::environment::Effect>,
+}
+
+enum EnvironmentPhase {
+    StructureSync,
+    Debris,
+    FireFlood,
 }
 
 impl crate::match_runtime::Match {
@@ -123,6 +130,7 @@ impl crate::match_runtime::Match {
         let winner_decided = self.finish.is_some();
         // Boundary orders carry the previous clock's timestamps and view keys.
         let commands = self.apply_commands(self.world.game.tick as u64 + 1, winner_decided)?;
+        let mut environment = self.tick_environment_phase(EnvironmentPhase::StructureSync)?;
         self.grid.rebuild(&self.world.game.units);
         let prior = self
             .world
@@ -133,7 +141,13 @@ impl crate::match_runtime::Match {
             .collect();
         self.world.game.tick += 1;
         let tick = self.world.game.tick;
-        let mut phases = vec![TickPhase::Commands, TickPhase::Clock];
+        let mut phases = vec![
+            TickPhase::Commands,
+            TickPhase::StructureSync,
+            TickPhase::Clock,
+        ];
+        environment.extend(self.tick_environment_phase(EnvironmentPhase::Debris)?);
+        phases.push(TickPhase::Debris);
         self.sample_conquest_tick()?;
         phases.push(TickPhase::StorySample);
         self.start.weather.step(tick as u64);
@@ -232,8 +246,14 @@ impl crate::match_runtime::Match {
         )
         .map_err(|e| format!("living weather: {e:?}"))?;
         drop(smokes);
-        game.smokes.retain(|s| s.remaining.is_some_and(|t| t > 0.0));
         phases.push(TickPhase::LivingWeather);
+        // Expiring smoke still blocks ignition during the source fire phase.
+        environment.extend(self.tick_environment_phase(EnvironmentPhase::FireFlood)?);
+        self.world
+            .game
+            .smokes
+            .retain(|s| s.remaining.is_some_and(|t| t > 0.0));
+        phases.push(TickPhase::FireFlood);
         self.apply_point_supply(&unit_order)?;
         phases.push(TickPhase::PointSupply);
         // Reinforcement and death adapters run between these two point phases.
@@ -249,9 +269,8 @@ impl crate::match_runtime::Match {
             route_requests: Vec::new(),
             commands,
             paths,
+            environment,
             unavailable: vec![
-                TickPhase::StructureSync,
-                TickPhase::Debris,
                 TickPhase::Research,
                 TickPhase::UnitReserves,
                 TickPhase::Production,
@@ -262,12 +281,99 @@ impl crate::match_runtime::Match {
                 TickPhase::Projectiles,
                 TickPhase::Support,
                 TickPhase::Scenario,
-                TickPhase::FireFlood,
                 TickPhase::SupplyNetwork,
                 TickPhase::Reinforcement,
                 TickPhase::Death,
                 TickPhase::Convoys,
             ],
         })
+    }
+
+    fn tick_environment_phase(
+        &mut self,
+        phase: EnvironmentPhase,
+    ) -> Result<Vec<crate::environment::Effect>, String> {
+        use crate::environment::Context;
+        // Environment admission names every current unit. Late objective and
+        // retirement consumers retain their separately captured source list.
+        let ids: Vec<_> = self.world.game.units.keys().copied().collect();
+        let rain = self.world.game.rain;
+        let wet = self.world.game.wet.unwrap_or(0.0);
+        let tick = self.world.game.tick as u64;
+        let mut context = Context {
+            tick,
+            seed: &mut self.start.environment_seed,
+            next_id: &mut self.next_unit_id,
+            unit_order: &ids,
+            grid: &self.grid,
+            rain,
+            wet,
+            wind_angle: self.start.wind.0,
+            wind_strength: self.start.wind.1,
+        };
+        let mut effects = Vec::new();
+        match phase {
+            EnvironmentPhase::StructureSync => {
+                for &id in &ids {
+                    if self
+                        .world
+                        .structures
+                        .iter()
+                        .any(|s| s.entity_id == Some(id))
+                    {
+                        let owner = self.combat.get(id).and_then(|m| m.last_hit);
+                        effects.extend(
+                            self.environment
+                                .sync_building_sections(&mut self.world, id, owner, &mut context)
+                                .map_err(|e| format!("building section sync: {e}"))?,
+                        );
+                    }
+                }
+            }
+            EnvironmentPhase::Debris => {
+                self.environment
+                    .step_sections(&mut self.world, self.rules.movement.tick, &mut context)
+                    .map_err(|e| format!("section debris: {e}"))?;
+                self.environment
+                    .step_wrecks(&mut self.world, self.rules.movement.tick, &mut context)
+                    .map_err(|e| format!("wreck debris: {e}"))?;
+            }
+            EnvironmentPhase::FireFlood if tick % 10 == 0 => {
+                if !self.world.fires.is_empty() {
+                    effects.extend(
+                        self.environment
+                            .burn(
+                                &mut self.world,
+                                self.rules.movement.tick * 10.0,
+                                &mut context,
+                            )
+                            .map_err(|e| format!("burn: {e}"))?,
+                    );
+                }
+                if !self.world.soak().is_empty() {
+                    self.environment
+                        .flood(&mut self.world)
+                        .map_err(|e| format!("flood: {e}"))?;
+                }
+            }
+            EnvironmentPhase::FireFlood => {}
+        }
+        let mut damage = crate::match_combat::DamageWorld {
+            world: &mut self.world,
+            combat: &mut self.combat,
+            grid: &mut self.grid,
+            rules: &self.rules,
+            logistics: &self.logistics,
+            production: &self.production,
+            mode: self.options.mode,
+            tech_enabled: self.options.tech,
+            environment: &mut self.environment,
+            environment_seed: &mut self.start.environment_seed,
+            next_id: &mut self.next_unit_id,
+            unit_order: &ids,
+            wind_angle: self.start.wind.0,
+            wind_strength: self.start.wind.1,
+        };
+        Ok(damage.environment_effects(effects))
     }
 }

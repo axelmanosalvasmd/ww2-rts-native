@@ -94,6 +94,34 @@ fn connected_tick_phases_match_actual_friendly_reference_steps() {
             }];
             u.path_gen += 1;
         }
+        if let Some(changes) = input["changes"].as_array() {
+            for row in changes {
+                m.world
+                    .set_cell(
+                        row[0].as_u64().unwrap() as usize,
+                        row[1].as_str().unwrap().as_bytes()[0],
+                    )
+                    .unwrap();
+            }
+        }
+        if let Some(fires) = input["fires"].as_array() {
+            for row in fires {
+                m.world
+                    .fires
+                    .insert(row[0].as_u64().unwrap() as usize, row[1].as_f64().unwrap());
+            }
+        }
+        if let Some(smokes) = input["smokes"].as_array() {
+            for cloud in smokes {
+                m.world.game.smokes.push(ww2_core::game::Smoke {
+                    id: cloud["id"].as_u64().unwrap() as u32,
+                    x: cloud["x"].as_f64().unwrap(),
+                    z: cloud["z"].as_f64().unwrap(),
+                    r: cloud["r"].as_f64().unwrap(),
+                    remaining: Some(cloud["t"].as_f64().unwrap()),
+                });
+            }
+        }
         if let Some(commands) = input["commands"].as_array() {
             for row in commands {
                 m.enqueue_command(
@@ -108,7 +136,7 @@ fn connected_tick_phases_match_actual_friendly_reference_steps() {
             }
         }
         let mut expected = c["checkpoints"].as_array().unwrap().iter().peekable();
-        for _ in 0..200 {
+        for _ in 0..c["ticks"].as_u64().unwrap_or(200) {
             let report = m.advance_tick().unwrap();
             assert!(!report.unavailable.is_empty());
             if expected
@@ -141,6 +169,13 @@ fn connected_tick_phases_match_actual_friendly_reference_steps() {
                             })
                             .collect::<Vec<_>>()
                     );
+                }
+                if input["fires"].is_array() {
+                    state["environment"] = json!({
+                        "fires":m.world.fires.iter().map(|(c,left)|json!([c,bits(*left)])).collect::<Vec<_>>(),
+                        "smokes":m.world.game.smokes.iter().map(|s|json!([s.id,bits(s.x),bits(s.z),bits(s.r),bits(s.remaining.unwrap())])).collect::<Vec<_>>(),
+                        "chars":String::from_utf8(m.world.game.chars.clone()).unwrap(),"burnt":m.world.burnt
+                    });
                 }
                 assert_eq!(
                     state,

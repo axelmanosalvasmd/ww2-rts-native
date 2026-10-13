@@ -25,7 +25,7 @@ const snapshot=g=>({tick:g.tick,visionTick:g.visionTick,seed:g.seed>>>0,wind:[bi
   players:g.players.map(p=>[bits(p.mp),bits(p.vp),bits(p.inc)]),
   points:g.points.map(p=>[p.owner,p.capper,bits(p.progress),p.cut,p.contested,p.onPoint,p.capTick??null])});
 const cases=[];
-for(const spec of [...['standard','large','massive','endless'].map(army=>({army})),{army:'standard',commands:true}]) {
+for(const spec of [...['standard','large','massive','endless'].map(army=>({army})),{army:'standard',commands:true},{army:'standard',environment:true}]) {
  const {army}=spec;
  const map={name:'Friendly tick integration',w:20,h:20,rows:Array(20).fill('.'.repeat(20)),spawns:[{x:0,y:0},{x:19,y:19}],points:[{id:'point',x:8,y:8},{id:'locked',x:11,y:8,needs:0}]};
  const old=Math.random; Math.random=()=>.5;let g;
@@ -38,21 +38,32 @@ for(const spec of [...['standard','large','massive','endless'].map(army=>({army}
   {tick:5,issuer:0,sequence:4,command:{t:'stop',ids:[1]}},
   {tick:6,issuer:0,sequence:5,command:{t:'amove',orders:[[1,17,19]]}}
  ];
+ if(spec.environment){
+  input.paths=input.paths.filter(row=>row[0]!==1);
+  input.fires=[[166,2]];input.smokes=[{id:999,x:13,z:17,r:5,t:.45}];
+  input.changes=Array.from({length:9},(_,i)=>[166+(Math.floor(i/3)-1)*20+(i%3)-1,'H']).filter(row=>row[0]!==166);
+ }
  for(const u of g.units.values())u.holdPos=true;
  g.seed=input.seed;g.wind={a:input.wind[0],v:input.wind[1]};
  for(const [id,x,z]of input.positions)Object.assign(g.units.get(id),{x,z});
  for(const [id,x,z]of input.paths)g.units.get(id).path=[{x,z}];
+ for(const [cell,ch]of input.changes??[])sim.__setCell(g,cell,ch);
+ for(const [cell,left]of input.fires??[])g.fires.set(cell,left);
+ for(const cloud of input.smokes??[])g.smokes.push({...cloud});
  const checkpoints=[];
- for(let i=0;i<200;i++){
+ const ticks=spec.environment?20:200;
+ for(let i=0;i<ticks;i++){
   for(const row of (input.commands??[]).filter(c=>c.tick===g.tick+1).sort((a,b)=>a.issuer-b.issuer||a.sequence-b.sequence))sim.command(g,row.issuer,row.command);
   sim.step(g);
-  if([1,2,3,4,5,40,80,160,161,200].includes(g.tick)){
+  if(spec.environment&&g.tick===10&&(g.fires.size<2||g.smokes.length))throw Error('Expiring smoke must suppress the first spreading fire cloud');
+  if([1,2,3,4,5,40,80,160,161,200].includes(g.tick)||spec.environment&&[9,10,11,20].includes(g.tick)){
    const state=snapshot(g);
    if(spec.commands)state.control=[...g.units.values()].map(u=>[u.id,u.moveOutcome??null,u.moveOutcomeTick??null,(u.orders??[]).length,u.worldGoal?[bits(u.worldGoal.x),bits(u.worldGoal.z)]:null,u.amove?[bits(u.amove.x),bits(u.amove.z)]:null]);
+   if(spec.environment)state.environment={fires:[...g.fires].map(([c,left])=>[c,bits(left)]),smokes:g.smokes.map(s=>[s.id,bits(s.x),bits(s.z),bits(s.r),bits(s.t)]),chars:g.chars.join(''),burnt:[...g.burnt]};
    checkpoints.push(state);
   }
  }
- cases.push({map,army,input,checkpoints});
+ cases.push({map,army,ticks,input,checkpoints});
 }
 // A terrain barrier appears after supply. Income must retain that earlier beat's
 // cut flags; the next supply beat observes the barrier.
@@ -72,4 +83,4 @@ for(const tick of [1,41]){
 clean();const output=JSON.stringify({reference:pin,node:process.version,arch:process.arch,cases,ordering:{map:orderingMap,army:'standard',steps:ordering}})+'\n';
 const path=fileURLToPath(new URL('../rust/crates/simtest/tests/fixtures/match-tick.json',import.meta.url));
 if(process.argv.includes('--check')){if(readFileSync(path,'utf8')!==output)throw Error('Match tick fixture differs');}else writeFileSync(path,output);
-console.log(`Verified ${cases.length} actual-step traces, ${cases.length*200} ticks, ${cases.reduce((n,c)=>n+c.checkpoints.length,0)} checkpoints`);
+console.log(`Verified ${cases.length} actual-step traces, ${cases.reduce((n,c)=>n+c.ticks,0)} ticks, ${cases.reduce((n,c)=>n+c.checkpoints.length,0)} checkpoints`);
