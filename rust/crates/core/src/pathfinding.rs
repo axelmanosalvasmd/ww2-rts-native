@@ -159,6 +159,23 @@ impl Clone for Pathfinding {
     }
 }
 
+impl Pathfinding {
+    /// The routing guard validated that these arrays belong to the same
+    /// recipient. Keep old versions so the next search applies its change log.
+    pub(crate) fn fork_for_terrain(
+        &self,
+        source: TerrainView<'_>,
+        prepared: TerrainView<'_>,
+    ) -> Self {
+        let mut fork = self.clone();
+        let vehicle_buffers = fork.vehicles.buffers_for(source);
+        fork.navigation
+            .rebind_terrain(source, prepared, &vehicle_buffers);
+        fork.vehicles.rebind_terrain(source, prepared);
+        fork
+    }
+}
+
 #[derive(Clone, Default)]
 struct Scratch {
     scores: Vec<f32>,

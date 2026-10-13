@@ -668,6 +668,15 @@ pub struct PreparedRecipientRouting<'a> {
     receipt: crate::world::ObservationReceipt,
 }
 impl PreparedRecipientRouting<'_> {
+    /// Preserve canonical search history while rebinding this recipient's
+    /// external arrays to the preview. Publish the fork only with this receipt.
+    pub fn fork_paths(
+        &self,
+        paths: &crate::pathfinding::Pathfinding,
+    ) -> crate::pathfinding::Pathfinding {
+        paths.fork_for_terrain(self.target.query().navigation(), self.query().navigation())
+    }
+
     pub fn query(&self) -> RouteQuery<'_> {
         self.state.query()
     }
