@@ -1,5 +1,13 @@
 # Three Crossroads Native: design decisions
 
+## Construction effect readback (2026-10-13, source only)
+
+The frozen `4049ef8` affected-first run reaches `two-workers-finish-and-repair` snapshot 310 and fails its effect comparison. Canonical Hurt JSON omits unset `fo` and `local`; the private construction recorder retains both as null because its recursive encoder converts undefined before serialization. Source `damageWorldSection` (`sim.js:2605`) declares those properties with undefined when there is no owner or local contact. Source section collapse (`2579-2580`) likewise declares `to` undefined after the live entity is removed. Ordinary JSON.stringify omits these undefined properties, as the existing ordered-event recorder does when serializing its structured-cloned shots. The public `Effect::to_json` behavior is correct and remains unchanged.
+
+A complete reconstruction audit covers every effect frame in all 29 construction cases: nine Hurt rows with null `fo`/`local`, twelve identified section-collapse rows with null `to`, and three building-collapse rows with a required numeric owner. The consumer now reconstructs only those optional JSON-presence differences before exact array comparison. It removes null `fo`/`local` only on Hurt and null `to` only on collapse rows with a real section string. It retains required/other nulls, explicit false, numeric owner zero, all bit-tagged values and every row's position. A malformed frame, row or kind is refused. No field is copied from the expected frame into Native, and no event is filtered, sorted or deduplicated.
+
+This is a proof-reader correction under PARITY's exact semantic comparison, not a change to gameplay or public wire presence. Source recorder/fixture bytes, typed serializers, producer emission order, TickFailure prefix ownership and existing ordered-event failure regressions are preserved. The failed `4049ef8` log stays attributed to that head; the isolated successor needs independent source review and a later native cycle.
+
 ## Construction replay stance projection (2026-10-13, source only)
 
 The frozen `4711237` workspace run fails `construction_tick` for `stamp:hq` snapshot 1: native Hold Fire is false while the private Source recorder stores null. Source `spawnUnit` (`sim.js:1773-1804`) declares `holdFire` and `holdPos` undefined; `placeBuilding` (`1022-1027`) preserves them. Gameplay reads these switches by truthiness. Source `stanceBits` (`3334`) and public `unitRow` (`5888-5891`) encode undefined and false identically as unset bits 2048 and 4096. Native canonical boolean false preserves that behavior, so changing the initializer would invent state without fixing an observable mismatch.

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Corrected construction effect readback for private Source undefined sentinels: omit only null Hurt owner/local fields and null owner on section-collapse rows when comparing public event JSON. The complete 29-case audit covers 24 events; required fields, explicit false, numeric zero, event order and all other assertions stay exact. Source recorder, fixtures, wire producers and partial-failure ownership are unchanged. The frozen native failure remains recorded; this successor has not run natively.
+
 - Compare only the two optional Source stance switches by their effective boolean value in the full construction replay. Source unset Hold Fire and Hold Position produce the same off flags as native false; the reader rejects missing fields and values outside boolean/null. Recorder, fixture, other exact assertions and gameplay are unchanged. The frozen native failure remains recorded; this successor has not run natively.
 
 - Rebuilt command-control rows for the replacement actors in the original combat/death scene, using the same constructor as canonical startup. The combined workspace stopped with three combat tests passing and one missing-control refusal; the construction retirement guard and expected Source outputs remain unchanged. This test setup repair has not run natively.
