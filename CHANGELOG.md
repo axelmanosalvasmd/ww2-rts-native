@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added a borrowed live-weather phase with the pinned environment RNG, wind drift, smoke decay, showers and wet-ground updates. Three focused tests cover 59 original-JavaScript sequences (386 steps) and 400 RNG draws, including disabled weather and planned transitions. The phase reports fire/flood timing but leaves terrain effects and final smoke removal to the match integrator.
+
 - Added a canonical mutable World with terrain edits, material/mine cleanup, packed state, region invalidation, stable cell logs, journals and independent recipient pending indices (issue #62). Six original-source traces cover 78 actions, including four authored maps. Building section registration preserves displaced section values without duplicating health; live terrain vectors move into Game while the initial snapshot remains separate. Building registration rejects exhausted counters before changing any section. Wrecks now retain an optional settled cell for cleanup, and runtime building footprints use their movement/sight flags. Active destruction, fire simulation and full match startup remain separate work.
 
 - Added a standalone combat damage and suppression component with catalog-backed role, armor, veterancy, retreat and threat rules. Six focused tests compare 3,828 original JavaScript cases and actual mutation order, including health, XP, death impulse, hit memory and rider requests. The component returns ordered effects for later integration; it does not fire weapons, sample terrain cover, place riders, remove dead units or change the ABI. Documented the source's zero-damage effects, building modifier replacement and missing-rider cargo behavior, with the affected combat rows still in progress.
