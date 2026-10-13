@@ -7,6 +7,8 @@ pub mod combat;
 pub mod deployment;
 pub mod economy;
 pub mod economy_state;
+pub mod environment;
+pub mod environment_debris;
 pub mod fog;
 pub mod formation;
 pub mod game;
