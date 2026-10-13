@@ -75,6 +75,29 @@ fn infantry_naval_and_vehicle_paths_match_original_find_path() {
         wet_ford: fixture["rules"]["wetFord"].as_f64().unwrap(),
         wet_ground: fixture["rules"]["wetGround"].as_f64().unwrap(),
     };
+    let compiled = PathRules::compiled().unwrap();
+    let values = |r: PathRules| {
+        [
+            r.wall_hug,
+            r.bunker_radius,
+            r.road_speed,
+            r.wood_speed,
+            r.ford_speed[0],
+            r.ford_speed[1],
+            r.mud_speed[0],
+            r.mud_speed[1],
+            r.churn,
+            r.wet_ford,
+            r.wet_ground,
+        ]
+        .map(f64::to_bits)
+    };
+    assert_eq!(
+        values(compiled),
+        values(rules),
+        "compiled costs must match the original-JavaScript oracle"
+    );
+    let rules = compiled;
     let mut queries = 0;
     let mut found = 0;
     let mut unreachable = 0;
