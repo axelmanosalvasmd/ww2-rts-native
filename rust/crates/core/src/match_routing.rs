@@ -793,6 +793,10 @@ impl PreparedRecipientRouting<'_> {
         paths.fork_for_terrain(self.target.query().navigation(), self.query().navigation())
     }
 
+    /// Accepted preview rows for a detached producer, before publication.
+    pub fn remembered(&self) -> &[ObservedRow] {
+        self.state.remembered()
+    }
     pub fn query(&self) -> RouteQuery<'_> {
         self.state.query()
     }
@@ -815,6 +819,15 @@ pub struct RecipientRoutingCommit<'a, 'w, 'e> {
     ledger: crate::world::PreparedObservation<'w>,
 }
 impl RecipientRoutingCommit<'_, '_, '_> {
+    /// Rebind existing search history when an observation publishes new terrain storage.
+    /// Use the searched fork instead when the consumer ran searches against its preview.
+    pub fn commit_with_paths(self, paths: &mut crate::pathfinding::Pathfinding) {
+        paths.rebind_terrain(
+            self.target.query().navigation(),
+            self.state.query().navigation(),
+        );
+        self.commit();
+    }
     pub fn commit(self) {
         *self.target = self.state;
         *self.fog_target = self.fog;

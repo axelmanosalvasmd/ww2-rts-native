@@ -2,6 +2,41 @@
 
 ## Unreleased
 
+- Normally joined the frozen human observer/state/quiet-policy proof with the current main and chronological-event candidate in a separate branch. Preserved approved ABI 2 and canonical command dispatch, adapted human routing to the current Environment receipt guard, and exposed ordered tick-event hurt projection. Historical human native results stay on their ABI 1 prerequisite branch; all nine unchanged original-source fixture checks pass, while this new union has no compile or native acceptance.
+
+- Verified the composed human observer, attention state and bounded quiet-policy callback at compiled `f011ce1`: 17 focused debug tests, all 280 locked workspace release tests, strict all-target Clippy, formatting and release FFI pass. Independent copied binaries pass 17 tests in each profile; final artifacts and complete failure history are saved outside the build cache. Host scheduling, all-seat delivery, canonical command admission and full AI remain pending.
+
+- Registered the shared human fixture decoder once per library test crate, fixing the strict duplicate-module lint. State and policy assertions reuse that decoder; external integration tests remain separate crates. Runtime behavior and source fixtures are unchanged, with final native gates pending.
+
+- Used a stable descending group-count key for idle human camera scans, preserving equal-group order and fixing the strict Clippy gate. All 17 focused debug and 280 workspace release tests passed before this lint repair; final exact-head gates remain pending.
+
+- Corrected the human observer refusal snapshot helper to read existing canonical rows directly in deliberately unsupported contexts. The first focused human library run passed nine tests and exposed this helper's guarded-getter unwrap; runtime mode admission and actual fixtures remain unchanged. Complete native checks are still pending.
+
+- Fixed the first human proof compiler errors: retain a reference to the delivered victim before consuming the filtered unit vector, and name the packet type in two no-view assertions. No policy, ordering, timing or RNG behavior changes; the original failed compile log is preserved and native checks remain pending.
+
+- Normally consumed the independently reviewed human observer cache-identity correction in the bounded policy assembly. Original packet APIs and private state leaves remain intact; this complete source union still needs independent reanchor and its first native cycle.
+
+- Added a bounded native strategic callback on the ordinary human attention schedule. It rebuilds policy from detached camera-filtered facts, preserves minimal Move/Cover/Buy/Tech shapes, and stages private human and policy state together. Three real Source openings provide complete packets at seven actual deliveries and three raw planning calls outside scripted think beats. The new policy replay and RNG/refusal assertions are written but unrun; observation cache repair, canonical admission and full human AI remain pending.
+
+- Normally combined the resumed human state proof with the detached observation and checked bounded commander prerequisites in a separate policy assembly. Both parent histories and their distinct evidence remain intact; the observer cache-identity review finding and new native composition checks remain pending.
+
+- Resumed the human commander proof: registered cap, locality, urgent resumption and atomic-refusal tests, and captured raw original planner attempts before input filtering. Reset now retains subscriber alert identities and accepts a trusted current seed for fresh timing. A real two-grenade Source replay protects reset identity and first-active seed timing; native compilation, policy composition and command acceptance remain pending.
+
+- Checkpointed paused human commander development, preserving source-only timing/input/state components, original denial and cap/locality/resumption receipts, and unfinished shared proof tests. The cfg seam tests are not registered or compiled; the pre-pause allocator reset patch lacks its identity witness and review. All human native checks, complete policy/producer/runner integration and unavailable ground Attack/Retreat actuators remain pending. No tests or development continued after the pause.
+
+- Added the detached ordinary human commander state provider: camera attention, real owner alerts with shared identity, urgent interruption and resumption, fresh-view planning, input timing/caps/locality, and delayed raw attempts. Three opening traces and two real grenade-alert traces record 441 full Source steps, 12 delivered views and 12 physical inputs. Native component tests replay the actual facts and Source-collected policy output, but have not run. The native policy callback, observation producer, ground Attack/Retreat admission and Match scheduling remain pending; delayed attempts do not claim actuator acceptance.
+- Preserve canonical path-cache history when a human observation publishes prepared routing arrays. Rebind the selected recipient's storage only after packet and receipt validation, keeping other recipients' caches intact. The original-reader check adds two route-history scenes and 24 route queries; four native observer tests are written but remain unrun pending the coherent state and planner proof.
+
+- Pause the human observer at source checkpoint `e529409`. The original-reader check records four scenes, 48 views and three hurt batches; no native test or coherent build has run. The owner cleared the `404a948` producer repairs and navigation cleared its borrowed accessor; the final filtered-packet successor still needs independent review and native acceptance. Single-seat publication is implemented, while all-seat delivery coordination remains separate.
+
+- Rebuild the human commander's strategic packet from validated camera-filtered detached rows, with original screen memory in the observation oracle. Keep current packet facts and research intact, and refuse forged rows without reading Game.
+
+- Add a complete existing strategic packet producer for the ordinary human commander, with decoded own move goals, delivered visibility and ordered 60-second sightings. Stage recipient memory before publication and filter real owner hurt frames without losing reset/append ordinals. Four original-reader scenes record 48 views and three hurt batches; native checks are pending.
+
+- Bring source-reviewed human commander timing, raw input helpers and detached common view types into the isolated observation producer branch. Native acceptance remains pending.
+
+- Prepare a separate human commander observation branch by normally combining checked commander `be1cb2c` with ordinary Default `262926e`. Retain both Cover and Entrench dispatch and canonical owners; this new union has no native acceptance yet.
+
 - Prepared a separate normal union of frozen ordered-event PR #194 and the consolidated original-source frontier `dfcc0bf`. Preserved the one TickEvent/TickFailure result, producer emission sinks, original World component bodies, approved ABI 2 and the optimized test profile with debug assertions and overflow checks. Migrated the inherited quiet engineering consumer to require empty owned events, and report accepted recipient traffic once rather than unavailable. Published parents remain unchanged; exact union source review and the full optimized native cycle are pending.
 
 - Retained the newly published AIR frontier by normal merge so the event closure has one accepted parent instead of a misleading crisscross comparison. Runtime, event source fixtures and the approved ABI 2 header are unchanged; exact combined platform checks remain pending.
