@@ -22,6 +22,10 @@ pub struct RegionState {
     pub team: i32,
     pub progress: f64,
     pub capper: Option<usize>,
+    pub contested: bool,
+    /// Absent until the live source phase computes production locks.
+    pub locked: Option<bool>,
+    pub cap_tick: Option<i64>,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct ResourceNode {
@@ -47,6 +51,7 @@ pub struct KnownBuilding {
     pub built: Option<f64>,
 }
 pub struct WorldRuntime {
+    pub memory: crate::world_memory::WorldMemory,
     pub regions: Vec<RegionState>,
     pub nodes: Vec<ResourceNode>,
     pub local_defender: LocalDefender,
@@ -230,7 +235,7 @@ impl Match {
         world.game.rain = start.initial_rain;
         world.game.wet = start.initial_wet;
         // Static structures precede the source World journal's zero position.
-        world.take_journal();
+        world.reset_journal();
         let geography = map.geography().expect("checked geography");
         let regions = geography
             .regions
@@ -250,6 +255,9 @@ impl Match {
                     team,
                     progress: if r.home.is_some() { 1.0 } else { 0.0 },
                     capper: None,
+                    contested: false,
+                    locked: None,
+                    cap_tick: None,
                 })
             })
             .collect::<Result<Vec<_>, String>>()?;
@@ -261,6 +269,7 @@ impl Match {
             geography.regions.len(),
         )?;
         let runtime = WorldRuntime {
+            memory: crate::world_memory::WorldMemory::default(),
             regions,
             nodes: Vec::new(),
             rails,

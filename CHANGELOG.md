@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Integrated the immutable World region and memory provider into the separate canonical World finish branch, preserving its capture, income, home and unsupported-side-effect preflights. Shared World finish implementation and native verification remain pending.
+
 - Shared canonical finish, end reasons and typed source timeline between Conquest and explicit Assault. Assault's late phase now subtracts elapsed simulation time, prioritizes loss of all living bunkers over timer expiry, records a draw when no attacker exists, and freezes its first result and clock. Existing story callbacks and internal results use the same Match state for Assault; generic ticking and other mode actuators remain unsupported. An unchanged-source recorder covers 11 Assault traces and 22 phases; native verification is pending the scheduled build slot.
 
 - Verified the final Assault/World/canonical Match union: 43 original-source starts and 702 units compare deployment, legacy trigger state, combat/firing defaults, control and production rows, terrain logs and structures. All 162 locked release workspace tests, focused debug regressions, strict Clippy, formatting and release FFI pass. The original five-map legacy-trigger rejection and two Clippy style errors found during checks were corrected; full Assault runtime and three-platform CI remain pending.
@@ -24,6 +26,53 @@
 
 - Added the native Match Conquest victory phase and finish bookkeeping: team VP in slot order, latest still-held capture location, 0.1 m end rounding, first-winner preservation, reveal and exact Conquest timeline fields. Canonical point accounting now freezes VP and capture story counts after the winner while ownership and manpower can continue. Three focused tests compare 12 original-JavaScript traces (24 assembled-match checkpoints) and invalid-state atomicity; existing startup and point-income tests pass. Other modes, command refusal, remaining story counters, result transport and the full battle loop remain unfinished.
 - Added a bounded World startup constructor with canonical home ownership, wallets, HQs, local defenders, fortifications, resource nodes, empty production and rail state, and actual initial visibility. The shared unit factory preserves source order and canonical guard controls; generator random history is retained. Five original-source records cover 2,761 units. Native checks are pending. Logistics-enabled startup, World terrain memory, mode tick phases, commands, trains and server hosting remain explicit boundaries.
+- Integrated the checked World recipient-memory dependency into the live-region branch, preserving its sole memory owner, journal reset and private region projection alongside canonical lock and capture-time fields. Combined native checks are queued.
+
+- Added an original World nations-finish transition to the region phase oracle, proving its atomic refusal separately from World-share and draw finishes. The expanded recorder covers 20 traces and 39 transitions; native checks remain queued.
+
+- Recorded 19 original World capture/income traces with 38 transitions and added native comparison, current-depot and atomic-error tests. Independent source/oracle review passes; native verification is queued. Documented retained tick facts and the unsupported fort, elimination and finish consequences.
+
+- Corrected the live region and relocated home coordinates to the source's cell centers after independent source review caught the missing half-cell offset, before fixture or native acceptance.
+
+- Wrote the bounded authoritative World income and capture actuator, using canonical wallets and region state with source production locks, live infantry order, capture story and home relocation. Unsupported fort seizure, army elimination and World finishes reject before publishing any phase changes. The full World tick remains refused; source oracle and native verification follow.
+
+- Added canonical World region lock and capture-time fields, preserving the recipient producer's contested field. Added explicit current depot facts for income so tick-list upkeep and live node payments can use their distinct source views. Native checks are pending in the shared Cargo queue.
+
+- Kept the new validation note scoped to World recipient memory and its release FFI check; earlier generator evidence is unchanged.
+
+- Verified owner-bound World knowledge on the merged startup head: nine core debug tests, two World memory debug tests and all 164 locked release workspace tests pass, including 120 original-source actions, journal/revision atomic guards and hidden-knowledge checks. Strict workspace Clippy, formatting and the release FFI build pass. World battle-loop, commands, full snapshots and wire integration remain unfinished.
+
+- Merged the checked final World startup dependency into the recipient-memory branch, preserving canonical combat/firing fields, empty memory, uncontested regions and journal reset. The prior memory head passes six core tests and both 120-action debug/hidden-knowledge tests; combined release gates follow.
+
+- Recorded the expanded four-trace World knowledge evidence: 120 actions, 27 route reads, 16 terrain deliveries, nine region reads and six wreck reads. Core atomic guards and startup checks pass; full memory replay, release and strict lint checks remain pending.
+
+- Strengthened the World original-source recorder with an authored hidden mine during reveal and a wreck removed outside current sight, then revisited. The four traces now contain 120 actions; native replay remains pending.
+
+- Delegated World wreck discovery and removal to the shared current-position visibility predicate, removing its private copy. World ghost removal retains its distinct source close-range rule. Native replay is pending.
+
+- Exposed the canonical immutable current-position team visibility predicate for support and recipient producers. Renamed the private visible-enemy-unit collector to distinguish it from point visibility; terrain/fog/range semantics and maintained grid order are unchanged. Caller validation remains required. Native point-predicate acceptance is pending.
+
+- Made the World delivery cursor branch explicit after strict Clippy rejected an unnecessary unwrap; full and incremental read ordering is unchanged. The corrected wreck oracle reproduces four traces and 119 actions.
+
+- Fixed the World oracle's remembered-wreck iterator projection to record actual rows instead of an empty iterator object. Native replay already matched the first terrain, identity and route fingerprints; corrected wreck records are being replayed next.
+
+- Completed the atomic guard fixture setup with the ordinary loader's required capture point. The World source recorder also retains signed-label membership maps and adds a nonmultiple-dimension region-lock trace after the startup fixture changed shape. Native checks remain in progress.
+
+- Integrated the coordinated startup rail/station row projection and canonical region lookup into World memory. Focused atomic guard fixtures now use valid minimum map dimensions. Recipient rows populate the existing CellData fields from borrowed WorldRails, without a second rail representation. Native verification continues.
+
+- Carried the startup lane's explicit World rail-position map type into the recipient-memory dependency tree, fixing the compiler's ambiguous index type without changing rail traversal or values. Native verification remains in progress.
+
+- Reused the canonical checked cell-coordinate conversion for World region lookups after the first compile exposed an unavailable math helper. Imported the reviewed optional wreck-identity prerequisite from the combat lane. Native checks continue.
+
+- Added optional durable wreck IDs to query state, preserving absent identity in older query fixtures. The authoritative wreck producer uses the dead unit ID; remembered-routing consumers can reject missing identity explicitly. No wire or C layout changed.
+
+- Corrected World routing wetness to preserve the canonical optional weather state, using source zero wetness when absent. Independent source review caught the scalar/optional type mismatch before native checks.
+
+- Added original-source World recipient knowledge records for three traces and 111 actions, including 6,200 accepted changes, journal and memory-log trimming, teammate delivery cursors, hidden mines, reveal, signed region IDs, remembered wrecks and per-tick route caches. The explicit World visibility phase updates canonical building ghosts and local-defender visibility. Discovered rows borrow existing rail/station metadata. Native checks and review remain pending; full World tick, snapshots and commands remain separate.
+
+- Added checked absolute World journal cursors and prefix trimming, with an explicit zero-epoch startup reset that preserves ordinary journal drains. World runtime now owns lazy shared team terrain memory, stable accepted-row revisions, separate commander delivery and route cursors, and canonical region contested state. Native integration and original-source verification are pending.
+
+- Fixed the missing rail track-position type annotation found by the first World native compile. Added checked World region/economy projections and optional rail/station snapshot fields with atomic post-rails row annotation after the original startup oracle found missing metadata. Mutable-terrain callers still need to invoke the explicit projection hook. Updated the crafted source case to test floating-column lookup on nonmultiple dimensions; full native acceptance remains pending.
 - Verified the merged bounded World constructor with 160 locked release workspace tests, strict Clippy, formatting and release FFI. Five original startups cover 2,761 units, canonical combat/firing metadata, home ownership, visibility, terrain log order and rails; all 63 ordinary startup records remain unchanged. Parity rows stay in progress for live World and server integration.
 
 - Formatted the new World firing metadata assertions with the pinned Rust formatter.
@@ -114,8 +163,6 @@
 - Adapted recipient routing fire reads to the current ordered fire container during integration, preserving insertion order and visibility masks. Routing fixtures now explicitly omit smoke lifetimes introduced by the environment phase.
 
 - Added Match-owned observed terrain and remembered wreck routing for ordinary Conquest. Current-position discovery, cached fire fog, row revisions, outbox order, same-key bunker fields and live wetness match 162 original-source actions, 44 route views, eight searches and four wreck cover queries. Fixed same-key wetness staleness found in independent review. Debug/release tests, startup regressions, strict Clippy and formatting pass. Lifecycle callers retain a removed unit before another route read; wrecks require canonical IDs. Command/tick/convoy integration, World memory and wire/ABI changes remain separate; MOV-29 and MAP-100 stay in progress.
-
-- Added optional durable wreck IDs to query state, preserving absent identity in older query fixtures. The authoritative wreck producer uses the dead unit ID; remembered-routing consumers can reject missing identity explicitly. No wire or C layout changed.
 
 
 - Connected full generator output to typed World map inputs, retaining authored landmark tags, region and cell biomes and ordered rail metadata. The generated-to-loader test compares physical terrain flags, house kinds, health and wear against original static initialization.
