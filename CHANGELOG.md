@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added an unmodified full-step source oracle for shared projects: seven cases, 25 actions, 193 steps and 215 snapshots verify payment once, joins/sweep timing, late dead-worker removal, Stop without refund, completion and real retry-limit-one route failure. Three native admission guards and the sole-runner replay specification are written; native execution and full tick composition remain pending.
+
+- Added read-only mass-project tick admission for current actor order, canonical membership and paid jobs, waiting Join shape, source clock/counter capacity and the ordinary Conquest boundary. It preserves stale-project command denial and leaves the early recount and per-unit work phases with the sole tick owner; native verification and full-step fixture evidence are pending.
+
 - Shared mass projects pass native differential checks at `0f17e93`: 168 supported plans, 30 segment prices and 23 actual Match traces (131 actions), plus atomic admission guards. The final 13 focused debug checks, all 210 release workspace tests, strict Clippy, formatting and release FFI passed; independent source review and four debug plus four release replays passed. Full tick assembly, previews, recipient works rows, fill, concrete and construction remain separate.
 
 - The first shared-project native proof passed 13 focused debug checks and all 210 release workspace tests. Strict Clippy then found five style-only issues in the new runtime/tests; these were corrected before the fresh final gates.

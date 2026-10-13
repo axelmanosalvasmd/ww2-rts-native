@@ -37,7 +37,7 @@ fn refusal(reason: Reason) -> Denial {
 }
 
 impl Match {
-    fn validate_project_unit(&self, id: UnitId) -> Result<(), String> {
+    pub(super) fn validate_project_unit(&self, id: UnitId) -> Result<(), String> {
         let u = self
             .world
             .game

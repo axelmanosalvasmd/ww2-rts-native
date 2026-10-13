@@ -12,6 +12,8 @@ use crate::{
 mod match_engineering;
 #[path = "match_projects.rs"]
 mod match_projects;
+#[path = "field_project_tick.rs"]
+mod project_tick;
 
 use std::{
     collections::{BTreeMap, BTreeSet},

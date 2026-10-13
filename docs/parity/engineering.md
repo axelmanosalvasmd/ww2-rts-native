@@ -27,6 +27,8 @@ Mutable-world progress (issue #62): the canonical World layer now implements ter
 
 Mass-project checkpoint is in progress: original-source recording covers 216 pattern plans, 40 proportional prices and 25 shared-project traces (137 actions, 162 snapshots). The new canonical project owner preserves listed and still-referenced archived identities alongside the existing paid Dig owner. The typed Match dispatcher and per-unit providers compare 23 traces and 131 actions, including paid route-drop membership preservation. The pure helper compares 168 supported plans and 30 prices. Compiled `0f17e93` passed 13 focused debug checks, all 210 release workspace tests, strict Clippy, formatting and release FFI; independent source review and four debug plus four release test executions passed. Runner assembly, client previews, recipient works rows and full engineering integration remain separate. Fill and concrete work remain explicitly unsupported.
 
+The additive tick-admission/source checkpoint records seven cases through unmodified `createGame`, `command` and full `step`, with 193 steps and 215 snapshots. It protects the actual early recount, sweep twenty, same-turn allocation, late death and paid route-drop boundaries. The read-only preclock helper and written native guards remain unexecuted until a managed build lease; native full-runner comparison remains separate. [Assembly and fixture specification](../runtime/mass-project-tick.md).
+
 ## Digging rules
 
 | ID | Behavior / content | Evidence | Rust (Julio) | Unreal (Axel) | Depends on | Acceptance check | Status |
