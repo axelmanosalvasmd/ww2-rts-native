@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Corrected recorded Buy denial matching to use RecruitError’s actual public re-export. The combined engineering compile exposed the stale module path; handler behavior is unchanged and native proof is running in its isolated leased tree.
+
 - Corrected inherited ability and recovery fixture constructors to use the checked command owner’s explicit 4,096-order capacity and tick-one queue initialization. Their former Default calls did not exist on this combined ancestry. Native verification remains pending.
 
 - Preserved invalid-coordinate refusal precedence for typed aimed abilities over the new unsupported-project preflight. The existing project-boundary regression now includes a nonfinite typed aim; raw JSON behavior is unchanged. Native proof remains pending.
