@@ -243,6 +243,8 @@ fn armory(m: &mut Match, slot: usize, cell: usize) -> u32 {
     .publish_with(|u, _| {
         m.combat.initialize(u.id);
         m.firing.initialize(u.id);
+        m.abilities.initialize(u.id);
+        m.recovery.initialize(u.id);
     });
     for c in cells {
         m.world.set_cell(c, b'K').unwrap();
@@ -325,6 +327,8 @@ fn original_match_research_and_world_training_phases() {
                         .step_training(a["id"].as_u64().unwrap() as u32, a["dt"].as_f64().unwrap())
                         .unwrap();
                     if let Some(done) = done {
+                        assert_eq!(m.abilities.get(done.unit), Some(&Default::default()));
+                        assert_eq!(m.recovery.get(done.unit), Some(&Default::default()));
                         completions += 1;
                         unreachable += usize::from(
                             done.route_status
@@ -419,13 +423,15 @@ fn original_match_research_and_world_training_phases() {
 }
 fn unchanged(m: &Match) -> String {
     format!(
-        "{:?}{:?}{:?}{:?}{:?}{:?}{:?}{:?}{}",
+        "{:?}{:?}{:?}{:?}{:?}{:?}{:?}{:?}{:?}{:?}{}",
         m.production,
         m.start.economy,
         m.world.game.units,
         m.commands.units,
         m.combat,
         m.firing,
+        m.abilities,
+        m.recovery,
         m.story,
         m.recruit_metadata,
         m.next_unit_id
@@ -435,7 +441,7 @@ fn unchanged(m: &Match) -> String {
 fn aborted_completion_and_research_publish_nothing() {
     let f = fixture();
     let c = &f["cases"][2];
-    for failure in ["combat", "firing", "id"] {
+    for failure in ["combat", "firing", "abilities", "recovery", "id"] {
         let mut m = make(c);
         let hq = resolve(&m, 0, "hq");
         buy(&mut m, 0, "engineer", Some(hq)).unwrap();
@@ -445,6 +451,12 @@ fn aborted_completion_and_research_publish_nothing() {
             }
             "firing" => {
                 m.firing.initialize(m.next_unit_id);
+            }
+            "abilities" => {
+                m.abilities.initialize(m.next_unit_id);
+            }
+            "recovery" => {
+                m.recovery.initialize(m.next_unit_id);
             }
             "id" => m.next_unit_id = u32::MAX,
             _ => unreachable!(),

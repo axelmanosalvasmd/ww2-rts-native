@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Joined canonical ability/recovery defaults and stale identity guards to World construction and training publication, with the owning production agent’s approval. Existing source-constructor and training regressions check fresh rows and aborted completions. Combined native proof remains pending; World gameplay dispatch is not claimed.
+
 - Added mixed handler replay and forward/reverse arrival tests through the real Match command queue. Per-operation snapshots compare represented canonical values and float bits; source reaction timers are explicitly excluded. Native execution remains pending.
 
 - Captured 24 mixed recorded gameplay operations with 23 unchanged original JavaScript handler calls, including same-batch purchase/ability, research, support, movement and trusted companion inputs. The fixed-seed 328,556-byte fixture regenerates exactly on x64 Node 24.21.0. Host ownership checks are labeled separately; native replay remains pending.

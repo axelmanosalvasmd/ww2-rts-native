@@ -266,7 +266,11 @@ impl Match {
                 ))?;
         let game = &self.world.game;
         let id = self.next_unit_id;
-        if self.combat.get(id).is_some() || self.firing.get(id).is_some() {
+        if self.combat.get(id).is_some()
+            || self.firing.get(id).is_some()
+            || self.abilities.get(id).is_some()
+            || self.recovery.get(id).is_some()
+        {
             return Err(ProductionStepError::InvalidState(
                 "training metadata identity occupied",
             ));
@@ -402,6 +406,8 @@ impl Match {
         publication.publish_with(|unit, _| {
             self.combat.initialize(unit.id);
             self.firing.initialize(unit.id);
+            self.abilities.initialize(unit.id);
+            self.recovery.initialize(unit.id);
         });
         Ok(Some(CompletedTrainingUnit {
             unit: id,
