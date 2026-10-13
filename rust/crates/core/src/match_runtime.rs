@@ -399,6 +399,7 @@ pub struct Match {
     pub scenario: Option<crate::legacy_scenario::LegacyScenario>,
     pub logistics: crate::logistics::LogisticsState,
     pub capture_ticks: Vec<Option<i64>>,
+    pub tick_state: crate::match_tick::TickState,
     pub next_unit_id: u32,
     pub rules: Rules,
 }
@@ -446,6 +447,7 @@ impl Match {
             scenario,
             logistics: crate::logistics::LogisticsState::default(),
             capture_ticks: vec![None; map.points().len()],
+            tick_state: crate::match_tick::TickState::default(),
             next_unit_id,
             rules,
         };
