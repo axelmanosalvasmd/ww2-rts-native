@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Warm real World route memory before rollback witnesses and preserve remembered rows, route buffers, versions, fire/bunker and wreck views on refusal. Assert the nonfinite story failure reaches its named post-wreck finish guard.
+
 - Add a local-defender garrison to the actual World collapse oracle. Its canonical actor and damaged survivor remain present; the test uses an explicit source-only owner adapter for the internal sentinel, without adding a transport or ordinary-owner fallback.
 
 - Refuse selected mass-work and construction activity when only Boolean projections exist in this ancestry. Their canonical project membership cleanup remains with the later owner; add atomic refusal witnesses instead of silently dropping unrepresented work.

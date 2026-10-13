@@ -225,6 +225,28 @@ fn actual_world_elimination_matches_original_order_collateral_and_overflow() {
         }
     }
 }
+fn remembered(m: &Match) -> String {
+    let memory = &m.world_runtime.as_ref().unwrap().memory;
+    let team = memory.team(5).unwrap();
+    let query = team.query();
+    let terrain = query.navigation();
+    let live = memory.live_for(0).unwrap();
+    let live_view = live.live();
+    format!(
+        "{:?}{:?}{:?}{:?}{:?}{:?}{:?}{:?}{:?}{:?}{:?}",
+        team.rows(),
+        team.version(),
+        terrain.flags.as_ptr(),
+        terrain.flags,
+        terrain.heights.as_ref().map(|h| h.as_ptr()),
+        terrain.heights,
+        terrain.versions,
+        live_view.fires.as_ptr(),
+        live_view.fires,
+        live_view.bunkers,
+        live.wrecks()
+    )
+}
 fn protected(m: &Match) -> String {
     format!(
         "{:?}{:?}{:?}{:?}{:?}{:?}{:?}{:?}{:?}{:?}{:?}",
@@ -256,16 +278,21 @@ fn unsupported_and_late_world_guards_preserve_every_canonical_owner() {
         |m| m.world.game.units.get_mut(&12).unwrap().entrench = true,
         |m| m.world.game.units.get_mut(&12).unwrap().build = true,
     ];
-    for change in mutations {
+    for (index, change) in mutations.into_iter().enumerate() {
         let mut m = world_scene::make_match(&f, case["input"]["teams"].as_array().unwrap());
         let order = setup(&mut m, &f, case);
+        m.refresh_world_routing(0).unwrap();
+        let memory_before = remembered(&m);
         change(&mut m);
         let before = protected(&m);
-        assert!(
-            m.apply_world_capture_income_and_elimination(&order, &order, 0.05)
-                .is_err()
-        );
+        let error = m
+            .apply_world_capture_income_and_elimination(&order, &order, 0.05)
+            .unwrap_err();
+        if index == 1 {
+            assert_eq!(error, "nonfinite match story counter");
+        }
         assert_eq!(protected(&m), before);
+        assert_eq!(remembered(&m), memory_before);
     }
 }
 
