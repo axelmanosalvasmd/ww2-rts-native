@@ -137,15 +137,54 @@ impl crate::match_runtime::Match {
             phases.push(TickPhase::Vision);
         }
         let mut route_requests = Vec::new();
-        let moved = movement::move_units_with_routes(
-            &mut self.world.game,
-            &self.rules,
-            &mut self.grid,
-            &mut |_, _, unit, goal, kind| {
-                route_requests.push((unit.id, goal, kind));
-                unit.repath = 1.0;
-            },
-        );
+        let mut moved = Vec::new();
+        let mut last_id = None;
+        loop {
+            // The source iterates its live Map. Monotonic IDs let births made
+            // during a unit's turn enter this same loop without a stale ID list.
+            let next = match last_id {
+                Some(id) => self
+                    .world
+                    .game
+                    .units
+                    .range((std::ops::Bound::Excluded(id), std::ops::Bound::Unbounded))
+                    .next(),
+                None => self.world.game.units.iter().next(),
+            };
+            let Some((&id, unit)) = next else { break };
+            last_id = Some(id);
+            if !movement::reaches_block(&self.rules, unit) {
+                continue;
+            }
+            // Reserve and order adapters attach before these timer changes.
+            let factor = movement::supp_speed(unit.supp);
+            let rally = if crate::vision::in_trench(&self.world.game, &self.rules, unit) {
+                self.rules.movement.trench_rally
+            } else {
+                8.0
+            };
+            let infantry = self.rules.kinds[unit.kind].infantry;
+            let unit = self.world.game.units.get_mut(&id).expect("current unit");
+            if infantry {
+                unit.supp = crate::math::max(0.0, unit.supp - rally * dt);
+            }
+            unit.repath -= dt;
+            unit.sprint -= dt;
+            if let Some(result) = movement::move_unit_with_routes(
+                &mut self.world.game,
+                &self.rules,
+                &mut self.grid,
+                id,
+                factor,
+                &mut |_, _, unit, goal, kind| {
+                    route_requests.push((unit.id, goal, kind));
+                    unit.repath = 1.0;
+                },
+            ) {
+                moved.push(result);
+            }
+            // Firing attaches here, after this unit's actual moved facts.
+        }
         phases.push(TickPhase::Movement);
         let unit_order: Vec<_> = self.world.game.units.keys().copied().collect();
         separation::separate_crowds(&mut self.world.game, &self.rules, &mut self.grid);
