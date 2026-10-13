@@ -333,7 +333,44 @@ fn near(w: &World, c: usize) -> [Option<usize>; 4] {
         (c % width + 1 < width).then_some(c + 1),
     ]
 }
+// World construction establishes these shapes. Public terrain arrays can later be
+// replaced, so every environment admission rechecks them before indexing or writes.
+fn check_terrain(w: &World) -> Result<(), EnvironmentError> {
+    let g = &w.game;
+    let n =
+        g.w.checked_mul(g.h)
+            .ok_or(EnvironmentError::InvalidInput("terrain shape"))?;
+    if g.w == 0
+        || g.h == 0
+        || g.w > (1usize << 26)
+        || g.h > (1usize << 26)
+        || [
+            g.chars.len(),
+            g.flags.len(),
+            g.house.len(),
+            g.cell_hp.len(),
+            w.mine_layer.len(),
+            w.surface_wear.len(),
+            w.burnt.len(),
+            w.scar.len(),
+            w.cell_state.len(),
+        ]
+        .iter()
+        .any(|len| *len != n)
+        || g.ground.as_ref().is_none_or(|v| v.len() != n)
+        || g.objects.as_ref().is_none_or(|v| v.len() != n)
+        || g.wear.as_ref().is_none_or(|v| v.len() != n)
+        || g.height.as_ref().is_some_and(|v| v.len() != n)
+        || g.trench_front.as_ref().is_some_and(|v| v.len() != n)
+        || g.tough.as_ref().is_some_and(|v| v.len() != n)
+        || w.shoal.as_ref().is_some_and(|v| v.len() != n)
+    {
+        return Err(EnvironmentError::InvalidInput("terrain shape"));
+    }
+    Ok(())
+}
 fn check(w: &World, ctx: &Context<'_>) -> Result<&'static Tuning, EnvironmentError> {
+    check_terrain(w)?;
     if ctx.tick > 9_007_199_254_740_941 || ctx.tick.checked_add(50).is_none() {
         return Err(EnvironmentError::InvalidInput("tick"));
     }

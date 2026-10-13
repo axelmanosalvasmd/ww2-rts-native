@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reject malformed live terrain shapes in shared environment admission before retirement removes actors or debris changes terrain. Present optional arrays must match the grid; flat height remains supported. Added a focused rejection test covering 21 shape failures and absent optional layers. Source review and formatting are checked; native execution is pending.
+
 - Prepared ordinary retirement for registered aircraft and sparse ground AA metadata, replacing the blanket aircraft refusal that also rejected living actors. Added a read-only prospective-clock admission using the real aviation registry and copied environment seed/ID values. Dead aircraft create no hull, preserve queued AA events and retain Combat/Firing source rows; the existing death-story consumer remains singular. Seven original retirement cases include finite off-map Base aircraft and a real AA kill followed by one bounty/death tally. Two focused native tests are written; execution remains pending. No tick or interface changes.
 
 - Restored the source's forced-unit stance exclusion after independent command review caught an overbroad eligibility arm. The source names legacy command alternatives, while actual stance commands use t=stance and remain excluded. Added the real forced-ground stance regression; the command oracle now passes 71 traces and 147 checkpoints. Native command proof remains pending.
