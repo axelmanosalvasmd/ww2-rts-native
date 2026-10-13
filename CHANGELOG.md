@@ -2,11 +2,19 @@
 
 ## Unreleased
 
+- Preserved the final verified movement snapshot repair and evidence in the separate composition dependency union. The composition descendant still needs its own combined native checks.
+
 - Integrated the verified FieldWorks and ability/recovery provider into snapshot composition prerequisites. Preserved shared startup publication, support command dispatch and canonical movement-result tails while adding the owner's ability dispatch and cancellation component. Combined native verification remains pending.
 
 - Added canonical ground support strikes and team fighter cover to the internal Conquest recipient cache, validated shared finish fields, and kept Assault and World snapshots refused. The original cached-source recorder now checks 72 states and 216 recipient projections, including real support command admission and mixed actor rounding. Combined native validation is pending; complete seat envelopes, active flights/shots and remaining list/work providers stay explicit boundaries.
 
 - Integrated verified ground support and shared finish prerequisites into the separate snapshot composition branch. Preserved ability, recovery and firing initialization at the prepared publication callbacks after the shared startup refactor, keeping one publication authority. The combined branch still needs native validation; this does not enable another snapshot mode.
+
+- Recorded the exact verified snapshot runtime head and immutable archive hash in DESIGN, replacing pending native status for the completed represented fields. Tested Rust and harness files remain unchanged.
+
+- Verified the internal recipient snapshot and canonical movement checkpoint on Vostro Linux x86_64 at 91737e3: nine focused debug tests, all 164 release workspace tests, strict workspace/all-target Clippy, formatting and release FFI pass after clean package builds. Original source fixtures cover 70 states/210 cached projections, 13 delivery steps/39 reads and 58 command traces/259 steps. Full message envelopes, support actors and transport remain separate; three-platform Actions evidence is still required by integration.
+
+- Fixed a strict Clippy assertion in the snapshot delivery regression by using is_empty. All focused debug and release workspace tests passed on the prior frozen head; the fresh head still needs the remaining native gates.
 
 - Added canonical optional movement-result tails to UnitControl and the owner-only snapshot reader. Actual path failure and completion operations record their tick; later move, stop and reaction intents preserve the previous tail. Extended the original command oracle to 58 traces and 259 steps, including 518 recipient movement observations and two retained recovery/replan branches. All 246 prior steps are unchanged apart from added result/recipient observations. Cached snapshot fixtures remain 70 states and 210 recipients. Native verification is pending the managed Rust lane; no complete envelope, wire or ABI change was added.
 
