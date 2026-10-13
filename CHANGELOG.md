@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Record original ground effect delivery in 10 traces: 337 complete Source ticks, 835 seat results, 36 emitted events and 37 seeded draws. Check event order, hidden identity filtering, fog limits on launch extrapolation and scheduled batch reset with no selected recipients. Preserve live-flight, falling and aircraft snapshots as refusal witnesses; native replay remains pending.
+
 - Correct the scuttling atomicity regression to use the recorded startup scene with two live owned units. The first engineering native check passed the orphan-membership guard, then found that the original selected scene contained only one owned unit before the actuator ran. Runtime and Source fixtures are unchanged; fresh combined gates remain pending.
 
 - Converge the engineering replay with the three reviewed timeline test adapters. Preserve both parents' runtime, recorded Source fixtures and strict comparisons; fresh verification of this combined head is pending.
