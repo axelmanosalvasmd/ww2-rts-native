@@ -414,14 +414,13 @@ fn original_routes_keep_prewarmed_history_across_human_observations() {
 }
 
 fn canonical_projection(m: &Match) -> Value {
-    let remembered: Vec<_> = m
-        .recipient_routing(0)
-        .unwrap()
+    let routing = &m.recipients[0];
+    let remembered: Vec<_> = routing
         .remembered()
         .iter()
         .map(|r| json!([r.row.cell, format!("{:?}", r.row)]))
         .collect();
-    json!({"rows":remembered,"routes":format!("{:?}",m.recipient_routing(0).unwrap().query().navigation()),
+    json!({"rows":remembered,"routes":format!("{:?}",routing.query().navigation()),
         "pending":m.world.pending(crate::world::Recipient::Player(0)),"journal":m.world.journal().iter().map(|r|format!("{r:?}")).collect::<Vec<_>>(),
         "fog":format!("{:?}",m.routing_fog),"queue":format!("{:?}",m.commands.queue.snapshot()),"random":format!("{:?}",m.start.random.snapshot()),
         "wallet":m.start.economy.players[0].mp,"units":format!("{:?}",m.world.game.units)})
