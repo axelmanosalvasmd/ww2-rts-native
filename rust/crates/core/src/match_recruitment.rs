@@ -19,6 +19,7 @@ pub enum RecruitError {
     Placement(crate::produced_units::Error),
     Knowledge(KnowledgeError),
     Path(crate::pathfinding::PathError),
+    Publication(crate::unit_publication::PublicationError),
 }
 impl From<production::Error> for RecruitError {
     fn from(e: production::Error) -> Self {
@@ -183,12 +184,14 @@ impl Match {
             .rules
             .kind(kind)
             .ok_or(RecruitError::InvalidState("recruit kind"))?;
-        let next = self
+        let _next = self
             .next_unit_id
             .checked_add(1)
             .ok_or(RecruitError::InvalidState("unit ID capacity exhausted"))?;
-        if self.recruit_metadata.contains_key(&self.next_unit_id)
+        if self.combat.get(self.next_unit_id).is_some()
+            || self.recruit_metadata.contains_key(&self.next_unit_id)
             || self.commands.units.contains_key(&self.next_unit_id)
+            || self.firing.get(self.next_unit_id).is_some()
         {
             return Err(RecruitError::InvalidState(
                 "recruit metadata ID already exists",
@@ -275,15 +278,29 @@ impl Match {
             initial_rally: placed.rally.map(|r| r.kind),
             initial_route_status: route_status,
         };
-        let purchase = prepared.commit();
         let id = placed.unit.id;
-        // Source spawnUnit inserts once and placeUnit then moves the same grid
-        // record. Staged insertion directly at its final pose retains that order.
-        self.world.game.units.insert(id, placed.unit);
-        self.grid.update(id, &self.world.game.units[&id]);
-        self.commands.insert(id, control);
-        self.recruit_metadata.insert(id, metadata);
-        self.next_unit_id = next;
+        let publication = crate::unit_publication::prepare_publication(
+            crate::unit_publication::PublicationParts {
+                units: &mut self.world.game.units,
+                grid: &mut self.grid,
+                controls: &mut self.commands.units,
+                recruitment: &mut self.recruit_metadata,
+                next_id: &mut self.next_unit_id,
+            },
+            &self.rules,
+            count,
+            vec![crate::unit_publication::StagedUnit {
+                unit: placed.unit,
+                control,
+                recruitment: Some(metadata),
+            }],
+        )
+        .map_err(RecruitError::Publication)?;
+        let purchase = prepared.commit();
+        let _published = publication.publish_with(|unit, _| {
+            self.combat.initialize(unit.id);
+            self.firing.initialize(unit.id);
+        });
         Ok(CompletedRecruitUnit {
             unit: id,
             purchase,

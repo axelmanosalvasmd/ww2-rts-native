@@ -134,7 +134,7 @@ impl Match {
             || self.start.players.len() != players.len()
             || self.options.players.len() != players.len()
             || self.world.game.players.len() != players.len()
-            || self.capture_counts.len() != players.len()
+            || self.story.len() != players.len()
             || self.capture_ticks.len() != self.start.points.len()
             || self.world.game.tick < 0
             || self.world.game.tick > 9_007_199_254_740_991
@@ -152,11 +152,12 @@ impl Match {
                 || p.team != self.world.game.players[index].team
                 || p.team != self.options.players[index].team
                 || !p.vp.is_finite()
-                || !self.capture_counts[index].is_finite()
-                || self.capture_counts[index] < 0.0
             {
                 return Err("invalid Conquest player identity or score".into());
             }
+        }
+        for row in &self.story {
+            row.validate()?;
         }
         if self
             .capture_ticks

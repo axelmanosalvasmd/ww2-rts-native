@@ -1,7 +1,9 @@
 //! Pure seeded base World geography. Biome dressing, landmarks and rails are later stages.
 //! All coordinates and bounds here are cells, never simulation metres.
 mod landforms;
+mod rails;
 mod roads;
+mod scenery;
 mod territories;
 
 use crate::{
@@ -10,6 +12,9 @@ use crate::{
 };
 
 pub const GENERATOR_VERSION: u32 = 1;
+pub const WORLD_GENERATOR_VERSION: u32 = 2;
+pub use rails::{RailLine, RailNetwork, RailStation};
+pub use scenery::{Biome, Scenery};
 pub const REGION_CELLS: usize = 64;
 
 pub use crate::world_map::WorldSize;
@@ -96,6 +101,8 @@ pub struct GeneratedGeography {
     pub spawns: Vec<CellPoint>,
     pub region_map: Vec<i16>,
     pub waterways: Waterways,
+    /// Road reserve used by subsequent scenery placement.
+    pub road_mask: Vec<u8>,
 }
 impl GeneratedGeography {
     /// Transfer bare geography to the agreed loader input without rebuilding terrain from JSON.
@@ -171,6 +178,86 @@ impl GeneratedGeography {
                 metadata: std::collections::BTreeMap::from([("waterways".into(), waterways)]),
             },
         }
+    }
+}
+/// Complete geography, optional biome dressing and the rail overlay. Match setup is separate.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GeneratedWorld {
+    pub geography: GeneratedGeography,
+    pub scenery: Option<Scenery>,
+    pub rails: RailNetwork,
+}
+impl GeneratedWorld {
+    /// Preserve authored landmark tags and biome hints for source-equivalent terrain initialization.
+    /// Rail metadata is authoritative input. Recipient delivery is a separate operation.
+    pub fn into_world_map_input(self) -> crate::world_map::WorldMapInput {
+        use serde_json::json;
+        let mut input = self.geography.into_world_map_input();
+        input.geography.generator_version = Some(WORLD_GENERATOR_VERSION);
+        if let Some(scenery) = self.scenery {
+            for (region, biome) in input.geography.regions.iter_mut().zip(scenery.regions) {
+                region.biome = Some(biome.name().into());
+            }
+            input.geography.biomes = Some(scenery.cells);
+            input.buildings = scenery.buildings;
+        }
+        let stations = self
+            .rails
+            .stations
+            .into_iter()
+            .map(|s| json!({"region":s.region,"x":s.x,"y":s.y}))
+            .collect::<Vec<_>>();
+        let lines = self
+            .rails
+            .lines
+            .into_iter()
+            .map(|l| json!({"a":l.a,"b":l.b,"cells":l.cells,"regions":l.regions}))
+            .collect::<Vec<_>>();
+        input
+            .geography
+            .metadata
+            .insert("rails".into(), json!({"stations":stations,"lines":lines}));
+        input
+    }
+}
+/// Consume exactly the same single Terrain draw as base geography generation.
+pub fn generate_world(
+    random: &mut MatchRandom,
+    size: WorldSize,
+    teams: &[i32],
+    scenery: bool,
+) -> Result<GeneratedWorld, GenerationError> {
+    let geography = generate(random, size, teams)?;
+    Ok(complete(geography, scenery))
+}
+pub fn generate_world_from_terrain_seed(
+    seed: u32,
+    size: WorldSize,
+    teams: &[i32],
+    scenery: bool,
+) -> Result<GeneratedWorld, GenerationError> {
+    Ok(complete(
+        generate_from_terrain_seed(seed, size, teams)?,
+        scenery,
+    ))
+}
+fn complete(mut geography: GeneratedGeography, dress: bool) -> GeneratedWorld {
+    let scenery = if dress {
+        Some(scenery::generate(
+            geography.terrain_seed,
+            &mut geography.grid,
+            &geography.regions,
+            &geography.region_map,
+            &geography.road_mask,
+        ))
+    } else {
+        None
+    };
+    let rails = rails::generate(&geography.grid, &geography.regions, &geography.region_map);
+    GeneratedWorld {
+        geography,
+        scenery,
+        rails,
     }
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -420,6 +507,7 @@ pub fn generate_from_terrain_seed(
         regions,
         spawns,
         region_map,
+        road_mask: road,
         waterways,
     })
 }
