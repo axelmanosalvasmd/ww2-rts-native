@@ -30,6 +30,7 @@ function record(name,{teams=[5,1,5],regions={},players={},units=[],nodes=[],step
  g.units=new Map(units.map(u=>[u.id,{garrison:-1,supp:0,rot:0,path:[],cargo:[],...structuredClone(u)}]));g.nodes=structuredClone(nodes);
  g.seed=123456789;g.nextId=1000;g.wind={a:.7,v:.6};g.wx={rain:0,wet:0};g.fallingSections=[];
  for(const u of g.units.values())if(u.cells.length){for(const c of u.cells)sim.mutateWorldCell(g,c,{object:'K'});sim.__registerBuildingStructure(g,u);}
+ for(const u of g.units.values())if(u.postRegisterHp!==undefined)u.hp=u.postRegisterHp;
  g.newCells=[];g.cellJournal=[];g.shots=[];g.tick=40;g.winner=null;g.timeline=[];g.reveal=false;
  g.story=g.players.map(()=>Object.fromEntries(STORY_KEYS.map(k=>[k,0])));
  g.players.forEach((p,slot)=>Object.assign(p,{mp:100,mun:4,fuel:2,vp:0,inc:0,away:false,out:false,spawn:at(slot===2?total-1:slot),...players[slot]}));
@@ -59,7 +60,7 @@ record('outer player order and signed health',{regions:gone,units:[unit(90,2,'ta
 record('allied surviving territory protects both commanders',{regions:{0:{team:-1,progress:0},2:{team:5,progress:1},63:{team:1,progress:1}},units:[unit(31,0,'rifle',3),unit(90,2,'tank',2),unit(8,1,'rifle',3)],steps:[{dt:.05}]});
 const c=210*512+210;
 record('registered building evicts later deleted and surviving garrisons',{regions:gone,units:[unit(40,0,'hq',27,{x:421,z:421,cells:[c,c+1]}),unit(12,2,'rifle',27,{x:421,z:421,garrison:c}),unit(14,1,'rifle',27,{x:421,z:421,garrison:c+1})],nodes:[{c,x:421,z:421,depot:40,rate:2,fuel:false}],steps:[{dt:.05}]});
-record('multiple registered buildings follow player then Map order',{regions:gone,units:[unit(22,2,'hq',27,{x:429,z:421,cells:[c+4]}),unit(40,0,'hq',27,{x:421,z:421,cells:[c,c+1]}),unit(41,0,'barracks',27,{x:425,z:421,cells:[c+2]})],steps:[{dt:0}]});
+record('multiple registered buildings follow player then Map order',{regions:gone,units:[unit(22,2,'hq',27,{x:429,z:421,cells:[c+4]}),unit(40,0,'hq',27,{x:421,z:421,cells:[c,c+1]}),unit(41,0,'barracks',27,{x:425,z:421,cells:[c+2],postRegisterHp:-10})],steps:[{dt:0}]});
 record('actual section overflow settles after ninety six flights',{regions:gone,units:[unit(40,0,'hq',27,{x:517,z:421,cells:Array.from({length:97},(_,i)=>c+i)})],steps:[{dt:0}]});
 clean();const output=JSON.stringify({format:1,reference:pin,node:process.version,arch:process.arch,definitions,cases})+'\n';
 const path=`${root}/rust/crates/simtest/tests/fixtures/world-elimination.json`;

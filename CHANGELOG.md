@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Include a registered building whose current HP is negative in the ordered wreck oracle, proving administrative removal still runs its wreck path regardless of current health.
+
 - Extend administrative cleanup proof with an actual paid trench job and assert its descriptor is canceled without restoring the charged wallet.
 
 - Seed an actual logged terrain mutation in the recipient draft guard regression, so acknowledgement changes a real pending index rather than an empty set.

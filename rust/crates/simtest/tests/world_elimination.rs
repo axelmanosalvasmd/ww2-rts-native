@@ -123,6 +123,9 @@ fn setup(m: &mut Match, f: &Value, case: &Value) -> Vec<u32> {
                 .register_building_structure(id, &cells, hp, hp_per)
                 .unwrap();
         }
+        if let Some(hp) = raw["postRegisterHp"].as_f64() {
+            m.world.game.units.get_mut(&id).unwrap().hp = hp;
+        }
     }
     m.world.take_new_cells();
     m.world.reset_journal();
