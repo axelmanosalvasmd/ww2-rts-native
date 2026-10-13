@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Combined the immutable staged Buy and observer provider ancestry with the isolated commander shopping follow-up. Buy/publication and observer bodies remain unchanged; field work and the single command queue retain their current owners. Combined native checks are pending.
+
 - Added a bounded later commander research prefix through the existing typed command queue. Four actual-source scenarios span eight delivered frames and 12 waypoint draws, covering pending HQ labs, repeated missing-Armory refusal and fractional-wallet snapshot precision. Native execution remains pending; construction, shopping and full AI remain outside this checkpoint.
 
 - Applied the canonical engineering owner's compiler boundary repairs in the isolated Cover union: public recruitment error paths, optional damage actor context and ordered pending-cell fixture projection. The newer checked recovery health and ability fixture bodies were retained. Native proof of this combined checkpoint is pending.
@@ -37,14 +39,34 @@
 - Kept the opening commander's fallback vision query on a fresh temporary spatial index, preserving the maintained gameplay index while applying the source vision phase. Recipient-routing index preservation is being verified in the FPS integration lane.
 
 - Added a bounded native Conquest opening commander: detached recipient observations, source point scores and cover waypoints, fixed per-seat scheduling, isolated seeded draws and typed movement orders through the canonical Match queue. Economic, combat, camera, World and complete-match AI behavior remain pending; no wire or C interface changed.
+- Added a fourth original World birth case with a different team’s warmed vehicle history, four accepted prebirth changes and a postbirth reroute. The recorder now covers 14 births, 12 prebirth searches and one cross-team reroute; native success/abort cache-lifetime checks remain pending.
+
+- Kept World search histories bound to every team array moved by a successful preview, including teams not read in that transaction. Consumer source review found the selected-team-only mapping could discard other warmed incremental histories.
+
+- Corrected the new birth replay to call the canonical byte-based World cell setter. Source recording remains unchanged; native compilation and replay are still pending.
+
+- Checked ordered fire membership and mine ownership/discovery maps before prepared routing commits. Independent source review found these facts can change without advancing a terrain key; rejected preparations retain the original recipient and World ledgers.
+
+- Recorded 13 original birth-sight cases: ten ordinary buys through the original command and three World produce-unit calls, plus eight warmed infantry/vehicle searches across ordered terrain changes. Added native typed-publication, abort, source-frame, cache-identity and journal-trim witnesses. Native execution and independent review remain pending.
+- Bound detached recruitment search history to the routing owner’s preview buffers before search. Exact recipient identities retain incremental graph history, while failed previews still leave canonical caches unchanged. Native and birth-oracle checks remain pending.
 
 - Restricted preview graph rebinding to the selected recipient's exact flags allocation or its matching owned vehicle-clearance arrays. Unmatched and authoritative cache identities remain untouched. Native transaction witnesses follow.
 
 - Added routing-guard search forks that rebind existing recipient terrain identities to preview buffers while preserving prior graph versions and traversal history. Vehicle source identities follow the same mapping. Source recorder and native cache-history checks remain pending.
+- Applied detached search-cache publication to the public component recruit actuator too, so late transaction errors preserve canonical graph history through both purchase entry points. Native checks remain pending.
+
+- Preserved warmed canonical path caches when a staged recruitment preview fails. Searches now run on the approved derived-cache fork and publish it only on success; the late-story regression also checks a same-clock reroute against a branch that never attempted the preview. Native checks remain pending.
 
 - Added transactional copies of derived path-search history. Copies retain external terrain identities and rebind navigation graphs to their copied vehicle buffers; aborts can discard the copy while preserving canonical warmed caches. Native cache-history protection remains pending.
 
 - Kept ordinary route fog reads lazy when there are no fires, matching the original filter callback. A prior empty-fire read leaves first birth sight eligible to build fog; a prior fire read retains its cached mask. Original produce-unit proof is being added; native replay remains pending.
+- Scoped the canceled-preview regression query borrows before extracting cache identity, preserving the actual RouteQuery lifetime and releasing recipient reads before the mutable transaction. Native execution remains pending.
+
+- Corrected the new canceled-preview regression to inspect actual TerrainView buffer/version fields and import its private field-split type. Source review found these compile-visible test defects before native checks.
+
+- Connected admitted Conquest rally purchases to the canonical prepared birth observer. Receipt and Fog publication now follow wallet/unit/story preflight, while rejected previews discard derived path scratch. A late-story regression checks observation and four-metadata atomicity; native and birth-oracle proof remain pending.
+
+- Joined the source-written prepared-observer dependency to recorded recruitment while retaining canonical combat, firing, ability and recovery ownership. This consumer checkpoint awaits source and native proof.
 
 - Added borrowed staged sight sources and a recipient component preview that defers terrain acknowledgements until infallible publication. Existing fog and routing keys stay lazy; the matching World preview defers journal trimming. Original-source and native observer verification remain pending. No authoritative unit is inserted during preparation.
 

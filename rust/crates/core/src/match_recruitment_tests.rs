@@ -1,3 +1,4 @@
+use super::RecruitParts;
 use crate::{
     economy::{Faction, Mode},
     economy_state::ArmySize,
@@ -157,6 +158,14 @@ fn recorded_buy_matches_original_commands_with_owned_routing() {
                                 Some(&crate::match_firing::FiringUnit::default()),
                                 "recruits must publish canonical target and timer defaults"
                             );
+                            assert_eq!(
+                                m.abilities.get(done.unit),
+                                Some(&crate::match_abilities::AbilityUnit::default())
+                            );
+                            assert_eq!(
+                                m.recovery.get(done.unit),
+                                Some(&crate::match_recovery::RecoveryUnit::default())
+                            );
                             let u = &m.world.game.units[&done.unit];
                             let control = &m.commands.units[&done.unit];
                             let failed = done.route_status == Some(PathStatus::Unreachable);
@@ -188,13 +197,15 @@ fn recorded_buy_matches_original_commands_with_owned_routing() {
 }
 fn unchanged(m: &Match) -> String {
     format!(
-        "{:?}{:?}{:?}{:?}{:?}{:?}{:?}{}",
+        "{:?}{:?}{:?}{:?}{:?}{:?}{:?}{:?}{:?}{}",
         m.start.economy,
         m.world.game.units,
         m.commands.units,
         m.recruit_metadata,
         m.combat,
         m.firing,
+        m.abilities,
+        m.recovery,
         m.story,
         m.next_unit_id
     )
@@ -388,4 +399,73 @@ fn refused_buy_does_not_freeze_same_tick_garrison_move_memory() {
     assert_eq!(r["denied"]["routeReads"], 0);
     assert_eq!(r["move"]["routeReads"], 1);
     assert_eq!(r["prematureRead"]["rememberedCell"], ".");
+}
+
+#[test]
+fn rejected_final_preflight_discards_staged_sight_and_purchase() {
+    let fixture: Value = serde_json::from_str(include_str!(
+        "../../simtest/tests/fixtures/match-recruitment.json"
+    ))
+    .unwrap();
+    let setup = || {
+        let mut m = make(&fixture["cases"][0]["map"]);
+        m.start.economy.players[0].mp = 5000.0;
+        m.player_rallies[0] = Some(Point { x: 35.0, z: 35.0 });
+        m.world.game.tick += 1;
+        let warm =
+            crate::match_commands::Command::from_json(&json!({"t":"move","ids":[1],"x":61,"z":41}))
+                .unwrap();
+        assert_eq!(m.execute_command(0, &warm, false).unwrap(), None);
+        assert!(!m.world.game.units[&1].path.is_empty());
+        m.world.set_cell(700, b'O').unwrap();
+        m
+    };
+    let mut m = setup();
+    let mut control = setup();
+    let staged = recruit_parts!(m).stage(0, "rifle", None, false).unwrap();
+    // Exercise a final story rejection after admission and before publication.
+    m.story[0].mp_spent = f64::NAN;
+    let before = unchanged(&m);
+    let identity = {
+        let query = m.recipients[0].query();
+        let view = query.navigation();
+        (view.flags.as_ptr(), view.versions.knowledge)
+    };
+    let rows = m.recipients[0].remembered().to_vec();
+    let pending = m.world.pending(crate::world::Recipient::Player(0)).cloned();
+    let fog = m.routing_fog.clone();
+    assert!(matches!(
+        m.finish_recorded_buy(staged),
+        Err(RecruitError::Story(_))
+    ));
+    assert_eq!(unchanged(&m), before);
+    let after_identity = {
+        let query = m.recipients[0].query();
+        let view = query.navigation();
+        (view.flags.as_ptr(), view.versions.knowledge)
+    };
+    assert_eq!(after_identity, identity);
+    assert_eq!(m.recipients[0].remembered(), rows);
+    assert_eq!(
+        m.world.pending(crate::world::Recipient::Player(0)),
+        pending.as_ref()
+    );
+    assert_eq!(m.routing_fog, fog);
+    // A second actual command at the same clock sees the original warmed graph,
+    // as the control branch that never attempted a preview does.
+    m.story[0].mp_spent = 0.0;
+    let reroute =
+        crate::match_commands::Command::from_json(&json!({"t":"move","ids":[1],"x":65,"z":45}))
+            .unwrap();
+    assert_eq!(m.execute_command(0, &reroute, false).unwrap(), None);
+    assert_eq!(control.execute_command(0, &reroute, false).unwrap(), None);
+    assert_eq!(
+        format!("{:?}", m.world.game.units[&1]),
+        format!("{:?}", control.world.game.units[&1])
+    );
+    assert_eq!(m.commands.units[&1], control.commands.units[&1]);
+    assert_eq!(
+        m.recipients[0].remembered(),
+        control.recipients[0].remembered()
+    );
 }
