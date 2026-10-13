@@ -1,9 +1,14 @@
 use serde_json::Value;
 use std::io::Read;
-use ww2_core::{economy::Mode, match_firing::LaunchEvent, random::StreamId};
+use ww2_core::{
+    economy::Mode,
+    game::ModeKind,
+    match_firing::{AbilityBlast, LaunchEvent},
+    random::StreamId,
+};
 #[path = "common/firing.rs"]
 mod common;
-use common::{compare, make, snapshot};
+use common::{compare, make, make_with_mode, snapshot};
 fn fixture() -> Value {
     let mut text = String::new();
     flate2::read::GzDecoder::new(&include_bytes!("fixtures/match-firing.json.gz")[..])
@@ -12,11 +17,17 @@ fn fixture() -> Value {
     serde_json::from_str(&text).unwrap()
 }
 #[test]
-fn assembled_match_targeting_and_launches_match_original_source() {
+fn default_and_conquest_targeting_and_launches_match_original_source() {
     let fixture: Value = fixture();
     let mut phases = 0;
-    for c in fixture["cases"].as_array().unwrap() {
-        let mut m = make(c);
+    for (c, mode) in fixture["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|c| [Mode::Default, Mode::Conquest].map(|mode| (c, mode)))
+    {
+        let mut m = make_with_mode(c, mode);
+        assert!(m.world.game.mode.is_none());
         let run = c["variation"].as_str().unwrap().starts_with("flight");
         let mut last = 0;
         for s in c["steps"].as_array().unwrap() {
@@ -95,7 +106,7 @@ fn assembled_match_targeting_and_launches_match_original_source() {
             phases += 1;
         }
     }
-    assert_eq!(phases, 588);
+    assert_eq!(phases, 588 * 2);
 }
 
 #[test]
@@ -133,14 +144,63 @@ fn unsupported_modes_and_later_bad_payloads_leave_firing_unchanged() {
     }
     assert_eq!(actual, expected);
     assert_eq!(m.world.game.chars, world.chars);
-    m.options.mode = Mode::World;
+    let blast = AbilityBlast::from_unit(m.world.game.units[&1].kind, &m.rules).unwrap();
+    let at = m.world.game.units[&2].at();
     m.world.game.units.get_mut(&1).unwrap().owner = u32::MAX as usize;
     let before = m.firing.clone();
-    assert!(m.begin_firing_tick(&[1, 2, 3]).is_err());
-    assert!(m.advance_firing_timers(1, 0.05).is_err());
-    assert!(m.apply_unit_firing(1, false, 0.05).is_err());
-    assert!(m.can_shoot_target(1, 2).is_err());
-    assert_eq!(m.firing, before);
+    let combat = m.combat.clone();
+    let logistics = m.logistics.clone();
+    let commands = m.commands.clone();
+    let random = m.start.random.snapshot();
+    let unsupported = [
+        Mode::Classic,
+        Mode::World,
+        Mode::Assault,
+        Mode::Annihilation,
+        Mode::Horde,
+        Mode::Tutorial,
+        Mode::Other,
+    ]
+    .map(|mode| (mode, None));
+    let inconsistent = [
+        ModeKind::Classic,
+        ModeKind::World,
+        ModeKind::Assault,
+        ModeKind::Annihilation,
+        ModeKind::Horde,
+        ModeKind::Tutorial,
+    ]
+    .into_iter()
+    .flat_map(|kind| [Mode::Default, Mode::Conquest].map(|mode| (mode, Some(kind))));
+    for (mode, kind) in unsupported.into_iter().chain(inconsistent) {
+        m.options.mode = mode;
+        m.world.game.mode = kind;
+        let world = format!("{:?}", m.world.game);
+        for error in [
+            m.capture_firing_prior().unwrap_err(),
+            m.begin_firing_tick(&[1, 2, 3]).unwrap_err(),
+            m.advance_firing_timers(1, 0.05).unwrap_err(),
+            m.apply_unit_firing(1, false, 0.05).unwrap_err(),
+            m.can_shoot_target(1, 2).unwrap_err(),
+            m.step_firing_flights().unwrap_err(),
+            m.advance_firing_salvos(0.05).unwrap_err(),
+            m.advance_firing_grenades(0.05).unwrap_err(),
+            m.launch_ability_flight(1, at, blast, None, Some(1))
+                .unwrap_err(),
+            m.launch_weapon_salvo(1, at, None).unwrap_err(),
+        ] {
+            assert!(
+                error.contains("ordinary Conquest mode"),
+                "{mode:?}/{kind:?}: {error}"
+            );
+        }
+        assert_eq!(m.firing, before);
+        assert_eq!(m.combat, combat);
+        assert_eq!(m.logistics, logistics);
+        assert_eq!(m.commands, commands);
+        assert_eq!(m.start.random.snapshot(), random);
+        assert_eq!(format!("{:?}", m.world.game), world);
+    }
 }
 
 #[test]

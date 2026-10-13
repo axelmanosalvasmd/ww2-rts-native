@@ -335,8 +335,12 @@ fn dist(a: Point, b: Point) -> f64 {
 
 impl Match {
     fn supported_firing_mode(&self) -> Result<(), String> {
-        if self.options.mode != crate::economy::Mode::Conquest {
-            return Err("weapon execution currently requires Conquest".into());
+        if !matches!(
+            self.options.mode,
+            crate::economy::Mode::Default | crate::economy::Mode::Conquest
+        ) || self.world.game.mode.is_some()
+        {
+            return Err("weapon execution requires ordinary Conquest mode".into());
         }
         Ok(())
     }

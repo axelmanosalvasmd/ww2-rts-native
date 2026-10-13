@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Admit Default as the ordinary Conquest alias for targeting, firing and typed ability launches, requiring consistent Game.mode state. Rewrote the existing source replay tests to exercise both aliases and expanded atomic rejection checks for actual other modes; the separate FPS owner will replace its artificial Default-rejection test after consuming this helper. Native follow-up checks are pending.
+
 - Verified typed ability flights on compiled head e1e74ad: five focused debug/release tests, all 162 locked workspace release tests, strict Clippy, formatting and release FFI build pass. The source oracles reproduce 30 ability-flight traces with 210 checkpoints and 114 ordinary firing traces with 588 checkpoints. Conquest-only launch admission and caller-owned ability/FPS state remain explicit.
 
 - Removed a literal-None lifetime fallback left after ordinary salvos moved into the shared launcher, preserving the existing direct-round expiry calculation and satisfying strict Clippy.
