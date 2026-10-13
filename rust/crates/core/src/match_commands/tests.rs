@@ -181,6 +181,8 @@ fn set(m: &mut Match, id: u32, fields: &Value) {
                         forced: value["forced"].as_bool().unwrap(),
                         stranded: value["stranded"].as_bool().unwrap(),
                         exhausted: false,
+                        supply_rate: None,
+                        cut_for: None,
                     },
                 );
             }
