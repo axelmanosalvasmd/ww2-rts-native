@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Integrated the typed ability-flight launcher with checked World startup, recipient memory and ground supply ancestry. Both source implementations and their publication guards are retained; final combined native validation is pending.
+- Integrated the typed ability-flight launcher with checked World startup, recipient memory and ground supply ancestry. Both source implementations and their publication guards are retained. Final combined checks pass: 13 focused debug tests, all 179 locked release workspace tests, strict Clippy, formatting and release FFI.
 
 - Restored the World-only logistics preflight lost while integrating the Conquest supply adapter. Ordinary Conquest still initializes logistics; World rejects it before creating state, as the existing startup regression requires.
 
