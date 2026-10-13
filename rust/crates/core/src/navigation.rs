@@ -139,6 +139,22 @@ pub struct Navigation {
 }
 
 impl Navigation {
+    pub(crate) fn rebind_terrain(&mut self, source: TerrainView<'_>, prepared: TerrainView<'_>) {
+        for graph in self.graphs.values_mut() {
+            let id = &mut graph.identity;
+            if id.width == source.width
+                && id.height == source.height
+                && id.knowledge_id == source.knowledge_id
+                && id.heights == source.heights.map(|v| v.as_ptr() as usize)
+            {
+                id.heights = prepared.heights.map(|v| v.as_ptr() as usize);
+                if id.flags == source.flags.as_ptr() as usize {
+                    id.flags = prepared.flags.as_ptr() as usize;
+                }
+            }
+        }
+    }
+
     pub(crate) fn rebind_flags(&mut self, buffers: &[(usize, usize)]) {
         for graph in self.graphs.values_mut() {
             if let Some((_, new)) = buffers.iter().find(|(old, _)| *old == graph.identity.flags) {
