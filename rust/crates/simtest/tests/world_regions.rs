@@ -1,8 +1,9 @@
 //! Original World helper transitions on a real native World Match.
-use serde_json::{Value,json};
-use ww2_core::{economy::Mode,economy_state::ArmySize};
-#[path="common/world_scene.rs"] mod world_scene;
-use world_scene::{make_match,reset,update_unit,update_region,projection,sorted_units};
+use serde_json::{Value, json};
+use ww2_core::{economy::Mode, economy_state::ArmySize};
+#[path = "common/world_scene.rs"]
+mod world_scene;
+use world_scene::{make_match, projection, reset, sorted_units, update_region, update_unit};
 
 #[test]
 fn original_world_capture_income_transitions_and_explicit_consequences() {

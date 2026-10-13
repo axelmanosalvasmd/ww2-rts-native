@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Formatted the inherited finish/story provider and three phase comparison tests after the strict format check. All 208 locked release workspace tests and strict Clippy passed at the preceding source; final formatted-source gates follow.
+
 - Converged the existing test-only observer wetness projection repair after the World elimination release gate found JSON `0.0` versus `0` and an unused import. The 46 affected debug tests passed at the preceding head; release and strict final gates require the repaired source.
 
 - Fixed the first native World elimination fixture setup failure by restoring its original dead fighter through the reviewed pure AIR field constructor. Ordinary AIR refusal and the six source cases stay intact; the unused native Base normalization is explicit. The preceding head passed 35 affected debug tests; final release and strict gates remain pending. Formatted the shared fixture helper before those gates.
