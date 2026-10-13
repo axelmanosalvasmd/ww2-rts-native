@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed the inherited recovery replay's restored scene after the release suite caught stale startup ability rows at future convoy IDs. Scene reset now clears ability metadata and restored actors receive their canonical defaults. The convoy freshness guard, recovery runtime and original fixture are unchanged.
+
 - Fixed the withdrawal replay's truck setup after native execution caught an unconditional reserve unwrap. Source logistics excludes trucks, so test publication now inserts the prepared reserve row only when eligible. Withdrawal runtime and original expectations are unchanged; combined gates are rerunning.
 
 - Prepared an isolated withdrawal successor with the checked staged-recipient routing provider. Immediate convoy refresh retains the provider's deferred journal receipt and commits it before searching. Withdrawal, route policy, reserves and truck metadata callbacks are unchanged; original-source checks and combined native verification remain required.
