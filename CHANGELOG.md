@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added a deterministic FIFO path-request scheduler with per-tick search budgets, stale/dead request removal, one pending request per unit and goal/version retry limits. Callback adapters supply current goals, real search results and unit updates; the scheduler has no hidden terrain or combat reads. An original-source oracle matches 594 actions, 201 searches and 20 order drops, including queue replacements, zero-budget stale removal, direct-command retry resets and empty recovery paths. Movement integration and full order eligibility remain separate work.
+
 - Recorded embedded map delivery and its 96 live HTTP comparisons in the design and server parity inventory. NET-11 remains in progress: public projections are served, while raw editor reads, map writes and authoritative world loading are still missing.
 
 - Added read-only map delivery to `ww2-server`: both `/maps/<name>` and `/maps/<name>.json` serve all 33 advertised maps from embedded client-safe projections. `harness/map-assets.mjs` requires the clean pinned reference and regenerates those projections, their Rust include index and the lobby catalogue together through the reference's `mapForClient`. The HTTP harness passes 96 exact comparisons against the live Node server, including both URL forms, invalid names, missing maps, traversal paths, unsupported methods and credential refusal. Legacy and layered World projection checks cover hidden mines, their materials, triggers and scenario scripts. No raw authoring maps are embedded or available through credentials. Editor POST remains unimplemented (405), as do authoritative map loading, generated World matches and static browser hosting.
