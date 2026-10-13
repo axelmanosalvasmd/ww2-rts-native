@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Preserve final captured World income facts through completed ordinary retirement and wire the accepted income, real convoy and current-region tail in the still-guarded caller branch. Reject incomplete callback prefixes, duplicate or conflicting identities and missing objects. Keep administrative removal records separate from ordinary death callbacks and move committed region effects once into chronological output. A fifth real-World-constructor test checks captured order and read-only fact refusals; native World tick admission and verification remain pending.
+
 - Correct the new World command prelude test to inspect the canonical request state through the existing public MatchCommands accessor. Independent source review caught two cross-crate reads of its private field before compilation; runtime, fixture and comparisons are unchanged. Native execution remains pending.
 
 - Add the actual World guard-home snap and voluntary retreat completion rule to the separate caller continuation. A displaced guard clears only its path and attack intent before command completion, without updating the grid. Voluntary World retreat uses the 15-metre home radius; forced and ordinary completion keep the endpoint/path/speed condition. Reuse the existing staged support timer body for inert World cooldowns, with read-only key, team, finite-output and active-effect guards. Four real-World-constructor tests are written and formatted but not run. Whole World tick admission remains closed while actor and routing providers are assembled.

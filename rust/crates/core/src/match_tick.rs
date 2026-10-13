@@ -49,6 +49,8 @@ pub enum TickPhase {
     Reinforcement,
     Death,
     PointCaptureIncome,
+    WorldIncome,
+    WorldRegions,
     Convoys,
     Victory,
 }
@@ -131,6 +133,8 @@ pub struct TickReport {
     /// One owned sequence in actual emission order, detached from producer buffers.
     pub events: Vec<TickEvent>,
     pub retired: Vec<crate::match_combat::RetiredUnit>,
+    /// Administrative territory removals never enter ordinary death/story callbacks.
+    pub world_removed: Vec<crate::game::Unit>,
 }
 impl TickReport {
     /// Direct environment phases only. Producer-internal effects stay nested in events.
@@ -633,10 +637,24 @@ impl crate::match_runtime::Match {
         phases.push(TickPhase::Reinforcement);
         self.tick_retirement(&unit_order, retirement, events)?;
         phases.push(TickPhase::Death);
-        self.apply_point_capture_income(&unit_order)?;
-        phases.push(TickPhase::PointCaptureIncome);
-        self.apply_conquest_victory()?;
-        phases.push(TickPhase::Victory);
+        let mut world_removed = Vec::new();
+        if self.options.mode == crate::economy::Mode::World {
+            let captured = self.world_tick_income_facts(&unit_order, retirement)?;
+            self.apply_world_income(&captured, dt)?;
+            phases.push(TickPhase::WorldIncome);
+            self.step_supply_convoys(self.finish.is_some())?;
+            phases.push(TickPhase::Convoys);
+            let current = self.world.game.units.keys().copied().collect::<Vec<_>>();
+            let result = self.apply_world_regions(&current, dt)?;
+            events.extend(result.effects.into_iter().map(TickEvent::Environment));
+            world_removed = result.removed;
+            phases.push(TickPhase::WorldRegions);
+        } else {
+            self.apply_point_capture_income(&unit_order)?;
+            phases.push(TickPhase::PointCaptureIncome);
+            self.apply_conquest_victory()?;
+            phases.push(TickPhase::Victory);
+        }
         Ok(TickReport {
             tick,
             prior,
@@ -647,6 +665,7 @@ impl crate::match_runtime::Match {
             paths,
             events: Vec::new(),
             retired: std::mem::take(&mut retirement.removed),
+            world_removed,
             unavailable: vec![
                 TickPhase::Research,
                 TickPhase::UnitReserves,

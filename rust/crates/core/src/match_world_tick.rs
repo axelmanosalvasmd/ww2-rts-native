@@ -11,6 +11,60 @@ use crate::{
 };
 
 impl Match {
+    /// Final upkeep facts retain the captured order even after actual ordinary removal.
+    /// An incomplete removal/callback prefix cannot advance the World economy.
+    pub fn world_tick_income_facts(
+        &self,
+        captured: &[UnitId],
+        retirement: &crate::match_combat::RetirementProgress,
+    ) -> Result<Vec<crate::match_world_phases::WorldIncomeUnit>, String> {
+        self.validate_world_phase_context(self.rules.movement.tick)?;
+        let count = retirement.removed.len();
+        if [
+            retirement.completed,
+            retirement.companions_notified,
+            retirement.stories_notified,
+            retirement.routes_retained,
+        ]
+        .iter()
+        .any(|done| *done != count)
+        {
+            return Err("World income requires completed ordinary retirement callbacks".into());
+        }
+        let mut seen = std::collections::BTreeSet::new();
+        let mut removed = std::collections::BTreeMap::new();
+        for record in &retirement.removed {
+            let unit = &record.unit;
+            if unit.id == 0
+                || removed.insert(unit.id, unit).is_some()
+                || self.world.game.units.contains_key(&unit.id)
+                || !captured.contains(&unit.id)
+            {
+                return Err("conflicting World retired income identity".into());
+            }
+        }
+        captured
+            .iter()
+            .map(|id| {
+                if *id == 0 || !seen.insert(*id) {
+                    return Err("duplicate World captured income identity".into());
+                }
+                let unit = self
+                    .world
+                    .game
+                    .units
+                    .get(id)
+                    .or_else(|| removed.get(id).copied())
+                    .ok_or("missing final World captured object")?;
+                if unit.id != *id || unit.kind >= self.rules.kinds.len() || !unit.hp.is_finite() {
+                    return Err("invalid final World captured object".into());
+                }
+                self.world_actor_view(unit.owner)?;
+                Ok(crate::match_world_phases::WorldIncomeUnit::from(unit))
+            })
+            .collect()
+    }
+
     /// Validate the actual guard pose and completion facts without mutating grid or commands.
     pub fn validate_world_command_prelude(&self, id: UnitId) -> Result<(), String> {
         if self.options.mode != Mode::World || self.world.game.mode != Some(ModeKind::World) {

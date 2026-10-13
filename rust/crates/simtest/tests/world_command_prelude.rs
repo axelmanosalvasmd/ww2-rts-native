@@ -345,3 +345,79 @@ fn world_support_timer_refusals_preserve_every_timer_before_publication() {
         assert_eq!(m.start.environment_seed, environment_seed);
     }
 }
+
+#[test]
+fn world_income_facts_keep_captured_order_and_refuse_missing_or_incomplete_facts() {
+    use ww2_core::match_combat::{RetiredUnit, RetirementProgress};
+    let m = scene();
+    let current: Vec<_> = m.world.game.units.keys().copied().collect();
+    assert!(current.len() > 2);
+    let outside_capture = *current.last().unwrap();
+    // This current actor is outside the earlier membership. Capture order is deliberately
+    // distinct from the canonical current order, and must never be reconstructed from it.
+    let captured: Vec<_> = current[..current.len() - 1].iter().rev().copied().collect();
+    let wallets = m.start.economy.clone();
+    let rng = m.start.random.snapshot();
+    let environment_seed = m.start.environment_seed;
+    let units = format!("{:?}", m.world.game.units);
+    let controls = format!("{:?}", m.commands.units);
+    let grid = format!("{:?}", m.grid);
+    let tick = m.world.game.tick;
+    let complete_without_removals = RetirementProgress::default();
+    let facts = m
+        .world_tick_income_facts(&captured, &complete_without_removals)
+        .unwrap();
+    assert_eq!(facts.iter().map(|row| row.id).collect::<Vec<_>>(), captured);
+    assert_eq!(facts.len(), current.len() - 1);
+    assert!(!facts.iter().any(|row| row.id == outside_capture));
+    for row in &facts {
+        let unit = &m.world.game.units[&row.id];
+        assert_eq!((row.owner, row.kind), (unit.owner, unit.kind));
+        assert_eq!(row.hp.to_bits(), unit.hp.to_bits());
+    }
+    let first = captured[0];
+    let duplicate = m
+        .world_tick_income_facts(&[first, first], &complete_without_removals)
+        .unwrap_err();
+    assert!(duplicate.contains("duplicate"), "{duplicate}");
+    let missing = m.next_unit_id;
+    assert!(!m.world.game.units.contains_key(&missing));
+    let missing_error = m
+        .world_tick_income_facts(&[first, missing], &complete_without_removals)
+        .unwrap_err();
+    assert!(missing_error.contains("missing final"), "{missing_error}");
+    // Deliberately invalid progress only. This live object was never retired, and no
+    // completed wreck, bounty or lifecycle prefix is fabricated for a success witness.
+    let incomplete = RetirementProgress {
+        removed: vec![RetiredUnit {
+            unit: m.world.game.units[&first].clone(),
+            last_hit: m.combat.get(first).unwrap().last_hit,
+            enemy_killer: None,
+        }],
+        ..Default::default()
+    };
+    let incomplete_error = m
+        .world_tick_income_facts(&captured, &incomplete)
+        .unwrap_err();
+    assert!(
+        incomplete_error.contains("completed ordinary retirement"),
+        "{incomplete_error}"
+    );
+    assert_eq!(incomplete.removed.len(), 1);
+    assert_eq!(
+        [
+            incomplete.completed,
+            incomplete.companions_notified,
+            incomplete.stories_notified,
+            incomplete.routes_retained,
+        ],
+        [0; 4]
+    );
+    assert_eq!(m.start.economy, wallets);
+    assert_eq!(m.start.random.snapshot(), rng);
+    assert_eq!(m.start.environment_seed, environment_seed);
+    assert_eq!(format!("{:?}", m.world.game.units), units);
+    assert_eq!(format!("{:?}", m.commands.units), controls);
+    assert_eq!(format!("{:?}", m.grid), grid);
+    assert_eq!(m.world.game.tick, tick);
+}
