@@ -1,5 +1,9 @@
 # Three Crossroads Native: design decisions
 
+## Startup privacy assertion lint closure (2026-10-13)
+
+The exact `81cd1ef` cycle passes its real WebSocket and ClientView lifecycle test and formatting, then strict Clippy refuses the test helper's one-element loop over `rows`. The successor reads `map["rows"]` directly and retains the identical array/type and hidden-mine assertion. It changes no runtime, core, FFI, map asset, lifecycle order or admission guard. The actual lifecycle pass belongs to `81cd1ef`; the full workspace and release FFI did not run in that stopped cycle. Raw logs remain at `/private/tmp/ww2-pure-startup-native-81cd1ef/`. Fresh strict lint, coherent workspace and exact-head platform checks remain required.
+
 ## Startup public-map optional fields (2026-10-13, source successor)
 
 The exact `08b378d` startup attempt compiles and reaches the public-map helper, then fails its unconditional `mineMaterials == []` assertion with null versus array. No test passes, and no later gate runs; the raw failure stays at `/private/tmp/ww2-pure-startup-native-08b378d/startup-first.log`. Direct calls to unchanged pinned `mapForClient` match the complete committed Default and El Alamein JSON projections, and both omit `layers.mineMaterials`. Source `world-layers.js:75` replaces that list only if it exists; it does not add an empty field to a rows-only map.
