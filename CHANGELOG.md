@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added captured-list burning so late-born units miss the current direct fire beat, while complete live context still validates every unit and handles garrison eviction. Structural and legacy rubble effects receive the same captured actors. The source fixture now records 47 traces and 262 actions, with all 44 prior traces unchanged; new cases include an actual Para arrival, current garrison eviction and legacy fire expiry. Native verification remains pending the shared build slot.
+
 - Added explicit captured actor membership for blast damage and source-list terrain casualties while keeping full canonical environment validation and ordinary projectile defaults. Bridge casualties and legacy rubble/blocked-cell checks use captured actors; garrison eviction still uses current units. Independent source review passes; native checks are queued.
 
 - Verified the complete command/firing ancestry after recruitment metadata integration: 155 workspace tests, five focused debug/release tests, strict Clippy, formatting and release FFI build pass. The diff against the reviewed command branch contains only weapon-phase code, publication defaults, fixtures and documentation.
