@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Extracted canonical single-target generic hurt for FPS and other direct effects, retaining source damage reductions and rider disembarkation without projectile armor, shooter XP or radial impulse. Hurt records keep the contact position before rider movement; explosions add radial impulse afterward. The shared source diff is independently reviewed; native regression verification is pending.
+
 - Added original-source support direction-fallback cases. The ground-support recorder now covers 60 traces and 900 checkpoints. Native verification remains queued.
 
 - Connected support to the single recorded command queue, with whole-command validation and source cooldown/manpower denials. Ground strike progression now accepts captured late actor subsets. The original-source oracle covers 54 traces and 810 checkpoints, including direct-hit exclusion, bridge failure and rubble spilling beside a fresh vehicle. A mixed Move/Support queue regression checks arrival-independent ordering, one payment and preserved movement. Native checks remain queued; aircraft support and complete tick integration remain unfinished.
