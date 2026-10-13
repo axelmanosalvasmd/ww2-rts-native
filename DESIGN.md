@@ -1013,3 +1013,7 @@ The proof repaired inherited assembly interfaces and fixture projections using t
 ## Ground support tick preparation (2026-10-13)
 
 [The ground support provider](docs/runtime/ground-support-tick.md) keeps capability checks separate from ordinary cost/cooldown admission and delegates the late strike and timer phase to the canonical component. It consumes the runner's captured membership and leaves events in the existing support buffer. Actual full Source step fixtures retain all represented timers and effects; the sole tick caller and native composition proof remain separate. Default and Conquest share only the absent-mode ordinary context. No alternate tick engine, unit registry or input queue is introduced.
+
+## Ground support tick source composition (2026-10-13)
+
+A separate continuation of frozen reaction source `c22969b` normally merges provider `37b7661` and connects its read-only boundary admission plus real late ground strike phase. Captured pre-separation IDs feed strikes after flights/grenades/salvos; with AIR refused, anti-air is inert. The same canonical helper then advances covers and cooldowns before weather, replacing the previous timer-only call so raw timers decay once. Events remain in SupportState. Logistics, coarse strikes, AIR/Para and other unavailable capabilities retain explicit guards. The source recorder has 13 traces, 2,705 ticks and 153 checkpoints; actual full-runner native replay is being written, with combined proof pending. [Composition sites and bounds](docs/runtime/ground-support-composition.md).

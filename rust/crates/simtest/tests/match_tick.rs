@@ -605,7 +605,7 @@ fn queued_companion_join_enters_prior_and_skips_ordinary_timers() {
 }
 
 #[test]
-fn unconnected_support_boundary_preserves_all_pending_input_and_timers() {
+fn unsupported_air_support_boundary_preserves_all_pending_input_and_timers() {
     use ww2_core::{match_commands::Command, orders::OrderKey};
     let fixture: Value = serde_json::from_str(include_str!("fixtures/match-tick.json")).unwrap();
     let mut m = make(&fixture["cases"][0]);
@@ -628,7 +628,7 @@ fn unconnected_support_boundary_preserves_all_pending_input_and_timers() {
             sequence: 2,
         },
         Command::Support {
-            kind: "artillery".into(),
+            kind: "bombing".into(),
             at: Point { x: 8.0, z: 8.0 },
             direction: None,
         },
@@ -645,7 +645,7 @@ fn unconnected_support_boundary_preserves_all_pending_input_and_timers() {
     assert!(
         m.advance_tick()
             .unwrap_err()
-            .contains("support strike tick actuator")
+            .contains("support aircraft tick phase")
     );
     assert_eq!(snapshot(&m), before);
     assert_eq!(m.commands.units, controls);
@@ -677,7 +677,7 @@ fn unconnected_support_boundary_preserves_all_pending_input_and_timers() {
                 sequence: 1,
             },
             Command::Support {
-                kind: "artillery".into(),
+                kind: "bombing".into(),
                 at: Point { x: 8.0, z: 8.0 },
                 direction: None,
             },
@@ -708,7 +708,7 @@ fn unconnected_support_boundary_preserves_all_pending_input_and_timers() {
         future
             .advance_tick()
             .unwrap_err()
-            .contains("support strike tick actuator")
+            .contains("support aircraft tick phase")
     );
     assert_eq!(snapshot(&future), before);
     assert_eq!(
