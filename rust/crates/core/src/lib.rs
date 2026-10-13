@@ -15,14 +15,18 @@ pub mod legacy_scenario;
 
 pub mod logistics;
 pub mod map;
+pub mod match_runtime;
 pub mod math;
 pub mod movement;
 pub mod navigation;
+pub mod observed_memory;
+
 pub mod objectives;
 pub mod path_requests;
 
 pub mod orders;
 pub mod pathfinding;
+pub mod produced_units;
 pub mod production;
 pub mod projectiles;
 
