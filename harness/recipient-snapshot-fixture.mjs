@@ -20,7 +20,7 @@ const map={name:'Snapshot fixture',w:20,h:20,rows,spawns:[{x:1,y:1},{x:18,y:18},
 assert.ok(process.argv.slice(2).every(arg=>arg==='--check'));
 const cases=[];
 const publicState=(g,army='standard')=>({army,tech:g.tech,wx:g.wx,wind:g.wind,support:g.players.map(p=>p.sup),strikes:g.strikes,covers:g.covers??[],points:g.points.map(q=>({owner:q.owner,capper:q.capper,progress:q.progress,cut:q.cut,needs:q.needs,contested:q.contested,onPoint:q.onPoint})),smokes:g.smokes,fires:[...g.fires]});
-const fields=['tick','units','mp','mun','fuel','inc','fuelInc','upkeep','out','vp','winner','end','rally','tech','weather','plans','orders','queues','productionJobs','army','wx','sup','points','smokes','fires','movement','strikes','covers'];
+const fields=['tick','units','mp','mun','fuel','inc','fuelInc','upkeep','out','vp','winner','end','rally','tech','weather','plans','orders','queues','productionJobs','army','wx','sup','points','smokes','fires','movement','strikes','covers','works'];
 const fullFor=g=>{const cache=sim.snapshotCache(g);return g.players.map((_,slot)=>{const result=sim.snapshotFor(g,slot,[],[],cache);result.cells=sim.terrainFor(g,slot,true);result.fog=sim.fogFor(g,slot,true);return JSON.parse(JSON.stringify(result));});};
 for(const kind of ['rifle','sniper','tank','halftrack','engineer','bunker']) {
  for(const placement of ['open','trench','cover','near-corner','near-vehicle','near-wrap','deleted-target','finished']) {
