@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed the ordered-retirement regression's snapshot setup to supply every live unit's canonical firing timer. The first composed native run passed 30 library and two field-work tests, then the new regression panicked on its empty timer map before exercising retirement. Runtime retirement and source fixtures are unchanged; complete gates are restarting at the corrected checkpoint.
+
 - Updated the operative tick replay after central control state gained the reaction timer. Trusted fixture patches now set canonical `UnitControl.react`, and operative rows compare its exact preserved value. Ordinary reaction execution remains unavailable and its timer remains outside this bounded projection. No runtime phase or gameplay state was added; native verification is pending.
 
 - Normal-merged the checked central abilities/World metadata provider 643ad2b into a separate successor of frozen ac43c28. Preserved the sole operative caller and all four stale-ID guards and default publication callbacks for join and respawn. Reaction and World providers remain available components without enabling their missing tick phases. The merged original World memory recorder reproduces four traces and 120 actions while preserving the explicit remembered-wreck arrays. First combined operative native proof remains pending.
