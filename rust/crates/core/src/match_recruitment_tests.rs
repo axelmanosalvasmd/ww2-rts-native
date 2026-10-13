@@ -244,3 +244,59 @@ fn recorded_buy_preflight_never_charges_or_publishes() {
     ));
     assert_eq!(unchanged(&m), before);
 }
+
+#[test]
+fn denied_rally_buy_preserves_moved_gameplay_bucket_order() {
+    let fixture: Value = serde_json::from_str(include_str!(
+        "../../simtest/tests/fixtures/match-recruitment.json"
+    ))
+    .unwrap();
+    let mut m = make(&fixture["cases"][0]["map"]);
+    let at = Point { x: 49.0, z: 33.0 };
+    let kind = m.rules.kind("tank").unwrap();
+    // Two canonical heavy drafts provide a valid current-position visibility
+    // fixture. Only the low ID leaves and returns, like a maintained movement update.
+    for id in [1, 2] {
+        let unit = crate::unit_spawn::initial_unit(
+            &m.rules,
+            crate::catalog::Catalog::compiled().unwrap(),
+            kind,
+            id,
+            0,
+            at,
+        )
+        .unwrap();
+        let control = crate::match_commands::UnitControl::new(&unit, &m.rules).unwrap();
+        m.world.game.units.insert(id, unit);
+        m.commands.insert(id, control);
+    }
+    m.grid = crate::grid::SpatialGrid::new(&m.world.game.units, 16.0);
+    let low = m.world.game.units.get_mut(&1).unwrap();
+    low.x = 65.0;
+    m.grid.update(1, low);
+    low.x = at.x;
+    m.grid.update(1, low);
+    let probe = |m: &Match| {
+        (
+            m.grid
+                .unordered(&m.world.game.units, (at.x, at.z), 1.0, |_, _| true),
+            m.grid
+                .heavy(&m.world.game.units, (at.x, at.z), 1.0, |_, _| true),
+        )
+    };
+    let before = probe(&m);
+    assert_eq!(before, (vec![2, 1], vec![2, 1]));
+    m.player_rallies[0] = Some(Point { x: 35.0, z: 35.0 });
+    m.start.economy.players[0].mp = 0.0;
+    m.world.game.tick += 1; // Force recipient live refresh and remembered row replay.
+    m.world.set_cell(700, b'O').unwrap();
+    let state = unchanged(&m);
+    assert!(matches!(
+        m.recorded_buy(0, "rifle", None),
+        Err(RecruitError::Admission(crate::production::Error::Denied(
+            crate::production::Denial::Mp
+        )))
+    ));
+    assert_eq!(unchanged(&m), state);
+    assert_eq!(probe(&m), before);
+}
