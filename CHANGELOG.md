@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Remove two redundant formatting borrows in the ingress refusal test after `40a778b` passed all four focused admission/lobby/socket tests and formatting, then strict Clippy stopped on those expressions. The same Debug comparison and every assertion remain intact; runtime and fixtures are unchanged. Remaining full native gates need the new head.
+
 - Correct the commander socket test's reconnect lifecycle after `82e3540` passed two admission tests and one lobby test, then failed by reading a unit immediately after start. Start resets the decoder's unit rows and carries no units; the test now checks that empty baseline and waits for the first actual snapshot before checking the retained held-fire flag. Runtime, decoder and original fixtures are unchanged. The failed log is retained; fresh native verification is pending.
 
 - Retained the root-reviewed startup test lint closure `3b84f7c` through normal ancestry in the commander-ingress candidate. Only the identical direct rows privacy assertion changes beyond its repaired startup parent; ingress production and all four new tests retain their source-reviewed bytes. Exact-head combined native proof remains pending.

@@ -344,7 +344,7 @@ mod tests {
         let unit = state.world.game.units.get_mut(&actor).unwrap();
         unit.build = false;
         unit.garrison = None;
-        let before = format!("{:?}", &ingress);
+        let before = format!("{:?}", ingress);
         assert_eq!(
             ingress.enqueue(
                 &mut state,
@@ -353,7 +353,7 @@ mod tests {
             ),
             Err(Denial::Blocked)
         );
-        assert_eq!(format!("{:?}", &ingress), before);
+        assert_eq!(format!("{:?}", ingress), before);
         assert_eq!(state.commands.pending_commands(), 0);
     }
 }
