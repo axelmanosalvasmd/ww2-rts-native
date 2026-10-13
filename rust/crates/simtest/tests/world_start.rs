@@ -210,6 +210,18 @@ fn original_world_startup() {
             assert_eq!(bits(combat.hit_at), bits(raw["hitAt"].as_f64().unwrap()));
             assert_eq!(json!(combat.cargo), raw["cargo"]);
             assert_eq!(
+                instance.abilities.get(actual.id),
+                Some(&ww2_core::match_abilities::AbilityUnit::default()),
+                "case {index} unit {} ability birth metadata",
+                actual.id
+            );
+            assert_eq!(
+                instance.recovery.get(actual.id),
+                Some(&ww2_core::match_recovery::RecoveryUnit::default()),
+                "case {index} unit {} recovery birth metadata",
+                actual.id
+            );
+            assert_eq!(
                 simtest::replay::diff(actual, &expected),
                 None,
                 "case {index} unit {}",

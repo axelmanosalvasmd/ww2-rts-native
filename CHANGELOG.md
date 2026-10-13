@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Extended the existing original World startup replay to require canonical ability and recovery birth defaults for every source unit, alongside combat and firing metadata.
+
 - Integrated canonical ability and recovery state with checked World startup, memory and ground supply. World publication now initializes all four combat, firing, ability and recovery metadata owners, with fresh-identity preflight before insertion; final combined native checks are pending.
 
 - Integrated the typed ability-flight launcher with checked World startup, recipient memory and ground supply ancestry. Both source implementations and their publication guards are retained; final combined native validation is pending.
