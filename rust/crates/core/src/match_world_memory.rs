@@ -464,7 +464,7 @@ impl Match {
             }
             let locked = base_rows.iter().any(|&(kind, owner, b)| {
                 produces[kind]
-                    && region_at(geography, game.w, game.h, b) == Some(i)
+                    && region_at(geography, game, b) == Some(i)
                     && (self.rules.kinds[kind].name == "worldbase"
                         || game.players.get(owner).is_some_and(|p| p.team == live.team))
             });
@@ -541,23 +541,16 @@ impl Match {
         Ok(rows)
     }
 }
-fn region_at(
-    w: &crate::world_map::WorldDefinition,
-    width: usize,
-    height: usize,
-    at: Point,
-) -> Option<usize> {
-    let x = math::floor(at.x / CELL);
-    let y = math::floor(at.z / CELL);
-    if x < 0.0 || y < 0.0 || x >= width as f64 || y >= height as f64 {
-        return None;
-    }
+fn region_at(w: &crate::world_map::WorldDefinition, game: &Game, at: Point) -> Option<usize> {
+    let cell = game.cell_of(at.x, at.z)?;
+    let x = cell % game.w;
+    let y = cell / game.w;
     if let Some(map) = &w.region_map {
-        let i = map[y as usize * width + x as usize];
+        let i = map[cell];
         return (i >= 0).then_some(i as usize);
     }
-    let cols = width / w.region_cells;
-    let i = (y as usize / w.region_cells) * cols + x as usize / w.region_cells;
+    let cols = game.w / w.region_cells;
+    let i = (y / w.region_cells) * cols + x / w.region_cells;
     (i < w.regions.len()).then_some(i)
 }
 /// Group by raw region-map labels, exactly as source. Labels are not remapped to r.id.
