@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-- Joined the actual pre-quiet snapshot prerequisites with the current ability and recovery provider through a normal merge. Kept shared Assault startup, ground support and recipient projections, and canonical World metadata. Added only the required World support default, ordinary post-routing logistics initialization and full-current recovery fixture context. Original-source checks match 72 cached states, 216 recipient projections, 13 delivery steps, 39 recipients, four World traces with 120 actions, and 60 ground support traces with 1,400 checkpoints. Independent source review passes; combined native checks remain pending. The quiet snapshot composition is not included.
+- Verified the actual snapshot prerequisite merge at runtime/test head `26113c5` on the Vostro Linux x86_64: 28 affected debug checks, all 203 locked release workspace tests, strict all-target workspace Clippy, formatting and release FFI pass. The final evidence update changes documentation only. Quiet composition remains a separate candidate with separate verification.
+
+- Joined the actual pre-quiet snapshot prerequisites with the current ability and recovery provider through a normal merge. Kept shared Assault startup, ground support and recipient projections, and canonical World metadata. Added only the required World support default, ordinary post-routing logistics initialization and full-current recovery fixture context. Original-source checks match 72 cached states, 216 recipient projections, 13 delivery steps, 39 recipients, four World traces with 120 actions, and 60 ground support traces with 1,400 checkpoints. Independent source review and the combined native checks pass at `26113c5`. The quiet snapshot composition is not included.
 
 - Preserved the final verified movement snapshot repair and evidence in the separate composition dependency union. The composition descendant still needs its own combined native checks.
 
