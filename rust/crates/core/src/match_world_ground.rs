@@ -327,7 +327,7 @@ impl Match {
             None,
         )?;
         let mut paths = preview.fork_paths(&self.commands.paths);
-        let (game, commit) = preview.prepare_publication(&mut self.world, &self.environment)?;
+        let (game, mut commit) = preview.prepare_publication(&mut self.world, &self.environment)?;
         let read = std::cell::Cell::new(false);
         let query = commit.query();
         let terrain = query
@@ -406,6 +406,13 @@ impl Match {
         )
         .map_err(|e| format!("World movement traffic: {e:?}"));
         drop(query);
+        commit.sync_moved_object(
+            game.units
+                .get(&id)
+                .expect("movement reinserts checked unit"),
+            &self.rules,
+            read.get(),
+        );
         if read.get() {
             commit.commit();
             self.commands.paths = paths;

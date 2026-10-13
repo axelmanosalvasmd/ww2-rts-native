@@ -366,8 +366,8 @@ fn route_state(m: &Match, owner: usize, result: &crate::pathfinding::PathResult)
 #[test]
 fn original_world_route_histories_and_full_memory_retry_version() {
     let f = fixture();
-    let mut m = make(&f);
     for case in f["routing"].as_array().unwrap() {
+        let mut m = make(&f);
         setup(&mut m, &case["input"]);
         let owner = slot(&case["input"]["slot"]);
         vision_mask(&mut m, owner, &case["input"]["visibleCells"]);
@@ -404,6 +404,7 @@ fn original_world_route_histories_and_full_memory_retry_version() {
         }
     }
     let case = &f["scheduler"][0];
+    let mut m = make(&f);
     setup(&mut m, &case["input"]);
     for a in case["input"]["initialEdits"].as_array().unwrap() {
         mutation(&mut m, a);
@@ -446,6 +447,52 @@ fn original_world_route_histories_and_full_memory_retry_version() {
 fn lazy_world_movement_and_refusal_preserve_memory_ledger_and_history() {
     let f = fixture();
     let mut m = make(&f);
+    for case in f["movement"].as_array().unwrap() {
+        let mut m = make(&f);
+        setup(&mut m, &case["input"]);
+        let owner = slot(&case["input"]["slot"]);
+        vision_mask(&mut m, owner, &case["input"]["visibleCells"]);
+        m.begin_path_tick(4096, 3).unwrap();
+        let moved = m.move_unit_with_command_routes(7, 1.0).unwrap().unwrap();
+        let u = &m.world.game.units[&7];
+        let expected = &case["expected"];
+        assert_eq!(
+            json!({"speedBits":bits(moved.speed),"xBits":bits(u.x),"zBits":bits(u.z),"rotBits":bits(u.rot),"path":path(&u.path)}),
+            json!({"speedBits":expected["speedBits"],"xBits":expected["xBits"],"zBits":expected["zBits"],"rotBits":expected["rotBits"],"path":expected["path"]}),
+            "{}",
+            case["name"]
+        );
+        let runtime = m.world_runtime.as_ref().unwrap();
+        let team = m.actor_policy(owner).unwrap().team;
+        if expected["readCount"] == 0 {
+            assert!(runtime.memory.team(team).is_none());
+        } else {
+            let memory = runtime.memory.team(team).unwrap();
+            assert_eq!(
+                memory.version(),
+                expected["memoryVersion"].as_u64().unwrap()
+            );
+            assert_eq!(
+                memory.query().navigation().versions.knowledge,
+                expected["navigationVersion"].as_u64().unwrap()
+            );
+            let bound = runtime
+                .memory
+                .live_for(owner)
+                .unwrap()
+                .units
+                .iter()
+                .find(|u| u.id == 7)
+                .unwrap();
+            assert_eq!(
+                json!([bits(bound.at.x), bits(bound.at.z)]),
+                json!([
+                    expected["cachedUnitPose"]["xBits"],
+                    expected["cachedUnitPose"]["zBits"]
+                ])
+            );
+        }
+    }
     let c = &f["traffic"][0];
     setup(&mut m, &c["input"]);
     unit(&mut m, &c["input"]["other"]);

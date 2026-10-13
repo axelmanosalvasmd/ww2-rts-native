@@ -775,6 +775,13 @@ impl WorldRoutingCommit<'_, '_, '_> {
     pub(crate) fn failure_version(&self) -> u64 {
         self.state.team(self.team).unwrap().version()
     }
+    pub(crate) fn sync_moved_object(&mut self, unit: &Unit, rules: &Rules, publish: bool) {
+        if publish {
+            self.state.update_cached_ground_unit(unit, rules);
+        } else {
+            self.target.update_cached_ground_unit(unit, rules);
+        }
+    }
     pub fn commit(self) {
         *self.target = self.state;
         self.ledger.commit();

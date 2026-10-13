@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Isolate physical World route scenes with fresh native matches, preserving history within each original scene. Add two actual original walkRoute witnesses for deferred no-read and terrain-read publication, including cached object pose after motion. Update only existing cached World bound-unit facts after movement to preserve source object-reference semantics, without adding visibility membership or changing terrain/Fog/delivery cursors. Source checks pass; native execution remains pending.
+
 - Restore fresh derived path and request caches between independent World ground oracle scenes, matching their separate original Game instances while retaining incremental history within each scene. This test-only source correction has not run native checks.
 
 - Validate World ground actor team binding through the shared game-only actor helper before path preparation, retaining one canonical actor policy and using the complete coordinated prerequisite. This source-only follow-up has not run native checks.

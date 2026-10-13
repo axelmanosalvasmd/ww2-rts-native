@@ -12,7 +12,7 @@ const clean=()=>{if(git(['rev-parse','HEAD'])!==pin||git(['status','--porcelain'
 if(process.arch!=='x64'||process.version!=='v24.21.0')throw Error('Use x64 Node24.21.0');
 if(process.argv.slice(2).some(v=>v!=='--check'))throw Error('Only --check is supported');
 clean();
-registerHooks({load(url,context,next){const out=next(url,context);if(url!==pathToFileURL(`${ref}/shared/sim.js`).href)return out;return {...out,source:String(out.source)+'\nexport {marchMul as __marchMul,homeOf as __homeOf,coverRank as __coverRank,knownTerrainFor as __knownTerrainFor,beginPathTick as __beginPathTick,requestStepPath as __requestStepPath,performStepPath as __performStepPath,pathFailures as __pathFailures,touch as __touch};\n'};}});
+registerHooks({load(url,context,next){const out=next(url,context);if(url!==pathToFileURL(`${ref}/shared/sim.js`).href)return out;return {...out,source:String(out.source)+'\nexport {marchMul as __marchMul,homeOf as __homeOf,coverRank as __coverRank,knownTerrainFor as __knownTerrainFor,beginPathTick as __beginPathTick,requestStepPath as __requestStepPath,performStepPath as __performStepPath,pathFailures as __pathFailures,touch as __touch,walkRoute as __walkRoute,speedMul as __speedMul};\n'};}});
 const sim=await import(pathToFileURL(`${ref}/shared/sim.js`));
 const {trafficStep}=await import(pathToFileURL(`${ref}/shared/local-traffic.js`));
 const {rebuildGrid}=await import(pathToFileURL(`${ref}/shared/grid.js`));
@@ -153,7 +153,20 @@ function schedulerCase(){const ring=[];for(let y=7;y<=9;y++)for(let x=7;x<=9;x++
  scheduler.push({name:'accepted wear resets failed route count without graph version change',input,captures});
 }
 schedulerCase();
+// One original infantry movement call per scene, with no other traffic or tick phases.
+const movement=[];
+function movementCase(name,input){const g=physicalGame(input),u=g.units.get(input.unit.id),def=sim.UNITS[u.type];let readCount=0,cachedView;
+ const trafficView=()=>{readCount++;return cachedView=sim.__knownTerrainFor(g,u.owner);};
+ const speed=def.speed*sim.__speedMul(g,u)*sim.__marchMul(g,u,def);
+ sim.__walkRoute(g,u,def,u.path,speed,sim.TICK,false,{yielding:false},trafficView);
+ const m=g.world.memory.get(g.players[u.owner].team),cachedUnit=cachedView?.units.get(u.id);
+ movement.push({name,input,expected:{readCount,speedBits:bits(speed),xBits:bits(u.x),zBits:bits(u.z),rotBits:bits(u.rot),path:u.path.map(p=>[bits(p.x),bits(p.z)]),memoryVersion:m?.version??null,navigationVersion:m?.path?.navigationKnowledgeVersion??null,cachedUnitPose:cachedUnit?{xBits:bits(cachedUnit.x),zBits:bits(cachedUnit.z),rotBits:bits(cachedUnit.rot)}:null}});
+}
+movementCase('commander single waypoint preserves deferred terrain read',{
+ slot:0,unit:unit(7,0,'rifle',20,{x:17,z:17,rot:0,path:[{x:27,z:17}]}),visibleCells:[c,c+5]});
+movementCase('neutral near waypoint uses remembered clear skip',{
+ slot:-1,unit:unit(7,-1,'rifle',19,{x:17,z:17,rot:0,path:[{x:17.1,z:17},{x:21,z:17},{x:27,z:17}]}),visibleCells:[c,c+2,c+5]});
 clean();
-const output=JSON.stringify({format:1,reference:pin,node:process.version,arch:process.arch,definitions,march,home,cover,visibility,traffic,routing,scheduler})+'\n',path=`${root}/rust/crates/simtest/tests/fixtures/world-ground-routing.json`;
+const output=JSON.stringify({format:1,reference:pin,node:process.version,arch:process.arch,definitions,march,home,cover,visibility,traffic,routing,scheduler,movement})+'\n',path=`${root}/rust/crates/simtest/tests/fixtures/world-ground-routing.json`;
 if(process.argv.includes('--check')){if(readFileSync(path,'utf8')!==output)throw Error('World ground routing fixture differs');}else writeFileSync(path,output);
-console.log(`Verified original World queries: ${march.length} march, ${home.length} home, ${cover.length} cover, ${visibility.length} visibility, ${traffic.length} traffic, ${routing.length} route histories, ${scheduler.length} scheduler history`);
+console.log(`Verified original World queries: ${march.length} march, ${home.length} home, ${cover.length} cover, ${visibility.length} visibility, ${traffic.length} traffic, ${routing.length} route histories, ${scheduler.length} scheduler history, ${movement.length} movement`);
