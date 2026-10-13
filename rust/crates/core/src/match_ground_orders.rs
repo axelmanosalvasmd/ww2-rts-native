@@ -364,8 +364,8 @@ impl Match {
                 owner,
                 ExistingObservers::new(&exits[..prefix])?,
             )?;
-            let terrain = preview
-                .query()
+            let query = preview.query();
+            let terrain = query
                 .path_terrain(preview.live())
                 .map_err(|e| format!("ground retreat terrain: {e:?}"))?;
             let unit = exits.iter().find(|exit| exit.id() == id).unwrap().unit();

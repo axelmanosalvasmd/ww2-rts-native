@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Addressed the first combined construction/GroundAttack compiler failures before any tests ran: restored the paired ability-test control binding, retained routing query lifetimes, and committed the new observation receipt only into the temporary construction draft before search. Applied the exact checked PR #193 canonical support snapshot/factory migration to Game.strikes and SupportTiming, retaining original fixture bytes and explicit raw/AIR refusals. The failed strict log contains 11 compiler errors; formatting had passed, and fresh compilation plus all native tests remain pending.
+
 - Normally retained verified main `8f27227` in the separate construction/GroundAttack candidate, including the accepted recipient-known terrain traffic adapter. Existing dispatch, path callbacks, ordered output and source fixtures remain intact. Corrected the sole caller receipt to report connected TrafficKnowledge once instead of listing it as unavailable; the existing actual-runner regression protects that truthful receipt. Combined native verification remains pending and no frozen proof branch changed.
 
 - Prepared the source-reviewed construction/ground caller for a coherent native cycle by normally retaining the ordered-event publication parent, current main and the central 40-minute CI budget. Core and simulation consumer bytes remain exactly `c501e12`; the approved ABI 2 header and server provider bytes come from those accepted parents. New combined native and platform results remain pending, and earlier ABI 1 branch FFI evidence is not an ABI 2 consumer result.

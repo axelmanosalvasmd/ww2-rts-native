@@ -564,18 +564,21 @@ impl Match {
                 preview.grid.update(id, &unit);
             }
             preview.routed = true;
-            crate::match_routing::refresh_recipient_parts(
-                &mut preview.physical.world,
-                &self.rules,
-                &mut preview.grid,
-                &preview.buildings,
+            let receipt = crate::match_routing::refresh_recipient_parts(
+                crate::match_routing::RecipientObservation {
+                    world: &preview.physical.world,
+                    rules: &self.rules,
+                    building_cells: &preview.buildings,
+                    environment: &self.environment,
+                },
                 &mut preview.fog,
                 &mut preview.recipients[unit.owner],
                 unit.owner,
             )?;
+            receipt.commit(&mut preview.physical.world)?;
             let recipient = &preview.recipients[unit.owner];
-            let terrain = recipient
-                .query()
+            let query = recipient.query();
+            let terrain = query
                 .path_terrain(recipient.live())
                 .map_err(|e| format!("construction route: {e:?}"))?;
             let route = crate::match_commands::search_route(

@@ -120,6 +120,11 @@ fn apply_inputs(m: &mut Match, id: u32, v: &Value) {
             "worldGoal" => u.world_goal = (!value.is_null()).then(|| point(value)),
             "dig" => u.dig = truth(value),
             "build" => {
+                let c = m
+                    .commands
+                    .units
+                    .get_mut(&id)
+                    .expect("restored ability control");
                 c.build_target = value
                     .as_u64()
                     .filter(|id| *id != 0)

@@ -737,26 +737,27 @@ pub(crate) mod tests {
             p.visible.sort_unstable();
         }
         if let Some(public) = case["publicState"].as_object() {
-            m.support.strikes = public["strikes"]
+            m.world.game.strikes = public["strikes"]
                 .as_array()
                 .unwrap()
                 .iter()
-                .map(|s| crate::match_support::SupportStrike {
-                    kind: match s["kind"].as_str().unwrap() {
-                        "artillery" => crate::match_support::SupportKind::Artillery,
-                        "smoke" => crate::match_support::SupportKind::Smoke,
-                        "cover" => crate::match_support::SupportKind::Cover,
-                        _ => panic!("unsupported fixture strike"),
-                    },
+                .map(|s| crate::game::Strike {
+                    kind: crate::game::StrikeKind::Other,
                     owner: s["owner"].as_u64().unwrap() as usize,
-                    at: Point {
-                        x: n(s, "x"),
-                        z: n(s, "z"),
-                    },
-                    direction: n(s, "dir"),
-                    delay: n(s, "t"),
-                    left: n(s, "left"),
-                    next: n(s, "next"),
+                    x: n(s, "x"),
+                    z: n(s, "z"),
+                    dir: n(s, "dir"),
+                    runtime: Some(crate::match_support::SupportTiming {
+                        kind: match s["kind"].as_str().unwrap() {
+                            "artillery" => crate::match_support::SupportKind::Artillery,
+                            "smoke" => crate::match_support::SupportKind::Smoke,
+                            "cover" => crate::match_support::SupportKind::Cover,
+                            _ => panic!("unsupported fixture strike"),
+                        },
+                        delay: n(s, "t"),
+                        left: n(s, "left"),
+                        next: n(s, "next"),
+                    }),
                     live: s["live"].as_bool().unwrap_or(false),
                 })
                 .collect();
