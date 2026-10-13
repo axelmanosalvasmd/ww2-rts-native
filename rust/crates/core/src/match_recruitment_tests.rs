@@ -337,7 +337,7 @@ fn refused_buy_does_not_freeze_same_tick_garrison_move_memory() {
         m.recipients[slot].query().navigation().versions,
         m.world
             .pending(crate::world::Recipient::Player(slot))
-            .map(|v| v.to_vec()),
+            .map(|v| v.iter().copied().collect::<Vec<_>>()),
     );
     let state = unchanged(&m);
     let result = m.recorded_buy(slot, r["denied"]["command"]["unit"].as_str().unwrap(), None);
@@ -349,7 +349,7 @@ fn refused_buy_does_not_freeze_same_tick_garrison_move_memory() {
             m.recipients[slot].query().navigation().versions,
             m.world
                 .pending(crate::world::Recipient::Player(slot))
-                .map(|v| v.to_vec())
+                .map(|v| v.iter().copied().collect::<Vec<_>>())
         ),
         before
     );

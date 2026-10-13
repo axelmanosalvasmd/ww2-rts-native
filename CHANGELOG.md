@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Updated inherited native fixture consumers for the complete damage ordering context and ordered pending-cell set. The recovery fixture keeps the existing full actor list, and recruitment snapshots preserve the same cell contents. Native proof is restarting after these test compiler errors.
+
 - Split the existing ability fixture control projection into a local JSON value to fit the macro recursion limit when the engineering library tests compile. The represented fields and expected fixture values are unchanged.
 
 - Repaired the engineering union compiler boundaries: recruitment errors use the existing public re-export, section retirement supplies the source full-list ordering option, and recovery validates optional section maxima before arithmetic. The first native compile exposed these inherited mismatches; the coupled proof is restarting at the repaired checkpoint.
