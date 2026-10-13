@@ -775,8 +775,8 @@ impl Match {
             return Ok(OpeningTick::Stopped);
         }
         if now % 4 == 1 && self.world.game.vision_tick != Some(now) {
-            self.grid.rebuild(&self.world.game.units);
-            vision::update_vision(&mut self.world.game, &self.rules, &self.grid);
+            let grid = crate::grid::SpatialGrid::new(&self.world.game.units, 16.0);
+            vision::update_vision(&mut self.world.game, &self.rules, &grid);
         }
         let mut staged = seat.clone();
         if now % 2 == 0 {

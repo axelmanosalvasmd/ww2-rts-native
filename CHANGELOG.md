@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Kept the opening commander's fallback vision query on a fresh temporary spatial index, preserving the maintained gameplay index while applying the source vision phase. Recipient-routing index preservation is being verified in the FPS integration lane.
+
 - Added a bounded native Conquest opening commander: detached recipient observations, source point scores and cover waypoints, fixed per-seat scheduling, isolated seeded draws and typed movement orders through the canonical Match queue. Economic, combat, camera, World and complete-match AI behavior remain pending; no wire or C interface changed.
 
 - Stacked the checked Conquest command actuator on the reviewed recruitment and recipient-routing checkpoint, retaining its complete command behavior and canonical shared control state. Combined integration checks belong to the shared CI lane.
