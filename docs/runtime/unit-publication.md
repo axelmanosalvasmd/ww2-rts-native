@@ -8,4 +8,6 @@
 
 Publication consumes the guard, applies staged HP, inserts each unit in source order, maintains the grid, inserts canonical controls and optional recruitment facts, then advances the allocator. An infallible callback publishes already prepared metadata owned by firing, combat or reserves. Those owners must complete fallible validation and reject stale metadata for every new ID before payment. They must not duplicate unit position or HP. This primitive implements no purchase price, FPS eligibility or game-rule override itself.
 
-The source-only prerequisite commit is intended to unblock the FPS consumer. It remains pending Rust verification and focused regression/review at this stage; no build or merge completion is claimed.
+Three focused regressions check whole-batch rejection/drop, staged squad HP with disjoint payment and ordered grid/control/ID publication, and explicit World actor admission with finite guard-home validation. The original recruitment oracle has six traces and 33 buys, including an unrelated casualty at negative HP that must not block publication. The existing original spawn oracle also regenerates unchanged.
+
+The implementation passes 130 workspace tests, five release transaction/recruitment tests, strict workspace Clippy and formatting. Independent review reran the five focused tests and original recruitment regeneration with no remaining findings. Full FPS/World execution and future training integration remain separate; those consumers must preserve their own metadata preflight and publication callbacks.
