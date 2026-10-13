@@ -262,7 +262,7 @@ fn original_command_and_waiting_order_phases() {
             count += 1;
         }
     }
-    assert_eq!(count, 256);
+    assert_eq!(count, 261);
 }
 #[test]
 fn ordered_match_boundary_and_whole_command_rejection() {

@@ -128,6 +128,12 @@ for(const [kind,def]of Object.entries(sim.UNITS).filter(([,d])=>!d.air))trace('t
 // Immediate Cover uses the real command body and existing route oracle.
 const coverCases=[
  ['open-no-cover',maps[0],[{kind:'rifle',x:25,z:23}],[{command:{t:'cover',ids:[1]}}]],
+ ['mixed-retreat-no-cover',maps[0],[{kind:'rifle',x:25,z:23,fields:{retreating:true,follow:77}},{kind:'rifle',x:29,z:23,fields:{follow:77}}],[{command:{t:'cover',ids:[1,2]}}]],
+ ['mixed-kind-no-cover',maps[0],[{kind:'tank',x:25,z:23,fields:{follow:77}},{kind:'rifle',x:29,z:23,fields:{follow:77}}],[{command:{t:'cover',ids:[1,2]}}]],
+ ['riding-refusal',maps[1],[{kind:'rifle',x:27,z:23,fields:{riding:9,follow:77}}],[{command:{t:'cover',ids:[1]}}]],
+ ['operative-refusal',maps[1],[{kind:'rifle',x:27,z:23,fields:{operative:{},follow:77}}],[{command:{t:'cover',ids:[1]}}]],
+ ['forced-supply-refusal',maps[1],[{kind:'rifle',x:27,z:23,fields:{logistics:{forced:true,stranded:true},follow:77}}],[{command:{t:'cover',ids:[1]}}]],
+
  ['wrong-kind',maps[1],[{kind:'tank',x:25,z:23,fields:{follow:77}}],[{command:{t:'cover',ids:[1]}}]],
  ['wrong-owner',maps[1],[{kind:'rifle',owner:1,x:25,z:23}],[{command:{t:'cover',ids:[1]}}]],
  ['retreating',maps[1],[{kind:'rifle',x:25,z:23,fields:{retreating:true,follow:77}}],[{command:{t:'cover',ids:[1]}}]],

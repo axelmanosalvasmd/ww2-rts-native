@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Extended the immediate Cover source oracle with mixed retreat/no-cover and wrong-kind selections, plus riding, operative and forced-supply refusals. The original command body now records 71 traces and 261 steps. Native comparison and the staged recipient-observation integration are still pending.
+
 - Preserved moved gameplay bucket order during Cover recipient refresh and full wreck observation, using the narrow source corrections from 0b397d3, ada6c4 and 7699d8c. Added a maintained ordinary/heavy bucket Cover regression with a later path-capacity denial and checked path identity before a route refresh. Native proof remains pending.
 
 - Fixed holder policy validation so an already covered or entrenching squad near a remembered house refuses the unimplemented garrison decision before committing private memory or RNG. Two new original-thinker cases bring the AI oracle to 62 cases with 270 waypoint draws; native comparison remains pending.
