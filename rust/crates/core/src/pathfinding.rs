@@ -168,7 +168,9 @@ impl Pathfinding {
         prepared: TerrainView<'_>,
     ) -> Self {
         let mut fork = self.clone();
-        fork.navigation.rebind_terrain(source, prepared);
+        let vehicle_buffers = fork.vehicles.buffers_for(source);
+        fork.navigation
+            .rebind_terrain(source, prepared, &vehicle_buffers);
         fork.vehicles.rebind_terrain(source, prepared);
         fork
     }
