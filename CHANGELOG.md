@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Correct the ordinary research replay's capability assertion to require Production to remain unavailable while Research is connected. Keep every complete Source projection, phase/order check, immediate-birth comparison and ordinary nonempty-queue refusal. This matches the bounded caller integration; queued World/Classic training and broader production actuation remain separate. No runtime or original fixture changes, and no native validation is claimed for this consumer successor.
+
 - Recorded four complete original ordinary tick traces with 2,429 steps, 4,810 research observations, seven commands and two immediate recruitment births. Added an actual-runner consumer and two original restored-queue failure witnesses. Observed and unobserved Source replay agree; native execution awaits the sole tick owner's research hookup. Retained unsupported restored queues rather than inventing a Conquest mode object.
 
 - Added read-only admission for canonical research and live-building production phases, including actual World context, foreign queue rows and prospective numeric overflow. Ordinary Conquest keeps immediate purchases and refuses nonempty restored training queues. World queued AIR and logistics publication remain unsupported. Training publication also checks the canonical Aviation and reserve owners before using an ID. Full tick hookup and native proof are pending.

@@ -1,5 +1,9 @@
 # Three Crossroads Native: design decisions
 
+## Ordinary research capability report (2026-10-13, consumer successor)
+
+The sole caller's bounded hookup advances Research after optional vision and before project recounting. It does not connect per-building queued training in ordinary Conquest; canonical nonempty ordinary queues remain refused before clock publication. The complete original-step consumer now requires Research to be available and Production to remain in `report.unavailable`, preserving every original state, phase-order, immediate-birth and denial comparison. This is an explicit capability-report correction, not a reduced Source comparison or a new runtime guard. World/Classic queued production and actual building-turn publication remain separate. The source consumer must be composed with the sole caller before a fresh native run; this isolated patch runs no Cargo and carries no native result.
+
 ## Research and production phase admission (2026-10-13, source candidate)
 
 `Match::validate_production_phases(dt)` checks the canonical ProductionState, borrowed units and wallets before the caller advances its clock. Prospective research and individual building rows reuse the existing progression algorithms without publishing them. No Match, unit registry or wallet is cloned. Actual placement, observed rally routing and metadata publication remain at each later building turn. The guard accepts the existing World context and refuses queued AIR and enabled logistics until their actual publication consumers are connected. It does not replace full World terrain, actor or routing admission.
