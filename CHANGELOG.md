@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Updated the command replay’s restored digging state to create a canonical field-work descriptor through real placement preparation. Its existing Move and Stop checkpoints now also require descriptor cancellation, replacing the stale activity-only test setup. Native replay remains pending.
+
 - Documented the ordinary Dig dispatcher and scheduler boundary with 12 reproducible source traces and 47 actions. Native execution and unit-loop integration remain pending.
 
 - Connected ordinary Dig to the single recorded command dispatcher and real path-request goal/drop hooks. Accepted Move and Stop cancel canonical field work synchronously; queued digs and excluded fort kinds remain explicit. Invalid cancellation state propagates through the existing checked path API. Source/native replay verification remains pending.
