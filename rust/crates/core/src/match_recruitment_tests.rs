@@ -4,8 +4,8 @@ use crate::{
     economy_state::ArmySize,
     game::Point,
     map::AuthoritativeMap,
-    navigation::Versions,
     match_runtime::{Match, MatchOptions, PlayerConfig, RecruitError},
+    navigation::Versions,
     pathfinding::PathStatus,
     weather::WeatherChoice,
 };

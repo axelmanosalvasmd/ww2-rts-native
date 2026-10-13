@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix command proof readers to allow movement-only setup rows and compare paid Dig numbers with the original JSON integer spelling. Native commander execution and policy replay checks pass; remaining combined checks are pending.
+
 - Fix the coherent commander proof union by keeping one copy of the paid-work cancellation and AP refusal tests, and importing the routing version type used by recruitment tests.
 
 - Combined the checked staged observer footprint and birth replay repairs with the coherent commander proof successor. Policy and source scenario files remain unchanged; native checks of this combined consumer are pending.

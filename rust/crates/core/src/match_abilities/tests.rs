@@ -800,4 +800,3 @@ fn rejected_ap_launch_preserves_loaded_round_ammunition_and_random_stream() {
     assert!(m.firing.flights.is_empty());
     assert!(m.firing.take_events().is_empty());
 }
-

@@ -116,9 +116,7 @@ fn initial(c: &Value) -> Match {
     }
     if c["steps"]
         .as_array()
-        .unwrap()
-        .iter()
-        .any(|s| s["work"].is_object())
+        .is_some_and(|steps| steps.iter().any(|s| s["work"].is_object()))
     {
         for player in &mut m.start.economy.players {
             player.mp = 150.0;
@@ -771,15 +769,22 @@ fn queued_cover_admission_keeps_live_routes_and_observations() {
     );
 }
 
+fn source_number(n: f64) -> Value {
+    if n.fract() == 0.0 {
+        json!(n as i64)
+    } else {
+        json!(n)
+    }
+}
 fn work_snapshot(m: &Match) -> Value {
     let dig:Vec<_> = m.world.game.units.keys().map(|id| {
         let d = m.field_works.jobs().get(id).map(|d| {
-            let mut row=json!({"x":d.at.x,"z":d.at.z,"cells":d.cells.iter().map(|c|json!([c.cell,(c.ch as char).to_string()])).collect::<Vec<_>>(),"t":d.elapsed,"kind":d.kind.as_str(),"dir":d.direction});
+            let mut row=json!({"x":source_number(d.at.x),"z":source_number(d.at.z),"cells":d.cells.iter().map(|c|json!([c.cell,(c.ch as char).to_string()])).collect::<Vec<_>>(),"t":source_number(d.elapsed),"kind":d.kind.as_str(),"dir":d.direction.map(source_number)});
             let object=row.as_object_mut().unwrap();
             if let Some(n)=d.original_cells {object.insert("n".into(),json!(n));}
-            if let Some(reach)=d.reach {object.insert("reach".into(),json!(reach));}
-            if let Some(front)=d.front {object.insert("front".into(),json!(front));}
-            if let Some(from)=d.from {object.insert("from".into(),json!({"x":from.x,"z":from.z}));}
+            if let Some(reach)=d.reach {object.insert("reach".into(),source_number(reach));}
+            if let Some(front)=d.front {object.insert("front".into(),source_number(front));}
+            if let Some(from)=d.from {object.insert("from".into(),json!({"x":source_number(from.x),"z":source_number(from.z)}));}
             row
         });
         json!({"id":id,"dig":d})
