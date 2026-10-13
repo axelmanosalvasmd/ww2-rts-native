@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added ground production door placement with ordered exit rings, vehicle clearance, occupancy checks, origin-region fallback, heading and spawn ghosts. Two focused tests compare 934 projections from the unchanged JavaScript on 43 terrains, including all 44 non-air kinds and 33 authored maps. Recruitment receives a placed Unit and an explicit rally routing request; wallet/ID changes, path execution, full unit-state initialization and air-base production remain outside the helper.
+
 - Add Conquest recruitment preparation with canonical population, queue and maker checks. Placement failure drops the request without payment; successful commit charges MP once. Two focused tests cover 266 original-JavaScript buy commands and aborted transactions. Other modes, placement and Match integration remain separate.
 
 - Added per-player observed terrain memory with filtering before storage, stable row revisions, canonical full-route order and a separate snapshot outbox. Three original-source traces match 117 actions, including hidden mines, unseen removals, building cancellation, allied/live/ruin footprints, reveal, teams and reconnect reads. Invalid shapes, exhausted revisions and mismatched route recipients reject before memory changes. World Conquest memory, real visibility wiring, snapshot serialization and Match integration remain separate; MOV-29 and MAP-100 stay in progress.
