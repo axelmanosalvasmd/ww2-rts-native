@@ -129,7 +129,11 @@ fn wreck(m: &mut Match, a: &Value) {
         id,
         WreckMetadata {
             kind: m.rules.kind(a["kind"].as_str().unwrap_or("tank")).unwrap(),
-            owner: a["owner"].as_u64().unwrap_or(1) as usize,
+            owner: if a["owner"].as_i64() == Some(-1) {
+                crate::game::LOCAL_DEFENDER_OWNER
+            } else {
+                a["owner"].as_u64().unwrap_or(1) as usize
+            },
             rotation: a["rot"].as_f64().unwrap_or(-0.26),
             motion: moving.then(|| DebrisBody {
                 id: format!("wreck:{id}"),
@@ -273,7 +277,7 @@ fn original_recipient_lists_retain_display_privacy_order_and_world_nodes() {
             count += 1;
         }
     }
-    assert_eq!(count, 90);
+    assert_eq!(count, 92);
 }
 fn ordinary_context(m: &Match) -> crate::match_routing::RecipientContext<'_> {
     crate::match_routing::RecipientContext {
