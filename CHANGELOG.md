@@ -3,6 +3,9 @@
 ## Unreleased
 
 - Carried the checked ability-flight recorder prerequisites: direct-launch cases use the actual catalog ability range, and actor inputs preserve the source incoming-hit sentinel. The old inputs placed short-range abilities outside the unchanged source phase guard and replaced the hit sentinel with null. Runtime defaults and geometry are unchanged.
+- Fixed the production differential fixture’s paid-job cost projection to compare MP and Fuel by IEEE bits on both sides. This removes the JSON integer-versus-float mismatch found in the coupled engineering release run without changing production arithmetic or runtime behavior.
+
+- Carried the routing owner’s all-team World buffer mapping repair and 14-case original birth fixture into both consumers. The real training replay keeps its three-case scope; provider cross-team success/history coverage remains separately labeled, with native checks pending.
 
 - Added the existing flight-fixture comparison path to numeric mismatch diagnostics so the coupled native proof can identify missing represented values directly. Core release tests passed before the inherited simtest comparison stopped.
 

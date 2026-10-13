@@ -28,7 +28,7 @@ function run(name,map,actions){
   const id=a=>a.id??[...g.units.values()].find(u=>u.owner===(a.slot??0)&&u.type===(a.maker??'hq'))?.id;
   function projection(){return{tick:g.tick,next:g.nextId,nextJob:g.nextProductionJob??0,mode:g.mode?.kind??null,winner:g.winner,
    players:g.players.map(p=>({slot:p.slot,away:!!p.away,out:!!p.out,mp:bits(p.mp),mun:bits(p.mun),fuel:bits(p.fuel),tier:p.tier,armory:{...p.armory},lab:p.lab.map(j=>({kind:j.kind,progress:bits(j.prog),time:bits(j.time)})),spent:bits(g.story?.[p.slot]?.mpSpent??0)})),
-   buildings:makers.filter(n=>g.units.has(n)).map(n=>{const b=g.units.get(n);return{id:n,owner:b.owner,kind:b.type,hp:bits(b.hp),built:bits(b.built),queue:[...b.queue],jobs:(b.productionJobs??[]).map(j=>({...j})),progress:bits(b.prog),rally:point(b.rally)};}),
+   buildings:makers.filter(n=>g.units.has(n)).map(n=>{const b=g.units.get(n);return{id:n,owner:b.owner,kind:b.type,hp:bits(b.hp),built:bits(b.built),queue:[...b.queue],jobs:(b.productionJobs??[]).map(j=>({...j,mp:bits(j.mp),fuel:bits(j.fuel)})),progress:bits(b.prog),rally:point(b.rally)};}),
    created:[...g.units.values()].filter(u=>u.id>=initialNext).map(u=>({id:u.id,owner:u.owner,kind:u.type,hp:bits(u.hp),pose:[u.x,u.z,u.rot,u.aim,u.ghost??0].map(bits),goal:point(u.worldGoal),routeEnd:point(u.routeEnd),path:u.path.map(point),rally:u.drift==='rally',auto:u.auto,autoRetreat:u.autoRetreat,grid:sim.gridFor(g).candidates(u,12).map(v=>v.id)}))};}
   const start=projection();
   for(const raw of actions){const a=structuredClone(raw);let result=null,executed=true;
