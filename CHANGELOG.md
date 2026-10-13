@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Restore the complete World provider and transaction module alongside additive observation receipt APIs after dependency conflict resolution dropped the provider body. No intended World behavior change.
+
 - Add an explicit complete-live-order World region phase that stages actual administrative deletion and building wrecks before publishing wallets, homes, terrain, retained route facts and finish. The existing capture-only wrapper keeps its elimination refusal.
 
 - Reused the World memory terrain-binding check before preparing removed cached-unit facts. Independent source review found same-sized foreign memory could otherwise be accepted; a matching-ID two-World rejection test protects the original memory and route allocations.
