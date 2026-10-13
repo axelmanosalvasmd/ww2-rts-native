@@ -222,6 +222,33 @@ pub fn initial_unit(
     owner: usize,
     at: Point,
 ) -> Result<Unit, SpawnError> {
+    initial_fields(rules, catalog, kind, id, owner, at, false)
+}
+
+/// Explicit physical aircraft fields for controlled scene restoration or staged publication.
+/// This does not register a sortie, resolve an air base, scatter, or admit aircraft execution.
+/// A restored source row without an air object may normalize the unused physical field to Base.
+pub fn initial_aircraft(
+    rules: &Rules,
+    catalog: &Catalog,
+    kind: usize,
+    id: UnitId,
+    owner: usize,
+    at: Point,
+) -> Result<Unit, SpawnError> {
+    initial_fields(rules, catalog, kind, id, owner, at, true)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn initial_fields(
+    rules: &Rules,
+    catalog: &Catalog,
+    kind: usize,
+    id: UnitId,
+    owner: usize,
+    at: Point,
+    aircraft: bool,
+) -> Result<Unit, SpawnError> {
     if id == 0 {
         return Err(SpawnError::InvalidId);
     }
@@ -229,8 +256,11 @@ pub fn initial_unit(
         return Err(SpawnError::InvalidPosition);
     }
     let profile = rules.kinds.get(kind).ok_or(SpawnError::UnknownKind)?;
-    if profile.air {
+    if profile.air && !aircraft {
         return Err(SpawnError::UnsupportedAir);
+    }
+    if !profile.air && aircraft {
+        return Err(SpawnError::InvalidDefinition);
     }
     let definition = catalog.unit(&profile.name)?;
     let models = definition
@@ -255,7 +285,7 @@ pub fn initial_unit(
         rot: 0.0,
         garrison: None,
         riding: false,
-        air: None,
+        air: aircraft.then_some(crate::game::PlaneState::Base),
         still: Some(0.0),
         shot_at: None,
         dust: None,

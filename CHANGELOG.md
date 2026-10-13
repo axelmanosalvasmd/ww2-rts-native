@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Exposed the existing physical aircraft field initializer through an explicit pure constructor for controlled scene restoration. It shares ordinary defaults once, preserves ordinary UnsupportedAir and does not create sortie metadata or admit World flight. The World elimination source's restored dead fighter has no air object; the consumer may normalize only that unused physical field to native Base while preserving kind, ID, owner, HP and pose. Constructor source review and native execution remain pending; no World startup, mission, movement or weapon support is added.
+
 - Fix native fixture compilation by retaining three route queries while their borrowed navigation views are read. Use the explicit World effect adapter in elimination comparisons, and scope the shared sorting helper lint to that one test helper.
 
 - Fix the first native World elimination compile: observation receipts retain canonical `u32` footprint indices, and staged sight validates their checked conversion to bounded terrain indices. No cell data or observation ordering changes.

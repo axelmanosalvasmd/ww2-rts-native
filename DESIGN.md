@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## Pure aircraft fields for restored scenes (2026-10-13)
+
+The World elimination recorder restores explicit minimal units through `new Map`, including a dead fighter with ID 3, owner 2 and HP 0. It does not call `spawnUnit`, attach an air object or execute a plane turn. The elimination phase compares kind, identity, owner, HP and pose. Passing this row through the ordinary native field constructor correctly refuses AIR, so the constructor now exposes an explicit `initial_aircraft` path that reuses the same `initial_fields` body with AIR opt-in. This is the same physical-field factoring used by the checked aviation provider, without bringing its runtime, staged scatter, command or tick ancestry into World.
+
+The explicit constructor returns native PlaneState::Base for its unused aircraft physical field. This is a bounded normalization of the controlled restored scene, not evidence that the original row had an air object. The consumer retains the original fixture and applies its incoming HP after construction. No sortie/fuel/ammunition/mission registry is created, and no base resolution, grid insertion, scatter or actor admission belongs to this pure API. Ordinary `initial_unit` retains UnsupportedAir, and non-air types refuse the explicit aircraft constructor. Mode-specific publication and all World aircraft operator guards stay with their existing owners. Constructor and World consumer native proof remain pending.
+
 The plan, its evidence and its open work are issue #1. This file records what was decided and why, and the measurements as they come in. Paths such as `shared/sim.js` refer to the JavaScript game in `reference/ww2-rts`.
 
 ## Why native (2026-10-11)
