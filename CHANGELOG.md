@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added one shared field-work cancellation helper for staged transactions borrowing wallet/story and unit state separately. Match delegates to the same implementation, including identity and activity checks before mutation. Native checks remain pending.
+
 - Added the approved canonical Match field-work owner and startup default, plus synchronous cancellation that removes a real descriptor before clearing its activity flag without a refund. Missing or inconsistent activity rejects before writes. Component and combined native proof remain pending.
 
 - Integrated the frozen field-work component as a source-only prerequisite for the approved canonical Match job owner. Its source recorder and review are recorded, while queued native proof remains pending.
