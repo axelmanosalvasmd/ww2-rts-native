@@ -3,6 +3,7 @@
 
 pub mod catalog;
 pub mod economy;
+pub mod economy_state;
 pub mod fog;
 pub mod formation;
 pub mod game;
