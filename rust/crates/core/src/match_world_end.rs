@@ -41,12 +41,18 @@ fn validate_transition(
     Ok(())
 }
 impl Match {
+    fn world_finish_unit_facts(&self)->Result<Vec<WorldFinishUnitFacts>,String>{
+        self.world.game.units.iter().map(|(id,u)|{
+            if *id==0 || *id!=u.id{return Err("invalid canonical World finish unit identity".into());}
+            Ok(WorldFinishUnitFacts{id:*id,owner:u.owner,kind:u.kind,hp:u.hp})
+        }).collect()
+    }
     /// Owned preparation retains no canonical borrow across region/wallet/home/story commits.
     /// This is internal to the region actuator, not a shortcut past its side-effect preflight.
     pub(crate) fn prepare_world_finish(
         &self, wallets: &EconomyState, regions: &[RegionState],
     ) -> Result<Option<(MatchFinish,MatchSample)>,String> {
-        let units=self.world.game.units.values().map(|u|WorldFinishUnitFacts{id:u.id,owner:u.owner,kind:u.kind,hp:u.hp}).collect::<Vec<_>>();
+        let units=self.world_finish_unit_facts()?;
         self.prepare_world_finish_with_units(wallets,regions,&units)
     }
     /// Prepare against actual post-wreck survivors, before any canonical removal or terrain
@@ -60,7 +66,7 @@ impl Match {
         if self.finish.is_some(){return Ok(None);}
         self.validate_match_finish_state()?;
         self.validate_sample_units()?;
-        let current=self.world.game.units.values().map(|u|WorldFinishUnitFacts{id:u.id,owner:u.owner,kind:u.kind,hp:u.hp}).collect::<Vec<_>>();
+        let current=self.world_finish_unit_facts()?;
         let removable=wallets.players.iter().enumerate().filter(|(_,p)|p.out && !regions.iter().any(|r|r.team==p.team)).map(|(slot,_)|slot).collect();
         validate_transition(&current,survivors,removed,&removable)?;
         self.prepare_world_finish_with_units(wallets,regions,survivors)
