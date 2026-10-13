@@ -871,16 +871,15 @@ fn original_paid_construction_replays_full_match_ticks() {
                     let position = |phase| report.phases.iter().position(|p| *p == phase).unwrap();
                     assert!(position(TickPhase::Firing) < position(TickPhase::Construction));
                     assert!(position(TickPhase::Construction) < position(TickPhase::Separation));
-                    effects = json!(
-                        report
-                            .events
-                            .iter()
-                            .map(|event| match event {
-                                TickEvent::Environment(effect) => effect.to_json(),
-                                other => panic!("{name}: unexpected producer in quiet construction scene: {other:?}"),
-                            })
-                            .collect::<Vec<_>>()
-                    );
+                    effects
+                        .as_array_mut()
+                        .expect("owned construction caller effect batch")
+                        .extend(report.events.iter().map(|event| match event {
+                            TickEvent::Environment(effect) => effect.to_json(),
+                            other => panic!(
+                                "{name}: unexpected producer in quiet construction scene: {other:?}"
+                            ),
+                        }));
                     steps += 1;
                 }
                 patch(&mut expected, &c["patches"][next]);

@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-- Corrected construction effect readback for private Source undefined sentinels: omit only null Hurt owner/local fields and null owner on section-collapse rows when comparing public event JSON. The complete 29-case audit covers 24 events; required fields, explicit false, numeric zero, event order and all other assertions stay exact. Source recorder, fixtures, wire producers and partial-failure ownership are unchanged. The frozen native failure remains recorded; this successor has not run natively.
+- Retain the construction test caller's effect batch across ticks, commands and authored priming, matching the unchanged Source capture lifetime. Append only actual ordered TickReport events and reset only for a new case. All 29 cases are append-only: seven emissions across three boundaries produce 24 retained row occurrences. Producers, failure payloads, Source recorder and fixtures are unchanged; the frozen empty-batch failure is preserved and this successor has not run natively.
+
+- Corrected construction effect readback for private Source undefined sentinels: omit only null Hurt owner/local fields and null owner on section-collapse rows when comparing public event JSON. The complete 29-case audit covers 24 retained row occurrences; required fields, explicit false, numeric zero, event order and all other assertions stay exact. Source recorder, fixtures, wire producers and partial-failure ownership are unchanged. The frozen native failure remains recorded; this successor has not run natively.
 
 - Compare only the two optional Source stance switches by their effective boolean value in the full construction replay. Source unset Hold Fire and Hold Position produce the same off flags as native false; the reader rejects missing fields and values outside boolean/null. Recorder, fixture, other exact assertions and gameplay are unchanged. The frozen native failure remains recorded; this successor has not run natively.
 
