@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Joined the source-reviewed owner-bound recorded-buy wrapper to the production callbacks, preserving spending, combat/firing freshness and the separate observation index used by denied purchases. Combined native verification remains pending.
+
 - Added Match research admission with canonical wallet/lab/spending guards, early research advancement and source-positioned single-building training publication. Conquest explicitly refuses nonempty queues; legal World queues use actual region ownership and remembered routing. A real-constructor source recorder covers five cases, 54 actions, 12 commands and three full ticks, with native checks limited to production phases. Aircraft, logistics-enabled completion and remaining mode/dispatcher integration stay explicit boundaries; native verification is pending.
 
 - Joined the source World-memory producer for queued-training routing, retaining checked ordinary recipient evidence and the separate World native acceptance boundary. No live-terrain fallback was added.
@@ -13,6 +15,15 @@
 - Preserved canonical story, environment, tick, recipient, combat and firing state when joining World startup to the checked Match ancestry. World births initialize fresh combat and firing rows through the shared publication callback; native union checks remain pending.
 
 - Joined the World region startup context to the production integration ancestry while preserving canonical combat, firing and environment ownership. Native checks for this source union remain pending.
+- Fixed refused recorded buys with rallies sorting maintained gameplay grid buckets during recipient refresh. Visibility and remembered-wreck queries now use a separate current-position observation index, following the checked FPS correction. A focused denial regression preserves both ordinary and heavy moved-bucket order. Removed the stale claim that recruitment spending still needed integration; native checks remain pending.
+
+- Exposed the canonical owner-bound recorded-buy actuator through the Rust API so it can be verified before input-dispatch integration. Its gate, routing and transaction behavior is unchanged; the C ABI and wire interfaces are unchanged.
+
+- Fixed crate-local recorded-buy test imports found by independent source review before the first native compile. Combat, firing and path-status assertions now resolve within the core crate. Native verification remains pending.
+
+- Added recorded-buy replay coverage using the existing six original-source traces and 33 commands, now recording source MP-spending counters. Owned routing, denial outcomes and fresh combat/firing publication are compared without a second fixture; atomic tests cover stale metadata, story preflight and blocked seats. Rust verification remains pending.
+
+- Added an internal recorded-buy actuator that gates canonical finish and seats, borrows owned recipient routing through disjoint recruitment fields, and preflights exact MP-spending story updates before payment. Combat and firing rows remain canonical publication callbacks. This source prerequisite awaits native verification and the recorded command consumer.
 
 - Preserved both fresh combat and firing identities and their default publication callbacks when joining the checked firing ancestry to prepared publication. Combined production-lane validation remains pending.
 - Documented the checked regional lookup and explicit post-rails snapshot projection boundaries, including the first native log failure and remaining mutable-terrain hook consumers.

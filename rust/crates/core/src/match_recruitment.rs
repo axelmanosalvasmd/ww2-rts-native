@@ -20,6 +20,8 @@ pub enum RecruitError {
     Knowledge(KnowledgeError),
     Path(crate::pathfinding::PathError),
     Publication(crate::unit_publication::PublicationError),
+    Routing(String),
+    Story(String),
 }
 impl From<production::Error> for RecruitError {
     fn from(e: production::Error) -> Self {
@@ -66,7 +68,97 @@ impl<'a> RecruitRouting<'a> {
         })
     }
 }
+struct RecruitParts<'a> {
+    world: &'a mut crate::world::World,
+    start: &'a mut super::StartPlan,
+    options: &'a super::MatchOptions,
+    rules: &'a crate::rules::Rules,
+    production: &'a production::ProductionState,
+    player_rallies: &'a [Option<crate::game::Point>],
+    building_rallies: &'a std::collections::BTreeMap<u32, Option<crate::game::Point>>,
+    produced_placer: &'a mut crate::produced_units::ProducedPlacer,
+    commands: &'a mut crate::match_commands::MatchCommands,
+    combat: &'a mut crate::match_combat::CombatState,
+    firing: &'a mut crate::match_firing::FiringState,
+    story: &'a mut [crate::match_story::PlayerStory],
+    grid: &'a mut crate::grid::SpatialGrid,
+    recruit_metadata: &'a mut std::collections::BTreeMap<u32, RecruitMetadata>,
+    next_unit_id: &'a mut u32,
+}
+macro_rules! recruit_parts {
+    ($m:expr) => {
+        RecruitParts {
+            world: &mut $m.world,
+            start: &mut $m.start,
+            options: &$m.options,
+            rules: &$m.rules,
+            production: &$m.production,
+            player_rallies: &$m.player_rallies,
+            building_rallies: &$m.building_rallies,
+            produced_placer: &mut $m.produced_placer,
+            commands: &mut $m.commands,
+            combat: &mut $m.combat,
+            firing: &mut $m.firing,
+            story: &mut $m.story,
+            grid: &mut $m.grid,
+            recruit_metadata: &mut $m.recruit_metadata,
+            next_unit_id: &mut $m.next_unit_id,
+        }
+    };
+}
 impl Match {
+    /// Execute recorded Conquest purchases against the canonical finish and seat state.
+    /// Routing borrows the actual refreshed recipient projection, never a copied view.
+    pub fn recorded_buy(
+        &mut self,
+        slot: usize,
+        kind: &str,
+        from: Option<u32>,
+    ) -> Result<CompletedRecruitUnit, RecruitError> {
+        let wallet = self
+            .start
+            .economy
+            .players
+            .get(slot)
+            .ok_or(production::Error::Denied(Denial::Blocked))?;
+        if self.finish.is_some() || wallet.away || wallet.out {
+            return Err(production::Error::Denied(Denial::Blocked).into());
+        }
+        self.validate_conquest_finish_state()
+            .map_err(RecruitError::Story)?;
+        // A refresh is cache preparation only. It precedes typed admission when
+        // a represented rally may require routing, but never publishes a purchase.
+        if self.player_rallies.get(slot).is_some_and(Option::is_some)
+            || self.building_rallies.values().any(Option::is_some)
+        {
+            self.refresh_recipient_routing(slot)
+                .map_err(RecruitError::Routing)?;
+        } else {
+            return recruit_parts!(self).recruit(slot, kind, from, false, None);
+        }
+        let recipient = &self.recipients[slot];
+        let query = recipient.query();
+        let routing = RecruitRouting {
+            slot,
+            team: self.world.game.players[slot].team,
+            query: &query,
+            live: recipient.live(),
+        };
+        recruit_parts!(self).recruit(slot, kind, from, false, Some(routing))
+    }
+    /// Public component actuator retaining explicit winner and recipient inputs.
+    pub fn recruit(
+        &mut self,
+        slot: usize,
+        kind: &str,
+        from: Option<u32>,
+        winner_decided: bool,
+        routing: Option<RecruitRouting<'_>>,
+    ) -> Result<CompletedRecruitUnit, RecruitError> {
+        recruit_parts!(self).recruit(slot, kind, from, winner_decided, routing)
+    }
+}
+impl RecruitParts<'_> {
     /// The typed buy actuator. A winner, away or eliminated seat is blocked.
     /// Routing is required only when produceUnit emits a rally request. No wallet,
     /// ID, unit or grid changes occur until placement and route input checks pass.
@@ -188,10 +280,10 @@ impl Match {
             .next_unit_id
             .checked_add(1)
             .ok_or(RecruitError::InvalidState("unit ID capacity exhausted"))?;
-        if self.combat.get(self.next_unit_id).is_some()
-            || self.recruit_metadata.contains_key(&self.next_unit_id)
-            || self.commands.units.contains_key(&self.next_unit_id)
-            || self.firing.get(self.next_unit_id).is_some()
+        if self.combat.get(*self.next_unit_id).is_some()
+            || self.recruit_metadata.contains_key(&*self.next_unit_id)
+            || self.commands.units.contains_key(&*self.next_unit_id)
+            || self.firing.get(*self.next_unit_id).is_some()
         {
             return Err(RecruitError::InvalidState(
                 "recruit metadata ID already exists",
@@ -214,7 +306,7 @@ impl Match {
                 view,
                 &game.units,
                 ProduceInput {
-                    id: self.next_unit_id,
+                    id: *self.next_unit_id,
                     owner: slot,
                     kind: kind_index,
                     scatter_index: u32::try_from(game.units.len())
@@ -285,7 +377,7 @@ impl Match {
                 grid: &mut self.grid,
                 controls: &mut self.commands.units,
                 recruitment: &mut self.recruit_metadata,
-                next_id: &mut self.next_unit_id,
+                next_id: self.next_unit_id,
             },
             &self.rules,
             count,
@@ -296,11 +388,22 @@ impl Match {
             }],
         )
         .map_err(RecruitError::Publication)?;
+        let story = crate::match_story::prepare_story_updates(
+            &mut *self.story,
+            winner_decided,
+            &[crate::match_story::StoryChange {
+                slot: Some(slot),
+                key: crate::match_story::StoryKey::MpSpent,
+                amount: request.spend.mp,
+            }],
+        )
+        .map_err(RecruitError::Story)?;
         let purchase = prepared.commit();
         let _published = publication.publish_with(|unit, _| {
             self.combat.initialize(unit.id);
             self.firing.initialize(unit.id);
         });
+        story.commit();
         Ok(CompletedRecruitUnit {
             unit: id,
             purchase,
@@ -308,3 +411,7 @@ impl Match {
         })
     }
 }
+
+#[cfg(test)]
+#[path = "match_recruitment_tests.rs"]
+mod tests;

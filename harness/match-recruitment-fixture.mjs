@@ -34,7 +34,7 @@ function run(name,actions,map=base){
   const result=sim.command(g,slot,{t:'buy',unit:a.kind,...(a.from===undefined?{}:{from:a.from})})??null;
   const u=g.units.get(before);
   const unit=u?{id:u.id,owner:u.owner,kind:u.type,pose:[u.x,u.z,u.rot,u.aim,u.ghost].map(bits),hp:bits(u.hp),path:u.path.map(point),goal:point(u.worldGoal),routeEnd:point(u.routeEnd),drift:u.drift==='rally',auto:u.auto,autoRetreat:u.autoRetreat,grid:sim.gridFor(g).candidates(u,20).map(v=>v.id),producer:g.__producer,routeFailed:(g.pathStats?.failed??0)>failed}:null;
-  stages.push({action:a,routing,expected:{result,next:g.nextId,money:g.players.map(p=>bits(p.mp)),unit}});
+  stages.push({action:a,routing,source_spending:g.players.map((_,i)=>bits(g.story?.[i]?.mpSpent??0)),expected:{result,next:g.nextId,money:g.players.map(p=>bits(p.mp)),unit}});
  }
  cases.push({name,map,rows:rowPool,stages});
 }
