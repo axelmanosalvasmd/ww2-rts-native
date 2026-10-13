@@ -1,5 +1,6 @@
 //! Source-only full-step fixture loading and canonical Match projections.
-//! Source `react` has no canonical reaction row and is excluded explicitly.
+//! Operative `react` uses the canonical control timer and must remain unchanged.
+//! Ordinary `react` remains excluded until its tick phase is connected.
 //! Source flight `duration` has no stored LiveFlight field; exact expiry,
 //! trajectory and the linked ticket timer protect the represented duration facts.
 //! Native objects eagerly allocate empty story/optional state; source absent
@@ -296,6 +297,7 @@ pub fn make(f: &Value, initial: &Value, mode: Mode) -> Match {
         c.auto_retreat = truthy(&source["autoRetreat"]);
         c.hold_fire = truthy(&source["holdFire"]);
         c.attack_id = id(&source["attackId"]);
+        c.react = n(&source["react"]);
         assert!(source["orders"].as_array().unwrap().is_empty());
         m.commands.insert(u.id, c);
         let w = m.firing.initialize(u.id);
@@ -338,7 +340,7 @@ pub fn patch_unit(m: &mut Match, unit: u32, values: &Value) {
             "nadeT" => m.companions.soldiers.get_mut(&unit).unwrap().nade_time = n(v),
             "nades" => m.companions.soldiers.get_mut(&unit).unwrap().nades = id(v),
             "mags" => m.companions.soldiers.get_mut(&unit).unwrap().mags = [id(&v[0]), id(&v[1])],
-            "react" => {} // No reaction sidecar exists; source proof retains this field.
+            "react" => m.commands.units.get_mut(&unit).unwrap().react = n(v),
             other => panic!("unrepresented trusted patch: {other}"),
         }
     }
@@ -431,7 +433,7 @@ fn unit_row(m: &Match, unit: u32) -> Value {
         "x":u.x,"z":u.z,"rot":u.rot,"aim":c.aim,"moveSpeed":u.move_speed,"travelDir":u.travel_dir,
         "vx":u.vx,"vz":u.vz,"hp":u.hp,"supp":u.supp,"path":u.path.iter().copied().map(point_json).collect::<Vec<_>>(),
         "orders":[],"attackId":c.attack_id,"targetId":w.target_id,"cooldown":w.cooldown,"still":u.still,
-        "retarget":w.retarget,"repath":u.repath,"stuck":u.stuck,"cd":a.cooldown,"buff":a.buff,"ap":a.ap,
+        "retarget":w.retarget,"repath":u.repath,"react":c.react,"stuck":u.stuck,"cd":a.cooldown,"buff":a.buff,"ap":a.ap,
         "nade":c.nade.map(point_json),"retreating":u.retreating,"reinf":r.reinforcement,"dig":null,
         "garrison":u.garrison.map_or(-1,|n|n as i64),"enter":c.enter.map_or(-1,|n|n as i64),"board":u.board,
         "amove":u.amove.map(point_json),"face":c.face.map(|f|json!({"angle":f.angle,"x":f.at.x,"z":f.at.z})),
@@ -573,10 +575,15 @@ impl Projection {
         );
         assert_eq!(g.units.len(), expected["units"].as_array().unwrap().len());
         for row in expected["units"].as_array().unwrap() {
+            let excluded: &[&str] = if truthy(&row["operative"]) {
+                &[]
+            } else {
+                &["react"]
+            };
             compare_fields(
                 &unit_row(m, id(&row["id"])),
                 row,
-                &["react"],
+                excluded,
                 &path(context, format!("unit:{}", row["id"])),
             );
         }
