@@ -34,7 +34,7 @@ pub struct WorldPanel {
     pub owned: usize,
     pub cap: f64,
     pub regions: Vec<KnownRegion>,
-    pub stations: Vec<KnownStation>,
+    pub stations: Option<Vec<KnownStation>>,
     pub recovery: WorldRecovery,
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -70,6 +70,15 @@ fn rounded(n: f64) -> Result<f64, String> {
         .is_finite()
         .then_some(value)
         .ok_or("invalid rounded World metadata number".into())
+}
+fn source_truthy(value: &Value) -> bool {
+    match value {
+        Value::Null => false,
+        Value::Bool(value) => *value,
+        Value::Number(value) => value.as_f64() != Some(0.0),
+        Value::String(value) => !value.is_empty(),
+        Value::Array(_) | Value::Object(_) => true,
+    }
 }
 fn number(n: f64) -> Value {
     if n == 0.0 { json!(0) } else { json!(n) }
@@ -239,6 +248,13 @@ impl Match {
                 })
             })
             .collect::<Result<Vec<_>, String>>()?;
+        // Source setupWorld calls setupRails only for truthy authored rails.
+        // The immutable authoring fact distinguishes absent stations from a present empty list.
+        let stations = geography
+            .metadata
+            .get("rails")
+            .is_some_and(source_truthy)
+            .then_some(stations);
         let queues: Vec<Vec<&str>> = game
             .units
             .values()
@@ -424,8 +440,15 @@ impl WorldRecipientMetadata {
             row
         }).collect();
         out["world"] = json!({"home":[number(p.home.x),number(p.home.z)],"size":p.size.name(),"total":p.total,"goal":p.goal,"owned":p.owned,"cap":number(p.cap),"regions":regions,
-            "stations":p.stations.iter().map(|s|json!({"region":s.region,"x":number(s.at.x),"z":number(s.at.z)})).collect::<Vec<_>>(),
             "recovery":{"hq":number(p.recovery.hq),"engineer":number(p.recovery.engineer),"available":p.recovery.available}});
+        if let Some(stations) = &p.stations {
+            out["world"]["stations"] = json!(
+                stations
+                    .iter()
+                    .map(|s| json!({"region":s.region,"x":number(s.at.x),"z":number(s.at.z)}))
+                    .collect::<Vec<_>>()
+            );
+        }
         if let Some(g) = &self.geography {
             let mats = |rs: &[KnownMaterial]| {
                 rs.iter()

@@ -36,6 +36,13 @@ fn load(case: &Value) -> Match {
         }
     }
     let mut map = c["map"].clone();
+    if let Some(rails) = case.get("railsOverride") {
+        if rails.as_str() == Some("absent") {
+            map["world"].as_object_mut().unwrap().remove("rails");
+        } else {
+            map["world"]["rails"] = rails.clone();
+        }
+    }
     if let Some(runs) = map["world"]["regionMapRuns"].as_array() {
         let cells: Vec<_> = runs
             .iter()
@@ -357,11 +364,11 @@ fn original_world_metadata_readers_preserve_privacy_and_optional_fields() {
             steps += 1;
         }
     }
-    assert_eq!((steps, captures), (147, 28));
+    assert_eq!((steps, captures), (153, 34));
 }
 #[test]
 fn late_invalid_projection_preserves_memory_fog_journal_pending_and_send_cursor() {
-    let case = &fixture()["cases"][1];
+    let case = &fixture()["cases"][7];
     let mut m = load(case);
     m.world.register_recipient(Recipient::Player(0));
     m.world_recipient_metadata(0, false).unwrap();

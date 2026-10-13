@@ -19,9 +19,10 @@ const environmentSeed=seed=>Number(mix((mix(BigInt(seed)^((2n*gamma)&mask))+gamm
 // Canonical value hashing bounds the fixture while covering every map cell and ordered material row.
 function mapDigest(value){let h=0xcbf29ce484222325n;const feed=bytes=>{for(const b of bytes)h=BigInt.asUintN(64,(h^BigInt(b))*0x100000001b3n)};const visit=v=>{if(v===null)feed(Buffer.from('n'));else if(typeof v==='boolean')feed(Buffer.from(v?'t':'f'));else if(typeof v==='number'){feed(Buffer.from('d'));const b=Buffer.alloc(8);b.writeDoubleLE(v===0?0:v);feed(b)}else if(typeof v==='string'){feed(Buffer.from('s'));feed(Buffer.from(v));feed([0])}else if(Array.isArray(v)){feed(Buffer.from('a'));v.forEach(visit);feed(Buffer.from(']'))}else{feed(Buffer.from('o'));Object.keys(v).sort().forEach(k=>{visit(k);visit(v[k])});feed(Buffer.from('}'))}};visit(value);return h.toString(16).padStart(16,'0')}
 const cases=[];
-function record(name,startIndex,actions,teams){
+function record(name,startIndex,actions,teams,railsOverride){
  const c=structuredClone(starts.cases[startIndex]),map=structuredClone(c.map);
  if(teams)c.players.forEach((p,i)=>p.team=teams[i]);
+ if(railsOverride!==undefined){if(railsOverride==='absent')delete map.world.rails;else map.world.rails=railsOverride;}
  if(map.world.regionMapRuns){map.world.regionMap=map.world.regionMapRuns.flatMap(([v,n])=>Array(n).fill(v));delete map.world.regionMapRuns;}
  const old=Math.random;Math.random=()=>environmentSeed(c.seed)/4294967296;let g;
  try{g=sim.createGame(map,c.players.map(p=>p.name),c.settings.shuffle,c.players.map(p=>p.team),c.players.map(p=>p.faction),{mode:'world',army:c.settings.army,weather:c.settings.living?c.settings.weather:false,weatherSeed:c.weatherSeed,tech:c.settings.tech,logistics:false})}finally{Math.random=old}
@@ -51,9 +52,10 @@ function record(name,startIndex,actions,teams){
   }
   rows.push({action:a,result:structuredClone(result)});
  }
- cases.push({name,startIndex,teams:teams??null,rows});
+ cases.push({name,startIndex,teams:teams??null,...(railsOverride===undefined?{}:{railsOverride}),rows});
 }
 const capture=(slot,map=false)=>({op:'capture',slot,map}),vision=tick=>({op:'vision',tick});
+for(const rails of ['absent',false,null,0,'',{stations:[],lines:[]}])record(`station-presence-${JSON.stringify(rails)}`,0,[capture(0)],undefined,rails);
 record('massive-world-endless-army',3,[capture(0,true)]);
 record('real-startup-shared-team-map',1,[capture(0,true),capture(1,true),capture(2,true),capture(0),vision(1),capture(1)]);
 record('known-geography-lists-and-hidden-replacements',1,[

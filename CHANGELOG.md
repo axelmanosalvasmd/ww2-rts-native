@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix the new World panel's station presence after independent source review: absent or source-falsy authored rails omit the field, while present empty rails emit an empty list. Add six original-reader cases; the fixture now contains 11 scenes, 153 actions and 34 captures. Native execution remains pending.
+
 - Add an internal single-commander World metadata read over canonical team memory: known geography, regions/home, population/recovery, stations and observed wreck/mine/node lists. All projections stage before journal/memory publication, without draining terrain cursors. Five original-source scenes record 147 actions and 28 captures; native proof is pending. Complete World envelopes, spectators and transport remain separate.
 
 - Prepare a separate World recipient metadata branch by joining checked World administrative state with the reviewed canonical recipient-list providers. No new metadata producer or combined native acceptance is claimed yet.
