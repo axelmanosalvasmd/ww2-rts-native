@@ -10,6 +10,11 @@ use crate::{
     weather::{WeatherRow, WeatherRules},
 };
 use serde_json::{Map, Value, json};
+#[path = "recipient_snapshot/delivery.rs"]
+mod delivery;
+#[path = "recipient_snapshot/owners.rs"]
+mod owners;
+pub use delivery::{DeliveryFrame, DeliveryState};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SnapshotCapability {
@@ -61,6 +66,7 @@ pub struct RecipientProjection {
 pub struct SnapshotCache<'a> {
     state: &'a Match,
     rows: Vec<Value>,
+    owners: Vec<Map<String, Value>>,
 }
 impl<'a> SnapshotCache<'a> {
     pub fn new(state: &'a Match) -> Result<Self, SnapshotError> {
@@ -109,7 +115,12 @@ impl<'a> SnapshotCache<'a> {
             .values()
             .map(|u| unit_row(state, u))
             .collect::<Result<_, _>>()?;
-        Ok(Self { state, rows })
+        let owners = owners::capture(state)?;
+        Ok(Self {
+            state,
+            rows,
+            owners,
+        })
     }
     pub fn recipient(&self, slot: usize) -> Result<RecipientProjection, SnapshotError> {
         let g = &self.state.world.game;
@@ -142,15 +153,13 @@ impl<'a> SnapshotCache<'a> {
             .collect::<Vec<_>>();
         let mut fields = economy_fields(self.state, slot)?;
         fields.insert("units".into(), json!(units));
+        fields.extend(self.owners[slot].clone());
         Ok(RecipientProjection {
             fields,
             missing: vec![
-                SnapshotCapability::Production,
                 SnapshotCapability::MovementOutcomes,
                 SnapshotCapability::ArmyAndSupport,
                 SnapshotCapability::WrecksAndFoundMines,
-                SnapshotCapability::Plans,
-                SnapshotCapability::Orders,
                 SnapshotCapability::Terrain,
                 SnapshotCapability::Fog,
                 SnapshotCapability::ShotsAndFlights,
@@ -495,7 +504,7 @@ mod tests {
     fn optional(v: &Value, key: &str) -> Option<f64> {
         v[key].as_f64()
     }
-    fn initialize(case: &Value) -> Match {
+    pub(super) fn initialize(case: &Value) -> Match {
         let map = AuthoritativeMap::from_json(&serde_json::to_vec(&case["map"]).unwrap()).unwrap();
         let mut m = Match::new(
             &map,
@@ -524,6 +533,9 @@ mod tests {
         .unwrap();
         m.world.game.tick = case["tick"].as_i64().unwrap();
         m.world.game.chars = case["chars"].as_str().unwrap().as_bytes().to_vec();
+        for id in m.world.game.units.keys().copied().collect::<Vec<_>>() {
+            m.production.remove_building(id);
+        }
         m.world.game.units.clear();
         m.commands.units.clear();
         let catalog = Catalog::compiled().unwrap();
@@ -566,11 +578,65 @@ mod tests {
                 .as_i64()
                 .filter(|n| *n >= 0)
                 .map(|n| n as usize);
+            let point = |v: &Value| {
+                v.as_object().map(|_| Point {
+                    x: n(v, "x"),
+                    z: n(v, "z"),
+                })
+            };
+            u.amove = point(&v["amove"]);
+            u.world_goal = point(&v["worldGoal"]);
+            u.board = v["board"].as_u64().unwrap_or(0) as u32;
+            u.path = v["path"].as_array().map_or_else(Vec::new, |rows| {
+                rows.iter().map(|v| point(v).unwrap()).collect()
+            });
             let mut control = UnitControl::new(&u, &m.rules).unwrap();
             control.aim = n(v, "aim");
             control.hold_fire = v["holdFire"].as_bool().unwrap_or(false);
             control.auto_retreat = v["autoRetreat"].as_bool().unwrap_or(false);
             control.auto_cast = v["auto"].as_bool().unwrap_or(false);
+            control.attack_id = v["attackId"].as_u64().unwrap_or(0) as u32;
+            control.fire_at = v["fireAt"].as_i64().filter(|n| *n >= 0).map(|n| n as usize);
+            control.enter = v["enter"].as_i64().filter(|n| *n >= 0).map(|n| n as usize);
+            control.nade = point(&v["nade"]);
+            if let Some(orders) = v["orders"].as_array() {
+                for order in orders {
+                    control
+                        .orders
+                        .push_back(crate::match_commands::Command::Move {
+                            orders: vec![crate::match_commands::MoveOrder {
+                                unit: i64::from(id),
+                                at: Point {
+                                    x: n(order, "x"),
+                                    z: n(order, "z"),
+                                },
+                            }],
+                            control_ids: None,
+                            attack_move: order["t"] == "amove",
+                            queue: false,
+                            together: false,
+                            face: None,
+                        });
+                }
+            }
+            if v["queue"].is_array() {
+                m.production.initialize_building(id).unwrap();
+                m.building_rallies.insert(id, point(&v["rally"]));
+                for job in v["productionJobs"].as_array().unwrap() {
+                    let actual = m
+                        .production
+                        .record_paid(
+                            id,
+                            job["type"].as_str().unwrap(),
+                            crate::economy::Price {
+                                mp: n(job, "mp"),
+                                fuel: n(job, "fuel"),
+                            },
+                        )
+                        .unwrap();
+                    assert_eq!(actual, job["id"].as_u64().unwrap());
+                }
+            }
             m.commands.units.insert(id, control);
             let ability = m.abilities.initialize(id);
             ability.cooldown = n(v, "cd");
@@ -612,12 +678,49 @@ mod tests {
         for p in &mut m.world.game.players {
             p.visible.sort_unstable();
         }
+        let elapsed = case["inputs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|v| optional(v, "prog"))
+            .fold(0., math::max);
+        if elapsed > 0. {
+            let units = m
+                .world
+                .game
+                .units
+                .values()
+                .map(|u| crate::production::UnitView {
+                    id: u.id,
+                    owner: Some(u.owner),
+                    kind: m.rules.kinds[u.kind].name.as_str(),
+                    hp: u.hp,
+                    built: u.built.unwrap_or(0.),
+                })
+                .collect::<Vec<_>>();
+            let context = crate::production::Context {
+                mode: crate::economy_state::ModeContext {
+                    kind: Mode::Conquest,
+                    ..Default::default()
+                },
+                army: m.options.army,
+                tech_enabled: m.options.tech,
+                naval: m.world.game.naval,
+                sudden_death: false,
+                units: &units,
+                drops: &[],
+                world: None,
+            };
+            m.production
+                .advance(&context, &m.start.economy, elapsed)
+                .unwrap();
+        }
         if case["finished"] == true {
             m.apply_conquest_victory().unwrap();
         }
         m
     }
-    fn equal(actual: &Value, expected: &Value, path: &str) {
+    pub(super) fn equal(actual: &Value, expected: &Value, path: &str) {
         match (actual, expected) {
             (Value::Number(a), Value::Number(b)) => assert_eq!(a.as_f64(), b.as_f64(), "{path}"),
             (Value::Array(a), Value::Array(b)) => {
