@@ -348,6 +348,7 @@ impl Match {
                 .finish(draft)
                 .map(Some);
         }
+        let mut paths = self.commands.paths.clone();
         let result = (|| {
             let observer = crate::staged_observer::StagedObserver::new(
                 &self.world.game,
@@ -379,7 +380,7 @@ impl Match {
             .map_err(ProductionStepError::Routing)?;
             route_training(
                 &self.rules,
-                &mut self.commands.paths,
+                &mut paths,
                 &mut draft,
                 preview.query(),
                 preview.live(),
@@ -391,8 +392,8 @@ impl Match {
             routing_commit.commit();
             Ok(Some(done))
         })();
-        if result.is_err() {
-            self.commands.paths = crate::pathfinding::Pathfinding::new();
+        if result.is_ok() {
+            self.commands.paths = paths;
         }
         result
     }

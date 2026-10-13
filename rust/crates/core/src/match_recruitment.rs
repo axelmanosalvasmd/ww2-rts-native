@@ -258,6 +258,7 @@ impl Match {
         if staged.placed.rally.is_none() {
             return recruit_parts!(self).finish(staged);
         }
+        let mut paths = self.commands.paths.clone();
         let result = (|| {
             let versions = Versions {
                 infantry: self.world.versions.infantry,
@@ -300,7 +301,7 @@ impl Match {
             route_recruit(
                 &self.world.game,
                 &self.rules,
-                &mut self.commands.paths,
+                &mut paths,
                 &mut staged,
                 Some(routing),
             )?;
@@ -311,9 +312,8 @@ impl Match {
             routing_commit.commit();
             Ok(done)
         })();
-        if result.is_err() {
-            // A canceled preview must never leave graph keys for its temporary buffers.
-            self.commands.paths = crate::pathfinding::Pathfinding::new();
+        if result.is_ok() {
+            self.commands.paths = paths;
         }
         result
     }

@@ -407,11 +407,21 @@ fn rejected_final_preflight_discards_staged_sight_and_purchase() {
         "../../simtest/tests/fixtures/match-recruitment.json"
     ))
     .unwrap();
-    let mut m = make(&fixture["cases"][0]["map"]);
-    m.start.economy.players[0].mp = 5000.0;
-    m.player_rallies[0] = Some(Point { x: 35.0, z: 35.0 });
-    m.world.game.tick += 1;
-    m.world.set_cell(700, b'O').unwrap();
+    let setup = || {
+        let mut m = make(&fixture["cases"][0]["map"]);
+        m.start.economy.players[0].mp = 5000.0;
+        m.player_rallies[0] = Some(Point { x: 35.0, z: 35.0 });
+        m.world.game.tick += 1;
+        let warm =
+            crate::match_commands::Command::from_json(&json!({"t":"move","ids":[1],"x":61,"z":41}))
+                .unwrap();
+        assert_eq!(m.execute_command(0, &warm, false).unwrap(), None);
+        assert!(!m.world.game.units[&1].path.is_empty());
+        m.world.set_cell(700, b'O').unwrap();
+        m
+    };
+    let mut m = setup();
+    let mut control = setup();
     let staged = recruit_parts!(m).stage(0, "rifle", None, false).unwrap();
     // Exercise a final story rejection after admission and before publication.
     m.story[0].mp_spent = f64::NAN;
@@ -441,4 +451,21 @@ fn rejected_final_preflight_discards_staged_sight_and_purchase() {
         pending.as_ref()
     );
     assert_eq!(m.routing_fog, fog);
+    // A second actual command at the same clock sees the original warmed graph,
+    // as the control branch that never attempted a preview does.
+    m.story[0].mp_spent = 0.0;
+    let reroute =
+        crate::match_commands::Command::from_json(&json!({"t":"move","ids":[1],"x":65,"z":45}))
+            .unwrap();
+    assert_eq!(m.execute_command(0, &reroute, false).unwrap(), None);
+    assert_eq!(control.execute_command(0, &reroute, false).unwrap(), None);
+    assert_eq!(
+        format!("{:?}", m.world.game.units[&1]),
+        format!("{:?}", control.world.game.units[&1])
+    );
+    assert_eq!(m.commands.units[&1], control.commands.units[&1]);
+    assert_eq!(
+        m.recipients[0].remembered(),
+        control.recipients[0].remembered()
+    );
 }

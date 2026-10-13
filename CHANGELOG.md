@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Preserved canonical path-cache history on aborted World training previews too. Only a detached derived-cache fork sees temporary memory buffers, and it joins the infallible success commit. Native follow-up verification remains pending.
+
+- Preserved warmed canonical path caches when a staged recruitment preview fails. Searches now run on the approved derived-cache fork and publish it only on success; the late-story regression also checks a same-clock reroute against a branch that never attempted the preview. Native checks remain pending.
+
+- Added transactional copies of derived path-search history. Copies retain external terrain identities and rebind navigation graphs to their copied vehicle buffers; aborts can discard the copy while preserving canonical warmed caches. Native cache-history protection remains pending.
 - Staged legal World training rally observations through the canonical borrowed birth preview, then revalidated the same queue completion before unit and memory publication. Four canonical metadata owners publish together; no-rally births skip observation, and aborted previews reset path scratch. Source birth and native proof remain pending.
 
 - Kept ordinary route fog reads lazy when there are no fires, matching the original filter callback. A prior empty-fire read leaves first birth sight eligible to build fog; a prior fire read retains its cached mask. Original produce-unit proof is being added; native replay remains pending.
