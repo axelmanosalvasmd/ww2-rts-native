@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Checked ordered fire membership and mine ownership/discovery maps before prepared routing commits. Independent source review found these facts can change without advancing a terrain key; rejected preparations retain the original recipient and World ledgers.
+
+- Recorded 13 original birth-sight cases: ten ordinary buys through the original command and three World produce-unit calls, plus eight warmed infantry/vehicle searches across ordered terrain changes. Added native typed-publication, abort, source-frame, cache-identity and journal-trim witnesses. Native execution and independent review remain pending.
 - Recorded the prepared birth-routing and training evidence boundary in the movement and base parity inventories. Full rows remain in progress while original birth replay and native consumer checks are pending.
 
 - Retained World training’s incremental route history through the routing owner’s preview-aware path fork. Exact recipient buffers rebind before search; the fork moves only with successful queue, unit and memory publication. Native proof remains pending.
