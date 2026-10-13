@@ -197,7 +197,8 @@ impl crate::match_runtime::Match {
         let dt = self.rules.movement.tick;
         let winner_decided = self.finish.is_some();
         // Boundary orders carry the previous clock's timestamps and view keys.
-        let commands = self.apply_commands(self.world.game.tick as u64 + 1, winner_decided)?;
+        let boundary = self.world.game.tick as u64 + 1;
+        let commands = self.apply_commands(boundary, winner_decided)?;
         // Boundary joins are included in prior poses and the same live unit loop.
         self.prepare_companion_tick()?;
         self.validate_tick_capabilities()?;
