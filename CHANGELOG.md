@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Validate every source terrain-array shape before staged wreck calls, preventing malformed optional arrays from panicking before the later publication guard. Add draft cursor/revision refusal and allocation-preserving publication regressions, plus paid-work and rider admission checks.
+
 - Restore the complete World provider, design and changelog alongside additive observation APIs after a conflict resolver dropped existing bodies.
 
 - Add an explicit complete-live-order World region phase that stages actual administrative deletion and building wrecks before publishing wallets, homes, terrain, retained route facts and finish. The existing capture-only wrapper keeps its elimination refusal.

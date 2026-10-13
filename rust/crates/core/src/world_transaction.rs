@@ -23,6 +23,14 @@ impl World {
     /// Only administrative batches needing real removal or wrecking create this draft.
     /// It is temporary preparation, not another live terrain or gameplay owner.
     pub(crate) fn begin_transaction(&self) -> Result<WorldTransaction, WorldError> {
+        let n = self
+            .game
+            .w
+            .checked_mul(self.game.h)
+            .ok_or(WorldError::InvalidTerrain)?;
+        if !terrain_shape(self, n) {
+            return Err(WorldError::InvalidTerrain);
+        }
         let journal_end = self.journal_end()?;
         let world = Self {
             game: self.game.clone(),
@@ -174,5 +182,71 @@ impl PreparedWorldPublication<'_> {
         std::mem::swap(&mut self.target.geography, &mut self.draft.geography);
         std::mem::swap(&mut self.target.rules, &mut self.draft.rules);
         *self.target = self.draft;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::map::AuthoritativeMap;
+    fn world() -> World {
+        let input = serde_json::json!({"name":"World draft guard","w":20,"h":20,
+            "rows":vec![".".repeat(20);20],"spawns":[{"x":0,"y":0},{"x":19,"y":19}],
+            "points":[{"x":10,"y":10}]});
+        World::from_map(&AuthoritativeMap::from_json(&serde_json::to_vec(&input).unwrap()).unwrap())
+            .unwrap()
+    }
+    #[test]
+    fn drafts_reject_trim_recipient_revision_and_shape_changes_without_publication() {
+        let mut w = world();
+        w.touch(1).unwrap();
+        w.touch(2).unwrap();
+        let draft = w.begin_transaction().unwrap();
+        let end = w.journal_end().unwrap();
+        w.trim_journal_before(1).unwrap();
+        assert_eq!(w.journal_end().unwrap(), end);
+        assert!(draft.prepare_publication(&mut w).is_err());
+        assert_eq!(w.journal_base(), 1);
+        assert_eq!(w.journal(), &[2]);
+        let draft = w.begin_transaction().unwrap();
+        w.register_recipient(Recipient::Player(0));
+        let pending = w.pending(Recipient::Player(0)).cloned();
+        assert!(draft.prepare_publication(&mut w).is_err());
+        assert_eq!(w.pending(Recipient::Player(0)), pending.as_ref());
+        let draft = w.begin_transaction().unwrap();
+        w.acknowledge(Recipient::Player(0), &[0]);
+        let pending = w.pending(Recipient::Player(0)).cloned();
+        assert!(draft.prepare_publication(&mut w).is_err());
+        assert_eq!(w.pending(Recipient::Player(0)), pending.as_ref());
+        let draft = w.begin_transaction().unwrap();
+        w.game.terrain_version += 1;
+        assert!(draft.prepare_publication(&mut w).is_err());
+        w.game.height = Some(Vec::new());
+        assert!(w.begin_transaction().is_err());
+    }
+    #[test]
+    fn publication_keeps_original_terrain_allocations_and_ordered_ledgers() {
+        let mut w = world();
+        w.game.height = Some(vec![0; 400]);
+        let identity = (
+            w.game.flags.as_ptr(),
+            w.game.chars.as_ptr(),
+            w.game.height.as_ref().unwrap().as_ptr(),
+        );
+        let mut draft = w.begin_transaction().unwrap();
+        draft.world.set_cell(9, b'R').unwrap();
+        draft.world.touch(3).unwrap();
+        let expected = draft.world.journal().to_vec();
+        draft.prepare_publication(&mut w).unwrap().commit();
+        assert_eq!(
+            (
+                w.game.flags.as_ptr(),
+                w.game.chars.as_ptr(),
+                w.game.height.as_ref().unwrap().as_ptr()
+            ),
+            identity
+        );
+        assert_eq!(w.game.chars[9], b'R');
+        assert_eq!(w.journal(), expected);
     }
 }

@@ -70,9 +70,25 @@ impl Match {
                 .combat
                 .get(*id)
                 .ok_or("missing World elimination combat metadata")?;
+            if self.field_works.is_active(*id) != unit.dig {
+                return Err("invalid World elimination paid-work projection".into());
+            }
             if unit.riding || combat.carrier.is_some() || !combat.cargo.is_empty() {
                 return Err("unsupported World elimination: cargo and rider links".into());
             }
+        }
+        if planned
+            .iter()
+            .any(|id| self.rules.kinds[self.world.game.units[id].kind].building)
+            && self.world.game.units.values().any(|unit| {
+                unit.riding
+                    || self
+                        .combat
+                        .get(unit.id)
+                        .is_some_and(|m| m.carrier.is_some() || !m.cargo.is_empty())
+            })
+        {
+            return Err("unsupported World building elimination: current cargo and riders".into());
         }
         let mut transaction = self.world.begin_transaction().map_err(|e| e.to_string())?;
         let mut environment = self.environment.clone();
