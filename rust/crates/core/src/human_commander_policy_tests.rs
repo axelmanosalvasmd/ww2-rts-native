@@ -1,12 +1,10 @@
 //! Actual original full-step observations through native quiet policy and human input phases.
 use super::*;
-use crate as core_api;
+use crate::human_commander_test_facts as facts;
 use crate::{
     commander_ai::{Input, PlayerObservation, PointObservation, UnitObservation},
     random::StreamId,
 };
-#[path = "../tests/support/human_commander_facts.rs"]
-mod facts;
 
 fn fixture() -> Value {
     serde_json::from_str(include_str!(

@@ -1,8 +1,6 @@
 //! Constructed original helper seams. These replay motor state, not Match actuators.
 use super::*;
-use crate as core_api;
-#[path = "../tests/support/human_commander_facts.rs"]
-mod facts;
+use crate::human_commander_test_facts as facts;
 
 fn fixture() -> Value {
     serde_json::from_str(include_str!("../tests/fixtures/human-commander-seams.json")).unwrap()

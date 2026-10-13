@@ -24,6 +24,12 @@ pub mod human_commander_inputs;
 pub mod human_commander_policy;
 pub mod human_commander_state;
 pub mod human_commander_timing;
+
+#[cfg(test)]
+use crate as core_api;
+#[cfg(test)]
+#[path = "../tests/support/human_commander_facts.rs"]
+mod human_commander_test_facts;
 pub mod legacy_scenario;
 pub mod match_companion_effects;
 mod match_companion_tick;

@@ -2,6 +2,8 @@
 
 ## Human policy source assembly (2026-10-13)
 
+Strict all-target Clippy then reaches the newly composed library tests and detects two registrations of the same fixture decoder file. A single cfg-test root module now supplies both state and policy assertions; the external integration target retains its own crate-local module. This changes test linkage only, without changing decoded values, assertions, production modules or the seventeen-test inventory. The diagnostic is preserved and final exact-head gates remain pending.
+
 At `c7cf54a`, all seventeen focused human debug tests and 280 locked workspace release tests pass. Strict Clippy then finds one descending-sort style lint in idle camera group selection. The successor uses the same stable order with `Reverse(count)` as its key; equal-size groups retain first insertion order, with no RNG or selection change. The original comparator agrees with Source's descending group count. Debug and release binaries and the complete logs are copied outside the cache before rebuilding. Final exact-head checks remain pending.
 
 The first focused human library run passes nine tests and fails one refusal assertion because its snapshot helper invokes the ordinary routing getter after deliberately making the context unsupported. The owner repairs only the test helper: it reads the existing canonical recipient rows and navigation buffer directly. No mode is remapped, and the runtime refusal guard remains unchanged. This exposes the intended before/after state for the real atomic-refusal assertion. The failed log is preserved; complete focused and final native gates remain pending.

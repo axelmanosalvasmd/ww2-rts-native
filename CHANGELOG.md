@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Registered the shared human fixture decoder once per library test crate, fixing the strict duplicate-module lint. State and policy assertions reuse that decoder; external integration tests remain separate crates. Runtime behavior and source fixtures are unchanged, with final native gates pending.
+
 - Used a stable descending group-count key for idle human camera scans, preserving equal-group order and fixing the strict Clippy gate. All 17 focused debug and 280 workspace release tests passed before this lint repair; final exact-head gates remain pending.
 
 - Corrected the human observer refusal snapshot helper to read existing canonical rows directly in deliberately unsupported contexts. The first focused human library run passed nine tests and exposed this helper's guarded-getter unwrap; runtime mode admission and actual fixtures remain unchanged. Complete native checks are still pending.
