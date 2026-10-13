@@ -283,6 +283,7 @@ impl Match {
         let initial_tech =
             TechState::new(1, 0, 0, 0).map_err(|e| format!("World research: {e:?}"))?;
         let mut result = Self {
+            aviation: crate::match_aviation::AviationState::default(),
             field_works: crate::field_works::FieldWorksRuntime::default(),
             convoys: None,
             supply_net: crate::supply_network::GroundSupplyNetwork::default(),

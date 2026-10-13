@@ -217,6 +217,7 @@ pub fn events(m: &mut Match) -> Value {
                 SupportEvent::SmokeShells(p) =>
                     json!({"x":p.x,"z":p.z,"k":"smokeshells","pub":true}),
                 SupportEvent::Environment(effect) => effect.to_json(),
+                other => panic!("unexpected nonground support event: {other:?}"),
             })
             .collect::<Vec<_>>()
     )
@@ -224,10 +225,15 @@ pub fn events(m: &mut Match) -> Value {
 
 pub fn signature(m: &Match) -> Value {
     json!([
-        m.support
+        m.world
+            .game
             .strikes
             .iter()
-            .map(|s| json!([s.kind.name(), s.live, s.left]))
+            .map(|s| json!([
+                s.runtime.as_ref().unwrap().kind.name(),
+                s.live,
+                s.runtime.as_ref().unwrap().left
+            ]))
             .collect::<Vec<_>>(),
         m.support.covers.len(),
         m.world.game.smokes.len(),
@@ -259,7 +265,7 @@ pub fn compare(
         "players":m.start.players.iter().enumerate().map(|(i,p)|{let e=&m.start.economy.players[i];json!({"slot":i,"name":p.config.name,"team":g.players[i].team,"faction":p.config.faction as u8,"vp":e.vp,"mp":e.mp,"inc":e.inc,"sup":p.support,"spawn":point_json(p.spawn),"visible":g.players[i].visible,"away":e.away,"out":e.out})}).collect::<Vec<_>>(),
         "points":m.start.points.iter().enumerate().map(|(i,p)|json!({"scenarioId":p.id,"x":p.at.x,"z":p.at.z,"vp":p.vp,"mp":p.mp,"owner":p.owner.map_or(-1,|v|v as i64),"capper":p.capper.map_or(-1,|v|v as i64),"progress":p.progress,"cut":p.cut,"kind":p.kind,"needs":p.needs.map_or(-1,|v|v as i64),"onPoint":p.on_point,"contested":p.contested,"capTick":m.capture_ticks[i]})).collect::<Vec<_>>(),
         "units":g.units.keys().map(|id|unit_row(m,*id)).collect::<Vec<_>>(),"unitOrder":g.units.keys().collect::<Vec<_>>(),
-        "strikes":m.support.strikes.iter().map(|s|json!({"kind":s.kind.name(),"owner":s.owner,"x":s.at.x,"z":s.at.z,"dir":s.direction,"t":s.delay,"left":s.left,"next":s.next,"live":s.live})).collect::<Vec<_>>(),
+        "strikes":m.world.game.strikes.iter().map(|s| { let timing=s.runtime.as_ref().unwrap();json!({"kind":timing.kind.name(),"owner":s.owner,"x":s.x,"z":s.z,"dir":s.dir,"t":timing.delay,"left":timing.left,"next":timing.next,"live":s.live})}).collect::<Vec<_>>(),
         "covers":m.support.covers.iter().map(|c|json!({"team":c.team,"owner":c.owner,"x":c.at.x,"z":c.at.z,"r":c.radius,"t":c.remaining})).collect::<Vec<_>>(),
         "smokes":g.smokes.iter().map(|s|json!({"id":s.id,"x":s.x,"z":s.z,"r":s.r,"t":s.remaining})).collect::<Vec<_>>(),"shots":shots,
         "timeline":m.timeline.iter().map(|s|match s { MatchSample::Conquest {t,vp}=>json!({"t":t,"vp":vp}), MatchSample::Territories {..}=>panic!("ground-support fixture cannot represent a Territories timeline") }).collect::<Vec<_>>(),"flights":[],"nades":[],"salvos":[],

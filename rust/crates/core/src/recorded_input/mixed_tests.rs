@@ -322,25 +322,30 @@ fn compare(m: &Match, expected: &Value) {
         }
     }
     assert_eq!(
-        m.support.strikes.len(),
+        m.world.game.strikes.len(),
         expected["strikes"].as_array().unwrap().len()
     );
     for (s, row) in m
-        .support
+        .world
+        .game
         .strikes
         .iter()
         .zip(expected["strikes"].as_array().unwrap())
     {
-        assert_eq!(json!(s.kind.name()), row["kind"]);
+        let timing = s
+            .runtime
+            .as_ref()
+            .expect("canonical recorded support timing");
+        assert_eq!(json!(timing.kind.name()), row["kind"]);
         assert_eq!(json!(s.owner), row["owner"]);
         assert_eq!(json!(s.live), row["live"]);
         for (name, n) in [
-            ("x", s.at.x),
-            ("z", s.at.z),
-            ("dir", s.direction),
-            ("t", s.delay),
-            ("left", s.left),
-            ("next", s.next),
+            ("x", s.x),
+            ("z", s.z),
+            ("dir", s.dir),
+            ("t", timing.delay),
+            ("left", timing.left),
+            ("next", timing.next),
         ] {
             assert_eq!(bits(n), bits(row[name].as_f64().unwrap()));
         }

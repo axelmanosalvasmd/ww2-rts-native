@@ -275,6 +275,8 @@ pub struct Strike {
     pub z: f64,
     /// Direction of the corridor's long side, radians.
     pub dir: f64,
+    /// Actual Match strike timers. Query-only fixtures omit runtime metadata.
+    pub runtime: Option<crate::match_support::SupportTiming>,
 }
 
 /// One cell of a structure (`g.structuralCells`): a building is aimed at by its standing cells.
