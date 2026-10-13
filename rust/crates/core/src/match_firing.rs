@@ -1350,10 +1350,17 @@ impl Match {
                 self.turn_firing_hull(id, math::atan2(at.z - u.z, at.x - u.x), dt)?;
             }
         }
-        let u = self.world.game.units[&id].clone();
-        if n(w, "range", 0.0) == 0.0 || !self.logistics.can_fire(id, 1.0) || u.retreating {
+        let u = &self.world.game.units[&id];
+        let at = u.at();
+        let rot = u.rot;
+        let retreating = u.retreating;
+        let still = u.still;
+        let amove = u.amove;
+        let hit_from = u.hit_from;
+        let infantry = self.rules.kinds[u.kind].infantry;
+        if n(w, "range", 0.0) == 0.0 || !self.logistics.can_fire(id, 1.0) || retreating {
             self.firing.initialize(id).target_id = 0;
-            self.commands.units.get_mut(&id).unwrap().aim = u.rot;
+            self.commands.units.get_mut(&id).unwrap().aim = rot;
             return Ok(());
         }
         let current = self.firing.get(id).copied().unwrap_or_default();
@@ -1370,15 +1377,15 @@ impl Match {
         let target = self.firing.get(id).unwrap().target_id;
         if target != 0 && self.can_shoot_target(id, target)? {
             let t = &self.world.game.units[&target];
-            let aim = math::atan2(t.z - u.z, t.x - u.x);
+            let aim = math::atan2(t.z - at.z, t.x - at.x);
             self.commands.units.get_mut(&id).unwrap().aim = aim;
-            if self.rules.kinds[u.kind].infantry && !moving {
+            if infantry && !moving {
                 self.world.game.units.get_mut(&id).unwrap().rot = aim;
             }
             let ready = if moving {
                 w.get("moveFire").is_some()
             } else {
-                u.still.is_some_and(|s| s >= n(w, "setup", 0.0))
+                still.is_some_and(|s| s >= n(w, "setup", 0.0))
             };
             if ready
                 && self.firing.get(id).unwrap().cooldown <= 0.0
@@ -1390,9 +1397,9 @@ impl Match {
             self.set_firing_target(id, 0)?;
             if let Some(face) = self.commands.units[&id].face
                 && !moving
-                && u.amove.is_none()
+                && amove.is_none()
                 && (!hull
-                    || u.hit_from.is_none()
+                    || hit_from.is_none()
                     || self
                         .combat
                         .get(id)
@@ -1400,7 +1407,7 @@ impl Match {
             {
                 if hull {
                     self.turn_firing_hull(id, face.angle, dt)?;
-                } else if self.rules.kinds[u.kind].infantry {
+                } else if infantry {
                     self.world.game.units.get_mut(&id).unwrap().rot = face.angle;
                 }
             }
