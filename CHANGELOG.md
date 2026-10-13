@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added source recorders for Conquest ground abilities (30 traces, 141 actions) and recovery/section repairs (22 traces, 128 actions), with exact-pin and clean-reference checks. Wrote canonical section repair, captured recovery preparation, medic healing and team mine discovery; route application, reinforcement, ability execution and native differential verification remain unfinished.
+
 - Reserved one canonical Match ability row for cooldown, buff, AP and aimed-order flags, plus recovery-only wound/heal/reinforcement metadata. Starting and recruited units initialize these rows; Game health/sprint, UnitControl aimed points and logistics provisions retain their existing owners. Ability/recovery execution and native verification remain unfinished.
 
 - Initialized canonical combat metadata when Match recruitment publishes a new unit, so its first combat event passes admission. Existing original-source recruitment traces now check each admitted unit has the source defaults.
