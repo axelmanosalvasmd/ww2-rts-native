@@ -2,6 +2,10 @@
 pub mod authoritative_maps;
 mod lobby;
 mod maps;
+pub mod snapshot_backpressure;
+pub mod snapshot_delta;
+pub mod snapshot_lists;
+pub mod tick_timing;
 
 use axum::{
     Json, Router,
