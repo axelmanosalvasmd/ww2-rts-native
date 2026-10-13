@@ -378,7 +378,8 @@ fn world_firing_admission_refuses_before_a_recorded_technology_payment_or_bounda
     let commands = format!(
         "{:?}",
         (
-            m.commands.queue.snapshot(),
+            m.commands.next_tick(),
+            m.commands.pending_commands(),
             &m.commands.units,
             m.commands.path_requests()
         )
@@ -416,7 +417,8 @@ fn world_firing_admission_refuses_before_a_recorded_technology_payment_or_bounda
         format!(
             "{:?}",
             (
-                m.commands.queue.snapshot(),
+                m.commands.next_tick(),
+                m.commands.pending_commands(),
                 &m.commands.units,
                 m.commands.path_requests()
             )

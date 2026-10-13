@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Remove private queue-field access from the new cross-crate World admission test after exact source recheck. Compare the public next boundary, pending count, controls and path requests; preserve the separately recorded Technology setup and all wallet, lab, event and fault assertions. No queue API or runtime changes are added, and native compilation is still pending.
+
 - Normally compose the source-reviewed rally drift presence correction with the World caller. Preserve actual movement retirement and require both drift presence and its rally subtype when a later reaction reads it. A new reaction route clears the retired subtype; the mixed-order reader follows the same presence rule. Original 129-step Source history is retained, with native verification pending.
 
 - Correct the new World firing-admission test to compare the actual public queue snapshot, controls and path requests. Independent source review caught Debug formatting of MatchCommands, which has no Debug implementation, before native compilation. Runtime, Source fixture and assertions are unchanged; native execution remains pending.
