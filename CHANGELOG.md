@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added a typed internal small-arms shot event for the operative producer, preserving its existing effect, shooter, endpoint and optional enemy/man fields. No contact or hit-direction fields were added.
+
 - Preflighted canonical shooter metadata and finite ammunition before ability/salvo launches, and reject malformed retained blast identities before stepping any flight. Timer input bounds keep physical grenade pruning safe.
 
 - Fixed physical ability launch admission at the inclusive map edge, which the source ability command permits. Added an unchanged-source grenade edge case before native verification.
