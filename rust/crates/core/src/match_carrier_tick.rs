@@ -12,7 +12,7 @@ impl Match {
         }
         for (&id, unit) in &self.world.game.units {
             let meta = self.combat.get(id).ok_or("missing carrier tick metadata")?;
-            if !unit.riding && unit.board == 0 && meta.cargo.is_empty() {
+            if !unit.riding && meta.carrier.is_none() && unit.board == 0 && meta.cargo.is_empty() {
                 continue;
             }
             self.validate_carrier_unit(id)?;

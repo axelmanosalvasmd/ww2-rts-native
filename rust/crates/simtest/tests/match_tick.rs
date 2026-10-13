@@ -549,7 +549,15 @@ fn trusted_tick_scene_stages_clock_paths_and_empty_queue_without_replay() {
 fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
     use ww2_core::{match_commands::Command, orders::OrderKey};
     let fixture: Value = serde_json::from_str(include_str!("fixtures/match-tick.json")).unwrap();
-    for actor in ["garrison", "rail", "riding", "logistics", "convoys", "mode"] {
+    for actor in [
+        "garrison",
+        "rail",
+        "riding",
+        "reverse riding",
+        "logistics",
+        "convoys",
+        "mode",
+    ] {
         let mut m = make(&fixture["cases"][0]);
         let id = *m.world.game.units.keys().next().unwrap();
         let rail_kind = m.rules.kinds.iter().position(|kind| kind.rail).unwrap();
@@ -568,6 +576,7 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
                 unit.riding = true;
                 m.combat.get_mut(id).unwrap().carrier = Some(900);
             }
+            "reverse riding" => m.combat.get_mut(id).unwrap().carrier = Some(900),
             "logistics" => m.options.logistics = true,
             "convoys" => m.convoys = ww2_core::supply_convoys::ConvoyState::setup(true),
             "mode" => m.world.game.mode = Some(ww2_core::game::ModeKind::World),
@@ -622,6 +631,7 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
                 "logistics" | "convoys" => "reserve and convoy tick phases",
                 "mode" => "ordinary Conquest",
                 "riding" => "thrown carrier ejection tick phase",
+                "reverse riding" => "invalid canonical carrier unit",
                 _ => "rail tick actor",
             }),
             "{actor}: {error}"

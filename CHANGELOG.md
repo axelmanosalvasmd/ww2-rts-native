@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed a carrier tick admission shortcut found by independent review: a nonriding Game unit with a retained carrier relation now reaches canonical parity validation before commands, clock or timers mutate. The whole-admission regression preserves both queued boundaries and all canonical timers on refusal. Native execution remains pending.
+
 - Normal-merged the checked ordinary Default runner into the separate carrier integration, preserving the new riding/boarding sites and canonical command siblings. The 240-test predecessor proof remains distinct from the uncompiled carrier composition; no frozen proof branch changed.
 
 - Added source-written carrier tick admission and actual early riding/late boarding sites in a separate integration tree. Canonical pose/grid and ability cooldown update before the rider continues; OnFoot prunes stale cargo and Boarded skips the remaining turn. Existing validators preflight active reciprocal relations and queued Board goals, retaining missing/dead target clearing while refusing thrown ejection and boat/rail/garrison transport. Native composition remains pending.
