@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added an internal recorded-buy actuator that gates canonical finish and seats, borrows owned recipient routing through disjoint recruitment fields, and preflights exact MP-spending story updates before payment. Combat and firing rows remain canonical publication callbacks. This source prerequisite awaits native verification and the recorded command consumer.
+
 - Preserved both fresh combat and firing identities and their default publication callbacks when joining the checked firing ancestry to prepared publication. Combined production-lane validation remains pending.
 
 - Added shared mode-aware UnitControl initialization using compiled ability costs, and selected it from the staged factory's actual Game mode. The original spawn oracle preserves all 55 earlier scenarios and adds six Classic/World spawns for absent, paid and free abilities. This source-only prerequisite still awaits native verification; World startup can remove its private cost lookup.
