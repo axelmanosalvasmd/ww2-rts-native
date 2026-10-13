@@ -501,10 +501,12 @@ impl crate::match_runtime::Match {
             self.apply_attack_move(id)?;
             self.apply_ground_attack(id)?;
             self.react_unit(id)?;
-            let before = self.world.game.units[&id].at();
+            let before = self.world.game.units[&id].pose();
+            let before_dust = self.world.game.units[&id].dust;
             if let Some(result) = self.move_unit_with_command_routes(id, factor)? {
                 moved.push(result);
             }
+            self.apply_moved_ground_contact(id, before, before_dust)?;
             let unit = &self.world.game.units[&id];
             let moving = !unit.path.is_empty()
                 || crate::math::hypot(unit.x - before.x, unit.z - before.z) > 0.001;

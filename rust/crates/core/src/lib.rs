@@ -38,6 +38,7 @@ pub mod match_combat;
 pub mod match_commander;
 pub mod match_commands;
 pub mod match_construction;
+pub mod match_ground_contact;
 pub mod match_cover;
 mod match_destroy;
 pub mod match_end;

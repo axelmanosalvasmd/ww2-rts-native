@@ -1009,6 +1009,38 @@ impl World {
         };
         Ok(Mutation { logged_index })
     }
+    /// Commit Source vehicle wear, including both rows of an open-ground mud transition.
+    pub(crate) fn apply_vehicle_wear(&mut self, c: usize, next: f32) -> Result<(), WorldError> {
+        self.preflight_cell_rows(&[c])?;
+        if !next.is_finite()
+            || !(0.0..=1.0).contains(&next)
+            || !matches!(self.game.chars[c], b'.' | b'M')
+            || self
+                .game
+                .wear
+                .as_ref()
+                .is_none_or(|v| v.len() != self.game.chars.len())
+        {
+            return Err(WorldError::InvalidChange);
+        }
+        let mud = self.game.chars[c] == b'.' && next >= 1.0;
+        self.journal_end()?
+            .checked_add(2)
+            .ok_or(WorldError::VersionExhausted)?;
+        if mud {
+            self.mutation_capacity(2)?;
+        }
+        self.game.wear.as_mut().unwrap()[c] = next;
+        if mud {
+            self.set_cell(c, b'M')?;
+            self.game.wear.as_mut().unwrap()[c] = 0.0;
+            self.cell_state[c] = self.state_of(c);
+            self.log_cell(c, false)?;
+        } else {
+            self.touch(c)?;
+        }
+        Ok(())
+    }
     /// Register a new base building after its footprint cells have been placed.
     /// Existing cell sections move to historical storage, retaining the old graph's values.
     pub fn register_building_structure(

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Connect actual moved-vehicle ground wear to the canonical World owner. Preserve Float32 wear, wet and below-sea multipliers, look-only journal updates, both mud-transition rows, and dust after terrain contact. The frozen construction warm-route failure showed the missing real contact at cell 792. An unchanged Source full-step recorder covers six scenes and 12 steps; two native component tests and the existing full construction replay await execution. Crushing and hostile mine detonation remain explicit unsupported boundaries, with the broader GroundEffects phase still unavailable.
+
 - Detach authored construction prime values before injecting them into Source. Later repair ticks had mutated the saved input reserves, so native replay began with depleted provisions before the repair command. Regeneration changes only two recorded action inputs back to the authored 0.001 and 0.002; all 2,013 expected snapshots across 29 cases remain identical. Construction and logistics rules are unchanged. The frozen native failure is retained; this successor has not run natively.
 
 - Retain the construction test caller's effect batch across ticks, commands and authored priming, matching the unchanged Source capture lifetime. Append only actual ordered TickReport events and reset only for a new case. All 29 cases are append-only: seven emissions across three boundaries produce 24 retained row occurrences. Producers, failure payloads, Source recorder and fixtures are unchanged; the frozen empty-batch failure is preserved and this successor has not run natively.
