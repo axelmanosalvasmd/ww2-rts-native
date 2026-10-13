@@ -2,13 +2,15 @@
 
 ## Unreleased
 
+- Added an actual-source full-carrier refusal with a paid Dig still active, followed by unload and successful boarding. The replay now requires refusal to preserve the job and spent wallet before successful admission cancels it without refund. Native proof is pending.
+
 - Fixed manual unload to retain missing cargo IDs until the source early-loop prune, preserving occupied seats and cargo flags between those phases. Added an actual-source unload-before-prune trace after independent review found the gap. Native verification is pending.
 
 - Integrated the captured-membership prerequisite's building-wreck lifecycle correction, passing explicit full-current membership as the original wreckBuilding does. Carrier behavior and its source fixture are unchanged; native verification remains pending.
 
 - Kept carrier per-unit validation local to its actor, carrier and live cargo while command admission still preflights all current units. Added a 4,096-entry cargo resource bound without changing ground-carrier seat rules or the source fixture.
 
-- Added a bounded ordinary Match carrier component using canonical board/cargo/riding state, own-seat reservations, recipient-aware routes, paid Dig cancellation, physical ground boarding, riding pose updates and manual unload. The pinned-source recorder covers 13 traces and 61 actions, including stable selection ties, a hidden obstacle and carrier/grid flag receipts. Boats, rail, garrison exits, unrepresented building/entrench work and wrecked-carrier ejection remain explicit unsupported boundaries; command parser/scheduler attachment and native verification are pending.
+- Added a bounded ordinary Match carrier component using canonical board/cargo/riding state, own-seat reservations, recipient-aware routes, paid Dig cancellation, physical ground boarding, riding pose updates and manual unload. The pinned-source recorder covers 14 traces and 66 actions, including stable selection ties, a hidden obstacle and carrier/grid flag receipts. Boats, rail, garrison exits, unrepresented building/entrench work and wrecked-carrier ejection remain explicit unsupported boundaries; command parser/scheduler attachment and native verification are pending.
 
 - Applied the ability owner’s narrow paid-work cancellation fix to the Dig integration. Accepted manual aimed abilities remove the canonical job without refund; unsupported project state rejects before selection writes. Updated the original-source fixture and retained focused paid-work and refusal regressions. Native proof remains pending.
 

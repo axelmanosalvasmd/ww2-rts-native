@@ -11154,6 +11154,1010 @@
       ]
     },
     {
+      "name": "full-carrier-keeps-paid-dig",
+      "map": {
+        "name": "Carrier checkpoint",
+        "w": 40,
+        "h": 30,
+        "rows": [
+          "........................................",
+          "........................................",
+          "........................................",
+          "........................................",
+          "........................................",
+          "........................................",
+          "........................................",
+          "........................................",
+          "........................................",
+          "........................................",
+          "........................................",
+          "........................................",
+          "........................................",
+          "........................................",
+          "........................................",
+          "........................................",
+          "........................................",
+          "........................................",
+          "........................................",
+          "........................................",
+          "........................................",
+          "........................................",
+          "........................................",
+          "........................................",
+          "........................................",
+          "........................................",
+          "........................................",
+          "........................................",
+          "........................................",
+          "........................................"
+        ],
+        "spawns": [
+          {
+            "x": 0,
+            "y": 0
+          },
+          {
+            "x": 39,
+            "y": 29
+          }
+        ],
+        "points": [
+          {
+            "x": 20,
+            "y": 15
+          }
+        ]
+      },
+      "units": [
+        {
+          "id": 1,
+          "type": "rifle",
+          "x": 20,
+          "z": 23
+        },
+        {
+          "id": 2,
+          "type": "halftrack",
+          "x": 24,
+          "z": 23,
+          "cargo": [
+            3
+          ]
+        },
+        {
+          "id": 3,
+          "type": "rifle",
+          "x": 24,
+          "z": 23,
+          "riding": 2
+        }
+      ],
+      "initial": {
+        "units": [
+          {
+            "id": 1,
+            "kind": "rifle",
+            "owner": 0,
+            "pose": [
+              "4034000000000000",
+              "4037000000000000",
+              "0000000000000000"
+            ],
+            "hp": "4059000000000000",
+            "supp": "0000000000000000",
+            "still": "0000000000000000",
+            "cd": "0000000000000000",
+            "cooldown": "0000000000000000",
+            "retarget": "0000000000000000",
+            "repath": "0000000000000000",
+            "board": 0,
+            "riding": 0,
+            "cargo": [],
+            "path": [],
+            "follow": 77,
+            "attack": 0,
+            "target": 0,
+            "work": false,
+            "orders": 0,
+            "face": false,
+            "nade": null,
+            "enter": -1,
+            "fireAt": -1,
+            "build": false,
+            "entrench": false,
+            "worldGoal": null,
+            "amove": null,
+            "traffic": false,
+            "trafficWait": "0000000000000000",
+            "outcome": null,
+            "outcomeTick": null,
+            "flags": 0,
+            "grid": [
+              1,
+              2,
+              3
+            ]
+          },
+          {
+            "id": 2,
+            "kind": "halftrack",
+            "owner": 0,
+            "pose": [
+              "4038000000000000",
+              "4037000000000000",
+              "0000000000000000"
+            ],
+            "hp": "406b800000000000",
+            "supp": "0000000000000000",
+            "still": "0000000000000000",
+            "cd": "0000000000000000",
+            "cooldown": "0000000000000000",
+            "retarget": "0000000000000000",
+            "repath": "0000000000000000",
+            "board": 0,
+            "riding": 0,
+            "cargo": [
+              3
+            ],
+            "path": [],
+            "follow": 77,
+            "attack": 0,
+            "target": 0,
+            "work": false,
+            "orders": 0,
+            "face": false,
+            "nade": null,
+            "enter": -1,
+            "fireAt": -1,
+            "build": false,
+            "entrench": false,
+            "worldGoal": null,
+            "amove": null,
+            "traffic": false,
+            "trafficWait": "0000000000000000",
+            "outcome": null,
+            "outcomeTick": null,
+            "flags": 8912896,
+            "grid": [
+              1,
+              2,
+              3
+            ]
+          },
+          {
+            "id": 3,
+            "kind": "rifle",
+            "owner": 0,
+            "pose": [
+              "4038000000000000",
+              "4037000000000000",
+              "0000000000000000"
+            ],
+            "hp": "4059000000000000",
+            "supp": "0000000000000000",
+            "still": "0000000000000000",
+            "cd": "0000000000000000",
+            "cooldown": "0000000000000000",
+            "retarget": "0000000000000000",
+            "repath": "0000000000000000",
+            "board": 0,
+            "riding": 2,
+            "cargo": [],
+            "path": [],
+            "follow": 77,
+            "attack": 0,
+            "target": 0,
+            "work": false,
+            "orders": 0,
+            "face": false,
+            "nade": null,
+            "enter": -1,
+            "fireAt": -1,
+            "build": false,
+            "entrench": false,
+            "worldGoal": null,
+            "amove": null,
+            "traffic": false,
+            "trafficWait": "0000000000000000",
+            "outcome": null,
+            "outcomeTick": null,
+            "flags": 262144,
+            "grid": [
+              1,
+              2,
+              3
+            ]
+          }
+        ],
+        "money": [
+          "407f400000000000",
+          "407f400000000000"
+        ],
+        "shots": []
+      },
+      "rows": [
+        {
+          "action": {
+            "op": "command",
+            "cmd": {
+              "t": "dig",
+              "ids": [
+                1
+              ],
+              "kind": "trench",
+              "x": 20,
+              "z": 20,
+              "dir": 0
+            }
+          },
+          "result": null,
+          "snapshot": {
+            "units": [
+              {
+                "id": 1,
+                "kind": "rifle",
+                "owner": 0,
+                "pose": [
+                  "4034000000000000",
+                  "4037000000000000",
+                  "0000000000000000"
+                ],
+                "hp": "4059000000000000",
+                "supp": "0000000000000000",
+                "still": "0000000000000000",
+                "cd": "0000000000000000",
+                "cooldown": "0000000000000000",
+                "retarget": "0000000000000000",
+                "repath": "0000000000000000",
+                "board": 0,
+                "riding": 0,
+                "cargo": [],
+                "path": [],
+                "follow": 0,
+                "attack": 0,
+                "target": 0,
+                "work": true,
+                "orders": 0,
+                "face": false,
+                "nade": null,
+                "enter": -1,
+                "fireAt": -1,
+                "build": false,
+                "entrench": false,
+                "worldGoal": null,
+                "amove": null,
+                "traffic": false,
+                "trafficWait": "0000000000000000",
+                "outcome": "interrupted",
+                "outcomeTick": 10,
+                "flags": 0,
+                "grid": [
+                  1,
+                  2,
+                  3
+                ]
+              },
+              {
+                "id": 2,
+                "kind": "halftrack",
+                "owner": 0,
+                "pose": [
+                  "4038000000000000",
+                  "4037000000000000",
+                  "0000000000000000"
+                ],
+                "hp": "406b800000000000",
+                "supp": "0000000000000000",
+                "still": "0000000000000000",
+                "cd": "0000000000000000",
+                "cooldown": "0000000000000000",
+                "retarget": "0000000000000000",
+                "repath": "0000000000000000",
+                "board": 0,
+                "riding": 0,
+                "cargo": [
+                  3
+                ],
+                "path": [],
+                "follow": 77,
+                "attack": 0,
+                "target": 0,
+                "work": false,
+                "orders": 0,
+                "face": false,
+                "nade": null,
+                "enter": -1,
+                "fireAt": -1,
+                "build": false,
+                "entrench": false,
+                "worldGoal": null,
+                "amove": null,
+                "traffic": false,
+                "trafficWait": "0000000000000000",
+                "outcome": null,
+                "outcomeTick": null,
+                "flags": 8912896,
+                "grid": [
+                  1,
+                  2,
+                  3
+                ]
+              },
+              {
+                "id": 3,
+                "kind": "rifle",
+                "owner": 0,
+                "pose": [
+                  "4038000000000000",
+                  "4037000000000000",
+                  "0000000000000000"
+                ],
+                "hp": "4059000000000000",
+                "supp": "0000000000000000",
+                "still": "0000000000000000",
+                "cd": "0000000000000000",
+                "cooldown": "0000000000000000",
+                "retarget": "0000000000000000",
+                "repath": "0000000000000000",
+                "board": 0,
+                "riding": 2,
+                "cargo": [],
+                "path": [],
+                "follow": 77,
+                "attack": 0,
+                "target": 0,
+                "work": false,
+                "orders": 0,
+                "face": false,
+                "nade": null,
+                "enter": -1,
+                "fireAt": -1,
+                "build": false,
+                "entrench": false,
+                "worldGoal": null,
+                "amove": null,
+                "traffic": false,
+                "trafficWait": "0000000000000000",
+                "outcome": null,
+                "outcomeTick": null,
+                "flags": 262144,
+                "grid": [
+                  1,
+                  2,
+                  3
+                ]
+              }
+            ],
+            "money": [
+              "407d600000000000",
+              "407f400000000000"
+            ],
+            "shots": []
+          }
+        },
+        {
+          "action": {
+            "op": "command",
+            "cmd": {
+              "t": "board",
+              "ids": [
+                1
+              ],
+              "target": 2
+            }
+          },
+          "result": "max",
+          "snapshot": {
+            "units": [
+              {
+                "id": 1,
+                "kind": "rifle",
+                "owner": 0,
+                "pose": [
+                  "4034000000000000",
+                  "4037000000000000",
+                  "0000000000000000"
+                ],
+                "hp": "4059000000000000",
+                "supp": "0000000000000000",
+                "still": "0000000000000000",
+                "cd": "0000000000000000",
+                "cooldown": "0000000000000000",
+                "retarget": "0000000000000000",
+                "repath": "0000000000000000",
+                "board": 0,
+                "riding": 0,
+                "cargo": [],
+                "path": [],
+                "follow": 0,
+                "attack": 0,
+                "target": 0,
+                "work": true,
+                "orders": 0,
+                "face": false,
+                "nade": null,
+                "enter": -1,
+                "fireAt": -1,
+                "build": false,
+                "entrench": false,
+                "worldGoal": null,
+                "amove": null,
+                "traffic": false,
+                "trafficWait": "0000000000000000",
+                "outcome": "interrupted",
+                "outcomeTick": 10,
+                "flags": 0,
+                "grid": [
+                  1,
+                  2,
+                  3
+                ]
+              },
+              {
+                "id": 2,
+                "kind": "halftrack",
+                "owner": 0,
+                "pose": [
+                  "4038000000000000",
+                  "4037000000000000",
+                  "0000000000000000"
+                ],
+                "hp": "406b800000000000",
+                "supp": "0000000000000000",
+                "still": "0000000000000000",
+                "cd": "0000000000000000",
+                "cooldown": "0000000000000000",
+                "retarget": "0000000000000000",
+                "repath": "0000000000000000",
+                "board": 0,
+                "riding": 0,
+                "cargo": [
+                  3
+                ],
+                "path": [],
+                "follow": 77,
+                "attack": 0,
+                "target": 0,
+                "work": false,
+                "orders": 0,
+                "face": false,
+                "nade": null,
+                "enter": -1,
+                "fireAt": -1,
+                "build": false,
+                "entrench": false,
+                "worldGoal": null,
+                "amove": null,
+                "traffic": false,
+                "trafficWait": "0000000000000000",
+                "outcome": null,
+                "outcomeTick": null,
+                "flags": 8912896,
+                "grid": [
+                  1,
+                  2,
+                  3
+                ]
+              },
+              {
+                "id": 3,
+                "kind": "rifle",
+                "owner": 0,
+                "pose": [
+                  "4038000000000000",
+                  "4037000000000000",
+                  "0000000000000000"
+                ],
+                "hp": "4059000000000000",
+                "supp": "0000000000000000",
+                "still": "0000000000000000",
+                "cd": "0000000000000000",
+                "cooldown": "0000000000000000",
+                "retarget": "0000000000000000",
+                "repath": "0000000000000000",
+                "board": 0,
+                "riding": 2,
+                "cargo": [],
+                "path": [],
+                "follow": 77,
+                "attack": 0,
+                "target": 0,
+                "work": false,
+                "orders": 0,
+                "face": false,
+                "nade": null,
+                "enter": -1,
+                "fireAt": -1,
+                "build": false,
+                "entrench": false,
+                "worldGoal": null,
+                "amove": null,
+                "traffic": false,
+                "trafficWait": "0000000000000000",
+                "outcome": null,
+                "outcomeTick": null,
+                "flags": 262144,
+                "grid": [
+                  1,
+                  2,
+                  3
+                ]
+              }
+            ],
+            "money": [
+              "407d600000000000",
+              "407f400000000000"
+            ],
+            "shots": []
+          }
+        },
+        {
+          "action": {
+            "op": "command",
+            "cmd": {
+              "t": "unload",
+              "ids": [
+                2
+              ]
+            }
+          },
+          "result": null,
+          "snapshot": {
+            "units": [
+              {
+                "id": 1,
+                "kind": "rifle",
+                "owner": 0,
+                "pose": [
+                  "4034000000000000",
+                  "4037000000000000",
+                  "0000000000000000"
+                ],
+                "hp": "4059000000000000",
+                "supp": "0000000000000000",
+                "still": "0000000000000000",
+                "cd": "0000000000000000",
+                "cooldown": "0000000000000000",
+                "retarget": "0000000000000000",
+                "repath": "0000000000000000",
+                "board": 0,
+                "riding": 0,
+                "cargo": [],
+                "path": [],
+                "follow": 0,
+                "attack": 0,
+                "target": 0,
+                "work": true,
+                "orders": 0,
+                "face": false,
+                "nade": null,
+                "enter": -1,
+                "fireAt": -1,
+                "build": false,
+                "entrench": false,
+                "worldGoal": null,
+                "amove": null,
+                "traffic": false,
+                "trafficWait": "0000000000000000",
+                "outcome": "interrupted",
+                "outcomeTick": 10,
+                "flags": 0,
+                "grid": [
+                  1,
+                  2,
+                  3
+                ]
+              },
+              {
+                "id": 2,
+                "kind": "halftrack",
+                "owner": 0,
+                "pose": [
+                  "4038000000000000",
+                  "4037000000000000",
+                  "0000000000000000"
+                ],
+                "hp": "406b800000000000",
+                "supp": "0000000000000000",
+                "still": "0000000000000000",
+                "cd": "0000000000000000",
+                "cooldown": "0000000000000000",
+                "retarget": "0000000000000000",
+                "repath": "0000000000000000",
+                "board": 0,
+                "riding": 0,
+                "cargo": [],
+                "path": [],
+                "follow": 0,
+                "attack": 0,
+                "target": 0,
+                "work": false,
+                "orders": 0,
+                "face": false,
+                "nade": null,
+                "enter": -1,
+                "fireAt": -1,
+                "build": false,
+                "entrench": false,
+                "worldGoal": null,
+                "amove": null,
+                "traffic": false,
+                "trafficWait": "0000000000000000",
+                "outcome": null,
+                "outcomeTick": null,
+                "flags": 0,
+                "grid": [
+                  1,
+                  2,
+                  3
+                ]
+              },
+              {
+                "id": 3,
+                "kind": "rifle",
+                "owner": 0,
+                "pose": [
+                  "4039000000000000",
+                  "4037000000000000",
+                  "0000000000000000"
+                ],
+                "hp": "4059000000000000",
+                "supp": "0000000000000000",
+                "still": "0000000000000000",
+                "cd": "0000000000000000",
+                "cooldown": "0000000000000000",
+                "retarget": "0000000000000000",
+                "repath": "0000000000000000",
+                "board": 0,
+                "riding": 0,
+                "cargo": [],
+                "path": [],
+                "follow": 77,
+                "attack": 0,
+                "target": 0,
+                "work": false,
+                "orders": 0,
+                "face": false,
+                "nade": null,
+                "enter": -1,
+                "fireAt": -1,
+                "build": false,
+                "entrench": false,
+                "worldGoal": null,
+                "amove": null,
+                "traffic": false,
+                "trafficWait": "0000000000000000",
+                "outcome": null,
+                "outcomeTick": null,
+                "flags": 0,
+                "grid": [
+                  1,
+                  2,
+                  3
+                ]
+              }
+            ],
+            "money": [
+              "407d600000000000",
+              "407f400000000000"
+            ],
+            "shots": []
+          }
+        },
+        {
+          "action": {
+            "op": "command",
+            "cmd": {
+              "t": "board",
+              "ids": [
+                1
+              ],
+              "target": 2
+            }
+          },
+          "result": null,
+          "snapshot": {
+            "units": [
+              {
+                "id": 1,
+                "kind": "rifle",
+                "owner": 0,
+                "pose": [
+                  "4034000000000000",
+                  "4037000000000000",
+                  "0000000000000000"
+                ],
+                "hp": "4059000000000000",
+                "supp": "0000000000000000",
+                "still": "0000000000000000",
+                "cd": "0000000000000000",
+                "cooldown": "0000000000000000",
+                "retarget": "0000000000000000",
+                "repath": "0000000000000000",
+                "board": 2,
+                "riding": 0,
+                "cargo": [],
+                "path": [
+                  [
+                    "4038000000000000",
+                    "4037000000000000"
+                  ]
+                ],
+                "follow": 0,
+                "attack": 0,
+                "target": 0,
+                "work": false,
+                "orders": 0,
+                "face": false,
+                "nade": null,
+                "enter": -1,
+                "fireAt": -1,
+                "build": false,
+                "entrench": false,
+                "worldGoal": null,
+                "amove": null,
+                "traffic": false,
+                "trafficWait": "0000000000000000",
+                "outcome": "interrupted",
+                "outcomeTick": 10,
+                "flags": 0,
+                "grid": [
+                  1,
+                  2,
+                  3
+                ]
+              },
+              {
+                "id": 2,
+                "kind": "halftrack",
+                "owner": 0,
+                "pose": [
+                  "4038000000000000",
+                  "4037000000000000",
+                  "0000000000000000"
+                ],
+                "hp": "406b800000000000",
+                "supp": "0000000000000000",
+                "still": "0000000000000000",
+                "cd": "0000000000000000",
+                "cooldown": "0000000000000000",
+                "retarget": "0000000000000000",
+                "repath": "0000000000000000",
+                "board": 0,
+                "riding": 0,
+                "cargo": [],
+                "path": [],
+                "follow": 0,
+                "attack": 0,
+                "target": 0,
+                "work": false,
+                "orders": 0,
+                "face": false,
+                "nade": null,
+                "enter": -1,
+                "fireAt": -1,
+                "build": false,
+                "entrench": false,
+                "worldGoal": null,
+                "amove": null,
+                "traffic": false,
+                "trafficWait": "0000000000000000",
+                "outcome": null,
+                "outcomeTick": null,
+                "flags": 0,
+                "grid": [
+                  1,
+                  2,
+                  3
+                ]
+              },
+              {
+                "id": 3,
+                "kind": "rifle",
+                "owner": 0,
+                "pose": [
+                  "4039000000000000",
+                  "4037000000000000",
+                  "0000000000000000"
+                ],
+                "hp": "4059000000000000",
+                "supp": "0000000000000000",
+                "still": "0000000000000000",
+                "cd": "0000000000000000",
+                "cooldown": "0000000000000000",
+                "retarget": "0000000000000000",
+                "repath": "0000000000000000",
+                "board": 0,
+                "riding": 0,
+                "cargo": [],
+                "path": [],
+                "follow": 77,
+                "attack": 0,
+                "target": 0,
+                "work": false,
+                "orders": 0,
+                "face": false,
+                "nade": null,
+                "enter": -1,
+                "fireAt": -1,
+                "build": false,
+                "entrench": false,
+                "worldGoal": null,
+                "amove": null,
+                "traffic": false,
+                "trafficWait": "0000000000000000",
+                "outcome": null,
+                "outcomeTick": null,
+                "flags": 0,
+                "grid": [
+                  1,
+                  2,
+                  3
+                ]
+              }
+            ],
+            "money": [
+              "407d600000000000",
+              "407f400000000000"
+            ],
+            "shots": []
+          }
+        },
+        {
+          "action": {
+            "op": "phase",
+            "id": 1
+          },
+          "result": {
+            "boarded": 2
+          },
+          "snapshot": {
+            "units": [
+              {
+                "id": 1,
+                "kind": "rifle",
+                "owner": 0,
+                "pose": [
+                  "4034000000000000",
+                  "4037000000000000",
+                  "0000000000000000"
+                ],
+                "hp": "4059000000000000",
+                "supp": "0000000000000000",
+                "still": "0000000000000000",
+                "cd": "0000000000000000",
+                "cooldown": "0000000000000000",
+                "retarget": "0000000000000000",
+                "repath": "0000000000000000",
+                "board": 0,
+                "riding": 2,
+                "cargo": [],
+                "path": [],
+                "follow": 0,
+                "attack": 0,
+                "target": 0,
+                "work": false,
+                "orders": 0,
+                "face": false,
+                "nade": null,
+                "enter": -1,
+                "fireAt": -1,
+                "build": false,
+                "entrench": false,
+                "worldGoal": null,
+                "amove": null,
+                "traffic": false,
+                "trafficWait": "0000000000000000",
+                "outcome": "interrupted",
+                "outcomeTick": 10,
+                "flags": 262144,
+                "grid": [
+                  1,
+                  2,
+                  3
+                ]
+              },
+              {
+                "id": 2,
+                "kind": "halftrack",
+                "owner": 0,
+                "pose": [
+                  "4038000000000000",
+                  "4037000000000000",
+                  "0000000000000000"
+                ],
+                "hp": "406b800000000000",
+                "supp": "0000000000000000",
+                "still": "0000000000000000",
+                "cd": "0000000000000000",
+                "cooldown": "0000000000000000",
+                "retarget": "0000000000000000",
+                "repath": "0000000000000000",
+                "board": 0,
+                "riding": 0,
+                "cargo": [
+                  1
+                ],
+                "path": [],
+                "follow": 0,
+                "attack": 0,
+                "target": 0,
+                "work": false,
+                "orders": 0,
+                "face": false,
+                "nade": null,
+                "enter": -1,
+                "fireAt": -1,
+                "build": false,
+                "entrench": false,
+                "worldGoal": null,
+                "amove": null,
+                "traffic": false,
+                "trafficWait": "0000000000000000",
+                "outcome": null,
+                "outcomeTick": null,
+                "flags": 8912896,
+                "grid": [
+                  1,
+                  2,
+                  3
+                ]
+              },
+              {
+                "id": 3,
+                "kind": "rifle",
+                "owner": 0,
+                "pose": [
+                  "4039000000000000",
+                  "4037000000000000",
+                  "0000000000000000"
+                ],
+                "hp": "4059000000000000",
+                "supp": "0000000000000000",
+                "still": "0000000000000000",
+                "cd": "0000000000000000",
+                "cooldown": "0000000000000000",
+                "retarget": "0000000000000000",
+                "repath": "0000000000000000",
+                "board": 0,
+                "riding": 0,
+                "cargo": [],
+                "path": [],
+                "follow": 77,
+                "attack": 0,
+                "target": 0,
+                "work": false,
+                "orders": 0,
+                "face": false,
+                "nade": null,
+                "enter": -1,
+                "fireAt": -1,
+                "build": false,
+                "entrench": false,
+                "worldGoal": null,
+                "amove": null,
+                "traffic": false,
+                "trafficWait": "0000000000000000",
+                "outcome": null,
+                "outcomeTick": null,
+                "flags": 0,
+                "grid": [
+                  1,
+                  2,
+                  3
+                ]
+              }
+            ],
+            "money": [
+              "407d600000000000",
+              "407f400000000000"
+            ],
+            "shots": []
+          }
+        }
+      ]
+    },
+    {
       "name": "hidden-obstacle-owner-route",
       "map": {
         "name": "Carrier checkpoint",
