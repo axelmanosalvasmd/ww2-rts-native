@@ -280,6 +280,13 @@ impl Match {
         let initial_tech =
             TechState::new(1, 0, 0, 0).map_err(|e| format!("World research: {e:?}"))?;
         let mut result = Self {
+            combat: crate::match_combat::CombatState::default(),
+            environment: crate::environment::EnvironmentRuntime::default(),
+            firing: crate::match_firing::FiringState::default(),
+            recipients: Vec::new(),
+            routing_fog: crate::fog::Fog::default(),
+            tick_state: crate::match_tick::TickState::default(),
+            fallen: crate::match_story::FallenLocations::default(),
             world_runtime: Some(runtime),
             commands: crate::match_commands::MatchCommands::new(4096),
             grid: SpatialGrid::new(&world.game.units, 16.0),
@@ -296,7 +303,7 @@ impl Match {
             scenario: None,
             logistics: crate::logistics::LogisticsState::default(),
             capture_ticks: Vec::new(),
-            capture_counts: vec![0.0; count],
+            story: vec![crate::match_story::PlayerStory::default(); count],
             finish: None,
             timeline: Vec::new(),
             next_unit_id: 1,
@@ -363,7 +370,10 @@ impl Match {
             vec![draft],
         )
         .map_err(|e| format!("World publication: {e:?}"))?
-        .publish();
+        .publish_with(|unit, _| {
+            self.combat.initialize(unit.id);
+            self.firing.initialize(unit.id);
+        });
         Ok(id)
     }
     fn stage_world_unit(
@@ -374,7 +384,7 @@ impl Match {
         pose: Option<Point>,
     ) -> Result<StagedUnit, String> {
         let kind = self.rules.kind(name).ok_or("unknown World unit kind")?;
-        let mut draft = StagedUnit::ordinary_with_actor(
+        let draft = StagedUnit::ordinary_with_actor(
             &self.world.game,
             &self.rules,
             self.world_actor(owner)?,
@@ -384,23 +394,6 @@ impl Match {
             pose,
         )
         .map_err(|e| format!("World spawn: {e:?}"))?;
-        let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
-        let ability = catalog
-            .unit(name)
-            .map_err(|e| e.to_string())?
-            .get("ab")
-            .ok_or("missing World ability")?;
-        let ability_id = ability
-            .get("id")
-            .and_then(Value::string)
-            .ok_or("missing ability identity")?;
-        let ability_costs = catalog.table("AB_MUN").map_err(|e| e.to_string())?;
-        let cost = ability
-            .get("mun")
-            .and_then(Value::number)
-            .or_else(|| ability_costs.get(ability_id).and_then(Value::number))
-            .unwrap_or(0.0);
-        draft.control.auto_cast = ability_id != "none" && cost == 0.0;
         Ok(draft)
     }
     fn world_building(&mut self, owner: usize, name: &str, cell: usize) -> Result<u32, String> {

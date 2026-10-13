@@ -188,7 +188,8 @@ impl Match {
             .next_unit_id
             .checked_add(1)
             .ok_or(RecruitError::InvalidState("unit ID capacity exhausted"))?;
-        if self.recruit_metadata.contains_key(&self.next_unit_id)
+        if self.combat.get(self.next_unit_id).is_some()
+            || self.recruit_metadata.contains_key(&self.next_unit_id)
             || self.commands.units.contains_key(&self.next_unit_id)
         {
             return Err(RecruitError::InvalidState(
@@ -295,7 +296,9 @@ impl Match {
         )
         .map_err(RecruitError::Publication)?;
         let purchase = prepared.commit();
-        let _published = publication.publish();
+        let _published = publication.publish_with(|unit, _| {
+            self.combat.initialize(unit.id);
+        });
         Ok(CompletedRecruitUnit {
             unit: id,
             purchase,
