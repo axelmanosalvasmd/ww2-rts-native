@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-- Added immediate canonical medic route replacement and captured-frame reinforcement with actual provision hooks and spending tallies. Corrected the recovery recorder to capture separate frames on cadence ticks 9 and 10 (22 traces, 129 actions). Native differential verification and aimed-flight execution remain pending.
+- Wrote the aimed ground-ability phase against the shared physical-flight and salvo producers, including current-ammo rechecks, automatic route retention and budgeted walks. Smoke admission rejects IDs already held by a smoke cloud or wreck before changing selected units. Fixed cadence healing to use ten ticks of elapsed time and added original-source proof (23 recovery traces, 133 actions). Incoming flight/provision dependencies and native differential checks remain pending.
+
+- Added immediate canonical medic route replacement and captured-frame reinforcement with actual provision hooks and spending tallies. Corrected the recovery recorder to capture separate frames on cadence ticks 9 and 10 (23 traces, 133 actions). Native differential verification and aimed-flight execution remain pending.
 
 - Wrote typed Conquest Ability/Autocast dispatch, canonical instant abilities, all ground autocast judgments and the existing FIFO aimed-path binding. Ability cooldown/buff timers remain separate from weapon timers; smoke IDs use the shared unit counter. The ability recorder now pairs the canonical Combat purpose stream at seed 701. Aimed launches, reinforcement and native differential consumers remain unfinished; no passing native execution claim is made.
 - Verified the complete command/firing ancestry after recruitment metadata integration: 155 workspace tests, five focused debug/release tests, strict Clippy, formatting and release FFI build pass. The diff against the reviewed command branch contains only weapon-phase code, publication defaults, fixtures and documentation.
@@ -31,7 +33,7 @@
 
 - Stacked the checked Conquest command actuator on the reviewed recruitment and recipient-routing checkpoint, retaining its complete command behavior and canonical shared control state. Combined integration checks belong to the shared CI lane.
 
-- Added source recorders for Conquest ground abilities (30 traces, 141 actions) and recovery/section repairs (22 traces, 129 actions), with exact-pin and clean-reference checks. Wrote canonical section repair, captured recovery preparation, medic healing and team mine discovery; route application, reinforcement, ability execution and native differential verification remain unfinished.
+- Added source recorders for Conquest ground abilities (30 traces, 141 actions) and recovery/section repairs (23 traces, 133 actions), with exact-pin and clean-reference checks. Wrote canonical section repair, captured recovery preparation, medic healing and team mine discovery; route application, reinforcement, ability execution and native differential verification remain unfinished.
 
 - Reserved one canonical Match ability row for cooldown, buff, AP and aimed-order flags, plus recovery-only wound/heal/reinforcement metadata. Starting and recruited units initialize these rows; Game health/sprint, UnitControl aimed points and logistics provisions retain their existing owners. Ability/recovery execution and native verification remain unfinished.
 

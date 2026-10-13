@@ -439,7 +439,7 @@ impl Match {
         if self.world.game.tick % 10 != 0 {
             return Ok(Vec::new());
         }
-        let routes = self.heal_wounded(&frame.units, dt)?;
+        let routes = self.heal_wounded(&frame.units, dt * 10.)?;
         self.sweep_prepared_mines(frame)?;
         Ok(routes)
     }

@@ -39,6 +39,7 @@ use crate::{
     catalog::{Catalog, Value},
     game::{CELL, COVER, MOVE, Point, Smoke, TRENCH},
     match_commands::{Command, Denial, MoveOutcome},
+    match_firing::AbilityBlast,
     match_runtime::Match,
     math,
     navigation::{TerrainView, Versions},
@@ -377,6 +378,79 @@ impl Match {
             self.finish.is_some(),
         )
     }
+    /// Advance the queued ground ability after jobs and before entering/boarding.
+    /// Firing retains the committed flights, grenade tickets and ordered launch events.
+    pub fn step_aimed_ability(&mut self, id: UnitId) -> Result<(), String> {
+        self.validate_abilities()?;
+        let u = self.world.game.units.get(&id).ok_or("missing aimed unit")?;
+        let control = &self.commands.units[&id];
+        if u.hp <= 0. || u.riding || control.operative {
+            return Ok(());
+        }
+        let Some(at) = control.nade else {
+            return Ok(());
+        };
+        let row = *self.abilities.get(id).unwrap();
+        let halt = !row.aimed_auto || row.aimed_walked;
+        let kind = self.ability_kind(id)?;
+        let ab = ability(self, id)?;
+        let in_range = dist(u.at(), at) <= n(ab, "range", 0.);
+        let w = definition(self, id)?
+            .get("w")
+            .ok_or("missing ability weapon")?;
+        let count =
+            if matches!(kind, AbilityKind::Grenade | AbilityKind::Satchel) && flag(w, "perModel") {
+                (u.hp / n(definition(self, id)?, "hpPer", 1.)).ceil()
+            } else {
+                1.
+            };
+        if kind.aimed() && in_range && !self.logistics.can_fire(id, count) {
+            self.clear_aimed_ability(id);
+            return Ok(());
+        }
+        if kind.aimed() && in_range {
+            if halt && u.path_gen == u64::MAX {
+                return Err("aimed path identity exhausted".into());
+            }
+            if kind == AbilityKind::Barrage {
+                let requested = ab.get("shells").and_then(Value::number);
+                if requested
+                    .is_some_and(|n| !n.is_finite() || n <= 0. || n > 4096. || n.floor() != n)
+                {
+                    return Err("invalid ability salvo count".into());
+                }
+                self.launch_weapon_salvo(id, at, requested.map(|n| n as u32))?;
+                self.firing.get_mut(id).unwrap().cooldown = n(w, "interval", 0.);
+            } else {
+                if !count.is_finite() || count <= 0. || count > 4096. {
+                    return Err("invalid ability ammunition count".into());
+                }
+                let blast = AbilityBlast::from_unit(u.kind, &self.rules)?;
+                self.launch_ability_flight(id, at, blast, None, Some(count as u32))?;
+            }
+            self.clear_aimed_ability(id);
+            self.abilities.get_mut(id).unwrap().cooldown = n(ab, "cd", 0.);
+            if halt {
+                let u = self.world.game.units.get_mut(&id).unwrap();
+                u.path.clear();
+                u.path_gen += 1;
+            }
+        } else if self.logistics.get(id).is_some_and(|r| r.forced) {
+            self.clear_aimed_ability(id);
+        } else if u.repath <= 0. {
+            self.request_command_path(id, at, crate::path_requests::RequestKind::Nade)?;
+            if self.commands.units[&id].nade.is_some() {
+                self.abilities.get_mut(id).unwrap().aimed_walked = true;
+            }
+        }
+        Ok(())
+    }
+    fn clear_aimed_ability(&mut self, id: UnitId) {
+        self.commands.units.get_mut(&id).unwrap().nade = None;
+        let row = self.abilities.get_mut(id).unwrap();
+        row.aimed_auto = false;
+        row.aimed_walked = false;
+    }
     pub(crate) fn preflight_ability_selection(
         &self,
         selected: &[UnitId],
@@ -452,12 +526,21 @@ impl Match {
                 return Err("unit path identity exhausted".into());
             }
         }
-        if self
+        let smoke_end = self
             .next_unit_id
             .checked_add(u32::try_from(smoke_ids.len()).map_err(|_| "smoke identity capacity")?)
-            .is_none()
+            .ok_or("smoke identity capacity")?;
+        if self
+            .world
+            .game
+            .smokes
+            .iter()
+            .any(|s| (self.next_unit_id..smoke_end).contains(&s.id))
+            || self.world.game.wrecks.iter().any(|w| {
+                w.id.is_some_and(|id| (self.next_unit_id..smoke_end).contains(&id))
+            })
         {
-            return Err("smoke identity capacity".into());
+            return Err("smoke identity already held".into());
         }
         Ok(exits)
     }
