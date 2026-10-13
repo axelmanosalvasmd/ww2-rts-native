@@ -159,6 +159,7 @@ pub struct World {
     pub sections: BTreeMap<usize, SectionMetadata>,
     pub detached_sections: BTreeMap<String, DetachedSection>,
     initial: InitialTerrain,
+    geography: Option<crate::world_map::WorldDefinition>,
     pub versions: RegionVersions,
     rules: Rules,
     log: Vec<CellRow>,
@@ -170,6 +171,10 @@ pub struct World {
     soak_members: BTreeSet<i64>,
 }
 impl World {
+    /// Immutable authoring geography. Live team ownership belongs to a future mode state.
+    pub fn geography(&self) -> Option<&crate::world_map::WorldDefinition> {
+        self.geography.as_ref()
+    }
     pub fn from_map(map: &AuthoritativeMap) -> Result<Self, MapError> {
         Self::from_structured(map, map.initialize_structures()?).map_err(|e| MapError::Invalid {
             field: "world".into(),
@@ -293,6 +298,7 @@ impl World {
             sections: BTreeMap::new(),
             detached_sections: BTreeMap::new(),
             initial,
+            geography: map.geography().cloned(),
             versions: RegionVersions::default(),
             rules,
             log: Vec::new(),
