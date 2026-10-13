@@ -680,3 +680,6 @@ impl Match {
         Ok((!used).then_some(reason))
     }
 }
+
+#[cfg(test)]
+mod tests;

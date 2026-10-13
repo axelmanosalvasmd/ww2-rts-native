@@ -746,3 +746,6 @@ impl Match {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests;

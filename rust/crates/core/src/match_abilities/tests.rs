@@ -2,9 +2,7 @@
 // Object-valued control fields compare their represented presence or boolean state.
 // React has no canonical owner here. Raw tables, suppression sets and duplicate launch
 // duration/stamp fields are omitted; blast values, events, geometry and timing are checked.
-use serde_json::{Value, json};
-use std::collections::VecDeque;
-use ww2_core::{
+use crate::{
     catalog::Catalog,
     economy::{Faction, Mode},
     economy_state::ArmySize,
@@ -23,6 +21,8 @@ use ww2_core::{
     weather::WeatherChoice,
     world::World,
 };
+use serde_json::{Value, json};
+use std::collections::VecDeque;
 fn point(v: &Value) -> Point {
     Point {
         x: v["x"].as_f64().unwrap(),
@@ -305,6 +305,14 @@ fn make(case: &Value) -> (Match, Vec<u32>) {
     for p in &mut m.world.game.players {
         p.visible = order.clone();
     }
+    // Match::new initialized the old world. Bind fresh observation state to this
+    // component fixture's actual initial terrain, without a public restore API.
+    m.building_cells.clear();
+    for slot in 0..m.world.game.players.len() {
+        m.world
+            .register_recipient(crate::world::Recipient::Player(slot));
+    }
+    m.initialize_recipient_routing().unwrap();
     (m, order)
 }
 fn combat_random(m: &Match) -> (String, Vec<f64>) {
@@ -335,7 +343,7 @@ fn combat_random(m: &Match) -> (String, Vec<f64>) {
     }
     (format!("{current:016x}"), draws)
 }
-fn blast(source: &ww2_core::match_combat::ExplosionSource) -> Value {
+fn blast(source: &crate::match_combat::ExplosionSource) -> Value {
     json!({"inf":source.infantry,"veh":source.vehicle,"terrain":source.terrain,"supp":source.suppression,"scar":source.scar,"antiGarrison":source.anti_garrison})
 }
 fn snapshot(m: &Match, order: &[u32], shots: &[Value]) -> Value {
@@ -458,7 +466,8 @@ fn diff(a: &Value, b: &Value, path: &str) -> String {
 }
 #[test]
 fn conquest_abilities_match_original_source_phases() {
-    let fixture: Value = serde_json::from_str(include_str!("fixtures/match-ability.json")).unwrap();
+    let fixture: Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/match-ability.json")).unwrap();
     assert_eq!(
         fixture["reference"],
         "e4e579a838aabae3b1d9dadbc17a0a87147bc52d"
@@ -616,7 +625,8 @@ fn conquest_abilities_match_original_source_phases() {
 
 #[test]
 fn smoke_identity_collision_rejects_before_selected_unit_writes() {
-    let fixture: Value = serde_json::from_str(include_str!("fixtures/match-ability.json")).unwrap();
+    let fixture: Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/match-ability.json")).unwrap();
     let (mut m, order) = make(&fixture["cases"][0]);
     m.world.game.smokes.push(Smoke {
         id: m.next_unit_id,

@@ -1,5 +1,4 @@
-use serde_json::{Value, json};
-use ww2_core::{
+use crate::{
     catalog::Catalog,
     economy::{Faction, Mode},
     economy_state::ArmySize,
@@ -21,6 +20,7 @@ use ww2_core::{
     weather::WeatherChoice,
     world::{Appearance, CellChange, Recipient, World},
 };
+use serde_json::{Value, json};
 
 fn point(v: &Value) -> Point {
     Point {
@@ -42,7 +42,7 @@ fn runs(values: impl IntoIterator<Item = Value>) -> Value {
 fn bits(values: &[f32]) -> Value {
     runs(values.iter().map(|v| json!(v.to_bits())))
 }
-fn row(row: &ww2_core::world::CellRow) -> Value {
+fn row(row: &crate::world::CellRow) -> Value {
     let d = &row.data;
     let mut data = json!({"ground":char::from(d.ground).to_string(),"object":char::from(d.object).to_string(),"material":d.material,"groundMaterial":d.ground_material,"groundWear":d.ground_wear});
     if let Some(v) = d.trench_front {
@@ -65,7 +65,7 @@ fn row(row: &ww2_core::world::CellRow) -> Value {
         data
     ])
 }
-fn body(v: &ww2_core::environment_debris::DebrisBody) -> Value {
+fn body(v: &crate::environment_debris::DebrisBody) -> Value {
     json!({"id":v.id,"kind":v.kind.as_str(),"x":v.x,"y":v.y,"z":v.z,"vx":v.vx,"vy":v.vy,"vz":v.vz,"dir":v.dir,"material":v.material,"mass":v.mass,"radius":v.radius,"origin":{"x":v.origin.x,"z":v.origin.z},"gravity":v.gravity,"drag":v.drag,"stamp":v.stamp,"born":v.born,"contacts":v.contacts,"settled":v.settled,"tilt":v.tilt})
 }
 fn projected_reserves(v: &Reserves) -> Value {
@@ -336,6 +336,14 @@ fn make(case: &Value) -> (Match, Vec<u32>) {
     if m.options.logistics {
         m.next_unit_id = order.iter().copied().max().unwrap_or(0) + 1;
     }
+    // Match::new initialized the old world. Bind fresh observation state to this
+    // component fixture's actual initial terrain, without a public restore API.
+    m.building_cells.clear();
+    for slot in 0..m.world.game.players.len() {
+        m.world
+            .register_recipient(crate::world::Recipient::Player(slot));
+    }
+    m.initialize_recipient_routing().unwrap();
     (m, order)
 }
 fn prime(m: &mut Match, id: u32, changes: &Value) {
@@ -364,7 +372,7 @@ fn prime(m: &mut Match, id: u32, changes: &Value) {
 #[test]
 fn represented_recovery_phases_match_original_source() {
     let fixture: Value =
-        serde_json::from_str(include_str!("fixtures/match-recovery.json")).unwrap();
+        serde_json::from_str(include_str!("../../tests/fixtures/match-recovery.json")).unwrap();
     assert_eq!(
         fixture["reference"],
         "e4e579a838aabae3b1d9dadbc17a0a87147bc52d"
@@ -646,7 +654,7 @@ fn represented_recovery_phases_match_original_source() {
 #[test]
 fn medic_path_identity_capacity_rejects_before_health_or_wound_writes() {
     let fixture: Value =
-        serde_json::from_str(include_str!("fixtures/match-recovery.json")).unwrap();
+        serde_json::from_str(include_str!("../../tests/fixtures/match-recovery.json")).unwrap();
     let case = fixture["cases"]
         .as_array()
         .unwrap()
