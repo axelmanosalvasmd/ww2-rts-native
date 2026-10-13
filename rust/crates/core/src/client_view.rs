@@ -198,7 +198,8 @@ impl ClientView {
             .and_then(|v| v.get("fog"))
             .is_some_and(|v| !v.is_null())
     }
-    /// The browser lifts ordinary-map fog when no mask is supplied. World maps stay opaque.
+    /// Initial missing-mask behavior: ordinary-map fog is lifted, World maps stay opaque.
+    /// Renderer-only lifting at match end is not tracked here; the raw masks stay unchanged.
     pub fn fog_lifted(&self) -> bool {
         !self.has_fog_mask()
             && !self

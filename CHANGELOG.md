@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added a regression that compares every recorded message against the pinned browser view for both Conquest and World recipients. Clarified that the client view reports initial missing-mask fog lifting; it does not track the renderer lifting fog at match end.
+
 - Added the recipient-owned Rust client view: typed unit rows with raw fields retained, full and delta unit updates, held-set resync checks, fog XOR and exploration, remembered terrain, and changed cells retained until read. Invalid messages leave the view unchanged. `simtest --view` replays raw or gzip server JSON lines and prints stable state hashes for browser comparison. Lobby, pause and denial messages remain available without resetting the match, and readers can distinguish absent fog masks from dark cells. Five focused view tests cover lifecycle, delta recovery, fog and terrain updates, and invalid input; no existing tests were replaced.
 
 - Issue #2 measured on the Vostro (i5-12400, Ubuntu 24.04, x64 Node 24.21.0, rustc 1.99.0; median of three 200-tick runs; load average 3.2 to 4.0, so not idle). Ported work per tick (movement, separation and a quarter of vision and fog) at 400, 1,000 and 2,000 units: Node 5.4, 14.6 and 35.7 ms; Rust on one thread 1.8, 6.7 and 18.9 ms; Rust with threads 1.6, 6.0 and 17.2 ms. At 2,000 units fog is 7.9 times faster threaded and vision 6.6 times, movement 2.1 times and separation 1.4 times on one thread. Full table and reading in `DESIGN.md` ("Sim test (#2)"); the confidence row for a native server is updated with it, and the README status no longer says no code exists.
