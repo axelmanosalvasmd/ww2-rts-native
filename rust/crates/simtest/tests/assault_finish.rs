@@ -57,6 +57,14 @@ fn canonical_assault_phase_matches_original_finish_story_and_samples() {
             if a["fallen"].is_object(){m.fallen.bunker=Some(at(&a["fallen"]));}
             if a["death"].is_object(){let d=&a["death"];m.record_death(DeathRecord{owner:Some(d["owner"].as_u64().unwrap() as usize),kind:"bunker",at:at(&d["at"])},Some(d["by"].as_u64().unwrap() as usize)).unwrap();}
             if a["spend"].is_array(){m.record_spending(a["spend"][0].as_u64().unwrap() as usize,a["spend"][1].as_f64().unwrap()).unwrap();}
+            if c["represented"]==false {
+                let before=commit_state(&m);
+                assert!(m.sample_match_tick().is_err());
+                assert!(m.apply_assault_victory(a["dt"].as_f64().unwrap_or(m.rules.movement.tick)).is_err());
+                assert_eq!(commit_state(&m),before);
+                phases+=1;
+                continue;
+            }
             if a["periodic"]==true{m.sample_match_tick().unwrap();}
             m.apply_assault_victory(a["dt"].as_f64().unwrap_or(m.rules.movement.tick)).unwrap();
             assert_eq!(snapshot(&m),step["expected"],"{} phase{}",c["name"],phases);
@@ -71,7 +79,7 @@ fn commit_state(m: &Match)->String { format!("{:?}{:?}{:?}{:?}{:?}{}",m.assault,
 #[test]
 fn invalid_phase_inputs_leave_timer_finish_story_and_timeline_atomic() {
     let f=fixture();
-    let mutations:[fn(&mut Match);9]=[
+    let mutations:[fn(&mut Match);10]=[
         |m|m.options.players[1].team=5,
         |m|m.world.game.players[0].slot=1,
         |m|m.assault.as_mut().unwrap().time_left=f64::NAN,
@@ -79,6 +87,7 @@ fn invalid_phase_inputs_leave_timer_finish_story_and_timeline_atomic() {
         |m|m.start.points[0].owner=Some(6),
         |m|m.world.game.units.values_mut().next().unwrap().hp=f64::NAN,
         |m|m.world.game.units.values_mut().next().unwrap().kind=usize::MAX,
+        |m|m.world.game.units.values_mut().next().unwrap().owner=LOCAL_DEFENDER_OWNER,
         |m|m.timeline.push(MatchSample::Conquest{t:0.0,vp:vec![0.0,0.0]}),
         |m|{m.assault.as_mut().unwrap().time_left=0.0;m.fallen.bunker=Some(Point{x:f64::MAX,z:0.0});for u in m.world.game.units.values_mut(){u.hp=0.0;}},
     ];

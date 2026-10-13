@@ -139,7 +139,7 @@ impl Match {
         let players = &self.start.economy.players;
         for unit in self.world.game.units.values() {
             if unit.kind >= self.rules.kinds.len() || !unit.hp.is_finite()
-                || (unit.owner >= players.len() && unit.owner != LOCAL_DEFENDER_OWNER)
+                || (unit.owner >= players.len() && !(self.options.mode == Mode::World && unit.owner == LOCAL_DEFENDER_OWNER))
             { return Err("invalid Match sample unit".into()); }
         }
         Ok(())

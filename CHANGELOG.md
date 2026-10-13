@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Corrected Assault finish's shared sample actor guard after independent review: the hidden local-defender sentinel belongs only to World. The original controlled neutral-bunker observation is retained as unrepresented, with sampler and late-phase atomic refusal checks plus a malformed-actor regression. Ordinary commander outcomes are unchanged; no full neutral-actor parity is claimed, and native checks remain pending.
+
 - Shared canonical finish, end reasons and typed source timeline between Conquest and explicit Assault. Assault's late phase now subtracts elapsed simulation time, prioritizes loss of all living bunkers over timer expiry, records a draw when no attacker exists, and freezes its first result and clock. Existing story callbacks and internal results use the same Match state for Assault; generic ticking and other mode actuators remain unsupported. An unchanged-source recorder covers 11 Assault traces and 22 phases; native verification is pending the scheduled build slot.
 
 - Verified the final Assault/World/canonical Match union: 43 original-source starts and 702 units compare deployment, legacy trigger state, combat/firing defaults, control and production rows, terrain logs and structures. All 162 locked release workspace tests, focused debug regressions, strict Clippy, formatting and release FFI pass. The original five-map legacy-trigger rejection and two Clippy style errors found during checks were corrected; full Assault runtime and three-platform CI remain pending.
