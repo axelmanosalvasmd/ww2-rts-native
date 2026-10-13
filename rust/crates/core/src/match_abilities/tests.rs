@@ -268,7 +268,7 @@ fn make(case: &Value) -> (Match, Vec<u32>) {
         p.mun = 0.;
         p.fuel = 0.;
     }
-    m.commands = MatchCommands::default();
+    m.commands = MatchCommands::new(4096);
     m.abilities = AbilityState::default();
     m.firing = FiringState::default();
     m.firing.next_flight = 2000;
