@@ -348,7 +348,6 @@ impl Match {
                 .finish(draft)
                 .map(Some);
         }
-        let mut paths = self.commands.paths.clone();
         let result = (|| {
             let observer = crate::staged_observer::StagedObserver::new(
                 &self.world.game,
@@ -378,6 +377,7 @@ impl Match {
                 Some(observer),
             )
             .map_err(ProductionStepError::Routing)?;
+            let mut paths = preview.fork_paths(&self.commands.paths);
             route_training(
                 &self.rules,
                 &mut paths,
@@ -390,12 +390,12 @@ impl Match {
                 .map_err(ProductionStepError::Routing)?;
             let done = training_parts!(self, game).finish(draft)?;
             routing_commit.commit();
-            Ok(Some(done))
+            Ok((Some(done), paths))
         })();
-        if result.is_ok() {
+        result.map(|(done, paths)| {
             self.commands.paths = paths;
-        }
-        result
+            done
+        })
     }
 }
 struct TrainingDraft {

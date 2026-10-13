@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Retained World training’s incremental route history through the routing owner’s preview-aware path fork. Exact recipient buffers rebind before search; the fork moves only with successful queue, unit and memory publication. Native proof remains pending.
+
 - Bound detached recruitment search history to the routing owner’s preview buffers before search. Exact recipient identities retain incremental graph history, while failed previews still leave canonical caches unchanged. Native and birth-oracle checks remain pending.
 
 - Restricted preview graph rebinding to the selected recipient's exact flags allocation or its matching owned vehicle-clearance arrays. Unmatched and authoritative cache identities remain untouched. Native transaction witnesses follow.
