@@ -105,6 +105,37 @@ fn original_world_startup() {
             "spawn":[bits(p.spawn.x),bits(p.spawn.z)],"mp":bits(w.mp),"inc":bits(w.inc),"mun":bits(w.mun),"fuel":bits(w.fuel),"visible":g.visible,
         })).collect();
         assert_eq!(json!(players), e["players"], "case {index} commanders");
+        for query in e["regionQueries"].as_array().unwrap() {
+            let at = ww2_core::game::Point {
+                x: query[0].as_f64().unwrap(),
+                z: query[1].as_f64().unwrap(),
+            };
+            let actual = instance.world_region_index(at).unwrap();
+            assert_eq!(json!(actual), query[2], "case {index} region query {at:?}");
+            assert_eq!(
+                json!(actual.map(|i| instance.world.geography().unwrap().regions[i].id)),
+                query[3]
+            );
+            assert_eq!(
+                instance.world_region_at(at).unwrap().map(|r| r.team),
+                actual.map(|i| runtime.regions[i].team)
+            );
+        }
+        for (i, region) in instance.world_economy_regions().unwrap().iter().enumerate() {
+            assert_eq!(region.team, runtime.regions[i].team);
+            use ww2_core::economy_state::RegionKind;
+            let expected = match instance.world.geography().unwrap().regions[i]
+                .kind
+                .as_deref()
+            {
+                Some("city") => RegionKind::City,
+                Some("industrial") => RegionKind::Industrial,
+                Some("resource") => RegionKind::Resource,
+                _ => RegionKind::Other,
+            };
+            assert_eq!(region.kind, expected);
+        }
+
         assert_eq!(
             json!(
                 runtime
@@ -138,6 +169,13 @@ fn original_world_startup() {
             e["actor"],
             "case {index} neutral actor"
         );
+        let tech:Vec<_>=(0..instance.start.players.len()).map(|slot| {
+            let research=instance.production.player(slot).unwrap();
+            assert!(research.jobs().is_empty());
+            let t=research.tech();
+            if !instance.options.tech { Value::Null } else {json!([t.tier(),{"inf":t.level(ww2_core::economy::Technology::Infantry),"guns":t.level(ww2_core::economy::Technology::Guns),"armor":t.level(ww2_core::economy::Technology::Armor)},[]])}
+        }).collect();
+        assert_eq!(json!(tech), e["tech"], "case {index} research");
         assert_eq!(game.units.len(), e["units"].as_array().unwrap().len());
         assert_eq!(instance.next_unit_id as usize, game.units.len() + 1);
         for raw in e["units"].as_array().unwrap() {
@@ -310,6 +348,14 @@ fn generated_world_retains_random_history_and_replays() {
     assert_eq!(actor.team, -1);
     assert_eq!(actor.faction, Faction::Usa);
     assert!(first.world_actor_view(LOCAL_DEFENDER_OWNER - 1).is_err());
+    assert!(
+        first
+            .world_region_index(ww2_core::game::Point {
+                x: f64::NAN,
+                z: 0.0
+            })
+            .is_err()
+    );
     assert_eq!(
         first.start.economy.players.len(),
         first.world.game.players.len()
@@ -351,5 +397,24 @@ fn incomplete_world_inputs_are_explicit_and_do_not_mutate_the_map() {
     input["world"]["rails"] = json!({"stations":[{"region":1000,"x":0,"y":0}],"lines":[]});
     let invalid = AuthoritativeMap::from_json(&serde_json::to_vec(&input).unwrap()).unwrap();
     assert!(Match::new_world(&invalid, o.clone(), MatchRandom::new(o.seed)).is_err());
+
+    let mut instance = Match::new_world(&m, o.clone(), MatchRandom::new(o.seed)).unwrap();
+    let log = instance.world.cell_log().to_vec();
+    let new = instance.world.new_cells().to_vec();
+    let start = new.len() - 2;
+    let fields = [
+        (new[start].cell, Some(255), None),
+        (new[start + 1].cell, None, Some(1000)),
+    ];
+    assert!(instance.world.annotate_recent_rows(start, &fields).is_err());
+    assert_eq!(instance.world.cell_log(), log);
+    assert_eq!(instance.world.new_cells(), new);
+    instance.world_runtime.as_mut().unwrap().regions.pop();
+    assert!(
+        instance
+            .world_region_index(ww2_core::game::Point { x: 1.0, z: 1.0 })
+            .is_err()
+    );
+    assert!(instance.world_economy_regions().is_err());
     assert_eq!(m.source(), &before);
 }

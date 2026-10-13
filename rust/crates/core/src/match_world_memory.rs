@@ -88,7 +88,8 @@ impl Match {
         world_memory::validate(&self.world, &self.rules, actor.team)?;
         let runtime = self.world_runtime.as_ref().unwrap();
         let geography = self.world.geography().ok_or("missing World geography")?;
-        if runtime.regions.len() != geography.regions.len()
+        if self.start.dimensions != (self.world.game.w, self.world.game.h)
+            || runtime.regions.len() != geography.regions.len()
             || self.start.players.len() != self.world.game.players.len()
             || self
                 .world
@@ -464,7 +465,10 @@ impl Match {
             }
             let locked = base_rows.iter().any(|&(kind, owner, b)| {
                 produces[kind]
-                    && region_at(geography, game, b) == Some(i)
+                    && self
+                        .world_region_index(b)
+                        .expect("validated immutable World region context")
+                        == Some(i)
                     && (self.rules.kinds[kind].name == "worldbase"
                         || game.players.get(owner).is_some_and(|p| p.team == live.team))
             });
@@ -540,18 +544,6 @@ impl Match {
             .regions = rows.clone();
         Ok(rows)
     }
-}
-fn region_at(w: &crate::world_map::WorldDefinition, game: &Game, at: Point) -> Option<usize> {
-    let cell = game.cell_of(at.x, at.z)?;
-    let x = cell % game.w;
-    let y = cell / game.w;
-    if let Some(map) = &w.region_map {
-        let i = map[cell];
-        return (i >= 0).then_some(i as usize);
-    }
-    let cols = game.w / w.region_cells;
-    let i = (y / w.region_cells) * cols + x / w.region_cells;
-    (i < w.regions.len()).then_some(i)
 }
 /// Group by raw region-map labels, exactly as source. Labels are not remapped to r.id.
 fn territory_runs(

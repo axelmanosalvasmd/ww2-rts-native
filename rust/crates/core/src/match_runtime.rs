@@ -440,7 +440,7 @@ pub struct BuildingCell {
     pub at: Point,
 }
 
-/// Authoritative Conquest startup state. Tick execution is added independently.
+/// Authoritative startup state. Each mode admits only its implemented phases.
 /// Live terrain and units have a single owner in `world.game`.
 pub struct Match {
     pub world_runtime: Option<crate::match_world::WorldRuntime>,

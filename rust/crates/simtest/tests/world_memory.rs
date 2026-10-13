@@ -62,8 +62,8 @@ fn projected(r: &WorldRow) -> Value {
         [char::from(r.initial.0).to_string(), r.initial.1],
         r.biome,
         r.landmark,
-        r.rail,
-        r.station,
+        d.rail,
+        d.station,
         r.observed.revision
     ])
 }
@@ -154,11 +154,18 @@ fn map(c: &Value) -> AuthoritativeMap {
     AuthoritativeMap::from_json(&serde_json::to_vec(&m).unwrap()).unwrap()
 }
 
-fn load(index: usize) -> Match {
+fn load(index: usize, shape: Option<&Value>) -> Match {
     let starts: Value = serde_json::from_str(include_str!("fixtures/world-start.json")).unwrap();
-    let c = &starts["cases"][index];
-    let m = map(c);
-    let o = options(c);
+    let mut c = starts["cases"][index].clone();
+    if let Some(shape) = shape.filter(|s| !s.is_null()) {
+        c["map"]["w"] = shape["w"].clone();
+        c["map"]["h"] = shape["h"].clone();
+        c["map"]["rows"] = json!(vec![".".repeat(idx(&shape["w"])); idx(&shape["h"])]);
+        c["map"]["heights"] = json!(vec!["0".repeat(idx(&shape["w"])); idx(&shape["h"])]);
+        c["map"]["world"]["regionMapRuns"] = shape["regionMapRuns"].clone();
+    }
+    let m = map(&c);
+    let o = options(&c);
     Match::new_world(&m, o.clone(), MatchRandom::new(o.seed)).unwrap()
 }
 #[test]
@@ -172,7 +179,7 @@ fn original_world_memory_producers() {
     assert_eq!(fixture["arch"], "x64");
     let mut count = 0;
     for c in fixture["cases"].as_array().unwrap() {
-        let mut m = load(idx(&c["startIndex"]));
+        let mut m = load(idx(&c["startIndex"]), Some(&c["mapShape"]));
         let mut aliases: BTreeMap<String, u32> = BTreeMap::new();
         for (at, (a, s)) in c["actions"]
             .as_array()
@@ -421,7 +428,7 @@ fn original_world_memory_producers() {
             count += 1;
         }
     }
-    assert_eq!(count, 111);
+    assert_eq!(count, 119);
 }
 fn query_cell(knowledge: &ww2_core::route_knowledge::RouteKnowledge, c: usize) -> Value {
     let v = knowledge.cell(c).unwrap();
@@ -436,7 +443,7 @@ fn query_cell(knowledge: &ww2_core::route_knowledge::RouteKnowledge, c: usize) -
 }
 #[test]
 fn malformed_context_and_hidden_knowledge_are_atomic() {
-    let mut m = load(1);
+    let mut m = load(1, None);
     m.world.game.units.clear();
     m.grid.rebuild(&m.world.game.units);
     m.refresh_world_visibility().unwrap();

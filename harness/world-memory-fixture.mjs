@@ -14,6 +14,7 @@ source=source.replace(probe,'oracleWorldRow(team,row,m.version+1); '+probe);
 source=source.replace(/from (['"])(\.\/[^'"]+)\1/g,(_,q,p)=>`from ${q}${new URL(p,pathToFileURL(path)).href}${q}`);
 source+='\nexport {worldTerrainMemory,worldTerrainFor,worldPathView,worldSnapshot,worldWrecksFor,rebuildGrid,logCell,touch};\nexport let oracleWorldRow=()=>{}; export const setWorldRowProbe=f=>{oracleWorldRow=f};\n';
 const sim=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
+const {generateWorldMap}=await import(pathToFileURL(resolve(ref,'shared/world-conquest.js')));
 const starts=JSON.parse(readFileSync(new URL('../rust/crates/simtest/tests/fixtures/world-start.json',import.meta.url),'utf8'));
 const mask=(1n<<64n)-1n,gamma=0x9e3779b97f4a7c15n;
 const mix=x=>{x=((x^(x>>30n))*0xbf58476d1ce4e5b9n)&mask;x=((x^(x>>27n))*0x94d049bb133111ebn)&mask;return x^(x>>31n);};
@@ -22,8 +23,10 @@ const bits=n=>{const b=Buffer.alloc(8);b.writeDoubleBE(n);return b.toString('hex
 const hash=v=>{let h=0xcbf29ce484222325n;for(const b of Buffer.from(JSON.stringify(v)))h=BigInt.asUintN(64,(h^BigInt(b))*0x100000001b3n);return h.toString(16).padStart(16,'0');};
 const runs=vs=>{const out=[];for(const v of vs){if(out.length&&out.at(-1)[0]===v)out.at(-1)[1]++;else out.push([v,1]);}return out;};
 const cases=[];
-function record(startIndex,actions){
+function record(startIndex,actions,rawLabels=false){
  const c=starts.cases[startIndex],map=structuredClone(c.map);if(map.world.regionMapRuns){map.world.regionMap=map.world.regionMapRuns.flatMap(([v,n])=>Array(n).fill(v));delete map.world.regionMapRuns;}
+ let mapShape=null;
+ if(rawLabels){const labels=generateWorldMap({size:'huge',seed:1,players:2,teams:[0,1],scenery:false}).world.regionMap;map.w=512;map.h=512;map.rows=Array(512).fill('.'.repeat(512));map.heights=Array(512).fill('0'.repeat(512));map.world.regionMap=labels;mapShape={w:512,h:512,regionMapRuns:runs(labels)};}
  const old=Math.random;Math.random=()=>environmentSeed(c.seed)/4294967296;let g;
  try{g=sim.createGame(map,c.players.map(p=>p.name),c.settings.shuffle,c.players.map(p=>p.team),c.players.map(p=>p.faction),{mode:'world',army:c.settings.army,weather:c.settings.living?c.settings.weather:false,weatherSeed:c.weatherSeed,tech:c.settings.tech,logistics:false});}finally{Math.random=old;}
  const revisions=new WeakMap(),aliases=new Map(),snapshots=[];sim.setWorldRowProbe((team,row,rev)=>revisions.set(row,rev));
@@ -60,7 +63,7 @@ function record(startIndex,actions){
   }
   snapshots.push({result:structuredClone(result),teams:[...g.world.memory].map(([t,m])=>[t,m.version,rows(m.cells.values()),m.regions.size,wrecks(m.wrecks.values())]),journal:[g.journalBase??0,g.cellJournal.length],versions:[g.tick,g.terrainVersion??0,g.visionTick??null],visible:g.players.map(p=>[...p.visible]),localVisible:[...g.players[-1].visible]});
  }
- cases.push({startIndex,actions,snapshots});
+ cases.push({startIndex,mapShape,actions,snapshots});
 }
 // Shared team memory and independent player cursors, then unseen mutation and same-key mine discovery.
 record(1,[
@@ -88,7 +91,7 @@ record(4,[
  {op:'region',index:0,fields:{team:1,progress:.921,capper:1,contested:false}},{op:'regions',slot:0},
  {op:'remove',alias:'base'},{op:'regions',slot:0},{op:'reveal',value:true},{op:'regions',slot:0},{op:'read',slot:0,full:false},{op:'route',slot:0},
  {op:'reveal',value:false},{op:'read',slot:0,full:false},{op:'route',slot:-1},
-]);
+],true);
 record(4,[
  {op:'clearUnits'},{op:'spawn',alias:'eye',owner:0,kind:'rifle',x:41,z:41},{op:'vision',tick:1},
  {op:'wreck',id:9001,x:43.14,z:41.26,moving:true},{op:'route',slot:0},{op:'wreckRead',slot:0},
@@ -99,6 +102,12 @@ record(4,[
  {op:'move',alias:'post',x:49,z:41},{op:'route',slot:0},{op:'move',alias:'post',x:49,z:41,fields:{hp:0}},{op:'remove',alias:'post'},{op:'route',slot:0},
  {op:'wet',value:1},{op:'route',slot:0},{op:'wet',value:0},{op:'route',slot:0},
  {op:'vision',tick:4},{op:'route',slot:0},{op:'wreckRead',slot:1},
+],true);
+record(4,[
+ {op:'clearUnits'},{op:'spawn',alias:'eye',owner:0,kind:'rifle',x:43,z:143},
+ {op:'spawn',alias:'base',owner:0,kind:'hq',x:43,z:143},
+ {op:'region',index:8,fields:{team:3,progress:.41,capper:0}},
+ {op:'vision',tick:1},{op:'regions',slot:0},{op:'route',slot:0},{op:'read',slot:0,full:true},
 ]);
 const out=JSON.stringify({reference:pin,node:process.version,arch:process.arch,cases})+'\n';
 const target=new URL('../rust/crates/simtest/tests/fixtures/world-memory.json',import.meta.url);

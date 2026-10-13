@@ -19,8 +19,6 @@ pub struct WorldRow {
     pub initial: (u8, i8),
     pub biome: Option<u8>,
     pub landmark: Option<String>,
-    pub rail: Option<u8>,
-    pub station: Option<usize>,
     /// Captured only when the source accepts a replacement row.
     pub cover: CoverBasis,
 }
@@ -31,8 +29,6 @@ impl WorldRow {
             && self.initial == other.initial
             && self.biome == other.biome
             && self.landmark == other.landmark
-            && self.rail == other.rail
-            && self.station == other.station
     }
     fn route_row(&self) -> Result<crate::route_knowledge::RememberedCell, String> {
         let mut row = self
@@ -415,6 +411,8 @@ fn seen_row(
     station: Option<usize>,
 ) -> Result<WorldRow, String> {
     let mut row = world.cell_row(c).map_err(|e| e.to_string())?;
+    row.data.rail = rail;
+    row.data.station = station;
     let owner = world.mines.get(&c).copied().unwrap_or(-1);
     let owned = owner >= 0
         && world
@@ -466,8 +464,6 @@ fn seen_row(
             .map(|v| v[c])
             .filter(|v| *v < 255),
         landmark,
-        rail,
-        station,
         cover: CoverBasis {
             house_kind: Some(world.game.house[c]),
             toughness: world.game.tough.as_ref().map_or(1.0, |v| v[c]),
@@ -566,7 +562,9 @@ mod tests {
     use super::*;
     #[test]
     fn exhausted_revision_and_log_cursor_preserve_memory() {
-        let map=crate::map::AuthoritativeMap::from_json(br#"{"name":"memory","w":3,"h":3,"rows":["...","...","..."],"spawns":[{"x":0,"y":0},{"x":2,"y":2}],"points":[]}"#).unwrap();
+        let input = serde_json::json!({"name":"guard map","w":20,"h":20,"rows":vec![".".repeat(20);20],"spawns":[{"x":0,"y":0},{"x":19,"y":19}],"points":[]});
+        let map =
+            crate::map::AuthoritativeMap::from_json(&serde_json::to_vec(&input).unwrap()).unwrap();
         let mut world = World::from_map(&map).unwrap();
         world.game.mode = Some(ModeKind::World);
         world.game.reveal = true;
@@ -598,7 +596,7 @@ mod tests {
         assert_eq!(memory.team(0).unwrap().rows, before);
         assert_eq!(memory.team(0).unwrap().key, key);
         assert_eq!(world.journal(), journal);
-        memory.team_mut(0).unwrap().version = 9;
+        memory.team_mut(0).unwrap().version = 400;
         memory.team_mut(0).unwrap().log_base = u64::MAX;
         assert!(
             memory
