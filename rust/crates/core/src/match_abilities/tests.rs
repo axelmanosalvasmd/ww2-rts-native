@@ -502,6 +502,25 @@ fn conquest_abilities_match_original_source_phases() {
                 Some(crate::match_commands::Denial::Unsupported)
             );
             assert_eq!(snapshot(&m, &order, &[]), before);
+            assert_eq!(
+                m.execute_command(
+                    0,
+                    &Command::Ability {
+                        ids: vec![1],
+                        at: Some(Point {
+                            x: f64::NAN,
+                            z: 15.
+                        }),
+                        queue: false,
+                        automatic: false,
+                    },
+                    false,
+                )
+                .unwrap(),
+                Some(crate::match_commands::Denial::Blocked),
+                "invalid typed aim retains coordinate refusal precedence",
+            );
+            assert_eq!(snapshot(&m, &order, &[]), before);
             unsupported_work += 1;
             continue;
         }

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Preserved invalid-coordinate refusal precedence for typed aimed abilities over the new unsupported-project preflight. The existing project-boundary regression now includes a nonfinite typed aim; raw JSON behavior is unchanged. Native proof remains pending.
+
 - Applied the ability owner’s narrow paid-work cancellation fix to the Dig integration. Accepted manual aimed abilities remove the canonical job without refund; unsupported project state rejects before selection writes. Updated the original-source fixture and retained focused paid-work and refusal regressions. Native proof remains pending.
 
 - Updated the command replay’s restored digging state to create a canonical field-work descriptor through real placement preparation. Its existing Move and Stop checkpoints now also require descriptor cancellation, replacing the stale activity-only test setup. Native replay remains pending.
