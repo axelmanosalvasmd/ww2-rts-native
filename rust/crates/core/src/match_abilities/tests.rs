@@ -718,3 +718,32 @@ fn manual_aimed_ability_cancels_real_paid_work_without_refund() {
     assert_eq!(m.start.economy.players[0].mp, initial_mp - cost);
     assert_eq!(m.world.game.chars, terrain);
 }
+
+#[test]
+fn rejected_ap_launch_preserves_loaded_round_ammunition_and_random_stream() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/match-ability.json")).unwrap();
+    let case = fixture["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|v| v["name"] == "loaded-ap-consumed-after-qualifying-fire")
+        .unwrap();
+    let (mut m, order) = make(case);
+    let command = command(&case["actions"][0]["cmd"], false);
+    assert_eq!(m.execute_command(0, &command, false).unwrap(), None);
+    assert!(m.abilities.get(1).unwrap().ap);
+    m.begin_firing_tick(&order).unwrap();
+    m.firing.next_flight = 9_007_199_254_740_991;
+    let ability = m.abilities.get(1).unwrap().clone();
+    let ammo = m.logistics.get(1).cloned();
+    let random = m.start.random.snapshot();
+    let error = m.apply_unit_firing(1, false, 0.05).unwrap_err();
+    assert!(error.contains("flight ID exhausted"), "{error}");
+    assert_eq!(m.abilities.get(1), Some(&ability));
+    assert_eq!(m.logistics.get(1), ammo.as_ref());
+    assert_eq!(m.start.random.snapshot(), random);
+    assert_eq!(m.firing.next_flight, 9_007_199_254_740_991);
+    assert!(m.firing.flights.is_empty());
+    assert!(m.firing.take_events().is_empty());
+}
