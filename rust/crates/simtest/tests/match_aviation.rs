@@ -19,6 +19,42 @@ fn fixture() -> Value {
 fn bits(value: f64) -> Value {
     json!(format!("{:016x}", value.to_bits()))
 }
+// JSON numbers have one source Number representation; state bit strings remain exact.
+fn assert_json(actual: &Value, expected: &Value, path: &str) {
+    match expected {
+        Value::Number(_) => {
+            let a = actual
+                .as_f64()
+                .unwrap_or_else(|| panic!("{path}: expected number"));
+            let b = expected.as_f64().unwrap();
+            if a == 0.0 && b == 0.0 {
+                return;
+            }
+            assert_eq!(a.to_bits(), b.to_bits(), "{path}");
+        }
+        Value::Array(rows) => {
+            let actual = actual.as_array().unwrap();
+            assert_eq!(actual.len(), rows.len(), "{path}");
+            for (i, (a, b)) in actual.iter().zip(rows).enumerate() {
+                assert_json(a, b, &format!("{path}[{i}]"));
+            }
+        }
+        Value::Object(rows) => {
+            let actual = actual.as_object().unwrap();
+            assert_eq!(actual.len(), rows.len(), "{path}");
+            for (key, b) in rows {
+                assert_json(
+                    actual
+                        .get(key)
+                        .unwrap_or_else(|| panic!("{path}.{key}: missing")),
+                    b,
+                    &format!("{path}.{key}"),
+                );
+            }
+        }
+        _ => assert_eq!(actual, expected, "{path}"),
+    }
+}
 fn make(map: &Value) -> Match {
     let map = AuthoritativeMap::from_json(&serde_json::to_vec(map).unwrap()).unwrap();
     Match::new(
@@ -334,11 +370,10 @@ fn held_flights_rearming_and_continuous_aa_match_every_original_call() {
     let mut checkpoints = 0;
     for trace in f["traces"].as_array().unwrap() {
         let mut m = scene(trace);
-        assert_eq!(
-            snapshot(&m, &[]),
-            trace["initial"],
-            "{} initial",
-            trace["name"]
+        assert_json(
+            &snapshot(&m, &[]),
+            &trace["initial"],
+            &format!("{} initial", trace["name"]),
         );
         checkpoints += 1;
         for (index, frame) in trace["frames"].as_array().unwrap().iter().enumerate() {
@@ -408,11 +443,10 @@ fn held_flights_rearming_and_continuous_aa_match_every_original_call() {
                 trace["name"]
             );
             let events = m.aviation.take_events();
-            assert_eq!(
-                snapshot(&m, &events),
-                frame["expected"],
-                "{} action {index}",
-                trace["name"]
+            assert_json(
+                &snapshot(&m, &events),
+                &frame["expected"],
+                &format!("{} action {index}", trace["name"]),
             );
             assert!(m.firing.events.is_empty());
             checkpoints += 1;
