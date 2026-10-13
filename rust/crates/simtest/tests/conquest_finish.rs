@@ -44,7 +44,7 @@ fn make(c: &Value) -> Match {
     .unwrap()
 }
 fn snapshot(m: &Match) -> Value {
-    json!({"winner":m.finish.map(|f|f.winner),"reason":m.finish.map(|f|f.reason.as_str()),"endAt":m.finish.map(|f|json!({"x":bits(f.end_at.x),"z":bits(f.end_at.z)})),"endTick":m.finish.map(|f|f.end_tick),"reveal":m.world.game.reveal,"timeline":m.timeline.iter().map(|s|json!({"t":bits(s.t),"vp":s.vp.iter().map(|v|bits(*v)).collect::<Vec<_>>()})).collect::<Vec<_>>(),"captures":m.capture_counts.iter().map(|v|bits(*v)).collect::<Vec<_>>(),"players":m.start.economy.players.iter().map(|p|json!([bits(p.mp),bits(p.vp),bits(p.inc)])).collect::<Vec<_>>(),"captureTicks":m.capture_ticks})
+    json!({"winner":m.finish.map(|f|f.winner),"reason":m.finish.map(|f|f.reason.as_str()),"endAt":m.finish.map(|f|json!({"x":bits(f.end_at.x),"z":bits(f.end_at.z)})),"endTick":m.finish.map(|f|f.end_tick),"reveal":m.world.game.reveal,"timeline":m.timeline.iter().map(|s|json!({"t":bits(s.t),"vp":s.vp.iter().map(|v|bits(*v)).collect::<Vec<_>>()})).collect::<Vec<_>>(),"captures":m.story.iter().map(|v|bits(v.captures)).collect::<Vec<_>>(),"players":m.start.economy.players.iter().map(|p|json!([bits(p.mp),bits(p.vp),bits(p.inc)])).collect::<Vec<_>>(),"captureTicks":m.capture_ticks})
 }
 fn fixture() -> Value {
     serde_json::from_str(include_str!("fixtures/conquest-finish.json")).unwrap()

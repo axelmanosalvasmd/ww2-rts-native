@@ -1,0 +1,33 @@
+// Call unchanged source story callbacks and actual finish on assembled createGame state.
+import {readFileSync,writeFileSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import {registerHooks} from 'node:module';
+import {resolve} from 'node:path';
+import {fileURLToPath,pathToFileURL} from 'node:url';
+const root=fileURLToPath(new URL('../',import.meta.url));const reference=resolve(process.env.WW2_REFERENCE??`${root}/reference/ww2-rts`);const pin='e4e579a838aabae3b1d9dadbc17a0a87147bc52d';
+if(process.arch!=='x64'||process.version!=='v24.21.0')throw Error('Use x64 Node v24.21.0');
+const clean=()=>{if(execFileSync('git',['rev-parse','HEAD'],{cwd:reference,encoding:'utf8'}).trim()!==pin||execFileSync('git',['status','--porcelain','--untracked-files=no'],{cwd:reference,encoding:'utf8'}).trim())throw Error('Pinned clean reference required');};clean();
+registerHooks({load(url,context,next){const result=next(url,context);if(url!==pathToFileURL(`${reference}/shared/sim.js`).href)return result;let source=String(result.source);const a='  // teammates standing on it keep it theirs.',z='  stepConvoys(g, dt, supplyHooks(g));';if(source.split(a).length!==2||source.split(z).length!==2)throw Error('Point phase anchor changed');const victory="  for (const pl of g.players) if (teamVp(pl.team) >= g.winVp && g.winner === null) finish(g, pl.team, 'vp', lastCapture(g, pl.team)); // winner = team id";if(source.split(victory).length!==2)throw Error('Victory anchor changed');source+=`\nexport function __points(g,list,dt){${source.slice(source.indexOf(a),source.indexOf(z))}}\nexport function __storyVictory(g){const teamVp=(t)=>g.players.reduce((a,q)=>a+(q.team===t?q.vp:0),0);${victory}\n}\n`;return{...result,source};}});
+const sim=await import(pathToFileURL(`${reference}/shared/sim.js`));const story=await import(pathToFileURL(`${reference}/shared/story.js`));
+const bits=n=>{const b=Buffer.alloc(8);b.writeDoubleBE(n);return b.toString('hex');};const encode=v=>typeof v==='number'?bits(v):Array.isArray(v)?v.map(encode):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).map(([k,x])=>[k,encode(x)])):v;
+const map={name:'Match story',w:20,h:20,rows:Array(20).fill('.'.repeat(20)),spawns:[{x:1,y:1},{x:18,y:18},{x:1,y:18}],points:[{id:'first',x:8,y:8},{id:'second',x:11,y:8}]};
+const cases=[];function trace(name,teams,actions){const old=Math.random;Math.random=()=>0.5;let g;try{g=sim.createGame(map,teams.map((_,i)=>`P${i}`),false,teams,teams.map((_,i)=>i%4),{weather:false,tech:true,logistics:false,supply:false});}finally{Math.random=old;}const steps=[];
+for(const action of actions){g.tick=action.tick??1;switch(action.kind){
+case 'tally':story.tally(g,action.slot,action.key,action.amount);break;
+case 'support':story.tally(g,action.slot,'supportCalls');if(action.mpCharge!==null)story.tally(g,action.slot,'mpSpent',action.mpCharge);break;
+case 'death':{const owner=action.owner??-1,last=action.lastHit??-1;const enemy=last>=0&&!sim.allied(g,last,owner)?last:-1;story.died(g,{owner,type:action.unit,x:action.at.x,z:action.at.z},sim.UNITS[action.unit],enemy);break;}
+case 'points':for(const p of action.points??[])Object.assign(g.points[p.index],{owner:p.owner,capper:p.capper,progress:p.progress});for(const [id,x,z]of action.moves??[])Object.assign(g.units.get(id),{x,z});sim.__points(g,[...g.units.values()],sim.TICK);break;
+case 'sample':story.sample(g,()=>false);break;
+case 'out':g.players[action.slot].out=action.value;break;
+case 'finish':{const slot=g.players.findIndex(p=>p.team===action.winner);g.players[slot].vp=g.winVp;if(action.at){Object.assign(g.points[0],action.at,{owner:slot,capTick:g.tick});}sim.__storyVictory(g);break;}
+default:throw Error('Unknown story action');}
+const report=g.winner===null?null:{winner:g.winner,teams:g.players.map(p=>p.team),names:g.players.map(p=>p.name),...story.storyResult(g)};
+steps.push({action,expected:encode({story:g.players.map((_,i)=>Object.fromEntries(story.STORY_KEYS.map(k=>[k,g.story?.[i]?.[k]??0]))),fallen:g.fallen??{},captureTicks:g.points.map(p=>p.capTick??null),report})});}cases.push({name,map,teams,steps});}
+trace('every-counter-rounding',[0,1,0],[...story.STORY_KEYS.map((key,i)=>({kind:'tally',slot:i%3,key,amount:i+.5})),{kind:'tally',slot:0,key:'mpSpent',amount:-.5},{kind:'sample',tick:1},{kind:'finish',winner:0,tick:11,at:{x:17.25,z:-.05}},{kind:'tally',slot:1,key:'kills',amount:2},{kind:'support',slot:1,mpCharge:99}]);
+trace('expenses-and-refunds',[0,1],[{kind:'tally',slot:0,key:'mpSpent',amount:300},{kind:'tally',slot:0,key:'mpSpent',amount:-225},{kind:'tally',slot:0,key:'mpSpent',amount:-100.5},{kind:'support',slot:0,mpCharge:75},{kind:'support',slot:1,mpCharge:null},{kind:'tally',slot:0,key:'built',amount:1},{kind:'finish',winner:1,tick:100}]);
+trace('death-attribution-fallen',[0,1,0],[{kind:'death',owner:0,lastHit:1,unit:'rifle',at:{x:3,z:4}},{kind:'death',owner:0,lastHit:2,unit:'tank',at:{x:5,z:6}},{kind:'death',owner:1,lastHit:null,unit:'hq',at:{x:7,z:8}},{kind:'death',owner:1,lastHit:0,unit:'bunker',at:{x:9,z:10}},{kind:'death',owner:null,lastHit:0,unit:'tower',at:{x:11,z:12}},{kind:'death',owner:1,lastHit:0,unit:'wall',at:{x:13,z:14}},{kind:'finish',winner:0,tick:20},{kind:'death',owner:0,lastHit:1,unit:'hq',at:{x:99,z:99}}]);
+trace('capture-canonical-and-freeze',[0,1],[{kind:'points',tick:1,points:[{index:0,owner:-1,capper:0,progress:.995}],moves:[[1,17,17],[2,17,17],[3,17,17]]},{kind:'finish',winner:0,tick:2},{kind:'points',tick:3,points:[{index:1,owner:-1,capper:0,progress:.995}],moves:[[1,23,17],[2,23,17],[3,23,17]]}]);
+trace('neutral-noop-and-repeated-death',[0,1],[{kind:'tally',slot:-1,key:'built',amount:1},{kind:'death',owner:0,lastHit:1,unit:'tank',at:{x:5,z:6}},{kind:'death',owner:0,lastHit:1,unit:'tank',at:{x:5,z:6}},{kind:'finish',winner:0,tick:6}]);
+trace('team-gaps-result-fields',[2,5,2],[{kind:'tally',slot:1,key:'planesDowned',amount:1},{kind:'tally',slot:2,key:'mpSpent',amount:8.7},{kind:'finish',winner:2,tick:19}]);
+trace('out-player-events-still-count',[0,1],[{kind:'out',slot:1,value:true},{kind:'death',owner:0,lastHit:1,unit:'rifle',at:{x:2,z:3}},{kind:'tally',slot:1,key:'mpSpent',amount:3.25},{kind:'death',owner:0,lastHit:0,unit:'rifle',at:{x:2,z:3}},{kind:'finish',winner:0,tick:30}]);
+clean();const output=JSON.stringify({format:1,reference:pin,node:process.version,arch:process.arch,cases})+'\n';const path=`${root}/rust/crates/simtest/tests/fixtures/match-story.json`;if(process.argv.includes('--check')){if(readFileSync(path,'utf8')!==output)throw Error('Match story fixture differs');}else writeFileSync(path,output);console.log(`Verified ${cases.length} canonical story traces, ${cases.reduce((n,c)=>n+c.steps.length,0)} actions`);

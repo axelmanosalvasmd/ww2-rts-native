@@ -138,7 +138,41 @@ try {
   ]) { const m = layered(); fn(m); record(`invalid:layer-${name}`, m); }
   edit('boundary:empty-structures', m => { m.structures = []; });
   edit('unsupported:scenario', m => { m.scenario = { version: 1 }; }, 'scenario');
-  edit('unsupported:world', m => { m.world = {}; }, 'world');
+  edit('invalid:world-empty', m => { m.world = {}; });
+  const { generateWorldMap } = await import(pathToFileURL(join(reference, 'shared/world-conquest.js')));
+  for (const [size, players, scenery] of [['huge',1,false],['huge',6,true],['massive',1,true],['massive',6,false]]) {
+    const map = generateWorldMap({size,seed:20261003,players,scenery});
+    record(`boundary:world-generated-${size}-${players}-${scenery}`, map);
+    // Lossless fixture encoding keeps generated map inputs and exact array comparisons compact.
+    const entry = cases.at(-1); entry.encoding = 'world-runs';
+    for (const key of ['rows','heights']) if (entry.map[key]) entry.map[key] = runs(entry.map[key].join(''));
+    for (const key of ['regionMap','biomes']) if (entry.map.world[key]) entry.map.world[key] = runs(entry.map.world[key]);
+    for (const key of ['chars','ground','objects']) entry.terrain[key] = runs(entry.terrain[key]);
+  }
+  const world = (players=1) => {
+    const m=base();m.points=[];m.spawns=Array.from({length:players},(_,i)=>({x:2+i%8*2,y:2+Math.floor(i/8)*2}));
+    m.world={size:'huge',total:64,regionCells:64,regionMap:Array(400).fill(0),regions:Array.from({length:64},(_,id)=>({id,x:2+id%8*2,y:2+Math.floor(id/8)*2,bounds:[0,0,20,20],...(id<players?{home:id}:{}),kind:'rural',name:`Region ${id}`}))};
+    return m;
+  };
+  record('boundary:world-one-home',world());record('boundary:world-six-homes',world(6));
+  {const m=world();delete m.world.regionMap;delete m.heights;record('boundary:world-legacy-membership',m);}
+  {const m=world();m.world.regions.reverse();m.world.regions[0].id=-3;record('boundary:world-region-order',m);}
+  {const m=world();m.worldVersion=2;m.layers={ground:[...m.rows],objects:[...m.rows],mines:[...m.rows]};
+   cell(m.layers.ground,10,10,'D');cell(m.layers.objects,10,10,'T');cell(m.layers.mines,10,10,'N');cell(m.rows,10,10,'N');
+   m.layers.groundMaterials=[{c:210,material:'road'}];m.layers.mineMaterials=[{c:210,material:'steel'}];record('boundary:world-hidden-layers',m);}
+  for(const [name,fn] of [
+    ['size',m=>m.world.size='small'],['total',m=>m.world.total=128],['span',m=>m.world.regionCells=32],
+    ['region-count',m=>m.world.regions.pop()],['membership-count',m=>m.world.regionMap.pop()],['membership-low',m=>m.world.regionMap[0]=-2],
+    ['membership-high',m=>m.world.regionMap[0]=64],['membership-fraction',m=>m.world.regionMap[0]=.5],
+    ['region-id',m=>m.world.regions[1].id=0],['region-fraction',m=>m.world.regions[0].id=.5],['region-position',m=>m.world.regions[0].x=20],
+    ['region-blocked',m=>cell(m.rows,2,2,'B')],['bounds-shape',m=>m.world.regions[0].bounds.pop()],
+    ['home-missing',m=>delete m.world.regions[0].home],['home-duplicate',m=>m.world.regions[1].home=0],['home-high',m=>m.world.regions[0].home=1],
+    ['points',m=>m.points=[{x:0,y:0}]],['spawn-count',m=>m.spawns=[]],['spawn-assault',m=>m.spawns[0].assault=true],
+    ['connected-water',m=>m.rows[3]='W'.repeat(20)],['connected-vehicle',m=>m.rows[3]='R'.repeat(20)],
+    ['connected-height',m=>{m.heights=Array(20).fill('0'.repeat(20));m.heights[3]='2'.repeat(20);}],
+    ['layer-compose',m=>{m.worldVersion=2;m.layers={ground:[...m.rows],objects:[...m.rows]};cell(m.layers.ground,1,1,'D');}],
+  ]) {const m=world();fn(m);record(`invalid:world-${name}`,m);}
+
   Math.random = originalRandom;
   clean();
   const content = JSON.stringify({ reference: pin, node: process.version, arch: process.arch, cases }) + '\n';

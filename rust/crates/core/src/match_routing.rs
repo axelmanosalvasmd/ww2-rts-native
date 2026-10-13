@@ -1,7 +1,7 @@
 //! Conquest recipient routing. Discovery queries current units, not fog masks.
 use crate::{
     economy::Mode,
-    game::{CELL, Game, Point, Unit},
+    game::{CELL, Game, Point, Unit, Wreck},
     grid::SpatialGrid,
     match_runtime::{BuildingCell, Match},
     math,
@@ -26,6 +26,8 @@ pub struct RecipientRouting {
     bound_units: Vec<BoundUnit>,
     wetness: f64,
     roads: bool,
+    wreck_memory: Vec<Wreck>,
+    wrecks: Vec<Wreck>,
 }
 impl RecipientRouting {
     pub fn knowledge(&self) -> &RouteKnowledge {
@@ -41,6 +43,12 @@ impl RecipientRouting {
             wetness: self.wetness,
             roads: self.roads,
         }
+    }
+    pub fn wrecks(&self) -> &[Wreck] {
+        &self.wrecks
+    }
+    pub fn remembered_wrecks(&self) -> &[Wreck] {
+        &self.wreck_memory
     }
     pub fn remembered(&self) -> &[ObservedRow] {
         self.memory.full_rows()
@@ -186,6 +194,51 @@ fn facts(
     }
     Ok(result)
 }
+fn refresh_wrecks(
+    state: &mut RecipientRouting,
+    game: &Game,
+    rules: &Rules,
+    grid: &SpatialGrid,
+    owner: usize,
+) {
+    let team = game.players[owner].team;
+    let reach = game
+        .units
+        .values()
+        .filter(|u| game.team_of(u) == team)
+        .map(|u| vision_of(game, rules, u))
+        .fold(1.0, math::max);
+    let visible = |at| game.reveal || sees(game, rules, grid, team, reach, at);
+    for current in &game.wrecks {
+        if !visible(Point {
+            x: current.x,
+            z: current.z,
+        }) {
+            continue;
+        }
+        let row = Wreck {
+            id: current.id,
+            cell: None,
+            x: math::round(current.x * 10.0) / 10.0,
+            z: math::round(current.z * 10.0) / 10.0,
+            moving: current.moving,
+        };
+        if let Some(old) = state.wreck_memory.iter_mut().find(|w| w.id == current.id) {
+            *old = row;
+        } else {
+            state.wreck_memory.push(row);
+        }
+    }
+    state.wreck_memory.retain(|old| {
+        game.wrecks.iter().any(|w| w.id == old.id) || !visible(Point { x: old.x, z: old.z })
+    });
+    for row in &mut state.wreck_memory {
+        if row.moving && !visible(Point { x: row.x, z: row.z }) {
+            row.moving = false;
+        }
+    }
+}
+
 impl Match {
     pub(crate) fn initialize_recipient_routing(&mut self) -> Result<(), String> {
         self.validate_routing_context()?;
@@ -225,6 +278,8 @@ impl Match {
                     bound_units: Vec::new(),
                     wetness: 0.0,
                     roads: w.roads,
+                    wreck_memory: Vec::new(),
+                    wrecks: Vec::new(),
                 })
             })
             .collect::<Result<_, String>>()?;
@@ -234,6 +289,30 @@ impl Match {
         crate::observed_memory::validate_world(&self.world)
             .map_err(|e| format!("routing terrain: {e:?}"))?;
         let g = &self.world.game;
+        if self.recipients.iter().any(|state| {
+            state
+                .bound_units
+                .iter()
+                .any(|u| u.kind >= self.rules.kinds.len())
+        }) || self.routing_fog.teams.values().any(|f| {
+            f.vis.len() != g.w * g.h || f.next.len() != g.w * g.h || f.explored.len() != g.w * g.h
+        }) || self.routing_fog.terrain.as_ref().is_some_and(|t| {
+            t.sight.len() != g.w * g.h
+                || t.sat_w != g.w + 1
+                || t.sat.len() != (g.w + 1) * (g.h + 1)
+                || t.height.as_ref().is_some_and(|h| h.len() != g.w * g.h)
+        }) {
+            return Err("invalid owned routing cache shape".into());
+        }
+        let mut wreck_ids = std::collections::BTreeSet::new();
+        if g.wrecks.iter().any(|w| {
+            w.id.is_none_or(|id| id == 0 || !wreck_ids.insert(id))
+                || !w.x.is_finite()
+                || !w.z.is_finite()
+                || w.cell.is_some_and(|c| c >= g.w * g.h)
+        }) {
+            return Err("routing needs valid unique wreck identities and positions".into());
+        }
         if !matches!(self.options.mode, Mode::Default | Mode::Conquest) || g.mode.is_some() {
             return Err("owned routing currently supports ordinary Conquest".into());
         }
@@ -310,6 +389,21 @@ impl Match {
     }
     fn refresh_memory(&mut self, owner: usize) -> Result<(), String> {
         self.validate_recipient(owner)?;
+        if !self.recipients[owner].memory.needs_replay(&self.world) {
+            let team = self.world.game.players[owner].team;
+            self.recipients[owner]
+                .memory
+                .refresh(
+                    &mut self.world,
+                    ObservationFrame {
+                        team,
+                        skip_fog: false,
+                    },
+                    &mut Facts::default(),
+                )
+                .map_err(|e| format!("observed refresh: {e:?}"))?;
+            return Ok(());
+        }
         // Observation needs current positions without sorting the gameplay index
         // during a command between the source's explicit rebuild phases.
         let grid = SpatialGrid::new(&self.world.game.units, 16.0);
@@ -335,15 +429,19 @@ impl Match {
         let key = (g.tick, g.terrain_version, g.vision_tick.unwrap_or(-1));
         if self.recipients[owner].key == Some(key) {
             self.recipients[owner].refresh_bound_units(&self.world.game, &self.rules);
+            self.recipients[owner].wetness = self.world.game.wet.unwrap_or(0.0);
             return Ok(());
         }
         self.refresh_memory(owner)?;
+        self.grid.rebuild(&self.world.game.units);
         let state = &mut self.recipients[owner];
         state
             .memory
             .apply_routes(&mut state.routes)
             .map_err(|e| format!("observed projection: {e:?}"))?;
         let g = &self.world.game;
+        refresh_wrecks(state, g, &self.rules, &self.grid, owner);
+        state.wrecks = state.wreck_memory.clone();
         let fog = self.routing_fog.team(g, &self.rules, g.players[owner].team);
         state.fires.fill(false);
         for (&c, _) in self.world.fires.iter() {
@@ -418,6 +516,21 @@ impl Match {
         self.validate_recipient(owner)?;
         Ok(&self.recipients[owner])
     }
+    /// Full remembered wreck projection for the fields used by core cover queries.
+    /// Hidden moving wrecks become static remembered cover; removal waits until seen.
+    pub fn observed_wrecks(&mut self, owner: usize) -> Result<Vec<Wreck>, String> {
+        self.validate_recipient(owner)?;
+        self.grid.rebuild(&self.world.game.units);
+        refresh_wrecks(
+            &mut self.recipients[owner],
+            &self.world.game,
+            &self.rules,
+            &self.grid,
+            owner,
+        );
+        Ok(self.recipients[owner].wreck_memory.clone())
+    }
+
     /// Full/reconnect reads preserve memory order; delta reads drain only its outbox.
     pub fn observed_terrain(
         &mut self,
