@@ -37,6 +37,7 @@ pub mod separation;
 pub mod sort;
 pub mod structures;
 pub mod supply_convoys;
+pub mod supply_network;
 pub mod terrain;
 pub mod traffic;
 pub mod unit_spawn;
