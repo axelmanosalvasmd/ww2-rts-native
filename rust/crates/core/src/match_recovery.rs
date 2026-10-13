@@ -336,7 +336,7 @@ impl Match {
             {
                 return Err("invalid recovery provisions".into());
             }
-            if self.commands.units.get(&id).is_none() {
+            if !self.commands.units.contains_key(&id) {
                 return Err("missing recovery control".into());
             }
             let definition = def(self, id)?;

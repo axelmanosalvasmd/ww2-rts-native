@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Resolved strict Clippy findings in the native recovery validation and replay helpers without changing their behavior. The release workspace suite passed 177 tests before this cleanup; exact final checks are rerunning.
+
 - Preserved Blocked precedence for a typed nonfinite aimed point before unsupported-project checks. The existing project-boundary replay now verifies that invalid aim preserves work activity, while valid replacement still refuses unrepresented projects.
 
 - Corrected replay setup to represent visibility membership as sorted unique IDs while preserving the original actor/grid insertion order for tie cases. This satisfies canonical routing validation without changing target membership. Native comparisons are rerunning.
