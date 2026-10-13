@@ -242,6 +242,9 @@ struct ObservationSource {
     smokes: Vec<crate::game::Smoke>,
     strikes: Vec<crate::game::Strike>,
     wrecks: Vec<crate::game::Wreck>,
+    fires: Vec<usize>,
+    mines: BTreeMap<usize, i32>,
+    mine_seen: BTreeMap<usize, u32>,
 }
 #[derive(PartialEq)]
 struct ObservationUnit {
@@ -365,6 +368,9 @@ impl World {
             smokes: g.smokes.clone(),
             strikes: g.strikes.clone(),
             wrecks: g.wrecks.clone(),
+            fires: self.fires.iter().map(|(&c, _)| c).collect(),
+            mines: self.mines.clone(),
+            mine_seen: self.mine_seen.clone(),
         }
     }
     pub(crate) fn defer_observation(
