@@ -5,6 +5,7 @@
 - Connected immediate Conquest ground/naval recruitment to Match with staged placement, owner-observed rally routes, exact MP charges, monotonic IDs, canonical control rows and maintained spatial indexing. Five original-source traces cover 32 buy commands; failed routes still buy, while malformed placement/routing leaves full wallet, unit, control, metadata and ID state untouched. Air, ambiguous pending support kinds and later Match systems remain explicit boundaries.
 
 - Added one canonical Match control row for aim, ability and retreat switches, attack intent, facing and waiting orders. Startup prepares the rows from unit definitions; recruitment can stage them before charging. Command execution is the next part of this lane, and no wire or C interface changed.
+- Adapted recipient routing fire reads to the current ordered fire container during integration, preserving insertion order and visibility masks.
 
 - Added Match-owned observed terrain and remembered wreck routing for ordinary Conquest. Current-position discovery, cached fire fog, row revisions, outbox order, same-key bunker fields and live wetness match 162 original-source actions, 44 route views, eight searches and four wreck cover queries. Fixed same-key wetness staleness found in independent review. Debug/release tests, startup regressions, strict Clippy and formatting pass. Lifecycle callers retain a removed unit before another route read; wrecks require canonical IDs. Command/tick/convoy integration, World memory and wire/ABI changes remain separate; MOV-29 and MAP-100 stay in progress.
 
