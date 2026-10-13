@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Matched recovery aid-owner validation to the canonical unsigned owner type, preserving out-of-range rejection without an impossible negative-owner branch. Native checks remain pending.
+
 - Marked the bounded Conquest ability, healing and mine-detection parity rows in progress, with source-only evidence and explicit pending native checks. Paid modes, full tick integration and field construction remain separate.
 
 - Extended recruitment identity admission to reject stale combat, ability and recovery rows before charging or publishing a new unit. This preserves default metadata for a buy followed by an ability in the same recorded-input batch. Native combined verification remains pending.
