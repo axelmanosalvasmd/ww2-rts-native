@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added optional durable wreck IDs to query state, preserving absent identity in older query fixtures. The authoritative wreck producer uses the dead unit ID; remembered-routing consumers can reject missing identity explicitly. No wire or C layout changed.
+
 - Reserved canonical Match combat metadata for XP, incoming-hit history, death impulse and ordered cargo/carrier identities, plus the existing environment runtime. Starting units and buildings receive the original empty/default metadata; Game continues to own health, suppression and positions. The firing lane owns retarget and resets it through a typed sink. Damage/death execution and verification follow in this component lane.
 
 - Connected Conquest point supply, capture and income to the assembled Match, using the tick's ordered unit list and one canonical objective/reserve state. Eight original-source traces compare 72 phases across all armies, allied and enemy teams, disconnection, supply obstruction, post-decision VP freezing and units spawned during a tick. Capture timestamps follow source winner gating; malformed input leaves objectives and wallets unchanged. This phase does not advance the clock or implement the remaining match systems.
