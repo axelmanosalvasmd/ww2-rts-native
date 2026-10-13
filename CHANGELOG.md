@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Bring source-reviewed human commander timing, raw input helpers and detached common view types into the isolated observation producer branch. Native acceptance remains pending.
+
 - Prepare a separate human commander observation branch by normally combining checked commander `be1cb2c` with ordinary Default `262926e`. Retain both Cover and Entrench dispatch and canonical owners; this new union has no native acceptance yet.
 
 - Verified the coherent commander consumer on the Mac at `e7f1b1f`: all 227 locked workspace release tests, 25 focused debug tests, strict all-target Clippy, formatting and the release FFI build pass. The proof covers bounded opening and holder decisions, later research admission, paid Germany MG purchase and next delivered movement, and real Cover job cleanup. Full AI, broader shopping, construction, mass-project Cover and hosted or Unreal acceptance remain pending.
@@ -99,6 +101,14 @@
 - Added borrowed staged sight sources and a recipient component preview that defers terrain acknowledgements until infallible publication. Existing fog and routing keys stay lazy; the matching World preview defers journal trimming. Original-source and native observer verification remain pending. No authoritative unit is inserted during preparation.
 
 - Carried the reviewed local observation-index repairs into all ordinary recipient refresh, point visibility and wreck reads. These queries preserve maintained gameplay bucket order; staged-observer integration and its native regression checks follow separately.
+- Defined the detached ordinary human commander facts used by the independent observation producer and runtime: ordered visibility, own motion plans, sightings, current public stop controls and owner hurt batches with original event ordinals. No Match, transport or queue interface changes; the complete human-state runtime and producer remain in progress.
+
+- Added detached ordinary human input helpers for duplicate-order filtering, first matching formation groups, camera and selection changes, keys and clicks. The unchanged Source oracle covers 31 cases and 79 emitted input rows, including raw command extensions, duplicate and missing IDs, minimap moves and exact screen boundaries. Native tests are written but not run; alert scheduling, timed input execution, policy and Match hookup remain pending.
+
+- Fixed the human timing stream's long-run accumulator: the Source keeps a floating-point Number rather than wrapping its seed to 32 bits after every draw. Three original fractions around draw 4,917,759 protect the first precision-boundary divergence. The focused native regression is written but not run.
+
+- Added the ordinary human commander's private timing provider: slot-seeded timing, difficulty medians and caps, lognormal opening/reaction/input/scan delays, and view-demand checks. The unchanged Source recorder covers 48 profiles, 336 sequential samples, eight public openings and two reset/level-change records. Native tests are written but not run; camera, alerts, input queues, policy and runner integration remain separate.
+
 - Independently replayed the Default proof's copied core, support and mass-project binaries in both profiles: all 80 test executions pass, with seven artifact hashes, 13 compiled-source hashes and 13 gate-log hashes verified. This documentation closure changes no Rust or harness file.
 
 - Verified the ordinary Default caller and provider assembly on the Mac at `07250fdf`: all 240 locked workspace release tests, 40 distinct focused debug tests, strict all-target Clippy, formatting and the release FFI build pass without source repairs. All 13 original support traces now run unchanged through 2,705 ticks and 153 checkpoints, including Default's 45 ticks and nine checkpoints; the seven mass-project cases also pass. Raw empty-string feature defaults, unsupported modes, AIR/logistics scope and hosted or Unreal acceptance remain separate.
