@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Clarify the World metadata documentation's admission order: wreck display validation and the staged collector/selectors all complete before publication. Runtime and fixtures remain identical to verified `2471c2c`.
+
 - Verify the single-commander World metadata producer on Mac: every 228 locked release workspace test, strict Clippy, formatting and release FFI pass at final code `2471c2c`. Eight preliminary debug tests passed at runtime-identical `b0ee319`, then the affected retention test passed at `88dd548`. Independent source and copied-binary review covers 11 original scenes, 153 actions and 34 captures. Complete World envelopes and fresh platform CI remain pending.
 
 - Separate the independent optional region name/kind serializer branches after strict Clippy flagged their same-line formatting. Both fields still emit independently. The preceding head passed every locked release workspace test; final formatter-successor gates follow.
