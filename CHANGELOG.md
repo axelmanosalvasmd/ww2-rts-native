@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Documented the ordinary Dig dispatcher and scheduler boundary with 12 reproducible source traces and 47 actions. Native execution and unit-loop integration remain pending.
+
 - Connected ordinary Dig to the single recorded command dispatcher and real path-request goal/drop hooks. Accepted Move and Stop cancel canonical field work synchronously; queued digs and excluded fort kinds remain explicit. Invalid cancellation state propagates through the existing checked path API. Source/native replay verification remains pending.
 
 - Staged ordinary field-work admission beside the existing recorded input ancestry. Shared routing-part helpers retain local observation indexes, constructor state remains singular, and the initial input proof head stays unchanged. Combined source/native verification remains pending.
