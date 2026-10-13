@@ -184,6 +184,9 @@ pub(super) fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(
     {
         return Err(refused(SnapshotCapability::ShotsAndFlights));
     }
+    if !state.aviation.events.is_empty() || !state.aviation.planes.is_empty() {
+        return Err(refused(SnapshotCapability::Air));
+    }
     if state
         .environment
         .falling_sections()

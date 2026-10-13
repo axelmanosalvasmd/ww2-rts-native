@@ -350,6 +350,7 @@ impl Match {
         if !(0..9_007_199_254_740_351).contains(&self.world.game.tick) {
             return Err("invalid prior-pose tick".into());
         }
+        self.validate_firing_units()?;
         self.firing.prior = self
             .world
             .game
@@ -360,7 +361,28 @@ impl Match {
         self.firing.prior_tick = Some(self.world.game.tick + 1);
         Ok(())
     }
+    /// Admit aircraft as observed context only. Their canonical sortie owner
+    /// validates physical state and metadata; this does not admit air weapons.
+    pub(crate) fn validate_aircraft_firing_context(&self) -> Result<(), String> {
+        if self
+            .world
+            .game
+            .units
+            .values()
+            .any(|u| u.air.is_some() || self.rules.kinds.get(u.kind).is_some_and(|kind| kind.air))
+        {
+            self.validate_aviation()
+                .map_err(|error| error.to_string())?;
+            if self.world.game.units.values().any(|u| {
+                u.air.is_some() && (u.x.abs() > 1_073_741_824.0 || u.z.abs() > 1_073_741_824.0)
+            }) {
+                return Err("aircraft firing context exceeds environment position bounds".into());
+            }
+        }
+        Ok(())
+    }
     fn validate_firing_units(&self) -> Result<(), String> {
+        self.validate_aircraft_firing_context()?;
         for (&id, u) in &self.world.game.units {
             if u.id != id
                 || u.kind >= self.rules.kinds.len()
@@ -368,7 +390,8 @@ impl Match {
                 || ![u.x, u.z, u.hp, u.rot, u.supp]
                     .iter()
                     .all(|n| n.is_finite())
-                || self.world.game.cell_of(u.x, u.z).is_none()
+                || (self.world.game.cell_of(u.x, u.z).is_none()
+                    && !(u.air.is_some() && self.rules.kinds[u.kind].air))
                 || u.cells
                     .as_ref()
                     .is_some_and(|c| c.iter().any(|&c| c as usize >= self.world.game.flags.len()))
@@ -587,13 +610,20 @@ impl Match {
                 FlightSurface::Cell(cell) => ContactTarget::Cell(cell),
             };
             let (mut damage, retarget) = self.firing_damage_view(&unit_order);
-            let (amount, effects) = damage
-                .local_contact(source, target, impact, &contact_id, blast_source, retarget)
-                .map_err(|e| e.to_string())?;
-            damage_amount = amount;
+            let mut effects = Vec::new();
+            let result = damage.local_contact_emitting(
+                source,
+                target,
+                impact,
+                &contact_id,
+                blast_source,
+                retarget,
+                &mut |effect| effects.push(effect),
+            );
             self.firing
                 .events
                 .extend(effects.into_iter().map(LaunchEvent::Environment));
+            damage_amount = result.map_err(|e| e.to_string())?;
         }
         let target = contact.and_then(|c| {
             if let FlightSurface::Unit(id) = c.surface {
@@ -655,21 +685,22 @@ impl Match {
                 .map(|t| (t.id, math::max(0.0, t.hp)))
                 .collect();
             let (mut damage, retarget) = self.firing_damage_view(&unit_order);
-            let effects = damage
-                .explosion(
-                    Point { x: at.x, z: at.z },
-                    p.blast_radius.ok_or("missing blast radius")?,
-                    profile,
-                    p.owner as i32,
-                    Some(&blast_id),
-                    Some(direction),
-                    None,
-                    retarget,
-                )
-                .map_err(|e| e.to_string())?;
+            let mut effects = Vec::new();
+            let result = damage.explosion_emitting(
+                Point { x: at.x, z: at.z },
+                p.blast_radius.ok_or("missing blast radius")?,
+                profile,
+                p.owner as i32,
+                Some(&blast_id),
+                Some(direction),
+                None,
+                retarget,
+                &mut |effect| effects.push(effect),
+            );
             self.firing
                 .events
                 .extend(effects.into_iter().map(LaunchEvent::Environment));
+            result.map_err(|e| e.to_string())?;
             self.blast_experience(p.shooter, p.owner, &before)?;
         } else if p.terrain != 0.0 {
             let g = &self.world.game;
@@ -695,20 +726,21 @@ impl Match {
             context.contact_id = Some(&blast_id);
             context.direction = Some(direction);
             let (mut damage, _) = self.firing_damage_view(&unit_order);
-            let effects = damage
-                .terrain_blast(
-                    crate::environment::Blast {
-                        at: Point { x: at.x, z: at.z },
-                        radius: 1.5,
-                        damage: p.terrain * p.energy,
-                        scar: p.scar,
-                    },
-                    &mut context,
-                )
-                .map_err(|e| e.to_string())?;
+            let mut effects = Vec::new();
+            let result = damage.terrain_blast_emitting(
+                crate::environment::Blast {
+                    at: Point { x: at.x, z: at.z },
+                    radius: 1.5,
+                    damage: p.terrain * p.energy,
+                    scar: p.scar,
+                },
+                &mut context,
+                &mut |effect| effects.push(effect),
+            );
             self.firing
                 .events
                 .extend(effects.into_iter().map(LaunchEvent::Environment));
+            result.map_err(|e| e.to_string())?;
             self.blast_experience(p.shooter, p.owner, &before)?;
         }
         Ok(true)

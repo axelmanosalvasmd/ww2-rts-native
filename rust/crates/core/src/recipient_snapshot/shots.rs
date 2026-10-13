@@ -6,6 +6,7 @@ use crate::{
     grid::SpatialGrid,
     match_firing::LaunchEvent,
     match_support::SupportEvent,
+    match_tick::TickEvent,
     projectiles::{self, BodyPosition, Box3, Flight, Point3},
 };
 
@@ -18,12 +19,47 @@ pub enum ShotRef<'a> {
     Environment(&'a Effect),
 }
 
+impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
+    type Error = SnapshotError;
+
+    fn try_from(value: &'a TickEvent) -> Result<Self, Self::Error> {
+        match value {
+            TickEvent::Firing(value) => Ok(Self::Firing(value)),
+            TickEvent::Support(value) => Ok(Self::Support(value)),
+            TickEvent::Environment(value) => Ok(Self::Environment(value)),
+            TickEvent::Aviation(_) => Err(SnapshotError::Unsupported {
+                unit: 0,
+                capability: SnapshotCapability::Air,
+            }),
+        }
+    }
+}
+
 pub struct SelectedGroundShotFrame<'a> {
     frame: SelectedGroundListFrame<'a>,
     shots: Vec<(usize, Value)>,
 }
 
 impl DeliveryState {
+    /// Borrow the complete caller-owned tick batch in its actual order. The host
+    /// owns accumulation and scheduled resets, including ticks with no recipients.
+    /// An unsupported row refuses before any selected delivery owner publishes.
+    pub fn capture_selected_with_tick_events<'a>(
+        &mut self,
+        state: &'a mut Match,
+        selected: &[SelectedSeat],
+        events: &[TickEvent],
+    ) -> Result<Option<SelectedGroundShotFrame<'a>>, SnapshotError> {
+        if selected.is_empty() {
+            return Ok(None);
+        }
+        let shots = events
+            .iter()
+            .map(ShotRef::try_from)
+            .collect::<Result<Vec<_>, _>>()?;
+        self.capture_selected_with_shots(state, selected, &shots)
+    }
+
     /// Project the complete supplied batch before any selected memory owner
     /// publishes. The host retains the scheduled global batch-reset policy.
     /// Persistent flight/AIR/debris actors and undrained producer buffers still
@@ -165,6 +201,16 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
     match shot {
         ShotRef::Environment(value) => effect(state, value),
         ShotRef::Support(SupportEvent::Environment(value)) => effect(state, value),
+        ShotRef::Support(
+            SupportEvent::Bomb(_)
+            | SupportEvent::Chutes(_)
+            | SupportEvent::Plane { .. }
+            | SupportEvent::Flak { .. }
+            | SupportEvent::ShotDown { .. },
+        ) => Err(SnapshotError::Unsupported {
+            unit: 0,
+            capability: SnapshotCapability::Air,
+        }),
         ShotRef::Support(SupportEvent::Shell(at) | SupportEvent::SmokeShells(at)) => {
             numbers(&[at.x, at.z])?;
             let name = if matches!(shot, ShotRef::Support(SupportEvent::Shell(_))) {
@@ -211,24 +257,10 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
                     owner(state, *seat)?;
                     numbers(&[at.x, at.z, *spread])?;
                 }
-                LaunchEvent::Throw {
-                    shooter,
-                    owner: seat,
-                    at,
-                } => {
-                    identity(u64::from(*shooter))?;
-                    owner(state, *seat)?;
-                    numbers(&[at.x, at.z])?;
-                }
-                LaunchEvent::SmallArms(value) => {
-                    identity(u64::from(value.shooter))?;
-                    owner(state, value.owner)?;
-                    point(value.at)?;
-                    if let Some(hit) = value.hit {
-                        identity(u64::from(hit.target))?;
-                        owner(state, hit.owner)?;
-                    }
-                }
+                // SmallArms is an operative payload. Throw is shared by ordinary
+                // abilities and operatives, with no retained source provenance.
+                // Both refuse until that capability has its own admission facts.
+                LaunchEvent::Throw { .. } | LaunchEvent::SmallArms(_) => return Err(refused()),
                 LaunchEvent::Contact(value) => {
                     kind(state, value.kind)?;
                     identity(value.flight)?;
@@ -459,6 +491,46 @@ mod tests {
         assert_eq!(format!("{:?}", state.recipients), recipients);
         assert_eq!(state.routing_fog, fog);
         assert_eq!(delivery, acknowledgments);
+        // A later unrepresented producer row must not publish the valid prefix.
+        for unexpected in [
+            TickEvent::Aviation(crate::match_aviation::AviationEvent::PlaneDown {
+                target: 1,
+                owner: 0,
+                at: Point { x: 13.0, z: 13.0 },
+                direction: 0.0,
+            }),
+            TickEvent::Firing(LaunchEvent::Throw {
+                shooter: 1,
+                owner: 0,
+                at: Point { x: 13.0, z: 13.0 },
+            }),
+            TickEvent::Environment(metadata.clone()),
+        ] {
+            let batch = [TickEvent::Environment(valid.clone()), unexpected];
+            assert!(
+                delivery
+                    .capture_selected_with_tick_events(
+                        &mut state,
+                        &[SelectedSeat {
+                            slot: 0,
+                            full: false,
+                            omit: false
+                        }],
+                        &batch,
+                    )
+                    .is_err()
+            );
+            assert_eq!(format!("{:?}", state.world), world);
+            assert_eq!(format!("{:?}", state.recipients), recipients);
+            assert_eq!(state.routing_fog, fog);
+            assert_eq!(delivery, acknowledgments);
+            assert!(
+                delivery
+                    .capture_selected_with_tick_events(&mut state, &[], &batch)
+                    .unwrap()
+                    .is_none()
+            );
+        }
         assert!(
             delivery
                 .capture_selected_with_shots(&mut state, &[], &shots)

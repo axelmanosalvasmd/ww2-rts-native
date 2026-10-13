@@ -83,6 +83,7 @@ fn original_full_steps_consume_operative_turns_and_lifecycle() {
                     assert!(!report.unavailable.contains(&TickPhase::Operative));
                     // The report continues to disclose the unrelated missing phases.
                     assert!(!report.unavailable.is_empty());
+                    projection.record_events(&m, report.events);
                     ticks += 1;
                 }
                 operation => panic!("{context}: unhandled source operation {operation}"),
@@ -204,7 +205,12 @@ fn malformed_operative_identity_rejects_before_clock_or_respawn_publication() {
             _ => unreachable!(),
         }
         let before = admission_state(&m);
-        assert!(m.advance_tick().is_err(), "{failure}: refused admission");
+        let refused = m.advance_tick().unwrap_err();
+        assert!(
+            refused.events.is_empty(),
+            "{failure}: admission emits no events"
+        );
+        assert_eq!(refused.tick, m.world.game.tick, "{failure}: refusal clock");
         assert_eq!(admission_state(&m), before, "{failure}: untouched state");
         assert!(
             m.tick_state.fault().is_none(),
@@ -278,7 +284,9 @@ fn rejected_operative_admission_retains_the_recorded_boundary_order() {
     m.enqueue_command(order, Command::Unsupported).unwrap();
     let body = m.companions.soldiers.remove(&id).unwrap();
     let before = admission_state(&m);
-    assert!(m.advance_tick().is_err());
+    let refused = m.advance_tick().unwrap_err();
+    assert!(refused.events.is_empty(), "admission emits no events");
+    assert_eq!(refused.tick, m.world.game.tick, "refusal clock");
     assert_eq!(admission_state(&m), before);
     m.companions.soldiers.insert(id, body);
     let report = m.advance_tick().unwrap();

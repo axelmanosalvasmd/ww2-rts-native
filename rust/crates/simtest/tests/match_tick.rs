@@ -549,7 +549,16 @@ fn trusted_tick_scene_stages_clock_paths_and_empty_queue_without_replay() {
 fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
     use ww2_core::{match_commands::Command, orders::OrderKey};
     let fixture: Value = serde_json::from_str(include_str!("fixtures/match-tick.json")).unwrap();
-    for actor in ["garrison", "rail", "riding", "logistics", "convoys", "mode"] {
+    for actor in [
+        "garrison",
+        "rail",
+        "riding",
+        "reverse riding",
+        "idle suppression",
+        "logistics",
+        "convoys",
+        "mode",
+    ] {
         let mut m = make(&fixture["cases"][0]);
         let id = *m.world.game.units.keys().next().unwrap();
         let rail_kind = m.rules.kinds.iter().position(|kind| kind.rail).unwrap();
@@ -564,7 +573,12 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
                 unit.hp = 34.0;
             }
             "rail" => unit.kind = rail_kind,
-            "riding" => unit.riding = true,
+            "riding" => {
+                unit.riding = true;
+                m.combat.get_mut(id).unwrap().carrier = Some(900);
+            }
+            "reverse riding" => m.combat.get_mut(id).unwrap().carrier = Some(900),
+            "idle suppression" => unit.supp = -1.0,
             "logistics" => m.options.logistics = true,
             "convoys" => m.convoys = ww2_core::supply_convoys::ConvoyState::setup(true),
             "mode" => m.world.game.mode = Some(ww2_core::game::ModeKind::World),
@@ -614,11 +628,13 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
             .collect::<Vec<_>>();
         let error = m.advance_tick().unwrap_err();
         assert!(
-            error.contains(match actor {
+            error.reason.contains(match actor {
                 "garrison" => "automatic garrison retreat tick exit",
                 "logistics" | "convoys" => "reserve and convoy tick phases",
                 "mode" => "ordinary Conquest",
-                _ => "rail or carrier tick actor",
+                "riding" => "thrown carrier ejection tick phase",
+                "reverse riding" | "idle suppression" => "invalid canonical carrier unit",
+                _ => "rail tick actor",
             }),
             "{actor}: {error}"
         );
@@ -698,76 +714,99 @@ fn queued_companion_join_enters_prior_and_skips_ordinary_timers() {
 }
 
 #[test]
-fn unsupported_air_support_boundary_preserves_all_pending_input_and_timers() {
-    use ww2_core::{match_commands::Command, orders::OrderKey};
+fn malformed_support_metadata_preserves_whole_recorded_boundary() {
+    use ww2_core::{match_commands::Command, match_support::FighterCover, orders::OrderKey};
     let fixture: Value = serde_json::from_str(include_str!("fixtures/match-tick.json")).unwrap();
-    let mut m = make(&fixture["cases"][0]);
-    let first = *m.world.game.units.keys().next().unwrap();
-    m.enqueue_command(
-        OrderKey {
-            tick: 1,
-            issuer: 0,
-            sequence: 1,
-        },
-        Command::Stop {
-            ids: vec![i64::from(first)],
-        },
-    )
-    .unwrap();
-    m.enqueue_command(
-        OrderKey {
-            tick: 1,
-            issuer: 0,
-            sequence: 2,
-        },
-        Command::Support {
-            kind: "bombing".into(),
-            at: Point { x: 8.0, z: 8.0 },
-            direction: None,
-        },
-    )
-    .unwrap();
-    let before = snapshot(&m);
-    let timers = m
-        .start
-        .players
-        .iter()
-        .map(|p| p.support.clone())
-        .collect::<Vec<_>>();
-    let controls = m.commands.units.clone();
-    assert!(
-        m.advance_tick()
-            .unwrap_err()
-            .contains("support aircraft tick phase")
-    );
-    assert_eq!(snapshot(&m), before);
-    assert_eq!(m.commands.units, controls);
-    assert_eq!(m.commands.next_tick(), Some(1));
-    assert_eq!(m.commands.pending_commands(), 2);
-    assert_eq!(
-        m.start
-            .players
-            .iter()
-            .map(|p| p.support.clone())
-            .collect::<Vec<_>>(),
-        timers
-    );
-    assert!(m.support.strikes.is_empty());
-    assert!(m.tick_state.fault().is_none());
+    for malformed in ["cooldown", "player team", "cover team"] {
+        let mut m = make(&fixture["cases"][0]);
+        match malformed {
+            "cooldown" => {
+                m.start.players[0].support.remove("artillery");
+            }
+            "player team" => m.start.players[0].config.team += 1,
+            "cover team" => m.support.covers.push(FighterCover {
+                owner: 0,
+                team: m.world.game.players[0].team + 1,
+                at: Point { x: 8.0, z: 8.0 },
+                radius: 40.0,
+                remaining: 60.0,
+            }),
+            _ => unreachable!(),
+        }
+        let id = *m.world.game.units.keys().next().unwrap();
+        for (sequence, command) in [
+            (
+                1,
+                Command::Stop {
+                    ids: vec![i64::from(id)],
+                },
+            ),
+            (
+                2,
+                Command::Support {
+                    kind: "artillery".into(),
+                    at: Point { x: 8.0, z: 8.0 },
+                    direction: None,
+                },
+            ),
+        ] {
+            m.enqueue_command(
+                OrderKey {
+                    tick: 1,
+                    issuer: 0,
+                    sequence,
+                },
+                command,
+            )
+            .unwrap();
+        }
+        let state = |m: &Match| {
+            format!(
+                "{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}",
+                m.world,
+                m.commands.units,
+                m.start.players,
+                m.start.economy,
+                m.support,
+                m.start.random.snapshot(),
+                m.firing,
+                m.abilities
+            )
+        };
+        let before = state(&m);
+        assert!(m.advance_tick().is_err(), "{malformed}");
+        assert_eq!(state(&m), before, "{malformed}");
+        assert_eq!(m.commands.next_tick(), Some(1));
+        assert_eq!(m.commands.pending_commands(), 2);
+        assert!(m.tick_state.fault().is_none());
+    }
+}
 
-    let mut future = make(&fixture["cases"][0]);
-    let timers = future
-        .start
-        .players
-        .iter()
-        .map(|p| p.support.clone())
-        .collect::<Vec<_>>();
-    future
-        .enqueue_command(
+#[test]
+fn offmap_support_boundary_dispatches_once_and_decays_timers_once() {
+    use ww2_core::{catalog::Catalog, match_commands::Command, orders::OrderKey};
+    let fixture: Value = serde_json::from_str(include_str!("fixtures/match-tick.json")).unwrap();
+    for boundary in [1, 2] {
+        let mut m = make(&fixture["cases"][0]);
+        m.start.economy.players[0].mp = 1000.0;
+        let first = *m.world.game.units.keys().next().unwrap();
+        let before_id = m.next_unit_id;
+        m.enqueue_command(
             OrderKey {
-                tick: 2,
+                tick: boundary,
                 issuer: 0,
                 sequence: 1,
+            },
+            Command::Stop {
+                ids: vec![i64::from(first)],
+            },
+        )
+        .unwrap();
+        m.enqueue_command(
+            OrderKey {
+                tick: boundary,
+                issuer: 0,
+                sequence: 2,
             },
             Command::Support {
                 kind: "bombing".into(),
@@ -776,46 +815,62 @@ fn unsupported_air_support_boundary_preserves_all_pending_input_and_timers() {
             },
         )
         .unwrap();
-    let report = future.advance_tick().unwrap();
-    assert!(
-        report
-            .phases
-            .contains(&ww2_core::match_tick::TickPhase::SupportTimers)
-    );
-    for (slot, row) in timers.iter().enumerate() {
-        for (name, before) in row {
+        let dt = m.rules.movement.tick;
+        let initial = m.start.players[0].support.clone();
+        if boundary == 2 {
+            let report = m.advance_tick().unwrap();
+            assert!(report.commands.is_empty());
+            assert_eq!(m.commands.pending_commands(), 2);
+            for (kind, value) in &initial {
+                assert_eq!(m.start.players[0].support[kind], value - dt);
+            }
+            assert!(m.world.game.strikes.is_empty());
+        }
+        let before = m.start.players[0].support.clone();
+        let wallet = m.start.economy.players[0].mp;
+        let spent = m.story[0].mp_spent;
+        let calls = m.story[0].support_calls;
+        let report = m.advance_tick().unwrap();
+        assert_eq!(report.commands.len(), 2);
+        assert!(report.commands.iter().all(|result| result.denial.is_none()));
+        assert_eq!(m.commands.pending_commands(), 0);
+        assert_eq!(m.commands.next_tick(), Some(boundary + 1));
+        assert_eq!(m.world.game.tick, boundary as i64);
+        assert_eq!(m.next_unit_id, before_id);
+        assert_eq!(m.world.game.strikes.len(), 1);
+        let strike = &m.world.game.strikes[0];
+        let timing = strike.runtime.as_ref().unwrap();
+        assert_eq!(timing.kind, ww2_core::match_support::SupportKind::Bombing);
+        let def = Catalog::compiled().unwrap().support("bombing").unwrap();
+        let field = |key| def.get(key).unwrap().number().unwrap();
+        assert_eq!(timing.delay, field("delay") - dt);
+        assert!(!strike.live);
+        assert_eq!(
+            m.start.economy.players[0].mp,
+            (wallet - field("cost")) + m.start.economy.players[0].inc * dt
+        );
+        assert_eq!(m.story[0].mp_spent, spent + field("cost"));
+        assert_eq!(m.story[0].support_calls, calls + 1.0);
+        assert_eq!(m.start.players[0].support["bombing"], field("cd") - dt);
+        for (kind, value) in before.iter().filter(|(kind, _)| kind.as_str() != "bombing") {
+            assert_eq!(m.start.players[0].support[kind], value - dt);
+        }
+        for phase in [
+            ww2_core::match_tick::TickPhase::Support,
+            ww2_core::match_tick::TickPhase::AntiAir,
+            ww2_core::match_tick::TickPhase::SupportTimers,
+        ] {
             assert_eq!(
-                future.start.players[slot].support[name],
-                before - future.rules.movement.tick
+                report
+                    .phases
+                    .iter()
+                    .filter(|actual| **actual == phase)
+                    .count(),
+                1
             );
         }
+        assert!(m.tick_state.fault().is_none());
     }
-    let before = snapshot(&future);
-    let timers = future
-        .start
-        .players
-        .iter()
-        .map(|p| p.support.clone())
-        .collect::<Vec<_>>();
-    assert!(
-        future
-            .advance_tick()
-            .unwrap_err()
-            .contains("support aircraft tick phase")
-    );
-    assert_eq!(snapshot(&future), before);
-    assert_eq!(
-        future
-            .start
-            .players
-            .iter()
-            .map(|p| p.support.clone())
-            .collect::<Vec<_>>(),
-        timers
-    );
-    assert_eq!(future.commands.next_tick(), Some(2));
-    assert_eq!(future.commands.pending_commands(), 1);
-    assert!(future.tick_state.fault().is_none());
 }
 
 #[test]

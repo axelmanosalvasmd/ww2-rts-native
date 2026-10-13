@@ -75,7 +75,7 @@ fn actual_ground_support_ticks_match_source_effects_and_lifetimes() {
             assert_eq!(report.unit_order, [1]);
             assert_eq!(m.grid.owned_by(&m.world.game.units, 0), Vec::<u32>::new());
             assert_eq!(m.grid.owned_by(&m.world.game.units, 1), [1]);
-            assert!(report.environment.is_empty() && report.retired.is_empty());
+            assert!(report.environment().next().is_none() && report.retired.is_empty());
             assert!(
                 m.firing.events.is_empty(),
                 "{name}:{tick}: unexpected non-support effect"
@@ -105,7 +105,8 @@ fn actual_ground_support_ticks_match_source_effects_and_lifetimes() {
             } else {
                 assert!(report.commands.is_empty());
             }
-            let events = common::events(&mut m);
+            let events = common::events(&report.events);
+            assert!(m.support.events.is_empty() && m.aviation.events.is_empty());
             let next_signature = common::signature(&m);
             let next_quiet = quiet_state(&m);
             if let Some(expected) = frames.get(&tick) {
