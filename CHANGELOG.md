@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Used a canonical cache identity in the recovery stock fixture, retaining the original cache-first provision behavior so its native consumer can use the real convoy state. Native replay remains pending.
+
 - Matched recovery aid-owner validation to the canonical unsigned owner type, preserving out-of-range rejection without an impossible negative-owner branch. Native checks remain pending.
 
 - Marked the bounded Conquest ability, healing and mine-detection parity rows in progress, with source-only evidence and explicit pending native checks. Paid modes, full tick integration and field construction remain separate.
