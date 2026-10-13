@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added a source-written whole-scene admission test for configured tick 18 and the next real runner boundary. It checks empty-queue restoration, unchanged RNG/wallet, running/primed/pending-input refusal and invalid-clock atomicity; native execution is pending.
+
 - Added deterministic initial tick path configuration with the unchanged 4,096/20 defaults. Trusted fresh scenes stage an empty command-queue restore and clock together before any writes; pending, running or faulted queues cannot be rewound. The actual mass retry-one source scene can now use the sole scheduler without manual phase calls. Combined native proof remains pending.
 
 - Connected canonical mass-project admission, early recount and per-unit segment allocation immediately before paid field work in the separate continuation. Retirement and accepted retreat now validate both paid-job and project-membership parity before sole cancellation. Construction remains excluded; native full-step comparison is being written and no combined proof is claimed.

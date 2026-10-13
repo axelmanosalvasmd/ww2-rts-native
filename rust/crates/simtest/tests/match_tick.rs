@@ -469,6 +469,83 @@ fn rejected_clock_does_not_consume_a_tick() {
 }
 
 #[test]
+fn trusted_tick_scene_stages_clock_paths_and_empty_queue_without_replay() {
+    use ww2_core::{match_commands::Command, match_tick::TickPathConfig, orders::OrderKey};
+    let fixture: Value = serde_json::from_str(include_str!("fixtures/match-tick.json")).unwrap();
+    let mut m = make(&fixture["cases"][0]);
+    assert_eq!(m.tick_state.path_config(), TickPathConfig::default());
+    let random = m.start.random.snapshot();
+    let wallet = m.start.economy.clone();
+    m.initialize_tick_scene(
+        18,
+        TickPathConfig {
+            budget: 0,
+            retry_limit: 1,
+        },
+    )
+    .unwrap();
+    assert_eq!(m.world.game.tick, 18);
+    assert_eq!(m.commands.next_tick(), Some(19));
+    assert_eq!(m.commands.pending_commands(), 0);
+    assert_eq!(m.start.random.snapshot(), random);
+    assert_eq!(m.start.economy, wallet);
+    assert_eq!(m.tick_state.path_config().budget, 0);
+    let clock = m.world.game.tick;
+    assert!(
+        m.initialize_tick_scene(0, TickPathConfig::default())
+            .is_err()
+    );
+    assert_eq!(m.world.game.tick, clock);
+    let report = m.advance_tick().unwrap();
+    assert_eq!(report.tick, 19);
+    assert_eq!(m.commands.next_tick(), Some(20));
+    assert!(
+        m.initialize_tick_scene(0, TickPathConfig::default())
+            .is_err()
+    );
+
+    let mut pending = make(&fixture["cases"][0]);
+    pending
+        .enqueue_command(
+            OrderKey {
+                tick: 1,
+                issuer: 0,
+                sequence: 1,
+            },
+            Command::Stop { ids: vec![1] },
+        )
+        .unwrap();
+    let before = snapshot(&pending);
+    assert!(
+        pending
+            .initialize_tick_scene(
+                18,
+                TickPathConfig {
+                    budget: 4096,
+                    retry_limit: 1
+                }
+            )
+            .is_err()
+    );
+    assert_eq!(snapshot(&pending), before);
+    assert_eq!(pending.commands.pending_commands(), 1);
+    assert_eq!(pending.commands.next_tick(), Some(1));
+    assert_eq!(pending.tick_state.path_config(), TickPathConfig::default());
+    assert!(pending.tick_state.fault().is_none());
+
+    let mut invalid = make(&fixture["cases"][0]);
+    let before = snapshot(&invalid);
+    assert!(
+        invalid
+            .initialize_tick_scene(u64::MAX, TickPathConfig::default())
+            .is_err()
+    );
+    assert_eq!(snapshot(&invalid), before);
+    assert_eq!(invalid.commands.next_tick(), Some(1));
+    assert_eq!(invalid.tick_state.path_config(), TickPathConfig::default());
+}
+
+#[test]
 fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
     use ww2_core::{match_commands::Command, orders::OrderKey};
     let fixture: Value = serde_json::from_str(include_str!("fixtures/match-tick.json")).unwrap();
