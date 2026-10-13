@@ -159,7 +159,7 @@ impl WorldRails {
             lines,
             ..Self::default()
         };
-        let mut track_positions = BTreeMap::new();
+        let mut track_positions: BTreeMap<usize, usize> = BTreeMap::new();
         for line in &out.lines {
             for pair in line.cells.windows(2) {
                 let [a, b] = [pair[0], pair[1]];

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Carried the startup lane's explicit World rail-position map type into the recipient-memory dependency tree, fixing the compiler's ambiguous index type without changing rail traversal or values. Native verification remains in progress.
+
 - Reused the canonical checked cell-coordinate conversion for World region lookups after the first compile exposed an unavailable math helper. Imported the reviewed optional wreck-identity prerequisite from the combat lane. Native checks continue.
 
 - Added optional durable wreck IDs to query state, preserving absent identity in older query fixtures. The authoritative wreck producer uses the dead unit ID; remembered-routing consumers can reject missing identity explicitly. No wire or C layout changed.
