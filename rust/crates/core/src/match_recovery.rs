@@ -413,14 +413,11 @@ impl Match {
             }
         }
         for (&cell, &owner) in &self.world.aid {
-            if owner < 0
-                || owner as usize >= self.world.game.players.len()
-                || cell >= self.world.game.chars.len()
-            {
+            if owner >= self.world.game.players.len() || cell >= self.world.game.chars.len() {
                 return Err("invalid recovery aid".into());
             }
             frame.tents.push((
-                owner as usize,
+                owner,
                 Point {
                     x: (cell % self.world.game.w) as f64 * CELL + CELL / 2.,
                     z: (cell / self.world.game.w) as f64 * CELL + CELL / 2.,
@@ -749,3 +746,6 @@ impl Match {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests;

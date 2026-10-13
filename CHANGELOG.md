@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Staged ordinary field-work admission beside the existing recorded input ancestry. Shared routing-part helpers retain local observation indexes, constructor state remains singular, and the initial input proof head stays unchanged. Combined source/native verification remains pending.
+
 - Joined canonical ability/recovery defaults and stale identity guards to World construction and training publication, with the owning production agent’s approval. Existing source-constructor and training regressions check fresh rows and aborted completions. Combined native proof remains pending; World gameplay dispatch is not claimed.
 
 - Added mixed handler replay and forward/reverse arrival tests through the real Match command queue. Per-operation snapshots compare represented canonical values and float bits; source reaction timers are explicitly excluded. Native execution remains pending.
@@ -100,6 +102,36 @@
 - Combined FPS identities with the checked Match state and kept the newer remembered-routing fast path. Observation and wreck discovery use a fresh local spatial index so command reads retain gameplay bucket order. Exact combined native checks remain pending.
 
 - Combined the prepared unit-publication transaction with canonical combat and firing initialization, retaining both stale-metadata checks before recruitment charges. Recorded gameplay input integration consumes this shared factory.
+- Added a staged Match ordinary-dig actuator using the canonical wallet, terrain and field-work job owner, with real sight checks, garrison exit, synchronous activity projection and story counters. Eight original-source traces cover 31 admission and lifecycle actions. Native proof, typed Dig dispatch and live tick binding remain pending.
+
+- Reserved shared command denial names for source manpower, maximum, missing-builder and visibility refusals, allowing the separate ordinary-dig actuator to use the single dispatcher enum. No gameplay handler or queue changes are included; native actuator proof remains pending.
+
+- Added one shared field-work cancellation helper for staged transactions borrowing wallet/story and unit state separately. Match delegates to the same implementation, including identity and activity checks before mutation. Native checks remain pending.
+
+- Added the approved canonical Match field-work owner and startup default, plus synchronous cancellation that removes a real descriptor before clearing its activity flag without a refund. Missing or inconsistent activity rejects before writes. Component and combined native proof remain pending.
+
+- Integrated the frozen field-work component as a source-only prerequisite for the approved canonical Match job owner. Its source recorder and review are recorded, while queued native proof remains pending.
+
+- Updated the provision prerequisite to its verified supply checkpoint (137 release workspace tests, 14 affected debug checks and strict Clippy/formatting). Its runtime source is unchanged; the combined ability/recovery proof remains pending.
+
+- Bound component replay recipients to their actual replacement World snapshot instead of stale startup memory. Kept fixture setup inside test-only core modules so resetting observation state adds no public restore API. Native checks remain pending.
+
+- Extended the native ability replay to 33 Conquest cases (147 actions), including actual ordinary-fire buff/AP payloads, plus two paid-mode refusals. Added unchanged-state checks for smoke ID collisions in mixed selections and exhausted medic path identity. Native execution remains pending.
+
+- Added original-source ordinary-fire cases for suppressive buffs and AP consumption, including naval target restrictions, manual AP against concrete and empty-ammo retention. The ability recorder now contains 35 traces and 156 actions; the canonical firing borrow and native proof remain pending.
+
+- Integrated stable source-only provision and typed-flight prerequisites for the ability/recovery compiler pass. Reconstructed an erroneous local conflict resolution from preserved Git blobs before any build; final dependency and combined native proofs remain pending.
+
+- Added native fixture consumers for 28 Conquest ability traces (132 actions), two explicit paid-mode refusals and all 23 recovery traces (133 actions), including canonical cache-first provisions. Consumers are source-written and formatted; they have not yet run against incoming runtime prerequisites.
+
+- Fixed recovery recorder input aliasing: source provision spending now mutates cloned stock, preserving the recorded cache action's five provisions for independent native replay. Output snapshots retain the actual source mutations.
+
+- Used a canonical cache identity in the recovery stock fixture, retaining the original cache-first provision behavior so its native consumer can use the real convoy state. Native replay remains pending.
+
+- Matched recovery aid-owner validation to the canonical unsigned owner type, preserving out-of-range rejection without an impossible negative-owner branch. Native checks remain pending.
+
+- Marked the bounded Conquest ability, healing and mine-detection parity rows in progress, with source-only evidence and explicit pending native checks. Paid modes, full tick integration and field construction remain separate.
+
 - Extended recruitment identity admission to reject stale combat, ability and recovery rows before charging or publishing a new unit. This preserves default metadata for a buy followed by an ability in the same recorded-input batch. Native combined verification remains pending.
 
 - Wrote the aimed ground-ability phase against the shared physical-flight and salvo producers, including current-ammo rechecks, automatic route retention and budgeted walks. Smoke admission rejects IDs already held by a smoke cloud or wreck before changing selected units. Fixed cadence healing to use ten ticks of elapsed time and added original-source proof (23 recovery traces, 133 actions). Incoming flight/provision dependencies and native differential checks remain pending.
@@ -109,6 +141,15 @@
 - Wrote typed Conquest Ability/Autocast dispatch, canonical instant abilities, all ground autocast judgments and the existing FIFO aimed-path binding. Ability cooldown/buff timers remain separate from weapon timers; smoke IDs use the shared unit counter. The ability recorder now pairs the canonical Combat purpose stream at seed 701. Aimed launches, reinforcement and native differential consumers remain unfinished; no passing native execution claim is made.
 - Reserved a fixed internal World local-defender actor identity outside commander slots. World team and alliance queries recognize that actor without adding a player seat or wallet; ordinary invalid owner behavior is unchanged. Native World construction and guard tick execution remain pending.
 
+- Removed the obsolete local weapon-blast import after flights began retaining their own typed blast source.
+
+- Added a typed internal small-arms shot event for the operative producer, preserving its existing effect, shooter, endpoint and optional enemy/man fields. No contact or hit-direction fields were added.
+
+- Preflighted canonical shooter metadata and finite ammunition before ability/salvo launches, and reject malformed retained blast identities before stepping any flight. Timer input bounds keep physical grenade pruning safe.
+
+- Fixed physical ability launch admission at the inclusive map edge, which the source ability command permits. Added an unchanged-source grenade edge case before native verification.
+
+- Added typed grenade/satchel launch requests, retained ability blast profiles in canonical flights, and shared the physical salvo launcher with ordinary fire and barrage. Flight-linked grenade tickets keep source late-phase pruning without a second blast. The new pinned-source oracle records 30 traces and 210 checkpoints; native verification is pending the shared build slot.
 
 - Verified the complete command/firing ancestry after recruitment metadata integration: 155 workspace tests, five focused debug/release tests, strict Clippy, formatting and release FFI build pass. The diff against the reviewed command branch contains only weapon-phase code, publication defaults, fixtures and documentation.
 
@@ -174,6 +215,16 @@
 - Added the native Match Conquest victory phase and finish bookkeeping: team VP in slot order, latest still-held capture location, 0.1 m end rounding, first-winner preservation, reveal and exact Conquest timeline fields. Canonical point accounting now freezes VP and capture story counts after the winner while ownership and manpower can continue. Three focused tests compare 12 original-JavaScript traces (24 assembled-match checkpoints) and invalid-state atomicity; existing startup and point-income tests pass. Other modes, command refusal, remaining story counters, result transport and the full battle loop remain unfinished.
 - Reserved two path-identity increments before a movement block, covering a replacement route followed by a physical obstruction. Exhaustion rejects before unit mutation instead of risking a debug overflow or release wrap.
 - Reserved one canonical Match ability row for cooldown, buff, AP and aimed-order flags, plus recovery-only wound/heal/reinforcement metadata. Starting and recruited units initialize these rows; Game health/sprint, UnitControl aimed points and logistics provisions retain their existing owners. Ability/recovery execution and native verification remain unfinished.
+- Added canonical ordinary-Conquest ground supply, real safe convoy routes and physical handoff. Native comparisons pass for 233 networks, 39,839 refill rates, 468 routes, 324 handoffs, 63 logistics constructors with 663 reserve records, and three original-hook runtime traces (873 phases, 72 checkpoints). Fourteen affected debug tests and all 137 release workspace tests pass. Independent review fixed route-clear identity changes, invalid initialization publication, lazy recipient reads and ordered danger-view updates. The 468-route source fixture alternates ordinary and danger searches; those searches now retain separate graph caches. Immediate route searches publish endpoint and failure-reset effects, while queued projected searches leave live metadata intact. Timestamp and retry fixtures compare float bits. Fixed merged command/routing exports and fixture fields, and replaced test slice copies after strict Clippy feedback. Actual runtime traces include Move, two waiting destinations, Stop, Resume, support spending and three convoy deaths. Forced withdrawal, World supply and the complete tick remain separate.
+- Added one canonical Match control row for aim, ability and retreat switches, attack intent, facing and waiting orders. Startup prepares the rows from unit definitions; recruitment can stage them before charging. Command execution is the next part of this lane, and no wire or C interface changed.
+- Added canonical chosen-target and weapon-timer state to Match for the firing integration. Unit health and position, command aim and combat hit history retain their existing owners; the firing phase is still in progress.
+- Reserved canonical Match combat metadata for XP, incoming-hit history, death impulse and ordered cargo/carrier identities, plus the existing environment runtime. Starting units and buildings receive the original empty/default metadata; Game continues to own health, suppression and positions. The firing lane owns retarget and resets it through a typed sink. Damage/death execution and verification follow in this component lane.
+- Added the Match-owned recipient routing API, current-position Conquest discovery facts, source-key caching and separate fog-filtered fire hazards. The source recorder covers 123 actions, including same-key bunker membership and removal retention. This prerequisite is awaiting serialized native tests; remembered wreck projection and integrated command/tick consumers follow in this branch.
+- Added Match-owned observed terrain and remembered wreck routing for ordinary Conquest. Current-position discovery, cached fire fog, row revisions, outbox order, same-key bunker fields and live wetness match 162 original-source actions, 44 route views, eight searches and four wreck cover queries. Fixed same-key wetness staleness found in independent review. Debug/release tests, startup regressions, strict Clippy and formatting pass. Lifecycle callers retain a removed unit before another route read; wrecks require canonical IDs. Command/tick/convoy integration, World memory and wire/ABI changes remain separate; MOV-29 and MAP-100 stay in progress.
+
+- Added optional durable wreck IDs to query state, preserving absent identity in older query fixtures. The authoritative wreck producer uses the dead unit ID; remembered-routing consumers can reject missing identity explicitly. No wire or C layout changed.
+
+- Reserved two path-identity increments before a movement block, covering a replacement route followed by a physical obstruction. Exhaustion rejects before unit mutation instead of risking a debug overflow or release wrap.
 
 
 - Added the executable Conquest movement command phase over the canonical Match queue and control rows: Move, attack-move, Stop, stance validation, eight waiting orders and real recipient-bound route searches. The original JavaScript recorder supplies 56 traces and 246 steps, including malformed whole orders, forced supply holds, garrison exit and deferred retries. Three focused native tests pass in debug and release, including two original recovery/replan branches, ordering and counter-exhaustion guards. Empty replans retain the old route. Automatic reactions, aircraft, other command kinds, wire and C integration remain separate.
@@ -234,6 +285,7 @@
 - Added generated World map validation and loading through the authoritative map path and typed generator handoff, with immutable ordered geography beside canonical mutable terrain. The existing oracle now has 138 cases and 58 static states, preserves 105 earlier records, and adds bare/dressed Huge/Massive worlds plus malformed region/home/layer/connectivity cases. Empty World metadata now returns Invalid, and defensive numeric/text/bounds/biome checks reject malformed source values. Ordinary Match startup refuses World maps; bounded external file loading stays in simtest. World mode startup, rail algorithms, scenarios, wire and ABI changes remain separate.
 
 - Added typed World size, region, immutable geography and terrain inputs for the native generator-to-loader handoff. Validation and mutable World initialization follow separately; no wire or ABI interface changes. Region biome labels and explicit landmark building tags now accompany the typed handoff.
+- Added ordinary paid field-work placement and timed terrain execution for trenches, sandbags, wire, traps, Gun Pits, mines, known-mine clearing and Field Hospitals. Canonical dig records retain source cell order, visibility masking, engineer pace, per-cell ground checks and float32 trench fronts; prepared admission spends once and refused replacements preserve paid work. The original JavaScript recorder covers 22 traces and 367 actions. Dispatcher, routing and story integration, queues/shared projects, bridges, concrete buildings and fill work remain pending.
 
 - Added the native Match Conquest victory phase and finish bookkeeping: team VP in slot order, latest still-held capture location, 0.1 m end rounding, first-winner preservation, reveal and exact Conquest timeline fields. Canonical point accounting now freezes VP and capture story counts after the winner while ownership and manpower can continue. Three focused tests compare 12 original-JavaScript traces (24 assembled-match checkpoints) and invalid-state atomicity; existing startup and point-income tests pass. Other modes, command refusal, remaining story counters, result transport and the full battle loop remain unfinished.
 
@@ -245,8 +297,6 @@
 
 
 - Added canonical application of combat damage/suppression events, rider placement and maintained-grid updates, explicit unit/section/terrain contact adapters, terminal blast damage, and ordered ground-unit retirement. The adapter retains shooter XP after removal and reports deferred story/FPS/convoy/routing notifications. Added building section reconciliation and vehicle wreck motion, settlement, scorch and oldest-hull cleanup through the existing environment runtime. Three focused tests pass, comparing nine original JavaScript traces with 35 actions and checking atomic rejection plus grid order. All 131 workspace tests, strict Clippy and formatting pass. Full firing and tick orchestration remain separate lanes.
-
-- Added optional durable wreck IDs to query state, preserving absent identity in older query fixtures. The authoritative wreck producer uses the dead unit ID; remembered-routing consumers can reject missing identity explicitly. No wire or C layout changed.
 
 - Reserved canonical Match combat metadata for XP, incoming-hit history, death impulse and ordered cargo/carrier identities, plus the existing environment runtime. Starting units and buildings receive the original empty/default metadata; Game continues to own health, suppression and positions. The firing lane owns retarget and resets it through a typed sink. Damage/death execution and verification follow in this component lane.
 

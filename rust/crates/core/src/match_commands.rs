@@ -214,6 +214,8 @@ pub enum Denial {
     SuddenDeath,
     Unseen,
     NotWaiting,
+    NoBuilders,
+    NotVisible,
 }
 impl Denial {
     pub fn name(self) -> &'static str {
@@ -234,6 +236,8 @@ impl Denial {
             Self::SuddenDeath => "suddenDeath",
             Self::Unseen => "unseen",
             Self::NotWaiting => "notWaiting",
+            Self::NoBuilders => "noBuilders",
+            Self::NotVisible => "notVisible",
         }
     }
 }
@@ -630,6 +634,9 @@ impl crate::match_runtime::Match {
                     return Err("unit path identity exhausted".into());
                 }
             }
+        }
+        if !self.intercept_convoy_movement(owner, command, &controlled)? {
+            return Ok(Some(Denial::Blocked));
         }
         // The source applies forced supply holds before ordinary ownership filtering.
         for raw in &controlled {

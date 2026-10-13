@@ -126,9 +126,6 @@ impl StartPlan {
         if !options.living_weather && options.weather != WeatherChoice::Map {
             return Err("disabled living weather requires the map weather choice".into());
         }
-        if options.logistics {
-            return Err("native startup does not yet initialize logistics".into());
-        }
         if !(1..=6).contains(&options.players.len())
             || options.players.iter().any(|p| p.team < 0 || p.team >= 6)
         {
@@ -447,13 +444,14 @@ pub struct BuildingCell {
 /// Live terrain and units have a single owner in `world.game`.
 pub struct Match {
     pub support: crate::match_support::SupportState,
+    pub field_works: crate::field_works::FieldWorksRuntime,
     pub abilities: crate::match_abilities::AbilityState,
     pub recovery: crate::match_recovery::RecoveryState,
+    pub commands: crate::match_commands::MatchCommands,
     pub combat: crate::match_combat::CombatState,
     pub environment: crate::environment::EnvironmentRuntime,
     pub companions: crate::companions::Companions,
     pub world_runtime: Option<crate::match_world::WorldRuntime>,
-    pub commands: crate::match_commands::MatchCommands,
     pub world: World,
     pub start: StartPlan,
     pub options: MatchOptions,
@@ -467,8 +465,11 @@ pub struct Match {
     pub recruit_metadata: BTreeMap<u32, RecruitMetadata>,
     pub(crate) produced_placer: crate::produced_units::ProducedPlacer,
     pub scenario: Option<crate::legacy_scenario::LegacyScenario>,
-    pub firing: crate::match_firing::FiringState,
     pub logistics: crate::logistics::LogisticsState,
+    pub convoys: Option<crate::supply_convoys::ConvoyState>,
+    pub supply_net: crate::supply_network::GroundSupplyNetwork,
+    pub(crate) supply_routes: crate::supply_routes::SupplyRouting,
+    pub firing: crate::match_firing::FiringState,
     pub capture_ticks: Vec<Option<i64>>,
     pub tick_state: crate::match_tick::TickState,
     /// Canonical source counters. Event owners must record accepted effects exactly once.
@@ -480,7 +481,33 @@ pub struct Match {
     pub rules: Rules,
 }
 
+/// Shared cancellation for transactions holding disjoint wallet/story guards.
+pub(crate) fn cancel_field_work_state(
+    runtime: &mut crate::field_works::FieldWorksRuntime,
+    unit: &mut crate::game::Unit,
+) -> Result<(), String> {
+    if unit.dig != runtime.is_active(unit.id) {
+        return Err("unrepresented or inconsistent field-work activity".into());
+    }
+    runtime.cancel(unit.id);
+    unit.dig = false;
+    Ok(())
+}
+
 impl Match {
+    /// Cancel current paid work without a refund. The descriptor is removed before its activity flag.
+    pub fn cancel_field_work(&mut self, id: u32) -> Result<(), String> {
+        let unit = self
+            .world
+            .game
+            .units
+            .get_mut(&id)
+            .ok_or("missing field-work unit")?;
+        if unit.id != id {
+            return Err("inconsistent field-work identity".into());
+        }
+        cancel_field_work_state(&mut self.field_works, unit)
+    }
     pub fn new(map: &crate::map::AuthoritativeMap, options: MatchOptions) -> Result<Self, String> {
         let rules = Rules::compiled().map_err(|e| e.to_string())?;
         let start = StartPlan::prepare(map, &options, &rules)?;
@@ -515,13 +542,14 @@ impl Match {
         let player_count = start.players.len();
         let mut result = Self {
             support: crate::match_support::SupportState::default(),
+            field_works: crate::field_works::FieldWorksRuntime::default(),
             abilities: crate::match_abilities::AbilityState::default(),
             recovery: crate::match_recovery::RecoveryState::default(),
+            commands: crate::match_commands::MatchCommands::new(4096),
             combat: crate::match_combat::CombatState::default(),
             environment: crate::environment::EnvironmentRuntime::default(),
             companions: crate::companions::Companions::default(),
             world_runtime: None,
-            commands: crate::match_commands::MatchCommands::new(4096),
             grid: SpatialGrid::new(&world.game.units, 16.0),
             recipients: Vec::new(),
             routing_fog: crate::fog::Fog::default(),
@@ -535,8 +563,11 @@ impl Match {
             recruit_metadata: BTreeMap::new(),
             produced_placer: crate::produced_units::ProducedPlacer::new(),
             scenario,
-            firing: crate::match_firing::FiringState::default(),
             logistics: crate::logistics::LogisticsState::default(),
+            convoys: None,
+            supply_net: crate::supply_network::GroundSupplyNetwork::default(),
+            supply_routes: crate::supply_routes::SupplyRouting::default(),
+            firing: crate::match_firing::FiringState::default(),
             capture_ticks: vec![None; map.points().len()],
             tick_state: crate::match_tick::TickState::default(),
             story: vec![crate::match_story::PlayerStory::default(); player_count],
@@ -554,13 +585,12 @@ impl Match {
             result.recovery.initialize(unit.id);
             let control = crate::match_commands::UnitControl::new(unit, &result.rules)?;
             result.commands.insert(unit.id, control);
-        }
-        for &id in result.world.game.units.keys() {
-            result.firing.initialize(id);
-            result.combat.initialize(id);
+            result.firing.initialize(unit.id);
+            result.combat.initialize(unit.id);
         }
         result.grid.rebuild(&result.world.game.units);
         result.initialize_recipient_routing()?;
+        result.initialize_logistics()?;
         Ok(result)
     }
 
