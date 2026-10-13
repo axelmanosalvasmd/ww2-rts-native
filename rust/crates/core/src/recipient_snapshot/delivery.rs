@@ -56,7 +56,7 @@ impl DeliveryState {
             for slot in 0..count {
                 cache.recipient(slot)?;
                 state
-                    .recipient_routing(slot)
+                    .preflight_observed_terrain(slot)
                     .map_err(|_| SnapshotError::Rules)?;
             }
         }

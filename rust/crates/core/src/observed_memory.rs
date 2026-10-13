@@ -117,6 +117,7 @@ impl From<KnowledgeError> for ObservedError {
 
 /// Keep this producer with its player across snapshots and reconnects. Recreate
 /// it and the corresponding RouteKnowledge when a new initial map is installed.
+#[cfg_attr(test, derive(Debug))]
 pub struct ObservedMemory {
     slot: usize,
     identity: u64,
@@ -128,6 +129,13 @@ pub struct ObservedMemory {
     outbox: Vec<ObservedRow>,
     key: Option<(u32, i64)>,
     revision: u64,
+}
+// Transient admission result. Only refresh publishes its accepted rows.
+struct PreparedRefresh {
+    key: Option<(u32, i64)>,
+    register: bool,
+    ack: Vec<usize>,
+    accepted: Vec<(CellRow, Option<bool>)>,
 }
 impl ObservedMemory {
     pub fn new(world: &World, slot: usize, identity: u64) -> Result<Self, ObservedError> {
@@ -199,6 +207,57 @@ impl ObservedMemory {
         frame: ObservationFrame,
         facts: &mut F,
     ) -> Result<usize, ObservedError> {
+        let PreparedRefresh {
+            key,
+            register,
+            ack,
+            accepted,
+        } = self.prepare_refresh(world, frame, facts)?;
+        let increment = accepted.len();
+        for (row, mine_owned) in accepted {
+            self.revision += 1;
+            let c = row.cell;
+            let entry = ObservedRow {
+                row,
+                mine_owned,
+                revision: self.revision,
+            };
+            if let Some(&at) = self.positions.get(&c) {
+                self.rows[at] = entry.clone();
+            } else {
+                self.positions.insert(c, self.rows.len());
+                self.rows.push(entry.clone());
+            }
+            self.outbox.retain(|old| old.row.cell != c);
+            self.outbox.push(entry);
+        }
+        let recipient = Recipient::Player(self.slot);
+        if register {
+            world.register_recipient(recipient);
+        }
+        if let Some(key) = key {
+            world.acknowledge(recipient, &ack);
+            self.key = Some(key);
+        }
+        Ok(increment)
+    }
+
+    /// Validate the exact next collector read without memory or pending writes.
+    pub(crate) fn preflight_refresh<F: ObservationFacts>(
+        &self,
+        world: &World,
+        frame: ObservationFrame,
+        facts: &mut F,
+    ) -> Result<(), ObservedError> {
+        self.prepare_refresh(world, frame, facts).map(|_| ())
+    }
+
+    fn prepare_refresh<F: ObservationFacts>(
+        &self,
+        world: &World,
+        frame: ObservationFrame,
+        facts: &mut F,
+    ) -> Result<PreparedRefresh, ObservedError> {
         self.validate_binding(world)?;
         let key = (
             world.game.terrain_version,
@@ -210,11 +269,20 @@ impl ObservedMemory {
             |p| p.iter().copied().collect(),
         );
         if pending.is_empty() {
-            world.register_recipient(recipient);
-            return Ok(0);
+            return Ok(PreparedRefresh {
+                key: None,
+                register: true,
+                ack: Vec::new(),
+                accepted: Vec::new(),
+            });
         }
         if self.key == Some(key) {
-            return Ok(0);
+            return Ok(PreparedRefresh {
+                key: None,
+                register: false,
+                ack: Vec::new(),
+                accepted: Vec::new(),
+            });
         }
         let mut ack = Vec::new();
         let mut accepted = Vec::new();
@@ -286,27 +354,12 @@ impl ObservedMemory {
         self.revision
             .checked_add(increment)
             .ok_or(ObservedError::RevisionExhausted)?;
-        for (row, mine_owned) in accepted {
-            self.revision += 1;
-            let c = row.cell;
-            let entry = ObservedRow {
-                row,
-                mine_owned,
-                revision: self.revision,
-            };
-            if let Some(&at) = self.positions.get(&c) {
-                self.rows[at] = entry.clone();
-            } else {
-                self.positions.insert(c, self.rows.len());
-                self.rows.push(entry.clone());
-            }
-            self.outbox.retain(|old| old.row.cell != c);
-            self.outbox.push(entry);
-        }
-        world.register_recipient(recipient);
-        world.acknowledge(recipient, &ack);
-        self.key = Some(key);
-        Ok(increment as usize)
+        Ok(PreparedRefresh {
+            key: Some(key),
+            register: true,
+            ack,
+            accepted,
+        })
     }
 
     /// Forward full remembered rows in canonical order. Snapshot drain order

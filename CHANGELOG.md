@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed quiet snapshot admission so malformed lazy terrain in a later seat cannot publish an earlier seat's memory or pending acknowledgment. Actual refresh and read-only preflight share one preparation function; no Match, World or memory component is cloned. Added a whole-admission regression covering remembered rows, outboxes, routes, World pending state, fog and delivery flags. Existing wire fields and unsupported-state limits are unchanged. Native verification is pending for this descendant.
+
 - Normally merged the frozen quiet snapshot feature into the reviewed canonical prerequisite union. Kept current World memory and startup metadata while preserving the quiet admission and its original fixtures. Source checks pass for 73 states, 219 partial and 219 full snapshots, 13 delivery steps with 39 recipient reads, and four World memory traces with 120 actions. This new combined head needs independent source review and native checks; the earlier Vostro results remain tied to `5efaf17`.
 
 - Joined the actual pre-quiet snapshot prerequisites with the current ability and recovery provider through a normal merge. Kept shared Assault startup, ground support and recipient projections, and canonical World metadata. Added only the required World support default, ordinary post-routing logistics initialization and full-current recovery fixture context. Original-source checks match 72 cached states, 216 recipient projections, 13 delivery steps, 39 recipients, four World traces with 120 actions, and 60 ground support traces with 1,400 checkpoints. Independent source review passes; combined native checks remain pending. The quiet snapshot composition is not included.

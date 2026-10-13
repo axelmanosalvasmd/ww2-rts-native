@@ -17,6 +17,7 @@ use std::collections::BTreeMap;
 
 /// One owner's remembered rows and routing projection. Refresh through Match;
 /// consumers borrow this state separately from mutable units or path scratch.
+#[cfg_attr(test, derive(Debug))]
 pub struct RecipientRouting {
     memory: ObservedMemory,
     routes: RouteKnowledge,
@@ -55,6 +56,7 @@ impl RecipientRouting {
     }
 }
 #[derive(Clone, Copy)]
+#[cfg_attr(test, derive(Debug))]
 struct BoundUnit {
     id: u32,
     kind: usize,
@@ -477,6 +479,29 @@ impl Match {
             owner,
         );
         Ok(self.recipients[owner].wreck_memory.clone())
+    }
+
+    /// Admit the same lazy terrain read without publishing memory or pending state.
+    pub fn preflight_observed_terrain(&self, owner: usize) -> Result<(), String> {
+        self.validate_recipient(owner)?;
+        let state = &self.recipients[owner];
+        let mut observations = if state.memory.needs_replay(&self.world) {
+            let grid = SpatialGrid::new(&self.world.game.units, 16.0);
+            facts(&self.world, &self.rules, &grid, &self.building_cells, owner)?
+        } else {
+            Facts::default()
+        };
+        state
+            .memory
+            .preflight_refresh(
+                &self.world,
+                ObservationFrame {
+                    team: self.world.game.players[owner].team,
+                    skip_fog: false,
+                },
+                &mut observations,
+            )
+            .map_err(|e| format!("observed preflight: {e:?}"))
     }
 
     /// Full/reconnect reads preserve memory order; delta reads drain only its outbox.

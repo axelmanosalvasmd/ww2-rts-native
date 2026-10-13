@@ -88,6 +88,7 @@ struct Change {
     cells: Vec<usize>,
 }
 
+#[cfg_attr(test, derive(Debug))]
 pub struct RouteKnowledge {
     width: usize,
     height: usize,
