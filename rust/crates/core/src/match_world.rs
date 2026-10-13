@@ -106,6 +106,89 @@ impl Match {
             })
         }
     }
+    fn checked_world_regions(
+        &self,
+    ) -> Result<(&crate::world_map::WorldDefinition, &WorldRuntime), String> {
+        if self.world.game.mode != Some(ModeKind::World) {
+            return Err("World region lookup requires World mode".into());
+        }
+        let geography = self.world.geography().ok_or("missing World geography")?;
+        let runtime = self.world_runtime.as_ref().ok_or("missing World runtime")?;
+        let game = &self.world.game;
+        if game.w == 0
+            || game.h == 0
+            || game.w.checked_mul(game.h) != Some(game.chars.len())
+            || self.start.dimensions != (game.w, game.h)
+            || runtime.regions.len() != geography.regions.len()
+            || geography
+                .region_map
+                .as_ref()
+                .is_some_and(|m| m.len() != game.w * game.h)
+        {
+            return Err("mismatched World region shape".into());
+        }
+        Ok((geography, runtime))
+    }
+    /// Source membership values are ordered vector indices, distinct from region IDs.
+    pub fn world_region_index(&self, at: Point) -> Result<Option<usize>, String> {
+        if !at.x.is_finite() || !at.z.is_finite() {
+            return Err("nonfinite World region point".into());
+        }
+        let (geography, runtime) = self.checked_world_regions()?;
+        let game = &self.world.game;
+        if let Some(membership) = &geography.region_map {
+            let Some(cell) = game.cell_of(at.x, at.z) else {
+                return Ok(None);
+            };
+            let index = membership[cell];
+            return Ok((index >= 0)
+                .then_some(index as usize)
+                .filter(|&i| i < runtime.regions.len()));
+        }
+        let span = geography.region_cells as f64 * CELL;
+        let (x, y) = ((at.x / span).floor(), (at.z / span).floor());
+        let columns = game.w as f64 / geography.region_cells as f64;
+        if x < 0.0 || y < 0.0 || x >= columns || y >= game.h as f64 / geography.region_cells as f64
+        {
+            return Ok(None);
+        }
+        let index = y * columns + x;
+        // A fractional source array key has no region. Province bounds also retain
+        // the source's partial last-column behavior on nonmultiple dimensions.
+        Ok(
+            (index.fract() == 0.0 && index < runtime.regions.len() as f64)
+                .then_some(index as usize),
+        )
+    }
+    pub fn world_region_at(&self, at: Point) -> Result<Option<&RegionState>, String> {
+        let index = self.world_region_index(at)?;
+        Ok(index.map(|index| {
+            &self
+                .world_runtime
+                .as_ref()
+                .expect("checked World runtime")
+                .regions[index]
+        }))
+    }
+    /// Economy consumes actual runtime ownership and exact source kind labels.
+    pub fn world_economy_regions(&self) -> Result<Vec<crate::economy_state::Region>, String> {
+        use crate::economy_state::{Region, RegionKind};
+        let (geography, runtime) = self.checked_world_regions()?;
+        Ok(geography
+            .regions
+            .iter()
+            .zip(&runtime.regions)
+            .map(|(definition, state)| Region {
+                team: state.team,
+                kind: match definition.kind.as_deref() {
+                    Some("city") => RegionKind::City,
+                    Some("industrial") => RegionKind::Industrial,
+                    Some("resource") => RegionKind::Resource,
+                    _ => RegionKind::Other,
+                },
+            })
+            .collect())
+    }
     /// Construct the bounded native startup state. World tick phases, recipient
     /// terrain collection and logistics-enabled matches remain separate adapters.
     /// `random` retains the generator's used streams rather than restarting them.
@@ -215,7 +298,25 @@ impl Match {
             next_unit_id: 1,
             rules,
         };
+        let row_start = result.world.new_cells().len();
         result.initialize_world()?;
+        let rails = &result.world_runtime.as_ref().expect("World runtime").rails;
+        let rail_at: BTreeMap<_, _> = rails.rail_at.iter().copied().collect();
+        let station_at: BTreeMap<_, _> = rails.station_at.iter().copied().collect();
+        let fields: Vec<_> = result.world.new_cells()[row_start..]
+            .iter()
+            .map(|row| {
+                (
+                    row.cell,
+                    rail_at.get(&row.cell).copied(),
+                    station_at.get(&row.cell).copied(),
+                )
+            })
+            .collect();
+        result
+            .world
+            .annotate_recent_rows(row_start, &fields)
+            .map_err(|e| e.to_string())?;
         Ok(result)
     }
 
