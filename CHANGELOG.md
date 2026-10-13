@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Integrated the frozen field-work component as a source-only prerequisite for the approved canonical Match job owner. Its source recorder and review are recorded, while queued native proof remains pending.
+
 - Updated the provision prerequisite to its verified supply checkpoint (137 release workspace tests, 14 affected debug checks and strict Clippy/formatting). Its runtime source is unchanged; the combined ability/recovery proof remains pending.
 
 - Bound component replay recipients to their actual replacement World snapshot instead of stale startup memory. Kept fixture setup inside test-only core modules so resetting observation state adds no public restore API. Native checks remain pending.
@@ -125,6 +127,7 @@
 - Added generated World map validation and loading through the authoritative map path and typed generator handoff, with immutable ordered geography beside canonical mutable terrain. The existing oracle now has 138 cases and 58 static states, preserves 105 earlier records, and adds bare/dressed Huge/Massive worlds plus malformed region/home/layer/connectivity cases. Empty World metadata now returns Invalid, and defensive numeric/text/bounds/biome checks reject malformed source values. Ordinary Match startup refuses World maps; bounded external file loading stays in simtest. World mode startup, rail algorithms, scenarios, wire and ABI changes remain separate.
 
 - Added typed World size, region, immutable geography and terrain inputs for the native generator-to-loader handoff. Validation and mutable World initialization follow separately; no wire or ABI interface changes. Region biome labels and explicit landmark building tags now accompany the typed handoff.
+- Added ordinary paid field-work placement and timed terrain execution for trenches, sandbags, wire, traps, Gun Pits, mines, known-mine clearing and Field Hospitals. Canonical dig records retain source cell order, visibility masking, engineer pace, per-cell ground checks and float32 trench fronts; prepared admission spends once and refused replacements preserve paid work. The original JavaScript recorder covers 22 traces and 367 actions. Dispatcher, routing and story integration, queues/shared projects, bridges, concrete buildings and fill work remain pending.
 
 - Added the native Match Conquest victory phase and finish bookkeeping: team VP in slot order, latest still-held capture location, 0.1 m end rounding, first-winner preservation, reveal and exact Conquest timeline fields. Canonical point accounting now freezes VP and capture story counts after the winner while ownership and manpower can continue. Three focused tests compare 12 original-JavaScript traces (24 assembled-match checkpoints) and invalid-state atomicity; existing startup and point-income tests pass. Other modes, command refusal, remaining story counters, result transport and the full battle loop remain unfinished.
 
