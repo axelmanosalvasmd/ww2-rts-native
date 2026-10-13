@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added internal first-person companion entry, validated input and press counters, deterministic movement/collision, loadout timers, ordinary-command squad following, death hooks and atomic source-ordered respawn batches. Seventeen original JavaScript traces provide 536 operations with exact float and maintained-grid evidence, plus eight admission and eleven role cases. Native tests are written and awaiting the shared Cargo slot. Fire rays, damage, grenade effects, full match scheduling, server/client integration and the pending hit-direction privacy proposal remain separate; no C or network interface changed.
+
 - Fixed publication validation rejecting unrelated casualties with negative HP before source death removal. Existing units accept finite negative health, while new drafts and staged squad HP stay nonnegative. An added original-source buy trace protects the admission behavior.
 
 - Added explicit World actor staging and publication policy to the shared unit guard while keeping ordinary commander checks strict. Three focused regressions now cover refused/aborted batches, ordered HP/payment publication and the World-only neutral identity; native verification is pending.

@@ -5,6 +5,8 @@ pub mod catalog;
 pub mod client_view;
 pub mod combat;
 pub mod conquest_end;
+pub mod companions;
+pub mod match_companions;
 pub mod deployment;
 pub mod economy;
 pub mod economy_state;
