@@ -9,7 +9,11 @@ use crate::{
     game::{CELL, LOCAL_DEFENDER_OWNER, ModeKind, Point},
     match_runtime::Match,
     match_story::{StoryChange, StoryKey, prepare_story_updates},
+    match_world_elimination::WorldRegionEffects,
+    match_world_end::WorldFinishUnitFacts,
+    match_world_memory::WorldRoutingContext,
     math,
+    world_route_retention::prepare_world_route_retention,
 };
 use std::collections::BTreeSet;
 
@@ -51,6 +55,28 @@ impl Match {
         unit_order: &[u32],
         dt: f64,
     ) -> Result<Vec<WorldCapture>, String> {
+        Ok(self.world_region_phase(unit_order, None, dt)?.captures)
+    }
+    /// Run the bounded phase with actual administrative removals and building wrecks.
+    /// The complete current order is distinct from the captured tick upkeep list.
+    /// Unsupported fort, logistics and rider consequences leave every owner unchanged.
+    pub fn apply_world_capture_income_and_elimination(
+        &mut self,
+        tick_order: &[u32],
+        live_order: &[u32],
+        dt: f64,
+    ) -> Result<WorldRegionEffects, String> {
+        self.world_region_phase(tick_order, Some(live_order), dt)
+    }
+    fn world_region_phase(
+        &mut self,
+        unit_order: &[u32],
+        live_order: Option<&[u32]>,
+        dt: f64,
+    ) -> Result<WorldRegionEffects, String> {
+        if let Some(order) = live_order {
+            self.validate_world_live_order(order)?;
+        }
         if self.options.mode != Mode::World
             || self.world.game.mode != Some(ModeKind::World)
             || self.options.logistics
@@ -296,7 +322,7 @@ impl Match {
                 .filter(|(_, r)| r.team == wallet.team)
                 .collect();
             if own.is_empty() {
-                if game.units.values().any(|u| u.owner == slot) {
+                if live_order.is_none() && game.units.values().any(|u| u.owner == slot) {
                     return Err(
                         "unsupported World phase: army elimination and terrain wrecking".into(),
                     );
@@ -321,7 +347,29 @@ impl Match {
                 spawns[slot] = best.expect("owned region").0;
             }
         }
-        let finish = self.prepare_world_finish(&wallets, &regions)?;
+        let draft = live_order
+            .map(|order| self.prepare_world_elimination(order, &regions))
+            .transpose()?
+            .flatten();
+        let finish = if let Some(draft) = &draft {
+            let facts = draft
+                .survivors
+                .iter()
+                .map(|id| {
+                    let unit = &draft.transaction.world.game.units[id];
+                    WorldFinishUnitFacts {
+                        id: *id,
+                        owner: unit.owner,
+                        kind: unit.kind,
+                        hp: unit.hp,
+                    }
+                })
+                .collect::<Vec<_>>();
+            let removed = draft.removed.iter().map(|u| u.id).collect::<Vec<_>>();
+            self.prepare_world_finish_after_removal(&wallets, &regions, &facts, &removed)?
+        } else {
+            self.prepare_world_finish(&wallets, &regions)?
+        };
         let changes: Vec<_> = captured
             .iter()
             .map(|event| StoryChange {
@@ -330,17 +378,64 @@ impl Match {
                 amount: 1.0,
             })
             .collect();
-        let story = prepare_story_updates(&mut self.story, false, &changes)?;
-        self.world_runtime
-            .as_mut()
-            .expect("checked World runtime")
-            .regions = regions;
-        self.start.economy = wallets;
-        for (player, at) in self.start.players.iter_mut().zip(spawns) {
-            player.spawn = at;
+        let mut report = WorldRegionEffects {
+            captures: captured,
+            ..Default::default()
+        };
+        if let Some(draft) = draft {
+            let runtime = self.world_runtime.as_mut().expect("checked World runtime");
+            let final_units = draft.removed.iter().collect::<Vec<_>>();
+            let retention = prepare_world_route_retention(
+                WorldRoutingContext {
+                    world: &self.world,
+                    rules: &self.rules,
+                    start: &self.start,
+                    rails: &runtime.rails,
+                    regions: &runtime.regions,
+                    known_buildings: &runtime.known_buildings,
+                    local_defender: &runtime.local_defender,
+                },
+                &mut runtime.memory,
+                &final_units,
+            )?;
+            let publication = draft
+                .transaction
+                .prepare_publication(&mut self.world)
+                .map_err(|e| e.to_string())?;
+            let story = prepare_story_updates(&mut self.story, false, &changes)?;
+            // Every fallible guard has succeeded. Publish the single canonical owners in place.
+            publication.commit();
+            self.environment = draft.environment;
+            self.grid = draft.grid;
+            self.combat = draft.combat;
+            self.start.environment_seed = draft.seed;
+            self.next_unit_id = draft.next_id;
+            runtime.nodes = draft.nodes;
+            runtime.regions = regions;
+            retention.commit();
+            self.start.economy = wallets;
+            for (player, at) in self.start.players.iter_mut().zip(spawns) {
+                player.spawn = at;
+            }
+            story.commit();
+            self.retire_world_metadata(&draft.removed);
+            report.removed = draft.removed;
+            report.effects = draft.effects;
+        } else {
+            let story = prepare_story_updates(&mut self.story, false, &changes)?;
+            self.world_runtime
+                .as_mut()
+                .expect("checked World runtime")
+                .regions = regions;
+            self.start.economy = wallets;
+            for (player, at) in self.start.players.iter_mut().zip(spawns) {
+                player.spawn = at;
+            }
+            story.commit();
         }
-        story.commit();
-        if let Some(finish) = finish { self.publish_match_finish(finish); }
-        Ok(captured)
+        if let Some(finish) = finish {
+            self.publish_match_finish(finish);
+        }
+        Ok(report)
     }
 }
