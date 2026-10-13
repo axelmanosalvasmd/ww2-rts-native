@@ -118,6 +118,7 @@ impl From<KnowledgeError> for ObservedError {
 /// Keep this producer with its player across snapshots and reconnects. Recreate
 /// it and the corresponding RouteKnowledge when a new initial map is installed.
 #[derive(Clone)]
+#[cfg_attr(test, derive(Debug))]
 pub struct ObservedMemory {
     slot: usize,
     identity: u64,
@@ -129,6 +130,12 @@ pub struct ObservedMemory {
     outbox: Vec<ObservedRow>,
     key: Option<(u32, i64)>,
     revision: u64,
+}
+// Transient admission, not a second recipient memory or delivery ledger.
+struct PreparedRefresh {
+    key: Option<(u32, i64)>,
+    ack: Option<Vec<usize>>,
+    accepted: Vec<(CellRow, Option<bool>)>,
 }
 impl ObservedMemory {
     pub fn new(world: &World, slot: usize, identity: u64) -> Result<Self, ObservedError> {
@@ -213,6 +220,51 @@ impl ObservedMemory {
         facts: &mut F,
         capture_frame: bool,
     ) -> Result<(usize, crate::world::ObservationReceipt), ObservedError> {
+        let PreparedRefresh { key, ack, accepted } = self.prepare_refresh(world, frame, facts)?;
+        let count = accepted.len();
+        for (row, mine_owned) in accepted {
+            self.revision += 1;
+            let c = row.cell;
+            let entry = ObservedRow {
+                row,
+                mine_owned,
+                revision: self.revision,
+            };
+            if let Some(&at) = self.positions.get(&c) {
+                self.rows[at] = entry.clone();
+            } else {
+                self.positions.insert(c, self.rows.len());
+                self.rows.push(entry.clone());
+            }
+            self.outbox.retain(|old| old.row.cell != c);
+            self.outbox.push(entry);
+        }
+        if let Some(key) = key {
+            self.key = Some(key);
+        }
+        let recipient = Recipient::Player(self.slot);
+        Ok((
+            count,
+            world.defer_observation(ack.map(|indices| (recipient, indices)), capture_frame),
+        ))
+    }
+
+    /// Admit the same collector read without publishing rows or creating a receipt.
+    pub(crate) fn preflight_refresh<F: ObservationFacts>(
+        &self,
+        world: &World,
+        frame: ObservationFrame,
+        facts: &mut F,
+    ) -> Result<(), ObservedError> {
+        self.prepare_refresh(world, frame, facts).map(|_| ())
+    }
+
+    fn prepare_refresh<F: ObservationFacts>(
+        &self,
+        world: &World,
+        frame: ObservationFrame,
+        facts: &mut F,
+    ) -> Result<PreparedRefresh, ObservedError> {
         self.validate_binding(world)?;
         let key = (
             world.game.terrain_version,
@@ -224,13 +276,18 @@ impl ObservedMemory {
             |p| p.iter().copied().collect(),
         );
         if pending.is_empty() {
-            return Ok((
-                0,
-                world.defer_observation(Some((recipient, Vec::new())), capture_frame),
-            ));
+            return Ok(PreparedRefresh {
+                key: None,
+                ack: Some(Vec::new()),
+                accepted: Vec::new(),
+            });
         }
         if self.key == Some(key) {
-            return Ok((0, world.defer_observation(None, capture_frame)));
+            return Ok(PreparedRefresh {
+                key: None,
+                ack: None,
+                accepted: Vec::new(),
+            });
         }
         let mut ack = Vec::new();
         let mut accepted = Vec::new();
@@ -302,28 +359,11 @@ impl ObservedMemory {
         self.revision
             .checked_add(increment)
             .ok_or(ObservedError::RevisionExhausted)?;
-        for (row, mine_owned) in accepted {
-            self.revision += 1;
-            let c = row.cell;
-            let entry = ObservedRow {
-                row,
-                mine_owned,
-                revision: self.revision,
-            };
-            if let Some(&at) = self.positions.get(&c) {
-                self.rows[at] = entry.clone();
-            } else {
-                self.positions.insert(c, self.rows.len());
-                self.rows.push(entry.clone());
-            }
-            self.outbox.retain(|old| old.row.cell != c);
-            self.outbox.push(entry);
-        }
-        self.key = Some(key);
-        Ok((
-            increment as usize,
-            world.defer_observation(Some((recipient, ack)), capture_frame),
-        ))
+        Ok(PreparedRefresh {
+            key: Some(key),
+            ack: Some(ack),
+            accepted,
+        })
     }
 
     /// Forward full remembered rows in canonical order. Snapshot drain order
@@ -454,6 +494,42 @@ mod tests {
         let input = serde_json::json!({"name":"Guard","w":20,"h":20,"rows":vec![".".repeat(20);20],"spawns":[{"x":0,"y":0},{"x":19,"y":19}],"points":[{"x":10,"y":10}]});
         World::from_map(&AuthoritativeMap::from_json(&serde_json::to_vec(&input).unwrap()).unwrap())
             .unwrap()
+    }
+    #[test]
+    fn preparation_preserves_deferred_registration_and_unchanged_key_actions() {
+        let mut w = world();
+        let mut memory = ObservedMemory::new(&w, 0, 7).unwrap();
+        let frame = ObservationFrame {
+            team: 0,
+            skip_fog: false,
+        };
+        memory.preflight_refresh(&w, frame, &mut Seen).unwrap();
+        assert!(w.pending(Recipient::Player(0)).is_none());
+        assert_eq!(memory.key, None);
+        let (count, receipt) = memory.refresh_impl(&w, frame, &mut Seen, true).unwrap();
+        assert_eq!(count, 0);
+        assert_eq!(memory.key, None);
+        assert!(w.pending(Recipient::Player(0)).is_none());
+        receipt.commit(&mut w).unwrap();
+        assert!(w.pending(Recipient::Player(0)).unwrap().is_empty());
+
+        w.set_cell(30, b'T').unwrap();
+        let pending = w.pending(Recipient::Player(0)).unwrap().clone();
+        let before = format!("{memory:?}");
+        memory.preflight_refresh(&w, frame, &mut Seen).unwrap();
+        assert_eq!(format!("{memory:?}"), before);
+        assert_eq!(w.pending(Recipient::Player(0)), Some(&pending));
+        // Drop a deferred acknowledgment to leave a nonempty pending set at
+        // an unchanged collector key. Its next receipt must remain a no-op.
+        let (count, receipt) = memory.refresh_impl(&w, frame, &mut Seen, false).unwrap();
+        assert_eq!(count, 1);
+        drop(receipt);
+        let before = format!("{memory:?}");
+        let (count, receipt) = memory.refresh_impl(&w, frame, &mut Seen, true).unwrap();
+        assert_eq!(count, 0);
+        assert_eq!(format!("{memory:?}"), before);
+        receipt.commit(&mut w).unwrap();
+        assert_eq!(w.pending(Recipient::Player(0)), Some(&pending));
     }
     #[test]
     fn exhaustion_and_invalid_input_leave_memory_and_pending_unchanged() {

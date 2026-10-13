@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Normally converged the verified quiet snapshot and active-list providers, retaining their original fixtures, rollback tests, staged observation and canonical list guards. Both now use one immutable terrain preparation without a component preview copy. Actual collection preserves deferred registration, acknowledgment and source-frame capture; a focused regression distinguishes empty registration from an unchanged-key no-op. World birth metadata identity checks remain intact. This combined source needs its own review and native proof.
+
 - Merged the published quiet-snapshot evidence into the verified active-list delivery, preserving every tested Rust and harness file. The draft now has a real quiet-provider ancestor; broader staged-observation and World-memory prerequisites remain explicit, and convergence with the newer root stack is separate.
 
 - Verified canonical recipient lists and bounded ordinary active-list snapshots on the Mac at compiled 48c7e15: 12 affected snapshot debug tests, all 213 release workspace tests, strict Clippy, formatting and release FFI pass. Runtime-identical 4140ae0 also passed 25 focused debug tests. Source evidence covers five list traces and 92 actions, 11 active frames and 33 full recipient results, alongside the existing quiet and delivery fixtures. World full envelopes, active actors and transport remain separate.
@@ -17,6 +19,16 @@
 - Preserved the independently reviewed, Vostro-verified quiet snapshot constructor, actor-order and ordinary logistics startup repairs in the separate active-list extension. The active-list dependency union still needs its own native proof.
 
 - Integrated the source-cleared canonical recipient list and staged observation prerequisites into a separate active-list snapshot extension. Preserved the ordinary snapshot guard and existing actor exclusions. Native verification and all-seat list preparation remain pending.
+- Verified the quiet snapshot admission repair at `01779f6` on Vostro Linux x86_64: 16 focused debug tests, all 206 locked release workspace tests, strict Clippy, formatting and release FFI pass. Normally merged the published prerequisite evidence from PR #159; this delivery changes documentation only over the tested repair.
+
+- Fixed quiet snapshot admission so malformed lazy terrain in a later seat cannot publish an earlier seat's memory or pending acknowledgment. Actual refresh and read-only preflight share one preparation function; no Match, World or memory component is cloned. The whole-admission regression covers remembered rows, outboxes, routes, World pending state, fog and delivery flags. Independent source review and native checks pass at `01779f6`.
+
+- Normally merged the frozen quiet snapshot feature into the reviewed canonical prerequisite union. Kept current World memory and startup metadata while preserving the quiet admission and its original fixtures. Source checks pass for 73 states, 219 partial and 219 full snapshots, 13 delivery steps with 39 recipient reads, and four World memory traces with 120 actions. This merge passes 23 focused debug tests, all 205 release workspace tests and strict gates at `28712a2`; the later admission repair has its own proof.
+
+- Verified the actual snapshot prerequisite merge at runtime/test head `26113c5` on Vostro Linux x86_64: 28 affected debug checks, all 203 locked release workspace tests, strict all-target workspace Clippy, formatting and release FFI pass. The final evidence update changes documentation only. Quiet composition has separate verification.
+
+- Joined the actual pre-quiet snapshot prerequisites with the current ability and recovery provider through a normal merge. Kept shared Assault startup, ground support and recipient projections, and canonical World metadata. Added only the required World support default, ordinary post-routing logistics initialization and full-current recovery fixture context. Original-source checks match 72 cached states, 216 recipient projections, 13 delivery steps, 39 recipients, four World traces with 120 actions, and 60 ground support traces with 1,400 checkpoints. Independent source review and combined native checks pass at `26113c5`. The prerequisite itself excludes quiet composition.
+
 - Verified the repaired quiet Conquest snapshot assembly on Vostro Linux x86_64 at `5efaf17`: 21 focused debug tests, all 201 locked release workspace tests, strict Clippy, formatting and release FFI pass. Original-source checks cover 73 states, 219 partial and 219 full snapshots, plus 13 delivery steps and 39 recipient reads. Active actor/list integration and server transport remain separate.
 
 - Restored the ordinary Conquest logistics initialization call after the shared startup refactor. The native supply regressions exposed empty reserves and an absent convoy service. Initialization again runs after bases, metadata and recipient routing; disabled logistics and other modes keep their existing limits. Combined native verification is pending.
@@ -164,6 +176,21 @@
 - Added borrowed staged sight sources and a recipient component preview that defers terrain acknowledgements until infallible publication. Existing fog and routing keys stay lazy; the matching World preview defers journal trimming. Original-source and native observer verification remain pending. No authoritative unit is inserted during preparation.
 
 - Carried the reviewed local observation-index repairs into all ordinary recipient refresh, point visibility and wreck reads. These queries preserve maintained gameplay bucket order; staged-observer integration and its native regression checks follow separately.
+- Added four-owner birth metadata checks to the existing bounded World startup guard fixture, so focused debug protection covers the new publication callback while the complete release suite covers every original World case.
+
+- Extended the existing original World startup replay to require canonical ability and recovery birth defaults for every source unit, alongside combat and firing metadata.
+
+- Integrated canonical ability and recovery state with checked World startup, memory and ground supply. World publication now initializes all four combat, firing, ability and recovery metadata owners, with fresh-identity preflight before insertion. Final combined checks pass: 17 affected debug tests, all 187 locked release workspace tests, strict workspace Clippy, formatting and release FFI.
+
+- Integrated the typed ability-flight launcher with checked World startup, recipient memory and ground supply ancestry. Both source implementations and their publication guards are retained. Final combined checks pass: 13 focused debug tests, all 179 locked release workspace tests, strict Clippy, formatting and release FFI.
+
+- Restored the World-only logistics preflight lost while integrating the Conquest supply adapter. Ordinary Conquest still initializes logistics; World rejects it before creating state, as the existing startup regression requires.
+
+- Integrated the ground supply adapter with checked World startup and memory. World keeps empty convoy/network defaults and its explicit logistics refusal. Final combined checks pass: six affected debug tests, all 177 locked release workspace tests, strict workspace Clippy, formatting and release FFI.
+
+- Added canonical ordinary-Conquest ground supply, real safe convoy routes and physical handoff. Native comparisons pass for 233 networks, 39,839 refill rates, 468 routes, 324 handoffs, 63 logistics constructors with 663 reserve records, and three original-hook runtime traces (873 phases, 72 checkpoints). Fourteen affected debug tests and all 137 release workspace tests pass. Independent review fixed route-clear identity changes, invalid initialization publication, lazy recipient reads and ordered danger-view updates. The 468-route source fixture alternates ordinary and danger searches; those searches now retain separate graph caches. Immediate route searches publish endpoint and failure-reset effects, while queued projected searches leave live metadata intact. Timestamp and retry fixtures compare float bits. Fixed merged command/routing exports and fixture fields, and replaced test slice copies after strict Clippy feedback. Actual runtime traces include Move, two waiting destinations, Stop, Resume, support spending and three convoy deaths. Forced withdrawal, World supply and the complete tick remain separate. Stack convergence removes only duplicate predecessor descriptions.
+
+- Integrated World memory with the canonical command, firing and reaction startup ancestry. Memory journal defaults and bounded World observation behavior are retained. Final local checks pass: 24 focused debug tests, 170 locked release workspace tests, strict Clippy, formatting and release FFI; hosted platform checks remain pending.
 
 - Kept the new validation note scoped to World recipient memory and its release FFI check; earlier generator evidence is unchanged.
 
@@ -200,6 +227,8 @@
 - Added checked absolute World journal cursors and prefix trimming, with an explicit zero-epoch startup reset that preserves ordinary journal drains. World runtime now owns lazy shared team terrain memory, stable accepted-row revisions, separate commander delivery and route cursors, and canonical region contested state. Native integration and original-source verification are pending.
 
 - Fixed the missing rail track-position type annotation found by the first World native compile. Added checked World region/economy projections and optional rail/station snapshot fields with atomic post-rails row annotation after the original startup oracle found missing metadata. Mutable-terrain callers still need to invoke the explicit projection hook. Updated the crafted source case to test floating-column lookup on nonmultiple dimensions; full native acceptance remains pending.
+- Integrated World startup with the reviewed command, firing and reaction ancestry, preserving canonical publication defaults and both sets of evidence. The merged local checks pass: 20 focused debug tests, 166 locked release workspace tests, strict Clippy, formatting and release FFI. Hosted platform checks remain pending.
+
 - Verified the merged bounded World constructor with 160 locked release workspace tests, strict Clippy, formatting and release FFI. Five original startups cover 2,761 units, canonical combat/firing metadata, home ownership, visibility, terrain log order and rails; all 63 ordinary startup records remain unchanged. Parity rows stay in progress for live World and server integration.
 
 - Formatted the new World firing metadata assertions with the pinned Rust formatter.
@@ -241,6 +270,7 @@
 
 - Preserved canonical recruited combat defaults through the shared publication callback when integrating the reviewed combat ancestry. Fresh combat identities reject before payment; production stepping remains under implementation.
 - Preserved recruited combat metadata in the shared publication callback and rejected occupied combat IDs before charging during integration.
+- Added canonical Match ground reactions, automatic retreat and idle spacing using shared command destinations, owner-known routes, firing targets and combat hit history. Three focused tests pass in debug and release, comparing 51 unchanged-source reaction/retreat cases and checking atomic rejection. Only the missing reaction timer is added to UnitControl. Air, carrier and garrison retreat exits remain explicit unsupported paths. Complete tick hookup remains separate. Adapted routing to canonical ordered-fire iteration and filled absent reserve defaults in the merged command fixture. At checkpoint ab0394d, strict Clippy stopped on two unused helpers in its inherited firing milestone. Final merged checks are pending.
 - Verified the bounded Conquest ability/recovery provider at exact runtime/test head `1f9a16b`: 13 core debug checks (four ability, two recovery), three firing and two recruitment debug checks, all 177 locked release workspace tests, strict Clippy, formatting and release FFI. Independent source and debug/release replay checks pass. Added phase API documentation and kept full tick/engineering/other-mode/ABI/transport parity in progress; final evidence commits preserve Rust/harness trees.
 
 - Resolved strict Clippy findings in the native recovery validation and replay helpers without changing their behavior. The release workspace suite passed 177 tests before this cleanup; exact final checks are rerunning.
@@ -375,8 +405,6 @@
 - Added the Match-owned recipient routing API, current-position Conquest discovery facts, source-key caching and separate fog-filtered fire hazards. The source recorder covers 123 actions, including same-key bunker membership and removal retention. This prerequisite is awaiting serialized native tests; remembered wreck projection and integrated command/tick consumers follow in this branch.
 - Added Match-owned observed terrain and remembered wreck routing for ordinary Conquest. Current-position discovery, cached fire fog, row revisions, outbox order, same-key bunker fields and live wetness match 162 original-source actions, 44 route views, eight searches and four wreck cover queries. Fixed same-key wetness staleness found in independent review. Debug/release tests, startup regressions, strict Clippy and formatting pass. Lifecycle callers retain a removed unit before another route read; wrecks require canonical IDs. Command/tick/convoy integration, World memory and wire/ABI changes remain separate; MOV-29 and MAP-100 stay in progress.
 
-- Added optional durable wreck IDs to query state, preserving absent identity in older query fixtures. The authoritative wreck producer uses the dead unit ID; remembered-routing consumers can reject missing identity explicitly. No wire or C layout changed.
-
 - Reserved two path-identity increments before a movement block, covering a replacement route followed by a physical obstruction. Exhaustion rejects before unit mutation instead of risking a debug overflow or release wrap.
 
 
@@ -435,6 +463,8 @@
 - Added one canonical Match control row for aim, ability and retreat switches, attack intent, facing and waiting orders. Startup prepares the rows from unit definitions; recruitment can stage them before charging. Command execution is the next part of this lane, and no wire or C interface changed.
 - Added canonical chosen-target and weapon-timer state to Match for the firing integration. Unit health and position, command aim and combat hit history retain their existing owners; the firing phase is still in progress.
 - Added the Match-owned recipient routing API, current-position Conquest discovery facts, source-key caching and separate fog-filtered fire hazards. The source recorder covers 123 actions, including same-key bunker membership and removal retention. This prerequisite is awaiting serialized native tests; remembered wreck projection and integrated command/tick consumers follow in this branch.
+
+- Added complete event-adapter preflight for canonical retreat velocities, pose, suppression and sprint values so malformed later blast targets fail before earlier unit damage. Focused native checks pass.
 - Connected Conquest point supply, capture and income to the assembled Match, using the tick's ordered unit list and one canonical objective/reserve state. Eight original-source traces compare 72 phases across all armies, allied and enemy teams, disconnection, supply obstruction, post-decision VP freezing and units spawned during a tick. Capture timestamps follow source winner gating; malformed input leaves objectives and wallets unchanged. This phase does not advance the clock or implement the remaining match systems.
 
 

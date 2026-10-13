@@ -220,6 +220,74 @@ mod tests {
         }
     }
     #[test]
+    fn later_lazy_terrain_failure_preserves_all_quiet_admission_state() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/recipient-delivery.json"))
+                .unwrap();
+        let mut state = super::super::tests::initialize(&fixture["initial"]);
+        let bad = 5 * state.world.game.w + 5;
+        let good = bad + 1;
+        state.world.set_cell(bad, b'T').unwrap();
+        // The first two seats have actually consumed this valid row. Only the
+        // last seat will revisit it after its material becomes malformed.
+        for slot in 0..2 {
+            state.observed_terrain(slot, true).unwrap();
+        }
+        let index = state
+            .world
+            .cell_log()
+            .iter()
+            .position(|row| row.cell == bad)
+            .unwrap();
+        for slot in 0..2 {
+            assert!(
+                !state
+                    .world
+                    .pending(crate::world::Recipient::Player(slot))
+                    .unwrap()
+                    .contains(&index)
+            );
+        }
+        assert!(
+            state
+                .world
+                .pending(crate::world::Recipient::Player(2))
+                .unwrap()
+                .contains(&index)
+        );
+        state.world.set_cell(good, b'T').unwrap();
+        state.world.materials.insert(bad, "invalid".into());
+        let mut delivery = DeliveryState::new(&state).unwrap();
+        // Debug derives exist only for tests and cover every canonical memory,
+        // outbox, route array/key/history and World pending field, not a subset.
+        let memories = format!("{:?}", state.recipients);
+        let world = format!("{:?}", state.world);
+        let fog = format!("{:?}", state.routing_fog);
+        let flags = format!("{delivery:?}");
+        state.preflight_observed_terrain(0).unwrap();
+        assert!(state.preflight_observed_terrain(2).is_err());
+        assert!(matches!(
+            delivery.capture_quiescent(&mut state, &[false; 3], &[false; 3], &[]),
+            Err(SnapshotError::Rules)
+        ));
+        assert_eq!(format!("{:?}", state.recipients), memories);
+        assert_eq!(format!("{:?}", state.world), world);
+        assert_eq!(format!("{:?}", state.routing_fog), fog);
+        assert_eq!(format!("{delivery:?}"), flags);
+        state.world.materials.remove(&bad);
+        let frame = delivery
+            .capture_quiescent(&mut state, &[false; 3], &[false; 3], &[])
+            .unwrap();
+        assert!(
+            frame.recipient(0).unwrap().into_json()["cells"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|row| row[0] == good)
+        );
+    }
+
+    #[test]
     fn unrepresented_event_or_persisted_lists_preserve_delivery_acknowledgments() {
         let fixture: Value =
             serde_json::from_str(include_str!("../../tests/fixtures/recipient-delivery.json"))

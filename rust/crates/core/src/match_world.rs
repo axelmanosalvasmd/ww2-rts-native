@@ -366,6 +366,13 @@ impl Match {
     }
     fn publish_world_unit(&mut self, draft: StagedUnit) -> Result<u32, String> {
         let id = draft.unit.id;
+        if self.combat.get(id).is_some()
+            || self.firing.get(id).is_some()
+            || self.abilities.get(id).is_some()
+            || self.recovery.get(id).is_some()
+        {
+            return Err("World publication metadata identity already exists".into());
+        }
         let mode = self.world.game.mode;
         prepare_world_publication(
             PublicationParts {
