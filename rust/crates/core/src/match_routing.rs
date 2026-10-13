@@ -629,12 +629,16 @@ fn refresh_parts(
     let grid = SpatialGrid::new(&g.units, 16.0);
     refresh_wrecks(state, g, rules, &grid, owner, observer);
     state.wrecks = state.wreck_memory.clone();
-    let vis = &fog
-        .team_with_observer(g, rules, g.players[owner].team, observer)
-        .vis;
     state.fires.fill(false);
-    for (&c, _) in world.fires.iter() {
-        state.fires[c] = vis[c] != 0;
+    // Source teamFog is inside the fire filter callback. An empty fire map
+    // leaves a cold fog cache available for the later birth sight source.
+    if !world.fires.is_empty() {
+        let vis = &fog
+            .team_with_observer(g, rules, g.players[owner].team, observer)
+            .vis;
+        for (&c, _) in world.fires.iter() {
+            state.fires[c] = vis[c] != 0;
+        }
     }
     state.bound_units = g
         .units
