@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Recorded the actual World controller order in seven original-source traces: 114 ticks and 1,486 phase entries. The plan preserves retired tick facts, later convoy births, neutral actor membership, regional supply, capture and finish timing. Native World dispatch remains guarded; no scheduler or runtime interface changed.
+
 - Restore explicit flat source/native scene terrain before registering elimination fixtures. This prevents unrelated bootstrap geometry from contaminating debris comparisons when the transition harness does not claim matched startup random streams.
 
 - Warm real World route memory before rollback witnesses and preserve remembered rows, route buffers, versions, fire/bunker and wreck views on refusal. Assert the nonfinite story failure reaches its named post-wreck finish guard.

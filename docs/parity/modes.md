@@ -9,6 +9,8 @@ Conventions used below:
 - "Seeded parity run" means the JS `playMatch` harness (`shared/ai-schedule.js:47-72`), which replaces `Math.random` with a seeded generator for the whole match, creation included. The native run uses the same map, names, teams, factions, options and seed, and must give the same winner, `endReason`, `endTick` and `endAt`.
 - Economy, buildings and tiers are BASE rows; this section references them instead of repeating them.
 
+World controller source order is now recorded separately in seven actual-step traces (114 ticks, 1,486 phase entries). This evidence covers phase membership and timing only. Native World ticking remains unimplemented; the integration boundaries are documented in `docs/runtime/world-tick-integration.md`.
+
 ## Mode catalogue and lobby settings
 
 | ID | Behavior / content | Evidence | Rust (Julio) | Unreal (Axel) | Depends on | Acceptance check | Status |
