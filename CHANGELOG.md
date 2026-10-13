@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added genuine prepared garrison exits to ordinary ground Retreat. Existing actor sight replaces the original row once, group exits retain the first cached terrain/fog frame, and later routes see updated live actor poses. Publication keeps one validated source receipt and the existing retreat authority. A real warmed-cache group capture extends the unchanged earlier 26 cases to 27 cases, 47 commands, 29 full steps and 107 states; native verification and tick hookup remain pending.
+
 - Resumed the paused ground-order lane. Independent source readback found that its convoy refusal guard treated optional canonical convoy state as a direct value; the guard now reads the existing Option without changing uncapped owned selection or refusal order. Added a focused guard for an owned convoy row beyond the ordinary troop cap, protecting follow, route requests and fog on refusal. Native verification remains pending.
 
 - Paused ground-order implementation at the user's request and saved its native consumer draft. Source review repairs refuse missing selected control rows and active convoy Retreat before mutation, and stage direct Attack projection after target validation. The draft describes 23 command-prefix cases and 20 quiet full-step cases in both arrival orders; no Cargo or native execution ran. GroundAttack tick wiring, final repair review and the garrison Retreat observation overlay remain pending.

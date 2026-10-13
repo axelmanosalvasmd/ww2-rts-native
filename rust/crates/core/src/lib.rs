@@ -24,6 +24,7 @@ pub mod match_companion_effects;
 mod match_companion_tick;
 pub mod match_companions;
 
+pub(crate) mod existing_observers;
 pub mod logistics;
 pub mod map;
 pub mod match_abilities;

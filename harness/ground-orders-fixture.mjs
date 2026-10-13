@@ -30,7 +30,7 @@ const step=()=>({op:'step'}),prime=units=>({op:'prime',units});
 const command=(t,ids,extra={},sequence)=>({op:'command',cmd:{t,ids,...extra},...(sequence===undefined?{}:{sequence})});
 const oldRandom=Math.random,cases=[];let totalSteps=0,totalCommands=0;
 try {
- function record(name,spawns,actions,{terrain=map(),budget=4096,retryLimit=1,unitPrime={},boundaryOnly=false,allowEffects=false,check=()=>{}}={}){
+ function record(name,spawns,actions,{terrain=map(),budget=4096,retryLimit=1,unitPrime={},boundaryOnly=false,allowEffects=false,cacheKeyFacts=false,check=()=>{}}={}){
   let draws=0;Math.random=()=>{draws++;return .5;};
   const opts={weather:false,tech:false,supply:false,logistics:false},names=['Ground orders','Opposition'],teams=[0,1],factions=[0,1];
   assert.equal(sim.validateMap(terrain),null);
@@ -54,6 +54,7 @@ try {
    // Read the maintained index without rebuilding it or exposing private helpers.
    const candidates=new Map([...g.units.values()].map(u=>[u.id,gridFor(g).candidates(u,setup.gridRadius).map(v=>v.id)]));
    const s={tick:g.tick,actorOrder:[...g.units.keys()],units:[...g.units.values()].map(u=>({id:u.id,type:u.type,owner:u.owner,...point(u),groundFlags:sim.internals.flagsAt(g,u.x,u.z),rot:bits(u.rot),aim:bits(u.aim),hp:bits(u.hp),cargo:[...u.cargo],path:u.path.map(point),orders:encode(u.orders),dig:encode(u.dig?{...u.dig,project:u.dig.project?.id}:null),entrench:u.entrench?.id??null,logistics:encode(u.logistics),controls:encode(keys(controls.map(k=>[k,u[k]]))),timers:encode(keys(timers.map(k=>[k,u[k]]))),grid:candidates.get(u.id)})),players:g.players.map(p=>({slot:p.slot,team:p.team,visible:[...p.visible].sort((a,b)=>a-b),spawn:point(p.spawn),mp:bits(p.mp),inc:bits(p.inc),mun:p.mun===undefined?null:bits(p.mun),fuel:p.fuel===undefined?null:bits(p.fuel),vp:bits(p.vp),out:p.out??null,away:p.away??null,sup:encode(p.sup)})),projects:encode([...(g.projects??[])].map(([id,p])=>[id,p])),projectSeq:g.projectSeq??0,story:encode(g.story),timeline:encode(g.timeline),points:encode(g.points),seed:g.seed>>>0,nextId:g.nextId,winner:g.winner,pathStats:encode(g.pathStats),randomDraws:draws,shots:encode(g.shots),terrain:{journal:encode(g.cellJournal),newCells:encode(g.newCells),cellLog:encode(g.cellLog),versions:encode(keys(['terrainVersion','obstructionVersion','infantryRegionVersion','vehicleRegionVersion','navalRegionVersion'].map(k=>[k,g[k]])))}};
+   if(cacheKeyFacts)s.pathViewKey=`${g.tick}:${g.terrainVersion??0}:${g.visionTick??-1}`;
    states.push(s);return s;
   };
   observe();let sequence=0,commandsAtBoundary=false;
@@ -114,6 +115,36 @@ try {
 
  record('paid-job-unseen-refusal-retains-work',[U('attacker','engineer',30,33)],[command('dig',['attacker'],{kind:'trench',x:30,z:30,dir:0}),attack(['attacker'],999),step()],{check:({states,records,unit})=>{assert.equal(records[1].result,'unseen');assert.ok(unit(states[2],'attacker').dig);assert.equal(states[1].players[0].mp,states[2].players[0].mp);}});
  record('whole-malformed-order-rejection-before-follow',scene(),[command('attack',['attacker'],{target:'target',orders:[[1,'bad',20]]}),step()],{unitPrime:{attacker:{follow:'observer'}},check:({states,records,aliases})=>{assert.equal(records[0].result,'blocked');assert.equal(control(states[1],'attacker','follow',aliases).f64,bits(aliases.observer));}});
+
+ // Move performs real findPath and warms observedPathView. Stop and the following
+ // repeated group Retreat stay in that tick/terrain/vision epoch. Its cached unit
+ // rows reference the original actors, so physical exits remain live route facts.
+ record('warm-owner-cache-group-garrison-retreat',[
+  U('warm','rifle',11,21),U('first','rifle',31,31),U('second','rifle',29,31),
+ ],[
+  command('move',['warm'],{orders:[['warm',13,21]]}),stop(['warm']),
+  retreat(['first','second','first']),step(),
+ ],{terrain:house,cacheKeyFacts:true,unitPrime:{
+  first:{garrison:15*80+15,follow:'warm'},second:{garrison:15*80+14,follow:'warm'},
+ },check:({states,records,unit,aliases})=>{
+  assert.equal(records[0].result,null);assert.equal(records[1].result,null);assert.equal(records[2].result,null);
+  assert.equal(states[1].pathStats.calls.f64,bits(1),'real Move must warm the source route view');
+  for(const s of states.slice(1,4))assert.equal(s.pathViewKey,states[0].pathViewKey,'inputs must retain the warmed source epoch');
+  assert.equal(states[3].pathStats.calls.f64,bits(4),'warm route plus all three recorded Retreat rows must search');
+  assert.deepEqual(records[2].action.cmd.ids,[aliases.first,aliases.second,aliases.first]);
+  for(const actor of ['first','second']){
+   const before=unit(states[2],actor),exited=unit(states[3],actor),after=unit(states[4],actor);
+   assert.notEqual(before.controls.garrison.f64,bits(-1));assert.equal(exited.controls.garrison.f64,bits(-1));
+   assert.notDeepEqual([exited.x,exited.z],[before.x,before.z],'actual physical nearest-free exit');
+   assert.equal(exited.groundFlags&sim.MOVE,0,'exit must occupy actual open ground');
+   assert.ok(exited.path.length,'group must receive real source home routes');
+   assert.equal(exited.controls.retreating,true);assert.equal(exited.controls.follow.f64,bits(0));
+   assert.equal(after.controls.garrison.f64,bits(-1));assert.equal(after.controls.retreating,true);
+   assert.equal(exited.dig,null);assert.equal(exited.entrench,null);
+  }
+  assert.equal(states[2].players[0].mp,states[3].players[0].mp,'Retreat neither spends nor refunds');
+  assert.equal(states[0].actorOrder.length,13,'ten startup actors plus exactly three existing observers');
+ }});
  const changes=(a,b,path=[],out=[])=>{if(Object.is(a,b))return out;if(Array.isArray(a)&&Array.isArray(b)&&a.length===b.length){for(let i=0;i<a.length;i++)changes(a[i],b[i],[...path,i],out);return out;}if(a&&b&&typeof a==='object'&&typeof b==='object'&&!Array.isArray(a)&&!Array.isArray(b)){for(const k of new Set([...Object.keys(a),...Object.keys(b)]))if(!Object.hasOwn(b,k))out.push([[...path,k]]);else changes(a[k],b[k],[...path,k],out);return out;}out.push([path,b]);return out;};
  for(const c of cases){c.initial=c.states[0];c.patches=c.states.slice(1).map((s,i)=>changes(c.states[i],s));c.snapshots=c.states.length;delete c.states;}
  clean();const content=JSON.stringify({reference:pin,node:process.version,arch:process.arch,boundary:'unchanged createGame + ordered command + full step, with explicit boundary-only unsupported scenes',scope:{damageParity:false,rawFlags:false,privateScheduler:false},steps:totalSteps,commands:totalCommands,cases})+'\n';

@@ -1,6 +1,7 @@
 //! Conquest recipient routing. Discovery queries current units, not fog masks.
 use crate::{
     economy::Mode,
+    existing_observers::{ExistingObservers, ObserverOverlay},
     game::{CELL, Game, Point, Unit, Wreck},
     grid::SpatialGrid,
     match_runtime::{BuildingCell, Match},
@@ -90,9 +91,17 @@ impl BoundUnit {
 }
 impl RecipientRouting {
     fn refresh_bound_units(&mut self, game: &Game, rules: &Rules) {
+        self.refresh_bound_units_with_overlay(game, rules, ObserverOverlay::None);
+    }
+    fn refresh_bound_units_with_overlay(
+        &mut self,
+        game: &Game,
+        rules: &Rules,
+        overlay: ObserverOverlay<'_, '_>,
+    ) {
         for bound in &mut self.bound_units {
             if let Some(unit) = game.units.get(&bound.id) {
-                *bound = BoundUnit::from_unit(unit);
+                *bound = BoundUnit::from_unit(overlay.replace(unit));
             }
         }
         self.bunkers = self
@@ -131,16 +140,18 @@ fn sees(
     team: i32,
     reach: f64,
     at: Point,
-    observer: Option<crate::staged_observer::StagedObserver<'_>>,
+    observer: ObserverOverlay<'_, '_>,
 ) -> bool {
     grid.unordered(&game.units, (at.x, at.z), reach, |_, u| {
         game.team_of(u) == team
     })
     .into_iter()
+    .filter(|id| !observer.contains(*id))
     .any(|id| unit_sees(game, rules, &game.units[&id], at))
-        || observer.is_some_and(|source| {
-            game.team_of(source.unit()) == team && unit_sees(game, rules, source.unit(), at)
-        })
+        || observer
+            .replacements()
+            .chain(observer.added())
+            .any(|unit| game.team_of(unit) == team && unit_sees(game, rules, unit, at))
 }
 
 fn facts(
@@ -149,13 +160,12 @@ fn facts(
     grid: &SpatialGrid,
     buildings: &BTreeMap<usize, BuildingCell>,
     slot: usize,
-    observer: Option<crate::staged_observer::StagedObserver<'_>>,
+    observer: ObserverOverlay<'_, '_>,
 ) -> Result<Facts, String> {
     let game = &world.game;
     let team = game.players[slot].team;
-    let reach = game
-        .units
-        .values()
+    let reach = observer
+        .units(game)
         .filter(|u| game.team_of(u) == team)
         .map(|u| vision_of(game, rules, u))
         .fold(1.0, math::max);
@@ -220,13 +230,12 @@ fn collect_wrecks(
     rules: &Rules,
     grid: &SpatialGrid,
     owner: usize,
-    observer: Option<crate::staged_observer::StagedObserver<'_>>,
+    observer: ObserverOverlay<'_, '_>,
     environment: &crate::environment::EnvironmentRuntime,
 ) -> Result<Vec<crate::recipient_lists::RememberedWreck>, String> {
     let team = game.players[owner].team;
-    let reach = game
-        .units
-        .values()
+    let reach = observer
+        .units(game)
         .filter(|u| game.team_of(u) == team)
         .map(|u| vision_of(game, rules, u))
         .fold(1.0, math::max);
@@ -260,13 +269,12 @@ fn staged_wreck_memory(
     rules: &Rules,
     grid: &SpatialGrid,
     owner: usize,
-    observer: Option<crate::staged_observer::StagedObserver<'_>>,
+    observer: ObserverOverlay<'_, '_>,
     accepted: Vec<crate::recipient_lists::RememberedWreck>,
 ) -> Vec<crate::recipient_lists::RememberedWreck> {
     let team = game.players[owner].team;
-    let reach = game
-        .units
-        .values()
+    let reach = observer
+        .units(game)
         .filter(|u| game.team_of(u) == team)
         .map(|u| vision_of(game, rules, u))
         .fold(1.0, math::max);
@@ -367,7 +375,7 @@ impl Match {
             &self.building_cells,
             &mut self.recipients[owner],
             owner,
-            None,
+            ObserverOverlay::None,
             false,
         )?;
         receipt.commit(&mut self.world)
@@ -440,7 +448,7 @@ impl Match {
             team,
             reach,
             at,
-            None,
+            ObserverOverlay::None,
         ))
     }
 
@@ -460,7 +468,7 @@ impl Match {
             &self.rules,
             &observation_grid,
             owner,
-            None,
+            ObserverOverlay::None,
             &self.environment,
         )?;
         let rows = staged_wreck_memory(
@@ -469,7 +477,7 @@ impl Match {
             &self.rules,
             &observation_grid,
             owner,
-            None,
+            ObserverOverlay::None,
             accepted,
         );
         publish_wreck_memory(&mut self.recipients[owner], rows);
@@ -484,14 +492,21 @@ impl Match {
         self.validate_recipient(owner)?;
         let g = &self.world.game;
         let grid = SpatialGrid::new(&g.units, 16.0);
-        let accepted = collect_wrecks(g, &self.rules, &grid, owner, None, &self.environment)?;
+        let accepted = collect_wrecks(
+            g,
+            &self.rules,
+            &grid,
+            owner,
+            ObserverOverlay::None,
+            &self.environment,
+        )?;
         let rows = staged_wreck_memory(
             &self.recipients[owner].wreck_memory,
             g,
             &self.rules,
             &grid,
             owner,
-            None,
+            ObserverOverlay::None,
             accepted,
         );
         let display = crate::recipient_lists::display_rows(&rows)?;
@@ -511,7 +526,7 @@ impl Match {
                 &grid,
                 &self.building_cells,
                 owner,
-                None,
+                ObserverOverlay::None,
             )?
         } else {
             Facts::default()
@@ -646,7 +661,7 @@ fn refresh_memory_parts(
     buildings: &BTreeMap<usize, BuildingCell>,
     state: &mut RecipientRouting,
     owner: usize,
-    observer: Option<crate::staged_observer::StagedObserver<'_>>,
+    observer: ObserverOverlay<'_, '_>,
     capture_frame: bool,
 ) -> Result<crate::world::ObservationReceipt, String> {
     let mut facts = if state.memory.needs_replay(world) {
@@ -693,7 +708,7 @@ pub(crate) fn refresh_recipient_parts(
         state,
         fog,
         owner,
-        None,
+        ObserverOverlay::None,
         false,
     )
 }
@@ -702,7 +717,7 @@ fn refresh_parts(
     state: &mut RecipientRouting,
     fog: &mut crate::fog::Fog,
     owner: usize,
-    observer: Option<crate::staged_observer::StagedObserver<'_>>,
+    observer: ObserverOverlay<'_, '_>,
     capture_frame: bool,
 ) -> Result<crate::world::ObservationReceipt, String> {
     let RecipientObservation {
@@ -714,7 +729,7 @@ fn refresh_parts(
     let g = &world.game;
     let key = (g.tick, g.terrain_version, g.vision_tick.unwrap_or(-1));
     if state.key == Some(key) {
-        state.refresh_bound_units(g, rules);
+        state.refresh_bound_units_with_overlay(g, rules, observer);
         state.wetness = g.wet.unwrap_or(0.0);
         return Ok(world.defer_observation(None, capture_frame));
     }
@@ -749,16 +764,14 @@ fn refresh_parts(
     // leaves a cold fog cache available for the later birth sight source.
     if !world.fires.is_empty() {
         let vis = &fog
-            .team_with_observer(g, rules, g.players[owner].team, observer)
+            .team_with_overlay(g, rules, g.players[owner].team, observer)
             .vis;
         for (&c, _) in world.fires.iter() {
             state.fires[c] = vis[c] != 0;
         }
     }
-    state.bound_units = g
-        .units
-        .values()
-        .chain(observer.map(|o| o.unit()))
+    state.bound_units = observer
+        .units(g)
         .filter(|u| {
             g.reveal
                 || g.allied(u.owner, owner)
@@ -766,7 +779,7 @@ fn refresh_parts(
         })
         .map(BoundUnit::from_unit)
         .collect();
-    state.refresh_bound_units(g, rules);
+    state.refresh_bound_units_with_overlay(g, rules, observer);
     state.wetness = g.wet.unwrap_or(0.0);
     state.roads = world.roads;
     state.key = Some(key);
@@ -857,9 +870,31 @@ pub fn prepare_recipient_routing<'a>(
     owner: usize,
     observer: Option<crate::staged_observer::StagedObserver<'_>>,
 ) -> Result<PreparedRecipientRouting<'a>, String> {
+    validate_routing_preparation(context, target, fog_target, owner)?;
+    if let Some(source) = observer {
+        crate::staged_observer::StagedObserver::new(
+            &context.world.game,
+            context.rules,
+            source.unit().id,
+            owner,
+            source.unit(),
+        )?;
+    }
+    let observer = observer.map_or(ObserverOverlay::None, |source| {
+        ObserverOverlay::Added(source.unit())
+    });
+    prepare_routing_overlay(context, target, fog_target, owner, observer)
+}
+
+fn validate_routing_preparation(
+    context: RecipientContext<'_>,
+    target: &RecipientRouting,
+    fog_target: &crate::fog::Fog,
+    owner: usize,
+) -> Result<(), String> {
     validate_context(
         RecipientContext { ..context },
-        std::iter::once(&*target),
+        std::iter::once(target),
         fog_target,
     )?;
     if target.memory.slot() != owner
@@ -872,15 +907,15 @@ pub fn prepare_recipient_routing<'a>(
         .memory
         .validate_binding(context.world)
         .map_err(|e| format!("routing binding: {e:?}"))?;
-    if let Some(source) = observer {
-        crate::staged_observer::StagedObserver::new(
-            &context.world.game,
-            context.rules,
-            source.unit().id,
-            owner,
-            source.unit(),
-        )?;
-    }
+    Ok(())
+}
+fn prepare_routing_overlay<'a>(
+    context: RecipientContext<'_>,
+    target: &'a mut RecipientRouting,
+    fog_target: &'a mut crate::fog::Fog,
+    owner: usize,
+    observer: ObserverOverlay<'_, '_>,
+) -> Result<PreparedRecipientRouting<'a>, String> {
     let mut state = target.clone();
     let mut fog = fog_target.clone();
     let receipt = refresh_parts(
@@ -907,6 +942,55 @@ pub fn prepare_recipient_routing<'a>(
             context.environment,
         ),
     })
+}
+
+/// Prepare the first actual exit prefix without adding an existing actor as a birth.
+pub(crate) fn prepare_recipient_exit_routing<'a>(
+    context: RecipientContext<'_>,
+    target: &'a mut RecipientRouting,
+    fog_target: &'a mut crate::fog::Fog,
+    owner: usize,
+    exits: ExistingObservers<'_, '_>,
+) -> Result<PreparedRecipientRouting<'a>, String> {
+    validate_routing_preparation(context, target, fog_target, owner)?;
+    exits.validate_source(&context.world.game, owner)?;
+    prepare_routing_overlay(
+        context,
+        target,
+        fog_target,
+        owner,
+        ObserverOverlay::Existing(exits),
+    )
+}
+impl PreparedRecipientRouting<'_> {
+    /// Same source route key: later exits change cached object poses, not remembered rows.
+    pub(crate) fn refresh_existing_exit_prefix(
+        &mut self,
+        context: RecipientContext<'_>,
+        owner: usize,
+        exits: ExistingObservers<'_, '_>,
+    ) -> Result<(), String> {
+        self.receipt.validate_source(context.world)?;
+        self.wreck_frame.validate(context.environment)?;
+        exits.validate_source(&context.world.game, owner)?;
+        if self.state.memory.slot() != owner
+            || self.state.memory.identity() != owner as u64
+            || self.state.key
+                != Some((
+                    context.world.game.tick,
+                    context.world.game.terrain_version,
+                    context.world.game.vision_tick.unwrap_or(-1),
+                ))
+        {
+            return Err("existing exit route epoch mismatch".into());
+        }
+        self.state.refresh_bound_units_with_overlay(
+            &context.world.game,
+            context.rules,
+            ObserverOverlay::Existing(exits),
+        );
+        Ok(())
+    }
 }
 
 type OrdinaryListResults = Vec<(usize, crate::recipient_lists::RecipientLists)>;
@@ -1030,8 +1114,23 @@ pub fn prepare_ordinary_recipient_lists(
     let mut replacements = Vec::with_capacity(owners.len());
     for &owner in owners {
         let prior = &state.recipients[owner].wreck_memory;
-        let accepted = collect_wrecks(g, &state.rules, &grid, owner, None, &state.environment)?;
-        let rows = staged_wreck_memory(prior, g, &state.rules, &grid, owner, None, accepted);
+        let accepted = collect_wrecks(
+            g,
+            &state.rules,
+            &grid,
+            owner,
+            ObserverOverlay::None,
+            &state.environment,
+        )?;
+        let rows = staged_wreck_memory(
+            prior,
+            g,
+            &state.rules,
+            &grid,
+            owner,
+            ObserverOverlay::None,
+            accepted,
+        );
         let wrecks = crate::recipient_lists::display_rows(&rows)?;
         let team = g.players[owner].team;
         let found_mines = state

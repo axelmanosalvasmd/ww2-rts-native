@@ -2,14 +2,14 @@
 use crate::{
     catalog::Catalog,
     economy::Mode,
-    game::{MOVE, Point, Unit},
+    existing_observers::{ExistingObservers, PreparedGroundExit},
+    game::{Point, Unit},
     grid::UnitId,
     match_commands::{Command, MoveOutcome, search_route},
-    match_routing::{RecipientContext, prepare_recipient_routing},
+    match_routing::{RecipientContext, prepare_recipient_exit_routing},
     match_runtime::Match,
     path_requests::RequestKind,
     pathfinding::PathRules,
-    unit_spawn::SpawnPlacer,
 };
 use std::collections::BTreeMap;
 
@@ -133,17 +133,9 @@ impl Match {
             .and_then(|v| v.number())
             .unwrap_or(0.))
     }
-    fn physical_ground_exit(&self, mut u: Unit) -> Result<Unit, String> {
-        if u.garrison.is_some() {
-            let view = crate::match_commands::physical_navigation(&self.world.game);
-            let cell = SpawnPlacer::new()
-                .nearest_free(view, u.at(), MOVE, None)
-                .map_err(|e| format!("ground order building exit: {e:?}"))?;
-            u.x = (cell % view.width) as f64 * crate::game::CELL + crate::game::CELL * 0.5;
-            u.z = (cell / view.width) as f64 * crate::game::CELL + crate::game::CELL * 0.5;
-            u.garrison = None;
-        }
-        Ok(u)
+    fn physical_ground_exit(&self, id: UnitId) -> Result<Unit, String> {
+        PreparedGroundExit::prepare(&self.world.game, &self.rules, id)
+            .map(PreparedGroundExit::into_unit)
     }
     pub(crate) fn ground_attack_command(
         &mut self,
@@ -195,7 +187,7 @@ impl Match {
                 }
                 let u = self.world.game.units[&id].clone();
                 let u = if !self.can_shoot_target(id, target)? {
-                    self.physical_ground_exit(u)?
+                    self.physical_ground_exit(id)?
                 } else {
                     u
                 };
@@ -301,11 +293,6 @@ impl Match {
             if self.world.game.units[&id].build {
                 return Ok(Some(Denial::Unsupported));
             }
-            // An existing-observer route preview must replace, rather than append,
-            // a physical building exit before this batch can admit garrison routes.
-            if self.world.game.units[&id].garrison.is_some() {
-                return Ok(Some(Denial::Unsupported));
-            }
         }
         self.ground_order_capacity(&selected)?;
         let mut forced = Vec::new();
@@ -336,43 +323,66 @@ impl Match {
             .iter()
             .map(|id| self.reaction_home(*id))
             .collect::<Result<Vec<_>, _>>()?;
-        let preview = prepare_recipient_routing(
-            RecipientContext {
-                world: &self.world,
-                rules: &self.rules,
-                building_cells: &self.building_cells,
-                start: &self.start,
-                options: &self.options,
-                environment: &self.environment,
-            },
+        let mut exits = Vec::new();
+        let mut unique = std::collections::BTreeSet::new();
+        let mut prefixes = Vec::new();
+        for &id in &selected {
+            if unique.insert(id) {
+                exits.push(PreparedGroundExit::prepare(
+                    &self.world.game,
+                    &self.rules,
+                    id,
+                )?);
+            }
+            prefixes.push(exits.len());
+        }
+        let context = RecipientContext {
+            world: &self.world,
+            rules: &self.rules,
+            building_cells: &self.building_cells,
+            start: &self.start,
+            options: &self.options,
+            environment: &self.environment,
+        };
+        let mut preview = prepare_recipient_exit_routing(
+            context,
             self.recipients
                 .get_mut(owner)
                 .ok_or("missing ground retreat recipient")?,
             &mut self.routing_fog,
             owner,
-            None,
+            ExistingObservers::new(&exits[..prefixes[0]])?,
         )?;
         let mut paths = preview.fork_paths(&self.commands.paths);
         let rules = PathRules::compiled().map_err(|e| e.to_string())?;
-        let terrain = preview
-            .query()
-            .path_terrain(preview.live())
-            .map_err(|e| format!("ground retreat terrain: {e:?}"))?;
         let mut routes = Vec::new();
-        for (&id, &home) in selected.iter().zip(&homes) {
-            let u = &self.world.game.units[&id];
+        for ((&id, &home), &prefix) in selected.iter().zip(&homes).zip(&prefixes) {
+            preview.refresh_existing_exit_prefix(
+                context,
+                owner,
+                ExistingObservers::new(&exits[..prefix])?,
+            )?;
+            let terrain = preview
+                .query()
+                .path_terrain(preview.live())
+                .map_err(|e| format!("ground retreat terrain: {e:?}"))?;
+            let unit = exits.iter().find(|exit| exit.id() == id).unwrap().unit();
             routes.push(
                 search_route(
                     &mut paths,
                     terrain,
                     rules,
-                    &self.rules.kinds[u.kind],
-                    u,
+                    &self.rules.kinds[unit.kind],
+                    unit,
                     home,
                 )?
                 .result,
             );
         }
+        let drafts = exits
+            .into_iter()
+            .map(|exit| (exit.id(), exit.into_unit()))
+            .collect::<BTreeMap<_, _>>();
         let (_, receipt) = preview.prepare_publication(&mut self.world, &self.environment)?;
         receipt.commit();
         self.commands.paths = paths;
@@ -383,7 +393,12 @@ impl Match {
             self.commands.units.get_mut(id).unwrap().follow = 0;
         }
         for ((id, home), route) in selected.into_iter().zip(homes).zip(routes) {
-            let u = self.world.game.units[&id].clone();
+            let mut u = self.world.game.units[&id].clone();
+            let draft = &drafts[&id];
+            u.x = draft.x;
+            u.z = draft.z;
+            u.garrison = draft.garrison;
+            self.grid.update(id, &u);
             self.apply_retreat_route(u, home, route)
                 .expect("complete retreat batch admitted");
             let ability = self.abilities.get_mut(id).unwrap();
