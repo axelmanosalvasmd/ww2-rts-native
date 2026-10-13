@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Updated the Conquest parity evidence for the source-written command, route and environment assembly, distinguishing its six original-step traces and independent source review from pending combined native checks and remaining actuators.
+
 - Strengthened the actual-step command trace so its first short Move completes before a queued Move resumes inside tick two. The fixture now checks both previous-clock boundary timestamps and current-clock queued-order timestamps, alongside deterministic input-key ordering.
 
 - Attached early building-section reconciliation, section/wreck debris and late fire/flood phases to the staged tick, using the canonical environment seed, IDs, smoke lifetime and combat attribution. Expired smoke is removed after burning, so it still blocks a same-tick ignition cloud. A sixth actual-step trace exercises flame escape, spreading fire, smoke decay and the shared environment stream; the source fixture covers 1,020 ticks and 59 checkpoints. Combined native validation remains pending.
