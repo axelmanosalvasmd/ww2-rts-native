@@ -749,6 +749,8 @@ impl crate::match_runtime::Match {
                     crate::match_support::SupportDenial::Blocked => Denial::Blocked,
                     crate::match_support::SupportDenial::Cooldown => Denial::Cooldown,
                     crate::match_support::SupportDenial::Manpower => Denial::Manpower,
+                    crate::match_support::SupportDenial::Unseen => Denial::Unseen,
+                    crate::match_support::SupportDenial::Population => Denial::Population,
                 })),
                 Err(crate::match_support::SupportError::Unsupported(_)) => {
                     Ok(Some(Denial::Unsupported))

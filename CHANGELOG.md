@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Restored the verified Unseen and Population support denial mappings lost during the aircraft caller union, found by its first native compile. The existing public denial meanings and all command siblings remain unchanged. No tests ran before this compile failure; repaired combined verification is pending and the failure log is preserved.
+
 - Normally incorporated the verified coherent support provider successor into the separate aircraft caller. Runtime support remains identical to the reviewed 817b96d body; its actual test-only compiler/numeric repairs and evidence are retained. Shared caller metadata guards and new scheduling remain separate, with combined native verification pending.
 
 - Preserved complete support cooldown-key and player/cover team admission while attaching general AIR support. Independent review found that dropping the old ground metadata bindings could consume queued input before a missing cooldown failed. Both the legacy ground helper and new caller use one read-only metadata guard; whole-boundary malformed-key/team regressions retain clock, keys, wallets, state and timers. Native assembly checks remain pending.
