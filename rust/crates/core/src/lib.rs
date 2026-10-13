@@ -49,6 +49,7 @@ pub mod match_runtime;
 pub mod match_story;
 pub mod match_support;
 pub mod match_tick;
+pub mod match_withdrawal;
 pub mod match_world_elimination;
 pub mod match_world_end;
 pub mod math;

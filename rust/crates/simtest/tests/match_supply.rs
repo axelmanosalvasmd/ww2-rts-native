@@ -279,6 +279,8 @@ fn real_supply_hooks_spawn_route_service_and_retire_in_canonical_match() {
     let fixture: Value =
         serde_json::from_str(include_str!("fixtures/match-supply-runtime.json")).unwrap();
     let mut branches = std::collections::BTreeSet::new();
+    let mut births = 0;
+
     for trace in fixture["traces"].as_array().unwrap() {
         let i = trace["sourceCase"].as_u64().unwrap() as usize;
         let c = &base["cases"][i];
@@ -398,9 +400,30 @@ fn real_supply_hooks_spawn_route_service_and_retire_in_canonical_match() {
             if tick % 20 == 0 {
                 instance.refresh_supply_network(&ids).unwrap();
             }
+            let previous = instance
+                .convoys
+                .as_ref()
+                .unwrap()
+                .trucks
+                .keys()
+                .copied()
+                .collect::<Vec<_>>();
             instance
                 .step_supply_convoys(action["winner"].as_bool().unwrap())
                 .unwrap();
+            for id in &previous {
+                if !instance.world.game.units.contains_key(id) {
+                    assert!(instance.abilities.get(*id).is_none());
+                    assert!(instance.recovery.get(*id).is_none());
+                }
+            }
+            for id in instance.convoys.as_ref().unwrap().trucks.keys() {
+                if !previous.contains(id) {
+                    births += 1;
+                    assert_eq!(instance.abilities.get(*id), Some(&Default::default()));
+                    assert_eq!(instance.recovery.get(*id), Some(&Default::default()));
+                }
+            }
             if !step["expected"].is_null() {
                 assert_eq!(runtime(&instance), step["expected"], "case{i} tick{tick}");
             }
@@ -409,6 +432,7 @@ fn real_supply_hooks_spawn_route_service_and_retire_in_canonical_match() {
             }
         }
     }
+    assert!(births > 0, "source trace must exercise actual truck births");
     for state in ["loading", "delivering", "unloading", "returning"] {
         assert!(branches.contains(state), "missing real hook branch {state}");
     }

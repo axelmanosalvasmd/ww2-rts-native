@@ -174,6 +174,8 @@ pub struct UnitControl {
     pub outcome_tick: Option<i64>,
     pub move_result: Option<MoveResult>,
     pub route_end: Option<Point>,
+    pub supply_started: bool,
+    pub supply_retry: Option<u64>,
     pub supply_hold: bool,
     pub supply_escape: bool,
     pub enter: Option<usize>,
@@ -229,6 +231,8 @@ impl UnitControl {
             outcome_tick: None,
             move_result: None,
             route_end: None,
+            supply_started: false,
+            supply_retry: None,
             supply_hold: false,
             supply_escape: false,
             enter: None,
@@ -1459,6 +1463,7 @@ pub(crate) fn search_route(
     let mut result = paths
         .find_path(terrain, rules, kind, u.at(), to, None)
         .map_err(|e| format!("command path: {e:?}"))?;
+    let live_route_end = result.route_end;
     let mut failed = result.status == crate::pathfinding::PathStatus::Unreachable;
     if result.waypoints.first().is_some_and(|p| {
         !crate::pathfinding::walkable(terrain.navigation, u.at(), *p, kind.block(), 0.9)
@@ -1495,6 +1500,7 @@ pub(crate) fn search_route(
                 .is_some_and(|p| crate::pathfinding::walkable(nav, at, *p, kind.block(), 0.9))
             {
                 result = next;
+                result.route_end = live_route_end;
                 result.waypoints.insert(0, at);
                 break;
             }
