@@ -77,6 +77,7 @@ pub mod supply_network;
 pub mod supply_routes;
 pub mod terrain;
 pub mod traffic;
+pub mod traffic_knowledge;
 pub mod unit_publication;
 pub mod unit_spawn;
 pub mod vehicle;
