@@ -124,6 +124,16 @@ Decided now so release stays cheap:
 3. Unreal game: terrain, units, effects, HUD, sound, then the FPS view, with the browser client still working alongside.
 4. Retire the JavaScript client and Node server in ww2-rts.
 
+## Terrain navigation regions (2026-10-12)
+
+`navigation.rs` ports `shared/navigation.js`: chunk-local connected regions, directed portals, region routes and limited next-leg selection. It is the coarse prerequisite for fine A*, not a complete unit pathfinder. A `TerrainView` supplies only borrowed flags, heights and version/change information; the planner cannot consult hidden terrain through another game object.
+
+Region edges and incoming IDs keep the reference insertion order. Dirty chunks reuse freed region IDs in the same order, and route ties use region IDs. This matters because route choices can depend on update history. Direct changes or up to 32 retained changes update the affected chunks; missing continuity or a new terrain identity causes a rebuild. The route cache keeps the reference's 128-entry bound.
+
+`NavigationLeg` borrows the cache's labels while owning its allowed-region list. Rust therefore prevents the caller from updating that cache while the fine search uses its filter. This replaces the reference's instruction to use a filter immediately with a lifetime rule.
+
+All 4,888 recorded queries match the reference's target, connectivity, limit flag, ordered region IDs and per-cell filter. The 35 scenarios include 277 terrain updates, 1,372 limited legs and 1,268 disconnected outcomes. The recorder rejects a wrong pin or dirty tracked source. No performance claim is made. Fine A*, unit path queues and integration into movement remain pending.
+
 ## The core's math (2026-10-12)
 
 The core carries its own math (`rust/crates/core/src/math.rs`) instead of Rust's `f64` methods, which call each platform's C library. It ports V8's fdlibm (`src/base/ieee754.cc` as Node 24.21.0 compiles it) and V8's `Math.hypot`, plus JavaScript's `round`, `max`, `min` and `sign`, so every platform computes the same bits and they equal the JavaScript game's.

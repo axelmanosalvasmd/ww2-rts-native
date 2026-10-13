@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Recorded the coarse navigation port and its 4,888 reference-query checks in DESIGN.md. MOV-37 and MOV-38 remain in progress until fine pathfinding and movement integration use the planner.
+
+- The navigation fixture generator now verifies the reference's exact pinned commit and rejects tracked changes before importing its source. Untracked and ignored files, including `node_modules`, do not invalidate the fixture run.
+
+- Added the Rust terrain region and directed portal planner behind a borrowed, caller-supplied terrain view. It preserves insertion-order ties, incremental chunk updates and bounded route caching from `shared/navigation.js`. All 4,888 recorded x64 Node 24.21.0 queries match the target, connection status, leg limit, allowed regions and cell filter, including 277 terrain updates, directed cliffs and map edges. Invalid shapes and cell indices return errors. This is the coarse prerequisite for fine A*, not full pathfinding; movement and FFI remain unchanged and performance is unmeasured.
+
 - Run branch verification through pull requests and main verification after merge, avoiding duplicate push and pull-request CI jobs for the same change.
 
 - Added Rust CI on Ubuntu 24.04, Windows 2025 and macOS 15 for the pinned toolchain: formatting, strict Clippy, workspace tests and the release C library. Linux also links the existing C caller and replays the formation fixture. Rust and workflow changes trigger the checks; manual runs are available.
