@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Preserved complete support cooldown-key and player/cover team admission while attaching general AIR support. Independent review found that dropping the old ground metadata bindings could consume queued input before a missing cooldown failed. Both the legacy ground helper and new caller use one read-only metadata guard; whole-boundary malformed-key/team regressions retain clock, keys, wallets, state and timers. Native assembly checks remain pending.
+
 - Connected source-reviewed aircraft turns and canonical off-map support to the single ordinary tick caller in a separate source assembly. Aircraft continue before ground timers/work/riding; late captured strikes run before one Aviation AA pass and one cover/cooldown decay. Queue-boundary and post-command state guards remain distinct. Replaced the old bombing-refusal test with actual queue/payment/timer assertions because that capability is now attached; combined native proof is pending.
 
 - Normally incorporated the checked carrier closure into the separate aircraft source union, preserving the accepted Board route endpoint repair and all proof evidence. Rust aircraft/support providers remain their reviewed bodies; real AIR scheduling and combined native checks remain pending.

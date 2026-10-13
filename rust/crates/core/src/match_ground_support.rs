@@ -36,7 +36,7 @@ impl Match {
     }
 
     fn validate_ground_support_state(&self) -> Result<(), SupportError> {
-        self.validate_support()?;
+        self.validate_support_metadata()?;
         if self.world.game.strikes.iter().any(|strike| {
             strike.runtime.as_ref().is_none_or(|timing| {
                 !matches!(
@@ -60,6 +60,12 @@ impl Match {
                 "on-map aircraft support phase is unavailable",
             ));
         }
+        Ok(())
+    }
+
+    /// Common canonical player/cooldown/cover bindings, independent of strike kind.
+    pub(crate) fn validate_support_metadata(&self) -> Result<(), SupportError> {
+        self.validate_support()?;
         let kinds = Catalog::compiled()
             .and_then(|catalog| catalog.table("SUPPORT"))
             .map_err(|e| SupportError::Actuation(e.to_string()))?

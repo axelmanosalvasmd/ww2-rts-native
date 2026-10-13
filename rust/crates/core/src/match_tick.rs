@@ -206,6 +206,8 @@ impl crate::match_runtime::Match {
         self.validate_aircraft_runner_boundary(boundary)
             .map_err(|error| format!("aircraft admission: {error}"))?;
         let current_order = game.units.keys().copied().collect::<Vec<_>>();
+        self.validate_support_metadata()
+            .map_err(|error| format!("support metadata admission: {error}"))?;
         self.validate_support_tick_phases(&current_order, self.rules.movement.tick, boundary)
             .map_err(|error| format!("support admission: {error}"))?;
         self.validate_carrier_tick()?;
@@ -277,6 +279,8 @@ impl crate::match_runtime::Match {
         self.validate_carrier_tick()?;
         self.validate_reaction_tick_actors()?;
         let current_order = self.world.game.units.keys().copied().collect::<Vec<_>>();
+        self.validate_support_metadata()
+            .map_err(|error| format!("support published metadata: {error}"))?;
         self.validate_support_tick_phases(&current_order, dt, boundary)
             .map_err(|error| format!("support published state: {error}"))?;
         self.validate_field_project_tick(&current_order)?;

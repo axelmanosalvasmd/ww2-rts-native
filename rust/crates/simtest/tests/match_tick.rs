@@ -714,6 +714,75 @@ fn queued_companion_join_enters_prior_and_skips_ordinary_timers() {
 }
 
 #[test]
+fn malformed_support_metadata_preserves_whole_recorded_boundary() {
+    use ww2_core::{match_commands::Command, match_support::FighterCover, orders::OrderKey};
+    let fixture: Value = serde_json::from_str(include_str!("fixtures/match-tick.json")).unwrap();
+    for malformed in ["cooldown", "player team", "cover team"] {
+        let mut m = make(&fixture["cases"][0]);
+        match malformed {
+            "cooldown" => {
+                m.start.players[0].support.remove("artillery");
+            }
+            "player team" => m.start.players[0].config.team += 1,
+            "cover team" => m.support.covers.push(FighterCover {
+                owner: 0,
+                team: m.world.game.players[0].team + 1,
+                at: Point { x: 8.0, z: 8.0 },
+                radius: 40.0,
+                remaining: 60.0,
+            }),
+            _ => unreachable!(),
+        }
+        let id = *m.world.game.units.keys().next().unwrap();
+        for (sequence, command) in [
+            (
+                1,
+                Command::Stop {
+                    ids: vec![i64::from(id)],
+                },
+            ),
+            (
+                2,
+                Command::Support {
+                    kind: "artillery".into(),
+                    at: Point { x: 8.0, z: 8.0 },
+                    direction: None,
+                },
+            ),
+        ] {
+            m.enqueue_command(
+                OrderKey {
+                    tick: 1,
+                    issuer: 0,
+                    sequence,
+                },
+                command,
+            )
+            .unwrap();
+        }
+        let state = |m: &Match| {
+            format!(
+                "{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}",
+                m.world,
+                m.commands.units,
+                m.start.players,
+                m.start.economy,
+                m.support,
+                m.start.random.snapshot(),
+                m.firing,
+                m.abilities
+            )
+        };
+        let before = state(&m);
+        assert!(m.advance_tick().is_err(), "{malformed}");
+        assert_eq!(state(&m), before, "{malformed}");
+        assert_eq!(m.commands.next_tick(), Some(1));
+        assert_eq!(m.commands.pending_commands(), 2);
+        assert!(m.tick_state.fault().is_none());
+    }
+}
+
+#[test]
 fn offmap_support_boundary_dispatches_once_and_decays_timers_once() {
     use ww2_core::{catalog::Catalog, match_commands::Command, orders::OrderKey};
     let fixture: Value = serde_json::from_str(include_str!("fixtures/match-tick.json")).unwrap();
