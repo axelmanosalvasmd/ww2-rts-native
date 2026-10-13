@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Keep borrowed actor visibility membership independent of order. The canonical World local defender records maintained-grid order, so a binary search could miss visible targets. Add an unsorted-membership witness without sorting or changing the canonical vector; native execution is pending.
+
 - Add a borrowed actor policy for ordinary and World ground providers. Preserve the existing local defender's owner -1, team, visibility and zero resources without adding a commander seat or mutable actor store. This internal source prerequisite does not enable the World tick and has not run native checks.
 
 - Normally include final main `d1f2fb5` in the separate internal runtime bundle. Its tree is identical to the already incorporated ordered-event head `a068dd8`, so provider, ABI 2 and CI source bytes are unchanged. Combined native verification and interface review before publication remain pending.

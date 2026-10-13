@@ -18,7 +18,7 @@ pub struct ActorPolicy<'a> {
 }
 impl ActorPolicy<'_> {
     pub fn sees(&self, id: u32) -> bool {
-        self.visible.binary_search(&id).is_ok()
+        self.visible.contains(&id)
     }
 }
 
@@ -89,5 +89,26 @@ impl Match {
                 visible: &player.visible,
             })
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn local_actor_visibility_keeps_maintained_grid_order() {
+        let visible = [9, 2, 7];
+        let actor = ActorPolicy {
+            owner: LOCAL_DEFENDER_OWNER,
+            source_owner: -1,
+            economy_slot: None,
+            team: -1,
+            faction: Faction::try_from(0).unwrap(),
+            spawn: Point { x: 0., z: 0. },
+            visible: &visible,
+        };
+        assert!(visible.iter().all(|&id| actor.sees(id)));
+        assert!(!actor.sees(3));
+        assert_eq!(actor.visible, &[9, 2, 7]);
     }
 }
