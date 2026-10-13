@@ -2,7 +2,19 @@
 
 ## Unreleased
 
+- Normally merged the frozen quiet snapshot feature into the reviewed canonical prerequisite union. Kept current World memory and startup metadata while preserving the quiet admission and its original fixtures. Source checks pass for 73 states, 219 partial and 219 full snapshots, 13 delivery steps with 39 recipient reads, and four World memory traces with 120 actions. This new combined head needs independent source review and native checks; the earlier Vostro results remain tied to `5efaf17`.
+
 - Joined the actual pre-quiet snapshot prerequisites with the current ability and recovery provider through a normal merge. Kept shared Assault startup, ground support and recipient projections, and canonical World metadata. Added only the required World support default, ordinary post-routing logistics initialization and full-current recovery fixture context. Original-source checks match 72 cached states, 216 recipient projections, 13 delivery steps, 39 recipients, four World traces with 120 actions, and 60 ground support traces with 1,400 checkpoints. Independent source review passes; combined native checks remain pending. The quiet snapshot composition is not included.
+
+- Verified the repaired quiet Conquest snapshot assembly on Vostro Linux x86_64 at `5efaf17`: 21 focused debug tests, all 201 locked release workspace tests, strict Clippy, formatting and release FFI pass. Original-source checks cover 73 states, 219 partial and 219 full snapshots, plus 13 delivery steps and 39 recipient reads. Active actor/list integration and server transport remain separate.
+
+- Restored the ordinary Conquest logistics initialization call after the shared startup refactor. The native supply regressions exposed empty reserves and an absent convoy service. Initialization again runs after bases, metadata and recipient routing; disabled logistics and other modes keep their existing limits. Combined native verification is pending.
+
+- Fixed two snapshot dependency compilation omissions: initialized the seven canonical World Match owners and supplied the recovery fixture's full-current actor-order argument. Restored the World-only refusal for unrepresented logistics startup. Existing publication callbacks and snapshot mode limits are preserved. Combined native verification is pending.
+
+- Added a quiet snapshot admission regression for an invalid remembered-mine cell. The existing shared routing guard rejects it before terrain or fog acknowledgments change; no runtime behavior changed.
+
+- Added an internal complete seat snapshot for explicitly admitted quiet ordinary Conquest frames. Before terrain/fog delivery, it checks actual persistent actors, paid work, recipient remembered wrecks/discovered mines and caller-owned environment events; unsupported state refuses instead of receiving empty defaults. The original recorder now checks 73 states, 219 partial projections and 219 full source snapshots, including technology omission. Combined native verification is pending; transport, spectators and active actor/list projection remain separate.
 
 - Preserved the final verified movement snapshot repair and evidence in the separate composition dependency union. The composition descendant still needs its own combined native checks.
 
