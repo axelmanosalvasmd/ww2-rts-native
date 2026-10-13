@@ -136,6 +136,7 @@ impl GeneratedGeography {
             chars: self.grid.chars,
             heights: Some(self.grid.heights),
             layers: None,
+            buildings: Vec::new(),
             spawns: self
                 .spawns
                 .into_iter()
@@ -160,6 +161,7 @@ impl GeneratedGeography {
                         team: r.team,
                         kind: Some(r.kind.name().into()),
                         name: Some(r.name),
+                        biome: None,
                     })
                     .collect(),
                 region_map: Some(self.region_map),
