@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Checked ordered fire membership and mine ownership/discovery maps before prepared routing commits. Independent source review found these facts can change without advancing a terrain key; rejected preparations retain the original recipient and World ledgers.
+
+- Recorded 13 original birth-sight cases: ten ordinary buys through the original command and three World produce-unit calls, plus eight warmed infantry/vehicle searches across ordered terrain changes. Added native typed-publication, abort, source-frame, cache-identity and journal-trim witnesses. Native execution and independent review remain pending.
 - Bound detached recruitment search history to the routing owner’s preview buffers before search. Exact recipient identities retain incremental graph history, while failed previews still leave canonical caches unchanged. Native and birth-oracle checks remain pending.
 
 - Restricted preview graph rebinding to the selected recipient's exact flags allocation or its matching owned vehicle-clearance arrays. Unmatched and authoritative cache identities remain untouched. Native transaction witnesses follow.
