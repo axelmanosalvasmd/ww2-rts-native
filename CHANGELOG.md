@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reject zero, future and mismatched live operative unit identities before tick mutation, including the zero ID reserved for a dead companion. Historical metadata-backed controls keep their existing nonzero allocator bounds. The source guard follow-up is separate from the frozen provider; native admission regression is pending.
+
 - Strengthened operative preflight to inspect every operative control row, rejecting unbacked or future identities while preserving metadata-backed dead rows retained for projectiles. Added original full-step recordings: 15 traces, 576 operations and 506 source ticks, with 10 seeded Combat draws and exact paid/led-squad respawn checks. Native replay and tick consumption remain pending.
 
 - Added a source-written operative turn provider for the sole Match tick runner: registry and next-clock preflight, one movement/timer turn, then immediate canonical fire or grenade request consumption. Tick placement, death/respawn consumer hooks, full-step fixtures and native verification are pending; no second timer or runtime state was added.
