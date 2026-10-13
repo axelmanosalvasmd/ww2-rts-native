@@ -17,14 +17,19 @@
 //!   crushing and wear off, and asserts the terrain never changes); with wear unchanged, `touch` only
 //!   tells clients about a cell whose look changed, and the workload checks none did;
 //! - World Conquest's road march (`marchMul`, 1 here), riders following their carrier, trains and planes;
-//! - each player's remembered view of the map: traffic steers by the real map, as in the workload.
+//! - the default entry points use the physical map, as in the frozen workload.
+//!   Match uses `move_unit_with_knowledge` for remembered traffic decisions.
 
 use crate::game::{Clearance, FORD, Game, MUD, Point, Pose, Unit, WIRE};
 use crate::grid::{SpatialGrid, UnitId};
 use crate::math;
+use crate::route_knowledge::KnowledgeError;
 use crate::rules::{Rules, UnitKind};
 use crate::terrain::{height_at, speed_mul, truthy, walkable, wet_at};
-use crate::traffic::{Steer, ghost_pair, remember_position, start_ghost, traffic_step};
+use crate::traffic::{
+    Steer, ghost_pair, remember_position, start_ghost, traffic_step_with_knowledge,
+};
+use crate::traffic_knowledge::TrafficKnowledge;
 use crate::vehicle::{VehicleStep, angle_delta, swept_vehicle_clear, vehicle_step};
 use crate::vision::{in_trench, or_one};
 
@@ -108,20 +113,47 @@ pub fn move_unit_with_routes(
     supp_speed: f64,
     routes: &mut impl FnMut(&Game, &Rules, &mut Unit, Point, RouteRequest),
 ) -> Option<Moved> {
+    move_unit_with_knowledge(
+        g,
+        rules,
+        grid,
+        id,
+        supp_speed,
+        routes,
+        &TrafficKnowledge::physical(),
+    )
+    .expect("physical movement cannot fail")
+}
+
+/// Real routing with explicit traffic terrain. A knowledge error is fatal to the
+/// tick; the unit is always reinserted, including after an error.
+#[allow(clippy::too_many_arguments)]
+pub fn move_unit_with_knowledge(
+    g: &mut Game,
+    rules: &Rules,
+    grid: &mut SpatialGrid,
+    id: UnitId,
+    supp_speed: f64,
+    routes: &mut impl FnMut(&Game, &Rules, &mut Unit, Point, RouteRequest),
+    knowledge: &TrafficKnowledge<'_>,
+) -> Result<Option<Moved>, KnowledgeError> {
     // The unit is out of the map while it moves. The reference reads it there only through `waitsOn`, which
     // stops at it either way (its `queuedBehind` is 0 by then), and every query skips it.
-    let mut u = g.units.remove(&id)?;
-    let speed = block(g, rules, grid, &mut u, supp_speed, routes);
+    let Some(mut u) = g.units.remove(&id) else {
+        return Ok(None);
+    };
+    let speed = block(g, rules, grid, &mut u, supp_speed, routes, knowledge);
     grid.update(id, &u);
     let infantry = rules.kinds[u.kind].infantry;
     g.units.insert(id, u);
-    Some(Moved {
+    Ok(Some(Moved {
         id,
-        speed,
+        speed: speed?,
         infantry,
-    })
+    }))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn block(
     g: &Game,
     rules: &Rules,
@@ -129,7 +161,8 @@ fn block(
     u: &mut Unit,
     supp_speed: f64,
     routes: &mut impl FnMut(&Game, &Rules, &mut Unit, Point, RouteRequest),
-) -> f64 {
+    knowledge: &TrafficKnowledge<'_>,
+) -> Result<f64, KnowledgeError> {
     let m = &rules.movement;
     let dt = m.tick;
     let kind = &rules.kinds[u.kind];
@@ -185,7 +218,7 @@ fn block(
             ..Steer::default()
         }
     } else {
-        traffic_step(g, rules, grid, u, goal, dt)
+        traffic_step_with_knowledge(g, rules, grid, u, goal, dt, knowledge)?
     };
     let stalled = (ground_vehicle || kind.infantry && !steer.blocked && !steer.yielding)
         && u.stuck > 0.75
@@ -215,11 +248,11 @@ fn block(
     };
     let dropped = if ground_vehicle {
         drive_vehicle(
-            g, rules, grid, u, kind, route, speed, dt, back, &steer, before,
+            g, rules, grid, u, kind, route, speed, dt, back, &steer, before, knowledge,
         );
         false
     } else {
-        walk_route(g, rules, u, kind, route, speed, dt, back, &steer)
+        walk_route(g, rules, u, kind, route, speed, dt, back, &steer, knowledge)
     };
     if dropped {
         // `u.path = []`: a new route array
@@ -255,7 +288,7 @@ fn block(
     }
     if kind.infantry {
         // measured after crowd separation, which can undo its step (`infantry_progress`)
-        return speed;
+        return Ok(speed);
     }
     let turning_in_place = ground_vehicle && angle_delta(before.rot, u.rot).abs() > 1e-4;
     let progress_speed = match &u.clearance {
@@ -274,7 +307,7 @@ fn block(
     } else {
         u.stuck = 0.0;
     }
-    speed
+    Ok(speed)
 }
 
 /// One tick of infantry or a boat along `route` (`walkRoute`): straight legs at full speed, the next
@@ -291,13 +324,14 @@ fn walk_route(
     dt: f64,
     back: bool,
     steer: &Steer,
+    knowledge: &TrafficKnowledge<'_>,
 ) -> bool {
     let block = kind.block();
     if kind.infantry && !steer.yielding {
         // Crowded squads can pass beside a waypoint. Keep required terrain corners and the exact final spot.
         while route.len() > 1
             && dist(u.at(), route[0]) < 1.0
-            && walkable(g, rules, u.at(), route[1], block | WIRE, 0.9)
+            && knowledge.clear(g, rules, u.at(), route[1], block | WIRE, 0.9)
         {
             route.remove(0);
         }
@@ -355,6 +389,7 @@ fn drive_vehicle(
     back: bool,
     steer: &Steer,
     before: Pose,
+    knowledge: &TrafficKnowledge<'_>,
 ) {
     use std::f64::consts::PI;
     let profile = kind
@@ -556,7 +591,8 @@ fn drive_vehicle(
         && math::cos(math::atan2(u.z - route[0].z, u.x - route[0].x) - next.travel_dir) > 0.0;
     let reached = near < math::max(0.12, pace * dt * 1.5)
         || next_leg.is_some_and(|leg| {
-            (near < lead || passed) && walkable(g, rules, u.at(), leg, block, kind.body_radius())
+            (near < lead || passed)
+                && knowledge.clear(g, rules, u.at(), leg, block, kind.body_radius())
         });
     if reached && !steer.yielding && u.clearance.is_none() {
         route.remove(0);

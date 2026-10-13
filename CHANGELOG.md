@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added borrowed recipient terrain to Match ground traffic steering and waypoint skipping while retaining physical speed and collision checks. The original-source recorder supplies 12 traces, 63 steps and 65 movement calls, including queues, passes, remembered edits and hidden physical contacts. Unit remains the sole owner of traffic and path-cache state; invalid knowledge errors propagate without losing the moving unit. World traffic, terrain effects and full match integration remain separate.
+
 - Stacked the checked Conquest command actuator on the reviewed recruitment and recipient-routing checkpoint, retaining its complete command behavior and canonical shared control state. Combined integration checks belong to the shared CI lane.
 
 
