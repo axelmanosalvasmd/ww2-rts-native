@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Corrected the source-written operative admission regression to use an absent historical ID when checking required retained firing/combat metadata. The earlier future ID only exercised allocator bounds; native verification remains pending.
+
+- Added source-written native tests for the operative tick composition: all 576 recorded operations and 506 actual ticks, exact represented state and 10 Combat draws, plus malformed admission, retained death metadata, queued-order preservation and direct clock-headroom checks. Support timers remain in the comparison. Native execution is pending; grenade settlement and ordinary jump/crouch body interoperability remain outside this checkpoint.
+
 - Connected the source operative respawn, early unit turn and ordered death hooks in a separate Conquest tick composition. Boundary joins enter prior poses, and operative turns skip ordinary timers. Replaced the earlier unconnected-actor refusal regression with a real queued-join phase test. The provider recorder reproduces 15 traces, 576 operations and 506 original ticks; combined native replay remains pending.
 
 - Connected canonical support cooldown and cover decay after projectiles and before living weather, preserving negative cooldowns and radio ownership before point updates. Active strikes and aircraft remain unavailable. A borrowed ordered boundary iterator rejects queued Support before consuming any input or changing payment, timers or the clock; a focused regression also protects future-boundary admission. Native verification is pending.

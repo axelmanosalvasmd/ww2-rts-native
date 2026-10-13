@@ -90,3 +90,91 @@ impl Match {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        economy::Faction,
+        economy_state::ArmySize,
+        map::AuthoritativeMap,
+        match_runtime::{MatchOptions, PlayerConfig},
+        weather::WeatherChoice,
+    };
+
+    #[test]
+    fn next_tick_reserves_the_entire_operative_death_delay_before_mutation() {
+        let map = AuthoritativeMap::from_json(
+            &serde_json::to_vec(&serde_json::json!({
+                "name":"Operative clock admission", "w":64, "h":64,
+                "rows":vec![".".repeat(64);64],
+                "spawns":[{"x":10,"y":32},{"x":54,"y":32}],
+                "points":[{"id":"inert","x":32,"y":32}],
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        let mut m = Match::new(
+            &map,
+            MatchOptions {
+                seed: 701,
+                mode: Mode::Conquest,
+                players: vec![
+                    PlayerConfig {
+                        name: "Commander".into(),
+                        team: 0,
+                        faction: Faction::Usa,
+                    },
+                    PlayerConfig {
+                        name: "Enemy".into(),
+                        team: 1,
+                        faction: Faction::Germany,
+                    },
+                ],
+                shuffle: false,
+                army: ArmySize::Standard,
+                weather: WeatherChoice::Map,
+                weather_seed: Some(1),
+                living_weather: false,
+                map_key: None,
+                tech: false,
+                supply: false,
+                logistics: false,
+                sandbox: false,
+            },
+        )
+        .unwrap();
+        m.join_companion("clock", 0, false).unwrap();
+        m.world.game.tick = SAFE_INTEGER - RESPAWN_TICKS;
+        let before = format!(
+            "{:?}",
+            (
+                &m.world,
+                &m.companions,
+                &m.start.economy,
+                m.commands.queue.snapshot(),
+                m.start.random.snapshot(),
+                m.next_unit_id
+            )
+        );
+        // Exercise this provider's boundary directly. The current full runner
+        // already imposes a stricter ordinary clock limit before this guard.
+        let error = m.prepare_companion_tick().unwrap_err();
+        assert!(error.contains("operative tick mode or clock"), "{error}");
+        assert_eq!(
+            format!(
+                "{:?}",
+                (
+                    &m.world,
+                    &m.companions,
+                    &m.start.economy,
+                    m.commands.queue.snapshot(),
+                    m.start.random.snapshot(),
+                    m.next_unit_id
+                )
+            ),
+            before
+        );
+        assert!(m.tick_state.fault().is_none());
+    }
+}
