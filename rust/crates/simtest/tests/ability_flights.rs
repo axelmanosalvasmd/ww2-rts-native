@@ -1,9 +1,9 @@
 use serde_json::{Value, json};
 use std::io::Read;
-use ww2_core::{game::Point, match_firing::AbilityBlast, random::StreamId};
+use ww2_core::{economy::Mode, game::Point, match_firing::AbilityBlast, random::StreamId};
 #[path = "common/firing.rs"]
 mod common;
-use common::{bits, compare, make, snapshot};
+use common::{bits, compare, make, make_with_mode, snapshot};
 fn fixture() -> Value {
     let mut text = String::new();
     flate2::read::GzDecoder::new(&include_bytes!("fixtures/ability-flights.json.gz")[..])
@@ -54,11 +54,17 @@ fn projection(m: &mut ww2_core::match_runtime::Match) -> Value {
     value
 }
 #[test]
-fn actual_ability_and_fps_launches_and_blasts_match_source() {
+fn default_and_conquest_ability_and_fps_launches_and_blasts_match_source() {
     let fixture = fixture();
     let mut checkpoints = 0;
-    for c in fixture["cases"].as_array().unwrap() {
-        let mut m = make(c);
+    for (c, mode) in fixture["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|c| [Mode::Default, Mode::Conquest].map(|mode| (c, mode)))
+    {
+        let mut m = make_with_mode(c, mode);
+        assert!(m.world.game.mode.is_none());
         m.world.game.units.get_mut(&1).unwrap().garrison =
             c["garrison"].as_u64().map(|v| v as usize);
         m.world.game.tick = 1;
@@ -132,7 +138,7 @@ fn actual_ability_and_fps_launches_and_blasts_match_source() {
             checkpoints += 1;
         }
     }
-    assert_eq!(checkpoints, 210);
+    assert_eq!(checkpoints, 210 * 2);
 }
 #[test]
 fn invalid_launches_are_atomic_and_only_success_returns_a_flight() {
