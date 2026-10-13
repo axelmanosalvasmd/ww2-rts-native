@@ -222,10 +222,71 @@ fn make(case: &Value) -> Match {
         c.cargo = v["cargo"].as_array().map_or_else(Vec::new, |v| {
             v.iter().map(|v| v.as_u64().unwrap() as u32).collect()
         });
+        m.abilities.initialize(id);
+        m.recovery.initialize(id);
         m.world.game.units.insert(id, u);
     }
     m.grid = SpatialGrid::new(&m.world.game.units, 16.);
     m
+}
+#[test]
+fn retirement_preflights_living_sidecars_and_cancels_paid_work_before_drop() {
+    use ww2_core::field_works::{FortKind, StartRequest};
+    let fixture: Value = serde_json::from_str(include_str!("fixtures/match-combat.json")).unwrap();
+    let mut m = make(&fixture["cases"][0]);
+    let at = m.world.game.units[&1].at();
+    let prepared = m
+        .field_works
+        .prepare_start(
+            &m.world,
+            &mut m.start.economy.players[0],
+            StartRequest {
+                control_eligible: true,
+                owner: 0,
+                unit: 1,
+                kind: FortKind::Trench,
+                at,
+                direction: Some(0.),
+            },
+            |_| true,
+        )
+        .unwrap();
+    prepared.commit(&mut m.field_works);
+    m.world.game.units.get_mut(&1).unwrap().dig = true;
+    m.world.game.units.get_mut(&1).unwrap().hp = 0.;
+    m.combat.get_mut(1).unwrap().xp = 7.;
+    let recovery = m.recovery.remove(2).unwrap();
+    let before = (
+        snapshot(&m, &Timers::default(), &BTreeMap::new()),
+        m.abilities.clone(),
+        m.recovery.clone(),
+        m.field_works.clone(),
+    );
+    assert!(m.retire_dead(&[1, 2, 3]).is_err());
+    assert_eq!(
+        (
+            snapshot(&m, &Timers::default(), &BTreeMap::new()),
+            m.abilities.clone(),
+            m.recovery.clone(),
+            m.field_works.clone(),
+        ),
+        before
+    );
+    assert!(m.world.game.units[&1].dig);
+    *m.recovery.initialize(2) = recovery;
+    let retired = m.retire_dead(&[1, 2, 3]).unwrap();
+    assert_eq!(retired.retired.len(), 1);
+    assert_eq!(retired.retired[0].unit.id, 1);
+    assert_eq!(retired.retired[0].unit.at(), at);
+    assert_eq!(retired.retired[0].unit.hp, 0.);
+    assert!(!retired.retired[0].unit.dig);
+    assert!(!m.world.game.units.contains_key(&1));
+    assert!(!m.field_works.is_active(1));
+    assert!(m.abilities.get(1).is_none());
+    assert!(m.recovery.get(1).is_none());
+    assert_eq!(m.combat.get(1).unwrap().xp, 7.);
+    assert!(m.abilities.get(2).is_some());
+    assert!(m.recovery.get(2).is_some());
 }
 #[test]
 fn ordered_damage_riders_terrain_and_death_match_original_source() {

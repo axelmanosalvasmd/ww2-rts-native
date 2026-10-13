@@ -4,6 +4,8 @@
 
 - Integrated the checked canonical ability, recovery and provision providers into the separate tick assembly, retaining the existing point-phase split and one metadata initialization per starting unit. Individual provider checks do not establish combined tick readiness; ordered phase wiring and combined native proof remain pending.
 
+- Added pre-drop ability, recovery and paid field-work cleanup for ordered retirement. Every captured potential unit is checked before removal, including live garrisons; each actual final unit loses those sidecars before leaving Game while Combat metadata remains for flights. A focused regression covers later-live-row rejection and retained shooter XP. Combined native verification is pending.
+
 - Connected staged tick burning to its captured late actor list while retaining complete current-unit environment validation. Later births will miss that direct fire beat; garrison eviction still reads current units. Combined provider integration and native checks remain pending.
 
 - Merged the captured fire and damage actor prerequisites into a separate staged tick assembly. Frozen PR #134 is unchanged; provider integration and combined native checks remain pending.

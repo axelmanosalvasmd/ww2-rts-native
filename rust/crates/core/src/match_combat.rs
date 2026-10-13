@@ -1067,6 +1067,43 @@ pub struct DeathResult {
     pub shots: Vec<environment::Effect>,
 }
 impl crate::match_runtime::Match {
+    /// Validate every captured potential removal, including living garrisons
+    /// that an earlier building retirement can kill in this same ordered pass.
+    fn validate_retirement_sidecars(&self, ids: &[UnitId]) -> Result<(), CombatError> {
+        for &id in ids {
+            let unit = self
+                .world
+                .game
+                .units
+                .get(&id)
+                .ok_or(CombatError::InvalidInput("death sidecar unit"))?;
+            if unit.id != id
+                || self.abilities.get(id).is_none()
+                || self.recovery.get(id).is_none()
+                || unit.dig != self.field_works.is_active(id)
+            {
+                return Err(CombatError::InvalidInput("death sidecar state"));
+            }
+        }
+        Ok(())
+    }
+
+    /// Drop Unit-owned sidecars at the actual removal boundary. Physical facts
+    /// and retained combat metadata stay available to the remaining phases.
+    fn retire_unit_sidecars(&mut self, unit: &mut crate::game::Unit) -> Result<(), CombatError> {
+        if self.abilities.get(unit.id).is_none()
+            || self.recovery.get(unit.id).is_none()
+            || unit.dig != self.field_works.is_active(unit.id)
+        {
+            return Err(CombatError::InvalidInput("death sidecar state"));
+        }
+        crate::match_runtime::cancel_field_work_state(&mut self.field_works, unit)
+            .map_err(|_| CombatError::InvalidInput("death field work"))?;
+        self.abilities.remove(unit.id);
+        self.recovery.remove(unit.id);
+        Ok(())
+    }
+
     /// Finish this tick's dead represented ground units in the caller's captured source order.
     /// Story/fallen, firing/control retirement and convoy hooks are returned to their owners.
     /// Metadata is retained while projectile sources may still refer to XP.
@@ -1084,6 +1121,7 @@ impl crate::match_runtime::Match {
             .copied()
             .filter(|id| self.world.game.units.contains_key(id))
             .collect::<Vec<_>>();
+        self.validate_retirement_sidecars(&ordered)?;
         let cfg = Catalog::compiled()
             .map_err(|_| CombatError::Rules)?
             .table("CFG")
@@ -1166,7 +1204,7 @@ impl crate::match_runtime::Match {
             .validate_retirement(&self.world, &facts, &ctx)?;
         let mut result = DeathResult::default();
         for id in ordered {
-            let Some(u) = self
+            let Some(mut u) = self
                 .world
                 .game
                 .units
@@ -1177,6 +1215,7 @@ impl crate::match_runtime::Match {
                 continue;
             };
             let metadata = self.combat.get(u.id).unwrap().clone();
+            self.retire_unit_sidecars(&mut u)?;
             self.world.game.units.remove(&u.id);
             self.grid.remove_unit(u.id);
             let current = self.world.game.units.keys().copied().collect::<Vec<_>>();
