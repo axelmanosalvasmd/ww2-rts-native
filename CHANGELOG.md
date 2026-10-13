@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Corrected the full-step carrier consumer’s absent-pace check after reading the actual native factory: source absence maps to the canonical NaN sentinel, while received numeric pace still compares exactly. No runtime or original fixture changed; native execution is pending.
+
 - Added a native actual-runner consumer for all 11 original full-step carrier cases. Both recorded arrival permutations enqueue 44 commands through 40 real tick calls and compare 62 initial/post-step projections. The source omitted mode stays native Default; no seed reset or expected-state injection is used. Source checks and formatting pass; native execution remains pending.
 
 - Normal-merged the source-reviewed carrier tick owner and checked Default runner into the full-step oracle tree. Existing queue variants and provider bodies are preserved; the new carrier composition awaits native replay.

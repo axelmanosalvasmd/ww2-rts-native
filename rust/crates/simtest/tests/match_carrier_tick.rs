@@ -430,7 +430,7 @@ fn compare(
             same!(tagged(json!(c.follow)), controls["follow"], "follow");
         }
         if controls["pace"].is_null() {
-            same!(u.pace, 0., "absent source pace");
+            assert!(u.pace.is_nan(), "{context}: absent source pace sentinel");
         } else {
             same!(tagged(json!(u.pace)), controls["pace"], "pace");
         }
