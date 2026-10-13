@@ -304,6 +304,8 @@ fn make(case: &Value) -> (Match, Vec<u32>) {
     }
     for p in &mut m.world.game.players {
         p.visible = order.clone();
+        p.visible.sort_unstable();
+        p.visible.dedup();
     }
     // Match::new initialized the old world. Bind fresh observation state to this
     // component fixture's actual initial terrain, without a public restore API.

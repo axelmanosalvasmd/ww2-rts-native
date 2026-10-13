@@ -797,11 +797,18 @@ impl crate::match_runtime::Match {
                 return self.move_command(owner, orders, *attack_move, *queue, *together, *face);
             }
             Command::Ability {
+                ids,
                 at,
                 queue,
                 automatic,
-                ..
-            } => return self.apply_ability_selection(owner, &selected, *at, *queue, *automatic),
+            } => {
+                let ordered = ids
+                    .iter()
+                    .take(limit)
+                    .map(|id| self.eligible_command_unit(*id, owner, command))
+                    .collect::<Vec<_>>();
+                return self.apply_ability_selection(owner, &ordered, *at, *queue, *automatic);
+            }
             Command::Autocast { on, .. } => {
                 let ready: Vec<_> = selected
                     .into_iter()

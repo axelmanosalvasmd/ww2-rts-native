@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Carried the verified provider repair for ordered ability refusal results into the engineering union after its release replay exposed lost ineligible selections. Fixture visibility lists now meet the canonical sorted recipient contract. The existing field-work cancellation remains singular and unchanged.
+
 - Removed a duplicated smoke-duration field from an inherited routing fixture. The release workspace compiler exposed the duplicate after the focused engineering and command tests passed.
 
 - Updated inherited native fixture consumers for the complete damage ordering context and ordered pending-cell set. The recovery fixture keeps the existing full actor list, and recruitment snapshots preserve the same cell contents. Native proof is restarting after these test compiler errors.
