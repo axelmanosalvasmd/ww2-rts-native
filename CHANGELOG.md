@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Connected the real ordinary field-work actuator between autocast and aimed ability/fire in the staged tick. Recorded Dig, accepted Move/Stop/Ability cancellation and retry-limit drop use the canonical descriptor and request scheduler. The actual-step recorder now covers eleven traces, 2,185 ticks and 120 checkpoints, including four paid trench cells completing at ticks 61, 122, 183 and 244; all ten prior traces are unchanged. Combined native validation remains pending.
+
+- Guarded unconnected operative unit execution before clock advancement, including an actor created by a recorded boundary join. A focused queued-admission regression checks the committed join remains visible while the staged runner faults before applying ground phases or retrying. Other missing phases and server match start remain explicit.
+
 - Merged the immutable source engineering and recorded-input provider into a separate tick composition. Preserved the checked ability selection/identity guards and fixture projections, captured burn actors and pre-drop cleanup while retaining the provider's actual engineering body and shared recruitment transaction. Provider and combined native proof remain pending.
 
 - Expanded the unchanged original-step tick recorder to ten traces, 1,940 ticks and 102 checkpoints. New cases protect boundary grenade launch/ticket expiry and paid infantry reinforcement on ticks 40 and 80, with exact ability/recovery rows and wallet/story charges. The eight earlier traces are unchanged. Native comparison of this assembly is pending.

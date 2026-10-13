@@ -20,7 +20,9 @@ pub enum TickPhase {
     UnitReserves,
     UnitOrders,
     Production,
+    Operative,
     Abilities,
+    FieldWork,
     AirRail,
     Riding,
     Reactions,
@@ -125,8 +127,18 @@ impl crate::match_runtime::Match {
             }
         }
         self.validate_abilities()?;
-        if !self.field_works.jobs().is_empty() || game.units.values().any(|u| u.dig) {
-            return Err("ordinary field-work tick actuator is not connected".into());
+        self.validate_tick_actors()?;
+        if self
+            .field_works
+            .jobs()
+            .keys()
+            .any(|id| !game.units.contains_key(id))
+            || game
+                .units
+                .values()
+                .any(|unit| unit.dig != self.field_works.is_active(unit.id))
+        {
+            return Err("invalid tick field-work activity".into());
         }
         let mut identities = std::collections::BTreeSet::new();
         for smoke in &game.smokes {
@@ -137,12 +149,27 @@ impl crate::match_runtime::Match {
         Ok(())
     }
 
+    fn validate_tick_actors(&self) -> Result<(), String> {
+        if self.world.game.units.values().any(|unit| {
+            self.commands
+                .units
+                .get(&unit.id)
+                .is_some_and(|control| control.operative)
+        }) {
+            return Err("operative tick actuator is not connected".into());
+        }
+        Ok(())
+    }
+
     fn run_tick(&mut self) -> Result<TickReport, String> {
         use crate::{movement, separation, vision, weather_runtime};
         let dt = self.rules.movement.tick;
         let winner_decided = self.finish.is_some();
         // Boundary orders carry the previous clock's timestamps and view keys.
         let commands = self.apply_commands(self.world.game.tick as u64 + 1, winner_decided)?;
+        // A boundary admission may publish an actor whose unit phase is absent.
+        // Fail this staged runner before that actor enters the ground loop.
+        self.validate_tick_actors()?;
         let mut environment = self.tick_environment_phase(EnvironmentPhase::StructureSync)?;
         self.grid.rebuild(&self.world.game.units);
         self.capture_firing_prior()?;
@@ -217,7 +244,7 @@ impl crate::match_runtime::Match {
             self.advance_firing_timers(id, dt)?;
             self.advance_ability_timers(id, dt)?;
             self.apply_autocast(id)?;
-            // Ordinary field work attaches here before aimed ability execution.
+            self.apply_field_work_unit(id)?;
             self.step_aimed_ability(id)?;
             self.apply_attack_move(id)?;
             let before = self.world.game.units[&id].at();
@@ -232,6 +259,7 @@ impl crate::match_runtime::Match {
         phases.extend([
             TickPhase::UnitOrders,
             TickPhase::Abilities,
+            TickPhase::FieldWork,
             TickPhase::Movement,
             TickPhase::Firing,
         ]);
@@ -317,6 +345,7 @@ impl crate::match_runtime::Match {
                 TickPhase::Research,
                 TickPhase::UnitReserves,
                 TickPhase::Production,
+                TickPhase::Operative,
                 TickPhase::AirRail,
                 TickPhase::Riding,
                 TickPhase::Reactions,

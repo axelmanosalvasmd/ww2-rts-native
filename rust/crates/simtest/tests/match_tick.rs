@@ -265,6 +265,29 @@ fn connected_tick_phases_match_actual_reference_steps() {
                             .collect::<Vec<_>>()
                     );
                 }
+                if c["field"] == true {
+                    let g = &m.world.game;
+                    state["field"] = json!({
+                        "jobs":m.field_works.jobs().iter().map(|(id,job)|json!([
+                            id,
+                            job.kind.as_str(),
+                            bits(job.at.x),
+                            bits(job.at.z),
+                            bits(job.direction),
+                            bits(job.elapsed),
+                            job.original_cells,
+                            job.cells.iter().map(|cell|json!([cell.cell,char::from(cell.ch).to_string()])).collect::<Vec<_>>(),
+                            job.front.map(bits),
+                            job.reach.map(bits),
+                            job.from.map(|at|[bits(at.x),bits(at.z)])
+                        ])).collect::<Vec<_>>(),
+                        "chars":String::from_utf8(g.chars.clone()).unwrap(),
+                        "front":g.chars.iter().enumerate().filter(|(_,ch)|**ch==b'T').map(|(cell,_)|json!([
+                            cell,
+                            bits(f64::from(g.trench_front.as_ref().unwrap()[cell]))
+                        ])).collect::<Vec<_>>()
+                    });
+                }
                 if input["commands"].is_array() {
                     use ww2_core::match_commands::MoveOutcome;
                     state["control"] = json!(
@@ -319,6 +342,37 @@ fn rejected_clock_does_not_consume_a_tick() {
     assert!(m.advance_tick().is_err());
     assert_eq!(snapshot(&m), before);
     assert!(m.tick_state.fault().is_none());
+}
+
+#[test]
+fn admitted_companion_cannot_enter_the_unconnected_ground_tick() {
+    let fixture: Value = serde_json::from_str(include_str!("fixtures/match-tick.json")).unwrap();
+    let mut m = make(&fixture["cases"][0]);
+    let count = m.world.game.units.len();
+    m.enqueue_command(
+        ww2_core::orders::OrderKey {
+            tick: 1,
+            issuer: 0,
+            sequence: 1,
+        },
+        ww2_core::match_commands::Command::CompanionJoin {
+            identity: ww2_core::recorded_input::CompanionJournalId::new(1).unwrap(),
+        },
+    )
+    .unwrap();
+    let error = m.advance_tick().unwrap_err();
+    assert!(error.contains("operative tick actuator"), "{error}");
+    assert_eq!(m.world.game.tick, 0);
+    assert_eq!(m.world.game.units.len(), count + 1);
+    assert!(m.commands.units.values().any(|control| control.operative));
+    assert!(m.tick_state.fault().is_some());
+    let after = snapshot(&m);
+    assert!(
+        m.advance_tick()
+            .unwrap_err()
+            .contains("tick runner faulted")
+    );
+    assert_eq!(snapshot(&m), after);
 }
 
 #[test]
