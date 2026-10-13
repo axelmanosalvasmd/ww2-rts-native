@@ -168,11 +168,14 @@ impl Pathfinding {
         prepared: TerrainView<'_>,
     ) -> Self {
         let mut fork = self.clone();
-        let vehicle_buffers = fork.vehicles.buffers_for(source);
-        fork.navigation
-            .rebind_terrain(source, prepared, &vehicle_buffers);
-        fork.vehicles.rebind_terrain(source, prepared);
+        fork.rebind_terrain(source, prepared);
         fork
+    }
+    pub(crate) fn rebind_terrain(&mut self, source: TerrainView<'_>, prepared: TerrainView<'_>) {
+        let vehicle_buffers = self.vehicles.buffers_for(source);
+        self.navigation
+            .rebind_terrain(source, prepared, &vehicle_buffers);
+        self.vehicles.rebind_terrain(source, prepared);
     }
 }
 
