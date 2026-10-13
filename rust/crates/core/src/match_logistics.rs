@@ -76,6 +76,35 @@ impl Match {
         self.convoys = ConvoyState::setup(true);
         self.step_supply_convoys_with_dt(false, 0.0)
     }
+    /// Prepare physical reserves before a new-unit payment/publication transaction commits.
+    pub fn prepare_new_unit_reserves(
+        &self,
+        unit: &Unit,
+    ) -> Result<Option<logistics::Reserves>, String> {
+        if !matches!(
+            self.options.mode,
+            crate::economy::Mode::Default | crate::economy::Mode::Conquest
+        ) {
+            return Err("new reserves require ordinary Conquest".into());
+        }
+        if unit.id == 0
+            || unit.owner >= self.start.players.len()
+            || unit.kind >= self.rules.kinds.len()
+            || self.world.game.units.contains_key(&unit.id)
+            || self.logistics.get(unit.id).is_some()
+        {
+            return Err("invalid new reserve identity".into());
+        }
+        let definition = Definition::from_catalog(&self.rules.kinds[unit.kind].name)
+            .map_err(|e| e.to_string())?;
+        let mut prepared = logistics::LogisticsState::default();
+        prepared.initialize_unit(
+            reserve_context(self.options.logistics),
+            facts(unit, &self.rules),
+            Some(&definition),
+        );
+        Ok(prepared.remove(unit.id))
+    }
     /// The source network runs on its own early-phase beat, using the tick's captured ordered list.
     pub fn refresh_supply_network(&mut self, unit_order: &[u32]) -> Result<(), String> {
         if self.convoys.is_none() {
@@ -181,6 +210,12 @@ impl Match {
         self.step_supply_convoys_with_dt(winner_decided, self.rules.movement.tick)
     }
     fn validate_supply(&self) -> Result<(), String> {
+        if !matches!(
+            self.options.mode,
+            crate::economy::Mode::Default | crate::economy::Mode::Conquest
+        ) {
+            return Err("supply adapter supports ordinary Conquest only".into());
+        }
         let g = &self.world.game;
         if g.tick < 0
             || g.tick as u64 > 9_007_199_254_740_351
@@ -241,7 +276,10 @@ impl Match {
             return Err("invalid canonical supply network".into());
         }
         for (i, p) in g.players.iter().enumerate() {
-            if i != p.slot || p.team != self.start.economy.players[i].team {
+            if i != p.slot
+                || !(0..32).contains(&p.team)
+                || p.team != self.start.economy.players[i].team
+            {
                 return Err("supply player ownership mismatch".into());
             }
         }
@@ -260,7 +298,7 @@ impl Match {
                     .is_some_and(|p| !p.x.is_finite() || !p.z.is_finite())
                 || u.amove
                     .is_some_and(|p| !p.x.is_finite() || !p.z.is_finite())
-                || self.commands.units.get(&u.id).is_none()
+                || !self.commands.units.contains_key(&u.id)
                 || self.firing.get(u.id).is_none()
                 || self.combat.get(u.id).is_none()
             {

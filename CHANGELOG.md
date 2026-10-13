@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified the new ground supply network, refill rates, real convoy routes and physical handoffs in 10 focused tests, plus 63 Match startup comparisons covering 663 reserve records. Fixed the observed-routing fire iterator integration and invalid canonical carrier/control checks; startup wiring and runtime traces remain in progress.
+
 - Prepared canonical Match supply phases, queue projection, truck placement/control actuation and death bookkeeping. New original-source recordings cover 63 logistics startups (663 reserve records), 288 convoy routes, 324 physical handoffs and 233 ground networks with 39,839 rate queries. Native comparisons remain pending the exclusive shared build slot; logistics startup stays refused until they pass.
 
 - Added source convoy-route and handoff helpers plus the initial canonical Match supply adapter. Recipient-routing and environment prerequisites are required before these phases can be verified or logistics startup can be enabled.

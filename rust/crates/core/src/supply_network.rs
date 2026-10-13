@@ -98,6 +98,7 @@ impl GroundSupplyNetwork {
             .checked_mul(view.height)
             .ok_or("invalid supply shape")?;
         if n == 0
+            || n > i32::MAX as usize
             || view.flags.len() != n
             || chars.len() != n
             || initial_chars.len() != n

@@ -62,6 +62,9 @@ impl SupplyRouting {
             to,
             safe,
         } = request;
+        if owner >= 32 {
+            return Err("invalid routing recipient".into());
+        }
         validate(known, from, to)?;
         if profile.air || profile.structure || profile.rail {
             return Err("unsupported convoy profile".into());
