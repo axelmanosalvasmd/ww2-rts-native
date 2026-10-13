@@ -140,11 +140,11 @@ The server also embeds the client-safe projection of all 33 authored maps. The g
 
 ## Compiled catalog and economy helpers (2026-10-12)
 
-`catalog.rs` embeds 42 post-initialization reference tables, including all 47 unit definitions, using `include_str!` and a single `OnceLock` parse. Access needs no files, network or engine. Explicit number tags preserve Infinity, NaN and negative zero. `harness/rules-fixture.mjs` verifies the reference commit and tracked source before generating the catalog, and a fingerprint checks every compiled field.
+The initial `catalog.rs` catalog embedded 42 post-initialization reference tables, including all 47 unit definitions, using `include_str!` and a single `OnceLock` parse. Access needs no files, network or engine. Explicit number tags preserve Infinity, NaN and negative zero. `harness/rules-fixture.mjs` verifies the reference commit and tracked source before generating the catalog, and a fingerprint checks every compiled field.
 
 `economy.rs` provides 11 stateless helpers: recruitment prices, faction compatibility, per-unit population weight, support drop population, building and builder lists, support and ability prices, required tiers, research prices and technology damage multipliers. Typed inputs admit the game's four factions and valid technology levels; unknown units/supports or impossible research states return errors. Ability overrides retain the reference's numeric values, including non-finite ones. Technology multipliers use the core's deterministic `pow`, consistent with the existing math decision.
 
-The recorded expectations call the JavaScript helpers themselves. Tests cover 10 mode inputs, every unit/faction, 80 support cases, 640 ability cases, 480 research cases and 56,400 damage multipliers. Grouped fingerprints plus 3,600 direct bit comparisons keep the fixture at 304 KB. The catalog is 26.6 KB.
+The recorded expectations call the JavaScript helpers themselves. Tests cover 10 mode inputs, every unit/faction, 80 support cases, 640 ability cases, 480 research cases and 56,400 damage multipliers. Grouped fingerprints plus 3,600 direct bit comparisons keep the fixture at 304 KB. The initial catalog was 26.6 KB; the following section records its expansion to 46 tables.
 
 The existing movement/vision `Rules` loader still accepts harness data. This catalog does not change the C interface or its formation-only `RULES_HASH`. Purchase execution, income, full army population counting, availability and placement remain separate work; these helpers alone do not validate an order.
 
