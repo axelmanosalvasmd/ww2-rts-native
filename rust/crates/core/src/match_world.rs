@@ -277,6 +277,12 @@ impl Match {
             TechState::new(1, 0, 0, 0).map_err(|e| format!("World research: {e:?}"))?;
         let mut result = Self {
             assault: None,
+            combat: crate::match_combat::CombatState::default(),
+            environment: crate::environment::EnvironmentRuntime::default(),
+            firing: crate::match_firing::FiringState::default(),
+            recipients: Vec::new(),
+            routing_fog: crate::fog::Fog::default(),
+            tick_state: crate::match_tick::TickState::default(),
             world_runtime: Some(runtime),
             commands: crate::match_commands::MatchCommands::new(4096),
             grid: SpatialGrid::new(&world.game.units, 16.0),
@@ -361,7 +367,10 @@ impl Match {
             vec![draft],
         )
         .map_err(|e| format!("World publication: {e:?}"))?
-        .publish();
+        .publish_with(|unit, _| {
+            self.combat.initialize(unit.id);
+            self.firing.initialize(unit.id);
+        });
         Ok(id)
     }
     fn stage_world_unit(

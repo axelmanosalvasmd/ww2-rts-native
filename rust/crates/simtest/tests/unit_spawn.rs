@@ -172,7 +172,7 @@ fn spawn_projection_and_region_placement_match_original_source() {
             map_count,
             fixture["supported"].as_array().unwrap().len()
         ),
-        (769, 513, 33, 44)
+        (775, 513, 33, 44)
     );
 }
 
