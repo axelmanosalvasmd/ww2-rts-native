@@ -731,11 +731,11 @@ impl crate::match_runtime::Match {
         search_route(&mut self.commands.paths, terrain, rules, kind, u, to).map(|r| r.result)
     }
 }
-struct CommandRoute {
-    result: crate::pathfinding::PathResult,
+pub(crate) struct CommandRoute {
+    pub(crate) result: crate::pathfinding::PathResult,
     failed: bool,
 }
-fn search_route(
+pub(crate) fn search_route(
     paths: &mut Pathfinding,
     terrain: crate::pathfinding::PathTerrain<'_>,
     rules: crate::pathfinding::PathRules,

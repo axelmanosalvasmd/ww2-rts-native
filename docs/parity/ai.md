@@ -122,3 +122,5 @@ This is a partial scripted opening component. The source fixture retains its one
 ### Immediate holder Cover checkpoint
 
 The quiet opening policy now records the first idle infantry holder's immediate Cover order, including source guards for existing cover, entrenchment and garrison state. The source oracle has 62 cases and 270 waypoint draws. The actuator adds 15 Cover cases to the command oracle (71 traces, 261 steps). Native comparison and queue admission tests are written but not yet run. AI-11, AI-39 and AI-49 remain in progress: paid holder fortification, nearby-house selection, active-job cancellation, queued Cover and the full commander remain incomplete.
+
+Cover now uses the canonical staged recipient guard for whole-batch failure atomicity. Source APIs and regression assertions are written; native validation and final independent source clearance remain pending. The pending-terrain acknowledgment and same-clock Move checks protect rejection before publication.

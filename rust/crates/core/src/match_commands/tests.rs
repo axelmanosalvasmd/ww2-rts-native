@@ -449,10 +449,44 @@ fn cover_refresh_preserves_moved_gameplay_bucket_order() {
     assert_eq!(probe(&m), before);
     m.recipient_sees(0, Point { x: 27.0, z: 23.0 }).unwrap();
     assert_eq!(probe(&m), before);
+    let mut untouched = initial(&case);
+    for id in [1, 3] {
+        let low = untouched.world.game.units.get_mut(&id).unwrap();
+        low.x = 49.0;
+        untouched.grid.update(id, low);
+        low.x = 27.0;
+        untouched.grid.update(id, low);
+    }
+    untouched.world.game.tick += 1;
+    assert_eq!(
+        untouched
+            .execute_command(0, &Command::Cover { ids: vec![1, 2] }, false)
+            .unwrap(),
+        None
+    );
+    untouched.observed_wrecks(0).unwrap();
+    untouched
+        .recipient_sees(0, Point { x: 27.0, z: 23.0 })
+        .unwrap();
+    untouched.world.game.units.get_mut(&2).unwrap().path_gen = u64::MAX;
+    untouched.world.game.tick += 1;
+    let witness = 11 * 32 + 14;
+    untouched.world.set_cell(witness, b'O').unwrap();
     m.world.game.units.get_mut(&2).unwrap().path_gen = u64::MAX;
     let state = snapshot(&m);
     let generation = m.world.game.units[&1].path_gen;
     m.world.game.tick += 1;
+    m.world.set_cell(witness, b'O').unwrap();
+    let rows = m.recipients[0].remembered().to_vec();
+    let query = m.recipients[0].query();
+    let navigation = query.navigation();
+    let versions = navigation.versions;
+    let flags = navigation.flags.to_vec();
+    let heights = navigation.heights.unwrap().to_vec();
+    let flags_ptr = navigation.flags.as_ptr();
+    let pending = m.world.pending(crate::world::Recipient::Player(0)).cloned();
+    assert!(!pending.as_ref().unwrap().is_empty());
+    let fog = m.routing_fog.clone();
     assert!(
         m.execute_command(0, &Command::Cover { ids: vec![1, 2] }, false)
             .is_err()
@@ -461,4 +495,40 @@ fn cover_refresh_preserves_moved_gameplay_bucket_order() {
     assert_eq!(m.world.game.units[&1].path_gen, generation);
     assert_eq!(m.world.game.units[&2].path_gen, u64::MAX);
     assert_eq!(probe(&m), before);
+    assert_eq!(m.recipients[0].remembered(), rows.as_slice());
+    let query = m.recipients[0].query();
+    let navigation = query.navigation();
+    assert_eq!(navigation.versions, versions);
+    assert_eq!(navigation.flags, flags.as_slice());
+    assert_eq!(navigation.heights.unwrap(), heights.as_slice());
+    assert_eq!(navigation.flags.as_ptr(), flags_ptr);
+    assert_eq!(
+        m.world.pending(crate::world::Recipient::Player(0)).cloned(),
+        pending
+    );
+    assert_eq!(m.routing_fog, fog);
+    let move_order = Command::Move {
+        orders: vec![MoveOrder {
+            unit: 1,
+            at: Point { x: 35.0, z: 27.0 },
+        }],
+        control_ids: None,
+        attack_move: false,
+        queue: false,
+        together: false,
+        face: None,
+    };
+    assert_eq!(
+        m.execute_command(0, &move_order, false).unwrap(),
+        untouched.execute_command(0, &move_order, false).unwrap()
+    );
+    assert_eq!(snapshot(&m), snapshot(&untouched));
+    assert_eq!(
+        m.recipients[0].remembered(),
+        untouched.recipients[0].remembered()
+    );
+    assert_eq!(
+        m.world.pending(crate::world::Recipient::Player(0)),
+        untouched.world.pending(crate::world::Recipient::Player(0))
+    );
 }

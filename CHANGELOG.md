@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Staged Cover recipient routing, Fog and terrain acknowledgments until the selected batch passes every path identity and publication check. Failed batches discard their own path scratch; successful actual path searches commit observations even when the resulting path is empty. Added a pending-terrain refusal and same-clock Move regression. Native proof remains pending.
+
 - Merged the canonical World recipient and staged observer prerequisites into the isolated Cover continuation. Provider bodies remain unchanged; combined native validation is pending.
 
 - Extended the immediate Cover source oracle with mixed retreat/no-cover and wrong-kind selections, plus riding, operative and forced-supply refusals. The original command body now records 71 traces and 261 steps. Native comparison and the staged recipient-observation integration are still pending.
