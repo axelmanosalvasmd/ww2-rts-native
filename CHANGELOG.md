@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added a native actual-runner consumer for all 11 original full-step carrier cases. Both recorded arrival permutations enqueue 44 commands through 40 real tick calls and compare 62 initial/post-step projections. The source omitted mode stays native Default; no seed reset or expected-state injection is used. Source checks and formatting pass; native execution remains pending.
+
 - Normal-merged the source-reviewed carrier tick owner and checked Default runner into the full-step oracle tree. Existing queue variants and provider bodies are preserved; the new carrier composition awaits native replay.
 
 - Recorded unchanged full source carrier steps: 11 cases, 22 commands, 20 steps and 57 snapshots. Passive grid observations and genuine failed/deferred routes replace observation rebuilds and post-command setup primes. Native actual-runner replay awaits the sole tick owner's transport hooks; no broader transport claim is made.
