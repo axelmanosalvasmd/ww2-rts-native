@@ -1,8 +1,8 @@
 # Rust to Unreal interface
 
-Status: **v0 draft, technical answers recorded.** Author: Julio. Consumer reviewer: Axel.
-Axel answered the drafts' technical questions on #5 (`axel-interface-response-004`, 2026-10-12); the answers are recorded below. Under `docs/agent-coordination.md` a comment is not an agreed interface, so the status stays "draft" until Axel approves a contract PR.
-Baseline: reference ww2-rts `e4e579a`; native `main` through PR #15 plus the client-view change. Formation calls and the first recipient-view calls are built and verified on Linux x86_64. ABI 2 is proposed for consumer review; it is not approved for adoption by this document.
+Status: **v0 draft; the six ABI 2 recipient-view calls are approved for staged adoption, pending PR #16 merge.** Author: Julio. Consumer reviewer: Axel.
+Axel approved those six calls and the staged Unreal update in [axel-abi2-approval-011](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6137078260). Julio's Rust-side approval is recorded in [julio-abi2-ack-012](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6137154035) and [PR #16](https://github.com/axelmanosalvasmd/ww2-rts-native/pull/16#issuecomment-6137154230). These decisions cover the six calls below and their staged consumer update only. The broader contract remains a draft, and the agreed scope is recorded after the normal PR merge. Actual ABI 2 build, link and runtime verification in the current Unreal checkout remains pending.
+Baseline: reference ww2-rts `e4e579a`; native `main` at `9c1db8af81accf433ce439c7a2da508a75d43208` plus PR #16. Formation calls and recipient-view calls have Linux x86_64 C-link verification; this is separate from Unreal integration and packaged-client verification.
 
 ## What the client needs from the core
 
@@ -57,7 +57,7 @@ Link the static library with the system libraries `cargo rustc -p ww2-ffi --rele
 
 ## Formation calls (introduced in ABI 1, 2026-10-12)
 
-`rust/crates/ffi` (`ww2-ffi`) introduced five functions for the #3 bridge test. That build returned ABI 1; the proposed recipient-view build below returns ABI 2. `ww2_rules_hash()` stays `0xed0ee23d32a621d1` because the compiled formation rules have not changed. The signatures and formation results below are unchanged.
+`rust/crates/ffi` (`ww2-ffi`) introduced five functions for the #3 bridge test. That build returned ABI 1; the recipient-view build below returns ABI 2. `ww2_rules_hash()` stays `0xed0ee23d32a621d1` because the compiled formation rules have not changed. The signatures and formation results below are unchanged.
 
 ```c
 uint32_t ww2_abi_version(void);
@@ -107,7 +107,7 @@ cargo test -p ww2-ffi    # the header check, the error cases and the panic bound
 
 The C program compiles without warnings and also passes on the Mac (`aarch64-apple-darwin`, Apple clang, linked with `-lSystem -lc -lm`); the Mac stays a planned target until the plugin links the library there.
 
-## Recipient-view calls (proposed ABI 2, 2026-10-12)
+## Recipient-view calls (ABI 2, approved for staged adoption)
 
 The C header now declares an opaque `ww2_view` and six functions:
 
@@ -127,7 +127,7 @@ Create one view per recipient and pass complete, unmodified server JSON messages
 - **Buffers.** Arrays belong to the caller. `out_len` receives the required count even when capacity is insufficient. A null array with zero capacity queries the count; a nonempty view returns `WW2_ERR_CAPACITY`. No partial row array is written on an error. Free the view once; a null view is accepted by `free`.
 - **Errors.** Added codes are `WW2_ERR_PARSE` -5, `WW2_ERR_WRONG_STATE` -6 and `WW2_ERR_POISONED` -7. Invalid JSON, UTF-8 or message shape leaves the state unchanged. A snapshot before `start` is a wrong-state error. Panics poison touched handles, and all operations except `free` then fail.
 - **Limits.** Messages are at most 16 MiB, maps at most four million cells, and the held set at most 100,000 units. These are decoder resource bounds, not gameplay limits or server command limits.
-- **Compatibility.** ABI 1 consumers check the version and will reject an ABI 2 replacement. Rebuild and verify the Unreal consumer against this header only after the shared interface review. No formation signature or wire-protocol field changed. Contract status stays draft.
+- **Compatibility.** ABI 1 consumers check the version and will reject an ABI 2 replacement. The scoped interface review is approved. The staged consumer update must retain the version check and verify its actual build, link and runtime behavior against this header. No formation signature or wire-protocol field changed. PR #16 remains open for coordinated adoption; the broader contract stays draft until its agreed scope is recorded through approval and merge.
 
 The Rust API also exposes raw start/snapshot/HUD fields, seen/explored masks and a raw received-cell cache with accumulated change ids. C readers for those fields, composed terrain and rule queries are later slices. This C interface therefore does not yet replace every temporary Unreal decoder.
 

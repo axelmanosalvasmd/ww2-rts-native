@@ -1,19 +1,98 @@
 //! Fine grid A* and path smoothing on explicitly supplied terrain and hazards.
 //!
-//! Supports infantry and naval profiles from `shared/sim.js` at `e4e579a`.
-//! Ground-vehicle footprints, automatic recipient-view selection and request
-//! scheduling are separate work. No game state is read behind the caller's view.
+//! Supports infantry, naval and road-vehicle profiles at `e4e579a`.
+//! Automatic recipient-view selection and request scheduling are separate work.
+//! No game state is read behind the caller's view.
 
-use crate::game::{CELL, MOVE, Point, WIRE};
+use crate::catalog::{Catalog, CatalogError, Value};
+use crate::game::{CELL, FORD, MOVE, MUD, Point, ROAD, WIRE, WOOD};
 use crate::math;
 use crate::navigation::{Navigation, NavigationError, Options, TerrainView};
 use crate::rules::UnitKind;
+use crate::vehicle_navigation::VehicleNavigation;
 
-/// Rules used by infantry and naval path cost and bunker clearance.
+/// Path cost and bunker clearance rules from the compiled catalog.
 #[derive(Clone, Copy, Debug)]
 pub struct PathRules {
     pub wall_hug: f64,
     pub bunker_radius: f64,
+    pub road_speed: f64,
+    pub ford_speed: [f64; 2],
+    pub mud_speed: [f64; 2],
+    pub wood_speed: f64,
+    pub churn: f64,
+    pub wet_ford: f64,
+    pub wet_ground: f64,
+}
+
+impl PathRules {
+    /// Load canonical path costs without runtime files or caller-provided JSON.
+    pub fn compiled() -> Result<Self, CatalogError> {
+        Self::from_catalog(Catalog::compiled()?)
+    }
+
+    /// Read path costs from the same catalog as the unit and movement rules.
+    /// Reject unusable costs before a native match starts.
+    pub fn from_catalog(catalog: &Catalog) -> Result<Self, CatalogError> {
+        let cfg = catalog.table("CFG")?;
+        let weather = cfg
+            .get("weather")
+            .ok_or_else(|| CatalogError("missing CFG.weather".into()))?;
+        let wood = cfg
+            .get("wood")
+            .ok_or_else(|| CatalogError("missing CFG.wood".into()))?;
+        let rules = Self {
+            wall_hug: path_number(cfg, "wallHug")?,
+            bunker_radius: path_number(catalog.unit("bunker")?, "radius")?,
+            road_speed: path_number(cfg, "roadSpeed")?,
+            ford_speed: path_pair(cfg, "fordSpeed")?,
+            mud_speed: path_pair(cfg, "mudSpeed")?,
+            wood_speed: path_number(wood, "speed")?,
+            churn: path_number(cfg, "churn")?,
+            wet_ford: path_number(weather, "wetFord")?,
+            wet_ground: path_number(weather, "wetGround")?,
+        };
+        if rules.wall_hug < 0.0
+            || rules.bunker_radius < 0.0
+            || [
+                rules.road_speed,
+                rules.wood_speed,
+                rules.ford_speed[0],
+                rules.ford_speed[1],
+                rules.mud_speed[0],
+                rules.mud_speed[1],
+            ]
+            .iter()
+            .any(|v| *v <= 0.0)
+            || [rules.churn, rules.wet_ford, rules.wet_ground]
+                .iter()
+                .any(|v| !(0.0..1.0).contains(v))
+        {
+            return Err(CatalogError("invalid path cost or ground speed".into()));
+        }
+        Ok(rules)
+    }
+}
+
+fn path_number(value: &Value, key: &str) -> Result<f64, CatalogError> {
+    value
+        .get(key)
+        .and_then(Value::number)
+        .filter(|n| n.is_finite())
+        .ok_or_else(|| CatalogError(format!("path rule {key} must be a finite number")))
+}
+fn path_pair(value: &Value, key: &str) -> Result<[f64; 2], CatalogError> {
+    let Some([a, b]) = value.get(key).and_then(Value::array) else {
+        return Err(CatalogError(format!(
+            "path rule {key} must have two numbers"
+        )));
+    };
+    match (a.number(), b.number()) {
+        (Some(a), Some(b)) if a.is_finite() && b.is_finite() => Ok([a, b]),
+        _ => Err(CatalogError(format!(
+            "path rule {key} must have finite numbers"
+        ))),
+    }
 }
 
 /// Each slice belongs to the same authoritative or recipient-owned terrain.
@@ -25,6 +104,11 @@ pub struct PathTerrain<'a> {
     pub known_mines: &'a [bool],
     pub fires: &'a [bool],
     pub bunkers: &'a [Point],
+    /// Current observed wear (zero when absent), public wetness and road presence.
+    /// Costs refresh on every search even when the navigation cache is reused.
+    pub wear: Option<&'a [f32]>,
+    pub wetness: f64,
+    pub roads: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -56,6 +140,7 @@ pub struct PathResult {
 pub struct Pathfinding {
     navigation: Navigation,
     scratch: Scratch,
+    vehicles: VehicleNavigation,
 }
 
 #[derive(Default)]
@@ -132,8 +217,7 @@ impl Pathfinding {
         to: Point,
         expansion_limit: Option<usize>,
     ) -> Result<PathResult, PathError> {
-        if profile.air || profile.rail || profile.structure || !(profile.infantry || profile.naval)
-        {
+        if profile.air || profile.rail || profile.structure {
             return Err(PathError::UnsupportedProfile);
         }
         let v = terrain.navigation;
@@ -145,6 +229,7 @@ impl Pathfinding {
             || n > i32::MAX as usize
             || v.flags.len() != n
             || v.heights.is_some_and(|h| h.len() != n)
+            || terrain.wear.is_some_and(|w| w.len() != n)
             || terrain.near_walls.len() != n
             || terrain.known_mines.len() != n
             || terrain.fires.len() != n
@@ -161,8 +246,47 @@ impl Pathfinding {
         {
             return Err(PathError::InvalidRules);
         }
+        let vehicle = profile.ground_vehicle();
+        if vehicle
+            && (!profile.radius.is_finite()
+                || profile.radius <= 0.0
+                || !terrain.wetness.is_finite()
+                || !(0.0..=1.0).contains(&terrain.wetness)
+                || terrain
+                    .wear
+                    .is_some_and(|w| w.iter().any(|v| !v.is_finite() || !(0.0..=1.0).contains(v)))
+                || [
+                    rules.road_speed,
+                    rules.wood_speed,
+                    rules.ford_speed[0],
+                    rules.ford_speed[1],
+                    rules.mud_speed[0],
+                    rules.mud_speed[1],
+                ]
+                .iter()
+                .any(|v| !v.is_finite() || *v <= 0.0)
+                || [rules.churn, rules.wet_ford, rules.wet_ground]
+                    .iter()
+                    .any(|v| !v.is_finite() || !(0.0..1.0).contains(v)))
+        {
+            return Err(PathError::InvalidRules);
+        }
         let block = profile.block();
-        let pull = if profile.naval { block } else { MOVE | WIRE };
+        let source = v;
+        let v = if vehicle {
+            self.vehicles.view(v, profile.radius, block)
+        } else {
+            v
+        };
+        let pull = if profile.naval {
+            block
+        } else if vehicle {
+            block | MUD | WOOD
+        } else {
+            MOVE | WIRE
+        };
+        let roads = vehicle && terrain.roads;
+        let low = if roads { 1.0 / rules.road_speed } else { 1.0 };
         self.scratch.prepare(n);
         let full_goal = self.scratch.nearest_free(v, to, block);
         let stand = cell_of(v, from).unwrap_or(0);
@@ -180,7 +304,10 @@ impl Pathfinding {
                 NavigationError::CellOutOfBounds => PathError::InvalidPosition,
             })?;
         let goal = leg.goal;
-        let route_end = if Some(full_goal) == cell_of(v, to) {
+        let route_end = if Some(full_goal) == cell_of(v, to)
+            && (!vehicle
+                || crate::vehicle_navigation::destination_clear(source, to, profile.radius, block))
+        {
             to
         } else {
             center(v, full_goal)
@@ -203,7 +330,7 @@ impl Pathfinding {
         let hq = |c: usize| {
             let dx = (c % v.width).abs_diff(goal % v.width) as f64;
             let dy = (c / v.width).abs_diff(goal / v.width) as f64;
-            dx.max(dy) + 0.414 * dx.min(dy)
+            (dx.max(dy) + 0.414 * dx.min(dy)) * low
         };
         scratch.heap.push(hq(start), start);
         scratch.scores[start] = 0.0;
@@ -266,12 +393,21 @@ impl Pathfinding {
                             0.0
                         };
                     }
+                    let move_cost = if vehicle {
+                        low.max(1.0 / ground_mul(terrain, rules, next))
+                    } else {
+                        1.0
+                    };
                     let cost = f64::from(scratch.scores[c])
-                        + if dx != 0 && dy != 0 { 1.414 } else { 1.0 }
+                        + (if dx != 0 && dy != 0 { 1.414 } else { 1.0 }) * move_cost
                         + f64::from(climb.max(0)) * 0.5
                         + f64::from(terrain.near_walls[next]) * rules.wall_hug
                         + post_penalty
-                        + if v.flags[next] & WIRE != 0 { 4.0 } else { 0.0 }
+                        + if !vehicle && v.flags[next] & WIRE != 0 {
+                            4.0
+                        } else {
+                            0.0
+                        }
                         + if terrain.fires[next] { 8.0 } else { 0.0 }
                         + if terrain.known_mines[next] { 30.0 } else { 0.0 };
                     if scratch.seen[next] != gen_id || cost < f64::from(scratch.scores[next]) {
@@ -318,6 +454,14 @@ impl Pathfinding {
         let mut i = 0;
         while i < points.len() {
             let mut j = points.len() - 1;
+            if roads {
+                for (k, point) in points.iter().enumerate().take(j).skip(i) {
+                    if cell_of(v, *point).is_some_and(|c| v.flags[c] & ROAD != 0) {
+                        j = k;
+                        break;
+                    }
+                }
+            }
             while j > i
                 && ((!profile.naval && !walkable(v, at, points[j], block, 0.9))
                     || !walkable(v, at, points[j], pull, 2.0)
@@ -335,6 +479,29 @@ impl Pathfinding {
             i = j + 1;
         }
         Ok(result)
+    }
+}
+
+fn ground_mul(terrain: PathTerrain<'_>, rules: PathRules, c: usize) -> f64 {
+    let f = terrain.navigation.flags[c];
+    let wear = terrain.wear.map_or(0.0, |w| f64::from(w[c]));
+    let wet = terrain.wetness
+        * if level(terrain.navigation, c) < 0 {
+            2.0
+        } else {
+            1.0
+        };
+    let lerp = |a: f64, b: f64| a + (b - a) * wear;
+    if f & FORD != 0 {
+        lerp(rules.ford_speed[0], rules.ford_speed[1]) * (1.0 - rules.wet_ford * wet.min(1.0))
+    } else if f & WOOD != 0 {
+        rules.wood_speed
+    } else if f & ROAD != 0 {
+        lerp(rules.road_speed, 1.0)
+    } else if f & MUD != 0 {
+        lerp(rules.mud_speed[0], rules.mud_speed[1]) * (1.0 - rules.wet_ground * wet)
+    } else {
+        (1.0 - rules.churn * wear) * (1.0 - rules.wet_ground * wet)
     }
 }
 

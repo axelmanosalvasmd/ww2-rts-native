@@ -1,5 +1,7 @@
 # Protocol recorder and browser oracle
 
+This harness verifies the internal Rust recipient decoder against the pinned reference protocol. PR #16 wraps the same decoder with six ABI 2 C calls, approved by both owners for staged adoption. PR merge and actual current-checkout Unreal verification remain pending. The harness does not establish Unreal integration or packaged-client completion.
+
 The baseline is reference commit `e4e579a838aabae3b1d9dadbc17a0a87147bc52d` and x64 Node 24.21.0. `WW2_REFERENCE` may point at another initialized checkout of that pin. Install its existing Node dependencies before running; the harness resolves `three` and `ws` from the reference checkout.
 
 ```sh
@@ -15,7 +17,7 @@ Only external test seams change: listening and automatic interval ticks are disa
 
 Each output has both `.jsonl` and deterministic `.jsonl.gz` forms. The committed files use gzip because complete World starts and longer Conquest streams exceed 500 KB uncompressed. They retain every raw message, including the full start. Nothing is cut from the map or snapshot payload. `view-check.mjs` also accepts multiple files in sequence for one recipient; use a separate invocation for a different recipient.
 
-The oracle directly imports the browser's `createWorldState` and `createFog`. It runs the unmodified `main.js` cell-application functions with rendering dependencies stubbed, and reads back received character, state, height, layer and discovery values. A start resets the browser view even when the match id repeats. A full snapshot replaces the held unit set; it does not reset fog or terrain. Every input line, including ignored lobby/deny/pause messages, produces one report with keys in this order:
+The oracle directly imports the browser's `createWorldState` and `createFog`. It runs the unmodified `main.js` cell-application functions with rendering dependencies stubbed and checks the browser's applied character, state, height, layer and discovery fields for received rows. The cross-language parity report compares the separate raw cell-row cache; it does not compare the complete composed terrain. A start resets the browser view even when the match id repeats. A full snapshot replaces the held unit set; it does not reset fog or terrain. Every input line, including ignored lobby/deny/pause messages, produces one report with keys in this order:
 
 `ids, units, seen, explored, cells, terrain, resync`
 

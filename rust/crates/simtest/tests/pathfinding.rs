@@ -1,7 +1,7 @@
 //! Compare the public path, resolved goal and search outcome with original JS.
 use serde_json::Value;
 use ww2_core::game::Point;
-use ww2_core::navigation::{TerrainView, Versions};
+use ww2_core::navigation::{TerrainChange, TerrainView, Versions};
 use ww2_core::pathfinding::{PathError, PathRules, PathStatus, PathTerrain, Pathfinding};
 use ww2_core::rules::UnitKind;
 
@@ -56,7 +56,7 @@ fn profile(name: &str, v: &Value) -> UnitKind {
 }
 
 #[test]
-fn infantry_and_naval_paths_match_original_find_path() {
+fn infantry_naval_and_vehicle_paths_match_original_find_path() {
     let fixture: Value = serde_json::from_str(include_str!("fixtures/pathfinding.json")).unwrap();
     assert_eq!(
         fixture["reference"],
@@ -67,7 +67,37 @@ fn infantry_and_naval_paths_match_original_find_path() {
     let rules = PathRules {
         wall_hug: fixture["rules"]["wallHug"].as_f64().unwrap(),
         bunker_radius: fixture["rules"]["bunkerRadius"].as_f64().unwrap(),
+        road_speed: fixture["rules"]["roadSpeed"].as_f64().unwrap(),
+        ford_speed: serde_json::from_value(fixture["rules"]["fordSpeed"].clone()).unwrap(),
+        mud_speed: serde_json::from_value(fixture["rules"]["mudSpeed"].clone()).unwrap(),
+        wood_speed: fixture["rules"]["woodSpeed"].as_f64().unwrap(),
+        churn: fixture["rules"]["churn"].as_f64().unwrap(),
+        wet_ford: fixture["rules"]["wetFord"].as_f64().unwrap(),
+        wet_ground: fixture["rules"]["wetGround"].as_f64().unwrap(),
     };
+    let compiled = PathRules::compiled().unwrap();
+    let values = |r: PathRules| {
+        [
+            r.wall_hug,
+            r.bunker_radius,
+            r.road_speed,
+            r.wood_speed,
+            r.ford_speed[0],
+            r.ford_speed[1],
+            r.mud_speed[0],
+            r.mud_speed[1],
+            r.churn,
+            r.wet_ford,
+            r.wet_ground,
+        ]
+        .map(f64::to_bits)
+    };
+    assert_eq!(
+        values(compiled),
+        values(rules),
+        "compiled costs must match the original-JavaScript oracle"
+    );
+    let rules = compiled;
     let mut queries = 0;
     let mut found = 0;
     let mut unreachable = 0;
@@ -78,52 +108,35 @@ fn infantry_and_naval_paths_match_original_find_path() {
         maps += usize::from(name.starts_with("map:"));
         let width = usize_field(scenario, "w");
         let height = usize_field(scenario, "h");
-        let flags: Vec<_> = runs(&scenario["flags"])
+        let mut flags: Vec<_> = runs(&scenario["flags"])
             .into_iter()
             .map(|v| v as u16)
             .collect();
-        let heights: Option<Vec<_>> = (!scenario["height"].is_null()).then(|| {
+        let mut heights: Option<Vec<_>> = (!scenario["height"].is_null()).then(|| {
             runs(&scenario["height"])
                 .into_iter()
                 .map(|v| v as i8)
                 .collect()
         });
-        let near: Vec<_> = runs(&scenario["near"])
+        let mut near: Vec<_> = runs(&scenario["near"])
             .into_iter()
             .map(|v| v as u8)
             .collect();
-        let mut mines = vec![false; flags.len()];
-        for c in scenario["mines"].as_array().unwrap() {
-            mines[c.as_u64().unwrap() as usize] = true;
-        }
-        let mut fires = vec![false; flags.len()];
-        for c in scenario["fires"].as_array().unwrap() {
-            fires[c.as_u64().unwrap() as usize] = true;
-        }
-        let bunkers: Vec<_> = scenario["bunkers"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(point)
-            .collect();
-        let navigation = TerrainView {
-            width,
-            height,
-            flags: &flags,
-            heights: heights.as_deref(),
-            world_known: scenario["worldKnown"].as_bool().unwrap(),
-            knowledge_id: 1,
-            versions: Versions::default(),
-            changed: None,
-            changes: &[],
-        };
-        let terrain = PathTerrain {
-            navigation,
-            near_walls: &near,
-            known_mines: &mines,
-            fires: &fires,
-            bunkers: &bunkers,
-        };
+        let mut wear: Option<Vec<f32>> = (!scenario["wear"].is_null()).then(|| {
+            scenario["wear"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .flat_map(|r| {
+                    std::iter::repeat_n(
+                        r[0].as_f64().unwrap() as f32,
+                        r[1].as_u64().unwrap() as usize,
+                    )
+                })
+                .collect()
+        });
+        let mut wetness = scenario["wetness"].as_f64().unwrap();
+        let mut version = 0;
         let mut finder = Pathfinding::new();
         for (i, query) in scenario["queries"].as_array().unwrap().iter().enumerate() {
             let name_type = query["type"].as_str().unwrap();
@@ -147,11 +160,78 @@ fn infantry_and_naval_paths_match_original_find_path() {
                 .iter()
                 .map(point)
                 .collect();
+            let update = &query["update"];
+            if update["replace"].as_bool() == Some(true) {
+                flags = flags.clone();
+            }
+            for edit in update["flags"].as_array().into_iter().flatten() {
+                flags[edit[0].as_u64().unwrap() as usize] = edit[1].as_u64().unwrap() as u16;
+            }
+            for edit in update["heights"].as_array().into_iter().flatten() {
+                heights.as_mut().unwrap()[edit[0].as_u64().unwrap() as usize] =
+                    edit[1].as_i64().unwrap() as i8;
+            }
+            for edit in update["wear"].as_array().into_iter().flatten() {
+                wear.as_mut().unwrap()[edit[0].as_u64().unwrap() as usize] =
+                    edit[1].as_f64().unwrap() as f32;
+            }
+            if let Some(v) = update["wetness"].as_f64() {
+                wetness = v;
+            }
+            if let Some(v) = update["version"].as_u64() {
+                version = v;
+            }
+            if !update.is_null() {
+                near.fill(0);
+                for (c, flag) in flags.iter().enumerate() {
+                    if flag & 3 != 3 {
+                        continue;
+                    }
+                    let x = c % width;
+                    for dy in [-1, 0, 1] {
+                        for dx in (if x > 0 { -1 } else { 0 })..=(if x < width - 1 { 1 } else { 0 })
+                        {
+                            let n = c as isize + dy * width as isize + dx;
+                            if n >= 0 && n < near.len() as isize {
+                                near[n as usize] = 1;
+                            }
+                        }
+                    }
+                }
+            }
+            let changed: Vec<usize> = update["changed"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .map(|v| v.as_u64().unwrap() as usize)
+                .collect();
             let query_terrain = PathTerrain {
+                navigation: TerrainView {
+                    width,
+                    height,
+                    flags: &flags,
+                    heights: heights.as_deref(),
+                    world_known: scenario["worldKnown"].as_bool().unwrap(),
+                    knowledge_id: 1,
+                    versions: Versions {
+                        vehicle: version,
+                        knowledge: version,
+                        ..Versions::default()
+                    },
+                    changed: update["from"].as_u64().map(|from| TerrainChange {
+                        from,
+                        to: version,
+                        cells: &changed,
+                    }),
+                    changes: &[],
+                },
+                near_walls: &near,
                 known_mines: &query_mines,
                 fires: &query_fires,
                 bunkers: &query_bunkers,
-                ..terrain
+                wear: wear.as_deref(),
+                wetness,
+                roads: scenario["roads"].as_bool().unwrap(),
             };
             let result = finder
                 .find_path(
@@ -188,7 +268,7 @@ fn infantry_and_naval_paths_match_original_find_path() {
     }
     assert_eq!(
         (queries, found, unreachable, deferred, maps),
-        (1175, 914, 163, 98, 33),
+        (1529, 1108, 299, 122, 33),
         "reference coverage changed"
     );
 }
@@ -216,15 +296,25 @@ fn invalid_inputs_and_unsupported_profiles_return_errors() {
         known_mines: &hazards,
         fires: &hazards,
         bunkers: &[],
+        wear: None,
+        wetness: 0.0,
+        roads: false,
     };
     let rules = PathRules {
         wall_hug: 0.5,
         bunker_radius: 2.0,
+        road_speed: 1.5,
+        ford_speed: [0.8, 0.5],
+        mud_speed: [0.5, 0.3],
+        wood_speed: 0.4,
+        churn: 0.3,
+        wet_ford: 0.3,
+        wet_ground: 0.3,
     };
     let from = Point { x: 1.0, z: 1.0 };
     let mut finder = Pathfinding::new();
-    for unsupported in 0..4 {
-        kind.infantry = unsupported != 0;
+    for unsupported in 1..4 {
+        kind.infantry = true;
         kind.air = unsupported == 1;
         kind.rail = unsupported == 2;
         kind.structure = unsupported == 3;

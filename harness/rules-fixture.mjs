@@ -43,6 +43,7 @@ const tables = {};
 for (const key of ['UNITS', 'UNIT_TYPES', 'CFG', 'SUPPORT', 'SUPPORT_TYPES', 'FORTS', 'TERRAIN', 'ENTRENCH', 'ENTRENCH_TYPES', 'BUILDABLE', 'WORLD_BUILDS', 'FIELD_BUILDS', 'SKIRMISH_BUILDS', 'AB_MUN', 'DOCTRINE', 'CELL', 'TICK', 'FACTION_COUNT', 'MAX_PLAYERS', 'MOVE', 'SIGHT', 'COVER', 'TRENCH', 'FORD', 'WIRE', 'VBLOCK', 'ROAD', 'MUD', 'WOOD', 'LAND', 'SHOAL']) tables[key] = sim[key];
 for (const key of ['TIER', 'TECH', 'TIER_NAMES']) tables[key] = tech[key];
 for (const key of ['WEATHER', 'WEATHER_KINDS', 'WEATHER_CHOICES', 'WEATHER_WARN']) tables[key] = weather[key];
+tables.WORLD_TUNING = (await load('world-conquest')).WORLD_TUNING;
 tables.SHAPES = formation.SHAPES;
 tables.TRAFFIC = traffic.TRAFFIC;
 tables.LANE = traffic.LANE;
