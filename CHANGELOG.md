@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Integrated the coordinated source-only ordinary list batch preparation API into active snapshot prerequisites. All-seat list replacements remain unpublished until producer/source/prior-memory checks finish; independent review and native verification remain pending for this union.
+
 - Preserved the independently reviewed, Vostro-verified quiet snapshot constructor, actor-order and ordinary logistics startup repairs in the separate active-list extension. The active-list dependency union still needs its own native proof.
 
 - Integrated the source-cleared canonical recipient list and staged observation prerequisites into a separate active-list snapshot extension. Preserved the ordinary snapshot guard and existing actor exclusions. Native verification and all-seat list preparation remain pending.
@@ -115,11 +117,20 @@
 - Added the native Match Conquest victory phase and finish bookkeeping: team VP in slot order, latest still-held capture location, 0.1 m end rounding, first-winner preservation, reveal and exact Conquest timeline fields. Canonical point accounting now freezes VP and capture story counts after the winner while ownership and manpower can continue. Three focused tests compare 12 original-JavaScript traces (24 assembled-match checkpoints) and invalid-state atomicity; existing startup and point-income tests pass. Other modes, command refusal, remaining story counters, result transport and the full battle loop remain unfinished.
 - Added a bounded World startup constructor with canonical home ownership, wallets, HQs, local defenders, fortifications, resource nodes, empty production and rail state, and actual initial visibility. The shared unit factory preserves source order and canonical guard controls; generator random history is retained. Five original-source records cover 2,761 units. Native checks are pending. Logistics-enabled startup, World terrain memory, mode tick phases, commands, trains and server hosting remain explicit boundaries.
 
+- Added read-only ordinary recipient-list batch preparation and checked publication. All requested seats validate before any remembered wreck row changes; stale hull, display, mode or recipient-memory inputs reject without publication. Source replay now exercises the prepared path, with a focused late-seat failure regression written. Native verification remains pending.
+
+- Merged the checked staged-routing provider footprint and test projection corrections into the recipient-list source successor. The provider evidence remains scoped to its recorded head; list and batch consumer native checks remain pending.
+
 - Added an actual-source World neutral wreck row and negative-zero rounding witness to the list replay. The fixture now covers five traces and 92 actions, including the internal neutral-owner sentinel projected as source owner -1; native proof remains pending.
 
 - Reject recipient wreck/node coordinates or wreck rotation whose source tenths rounding would overflow, before observation changes or JSON projection. Added the finite-but-unrepresentable rotation guard to the existing atomicity regression; native proof remains pending.
 
 - Added source-backed recipient wreck, found-mine and World resource-node lists. Full wreck display facts now stay in the single recipient memory beside derived cover queries; missing imported facts reject explicitly. Mine sightings retain discovery order. Prepared ordinary and World observations check the Environment source frame, and malformed visible metadata rejects before memory/Fog updates. The original-source fixture covers five traces and 92 actions; native verification is pending.
+- Verified prepared routing sight and cache transactions against 14 original births, 12 prebirth searches and one cross-team reroute. All three provider tests, focused routing and World memory debug tests, 167 release workspace tests, strict Clippy, formatting and release FFI pass. Actual recruitment wallet/story and World training integration remain separate.
+
+- Matched JavaScript JSON number spelling for endpoint wetness values in the shared birth replay projection and removed an unused test import. The first replay otherwise matched the cold-birth view exactly.
+
+- Corrected staged-observer cell validation and source fingerprints to use the canonical unit footprint index type. The first native compile exposed two integer-type mismatches.
 
 - Added a fourth original World birth case with a different team’s warmed vehicle history, four accepted prebirth changes and a postbirth reroute. The recorder now covers 14 births, 12 prebirth searches and one cross-team reroute; native success/abort cache-lifetime checks remain pending.
 

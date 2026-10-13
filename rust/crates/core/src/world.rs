@@ -289,7 +289,7 @@ struct ObservationUnit {
     built: Option<u64>,
     garrison: Option<usize>,
     air: Option<crate::game::PlaneState>,
-    cells: Option<Vec<usize>>,
+    cells: Option<Vec<u32>>,
 }
 enum ObservationAction {
     None,
@@ -334,10 +334,7 @@ impl PreparedObservation<'_> {
     }
 }
 impl ObservationReceipt {
-    pub(crate) fn prepare(
-        self,
-        world: &mut World,
-    ) -> Result<(&mut Game, PreparedObservation<'_>), String> {
+    pub(crate) fn validate_source(&self, world: &World) -> Result<(), String> {
         if self
             .frame
             .as_ref()
@@ -345,6 +342,13 @@ impl ObservationReceipt {
         {
             return Err("observation source changed before publication".into());
         }
+        Ok(())
+    }
+    pub(crate) fn prepare(
+        self,
+        world: &mut World,
+    ) -> Result<(&mut Game, PreparedObservation<'_>), String> {
+        self.validate_source(world)?;
         if let ObservationAction::Acknowledge {
             recipient, prior, ..
         } = &self.action

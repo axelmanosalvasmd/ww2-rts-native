@@ -876,3 +876,173 @@ pub fn prepare_recipient_routing<'a>(
         ),
     })
 }
+
+/// Read-only ordinary list preparation. Replacements are transient and become
+/// canonical only after every producer and recipient has passed its preflight.
+pub struct PreparedOrdinaryLists {
+    results: Vec<(usize, crate::recipient_lists::RecipientLists)>,
+    replacements: Vec<ListReplacement>,
+    source: crate::world::ObservationReceipt,
+    environment: crate::recipient_lists::WreckSourceFrame,
+}
+struct ListReplacement {
+    owner: usize,
+    prior: Vec<crate::recipient_lists::RememberedWreck>,
+    rows: Vec<crate::recipient_lists::RememberedWreck>,
+    queries: Vec<Wreck>,
+}
+/// Explicit source inputs allow assembly to borrow the remaining owners separately.
+pub struct OrdinaryListPublication<'a> {
+    pub world: &'a World,
+    pub environment: &'a crate::environment::EnvironmentRuntime,
+    pub options: &'a crate::match_runtime::MatchOptions,
+}
+pub struct OrdinaryListsCommit<'a, 'e> {
+    targets: &'a mut [RecipientRouting],
+    replacements: Vec<ListReplacement>,
+    _source: OrdinaryListPublication<'e>,
+}
+impl OrdinaryListsCommit<'_, '_> {
+    pub fn commit(self) {
+        for replacement in self.replacements {
+            let target = &mut self.targets[replacement.owner];
+            target.wreck_memory = replacement.rows;
+            target.wreck_queries = replacement.queries;
+        }
+    }
+}
+impl PreparedOrdinaryLists {
+    pub fn results(&self) -> &[(usize, crate::recipient_lists::RecipientLists)] {
+        &self.results
+    }
+    /// Validate all sources before acquiring the one canonical memory owner.
+    /// Publication holds source owners immutable and performs no terrain/Fog acknowledgment.
+    pub fn prepare_publication<'a, 'e>(
+        self,
+        source: OrdinaryListPublication<'e>,
+        targets: &'a mut [RecipientRouting],
+    ) -> Result<OrdinaryListsCommit<'a, 'e>, String> {
+        if !matches!(source.options.mode, Mode::Default | Mode::Conquest)
+            || source.world.game.mode.is_some()
+        {
+            return Err("ordinary list publication mode changed".into());
+        }
+        self.source.validate_source(source.world)?;
+        self.environment.validate(source.environment)?;
+        if targets.len() != source.world.game.players.len() {
+            return Err("list recipient table changed".into());
+        }
+        for replacement in &self.replacements {
+            let target = targets
+                .get(replacement.owner)
+                .ok_or("list recipient table changed")?;
+            target
+                .memory
+                .validate_binding(source.world)
+                .map_err(|e| format!("list memory binding: {e:?}"))?;
+            if target.memory.slot() != replacement.owner
+                || target.memory.identity() != replacement.owner as u64
+                || target.wreck_memory != replacement.prior
+            {
+                return Err("recipient wreck memory changed during list preparation".into());
+            }
+        }
+        Ok(OrdinaryListsCommit {
+            targets,
+            replacements: self.replacements,
+            _source: source,
+        })
+    }
+}
+/// All requested ordinary seats are prepared against one unchanged canonical source.
+/// Only each seat's bounded remembered wreck records are copied, not Match or terrain.
+pub fn prepare_ordinary_recipient_lists(
+    state: &Match,
+    owners: &[usize],
+) -> Result<PreparedOrdinaryLists, String> {
+    if !matches!(state.options.mode, Mode::Default | Mode::Conquest)
+        || state.world.game.mode.is_some()
+    {
+        return Err("ordinary list batch requires ordinary Conquest".into());
+    }
+    let mut unique = std::collections::BTreeSet::new();
+    for &owner in owners {
+        if !unique.insert(owner) {
+            return Err("duplicate list recipient".into());
+        }
+        state.validate_recipient(owner)?;
+    }
+    let g = &state.world.game;
+    if state
+        .world
+        .mine_seen
+        .keys()
+        .any(|cell| *cell >= g.chars.len())
+    {
+        return Err("invalid found-mine cell".into());
+    }
+    let grid = SpatialGrid::new(&g.units, 16.0);
+    let mut results = Vec::with_capacity(owners.len());
+    let mut replacements = Vec::with_capacity(owners.len());
+    for &owner in owners {
+        let prior = &state.recipients[owner].wreck_memory;
+        let accepted = collect_wrecks(g, &state.rules, &grid, owner, None, &state.environment)?;
+        let rows = staged_wreck_memory(prior, g, &state.rules, &grid, owner, None, accepted);
+        let wrecks = crate::recipient_lists::display_rows(&rows)?;
+        let team = g.players[owner].team;
+        let found_mines = state
+            .world
+            .mine_seen
+            .iter()
+            .filter_map(|(&cell, &bits)| {
+                ((bits >> team & 1) != 0 && g.chars[cell] == b'N').then_some(cell)
+            })
+            .collect();
+        let queries = rows.iter().map(|row| row.query.clone()).collect();
+        replacements.push(ListReplacement {
+            owner,
+            prior: prior.clone(),
+            rows,
+            queries,
+        });
+        results.push((
+            owner,
+            crate::recipient_lists::RecipientLists {
+                wrecks,
+                found_mines,
+                nodes: None,
+            },
+        ));
+    }
+    Ok(PreparedOrdinaryLists {
+        results,
+        replacements,
+        source: state.world.defer_observation(None, true),
+        environment: crate::recipient_lists::WreckSourceFrame::capture(g, &state.environment),
+    })
+}
+impl Match {
+    pub fn prepare_ordinary_recipient_lists(
+        &self,
+        owners: &[usize],
+    ) -> Result<PreparedOrdinaryLists, String> {
+        prepare_ordinary_recipient_lists(self, owners)
+    }
+    /// Convenience publication after assembly has finished its other fallible work.
+    pub fn publish_ordinary_recipient_lists(
+        &mut self,
+        prepared: PreparedOrdinaryLists,
+    ) -> Result<(), String> {
+        prepared
+            .prepare_publication(
+                OrdinaryListPublication {
+                    world: &self.world,
+                    environment: &self.environment,
+                    options: &self.options,
+                },
+                &mut self.recipients,
+            )?
+            .commit();
+        Ok(())
+    }
+}

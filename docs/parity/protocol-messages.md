@@ -374,3 +374,5 @@ When no seat, spectator or operative is connected for more than 60 s, the room a
 ### Recipient ground-list checkpoint
 
 A source-written internal producer now retains complete observed wreck rows from canonical Environment metadata and Game hulls, preserves found-mine discovery order, and projects World nodes from actual team memory and ResourceNode owners. Ordinary nodes remain absent; missing imported wreck facts reject explicitly. Five original-source traces cover 92 actions. Native checks and complete-envelope delivery integration remain pending; this does not change the draft wire contract.
+
+Ordinary list assembly can prepare all requested seats read-only, inspect their ordered typed results and publish their remembered wreck replacements only after every producer passes preflight. Source-frame and prior-memory checks reject stale preparations. This boundary neither acknowledges terrain/Fog nor advances server delivery versions; native batch verification remains pending.
