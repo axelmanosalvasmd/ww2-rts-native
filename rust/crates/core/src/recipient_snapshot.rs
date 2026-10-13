@@ -92,8 +92,12 @@ impl<'a> SnapshotCache<'a> {
         {
             return Err(SnapshotError::InvalidRecipient);
         }
-        for u in g.units.values() {
-            if u.kind >= state.rules.kinds.len() || u.owner >= g.players.len() {
+        for (id, u) in &g.units {
+            if *id != u.id
+                || u.id == 0
+                || u.kind >= state.rules.kinds.len()
+                || u.owner >= g.players.len()
+            {
                 return Err(SnapshotError::Rules);
             }
             finite(&[u.x, u.z])?;
@@ -660,6 +664,9 @@ mod tests {
             SnapshotCache::new(&m).unwrap().recipient(3),
             Err(SnapshotError::InvalidRecipient)
         ));
+        m.world.game.units.get_mut(&1).unwrap().id = 2;
+        assert!(matches!(SnapshotCache::new(&m), Err(SnapshotError::Rules)));
+        m.world.game.units.get_mut(&1).unwrap().id = 1;
         let saved_kind = m.world.game.units[&2].kind;
         m.world.game.units.get_mut(&2).unwrap().kind = usize::MAX;
         assert!(matches!(SnapshotCache::new(&m), Err(SnapshotError::Rules)));
