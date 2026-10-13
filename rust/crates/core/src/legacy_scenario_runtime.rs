@@ -24,6 +24,15 @@ pub(crate) fn step_legacy_scenario_emitting(
     tick: u64,
     emit: &mut dyn FnMut(LegacyScenarioEmission),
 ) -> Result<(), String> {
+    step_legacy_scenario_emitting_with_cell_hook(state, tick, emit, &mut || Ok(()))
+}
+
+fn step_legacy_scenario_emitting_with_cell_hook(
+    state: &mut Match,
+    tick: u64,
+    emit: &mut dyn FnMut(LegacyScenarioEmission),
+    after_cell: &mut dyn FnMut() -> Result<(), String>,
+) -> Result<(), String> {
     state.preflight_legacy_scenario()?;
     let Match {
         scenario,
@@ -83,6 +92,7 @@ pub(crate) fn step_legacy_scenario_emitting(
                 wind_strength,
                 destroy,
                 emit,
+                after_cell,
             ),
         })
         .map_err(|error| match error {
@@ -108,6 +118,7 @@ fn emit_destroy(
     wind_strength: f64,
     destroy: DestroyAction,
     emit: &mut dyn FnMut(LegacyScenarioEmission),
+    after_cell: &mut dyn FnMut() -> Result<(), String>,
 ) -> Result<(), String> {
     let [x0, y0, x1, y1] = destroy.bounds;
     if x0 > x1 || y0 > y1 || x1 >= world.game.w || y1 >= world.game.h {
@@ -153,6 +164,7 @@ fn emit_destroy(
                     &mut output,
                 )
                 .map_err(|error| format!("legacy scenario destroy: {error}"))?;
+            after_cell()?;
         }
     }
     Ok(())
@@ -217,6 +229,7 @@ mod tests {
         match_runtime::{MatchOptions, PlayerConfig},
         weather::WeatherChoice,
     };
+    use std::cell::Cell;
 
     #[test]
     fn great_bridge_due_triggers_emit_say_and_commit_destroy_effects() {
@@ -285,6 +298,84 @@ mod tests {
         assert_eq!(
             state.scenario.as_ref().unwrap().state().triggers["legacy:2@match"].count,
             1
+        );
+    }
+
+    #[test]
+    fn post_damage_failure_keeps_say_effect_and_world_prefix() {
+        let map = AuthoritativeMap::from_json(include_bytes!(
+            "../../server/src/authoritative-maps/the-great-bridge.json"
+        ))
+        .unwrap();
+        let mut state = Match::new(
+            &map,
+            MatchOptions {
+                seed: 701,
+                mode: Mode::Conquest,
+                players: (0..2)
+                    .map(|team| PlayerConfig {
+                        name: format!("P{team}"),
+                        team,
+                        faction: Faction::try_from(team as u8).unwrap(),
+                    })
+                    .collect(),
+                shuffle: false,
+                army: ArmySize::Standard,
+                weather: WeatherChoice::Map,
+                weather_seed: Some(1),
+                living_weather: false,
+                map_key: None,
+                tech: false,
+                supply: false,
+                logistics: false,
+                sandbox: false,
+            },
+        )
+        .unwrap();
+        state.world.game.tick = 8400;
+        let old_flags = state.world.game.flags.clone();
+        let environment_count = Cell::new(0);
+        let mut emitted = Vec::new();
+        let result = step_legacy_scenario_emitting_with_cell_hook(
+            &mut state,
+            8400,
+            &mut |event| {
+                if matches!(event, LegacyScenarioEmission::Environment(_)) {
+                    environment_count.set(environment_count.get() + 1);
+                }
+                emitted.push(event);
+            },
+            &mut || {
+                if environment_count.get() > 0 {
+                    Err("injected after canonical damage emission".into())
+                } else {
+                    Ok(())
+                }
+            },
+        );
+
+        assert_eq!(
+            result,
+            Err("injected after canonical damage emission".into())
+        );
+        assert!(matches!(
+            emitted.first(),
+            Some(LegacyScenarioEmission::Say(_))
+        ));
+        assert!(environment_count.get() > 0);
+        assert_ne!(state.world.game.flags, old_flags);
+        assert_eq!(
+            state.scenario.as_ref().unwrap().state().triggers["legacy:2@match"].count,
+            1
+        );
+        assert!(
+            !state
+                .scenario
+                .as_ref()
+                .unwrap()
+                .state()
+                .triggers
+                .contains_key("legacy:3@match")
         );
     }
 }
