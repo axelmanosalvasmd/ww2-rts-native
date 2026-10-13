@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Corrected the new birth replay to call the canonical byte-based World cell setter. Source recording remains unchanged; native compilation and replay are still pending.
+
 - Checked ordered fire membership and mine ownership/discovery maps before prepared routing commits. Independent source review found these facts can change without advancing a terrain key; rejected preparations retain the original recipient and World ledgers.
 
 - Recorded 13 original birth-sight cases: ten ordinary buys through the original command and three World produce-unit calls, plus eight warmed infantry/vehicle searches across ordered terrain changes. Added native typed-publication, abort, source-frame, cache-identity and journal-trim witnesses. Native execution and independent review remain pending.
