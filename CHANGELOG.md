@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Recorded the expanded four-trace World knowledge evidence: 120 actions, 27 route reads, 16 terrain deliveries, nine region reads and six wreck reads. Core atomic guards and startup checks pass; full memory replay, release and strict lint checks remain pending.
+
 - Strengthened the World original-source recorder with an authored hidden mine during reveal and a wreck removed outside current sight, then revisited. The four traces now contain 120 actions; native replay remains pending.
 
 - Delegated World wreck discovery and removal to the shared current-position visibility predicate, removing its private copy. World ghost removal retains its distinct source close-range rule. Native replay is pending.
