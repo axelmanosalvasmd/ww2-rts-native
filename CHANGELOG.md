@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Ported pure weather planning, map mood/default selection, one-time transitions, warning rows, effect descriptions, AI caution and presentation road masks to `weather.rs`. Canonical values come from the compiled catalog; the explicit plan seed preserves the reference's local mulberry32 sequence. Five focused tests compare 158 metadata cases, 5,682 plans, 590 transition rows, 231 synthetic roads and all 33 authored public maps with the original JavaScript helpers. Existing movement/sight logic, Game fields, ABI and rules hash are unchanged. Full match initialization, living rain/wet ground and snapshot/client integration remain pending.
+
 - Recorded the standalone request scheduler, its 606-action oracle and remaining integration work in the design and movement inventory. MOV-40 and MOV-41 remain in progress until live-order eligibility and actual movement use the scheduler.
 
 - Fixed path requests that return a usable route after an earlier fallback attempt increments the failure count. The scheduler now retains the route and applies the reference retry accounting independently. Two original-source cases cover route retention, retry-limit cancellation and recovery behavior; the fixture now matches 606 actions, 207 searches and 22 drops. Non-finite returned waypoints remain rejected.

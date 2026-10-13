@@ -28,3 +28,4 @@ pub mod traffic;
 pub mod vehicle;
 mod vehicle_navigation;
 pub mod vision;
+pub mod weather;
