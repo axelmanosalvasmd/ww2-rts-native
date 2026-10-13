@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Connected support to the single recorded command queue, with whole-command validation and source cooldown/manpower denials. Ground strike progression now accepts captured late actor subsets. The original-source oracle covers 54 traces and 810 checkpoints, including direct-hit exclusion, bridge failure and rubble spilling beside a fresh vehicle. A mixed Move/Support queue regression checks arrival-independent ordering, one payment and preserved movement. Native checks remain queued; aircraft support and complete tick integration remain unfinished.
+
 - Added explicit captured actor membership for blast damage and source-list terrain casualties while keeping full canonical environment validation and ordinary projectile defaults. Bridge casualties and legacy rubble/blocked-cell checks use captured actors; garrison eviction still uses current units. Independent source review passes; native checks are queued.
 
 - Added a bounded Conquest support actuator for paid artillery, smoke and fighter-cover calls, using canonical wallets, cooldowns, story counters and the OffMap random stream. The original-source recorder checks 36 traces and 540 admission/progression checkpoints. Native checks are queued. Aircraft support, captured-list damage membership and recorded-command integration remain pending.

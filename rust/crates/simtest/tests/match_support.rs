@@ -66,14 +66,17 @@ fn make(t: &Value) -> Match {
     m.combat = CombatState::default();
     m.firing = FiringState::default();
     m.commands.units.clear();
-    let kind = m.rules.kind("rifle").unwrap();
+    let kind = m.rules.kind(t["unit"]["kind"].as_str().unwrap()).unwrap();
     let mut u = unit_spawn::initial_unit(
         &m.rules,
         Catalog::compiled().unwrap(),
         kind,
         1,
         1,
-        Point { x: 41.0, z: 41.0 },
+        Point {
+            x: t["unit"]["x"].as_f64().unwrap(),
+            z: t["unit"]["z"].as_f64().unwrap(),
+        },
     )
     .unwrap();
     u.still = Some(20.0);
@@ -82,6 +85,17 @@ fn make(t: &Value) -> Match {
     m.combat.initialize(1).hit_by = Some(0);
     m.firing.initialize(1).retarget = 0.5;
     m.world.game.units.insert(1, u);
+    if t["variation"] == "late-house" {
+        m.world.sections.clear();
+        m.world.structures.clear();
+        m.world.game.sections.clear();
+    }
+    if let Some(c) = t["weakened"].as_u64() {
+        m.world.game.cell_hp[c as usize] = 40.0;
+        if t["variation"] == "late-bridge" {
+            m.world.game.sections.get_mut(&(c as u32)).unwrap().hp = 40.0;
+        }
+    }
     m.grid.rebuild(&m.world.game.units);
     for p in &mut m.start.economy.players {
         p.mp = if t["variation"] == "poor" { 0.0 } else { 500.0 };
@@ -178,7 +192,15 @@ fn actual_support_admission_strikes_and_timers_match_source() {
                 for current in last + 1..=tick {
                     m.world.game.tick = current;
                     m.support.events.clear();
-                    m.step_support_strikes(&[1], 0.05).unwrap();
+                    m.step_support_strikes(
+                        if t["variation"].as_str().unwrap().starts_with("late-") {
+                            &[]
+                        } else {
+                            &[1]
+                        },
+                        0.05,
+                    )
+                    .unwrap();
                     m.advance_support_timers(0.05).unwrap();
                 }
                 last = tick;
@@ -193,7 +215,7 @@ fn actual_support_admission_strikes_and_timers_match_source() {
             count += 1;
         }
     }
-    assert_eq!(count, 540);
+    assert_eq!(count, 810);
 }
 #[test]
 fn unsupported_air_and_invalid_membership_do_not_charge_or_publish() {
@@ -214,7 +236,69 @@ fn unsupported_air_and_invalid_membership_do_not_charge_or_publish() {
         .unwrap();
     let before = m.support.clone();
     let random = m.start.random.snapshot();
-    assert!(m.step_support_strikes(&[], 0.05).is_err());
+    assert!(m.step_support_strikes(&[2], 0.05).is_err());
     assert_eq!(m.support, before);
     assert_eq!(m.start.random.snapshot(), random);
+}
+
+#[test]
+fn mixed_move_and_support_share_one_recorded_boundary_order() {
+    use ww2_core::{
+        match_commands::{Command, Denial},
+        orders::OrderKey,
+    };
+    let f = fixture();
+    let rows = [
+        json!({"t":"support","kind":"artillery","x":41,"z":41,"dir":0.3}),
+        json!({"t":"move","orders":[[1,45,41]]}),
+        json!({"t":"support","kind":"artillery","x":51,"z":41,"dir":0.3}),
+    ];
+    let mut expected = None;
+    for arrival in [[0, 1, 2], [2, 0, 1], [1, 2, 0]] {
+        let mut m = make(&f["traces"][0]);
+        for i in arrival {
+            m.enqueue_command(
+                OrderKey {
+                    tick: 1,
+                    issuer: 1,
+                    sequence: i as u64 + 1,
+                },
+                Command::from_json(&rows[i]).unwrap(),
+            )
+            .unwrap();
+        }
+        let results = m.apply_commands(1, false).unwrap();
+        assert_eq!(
+            results.iter().map(|r| r.key.sequence).collect::<Vec<_>>(),
+            [1, 2, 3]
+        );
+        assert_eq!(
+            results.iter().map(|r| r.denial).collect::<Vec<_>>(),
+            [None, None, Some(Denial::Cooldown)]
+        );
+        assert_eq!(m.start.economy.players[1].mp, 350.0);
+        assert_eq!(m.story[1].support_calls, 1.0);
+        assert_eq!(m.story[1].mp_spent, 150.0);
+        assert_eq!(m.support.strikes.len(), 1);
+        assert_eq!(m.support.strikes[0].at, Point { x: 41.0, z: 41.0 });
+        assert!(!m.world.game.units[&1].path.is_empty());
+        let value = (
+            m.world.game.units[&1].path.clone(),
+            m.support.clone(),
+            m.start.players[1].support.clone(),
+        );
+        if let Some(expected) = &expected {
+            assert_eq!(&value, expected);
+        } else {
+            expected = Some(value);
+        }
+        let wallet = m.start.economy.players[1].mp;
+        assert!(
+            Command::from_json(
+                &json!({"t":"support","kind":"artillery","x":41,"z":41,"orders":[[1,2]]})
+            )
+            .is_err()
+        );
+        assert_eq!(m.start.economy.players[1].mp, wallet);
+    }
 }

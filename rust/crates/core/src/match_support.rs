@@ -270,13 +270,12 @@ impl Match {
         if !dt.is_finite() || dt < 0.0 || unit_order.windows(2).any(|v| v[0] >= v[1]) {
             return Err(SupportError::Invalid("invalid support step"));
         }
-        if unit_order.len() != self.world.game.units.len()
-            || unit_order
-                .iter()
-                .any(|id| !self.world.game.units.contains_key(id))
+        if unit_order
+            .iter()
+            .any(|id| !self.world.game.units.contains_key(id))
         {
             return Err(SupportError::Unsupported(
-                "blast adapter requires complete current unit membership",
+                "captured support actor has been removed from canonical state",
             ));
         }
         let smoke_count = self
@@ -348,6 +347,7 @@ impl Match {
                     let at = strip(s, along, side);
                     self.support.events.push(SupportEvent::Shell(at));
                     let (wind_angle, wind_strength) = self.start.wind;
+                    let current_order: Vec<_> = self.world.game.units.keys().copied().collect();
                     let mut damage = DamageWorld {
                         world: &mut self.world,
                         combat: &mut self.combat,
@@ -360,12 +360,12 @@ impl Match {
                         environment: &mut self.environment,
                         environment_seed: &mut self.start.environment_seed,
                         next_id: &mut self.next_unit_id,
-                        unit_order,
+                        unit_order: &current_order,
                         wind_angle,
                         wind_strength,
                     };
                     let effects = damage
-                        .explosion(
+                        .explosion_membership(
                             at,
                             number(def, "blast")?,
                             ExplosionSource::support(s.kind.name())
@@ -374,6 +374,7 @@ impl Match {
                             None,
                             None,
                             None,
+                            unit_order,
                             &mut self.firing,
                         )
                         .map_err(|e| SupportError::Actuation(e.to_string()))?;
