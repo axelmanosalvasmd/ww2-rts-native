@@ -30,28 +30,39 @@ const specs=[
 ];
 function load(name){return JSON.parse(readFileSync(resolve(reference,'maps',`${name}.json`),'utf8'));}
 function recipientProjection(g){return [0,1].map(slot=>{const snapshot=sim.snapshotFor(g,slot,g.shots);return{slot,scenario:structuredClone(snapshot.scenario??null),shots:structuredClone(snapshot.shots)};});}
+function supportTimers(g){return g.players.map((p,slot)=>({slot,support:Object.fromEntries(Object.entries(p.sup??{}).sort(([a],[b])=>a.localeCompare(b)))}));}
+function phaseObservation(g){return{tick:g.tick,winner:g.winner,supportTimers:supportTimers(g),wind:structuredClone(g.wind),livingWeather:g.wx?structuredClone(g.wx):null};}
 function recipientInputs(g){const falling=(g.fallingSections??[]).filter(section=>!section.settled);return{reveal:!!g.reveal,mode:g.mode?.kind??null,weather:g.weather?.now??null,players:g.players.map((p,slot)=>({slot,team:p.team,out:!!p.out,visible:[...p.visible].sort((a,b)=>a-b)})),units:[...g.units.values()].map(u=>({id:u.id,type:u.type,owner:u.owner,x:u.x,z:u.z,air:u.air?{state:u.air.state}:null,garrison:u.garrison,riding:!!u.riding,built:u.built??null,hp:u.hp})),fallingCount:falling.length,fallingSections:falling.map(s=>({id:s.id,kind:s.kind,section:s.section,c:s.c,x:s.x,z:s.z,y:s.y,dir:s.dir,time:s.time,until:s.until,impulse:s.impulse,mass:s.mass,material:s.material,radius:s.radius})),terrain:{w:g.w,h:g.h,flags:Array.from(g.flags),height:g.height?Array.from(g.height):null},smokes:g.smokes.map(s=>({x:s.x,z:s.z,r:s.r,id:s.id})),strikes:g.strikes.map(s=>({kind:s.kind,x:s.x,z:s.z,dir:s.dir,t:s.t,owner:s.owner}))};}
 function structureSections(g){return[...new Set(g.structuralCells?.values()??[])].map(s=>({id:s.id,c:s.c,structureId:s.structureId,hp:s.hp,maxHp:s.maxHp,state:s.state,material:s.material,anchor:s.anchor,supports:structuredClone(s.supports??[]),rubble:structuredClone(s.rubble??[]),failedAt:s.failedAt,direction:structuredClone(s.direction),impulse:s.impulse,entityId:s.entityId})).sort((a,b)=>a.c-b.c);}
 function run(name,ticks,failAfterExecution=null){
-  const map=load(name), callbacks=[];
+  const map=load(name), callbacks=[];let scenarioTimeline=[],damageActive=false,activeDamageExecution=null;
   const saved=Math.random;Math.random=()=>0.5;
   let g;try{g=sim.createGame(map,['A','B'],false,[0,1],[0,1],{mode:'conquest',weather:false,tech:false,supply:false,logistics:false,mapKey:name});}
   finally{Math.random=saved;}
   const damage=sim.__scenarioTools.damage;
   sim.__scenarioTools.damage=(state,action,execution)=>{
     callbacks.push({kind:'damage.begin',execution,action:structuredClone(action)});
-    const result=damage(state,action,execution);
+    scenarioTimeline.push({kind:'destroy.begin',execution,tick:state.tick,phase:phaseObservation(state)});
+    damageActive=true;activeDamageExecution=execution;let result;
+    try{result=damage(state,action,execution);}finally{damageActive=false;activeDamageExecution=null;}
     callbacks.push({kind:'damage.commit',execution,cellLogLength:state.cellLog.length});
-    if(execution===failAfterExecution)throw new Error(`injected after original damage callback ${execution}`);
+    scenarioTimeline.push({kind:'destroy.commit',execution,tick:state.tick,cellLogLength:state.cellLog.length});
+    if(execution===failAfterExecution){scenarioTimeline.push({kind:'failure.after-destroy-commit',execution,tick:state.tick});throw new Error(`injected after original damage callback ${execution}`);}
     return result;
   };
   const selected=[];let previousCellLog= g.cellLog.length;
   for(let target=1;target<=ticks.at(-1);target++){
     const beforeBridgeSections=name==='the-great-bridge'&&target===8400?structureSections(g):null;
+    const beforeStepPhase=phaseObservation(g);
+    scenarioTimeline=[];damageActive=false;activeDamageExecution=null;
     g.shots=[];
     const appended=[];
     Object.defineProperty(g.shots,'push',{value:function(...rows){
-      for(const row of rows)appended.push(structuredClone(row));
+      for(const row of rows){
+        const copy=structuredClone(row),ordinal=appended.length;appended.push(copy);
+        if(row.k==='say'&&typeof row.execution==='string'&&row.execution.startsWith('scenario:'))scenarioTimeline.push({kind:'scenario.say',execution:row.execution,shotOrdinal:ordinal,phase:phaseObservation(g)});
+        else if(damageActive)scenarioTimeline.push({kind:'destroy.output',execution:activeDamageExecution,shotOrdinal:ordinal,shotKind:row.k??null});
+      }
       return Array.prototype.push.apply(this,rows);
     }});
     callbacks.length=0;
@@ -62,7 +73,7 @@ function run(name,ticks,failAfterExecution=null){
     if(ticks.includes(g.tick)){
       const state=g.scenario?structuredClone(g.scenario):null;
       const frame={tick:g.tick,shots:appended,recipientInputs:recipientInputs(g),recipients:recipientProjection(g),callbacks:structuredClone(callbacks),scenario:state,
-        cellChanges:structuredClone(g.cellLog.slice(previousCellLog)),failure};
+        cellChanges:structuredClone(g.cellLog.slice(previousCellLog)),failure,phase:{beforeStep:beforeStepPhase,scenarioTimeline:structuredClone(scenarioTimeline),afterStep:phaseObservation(g)}};
       if(beforeBridgeSections){frame.structureSectionsBefore=beforeBridgeSections;frame.structureSectionsAfter=structureSections(g);}
       selected.push(frame);
     }
@@ -85,15 +96,32 @@ assert.equal(bridgeStructureAfter.length,84,'Great Bridge structure section coun
 assert(bridgeStructureAfter.every(section=>section.state==='failed'&&section.hp===0),'Great Bridge sections fail at zero HP');
 assert.equal(bridge8400.structureSectionsAfter.filter(section=>section.state==='failed').length,84,'Great Bridge failed bridge section count');
 assert.equal(bridge8400.structureSectionsAfter.filter(section=>section.state==='failed').reduce((sum,section)=>sum+section.hp,0),0,'failed bridge sections have zero HP');
+const bridgeTimeline=bridge8400.phase.scenarioTimeline;
+assert.equal(bridgeTimeline[0]?.kind,'scenario.say','Say is emitted first in the due trigger');
+assert.equal(bridgeTimeline[1]?.kind,'destroy.begin','Destroy follows the same trigger Say');
+assert.equal(bridgeTimeline.at(-1)?.kind,'destroy.commit','Destroy output commits before the scenario phase returns');
+assert.equal(bridgeTimeline.filter(row=>row.kind==='destroy.output'&&row.shotKind==='collapse').length,84,'Destroy emits all collapse rows inside its callback');
+assert(bridgeTimeline.every(row=>row.phase?.winner===null||row.kind==='destroy.commit'||row.kind==='destroy.output'),'Scenario acts only while no winner has been set');
+assert.deepEqual(bridgeTimeline[0].phase.livingWeather,bridge8400.phase.beforeStep.livingWeather,'scenario runs before living weather changes');
+assert.deepEqual(bridgeTimeline[0].phase.wind,bridge8400.phase.beforeStep.wind,'scenario runs before weather advances the match wind');
+assert.notDeepEqual(bridge8400.phase.afterStep.wind,bridge8400.phase.beforeStep.wind,'weather advances match wind after the scenario phase');
+assert.deepEqual(bridgeTimeline[0].phase.supportTimers,bridge8400.phase.afterStep.supportTimers,'support timers are already decremented before scenario');
+for(const slot of [0,1])assert(Math.abs(bridgeTimeline[0].phase.supportTimers[slot].support.artillery-bridge8400.phase.beforeStep.supportTimers[slot].support.artillery+0.05)<1e-9,'support cooldown has advanced by one 0.05-second tick before scenario');
 const failureTrace=run('the-great-bridge',[8400],'scenario:3:1');
 const failedFrame=failureTrace.steps[0];
 assert.match(failedFrame.failure,/injected after original damage callback scenario:3:1/);
 assert.equal(failedFrame.shots[0].k,'say');
 assert.equal(failedFrame.scenario.triggers['legacy:2@match'].count,1);
 assert(failedFrame.cellChanges.length>0,'original damage callback must commit terrain before injected failure');
+const failedTimeline=failedFrame.phase.scenarioTimeline;
+assert.equal(failedTimeline[0]?.kind,'scenario.say');
+assert.equal(failedTimeline[1]?.kind,'destroy.begin');
+assert.equal(failedTimeline.at(-2)?.kind,'destroy.commit');
+assert.equal(failedTimeline.at(-1)?.kind,'failure.after-destroy-commit');
+assert.equal(failedTimeline.filter(row=>row.kind==='destroy.output'&&row.shotKind==='collapse').length,84);
 clean();
 const out={reference:pin,node:process.version,arch:process.arch,
-  scope:'Pinned complete createGame and sim.step callbacks, actual SCENARIO_TOOLS.damage execution, chronological public shots, and selected per-seat snapshotFor scenario/shot projections; no replacement rules or custom trigger evaluator. The failure frame injects an error only after the original damage callback commits, to record its real output/state prefix.',
+  scope:'Pinned complete createGame and sim.step callbacks, source-phase observations for support timers, scenario Say/destroy and living weather, actual SCENARIO_TOOLS.damage execution, chronological mixed Say/destroy output, and selected per-seat snapshotFor scenario/shot projections; no replacement rules or custom trigger evaluator. The failure frame injects an error only after the original damage callback commits, to record its real output/state prefix.',
   traces,failureTrace};
 const path=resolve(root,'rust/crates/simtest/tests/fixtures/legacy-scenario-runtime.json.gz');
 const bytes=gzipSync(JSON.stringify(out)+'\n',{level:9});
