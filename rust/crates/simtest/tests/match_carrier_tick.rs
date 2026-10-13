@@ -575,7 +575,12 @@ fn compare(
             tagged(json!(
                 m.timeline
                     .iter()
-                    .map(|s| json!({"t":s.t,"vp":s.vp}))
+                    .map(|s| match s {
+                        ww2_core::match_end::MatchSample::Conquest { t, vp } =>
+                            json!({"t":t,"vp":vp}),
+                        ww2_core::match_end::MatchSample::Territories { .. } =>
+                            panic!("carrier-tick fixture cannot represent a Territories timeline"),
+                    })
                     .collect::<Vec<_>>()
             )),
             expected["timeline"],

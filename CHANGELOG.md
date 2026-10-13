@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Updated the integrated AIR test serializers for the canonical Conquest timeline enum, retaining exact fixture fields and refusing Territories samples. Preserved the support projector's invalid-owner assertion and tested the earlier canonical routing refusal separately. The preceding core run passed 68 tests and failed this changed-boundary assertion; hosted Clippy found the older timeline accesses before tests. Runtime and fixture values are unchanged; final verification is pending.
+
 - Fixed the consolidated candidate's first compile failures: the ordinary snapshot now reads verified ground strikes from canonical Game timing, and World route retention receives its current environment owner. Migrated existing snapshot tests without changing their fixture values and added atomic refusal checks for unrepresented strike rows. The initial native and hosted checks failed before tests; repaired verification is pending.
 
 - Joined the frozen AIR, server and World frontiers in one main candidate. Preserved canonical startup, commands, recipient receipts and typed World endings while resolving older shared routing definitions. Combined native and platform checks remain pending; the World envelope and FPS milestone stay deferred.
