@@ -1,5 +1,8 @@
 //! Native match startup. The setup plan is shared by the authoritative constructor.
 pub use crate::objectives::Objective;
+#[path = "match_recruitment.rs"]
+mod recruitment;
+pub use recruitment::{CompletedRecruitUnit, RecruitError, RecruitMetadata, RecruitRouting};
 use std::collections::BTreeMap;
 
 use crate::{
@@ -397,6 +400,9 @@ pub struct Match {
     pub building_cells: BTreeMap<usize, BuildingCell>,
     pub production: crate::production::ProductionState,
     pub building_rallies: BTreeMap<u32, Option<Point>>,
+    pub player_rallies: Vec<Option<Point>>,
+    pub recruit_metadata: BTreeMap<u32, RecruitMetadata>,
+    produced_placer: crate::produced_units::ProducedPlacer,
     pub scenario: Option<crate::legacy_scenario::LegacyScenario>,
     pub firing: crate::match_firing::FiringState,
     pub logistics: crate::logistics::LogisticsState,
@@ -451,6 +457,9 @@ impl Match {
             building_cells: BTreeMap::new(),
             production,
             building_rallies: BTreeMap::new(),
+            player_rallies: vec![None; player_count],
+            recruit_metadata: BTreeMap::new(),
+            produced_placer: crate::produced_units::ProducedPlacer::new(),
             scenario,
             firing: crate::match_firing::FiringState::default(),
             logistics: crate::logistics::LogisticsState::default(),
