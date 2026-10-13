@@ -1,4 +1,4 @@
-//! Ephemeral administrative World transaction. One canonical World remains live.
+//! Ephemeral rare-action World transaction. One canonical World remains live.
 //! Preserve terrain allocations and ordered history when publishing the prepared draft.
 use super::{Recipient, RegionVersions, World, WorldError};
 use std::collections::{BTreeMap, BTreeSet};
@@ -20,7 +20,7 @@ pub(crate) struct PreparedWorldPublication<'a> {
     draft: World,
 }
 impl World {
-    /// Only administrative batches needing real removal or wrecking create this draft.
+    /// Only accepted rare actions needing physical preparation create this draft.
     /// It is temporary preparation, not another live terrain or gameplay owner.
     pub(crate) fn begin_transaction(&self) -> Result<WorldTransaction, WorldError> {
         let n = self

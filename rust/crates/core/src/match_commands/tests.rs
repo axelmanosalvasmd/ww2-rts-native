@@ -256,7 +256,13 @@ fn set(m: &mut Match, id: u32, fields: &Value) {
             "enter" => c.enter = usize::try_from(value.as_i64().unwrap()).ok(),
             "fireAt" => c.fire_at = usize::try_from(value.as_i64().unwrap()).ok(),
             "board" => u.board = value.as_u64().unwrap() as u32,
-            "build" => u.build = value.as_u64().unwrap() != 0,
+            "build" => {
+                c.build_target = value
+                    .as_u64()
+                    .filter(|id| *id != 0)
+                    .map(|id| u32::try_from(id).unwrap());
+                u.build = c.build_target.is_some();
+            }
             "entrench" => u.entrench = !value.is_null(),
             "follow" => c.follow = value.as_u64().unwrap() as u32,
             "drift" => {
