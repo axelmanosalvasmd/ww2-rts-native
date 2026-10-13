@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added a borrowed live-weather phase with the pinned environment RNG, wind drift, smoke decay, showers and wet-ground updates. Three focused tests cover 59 original-JavaScript sequences (386 steps) and 400 RNG draws, including disabled weather and planned transitions. The phase reports fire/flood timing but leaves terrain effects and final smoke removal to the match integrator.
+
 - Added a standalone combat damage and suppression component with catalog-backed role, armor, veterancy, retreat and threat rules. Six focused tests compare 3,828 original JavaScript cases and actual mutation order, including health, XP, death impulse, hit memory and rider requests. The component returns ordered effects for later integration; it does not fire weapons, sample terrain cover, place riders, remove dead units or change the ABI. Documented the source's zero-damage effects, building modifier replacement and missing-rider cargo behavior, with the affected combat rows still in progress.
 
 - Added deterministic spawn scatter, origin-restricted nearest-free placement and construction of every field currently represented by `Game::Unit`. The oracle matches 769 original spawn projections and 513 nearest-free queries across all 44 non-air unit types and all 33 maps, including blocked fallbacks, disconnected regions and naval placement. HP comes from the catalog; absent caches and NaN pace retain reference defaults. Air-base placement is rejected. ID allocation, owner validation, spatial insertion, logistics and the full spawn pipeline remain with later integration; MOV-68 stays in progress.
