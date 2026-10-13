@@ -101,6 +101,19 @@ export async function traceSim() {
   return sim;
 }
 
+// Component replay with actual path searches. Other frozen-workload exclusions remain.
+// The caller supplies an explicit observed terrain view on its game.
+export async function traceSimWithRoutes() {
+  const sim = await loadSim([
+    ['function requestStepPath(g, u, to, kind) {\n  u.repath = 1; return;\n', 'function requestStepPath(g, u, to, kind) {\n'],
+    ['        else { u.repath = 1; }\n', '        else { const route = findPath(g, u, goal); if (route.length) u.path = route; u.repath = 1; }\n'],
+    ['export function findPath(g, from, to) {\n  return [];\n', 'export function findPath(g, from, to) {\n'],
+    ...HOOKS,
+  ]);
+  freeze(sim);
+  return sim;
+}
+
 // Keeps only the units inside a rectangle (metres): [x0, z0, x1, z1].
 export function keepArea(g, area) {
   for (const u of [...g.units.values()]) if (!(u.x >= area[0] && u.z >= area[1] && u.x < area[2] && u.z < area[3])) g.units.delete(u.id);
