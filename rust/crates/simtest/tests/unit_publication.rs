@@ -156,6 +156,29 @@ fn named_world_actor_requires_explicit_world_policy() {
             .is_err()
     );
     m.world.game.mode = Some(ModeKind::World);
+    let mut invalid_guard =
+        StagedUnit::ordinary_with_actor(&m.world.game, &m.rules, actor, kind, id, index, None)
+            .unwrap();
+    invalid_guard.control.guard_home = Some(Point {
+        x: f64::NAN,
+        z: 0.0,
+    });
+    assert!(
+        prepare_world_publication(
+            PublicationParts {
+                units: &mut m.world.game.units,
+                grid: &mut m.grid,
+                controls: &mut m.commands.units,
+                recruitment: &mut m.recruit_metadata,
+                next_id: &mut m.next_unit_id,
+            },
+            &m.rules,
+            2,
+            m.world.game.mode,
+            vec![invalid_guard]
+        )
+        .is_err()
+    );
     let draft =
         StagedUnit::ordinary_with_actor(&m.world.game, &m.rules, actor, kind, id, index, None)
             .unwrap();
@@ -209,14 +232,16 @@ fn named_world_actor_requires_explicit_world_policy() {
             },
             &m.rules,
             2,
-            Some(ModeKind::Conquest),
+            None,
             vec![draft]
         )
         .is_err()
     );
-    let draft =
+    let mut draft =
         StagedUnit::ordinary_with_actor(&m.world.game, &m.rules, actor, kind, id, index, None)
             .unwrap();
+    draft.control.guard_home = Some(draft.unit.at());
+    let home = draft.control.guard_home;
     prepare_world_publication(
         PublicationParts {
             units: &mut m.world.game.units,
@@ -233,6 +258,7 @@ fn named_world_actor_requires_explicit_world_policy() {
     .unwrap()
     .publish();
     assert_eq!(m.world.game.team_of(&m.world.game.units[&id]), -1);
+    assert_eq!(m.commands.units[&id].guard_home, home);
     assert!(
         m.world
             .game
