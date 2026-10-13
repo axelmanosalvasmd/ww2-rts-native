@@ -26,7 +26,10 @@ impl Match {
             .unwrap()
             .memory
             .validate_binding(&self.world)?;
-        self.actor_policy(unit.owner)?;
+        let actor = self.actor_policy(unit.owner)?;
+        if actor.team != crate::match_actor::checked_game_team(&self.world.game, unit.owner)? {
+            return Err("World ground actor team differs from canonical Game".into());
+        }
         self.rules
             .kinds
             .get(unit.kind)
