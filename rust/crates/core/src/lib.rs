@@ -3,15 +3,19 @@
 
 pub mod catalog;
 pub mod economy;
+pub mod economy_state;
 pub mod fog;
 pub mod formation;
 pub mod game;
 pub mod grid;
+pub mod map;
 pub mod math;
 pub mod movement;
 pub mod navigation;
 pub mod orders;
 pub mod pathfinding;
+pub mod projectiles;
+
 pub mod random;
 pub mod rules;
 pub mod separation;
