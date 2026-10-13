@@ -1,0 +1,17 @@
+# World tail call contract
+
+The existing Match tick controller remains the only owner of commands, prior poses, the clock and phase dispatch. This document connects the explicit World tail adapters to the pinned source sites; it does not enable World dispatch or create another runner.
+
+| Source boundary | Required input and native operation |
+| --- | --- |
+| `sim.js:5605`, before separation and late effects | Retain the actual ordered late collection identities. Do not freeze HP here. |
+| Late weather/fire/flood/recovery and ordinary retirement | Current objects receive their real effects. The retirement owner retains each removed object's final fields at its actual deletion boundary, including changes caused by earlier wrecks. |
+| `sim.js:5749`, World income | Assemble ordered `WorldIncomeUnit` facts from those final current or explicitly retained objects. `apply_world_income` checks matching current owner/kind/HP and reads current depots separately. Missing identities have no inferred HP or fallback. |
+| `sim.js:5755`, convoys | Invoke the real existing `step_supply_convoys(self.finish.is_some())` at this site. The caller derives its explicit `winner_decided` argument from the canonical finish. Its current body returns immediately when no convoy component exists or that argument is true, matching the original `stepConvoys` guard. Enabled World logistics still requires its actual World supply/routing owner. |
+| `sim.js:5768`, current regions | Supply complete current IDs after any actual convoy effects to `apply_world_regions`. Captured upkeep membership is not this collection. The caller maintains the actual spatial index. |
+
+The temporary phase policy derives from the canonical finish at each preparation. Both playing and decided states use the same income and current-region body. Decided World still pays income and advances region progress, homes and administrative removal. It validates terminal metadata, preserves reveal, and leaves the original finish, timeline, story counters and capture timestamps unchanged. Physical captures remain in the phase effect report. Periodic `sample_match_tick` returns false once decided. No new terminal counter or result owner is needed.
+
+The readonly shared context validator describes current phase admission only. It checks mode/logistics policy, commanders, wallets, canonical actors, geography and decided metadata. It cannot validate future post-combat facts or prove a missing object's retirement history. The sole runner must pre-admit every reachable unsupported actor and side effect before consuming commands or advancing the clock, then pass the actual later facts at their boundaries. Current fort transfer, logistics-enabled World, affected riders/cargo, unsupported shared work/construction and unconnected mode-aware phases still prevent whole-controller admission.
+
+Each explicit phase is atomic under its own guards. A committed income followed by a refused region phase is not a whole-tick rollback. The controller's existing fault/poison policy and full before-clock capability admission must handle partial controller progress. A later controller test must compare the actual original step order, captured and current membership, phase effects and seeded random history. The frozen original seven traces, 114 ticks and 1,486 phase entries remain source evidence; the new tail fixtures do not substitute for a native whole-tick replay or server ending-hold proof.

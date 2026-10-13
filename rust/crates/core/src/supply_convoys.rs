@@ -241,6 +241,8 @@ pub enum UnitRole {
 }
 #[derive(Clone, Debug)]
 pub struct UnitView {
+    /// A temporary projected pose, rather than the live unit object.
+    pub projected: bool,
     pub id: UnitId,
     pub owner: Option<usize>,
     pub role: UnitRole,
@@ -254,9 +256,17 @@ pub struct UnitView {
     pub path: Vec<Point>,
     pub world_goal: Option<Point>,
     pub orders: Vec<Point>,
+    /// Presence includes supported nonmovement orders; destinations above remain exact.
+    pub orders_pending: bool,
     pub amove: Option<Point>,
     pub stuck: f64,
 }
+impl UnitView {
+    fn has_orders(&self) -> bool {
+        self.orders_pending || !self.orders.is_empty()
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct Player {
     pub slot: usize,
@@ -367,6 +377,8 @@ pub enum RouteFailure {
 }
 #[derive(Clone, Debug)]
 pub struct Route {
+    /// A findPath effect. None retains the live unit's previous endpoint/history.
+    pub route_end: Option<Point>,
     pub path: Vec<Point>,
     pub failure: Option<RouteFailure>,
 }
@@ -1365,7 +1377,7 @@ impl ConvoyState {
                     || quantity(c.cargo) > 0.0
                     || !u.path.is_empty()
                     || u.world_goal.is_some()
-                    || !u.orders.is_empty()
+                    || u.has_orders()
                 {
                     continue;
                 }
@@ -1773,7 +1785,7 @@ impl ConvoyState {
                 continue;
             }
             if c.state == TruckState::Manual {
-                if u.path.is_empty() && u.world_goal.is_none() && u.orders.is_empty() {
+                if u.path.is_empty() && u.world_goal.is_none() && !u.has_orders() {
                     c.manual = false;
                     c.state = TruckState::Idle;
                 }
@@ -1854,16 +1866,18 @@ impl ConvoyState {
         Ok(())
     }
     pub fn convoy_death(&mut self, tick: u64, u: &UnitView) {
-        if u.role == UnitRole::Truck
-            && let Some(owner) = u.owner
-        {
+        self.retire_unit(tick, u.id, u.owner, u.role == UnitRole::Truck);
+    }
+    /// Death needs identity and truck eligibility only; positions and cargo remain caller-owned.
+    pub fn retire_unit(&mut self, tick: u64, id: UnitId, owner: Option<usize>, truck: bool) {
+        if truck && let Some(owner) = owner {
             self.losses
                 .entry(owner)
                 .or_default()
                 .push(tick as f64 / 20.0 + 30.0);
-            self.trucks.remove(&u.id);
+            self.trucks.remove(&id);
         }
-        self.stores.retain(|s| s.entity != Some(u.id));
+        self.stores.retain(|s| s.entity != Some(id));
     }
     pub fn support_provision<W: World>(
         &mut self,
@@ -2157,9 +2171,10 @@ impl ConvoyState {
                     return Ok(false);
                 };
                 let mut from = u.clone();
+                from.projected = true;
                 if queue
                     && (!u.path.is_empty()
-                        || !u.orders.is_empty()
+                        || u.has_orders()
                         || u.world_goal.is_some()
                         || u.amove.is_some())
                 {

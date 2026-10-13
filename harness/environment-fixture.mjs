@@ -14,7 +14,7 @@ const temp=mkdtempSync(join(tmpdir(),'ww2-environment-'));
 try {
  let code=readFileSync(join(reference,'shared/sim.js'),'utf8'),marker='  setupStructures(g, map);';assert.equal(code.split(marker).length,2);
  code=code.replace(marker,marker+'\n  return g;').replace(/from '(\.\/[^']+)'/g,(_,p)=>`from '${pathToFileURL(join(reference,'shared',p)).href}'`);
- code+='\nexport const environmentHooks={ignite,burn,flood,wreckCell,stepWorldDebris,registerBuildingStructure};\n';writeFileSync(join(temp,'sim.mjs'),code);
+ code+='\nexport const environmentHooks={ignite,burn,flood,wreckCell,stepWorldDebris,registerBuildingStructure,stepStrikes};\n';writeFileSync(join(temp,'sim.mjs'),code);
  const sim=await import(pathToFileURL(join(temp,'sim.mjs'))),H=sim.environmentHooks;
  const {rebuildGrid}=await import(pathToFileURL(join(reference,'shared/grid.js')));
  const runs=a=>{const out=[];for(const v of a){if(out.length&&out.at(-1)[0]===v)out.at(-1)[1]++;else out.push([v,1]);}return out;};
@@ -22,13 +22,30 @@ try {
  const section=s=>({id:s.id,structureId:s.structureId,c:s.c,hp:s.hp,maxHp:s.maxHp,material:s.material,anchor:s.anchor,supports:s.supports,state:s.state,rubble:s.rubble,impulse:s.impulse,failedAt:s.failedAt,direction:s.direction,settledAt:s.settledAt});
  function snapshot(g){return {chars:g.chars.join(''),ground:g.ground.join(''),objects:g.objects.join(''),mines:runs(g.mineLayer),flags:runs(g.flags),height:g.height&&runs(g.height),hp:bits(g.cellHp),wear:bits(g.wear),surfaceWear:bits(g.surfaceWear),burnt:runs(g.burnt),scar:bits(g.scar),state:runs(g.cellState),materials:sorted(g.materials),baseMaterials:sorted(g.baseMaterials),objectMaterials:sorted(g.objectMaterials),mineMaterials:sorted(g.mineMaterials),mineOwners:sorted(g.mines),mineSeen:sorted(g.mineSeen),fires:[...g.fires],versions:[g.terrainVersion??0,g.obstructionVersion??0,g.infantryRegionVersion??0,g.vehicleRegionVersion??0,g.navalRegionVersion??0],soak:[...g.soak],journal:[...g.cellJournal],log:g.cellLog,newCells:g.newCells,structures:[...g.structures.values()].map(s=>[s.id,s.kind,s.entityId??null,s.sections.map(section)]),units:[...g.units.values()].map(u=>[u.id,u.hp,u.supp,u.garrison??-1,u.path,u.lastHit??null]),smokes:g.smokes,falling:g.fallingSections,contacts:[...g.worldContacts],seed:g.seed>>>0,nextId:g.nextId};}
  const cases=[];const random=Math.random;Math.random=()=>0.5;
- function record(name,map,actions,units=[]){assert.equal(sim.validateMap(map),null);const g=sim.createGame(map,[],false,[],[],{weather:false});g.seed=123456789;g.nextId=1000;g.tick=10;g.wind={a:0.7,v:0.6};g.wx={rain:0,wet:0};g.cellJournal=[];g.shots=[];g.smokes=[];
+ function record(name,map,actions,units=[],names=[]){assert.equal(sim.validateMap(map),null);const g=sim.createGame(map,names,false,names.map((_,i)=>i),names.map(()=>0),{weather:false,logistics:false});g.seed=123456789;g.nextId=1000;g.tick=10;g.wind={a:0.7,v:0.6};g.wx={rain:0,wet:0};g.cellJournal=[];g.shots=[];g.smokes=[];
   for(const input of units){const d=sim.UNITS[input.type];g.units.set(input.id,{...input,owner:input.owner??0,hp:input.hp??d.hpPer*d.models,supp:input.supp??0,garrison:input.garrison??-1,path:input.path??[],air:input.air,riding:input.riding,heavy:!d.infantry});}
   rebuildGrid(g);const memory=new Set(),shots=[],lastHit=new Map();let result=null;
   const snapshots=[structuredClone(snapshot(g))],results=[];
   for(const a of actions){g.shots=[];result=null;g.tick=a.tick??g.tick;
    if(a.op==='ignite')H.ignite(g,a.c);
    else if(a.op==='burn')H.burn(g,[...g.units.values()],a.dt);
+   else if(a.op==='burn_captured')H.burn(g,a.actors.map(id=>g.units.get(id)),a.dt);
+   else if(a.op==='para_birth'){
+    g.players[0].mp=1000;
+    assert.equal(sim.command(g,0,{t:'support',kind:'para',x:20,z:20,dir:0}),undefined);
+    a.timeline=[];const before=new Set(g.units.keys());let arrived=false;
+    for(let i=1;i<=121;i++){
+     g.tick=(a.tick??9)+i;const list=[...g.units.values()];g.shots=[];H.stepStrikes(g,list,.05);
+     a.timeline.push({tick:g.tick,shots:structuredClone(g.shots),live:g.strikes.map(s=>!!s.live),count:g.strikes.length});
+     if(i<121){assert.equal(g.shots.length,0);assert.equal(g.strikes.length,1);assert.equal(g.strikes[0].live,false);}
+     else {assert.equal(g.shots.length,4);assert.equal(g.shots[0].k,'para');assert(g.shots.slice(1).every(s=>s.k==='chutes'));assert.equal(g.strikes.length,0);a.actors=list.map(u=>u.id);arrived=true;}
+    }
+    assert(arrived);a.births=[...g.units.values()].filter(u=>!before.has(u.id)).map(u=>({id:u.id,type:u.type,owner:u.owner,x:u.x,z:u.z,hp:u.hp,supp:u.supp,garrison:u.garrison,path:u.path}));
+    a.arrivalTick=g.tick;a.nextId=g.nextId;g.shots=[];
+   }
+   else if(a.op==='ignite_births'){
+    for(const u of g.units.values())if(u.id>=1000){const c=Math.floor(u.z/2)*g.w+Math.floor(u.x/2);sim.mutateWorldCell(g,c,{object:'H'});H.ignite(g,c);}
+   }
    else if(a.op==='flood')H.flood(g);
    else if(a.op==='debris')H.stepWorldDebris(g,a.dt);
    else if(a.op==='contact_loop'){for(let i=0;i<a.count;i++)sim.damageWorldSection(g,a.c,a.damage,{contactId:`fifo:${i}`});}
@@ -41,6 +58,7 @@ try {
    else if(a.op==='prime'){
     if(a.rain!==undefined)g.wx.rain=a.rain;if(a.wet!==undefined)g.wx.wet=a.wet;if(a.wind)g.wind=a.wind;
     if(a.fire){if(a.fire[1]===null)g.fires.delete(a.fire[0]);else g.fires.set(...a.fire);}
+    if(a.height){g.height??=new Int8Array(g.w*g.h);for(const [c,h] of a.height)g.height[c]=h;}
     if(a.wear)g.wear[a.wear[0]]=a.wear[1];if(a.scar)g.scar[a.scar[0]]=a.scar[1];if(a.hp)g.cellHp[a.hp[0]]=a.hp[1];
    } else throw Error(a.op);
    results.push({value:result,shots:structuredClone(g.shots)});snapshots.push(structuredClone(snapshot(g)));
@@ -63,6 +81,16 @@ try {
  {const m=blank();for(const c of [42,43,44,45])cell(m,c,'+');cell(m,41,'W');record('flood-one-wave-and-slope',m,[{op:'prime',wear:[42,.65]},{op:'flood'},{op:'flood'},{op:'flood'},{op:'flood'},{op:'flood'}]);}
  {const m=blank();m.structures=[];for(let c=40;c<160;c++)cell(m,c,'B');record('debris-overflow',m,[{op:'blast',at:{x:20,z:10},radius:20,damage:100000},{op:'debris',dt:2.5}]);}
  {const m=blank();cell(m,42,'T');cell(m,43,'Y');record('float32-assignment-expression-boundaries',m,[{op:'prime',wear:[42,0.99999994]},{op:'blast',at:{x:5,z:5},radius:0,damage:0.000016},{op:'prime',scar:[44,0.99999994]},{op:'blast',at:{x:9,z:5},radius:0,damage:0.000024,scar:1},{op:'prime',hp:[43,1.401298464324817e-45]},{op:'blast',at:{x:7,z:5},radius:0,damage:1e-45}]);}
+ {const m=blank();cell(m,42,'H');record('captured-burn-after-real-paratrooper-arrival',m,[{op:'ignite',c:42},{op:'para_birth',tick:9},{op:'ignite_births'},{op:'burn_captured',actors:[7,8],dt:.5},{op:'burn',dt:.5}], [{id:7,type:'rifle',x:5,z:5,hp:100},{id:8,type:'rifle',x:20,z:20,hp:100}],['P0']);}
+ {const m=blank();cell(m,42,'B');record('captured-burn-keeps-current-garrison-eviction',m,[{op:'ignite',c:42},{op:'burn_captured',actors:[7],dt:40}],[{id:7,type:'rifle',x:5,z:5,hp:200,garrison:42},{id:8,type:'rifle',x:5,z:5,hp:100,garrison:42}]);}
+ {const m=blank();cell(m,42,'H');record('captured-burn-legacy-expiry',m,[{op:'ignite',c:42},{op:'burn_captured',actors:[7],dt:40}],[{id:7,type:'rifle',x:5,z:5,hp:500},{id:8,type:'rifle',x:5,z:5,hp:100,garrison:42}]);}
+ // Int8 terrain values use JavaScript Number arithmetic in the unchanged dent helper.
+ for(const [name,height] of [
+  ['dent-minimum-int8',[[42,-128]]],
+  ['dent-high-neighbour-int8',[[42,0],[43,127]]],
+  ['dent-low-neighbour-int8',[[42,4],[22,4],[62,4],[41,4],[43,-128]]],
+  ['dent-valid-upper-level',[[42,4],[22,4],[62,4],[41,4],[43,4]]],
+ ]){const m=blank();record(name,m,[{op:'prime',height},{op:'blast',at:{x:5,z:5},radius:0,damage:1000,scar:1}]);}
  // Compact expected states as path replacements. Every Rust comparison reconstructs the full state.
  function changes(a,b,path=[],out=[]){
   if(Object.is(a,b))return out;

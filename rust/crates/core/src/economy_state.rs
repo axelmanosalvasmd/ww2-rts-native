@@ -101,6 +101,14 @@ pub struct Node {
     /// Index into `WorldContext::regions`. `None` means outside any region.
     pub region: Option<usize>,
 }
+/// Current authoritative depot facts, separate from the tick list used for upkeep.
+#[derive(Clone, Copy, Debug)]
+pub struct DepotFacts {
+    pub id: u64,
+    pub owner: Option<usize>,
+    pub hp: f64,
+    pub built: f64,
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RegionKind {
     City,
@@ -305,7 +313,8 @@ impl EconomyState {
         Ok(math::round(cap * number(army, "pop")?))
     }
 
-    /// Run the income phase after capture/elimination. The caller supplies the current winner
+    /// Run income at the mode's source phase. World pays before capture/elimination.
+    /// The caller supplies the current winner
     /// state and dt; points, units and ownership are not changed. Errors leave every wallet intact.
     pub fn advance_income(
         &mut self,
@@ -313,11 +322,44 @@ impl EconomyState {
         dt: f64,
         winner_decided: bool,
     ) -> Result<(), Error> {
+        let depots: Vec<_> = c
+            .units
+            .iter()
+            .map(|u| DepotFacts {
+                id: u.id,
+                owner: u.owner,
+                hp: u.hp,
+                built: u.built,
+            })
+            .collect();
+        self.advance_income_with_depots(c, &depots, dt, winner_decided)
+    }
+
+    /// Node payments consult these current facts. Upkeep still uses only `c.units`.
+    /// Validate both views before changing any canonical wallet.
+    pub fn advance_income_with_depots(
+        &mut self,
+        c: &Context<'_>,
+        current_depots: &[DepotFacts],
+        dt: f64,
+        winner_decided: bool,
+    ) -> Result<(), Error> {
         finite(dt, "dt")?;
         if dt < 0.0 {
             return Err(Error::InvalidNumber("dt"));
         }
-        let units = self.validate(c)?;
+        self.validate(c)?;
+        let mut depots = BTreeMap::new();
+        for depot in current_depots {
+            if let Some(owner) = depot.owner {
+                self.slot(owner)?;
+            }
+            finite(depot.hp, "depot hp")?;
+            finite(depot.built, "depot built")?;
+            if depots.insert(depot.id, depot).is_some() {
+                return Err(Error::DuplicateUnit(depot.id));
+            }
+        }
         let cat = Catalog::compiled()?;
         let cfg = cat.table("CFG")?;
         let classic = cfg.get("classic").unwrap();
@@ -354,7 +396,7 @@ impl EconomyState {
                     .nodes
                     .iter()
                     .filter(|n| {
-                        let Some(b) = n.depot.and_then(|id| units.get(&id)) else {
+                        let Some(b) = n.depot.and_then(|id| depots.get(&id)) else {
                             return false;
                         };
                         b.owner == Some(slot)

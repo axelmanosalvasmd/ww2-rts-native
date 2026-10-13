@@ -209,6 +209,21 @@ fn reaction_timer_and_unsupported_exit_preserve_canonical_state() {
     assert!(m.retreat_unit(id).is_err());
     assert_eq!(snapshot(&m, id), before);
     m.world.game.units.get_mut(&id).unwrap().garrison = None;
+    for (build, entrench, dig) in [
+        (true, false, false),
+        (false, true, false),
+        (false, false, true),
+    ] {
+        let u = m.world.game.units.get_mut(&id).unwrap();
+        u.build = build;
+        u.entrench = entrench;
+        u.dig = dig;
+        let before = snapshot(&m, id);
+        assert!(m.retreat_unit(id).is_err());
+        assert_eq!(snapshot(&m, id), before);
+        assert!(!m.field_works.is_active(id));
+    }
+    m.world.game.units.get_mut(&id).unwrap().dig = false;
     m.world.game.units.get_mut(&id).unwrap().path_gen = u64::MAX;
     let before = snapshot(&m, id);
     assert!(m.react_unit(id).is_err());
@@ -238,4 +253,45 @@ fn invalid_neighbor_rejects_before_reaction_timer_or_route_changes() {
     let before = snapshot(&m, 2);
     assert!(m.react_unit(2).is_err());
     assert_eq!(snapshot(&m, 2), before);
+}
+
+#[test]
+fn accepted_retreat_cancels_paid_work_after_route_preflight_without_refund() {
+    let f = fixture();
+    let mut m = make(&f, &f["cases"][0]);
+    let id = 1;
+    let u = m.world.game.units[&id].clone();
+    m.start.economy.players[u.owner].mp = 1000.0;
+    let prepared = m
+        .field_works
+        .prepare_start(
+            &m.world,
+            &mut m.start.economy.players[u.owner],
+            crate::field_works::StartRequest {
+                control_eligible: true,
+                owner: u.owner,
+                unit: id,
+                kind: crate::field_works::FortKind::Trench,
+                at: u.at(),
+                direction: Some(0.0),
+            },
+            |_| true,
+        )
+        .unwrap();
+    prepared.commit(&mut m.field_works);
+    m.world.game.units.get_mut(&id).unwrap().dig = true;
+    let paid = m.start.economy.players[u.owner].mp;
+    let job = m.field_works.jobs()[&id].clone();
+    m.world.game.units.get_mut(&id).unwrap().path_gen = u64::MAX;
+    let before = snapshot(&m, id);
+    assert!(m.retreat_unit(id).is_err());
+    assert_eq!(snapshot(&m, id), before);
+    assert_eq!(m.field_works.jobs()[&id], job);
+    assert_eq!(m.start.economy.players[u.owner].mp, paid);
+    m.world.game.units.get_mut(&id).unwrap().path_gen = 0;
+    m.retreat_unit(id).unwrap();
+    assert!(!m.field_works.is_active(id));
+    assert!(!m.world.game.units[&id].dig);
+    assert!(m.world.game.units[&id].retreating);
+    assert_eq!(m.start.economy.players[u.owner].mp, paid);
 }

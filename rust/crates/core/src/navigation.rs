@@ -133,12 +133,43 @@ impl NavigationLeg<'_> {
     }
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct Navigation {
     graphs: BTreeMap<(u16, usize), Graph>,
 }
 
 impl Navigation {
+    pub(crate) fn rebind_terrain(
+        &mut self,
+        source: TerrainView<'_>,
+        prepared: TerrainView<'_>,
+        vehicle_buffers: &[usize],
+    ) {
+        for graph in self.graphs.values_mut() {
+            let id = &mut graph.identity;
+            if id.width == source.width
+                && id.height == source.height
+                && id.knowledge_id == source.knowledge_id
+                && id.heights == source.heights.map(|v| v.as_ptr() as usize)
+                && (id.flags == source.flags.as_ptr() as usize
+                    || vehicle_buffers.contains(&id.flags))
+            {
+                id.heights = prepared.heights.map(|v| v.as_ptr() as usize);
+                if id.flags == source.flags.as_ptr() as usize {
+                    id.flags = prepared.flags.as_ptr() as usize;
+                }
+            }
+        }
+    }
+
+    pub(crate) fn rebind_flags(&mut self, buffers: &[(usize, usize)]) {
+        for graph in self.graphs.values_mut() {
+            if let Some((_, new)) = buffers.iter().find(|(old, _)| *old == graph.identity.flags) {
+                graph.identity.flags = *new;
+            }
+        }
+    }
+
     pub fn new() -> Self {
         Self::default()
     }
@@ -258,12 +289,14 @@ impl Identity {
     }
 }
 
+#[derive(Clone)]
 struct Edge {
     region: usize,
     crossings: Vec<(usize, usize)>,
 }
 // Edges and incoming IDs preserve JavaScript Map/Set insertion order. Numeric
 // sorting here would change tied routes and incremental-update history.
+#[derive(Clone)]
 struct Region {
     x: f64,
     y: f64,
@@ -280,12 +313,14 @@ impl Region {
         }
     }
 }
+#[derive(Clone)]
 struct CachedRoute {
     start: usize,
     goal: usize,
     route: Option<Vec<usize>>,
 }
 
+#[derive(Clone)]
 struct Graph {
     identity: Identity,
     labels: Vec<usize>,
@@ -835,6 +870,7 @@ impl Entry {
         self.score < other.score || self.score == other.score && self.region < other.region
     }
 }
+#[derive(Clone)]
 struct Heap(Vec<Entry>);
 impl Heap {
     fn push(&mut self, entry: Entry) {

@@ -154,6 +154,26 @@ pub struct CompletedUnit {
     pub kind: String,
     pub job_id: u64,
 }
+/// A staged single-building progress/completion transaction. It holds only
+/// production state, so unit placement and metadata can validate before commit.
+#[must_use = "stage publication and commit, or drop unchanged"]
+pub struct PreparedBuildingStep<'a> {
+    state: &'a mut ProductionState,
+    building: u32,
+    next: Option<BuildingProduction>,
+    completed: Option<CompletedUnit>,
+}
+impl PreparedBuildingStep<'_> {
+    pub fn completed(&self) -> Option<&CompletedUnit> {
+        self.completed.as_ref()
+    }
+    pub fn commit(self) -> Option<CompletedUnit> {
+        if let Some(next) = self.next {
+            self.state.buildings.insert(self.building, next);
+        }
+        self.completed
+    }
+}
 /// An admitted Conquest purchase, ready for the caller's staged placement.
 #[derive(Clone, Debug, PartialEq)]
 pub struct RecruitRequest {
@@ -188,6 +208,37 @@ impl PreparedRecruit<'_, '_> {
         CompletedRecruit {
             request: self.request,
         }
+    }
+}
+/// Research admission holds both canonical queues and the payer wallet without
+/// mutation, allowing the match to validate its spending record before commit.
+#[must_use = "prepare story spending and commit, or drop unchanged"]
+pub struct PreparedResearch<'a, 'facts> {
+    state: &'a mut ProductionState,
+    wallets: &'a mut EconomyState,
+    context: &'a Context<'facts>,
+    slot: usize,
+    kind: Technology,
+    cost: economy::ResearchCost,
+}
+impl PreparedResearch<'_, '_> {
+    pub fn cost(&self) -> economy::ResearchCost {
+        self.cost
+    }
+    pub fn commit(self) -> economy::ResearchCost {
+        // The context borrow keeps the validated authoritative inputs stable.
+        let _ = self.context;
+        let payer = &mut self.wallets.players[self.slot];
+        payer.mp -= self.cost.mp;
+        if self.cost.mun != 0.0 {
+            payer.mun -= self.cost.mun;
+        }
+        self.state.players[self.slot].jobs.push(ResearchJob {
+            kind: self.kind,
+            progress: 0.0,
+            time: self.cost.time,
+        });
+        self.cost
     }
 }
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -703,13 +754,13 @@ impl ProductionState {
         wallets.players[slot].fuel += refund.fuel;
         Ok(refund)
     }
-    pub fn request_research(
-        &mut self,
-        c: &Context<'_>,
-        wallets: &mut EconomyState,
+    pub fn prepare_research<'a, 'facts>(
+        &'a mut self,
+        c: &'a Context<'facts>,
+        wallets: &'a mut EconomyState,
         slot: usize,
         kind: Technology,
-    ) -> Result<economy::ResearchCost, Error> {
+    ) -> Result<PreparedResearch<'a, 'facts>, Error> {
         self.validate(c, wallets)?;
         self.slot(slot)?;
         if !c.tech_enabled {
@@ -743,42 +794,47 @@ impl ProductionState {
         if cost.mun != 0.0 && wallets.players[slot].mun < cost.mun {
             return denial(Denial::Mun);
         }
-        self.players[slot].jobs.push(ResearchJob {
+        Ok(PreparedResearch {
+            state: self,
+            wallets,
+            context: c,
+            slot,
             kind,
-            progress: 0.0,
-            time: cost.time,
-        });
-        wallets.players[slot].mp -= cost.mp;
-        if cost.mun != 0.0 {
-            wallets.players[slot].mun -= cost.mun;
-        }
-        Ok(cost)
+            cost,
+        })
     }
-    /// Advance research before training, as in step(). Away seats continue both;
-    /// out seats stop research. Training emits at most one unit per building call,
-    /// discards excess time, and pauses on dead/unfinished buildings or Sudden Death.
-    pub fn advance(
+    pub fn request_research(
         &mut self,
         c: &Context<'_>,
-        wallets: &EconomyState,
-        dt: f64,
-    ) -> Result<StepEvents, Error> {
-        self.validate(c, wallets)?;
+        wallets: &mut EconomyState,
+        slot: usize,
+        kind: Technology,
+    ) -> Result<economy::ResearchCost, Error> {
+        Ok(self.prepare_research(c, wallets, slot, kind)?.commit())
+    }
+    fn validate_dt(dt: f64) -> Result<(), Error> {
         if !dt.is_finite() || dt < 0.0 {
             return Err(Error::InvalidInput("dt"));
         }
-        let mut next = self.clone();
-        let mut out = StepEvents::default();
+        Ok(())
+    }
+    fn research_step(
+        players: &mut [PlayerResearch],
+        c: &Context<'_>,
+        wallets: &EconomyState,
+        dt: f64,
+        out: &mut Vec<(usize, Technology)>,
+    ) -> Result<(), Error> {
         if c.tech_enabled {
-            for slot in 0..next.players.len() {
+            for (slot, player) in players.iter_mut().enumerate() {
                 if wallets.players[slot].out {
                     continue;
                 }
                 let hq = Self::labs(c, wallets, slot, Technology::Tier);
                 let mut armories = Self::labs(c, wallets, slot, Technology::Infantry) as i64;
                 let mut jobs = vec![];
-                let mut tech = next.players[slot].tech;
-                for mut j in next.players[slot].jobs.clone() {
+                let mut tech = player.tech;
+                for mut j in player.jobs.clone() {
                     let run = if j.kind == Technology::Tier {
                         hq > 0
                     } else {
@@ -799,47 +855,115 @@ impl ProductionState {
                                 level(Technology::Guns),
                                 level(Technology::Armor),
                             )?;
-                            out.research.push((slot, j.kind));
+                            out.push((slot, j.kind));
                             continue;
                         }
                     }
                     jobs.push(j);
                 }
-                next.players[slot] = PlayerResearch { tech, jobs };
+                *player = PlayerResearch { tech, jobs };
             }
         }
-        if !c.sudden_death {
-            for u in c.units {
-                if u.hp <= 0.0
-                    || u.built < 1.0
-                    || !flag(Catalog::compiled()?.unit(u.kind)?, "building")
-                {
-                    continue;
-                }
-                let Some(b) = next.buildings.get_mut(&u.id) else {
-                    continue;
-                };
-                let Some(j) = b.jobs.first() else {
-                    continue;
-                };
-                let time = train_time(&j.kind)?;
-                b.progress += dt;
-                if !b.progress.is_finite() {
-                    return Err(Error::InvalidInput("training overflow"));
-                }
-                if b.progress >= time {
-                    let Some(owner) = u.owner else {
-                        return Err(Error::InvalidInput("neutral production"));
-                    };
-                    let job = b.jobs.remove(0);
-                    b.progress = 0.0;
-                    out.units.push(CompletedUnit {
-                        building: u.id,
-                        owner,
-                        kind: job.kind,
-                        job_id: job.id,
-                    });
-                }
+        Ok(())
+    }
+    fn building_step(
+        u: &UnitView<'_>,
+        sudden_death: bool,
+        b: &mut BuildingProduction,
+        dt: f64,
+    ) -> Result<Option<CompletedUnit>, Error> {
+        if sudden_death
+            || u.hp <= 0.0
+            || u.built < 1.0
+            || !flag(Catalog::compiled()?.unit(u.kind)?, "building")
+        {
+            return Ok(None);
+        }
+        let Some(j) = b.jobs.first() else {
+            return Ok(None);
+        };
+        let time = train_time(&j.kind)?;
+        b.progress += dt;
+        if !b.progress.is_finite() {
+            return Err(Error::InvalidInput("training overflow"));
+        }
+        if b.progress >= time {
+            let Some(owner) = u.owner else {
+                return Err(Error::InvalidInput("neutral production"));
+            };
+            let job = b.jobs.remove(0);
+            b.progress = 0.0;
+            return Ok(Some(CompletedUnit {
+                building: u.id,
+                owner,
+                kind: job.kind,
+                job_id: job.id,
+            }));
+        }
+        Ok(None)
+    }
+    /// Run only the source early lab phase. No building training advances here.
+    pub fn advance_research(
+        &mut self,
+        c: &Context<'_>,
+        wallets: &EconomyState,
+        dt: f64,
+    ) -> Result<Vec<(usize, Technology)>, Error> {
+        self.validate(c, wallets)?;
+        Self::validate_dt(dt)?;
+        let mut players = self.players.clone();
+        let mut out = Vec::new();
+        Self::research_step(&mut players, c, wallets, dt, &mut out)?;
+        self.players = players;
+        Ok(out)
+    }
+    /// Stage one building at its actual source unit-loop position. Completion
+    /// placement and unit publication must validate before consuming this guard.
+    pub fn prepare_building_step<'a>(
+        &'a mut self,
+        c: &Context<'_>,
+        wallets: &EconomyState,
+        building: u32,
+        dt: f64,
+    ) -> Result<PreparedBuildingStep<'a>, Error> {
+        self.validate(c, wallets)?;
+        Self::validate_dt(dt)?;
+        let u = c
+            .units
+            .iter()
+            .find(|u| u.id == building)
+            .ok_or(Error::InvalidInput("building missing"))?;
+        let mut next = self.buildings.get(&building).cloned();
+        let completed = if let Some(next) = &mut next {
+            Self::building_step(u, c.sudden_death, next, dt)?
+        } else {
+            None
+        };
+        Ok(PreparedBuildingStep {
+            state: self,
+            building,
+            next,
+            completed,
+        })
+    }
+    /// Component convenience: research first, then training in borrowed unit order.
+    /// Match scheduling uses the split phases at their actual source positions.
+    pub fn advance(
+        &mut self,
+        c: &Context<'_>,
+        wallets: &EconomyState,
+        dt: f64,
+    ) -> Result<StepEvents, Error> {
+        self.validate(c, wallets)?;
+        Self::validate_dt(dt)?;
+        let mut next = self.clone();
+        let mut out = StepEvents::default();
+        Self::research_step(&mut next.players, c, wallets, dt, &mut out.research)?;
+        for u in c.units {
+            if let Some(b) = next.buildings.get_mut(&u.id)
+                && let Some(unit) = Self::building_step(u, c.sudden_death, b, dt)?
+            {
+                out.units.push(unit);
             }
         }
         *self = next;

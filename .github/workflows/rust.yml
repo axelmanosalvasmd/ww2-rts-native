@@ -49,7 +49,7 @@ jobs:
       - name: Check Clippy
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
       - name: Test the workspace
-        run: cargo test --locked --workspace
+        run: cargo test --locked --workspace --profile ci-test
       - name: Build the release C library
         run: cargo build --locked -p ww2-ffi --release
       - name: Link and replay the C formation fixture on Linux

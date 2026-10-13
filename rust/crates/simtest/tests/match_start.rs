@@ -1,4 +1,9 @@
 //! Original createGame startup, with troop capture before starting bases are stamped.
+#[path = "common/startup_projection.rs"]
+mod projection;
+#[path = "common/startup.rs"]
+mod startup;
+use projection::{bits, equivalent, terrain};
 use serde_json::{Value, json};
 use ww2_core::{
     economy::{Faction, Mode, Technology},
@@ -8,100 +13,6 @@ use ww2_core::{
     rules::Rules,
     weather::WeatherChoice,
 };
-fn bits(n: f64) -> Value {
-    json!(format!("{:016x}", n.to_bits()))
-}
-fn runs(values: impl IntoIterator<Item = Value>) -> Value {
-    let mut out: Vec<[Value; 2]> = Vec::new();
-    for value in values {
-        if let Some(last) = out.last_mut().filter(|r| r[0] == value) {
-            last[1] = json!(last[1].as_u64().unwrap() + 1);
-        } else {
-            out.push([value, json!(1)]);
-        }
-    }
-    json!(out)
-}
-fn equivalent(a: &Value, b: &Value) -> bool {
-    match (a, b) {
-        (Value::Number(a), Value::Number(b)) => a.as_f64() == b.as_f64(),
-        (Value::Array(a), Value::Array(b)) => {
-            a.len() == b.len() && a.iter().zip(b).all(|(a, b)| equivalent(a, b))
-        }
-        (Value::Object(a), Value::Object(b)) => {
-            a.len() == b.len()
-                && a.iter()
-                    .all(|(k, a)| b.get(k).is_some_and(|b| equivalent(a, b)))
-        }
-        _ => a == b,
-    }
-}
-fn terrain(instance: &Match) -> Value {
-    use ww2_core::world::Recipient;
-    let w = &instance.world;
-    let g = &w.game;
-    let row = |r: &ww2_core::world::CellRow| {
-        let d = &r.data;
-        let mut data = json!({"ground":char::from(d.ground).to_string(),"object":char::from(d.object).to_string(),"material":d.material,"groundMaterial":d.ground_material,"groundWear":d.ground_wear});
-        if let Some(front) = d.trench_front {
-            data["trenchFront"] = json!(front);
-        }
-        if d.mine {
-            data["mine"] = json!(true);
-            if let Some(m) = &d.mine_material {
-                data["mineMaterial"] = json!(m);
-            }
-        }
-        if let Some(s) = &d.section {
-            data["section"] = json!({"id":s.id,"structureId":s.structure_id,"state":s.state,"hp":s.hp,"maxHp":s.max_hp,"material":s.material,"anchor":s.anchor});
-        }
-        json!([
-            r.cell,
-            char::from(r.ch).to_string(),
-            r.height,
-            r.state,
-            data
-        ])
-    };
-    let buildings: Vec<_> = w
-        .structures
-        .iter()
-        .filter(|s| s.kind == "building")
-        .map(|s| {
-            let sections: Vec<_> = s
-                .section_ids
-                .iter()
-                .zip(&s.cells)
-                .map(|(id, c)| {
-                    let (m, h) = w.section_by_id(id).unwrap();
-                    json!([
-                        m.id,
-                        m.structure_id,
-                        c,
-                        bits(h.hp),
-                        bits(h.max_hp.unwrap()),
-                        m.material,
-                        m.anchor,
-                        m.supports,
-                        "intact",
-                        m.rubble
-                    ])
-                })
-                .collect();
-            json!([s.id, s.entity_id, s.cells, sections])
-        })
-        .collect();
-    json!({"chars":runs(g.chars.iter().map(|c|json!(char::from(*c).to_string()))),
-        "ground":runs(g.ground.as_ref().unwrap().iter().map(|c|json!(char::from(*c).to_string()))),
-        "objects":runs(g.objects.as_ref().unwrap().iter().map(|c|json!(char::from(*c).to_string()))),
-        "flags":runs(g.flags.iter().map(|v|json!(v))),"height":g.height.as_ref().map(|h|runs(h.iter().map(|v|json!(v)))),
-        "hp":runs(g.cell_hp.iter().map(|v|json!(v.to_bits()))),"wear":w.cell_log().iter().map(|r|json!([r.cell,g.wear.as_ref().unwrap()[r.cell].to_bits()])).collect::<Vec<_>>(),
-        "state":runs(w.cell_state.iter().map(|v|json!(v))),
-        "versions":[g.terrain_version as u64,w.versions.obstruction,w.versions.infantry,w.versions.vehicle,w.versions.naval],
-        "log":w.cell_log().iter().map(row).collect::<Vec<_>>(),"newCells":w.new_cells().iter().map(row).collect::<Vec<_>>(),"journal":w.journal(),
-        "buildingCells":instance.building_cells.iter().map(|(c,b)|json!([c,b.unit,b.owner,bits(b.at.x),bits(b.at.z)])).collect::<Vec<_>>(),
-        "pending":(0..instance.start.players.len()).map(|i|w.pending(Recipient::Player(i)).unwrap()).collect::<Vec<_>>(),"buildings":buildings})
-}
 fn options(c: &Value, map_key: &str) -> MatchOptions {
     MatchOptions {
         seed: c["seed"].as_str().unwrap().parse().unwrap(),
@@ -285,9 +196,6 @@ fn startup_rejects_incomplete_features_and_keeps_failed_force_setup_atomic() {
     let mut invalid = Vec::new();
     let mut o = base.clone();
     o.mode = Mode::Classic;
-    invalid.push(o);
-    let mut o = base.clone();
-    o.logistics = true;
     invalid.push(o);
     let mut o = base.clone();
     o.players.clear();

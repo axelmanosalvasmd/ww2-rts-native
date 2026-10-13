@@ -119,6 +119,7 @@ impl EnvironmentRuntime {
         });
         let skip = BTreeSet::new();
         let hit = DamageContext {
+            actor_order: None,
             owner,
             contact_id: None,
             direction: Some(Point {
@@ -176,7 +177,15 @@ impl EnvironmentRuntime {
         let mut out = Vec::new();
         if let Some(structure) = structure {
             for (id, cell) in structure.section_ids.iter().zip(structure.cells) {
-                self.fail_section(w, id, cell, ctx, Some(Point { x: 0., z: 1. }), &mut out)?;
+                self.fail_section(
+                    w,
+                    id,
+                    cell,
+                    ctx,
+                    Some(Point { x: 0., z: 1. }),
+                    None,
+                    &mut out,
+                )?;
             }
         }
         for &cell in footprint {

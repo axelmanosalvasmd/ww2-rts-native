@@ -205,34 +205,39 @@ fn original_match_buy_placement_path_and_grid() {
                     let r = &stage["routing"];
                     let rows: Vec<_> = r["rows"]
                         .as_array()
-                        .unwrap()
-                        .iter()
+                        .into_iter()
+                        .flatten()
                         .map(|id| row(&case["rows"][id.as_u64().unwrap() as usize - 1]))
                         .collect();
                     let (memory, route) = &mut recipients[slot];
                     route.apply_rows(step as u64 + 1, &rows).unwrap();
                     let query = route.query();
                     let mut fires = vec![false; m.world.game.w * m.world.game.h];
-                    for c in r["fires"].as_array().unwrap() {
+                    for c in r["fires"].as_array().into_iter().flatten() {
                         fires[c.as_u64().unwrap() as usize] = true;
                     }
-                    let bunkers: Vec<_> =
-                        r["bunkers"].as_array().unwrap().iter().map(point).collect();
+                    let bunkers: Vec<_> = r["bunkers"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .map(point)
+                        .collect();
                     let live = LiveRouting {
                         fires: &fires,
                         bunkers: &bunkers,
-                        wetness: r["wet"].as_f64().unwrap(),
-                        roads: r["roads"].as_bool().unwrap(),
+                        wetness: r["wet"].as_f64().unwrap_or(0.0),
+                        roads: r["roads"].as_bool().unwrap_or(false),
                     };
-                    let routing =
+                    let routing = (!r.is_null()).then(|| {
                         RecruitRouting::new(memory, m.world.game.players[slot].team, &query, live)
-                            .unwrap();
+                            .unwrap()
+                    });
                     let result = m.recruit(
                         slot,
                         action["kind"].as_str().unwrap(),
                         action["from"].as_u64().map(|id| id as u32),
                         winner,
-                        Some(routing),
+                        routing,
                     );
                     let (reason, unit) = match result {
                         Ok(done) => {
@@ -241,6 +246,16 @@ fn original_match_buy_placement_path_and_grid() {
                                 m.combat.get(done.unit),
                                 Some(&ww2_core::match_combat::UnitCombat::default()),
                                 "recruits must enter combat with canonical default metadata"
+                            );
+                            assert_eq!(
+                                m.abilities.get(done.unit),
+                                Some(&ww2_core::match_abilities::AbilityUnit::default()),
+                                "recruits must enter with canonical default ability state"
+                            );
+                            assert_eq!(
+                                m.recovery.get(done.unit),
+                                Some(&ww2_core::match_recovery::RecoveryUnit::default()),
+                                "recruits must enter with canonical default recovery state"
                             );
                             assert_eq!(
                                 m.firing.get(done.unit),
@@ -334,6 +349,7 @@ fn malformed_or_unsupported_staging_never_publishes() {
     m.world.game.strikes.push(Strike {
         live: false,
         kind: StrikeKind::Other,
+        runtime: None,
         owner: 0,
         x: 1.0,
         z: 1.0,

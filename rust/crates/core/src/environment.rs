@@ -143,6 +143,8 @@ pub struct Blast {
 }
 /// A caller can reuse memory for overlapping circles in one beam/breath.
 pub struct DamageContext<'a> {
+    /// Captured source list for casualty and legacy rubble loops. None uses all current units.
+    pub actor_order: Option<&'a [u32]>,
     pub owner: Option<i32>,
     pub contact_id: Option<&'a str>,
     pub direction: Option<Point>,
@@ -153,6 +155,7 @@ pub struct DamageContext<'a> {
 impl<'a> DamageContext<'a> {
     pub fn plain(skip_buildings: &'a BTreeSet<u32>) -> Self {
         Self {
+            actor_order: None,
             owner: None,
             contact_id: None,
             direction: None,
@@ -302,6 +305,15 @@ fn material(name: &str) -> (f64, f64, f64, f64) {
         _ => (1., 0., 0.9, 0.02),
     }
 }
+fn check_damage_actors(w: &World, hit: &DamageContext<'_>) -> Result<(), EnvironmentError> {
+    if let Some(ids) = hit.actor_order {
+        let unique: BTreeSet<_> = ids.iter().copied().collect();
+        if unique.len() != ids.len() || ids.iter().any(|id| !w.game.units.contains_key(id)) {
+            return Err(EnvironmentError::InvalidInput("damage actor membership"));
+        }
+    }
+    Ok(())
+}
 fn center(w: &World, c: usize) -> Point {
     Point {
         x: (c % w.game.w) as f64 * 2. + 1.,
@@ -321,7 +333,44 @@ fn near(w: &World, c: usize) -> [Option<usize>; 4] {
         (c % width + 1 < width).then_some(c + 1),
     ]
 }
+// World construction establishes these shapes. Public terrain arrays can later be
+// replaced, so every environment admission rechecks them before indexing or writes.
+fn check_terrain(w: &World) -> Result<(), EnvironmentError> {
+    let g = &w.game;
+    let n =
+        g.w.checked_mul(g.h)
+            .ok_or(EnvironmentError::InvalidInput("terrain shape"))?;
+    if g.w == 0
+        || g.h == 0
+        || g.w > (1usize << 26)
+        || g.h > (1usize << 26)
+        || [
+            g.chars.len(),
+            g.flags.len(),
+            g.house.len(),
+            g.cell_hp.len(),
+            w.mine_layer.len(),
+            w.surface_wear.len(),
+            w.burnt.len(),
+            w.scar.len(),
+            w.cell_state.len(),
+        ]
+        .iter()
+        .any(|len| *len != n)
+        || g.ground.as_ref().is_none_or(|v| v.len() != n)
+        || g.objects.as_ref().is_none_or(|v| v.len() != n)
+        || g.wear.as_ref().is_none_or(|v| v.len() != n)
+        || g.height.as_ref().is_some_and(|v| v.len() != n)
+        || g.trench_front.as_ref().is_some_and(|v| v.len() != n)
+        || g.tough.as_ref().is_some_and(|v| v.len() != n)
+        || w.shoal.as_ref().is_some_and(|v| v.len() != n)
+    {
+        return Err(EnvironmentError::InvalidInput("terrain shape"));
+    }
+    Ok(())
+}
 fn check(w: &World, ctx: &Context<'_>) -> Result<&'static Tuning, EnvironmentError> {
+    check_terrain(w)?;
     if ctx.tick > 9_007_199_254_740_941 || ctx.tick.checked_add(50).is_none() {
         return Err(EnvironmentError::InvalidInput("tick"));
     }
@@ -459,6 +508,7 @@ impl EnvironmentRuntime {
         hit: &DamageContext<'_>,
     ) -> Result<(f64, Vec<Effect>), EnvironmentError> {
         check(w, ctx)?;
+        check_damage_actors(w, hit)?;
         if c >= w.game.chars.len() || damage.is_nan() || damage == f64::NEG_INFINITY {
             return Err(EnvironmentError::InvalidInput("section damage"));
         }
@@ -559,7 +609,7 @@ impl EnvironmentRuntime {
             w.log_cell(c, true)?;
             return Ok(taken);
         }
-        self.fail_section(w, &meta.id, c, ctx, hit.direction, out)?;
+        self.fail_section(w, &meta.id, c, ctx, hit.direction, hit.actor_order, out)?;
         let supported = self.supported(w, &structure.section_ids);
         for (id, &cell) in structure.section_ids.iter().zip(&structure.cells) {
             let (m, s) = w.section_by_id(id).unwrap();
@@ -576,7 +626,7 @@ impl EnvironmentRuntime {
                 4.,
                 impulse * if material_same { 1. } else { 0.7 },
             ));
-            self.fail_section(w, id, cell, ctx, hit.direction, out)?;
+            self.fail_section(w, id, cell, ctx, hit.direction, hit.actor_order, out)?;
         }
         if let Some(entity) = entity {
             let alive = structure.section_ids.iter().any(|id| {
@@ -630,6 +680,7 @@ impl EnvironmentRuntime {
         }
         seen
     }
+    #[allow(clippy::too_many_arguments)]
     fn fail_section(
         &mut self,
         w: &mut World,
@@ -637,6 +688,7 @@ impl EnvironmentRuntime {
         c: usize,
         ctx: &mut Context<'_>,
         direction: Option<Point>,
+        actor_order: Option<&[u32]>,
         out: &mut Vec<Effect>,
     ) -> Result<(), EnvironmentError> {
         if w.section_by_id(id).unwrap().1.failed {
@@ -728,7 +780,7 @@ impl EnvironmentRuntime {
             }
         }
         if was == b'=' {
-            for &uid in ctx.unit_order {
+            for &uid in actor_order.unwrap_or(ctx.unit_order) {
                 let u = &w.game.units[&uid];
                 if u.hp > 0.
                     && u.air.is_none()
@@ -756,7 +808,7 @@ impl EnvironmentRuntime {
             return Err(EnvironmentError::InvalidInput("wreck cell"));
         }
         let mut out = Vec::new();
-        self.wreck_inner(w, c, into, ctx, &mut out)?;
+        self.wreck_inner(w, c, into, ctx, None, &mut out)?;
         Ok(out)
     }
     fn wreck_inner(
@@ -765,11 +817,14 @@ impl EnvironmentRuntime {
         c: usize,
         into: Option<u8>,
         ctx: &mut Context<'_>,
+        actor_order: Option<&[u32]>,
         out: &mut Vec<Effect>,
     ) -> Result<(), EnvironmentError> {
         if w.game.sections.get(&(c as u32)).is_some_and(|s| !s.failed) {
             let skip = BTreeSet::new();
-            self.damage_section_inner(w, c, f64::INFINITY, ctx, &DamageContext::plain(&skip), out)?;
+            let mut hit = DamageContext::plain(&skip);
+            hit.actor_order = actor_order;
+            self.damage_section_inner(w, c, f64::INFINITY, ctx, &hit, out)?;
             return Ok(());
         }
         let t = tuning()?;
@@ -812,7 +867,7 @@ impl EnvironmentRuntime {
                 {
                     continue;
                 }
-                if ctx.unit_order.iter().any(|id| {
+                if actor_order.unwrap_or(ctx.unit_order).iter().any(|id| {
                     let u = &w.game.units[id];
                     u.hp > 0.
                         && u.air.is_none()
@@ -833,7 +888,7 @@ impl EnvironmentRuntime {
             }
         }
         if crate::map::flags(into) & MOVE != 0 {
-            for &id in ctx.unit_order {
+            for &id in actor_order.unwrap_or(ctx.unit_order) {
                 let u = &w.game.units[&id];
                 if u.hp > 0. && u.air.is_none() && w.game.cell_of(u.x, u.z) == Some(c) {
                     w.game.units.get_mut(&id).unwrap().hp = 0.;
@@ -851,6 +906,7 @@ impl EnvironmentRuntime {
         hit: &mut DamageContext<'_>,
     ) -> Result<Vec<Effect>, EnvironmentError> {
         let t = check(w, ctx)?;
+        check_damage_actors(w, hit)?;
         let Blast {
             at,
             radius,
@@ -962,7 +1018,7 @@ impl EnvironmentRuntime {
                         f64::from(w.game.wear.as_ref().unwrap()[c]) + amount / t.trench_hp;
                     w.game.wear.as_mut().unwrap()[c] = next_wear as f32;
                     if next_wear >= 1. {
-                        self.wreck_inner(w, c, Some(b'+'), ctx, &mut out)?;
+                        self.wreck_inner(w, c, Some(b'+'), ctx, hit.actor_order, &mut out)?;
                         continue;
                     }
                 }
@@ -998,7 +1054,7 @@ impl EnvironmentRuntime {
                     let next_hp = f64::from(w.game.cell_hp[c]) - amount;
                     w.game.cell_hp[c] = next_hp as f32;
                     if next_hp <= 0. {
-                        self.wreck_inner(w, c, None, ctx, &mut out)?;
+                        self.wreck_inner(w, c, None, ctx, hit.actor_order, &mut out)?;
                     } else {
                         w.touch(c)?;
                     }
@@ -1026,32 +1082,59 @@ impl EnvironmentRuntime {
         w.game
             .height
             .get_or_insert_with(|| vec![0; w.game.w * w.game.h]);
-        let target = level(w, c) - 1;
-        if target < t.min_level
+        // Source subtraction uses Numbers, not the Int8 terrain storage width.
+        let target = i16::from(level(w, c)) - 1;
+        if target < i16::from(t.min_level)
             || near(w, c)
                 .into_iter()
                 .flatten()
-                .any(|n| level(w, n) - target > 1)
+                .any(|n| i16::from(level(w, n)) - target > 1)
         {
             return Ok(());
         }
-        w.set_level(c, target)?;
+        w.set_level(c, target as i8)?;
         Ok(())
     }
+    /// Ordinary burning uses the complete current actor order.
     pub fn burn(
         &mut self,
         w: &mut World,
         dt: f64,
         ctx: &mut Context<'_>,
     ) -> Result<Vec<Effect>, EnvironmentError> {
+        self.burn_inner(w, dt, ctx, None)
+    }
+    /// Burning after late births uses the source's earlier captured actor list.
+    /// Context keeps all current units for validation, garrison eviction and live
+    /// grid queries. Only direct casualties and list-based rubble effects are captured.
+    pub fn burn_captured(
+        &mut self,
+        w: &mut World,
+        dt: f64,
+        ctx: &mut Context<'_>,
+        actor_order: &[u32],
+    ) -> Result<Vec<Effect>, EnvironmentError> {
+        self.burn_inner(w, dt, ctx, Some(actor_order))
+    }
+    fn burn_inner(
+        &mut self,
+        w: &mut World,
+        dt: f64,
+        ctx: &mut Context<'_>,
+        actor_order: Option<&[u32]>,
+    ) -> Result<Vec<Effect>, EnvironmentError> {
         let t = check(w, ctx)?;
+        let skip = BTreeSet::new();
+        let mut hit = DamageContext::plain(&skip);
+        hit.actor_order = actor_order;
+        check_damage_actors(w, &hit)?;
         if !dt.is_finite() || !(0.0..=7200.).contains(&dt) {
             return Err(EnvironmentError::InvalidInput("burn dt"));
         }
         let mut out = Vec::new();
         let wx = math::cos(ctx.wind_angle);
         let wz = math::sin(ctx.wind_angle);
-        for &id in ctx.unit_order {
+        for &id in actor_order.unwrap_or(ctx.unit_order) {
             let u = &w.game.units[&id];
             let c = if u.hp > 0. && u.air.is_none() && !u.riding && t.kinds.kinds[u.kind].infantry {
                 u.garrison.or_else(|| w.game.cell_of(u.x, u.z))
@@ -1142,8 +1225,6 @@ impl EnvironmentRuntime {
                     * dt
                     * (0.2 + 0.8 * material(w.material_name(c, false).unwrap()).1)
                     * (1. - ctx.rain * 0.7);
-                let skip = BTreeSet::new();
-                let mut hit = DamageContext::plain(&skip);
                 hit.direction = Some(Point { x: wx, z: wz });
                 self.damage_section_inner(w, c, amount, ctx, &hit, &mut out)?;
                 if w.game.sections.get(&(c as u32)).is_some_and(|s| s.failed) {
@@ -1167,7 +1248,7 @@ impl EnvironmentRuntime {
                 w.append_journal(c);
             }
             if ch == b'H' || ch == b'O' {
-                self.wreck_inner(w, c, Some(b'.'), ctx, &mut out)?;
+                self.wreck_inner(w, c, Some(b'.'), ctx, actor_order, &mut out)?;
             } else {
                 w.touch(c)?;
             }
