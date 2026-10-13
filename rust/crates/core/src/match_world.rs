@@ -292,6 +292,9 @@ impl Match {
             combat: crate::match_combat::CombatState::default(),
             environment: crate::environment::EnvironmentRuntime::default(),
             firing: crate::match_firing::FiringState::default(),
+            field_works: crate::field_works::FieldWorksRuntime::default(),
+            abilities: crate::match_abilities::AbilityState::default(),
+            recovery: crate::match_recovery::RecoveryState::default(),
             recipients: Vec::new(),
             routing_fog: crate::fog::Fog::default(),
             tick_state: crate::match_tick::TickState::default(),
@@ -367,6 +370,13 @@ impl Match {
     }
     fn publish_world_unit(&mut self, draft: StagedUnit) -> Result<u32, String> {
         let id = draft.unit.id;
+        if self.combat.get(id).is_some()
+            || self.firing.get(id).is_some()
+            || self.abilities.get(id).is_some()
+            || self.recovery.get(id).is_some()
+        {
+            return Err("World publication metadata identity already exists".into());
+        }
         let mode = self.world.game.mode;
         prepare_world_publication(
             PublicationParts {
@@ -385,6 +395,8 @@ impl Match {
         .publish_with(|unit, _| {
             self.combat.initialize(unit.id);
             self.firing.initialize(unit.id);
+            self.abilities.initialize(unit.id);
+            self.recovery.initialize(unit.id);
         });
         Ok(id)
     }

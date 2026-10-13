@@ -12,6 +12,7 @@ pub mod economy;
 pub mod economy_state;
 pub mod environment;
 pub mod environment_debris;
+pub mod field_works;
 pub mod fog;
 pub mod formation;
 pub mod game;
@@ -20,8 +21,11 @@ pub mod legacy_scenario;
 
 pub mod logistics;
 pub mod map;
+pub mod match_abilities;
 pub mod match_combat;
 pub mod match_commands;
+pub mod match_recovery;
+
 pub mod match_firing;
 pub mod match_logistics;
 pub mod match_reactions;
