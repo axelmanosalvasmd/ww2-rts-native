@@ -155,6 +155,7 @@ fn valid_control(c: &UnitControl) -> bool {
         && c.route_end.is_none_or(finite)
         && c.face.is_none_or(|f| f.angle.is_finite() && finite(f.at))
         && c.nade.is_none_or(finite)
+        && c.guard_home.is_none_or(finite)
         && c.orders.iter().all(|command| match command {
             Command::Move { orders, face, .. } => {
                 face.is_none_or(f64::is_finite)
