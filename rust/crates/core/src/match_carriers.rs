@@ -260,7 +260,7 @@ impl Match {
         for &(id, c) in &assignments {
             let u = self.world.game.units[&id].clone();
             let at = self.world.game.units[&c].at();
-            routes.push(self.command_route(owner, &u, at)?.waypoints);
+            routes.push(self.command_route(owner, &u, at)?);
         }
         for id in &eligible {
             self.commands.units.get_mut(id).unwrap().follow = 0;
@@ -280,7 +280,7 @@ impl Match {
         if !free.values().any(|n| *n > 0) && assignments.is_empty() {
             return Ok(Some(Denial::Maximum));
         }
-        for ((id, carrier), path) in assignments.into_iter().zip(routes) {
+        for ((id, carrier), route) in assignments.into_iter().zip(routes) {
             self.cancel_field_work(id)?;
             let u = self.world.game.units.get_mut(&id).unwrap();
             u.traffic = None;
@@ -293,10 +293,11 @@ impl Match {
             u.amove = None;
             u.build = false;
             u.repath = 0.;
-            u.path = path;
+            u.path = route.waypoints;
             u.path_gen += 1;
             let c = self.commands.units.get_mut(&id).unwrap();
             c.orders.clear();
+            c.route_end = Some(route.route_end);
             c.face = None;
             c.attack_id = 0;
             c.nade = None;

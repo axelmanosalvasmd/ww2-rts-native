@@ -2,9 +2,14 @@
 
 ## Unreleased
 
+- Normally incorporated the checked carrier closure into the separate aircraft source union, preserving the accepted Board route endpoint repair and all proof evidence. Rust aircraft/support providers remain their reviewed bodies; real AIR scheduling and combined native checks remain pending.
+
 - Normally merged the source-reviewed coherent support provider into the separate aircraft dependency union. All off-map strikes now use canonical Game.strikes and its timing metadata; migrated existing ground/FPS projections and retained the ground-only guard/default assertions without changing original fixtures. AIR scheduling and coherent native proof remain pending, and frozen carrier/native branches are unchanged.
 
 - Normally joined the source-reviewed aircraft runner provider into a separate carrier descendant, preserving Board/Unload, Entrench and aircraft command variants. Aircraft birth/retirement metadata and post-command validation remain canonical. The caller still refuses AIR until the support authority migration and real phase hookup; this uncompiled source composition changes no frozen native candidate.
+- Verified the ordinary carrier tick assembly on the Mac (arm64) at 49734cc: 80 focused debug tests, all 246 release workspace tests, strict Clippy, formatting and release FFI pass. Independent hashed copies pass 19 debug and 19 release tests. The unchanged full-source capture covers 11 cases, 22 commands, 20 steps and 57 snapshots; the real caller replays both arrival orders through 40 advances, 44 receipts and 62 state checks. Recorded the actual Board routeEnd repair and preserved its first failing log; AIR, thrown ejection, broader transport effects and full match start remain separate.
+
+- Fixed the Board command dropping its pathfinder route endpoint, found by the first actual carrier native replay. Accepted boarding now publishes the same canonical routeEnd that original findPath records, after route and paid-work cancellation preflight; the original full-step fixture and actuator resets are unchanged. The initial candidate passed 49 core debug tests and 14 earlier simtest checks before this differential failure; final repaired verification remains pending.
 
 - Normal-merged the final source-reviewed carrier admission repair into the actual-runner consumer. Idle ground actor checks now precede clock and input changes; original source captures and consumer bodies remain unchanged. Combined native proof is pending.
 
