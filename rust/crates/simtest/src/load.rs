@@ -533,6 +533,7 @@ pub fn load_game(g: &Value, rules: &Rules) -> Result<Loaded> {
         .enumerate()
         .map(|(i, s)| {
             Ok(Smoke {
+                remaining: given(s, "t").and_then(Value::as_f64),
                 id: i as u32,
                 x: num(s, "x")?,
                 z: num(s, "z")?,

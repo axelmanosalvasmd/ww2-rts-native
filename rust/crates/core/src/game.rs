@@ -248,6 +248,8 @@ impl Player {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Smoke {
     pub id: u32,
+    /// Remaining lifetime (`t`); absent on vision-only fixture clouds.
+    pub remaining: Option<f64>,
     pub x: f64,
     pub z: f64,
     pub r: f64,

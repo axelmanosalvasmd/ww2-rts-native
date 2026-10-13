@@ -1,0 +1,46 @@
+// Original buy command admission and payment, with placement replaced by a request.
+import {readFileSync,writeFileSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import {resolve} from 'node:path';
+import {fileURLToPath,pathToFileURL} from 'node:url';
+if(process.arch!=='x64'||process.version!=='v24.21.0')throw Error('Use x64 Node 24.21.0');
+const root=fileURLToPath(new URL('../',import.meta.url));
+const ref=resolve(process.env.WW2_REFERENCE??`${root}/reference/ww2-rts`),pin='e4e579a838aabae3b1d9dadbc17a0a87147bc52d';
+const git=a=>execFileSync('git',['-C',ref,...a],{encoding:'utf8'}).trim();
+if(git(['rev-parse','HEAD'])!==pin||git(['status','--porcelain','--untracked-files=no']))throw Error('Reference must be clean at pin');
+const sim=await import(pathToFileURL(`${ref}/shared/sim.js`)),tech=await import(pathToFileURL(`${ref}/shared/tech.js`));
+const src=readFileSync(`${ref}/shared/sim.js`,'utf8'),start=src.indexOf("  } else if (cmd.t === 'buy' &&"),end=src.indexOf('\n}\n\n// ---------- simulation',start);
+if(start<0||end<0)throw Error('Buy command not found');
+const body=src.slice(start,end).replace(/^  } else /,'');
+const names=['UNITS','canBuild','isConstructionMode','isSkirmishBaseMode','tierOf','popOf','popCap','popUse','priceOf','productionBuildings'];
+const command=new Function(...names,`function tally(){} function produceUnit(g,b,owner,kind){g.completed.push({building:b.id,owner,kind});} return function(g,slot,cmd){${body}}`)(...names.map(n=>sim[n]??tech[n]));
+const bits=x=>{const b=Buffer.alloc(8);b.writeDoubleBE(x);return b.toString('hex');};
+const unit=(id,owner,type,fields={})=>({id,owner,type,hp:100,built:1,queue:[],...fields});
+const base={mode:null,army:'standard',tech:false,naval:true,tier:1,mp:5000.125,mun:0,fuel:0,units:[unit(20,1,'hq'),unit(9,0,'barracks'),unit(2,0,'hq'),unit(3,0,'motorpool'),unit(4,0,'airfield'),unit(5,0,'shipyard'),unit(6,0,'armory'),unit(1,2,'hq')],strikes:[]};
+const cases=[];
+function run(name,kind,options={},faction=0,from){
+ const input={...structuredClone(base),...options},g={...structuredClone(input),army:sim.CFG.armies[input.army],players:[{slot:0,team:0,faction,tier:input.tier,mp:input.mp,mun:input.mun,fuel:input.fuel},{slot:1,team:0},{slot:2,team:1}],units:new Map(input.units.map(u=>[u.id,u])),completed:[]};
+ const result=command(g,0,{t:'buy',unit:kind,...(from===undefined?{}:{from})})??null;
+ cases.push({name,kind,faction,...(from===undefined?{}:{from}),options,expected:{result,money:[g.players[0].mp,g.players[0].mun,g.players[0].fuel].map(bits),completed:g.completed}});
+}
+for(let faction=0;faction<4;faction++)for(const kind of Object.keys(sim.UNITS))run(`catalog-${faction}-${kind}`,kind,{},faction);
+for(const kind of Object.keys(sim.UNITS))run(`tier-${kind}`,kind,{tech:true,naval:false,mp:0});
+run('explicit-conquest','rifle',{mode:{kind:'conquest'}});
+run('explicit-maker','rifle',{},0,2);run('invalid-maker','rifle',{},0,999);run('ally-maker','rifle',{},0,20);run('enemy-maker','rifle',{},0,1);run('zero-maker','rifle',{},0,0);
+run('naval-off','lcvp',{naval:false});run('tech-bypass','tank',{tech:false,mp:1000});run('tier-before-mp','tank',{tech:true,mp:0});
+run('mp-before-pop','rifle',{mp:0,units:[unit(2,0,'hq'),...Array.from({length:12},(_,n)=>unit(100+n,0,'rifle'))]});
+run('pop-before-max','tiger',{units:[unit(3,0,'motorpool'),unit(50,0,'tiger'),...Array.from({length:11},(_,n)=>unit(100+n,0,'rifle'))]},1);
+run('dead-max','tiger',{units:[unit(3,0,'motorpool'),unit(50,0,'tiger',{hp:0})]},1);
+run('queued-max','tiger',{units:[unit(3,0,'motorpool',{queue:['tiger']})]},1);
+run('queued-pop','rifle',{units:[unit(2,0,'hq',{queue:Array(12).fill('rifle')})]});
+run('dead-pop','rifle',{units:[unit(2,0,'hq'),...Array.from({length:12},(_,n)=>unit(100+n,0,'rifle',{hp:0}))]});
+run('fractional-pop-at-cap','conscript',{units:[unit(2,0,'hq'),...Array.from({length:15},(_,n)=>unit(100+n,0,'conscript'))]},2);
+run('pending-drop-pop','rifle',{strikes:Array.from({length:4},()=>({owner:0,kind:'para',live:false}))});
+run('landed-drop-no-pop','rifle',{strikes:Array.from({length:4},()=>({owner:0,kind:'para',live:true}))});
+for(const army of ['large','massive','endless'])run(`army-${army}`,'rifle',{army,units:[unit(2,0,'hq'),...Array.from({length:12},(_,n)=>unit(100+n,0,'rifle'))]});
+for(const [name,units] of [['no-maker',[]],['dead-maker',[unit(2,0,'hq',{hp:0})]],['unfinished-maker',[unit(2,0,'hq',{built:.5})]],['allied-only',[unit(20,1,'hq')]],['first-living',[unit(9,0,'barracks',{hp:0}),unit(2,0,'hq')]]])run(name,'rifle',{units});
+run('mp-before-missing-maker','rifle',{mp:0,units:[]});run('exact-balance','rifle',{mp:sim.UNITS.rifle.cost});run('below-price','rifle',{mp:sim.UNITS.rifle.cost-.0001});
+run('invalid-kind','not-a-unit');run('wrong-faction-before-classic','tiger',{mp:0,tech:true});
+const data=JSON.stringify({reference:pin,base,cases})+'\n',file=`${root}/rust/crates/core/tests/fixtures/recruitment.json`;
+if(process.argv.includes('--check')){if(readFileSync(file,'utf8')!==data)throw Error('Recruitment fixture differs');}else writeFileSync(file,data);
+console.log(`${process.argv.includes('--check')?'Checked':'Recorded'} ${cases.length} original buy commands`);
