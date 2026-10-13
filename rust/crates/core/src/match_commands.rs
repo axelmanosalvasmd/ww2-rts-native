@@ -527,7 +527,12 @@ impl crate::match_runtime::Match {
         }
         Ok(results)
     }
-    fn eligible_command_unit(&self, id: i64, owner: usize, command: &Command) -> Option<UnitId> {
+    pub(crate) fn eligible_command_unit(
+        &self,
+        id: i64,
+        owner: usize,
+        command: &Command,
+    ) -> Option<UnitId> {
         let id = u32::try_from(id).ok()?;
         let u = self.world.game.units.get(&id)?;
         let kind = self.rules.kinds.get(u.kind)?;

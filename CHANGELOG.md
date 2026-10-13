@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added a bounded ordinary Match carrier component using canonical board/cargo/riding state, own-seat reservations, recipient-aware routes, paid Dig cancellation, physical ground boarding, riding pose updates and manual unload. The pinned-source recorder covers 12 traces and 55 actions, including stable selection ties, a hidden obstacle and carrier/grid flag receipts. Boats, rail, garrison exits, unrepresented building/entrench work and wrecked-carrier ejection remain explicit unsupported boundaries; command parser/scheduler attachment and native verification are pending.
+
 - Applied the ability owner’s narrow paid-work cancellation fix to the Dig integration. Accepted manual aimed abilities remove the canonical job without refund; unsupported project state rejects before selection writes. Updated the original-source fixture and retained focused paid-work and refusal regressions. Native proof remains pending.
 
 - Updated the command replay’s restored digging state to create a canonical field-work descriptor through real placement preparation. Its existing Move and Stop checkpoints now also require descriptor cancellation, replacing the stale activity-only test setup. Native replay remains pending.
