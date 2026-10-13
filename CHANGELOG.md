@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Integrated the reviewed routing and executable command prerequisites for weapon-phase checks. Movement fixtures explicitly leave the newer territorial reserve fields absent. No production rule changed.
+
 - Preflight canonical unit identities, coordinates and terrain indices before projectile iteration, so malformed later contact targets reject before earlier rounds advance.
 
 - Expanded the firing source fixture to explicit area-weapon orders and limited/empty ammunition, covering every represented shooter kind. Rejects malformed timer and XP facts before unit firing changes. Native verification remains queued.
