@@ -164,6 +164,13 @@ fn invalid_launches_are_atomic_and_only_success_returns_a_flight() {
         assert_eq!(m.start.random.snapshot(), random);
         assert_eq!(m.logistics, ammo);
     }
+    let missing = m.combat.remove(1).unwrap();
+    assert!(
+        m.launch_ability_flight(1, point(&c["at"]), blast, None, None)
+            .is_err()
+    );
+    assert_eq!(m.firing, firing);
+    *m.combat.initialize(1) = missing;
     m.firing.next_flight = u64::MAX;
     let before = m.firing.clone();
     assert!(

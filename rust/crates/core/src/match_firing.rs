@@ -741,6 +741,12 @@ impl Match {
         for p in self.firing.flights.values() {
             if let Some(source) = p.blast_source {
                 validate_blast(source)?;
+                if source
+                    .weapon_kind
+                    .is_some_and(|k| k >= self.rules.kinds.len())
+                {
+                    return Err("invalid flight blast identity".into());
+                }
             }
         }
         let now = self.world.game.tick as f64 * 0.05;
@@ -2046,6 +2052,10 @@ impl Match {
             .get(&id)
             .ok_or("missing flight shooter")?;
         if u.hp <= 0.0
+            || self.combat.get(id).is_none()
+            || self.firing.get(id).is_none()
+            || self.logistics.get(id).is_some_and(|r| !r.ammo.is_finite())
+            || u.air.is_some()
             || flag(self.definition(u)?, "air")
             || u.riding
             || ![at.x, at.z].iter().all(|v| v.is_finite())
@@ -2315,9 +2325,10 @@ impl Match {
     pub fn advance_firing_grenades(&mut self, dt: f64) -> Result<(), String> {
         self.supported_firing_mode()?;
         if !dt.is_finite()
-            || dt < 0.0
+            || !(0.0..=640.0).contains(&dt)
             || self.firing.grenades.iter().any(|n| {
                 !n.remaining.is_finite()
+                    || !(0.0..=640.0).contains(&n.remaining)
                     || ![n.at.x, n.at.z].iter().all(|v| v.is_finite())
                     || n.owner >= self.world.game.players.len()
                     || n.flight == 0
