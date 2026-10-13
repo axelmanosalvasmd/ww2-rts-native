@@ -112,7 +112,7 @@ for (const sourceCase of [5, 27, 60]) for (const profile of ['rifle', 'tank', 'f
   step('unforced no-op', 10);
   step('first forced cancels intents without a store', 20,
     { orders: [{ t: 'move', orders: [[u.id, goal.x, goal.z]], queue: false },
-        { t: 'ability', x: goal.x, z: goal.z }],
+        ...(kind === 'rifle' ? [{ t: 'ability', x: goal.x, z: goal.z }] : [])],
       attackId: 999, targetId: 998, enter: 1, board: 2, nade: goal, fireAt: 3 },
     { forced: true }, 'none');
   step('existing path, stuck at boundary', 21, { path: one, worldGoal: goal, stuck: 1 });
