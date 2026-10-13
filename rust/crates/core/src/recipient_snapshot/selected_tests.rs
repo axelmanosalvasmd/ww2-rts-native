@@ -253,3 +253,48 @@ fn later_selected_terrain_or_list_refusal_is_whole_admission_atomic() {
         Err(SnapshotError::InvalidRecipient)
     ));
 }
+
+#[test]
+fn skipped_private_wallet_is_not_projected_or_refreshed() {
+    let mut state = initial();
+    let mut delivery = DeliveryState::new(&state).unwrap();
+    state.start.economy.players[2].mp = f64::NAN;
+    // This is recipient-local admission, not a malformed global actor/cache.
+    let cache = SnapshotCache::new(&state).unwrap();
+    assert!(matches!(
+        cache.recipient(2),
+        Err(SnapshotError::InvalidNumber)
+    ));
+    drop(cache);
+    let untouched = skipped(&state, 2);
+    let baseline = delivery.seat_fog_for_test(2);
+    let frame = delivery
+        .capture_selected_with_lists(&mut state, &[seat(0)], &[])
+        .unwrap()
+        .unwrap();
+    assert!(frame.recipient(0).is_ok());
+    assert!(matches!(
+        frame.recipient(2),
+        Err(SnapshotError::InvalidRecipient)
+    ));
+    drop(frame);
+    assert_eq!(skipped(&state, 2), untouched);
+    assert_eq!(delivery.seat_fog_for_test(2), baseline);
+    let memories = format!("{:?}", state.recipients);
+    let world = format!("{:?}", state.world);
+    let fog = format!("{:?}", state.routing_fog);
+    let before = delivery.clone();
+    assert!(matches!(
+        delivery.capture_selected_with_lists(&mut state, &[seat(0), seat(2)], &[]),
+        Err(SnapshotError::InvalidNumber)
+    ));
+    // Existing all-seat delivery still admits every private recipient field.
+    assert!(matches!(
+        delivery.capture(&mut state, &[false; 3], &[false; 3]),
+        Err(SnapshotError::InvalidNumber)
+    ));
+    assert_eq!(format!("{:?}", state.recipients), memories);
+    assert_eq!(format!("{:?}", state.world), world);
+    assert_eq!(format!("{:?}", state.routing_fog), fog);
+    assert_eq!(delivery, before);
+}

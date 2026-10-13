@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added a selected-delivery regression for a skipped malformed private wallet. Global cache admission accepts the represented actor frame; only a selected recipient's private projection may reject it. The existing all-seat API still validates every private recipient. The root-owned shared actor helper extraction and combined native proof remain pending.
+
 - Added ordered selected-seat snapshot delivery. Empty selection bypasses caches and collectors; invalid or duplicate seats refuse before publication. Only selected seats collect terrain, fog and remembered lists, while skipped seats retain pending cells, outboxes, fog acknowledgments and wreck memory. The original room callback and full/omitted-mask collectors reproduce 11 actions with 16 recipient results. Native verification remains pending.
 
 - Verified the normally merged quiet and active recipient snapshot consumers on Vostro Linux x86_64 at compiled `1ab2314`: 29 focused debug tests, all 215 locked/offline release workspace tests, strict Clippy, formatting and release FFI pass. Both the deferred receipt-action regression and quiet/active whole-admission guards pass. This evidence update preserves all tested Rust and harness files; transport and unsupported actor/mode projections remain separate.
