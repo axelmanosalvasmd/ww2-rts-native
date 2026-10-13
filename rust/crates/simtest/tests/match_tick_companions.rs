@@ -163,7 +163,7 @@ fn malformed_operative_identity_rejects_before_clock_or_respawn_publication() {
         "future identity",
         "map key mismatch",
         "missing body",
-        "orphan control",
+        "unbacked historical control",
     ] {
         let mut m = source::make(&f, &initial, Mode::Conquest);
         m.join_companion("guard", 0, false).unwrap();
@@ -193,8 +193,13 @@ fn malformed_operative_identity_rejects_before_clock_or_respawn_publication() {
             "missing body" => {
                 m.companions.soldiers.remove(&id);
             }
-            "orphan control" => {
-                m.commands.units.insert(900, m.commands.units[&id].clone());
+            "unbacked historical control" => {
+                // Constructor ID 1 was removed by the authored actor reset.
+                // It is historical, so only backing metadata can reject it.
+                assert!(!m.world.game.units.contains_key(&1));
+                assert!(1 < m.next_unit_id);
+                assert!(m.firing.get(1).is_none() && m.combat.get(1).is_none());
+                m.commands.units.insert(1, m.commands.units[&id].clone());
             }
             _ => unreachable!(),
         }
