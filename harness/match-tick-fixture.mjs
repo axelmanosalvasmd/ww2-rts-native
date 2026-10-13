@@ -25,17 +25,33 @@ const snapshot=g=>({tick:g.tick,visionTick:g.visionTick,seed:g.seed>>>0,wind:[bi
   players:g.players.map(p=>[bits(p.mp),bits(p.vp),bits(p.inc)]),
   points:g.points.map(p=>[p.owner,p.capper,bits(p.progress),p.cut,p.contested,p.onPoint,p.capTick??null])});
 const cases=[];
-for(const army of ['standard','large','massive','endless']) {
+for(const spec of [...['standard','large','massive','endless'].map(army=>({army})),{army:'standard',commands:true}]) {
+ const {army}=spec;
  const map={name:'Friendly tick integration',w:20,h:20,rows:Array(20).fill('.'.repeat(20)),spawns:[{x:0,y:0},{x:19,y:19}],points:[{id:'point',x:8,y:8},{id:'locked',x:11,y:8,needs:0}]};
  const old=Math.random; Math.random=()=>.5;let g;
  try{g=sim.createGame(map,['A','B'],false,[0,0],[0,1],{army,weather:false,tech:true,logistics:false});}finally{Math.random=old;}
  const input={holdPosition:true,seed:0x12345678,wind:[.75,.4],paths:[[1,17,17],[2,23,17]],positions:[[1,13,17],[2,27,17]]};
+ if(spec.commands)input.commands=[
+  {tick:1,issuer:0,sequence:2,command:{t:'move',orders:[[1,19,17]]}},
+  {tick:1,issuer:0,sequence:1,command:{t:'stop',ids:[1]}},
+  {tick:2,issuer:0,sequence:3,command:{t:'move',orders:[[1,19,21]],queue:true}},
+  {tick:5,issuer:0,sequence:4,command:{t:'stop',ids:[1]}},
+  {tick:6,issuer:0,sequence:5,command:{t:'amove',orders:[[1,17,19]]}}
+ ];
  for(const u of g.units.values())u.holdPos=true;
  g.seed=input.seed;g.wind={a:input.wind[0],v:input.wind[1]};
  for(const [id,x,z]of input.positions)Object.assign(g.units.get(id),{x,z});
  for(const [id,x,z]of input.paths)g.units.get(id).path=[{x,z}];
  const checkpoints=[];
- for(let i=0;i<200;i++){sim.step(g);if([1,2,3,4,5,40,80,160,161,200].includes(g.tick))checkpoints.push(snapshot(g));}
+ for(let i=0;i<200;i++){
+  for(const row of (input.commands??[]).filter(c=>c.tick===g.tick+1).sort((a,b)=>a.issuer-b.issuer||a.sequence-b.sequence))sim.command(g,row.issuer,row.command);
+  sim.step(g);
+  if([1,2,3,4,5,40,80,160,161,200].includes(g.tick)){
+   const state=snapshot(g);
+   if(spec.commands)state.control=[...g.units.values()].map(u=>[u.id,u.moveOutcome??null,u.moveOutcomeTick??null,(u.orders??[]).length,u.worldGoal?[bits(u.worldGoal.x),bits(u.worldGoal.z)]:null,u.amove?[bits(u.amove.x),bits(u.amove.z)]:null]);
+   checkpoints.push(state);
+  }
+ }
  cases.push({map,army,input,checkpoints});
 }
 // A terrain barrier appears after supply. Income must retain that earlier beat's
@@ -56,4 +72,4 @@ for(const tick of [1,41]){
 clean();const output=JSON.stringify({reference:pin,node:process.version,arch:process.arch,cases,ordering:{map:orderingMap,army:'standard',steps:ordering}})+'\n';
 const path=fileURLToPath(new URL('../rust/crates/simtest/tests/fixtures/match-tick.json',import.meta.url));
 if(process.argv.includes('--check')){if(readFileSync(path,'utf8')!==output)throw Error('Match tick fixture differs');}else writeFileSync(path,output);
-console.log(`Verified ${cases.length} actual-step traces, 800 ticks, ${cases.reduce((n,c)=>n+c.checkpoints.length,0)} checkpoints`);
+console.log(`Verified ${cases.length} actual-step traces, ${cases.length*200} ticks, ${cases.reduce((n,c)=>n+c.checkpoints.length,0)} checkpoints`);

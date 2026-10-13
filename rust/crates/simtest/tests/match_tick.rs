@@ -94,6 +94,19 @@ fn connected_tick_phases_match_actual_friendly_reference_steps() {
             }];
             u.path_gen += 1;
         }
+        if let Some(commands) = input["commands"].as_array() {
+            for row in commands {
+                m.enqueue_command(
+                    ww2_core::orders::OrderKey {
+                        tick: row["tick"].as_u64().unwrap(),
+                        issuer: row["issuer"].as_u64().unwrap() as u32,
+                        sequence: row["sequence"].as_u64().unwrap(),
+                    },
+                    ww2_core::match_commands::Command::from_json(&row["command"]).unwrap(),
+                )
+                .unwrap();
+            }
+        }
         let mut expected = c["checkpoints"].as_array().unwrap().iter().peekable();
         for _ in 0..200 {
             let report = m.advance_tick().unwrap();
@@ -102,8 +115,35 @@ fn connected_tick_phases_match_actual_friendly_reference_steps() {
                 .peek()
                 .is_some_and(|e| e["tick"].as_i64() == Some(report.tick))
             {
+                let mut state = snapshot(&m);
+                if input["commands"].is_array() {
+                    use ww2_core::match_commands::MoveOutcome;
+                    state["control"] = json!(
+                        m.world
+                            .game
+                            .units
+                            .values()
+                            .map(|u| {
+                                let c = &m.commands.units[&u.id];
+                                json!([
+                                    u.id,
+                                    c.outcome.map(|o| match o {
+                                        MoveOutcome::Interrupted => "interrupted",
+                                        MoveOutcome::Moving => "moving",
+                                        MoveOutcome::Unreachable => "unreachable",
+                                        MoveOutcome::Arrived => "completed",
+                                    }),
+                                    c.outcome_tick,
+                                    c.orders.len(),
+                                    u.world_goal.map(|p| [bits(p.x), bits(p.z)]),
+                                    u.amove.map(|p| [bits(p.x), bits(p.z)])
+                                ])
+                            })
+                            .collect::<Vec<_>>()
+                    );
+                }
                 assert_eq!(
-                    snapshot(&m),
+                    state,
                     *expected.next().unwrap(),
                     "army {} tick {}",
                     c["army"],

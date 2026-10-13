@@ -21,6 +21,7 @@ pub enum TickPhase {
     UnitOrders,
     Production,
     Reactions,
+    TrafficKnowledge,
     Movement,
     Firing,
     Construction,
@@ -61,6 +62,8 @@ pub struct TickReport {
     pub phases: Vec<TickPhase>,
     pub unavailable: Vec<TickPhase>,
     pub route_requests: Vec<(UnitId, crate::game::Point, RouteRequest)>,
+    pub commands: Vec<crate::match_commands::CommandResult>,
+    pub paths: crate::path_requests::TickReport,
 }
 
 impl crate::match_runtime::Match {
@@ -85,6 +88,7 @@ impl crate::match_runtime::Match {
         if game.tick < 0 || game.tick >= 9_007_199_254_740_991 {
             return Err("invalid tick clock".into());
         }
+        self.validate_command_tick(game.tick as u64 + 1)?;
         if !self.rules.movement.tick.is_finite() || self.rules.movement.tick <= 0.0 {
             return Err("invalid tick duration".into());
         }
@@ -116,6 +120,9 @@ impl crate::match_runtime::Match {
     fn run_tick(&mut self) -> Result<TickReport, String> {
         use crate::{movement, separation, vision, weather_runtime};
         let dt = self.rules.movement.tick;
+        let winner_decided = self.finish.is_some();
+        // Boundary orders carry the previous clock's timestamps and view keys.
+        let commands = self.apply_commands(self.world.game.tick as u64 + 1, winner_decided)?;
         self.grid.rebuild(&self.world.game.units);
         let prior = self
             .world
@@ -126,7 +133,7 @@ impl crate::match_runtime::Match {
             .collect();
         self.world.game.tick += 1;
         let tick = self.world.game.tick;
-        let mut phases = vec![TickPhase::Clock];
+        let mut phases = vec![TickPhase::Commands, TickPhase::Clock];
         self.sample_conquest_tick()?;
         phases.push(TickPhase::StorySample);
         self.start.weather.step(tick as u64);
@@ -136,7 +143,9 @@ impl crate::match_runtime::Match {
             vision::update_vision(&mut self.world.game, &self.rules, &self.grid);
             phases.push(TickPhase::Vision);
         }
-        let mut route_requests = Vec::new();
+        // These are the source defaults for an ordinary Conquest match.
+        let paths = self.begin_path_tick(4096, 20)?;
+        phases.push(TickPhase::Paths);
         let mut moved = Vec::new();
         let mut last_id = None;
         loop {
@@ -153,11 +162,16 @@ impl crate::match_runtime::Match {
             };
             let Some((&id, unit)) = next else { break };
             last_id = Some(id);
+            if unit.hp <= 0.0 {
+                continue;
+            }
+            let factor = movement::supp_speed(unit.supp);
+            // Reserve adapters attach before this pre-timer order phase.
+            self.prepare_unit_commands(id, winner_decided)?;
+            let unit = self.world.game.units.get(&id).expect("current unit");
             if !movement::reaches_block(&self.rules, unit) {
                 continue;
             }
-            // Reserve and order adapters attach before these timer changes.
-            let factor = movement::supp_speed(unit.supp);
             let rally = if crate::vision::in_trench(&self.world.game, &self.rules, unit) {
                 self.rules.movement.trench_rally
             } else {
@@ -170,22 +184,13 @@ impl crate::match_runtime::Match {
             }
             unit.repath -= dt;
             unit.sprint -= dt;
-            if let Some(result) = movement::move_unit_with_routes(
-                &mut self.world.game,
-                &self.rules,
-                &mut self.grid,
-                id,
-                factor,
-                &mut |_, _, unit, goal, kind| {
-                    route_requests.push((unit.id, goal, kind));
-                    unit.repath = 1.0;
-                },
-            ) {
+            self.apply_attack_move(id)?;
+            if let Some(result) = self.move_unit_with_command_routes(id, factor)? {
                 moved.push(result);
             }
             // Firing attaches here, after this unit's actual moved facts.
         }
-        phases.push(TickPhase::Movement);
+        phases.extend([TickPhase::UnitOrders, TickPhase::Movement]);
         let unit_order: Vec<_> = self.world.game.units.keys().copied().collect();
         separation::separate_crowds(&mut self.world.game, &self.rules, &mut self.grid);
         movement::infantry_progress(&mut self.world.game, &self.rules, &moved);
@@ -241,17 +246,17 @@ impl crate::match_runtime::Match {
             prior,
             unit_order,
             phases,
-            route_requests,
+            route_requests: Vec::new(),
+            commands,
+            paths,
             unavailable: vec![
-                TickPhase::Commands,
                 TickPhase::StructureSync,
                 TickPhase::Debris,
                 TickPhase::Research,
-                TickPhase::Paths,
                 TickPhase::UnitReserves,
-                TickPhase::UnitOrders,
                 TickPhase::Production,
                 TickPhase::Reactions,
+                TickPhase::TrafficKnowledge,
                 TickPhase::Firing,
                 TickPhase::Construction,
                 TickPhase::Projectiles,
