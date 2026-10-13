@@ -297,6 +297,29 @@ impl Match {
         self.firing.prior_tick = Some(self.world.game.tick + 1);
         Ok(())
     }
+    fn validate_firing_units(&self) -> Result<(), String> {
+        for (&id, u) in &self.world.game.units {
+            if u.id != id
+                || u.kind >= self.rules.kinds.len()
+                || u.owner >= self.world.game.players.len()
+                || ![u.x, u.z, u.hp, u.rot, u.supp]
+                    .iter()
+                    .all(|n| n.is_finite())
+                || self.world.game.cell_of(u.x, u.z).is_none()
+                || u.cells
+                    .as_ref()
+                    .is_some_and(|c| c.iter().any(|&c| c as usize >= self.world.game.flags.len()))
+                || u.garrison.is_some_and(|c| c >= self.world.game.flags.len())
+                || self
+                    .firing
+                    .get(u.id)
+                    .is_some_and(|s| !s.cooldown.is_finite() || !s.retarget.is_finite())
+            {
+                return Err("invalid canonical firing unit".into());
+            }
+        }
+        Ok(())
+    }
     fn firing_damage_view<'a>(
         &'a mut self,
         unit_order: &'a [UnitId],
@@ -638,6 +661,7 @@ impl Match {
         if !(0..=9_007_199_254_740_351).contains(&self.world.game.tick) {
             return Err("invalid flight tick".into());
         }
+        self.validate_firing_units()?;
         for (&id, p) in &self.firing.flights {
             if id != p.id
                 || id == 0
@@ -1606,26 +1630,7 @@ impl Match {
         if self.world.game.tick < 0 || self.world.game.tick > 9_007_199_254_740_351 {
             return Err("invalid firing tick".into());
         }
-        for (&id, u) in &self.world.game.units {
-            if u.id != id
-                || u.kind >= self.rules.kinds.len()
-                || u.owner >= self.world.game.players.len()
-                || ![u.x, u.z, u.hp, u.rot, u.supp]
-                    .iter()
-                    .all(|n| n.is_finite())
-                || self.world.game.cell_of(u.x, u.z).is_none()
-                || u.cells
-                    .as_ref()
-                    .is_some_and(|c| c.iter().any(|&c| c as usize >= self.world.game.flags.len()))
-                || u.garrison.is_some_and(|c| c >= self.world.game.flags.len())
-                || self
-                    .firing
-                    .get(u.id)
-                    .is_some_and(|s| !s.cooldown.is_finite() || !s.retarget.is_finite())
-            {
-                return Err("invalid canonical firing unit".into());
-            }
-        }
+        self.validate_firing_units()?;
         let mut claims = BTreeMap::new();
         for u in self.world.game.units.values() {
             if u.hp <= 0.0 {
