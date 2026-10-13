@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added an explicit Assault startup constructor and canonical defender, attacker, clock and bunker-count state. It normalizes attacker teams, cycles reserved defender spawns, drops VP-only objectives with remapped prerequisites, builds ordered trenches, sandbags, command bunkers and flak before ordinary bases, and preserves source MP and army/weather choices. A pinned original-JavaScript recorder covers 43 starts and 702 units on all 33 authored maps and six synthetic terrains. Native checks are pending. Generic startup and Conquest phases still refuse Assault; Assault tick, recruitment, finish, scenarios and server delivery remain unfinished.
+
 - Integrated the reviewed explicit World startup feature ancestry into the isolated Assault branch so both mode-specific constructors share one startup plan and publication policy. Combined native verification remains pending.
 
 - Integrated the reviewed shared unit-publication prerequisite into the isolated Assault startup branch, preserving canonical story state and existing recruitment callers. Assault implementation and combined native verification remain pending.
@@ -37,14 +39,10 @@
 
 - Add a shared prepared unit publication guard for source-ordered batches, canonical controls/grid/IDs and staged squad HP updates. Ordinary staging reuses scatter before pose overrides; recruitment delegates its final insertion to this primitive. This source-only prerequisite still needs Rust verification and regression review before public merge.
 
-- Reserved a fixed internal World local-defender actor identity outside commander slots. World team and alliance queries recognize that actor without adding a player seat or wallet; ordinary invalid owner behavior is unchanged. Native World construction and guarded publication remain pending.
-
 
 - Connected immediate Conquest ground/naval recruitment to Match with staged placement, owner-observed rally routes, exact MP charges, monotonic IDs, canonical control rows and maintained spatial indexing. Five original-source traces cover 32 buy commands; failed routes still buy, while malformed placement/routing leaves full wallet, unit, control, metadata and ID state untouched. Air, ambiguous pending support kinds and later Match systems remain explicit boundaries.
 
 - Added one canonical Match control row for aim, ability and retreat switches, attack intent, facing and waiting orders. Startup prepares the rows from unit definitions; recruitment can stage them before charging. Command execution is the next part of this lane, and no wire or C interface changed.
-
-- Connected Conquest point supply, capture and income to the assembled Match, using the tick's ordered unit list and one canonical objective/reserve state. Eight original-source traces compare 72 phases across all armies, allied and enemy teams, disconnection, supply obstruction, post-decision VP freezing and units spawned during a tick. Capture timestamps follow source winner gating; malformed input leaves objectives and wallets unchanged. This phase does not advance the clock or implement the remaining match systems.
 
 - Added authoritative terrain blasts, progressive section/building damage, support failure, ignition, burning, flooding and section-debris movement/settlement. Forty-four original JavaScript traces compare 253 actions across all 33 maps, including shared building HP, beam/contact deduplication, mine clearing, float32 assignment boundaries, garrison evacuation, bridge casualties and the 96-body overflow path. A separate debris oracle checks 54 mass cases, 21 constructors and 540 body states. Fires retain insertion order while borrowing the shared environment seed, and canonical smoke now has optional remaining lifetime. Independent review found and fixed fire-escape path counter exhaustion before partial damage. Full match scheduling, vehicle wreck production/settlement, repairs and wire/ABI exports remain unfinished.
 

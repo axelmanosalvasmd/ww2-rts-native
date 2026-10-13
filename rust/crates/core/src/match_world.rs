@@ -193,6 +193,7 @@ impl Match {
         let initial_tech =
             TechState::new(1, 0, 0, 0).map_err(|e| format!("World research: {e:?}"))?;
         let mut result = Self {
+            assault: None,
             world_runtime: Some(runtime),
             commands: crate::match_commands::MatchCommands::new(4096),
             grid: SpatialGrid::new(&world.game.units, 16.0),
@@ -209,7 +210,8 @@ impl Match {
             scenario: None,
             logistics: crate::logistics::LogisticsState::default(),
             capture_ticks: Vec::new(),
-            capture_counts: vec![0.0; count],
+            story: vec![crate::match_story::PlayerStory::default(); count],
+            fallen: crate::match_story::FallenLocations::default(),
             finish: None,
             timeline: Vec::new(),
             next_unit_id: 1,
