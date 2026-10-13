@@ -5,7 +5,7 @@
  *   cc -std=c11 -Wall -Wextra -I crates/ffi/include crates/ffi/examples/link_check.c \
  *     target/x86_64-unknown-linux-gnu/release/libww2_ffi.a -lgcc_s -lutil -lrt -lpthread -lm -ldl -lc \
  *     -o link_check
- *   ./link_check crates/core/tests/fixtures/formation.txt
+ *   ./link_check crates/core/tests/fixtures/formation.txt [server-messages.jsonl]
  *
  * The libraries after the archive are what `cargo rustc -p ww2-ffi --release -- --print
  * native-static-libs` lists for that target. The program prints the interface version, the rules
@@ -15,11 +15,16 @@
  * units or fewer are printed in full. It exits 0 when everything matches. */
 #include <inttypes.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "ww2_core.h"
 
 #define MAX_ITEMS 1024
+
+_Static_assert(sizeof(ww2_view_unit) == 152, "ABI 2 unit row size");
+_Static_assert(offsetof(ww2_view_unit, kind) == 8, "ABI 2 type name offset");
+_Static_assert(offsetof(ww2_view_unit, target) == 136, "ABI 2 target offset");
 
 static double from_bits(uint64_t bits) {
   double x;
@@ -108,6 +113,66 @@ static int run_case(const struct written_case *c) {
   return differs;
 }
 
+/* Replays raw server JSON messages, one per line, without a platform-specific getline. */
+static int check_view(const char *path) {
+  FILE *f = fopen(path, "rb");
+  if (!f) { printf("cannot open %s\n", path); return 1; }
+  ww2_view *view = NULL;
+  if (ww2_view_new(&view) != WW2_OK) { fclose(f); return 1; }
+  char *line = NULL;
+  size_t capacity = 0, length = 0, messages = 0;
+  int failures = 0, ch;
+  while (!failures) {
+    ch = fgetc(f);
+    if (ch == EOF || ch == '\n') {
+      if (length > 0) {
+        int32_t code = ww2_view_apply(view, line, length);
+        if (code != WW2_OK) {
+          printf("view message %zu: %d (", messages + 1, code);
+          print_last_error();
+          printf(")\n");
+          failures = 1;
+        }
+        messages++;
+        length = 0;
+      }
+      if (ch == EOF) break;
+      continue;
+    }
+    if (length == capacity) {
+      size_t next = capacity ? capacity * 2 : 4096;
+      if (next > 16 * 1024 * 1024) {
+        printf("view message exceeds 16 MiB\n"); failures = 1; break;
+      }
+      char *grown = realloc(line, next);
+      if (!grown) { failures = 1; break; }
+      line = grown;
+      capacity = next;
+    }
+    line[length++] = (char)ch;
+  }
+  if (ferror(f)) failures = 1;
+  free(line);
+  fclose(f);
+  size_t count = 0, written = 0;
+  uint8_t resync = 0;
+  if (ww2_view_unit_count(view, &count) != WW2_OK ||
+      ww2_view_needs_resync(view, &resync) != WW2_OK) failures = 1;
+  ww2_view_unit *units = count ? calloc(count, sizeof *units) : NULL;
+  if (count && !units) failures = 1;
+  if (!failures && ww2_view_units(view, units, count, &written) != WW2_OK) {
+    printf("view rows: "); print_last_error(); printf("\n"); failures = 1;
+  }
+  printf("%zu view messages: %zu units, needs_resync=%u\n", messages, count, (unsigned)resync);
+  for (size_t i = 0; !failures && i < written && i < 5; i++) {
+    printf("  unit %" PRIu32 " %s owner=%" PRId32 " x=%.17g z=%.17g hp=%.17g flags=%" PRIu32 "\n",
+           units[i].id, units[i].kind, units[i].owner, units[i].x, units[i].z, units[i].hp, units[i].flags);
+  }
+  free(units);
+  if (ww2_view_free(view) != WW2_OK) failures = 1;
+  return failures;
+}
+
 int main(int argc, char **argv) {
   printf("ww2_abi_version() = %" PRIu32 " (header WW2_ABI_VERSION %d)\n", ww2_abi_version(), WW2_ABI_VERSION);
   printf("ww2_rules_hash() = %016" PRIx64 "\n", ww2_rules_hash());
@@ -164,6 +229,7 @@ int main(int argc, char **argv) {
     printf("%zu written cases, %zu spots: %zu differ from the JavaScript\n", cases, spots, differing);
     failures += differing > 0 || cases == 0;
   }
+  if (argc > 2) failures += check_view(argv[2]);
   printf("%s\n", failures ? "FAILED" : "all checks passed");
   return failures ? 1 : 0;
 }
