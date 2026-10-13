@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Integrated the source-stable canonical reserve preparation prerequisite for paratrooper publication. The aircraft continuation and this combined ancestry remain native-pending; existing ground proof remains frozen separately.
+
 - Added source-work aircraft payloads for recon, strafing, bombing and dive strikes through canonical combat, flak ammunition and crater mutation. The unchanged prototype oracle passes 188 traces and 2,820 checkpoints, including interception and actual visibility readbacks. Native differential checks, paratrooper publication and complete tick hookup remain pending.
 
 - Integrated the immutable prepared-publication prerequisite into the separate aircraft support continuation. Ground support verification remains on its unchanged frozen candidate; this combined continuation has no native proof yet.
@@ -9,6 +11,7 @@
 - Started the aircraft support continuation with one canonical Game strike geometry and runtime timer owner, exact pending-drop metadata and source-order recon interception. Payload expansion and original-source/native proof are in progress; the verified-source ground checkpoint stays frozen separately.
 
 - Extracted canonical single-target generic hurt for FPS and other direct effects, retaining source damage reductions and rider disembarkation without projectile armor, shooter XP or radial impulse. Hurt records keep the contact position before rider movement; explosions add radial impulse afterward. The shared source diff is independently reviewed; native regression verification is pending.
+- Added canonical ordinary-Conquest ground supply, real safe convoy routes and physical handoff. Native comparisons pass for 233 networks, 39,839 refill rates, 324 handoffs, 63 logistics constructors with 663 reserve records, and three original-hook runtime traces (873 phases, 72 checkpoints). Final route metadata and cache repairs are awaiting the next native check. Independent review fixed route-clear identity changes, invalid initialization publication, lazy recipient reads and ordered danger-view updates. The 468-route source fixture alternates ordinary and danger searches; those searches now retain separate graph caches. Immediate route searches publish endpoint and failure-reset effects, while queued projected searches leave live metadata intact. Timestamp and retry fixtures compare float bits, and merged command/routing fixtures include current reserve and smoke fields. Actual runtime traces include Move, two waiting destinations, Stop, Resume, support spending and three convoy deaths. Forced withdrawal, World supply and the complete tick remain separate.
 
 - Added original-source support direction-fallback cases. The ground-support recorder now covers 60 traces and 900 checkpoints. Native verification remains queued.
 
