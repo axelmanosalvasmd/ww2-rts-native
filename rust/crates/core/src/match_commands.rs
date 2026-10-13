@@ -67,6 +67,10 @@ pub enum Stance {
 /// Internal recorded input. This is not a WebSocket or C interface.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Command {
+    Destroy {
+        ids: Vec<i64>,
+        id: Option<i64>,
+    },
     Entrench {
         ids: Vec<i64>,
         order: crate::field_works::ProjectOrder,
@@ -348,6 +352,10 @@ impl Command {
                 rows.iter().map(|v| safe_id(v).unwrap_or(-1)).collect()
             });
         match object.get("t").and_then(|v| v.as_str()) {
+            Some("destroy") => Ok(Self::Destroy {
+                ids,
+                id: object.get("id").and_then(safe_id),
+            }),
             Some("entrench") => {
                 use crate::field_works::{Pattern, ProjectMaterial, ProjectOrder};
                 let number = |key: &str| {
@@ -677,6 +685,9 @@ impl crate::match_runtime::Match {
         if matches!(command, Command::Unsupported) {
             return Ok(Some(Denial::Unsupported));
         }
+        if let Command::Destroy { ids, id } = command {
+            return self.execute_destroy(owner, ids, *id);
+        }
         if let Command::Entrench { ids, order, queue } = command {
             return self.execute_entrench(owner, ids, *order, *queue, winner_decided);
         }
@@ -751,7 +762,8 @@ impl crate::match_runtime::Match {
             | Command::Stance { ids, .. }
             | Command::Ability { ids, .. }
             | Command::Autocast { ids, .. } => ids.clone(),
-            Command::Entrench { .. }
+            Command::Destroy { .. }
+            | Command::Entrench { .. }
             | Command::Dig { .. }
             | Command::Technology { .. }
             | Command::Buy { .. }
@@ -912,7 +924,8 @@ impl crate::match_runtime::Match {
                     self.commands.units.get_mut(&id).unwrap().auto_cast = *on;
                 }
             }
-            Command::Entrench { .. }
+            Command::Destroy { .. }
+            | Command::Entrench { .. }
             | Command::Dig { .. }
             | Command::Technology { .. }
             | Command::Buy { .. }
