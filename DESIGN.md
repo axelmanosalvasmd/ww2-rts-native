@@ -445,6 +445,12 @@ First native execution exposed two test setup/projection defects and a source-re
 
 Initial input preflight rejects without changing the tick. A failure from any connected phase faults the runner, because earlier phases may already have committed; later calls refuse to continue that partial state. No recovery or persistence format is implied. Public ABI, wire messages and pending privacy decisions are unchanged.
 
+## Ordinary reaction tick source composition (2026-10-13)
+
+A separate successor consumes the canonical reaction owner at its actual ordinary unit sites: reaction timer decay beside weapon/ability timers, automatic retreat before autocast, then reaction after work/aimed/attack-move and before movement. The read-only automatic-retreat candidate shares the original predicate with execution and pre-clock unsupported-exit admission. Accepted retreat cancels the paid field descriptor after route/counter checks, without a refund. Operatives retain their early continue and unchanged reaction timer.
+
+The expanded unchanged-source recorder reproduces 18 traces, 2,274 ticks and 154 checkpoints. Seven additions protect spacing, fresh-hit cover/rally behavior, timer bits, the strict health threshold, retreat-before-autocast and paid-work cancellation before any cell executes. The full native consumer and independent composition review remain pending. This does not enable supply, carriers, aircraft, construction, mass projects, active support or full room simulation. [Call sites and bounds](docs/runtime/reaction-tick.md).
+
 ## Authoritative Conquest startup (2026-10-12)
 
 `match_runtime::Match::new` constructs an owned initial battlefield from an `AuthoritativeMap` and typed `MatchOptions`. `StartPlan` selects spawn slots and initializes players, wallets, objectives and weather. `World` owns the live terrain and units. Production owns each building's queue/progress and each player's research state; the original options retain configuration, not another wallet or research copy. The grid is rebuilt after all startup placement. Legacy scenarios initialize their neutral point-owner history and empty execution state without firing zero-time triggers.

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Documented the separate ordinary reaction tick source composition, actual source fixtures and retained unsupported boundaries. Combined native replay remains pending.
+
 - Normal-merged the verified operative runtime, fixture repairs and documentation into the separate reaction source assembly. Preserved the new reaction sites and original added traces; native proof of this reaction composition remains pending.
 
 - Added source-written ordinary reaction tick sites: timer decay, automatic retreat before autocast and reaction before movement. Factored the existing pure retreat predicate for pre-clock unsupported exit admission and consumed the canonical paid-work cancellation provider. Seven new actual-source cases expand the recorder to 18 traces, 2,274 ticks and 154 checkpoints; combined native proof remains pending.
