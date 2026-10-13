@@ -390,3 +390,149 @@ fn target_level_denials_and_unlisted_builds_retain_follow_and_slits_keep_finite_
     assert_eq!(m.commands.units[&site].aim, 0.0);
     assert_eq!(m.commands.units[&id].follow, 0);
 }
+
+#[test]
+fn recorded_queued_cover_inherits_attack_site_and_project_anchors_without_starting_work() {
+    use crate::field_works::{FortKind, Pattern, ProjectMaterial, ProjectOrder};
+    let (mut m, id) = scene();
+    let target = m
+        .world
+        .game
+        .units
+        .values()
+        .find(|u| u.owner == 1 && m.rules.kinds[u.kind].infantry)
+        .unwrap()
+        .id;
+    let attack_at = Point { x: 36.0, z: 20.0 };
+    let enemy = m.world.game.units.get_mut(&target).unwrap();
+    enemy.x = attack_at.x;
+    enemy.z = attack_at.z;
+    m.grid.update(target, enemy);
+    crate::vision::update_vision(&mut m.world.game, &m.rules, &m.grid);
+    assert!(m.world.game.players[0].sees(target));
+    let worker = m.world.game.units[&id].clone();
+    let paths = format!("{:?}", m.commands.paths);
+    let requests = format!("{:?}", m.commands.requests);
+    let rng = m.start.random.snapshot();
+    let environment_seed = m.start.environment_seed;
+    let mp = m.start.economy.players[0].mp;
+    let spent = m.story[0].mp_spent;
+    let site = m.next_unit_id;
+    let build_at = Point { x: 32.0, z: 24.0 };
+    let cover = || Command::Cover {
+        ids: vec![i64::from(id)],
+        queue: true,
+        at: None,
+    };
+    let commands = [
+        Command::Attack {
+            ids: vec![i64::from(id)],
+            target: i64::from(target),
+            queue: true,
+            at: None,
+        },
+        cover(),
+        Command::Build {
+            ids: vec![i64::from(id)],
+            kind: "flakpos".into(),
+            at: Some(build_at),
+            direction: None,
+            queue: true,
+        },
+        cover(),
+        Command::Entrench {
+            ids: vec![i64::from(id)],
+            order: ProjectOrder::New {
+                pattern: Some(Pattern::Line),
+                material: ProjectMaterial::Fort(FortKind::Trench),
+                from: Some(Point { x: 24.0, z: 30.0 }),
+                to: Some(Point { x: 36.0, z: 30.0 }),
+            },
+            queue: true,
+        },
+        cover(),
+    ];
+    for (sequence, command) in commands.into_iter().enumerate() {
+        m.enqueue_command(
+            crate::orders::OrderKey {
+                tick: 1,
+                issuer: 0,
+                sequence: sequence as u64,
+            },
+            command,
+        )
+        .unwrap();
+    }
+    let results = m.apply_commands(1, false).unwrap();
+    assert_eq!(results.len(), 6);
+    assert!(results.iter().all(|r| r.denial.is_none()));
+    let project = m.field_works.projects().next().unwrap();
+    assert_eq!(m.field_works.projects().count(), 1);
+    assert_eq!((project.crew, project.active), (0, 0));
+    assert!(!project.jobs.is_empty());
+    let project_at = project.jobs[0].at;
+    assert_eq!(m.world.game.units[&site].at(), build_at);
+    let orders = &m.commands.units[&id].orders;
+    assert_eq!(orders.len(), 6);
+    assert_eq!(
+        orders[0],
+        Command::Attack {
+            ids: vec![i64::from(id)],
+            target: i64::from(target),
+            queue: false,
+            at: Some(attack_at),
+        }
+    );
+    assert_eq!(
+        orders[2],
+        Command::Assist {
+            ids: vec![i64::from(id)],
+            target: i64::from(site),
+            at: Some(build_at),
+            queue: false,
+        }
+    );
+    assert_eq!(
+        orders[4],
+        Command::Entrench {
+            ids: vec![i64::from(id)],
+            order: ProjectOrder::Join {
+                project: project.id,
+                at: Some(project_at),
+            },
+            queue: false,
+        }
+    );
+    for (index, at) in [(1, attack_at), (3, build_at), (5, project_at)] {
+        assert_eq!(
+            orders[index],
+            Command::Cover {
+                ids: vec![i64::from(id)],
+                queue: false,
+                at: Some(at),
+            }
+        );
+    }
+    let mut live_worker = m.world.game.units[&id].clone();
+    let mut expected_worker = worker;
+    assert_eq!(live_worker.pace.to_bits(), expected_worker.pace.to_bits());
+    // Source pace starts as NaN. Normalize detached copies for the remaining fields.
+    live_worker.pace = 0.0;
+    expected_worker.pace = 0.0;
+    assert_eq!(live_worker, expected_worker);
+    assert_eq!(m.commands.units[&id].build_target, None);
+    assert_eq!(m.field_works.membership(id), None);
+    assert!(m.field_works.jobs().is_empty());
+    assert_eq!(m.world.game.units[&site].built, Some(0.0));
+    let cost = number(
+        Catalog::compiled().unwrap().unit("flakpos").unwrap(),
+        "cost",
+    )
+    .unwrap();
+    assert_eq!(m.start.economy.players[0].mp, mp - cost);
+    assert_eq!(m.story[0].mp_spent, spent + cost);
+    assert_eq!(format!("{:?}", m.commands.paths), paths);
+    assert_eq!(format!("{:?}", m.commands.requests), requests);
+    assert_eq!(m.start.random.snapshot(), rng);
+    assert_eq!(m.start.environment_seed, environment_seed);
+}
