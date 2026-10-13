@@ -1054,3 +1054,8 @@ At exact `b536f46`, fresh cleanup of all four workspace packages in both profile
 
 
 Independent copied release review verified the raw log and copied binary hashes, reran both metadata tests successfully, and independently counted all eleven debug and 233 release results at the exact corrected source head. No shared cache or Cargo was used for that rerun.
+## Rust CI duration limit (2026-10-13)
+
+The combined snapshot frontier at 6a5d4d6 ran the full debug workspace suite on GitHub-hosted Ubuntu 24.04, Windows 2025 and macOS 15. Run 38443050411 reached the World-memory tests while earlier tests were still passing, then all three jobs were cancelled by the workflow's 20-minute limit. The preserved logs contain no assertion failure. A timeout is not evidence that the remaining tests pass.
+
+The job limit is now 40 minutes so the expanded suite can finish. The platform matrix, pinned toolchain, commands, failure policy and release C-link gate are unchanged. New heads still need fresh checks. GitHub's job timeout setting cancels work at its limit; it does not impose a minimum run duration (https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idtimeout-minutes).

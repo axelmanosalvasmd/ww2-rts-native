@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Incorporated the reviewed 40-minute full-suite workflow limit into the verified metadata frontier. No runtime or test changes; fresh platform checks retain the entire suite.
+
 - Independently reran both copied release metadata tests from `b536f46`: 2 passed, with binary/log hashes and all 11 debug and 233 release results verified. Runtime and original fixtures are unchanged.
 
 - Verified the World metadata warm-cache correction at `b536f46`: all 11 affected debug tests and 233 locked release workspace tests pass, with strict Clippy, formatting and release FFI. No repairs were needed. Source comparison covers 12 scenes, 182 actions, 37 captures and 14 routes; an independent copied release rerun passes both metadata tests; fresh platform checks remain separate.
@@ -261,6 +263,8 @@
 - Added shared mode-aware UnitControl initialization using compiled ability costs, and selected it from the staged factory's actual Game mode. The original spawn oracle preserves all 55 earlier scenarios and adds six Classic/World spawns for absent, paid and free abilities. The merged native checks verify all 775 spawn rows; World startup uses this shared initializer.
 
 - Preserved canonical recruited combat defaults through the shared publication callback when integrating the reviewed combat ancestry. Fresh combat identities reject before payment; production stepping remains under implementation.
+- Allow 40 minutes for the full three-platform Rust CI job. The combined snapshot frontier reached World-memory tests with no assertion failures before its previous 20-minute limit cancelled all three jobs. Formatting, strict Clippy, the complete debug suite, release FFI build and Linux C replay remain required.
+
 - Refreshed the consolidated Rust frontier in PR #119 onto merged ABI 2 main `d88ef6d`. Preserved all core behavior, both changelog histories, the six approved recipient-view calls and the exact header. Only additive changelog entries conflicted; combined-tree platform checks are rerun on the refreshed head.
 
 - Added canonical Match ground reactions, automatic retreat and idle spacing using shared command destinations, owner-known routes, firing targets and combat hit history. Three focused tests pass in debug and release, comparing 51 unchanged-source reaction/retreat cases and checking atomic rejection. Only the missing reaction timer is added to UnitControl. Air, carrier and garrison retreat exits remain explicit unsupported paths. Complete tick hookup remains separate. Adapted routing to canonical ordered-fire iteration and filled absent reserve defaults in the merged command fixture. At checkpoint ab0394d, strict Clippy stopped on two unused helpers in its inherited firing milestone. Final merged checks are pending.
