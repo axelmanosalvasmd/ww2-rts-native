@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Document the bounded World elimination API, ephemeral staging tradeoff, owner cleanup and exact exclusions. Strengthen metadata proof with real charged production queues, a preserved survivor queue/control and an imported source-compared active flight; native execution remains pending.
+
 - Record six original World elimination transitions, including already-out armies, allied order, signed health, later-unit garrison eviction, building/depot cleanup and real 97-section debris overflow. Add native exact transition/effect/row and late-error rollback assertions; native execution remains pending.
 
 - Validate every source terrain-array shape before staged wreck calls, preventing malformed optional arrays from panicking before the later publication guard. Add draft cursor/revision refusal and allocation-preserving publication regressions, plus paid-work and rider admission checks.

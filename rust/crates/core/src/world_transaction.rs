@@ -80,8 +80,8 @@ impl World {
 }
 impl WorldTransaction {
     /// Bind the draft to its original structural context before publication.
-    /// The caller holds exclusive source ownership throughout preparation; HP, materials and
-    /// health/material writes without structural revisions are outside this binding check.
+    /// The caller holds exclusive source ownership throughout preparation. Independent health
+    /// and material writes without structural revisions are outside this binding check.
     /// Journal prefixes, terrain versions and recipient pending cursors are bound explicitly.
     pub(crate) fn prepare_publication(
         self,

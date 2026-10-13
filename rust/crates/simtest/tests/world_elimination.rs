@@ -236,7 +236,6 @@ fn protected(m: &Match) -> String {
 fn unsupported_and_late_world_guards_preserve_every_canonical_owner() {
     let f = fixture();
     let case = &f["cases"][3];
-    let mut m = world_scene::make_match(&f, case["input"]["teams"].as_array().unwrap());
     let mutations: [fn(&mut Match); 5] = [
         |m| m.world.game.height = Some(Vec::new()),
         |m| m.story[0].captures = f64::NAN,
@@ -245,6 +244,7 @@ fn unsupported_and_late_world_guards_preserve_every_canonical_owner() {
         |m| m.options.logistics = true,
     ];
     for change in mutations {
+        let mut m = world_scene::make_match(&f, case["input"]["teams"].as_array().unwrap());
         let order = setup(&mut m, &f, case);
         change(&mut m);
         let before = protected(&m);
@@ -287,21 +287,78 @@ fn administrative_removal_retains_captured_flight_xp_and_paid_metadata_has_no_re
     );
     let captured = ordinary.firing.flights.values().next().unwrap().clone();
     let f = fixture();
-    let scene = &f["cases"][0];
+    let scene = &f["cases"][3];
     let mut m = world_scene::make_match(&f, scene["input"]["teams"].as_array().unwrap());
-    let order = setup(&mut m, &f, scene);
+    let mut order = setup(&mut m, &f, scene);
+    world_scene::update_unit(
+        &mut m,
+        &json!({"id":15,"owner":1,"type":"hq","x":900.0,"z":900.0,"hp":3000.0,"built":1.0}),
+        true,
+    );
+    order.push(15);
     // A persistence witness imports a proven ordinary flight into World without launching or stepping it.
     let mut flight = captured.clone();
-    flight.shooter = 7;
-    flight.owner = 0;
-    flight.source_kind = m.world.game.units[&7].kind;
+    flight.shooter = 12;
+    flight.owner = 2;
+    flight.source_kind = m.world.game.units[&12].kind;
     m.firing.flights.insert(flight.id, flight.clone());
-    m.combat.get_mut(7).unwrap().xp = 4.5;
-    m.production.reconcile_queue(7, &["rifle"]).unwrap();
-    m.production.reconcile_queue(8, &["rifle"]).unwrap();
-    let survivor = m.production.building(8).unwrap().clone();
+    m.combat.get_mut(12).unwrap().xp = 4.5;
+    let region_facts = m.world_economy_regions().unwrap();
+    let units = m
+        .world
+        .game
+        .units
+        .values()
+        .map(|u| ww2_core::production::UnitView {
+            id: u.id,
+            owner: (u.owner != LOCAL_DEFENDER_OWNER).then_some(u.owner),
+            kind: &m.rules.kinds[u.kind].name,
+            hp: u.hp,
+            built: u.built.unwrap_or(0.0),
+        })
+        .collect::<Vec<_>>();
+    let context = ww2_core::production::Context {
+        mode: ww2_core::economy_state::ModeContext {
+            kind: ww2_core::economy::Mode::World,
+            defender_team: None,
+            income_excluded_slot: None,
+        },
+        army: m.options.army,
+        tech_enabled: false,
+        naval: false,
+        sudden_death: false,
+        units: &units,
+        drops: &[],
+        world: Some(ww2_core::economy_state::WorldContext {
+            regions: &region_facts,
+        }),
+    };
+    m.start.economy.players[0].mp = 1000.0;
+    m.start.economy.players[1].mp = 1000.0;
+    m.production
+        .queue_unit(
+            &context,
+            &mut m.start.economy,
+            0,
+            ww2_core::economy::Faction::Usa,
+            "rifle",
+            Some(40),
+        )
+        .unwrap();
+    m.production
+        .queue_unit(
+            &context,
+            &mut m.start.economy,
+            1,
+            ww2_core::economy::Faction::Usa,
+            "rifle",
+            Some(15),
+        )
+        .unwrap();
+    assert!(m.production.building(40).unwrap().rows()[0].job.charge.mp > 0.0);
+    let survivor = m.production.building(15).unwrap().clone();
     m.logistics.insert(
-        7,
+        12,
         ww2_core::logistics::Reserves {
             ammo: 3.,
             ammo_max: 4.,
@@ -318,17 +375,17 @@ fn administrative_removal_retains_captured_flight_xp_and_paid_metadata_has_no_re
             cut_for: None,
         },
     );
-    let survivor_control = m.commands.units[&8].clone();
+    let survivor_control = m.commands.units[&14].clone();
     let wallets = m.start.economy.clone();
     let story = m.story.clone();
     m.apply_world_capture_income_and_elimination(&order, &order, 0.)
         .unwrap();
     assert_eq!(m.firing.flights.get(&flight.id), Some(&flight));
-    assert_eq!(m.combat.get(7).unwrap().xp, 4.5);
-    assert!(m.production.building(7).is_none());
-    assert!(m.logistics.get(7).is_none());
-    assert_eq!(m.production.building(8), Some(&survivor));
-    assert_eq!(m.commands.units[&8], survivor_control);
+    assert_eq!(m.combat.get(12).unwrap().xp, 4.5);
+    assert!(m.production.building(40).is_none());
+    assert!(m.logistics.get(12).is_none());
+    assert_eq!(m.production.building(15), Some(&survivor));
+    assert_eq!(m.commands.units[&14], survivor_control);
     for (before, after) in wallets.players.iter().zip(&m.start.economy.players) {
         assert_eq!(
             (before.mp, before.mun, before.fuel),
@@ -336,5 +393,5 @@ fn administrative_removal_retains_captured_flight_xp_and_paid_metadata_has_no_re
         );
     }
     assert_eq!(m.story, story);
-    assert!(m.apply_unit_firing(8, false, 0.05).is_err());
+    assert!(m.apply_unit_firing(14, false, 0.05).is_err());
 }
