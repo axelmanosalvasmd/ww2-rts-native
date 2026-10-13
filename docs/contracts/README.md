@@ -8,6 +8,7 @@ These files reserve contract topics; no protocol or ABI is approved by their cre
 | --- | --- | --- | --- |
 | protocol.md | Julio | Axel | v0 draft; technical answers recorded (#5); three security corrections pending |
 | terrain.md | Julio | Axel | v0 draft; technical answers recorded (#5) |
+| [startup-tables/README.md](startup-tables/README.md) | Julio | Axel | Content/schema v1 candidate explicitly accepted by both owners in PR #195 review; transport remains unagreed; producer/platform proof and Unreal adoption pending |
 | rust-unreal-abi.md | Julio | Axel | Six ABI 2 recipient-view calls authoritative through PR #16, merged at `d88ef6d`; broader v0 contract remains draft; approved header unchanged; Linux C-link checks and Axel's Linux Editor result on `03a49ac` recorded; post-merge Unreal rerun and authoritative decoder adoption pending; consumer source unpublished |
 
 Contract PRs must state native/reference baseline, version/status, fields and semantics, ownership/privacy, error/recovery behavior, compatibility transition, fixtures and verification evidence. Both owners must explicitly approve breaking changes before adoption. Mark a contract agreed only after approvals and merge. Do not put credentials or private sessions in fixtures.

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Publish the bounded trusted-room commander input candidate after `17179f2` passes all 405 optimized workspace tests, strict Clippy, formatting and release FFI. All 401 inherited test names remain, alongside four ingress regressions. Normally join main `92fb7fe` with no Rust, harness, reference or CI file changes from the tested head, and correct the README trusted-host status. Final-head platform checks and Axel input review remain pending.
+
 - Remove two redundant formatting borrows in the ingress refusal test after `40a778b` passed all four focused admission/lobby/socket tests and formatting, then strict Clippy stopped on those expressions. The same Debug comparison and every assertion remain intact; runtime and fixtures are unchanged. Remaining full native gates need the new head.
 
 - Correct the commander socket test's reconnect lifecycle after `82e3540` passed two admission tests and one lobby test, then failed by reading a unit immediately after start. Start resets the decoder's unit rows and carries no units; the test now checks that empty baseline and waits for the first actual snapshot before checking the retained held-fire flag. Runtime, decoder and original fixtures are unchanged. The failed log is retained; fresh native verification is pending.
@@ -11,6 +13,8 @@
 - Normally retained the independently source-reviewed startup test successor `81cd1ef` in the isolated commander-ingress candidate. It preserves genuine Scenario refusal and supported Default lifecycle/privacy assertions, including optional mine-material field presence. Ingress and startup production bodies remain unchanged by this convergence; combined native verification is pending.
 
 - Added the first commander input path for already trusted native rooms: Move, attack-move, Stop and Stance use the existing core parser and recorded queue. The host assigns the current stable seat and next simulation boundary, reserves sequence numbers above existing same-seat keys, and preserves preloaded/future inputs and reconnect ownership. Real tick denials retain the existing four-per-second feedback throttle. Unsupported actor exits and other command families remain guarded. Four focused admission/socket tests are written but unrun; original-source checks reproduce 93 command traces, 344 steps and two route-recovery branches. Native and host review remain pending.
+
+- Verify trusted ordinary startup at `3b84f7c`: all 401 optimized workspace tests, strict Clippy, formatting and release FFI pass. An independent audit retains all 399 prior test names and passes 14 copied affected server checks. Normally incorporate schema-documentation main `4867984` without changing runtime, test, harness, header or reference source; fresh platform and Axel host review remain required.
 
 - Replace the startup privacy test's one-element rows loop with the same direct assertion. The real socket and ClientView lifecycle passes at `81cd1ef`, then strict Clippy stops on that loop; this successor retains every privacy and lifecycle assertion and needs the remaining native and platform checks.
 
@@ -115,6 +119,9 @@
 - Bring source-reviewed human commander timing, raw input helpers and detached common view types into the isolated observation producer branch. Native acceptance remains pending.
 
 - Prepare a separate human commander observation branch by normally combining checked commander `be1cb2c` with ordinary Default `262926e`. Retain both Cover and Entrench dispatch and canonical owners; this new union has no native acceptance yet.
+- Record both owners' acceptance of the startup-table v1 content/schema candidate and its strict revision/refusal policy. Delivery remains unagreed, and the six ABI 2 calls, runtime producer and Unreal adoption are unchanged. No content, schema or inventory bytes changed.
+
+- Add an unagreed startup-table content/schema proposal for consumer review: all 47 compiled tables plus 17 source-derived public constants, a portable generator, exact field inventory and independent table/formation hashes. Table transport, additional FFI calls and Unreal adoption remain pending explicit agreement.
 
 - Prepared a separate normal union of frozen ordered-event PR #194 and the consolidated original-source frontier `dfcc0bf`. Preserved the one TickEvent/TickFailure result, producer emission sinks, original World component bodies, approved ABI 2 and the optimized test profile with debug assertions and overflow checks. Migrated the inherited quiet engineering consumer to require empty owned events, and report accepted recipient traffic once rather than unavailable. Published parents remain unchanged; exact union source review and the full optimized native cycle are pending.
 
