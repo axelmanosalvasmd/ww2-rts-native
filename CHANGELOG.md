@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed the Board command dropping its pathfinder route endpoint, found by the first actual carrier native replay. Accepted boarding now publishes the same canonical routeEnd that original findPath records, after route and paid-work cancellation preflight; the original full-step fixture and actuator resets are unchanged. The initial candidate passed 49 core debug tests and 14 earlier simtest checks before this differential failure; final repaired verification remains pending.
+
 - Normal-merged the final source-reviewed carrier admission repair into the actual-runner consumer. Idle ground actor checks now precede clock and input changes; original source captures and consumer bodies remain unchanged. Combined native proof is pending.
 
 - Corrected the full-step carrier consumer’s absent-pace check after reading the actual native factory: source absence maps to the canonical NaN sentinel, while received numeric pace still compares exactly. No runtime or original fixture changed; native execution is pending.
