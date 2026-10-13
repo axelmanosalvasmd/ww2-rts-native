@@ -1082,16 +1082,17 @@ impl EnvironmentRuntime {
         w.game
             .height
             .get_or_insert_with(|| vec![0; w.game.w * w.game.h]);
-        let target = level(w, c) - 1;
-        if target < t.min_level
+        // Source subtraction uses Numbers, not the Int8 terrain storage width.
+        let target = i16::from(level(w, c)) - 1;
+        if target < i16::from(t.min_level)
             || near(w, c)
                 .into_iter()
                 .flatten()
-                .any(|n| level(w, n) - target > 1)
+                .any(|n| i16::from(level(w, n)) - target > 1)
         {
             return Ok(());
         }
-        w.set_level(c, target)?;
+        w.set_level(c, target as i8)?;
         Ok(())
     }
     pub fn burn(
