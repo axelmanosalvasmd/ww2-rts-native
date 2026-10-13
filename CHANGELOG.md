@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Track the trusted host's interim refusal of all five legacy-trigger maps explicitly in MODE-79 and MAP-14, as Axel acknowledgment 036 requires. Preserve the original Source target of running their triggers in every mode; host Scenario actuation/admission and the separate authoring-format decision remain pending. Strengthen the startup refusal regression with actual before/after lobby equality, and capture only map width in its private-mine iterator. No runtime or admission rule changes; native verification remains pending.
+
 - Correct the trusted startup lifecycle scene after the exact `7e26c58` native test refused El Alamein's canonical legacy Scenario before attachment. Use the supported authored Default map for the complete real socket/decoder lifecycle, and retain El Alamein as a genuine Scenario refusal with no start/snapshot, room, receipt account or match-ID publication. Keep its complete public-map mine/material/trigger exclusion checks separate. Runtime admission and every decoder lifecycle assertion remain intact; the failed log is preserved and successor native validation is pending.
 
 - Prepare a pure trusted room, Human and startup candidate from `32670c2`, normally joined with current main `d1f2fb5`. Extract only the seven reviewed server startup files from `d9941e3` to `7784525`, retaining their exact bytes and the original startup design. The 399-test native result belongs to `32670c2`; new startup decoder/socket and full native validation remain pending. Ground and construction are kept in their separate candidate, and concrete host/envelope review remains required before merge.

@@ -280,6 +280,7 @@ async fn actual_socket_start_decode_mutations_resync_reconnect_and_new_match() {
             "complete pinned private-mine mapForClient projection"
         );
         check_public_map(&public);
+        let width = authored.dimensions().0;
         let hidden = authored.source()["rows"]
             .as_array()
             .unwrap()
@@ -290,9 +291,7 @@ async fn actual_socket_start_decode_mutations_resync_reconnect_and_new_match() {
                     .unwrap()
                     .bytes()
                     .enumerate()
-                    .filter_map(move |(x, cell)| {
-                        (cell == b'N').then_some(z * authored.dimensions().0 + x)
-                    })
+                    .filter_map(move |(x, cell)| (cell == b'N').then_some(z * width + x))
             })
             .collect::<std::collections::BTreeSet<_>>();
         for key in ["materials", "objectMaterials"] {
@@ -304,6 +303,15 @@ async fn actual_socket_start_decode_mutations_resync_reconnect_and_new_match() {
                 );
             }
         }
+        let lobby_before = host.block_on(async {
+            let hub = control.server.hub.lock().await;
+            let room = &hub.rooms["ABC"];
+            room.lobby(
+                room.players[0].connection.as_ref().unwrap().id,
+                &hub.maps,
+                &hub.public_url,
+            )
+        });
         let refusal = host.block_on(control.attach("ABC", scripted)).unwrap_err();
         assert!(refusal.contains("capability: Scenario"), "{refusal}");
         host.block_on(async {
@@ -311,6 +319,16 @@ async fn actual_socket_start_decode_mutations_resync_reconnect_and_new_match() {
             assert!(hub.rooms["ABC"].native.is_none());
             assert!(hub.accounts.is_empty());
             assert_eq!(hub.next_epoch, 0);
+            let room = &hub.rooms["ABC"];
+            assert_eq!(
+                room.lobby(
+                    room.players[0].connection.as_ref().unwrap().id,
+                    &hub.maps,
+                    &hub.public_url,
+                ),
+                lobby_before,
+                "refused attachment preserves actual lobby roster, settings and result"
+            );
         });
         // The next actual packet is the requested default lobby, not a partial
         // start or snapshot from the refused scripted attachment.
