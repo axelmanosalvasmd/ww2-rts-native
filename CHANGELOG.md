@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified the crater arithmetic repair together with the checked aircraft context on Mac Apple Silicon at code 76c817d. The original oracle passes 48 environment traces and 261 actions; mandatory environment/terrain tests pass all five cases in debug and release, including former Int8 overflow and extreme slopes. Independent copied binaries pass five tests in each profile. All 184 release workspace tests, strict workspace/all-target Clippy, formatting and release FFI build pass. No source repair was needed during this proof, and the retained aircraft hooks remain separate from production tick integration.
+
 - Verified the coherent aircraft provider, recorded commands, firing context, retirement and tick hooks on Mac Apple Silicon at code d0e54d1: all 19 focused debug tests, all 184 release workspace tests, strict workspace/all-target Clippy, formatting and release FFI build pass. Independent copied binaries pass all 19 debug tests. The owned phase consumer matches 10 original full-step traces, 4,972 steps and 9,965 aircraft/AA calls. Fixed a replay-only negative-HP publication error by applying incoming corpse HP after valid birth; production runtime and expected fixtures are unchanged. Sole Match tick consumption and automatic, ground-target or area aircraft weapons remain unfinished.
 
 - Fixed the aircraft retirement replay's negative-HP scene construction after its first native failure. The consumer now publishes a valid fresh unit and then applies incoming corpse HP, matching the original spawn-then-patch sequence. The production publication guard and retirement fixture are unchanged; renewed coherent aircraft native gates remain pending.
