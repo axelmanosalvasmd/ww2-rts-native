@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Corrected staged-observer cell validation and source fingerprints to use the canonical unit footprint index type. The first native compile exposed two integer-type mismatches.
+
 - Added a fourth original World birth case with a different team’s warmed vehicle history, four accepted prebirth changes and a postbirth reroute. The recorder now covers 14 births, 12 prebirth searches and one cross-team reroute; native success/abort cache-lifetime checks remain pending.
 
 - Kept World search histories bound to every team array moved by a successful preview, including teams not read in that transaction. Consumer source review found the selected-team-only mapping could discard other warmed incremental histories.
