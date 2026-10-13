@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified the composed human observer, attention state and bounded quiet-policy callback at compiled `f011ce1`: 17 focused debug tests, all 280 locked workspace release tests, strict all-target Clippy, formatting and release FFI pass. Independent copied binaries pass 17 tests in each profile; final artifacts and complete failure history are saved outside the build cache. Host scheduling, all-seat delivery, canonical command admission and full AI remain pending.
+
 - Registered the shared human fixture decoder once per library test crate, fixing the strict duplicate-module lint. State and policy assertions reuse that decoder; external integration tests remain separate crates. Runtime behavior and source fixtures are unchanged, with final native gates pending.
 
 - Used a stable descending group-count key for idle human camera scans, preserving equal-group order and fixing the strict Clippy gate. All 17 focused debug and 280 workspace release tests passed before this lint repair; final exact-head gates remain pending.
