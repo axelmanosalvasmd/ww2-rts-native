@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Keep common snapshot actor admission independent of unselected private wallets. Delivery preflight still validates every selected recipient before writes. Add an orphan project-membership regression proving no terrain, fog, list or receipt owner changes on refusal.
+
+- Add real paid and shared engineering work to ordinary recipient snapshots: allied unrounded work rows, activity flags, digging progress, current plans and queued project anchors. Validate all canonical project/member/job bindings before delivery. Preserve quiet-frame refusal of active work; original Source replay and combined native verification are pending.
+- Admit the actual typed Default alias in ordinary snapshots without rewriting mode state. Genuine mode objects remain refused. The invalid bare Dig flag test now checks canonical activity refusal.
+
 - Combine the actual Default tick and typed snapshot prerequisites for active engineering recipient views. Preserve the single startup initialization, staged observer receipt and canonical unit/job owners; the combined native proof is pending.
 
 - Normal-merged the sole tick owner's immutable Default guard and reviewed provider aliases into the separate actual-source consumer. The checked support/project ancestry and all provider bodies are preserved; combined native checks are pending.

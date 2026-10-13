@@ -14,6 +14,8 @@ mod match_engineering;
 mod match_projects;
 #[path = "field_project_tick.rs"]
 mod project_tick;
+#[path = "field_work_snapshot.rs"]
+mod snapshot;
 
 use std::{
     collections::{BTreeMap, BTreeSet},

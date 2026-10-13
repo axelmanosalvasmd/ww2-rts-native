@@ -73,6 +73,19 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
                     } if orders.len() == 1 && orders[0].unit == i64::from(u.id) => {
                         (if *attack_move { 2 } else { 1 }, orders[0].at)
                     }
+                    Command::Entrench {
+                        ids,
+                        order:
+                            crate::field_works::ProjectOrder::Join {
+                                project,
+                                at: Some(at),
+                            },
+                        queue: false,
+                    } if ids.as_slice() == [i64::from(u.id)]
+                        && *project <= 9_007_199_254_740_991 =>
+                    {
+                        (7, *at)
+                    }
                     _ => {
                         return Err(SnapshotError::Unsupported {
                             unit: u.id,
@@ -166,7 +179,13 @@ fn plan(state: &Match, u: &Unit) -> Result<(u8, Point), SnapshotError> {
     if let Some(at) = c.nade {
         return Ok((6, at));
     }
-    // unit_row rejects active work before this cache is built.
+    if let Some(job) = state.field_works.jobs().get(&u.id) {
+        return Ok((7, job.at));
+    }
+    if let Some(at) = state.project_goal(u.id).map_err(|_| SnapshotError::Rules)? {
+        return Ok((7, at));
+    }
+    // Building-site identity is not represented by this engineering slice.
     if let Some(cell) = c.enter {
         return Ok((9, center(state, cell)?));
     }
