@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added a separate paired caller oracle for the same five legacy-trigger maps. It applies the declared seed 123 and wind before the first original `sim.step`, records actual per-seat `snapshotFor.falling` rows across 21 complete-step checkpoints, and retains the prior projection traces and failure prefix exactly. The Great Bridge checkpoint preserves all 516 structural rows and confirms 84 failed bridge sections at zero HP. The pinned x64 regeneration and original-field retention checks pass; native comparison remains pending.
+
 - Added recorder assertions for the exact Great Bridge structure list at tick 8400: 84 bridge sections begin intact at 2,400 HP and finish failed at 0 HP. The pinned x64 source fixture remains byte-identical after regeneration.
 
 - Extended the pinned x64 complete-step oracle with an observed legacy phase timeline. It records actual Say, Destroy callback and emitted-shot order, support cooldowns at scenario entry, and wind state before and after living weather; the Great Bridge witness confirms cooldown advancement precedes scenario actions and weather advances afterward.
