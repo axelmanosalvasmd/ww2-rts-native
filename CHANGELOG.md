@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified the merged bounded World constructor with 160 locked release workspace tests, strict Clippy, formatting and release FFI. Five original startups cover 2,761 units, canonical combat/firing metadata, home ownership, visibility, terrain log order and rails; all 63 ordinary startup records remain unchanged. Parity rows stay in progress for live World and server integration.
+
 - Formatted the new World firing metadata assertions with the pinned Rust formatter.
 
 - Compared every World startup unit's canonical combat and firing metadata with the original source, including local defenders. Removed only duplicate notes introduced by the dependency merge; existing entries remain intact.
@@ -12,21 +14,15 @@
 
 - Documented the checked regional lookup and explicit post-rails snapshot projection boundaries, including the first native log failure and remaining mutable-terrain hook consumers.
 
-- Reused the shared mode-aware control initializer for World startup and removed its private ability-cost lookup. Guard overrides stay canonical. Native proof of this updated startup dependency is pending.
+- Reused the shared mode-aware control initializer for World startup and removed its private ability-cost lookup. Guard overrides stay canonical. The merged native spawn and startup checks pass.
 
-- Fixed the missing rail track-position type annotation found by the first World native compile. Added checked World region/economy projections and optional rail/station snapshot fields with atomic post-rails row annotation after the original startup oracle found missing metadata. Mutable-terrain callers still need to invoke the explicit projection hook. Updated the crafted source case to test floating-column lookup on nonmultiple dimensions; full native acceptance remains pending.
+- Fixed the missing rail track-position type annotation found by the first World native compile. Added checked World region/economy projections and optional rail/station snapshot fields with atomic post-rails row annotation after the original startup oracle found missing metadata. Mutable-terrain callers still need to invoke the explicit projection hook. Updated the crafted source case to test floating-column lookup on nonmultiple dimensions; the final merged constructor checks pass.
 
-- Added a bounded World startup constructor with canonical home ownership, wallets, HQs, local defenders, fortifications, resource nodes, empty production and rail state, and actual initial visibility. The shared unit factory preserves source order and canonical guard controls; generator random history is retained. Five original-source records cover 2,761 units and commander research initialization. Native checks are pending. Logistics-enabled startup, World terrain memory, mode tick phases, commands, trains and server hosting remain explicit boundaries.
+- Added a bounded World startup constructor with canonical home ownership, wallets, HQs, local defenders, fortifications, resource nodes, empty production and rail state, and actual initial visibility. The shared unit factory preserves source order and canonical guard controls; generator random history is retained. Five original-source records cover 2,761 units and commander research initialization. Native debug and release checks pass. Logistics-enabled startup, World terrain memory, mode tick phases, commands, trains and server hosting remain explicit boundaries.
 
-- Reserved a fixed internal World local-defender actor identity outside commander slots. World team and alliance queries recognize that actor without adding a player seat or wallet; ordinary invalid owner behavior is unchanged. Native World construction and guarded publication remain pending.
+- Reserved a fixed internal World local-defender actor identity outside commander slots. World team and alliance queries recognize that actor without adding a player seat or wallet; ordinary invalid owner behavior is unchanged. The explicit World constructor and guarded publication are now verified within their bounded startup scope.
 
-
-
-
-
-
-
-- Added shared mode-aware UnitControl initialization using compiled ability costs, and selected it from the staged factory's actual Game mode. The original spawn oracle preserves all 55 earlier scenarios and adds six Classic/World spawns for absent, paid and free abilities. This source-only prerequisite still awaits native verification; World startup can remove its private cost lookup.
+- Added shared mode-aware UnitControl initialization using compiled ability costs, and selected it from the staged factory's actual Game mode. The original spawn oracle preserves all 55 earlier scenarios and adds six Classic/World spawns for absent, paid and free abilities. The merged native checks verify all 775 spawn rows; World startup uses this shared initializer.
 
 - Preserved canonical recruited combat defaults through the shared publication callback when integrating the reviewed combat ancestry. Fresh combat identities reject before payment; production stepping remains under implementation.
 - Preserved recruited combat metadata in the shared publication callback and rejected occupied combat IDs before charging during integration.
