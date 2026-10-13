@@ -2,7 +2,7 @@
 
 Status: **v0 draft; the six ABI 2 recipient-view calls are approved for staged adoption, pending PR #16 merge.** Author: Julio. Consumer reviewer: Axel.
 Axel approved those six calls and the staged Unreal update in [axel-abi2-approval-011](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6137078260). Julio's Rust-side approval is recorded in [julio-abi2-ack-012](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6137154035) and [PR #16](https://github.com/axelmanosalvasmd/ww2-rts-native/pull/16#issuecomment-6137154230). These decisions cover the six calls below and their staged consumer update only. The broader contract remains a draft, and the agreed scope is recorded after the normal PR merge. Actual ABI 2 build, link and runtime verification in the current Unreal checkout remains pending.
-Baseline: reference ww2-rts `e4e579a`; native `main` at `9c1db8af81accf433ce439c7a2da508a75d43208` plus PR #16. Formation calls and recipient-view calls have Linux x86_64 C-link verification; this is separate from Unreal integration and packaged-client verification.
+Baseline: reference ww2-rts `e4e579a`; native `main` at `b0251fce7001df85f8e2c3cf200af3cdd5a8e3c1` plus PR #16. Formation calls and recipient-view calls have Linux x86_64 C-link verification; this is separate from Unreal integration and packaged-client verification.
 
 ## What the client needs from the core
 
