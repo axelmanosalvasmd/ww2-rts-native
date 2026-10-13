@@ -166,6 +166,12 @@ fn aircraft_runner_admission_refuses_unrepresented_phases_before_queue_or_clock_
                 m.world.game.units.get_mut(&id).unwrap().air =
                     Some(ww2_core::game::PlaneState::Station);
                 m.commands.units.get_mut(&id).unwrap().hold_fire = false;
+                m.aviation.planes.get_mut(&id).unwrap().mission =
+                    Some(ww2_core::match_aviation::PlaneMission {
+                        kind: ww2_core::match_aviation::MissionKind::Patrol,
+                        target: None,
+                        at: ww2_core::game::Point { x: 40., z: 40. },
+                    });
             }
             3 => {
                 m.world.game.units.get_mut(&id).unwrap().air =
@@ -185,12 +191,22 @@ fn aircraft_runner_admission_refuses_unrepresented_phases_before_queue_or_clock_
             }
             _ => unreachable!(),
         }
+        m.enqueue_command(
+            OrderKey {
+                tick: 1,
+                issuer: 0,
+                sequence: 1,
+            },
+            Command::from_json(&json!({"t":"stance","ids":[id],"key":"holdFire","on":true}))
+                .unwrap(),
+        )
+        .unwrap();
         let before = format!(
             "{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}",
             m.world.game.units,
             m.aviation,
             m.commands.units,
-            m.commands.queue.snapshot(),
+            m.pending_commands(),
             m.start.random.snapshot(),
             m.start.economy.players,
             m.story,
@@ -208,7 +224,7 @@ fn aircraft_runner_admission_refuses_unrepresented_phases_before_queue_or_clock_
                 m.world.game.units,
                 m.aviation,
                 m.commands.units,
-                m.commands.queue.snapshot(),
+                m.pending_commands(),
                 m.start.random.snapshot(),
                 m.start.economy.players,
                 m.story,
@@ -216,5 +232,7 @@ fn aircraft_runner_admission_refuses_unrepresented_phases_before_queue_or_clock_
             )
         );
         assert!(m.tick_state.fault().is_none());
+        assert_eq!(m.pending_commands(), 1);
+        assert!(m.validate_command_tick(1).is_ok());
     }
 }
