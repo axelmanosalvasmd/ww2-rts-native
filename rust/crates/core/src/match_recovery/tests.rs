@@ -315,7 +315,7 @@ fn make(case: &Value) -> (Match, Vec<u32>) {
     m.firing = FiringState::default();
     m.combat = CombatState::default();
     m.recovery = RecoveryState::default();
-    m.commands = MatchCommands::default();
+    m.commands = MatchCommands::new(4096);
     m.logistics = LogisticsState::default();
     m.story = vec![PlayerStory::default(); 3];
     m.grid = SpatialGrid::new(&m.world.game.units, 16.);
@@ -325,6 +325,8 @@ fn make(case: &Value) -> (Match, Vec<u32>) {
     }
     for p in &mut m.world.game.players {
         p.visible = order.clone();
+        p.visible.sort_unstable();
+        p.visible.dedup();
     }
     m.options.logistics = case["logistics"].as_bool().unwrap();
     m.convoys = ConvoyState::setup(m.options.logistics);
