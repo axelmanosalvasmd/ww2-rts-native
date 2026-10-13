@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Corrected inherited ability and recovery fixture constructors to use the checked command owner’s explicit 4,096-order capacity and tick-one queue initialization. Their former Default calls did not exist on this combined ancestry. Native verification remains pending.
+
 - Preserved invalid-coordinate refusal precedence for typed aimed abilities over the new unsupported-project preflight. The existing project-boundary regression now includes a nonfinite typed aim; raw JSON behavior is unchanged. Native proof remains pending.
 
 - Applied the ability owner’s narrow paid-work cancellation fix to the Dig integration. Accepted manual aimed abilities remove the canonical job without refund; unsupported project state rejects before selection writes. Updated the original-source fixture and retained focused paid-work and refusal regressions. Native proof remains pending.

@@ -315,7 +315,7 @@ fn make(case: &Value) -> (Match, Vec<u32>) {
     m.firing = FiringState::default();
     m.combat = CombatState::default();
     m.recovery = RecoveryState::default();
-    m.commands = MatchCommands::default();
+    m.commands = MatchCommands::new(4096);
     m.logistics = LogisticsState::default();
     m.story = vec![PlayerStory::default(); 3];
     m.grid = SpatialGrid::new(&m.world.game.units, 16.);
