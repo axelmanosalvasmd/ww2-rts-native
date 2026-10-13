@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Corrected the spawn fixture total from 769 to 775 after adding six mode-aware control cases. The World owner found this stale assertion during native verification; the source records and gameplay values are unchanged.
+
 - Preserved canonical story, environment, tick, recipient, combat and firing state when joining World startup to the checked Match ancestry. World births initialize fresh combat and firing rows through the shared publication callback; native union checks remain pending.
 
 - Joined the World region startup context to the production integration ancestry while preserving canonical combat, firing and environment ownership. Native checks for this source union remain pending.
