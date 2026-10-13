@@ -506,6 +506,14 @@ fn authoritative_environment_matches_original_actions_and_order() {
                             w.fires.remove(&c);
                         }
                     }
+                    if let Some(values) = a["height"].as_array() {
+                        let size = w.game.chars.len();
+                        let height = w.game.height.get_or_insert_with(|| vec![0; size]);
+                        for value in values {
+                            height[value[0].as_u64().unwrap() as usize] =
+                                value[1].as_i64().unwrap() as i8;
+                        }
+                    }
                     if let Some(v) = a["scar"].as_array() {
                         w.scar[v[0].as_u64().unwrap() as usize] = v[1].as_f64().unwrap() as f32;
                     }

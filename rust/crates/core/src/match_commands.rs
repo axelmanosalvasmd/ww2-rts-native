@@ -85,6 +85,18 @@ pub enum Command {
     Stop {
         ids: Vec<i64>,
     },
+    Attack {
+        ids: Vec<i64>,
+        target: i64,
+        queue: bool,
+    },
+    Escort {
+        ids: Vec<i64>,
+        target: i64,
+    },
+    Retreat {
+        ids: Vec<i64>,
+    },
     Stance {
         ids: Vec<i64>,
         stance: Stance,
@@ -497,6 +509,16 @@ impl Command {
                     .ok_or(Denial::Blocked)?,
             }),
             Some("stop") => Ok(Self::Stop { ids }),
+            Some("attack") => Ok(Self::Attack {
+                ids,
+                target: object.get("target").and_then(safe_id).unwrap_or(-1),
+                queue: object.get("queue").and_then(|v| v.as_bool()) == Some(true),
+            }),
+            Some("escort") => Ok(Self::Escort {
+                ids,
+                target: object.get("target").and_then(safe_id).unwrap_or(-1),
+            }),
+            Some("retreat") => Ok(Self::Retreat { ids }),
             Some("stance") => {
                 let stance = match object.get("key").and_then(|v| v.as_str()) {
                     Some("holdFire") => Stance::HoldFire,
@@ -587,15 +609,16 @@ impl crate::match_runtime::Match {
         let kind = self.rules.kinds.get(u.kind)?;
         let control = self.commands.units.get(&id)?;
         let forced = self.logistics.get(id).is_some_and(|r| r.forced);
-        let allowed_forced = self.logistics.get(id).is_some_and(|r| r.stranded)
-            && matches!(command, Command::Ability { .. })
-            || matches!(
+        let allowed_forced =
+            matches!(
                 command,
                 Command::Move {
                     attack_move: false,
                     ..
                 } | Command::Stop { .. }
-            );
+                    | Command::Retreat { .. }
+            ) || matches!(command, Command::Attack { .. } | Command::Ability { .. })
+                && self.logistics.get(id).is_some_and(|r| r.stranded);
         (u.owner == owner
             && !kind.structure
             && !kind.rail
@@ -723,7 +746,10 @@ impl crate::match_runtime::Match {
             Command::Stop { ids }
             | Command::Stance { ids, .. }
             | Command::Ability { ids, .. }
-            | Command::Autocast { ids, .. } => ids.clone(),
+            | Command::Autocast { ids, .. }
+            | Command::Attack { ids, .. }
+            | Command::Escort { ids, .. }
+            | Command::Retreat { ids } => ids.clone(),
             Command::Entrench { .. }
             | Command::Dig { .. }
             | Command::Technology { .. }
@@ -732,6 +758,142 @@ impl crate::match_runtime::Match {
             | Command::CompanionInput { .. }
             | Command::Support { .. }
             | Command::Unsupported => unreachable!(),
+        };
+        let selected_ids: Vec<_> = match command {
+            Command::Move { orders, .. } => orders.iter().map(|o| o.unit).collect(),
+            _ => controlled.clone(),
+        };
+        let selected: Vec<_> = selected_ids
+            .iter()
+            .take(limit)
+            .filter_map(|&id| self.eligible_command_unit(id, owner, command))
+            .collect();
+        // New variants currently actuate their aircraft branches only.
+        match command {
+            Command::Attack { target, .. } => {
+                let target = u32::try_from(*target)
+                    .ok()
+                    .and_then(|id| self.world.game.units.get(&id));
+                let Some(target) = target.filter(|t| {
+                    !self.world.game.allied(owner, t.owner)
+                        && self.world.game.players[owner].sees(t.id)
+                }) else {
+                    return Ok(Some(Denial::Unseen));
+                };
+                if target.air.is_none() {
+                    return Ok(Some(Denial::Unsupported));
+                }
+                if target.hp <= 0.0 {
+                    return Ok(Some(Denial::Unseen));
+                }
+            }
+            Command::Escort { target, .. } => {
+                let target = u32::try_from(*target)
+                    .ok()
+                    .and_then(|id| self.world.game.units.get(&id));
+                if target.is_none_or(|t| {
+                    !self.world.game.allied(owner, t.owner)
+                        || self.rules.kinds[t.kind].structure
+                        || t.air.is_some()
+                }) {
+                    return Ok(Some(Denial::Unseen));
+                }
+            }
+            Command::Retreat { .. }
+                if selected
+                    .iter()
+                    .any(|id| !self.is_aircraft_command_unit(*id)) =>
+            {
+                return Ok(Some(Denial::Unsupported));
+            }
+            _ => {}
+        }
+        if selected.iter().any(|id| self.is_aircraft_command_unit(*id))
+            && matches!(command, Command::Ability { .. } | Command::Autocast { .. })
+        {
+            return Ok(Some(Denial::Unsupported));
+        }
+        use crate::match_aircraft_commands::AircraftOrder;
+        let aircraft = (|| -> Result<Vec<_>, crate::match_aviation::AviationError> {
+            let mut prepared = Vec::new();
+            if let Command::Move { orders, queue, .. } = command {
+                for row in orders.iter().take(limit) {
+                    let Some(id) = self
+                        .eligible_command_unit(row.unit, owner, command)
+                        .filter(|id| self.is_aircraft_command_unit(*id))
+                    else {
+                        continue;
+                    };
+                    if *queue {
+                        return Err(crate::match_aviation::AviationError::Unsupported(
+                            "queued aircraft commands are unavailable",
+                        ));
+                    }
+                    let at = Point {
+                        x: crate::math::max(
+                            0.0,
+                            crate::math::min(
+                                self.world.game.w as f64 * crate::game::CELL,
+                                row.at.x,
+                            ),
+                        ),
+                        z: crate::math::max(
+                            0.0,
+                            crate::math::min(
+                                self.world.game.h as f64 * crate::game::CELL,
+                                row.at.z,
+                            ),
+                        ),
+                    };
+                    prepared.push(self.prepare_aircraft_order(
+                        owner,
+                        id,
+                        AircraftOrder::Move(at),
+                    )?);
+                }
+            } else {
+                for &id in &selected {
+                    if !self.is_aircraft_command_unit(id) {
+                        continue;
+                    }
+                    let order = match command {
+                        Command::Stop { .. } => AircraftOrder::Stop,
+                        Command::Attack { target, queue, .. } => {
+                            if *queue {
+                                return Err(crate::match_aviation::AviationError::Unsupported(
+                                    "queued aircraft commands are unavailable",
+                                ));
+                            }
+                            AircraftOrder::Attack(
+                                u32::try_from(*target).expect("validated attack target"),
+                            )
+                        }
+                        Command::Escort { target, .. } => AircraftOrder::Escort(
+                            u32::try_from(*target).expect("validated escort target"),
+                        ),
+                        Command::Retreat { .. } => AircraftOrder::Retreat,
+                        Command::Stance { stance, on, .. } => {
+                            self.validate_aviation()?;
+                            if *stance == Stance::HoldFire && !*on {
+                                return Err(crate::match_aviation::AviationError::Unsupported(
+                                    "aircraft automatic weapons are unavailable",
+                                ));
+                            }
+                            continue;
+                        }
+                        _ => unreachable!(),
+                    };
+                    prepared.push(self.prepare_aircraft_order(owner, id, order)?);
+                }
+            }
+            Ok(prepared)
+        })();
+        let aircraft = match aircraft {
+            Ok(plan) => plan,
+            Err(crate::match_aviation::AviationError::Unsupported(_)) => {
+                return Ok(Some(Denial::Unsupported));
+            }
+            Err(e) => return Err(e.to_string()),
         };
         if matches!(
             command,
@@ -743,7 +905,10 @@ impl crate::match_runtime::Match {
             };
             let mut advances: BTreeMap<UnitId, u64> = BTreeMap::new();
             for raw in rows {
-                if let Some(id) = self.eligible_command_unit(raw, owner, command) {
+                if let Some(id) = self
+                    .eligible_command_unit(raw, owner, command)
+                    .filter(|id| !self.is_aircraft_command_unit(*id))
+                {
                     if self.world.game.units[&id].dig != self.field_works.is_active(id)
                         || self.world.game.units[&id].entrench
                             != self.field_works.membership(id).is_some()
@@ -782,27 +947,13 @@ impl crate::match_runtime::Match {
                     Command::Stop { .. } => control.supply_hold = true,
                     Command::Move {
                         attack_move: false, ..
-                    } => control.supply_hold = false,
+                    }
+                    | Command::Retreat { .. } => control.supply_hold = false,
                     _ => {}
                 }
             }
         }
 
-        let selected_ids: Vec<_> = match command {
-            Command::Move { orders, .. } => orders.iter().map(|o| o.unit).collect(),
-            _ => controlled.clone(),
-        };
-        let selected: Vec<_> = selected_ids
-            .iter()
-            .take(limit)
-            .filter_map(|&id| self.eligible_command_unit(id, owner, command))
-            .collect();
-        if selected
-            .iter()
-            .any(|id| self.world.game.units[id].air.is_some())
-        {
-            return Ok(Some(Denial::Unsupported));
-        }
         if let Command::Ability {
             at,
             queue,
@@ -827,7 +978,14 @@ impl crate::match_runtime::Match {
                 if selected.is_empty() {
                     return Ok(Some(Denial::Needs));
                 }
-                for id in selected {
+                for prepared in aircraft {
+                    self.apply_aircraft_order(prepared);
+                }
+                for id in selected
+                    .into_iter()
+                    .filter(|id| !self.is_aircraft_command_unit(*id))
+                    .collect::<Vec<_>>()
+                {
                     self.cancel_field_work(id)?;
                     self.stop_command_unit(id);
                 }
@@ -855,7 +1013,47 @@ impl crate::match_runtime::Match {
                 face,
                 ..
             } => {
-                return self.move_command(owner, orders, *attack_move, *queue, *together, *face);
+                for prepared in aircraft {
+                    self.apply_aircraft_order(prepared);
+                }
+                let ground: Vec<_> = orders
+                    .iter()
+                    .take(limit)
+                    .filter(|row| {
+                        u32::try_from(row.unit)
+                            .ok()
+                            .and_then(|id| self.world.game.units.get(&id))
+                            .is_none_or(|u| !self.is_aircraft_command_unit(u.id))
+                    })
+                    .cloned()
+                    .collect();
+                if ground.iter().take(limit).any(|row| {
+                    self.eligible_command_unit(row.unit, owner, command)
+                        .is_some()
+                }) {
+                    let denial =
+                        self.move_command(owner, &ground, *attack_move, *queue, *together, *face)?;
+                    return Ok(
+                        if selected.iter().any(|id| self.is_aircraft_command_unit(*id)) {
+                            None
+                        } else {
+                            denial
+                        },
+                    );
+                }
+                return Ok(if selected.is_empty() {
+                    Some(Denial::Blocked)
+                } else {
+                    None
+                });
+            }
+            Command::Attack { .. } | Command::Escort { .. } | Command::Retreat { .. } => {
+                if aircraft.is_empty() {
+                    return Ok(Some(Denial::Needs));
+                }
+                for prepared in aircraft {
+                    self.apply_aircraft_order(prepared);
+                }
             }
             Command::Ability {
                 ids,
@@ -1414,6 +1612,9 @@ impl crate::match_runtime::Match {
         {
             return Ok(());
         }
+        if u.air.is_some() {
+            return self.start_queued_orders(id, winner_decided);
+        }
         if let Some(goal) = u.world_goal {
             let end = self
                 .commands
@@ -1452,7 +1653,18 @@ impl crate::match_runtime::Match {
             return Ok(());
         };
         if u.air.is_some() {
-            return Err("queued aircraft commands are unsupported".into());
+            return if self
+                .commands
+                .units
+                .get(&id)
+                .ok_or("missing queued control")?
+                .orders
+                .is_empty()
+            {
+                Ok(())
+            } else {
+                Err("queued aircraft commands are unsupported".into())
+            };
         }
         let control = self
             .commands

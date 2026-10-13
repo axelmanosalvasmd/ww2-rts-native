@@ -443,6 +443,7 @@ pub struct BuildingCell {
 /// Authoritative startup state. Each mode admits only its implemented phases.
 /// Live terrain and units have a single owner in `world.game`.
 pub struct Match {
+    pub aviation: crate::match_aviation::AviationState,
     pub support: crate::match_support::SupportState,
     pub field_works: crate::field_works::FieldWorksRuntime,
     pub abilities: crate::match_abilities::AbilityState,
@@ -562,6 +563,7 @@ impl Match {
         };
         let player_count = start.players.len();
         let mut result = Self {
+            aviation: crate::match_aviation::AviationState::default(),
             support: crate::match_support::SupportState::default(),
             field_works: crate::field_works::FieldWorksRuntime::default(),
             abilities: crate::match_abilities::AbilityState::default(),
