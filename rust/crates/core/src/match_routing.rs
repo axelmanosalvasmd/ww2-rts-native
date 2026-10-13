@@ -677,6 +677,10 @@ impl PreparedRecipientRouting<'_> {
         paths.fork_for_terrain(self.target.query().navigation(), self.query().navigation())
     }
 
+    /// Accepted preview rows for a detached producer, before publication.
+    pub fn remembered(&self) -> &[ObservedRow] {
+        self.state.remembered()
+    }
     pub fn query(&self) -> RouteQuery<'_> {
         self.state.query()
     }

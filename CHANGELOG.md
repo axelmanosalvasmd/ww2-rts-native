@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add a complete existing strategic packet producer for the ordinary human commander, with decoded own move goals, delivered visibility and ordered 60-second sightings. Stage recipient memory before publication and filter real owner hurt frames without losing reset/append ordinals. Four original-reader scenes record 48 views and three hurt batches; native checks are pending.
+
 - Bring source-reviewed human commander timing, raw input helpers and detached common view types into the isolated observation producer branch. Native acceptance remains pending.
 
 - Prepare a separate human commander observation branch by normally combining checked commander `be1cb2c` with ordinary Default `262926e`. Retain both Cover and Entrench dispatch and canonical owners; this new union has no native acceptance yet.

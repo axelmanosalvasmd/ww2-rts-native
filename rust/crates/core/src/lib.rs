@@ -37,6 +37,7 @@ pub mod match_cover;
 pub mod match_recovery;
 
 pub mod match_firing;
+pub mod match_human_observation;
 pub mod match_ground_support;
 pub mod match_logistics;
 pub mod match_reactions;
