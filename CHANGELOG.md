@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Merged the published quiet-snapshot evidence into the verified active-list delivery, preserving every tested Rust and harness file. The draft now has a real quiet-provider ancestor; broader staged-observation and World-memory prerequisites remain explicit, and convergence with the newer root stack is separate.
+
 - Verified canonical recipient lists and bounded ordinary active-list snapshots on the Mac at compiled 48c7e15: 12 affected snapshot debug tests, all 213 release workspace tests, strict Clippy, formatting and release FFI pass. Runtime-identical 4140ae0 also passed 25 focused debug tests. Source evidence covers five list traces and 92 actions, 11 active frames and 33 full recipient results, alongside the existing quiet and delivery fixtures. World full envelopes, active actors and transport remain separate.
 
 - Rewrote the active-list rejection regression's indexed wreck loop as an enumerated iterator after strict Clippy flagged it. Assertions and runtime behavior are unchanged; the first combined candidate passed all 25 focused debug and 213 release workspace tests before that lint failure.
@@ -15,6 +17,7 @@
 - Preserved the independently reviewed, Vostro-verified quiet snapshot constructor, actor-order and ordinary logistics startup repairs in the separate active-list extension. The active-list dependency union still needs its own native proof.
 
 - Integrated the source-cleared canonical recipient list and staged observation prerequisites into a separate active-list snapshot extension. Preserved the ordinary snapshot guard and existing actor exclusions. Native verification and all-seat list preparation remain pending.
+- Verified the repaired quiet Conquest snapshot assembly on Vostro Linux x86_64 at `5efaf17`: 21 focused debug tests, all 201 locked release workspace tests, strict Clippy, formatting and release FFI pass. Original-source checks cover 73 states, 219 partial and 219 full snapshots, plus 13 delivery steps and 39 recipient reads. Active actor/list integration and server transport remain separate.
 
 - Restored the ordinary Conquest logistics initialization call after the shared startup refactor. The native supply regressions exposed empty reserves and an absent convoy service. Initialization again runs after bases, metadata and recipient routing; disabled logistics and other modes keep their existing limits. Combined native verification is pending.
 
