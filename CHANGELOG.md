@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Corrected the publication regression map to include the required authoring name. Its first native run rejected the incomplete fixture before reaching the transaction checks.
+
 - Added the canonical optional World guard home to UnitControl and checked it before publication. The World actor regression checks invalid home rejection and preserved staged home; the source guard return phase still needs tick integration.
 
 - Fixed publication validation rejecting unrelated casualties with negative HP before source death removal. Existing units accept finite negative health, while new drafts and staged squad HP stay nonnegative. An added original-source buy trace protects the admission behavior.

@@ -11,7 +11,7 @@ use ww2_core::{
     weather::WeatherChoice,
 };
 fn make() -> Match {
-    let map = json!({"w":30,"h":30,"rows":vec!["..............................";30],"spawns":[{"x":3,"y":3},{"x":25,"y":25}],"points":[{"id":"front","x":15,"y":15}]});
+    let map = json!({"name":"Publication transactions","w":30,"h":30,"rows":vec!["..............................";30],"spawns":[{"x":3,"y":3},{"x":25,"y":25}],"points":[{"id":"front","x":15,"y":15}]});
     let map = AuthoritativeMap::from_json(&serde_json::to_vec(&map).unwrap()).unwrap();
     Match::new(
         &map,
