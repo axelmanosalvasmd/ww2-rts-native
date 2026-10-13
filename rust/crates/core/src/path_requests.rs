@@ -158,12 +158,12 @@ pub struct TickReport {
     pub discarded: usize,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct Pending {
     token: u64,
     request: Request,
 }
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct Failure {
     incarnation: u64,
     request: Request,
@@ -171,7 +171,7 @@ struct Failure {
     count: u32,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct PathRequests {
     queue: VecDeque<Pending>,
     pending: BTreeMap<UnitId, Pending>,
@@ -195,6 +195,11 @@ impl PathRequests {
     }
     pub fn pending_len(&self) -> usize {
         self.pending.len()
+    }
+    /// Borrow FIFO requests, including stale entries, for adapter preflight.
+    /// This does not acknowledge pending work or change search budget.
+    pub(crate) fn queued_requests(&self) -> impl Iterator<Item = &Request> {
+        self.queue.iter().map(|pending| &pending.request)
     }
     pub fn stats(&self) -> SchedulerStats {
         self.stats

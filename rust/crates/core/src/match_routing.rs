@@ -285,7 +285,7 @@ impl Match {
             .collect::<Result<_, String>>()?;
         Ok(())
     }
-    fn validate_routing_context(&self) -> Result<(), String> {
+    pub(crate) fn validate_routing_context(&self) -> Result<(), String> {
         crate::observed_memory::validate_world(&self.world)
             .map_err(|e| format!("routing terrain: {e:?}"))?;
         let g = &self.world.game;
@@ -370,7 +370,7 @@ impl Match {
         }
         Ok(())
     }
-    fn validate_recipient(&self, owner: usize) -> Result<(), String> {
+    pub(crate) fn validate_recipient(&self, owner: usize) -> Result<(), String> {
         self.validate_routing_context()?;
         if self.recipients.len() != self.world.game.players.len() {
             return Err("recipient routing table mismatch".into());
@@ -389,83 +389,27 @@ impl Match {
     }
     fn refresh_memory(&mut self, owner: usize) -> Result<(), String> {
         self.validate_recipient(owner)?;
-        if !self.recipients[owner].memory.needs_replay(&self.world) {
-            let team = self.world.game.players[owner].team;
-            self.recipients[owner]
-                .memory
-                .refresh(
-                    &mut self.world,
-                    ObservationFrame {
-                        team,
-                        skip_fog: false,
-                    },
-                    &mut Facts::default(),
-                )
-                .map_err(|e| format!("observed refresh: {e:?}"))?;
-            return Ok(());
-        }
-        self.grid.rebuild(&self.world.game.units);
-        let mut facts = facts(
-            &self.world,
+        refresh_recipient_memory_parts(
+            &mut self.world,
             &self.rules,
-            &self.grid,
+            &mut self.grid,
             &self.building_cells,
+            &mut self.recipients[owner],
             owner,
-        )?;
-        let team = self.world.game.players[owner].team;
-        self.recipients[owner]
-            .memory
-            .refresh(
-                &mut self.world,
-                ObservationFrame {
-                    team,
-                    skip_fog: false,
-                },
-                &mut facts,
-            )
-            .map_err(|e| format!("observed refresh: {e:?}"))?;
-        Ok(())
+        )
     }
     /// Refresh before borrowing recipient query/live and mutable unit or search fields.
     pub fn refresh_recipient_routing(&mut self, owner: usize) -> Result<(), String> {
         self.validate_recipient(owner)?;
-        let g = &self.world.game;
-        let key = (g.tick, g.terrain_version, g.vision_tick.unwrap_or(-1));
-        if self.recipients[owner].key == Some(key) {
-            self.recipients[owner].refresh_bound_units(&self.world.game, &self.rules);
-            self.recipients[owner].wetness = self.world.game.wet.unwrap_or(0.0);
-            return Ok(());
-        }
-        self.refresh_memory(owner)?;
-        self.grid.rebuild(&self.world.game.units);
-        let state = &mut self.recipients[owner];
-        state
-            .memory
-            .apply_routes(&mut state.routes)
-            .map_err(|e| format!("observed projection: {e:?}"))?;
-        let g = &self.world.game;
-        refresh_wrecks(state, g, &self.rules, &self.grid, owner);
-        state.wrecks = state.wreck_memory.clone();
-        let fog = self.routing_fog.team(g, &self.rules, g.players[owner].team);
-        state.fires.fill(false);
-        for &c in self.world.fires.iter().map(|(cell, _)| cell) {
-            state.fires[c] = fog.vis[c] != 0;
-        }
-        state.bound_units = g
-            .units
-            .values()
-            .filter(|u| {
-                g.reveal
-                    || g.allied(u.owner, owner)
-                    || (g.players[owner].sees(u.id) && (u.air.is_none() || airborne(u)))
-            })
-            .map(BoundUnit::from_unit)
-            .collect();
-        state.refresh_bound_units(g, &self.rules);
-        state.wetness = g.wet.unwrap_or(0.0);
-        state.roads = self.world.roads;
-        state.key = Some(key);
-        Ok(())
+        refresh_recipient_parts(
+            &mut self.world,
+            &self.rules,
+            &mut self.grid,
+            &self.building_cells,
+            &mut self.routing_fog,
+            &mut self.recipients[owner],
+            owner,
+        )
     }
     /// Preserve the fields the original cached view still reads from a removed
     /// unit object. The lifecycle owner calls this with the final removed unit.
@@ -503,7 +447,7 @@ impl Match {
         if !at.x.is_finite() || !at.z.is_finite() {
             return Err("invalid visibility point".into());
         }
-        self.grid.rebuild(&self.world.game.units);
+        let grid = SpatialGrid::new(&self.world.game.units, 16.0);
         let g = &self.world.game;
         let team = g.players[owner].team;
         let reach = g
@@ -512,7 +456,7 @@ impl Match {
             .filter(|u| g.team_of(u) == team)
             .map(|u| vision_of(g, &self.rules, u))
             .fold(1.0, math::max);
-        Ok(sees(g, &self.rules, &self.grid, team, reach, at))
+        Ok(sees(g, &self.rules, &grid, team, reach, at))
     }
 
     /// Query an already refreshed owner state without borrowing all of Match mutably.
@@ -524,12 +468,12 @@ impl Match {
     /// Hidden moving wrecks become static remembered cover; removal waits until seen.
     pub fn observed_wrecks(&mut self, owner: usize) -> Result<Vec<Wreck>, String> {
         self.validate_recipient(owner)?;
-        self.grid.rebuild(&self.world.game.units);
+        let grid = SpatialGrid::new(&self.world.game.units, 16.0);
         refresh_wrecks(
             &mut self.recipients[owner],
             &self.world.game,
             &self.rules,
-            &self.grid,
+            &grid,
             owner,
         );
         Ok(self.recipients[owner].wreck_memory.clone())
@@ -549,4 +493,92 @@ impl Match {
             memory.take_changes()
         })
     }
+}
+
+fn refresh_recipient_memory_parts(
+    world: &mut World,
+    rules: &Rules,
+    _grid: &mut SpatialGrid,
+    buildings: &BTreeMap<usize, BuildingCell>,
+    state: &mut RecipientRouting,
+    owner: usize,
+) -> Result<(), String> {
+    if !state.memory.needs_replay(world) {
+        let team = world.game.players[owner].team;
+        state
+            .memory
+            .refresh(
+                world,
+                ObservationFrame {
+                    team,
+                    skip_fog: false,
+                },
+                &mut Facts::default(),
+            )
+            .map_err(|e| format!("observed refresh: {e:?}"))?;
+        return Ok(());
+    }
+    let observation_grid = SpatialGrid::new(&world.game.units, 16.0);
+    let mut facts = facts(world, rules, &observation_grid, buildings, owner)?;
+    let team = world.game.players[owner].team;
+    state
+        .memory
+        .refresh(
+            world,
+            ObservationFrame {
+                team,
+                skip_fog: false,
+            },
+            &mut facts,
+        )
+        .map_err(|e| format!("observed refresh: {e:?}"))?;
+    Ok(())
+}
+/// Validated caller-owned parts, used lazily by convoy routing callbacks.
+pub(crate) fn refresh_recipient_parts(
+    world: &mut World,
+    rules: &Rules,
+    grid: &mut SpatialGrid,
+    buildings: &BTreeMap<usize, BuildingCell>,
+    fog: &mut crate::fog::Fog,
+    state: &mut RecipientRouting,
+    owner: usize,
+) -> Result<(), String> {
+    let g = &world.game;
+    let key = (g.tick, g.terrain_version, g.vision_tick.unwrap_or(-1));
+    if state.key == Some(key) {
+        state.refresh_bound_units(&world.game, rules);
+        state.wetness = world.game.wet.unwrap_or(0.0);
+        return Ok(());
+    }
+    refresh_recipient_memory_parts(world, rules, grid, buildings, state, owner)?;
+    let observation_grid = SpatialGrid::new(&world.game.units, 16.0);
+
+    state
+        .memory
+        .apply_routes(&mut state.routes)
+        .map_err(|e| format!("observed projection: {e:?}"))?;
+    let g = &world.game;
+    refresh_wrecks(state, g, rules, &observation_grid, owner);
+    state.wrecks = state.wreck_memory.clone();
+    let fog = fog.team(g, rules, g.players[owner].team);
+    state.fires.fill(false);
+    for &c in world.fires.iter().map(|(cell, _)| cell) {
+        state.fires[c] = fog.vis[c] != 0;
+    }
+    state.bound_units = g
+        .units
+        .values()
+        .filter(|u| {
+            g.reveal
+                || g.allied(u.owner, owner)
+                || (g.players[owner].sees(u.id) && (u.air.is_none() || airborne(u)))
+        })
+        .map(BoundUnit::from_unit)
+        .collect();
+    state.refresh_bound_units(g, rules);
+    state.wetness = g.wet.unwrap_or(0.0);
+    state.roads = world.roads;
+    state.key = Some(key);
+    Ok(())
 }

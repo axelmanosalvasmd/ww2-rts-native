@@ -289,7 +289,7 @@ fn authoritative_environment_matches_original_actions_and_order() {
             w.game.units.insert(id, u);
             order.push(id);
         }
-        let grid = SpatialGrid::new(&w.game.units, 16.);
+        let mut grid = SpatialGrid::new(&w.game.units, 16.);
         let (mut seed, mut next_id, mut tick, mut rain, mut wet, mut wind_angle, mut wind_strength) =
             (123456789, 1000, 10, 0., 0., 0.7, 0.6);
         let mut memory = DamageMemory::default();
@@ -331,6 +331,73 @@ fn authoritative_environment_matches_original_actions_and_order() {
             match a["op"].as_str().unwrap() {
                 "ignite" => r.ignite(&mut w, c, &mut ctx).unwrap(),
                 "burn" => effects = r.burn(&mut w, a["dt"].as_f64().unwrap(), &mut ctx).unwrap(),
+                "burn_captured" => {
+                    let actors = a["actors"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|v| v.as_u64().unwrap() as u32)
+                        .collect::<Vec<_>>();
+                    effects = r
+                        .burn_captured(&mut w, a["dt"].as_f64().unwrap(), &mut ctx, &actors)
+                        .unwrap();
+                }
+                "para_birth" => {
+                    // Original stepStrikes records the actual arrival. This consumer
+                    // imports its births as burn context, without claiming native air support.
+                    assert_eq!(a["actors"], json!(order));
+                    let tape = a["timeline"].as_array().unwrap();
+                    assert_eq!(tape.len(), 121);
+                    for beat in &tape[..120] {
+                        assert_eq!(beat["shots"], json!([]));
+                        assert_eq!(beat["live"], json!([false]));
+                        assert_eq!(beat["count"], 1);
+                    }
+                    assert_eq!(tape[120]["shots"].as_array().unwrap().len(), 4);
+                    assert_eq!(tape[120]["live"], json!([]));
+                    assert_eq!(tape[120]["count"], 0);
+                    for v in a["births"].as_array().unwrap() {
+                        let id = v["id"].as_u64().unwrap() as u32;
+                        let kind = rules.kind(v["type"].as_str().unwrap()).unwrap();
+                        let mut u = initial_unit(
+                            &rules,
+                            catalog,
+                            kind,
+                            id,
+                            v["owner"].as_u64().unwrap() as usize,
+                            point(v),
+                        )
+                        .unwrap();
+                        u.hp = v["hp"].as_f64().unwrap();
+                        u.supp = v["supp"].as_f64().unwrap();
+                        u.garrison = v["garrison"].as_u64().map(|c| c as usize);
+                        u.path = v["path"].as_array().unwrap().iter().map(point).collect();
+                        w.game.units.insert(id, u);
+                        order.push(id);
+                    }
+                    next_id = a["nextId"].as_u64().unwrap() as u32;
+                    tick = a["arrivalTick"].as_u64().unwrap();
+                    grid.rebuild(&w.game.units);
+                }
+                "ignite_births" => {
+                    let cells = w
+                        .game
+                        .units
+                        .range(1000..)
+                        .map(|(_, u)| w.game.cell_of(u.x, u.z).unwrap())
+                        .collect::<Vec<_>>();
+                    for c in cells {
+                        w.mutate_cell(
+                            c,
+                            CellChange {
+                                object: Some(b'H'),
+                                ..Default::default()
+                            },
+                        )
+                        .unwrap();
+                        r.ignite(&mut w, c, &mut ctx).unwrap();
+                    }
+                }
                 "flood" => r.flood(&mut w).unwrap(),
                 "debris" => r
                     .step_sections(&mut w, a["dt"].as_f64().unwrap(), &mut ctx)
@@ -437,6 +504,14 @@ fn authoritative_environment_matches_original_actions_and_order() {
                             w.fires.insert(c, t);
                         } else {
                             w.fires.remove(&c);
+                        }
+                    }
+                    if let Some(values) = a["height"].as_array() {
+                        let size = w.game.chars.len();
+                        let height = w.game.height.get_or_insert_with(|| vec![0; size]);
+                        for value in values {
+                            height[value[0].as_u64().unwrap() as usize] =
+                                value[1].as_i64().unwrap() as i8;
                         }
                     }
                     if let Some(v) = a["scar"].as_array() {
@@ -631,4 +706,107 @@ fn fire_registry_preserves_updates_and_remove_reinsert_order() {
     assert_eq!(fires.len(), 2);
     fires.clear();
     assert!(fires.is_empty());
+}
+
+#[test]
+fn captured_burn_rejects_bad_membership_and_full_context_capacity_atomically() {
+    let fixture: Value = serde_json::from_str(include_str!("fixtures/environment.json")).unwrap();
+    let case = fixture["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == "captured-burn-after-real-paratrooper-arrival")
+        .unwrap();
+    let map = AuthoritativeMap::from_json(&serde_json::to_vec(&case["map"]).unwrap()).unwrap();
+    let mut w = World::from_map(&map).unwrap();
+    let rules = Rules::compiled().unwrap();
+    let catalog = Catalog::compiled().unwrap();
+    for id in [7, 8] {
+        let u = initial_unit(
+            &rules,
+            catalog,
+            rules.kind("rifle").unwrap(),
+            id,
+            0,
+            Point { x: 5.0, z: 5.0 },
+        )
+        .unwrap();
+        w.game.units.insert(id, u);
+    }
+    w.fires.insert(42, 10.0);
+    let mut runtime = EnvironmentRuntime::default();
+    let grid = SpatialGrid::new(&w.game.units, 16.0);
+    let order = [7, 8];
+    let owners = BTreeMap::new();
+    let mut seed = 123;
+    let mut next_id = 1000;
+    for actors in [&[7, 7][..], &[999][..]] {
+        let before = snapshot(&w, &runtime, seed, next_id, &order, &owners);
+        let mut ctx = Context {
+            tick: 10,
+            seed: &mut seed,
+            next_id: &mut next_id,
+            unit_order: &order,
+            grid: &grid,
+            rain: 0.0,
+            wet: 0.0,
+            wind_angle: 0.0,
+            wind_strength: 0.5,
+        };
+        assert!(
+            runtime
+                .burn_captured(&mut w, 0.5, &mut ctx, actors)
+                .is_err()
+        );
+        assert_eq!(
+            snapshot(&w, &runtime, seed, next_id, &order, &owners),
+            before
+        );
+    }
+    // An excluded new actor still belongs to complete validation.
+    w.game.units.get_mut(&8).unwrap().path_gen = u64::MAX;
+    let before = snapshot(&w, &runtime, seed, next_id, &order, &owners);
+    let mut ctx = Context {
+        tick: 10,
+        seed: &mut seed,
+        next_id: &mut next_id,
+        unit_order: &order,
+        grid: &grid,
+        rain: 0.0,
+        wet: 0.0,
+        wind_angle: 0.0,
+        wind_strength: 0.5,
+    };
+    assert!(runtime.burn_captured(&mut w, 0.5, &mut ctx, &[7]).is_err());
+    assert_eq!(
+        snapshot(&w, &runtime, seed, next_id, &order, &owners),
+        before
+    );
+    assert_eq!(w.game.units[&8].path_gen, u64::MAX);
+    w.game.units.get_mut(&8).unwrap().path_gen = 0;
+    for counter in [false, true] {
+        if counter {
+            w.versions.infantry = u64::MAX;
+        } else {
+            next_id = u32::MAX;
+        }
+        let before = snapshot(&w, &runtime, seed, next_id, &order, &owners);
+        let mut ctx = Context {
+            tick: 10,
+            seed: &mut seed,
+            next_id: &mut next_id,
+            unit_order: &order,
+            grid: &grid,
+            rain: 0.0,
+            wet: 0.0,
+            wind_angle: 0.0,
+            wind_strength: 0.5,
+        };
+        assert!(runtime.burn_captured(&mut w, 0.5, &mut ctx, &[7]).is_err());
+        assert_eq!(
+            snapshot(&w, &runtime, seed, next_id, &order, &owners),
+            before
+        );
+        next_id = 1000;
+    }
 }

@@ -2,6 +2,7 @@
 //! Wallets, story and other unit systems remain with their single owners.
 use crate::{
     catalog::Catalog,
+    economy::Mode,
     game::{Game, LOCAL_DEFENDER_OWNER, ModeKind, Point, Unit},
     grid::{SpatialGrid, UnitId},
     match_commands::{Command, UnitControl},
@@ -69,6 +70,55 @@ impl StagedUnit {
         scatter_index: u32,
         pose_override: Option<Point>,
     ) -> Result<Self, PublicationError> {
+        Self::stage(
+            game,
+            rules,
+            actor,
+            kind,
+            id,
+            scatter_index,
+            pose_override,
+            false,
+        )
+    }
+    /// Explicit aircraft factory. The authoritative aviation owner resolves airBase.
+    /// Ordinary publication retains its UnsupportedAir policy.
+    #[allow(clippy::too_many_arguments)]
+    pub fn aircraft(
+        game: &Game,
+        rules: &Rules,
+        owner: usize,
+        kind: usize,
+        id: UnitId,
+        scatter_index: u32,
+        player_spawn: Point,
+        air_base: Point,
+    ) -> Result<Self, PublicationError> {
+        Self::stage(
+            game,
+            rules,
+            SpawnActor::Commander {
+                owner,
+                spawn: player_spawn,
+            },
+            kind,
+            id,
+            scatter_index,
+            Some(air_base),
+            true,
+        )
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn stage(
+        game: &Game,
+        rules: &Rules,
+        actor: SpawnActor,
+        kind: usize,
+        id: UnitId,
+        scatter_index: u32,
+        pose_override: Option<Point>,
+        aircraft: bool,
+    ) -> Result<Self, PublicationError> {
         let (owner, player_spawn) = match actor {
             SpawnActor::Commander { owner, spawn } if owner < game.players.len() => (owner, spawn),
             SpawnActor::WorldLocalDefender { spawn } if game.mode == Some(ModeKind::World) => {
@@ -86,33 +136,46 @@ impl StagedUnit {
             .get(kind)
             .ok_or(PublicationError::Invalid("spawn kind"))?;
         let mut placer = SpawnPlacer::new();
-        let at = placer
-            .scatter_position(
-                TerrainView {
-                    width: game.w,
-                    height: game.h,
-                    flags: &game.flags,
-                    heights: game.height.as_deref(),
-                    world_known: false,
-                    knowledge_id: 0,
-                    versions: Versions::default(),
-                    changed: None,
-                    changes: &[],
-                },
-                profile,
-                player_spawn,
-                scatter_index,
-            )
-            .map_err(PublicationError::Spawn)?
-            .point;
+        let view = TerrainView {
+            width: game.w,
+            height: game.h,
+            flags: &game.flags,
+            heights: game.height.as_deref(),
+            world_known: false,
+            knowledge_id: 0,
+            versions: Versions::default(),
+            changed: None,
+            changes: &[],
+        };
+        let at = if aircraft {
+            placer.scatter_aircraft_position(view, profile, player_spawn, scatter_index)
+        } else {
+            placer.scatter_position(view, profile, player_spawn, scatter_index)
+        }
+        .map_err(PublicationError::Spawn)?
+        .point;
         let catalog = Catalog::compiled().map_err(|e| PublicationError::Spawn(e.into()))?;
-        let mut unit = unit_spawn::initial_unit(rules, catalog, kind, id, owner, at)
-            .map_err(PublicationError::Spawn)?;
+        let mut unit = if aircraft {
+            unit_spawn::initial_aircraft(rules, catalog, kind, id, owner, at)
+        } else {
+            unit_spawn::initial_unit(rules, catalog, kind, id, owner, at)
+        }
+        .map_err(PublicationError::Spawn)?;
         if let Some(at) = pose_override {
             unit.x = at.x;
             unit.z = at.z;
         }
-        let control = UnitControl::new(&unit, rules).map_err(PublicationError::Control)?;
+        let mode = match game.mode {
+            None => Mode::Default,
+            Some(ModeKind::Annihilation) => Mode::Annihilation,
+            Some(ModeKind::Assault) => Mode::Assault,
+            Some(ModeKind::Classic) => Mode::Classic,
+            Some(ModeKind::Horde) => Mode::Horde,
+            Some(ModeKind::Tutorial) => Mode::Tutorial,
+            Some(ModeKind::World) => Mode::World,
+        };
+        let control =
+            UnitControl::new_for_mode(&unit, rules, mode).map_err(PublicationError::Control)?;
         Ok(Self {
             unit,
             control,

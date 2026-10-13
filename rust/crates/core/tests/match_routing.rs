@@ -253,8 +253,8 @@ fn actual_match_visibility_memory_and_owned_routing_match_source() {
                         .unwrap()
                         .iter()
                         .map(|v| Smoke {
-                            id: 0,
                             remaining: None,
+                            id: 0,
                             x: v["x"].as_f64().unwrap(),
                             z: v["z"].as_f64().unwrap(),
                             r: v["r"].as_f64().unwrap(),
