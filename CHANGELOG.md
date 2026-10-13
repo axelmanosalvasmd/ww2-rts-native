@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Replaced two inherited supply-test wallet copies with equivalent to_vec calls after Vostro's strict Clippy rejected the iterator spelling. Runtime and fixtures are unchanged. The prior aviation checkpoint passed nine debug tests and every release workspace test; renewed Clippy, formatting and FFI gates remain pending.
+
 - Fixed two aircraft AA test duration literals rejected by the first Vostro compilation. They now use Rust's required 0.05 spelling. Runtime and source fixtures are unchanged; no native tests ran before that compiler failure, and the renewed native proof remains pending.
 
 - Consumed the independently reviewed building-wreck lifecycle compile repair: this caller explicitly passes full-current membership, as the original source does. Ground support gates passed on the provider; this aviation/command continuation still awaits its own native proof.
