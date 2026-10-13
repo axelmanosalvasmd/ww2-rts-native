@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reused the World memory terrain-binding check before preparing removed cached-unit facts. Independent source review found same-sized foreign memory could otherwise be accepted; a matching-ID two-World rejection test protects the original memory and route allocations.
+
 - Recorded two original World recipient views holding two removed cached unit objects. Added focused retention drop, invalid-final-fact and success tests that preserve route allocation identities and World ledgers. Original x64 recorder equality passes; native execution remains pending.
 
 - Added prepared World cached-unit retention for ordered removal transactions. The guard validates current IDs/owners/kinds and finite final HP/pose, then updates only matching cached rows after deletion. Drop preserves memory, route buffers, visibility and cursors; elimination/wreck integration and native checks remain pending.

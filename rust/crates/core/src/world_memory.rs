@@ -140,6 +140,17 @@ pub struct WorldMemory {
     visible_cells: BTreeMap<i32, (Option<i64>, Vec<usize>)>,
 }
 impl WorldMemory {
+    pub(crate) fn validate_binding(&self, world: &World) -> Result<(), String> {
+        let binding = (
+            world.game.w,
+            world.game.h,
+            world.initial().chars.as_ptr() as usize,
+        );
+        if self.binding.is_some_and(|old| old != binding) {
+            return Err("World memory belongs to another terrain".into());
+        }
+        Ok(())
+    }
     pub fn team(&self, team: i32) -> Option<&TeamMemory> {
         self.teams.iter().find(|(t, _)| *t == team).map(|(_, m)| m)
     }
@@ -188,9 +199,7 @@ impl WorldMemory {
         let station_at = rails.station_at.iter().copied().collect::<BTreeMap<_, _>>();
         let g = &world.game;
         let binding = (g.w, g.h, world.initial().chars.as_ptr() as usize);
-        if self.binding.is_some_and(|b| b != binding) {
-            return Err("World memory belongs to another terrain".into());
-        }
+        self.validate_binding(world)?;
         let end = world.journal_end().map_err(|e| e.to_string())?;
         let key = (g.vision_tick, g.terrain_version, g.reveal);
         let same_key = self.team(team).is_some_and(|m| m.key == Some(key));

@@ -102,6 +102,36 @@ fn prepared_removed_objects_match_original_cached_world_views_without_refreshing
         })
         .collect();
     let refs: Vec<_> = finals.iter().collect();
+    let mut other = load(&json!({"startIndex":f["startIndex"],"mode":"world"}));
+    other.world.game.units.clear();
+    for row in f["units"].as_array().unwrap() {
+        let u = unit_spawn::initial_unit(
+            &other.rules,
+            Catalog::compiled().unwrap(),
+            other.rules.kind(row["kind"].as_str().unwrap()).unwrap(),
+            idx(&row["id"]) as u32,
+            idx(&row["owner"]),
+            Point {
+                x: row["x"].as_f64().unwrap(),
+                z: row["z"].as_f64().unwrap(),
+            },
+        )
+        .unwrap();
+        other.world.game.units.insert(u.id, u);
+    }
+    assert!(prepare_world_route_retention(context(&other), &mut memory, &refs).is_err());
+    for (p, expected) in m.world.game.players.iter().zip(&buffers) {
+        let n = memory.team(p.team).unwrap().query().navigation();
+        assert_eq!(
+            (
+                n.flags.as_ptr(),
+                n.heights.unwrap().as_ptr(),
+                n.versions.knowledge
+            ),
+            *expected
+        );
+    }
+
     let guard = prepare_world_route_retention(context(&m), &mut memory, &refs).unwrap();
     drop(guard);
     for owner in 0..2 {

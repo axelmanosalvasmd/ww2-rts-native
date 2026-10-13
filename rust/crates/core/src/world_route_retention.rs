@@ -41,6 +41,7 @@ pub fn prepare_world_route_retention<'a>(
     target: &'a mut WorldMemory,
     final_units: &[&Unit],
 ) -> Result<PreparedWorldRouteRetention<'a>, String> {
+    target.validate_binding(context.world)?;
     let first_owner = final_units.first().map_or(0, |u| u.owner);
     validate_world_context(context, target, first_owner)?;
     let mut owners = BTreeSet::from([first_owner]);
