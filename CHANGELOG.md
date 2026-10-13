@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Apply the reviewed 40-minute Rust CI limit to PR #157 after all three prior jobs explicitly exceeded 20 minutes. Keep every check and all commander runtime/fixtures unchanged; push a fresh combined head instead of retrying the cancelled run.
+
 - Bring merged server frontier main `a173dc7` into the bounded commander stack without changing commander bodies. Preserve additive design and changelog histories. The prior three-platform run stopped at the actual 20-minute job limit; a fresh matrix with the reviewed timeout correction remains required.
 
 - Refresh the bounded commander and provider stack onto main `13a8d1f`, retaining both reaction and logistics exports and their existing parity progress. Commander, Cover and source fixture bodies are unchanged from checked `be1cb2c`; the approved ABI 2 wrapper is identical to main. Earlier 25 debug and 227 release results remain attributed to `e7f1b1f`; fresh combined-head platform checks are pending. The human commander continuation remains separate.
@@ -367,6 +369,8 @@
 - Added recipient-local unit delta ledgers for changed rows, ordered removals, held fingerprints, full resync and start/reconnect resets. The original source oracle matches 68 traces and 409 frames, including actual recipient snapshots from all 33 authored maps. The ledger accepts already filtered rows and rejects malformed or duplicate rows before changing state. Independent source review is clear; native checks, snapshot production and room simulation remain pending.
 
 - Embedded all 33 original authored maps (1,349,980 JSON bytes) in a separate private server catalogue and added native match construction without Node, filesystem map reads or a reference checkout. Cached validated maps remain immutable; each match gets independent mutable world state. Original mines, materials and triggers are retained. Public map routes still use their filtered assets and refuse editor credential access to private data. Room simulation and generated World startup remain unfinished.
+- Allow 40 minutes for the full three-platform Rust CI job. The combined snapshot frontier reached World-memory tests with no assertion failures before its previous 20-minute limit cancelled all three jobs. Formatting, strict Clippy, the complete debug suite, release FFI build and Linux C replay remain required.
+
 - Refreshed the consolidated Rust frontier in PR #119 onto merged ABI 2 main `d88ef6d`. Preserved all core behavior, both changelog histories, the six approved recipient-view calls and the exact header. Only additive changelog entries conflicted; combined-tree platform checks are rerun on the refreshed head.
 
 - Added canonical Match ground reactions, automatic retreat and idle spacing using shared command destinations, owner-known routes, firing targets and combat hit history. Three focused tests pass in debug and release, comparing 51 unchanged-source reaction/retreat cases and checking atomic rejection. Only the missing reaction timer is added to UnitControl. Air, carrier and garrison retreat exits remain explicit unsupported paths. Complete tick hookup remains separate. Adapted routing to canonical ordered-fire iteration and filled absent reserve defaults in the merged command fixture. At checkpoint ab0394d, strict Clippy stopped on two unused helpers in its inherited firing milestone. Final merged checks are pending.

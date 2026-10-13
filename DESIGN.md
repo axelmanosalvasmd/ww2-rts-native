@@ -4,6 +4,8 @@ The plan, its evidence and its open work are issue #1. This file records what wa
 
 ## Bounded commander stack on main (2026-10-13)
 
+The reviewed workflow commit `76cbe6d` is now a normal-merge ancestor. The only workflow change increases the job limit from 20 to 40 minutes; matrix platforms, test commands, strict checks and failure reporting are unchanged. New platform results must belong to the refreshed head, rather than rerunning the cancelled old head.
+
 The subsequent normal merge of main `a173dc7` includes the consolidated server frontier from PR #137 and retains both additive documentation histories. It does not change commander or Cover implementation, source fixtures, the approved ABI 2 header or their ownership. Run `38444852199` at `778ca07` stopped on all three platforms during workspace tests; each job annotation explicitly reports the 20-minute maximum execution time. Completed test summaries are preliminary evidence, not acceptance of that cancelled run. The reviewed 40-minute workflow correction and a fresh combined-head matrix are required before merging.
 
 PR #157 normally incorporates main `13a8d1f` into the checked commander endpoint `be1cb2c`. The merge retains both reaction and logistics module exports, main's canonical `UnitControl.react` default and the progress already recorded for retreat and recovery. Commander policy, detached opening observation, Cover and their source fixtures remain byte-identical to the prior endpoint. The six approved ABI 2 calls, generated header and consumer contracts are identical to main; the reference stays at `e4e579a`.
@@ -1071,3 +1073,9 @@ This establishes the exercised quiet envelopes and their canonical provider inte
 ## Server component frontier integration (2026-10-13)
 
 PR #137 consolidates the recipient delta, list history, socket backpressure and host timing providers from #115, #124 and #128 onto main `13a8d1f`, which includes the approved ABI 2 and reviewed core frontier. The normal merge changes no server Rust source, recorder or fixture bytes. Only additive changelog entries conflicted; both histories are retained. The six approved recipient-view calls and generated header remain identical to main. The earlier 23 server debug and 173 workspace release tests are branch-local evidence; fresh combined-head Linux, Windows and macOS checks are pending. Room-loop callbacks, complete simulation, public match admission, wire and privacy decisions remain outside this component frontier.
+
+## Rust CI duration limit (2026-10-13)
+
+The combined snapshot frontier at 6a5d4d6 ran the full debug workspace suite on GitHub-hosted Ubuntu 24.04, Windows 2025 and macOS 15. Run 38443050411 reached the World-memory tests while earlier tests were still passing, then all three jobs were cancelled by the workflow's 20-minute limit. The preserved logs contain no assertion failure. A timeout is not evidence that the remaining tests pass.
+
+The job limit is now 40 minutes so the expanded suite can finish. The platform matrix, pinned toolchain, commands, failure policy and release C-link gate are unchanged. New heads still need fresh checks. GitHub's job timeout setting cancels work at its limit; it does not impose a minimum run duration (https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idtimeout-minutes).
