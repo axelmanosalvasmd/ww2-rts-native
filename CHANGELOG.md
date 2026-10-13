@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Added a source-written full-step ground-support replay consumer for the actual composed Match runner. It compares 12 Conquest traces, 2,660 ticks and 144 checkpoints, protects source-silent ticks and captured unit membership, and verifies canonical timers/effects/terrain/story/IDs and OffMap draw state. The Source Default case remains an explicit read-only runner refusal; its lower-level support component evidence is retained. Fixtures, the sole caller and Match RNG are unchanged. Native verification remains pending.
+- Added a source-written full-step ground-support replay consumer for the actual composed Match runner. It compares 12 Conquest traces, 2,660 ticks and 144 checkpoints, protects source-silent health, pose, identity, story and random state plus captured unit membership, and verifies canonical timers/effects/terrain/story/IDs and OffMap draw state. The Source Default case remains an explicit read-only runner refusal; its lower-level support component evidence is retained. A read-only source observation audit confirms 5,104 quiet-tick health/pose/ID/story/OffMap-state checks across sampled and unsampled original runs. Fixtures, the sole caller and Match RNG are unchanged. Native verification remains pending.
 - Normal-merged the reviewed test-only reaction observation repairs into the separate ground-support continuation, preserving the actual support caller and aircraft refusal regression. Combined native proof remains pending.
 
 - Defined the old-clock command boundary once in the new ground-support caller, reusing it for dispatch and post-command validation. Source review caught the missing local variable before any native build.

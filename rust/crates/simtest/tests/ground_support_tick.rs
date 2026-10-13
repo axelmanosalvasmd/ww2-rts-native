@@ -6,6 +6,15 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 use ww2_core::{match_commands::Command, match_tick::TickPhase, orders::OrderKey};
 
+fn quiet_state(m: &ww2_core::match_runtime::Match) -> Value {
+    serde_json::json!({
+        "units":m.world.game.units.values().map(|u|serde_json::json!([u.id,u.x,u.z,u.rot,u.hp])).collect::<Vec<_>>(),
+        "nextId":m.next_unit_id,
+        "story":m.story.iter().map(|s|serde_json::json!([s.kills,s.losses,s.built,s.captures,s.mp_spent,s.support_calls,s.planes_downed])).collect::<Vec<_>>(),
+        "random":m.start.random.snapshot().streams.iter().map(|(k,s)|format!("{k:?}:{s:016x}")).collect::<Vec<_>>()
+    })
+}
+
 #[test]
 fn actual_ground_support_ticks_match_source_effects_and_lifetimes() {
     let fixture = common::fixture();
@@ -36,6 +45,7 @@ fn actual_ground_support_ticks_match_source_effects_and_lifetimes() {
         )
         .unwrap();
         let mut signature = common::signature(&m);
+        let mut quiet = quiet_state(&m);
         for tick in 1..=trace["spec"]["ticks"].as_u64().unwrap() {
             assert!(
                 m.support.events.is_empty(),
@@ -58,6 +68,8 @@ fn actual_ground_support_ticks_match_source_effects_and_lifetimes() {
                 "{name}:{tick}: captured late membership"
             );
             assert_eq!(report.unit_order, [1]);
+            assert_eq!(m.grid.owned_by(&m.world.game.units, 0), Vec::<u32>::new());
+            assert_eq!(m.grid.owned_by(&m.world.game.units, 1), [1]);
             assert!(report.environment.is_empty() && report.retired.is_empty());
             assert!(
                 m.firing.events.is_empty(),
@@ -90,6 +102,7 @@ fn actual_ground_support_ticks_match_source_effects_and_lifetimes() {
             }
             let events = common::events(&mut m);
             let next_signature = common::signature(&m);
+            let next_quiet = quiet_state(&m);
             if let Some(expected) = frames.get(&tick) {
                 common::compare(
                     &m,
@@ -109,8 +122,13 @@ fn actual_ground_support_ticks_match_source_effects_and_lifetimes() {
                     next_signature, signature,
                     "{name}:{tick}: unsampled lifetime/membership transition"
                 );
+                assert_eq!(
+                    next_quiet, quiet,
+                    "{name}:{tick}: unexpected quiet-tick health/pose/ID/story/random mutation"
+                );
             }
             signature = next_signature;
+            quiet = next_quiet;
             ticks += 1;
         }
         assert_eq!(m.commands.pending_commands(), 0);
