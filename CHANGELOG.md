@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added a standalone combat damage and suppression component with catalog-backed role, armor, veterancy, retreat and threat rules. Six focused tests compare 3,828 original JavaScript cases and actual mutation order, including health, XP, death impulse, hit memory and rider requests. The component returns ordered effects for later integration; it does not fire weapons, sample terrain cover, place riders, remove dead units or change the ABI. Documented the source's zero-damage effects, building modifier replacement and missing-rider cargo behavior, with the affected combat rows still in progress.
+
 - Recorded the ground-vehicle pathfinding design, exact fixture coverage and remaining integration work for issue #34. MOV-27 and MOV-28 are now in progress; the earlier infantry/naval stage remains documented.
 
 - Added ground-vehicle fine pathfinding for all 12 non-rail vehicle types. The search uses conservative turning clearance, exact destination clearance, road-aware costs and smoothing, and current wear, wetness and hazards from the supplied terrain. The existing oracle suite now matches 1,529 pinned JavaScript searches, including all 1,175 previous infantry/naval results and 354 vehicle cases. A cache regression checks reuse, direct and historical terrain edits in their original order, missing-history rebuilds, recipient changes and source replacement at unchanged versions. Aircraft, trains, structures, automatic recipient-view selection, request scheduling and movement integration remain outside this slice. No ABI or wire interface changed.
