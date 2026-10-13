@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Split the existing ability fixture control projection into a local JSON value to fit the macro recursion limit when the engineering library tests compile. The represented fields and expected fixture values are unchanged.
+
 - Repaired the engineering union compiler boundaries: recruitment errors use the existing public re-export, section retirement supplies the source full-list ordering option, and recovery validates optional section maxima before arithmetic. The first native compile exposed these inherited mismatches; the coupled proof is restarting at the repaired checkpoint.
 
 - Corrected the engineering replay to the coordinated command constructor and checked excluded work through parse plus dispatch. Queued digs and known excluded forts are represented inputs whose dispatcher returns unsupported. Native execution remains pending.
