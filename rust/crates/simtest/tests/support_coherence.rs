@@ -1,3 +1,4 @@
+#![recursion_limit = "256"]
 //! Original support/aircraft component calls, with persistent canonical native owners.
 //! This does not run or certify a complete Match tick. SourceRest remains in the oracle.
 //! The source-only random draw counter is retained; the actual OffMap state is compared.
@@ -34,7 +35,12 @@ fn point(at: Point) -> Value {
 fn compare(actual: &Value, expected: &Value, path: &str) {
     match expected {
         Value::Number(_) => assert_eq!(
-            actual.as_f64().unwrap().to_bits(),
+            actual
+                .as_f64()
+                .unwrap_or_else(|| panic!(
+                    "{path}: expected numeric Source value, Native was {actual}"
+                ))
+                .to_bits(),
             expected.as_f64().unwrap().to_bits(),
             "{path}"
         ),
@@ -244,7 +250,7 @@ fn projection(m: &Match, fog: &mut Fog, shots: &[Value]) -> Value {
         assert!(c.orders.is_empty(), "this source component scene has no queued commands");
         assert!(u.motion_before.is_none() && u.clearance.is_none() && u.traffic.is_none() && u.lane_scan.is_none());
         assert!(combat.death_impulse.is_none());
-        let rest = json!({"motionBefore":null,"motionClearance":null,"trafficTrail":u.traffic_trail.iter().map(|p|json!({"x":p.x,"z":p.z,"rot":p.rot})).collect::<Vec<_>>(),"trafficEntered":u.traffic_entered,"queuedBehind":u.queued_behind,"laneScan":null,"routeEnd":c.route_end.map(point),"pace":bits(u.pace),"ghost":bits(u.ghost),"build":u.build,"guardHome":c.guard_home.map(point),"deathImpulse":null,"atHit":combat.at_hit.map(bits),"dust":u.dust.map(bits),"cells":u.cells,"supplyEscape":c.supply_escape,"supplyHold":c.supply_hold});
+        let rest = json!({"motionBefore":null,"motionClearance":null,"trafficTrail":u.traffic_trail.iter().map(|p|json!({"x":p.x,"z":p.z,"rot":p.rot})).collect::<Vec<_>>(),"trafficEntered":u.traffic_entered,"queuedBehind":u.queued_behind,"laneScan":null,"routeEnd":c.route_end.map(point),"pace":if u.pace.is_nan() { Value::Null } else { bits(u.pace) },"ghost":bits(u.ghost),"build":u.build,"guardHome":c.guard_home.map(point),"deathImpulse":null,"atHit":combat.at_hit.map(bits),"dust":u.dust.map(bits),"cells":u.cells,"supplyEscape":c.supply_escape,"supplyHold":c.supply_hold});
         let reserves = m.logistics.get(u.id).map(|r|json!({"ammo":r.ammo,"ammoMax":r.ammo_max,"ammoPrice":r.ammo_price,"ammoCredit":r.ammo_credit,"provisions":r.provisions,"fuel":r.fuel,"emergency":r.emergency,"warning":r.warning,"forced":r.forced,"stranded":r.stranded,"exhausted":r.exhausted,"supplyRate":r.supply_rate,"cutFor":r.cut_for}));
         json!({"id":u.id,"kind":m.rules.kinds[u.kind].name,"owner":u.owner,"x":bits(u.x),"z":bits(u.z),"rot":bits(u.rot),"aim":bits(c.aim),"moveSpeed":bits(u.move_speed),"vx":u.vx.map(bits),"vz":u.vz.map(bits),"travelDir":u.travel_dir.map(bits),"hp":bits(u.hp),"supp":bits(u.supp),"cooldown":bits(firing.cooldown),"still":u.still.map(bits),"retarget":bits(firing.retarget),"repath":bits(u.repath),"stuck":bits(u.stuck),"cd":bits(ability.cooldown),"buff":bits(ability.buff),"ap":ability.ap,"reinf":bits(recovery.reinforcement),"hpWas":recovery.hp_was.map(bits),"woundAt":recovery.wound_at.map(|v|bits(v as f64)),"healAt":recovery.heal_at.map(|v|bits(v as f64)),"xp":bits(combat.xp),"sprint":bits(u.sprint),"hitAt":bits(combat.hit_at),"aaShot":aa.shot.map(bits),"aaReserve":aa.reserve.map(bits),"path":u.path.iter().copied().map(point).collect::<Vec<_>>(),"orders":[],"attackId":c.attack_id,"targetId":firing.target_id,"nade":c.nade.map(point),"retreating":u.retreating,"dig":u.dig,"garrison":u.garrison.map_or(-1,|v|v as i64),"enter":c.enter.map_or(-1,|v|v as i64),"board":u.board,"amove":u.amove.map(point),"face":c.face.map(|f|json!({"a":f.angle,"x":f.at.x,"z":f.at.z})),"fireAt":c.fire_at.map_or(-1,|v|v as i64),"riding":combat.carrier.unwrap_or(0),"cargo":combat.cargo,"hitBy":combat.hit_by,"hitFrom":u.hit_from.map(point),"drift":u.drift,"reverse":u.reverse.map(point),"auto":c.auto_cast,"autoRetreat":c.auto_retreat,"holdFire":c.hold_fire,"holdPos":u.hold_pos,"follow":c.follow,"lastHit":combat.last_hit,"downed":a.is_some_and(|a|a.downed),"traffic":null,"trafficWait":bits(u.traffic_wait),"moveOutcome":c.outcome.map(|o|match o {MoveOutcome::Interrupted=>"interrupted",MoveOutcome::Moving=>"moving",MoveOutcome::Unreachable=>"unreachable",MoveOutcome::Arrived=>"arrived"}),"moveOutcomeTick":c.outcome_tick,"worldGoal":u.world_goal.map(point),"entrench":u.entrench,"built":u.built,"shotAt":u.shot_at.map(bits),"logistics":reserves,"air":a.map(|a|json!({"state":state_name(u.air.unwrap()),"fuel":bits(a.fuel),"ammo":bits(a.ammo),"timer":bits(a.timer),"ang":bits(a.orbit),"mission":a.mission.map(|p|json!({"kind":p.kind.name(),"id":p.target.unwrap_or(0),"x":bits(p.at.x),"z":bits(p.at.z)}))})),"sourceRest":rest})
     }).collect::<Vec<_>>();
@@ -379,8 +385,9 @@ fn expected_projection(source: &Value) -> Value {
         if u["follow"].is_null() {
             u["follow"] = json!(0);
         }
-        if u["trafficWait"].is_null() {
-            u["trafficWait"] = bits(0.0);
+        u["trafficWait"] = bits(u["trafficWait"].as_f64().unwrap_or(0.0));
+        if !u["shotAt"].is_null() {
+            u["shotAt"] = bits(u["shotAt"].as_f64().unwrap());
         }
         let mut rest = select(
             &u["sourceRest"],
@@ -415,13 +422,19 @@ fn expected_projection(source: &Value) -> Value {
         if rest["queuedBehind"].is_null() {
             rest["queuedBehind"] = json!(0);
         }
-        for key in ["pace", "ghost"] {
-            rest[key] = if rest[key].is_null() {
-                bits(0.0)
-            } else {
-                bits(rest[key].as_f64().unwrap())
-            };
+        // The shared factory deliberately uses NaN for Source's undefined pace.
+        // Preserve absence; a present Source pace still compares its exact floating bits.
+        if !rest["atHit"].is_null() {
+            rest["atHit"] = bits(rest["atHit"].as_f64().unwrap());
         }
+        if !rest["pace"].is_null() {
+            rest["pace"] = bits(rest["pace"].as_f64().unwrap());
+        }
+        rest["ghost"] = if rest["ghost"].is_null() {
+            bits(0.0)
+        } else {
+            bits(rest["ghost"].as_f64().unwrap())
+        };
         u["sourceRest"] = rest;
     }
     value

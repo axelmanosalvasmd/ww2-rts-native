@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Normally incorporated the verified coherent support provider successor into the separate aircraft caller. Runtime support remains identical to the reviewed 817b96d body; its actual test-only compiler/numeric repairs and evidence are retained. Shared caller metadata guards and new scheduling remain separate, with combined native verification pending.
+
 - Preserved complete support cooldown-key and player/cover team admission while attaching general AIR support. Independent review found that dropping the old ground metadata bindings could consume queued input before a missing cooldown failed. Both the legacy ground helper and new caller use one read-only metadata guard; whole-boundary malformed-key/team regressions retain clock, keys, wallets, state and timers. Native assembly checks remain pending.
 
 - Connected source-reviewed aircraft turns and canonical off-map support to the single ordinary tick caller in a separate source assembly. Aircraft continue before ground timers/work/riding; late captured strikes run before one Aviation AA pass and one cover/cooldown decay. Queue-boundary and post-command state guards remain distinct. Replaced the old bombing-refusal test with actual queue/payment/timer assertions because that capability is now attached; combined native proof is pending.
@@ -345,6 +347,20 @@
 - Rejected smoke allocator collisions with current live units before any selected-unit effect, extending the existing mixed-selection identity regression. Native proof remains pending.
 
 - Connected manual aimed replacement to real paid field-work cancellation without a refund, and rejected unrepresented build or mass-entrench projects before control writes. The original ability recorder now has 36 traces (157 actions), with a separate unsupported-project boundary and a written cancellation regression. Native proof remains pending.
+- Verified the coherent off-map provider on Mac Apple Silicon at code `eaf358c`: all 223 locked release workspace tests, strict workspace/all-target Clippy, formatting and release FFI build pass. Affected debug evidence is split: 25 tests at `e5a954a` plus the corrected coupled replay at `eaf358c`, with unchanged production code. The replay matches 4 original scenes, 1,603 checkpoints and 432 read-only preclock guards. Native fixes concerned test macro compilation and absent/numeric readback only. Full AIR caller and current mass-support migration remain separate.
+
+- Corrected the coupled replay's source-number encoding after the labelled native failure reached a present traffic wait value. Present traffic wait and optional shot/anti-tank-hit ticks now use the same exact-bit comparison as their native fields; absent optional ticks stay absent. Runtime and original Source fixtures are unchanged.
+
+- Added the field path and native value to the coupled replay's numeric type failure, after the next native run reached an unlabelled comparison unwrap. All bit comparisons and Source expectations remain unchanged.
+
+- Corrected the coupled replay's unset-pace readback after its first native execution. The shared unit factory deliberately uses NaN for the prototype's undefined pace; the comparison now preserves that absence while keeping exact bits for present values. Production code and the original Source fixture remain unchanged.
+
+- Set the support-coherence integration test's macro recursion limit to 256, as recommended by the actual compiler failure. Restored the exact original flat projection after two insufficient factoring attempts; the limit affects test compilation only, with no production, Source fixture or assertion changes.
+
+- Factored aircraft and mission readback out of the support actor projection after the native retry located a remaining nested JSON macro expansion limit. This is a test-only compiler repair with identical fields and Source expectations.
+
+- Split the support-coherence replay's actor JSON projection into bounded objects after its first native compilation exceeded the macro recursion limit. All compared fields, production code and Source fixtures remain unchanged.
+
 - Migrated the inherited recorded-gameplay replay's strike readback to canonical `Game.strikes` and exact support timing. The Source recorder and expected fixture are unchanged; this removes the old `SupportState.strikes` interface from the coherent provider's tests.
 
 - Reject stale aviation/AA metadata at shared smoke/drop IDs before support advances or publishes Para actors. Independent review found that an orphan AA cadence could otherwise attach to a fresh ground actor; the no-write regression now covers this owner.
