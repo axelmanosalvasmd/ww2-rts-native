@@ -153,9 +153,6 @@ impl StartPlan {
         if !options.living_weather && options.weather != WeatherChoice::Map {
             return Err("disabled living weather requires the map weather choice".into());
         }
-        if options.logistics {
-            return Err("native startup does not yet initialize logistics".into());
-        }
         if !(1..=6).contains(&options.players.len())
             || options.players.iter().any(|p| p.team < 0 || p.team >= 6)
         {
@@ -521,10 +518,10 @@ pub struct BuildingCell {
 /// Live terrain and units have a single owner in `world.game`.
 pub struct Match {
     pub assault: Option<crate::assault_runtime::AssaultState>,
+    pub commands: crate::match_commands::MatchCommands,
     pub world_runtime: Option<crate::match_world::WorldRuntime>,
     pub combat: crate::match_combat::CombatState,
     pub environment: crate::environment::EnvironmentRuntime,
-    pub commands: crate::match_commands::MatchCommands,
     pub world: World,
     pub start: StartPlan,
     pub options: MatchOptions,
@@ -539,6 +536,9 @@ pub struct Match {
     pub(crate) produced_placer: crate::produced_units::ProducedPlacer,
     pub scenario: Option<crate::legacy_scenario::LegacyScenario>,
     pub logistics: crate::logistics::LogisticsState,
+    pub convoys: Option<crate::supply_convoys::ConvoyState>,
+    pub supply_net: crate::supply_network::GroundSupplyNetwork,
+    pub(crate) supply_routes: crate::supply_routes::SupplyRouting,
     pub firing: crate::match_firing::FiringState,
     pub capture_ticks: Vec<Option<i64>>,
     pub tick_state: crate::match_tick::TickState,
@@ -598,10 +598,10 @@ impl Match {
         let point_count = start.points.len();
         let result = Self {
             assault: None,
+            commands: crate::match_commands::MatchCommands::new(4096),
             world_runtime: None,
             combat: crate::match_combat::CombatState::default(),
             environment: crate::environment::EnvironmentRuntime::default(),
-            commands: crate::match_commands::MatchCommands::new(4096),
             grid: SpatialGrid::new(&world.game.units, 16.0),
             recipients: Vec::new(),
             routing_fog: crate::fog::Fog::default(),
@@ -616,6 +616,9 @@ impl Match {
             produced_placer: crate::produced_units::ProducedPlacer::new(),
             scenario,
             logistics: crate::logistics::LogisticsState::default(),
+            convoys: None,
+            supply_net: crate::supply_network::GroundSupplyNetwork::default(),
+            supply_routes: crate::supply_routes::SupplyRouting::default(),
             firing: crate::match_firing::FiringState::default(),
             capture_ticks: vec![None; point_count],
             tick_state: crate::match_tick::TickState::default(),
@@ -642,6 +645,7 @@ impl Match {
         self.grid.rebuild(&self.world.game.units);
         if self.world.game.mode.is_none() {
             self.initialize_recipient_routing()?;
+            self.initialize_logistics()?;
         }
         Ok(())
     }

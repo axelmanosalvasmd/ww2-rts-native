@@ -202,6 +202,9 @@ impl Match {
         options: MatchOptions,
         random: MatchRandom,
     ) -> Result<Self, String> {
+        if options.logistics {
+            return Err("World startup does not yet initialize logistics".into());
+        }
         if options.mode != Mode::World || map.geography().is_none() {
             return Err("World startup requires explicit World geography and mode".into());
         }
@@ -307,6 +310,9 @@ impl Match {
             produced_placer: crate::produced_units::ProducedPlacer::new(),
             scenario: None,
             logistics: crate::logistics::LogisticsState::default(),
+            convoys: None,
+            supply_net: crate::supply_network::GroundSupplyNetwork::default(),
+            supply_routes: crate::supply_routes::SupplyRouting::default(),
             capture_ticks: Vec::new(),
             story: vec![crate::match_story::PlayerStory::default(); count],
             fallen: crate::match_story::FallenLocations::default(),

@@ -242,6 +242,11 @@ fn original_match_buy_placement_path_and_grid() {
                                 Some(&ww2_core::match_combat::UnitCombat::default()),
                                 "recruits must enter combat with canonical default metadata"
                             );
+                            assert_eq!(
+                                m.firing.get(done.unit),
+                                Some(&ww2_core::match_firing::FiringUnit::default()),
+                                "recruits must publish canonical target and timer defaults"
+                            );
                             let u = &m.world.game.units[&done.unit];
                             let control = &m.commands.units[&done.unit];
                             let failed = done.route_status == Some(PathStatus::Unreachable);
@@ -267,7 +272,7 @@ fn original_match_buy_placement_path_and_grid() {
     assert!(admitted > 0 && failed_paths > 0);
 }
 fn unchanged(m: &Match) -> Value {
-    json!({"next":m.next_unit_id,"money":m.start.economy.players.iter().map(|p|bits(p.mp)).collect::<Vec<_>>(),"units":m.world.game.units.keys().collect::<Vec<_>>(),"metadata":format!("{:?}",m.recruit_metadata),"controls":format!("{:?}",m.commands.units),"unit_state":format!("{:?}",m.world.game.units),"wallets":format!("{:?}",m.start.economy),"grid":m.grid.in_order(&m.world.game.units,(0.0,0.0),1000.0,|_,_|true)})
+    json!({"next":m.next_unit_id,"money":m.start.economy.players.iter().map(|p|bits(p.mp)).collect::<Vec<_>>(),"units":m.world.game.units.keys().collect::<Vec<_>>(),"metadata":format!("{:?}",m.recruit_metadata),"firing":format!("{:?}",m.firing),"controls":format!("{:?}",m.commands.units),"unit_state":format!("{:?}",m.world.game.units),"wallets":format!("{:?}",m.start.economy),"grid":m.grid.in_order(&m.world.game.units,(0.0,0.0),1000.0,|_,_|true)})
 }
 #[test]
 fn malformed_or_unsupported_staging_never_publishes() {
@@ -342,4 +347,12 @@ fn malformed_or_unsupported_staging_never_publishes() {
     assert_eq!(unchanged(&m), before);
     m.world.game.strikes[0].kind = StrikeKind::Recon;
     assert!(m.recruit(0, "rifle", None, false, None).is_ok());
+    m.player_rallies[0] = None;
+    m.firing.initialize(m.next_unit_id);
+    let before = unchanged(&m);
+    assert!(matches!(
+        m.recruit(0, "rifle", None, false, None),
+        Err(RecruitError::InvalidState(_))
+    ));
+    assert_eq!(unchanged(&m), before);
 }
