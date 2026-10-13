@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Removed the stale source-only label from the verified reaction parity note. Only documentation changed from tested e14cde9.
+
 - Verified the ordinary reaction tick assembly on Vostro (Linux x86_64): 64 affected debug tests, all 227 workspace release tests, strict Clippy, formatting and release FFI pass at e14cde9. Independent source review and 19 original-step traces (2,474 ticks, 354 checkpoints) pass, including paid-work cancellation and repaired retreat completion. Ground support and mass-project descendants retain separate pending native proof; server match start remains refused.
 
 - Normal-merged the operative documentation closure into reaction evidence. No Rust, harness or fixture changed from tested reaction head e14cde9.
