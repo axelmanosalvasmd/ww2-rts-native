@@ -170,13 +170,18 @@ fn canonical_world_result_stays_decided_and_source_story_stays_frozen() {
     m.world.game.tick = 200;
     m.apply_world_capture_income(&[], 0.0).unwrap();
     let result = m.match_result().unwrap().unwrap();
-    let before = protected(&m);
-    assert!(m.apply_world_capture_income(&[], 0.05).is_err());
+    let finish = m.finish;
+    let timeline = m.timeline.clone();
+    let story = m.story.clone();
+    m.apply_world_capture_income(&[], 0.05).unwrap();
     assert!(!m.sample_match_tick().unwrap());
     m.record_spending(0, 100.0).unwrap();
-    assert_eq!(protected(&m), before);
+    assert_eq!(m.finish, finish);
+    assert_eq!(m.timeline, timeline);
+    assert_eq!(m.story, story);
+    assert!(m.world.game.reveal);
     assert_eq!(m.match_result().unwrap().unwrap(), result);
-    // Later World tick continuation and result transport remain outside this undecided actuator.
+    // The explicit World phase continues; a complete closing tick is still caller-owned.
 }
 
 fn number_bits(v: &Value) -> f64 {

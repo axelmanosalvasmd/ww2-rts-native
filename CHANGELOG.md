@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Allow the same bounded World income and region phases to continue after a valid canonical finish. Admission validates terminal metadata, reveal and clock provenance; region captures leave timestamps and story frozen while income, homes and administrative elimination continue. Replaced the old finished-phase refusal test with first-result and story preservation. Original closing-phase comparison and native proof are pending.
+
 - Clarified that the new split World phase fixture leaves the existing controller fixture unchanged. Runtime and checked test bytes are unchanged.
 
 - Verified the split World phase provider at `4ba02e9`: all 34 affected debug tests and 211 locked release workspace tests pass, with strict Clippy, formatting and release FFI. Six original scenes compare 20 final captured objects. No repairs were needed; full World ticking, convoy execution and historical retirement tracking remain separate.

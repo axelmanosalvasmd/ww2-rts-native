@@ -31,10 +31,15 @@ impl From<&Unit> for WorldIncomeUnit {
         }
     }
 }
+/// Ephemeral validated policy. The canonical result determines whether story counts.
+pub(crate) struct WorldPhaseContext {
+    pub regions: Vec<economy::Region>,
+    pub decided: bool,
+}
 impl Match {
     /// Publish only income. Regions, homes, story and armies are not advanced here.
     /// Current depots are read separately from the captured upkeep facts.
-    /// This does not admit World logistics, a closing hold or a complete World tick.
+    /// Valid decided World still pays income. This does not run a closing hold or a full tick.
     pub fn apply_world_income(
         &mut self,
         captured: &[WorldIncomeUnit],
@@ -48,15 +53,12 @@ impl Match {
     pub(crate) fn validate_world_phase_context(
         &self,
         dt: f64,
-    ) -> Result<Vec<economy::Region>, String> {
+    ) -> Result<WorldPhaseContext, String> {
         if self.options.mode != Mode::World
             || self.world.game.mode != Some(ModeKind::World)
             || self.options.logistics
-            || self.finish.is_some()
         {
-            return Err(
-                "World region phase requires undecided World with logistics disabled".into(),
-            );
+            return Err("World region phase requires World with logistics disabled".into());
         }
         if !dt.is_finite() || dt < 0.0 {
             return Err("invalid World phase dt".into());
@@ -108,7 +110,16 @@ impl Match {
                 return Err("invalid World phase unit".into());
             }
         }
-        Ok(regions)
+        let decided = self.finish.is_some();
+        if let Some(finish) = self.finish {
+            // Finish preparation returns early once decided, so admission must still
+            // validate its canonical metadata before any continuing phase publication.
+            self.validate_match_finish_state()?;
+            if finish.end_tick > game.tick || !game.reveal {
+                return Err("invalid decided World finish provenance".into());
+            }
+        }
+        Ok(WorldPhaseContext { regions, decided })
     }
 
     pub(crate) fn current_world_income_units(
@@ -137,7 +148,7 @@ impl Match {
         captured: &[WorldIncomeUnit],
         dt: f64,
     ) -> Result<economy::EconomyState, String> {
-        let regions = self.validate_world_phase_context(dt)?;
+        let context = self.validate_world_phase_context(dt)?;
         let game = &self.world.game;
         let mut seen = BTreeSet::new();
         for unit in captured {
@@ -210,7 +221,9 @@ impl Match {
                     drops: &[],
                     points: &[],
                     nodes: &nodes,
-                    world: Some(economy::WorldContext { regions: &regions }),
+                    world: Some(economy::WorldContext {
+                        regions: &context.regions,
+                    }),
                 },
                 &current_depots,
                 dt,

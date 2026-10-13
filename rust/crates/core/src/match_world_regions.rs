@@ -87,7 +87,7 @@ impl Match {
         if let Some(order) = live_order {
             self.validate_world_live_order(order)?;
         }
-        self.validate_world_phase_context(dt)?;
+        let context = self.validate_world_phase_context(dt)?;
         let mut wallets = if let Some(order) = income_order {
             let captured = self.current_world_income_units(order)?;
             self.prepare_world_income(&captured, dt)?
@@ -178,7 +178,9 @@ impl Match {
                 if r.progress >= 1.0 {
                     r.team = team;
                     r.capper = None;
-                    r.cap_tick = Some(game.tick);
+                    if !context.decided {
+                        r.cap_tick = Some(game.tick);
+                    }
                     for fort in game.units.values().filter(|u| {
                         u.hp > 0.0
                             && ["pillbox", "tower", "wall", "gate"]
@@ -287,7 +289,7 @@ impl Match {
                 .transaction
                 .prepare_publication(&mut self.world)
                 .map_err(|e| e.to_string())?;
-            let story = prepare_story_updates(&mut self.story, false, &changes)?;
+            let story = prepare_story_updates(&mut self.story, context.decided, &changes)?;
             // Every fallible guard has succeeded. Publish the single canonical owners in place.
             publication.commit();
             self.environment = draft.environment;
@@ -307,7 +309,7 @@ impl Match {
             report.removed = draft.removed;
             report.effects = draft.effects;
         } else {
-            let story = prepare_story_updates(&mut self.story, false, &changes)?;
+            let story = prepare_story_updates(&mut self.story, context.decided, &changes)?;
             self.world_runtime
                 .as_mut()
                 .expect("checked World runtime")
