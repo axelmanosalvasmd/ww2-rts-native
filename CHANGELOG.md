@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Load recorded artillery crater levels into the recipient-effects consumer through canonical World mutations. The original map starts flat, but Source allocates mutable heights at tick 101, so the tick-102 boundary correctly carries cell 2023 at level -1. Remove the obsolete flatness assertion, preserve immutable initial terrain and fog history, and retain every original output/refusal assertion. The failed d7eb0c7 native attempt remains recorded; fresh validation is pending.
+
 - Preserve one Match and its canonical fog query history per recipient-effects trace. Reload recorded public boundary inputs and use a disposable base-field query before complete-frame admission, including the live-flight refusal boundary. The fresh-per-boundary consumer lost the departed shooter's same-vision-tick fog circle, producing zero contact rows where Source produced one. Keep all original fixtures, comparisons and refusal witnesses; fresh native validation remains pending.
 
 - Set the recipient-effects test crate's macro recursion limit to 256 for its complete existing unit snapshot. The compiler reached the default expansion limit; every field, assertion and original fixture is retained. Production runtime and stack limits are unchanged.

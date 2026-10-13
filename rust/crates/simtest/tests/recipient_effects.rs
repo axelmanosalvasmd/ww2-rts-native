@@ -210,6 +210,30 @@ fn reload(state: &mut Match, source: &Value) {
             state.world.set_cell(cell, ch).unwrap();
         }
     }
+    // Source artillery creates a mutable height grid after the flat startup.
+    // Import only changed levels through World, retaining initial terrain/Fog.
+    if terrain["height"].is_null() {
+        assert!(state.world.game.height.is_none());
+    } else {
+        let heights: Vec<i8> = expand(&terrain["height"])
+            .iter()
+            .map(|v| {
+                let height = n(v);
+                assert!((-2.0..=4.0).contains(&height));
+                let level = height as i8;
+                assert_eq!(f64::from(level).to_bits(), height.to_bits());
+                level
+            })
+            .collect();
+        assert_eq!(heights.len(), state.world.game.chars.len());
+        for (cell, height) in heights.iter().copied().enumerate() {
+            if state.world.game.height.as_ref().map_or(0, |h| h[cell]) != height {
+                state.world.set_level(cell, height).unwrap();
+            }
+        }
+        assert_eq!(state.world.game.height.as_deref(), Some(heights.as_slice()));
+    }
+    assert!(state.world.initial().height.is_none());
     // Trusted boundary facts use canonical World mutation for letters and public
     // typed scalar storage. No expected recipient rows or random stream are installed.
     state.world.game.flags = expand(&terrain["flags"])
@@ -228,7 +252,6 @@ fn reload(state: &mut Match, source: &Value) {
         .map(|v| id(v) as u8)
         .collect();
     state.world.game.terrain_version = id(&terrain["versions"][0]);
-    assert!(terrain["height"].is_null(), "these original maps are flat");
     state.world.fires.clear();
     for row in source["environment"]["fires"].as_array().unwrap() {
         state.world.fires.insert(id(&row[0]) as usize, n(&row[1]));
