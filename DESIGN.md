@@ -600,3 +600,11 @@ The server now embeds the 33 original authoring documents in a catalogue separat
 The private generator verifies the exact clean reference pin and preserves every original JSON property, including mines, materials, triggers and scenario metadata. The public generator still calls `mapForClient`. HTTP routes can only use their own public index, including when an editor header is present. Embedding private authoring data is server packaging, not a new client contract or raw editor endpoint.
 
 Tests construct a Conquest Match from every authored map, retain the 246 El Alamein mine cells and original triggers, and verify that mutation in one match changes neither a second match nor its cached source. The existing public-map checks and live HTTP harness remain the delivery/privacy evidence. This does not enable room simulation, logistics startup, generated World matches, saves or editor writes.
+
+## Recipient unit delta ledger (2026-10-13)
+
+The server owns one ledger per recipient stream. It consumes already filtered scalar unit rows and preserves the pinned `unitDelta` comparison and insertion-order removals. JSON integer and floating-point spellings compare as JavaScript numbers; held XOR is signed 32-bit. A shorter row with an otherwise identical prefix retains the source's quiet-delta behavior. A full request still replaces that row. The ledger owns its copies, so caller mutation cannot change previously sent state.
+
+Whole-frame validation runs before any ledger mutation or resync consumption. Duplicate IDs, nonscalar columns and malformed IDs return errors. The ordinary start/reconnect reset clears held rows; the owner can then request full when the source role requires it. This primitive neither chooses visibility nor starts rooms. It does not implement shared wreck/node list versions, backpressure, terrain/fog production, role permission or the snapshot transport.
+
+The original-source recorder passes 68 traces and 409 frames. Sixty-six traces consume actual seat snapshots from all 33 authored maps; two cover insertion history, signed XOR, full empty frames, reset and scalar tails. Independent source review and a separate recorder rerun are clear. Native verification remains pending.

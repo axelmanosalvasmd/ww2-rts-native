@@ -1,5 +1,6 @@
 //! Lobby transport and private native match construction. Room simulation is not enabled.
 pub mod authoritative_maps;
+pub mod snapshot_delta;
 mod lobby;
 mod maps;
 
