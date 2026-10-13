@@ -107,7 +107,7 @@ impl Match {
         if game
             .strikes
             .iter()
-            .any(|s| s.kind == StrikeKind::Other && !s.live)
+            .any(|s| s.kind == StrikeKind::Other && !s.live && s.runtime.is_none())
         {
             return Err(RecruitError::InvalidState(
                 "pending support needs exact kind metadata",
@@ -134,10 +134,9 @@ impl Match {
         let drops: Vec<_> = game
             .strikes
             .iter()
-            .filter(|s| s.kind == StrikeKind::Recon)
             .map(|s| PendingDrop {
                 owner: s.owner,
-                kind: "recon",
+                kind: s.runtime.as_ref().map_or("recon", |t| t.kind.name()),
                 live: s.live,
             })
             .collect();

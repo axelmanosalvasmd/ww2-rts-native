@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Started the aircraft support continuation with one canonical Game strike geometry and runtime timer owner, exact pending-drop metadata and source-order recon interception. Payload expansion and original-source/native proof are in progress; the verified-source ground checkpoint stays frozen separately.
+
 - Extracted canonical single-target generic hurt for FPS and other direct effects, retaining source damage reductions and rider disembarkation without projectile armor, shooter XP or radial impulse. Hurt records keep the contact position before rider movement; explosions add radial impulse afterward. The shared source diff is independently reviewed; native regression verification is pending.
 
 - Added original-source support direction-fallback cases. The ground-support recorder now covers 60 traces and 900 checkpoints. Native verification remains queued.

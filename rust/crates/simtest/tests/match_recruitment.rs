@@ -329,6 +329,7 @@ fn malformed_or_unsupported_staging_never_publishes() {
     m.world.game.strikes.push(Strike {
         live: false,
         kind: StrikeKind::Other,
+        runtime: None,
         owner: 0,
         x: 1.0,
         z: 1.0,

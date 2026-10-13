@@ -5,7 +5,7 @@ use crate::{
     catalog::{Catalog, Value},
     economy::{self, Mode},
     environment,
-    game::{CELL, Point, Smoke},
+    game::{CELL, Point, Smoke, Strike, StrikeKind},
     match_combat::{DamageWorld, ExplosionSource},
     match_runtime::Match,
     match_story::{StoryChange, StoryKey, prepare_story_updates},
@@ -15,6 +15,7 @@ use crate::{
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SupportKind {
+    Recon,
     Artillery,
     Smoke,
     Cover,
@@ -22,6 +23,7 @@ pub enum SupportKind {
 impl SupportKind {
     pub const fn name(self) -> &'static str {
         match self {
+            Self::Recon => "recon",
             Self::Artillery => "artillery",
             Self::Smoke => "smoke",
             Self::Cover => "cover",
@@ -50,15 +52,11 @@ impl std::fmt::Display for SupportError {
 }
 impl std::error::Error for SupportError {}
 #[derive(Clone, Debug, PartialEq)]
-pub struct SupportStrike {
+pub struct SupportTiming {
     pub kind: SupportKind,
-    pub owner: usize,
-    pub at: Point,
-    pub direction: f64,
     pub delay: f64,
     pub left: f64,
     pub next: f64,
-    pub live: bool,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct FighterCover {
@@ -72,11 +70,27 @@ pub struct FighterCover {
 pub enum SupportEvent {
     Shell(Point),
     SmokeShells(Point),
+    Plane {
+        kind: SupportKind,
+        at: Point,
+        direction: f64,
+        owner: usize,
+    },
+    Flak {
+        unit: u32,
+        owner: usize,
+        at: Point,
+    },
+    ShotDown {
+        kind: SupportKind,
+        at: Point,
+        direction: f64,
+        fighters: bool,
+    },
     Environment(environment::Effect),
 }
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct SupportState {
-    pub strikes: Vec<SupportStrike>,
     pub covers: Vec<FighterCover>,
     pub events: Vec<SupportEvent>,
 }
@@ -104,10 +118,10 @@ fn cfg() -> Result<&'static Value, SupportError> {
         .table("CFG")
         .map_err(|e| SupportError::Actuation(e.to_string()))
 }
-fn strip(s: &SupportStrike, along: f64, side: f64) -> Point {
+fn strip(s: &Strike, along: f64, side: f64) -> Point {
     Point {
-        x: s.at.x + math::cos(s.direction) * along - math::sin(s.direction) * side,
-        z: s.at.z + math::sin(s.direction) * along + math::cos(s.direction) * side,
+        x: s.x + math::cos(s.dir) * along - math::sin(s.dir) * side,
+        z: s.z + math::sin(s.dir) * along + math::cos(s.dir) * side,
     }
 }
 impl Match {
@@ -124,7 +138,7 @@ impl Match {
         {
             return Err(SupportError::Invalid("support player ownership mismatch"));
         }
-        if self.support.strikes.len() > 4096
+        if self.world.game.strikes.len() > 4096
             || self.support.covers.len() > 4096
             || self
                 .start
@@ -132,12 +146,14 @@ impl Match {
                 .iter()
                 .any(|p| p.support.values().any(|v| !v.is_finite()))
             || self.start.economy.players.iter().any(|p| !p.mp.is_finite())
-            || self.support.strikes.iter().any(|s| {
+            || self.world.game.strikes.iter().any(|s| {
                 s.owner >= n
-                    || ![s.at.x, s.at.z, s.direction, s.delay, s.left, s.next]
-                        .iter()
-                        .all(|v| v.is_finite())
-                    || s.left < 0.0
+                    || ![s.x, s.z, s.dir].iter().all(|v| v.is_finite())
+                    || s.runtime.as_ref().is_none_or(|t| {
+                        ![t.delay, t.left, t.next].iter().all(|v| v.is_finite())
+                            || t.left < 0.0
+                            || (s.kind == StrikeKind::Recon) != (t.kind == SupportKind::Recon)
+                    })
             })
             || self.support.covers.iter().any(|c| {
                 c.owner >= n
@@ -173,10 +189,11 @@ impl Match {
             return Ok(Some(SupportDenial::Blocked));
         }
         let kind = match name {
+            "recon" => SupportKind::Recon,
             "artillery" => SupportKind::Artillery,
             "smoke" => SupportKind::Smoke,
             "cover" => SupportKind::Cover,
-            "recon" | "strafe" | "bombing" | "dive" | "para" => {
+            "strafe" | "bombing" | "dive" | "para" => {
                 return Err(SupportError::Unsupported(
                     "support plane actuator is unavailable",
                 ));
@@ -197,7 +214,7 @@ impl Match {
         if player.mp < cost {
             return Ok(Some(SupportDenial::Manpower));
         }
-        if self.support.strikes.len() == 4096 {
+        if self.world.game.strikes.len() == 4096 {
             return Err(SupportError::Invalid("support strike capacity exhausted"));
         }
         let at = Point {
@@ -224,14 +241,22 @@ impl Match {
         } else {
             def.get("dur").and_then(Value::number).unwrap_or(0.0)
         };
-        let strike = SupportStrike {
-            kind,
+        let strike = Strike {
+            kind: if kind == SupportKind::Recon {
+                StrikeKind::Recon
+            } else {
+                StrikeKind::Other
+            },
             owner,
-            at,
-            direction,
-            delay: number(def, "delay")?,
-            left: shells,
-            next: 0.0,
+            x: at.x,
+            z: at.z,
+            dir: direction,
+            runtime: Some(SupportTiming {
+                kind,
+                delay: number(def, "delay")?,
+                left: shells,
+                next: 0.0,
+            }),
             live: false,
         };
         let new_mp = player.mp - cost;
@@ -255,9 +280,95 @@ impl Match {
         .map_err(SupportError::Actuation)?;
         self.start.economy.players[owner].mp = new_mp;
         self.start.players[owner].support.insert(name.into(), cd);
-        self.support.strikes.push(strike);
+        self.world.game.strikes.push(strike);
         story.commit();
         Ok(None)
+    }
+    /// A passing support is intercepted once, when its arrival delay expires.
+    fn intercept_support(
+        &mut self,
+        strike: &Strike,
+        timing: &mut SupportTiming,
+        actors: &[u32],
+    ) -> Result<bool, SupportError> {
+        let team = self.world.game.players[strike.owner].team;
+        let at = Point {
+            x: strike.x,
+            z: strike.z,
+        };
+        let cover = (timing.kind != SupportKind::Recon)
+            .then(|| {
+                self.support.covers.iter().position(|c| {
+                    c.remaining > 0.0
+                        && c.team != team
+                        && math::hypot(c.at.x - strike.x, c.at.z - strike.z) <= c.radius
+                })
+            })
+            .flatten();
+        let mut down = cover.is_some();
+        let mut by = cover.map(|index| self.support.covers[index].owner);
+        if let Some(index) = cover {
+            self.support.covers[index].remaining = 0.0;
+        }
+        for &id in actors {
+            if down {
+                continue;
+            }
+            let u = &self.world.game.units[&id];
+            let def = catalog()?
+                .unit(&self.rules.kinds[u.kind].name)
+                .map_err(|e| SupportError::Actuation(e.to_string()))?;
+            let Some(aa) = def.get("aa") else {
+                continue;
+            };
+            let Some(chance) = aa.get("chance").and_then(Value::number) else {
+                continue;
+            };
+            let setup = aa.get("setup").and_then(Value::boolean).unwrap_or(false);
+            if self.commands.units[&id].hold_fire
+                || u.hp <= 0.0
+                || self.world.game.players[u.owner].team == team
+                || math::hypot(u.x - strike.x, u.z - strike.z) > number(aa, "range")?
+                || setup && u.still.is_some_and(|t| t < 2.0)
+                || u.built.is_some_and(|built| built < 1.0)
+                || self
+                    .logistics
+                    .get(id)
+                    .is_some_and(|r| r.forced && !r.stranded)
+            {
+                continue;
+            }
+            let owner = u.owner;
+            if self.logistics.consume_ammo(id, 1.0) == 0.0 {
+                continue;
+            }
+            self.support.events.push(SupportEvent::Flak {
+                unit: id,
+                owner,
+                at,
+            });
+            if self.start.random.next_fraction(StreamId::OffMap) < chance {
+                down = true;
+                by = Some(owner);
+            }
+        }
+        if !down {
+            return Ok(false);
+        }
+        self.record_plane_downed(by)
+            .map_err(SupportError::Actuation)?;
+        self.support.events.push(SupportEvent::ShotDown {
+            kind: timing.kind,
+            at,
+            direction: strike.dir,
+            fighters: cover.is_some(),
+        });
+        timing.left = if timing.kind == SupportKind::Recon {
+            self.start.random.next_fraction(StreamId::OffMap) * timing.left
+        } else {
+            0.0
+        };
+        Ok(true)
     }
     /// Run the source strike phase using the tick's captured late unit membership.
     /// Phase failures can follow committed earlier effects; the tick owner poisons failed ticks.
@@ -278,11 +389,32 @@ impl Match {
                 "captured support actor has been removed from canonical state",
             ));
         }
+        for &id in unit_order {
+            let u = &self.world.game.units[&id];
+            if u.owner >= self.world.game.players.len()
+                || u.kind >= self.rules.kinds.len()
+                || ![u.x, u.z, u.hp].iter().all(|v| v.is_finite())
+                || u.still.is_some_and(|v| !v.is_finite())
+                || u.built.is_some_and(|v| !v.is_finite())
+                || !self.commands.units.contains_key(&id)
+                || self
+                    .logistics
+                    .get(id)
+                    .is_some_and(|r| !r.ammo.is_finite() || r.ammo < 0.0)
+            {
+                return Err(SupportError::Invalid("invalid support actor"));
+            }
+        }
         let smoke_count = self
-            .support
+            .world
+            .game
             .strikes
             .iter()
-            .filter(|s| s.kind == SupportKind::Smoke && s.delay - dt <= 0.0)
+            .filter(|s| {
+                s.runtime
+                    .as_ref()
+                    .is_some_and(|t| t.kind == SupportKind::Smoke && t.delay - dt <= 0.0)
+            })
             .count()
             * 5;
         self.next_unit_id
@@ -291,31 +423,52 @@ impl Match {
                     .map_err(|_| SupportError::Invalid("smoke identity exhausted"))?,
             )
             .ok_or(SupportError::Invalid("smoke identity exhausted"))?;
-        let mut strikes = std::mem::take(&mut self.support.strikes);
+        let mut strikes = std::mem::take(&mut self.world.game.strikes);
         let result = (|| {
             for s in &mut strikes {
-                let def = definition(s.kind)?;
-                s.delay -= dt;
-                if s.delay > 0.0 {
+                let mut timing = s
+                    .runtime
+                    .take()
+                    .ok_or(SupportError::Invalid("missing support timer"))?;
+                let kind = timing.kind;
+                let def = definition(kind)?;
+                timing.delay -= dt;
+                // Keep metadata present even if this phase subsequently fails.
+                s.runtime = Some(timing.clone());
+                if timing.delay > 0.0 {
                     continue;
                 }
                 if !s.live {
                     s.live = true;
-                    if s.kind == SupportKind::Cover {
+                    if kind == SupportKind::Recon {
+                        self.support.events.push(SupportEvent::Plane {
+                            kind,
+                            at: Point { x: s.x, z: s.z },
+                            direction: s.dir,
+                            owner: s.owner,
+                        });
+                        if self.intercept_support(s, &mut timing, unit_order)? {
+                            s.runtime = Some(timing);
+                            continue;
+                        }
+                    }
+                    if kind == SupportKind::Cover {
                         if self.support.covers.len() == 4096 {
                             return Err(SupportError::Invalid("cover capacity exhausted"));
                         }
                         self.support.covers.push(FighterCover {
                             team: self.world.game.players[s.owner].team,
                             owner: s.owner,
-                            at: s.at,
+                            at: Point { x: s.x, z: s.z },
                             radius: number(def, "radius")?,
                             remaining: number(def, "dur")?,
                         });
-                        s.left = 0.0;
+                        timing.left = 0.0;
                     }
                 }
-                if s.kind == SupportKind::Smoke {
+                if kind == SupportKind::Recon {
+                    timing.left -= dt;
+                } else if kind == SupportKind::Smoke {
                     let clouds = number(def, "clouds")? as u32;
                     for i in 0..clouds {
                         let at = strip(
@@ -333,11 +486,14 @@ impl Match {
                         });
                         self.next_unit_id += 1;
                     }
-                    self.support.events.push(SupportEvent::SmokeShells(s.at));
-                    s.left = 0.0;
-                } else if s.kind == SupportKind::Artillery {
-                    s.next -= dt;
-                    if s.next > 0.0 {
+                    self.support
+                        .events
+                        .push(SupportEvent::SmokeShells(Point { x: s.x, z: s.z }));
+                    timing.left = 0.0;
+                } else if kind == SupportKind::Artillery {
+                    timing.next -= dt;
+                    if timing.next > 0.0 {
+                        s.runtime = Some(timing);
                         continue;
                     }
                     let along = (self.start.random.next_fraction(StreamId::OffMap) - 0.5)
@@ -368,7 +524,7 @@ impl Match {
                         .explosion_membership(
                             at,
                             number(def, "blast")?,
-                            ExplosionSource::support(s.kind.name())
+                            ExplosionSource::support(kind.name())
                                 .map_err(|e| SupportError::Actuation(e.to_string()))?,
                             s.owner as i32,
                             None,
@@ -408,16 +564,17 @@ impl Match {
                                 .map_err(|e| SupportError::Actuation(e.to_string()))?;
                         }
                     }
-                    s.left -= 1.0;
-                    s.next = number(def, "every")?;
+                    timing.left -= 1.0;
+                    timing.next = number(def, "every")?;
                 }
+                s.runtime = Some(timing);
             }
             Ok(())
         })();
         if result.is_ok() {
-            strikes.retain(|s| !s.live || s.left > 0.0);
+            strikes.retain(|s| !s.live || s.runtime.as_ref().is_some_and(|t| t.left > 0.0));
         }
-        self.support.strikes = strikes;
+        self.world.game.strikes = strikes;
         result
     }
     /// Covers and cooldowns decay after strike activation and anti-air, in source order.
