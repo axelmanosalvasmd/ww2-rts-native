@@ -313,6 +313,8 @@ pub fn snapshot(m: &Match, events: &[ww2_core::match_aviation::AviationEvent]) -
     json!({"units":units,"story":m.story.iter().map(|p|bits(p.planes_downed)).collect::<Vec<_>>(),"events":events})
 }
 
+// Component tests read the producer buffer; the runner uses detached report events.
+#[allow(dead_code)]
 pub fn aircraft_phase_snapshot(m: &Match) -> Value {
     aircraft_phase_snapshot_with_events(m, &m.aviation.events)
 }
