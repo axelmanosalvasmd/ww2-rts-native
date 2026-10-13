@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Recorded the coarse navigation port and its 4,888 reference-query checks in DESIGN.md. MOV-37 and MOV-38 remain in progress until fine pathfinding and movement integration use the planner.
+
 - The navigation fixture generator now verifies the reference's exact pinned commit and rejects tracked changes before importing its source. Untracked and ignored files, including `node_modules`, do not invalidate the fixture run.
 
 - Added the Rust terrain region and directed portal planner behind a borrowed, caller-supplied terrain view. It preserves insertion-order ties, incremental chunk updates and bounded route caching from `shared/navigation.js`. All 4,888 recorded x64 Node 24.21.0 queries match the target, connection status, leg limit, allowed regions and cell filter, including 277 terrain updates, directed cliffs and map edges. Invalid shapes and cell indices return errors. This is the coarse prerequisite for fine A*, not full pathfinding; movement and FFI remain unchanged and performance is unmeasured.
