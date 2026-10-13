@@ -15,6 +15,7 @@ use ww2_core::{
     environment::{Collapse, Effect, Hurt},
     game::{Point, Strike, StrikeKind},
     match_aviation::AviationEvent,
+    match_commands::UnitControl,
     match_firing::{ContactEvent, LaunchEvent, LiveFlight, SmallArmsEvent},
     match_runtime::Match,
     match_support::{SupportEvent, SupportKind, SupportTiming},
@@ -43,6 +44,15 @@ fn n(v: &Value) -> f64 {
 }
 fn id(v: &Value) -> u32 {
     n(v) as u32
+}
+fn truthy(v: &Value) -> bool {
+    match v {
+        Value::Null => false,
+        Value::Bool(b) => *b,
+        Value::Number(_) => n(v) != 0.0,
+        Value::String(s) => !s.is_empty(),
+        _ => true,
+    }
 }
 fn point(v: &Value) -> Point {
     Point {
@@ -100,7 +110,97 @@ fn make(trace: &Value, source: &Value) -> Match {
     let adapted =
         json!({"game":source,"players":source["players"],"units":source["units"],"operatives":[]});
     let mut state = common::make(&trace["setup"], &adapted, Mode::Conquest);
+    reload(&mut state, source);
+    state
+}
+
+// Reload recorded public boundary inputs into the same Match and World. Private
+// recipient/fog owners and normally seeded random streams retain their identity.
+fn reload(state: &mut Match, source: &Value) {
+    assert!(source["operatives"].as_array().unwrap().is_empty());
+    assert_eq!(source["skipFog"], false);
+    assert!(source["falling"].as_array().unwrap().is_empty());
     let random = state.start.random.snapshot();
+    state.world.game.tick = n(&source["tick"]) as i64;
+    state.world.game.vision_tick = source["visionTick"].as_f64().map(|n| n as i64);
+    state.next_unit_id = id(&source["nextId"]);
+    state.start.environment_seed = n(&source["seed"]) as i64 as u32;
+    state.start.wind = (n(&source["wind"]["a"]), n(&source["wind"]["v"]));
+    for p in source["players"].as_array().unwrap() {
+        let slot = id(&p["slot"]) as usize;
+        assert_eq!(state.world.game.players[slot].team, n(&p["team"]) as i32);
+        state.start.players[slot].spawn = point(&p["spawn"]);
+        state.start.players[slot].support = p["sup"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .map(|(k, v)| (k.clone(), n(v)))
+            .collect();
+        let wallet = &mut state.start.economy.players[slot];
+        wallet.mp = n(&p["mp"]);
+        wallet.vp = n(&p["vp"]);
+        wallet.inc = n(&p["inc"]);
+        wallet.away = truthy(&p["away"]);
+        wallet.out = truthy(&p["out"]);
+        state.world.game.players[slot].visible =
+            p["visible"].as_array().unwrap().iter().map(id).collect();
+        state.world.game.players[slot].visible.sort_unstable();
+    }
+    state.world.game.units.clear();
+    state.commands.units.clear();
+    state.firing.units.clear();
+    state.firing.flights.clear();
+    state.firing.suppressed.clear();
+    state.firing.events.clear();
+    state.firing.salvos.clear();
+    state.firing.grenades.clear();
+    for id in state.combat.iter().map(|(id, _)| id).collect::<Vec<_>>() {
+        state.combat.remove(id);
+    }
+    for id in state.abilities.iter().map(|(id, _)| id).collect::<Vec<_>>() {
+        state.abilities.remove(id);
+    }
+    for id in state.recovery.iter().map(|(id, _)| id).collect::<Vec<_>>() {
+        state.recovery.remove(id);
+    }
+    state.firing.next_flight = n(&source["nextFlight"]) as u64;
+    for row in source["units"].as_array().unwrap() {
+        assert!(!truthy(&row["operative"]));
+        assert!(row["orders"].as_array().unwrap().is_empty());
+        let unit = simtest::load::unit(
+            row,
+            &state.rules,
+            state.world.game.players.len(),
+            state.world.game.w * state.world.game.h,
+        )
+        .unwrap();
+        let mut control = UnitControl::new(&unit, &state.rules).unwrap();
+        control.aim = n(&row["aim"]);
+        control.auto_cast = truthy(&row["auto"]);
+        control.auto_retreat = truthy(&row["autoRetreat"]);
+        control.hold_fire = truthy(&row["holdFire"]);
+        control.attack_id = id(&row["attackId"]);
+        control.react = n(&row["react"]);
+        state.commands.insert(unit.id, control);
+        let firing = state.firing.initialize(unit.id);
+        firing.cooldown = n(&row["cooldown"]);
+        firing.retarget = n(&row["retarget"]);
+        firing.target_id = id(&row["targetId"]);
+        let combat = state.combat.initialize(unit.id);
+        combat.xp = n(&row["xp"]);
+        combat.hit_at = n(&row["hitAt"]);
+        combat.hit_by = (id(&row["hitBy"]) != 0).then(|| id(&row["hitBy"]));
+        combat.last_hit = row["lastHit"].as_f64().map(|n| n as i32);
+        combat.carrier = (id(&row["riding"]) != 0).then(|| id(&row["riding"]));
+        combat.cargo = row["cargo"].as_array().unwrap().iter().map(id).collect();
+        let ability = state.abilities.initialize(unit.id);
+        ability.cooldown = n(&row["cd"]);
+        ability.buff = n(&row["buff"]);
+        ability.ap = truthy(&row["ap"]);
+        state.recovery.initialize(unit.id).reinforcement = n(&row["reinf"]);
+        state.world.game.units.insert(unit.id, unit);
+    }
+    state.grid.rebuild(&state.world.game.units);
     let terrain = &source["terrain"];
     let chars = expand(&terrain["chars"]);
     assert_eq!(chars.len(), state.world.game.chars.len());
@@ -164,7 +264,6 @@ fn make(trace: &Value, source: &Value) -> Match {
         })
         .collect();
     assert_eq!(state.start.random.snapshot(), random);
-    state
 }
 
 // Import unredacted original producer payloads, in their recorded append order.
@@ -387,8 +486,8 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
         let name = trace["name"].as_str().unwrap();
         let mut recorded = trace["initial"].clone();
         let initial = common::decoded(&recorded);
-        let seed_state = make(trace, &initial);
-        let rules = &seed_state.rules;
+        let mut state = make(trace, &initial);
+        let terrain_identity = std::ptr::from_ref(state.world.initial());
         common::apply_delta(&mut recorded, &trace["admittedDelta"]);
         let mut batch = Vec::new();
         for frame in trace["frames"].as_array().unwrap() {
@@ -397,13 +496,13 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
             let emitted = common::decoded(&frame["generated"]);
             batch.extend(emitted.as_array().unwrap().iter().map(|row| {
                 event(
-                    rules,
+                    &state.rules,
                     row,
                     trace["spec"]["kind"] == "support" || trace["spec"]["kind"] == "falling",
                 )
             }));
             common::exact(
-                &source_wire(raw(&batch, rules)),
+                &source_wire(raw(&batch, &state.rules)),
                 &source_wire(before["shots"].clone()),
                 &format!("{name}: unredacted chronological batch"),
             );
@@ -425,21 +524,36 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
                     );
                     falling += 1; // Source witness only. No private body import or native claim.
                 } else {
-                    let mut state = make(trace, &before);
-                    // Each boundary has its own Match and fresh receipt owner.
-                    // No acknowledgments cross reconstructed Match instances.
-                    let mut delivery = receipt(
-                        &mut state,
-                        frame["refusals"]
-                            .as_array()
-                            .unwrap()
-                            .iter()
-                            .any(|v| v == "air"),
-                    );
+                    reload(&mut state, &before);
+                    assert_eq!(std::ptr::from_ref(state.world.initial()), terrain_identity);
+                    let random = state.start.random.snapshot();
                     if !before["flights"].as_array().unwrap().is_empty() {
                         live_flight(&mut state, &before);
                     }
-                    let random = state.start.random.snapshot();
+                    let air_input = frame["refusals"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .any(|v| v == "air");
+                    // Source snapshotFor warms teamFog at each selected query,
+                    // including the launch frame that native complete admission
+                    // refuses. The public base-field query supplies this input
+                    // history from canonical facts, before the refusal baseline.
+                    // Its disposable receipt is not complete-frame delivery.
+                    // The terminal AIR witness cannot admit even base fields;
+                    // no later supported boundary depends on its query history.
+                    if !selected.is_empty() && !air_input {
+                        let mut query = DeliveryState::new(&state).unwrap();
+                        assert!(
+                            query
+                                .capture_selected(&mut state, &selected)
+                                .unwrap()
+                                .is_some()
+                        );
+                    }
+                    // Each boundary has a fresh receipt owner on this same
+                    // Match. Delivery-history parity is outside this test.
+                    let mut delivery = receipt(&mut state, air_input);
                     let state_before = guard(&state, &delivery);
                     let result =
                         delivery.capture_selected_with_tick_events(&mut state, &selected, &batch);
@@ -497,7 +611,7 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
             }
             common::apply_delta(&mut recorded, &frame["afterDelta"]);
             common::exact(
-                &source_wire(raw(&batch, rules)),
+                &source_wire(raw(&batch, &state.rules)),
                 &source_wire(common::decoded(&recorded)["shots"].clone()),
                 &format!("{name}: after scheduled reset"),
             );

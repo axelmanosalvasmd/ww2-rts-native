@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Preserve one Match and its canonical fog query history per recipient-effects trace. Reload recorded public boundary inputs and use a disposable base-field query before complete-frame admission, including the live-flight refusal boundary. The fresh-per-boundary consumer lost the departed shooter's same-vision-tick fog circle, producing zero contact rows where Source produced one. Keep all original fixtures, comparisons and refusal witnesses; fresh native validation remains pending.
+
 - Set the recipient-effects test crate's macro recursion limit to 256 for its complete existing unit snapshot. The compiler reached the default expansion limit; every field, assertion and original fixture is retained. Production runtime and stack limits are unchanged.
 
 - Update the carrier and aircraft fixture serializers for typed MatchSample timelines. Their Default and Conquest scenes retain the same Conquest JSON, and incompatible Territories samples fail explicitly. Runtime, assertions and original fixtures are unchanged.
