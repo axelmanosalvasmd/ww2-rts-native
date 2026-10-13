@@ -30,7 +30,8 @@ const specs=[
 ];
 function load(name){return JSON.parse(readFileSync(resolve(reference,'maps',`${name}.json`),'utf8'));}
 function recipientProjection(g){return [0,1].map(slot=>{const snapshot=sim.snapshotFor(g,slot,g.shots);return{slot,scenario:structuredClone(snapshot.scenario??null),shots:structuredClone(snapshot.shots)};});}
-function recipientInputs(g){return{reveal:!!g.reveal,mode:g.mode?.kind??null,weather:g.weather?.now??null,players:g.players.map((p,slot)=>({slot,team:p.team,out:!!p.out,visible:[...p.visible].sort((a,b)=>a-b)})),units:[...g.units.values()].map(u=>({id:u.id,type:u.type,owner:u.owner,x:u.x,z:u.z,air:u.air?{state:u.air.state}:null,garrison:u.garrison,riding:!!u.riding,built:u.built??null,hp:u.hp})),terrain:{w:g.w,h:g.h,flags:Array.from(g.flags),height:g.height?Array.from(g.height):null},smokes:g.smokes.map(s=>({x:s.x,z:s.z,r:s.r,id:s.id})),strikes:g.strikes.map(s=>({kind:s.kind,x:s.x,z:s.z,dir:s.dir,t:s.t,owner:s.owner}))};}
+function recipientInputs(g){const falling=(g.fallingSections??[]).filter(section=>!section.settled);return{reveal:!!g.reveal,mode:g.mode?.kind??null,weather:g.weather?.now??null,players:g.players.map((p,slot)=>({slot,team:p.team,out:!!p.out,visible:[...p.visible].sort((a,b)=>a-b)})),units:[...g.units.values()].map(u=>({id:u.id,type:u.type,owner:u.owner,x:u.x,z:u.z,air:u.air?{state:u.air.state}:null,garrison:u.garrison,riding:!!u.riding,built:u.built??null,hp:u.hp})),fallingCount:falling.length,fallingSections:falling.map(s=>({id:s.id,kind:s.kind,section:s.section,c:s.c,x:s.x,z:s.z,y:s.y,dir:s.dir,time:s.time,until:s.until,impulse:s.impulse,mass:s.mass,material:s.material,radius:s.radius})),terrain:{w:g.w,h:g.h,flags:Array.from(g.flags),height:g.height?Array.from(g.height):null},smokes:g.smokes.map(s=>({x:s.x,z:s.z,r:s.r,id:s.id})),strikes:g.strikes.map(s=>({kind:s.kind,x:s.x,z:s.z,dir:s.dir,t:s.t,owner:s.owner}))};}
+function structureSections(g){return[...new Set(g.structuralCells?.values()??[])].map(s=>({id:s.id,c:s.c,structureId:s.structureId,hp:s.hp,maxHp:s.maxHp,state:s.state,material:s.material,anchor:s.anchor,supports:structuredClone(s.supports??[]),rubble:structuredClone(s.rubble??[]),failedAt:s.failedAt,direction:structuredClone(s.direction),impulse:s.impulse,entityId:s.entityId})).sort((a,b)=>a.c-b.c);}
 function run(name,ticks,failAfterExecution=null){
   const map=load(name), callbacks=[];
   const saved=Math.random;Math.random=()=>0.5;
@@ -46,6 +47,7 @@ function run(name,ticks,failAfterExecution=null){
   };
   const selected=[];let previousCellLog= g.cellLog.length;
   for(let target=1;target<=ticks.at(-1);target++){
+    const beforeBridgeSections=name==='the-great-bridge'&&target===8400?structureSections(g):null;
     g.shots=[];
     const appended=[];
     Object.defineProperty(g.shots,'push',{value:function(...rows){
@@ -59,8 +61,10 @@ function run(name,ticks,failAfterExecution=null){
     assert.equal(g.tick,target,`${name}: source step clock`);
     if(ticks.includes(g.tick)){
       const state=g.scenario?structuredClone(g.scenario):null;
-      selected.push({tick:g.tick,shots:appended,recipientInputs:recipientInputs(g),recipients:recipientProjection(g),callbacks:structuredClone(callbacks),scenario:state,
-        cellChanges:structuredClone(g.cellLog.slice(previousCellLog)),failure});
+      const frame={tick:g.tick,shots:appended,recipientInputs:recipientInputs(g),recipients:recipientProjection(g),callbacks:structuredClone(callbacks),scenario:state,
+        cellChanges:structuredClone(g.cellLog.slice(previousCellLog)),failure};
+      if(beforeBridgeSections){frame.structureSectionsBefore=beforeBridgeSections;frame.structureSectionsAfter=structureSections(g);}
+      selected.push(frame);
     }
     previousCellLog=g.cellLog.length;
     if(failure){assert.equal(target,ticks.at(-1),`${name}: unexpected callback failure tick`);break;}
@@ -69,6 +73,12 @@ function run(name,ticks,failAfterExecution=null){
   return {name,map,steps:selected};
 }
 const traces=specs.map(([name,ticks])=>run(name,ticks));
+const bridge8400=traces.find(trace=>trace.name==='the-great-bridge').steps.find(step=>step.tick===8400);
+assert.equal(bridge8400.recipientInputs.fallingCount,84,'Great Bridge tick 8400 unsettled Source falling sections');
+assert.equal(bridge8400.structureSectionsBefore.length,516,'Great Bridge structural section count before collapse');
+assert.equal(bridge8400.structureSectionsAfter.length,516,'Great Bridge structural section count after collapse');
+assert.equal(bridge8400.structureSectionsAfter.filter(section=>section.state==='failed').length,84,'Great Bridge failed bridge section count');
+assert.equal(bridge8400.structureSectionsAfter.filter(section=>section.state==='failed').reduce((sum,section)=>sum+section.hp,0),0,'failed bridge sections have zero HP');
 const failureTrace=run('the-great-bridge',[8400],'scenario:3:1');
 const failedFrame=failureTrace.steps[0];
 assert.match(failedFrame.failure,/injected after original damage callback scenario:3:1/);
