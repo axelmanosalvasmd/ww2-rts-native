@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added source-order mass field-work patterns and shared project identity to the single FieldWorksRuntime owner. Paid segments use proportional prices and the existing canonical Dig/terrain execution; cancellation removes membership and its flags synchronously without refund or eager source-counter changes. Match command/tick assembly and native differential checks are pending.
+
 - Verified the bounded Conquest ability/recovery provider at exact runtime/test head `1f9a16b`: 13 core debug checks (four ability, two recovery), three firing and two recruitment debug checks, all 177 locked release workspace tests, strict Clippy, formatting and release FFI. Independent source and debug/release replay checks pass. Added phase API documentation and kept full tick/engineering/other-mode/ABI/transport parity in progress; final evidence commits preserve Rust/harness trees.
 
 - Resolved strict Clippy findings in the native recovery validation and replay helpers without changing their behavior. The release workspace suite passed 177 tests before this cleanup; exact final checks are rerunning.

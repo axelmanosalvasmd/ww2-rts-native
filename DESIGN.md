@@ -14,6 +14,8 @@ The goal is thousands of units per battle and a public release later. ww2-rts#64
 
 ## Architecture (2026-10-11, pending step 1)
 
+Mass field projects use the single FieldWorksRuntime owner for unpaid ordered segments, unit membership and paid Dig records. Monotonic project IDs let BTreeMap retain source creation order; segment Vec order preserves middle-first allocation and strict first-distance ties within the next crew-sized window. A source-listed project can become archived while unit references still need its identity. Cancellation removes membership and paid work together without a refund, while cached active/crew counters keep the source recount timing. Pattern/source fixtures and Match integration are under development; no native project or complete engineering claim is made yet.
+
 Two programs talking over the network, as today. Only the rules core decides outcomes.
 
 1. **Rules core (Rust, `rust/crates/core`).** Port of `shared/`. 20 ticks a second. The same seed gives the same match. Unit, weapon and map tables live in data files both sides read. No engine, networking or file-system code.

@@ -432,11 +432,14 @@ pub(crate) fn cancel_field_work_state(
     runtime: &mut crate::field_works::FieldWorksRuntime,
     unit: &mut crate::game::Unit,
 ) -> Result<(), String> {
-    if unit.dig != runtime.is_active(unit.id) {
+    if unit.dig != runtime.is_active(unit.id)
+        || unit.entrench != runtime.membership(unit.id).is_some()
+    {
         return Err("unrepresented or inconsistent field-work activity".into());
     }
     runtime.cancel(unit.id);
     unit.dig = false;
+    unit.entrench = false;
     Ok(())
 }
 
