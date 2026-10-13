@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Aligned the tick consumer's optional control projection with the original recorder's observed fields. Ability and Dig cases enqueue commands but do not record control rows; the first native run added those extra rows and failed an otherwise exact tick-one comparison. Dedicated command traces still compare every recorded control row. Runtime scheduling and original fixtures are unchanged; full gates are restarting.
+
 - Fixed the ordered-retirement regression's snapshot setup to supply every live unit's canonical firing timer. The first composed native run passed 30 library and two field-work tests, then the new regression panicked on its empty timer map before exercising retirement. Runtime retirement and source fixtures are unchanged; complete gates are restarting at the corrected checkpoint.
 
 - Updated the operative tick replay after central control state gained the reaction timer. Trusted fixture patches now set canonical `UnitControl.react`, and operative rows compare its exact preserved value. Ordinary reaction execution remains unavailable and its timer remains outside this bounded projection. No runtime phase or gameplay state was added; native verification is pending.
