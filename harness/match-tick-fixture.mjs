@@ -110,7 +110,8 @@ const reactionSpecs=[
  {name:'reaction-contact-rally',ticks:6,enemy:true,paths:[[1,19,21]],fields:[[1,{drift:'rally',cooldown:100,holdFire:false}],[2,{holdPos:true,holdFire:false}]]},
  {name:'reaction-autoretreat-before-autocast',ticks:2,enemy:true,startTick:8,hp:34.999,changes:[[173,'H']],fields:[[1,{holdPos:true,holdFire:false,auto:true,cooldown:100}],[2,{holdPos:true,holdFire:true}]]},
  {name:'reaction-health-threshold-autocast',ticks:2,enemy:true,startTick:8,hp:35,changes:[[173,'H']],fields:[[1,{holdPos:true,holdFire:false,auto:true,cooldown:100}],[2,{holdPos:true,holdFire:true}]]},
- {name:'reaction-paid-dig-cancel',ticks:65,keep:[1],hp:34.999,fields:[[1,{holdPos:true,holdFire:true}]],field:true}
+ {name:'reaction-paid-dig-cancel',ticks:65,keep:[1],hp:34.999,fields:[[1,{holdPos:true,holdFire:true}]],field:true},
+ {name:'reaction-autoretreat-replaces-move',ticks:200,keep:[1],hp:34.999,fields:[]}
 ];
 for(const spec of reactionSpecs){
  const map={name:spec.name,w:20,h:20,rows:Array(20).fill('.'.repeat(20)),spawns:[{x:0,y:0},{x:19,y:19}],points:[{id:'point',x:16,y:14}]};
@@ -123,6 +124,7 @@ for(const spec of reactionSpecs){
  if(spec.hp!==undefined)input.hp=[[1,spec.hp]];
  if(spec.changes)input.changes=spec.changes;
  if(spec.name==='reaction-contact-cover')input.commands=[{tick:5,issuer:0,sequence:1,command:{t:'stance',ids:[1],key:'holdPos',on:false}}];
+ if(spec.name==='reaction-autoretreat-replaces-move')input.commands=[{tick:1,issuer:0,sequence:1,command:{t:'move',orders:[[1,30,30]]}}];
  if(spec.field)input.commands=[{tick:1,issuer:0,sequence:1,command:{t:'dig',ids:[1],kind:'trench',x:13,z:17,dir:0}}];
  for(const id of [...g.units.keys()])if(!input.keep.includes(id))g.units.delete(id);
  for(const [id,owner]of input.owners??[])g.units.get(id).owner=owner;
@@ -134,12 +136,13 @@ for(const spec of reactionSpecs){
  for(const [id,fields]of input.fields)Object.assign(g.units.get(id),fields);
  for(const [cell,ch]of input.changes??[])sim.__setCell(g,cell,ch);
  const checkpoints=[],random=spec.enemy?combatRandom(701):null;
- let paid,chargedStory,timer=.05;
+ let paid,chargedStory,retreatCompleted,timer=.05;
  for(let i=0;i<spec.ticks;i++){
   for(const row of (input.commands??[]).filter(c=>c.tick===g.tick+1).sort((a,b)=>a.issuer-b.issuer||a.sequence-b.sequence)){
    const before=g.players[row.issuer].mp;
    const result=sim.command(g,row.issuer,row.command);
    if(result!==undefined)throw Error(`${spec.name} command refused: ${result}`);
+   if(spec.name==='reaction-autoretreat-replaces-move'&&(!g.units.get(1).worldGoal||g.units.get(1).worldGoal.x!==30||g.units.get(1).worldGoal.z!==30))throw Error('Move must install its actual destination before automatic retreat');
    if(spec.field){if(!g.units.get(1).dig)throw Error('Paid Dig must exist before the real step');paid=before-g.players[0].mp;chargedStory=g.story[0].mpSpent;if(!(paid>0))throw Error('Dig must charge actual manpower');}
   }
   const beforeMp=g.players[0].mp;
@@ -153,6 +156,11 @@ for(const spec of reactionSpecs){
   if(spec.name==='reaction-autoretreat-before-autocast'&&i===0&&(!u.retreating||g.nades.length||u.nade||u.cd!==-.05||u.targetId))throw Error('Broken squad must retreat before the eligible autocast beat');
   if(spec.name==='reaction-health-threshold-autocast'&&i===0&&(u.retreating||!g.nades.length||u.cd!==sim.UNITS[u.type].ab.cd))throw Error('Exact health threshold must stay and cast on the same beat');
   if(spec.field&&(g.players[0].mp!==beforeMp+g.players[0].inc*.05||u.dig||g.chars.includes('T')||g.story[0].mpSpent!==chargedStory||g.story[0].built!==0))throw Error('Automatic retreat must cancel the paid job before work, retaining spent story and unbuilt terrain');
+  if(spec.name==='reaction-autoretreat-replaces-move'){
+   if(i===0&&(!u.retreating||u.moveOutcome!=='interrupted'||u.moveOutcomeTick!==1||!u.worldGoal||u.worldGoal.x!==g.players[0].spawn.x||u.worldGoal.z!==g.players[0].spawn.z))throw Error('Automatic retreat must replace the admitted Move with the real home route');
+   if(u.moveOutcome==='completed'&&!u.retreating&&!u.worldGoal)retreatCompleted??=g.tick;
+   if(i===spec.ticks-1&&(retreatCompleted===undefined||u.retreating||u.worldGoal||u.moveOutcome!=='completed'||u.moveOutcomeTick!==retreatCompleted))throw Error('The actual home route must finish and clear retreat on arrival');
+  }
   const state=snapshot(g);
   if(spec.enemy)state.combatState=random.state();
   state.reactions=[...g.units.values()].map(u=>({id:u.id,react:bits(u.react),drift:u.drift,reverse:ptOrNull(u.reverse),retreating:u.retreating,hitBy:u.hitBy,hitAt:bits(u.hitAt),hitFrom:ptOrNull(u.hitFrom),shotAt:u.shotAt===undefined?null:bits(u.shotAt),worldGoal:ptOrNull(u.worldGoal),amove:ptOrNull(u.amove),orders:u.orders.length,attack:u.attackId,holdPos:!!u.holdPos,holdFire:!!u.holdFire,autoRetreat:!!u.autoRetreat,auto:!!u.auto,nade:ptOrNull(u.nade),enter:u.enter,fireAt:u.fireAt,board:u.board,build:!!u.build,dig:!!u.dig,entrench:!!u.entrench,moveOutcome:u.moveOutcome??null,moveOutcomeTick:u.moveOutcomeTick??null}));

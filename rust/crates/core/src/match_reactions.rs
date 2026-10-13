@@ -130,6 +130,7 @@ impl Match {
             .units
             .get_mut(&id)
             .expect("retreat control checked");
+        c.route_end = Some(route.route_end);
         c.orders.clear();
         c.face = None;
         c.attack_id = 0;
