@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Added an optimized CI test profile with debug assertions and integer overflow checks retained. The same whole workspace test command uses that profile on Linux, Windows and macOS; formatting, strict all-target Clippy, release FFI and Linux C replay gates stay intact. Local duration and count verification are pending.
+- Added an optimized CI test profile with debug assertions and integer overflow checks retained. The same whole workspace test command uses that profile on Linux, Windows and macOS; formatting, strict all-target Clippy, release FFI and Linux C replay gates stay intact. On the Mac with two build jobs, all 362 tests passed in 491.76 seconds including new-profile compilation; executed test names matched the prior 362-test suite exactly. All 90 test executables report debug assertions and overflow checks enabled. Formatting, strict Clippy and release FFI also passed.
 
 - Joined the frozen World commander metadata provider, preserving its commander privacy filters and all-team cache rebinding after successful receipt. Migrated its pending-drop context to canonical Game strike timing and retained explicit malformed-row refusal. Extended the existing warmed-cache refusal witness without changing the original fixture. Updated stale ABI 2 status text to the verified merged six-call scope; broader contracts and Unreal adoption remain pending. Final combined gates remain pending.
 
