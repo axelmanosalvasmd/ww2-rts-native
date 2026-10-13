@@ -388,7 +388,7 @@ fn full_metadata(world: &world_generation::GeneratedWorld) -> Value {
         );
     } else {
         actual["biomesHash"] = Value::Null;
-        actual["buildings"] = json!([]);
+        actual["buildings"] = Value::Null;
     }
     actual["rails"] = json!({"stations":world.rails.stations.iter().map(|s|json!({"region":s.region,"x":s.x,"y":s.y})).collect::<Vec<_>>(),
         "lines":world.rails.lines.iter().map(|l|json!({"a":l.a,"b":l.b,"regions":l.regions,"length":l.cells.len(),"cellsHash":hash(l.cells.iter().flat_map(|&c|(c as u32).to_le_bytes()))})).collect::<Vec<_>>()});
@@ -601,7 +601,7 @@ fn original_dressed_geography_and_ordered_rail_paths() {
                     .map(|b| json!({"x":b.x,"y":b.y,"kind":b.kind}))
                     .collect::<Vec<_>>()
             ),
-            row["buildings"]
+            row.get("buildings").cloned().unwrap_or_else(|| json!([]))
         );
         let hints: Vec<_> = input
             .geography
