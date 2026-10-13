@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Accepted ground retreat now cancels the canonical paid field-work descriptor after route preflight, without refund; refused routes retain the job. Construction and unrepresented mass projects remain explicit refusals.
+
 - Updated the operative tick replay after central control state gained the reaction timer. Trusted fixture patches now set canonical `UnitControl.react`, and operative rows compare its exact preserved value. Ordinary reaction execution remains unavailable and its timer remains outside this bounded projection. No runtime phase or gameplay state was added; native verification is pending.
 
 - Normal-merged the checked central abilities/World metadata provider 643ad2b into a separate successor of frozen ac43c28. Preserved the sole operative caller and all four stale-ID guards and default publication callbacks for join and respawn. Reaction and World providers remain available components without enabling their missing tick phases. The merged original World memory recorder reproduces four traces and 120 actions while preserving the explicit remembered-wreck arrays. First combined operative native proof remains pending.
