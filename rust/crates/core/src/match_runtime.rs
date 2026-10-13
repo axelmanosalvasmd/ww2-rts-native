@@ -409,6 +409,7 @@ pub struct Match {
     pub production: crate::production::ProductionState,
     pub building_rallies: BTreeMap<u32, Option<Point>>,
     pub scenario: Option<crate::legacy_scenario::LegacyScenario>,
+    pub firing: crate::match_firing::FiringState,
     pub next_unit_id: u32,
     pub rules: Rules,
 }
@@ -455,6 +456,7 @@ impl Match {
             production,
             building_rallies: BTreeMap::new(),
             scenario,
+            firing: crate::match_firing::FiringState::default(),
             next_unit_id,
             rules,
         };
@@ -462,6 +464,9 @@ impl Match {
         for unit in result.world.game.units.values() {
             let control = crate::match_commands::UnitControl::new(unit, &result.rules)?;
             result.commands.insert(unit.id, control);
+        }
+        for &id in result.world.game.units.keys() {
+            result.firing.initialize(id);
         }
         result.grid.rebuild(&result.world.game.units);
         Ok(result)
