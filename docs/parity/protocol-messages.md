@@ -370,3 +370,7 @@ When no seat, spectator or operative is connected for more than 60 s, the room a
 - The full refusal reason chains on shared/sim.js:3640 (`dig`) and 3695 (`build`), which are long single-line expressions only partly read here; placement reasons come from `placementCheck` (ENG and BASE).
 - The complete key list of `shots` and `flights` entries (CMB owns them).
 - The close status a browser sees after `ws.close()` with no code (1005 expected, not checked).
+
+### Recipient ground-list checkpoint
+
+A source-written internal producer now retains complete observed wreck rows from canonical Environment metadata and Game hulls, preserves found-mine discovery order, and projects World nodes from actual team memory and ResourceNode owners. Ordinary nodes remain absent; missing imported wreck facts reject explicitly. Five original-source traces cover 90 actions. Native checks and complete-envelope delivery integration remain pending; this does not change the draft wire contract.

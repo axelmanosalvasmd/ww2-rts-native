@@ -66,6 +66,7 @@ impl Match {
         validate_world_context(
             WorldRoutingContext {
                 world: &self.world,
+                environment: &self.environment,
                 rules: &self.rules,
                 start: &self.start,
                 rails: &runtime.rails,
@@ -183,30 +184,52 @@ impl Match {
             .memory
             .terrain_for(team, owner, full)
     }
-    fn refresh_world_wrecks(&mut self, owner: usize) -> Result<(), String> {
+    fn observe_world_wrecks(
+        &mut self,
+        owner: usize,
+        full_facts: bool,
+    ) -> Result<(Vec<Wreck>, Vec<crate::recipient_lists::WreckRow>), String> {
         let team = self.validate_world_memory_context(owner)?;
-        let runtime = self.world_runtime.as_mut().unwrap();
-        refresh_wrecks_parts(
-            &self.world.game,
-            &self.rules,
-            &mut runtime.memory,
-            team,
-            None,
-        )
-    }
-    pub fn world_wrecks(&mut self, owner: usize) -> Result<Vec<Wreck>, String> {
-        self.refresh_world_memory(owner)?;
-        self.refresh_world_wrecks(owner)?;
-        let team = self.world_actor_view(owner)?.team;
-        Ok(self
+        let game = &self.world.game;
+        let accepted = collect_world_wrecks(game, &self.rules, team, None, &self.environment)?;
+        let prior = self
             .world_runtime
             .as_ref()
             .unwrap()
             .memory
             .team(team)
+            .map_or(&[][..], |m| m.wrecks.as_slice());
+        let rows = staged_world_wreck_memory(prior, game, &self.rules, team, None, accepted);
+        let display = if full_facts {
+            crate::recipient_lists::display_rows(&rows)?
+        } else {
+            Vec::new()
+        };
+        // All new fallible display work precedes terrain/Fog observation changes.
+        self.refresh_world_memory(owner)?;
+        let memory = self
+            .world_runtime
+            .as_mut()
             .unwrap()
-            .remembered_wrecks()
-            .to_vec())
+            .memory
+            .team_mut(team)
+            .expect("successful refresh creates team memory");
+        memory.wreck_queries = rows.iter().map(|row| row.query.clone()).collect();
+        memory.wrecks = rows;
+        Ok((memory.wreck_queries.clone(), display))
+    }
+    pub fn world_wrecks(&mut self, owner: usize) -> Result<Vec<Wreck>, String> {
+        Ok(self.observe_world_wrecks(owner, false)?.0)
+    }
+    /// Exact team-observed display rows; imported missing facts reject before collection.
+    pub fn world_wreck_rows(
+        &mut self,
+        owner: usize,
+    ) -> Result<Vec<crate::recipient_lists::WreckRow>, String> {
+        if owner == LOCAL_DEFENDER_OWNER {
+            return Err("local defender has no snapshot seat".into());
+        }
+        Ok(self.observe_world_wrecks(owner, true)?.1)
     }
     pub fn refresh_world_routing(&mut self, owner: usize) -> Result<(), String> {
         let team = self.validate_world_memory_context(owner)?;
@@ -215,6 +238,7 @@ impl Match {
         let receipt = refresh_world_parts(
             WorldRoutingContext {
                 world: &self.world,
+                environment: &self.environment,
                 rules: &self.rules,
                 start: &self.start,
                 rails: &runtime.rails,
@@ -450,6 +474,7 @@ fn territory_runs(
 #[derive(Clone, Copy)]
 pub struct WorldRoutingContext<'a> {
     pub world: &'a crate::world::World,
+    pub environment: &'a crate::environment::EnvironmentRuntime,
     pub rules: &'a Rules,
     pub start: &'a crate::match_runtime::StartPlan,
     pub rails: &'a crate::match_world_rails::WorldRails,
@@ -547,52 +572,53 @@ fn validate_world_context(
     }
     Ok(actor.team)
 }
-fn refresh_wrecks_parts(
+fn collect_world_wrecks(
     game: &Game,
     rules: &Rules,
-    memory: &mut world_memory::WorldMemory,
     team: i32,
     observer: Option<crate::staged_observer::StagedObserver<'_>>,
-) -> Result<(), String> {
+    environment: &crate::environment::EnvironmentRuntime,
+) -> Result<Vec<crate::recipient_lists::RememberedWreck>, String> {
+    let grid = crate::grid::SpatialGrid::new(&game.units, 16.0);
+    game.wrecks
+        .iter()
+        .filter(|w| {
+            game.reveal
+                || team_sees_with_observer(
+                    game,
+                    rules,
+                    &grid,
+                    team,
+                    Point { x: w.x, z: w.z },
+                    observer,
+                )
+        })
+        .map(|w| {
+            crate::recipient_lists::RememberedWreck::observe(
+                game,
+                rules,
+                w,
+                w.id.and_then(|id| environment.wreck_metadata().get(&id)),
+            )
+        })
+        .collect()
+}
+fn staged_world_wreck_memory(
+    prior: &[crate::recipient_lists::RememberedWreck],
+    game: &Game,
+    rules: &Rules,
+    team: i32,
+    observer: Option<crate::staged_observer::StagedObserver<'_>>,
+    accepted: Vec<crate::recipient_lists::RememberedWreck>,
+) -> Vec<crate::recipient_lists::RememberedWreck> {
     let grid = crate::grid::SpatialGrid::new(&game.units, 16.0);
     let visible = |at| team_sees_with_observer(game, rules, &grid, team, at, observer);
-    let wrecks = &mut memory
-        .team_mut(team)
-        .ok_or("World memory has not been refreshed")?
-        .wrecks;
-    for current in &game.wrecks {
-        if !game.reveal
-            && !visible(Point {
-                x: current.x,
-                z: current.z,
-            })
-        {
-            continue;
-        }
-        let row = Wreck {
-            id: current.id,
-            cell: None,
-            x: rounded(current.x),
-            z: rounded(current.z),
-            moving: current.moving,
-        };
-        if let Some(old) = wrecks.iter_mut().find(|r| r.id == current.id) {
-            *old = row;
-        } else {
-            wrecks.push(row);
-        }
-    }
-    // World reveal discovers wrecks, but removal still asks current teamSees.
-    wrecks.retain(|row| {
-        game.wrecks.iter().any(|w| w.id == row.id) || !visible(Point { x: row.x, z: row.z })
-    });
-    for row in wrecks {
-        if row.moving && !(game.reveal || visible(Point { x: row.x, z: row.z })) {
-            row.moving = false;
-        }
-    }
-    Ok(())
+    // Source World removal ignores reveal; known motion still respects it.
+    crate::recipient_lists::updated_wreck_memory(prior, game, accepted, visible, |at| {
+        game.reveal || visible(at)
+    })
 }
+
 fn refresh_world_parts(
     context: WorldRoutingContext<'_>,
     memory: &mut world_memory::WorldMemory,
@@ -608,12 +634,38 @@ fn refresh_world_parts(
         rails,
         ..
     } = context;
+    let cold_live = memory
+        .live_for(owner)
+        .is_none_or(|l| l.tick != Some(world.game.tick));
+    let accepted = if cold_live {
+        Some(collect_world_wrecks(
+            &world.game,
+            rules,
+            team,
+            observer,
+            context.environment,
+        )?)
+    } else {
+        None
+    };
     let (_, receipt) = memory.refresh_impl(world, rules, team, rails, observer, capture_frame)?;
     memory.apply_routes(team)?;
     let game = &world.game;
     let tick = game.tick;
     if memory.live_for(owner).is_none_or(|l| l.tick != Some(tick)) {
-        refresh_wrecks_parts(game, rules, memory, team, observer)?;
+        let team_memory = memory
+            .team_mut(team)
+            .expect("successful refresh creates team memory");
+        let rows = staged_world_wreck_memory(
+            &team_memory.wrecks,
+            game,
+            rules,
+            team,
+            observer,
+            accepted.unwrap(),
+        );
+        team_memory.wreck_queries = rows.iter().map(|row| row.query.clone()).collect();
+        team_memory.wrecks = rows;
         let vis = &memory
             .fog
             .team_with_observer(game, rules, team, observer)
@@ -655,6 +707,7 @@ pub struct PreparedWorldRouting<'a> {
     owner: usize,
     team: i32,
     receipt: crate::world::ObservationReceipt,
+    wreck_frame: crate::recipient_lists::WreckSourceFrame,
 }
 impl PreparedWorldRouting<'_> {
     /// Commit moves the copied arrays for every existing team, so all matching
@@ -687,32 +740,37 @@ impl PreparedWorldRouting<'_> {
         self.state.live_for(self.owner).unwrap().wrecks()
     }
 }
-pub struct WorldRoutingCommit<'a, 'w> {
+pub struct WorldRoutingCommit<'a, 'w, 'e> {
+    _environment: &'e crate::environment::EnvironmentRuntime,
     target: &'a mut world_memory::WorldMemory,
     state: world_memory::WorldMemory,
     ledger: crate::world::PreparedObservation<'w>,
 }
-impl WorldRoutingCommit<'_, '_> {
+impl WorldRoutingCommit<'_, '_, '_> {
     pub fn commit(self) {
         *self.target = self.state;
         self.ledger.commit();
     }
 }
 impl<'a> PreparedWorldRouting<'a> {
-    pub fn prepare_publication<'w>(
+    pub fn prepare_publication<'w, 'e>(
         self,
         world: &'w mut crate::world::World,
-    ) -> Result<(&'w mut Game, WorldRoutingCommit<'a, 'w>), String> {
+        environment: &'e crate::environment::EnvironmentRuntime,
+    ) -> Result<(&'w mut Game, WorldRoutingCommit<'a, 'w, 'e>), String> {
         let Self {
             target,
             state,
             receipt,
+            wreck_frame,
             ..
         } = self;
+        wreck_frame.validate(environment)?;
         let (game, ledger) = receipt.prepare(world)?;
         Ok((
             game,
             WorldRoutingCommit {
+                _environment: environment,
                 target,
                 state,
                 ledger,
@@ -753,5 +811,9 @@ pub fn prepare_world_routing<'a>(
         owner,
         team,
         receipt,
+        wreck_frame: crate::recipient_lists::WreckSourceFrame::capture(
+            &context.world.game,
+            context.environment,
+        ),
     })
 }

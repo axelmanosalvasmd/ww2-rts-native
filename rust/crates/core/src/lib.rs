@@ -30,6 +30,7 @@ pub mod math;
 pub mod movement;
 pub mod navigation;
 pub mod observed_memory;
+pub mod recipient_lists;
 
 pub mod objectives;
 pub mod path_requests;
