@@ -2,7 +2,7 @@
 
 Status: **v0 draft, technical answers recorded.** Author: Julio. Consumer reviewer: Axel.
 Axel answered the drafts' technical questions on #5 (`axel-interface-response-004`, 2026-10-12); the answers are recorded below. Under `docs/agent-coordination.md` a comment is not an agreed interface, so the status stays "draft" until Axel approves a contract PR.
-Baseline: reference ww2-rts `e4e579a`; native `main` after PR #12. The first calls below are built and verified on Linux x86_64 (branch `julio/ffi-first-calls`); the rest of this document is not built yet.
+Baseline: reference ww2-rts `e4e579a`; native `main` through PR #15 plus the client-view change. Formation calls and the first recipient-view calls are built and verified on Linux x86_64. ABI 2 is proposed for consumer review; it is not approved for adoption by this document.
 
 ## What the client needs from the core
 
@@ -23,7 +23,7 @@ Baseline: reference ww2-rts `e4e579a`; native `main` after PR #12. The first cal
 
 Issue #4 asks for one canonical decoder and knowledge state rather than two that drift. Axel accepted this design on #5: the core provides a **client view**, a handle that holds exactly what one recipient has been told.
 
-- Unreal passes every server message, as received, to the view. The view decodes it with the same code the Rust server uses to encode it.
+- Unreal passes every server message, as received, to the view. The view decodes the reference protocol. Sharing its schema with the future Rust server remains part of the server work.
 - Unreal reads what it draws from the view: units, changed terrain cells, fog, regions, resources.
 - Every rules query in the table above runs on the view. The view can only contain what the server sent, so no query can reach hidden state (IF-14), and the client links no server code.
 
@@ -51,13 +51,13 @@ With the browser client, Unreal and the Rust server sharing one decoder, a proto
 | Linux client | `x86_64-unknown-linux-gnu` | `libww2_ffi.a` (static) | any Linux machine (the Vostro) |
 | Server | `x86_64-unknown-linux-gnu`, plus the client targets | `ww2-server` binary (no FFI) | any |
 
-Build: `cargo build -p ww2-ffi --release --target <triple>`. Julio owns these artifacts; Axel owns linking them into the Unreal plugin and packaging (issue #4). Linux x86_64 is the first verified client target, because Axel develops and tests the client on Linux; Windows and Mac are planned and not yet proven.
+Build: `cargo build -p ww2-ffi --release --target <triple>`. Julio owns these artifacts; Axel owns linking them into the Unreal plugin and packaging (issue #4). Packaged Linux, Windows and macOS clients remain in final acceptance scope. Linux x86_64 is the first verified C-link target; an Editor or C-link result alone does not prove packaged-game completion. Windows and Mac Unreal linkage remain unproven.
 
 Link the static library with the system libraries `cargo rustc -p ww2-ffi --release --target <triple> -- --print native-static-libs` lists. For `x86_64-unknown-linux-gnu` with rustc 1.99.0 that is `-lgcc_s -lutil -lrt -lpthread -lm -ldl -lc` (measured on the Vostro, 2026-10-12). The library is built with Rust's default `panic = "unwind"`, which the panic boundary needs; a build with `panic = "abort"` would turn a caught panic into a crash.
 
-## First calls (built 2026-10-12)
+## Formation calls (introduced in ABI 1, 2026-10-12)
 
-`rust/crates/ffi` (`ww2-ffi`) holds the first five functions, for the #3 bridge test. `ww2_abi_version()` returns 1 and `ww2_rules_hash()` returns `0xed0ee23d32a621d1`.
+`rust/crates/ffi` (`ww2-ffi`) introduced five functions for the #3 bridge test. That build returned ABI 1; the proposed recipient-view build below returns ABI 2. `ww2_rules_hash()` stays `0xed0ee23d32a621d1` because the compiled formation rules have not changed. The signatures and formation results below are unchanged.
 
 ```c
 uint32_t ww2_abi_version(void);
@@ -107,9 +107,47 @@ cargo test -p ww2-ffi    # the header check, the error cases and the panic bound
 
 The C program compiles without warnings and also passes on the Mac (`aarch64-apple-darwin`, Apple clang, linked with `-lSystem -lc -lm`); the Mac stays a planned target until the plugin links the library there.
 
+## Recipient-view calls (proposed ABI 2, 2026-10-12)
+
+The C header now declares an opaque `ww2_view` and six functions:
+
+```c
+int32_t ww2_view_new(struct ww2_view **out);
+int32_t ww2_view_free(struct ww2_view *view);
+int32_t ww2_view_apply(struct ww2_view *view, const char *json, size_t len);
+int32_t ww2_view_unit_count(struct ww2_view *view, size_t *out);
+int32_t ww2_view_units(struct ww2_view *view, struct ww2_view_unit *out,
+                       size_t capacity, size_t *out_len);
+int32_t ww2_view_needs_resync(struct ww2_view *view, uint8_t *out);
+```
+
+Create one view per recipient and pass complete, unmodified server JSON messages to `apply`. A `start` resets the view, including reconnect to the same match. An `s` applies unit removals and changes, checks the held count/XOR, and updates raw fog and terrain state. The transport sends `resync` when requested and controls its rate limit. Unknown message types do not change the view; lobby, pause and deny messages remain available through the Rust API.
+
+- **Rows.** `ww2_view_unit` is 152 bytes on verified arm64 macOS and x86_64 Linux: `id`, `owner`, zero-padded `kind[64]`, eight doubles (`x`, `z`, `rot`, `aim`, `hp`, `supp`, `cd`, `built`), then `target`, `cover`, `flags`, `stars`. Rows are sorted by id. The type name must fit 63 UTF-8 bytes with no embedded NUL; an unrepresentable name fails before any row is written. Variable row tails are retained in Rust and are not exposed by this C struct.
+- **Buffers.** Arrays belong to the caller. `out_len` receives the required count even when capacity is insufficient. A null array with zero capacity queries the count; a nonempty view returns `WW2_ERR_CAPACITY`. No partial row array is written on an error. Free the view once; a null view is accepted by `free`.
+- **Errors.** Added codes are `WW2_ERR_PARSE` -5, `WW2_ERR_WRONG_STATE` -6 and `WW2_ERR_POISONED` -7. Invalid JSON, UTF-8 or message shape leaves the state unchanged. A snapshot before `start` is a wrong-state error. Panics poison touched handles, and all operations except `free` then fail.
+- **Limits.** Messages are at most 16 MiB, maps at most four million cells, and the held set at most 100,000 units. These are decoder resource bounds, not gameplay limits or server command limits.
+- **Compatibility.** ABI 1 consumers check the version and will reject an ABI 2 replacement. Rebuild and verify the Unreal consumer against this header only after the shared interface review. No formation signature or wire-protocol field changed. Contract status stays draft.
+
+The Rust API also exposes raw start/snapshot/HUD fields, seen/explored masks and a raw received-cell cache with accumulated change ids. C readers for those fields, composed terrain and rule queries are later slices. This C interface therefore does not yet replace every temporary Unreal decoder.
+
+**Verified:** all 1,236 messages in four recorded streams match the direct browser oracle for complete unit rows, raw cell-row caches and seen/explored masks. Conquest has 1,000 ticks per recipient and World has 200. The recordings use x64 Node 24.21.0, seed `0x3c1055`. Rust workspace tests, strict Clippy and formatting pass on the Mac. On the Vostro (Linux x86_64, Rust 1.99.0, gcc 13.3.0), workspace tests pass and the C link check compiles with `-Wall -Wextra -Werror -pedantic`. It reports:
+
+```text
+ww2_abi_version() = 2 (header WW2_ABI_VERSION 2)
+ww2_rules_hash() = ed0ee23d32a621d1
+32 written cases, 215 spots: 0 differ from the JavaScript
+510 view messages: 9 units, needs_resync=0
+508 view messages: 10 units, needs_resync=0
+110 view messages: 3 units, needs_resync=0
+108 view messages: 3 units, needs_resync=0
+```
+
+To repeat, build as above, compile `examples/link_check.c` with the listed Linux libraries, decompress any committed `protocol-*.jsonl.gz` capture, then run `link_check <formation.txt> <capture.jsonl>`. This proves C linkage and decoder behavior, not Unreal integration, packaged startup or multiplayer against a Rust server.
+
 ## Later slices
 
-The client view and its readers (units, cells, fog, regions) come with slice 1c, when Unreal first talks to the Rust server. The availability, placement, entrenchment and cover queries follow the client features that need them. Each slice adds functions and raises `ww2_abi_version`; each function arrives with a fixture recorded from the reference.
+C readers for fog, cells, regions and HUD fields, the versioned tables buffer, and availability, placement, entrenchment and cover queries follow the client features that need them. Each interface change requires its own fixture and consumer review.
 
 ## Answered on #5 (2026-10-12)
 

@@ -182,12 +182,16 @@ impl ClientView {
     pub fn start(&self) -> Option<&Value> {
         self.start.as_ref()
     }
+    /// Last received lobby message, not a derived match lifecycle state.
     pub fn lobby(&self) -> Option<&Value> {
         self.lobby.as_ref()
     }
+    /// Last received pause message. A lobby transition can clear the browser's effective pause
+    /// without replacing this raw message; presentation must account for the lobby state.
     pub fn pause(&self) -> Option<&Value> {
         self.pause.as_ref()
     }
+    /// Last received denial, retained until a later denial replaces it.
     pub fn last_denial(&self) -> Option<&Value> {
         self.last_denial.as_ref()
     }

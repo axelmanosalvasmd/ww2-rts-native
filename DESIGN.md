@@ -124,6 +124,20 @@ Decided now so release stays cheap:
 3. Unreal game: terrain, units, effects, HUD, sound, then the FPS view, with the browser client still working alongside.
 4. Retire the JavaScript client and Node server in ww2-rts.
 
+## Recipient client view (2026-10-12)
+
+`rust/crates/core/src/client_view.rs` holds one recipient's knowledge from the server's JSON messages. It starts empty, resets on every `start` (including reconnect to the same match), and updates held unit rows, raw terrain rows, fog masks and snapshot fields. The core still has no network, file-system, engine or unsafe code. `serde_json` 1.0.154 is built with `alloc` and `float_roundtrip`, so wire numbers have the same binary64 values as JavaScript.
+
+- **One decoder.** Unit deltas remove `gone`, replace on `all` or a missing `held`, and merge changed rows. The count/XOR check reports when the transport should request `resync`; the transport owns its one-second rate limit. A full unit resend does not reset fog or terrain. Wrecks and nodes carry forward when absent, as in the browser.
+- **Recipient data only.** The view stores the received map and snapshot, with raw extra fields preserved. Typed unit rows are sorted by id. Lobby, pause and deny messages have separate readers. Unknown message types leave the view unchanged. No authoritative game handle crosses the C interface.
+- **Terrain scope.** The terrain cache contains the latest received row for each cell, plus a changed-cell list that accumulates until drained. The start map remains available separately. This is raw wire state, not a replacement for the browser's composed terrain, height or placement queries. Omitted fields in a later row must not be interpreted as clearing previously composed terrain metadata. Those queries remain later work.
+- **Fog scope.** Seen and explored masks use the reference run encoding. Snapshot changes XOR into seen and add to explored. A missing mask and end-of-match rendering remain distinct from these raw masks. The client still owns fog fading, temporary illumination under visible units and end-of-match presentation.
+- **Invalid input.** Parsing and validation finish before a state update. A bad message leaves the view unchanged. Limits are 16 MiB per message, four million map cells and 100,000 held units. The C wrapper catches panics and poisons an affected handle, which can then only be freed.
+
+`harness/protocol-record.mjs` records complete, sanitized server messages from scripted clients. `harness/view-check.mjs` uses the pinned browser's `createWorldState` and `createFog`; `simtest --view` emits the same per-message report. The reports compare complete held unit rows, raw terrain-row caches and seen/explored masks. Gzip keeps complete World starts and longer Conquest sessions small; decompression belongs to `simtest`, not the core.
+
+Verification results and the exact ABI are recorded with this slice in `docs/contracts/rust-unreal-abi.md`.
+
 ## The core's math (2026-10-12)
 
 The core carries its own math (`rust/crates/core/src/math.rs`) instead of Rust's `f64` methods, which call each platform's C library. It ports V8's fdlibm (`src/base/ieee754.cc` as Node 24.21.0 compiles it) and V8's `Math.hypot`, plus JavaScript's `round`, `max`, `min` and `sign`, so every platform computes the same bits and they equal the JavaScript game's.
