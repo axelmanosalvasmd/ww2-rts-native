@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Fixed two snapshot dependency compilation omissions: initialized the seven canonical World Match owners and supplied the recovery fixture's full-current actor-order argument. Restored the World-only refusal for unrepresented logistics startup. Existing publication callbacks and snapshot mode limits are preserved. Combined native verification is pending.
+
+- Added a quiet snapshot admission regression for an invalid remembered-mine cell. The existing shared routing guard rejects it before terrain or fog acknowledgments change; no runtime behavior changed.
+
 - Added an internal complete seat snapshot for explicitly admitted quiet ordinary Conquest frames. Before terrain/fog delivery, it checks actual persistent actors, paid work, recipient remembered wrecks/discovered mines and caller-owned environment events; unsupported state refuses instead of receiving empty defaults. The original recorder now checks 73 states, 219 partial projections and 219 full source snapshots, including technology omission. Combined native verification is pending; transport, spectators and active actor/list projection remain separate.
 
 - Preserved the final verified movement snapshot repair and evidence in the separate composition dependency union. The composition descendant still needs its own combined native checks.

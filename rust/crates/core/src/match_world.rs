@@ -197,6 +197,9 @@ impl Match {
         options: MatchOptions,
         random: MatchRandom,
     ) -> Result<Self, String> {
+        if options.logistics {
+            return Err("World startup does not yet initialize logistics".into());
+        }
         if options.mode != Mode::World || map.geography().is_none() {
             return Err("World startup requires explicit World geography and mode".into());
         }
@@ -280,6 +283,10 @@ impl Match {
             combat: crate::match_combat::CombatState::default(),
             environment: crate::environment::EnvironmentRuntime::default(),
             firing: crate::match_firing::FiringState::default(),
+            field_works: crate::field_works::FieldWorksRuntime::default(),
+            abilities: crate::match_abilities::AbilityState::default(),
+            recovery: crate::match_recovery::RecoveryState::default(),
+            support: crate::match_support::SupportState::default(),
             recipients: Vec::new(),
             routing_fog: crate::fog::Fog::default(),
             tick_state: crate::match_tick::TickState::default(),
@@ -298,6 +305,9 @@ impl Match {
             produced_placer: crate::produced_units::ProducedPlacer::new(),
             scenario: None,
             logistics: crate::logistics::LogisticsState::default(),
+            convoys: None,
+            supply_net: crate::supply_network::GroundSupplyNetwork::default(),
+            supply_routes: crate::supply_routes::SupplyRouting::default(),
             capture_ticks: Vec::new(),
             story: vec![crate::match_story::PlayerStory::default(); count],
             fallen: crate::match_story::FallenLocations::default(),
