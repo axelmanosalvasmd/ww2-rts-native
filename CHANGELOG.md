@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add source-backed World ground route, home, march and traffic adapters over the existing actor policy and scheduler. Retry failures use the full accepted team-memory version, unknown World cover uses its remembered open baseline, and neutral traffic reads the existing local actor visibility without a commander seat. Deferred movement observations publish memory, Fog, ledger and rebound path history only when traffic or a search actually reads terrain. Replace the earlier test that deliberately refused unknown World cover. Original x64 recordings cover 58 policy/contact cases, 24 route-history reads and five retry attempts; native checks and whole World caller integration are pending. Active AIR, rail, enabled logistics and unconnected tactical paths remain refused.
+
 - Keep borrowed actor visibility membership independent of order. The canonical World local defender records maintained-grid order, so a binary search could miss visible targets. Add an unsorted-membership witness without sorting or changing the canonical vector; native execution is pending.
 
 - Add a borrowed actor policy for ordinary and World ground providers. Preserve the existing local defender's owner -1, team, visibility and zero resources without adding a commander seat or mutable actor store. This internal source prerequisite does not enable the World tick and has not run native checks.

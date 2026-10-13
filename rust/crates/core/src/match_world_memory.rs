@@ -755,9 +755,26 @@ pub struct WorldRoutingCommit<'a, 'w, 'e> {
     _environment: &'e crate::environment::EnvironmentRuntime,
     target: &'a mut world_memory::WorldMemory,
     state: world_memory::WorldMemory,
+    owner: usize,
+    team: i32,
     ledger: crate::world::PreparedObservation<'w>,
 }
 impl WorldRoutingCommit<'_, '_, '_> {
+    pub(crate) fn query(&self) -> RouteQuery<'_> {
+        self.state.team(self.team).unwrap().query()
+    }
+    pub(crate) fn knowledge(&self) -> &RouteKnowledge {
+        self.state.team(self.team).unwrap().knowledge()
+    }
+    pub(crate) fn live(&self) -> LiveRouting<'_> {
+        self.state.live_for(self.owner).unwrap().live()
+    }
+    pub(crate) fn wrecks(&self) -> &[Wreck] {
+        self.state.live_for(self.owner).unwrap().wrecks()
+    }
+    pub(crate) fn failure_version(&self) -> u64 {
+        self.state.team(self.team).unwrap().version()
+    }
     pub fn commit(self) {
         *self.target = self.state;
         self.ledger.commit();
@@ -774,7 +791,8 @@ impl<'a> PreparedWorldRouting<'a> {
             state,
             receipt,
             wreck_frame,
-            ..
+            owner,
+            team,
         } = self;
         wreck_frame.validate(environment)?;
         let (game, ledger) = receipt.prepare(world)?;
@@ -784,6 +802,8 @@ impl<'a> PreparedWorldRouting<'a> {
                 _environment: environment,
                 target,
                 state,
+                owner,
+                team,
                 ledger,
             },
         ))

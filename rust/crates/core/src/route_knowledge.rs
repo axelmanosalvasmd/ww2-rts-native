@@ -619,7 +619,7 @@ impl RouteKnowledge {
         wrecks: &[Wreck],
     ) -> Result<u8, KnowledgeError> {
         let c = self.cell_of(at).ok_or(KnowledgeError::InvalidCell)?;
-        if !self.known[c] {
+        if !self.known[c] && self.mode != KnowledgeMode::World {
             return Err(KnowledgeError::UnknownCell);
         }
         let flags = self.flags[c];

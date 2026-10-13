@@ -51,6 +51,9 @@ impl Match {
     }
 
     pub(crate) fn reaction_home_for(&self, unit: &Unit) -> Result<Point, String> {
+        if self.uses_world_routes() {
+            return self.world_ground_home_for(unit);
+        }
         let mut home = self
             .start
             .players
