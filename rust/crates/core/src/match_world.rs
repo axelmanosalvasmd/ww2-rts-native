@@ -22,6 +22,7 @@ pub struct RegionState {
     pub team: i32,
     pub progress: f64,
     pub capper: Option<usize>,
+    pub contested: bool,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct ResourceNode {
@@ -47,6 +48,7 @@ pub struct KnownBuilding {
     pub built: Option<f64>,
 }
 pub struct WorldRuntime {
+    pub memory: crate::world_memory::WorldMemory,
     pub regions: Vec<RegionState>,
     pub nodes: Vec<ResourceNode>,
     pub local_defender: LocalDefender,
@@ -197,6 +199,9 @@ impl Match {
         options: MatchOptions,
         random: MatchRandom,
     ) -> Result<Self, String> {
+        if options.logistics {
+            return Err("World startup does not yet initialize logistics".into());
+        }
         if options.mode != Mode::World || map.geography().is_none() {
             return Err("World startup requires explicit World geography and mode".into());
         }
@@ -230,7 +235,7 @@ impl Match {
         world.game.rain = start.initial_rain;
         world.game.wet = start.initial_wet;
         // Static structures precede the source World journal's zero position.
-        world.take_journal();
+        world.reset_journal();
         let geography = map.geography().expect("checked geography");
         let regions = geography
             .regions
@@ -250,6 +255,7 @@ impl Match {
                     team,
                     progress: if r.home.is_some() { 1.0 } else { 0.0 },
                     capper: None,
+                    contested: false,
                 })
             })
             .collect::<Result<Vec<_>, String>>()?;
@@ -261,6 +267,7 @@ impl Match {
             geography.regions.len(),
         )?;
         let runtime = WorldRuntime {
+            memory: crate::world_memory::WorldMemory::default(),
             regions,
             nodes: Vec::new(),
             rails,
@@ -280,6 +287,10 @@ impl Match {
             combat: crate::match_combat::CombatState::default(),
             environment: crate::environment::EnvironmentRuntime::default(),
             firing: crate::match_firing::FiringState::default(),
+            field_works: crate::field_works::FieldWorksRuntime::default(),
+            abilities: crate::match_abilities::AbilityState::default(),
+            recovery: crate::match_recovery::RecoveryState::default(),
+            support: crate::match_support::SupportState::default(),
             recipients: Vec::new(),
             routing_fog: crate::fog::Fog::default(),
             tick_state: crate::match_tick::TickState::default(),
@@ -298,6 +309,9 @@ impl Match {
             produced_placer: crate::produced_units::ProducedPlacer::new(),
             scenario: None,
             logistics: crate::logistics::LogisticsState::default(),
+            convoys: None,
+            supply_net: crate::supply_network::GroundSupplyNetwork::default(),
+            supply_routes: crate::supply_routes::SupplyRouting::default(),
             capture_ticks: Vec::new(),
             story: vec![crate::match_story::PlayerStory::default(); count],
             fallen: crate::match_story::FallenLocations::default(),
@@ -352,6 +366,13 @@ impl Match {
     }
     fn publish_world_unit(&mut self, draft: StagedUnit) -> Result<u32, String> {
         let id = draft.unit.id;
+        if self.combat.get(id).is_some()
+            || self.firing.get(id).is_some()
+            || self.abilities.get(id).is_some()
+            || self.recovery.get(id).is_some()
+        {
+            return Err("World publication metadata identity already exists".into());
+        }
         let mode = self.world.game.mode;
         prepare_world_publication(
             PublicationParts {
