@@ -214,13 +214,20 @@ fn malformed_operative_identity_rejects_before_clock_or_respawn_publication() {
 }
 
 #[test]
-fn retained_dead_operative_metadata_allows_the_next_tick() {
+fn retired_operative_metadata_is_collected_before_later_ticks() {
     let f = source::fixture();
     let initial = source::decoded(&f["traces"][0]["initial"]);
     let mut m = source::make(&f, &initial, Mode::Conquest);
     m.join_companion("history", 0, false).unwrap();
     let companion = m.companions.get("history").unwrap().id;
     let id = m.companions.records[&companion].unit_id;
+    let future = OrderKey {
+        tick: 5,
+        issuer: 0,
+        sequence: 29,
+    };
+    m.enqueue_command(future, Command::Unsupported).unwrap();
+    assert!(m.firing.flights.is_empty());
     m.world.game.units.get_mut(&id).unwrap().hp = 0.0;
     let report = m.advance_tick().unwrap();
     assert!(report.retired.iter().any(|retired| retired.unit.id == id));
@@ -234,7 +241,26 @@ fn retained_dead_operative_metadata_allows_the_next_tick() {
     assert!(m.commands.units[&id].operative);
     assert!(m.firing.get(id).is_some());
     assert!(m.combat.get(id).is_some());
-    assert!(m.advance_tick().is_ok());
+    // Collection follows the next flight phase. It must release the three
+    // retained owners together while leaving the companion's respawn due.
+    assert_eq!(m.advance_tick().unwrap().tick, 2);
+    assert!(!m.commands.units.contains_key(&id));
+    assert!(m.firing.get(id).is_none());
+    assert!(m.combat.get(id).is_none());
+    assert_eq!(m.companions.records[&companion].unit_id, 0);
+    assert_eq!(
+        m.companions.records[&companion].respawn_at,
+        report.tick + RESPAWN_TICKS
+    );
+    // This was the first subsequent admission failure when Combat alone was
+    // collected. The global input queue must also survive per-unit cleanup.
+    assert_eq!(m.advance_tick().unwrap().tick, 3);
+    assert!(m.tick_state.fault().is_none());
+    assert_eq!(m.advance_tick().unwrap().tick, 4);
+    let boundary = m.advance_tick().unwrap();
+    assert_eq!(boundary.tick, 5);
+    assert_eq!(boundary.commands.len(), 1);
+    assert_eq!(boundary.commands[0].key, future);
 }
 
 #[test]

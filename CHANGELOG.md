@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Released retained operative control, firing and path-request state at the existing no-flight Combat cleanup boundary. The first full operative replay reached tick three after death and found stranded owner rows whose Combat backing had been collected. All shooter metadata remains while any canonical flight references it; strict orphan admission, the recorded queue and allocator remain unchanged. The death-delay regression now covers collection and continued ticks, with complete gates pending.
+
 - Fixed the full-step Dig recorder to copy remaining cell tuples at each checkpoint. The live source deque later emptied earlier saved arrays, falsely recording zero cells at tick one. Regeneration now retains four, three, two and one cells before completion; all ten other traces and the ordering case remain unchanged. Runtime work, payment and timing are unchanged, and native gates are restarting against the corrected oracle.
 
 - Aligned the tick consumer's optional control projection with the original recorder's observed fields. Ability and Dig cases enqueue commands but do not record control rows; the first native run added those extra rows and failed an otherwise exact tick-one comparison. Dedicated command traces still compare every recorded control row. Runtime scheduling and original fixtures are unchanged; full gates are restarting.
