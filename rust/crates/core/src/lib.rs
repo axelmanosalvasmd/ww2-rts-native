@@ -12,6 +12,8 @@ pub mod formation;
 pub mod game;
 pub mod grid;
 pub mod legacy_scenario;
+
+pub mod logistics;
 pub mod map;
 pub mod match_runtime;
 pub mod math;
