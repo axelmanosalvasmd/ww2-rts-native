@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added canonical objective state and standalone capture-point and point-supply phases. Four focused tests compare 214 original-JavaScript capture traces (1,165 checkpoints) and 223 supply states, including exact capture progress, event order and control/reached masks. Preserved allied ownership, sequential prerequisites, forced-reserve guards, circular safe zones, MOVE-only supply seeds and square point-connectivity checks. Inputs are validated before objective mutation. Match scheduling, story application, income, refill networks and win/loss integration remain unfinished; no ABI or wire interface changed.
+
 - Added typed legacy map-trigger migration, startup state and once-only timed execution. Two focused tests match the original scenario engine over all five authored trigger maps and 17 boundary cases, with 100 steps covering action order, time jumps, point-owner history and stable execution IDs. Initialization emits nothing; ordered Say and Destroy requests are returned for a later match actuator. General scenarios, terrain destruction and match integration remain unfinished.
 
 - Added the twelve physical reserve helpers in `logistics.rs`, with optional per-unit state keyed by ID and borrowed definition/owner/movement facts. Exact JavaScript fixtures cover 60 enablement contexts, 118 weapon definitions, 708 initialization cases and 618 state/stock/query steps in 44 traces. Fractional ammo credit, fuel order, exhaustion, recovery and repeat initialization preserve source behavior. Match startup, powered-travel integration, withdrawal actions, convoys, territory supply and snapshots remain separate; no Game fields, ABI or rules hash changed.
