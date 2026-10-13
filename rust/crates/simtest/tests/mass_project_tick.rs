@@ -669,7 +669,7 @@ fn compare(
     );
     if !expected["pathStats"].is_null() {
         same!(
-            m.path_requests().stats().dropped as f64,
+            m.commands.path_requests().stats().dropped as f64,
             number(&expected["pathStats"]["dropped"]),
             "actual scheduler drops"
         );
