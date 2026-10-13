@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added borrowed staged sight sources and a recipient component preview that defers terrain acknowledgements until infallible publication. Existing fog and routing keys stay lazy; the matching World preview defers journal trimming. Original-source and native observer verification remain pending. No authoritative unit is inserted during preparation.
+
 - Carried the reviewed local observation-index repairs into all ordinary recipient refresh, point visibility and wreck reads. These queries preserve maintained gameplay bucket order; staged-observer integration and its native regression checks follow separately.
 
 - Kept the new validation note scoped to World recipient memory and its release FFI check; earlier generator evidence is unchanged.

@@ -54,6 +54,7 @@ pub struct KnownRegion {
     pub contested: bool,
 }
 
+#[derive(Clone)]
 pub struct TeamMemory {
     rows: Vec<WorldRow>,
     positions: BTreeMap<usize, usize>,
@@ -93,7 +94,7 @@ impl TeamMemory {
             .ok_or("World memory cursor exhausted".into())
     }
 }
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct Sent {
     revisions: BTreeMap<usize, (i32, u64)>,
     at: Option<u64>,
@@ -105,7 +106,7 @@ pub(crate) struct BoundUnit {
     pub hp: f64,
     pub at: Point,
 }
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct WorldLive {
     pub(crate) tick: Option<i64>,
     pub(crate) units: Vec<BoundUnit>,
@@ -129,7 +130,7 @@ impl WorldLive {
     }
 }
 /// Lazy source-order team memories. Local actor routing has no sent cursor.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct WorldMemory {
     pub(crate) teams: Vec<(i32, TeamMemory)>,
     sent: BTreeMap<usize, Sent>,
@@ -158,6 +159,19 @@ impl WorldMemory {
         team: i32,
         rails: &crate::match_world_rails::WorldRails,
     ) -> Result<usize, String> {
+        let (count, receipt) = self.refresh_impl(world, rules, team, rails, None, false)?;
+        receipt.commit(world)?;
+        Ok(count)
+    }
+    pub(crate) fn refresh_impl(
+        &mut self,
+        world: &World,
+        rules: &Rules,
+        team: i32,
+        rails: &crate::match_world_rails::WorldRails,
+        observer: Option<crate::staged_observer::StagedObserver<'_>>,
+        capture_frame: bool,
+    ) -> Result<(usize, crate::world::ObservationReceipt), String> {
         validate(world, rules, team)?;
         if rails
             .rail_at
@@ -180,9 +194,9 @@ impl WorldMemory {
         let end = world.journal_end().map_err(|e| e.to_string())?;
         let key = (g.vision_tick, g.terrain_version, g.reveal);
         let same_key = self.team(team).is_some_and(|m| m.key == Some(key));
-        let fog = self.fog.team(g, rules, team);
+        let fog = self.fog.team_with_observer(g, rules, team, observer);
         if same_key {
-            return Ok(0);
+            return Ok((0, world.defer_journal_trim(None, capture_frame)?));
         }
         let vis = fog.vis.clone();
         let fog_key = fog.key;
@@ -312,12 +326,11 @@ impl WorldMemory {
         m.seen = Some(vis);
         m.journal_at = Some(end);
         self.binding = Some(binding);
-        if world.journal().len() >= 65536 && trim_at > base {
-            world
-                .trim_journal_before(trim_at)
-                .map_err(|e| e.to_string())?;
-        }
-        Ok(count as usize)
+        let trim = (world.journal().len() >= 65536 && trim_at > base).then_some(trim_at);
+        Ok((
+            count as usize,
+            world.defer_journal_trim(trim, capture_frame)?,
+        ))
     }
     /// A full read preserves first insertion order; incremental reads resolve
     /// the current row identity at each log entry. Route reads use another cursor.
