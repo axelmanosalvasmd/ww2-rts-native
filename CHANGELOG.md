@@ -2,11 +2,18 @@
 
 ## Unreleased
 
+- Merged the checked staged-routing provider footprint and test projection corrections into the recipient-list source successor. The provider evidence remains scoped to its recorded head; list and batch consumer native checks remain pending.
+
 - Added an actual-source World neutral wreck row and negative-zero rounding witness to the list replay. The fixture now covers five traces and 92 actions, including the internal neutral-owner sentinel projected as source owner -1; native proof remains pending.
 
 - Reject recipient wreck/node coordinates or wreck rotation whose source tenths rounding would overflow, before observation changes or JSON projection. Added the finite-but-unrepresentable rotation guard to the existing atomicity regression; native proof remains pending.
 
 - Added source-backed recipient wreck, found-mine and World resource-node lists. Full wreck display facts now stay in the single recipient memory beside derived cover queries; missing imported facts reject explicitly. Mine sightings retain discovery order. Prepared ordinary and World observations check the Environment source frame, and malformed visible metadata rejects before memory/Fog updates. The original-source fixture covers five traces and 92 actions; native verification is pending.
+- Verified prepared routing sight and cache transactions against 14 original births, 12 prebirth searches and one cross-team reroute. All three provider tests, focused routing and World memory debug tests, 167 release workspace tests, strict Clippy, formatting and release FFI pass. Actual recruitment wallet/story and World training integration remain separate.
+
+- Matched JavaScript JSON number spelling for endpoint wetness values in the shared birth replay projection and removed an unused test import. The first replay otherwise matched the cold-birth view exactly.
+
+- Corrected staged-observer cell validation and source fingerprints to use the canonical unit footprint index type. The first native compile exposed two integer-type mismatches.
 
 - Added a fourth original World birth case with a different team’s warmed vehicle history, four accepted prebirth changes and a postbirth reroute. The recorder now covers 14 births, 12 prebirth searches and one cross-team reroute; native success/abort cache-lifetime checks remain pending.
 
