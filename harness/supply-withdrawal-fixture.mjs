@@ -58,7 +58,9 @@ function row(u) {
     at: point(u), path: u.path.map(point), worldGoal: point(u.worldGoal), routeEnd: point(u.routeEnd),
     retreating: u.retreating, garrison: u.garrison, stuck: bits(u.stuck),
     started: !!u.supplyStarted, escape: !!u.supplyEscape, hold: !!u.supplyHold, retry: u.supplyRetry ?? null,
-    orders: u.orders.map(c => c.orders.map(r => [r[0], bits(r[1]), bits(r[2])])),
+    orders: u.orders.map(c => c.t === 'move'
+      ? ['move', c.orders.map(r => [r[0], bits(r[1]), bits(r[2])])]
+      : ['ability', bits(c.x), bits(c.z)]),
     attack: u.attackId, target: u.targetId, enter: u.enter, board: u.board,
     nade: point(u.nade), fireAt: u.fireAt, face: u.face ?? null,
     build: !!u.build, dig: !!u.dig, entrench: !!u.entrench, amove: point(u.amove),
@@ -87,7 +89,8 @@ for (const sourceCase of [5, 27, 60]) for (const kind of ['rifle', 'tank']) {
   const one = [{ x: u.x + 4, z: u.z }], goal = one[0];
   step('unforced no-op', 10);
   step('first forced cancels intents without a store', 20,
-    { orders: [{ t: 'move', orders: [[u.id, goal.x, goal.z]], queue: false }],
+    { orders: [{ t: 'move', orders: [[u.id, goal.x, goal.z]], queue: false },
+        { t: 'ability', x: goal.x, z: goal.z }],
       attackId: 999, targetId: 998, enter: 1, board: 2, nade: goal, fireAt: 3 },
     { forced: true }, 'none');
   step('existing path, stuck at boundary', 21, { path: one, worldGoal: goal, stuck: 1 });
@@ -110,7 +113,7 @@ for (const sourceCase of [5, 27, 60]) for (const kind of ['rifle', 'tank']) {
   if (house >= 0) step('first forced exits a house', 180,
     { x: (house % g.w + .5) * 2, z: (Math.floor(house / g.w) + .5) * 2,
       garrison: house, supplyStarted: false, path: [], worldGoal: null, supplyRetry: 0 });
-  step('riding forced unit is left to carrier', 200, { riding: g.players[0].hq ?? 1, supplyStarted: false });
+  step('riding forced unit is left to carrier', 200, { riding: [...g.units.values()].find(t => t.owner === 0 && t.id !== u.id).id, supplyStarted: false });
   step('riding recovered unit clears prior withdrawal', 201, { supplyStarted: true }, { forced: false });
   traces.push({ sourceCase, initial, steps });
 }

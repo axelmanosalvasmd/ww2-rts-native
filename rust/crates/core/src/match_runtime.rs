@@ -392,6 +392,9 @@ pub struct BuildingCell {
 /// Authoritative Conquest startup state. Tick execution is added independently.
 /// Live terrain and units have a single owner in `world.game`.
 pub struct Match {
+    pub field_works: crate::field_works::FieldWorksRuntime,
+    pub abilities: crate::match_abilities::AbilityState,
+    pub recovery: crate::match_recovery::RecoveryState,
     pub commands: crate::match_commands::MatchCommands,
     pub combat: crate::match_combat::CombatState,
     pub environment: crate::environment::EnvironmentRuntime,
@@ -424,7 +427,33 @@ pub struct Match {
     pub rules: Rules,
 }
 
+/// Shared cancellation for transactions holding disjoint wallet/story guards.
+pub(crate) fn cancel_field_work_state(
+    runtime: &mut crate::field_works::FieldWorksRuntime,
+    unit: &mut crate::game::Unit,
+) -> Result<(), String> {
+    if unit.dig != runtime.is_active(unit.id) {
+        return Err("unrepresented or inconsistent field-work activity".into());
+    }
+    runtime.cancel(unit.id);
+    unit.dig = false;
+    Ok(())
+}
+
 impl Match {
+    /// Cancel current paid work without a refund. The descriptor is removed before its activity flag.
+    pub fn cancel_field_work(&mut self, id: u32) -> Result<(), String> {
+        let unit = self
+            .world
+            .game
+            .units
+            .get_mut(&id)
+            .ok_or("missing field-work unit")?;
+        if unit.id != id {
+            return Err("inconsistent field-work identity".into());
+        }
+        cancel_field_work_state(&mut self.field_works, unit)
+    }
     pub fn new(map: &crate::map::AuthoritativeMap, options: MatchOptions) -> Result<Self, String> {
         let rules = Rules::compiled().map_err(|e| e.to_string())?;
         let start = StartPlan::prepare(map, &options, &rules)?;
@@ -458,6 +487,9 @@ impl Match {
         };
         let player_count = start.players.len();
         let mut result = Self {
+            field_works: crate::field_works::FieldWorksRuntime::default(),
+            abilities: crate::match_abilities::AbilityState::default(),
+            recovery: crate::match_recovery::RecoveryState::default(),
             commands: crate::match_commands::MatchCommands::new(4096),
             combat: crate::match_combat::CombatState::default(),
             environment: crate::environment::EnvironmentRuntime::default(),
@@ -491,10 +523,11 @@ impl Match {
         result.setup_bases()?;
         for unit in result.world.game.units.values() {
             result.combat.initialize(unit.id);
+            result.firing.initialize(unit.id);
+            result.abilities.initialize(unit.id);
+            result.recovery.initialize(unit.id);
             let control = crate::match_commands::UnitControl::new(unit, &result.rules)?;
             result.commands.insert(unit.id, control);
-            result.firing.initialize(unit.id);
-            result.combat.initialize(unit.id);
         }
         result.grid.rebuild(&result.world.game.units);
         result.initialize_recipient_routing()?;

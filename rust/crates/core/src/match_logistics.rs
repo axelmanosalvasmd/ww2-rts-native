@@ -443,7 +443,11 @@ impl Match {
             if u.garrison.is_some() && exiting != Some(u.id) {
                 return Err("supply garrison entry is not represented".into());
             }
-            queued_points(&self.commands.units[&u.id], u.id)?;
+            queued_points(
+                &self.commands.units[&u.id],
+                u.id,
+                self.rules.kinds[u.kind].name != "truck",
+            )?;
             let c = self.combat.get(u.id).unwrap();
             if u.riding != c.carrier.is_some()
                 || c.carrier.is_some_and(|id| !g.units.contains_key(&id))
@@ -621,8 +625,9 @@ impl ConvoyWorld<'_> {
             riding: c.carrier,
             path: u.path.clone(),
             world_goal: u.world_goal,
-            orders: queued_points(&self.commands.units[&u.id], u.id)
+            orders: queued_points(&self.commands.units[&u.id], u.id, name != "truck")
                 .expect("validated queued convoy commands"),
+            orders_pending: !self.commands.units[&u.id].orders.is_empty(),
             amove: u.amove,
             stuck: u.stuck,
         }
@@ -936,35 +941,41 @@ impl supply_convoys::World for ConvoyWorld<'_> {
     }
 }
 
-fn queued_points(control: &UnitControl, id: u32) -> Result<Vec<Point>, String> {
-    control
-        .orders
-        .iter()
-        .map(|command| match command {
-            crate::match_commands::Command::Move {
+fn queued_points(control: &UnitControl, id: u32, abilities: bool) -> Result<Vec<Point>, String> {
+    use crate::match_commands::Command;
+    let mut points = Vec::new();
+    for command in &control.orders {
+        match command {
+            Command::Move {
                 orders,
                 control_ids,
                 queue,
                 together,
                 ..
             } => {
-                let matches = orders
-                    .iter()
-                    .filter(|order| order.unit == i64::from(id))
-                    .collect::<Vec<_>>();
                 if orders.len() != 1
                     || control_ids.is_some()
                     || *queue
                     || *together
-                    || matches.len() != 1
-                    || !matches[0].at.x.is_finite()
-                    || !matches[0].at.z.is_finite()
+                    || orders[0].unit != i64::from(id)
+                    || !orders[0].at.x.is_finite()
+                    || !orders[0].at.z.is_finite()
                 {
                     return Err("invalid queued convoy movement projection".into());
                 }
-                Ok(matches[0].at)
+                points.push(orders[0].at);
             }
-            _ => Err("unsupported queued convoy command projection".into()),
-        })
-        .collect()
+            Command::Ability {
+                ids,
+                at: Some(at),
+                queue: false,
+                automatic: false,
+            } if abilities
+                && ids.as_slice() == [i64::from(id)]
+                && at.x.is_finite()
+                && at.z.is_finite() => {}
+            _ => return Err("unsupported queued convoy command projection".into()),
+        }
+    }
+    Ok(points)
 }

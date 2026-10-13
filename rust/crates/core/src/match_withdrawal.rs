@@ -134,9 +134,8 @@ impl Match {
                 unit.garrison = None;
                 self.grid.update(id, &unit);
             }
-            self.field_works.cancel(id);
+            crate::match_runtime::cancel_field_work_state(&mut self.field_works, &mut unit)?;
             unit.build = false;
-            unit.dig = false;
             unit.entrench = false;
             unit.board = 0;
             unit.attack = false;
@@ -224,7 +223,7 @@ impl Match {
                     self.world.game.units.insert(id, unit.clone());
                     self.grid.update(id, &unit);
                 }
-                self.field_works.cancel(id);
+                self.cancel_field_work(id)?;
                 self.retreat_unit(id)?;
                 let current = self.world.game.units[&id].clone();
                 let destination = (!path.is_empty()).then_some(goal);

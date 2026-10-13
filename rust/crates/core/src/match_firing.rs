@@ -8,7 +8,7 @@ use crate::{
     catalog::{Catalog, Value},
     game::{CELL, COVER, Point, Unit},
     grid::UnitId,
-    match_combat::RetargetSink,
+    match_combat::{ExplosionSource, RetargetSink},
     match_runtime::Match,
     math, projectiles, vision,
 };
@@ -29,6 +29,7 @@ pub struct FiringState {
     pub suppressed: BTreeMap<u64, BTreeSet<UnitId>>,
     pub events: Vec<LaunchEvent>,
     pub salvos: Vec<LiveSalvo>,
+    pub grenades: Vec<GrenadeTicket>,
     claims: BTreeMap<(UnitId, i32), f64>,
     prior: BTreeMap<UnitId, crate::game::Pose>,
     prior_tick: Option<i64>,
@@ -46,6 +47,7 @@ impl Default for FiringState {
             prior_tick: None,
             events: Vec::new(),
             salvos: Vec::new(),
+            grenades: Vec::new(),
         }
     }
 }
@@ -81,6 +83,12 @@ pub enum LaunchEvent {
         count: u32,
         spread: f64,
     },
+    Throw {
+        shooter: UnitId,
+        owner: usize,
+        at: Point,
+    },
+    SmallArms(SmallArmsEvent),
     Environment(crate::environment::Effect),
     Contact(ContactEvent),
     Expiry {
@@ -89,6 +97,22 @@ pub enum LaunchEvent {
         time: f64,
         at: projectiles::Point3,
     },
+}
+
+/// Existing ordinary shot fields used by the operative producer.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SmallArmsEvent {
+    pub effect: &'static str,
+    pub shooter: UnitId,
+    pub owner: usize,
+    pub at: projectiles::Point3,
+    pub hit: Option<SmallArmsHit>,
+}
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SmallArmsHit {
+    pub target: UnitId,
+    pub owner: usize,
+    pub man: Option<u32>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -163,6 +187,21 @@ impl LaunchEvent {
                 spread,
             } => {
                 json!({"f":shooter,"fo":owner,"x":at.x,"z":at.z,"k":"salvo","n":count,"r":spread,"physical":true,"local":true})
+            }
+            Self::Throw { shooter, owner, at } => {
+                json!({"f":shooter,"fo":owner,"x":at.x,"z":at.z,"k":"throw","physical":true,"local":true})
+            }
+            Self::SmallArms(e) => {
+                let mut value = json!({"k":e.effect,"f":e.shooter,"fo":e.owner,"x":e.at.x,"y":e.at.y,"z":e.at.z});
+                if let Some(hit) = e.hit {
+                    value["t"] = json!(hit.target);
+                    value["to"] = json!(hit.owner);
+                    value["hit"] = json!(true);
+                    if let Some(man) = hit.man {
+                        value["m"] = json!(man);
+                    }
+                }
+                value
             }
             Self::Environment(e) => e.to_json(),
             Self::Expiry {
@@ -240,7 +279,7 @@ pub struct LiveFlight {
     pub terrain: f64,
     pub scar: f64,
     pub blast_radius: Option<f64>,
-    pub blast_source: bool,
+    pub blast_source: Option<ExplosionSource>,
     pub effect: Option<&'static str>,
 }
 
@@ -474,7 +513,7 @@ impl Match {
     ) -> Result<bool, String> {
         use crate::{
             combat::{Impact, WeaponDamage},
-            match_combat::{ContactTarget, ExplosionSource, FlightSource},
+            match_combat::{ContactTarget, FlightSource},
         };
         p.sequence = p
             .sequence
@@ -535,11 +574,7 @@ impl Match {
             at: Point { x: at.x, z: at.z },
             direction,
         };
-        let blast_source = if p.blast_source {
-            Some(ExplosionSource::weapon(p.source_kind, &self.rules).map_err(|e| e.to_string())?)
-        } else {
-            None
-        };
+        let blast_source = p.blast_source;
         let unit_order: Vec<_> = self.world.game.units.keys().copied().collect();
         let mut damage_amount = 0.0;
         if let Some(contact) = contact {
@@ -727,9 +762,20 @@ impl Match {
                 || p.suppression_scale < 0.0
                 || p.blast_radius
                     .is_some_and(|r| !r.is_finite() || r <= 0.0 || r > 4096.0)
-                || p.blast_source && p.blast_radius.is_none()
+                || p.blast_source.is_some() && p.blast_radius.is_none()
             {
                 return Err("invalid live flight payload".into());
+            }
+        }
+        for p in self.firing.flights.values() {
+            if let Some(source) = p.blast_source {
+                validate_blast(source)?;
+                if source
+                    .weapon_kind
+                    .is_some_and(|k| k >= self.rules.kinds.len())
+                {
+                    return Err("invalid flight blast identity".into());
+                }
             }
         }
         let now = self.world.game.tick as f64 * 0.05;
@@ -787,7 +833,7 @@ impl Match {
                 if !terminal && now >= p.expires {
                     let at = projectiles::flight_at(p.solution, p.expires)
                         .map_err(|e| format!("flight expiry position: {e:?}"))?;
-                    if p.blast_source {
+                    if p.blast_source.is_some() {
                         let expires = p.expires;
                         let velocity = projectiles::velocity_at(p.solution, expires)
                             .map_err(|e| format!("flight expiry velocity: {e:?}"))?;
@@ -903,7 +949,7 @@ impl Match {
                 && t.air.is_none()
                 && !t.riding
                 && t.id != p.shooter
-                && (p.blast_source || !g.allied(p.owner, t.owner))
+                && (p.blast_source.is_some() || !g.allied(p.owner, t.owner))
         });
         candidates.sort_unstable();
         for id in candidates {
@@ -978,10 +1024,16 @@ impl Match {
         let definition = self.definition(u)?;
         let target_definition = self.definition(t)?;
         let salvo = flag(w, "salvo");
+        if salvo {
+            let at = t.at();
+            let interval = n(w, "interval", 0.0);
+            let supply_rate = self.logistics.shortage_rate(id);
+            self.launch_weapon_salvo(id, at, None)?;
+            self.firing.initialize(id).cooldown = interval * supply_rate;
+            return Ok(());
+        }
         let per_model = flag(w, "perModel");
-        let requested = if salvo {
-            n(w, "rockets", f64::NAN)
-        } else if per_model {
+        let requested = if per_model {
             (u.hp / n(definition, "hpPer", 1.0)).ceil()
         } else {
             1.0
@@ -1050,20 +1102,6 @@ impl Match {
             * cover
             * hg
             * (1.0 + n(cfg, "vetAcc", 0.1) * f64::from(veterancy));
-        let spread = if let Some(far) = w.get("spreadFar").and_then(Value::number) {
-            let a = n(w, "spread", 0.0);
-            a + (far - a)
-                * math::min(
-                    1.0,
-                    math::max(
-                        0.0,
-                        (dist(u.at(), t.at()) - n(w, "minRange", 0.0))
-                            / (n(w, "range", 0.0) - n(w, "minRange", 0.0)),
-                    ),
-                )
-        } else {
-            n(w, "spread", 0.0)
-        };
         let aim = self.aim_point(u, t);
         let bearing = math::atan2(aim.z - u.z, aim.x - u.x);
         let from = projectiles::Point3::new(
@@ -1072,32 +1110,19 @@ impl Match {
                 + if u.garrison.is_some() { 3.5 } else { 1.2 },
             u.z,
         );
-        let profile = if salvo {
-            projectiles::ARTILLERY
-        } else {
-            projectiles::projectile_profile(
-                &self.rules.kinds[u.kind].name,
-                flag(w, "flame"),
-                n(w, "veh", 0.0),
-                flag(w, "shellTerrain"),
-            )
-            .map_err(|e| format!("projectile profile: {e:?}"))?
-        };
-        let duration = salvo.then(|| n(w, "flight", f64::NAN));
+        let profile = projectiles::projectile_profile(
+            &self.rules.kinds[u.kind].name,
+            flag(w, "flame"),
+            n(w, "veh", 0.0),
+            flag(w, "shellTerrain"),
+        )
+        .map_err(|e| format!("projectile profile: {e:?}"))?;
+        let duration = None;
         let mut random = self.start.random.clone();
         let mut flights = Vec::with_capacity(count as usize);
         let first_id = self.firing.next_flight;
         for i in 0..count {
-            let (x, z, height) = if salvo {
-                let angle =
-                    random.next_fraction(crate::random::StreamId::Combat) * std::f64::consts::TAU;
-                let radius = random.next_fraction(crate::random::StreamId::Combat).sqrt() * spread;
-                (
-                    t.x + math::cos(angle) * radius,
-                    t.z + math::sin(angle) * radius,
-                    0.02,
-                )
-            } else {
+            let (x, z, height) = {
                 let accurate = random.next_fraction(crate::random::StreamId::Combat) < accuracy;
                 let off = if accurate {
                     0.0
@@ -1131,11 +1156,7 @@ impl Match {
                 duration,
             )
             .map_err(|e| format!("launch solution: {e:?}"))?;
-            let delay = if salvo {
-                f64::from(i) * n(w, "every", 0.0)
-            } else {
-                0.0
-            };
+            let delay = 0.0;
             let born = g.tick as f64 * 0.05 + delay;
             let expires = born
                 + duration.unwrap_or_else(|| {
@@ -1169,7 +1190,7 @@ impl Match {
                 max_contacts: profile.max_contacts,
                 near: profile.near,
                 start_cell: g.cell_of(u.x, u.z).ok_or("shooter outside battlefield")?,
-                intended: (!salvo).then_some(target),
+                intended: Some(target),
                 damage_scale: 1.0,
                 armor_piercing: false,
                 ap_multiplier: n(
@@ -1178,27 +1199,23 @@ impl Match {
                     1.5,
                 ),
                 ap_naval: definition.get("ab").is_some_and(|a| flag(a, "naval")),
-                suppression: if salvo { 0.0 } else { n(w, "supp", 0.0) },
+                suppression: n(w, "supp", 0.0),
                 suppression_scale: if per_model {
                     f64::from(count) / n(definition, "models", 1.0)
                 } else {
                     1.0
                 },
-                volley_group: if salvo { flight_id } else { first_id },
-                explosive: salvo || flag(w, "shellTerrain"),
-                terrain: if salvo {
-                    0.0
-                } else {
-                    n(w, "shellTerrain", 0.0)
-                },
-                scar: if !salvo && flag(w, "shellTerrain") {
+                volley_group: first_id,
+                explosive: flag(w, "shellTerrain"),
+                terrain: n(w, "shellTerrain", 0.0),
+                scar: if flag(w, "shellTerrain") {
                     n(cfg.get("scar").ok_or("missing scar rules")?, "tank", 0.25)
                 } else {
                     0.0
                 },
-                blast_radius: salvo.then(|| n(w, "blast", 0.0)),
-                blast_source: salvo,
-                effect: salvo.then_some("rocket"),
+                blast_radius: None,
+                blast_source: None,
+                effect: None,
             });
         }
         self.logistics.consume_ammo(id, requested);
@@ -1214,26 +1231,8 @@ impl Match {
             }
             self.firing.flights.insert(flight.id, flight);
         }
-        if salvo && count > 0 {
-            self.firing.salvos.push(LiveSalvo {
-                at: t.at(),
-                owner: u.owner,
-                left: count,
-                next: n(w, "flight", 0.0),
-                every: n(w, "every", 0.0),
-                spread,
-            });
-            self.firing.events.push(LaunchEvent::Salvo {
-                shooter: id,
-                owner: u.owner,
-                at: t.at(),
-                count,
-                spread,
-            });
-        }
         self.world.game.units.get_mut(&id).unwrap().shot_at = Some(self.world.game.tick as f64);
-        self.firing.initialize(id).cooldown =
-            n(w, "interval", 0.0) * if salvo { 1.0 } else { rate } * supply_rate;
+        self.firing.initialize(id).cooldown = n(w, "interval", 0.0) * rate * supply_rate;
         Ok(())
     }
 
@@ -1888,7 +1887,7 @@ impl Match {
             z: target.z + cz * k,
         }
     }
-    fn aim_point(&self, shooter: &Unit, target: &Unit) -> Point {
+    pub(crate) fn aim_point(&self, shooter: &Unit, target: &Unit) -> Point {
         let Some(cells) = &target.cells else {
             return self.hull_point(shooter.at(), target);
         };
@@ -1992,5 +1991,386 @@ impl FiringState {
 
     pub fn remove(&mut self, id: UnitId) -> Option<FiringUnit> {
         self.units.remove(&id)
+    }
+}
+
+/// Physical grenade bookkeeping from the source late phase. This ticket holds
+/// no trajectory or blast payload; those belong to its one canonical flight.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct GrenadeTicket {
+    pub at: Point,
+    pub remaining: f64,
+    pub owner: usize,
+    pub flight: u64,
+}
+
+/// A grenade/satchel profile read from the actual unit ability catalog.
+/// Keeping construction private prevents a caller from substituting a weapon profile.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct AbilityBlast {
+    source: ExplosionSource,
+    radius: f64,
+    fuse: f64,
+}
+impl AbilityBlast {
+    pub fn from_unit(kind: usize, rules: &crate::rules::Rules) -> Result<Self, String> {
+        let name = &rules.kinds.get(kind).ok_or("unknown ability kind")?.name;
+        let definition = Catalog::compiled()
+            .map_err(|e| e.to_string())?
+            .unit(name)
+            .map_err(|e| e.to_string())?;
+        let ab = definition.get("ab").ok_or("missing blast ability")?;
+        if !matches!(
+            ab.get("id").and_then(Value::string),
+            Some("grenade" | "satchel")
+        ) {
+            return Err("ability has no physical grenade/satchel profile".into());
+        }
+        let blast = Self {
+            source: ExplosionSource {
+                infantry: n(ab, "inf", f64::NAN),
+                vehicle: n(ab, "veh", f64::NAN),
+                terrain: ab.get("terrain").and_then(Value::number),
+                suppression: n(ab, "supp", f64::NAN),
+                scar: n(ab, "scar", 0.0),
+                anti_garrison: ab.get("antiGarrison").and_then(Value::number),
+                weapon_kind: None,
+                off_map_support: false,
+            },
+            radius: n(ab, "radius", f64::NAN),
+            fuse: n(ab, "fuse", f64::NAN),
+        };
+        validate_blast(blast.source)?;
+        if !blast.radius.is_finite()
+            || !(0.0..=4096.0).contains(&blast.radius)
+            || blast.radius == 0.0
+            || !blast.fuse.is_finite()
+            || !(0.0..=640.0).contains(&blast.fuse)
+            || blast.fuse == 0.0
+        {
+            return Err("invalid ability blast geometry".into());
+        }
+        Ok(blast)
+    }
+}
+fn validate_blast(source: ExplosionSource) -> Result<(), String> {
+    if ![
+        source.infantry,
+        source.vehicle,
+        source.suppression,
+        source.scar,
+        source.terrain.unwrap_or(0.0),
+        source.anti_garrison.unwrap_or(1.0),
+    ]
+    .iter()
+    .all(|v| v.is_finite() && (0.0..=100_000.0).contains(v))
+    {
+        return Err("invalid flight blast profile".into());
+    }
+    Ok(())
+}
+
+impl Match {
+    fn launch_admission(&self, id: UnitId, at: Point, count: u32) -> Result<u64, String> {
+        self.supported_firing_mode()?;
+        self.validate_firing_units()?;
+        let u = self
+            .world
+            .game
+            .units
+            .get(&id)
+            .ok_or("missing flight shooter")?;
+        if u.hp <= 0.0
+            || self.combat.get(id).is_none()
+            || self.firing.get(id).is_none()
+            || self.logistics.get(id).is_some_and(|r| !r.ammo.is_finite())
+            || u.air.is_some()
+            || flag(self.definition(u)?, "air")
+            || u.riding
+            || ![at.x, at.z].iter().all(|v| v.is_finite())
+            || !(0.0..=self.world.game.w as f64 * CELL).contains(&at.x)
+            || !(0.0..=self.world.game.h as f64 * CELL).contains(&at.z)
+            || !(0..9_007_199_254_740_351).contains(&self.world.game.tick)
+            || count == 0
+            || count > 4096
+        {
+            return Err("invalid physical flight launch".into());
+        }
+        let first = self.firing.next_flight;
+        let end = first
+            .checked_add(u64::from(count))
+            .filter(|&n| first > 0 && n <= 9_007_199_254_740_991)
+            .ok_or("flight ID exhausted")?;
+        if self.firing.flights.range(first..end).next().is_some()
+            || self.firing.suppressed.range(first..end).next().is_some()
+            || self
+                .firing
+                .grenades
+                .iter()
+                .any(|n| (first..end).contains(&n.flight))
+        {
+            return Err("flight ID already held".into());
+        }
+        Ok(end)
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn prepare_physical_flight(
+        &self,
+        id: UnitId,
+        at: Point,
+        flight_id: u64,
+        duration: f64,
+        delay: f64,
+        profile: projectiles::ProjectileProfile,
+        source: ExplosionSource,
+        radius: f64,
+        effect: &'static str,
+    ) -> Result<LiveFlight, String> {
+        if !duration.is_finite()
+            || !(0.0..=640.0).contains(&duration)
+            || duration == 0.0
+            || !delay.is_finite()
+            || !(0.0..=640.0).contains(&delay)
+        {
+            return Err("invalid physical flight duration".into());
+        }
+        validate_blast(source)?;
+        if !radius.is_finite() || radius <= 0.0 || radius > 4096.0 {
+            return Err("invalid physical blast radius".into());
+        }
+        let g = &self.world.game;
+        let u = &g.units[&id];
+        let height = n(self.firing_config()?, "levelHeight", 2.5);
+        let from = projectiles::Point3::new(
+            u.x,
+            f64::from(g.level_at(u.x, u.z)) * height + if u.garrison.is_some() { 3.5 } else { 1.2 },
+            u.z,
+        );
+        let end = projectiles::Point3::new(
+            at.x,
+            f64::from(g.level_at(at.x, at.z)) * height + 0.02,
+            at.z,
+        );
+        let solution = projectiles::launch_solution(
+            from,
+            end,
+            profile.speed.unwrap_or(1.0),
+            profile.gravity,
+            Some(duration),
+        )
+        .map_err(|e| format!("physical launch: {e:?}"))?;
+        let born = g.tick as f64 * 0.05 + delay;
+        Ok(LiveFlight {
+            id: flight_id,
+            owner: u.owner,
+            shooter: id,
+            source_kind: u.kind,
+            solution: projectiles::Flight {
+                origin: solution.origin,
+                velocity: solution.velocity,
+                gravity: solution.gravity,
+                stamp: born,
+            },
+            launch_origin: from,
+            launched: born,
+            last: born,
+            expires: born + duration,
+            sent: delay == 0.0,
+            energy: 1.0,
+            sequence: 0,
+            max_contacts: profile.max_contacts,
+            near: profile.near,
+            start_cell: g.cell_of(u.x, u.z).ok_or("shooter outside battlefield")?,
+            intended: None,
+            damage_scale: 1.0,
+            armor_piercing: false,
+            ap_multiplier: 1.5,
+            ap_naval: false,
+            suppression: 0.0,
+            suppression_scale: 1.0,
+            volley_group: flight_id,
+            explosive: true,
+            terrain: 0.0,
+            scar: 0.0,
+            blast_radius: Some(radius),
+            blast_source: Some(source),
+            effect: Some(effect),
+        })
+    }
+    fn commit_physical_flight(&mut self, flight: LiveFlight) {
+        self.firing
+            .suppressed
+            .entry(flight.volley_group)
+            .or_default();
+        if flight.sent {
+            self.firing.events.push(LaunchEvent::from_flight(&flight));
+        }
+        self.firing.flights.insert(flight.id, flight);
+    }
+    /// Launch one real grenade/satchel flight. `None` duration uses the ability fuse;
+    /// FPS supplies its source duration and `None` ammo debit. Caller owns admission,
+    /// payment, cooldowns and operative counters, which follow this successful result.
+    pub fn launch_ability_flight(
+        &mut self,
+        id: UnitId,
+        at: Point,
+        blast: AbilityBlast,
+        duration: Option<f64>,
+        ammo_debit: Option<u32>,
+    ) -> Result<u64, String> {
+        let end = self.launch_admission(id, at, 1)?;
+        if ammo_debit
+            .is_some_and(|n| n == 0 || n > 4096 || !self.logistics.can_fire(id, f64::from(n)))
+        {
+            return Err("insufficient ability ammunition".into());
+        }
+        let first = self.firing.next_flight;
+        let duration = duration.unwrap_or(blast.fuse);
+        let flight = self.prepare_physical_flight(
+            id,
+            at,
+            first,
+            duration,
+            0.0,
+            projectiles::GRENADE,
+            blast.source,
+            blast.radius,
+            "boom",
+        )?;
+        let owner = flight.owner;
+        if let Some(n) = ammo_debit {
+            self.logistics.consume_ammo(id, f64::from(n));
+        }
+        self.firing.next_flight = end;
+        self.commit_physical_flight(flight);
+        self.firing.grenades.push(GrenadeTicket {
+            at,
+            remaining: duration,
+            owner,
+            flight: first,
+        });
+        self.firing.events.push(LaunchEvent::Throw {
+            shooter: id,
+            owner,
+            at,
+        });
+        Ok(first)
+    }
+    /// Source launchSalvo, including partial-ammo clamping and delayed rounds.
+    /// `None` uses weapon rockets, including the rocket barrage's omitted shell count.
+    /// Caller owns the firing/ability cooldown. No IDs, draws or ammo change on error.
+    pub fn launch_weapon_salvo(
+        &mut self,
+        id: UnitId,
+        at: Point,
+        requested: Option<u32>,
+    ) -> Result<Vec<u64>, String> {
+        self.launch_admission(id, at, 1)?;
+        let u = &self.world.game.units[&id];
+        let w = self.weapon(u)?.ok_or("unarmed salvo")?;
+        if !flag(w, "salvo") {
+            return Err("weapon has no physical salvo".into());
+        }
+        let requested = requested
+            .map(f64::from)
+            .unwrap_or_else(|| n(w, "rockets", f64::NAN));
+        if !requested.is_finite() || requested <= 0.0 || requested > 4096.0 {
+            return Err("invalid salvo size".into());
+        }
+        let count = self.logistics.get(id).map_or(requested, |r| {
+            math::min(requested, math::max(0.0, r.ammo).floor())
+        }) as u32;
+        let end = self.launch_admission(id, at, count)?;
+        let spread = if let Some(far) = w.get("spreadFar").and_then(Value::number) {
+            let a = n(w, "spread", 0.0);
+            a + (far - a)
+                * math::min(
+                    1.0,
+                    math::max(
+                        0.0,
+                        (dist(u.at(), at) - n(w, "minRange", 0.0))
+                            / (n(w, "range", 0.0) - n(w, "minRange", 0.0)),
+                    ),
+                )
+        } else {
+            n(w, "spread", 0.0)
+        };
+        if !spread.is_finite() || spread < 0.0 || spread > 4096.0 {
+            return Err("invalid salvo spread".into());
+        }
+        let source = ExplosionSource::weapon(u.kind, &self.rules).map_err(|e| e.to_string())?;
+        let duration = n(w, "flight", f64::NAN);
+        let every = n(w, "every", 0.0);
+        let owner = u.owner;
+        let first = self.firing.next_flight;
+        let mut random = self.start.random.clone();
+        let mut flights = Vec::with_capacity(count as usize);
+        for i in 0..count {
+            let angle =
+                random.next_fraction(crate::random::StreamId::Combat) * std::f64::consts::TAU;
+            let radius = random.next_fraction(crate::random::StreamId::Combat).sqrt() * spread;
+            let end_at = Point {
+                x: at.x + math::cos(angle) * radius,
+                z: at.z + math::sin(angle) * radius,
+            };
+            flights.push(self.prepare_physical_flight(
+                id,
+                end_at,
+                first + u64::from(i),
+                duration,
+                f64::from(i) * every,
+                projectiles::ARTILLERY,
+                source,
+                n(w, "blast", 0.0),
+                "rocket",
+            )?);
+        }
+        self.logistics.consume_ammo(id, requested);
+        self.start.random = random;
+        self.firing.next_flight = end;
+        for flight in flights {
+            self.commit_physical_flight(flight);
+        }
+        self.firing.salvos.push(LiveSalvo {
+            at,
+            owner,
+            left: count,
+            next: duration,
+            every,
+            spread,
+        });
+        self.world.game.units.get_mut(&id).unwrap().shot_at = Some(self.world.game.tick as f64);
+        self.firing.events.push(LaunchEvent::Salvo {
+            shooter: id,
+            owner,
+            at,
+            count,
+            spread,
+        });
+        Ok((first..end).collect())
+    }
+    /// Run after step_firing_flights, before the salvo timer phase. Linked tickets
+    /// expire/prune with source timing and never apply a second grenade blast.
+    pub fn advance_firing_grenades(&mut self, dt: f64) -> Result<(), String> {
+        self.supported_firing_mode()?;
+        if !dt.is_finite()
+            || !(0.0..=640.0).contains(&dt)
+            || self.firing.grenades.iter().any(|n| {
+                !n.remaining.is_finite()
+                    || !(0.0..=640.0).contains(&n.remaining)
+                    || ![n.at.x, n.at.z].iter().all(|v| v.is_finite())
+                    || n.owner >= self.world.game.players.len()
+                    || n.flight == 0
+            })
+        {
+            return Err("invalid grenade timer step".into());
+        }
+        for n in &mut self.firing.grenades {
+            n.remaining -= dt;
+        }
+        self.firing
+            .grenades
+            .retain(|n| n.remaining > 0.0 && self.firing.flights.contains_key(&n.flight));
+        Ok(())
     }
 }
