@@ -656,7 +656,12 @@ impl HumanRuntimeSnapshot {
             .into_iter()
             .flatten()
             .collect();
-        let Some(u) = screen.units.iter().find(|u| u.motion.id == alert.victim) else {
+        let Some(u) = screen
+            .units
+            .iter()
+            .copied()
+            .find(|u| u.motion.id == alert.victim)
+        else {
             return Ok(None);
         };
         if u.owner != owner || u.hp <= 0.0 {

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed the first human proof compiler errors: retain a reference to the delivered victim before consuming the filtered unit vector, and name the packet type in two no-view assertions. No policy, ordering, timing or RNG behavior changes; the original failed compile log is preserved and native checks remain pending.
+
 - Normally consumed the independently reviewed human observer cache-identity correction in the bounded policy assembly. Original packet APIs and private state leaves remain intact; this complete source union still needs independent reanchor and its first native cycle.
 
 - Added a bounded native strategic callback on the ordinary human attention schedule. It rebuilds policy from detached camera-filtered facts, preserves minimal Move/Cover/Buy/Tech shapes, and stages private human and policy state together. Three real Source openings provide complete packets at seven actual deliveries and three raw planning calls outside scripted think beats. The new policy replay and RNG/refusal assertions are written but unrun; observation cache repair, canonical admission and full human AI remain pending.

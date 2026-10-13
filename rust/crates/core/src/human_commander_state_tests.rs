@@ -107,7 +107,7 @@ fn initialize(case: &Value) -> HumanState {
         view.spawn.unwrap(),
     );
     human
-        .advance(control(view.tick), None, &empty_batch(), |_| {
+        .advance::<(), _>(control(view.tick), None, &empty_batch(), |_| {
             panic!("initialization must not plan")
         })
         .unwrap();
@@ -314,7 +314,7 @@ fn a_missing_delivered_view_cannot_consume_a_delayed_command() {
     let before = human.clone();
     assert_eq!(
         human
-            .advance(control(104), None, &empty_batch(), |_| panic!(
+            .advance::<(), _>(control(104), None, &empty_batch(), |_| panic!(
                 "a physical input does not invoke the planner"
             ))
             .unwrap_err(),

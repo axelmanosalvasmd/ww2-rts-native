@@ -2,6 +2,8 @@
 
 ## Human policy source assembly (2026-10-13)
 
+The first native inventory compile found two missing generic packet annotations in no-view assertions and a borrowed-vector ownership error in fightResponse. The narrow successor copies the existing delivered-unit reference before the vector is consumed and names the test packet as `()`. It preserves victim selection, unit iteration, command and timing order. The failed command and compiler diagnostics are retained outside the cache; no human test had executed at that point.
+
 The completed source union additionally consumes independently reviewed observer `8c0694b`. Its additive `commit_with_paths` preserves canonical warmed routing history across observation publication; no packet or callback API changes. The four observer native assertions, including the new history regression, remain uncompiled. Provider bodies match their owner freeze, and the complete human native cycle remains pending.
 
 The separate callback assembly normally combines resumed state proof `4fd52ac` with observation checkpoint `96bcbdb`, including its checked bounded commander and ordinary Default ancestors. It preserves provider bodies and both documentation histories. This assembly is source work, not a native acceptance claim. Independent observation review found a prepared-routing publication cache-identity issue; that owner correction must be consumed and reviewed before native nomination. The state and observation leaves remain frozen.
