@@ -165,27 +165,10 @@ fn original_paid_dig_lifecycles() {
             let mut result = Value::Null;
             match a["op"].as_str().unwrap() {
                 "command" => {
-                    let c = &a["cmd"];
-                    let ids = c["ids"]
-                        .as_array()
-                        .unwrap()
-                        .iter()
-                        .map(|v| v.as_i64().unwrap())
-                        .collect::<Vec<_>>();
-                    let denial = if c["t"] == "dig" {
-                        m.execute_dig(
-                            a["slot"].as_u64().unwrap_or(0) as usize,
-                            &ids,
-                            FortKind::parse(c["kind"].as_str().unwrap()).unwrap(),
-                            point(c),
-                            c["dir"].as_f64(),
-                            false,
-                        )
-                        .unwrap()
-                    } else {
-                        assert_eq!(c["t"], "stop");
-                        m.execute_command(0, &Command::Stop { ids }, false).unwrap()
-                    };
+                    let command = Command::from_json(&a["cmd"]).unwrap();
+                    let denial = m
+                        .execute_command(a["slot"].as_u64().unwrap_or(0) as usize, &command, false)
+                        .unwrap();
                     result = denial.map(|d| json!(d.name())).unwrap_or(Value::Null);
                 }
                 "step" => {

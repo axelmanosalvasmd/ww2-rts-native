@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Routed the Match engineering fixture consumer through typed command parsing and dispatch, so its pending native proof also requires the coordinated Dig admission and synchronous cancellation hooks.
+
 - Extended the Match digging recorder to 12 traces and 47 actions using actual path requests, FIFO deferral, synchronous Stop cancellation and failed-route job dropping. Native execution still awaits the input and routing dependency.
 
 - Added a staged Match ordinary-dig actuator using the canonical wallet, terrain and field-work job owner, with real sight checks, garrison exit, synchronous activity projection and story counters. Eight original-source traces cover 31 admission and lifecycle actions. Native proof, typed Dig dispatch and live tick binding remain pending.
