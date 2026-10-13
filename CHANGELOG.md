@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Factored aircraft and mission readback out of the support actor projection after the native retry located a remaining nested JSON macro expansion limit. This is a test-only compiler repair with identical fields and Source expectations.
+
 - Split the support-coherence replay's actor JSON projection into bounded objects after its first native compilation exceeded the macro recursion limit. All compared fields, production code and Source fixtures remain unchanged.
 
 - Migrated the inherited recorded-gameplay replay's strike readback to canonical `Game.strikes` and exact support timing. The Source recorder and expected fixture are unchanged; this removes the old `SupportState.strikes` interface from the coherent provider's tests.
