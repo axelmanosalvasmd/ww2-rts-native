@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added socket-local snapshot backpressure with the source's 256 × 1024 UTF-16-unit limit, one owed catch-up frame and stale-socket callback isolation. Write tickets reject duplicate completion and capacity errors before changing counters. Watcher sockets above 4 MiB receive the original 1013 close decision. The original-source recorder matches 13 traces, 54 callback steps and 12 watcher cases through both mode branches. Native checks and room transport wiring remain pending.
+
 - Added ordinary-room shared wreck/node list versions and World recipient-local list history, composed with the unit delta ledger. Full resync and reconnect reset include lists; invalid frames retain delivery state. List equality compares JSON content without depending on object key order or integer/float spelling, and checked version updates cannot partially overflow. The original-source recorder matches 7 traces and 75 steps, including removal of stale delta flags. Native checks and room snapshot wiring remain pending.
 
 - Added recipient-local unit delta ledgers for changed rows, ordered removals, held fingerprints, full resync and start/reconnect resets. The original source oracle matches 68 traces and 409 frames, including actual recipient snapshots from all 33 authored maps. The ledger accepts already filtered rows and rejects malformed or duplicate rows before changing state. Independent source review is clear; native checks, snapshot production and room simulation remain pending.

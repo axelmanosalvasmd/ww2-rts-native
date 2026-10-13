@@ -6,6 +6,8 @@ Native delta progress: `rust/crates/server/src/snapshot_delta.rs` supplies recip
 
 Native list progress: `snapshot_lists.rs` composes unit deltas with ordinary shared wreck/node versions and World recipient list history. Full/reset and invalid-state guards are implemented. The original-source recorder matches seven traces and 75 steps; native checks remain pending. This does not complete NET-65 or the actual room delivery pipeline.
 
+Native backpressure progress: `snapshot_backpressure.rs` tracks socket-local writes and one owed catch-up request, preserving stale-socket isolation and watcher close boundaries. The original callback recorder matches 13 traces and 54 steps plus 12 watcher cases in both mode branches. Native checks and actual room/transport integration remain pending, so NET-74 and NET-75 are not complete.
+
 Current Rust slice: `rust/crates/server` handles lobby/session behavior; `harness/server-lobby-check.mjs` checks 38 live checkpoints against Node. `harness/map-delivery-check.mjs` adds 96 HTTP comparisons for the 33 embedded client-safe maps and route failures. NET-11 remains in progress because raw editor reads are unavailable; POST editing is not implemented. Rows marked in progress are not claims of full match, static-hosting or persistence parity. See the server README for exact supported commands and limitations.
 
 Test key used in the Evidence and Acceptance columns:

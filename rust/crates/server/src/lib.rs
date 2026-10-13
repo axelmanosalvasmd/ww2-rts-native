@@ -1,9 +1,10 @@
 //! Lobby transport and private native match construction. Room simulation is not enabled.
 pub mod authoritative_maps;
-pub mod snapshot_delta;
-pub mod snapshot_lists;
 mod lobby;
 mod maps;
+pub mod snapshot_backpressure;
+pub mod snapshot_delta;
+pub mod snapshot_lists;
 
 use axum::{
     Json, Router,
