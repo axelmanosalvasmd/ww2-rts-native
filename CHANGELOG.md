@@ -2,7 +2,19 @@
 
 ## Unreleased
 
+- Combined recorded-buy owned routing and story preflight with canonical ability/recovery publication and stale-row admission. Combined native verification remains pending.
+
 - Combined Ability and Autocast with the single recorded command enum, retaining Support dispatch. Fresh recruitment prepares canonical ability and recovery defaults beside combat and firing, with stale-row rejection before payment. Ability native proof remains pending.
+- Added recorded-buy replay coverage using the existing six original-source traces and 33 commands, now recording source MP-spending counters. Owned routing, denial outcomes and fresh combat/firing publication are compared without a second fixture; atomic tests cover stale metadata, story preflight and blocked seats. Rust verification remains pending.
+
+- Added an internal recorded-buy actuator that gates canonical finish and seats, borrows owned recipient routing through disjoint recruitment fields, and preflights exact MP-spending story updates before payment. Combat and firing rows remain canonical publication callbacks. This source prerequisite awaits native verification and the recorded command consumer.
+
+- Preserved both fresh combat and firing identities and their default publication callbacks when joining the checked firing ancestry to prepared publication. Combined production-lane validation remains pending.
+
+- Added shared mode-aware UnitControl initialization using compiled ability costs, and selected it from the staged factory's actual Game mode. The original spawn oracle preserves all 55 earlier scenarios and adds six Classic/World spawns for absent, paid and free abilities. This source-only prerequisite still awaits native verification; World startup can remove its private cost lookup.
+
+- Preserved canonical recruited combat defaults through the shared publication callback when integrating the reviewed combat ancestry. Fresh combat identities reject before payment; production stepping remains under implementation.
+- Verified shared unit publication with 130 workspace tests, five release transaction/recruitment tests, strict Clippy/formatting and independent review. Original JavaScript regeneration matches six traces and 33 buys, including the negative-HP casualty regression; World/FPS execution and training remain separate integrations.
 
 - Staged the source-reviewed ground Support admission and shared command variant in recorded input integration. Its actuator source fixture is verified; exact combined native proof remains pending.
 
@@ -18,6 +30,9 @@
 - Added immediate canonical medic route replacement and captured-frame reinforcement with actual provision hooks and spending tallies. Corrected the recovery recorder to capture separate frames on cadence ticks 9 and 10 (23 traces, 133 actions). Native differential verification and aimed-flight execution remain pending.
 
 - Wrote typed Conquest Ability/Autocast dispatch, canonical instant abilities, all ground autocast judgments and the existing FIFO aimed-path binding. Ability cooldown/buff timers remain separate from weapon timers; smoke IDs use the shared unit counter. The ability recorder now pairs the canonical Combat purpose stream at seed 701. Aimed launches, reinforcement and native differential consumers remain unfinished; no passing native execution claim is made.
+- Reserved a fixed internal World local-defender actor identity outside commander slots. World team and alliance queries recognize that actor without adding a player seat or wallet; ordinary invalid owner behavior is unchanged. Native World construction and guard tick execution remain pending.
+
+
 - Verified the complete command/firing ancestry after recruitment metadata integration: 155 workspace tests, five focused debug/release tests, strict Clippy, formatting and release FFI build pass. The diff against the reviewed command branch contains only weapon-phase code, publication defaults, fixtures and documentation.
 
 - Initialized canonical weapon targets and timers when Match recruitment publishes a unit, and rejects a stale firing row before payment. The existing recruitment source replay checks default rows immediately after each admitted buy; invalid staging snapshots include firing state.
