@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Normal-merged the operative documentation closure into reaction evidence. No Rust, harness or fixture changed from tested reaction head e14cde9.
+
 - Repaired two reaction consumer checks exposed by the first Vostro debug run: observe the lazy Combat stream through a test-only clone before the first real draw, and compare the absent pace NaN sentinel by bits before whole-unit equality. Runtime, fixtures and live RNG remain unchanged; full native gates are pending.
 
 - Updated the inherited operative design note to reflect its completed coherent Mac proof. Reaction composition still awaits its own native cycle.
@@ -17,6 +19,8 @@
 - Added source-written ordinary reaction tick sites: timer decay, automatic retreat before autocast and reaction before movement. Factored the existing pure retreat predicate for pre-clock unsupported exit admission and consumed the canonical paid-work cancellation provider. Seven new actual-source cases expand the recorder to 18 traces, 2,274 ticks and 154 checkpoints; combined native proof remains pending.
 
 - Accepted ground retreat now cancels the canonical paid field-work descriptor after route preflight, without refund; refused routes retain the job. Construction and unrepresented mass projects remain explicit refusals.
+- Updated the inherited operative design note to reflect its completed coherent Mac proof, preserving the pending platform and transport boundaries. Rust and harness trees are unchanged.
+
 - Normal-merged the checked engineering evidence into the operative closure. Only documentation changed from compiled head 3a40f7b; all Rust and harness trees remain identical.
 
 - Verified the coherent Conquest engineering, ability/recovery and operative tick assembly on the Mac: all 225 workspace release tests, 73 affected debug tests at the same runtime, strict Clippy, formatting and release FFI pass. Independent hash-checked debug/release binaries pass 42 tests. Original replays cover 2,185 ordinary ticks and 506 operative ticks. Recorded the retained operative owner cleanup and concrete fixture/oracle repairs; ordinary reactions, supply orchestration, operative geometry/settlement interoperability and full match start remain separate.
