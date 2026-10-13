@@ -50,7 +50,7 @@ fn view(m: &Match) -> TerrainView<'_> {
     }
 }
 impl Match {
-    fn validate_carriers(&self) -> Result<(), String> {
+    fn validate_carrier_world(&self) -> Result<(), String> {
         let g = &self.world.game;
         if !matches!(self.options.mode, Mode::Default | Mode::Conquest) || g.mode.is_some() {
             return Err("carrier execution requires ordinary Conquest".into());
@@ -64,36 +64,49 @@ impl Match {
         {
             return Err("invalid carrier world shape/tick".into());
         }
-        for (&id, u) in &g.units {
-            let kind = self
-                .rules
-                .kinds
-                .get(u.kind)
-                .ok_or("unknown carrier unit kind")?;
-            let meta = self
-                .combat
-                .get(id)
-                .ok_or("missing carrier combat metadata")?;
-            if id == 0
-                || u.id != id
-                || u.owner >= g.players.len()
-                || ![u.x, u.z, u.rot, u.hp, u.supp, u.repath]
-                    .iter()
-                    .all(|v| v.is_finite())
-                || (!kind.air && g.cell_of(u.x, u.z).is_none())
-                || u.supp < 0.
-                || meta.carrier.is_some() != u.riding
-                || meta.carrier == Some(0)
-                || !self.commands.units.contains_key(&id)
-                || self.firing.get(id).is_none()
-                || u.dig != self.field_works.is_active(id)
-            {
-                return Err("invalid canonical carrier unit".into());
-            }
-            let unique: BTreeSet<_> = meta.cargo.iter().copied().collect();
-            if unique.len() != meta.cargo.len() || unique.contains(&0) || unique.contains(&id) {
-                return Err("invalid carrier cargo identities".into());
-            }
+        Ok(())
+    }
+    fn validate_carrier_unit(&self, id: UnitId) -> Result<(), String> {
+        let g = &self.world.game;
+        let u = g.units.get(&id).ok_or("missing carrier unit")?;
+        let kind = self
+            .rules
+            .kinds
+            .get(u.kind)
+            .ok_or("unknown carrier unit kind")?;
+        let meta = self
+            .combat
+            .get(id)
+            .ok_or("missing carrier combat metadata")?;
+        if id == 0
+            || u.id != id
+            || u.owner >= g.players.len()
+            || ![u.x, u.z, u.rot, u.hp, u.supp, u.repath]
+                .iter()
+                .all(|v| v.is_finite())
+            || (!kind.air && g.cell_of(u.x, u.z).is_none())
+            || u.supp < 0.
+            || meta.carrier.is_some() != u.riding
+            || meta.carrier == Some(0)
+            || !self.commands.units.contains_key(&id)
+            || self.firing.get(id).is_none()
+            || u.dig != self.field_works.is_active(id)
+        {
+            return Err("invalid canonical carrier unit".into());
+        }
+        if meta.cargo.len() > 4096 {
+            return Err("carrier cargo resource bound exceeded".into());
+        }
+        let unique: BTreeSet<_> = meta.cargo.iter().copied().collect();
+        if unique.len() != meta.cargo.len() || unique.contains(&0) || unique.contains(&id) {
+            return Err("invalid carrier cargo identities".into());
+        }
+        Ok(())
+    }
+    fn validate_carriers(&self) -> Result<(), String> {
+        self.validate_carrier_world()?;
+        for &id in self.world.game.units.keys() {
+            self.validate_carrier_unit(id)?;
         }
         Ok(())
     }
@@ -106,7 +119,7 @@ impl Match {
             .get("carries")
             .and_then(|v| v.number())
             .unwrap_or(0.);
-        if !n.is_finite() || n < 0. || n.fract() != 0. || n > 4096. {
+        if !n.is_finite() || n < 0. || n != f64::from(n as u32) || n > 4096. {
             return Err("invalid carrier seat definition".into());
         }
         Ok(n as usize)
@@ -298,7 +311,10 @@ impl Match {
     /// Source post-ability boarding block. A deferred path request remains explicit for
     /// the command scheduler; this method does not fabricate route completion.
     pub fn apply_unit_boarding(&mut self, id: UnitId) -> Result<BoardingOutcome, String> {
-        self.validate_carriers()?;
+        self.validate_carrier_world()?;
+        if self.world.game.units.contains_key(&id) {
+            self.validate_carrier_unit(id)?;
+        }
         let Some(u) = self.world.game.units.get(&id) else {
             return Ok(BoardingOutcome::Idle);
         };
@@ -317,6 +333,7 @@ impl Match {
             self.world.game.units.get_mut(&id).unwrap().board = 0;
             return Ok(BoardingOutcome::Cleared);
         };
+        self.validate_carrier_unit(carrier)?;
         if self.carrier_boundary(carrier) {
             return Err("unsupported boarding carrier".into());
         }
@@ -367,7 +384,10 @@ impl Match {
     /// Source early riding branch. Caller skips the remaining unit turn on Riding;
     /// dead-carrier ejection must be handled by the future drop/effect actuator.
     pub fn apply_unit_riding(&mut self, id: UnitId, dt: f64) -> Result<RidingOutcome, String> {
-        self.validate_carriers()?;
+        self.validate_carrier_world()?;
+        if self.world.game.units.contains_key(&id) {
+            self.validate_carrier_unit(id)?;
+        }
         if !dt.is_finite() || !(0.0..=2.5).contains(&dt) {
             return Err("invalid riding step".into());
         }
@@ -379,6 +399,11 @@ impl Match {
         }
         let Some(carrier) = self.combat.get(id).unwrap().carrier else {
             if !self.combat.get(id).unwrap().cargo.is_empty() {
+                for &rider in &self.combat.get(id).unwrap().cargo {
+                    if self.world.game.units.contains_key(&rider) {
+                        self.validate_carrier_unit(rider)?;
+                    }
+                }
                 let retained = self
                     .combat
                     .get(id)
@@ -401,6 +426,7 @@ impl Match {
         let Some(c) = self.world.game.units.get(&carrier) else {
             return Ok(RidingOutcome::UnsupportedEjection);
         };
+        self.validate_carrier_unit(carrier)?;
         if c.hp <= 0. {
             return Ok(RidingOutcome::UnsupportedEjection);
         }
