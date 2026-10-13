@@ -158,19 +158,19 @@ pub struct DeathRecord<'a> {
     pub kind: &'a str,
     pub at: Point,
 }
-/// Internal completed-Conquest report. Server display-name overrides and transport serialization
+/// Internal completed Match report. Server display-name overrides and transport serialization
 /// are separate consumers. These fields mirror source result facts without adding wire fields.
 #[derive(Clone, Debug, PartialEq)]
-pub struct ConquestResult {
+pub struct MatchResult {
     pub winner: i32,
     pub teams: Vec<i32>,
     pub names: Vec<String>,
-    pub reason: crate::conquest_end::ConquestEndReason,
+    pub reason: crate::match_end::EndReason,
     pub at: Point,
     pub end_tick: i64,
     pub story: Vec<PlayerStory>,
-    pub timeline: Vec<crate::conquest_end::ConquestSample>,
-    pub win_vp: f64,
+    pub timeline: Vec<crate::match_end::MatchSample>,
+    pub win_vp: Option<f64>,
     pub mode: &'static str,
 }
 fn truthy(v: &Value) -> bool {
@@ -189,7 +189,7 @@ impl Match {
         key: StoryKey,
         amount: f64,
     ) -> Result<(), String> {
-        self.validate_conquest_finish_state()?;
+        self.validate_match_finish_state()?;
         prepare_story_updates(
             &mut self.story,
             self.finish.is_some(),
@@ -216,7 +216,7 @@ impl Match {
         slot: usize,
         mp_charge: Option<f64>,
     ) -> Result<(), String> {
-        self.validate_conquest_finish_state()?;
+        self.validate_match_finish_state()?;
         let mut changes = vec![StoryChange {
             slot: Some(slot),
             key: StoryKey::SupportCalls,
@@ -241,7 +241,7 @@ impl Match {
         unit: DeathRecord<'_>,
         last_hit: Option<usize>,
     ) -> Result<(), String> {
-        self.validate_conquest_finish_state()?;
+        self.validate_match_finish_state()?;
         let (changes, fallen) = self.death_story_plan(unit, last_hit)?;
         prepare_story_updates(&mut self.story, self.finish.is_some(), &changes)?.commit();
         self.fallen = fallen;
@@ -255,7 +255,7 @@ impl Match {
         &self,
         deaths: &[(DeathRecord<'_>, Option<usize>)],
     ) -> Result<(), String> {
-        self.validate_conquest_finish_state()?;
+        self.validate_match_finish_state()?;
         let mut changes = Vec::new();
         for &(unit, last_hit) in deaths {
             changes.extend(self.death_story_plan(unit, last_hit)?.0);
@@ -313,41 +313,18 @@ impl Match {
     }
     /// Report only after canonical finish. Raw story counters remain unchanged when rounded.
     /// The owning server decides when and to whom this report may be delivered.
-    pub fn conquest_result(&self) -> Result<Option<ConquestResult>, String> {
+    pub fn conquest_result(&self) -> Result<Option<MatchResult>, String> {
         self.validate_conquest_finish_state()?;
+        self.match_result()
+    }
+    /// Internal report for explicitly represented modes. Transport and ending hold stay with
+    /// the server. Other mode names/reasons do not authorize their incomplete runtime.
+    pub fn match_result(&self) -> Result<Option<MatchResult>, String> {
+        self.validate_match_finish_state()?;
         let Some(finish) = self.finish else {
             return Ok(None);
         };
-        if !finish.end_at.x.is_finite()
-            || !finish.end_at.z.is_finite()
-            || finish.end_tick < 0
-            || finish.end_tick > 9_007_199_254_740_991
-            || !self
-                .start
-                .economy
-                .players
-                .iter()
-                .any(|p| p.team == finish.winner)
-        {
-            return Err("invalid Conquest report finish".into());
-        }
-        let teams = self
-            .start
-            .economy
-            .players
-            .iter()
-            .map(|p| p.team)
-            .max()
-            .unwrap_or(0) as usize
-            + 1;
-        if self.timeline.iter().any(|sample| {
-            !sample.t.is_finite()
-                || sample.vp.len() != teams
-                || sample.vp.iter().any(|v| !v.is_finite())
-        }) {
-            return Err("invalid Conquest report timeline".into());
-        }
-        Ok(Some(ConquestResult {
+        Ok(Some(MatchResult {
             winner: finish.winner,
             teams: self.start.economy.players.iter().map(|p| p.team).collect(),
             names: self
@@ -361,8 +338,16 @@ impl Match {
             end_tick: finish.end_tick,
             story: self.story.iter().map(|row| row.rounded()).collect(),
             timeline: self.timeline.clone(),
-            win_vp: self.start.win_vp,
-            mode: "conquest",
+            win_vp: if self.world.game.mode.is_none() {
+                Some(self.start.win_vp)
+            } else {
+                None
+            },
+            mode: if self.world.game.mode.is_none() {
+                "conquest"
+            } else {
+                "assault"
+            },
         }))
     }
 }

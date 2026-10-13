@@ -54,6 +54,18 @@ pub fn vision_of(g: &Game, rules: &Rules, u: &Unit) -> f64 {
 /// This reads current units, base sight, airborne state, buildings and physical line of sight;
 /// it does not change the canonical index, vision pass or recipient memory.
 pub fn team_sees(g: &Game, rules: &Rules, grid: &SpatialGrid, team: Team, at: Point) -> bool {
+    team_sees_with_observer(g, rules, grid, team, at, None)
+}
+/// Include an admitted unpublished source in current point sight. Cached fog is not queried.
+pub fn team_sees_with_observer(
+    g: &Game,
+    rules: &Rules,
+    grid: &SpatialGrid,
+    team: Team,
+    at: Point,
+    observer: Option<crate::staged_observer::StagedObserver<'_>>,
+) -> bool {
+    let sees = |u: &Unit| g.team_of(u) == team && unit_sees(g, rules, u, at);
     let reach = g
         .units
         .values()
@@ -62,15 +74,17 @@ pub fn team_sees(g: &Game, rules: &Rules, grid: &SpatialGrid, team: Team, at: Po
         .fold(1.0, math::max);
     grid.unordered(&g.units, (at.x, at.z), reach, |_, u| g.team_of(u) == team)
         .into_iter()
-        .any(|id| {
-            let u = &g.units[&id];
-            math::hypot(u.x - at.x, u.z - at.z) <= vision_of(g, rules, u)
-                && if u.air.is_some() {
-                    airborne(u)
-                } else {
-                    rules.kinds[u.kind].building || los(g, rules, (u.x, u.z), (at.x, at.z))
-                }
-        })
+        .any(|id| sees(&g.units[&id]))
+        || observer.is_some_and(|source| sees(source.unit()))
+}
+
+pub(crate) fn unit_sees(g: &Game, rules: &Rules, u: &Unit, at: Point) -> bool {
+    math::hypot(u.x - at.x, u.z - at.z) <= vision_of(g, rules, u)
+        && if u.air.is_some() {
+            airborne(u)
+        } else {
+            rules.kinds[u.kind].building || los(g, rules, (u.x, u.z), (at.x, at.z))
+        }
 }
 
 /// A ground unit's sight (`visionRange`): high ground and an upper floor see farther, rain sees less.
