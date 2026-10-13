@@ -292,3 +292,43 @@ pub(crate) fn display_rows(rows: &[RememberedWreck]) -> Result<Vec<WreckRow>, St
 
 #[cfg(test)]
 mod tests;
+
+/// Canonical global lists used only to version an ordinary send cache.
+/// Recipient messages still use their own remembered and filtered rows.
+pub struct OrdinaryRawLists {
+    pub wrecks: Value,
+    pub nodes: Option<Value>,
+}
+impl crate::match_runtime::Match {
+    pub fn ordinary_snapshot_raw_lists(&self) -> Result<OrdinaryRawLists, String> {
+        let game = &self.world.game;
+        if !matches!(
+            self.options.mode,
+            crate::economy::Mode::Default | crate::economy::Mode::Conquest
+        ) || game.mode.is_some()
+        {
+            return Err("global ordinary lists require absent Game mode".into());
+        }
+        let mut ids = std::collections::BTreeSet::new();
+        let mut rows = Vec::with_capacity(game.wrecks.len());
+        for hull in &game.wrecks {
+            let id = hull
+                .id
+                .filter(|id| *id != 0 && ids.insert(*id))
+                .ok_or("invalid global wreck identity")?;
+            let row = RememberedWreck::observe(
+                game,
+                &self.rules,
+                hull,
+                self.environment.wreck_metadata().get(&id),
+            )?
+            .display
+            .ok_or("missing global wreck display facts")?;
+            rows.push(row.to_json());
+        }
+        Ok(OrdinaryRawLists {
+            wrecks: Value::Array(rows),
+            nodes: None,
+        })
+    }
+}

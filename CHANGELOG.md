@@ -2,9 +2,118 @@
 
 ## Unreleased
 
+- Normally combine the exact verified internal table producer `b682891` with trusted-startup main `92fb7fe` in a separate publication tree. Preserve all producer, recorded data, schema, fixture and original-source harness bytes, plus all canonical main modules. The producer constituent passes 368 optimized workspace tests and all gates; main carries the checked 401-test startup baseline. Final combined 404-test and three-platform proof remain pending, with transport and Unreal adoption separate.
+
 - Flatten the startup-schema anyOf refusal condition to satisfy strict Clippy without changing short-circuit validation or output bytes. Exact predecessor `b9e9bb7` passes all 3 debug and 3 optimized startup-table tests, 7 economy tests and formatting; strict checks stop on this single style finding. Fresh successor gates remain pending.
 
 - Add an internal Rust startup-table producer from the full canonical Catalog and 17 maintained source-export additions, with pinned schema validation and exact missing/null/number-tag preservation. Extend the existing Node recorder with the complete 64-table payload and 1,743 numeric IEEE754 leaf values; its bytes match accepted candidate hash `5de90a79...2efd` while the original 47 tables and economy fixture stay unchanged. Three written Rust correspondence/refusal tests and platform byte proof await a compile lease. No transport or ABI change.
+
+- Verify trusted ordinary startup at `3b84f7c`: all 401 optimized workspace tests, strict Clippy, formatting and release FFI pass. An independent audit retains all 399 prior test names and passes 14 copied affected server checks. Normally incorporate schema-documentation main `4867984` without changing runtime, test, harness, header or reference source; fresh platform and Axel host review remain required.
+
+- Replace the startup privacy test's one-element rows loop with the same direct assertion. The real socket and ClientView lifecycle passes at `81cd1ef`, then strict Clippy stops on that loop; this successor retains every privacy and lifecycle assertion and needs the remaining native and platform checks.
+
+- Correct the startup test's optional mine-material assertion after the exact `08b378d` native attempt compiled and failed before any test passed. Original `mapForClient` and both complete committed Default/El Alamein assets omit `layers.mineMaterials`; the helper now requires an empty array only when that optional field exists. Complete map equality still protects field presence, and private-mine/material/script exclusions remain unchanged. Production output and admission are untouched; the failed log is preserved and fresh native verification remains pending.
+
+- Track the trusted host's interim refusal of all five legacy-trigger maps explicitly in MODE-79 and MAP-14, as Axel acknowledgment 036 requires. Preserve the original Source target of running their triggers in every mode; host Scenario actuation/admission and the separate authoring-format decision remain pending. Strengthen the startup refusal regression with actual before/after lobby equality, and capture only map width in its private-mine iterator. No runtime or admission rule changes; native verification remains pending.
+
+- Correct the trusted startup lifecycle scene after the exact `7e26c58` native test refused El Alamein's canonical legacy Scenario before attachment. Use the supported authored Default map for the complete real socket/decoder lifecycle, and retain El Alamein as a genuine Scenario refusal with no start/snapshot, room, receipt account or match-ID publication. Keep its complete public-map mine/material/trigger exclusion checks separate. Runtime admission and every decoder lifecycle assertion remain intact; the failed log is preserved and successor native validation is pending.
+
+- Prepare a pure trusted room, Human and startup candidate from `32670c2`, normally joined with current main `d1f2fb5`. Extract only the seven reviewed server startup files from `d9941e3` to `7784525`, retaining their exact bytes and the original startup design. The 399-test native result belongs to `32670c2`; new startup decoder/socket and full native validation remain pending. Ground and construction are kept in their separate candidate, and concrete host/envelope review remains required before merge.
+
+- Prepare Source-compatible trusted ordinary startup over the existing Match and recipient receipt owner. Bind the immutable authored/public map, lobby settings and human commander roster before attachment; send resume, playing lobby and the 13-field start before snapshots. Full start cells and Fog establish the same seat baseline, later snapshots use XOR Fog, reconnect preserves the match ID, replacement gets a new safe integer ID, and current-socket resync requests the existing full unit/list delivery. Public network start and restart remain denied. Replace obsolete tests that expected a full Fog object in the first snapshot, retaining stale-write and enqueue-loss checks; add safe-ID rejection and a real decoder/socket lifecycle regression. Source review and native validation are pending at this checkpoint.
+
+- Normally combine the source-cleared trusted room and event projector union `e56a627` with Human commander union `6f213a5` in a separate source-only bundle. Preserve detached private observations, canonical command queues, chronological shot ordinals and three-owner observation receipts. Only additive documentation conflicted; combined native verification and publication remain pending.
+
+- Prepare a separate source-only normal union of the trusted room host and recipient shot projector at `ee9e5dc` with the current-main ordered-event frontier at `a068dd8`. Preserve the canonical provider owners, ABI 2, optimized test profile, recorded consumer inputs and chronological receipts. Resolve duplicate command and support initialization seams, and retain both quiet engineering event assertions. Combined native verification and publication remain pending.
+
+- Load recorded artillery crater levels into the recipient-effects consumer through canonical World mutations. The original map starts flat, but Source allocates mutable heights at tick 101, so the tick-102 boundary correctly carries cell 2023 at level -1. Remove the obsolete flatness assertion, preserve immutable initial terrain and fog history, and retain every original output/refusal assertion. The failed d7eb0c7 native attempt remains recorded; fresh validation is pending.
+
+- Preserve one Match and its canonical fog query history per recipient-effects trace. Reload recorded public boundary inputs and use a disposable base-field query before complete-frame admission, including the live-flight refusal boundary. The fresh-per-boundary consumer lost the departed shooter's same-vision-tick fog circle, producing zero contact rows where Source produced one. Keep all original fixtures, comparisons and refusal witnesses; fresh native validation remains pending.
+
+- Set the recipient-effects test crate's macro recursion limit to 256 for its complete existing unit snapshot. The compiler reached the default expansion limit; every field, assertion and original fixture is retained. Production runtime and stack limits are unchanged.
+
+- Update the carrier and aircraft fixture serializers for typed MatchSample timelines. Their Default and Conquest scenes retain the same Conquest JSON, and incompatible Territories samples fail explicitly. Runtime, assertions and original fixtures are unchanged.
+
+- Update the quiet engineering consumer to use the ordered tick report's Environment iterator. It still checks that no Environment effects were emitted, while event ownership stays in the single report sequence. The original source fixture and runtime are unchanged.
+
+- Move read-only room attachment admission before the snapshot test module to satisfy strict Clippy item ordering. The method body and every test are unchanged; no lint allowance is added.
+
+- Update the support refusal regression after canonical strike ownership moved into routing admission. Assert the direct support InvalidRecipient refusal and the earlier complete-snapshot Rules refusal separately; retain every delivery rollback assertion. The prior run passed 19 snapshot tests and failed this outdated expected error. Runtime behavior is unchanged.
+
+- Correct the room lifecycle fixture to use Map weather when living weather is disabled, as Match admission requires. The first two real-event host tests pass; six Hub cases stopped at fixture construction before reaching their assertions. Runtime guards and test assertions are retained.
+
+- Fix the first room-host compile errors by using fixed clear weather and explicit player story slots in the lifecycle tests. Use the pinned Rust toolchain's `try_update` atomic alias with the same ordering and overflow check. The failed compile ran no tests; native verification remains pending.
+
+- Add two room-host regressions using actual rifle Flight and building-section Hurt events. They check retained failure output, refusal after a tick fault, Current capture without delivery, Scheduled delivery once and empty scheduled discard. Source review is clear; native verification is pending.
+
+- Compose the trusted room host with chronological tick output and ordinary recipient shot projection. Preserve successful scheduled batches, current-frame catch-up isolation and typed late-failure event/retirement prefixes. Unsupported AIR, persistent flight/falling actors and ambiguous throws remain explicit frame refusals. The combined native proof is pending.
+
+- Wire trusted room reconnect, abort-safe shutdown, canonical ending results and connection-scoped write accounting. Read-only attachment now validates every seat's ordinary lists before publication. Expected send and enqueue loss disconnects the affected seat instead of faulting the match. The old enqueue-fault regression is replaced with healthy-peer delivery, drop pause and full reconnect coverage. Original Source roster replay passes 3 traces and 11 operations; 7 Hub and 3 socket tests are written, with native verification pending.
+
+- Save the unfinished trusted room/server integration before the requested pause. Preserve current source and unexecuted tests, record known attachment, reconnect, socket-failure and lifecycle gaps in `docs/checkpoints/2026-10-13-pause.md`, and make no compiled or full-server readiness claim.
+
+- Add the source-written native room runtime over the existing Match, selected recipient collector, global raw list versions and host timing. Add read-only attachment admission, one caller effect batch, source pause/resume and 120-callback ending decisions. Transport integration and coherent native verification remain pending; public start and complete gameplay are not enabled.
+
+- Normally merge the verified host timing, snapshot delta, list-version and socket-accounting providers into the engineering delivery branch. Preserve each provider's original fixtures and existing code; the new room integration and combined native proof are pending.
+
+- Refreshed the consolidated server delta, list, backpressure and timing frontier in PR #137 onto ABI 2 main `13a8d1f`. Preserved both changelog histories and all server source, original-source recorders and fixtures. Only additive changelog entries conflicted; fresh combined-head platform checks remain pending.
+
+- Added host tick catch-up with the source's four-tick cap and backlog drop, plus snapshot cadence from rolling timing percentiles. Snapshot phases are recorded only on scheduled snapshot ticks; sustained spare capacity recovers the interval. Timing inputs and counter capacity are checked before mutation. The original-source recorder covers 8 meter traces with 747 samples and 7 clock traces with 34 polls. The combined server checkpoint passes 23 debug tests, 173 release workspace tests, strict Clippy, formatting and release FFI at 315f46a. Actual room-loop wiring remains pending; AI keeps its recorded schedule.
+
+- Integrated the server delta, list and socket backpressure checkpoints with the reviewed core ancestry. All original server tests and source fixtures are retained; final native checks remain pending.
+
+- Added socket-local snapshot backpressure with the source's 256 × 1024 UTF-16-unit limit, one owed catch-up frame and stale-socket callback isolation. Write tickets reject duplicate completion and capacity errors before changing counters. Watcher sockets above 4 MiB receive the original 1013 close decision. The original-source recorder matches 13 traces, 54 callback steps and 12 watcher cases through both mode branches. Native checks and room transport wiring remain pending.
+
+- Added ordinary-room shared wreck/node list versions and World recipient-local list history, composed with the unit delta ledger. Full resync and reconnect reset include lists; invalid frames retain delivery state. List equality compares JSON content without depending on object key order or integer/float spelling, and checked version updates cannot partially overflow. The original-source recorder matches 7 traces and 75 steps, including removal of stale delta flags. Native checks and room snapshot wiring remain pending.
+
+- Added recipient-local unit delta ledgers for changed rows, ordered removals, held fingerprints, full resync and start/reconnect resets. The original source oracle matches 68 traces and 409 frames, including actual recipient snapshots from all 33 authored maps. The ledger accepts already filtered rows and rejects malformed or duplicate rows before changing state. Independent source review is clear; native checks, snapshot production and room simulation remain pending.
+
+- Embedded all 33 original authored maps (1,349,980 JSON bytes) in a separate private server catalogue and added native match construction without Node, filesystem map reads or a reference checkout. Cached validated maps remain immutable; each match gets independent mutable world state. Original mines, materials and triggers are retained. Public map routes still use their filtered assets and refuse editor credential access to private data. Room simulation and generated World startup remain unfinished.
+
+- Added an ordinary recipient-effects consumer for the preserved full-step Source fixture. It asserts 157 snapshot boundaries, 785 seat projections and 90 shot rows, including chronological batches, hidden identity removal, local fog clipping and exact numeric bits. It uses fresh Match-bound receipts and leaves native RNG untouched. AIR, live-flight and unsupported-payload refusal witnesses are included; four falling frames remain Source-only, and companion/skipFog scenes are excluded. Formatting passes; native execution awaits the coherent host cycle.
+
+- Resumed ordinary RTS recipient event projection over the canonical ordered tick batch, preserving firing, support and direct environment order before selected recipient publication. Aviation, live projectiles, falling bodies, operative small-arms and throws without retained provenance still refuse explicitly. The isolated dependency union preserves Destroy and carrier commands with one Match initializer, and reads public support rows from canonical Game strikes instead of the retired parallel support list. Source review and native verification of this union remain pending; FPS behavior and public interfaces are unchanged.
+
+- Add a borrowed ordinary ground shot projector that stages the whole selected batch before recipient publication, preserves Source regular/local visibility and identity rules, and computes launch-event fog bounds with canonical geometry. Reuse the existing JSON zero normalizer for every producer type; source review caught and fixed its earlier Environment/Support bypass and a missing Point import. Add whole-batch metadata refusal protection. Independent original checks pass ten traces, 337 full ticks and 835 recipient results; the ordered runner consumer and native verification remain pending.
+
+- Record original ground effect delivery in 10 traces: 337 complete Source ticks, 835 seat results, 36 emitted events and 37 seeded draws. Check event order, hidden identity filtering, fog limits on launch extrapolation and scheduled batch reset with no selected recipients. Preserve live-flight, falling and aircraft snapshots as refusal witnesses; native replay remains pending.
+
+- Correct the scuttling atomicity regression to use the recorded startup scene with two live owned units. The first engineering native check passed the orphan-membership guard, then found that the original selected scene contained only one owned unit before the actuator ran. Runtime and Source fixtures are unchanged; fresh combined gates remain pending.
+- Normally joined the frozen human observer/state/quiet-policy proof with the current main and chronological-event candidate in a separate branch. Preserved approved ABI 2 and canonical command dispatch, adapted human routing to the current Environment receipt guard, and exposed ordered tick-event hurt projection. Historical human native results stay on their ABI 1 prerequisite branch; all nine unchanged original-source fixture checks pass, while this new union has no compile or native acceptance.
+
+- Verified the composed human observer, attention state and bounded quiet-policy callback at compiled `f011ce1`: 17 focused debug tests, all 280 locked workspace release tests, strict all-target Clippy, formatting and release FFI pass. Independent copied binaries pass 17 tests in each profile; final artifacts and complete failure history are saved outside the build cache. Host scheduling, all-seat delivery, canonical command admission and full AI remain pending.
+
+- Registered the shared human fixture decoder once per library test crate, fixing the strict duplicate-module lint. State and policy assertions reuse that decoder; external integration tests remain separate crates. Runtime behavior and source fixtures are unchanged, with final native gates pending.
+
+- Used a stable descending group-count key for idle human camera scans, preserving equal-group order and fixing the strict Clippy gate. All 17 focused debug and 280 workspace release tests passed before this lint repair; final exact-head gates remain pending.
+
+- Corrected the human observer refusal snapshot helper to read existing canonical rows directly in deliberately unsupported contexts. The first focused human library run passed nine tests and exposed this helper's guarded-getter unwrap; runtime mode admission and actual fixtures remain unchanged. Complete native checks are still pending.
+
+- Fixed the first human proof compiler errors: retain a reference to the delivered victim before consuming the filtered unit vector, and name the packet type in two no-view assertions. No policy, ordering, timing or RNG behavior changes; the original failed compile log is preserved and native checks remain pending.
+
+- Normally consumed the independently reviewed human observer cache-identity correction in the bounded policy assembly. Original packet APIs and private state leaves remain intact; this complete source union still needs independent reanchor and its first native cycle.
+
+- Added a bounded native strategic callback on the ordinary human attention schedule. It rebuilds policy from detached camera-filtered facts, preserves minimal Move/Cover/Buy/Tech shapes, and stages private human and policy state together. Three real Source openings provide complete packets at seven actual deliveries and three raw planning calls outside scripted think beats. The new policy replay and RNG/refusal assertions are written but unrun; observation cache repair, canonical admission and full human AI remain pending.
+
+- Normally combined the resumed human state proof with the detached observation and checked bounded commander prerequisites in a separate policy assembly. Both parent histories and their distinct evidence remain intact; the observer cache-identity review finding and new native composition checks remain pending.
+
+- Resumed the human commander proof: registered cap, locality, urgent resumption and atomic-refusal tests, and captured raw original planner attempts before input filtering. Reset now retains subscriber alert identities and accepts a trusted current seed for fresh timing. A real two-grenade Source replay protects reset identity and first-active seed timing; native compilation, policy composition and command acceptance remain pending.
+
+- Checkpointed paused human commander development, preserving source-only timing/input/state components, original denial and cap/locality/resumption receipts, and unfinished shared proof tests. The cfg seam tests are not registered or compiled; the pre-pause allocator reset patch lacks its identity witness and review. All human native checks, complete policy/producer/runner integration and unavailable ground Attack/Retreat actuators remain pending. No tests or development continued after the pause.
+
+- Added the detached ordinary human commander state provider: camera attention, real owner alerts with shared identity, urgent interruption and resumption, fresh-view planning, input timing/caps/locality, and delayed raw attempts. Three opening traces and two real grenade-alert traces record 441 full Source steps, 12 delivered views and 12 physical inputs. Native component tests replay the actual facts and Source-collected policy output, but have not run. The native policy callback, observation producer, ground Attack/Retreat admission and Match scheduling remain pending; delayed attempts do not claim actuator acceptance.
+- Preserve canonical path-cache history when a human observation publishes prepared routing arrays. Rebind the selected recipient's storage only after packet and receipt validation, keeping other recipients' caches intact. The original-reader check adds two route-history scenes and 24 route queries; four native observer tests are written but remain unrun pending the coherent state and planner proof.
+
+- Pause the human observer at source checkpoint `e529409`. The original-reader check records four scenes, 48 views and three hurt batches; no native test or coherent build has run. The owner cleared the `404a948` producer repairs and navigation cleared its borrowed accessor; the final filtered-packet successor still needs independent review and native acceptance. Single-seat publication is implemented, while all-seat delivery coordination remains separate.
+
+- Rebuild the human commander's strategic packet from validated camera-filtered detached rows, with original screen memory in the observation oracle. Keep current packet facts and research intact, and refuse forged rows without reading Game.
+
+- Add a complete existing strategic packet producer for the ordinary human commander, with decoded own move goals, delivered visibility and ordered 60-second sightings. Stage recipient memory before publication and filter real owner hurt frames without losing reset/append ordinals. Four original-reader scenes record 48 views and three hurt batches; native checks are pending.
+
+- Bring source-reviewed human commander timing, raw input helpers and detached common view types into the isolated observation producer branch. Native acceptance remains pending.
+
+- Prepare a separate human commander observation branch by normally combining checked commander `be1cb2c` with ordinary Default `262926e`. Retain both Cover and Entrench dispatch and canonical owners; this new union has no native acceptance yet.
+- Record both owners' acceptance of the startup-table v1 content/schema candidate and its strict revision/refusal policy. Delivery remains unagreed, and the six ABI 2 calls, runtime producer and Unreal adoption are unchanged. No content, schema or inventory bytes changed.
 
 - Add an unagreed startup-table content/schema proposal for consumer review: all 47 compiled tables plus 17 source-derived public constants, a portable generator, exact field inventory and independent table/formation hashes. Table transport, additional FFI calls and Unreal adoption remain pending explicit agreement.
 
@@ -17,6 +126,40 @@
 - Normally incorporated the current main server-helper frontier into the ordered-event closure. Core event code and fixtures remain unchanged; complete combined platform verification is pending, and component evidence does not establish an attached room loop.
 
 - Normally joined the published AIR parent and approved ABI 2 ancestry into a separate ordered-event closure. Core event bodies and original fixtures remain the verified event predecessor; the combined publication head awaits fresh platform checks. The earlier event static-library result remains ABI 1 branch evidence, not ABI 2 consumer proof.
+
+- Converge real selected-recipient delivery with engineering projections and recorded scuttling. Preserve the exact shared compile fixes and original Source works-field fixture extension; this combined native proof is pending.
+
+- Normally merged the source-reviewed Destroy actuator and closed both engineering replay tails. The consumer now retains all five unchanged source cases, 513 snapshots and 481 full steps, including dead-worker omission and actual retirement. Combined native verification remains pending.
+
+- Require the engineering replay runner to return no outside environment effects before passing an empty effect batch to the snapshot collector. This protects the focused quiet scene boundary; native execution is pending.
+
+- Normally merged the independently source-reviewed engineering snapshot collector into the separate replay consumer. Existing recorder and consumer bodies are unchanged; the combined native gate and scoped Destroy continuation remain pending.
+
+- Corrected the engineering replay draft to retain the original snapshotFor fog reads. Its focused payload comparison still covers engineering rows; no native proof is claimed.
+
+- Added a source-written engineering snapshot consumer using canonical staged actors, actual command admission, the single tick runner and recipient collectors. It covers 509 recorded states and 479 full ticks, preserves actual Default options and leaves the two unrepresented Destroy witnesses source-only. Native verification awaits the collector dependency and CI lease.
+
+- Added an original-source engineering snapshot recorder with five cases, 481 full ticks and 1,539 recipient results. It records mixed project segment kinds, allied paid work, queued join anchors after project deletion, unrounded work coordinates, progress tails and dead-worker omission after an actual destroy command. Native replay remains pending.
+- Add recorded Source scuttling through the canonical command path. Owned live non-riding selections get zero HP and an own-owner last hit, while work, controls and wallets stay unchanged until the next retirement phase. Preflight the complete selection before writes; add an atomic missing-metadata regression.
+
+- Extended the original snapshot recorder's partial-field boundary to include the newly represented canonical `works` field. Fresh `244931d` native checks compiled and passed all four selected-delivery tests, then two older exact-key tests rejected that added field. Regenerated 219 partial results from unchanged pinned Source; every prior fixture byte remains identical after removing only the new recorded fields. Runtime and strict equality assertions are unchanged; fresh combined native proof remains pending.
+
+- Fixed two inherited compile errors found by the fresh selected-delivery Vostro check at `4071c71`, before any tests ran. Snapshot admission now uses the canonical listed-project getter without exposing private state; the recovery fixture keeps one `actor_order: None`. Removed an unused snapshot test import. Source reanchor and a fresh combined native cycle remain pending.
+
+- Normally merged the canonical engineering and common actor-admission prerequisite into selected delivery. Shared actor checks no longer project skipped private wallets; selected preflight owns those recipient-local checks. Preserved both parents' source fixtures and admission regressions. Combined source review and native proof remain pending.
+
+- Added a selected-delivery regression for a skipped malformed private wallet. Global cache admission accepts the represented actor frame; only a selected recipient's private projection may reject it. The existing all-seat API still validates every private recipient. The shared actor helper now preserves that boundary; combined native proof remains pending.
+
+- Added ordered selected-seat snapshot delivery. Empty selection bypasses caches and collectors; invalid or duplicate seats refuse before publication. Only selected seats collect terrain, fog and remembered lists, while skipped seats retain pending cells, outboxes, fog acknowledgments and wreck memory. The original room callback and full/omitted-mask collectors reproduce 11 actions with 16 recipient results. Native verification remains pending.
+
+- Verified the normally merged quiet and active recipient snapshot consumers on Vostro Linux x86_64 at compiled `1ab2314`: 29 focused debug tests, all 215 locked/offline release workspace tests, strict Clippy, formatting and release FFI pass. Both the deferred receipt-action regression and quiet/active whole-admission guards pass. This evidence update preserves all tested Rust and harness files; transport and unsupported actor/mode projections remain separate.
+
+- Keep common snapshot actor admission independent of unselected private wallets. Delivery preflight still validates every selected recipient before writes. Add an orphan project-membership regression proving no terrain, fog, list or receipt owner changes on refusal.
+
+- Add real paid and shared engineering work to ordinary recipient snapshots: allied unrounded work rows, activity flags, digging progress, current plans and queued project anchors. Validate all canonical project/member/job bindings before delivery. Preserve quiet-frame refusal of active work; original Source replay and combined native verification are pending.
+- Admit the actual typed Default alias in ordinary snapshots without rewriting mode state. Genuine mode objects remain refused. The invalid bare Dig flag test now checks canonical activity refusal.
+
+- Combine the actual Default tick and typed snapshot prerequisites for active engineering recipient views. Preserve the single startup initialization, staged observer receipt and canonical unit/job owners; the combined native proof is pending.
 
 - Marked the shared aircraft component snapshot wrapper as intentionally unused by the detached-event runner test, fixing its strict-lint failure after all 105 focused debug tests and 270 release workspace tests passed at `625705e`. The annotation changes no helper body, runtime, input or fixture. Final lint, formatting and release FFI checks remain pending; the original failure is preserved.
 
@@ -516,6 +659,7 @@
 - Added an internal send-scoped Conquest projection for represented unit rows and recipient-owned economy, technology, rally, weather and finish fields. It reads canonical control, ability, recovery, firing and combat state, preserves the reference cached non-owner flag mask and hides unseen target IDs. An original-source fixture records 44 states and 132 recipient projections, including ally privacy, vehicles, cover, rounding and the distinct weapon/ability cooldowns. Missing canonical metadata returns a typed error; active air, engineering, gates and operatives remain unsupported. Plans, queued orders, terrain/fog, effects, points and the complete snapshot envelope remain pending. Native checks are pending the shared build lane.
 
 - Stacked the checked Conquest command actuator on the reviewed recruitment and recipient-routing checkpoint, retaining its complete command behavior and canonical shared control state. Combined integration checks belong to the shared CI lane.
+
 - Allow 40 minutes for the full three-platform Rust CI job. The combined snapshot frontier reached World-memory tests with no assertion failures before its previous 20-minute limit cancelled all three jobs. Formatting, strict Clippy, the complete debug suite, release FFI build and Linux C replay remain required.
 - Included the approved central CI fix `76cbe6d` in the PR #147 refresh, raising the full Rust job limit from 20 to 40 minutes. Preserved additive server, traffic and CI documentation; traffic and ABI 2 source remain unchanged.
 
@@ -1785,6 +1929,7 @@
 
 
 - Added complete event-adapter preflight for canonical retreat velocities, pose, suppression and sprint values so malformed later blast targets fail before earlier unit damage. Focused native checks pass.
+
 - Refreshed PR #16 onto main `242997f` with the approved ABI 2 header and six view calls unchanged. Recorded Axel's reported Linux UE 5.8.3 guard, build, replay and live shadow checks on `03a49ac`: 1,236 replay messages, 7,650 rows, 61 edge checks, 18 formation tests and 2,230 live snapshots passed. The consumer source is unpublished; packaged Linux, Windows and macOS builds and authoritative decoder adoption remain pending. Earlier pending-verification entries describe their original checkpoints.
 
 - Documented the ABI mismatch path for the staged consumer update: the Rust export returns version 2 directly, and an ABI 1 consumer must reject it against its own version constant before making other calls. No library version-mismatch error code or current Unreal guard verification is claimed.

@@ -786,7 +786,7 @@ pub enum OpeningTick {
 }
 
 impl Match {
-    fn validate_opening_projection(&self, owner: usize) -> Result<(), String> {
+    pub(crate) fn validate_opening_projection(&self, owner: usize) -> Result<(), String> {
         if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
             || self.world.geography().is_some()
             || self.options.logistics
@@ -871,6 +871,15 @@ impl Match {
             return Err("commander requires the canonical vision phase".into());
         }
         self.refresh_recipient_routing(owner)?;
+        self.commander_observation_from_rows(owner, self.recipient_routing(owner)?.remembered())
+    }
+    /// Pure strategic packet construction from an already accepted recipient row slice.
+    /// The human producer supplies preview rows before publishing its observation receipt.
+    pub(crate) fn commander_observation_from_rows(
+        &self,
+        owner: usize,
+        rows: &[crate::observed_memory::ObservedRow],
+    ) -> Result<Observation, String> {
         let g = &self.world.game;
         let seen: BTreeSet<_> = g
             .units
@@ -913,7 +922,7 @@ impl Match {
                 flag(ch)
             })
             .collect();
-        for observed in self.recipient_routing(owner)?.remembered() {
+        for observed in rows {
             let row = &observed.row;
             let surface = if row.data.object != b'.' {
                 row.data.object

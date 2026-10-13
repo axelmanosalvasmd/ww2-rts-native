@@ -15,6 +15,10 @@ impl SupportedSeatSnapshot {
     pub fn into_json(self) -> Value {
         Value::Object(self.fields)
     }
+    pub(super) fn with_shots(mut self, shots: Value) -> Self {
+        self.fields.insert("shots".into(), shots);
+        self
+    }
 }
 pub struct QuiescentDeliveryFrame<'a> {
     frame: DeliveryFrame<'a>,
@@ -179,6 +183,9 @@ pub(super) fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(
         || !state.support.events.is_empty()
     {
         return Err(refused(SnapshotCapability::ShotsAndFlights));
+    }
+    if !state.aviation.events.is_empty() || !state.aviation.planes.is_empty() {
+        return Err(refused(SnapshotCapability::Air));
     }
     if state
         .environment

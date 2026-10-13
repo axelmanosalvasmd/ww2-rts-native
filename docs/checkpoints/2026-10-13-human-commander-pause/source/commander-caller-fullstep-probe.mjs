@@ -1,0 +1,16 @@
+import {execFileSync} from 'node:child_process';
+import * as sim from '/Users/judiazm/Projects/ww2-rts-native/reference/ww2-rts/shared/sim.js';
+import * as ai from '/Users/judiazm/Projects/ww2-rts-native/reference/ww2-rts/shared/ai.js';
+import {planner,playMatch} from '/Users/judiazm/Projects/ww2-rts-native/reference/ww2-rts/shared/ai-schedule.js';
+const ref='/Users/judiazm/Projects/ww2-rts-native/reference/ww2-rts';
+const clean=()=>{if(execFileSync('git',['-C',ref,'rev-parse','HEAD'],{encoding:'utf8'}).trim()!=='e4e579a838aabae3b1d9dadbc17a0a87147bc52d'||execFileSync('git',['-C',ref,'status','--porcelain','--untracked-files=no'],{encoding:'utf8'}).trim())throw Error('pin or source cleanliness');};clean();
+const map={name:'Quiet real caller',w:64,h:64,rows:Array(64).fill('.'.repeat(64)),spawns:[{x:4,y:4},{x:59,y:59}],points:[{x:27,y:10},{x:13,y:27},{x:32,y:32}]};
+for(const {slot,level,maxTicks} of [{slot:0,level:'normal',maxTicks:42},{slot:1,level:'hard',maxTicks:9}]){
+ const random= Math.random;let seed=0x516e9200,phase='startup',draws={};const deliveries=[],wants=[],acts=[],attempts=[];
+ Math.random=()=>{(draws[phase]??=[]).push((seed=(Math.imul(seed,1664525)+1013904223)>>>0)/4294967296);return draws[phase].at(-1);};
+ const wrapped={...ai,observe:(g,s,cache)=>{const last=phase;phase='observe';try{const v=ai.observe(g,s,cache);deliveries.push({tick:g.tick,viewTick:v.tick,mp:v.players[s].mp,rawMP:g.players[s].mp,visible:[...v.players[s].visible],units:[...v.units.values()].filter(u=>u.owner===s).map(u=>({id:u.id,type:u.type,x:u.x,z:u.z,path:u.path}))});return v;}finally{phase=last;}},think:(g,s,o)=>{const last=phase;phase='thinker';acts.push({tick:g.tick,viewTick:o.view.tick,deliveredMP:o.view.players[s].mp,rawMP:g.players[s].mp});try{return ai.think(g,s,{...o,submit:command=>{const p=phase;phase='command';try{const rawBefore=g.players[s].mp;const denial=sim.command(g,s,command);attempts.push({tick:g.tick,viewTick:o.view.tick,owner:s,sequence:attempts.length,command,denial:denial??null,rawBefore,rawAfter:g.players[s].mp});return denial;}finally{phase=p;}}});}finally{phase=last;}}};
+ const brain=planner(wrapped),want=brain.wantsView;brain.wantsView=(g,s,l)=>{const yes=want(g,s,l);wants.push([g.tick,yes]);return yes;};
+ const source={...sim,createGame:(...args)=>sim.createGame(...args),step:g=>{const last=phase;phase='step';try{return sim.step(g);}finally{phase=last;}}};
+ let g;try{g=playMatch({map,names:['A','B'],teams:[0,1],factions:[0,1],shuffle:false,options:{mode:'conquest',tech:false,supply:false,weather:false,logistics:false},seats:[{slot,level,brain}],maxTicks,sim:source,setup:g=>{g.players[slot].mp=0;for(const u of g.units.values())if(u.owner!==slot)Object.assign(u,{holdFire:true,autoRetreat:false,holdPos:true});}});}finally{Math.random=random;}
+ console.log(JSON.stringify({slot,level,maxTicks,wantsTrue:wants.filter(r=>r[1]).map(r=>r[0]),deliveries,acts,attempts,draws:Object.fromEntries(Object.entries(draws).map(([p,v])=>[p,{count:v.length,values:v}])),final:{tick:g.tick,mp:g.players[slot].mp,mode:g.mode??null,units:[...g.units.values()].filter(u=>u.owner===slot).map(u=>({id:u.id,x:u.x,z:u.z,path:u.path,worldGoal:u.worldGoal}))}}));
+}clean();
