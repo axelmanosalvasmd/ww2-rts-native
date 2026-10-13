@@ -10,7 +10,7 @@
 use std::collections::HashMap;
 
 use crate::game::{
-    CELL, Game, ModeKind, PlaneState, SIGHT, Strike, StrikeKind, TRENCH, Team, Unit, WOOD,
+    CELL, Game, ModeKind, PlaneState, Point, SIGHT, Strike, StrikeKind, TRENCH, Team, Unit, WOOD,
 };
 use crate::grid::{SpatialGrid, UnitId};
 use crate::math;
@@ -47,6 +47,30 @@ pub fn vision_of(g: &Game, rules: &Rules, u: &Unit) -> f64 {
     } else {
         g.sight_mul(rules)
     }
+}
+
+/// Current-position point visibility from source `teamSees`, independent of fog masks.
+/// The caller supplies validated Game/Rules and a maintained or local observation index.
+/// This reads current units, base sight, airborne state, buildings and physical line of sight;
+/// it does not change the canonical index, vision pass or recipient memory.
+pub fn team_sees(g: &Game, rules: &Rules, grid: &SpatialGrid, team: Team, at: Point) -> bool {
+    let reach = g
+        .units
+        .values()
+        .filter(|u| g.team_of(u) == team)
+        .map(|u| vision_of(g, rules, u))
+        .fold(1.0, math::max);
+    grid.unordered(&g.units, (at.x, at.z), reach, |_, u| g.team_of(u) == team)
+        .into_iter()
+        .any(|id| {
+            let u = &g.units[&id];
+            math::hypot(u.x - at.x, u.z - at.z) <= vision_of(g, rules, u)
+                && if u.air.is_some() {
+                    airborne(u)
+                } else {
+                    rules.kinds[u.kind].building || los(g, rules, (u.x, u.z), (at.x, at.z))
+                }
+        })
 }
 
 /// A ground unit's sight (`visionRange`): high ground and an upper floor see farther, rain sees less.
@@ -308,7 +332,9 @@ pub fn update_vision_threaded(g: &mut Game, rules: &Rules, grid: &SpatialGrid) {
             let (list, teams) = (&list, &teams);
             let threads: Vec<_> = order
                 .iter()
-                .map(|&team| scope.spawn(move || team_sees(g, rules, grid, list, teams, team)))
+                .map(|&team| {
+                    scope.spawn(move || visible_enemy_units(g, rules, grid, list, teams, team))
+                })
                 .collect();
             threads
                 .into_iter()
@@ -339,7 +365,7 @@ fn team_views(g: &Game, rules: &Rules, grid: &SpatialGrid) -> Vec<Vec<UnitId>> {
             if let Some((_, seen)) = done.iter().find(|(team, _)| *team == p.team) {
                 return seen.clone();
             }
-            let seen = team_sees(g, rules, grid, &list, &teams, p.team);
+            let seen = visible_enemy_units(g, rules, grid, &list, &teams, p.team);
             done.push((p.team, seen.clone()));
             seen
         })
@@ -347,7 +373,7 @@ fn team_views(g: &Game, rules: &Rules, grid: &SpatialGrid) -> Vec<Vec<UnitId>> {
 }
 
 /// The enemy units one team sees, in the units' order.
-fn team_sees(
+fn visible_enemy_units(
     g: &Game,
     rules: &Rules,
     grid: &SpatialGrid,
