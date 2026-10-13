@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified the combined ground-support and mass-project tick assembly on the Mac (arm64): all 239 workspace release tests, 78 affected debug tests at the same runtime, strict Clippy, formatting and release FFI pass. Independent hash-checked copies pass 28 debug/release tests. Actual runner replay covers 12 Conquest support traces (2,660 ticks, 144 checkpoints), real Default refusal and seven project cases (193 ticks, 215 snapshots). Recorded two consumer-only compile repairs; Default alias, carriers, aircraft and full match start remain separate.
+
 - Raised the ground-support test crate's macro expansion limit for its complete canonical unit projection after the first native compiler reached serde_json's default recursion ceiling. All observed fields and runtime behavior remain unchanged; native checks continue at the repaired source.
 
 - Corrected the mass full-tick consumer to read path-request statistics through the existing command owner. The first composed Mac run passed all 42 affected core debug tests, then stopped on the missing Match-level accessor before simtest execution. Runtime, scheduler, RNG and original fixtures are unchanged; final native gates are restarting.

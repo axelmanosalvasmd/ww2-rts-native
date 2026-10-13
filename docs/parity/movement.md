@@ -304,3 +304,5 @@ Wall clock and scheduling
 ## Retirement and wreck lifecycle evidence
 
 The combat adapter removes dead units through the maintained grid without rebuilding surviving buckets. A focused mid-tick removal regression preserves the surviving query order. Its original-source fixture covers vehicle wreck initialization, motion, final Q cells, scorch and the oldest-hull cap among nine traces with 35 actions. MOV-106 remains in progress pending full tick scheduling and client presentation. Thrown carrier escape in MOV-76 remains outside this slice.
+
+The bounded ground-support tick composition at compiled `0f7850d` passes 12 Conquest full-source traces (2,660 ticks, 144 checkpoints), with the real Default scene explicitly refused before mutation. It consumes captured late actors and decays covers/cooldowns once. Complete AIR/Para support, other modes, transport and full support parity remain separate; relevant rows stay in progress.
