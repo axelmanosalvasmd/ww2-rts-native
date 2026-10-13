@@ -12,4 +12,6 @@ The recorder calls the unchanged source full `step`: 15 traces, 576 operations a
 
 Preflight distinguishes active bindings from retained dead metadata. A retired operative control may remain only with its canonical firing/combat rows, a nonzero historical ID below the allocator head, and no live body or registry reference. This keeps the existing retirement ownership without admitting a fabricated future actor.
 
+Live operative IDs also must be nonzero, below the allocator head, and match their canonical map key. Zero is the registry's dead-soldier sentinel and cannot represent a live actor. These checks precede clock advancement and respawn publication.
+
 The plain-terrain authored cases leave ordinary vision/projectile body interoperability with operative jump/crouch geometry outside this proof. Grenade contact/settlement, unavailable unrelated phases, transport and whole-game acceptance remain explicit boundaries until actually exercised and connected. Native replay and the consumer composition are pending.

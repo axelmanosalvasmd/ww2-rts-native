@@ -45,13 +45,17 @@ impl Match {
             if !control.operative {
                 continue;
             }
+            if *id == 0 || *id >= self.next_unit_id {
+                return Err("operative control identity is outside the allocator".into());
+            }
             if self.world.game.units.contains_key(id) {
+                if self.world.game.units[id].id != *id {
+                    return Err("operative unit identity does not match its map key".into());
+                }
                 if !self.companions.soldiers.contains_key(id) {
                     return Err("operative control has no matching soldier".into());
                 }
-            } else if *id == 0
-                || *id >= self.next_unit_id
-                || self.firing.get(*id).is_none()
+            } else if self.firing.get(*id).is_none()
                 || self.combat.get(*id).is_none()
                 || self.companions.soldiers.contains_key(id)
                 || self.companions.records.values().any(|op| op.unit_id == *id)
