@@ -25,7 +25,7 @@ const sparse=a=>Array.from(a,(v,i)=>v?[i,bits(v)]:null).filter(Boolean);
 const snapshot=(g,random)=>({mp:g.players.map(p=>bits(p.mp)),cooldowns:g.players.map(p=>Object.fromEntries(Object.entries(p.sup).map(([k,v])=>[k,bits(v)]))),strikes:g.strikes.map(s=>({kind:s.kind,owner:s.owner,x:bits(s.x),z:bits(s.z),dir:bits(s.dir),t:bits(s.t),left:bits(s.left),next:bits(s.next),live:s.live})),covers:(g.covers??[]).map(c=>({team:c.team,owner:c.owner,x:bits(c.x),z:bits(c.z),r:bits(c.r),t:bits(c.t)})),smokes:g.smokes.map(s=>({id:s.id,x:bits(s.x),z:bits(s.z),r:bits(s.r),t:bits(s.t)})),units:[...g.units.values()].map(u=>({id:u.id,hp:bits(u.hp),supp:bits(u.supp),lastHit:u.lastHit??null,hitBy:u.hitBy??null,hitAt:bits(u.hitAt),retarget:bits(u.retarget)})),terrain:{chars:g.chars.join(''),height:Array.from(g.height??Array(g.w*g.h).fill(0)),hp:sparse(g.cellHp),wear:sparse(g.wear),scar:sparse(g.scar),versions:[g.terrainVersion??0,g.obstructionVersion??0,g.infantryRegionVersion??0,g.vehicleRegionVersion??0,g.navalRegionVersion??0]},environment:[g.seed>>>0,g.nextId],story:(g.story??g.players.map(()=>({supportCalls:0,mpSpent:0}))).map(s=>[bits(s.supportCalls),bits(s.mpSpent)]),shots:g.shots,random:random.state()});
 const map={name:'Support arena',w:40,h:40,rows:Array(40).fill('.'.repeat(40)),spawns:[{x:2,y:2},{x:37,y:37}],points:[{x:20,y:20,kind:'radio'}]};
 const traces=[];
-for(const kind of ['artillery','smoke','cover'])for(const faction of [0,3])for(const variation of ['normal','radio','cut','poor','cooldown','clamp','late-unit','late-bridge','late-house']){
+for(const kind of ['artillery','smoke','cover'])for(const faction of [0,3])for(const variation of ['normal','radio','cut','poor','cooldown','clamp','fallback','late-unit','late-bridge','late-house']){
  const witness=rng(701),along=(witness.next()-.5)*24,side=(witness.next()-.5)*10,landing={x:41+Math.cos(.3)*along-Math.sin(.3)*side,z:41+Math.sin(.3)*along+Math.cos(.3)*side};
  const cx=Math.floor(landing.x/2),cy=Math.floor(landing.z/2),cell=cy*40+cx;
  const arena=structuredClone(map);if(variation==='late-bridge'||variation==='late-house'){arena.rows[cy]='.'.repeat(cx)+(variation==='late-bridge'?'=':'B')+'.'.repeat(39-cx);arena.points[0].x=25;arena.points[0].y=25;}
@@ -35,7 +35,7 @@ for(const kind of ['artillery','smoke','cover'])for(const faction of [0,3])for(c
  if(variation==='cooldown')g.players[0].sup[kind]=1;
  if(variation==='radio'||variation==='cut'){g.points[0].owner=0;g.points[0].cut=variation==='cut';}
  const random=rng(701),frames=[];
- const request={t:'support',kind,x:variation==='clamp'?-20:41,z:variation==='clamp'?95:41,dir:0.3};
+ const request={t:'support',kind,x:variation==='clamp'?-20:41,z:variation==='clamp'?95:41,dir:variation==='fallback'?'bad':0.3};
  let denial=sim.command(g,0,request)??null;frames.push({action:{op:'admit',request},denial,expected:snapshot(g,random)});
  denial=sim.command(g,0,request)??null;frames.push({action:{op:'admit',request},denial,expected:snapshot(g,random)});
  for(let tick=1;tick<=240;tick++){
