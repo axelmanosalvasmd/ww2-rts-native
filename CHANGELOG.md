@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Normal-merged the corrected source mass-project tick provider into a separate ground-support descendant, preserving the newer ability admission regression and actual operative/reaction caller. Canonical jobs and memberships remain singular; combined native proof is pending.
+
 - Normal-merged the reviewed test-only reaction observation repairs into the separate ground-support continuation, preserving the actual support caller and aircraft refusal regression. Combined native proof remains pending.
 
 - Defined the old-clock command boundary once in the new ground-support caller, reusing it for dispatch and post-command validation. Source review caught the missing local variable before any native build.
@@ -185,6 +187,30 @@
 
 - Preserved canonical recruited combat defaults through the shared publication callback when integrating the reviewed combat ancestry. Fresh combat identities reject before payment; production stepping remains under implementation.
 - Added canonical Match ground reactions, automatic retreat and idle spacing using shared command destinations, owner-known routes, firing targets and combat hit history. Three focused tests pass in debug and release, comparing 51 unchanged-source reaction/retreat cases and checking atomic rejection. Only the missing reaction timer is added to UnitControl. Air, carrier and garrison retreat exits remain explicit unsupported paths. Complete tick hookup remains separate. Adapted routing to canonical ordered-fire iteration and filled absent reserve defaults in the merged command fixture. At checkpoint ab0394d, strict Clippy stopped on two unused helpers in its inherited firing milestone. Final merged checks are pending.
+- Source review closed two preclock gaps: paid descriptors now enforce the existing six-cell executor bound, and potential queued new members reserve cached crew capacity except when the next tick performs the source twentieth-tick recount. Added source-counter and malformed-descriptor guard coverage; native execution remains pending.
+
+- Added an unmodified full-step source oracle for shared projects: seven cases, 25 actions, 193 steps and 215 snapshots verify payment once, joins/sweep timing, late dead-worker removal, Stop without refund, completion and real retry-limit-one route failure. Four native admission guards and the sole-runner replay specification are written; native execution and full tick composition remain pending.
+
+- Added read-only mass-project tick admission for current actor order, canonical membership and paid jobs, waiting Join shape, source clock/counter capacity and the ordinary Conquest boundary. It preserves stale-project command denial and leaves the early recount and per-unit work phases with the sole tick owner; native verification and full-step fixture evidence are pending.
+
+- Shared mass projects pass native differential checks at `0f17e93`: 168 supported plans, 30 segment prices and 23 actual Match traces (131 actions), plus atomic admission guards. The final 13 focused debug checks, all 210 release workspace tests, strict Clippy, formatting and release FFI passed; independent source review and four debug plus four release replays passed. Full tick assembly, previews, recipient works rows, fill, concrete and construction remain separate.
+
+- The first shared-project native proof passed 13 focused debug checks and all 210 release workspace tests. Strict Clippy then found five style-only issues in the new runtime/tests; these were corrected before the fresh final gates.
+
+- The existing command replay now restores its directly recorded entrenchment fields through the real project owner before Move/Stop cancellation. This preserves the source fixture while protecting the new membership validation; unused project imports found during compilation were removed.
+
+- Shared project segment prices now accept source cell counts beyond six; the first native source replay exposed an unsupported cap, including the existing seven-cell and eight-cell price fixtures.
+
+- Joined the checked ordinary engineering provider and its evidence-only handoff into the shared-project branch. The ordinary provider passed seven focused debug checks and 206 release workspace tests; the new project code has also passed its fresh native gates recorded above.
+
+- Separated failed Dig route cleanup from accepted replacement cancellation. A retry-limit drop removes only the paid job and Dig flag, preserving shared-project membership, cached active timing and the paid wallet; the queue-owner source review found the earlier full-cancellation mismatch. The actual unreachable-route source trace and native replay now verify that distinction.
+
+- Connected typed Entrench intent to the existing recorded queue and shared field-work owner. New and allied joins stage control changes, queued joins retain project identity, per-unit allocation rechecks sight and pays the buildable segment, and waiting plans read real unpaid/active work. Native/source component replay passes; full tick assembly remains separate, and construction, fill and concrete stay explicit exclusions.
+
+- Joined the real engineering/input source ancestry into the isolated mass-project checkpoint, preserving its singular paid-job cancellation and the checked ability/recovery defaults. The ordinary provider and combined mass-project checks now pass; full runner assembly remains separate.
+
+- Added source-order mass field-work patterns and shared project identity to the single FieldWorksRuntime owner. Paid segments use proportional prices and the existing canonical Dig/terrain execution; cancellation removes membership and its flags synchronously without refund or eager source-counter changes. Typed Match command and native component checks now pass; complete tick assembly remains separate.
+
 - Verified the bounded Conquest ability/recovery provider at exact runtime/test head `1f9a16b`: 13 core debug checks (four ability, two recovery), three firing and two recruitment debug checks, all 177 locked release workspace tests, strict Clippy, formatting and release FFI. Independent source and debug/release replay checks pass. Added phase API documentation and kept full tick/engineering/other-mode/ABI/transport parity in progress; final evidence commits preserve Rust/harness trees.
 
 - Resolved strict Clippy findings in the native recovery validation and replay helpers without changing their behavior. The release workspace suite passed 177 tests before this cleanup; exact final checks are rerunning.
