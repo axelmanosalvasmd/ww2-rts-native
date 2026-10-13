@@ -103,6 +103,7 @@
 - Bring source-reviewed human commander timing, raw input helpers and detached common view types into the isolated observation producer branch. Native acceptance remains pending.
 
 - Prepare a separate human commander observation branch by normally combining checked commander `be1cb2c` with ordinary Default `262926e`. Retain both Cover and Entrench dispatch and canonical owners; this new union has no native acceptance yet.
+- Added an isolated legacy-trigger runtime provider for source-ordered public Say and canonical Destroy damage. Destroy uses the shared World/Combat damage owner and emits committed effects as they occur; LastHit stays in canonical combat history. An x64 pinned-source recorder now captures all five shipped trigger maps, 21 selected complete-step frames and a failure injected after Great Bridge damage commits. Native compilation and the sole tick/recipient integration are pending.
 
 - Prepared a separate normal union of frozen ordered-event PR #194 and the consolidated original-source frontier `dfcc0bf`. Preserved the one TickEvent/TickFailure result, producer emission sinks, original World component bodies, approved ABI 2 and the optimized test profile with debug assertions and overflow checks. Migrated the inherited quiet engineering consumer to require empty owned events, and report accepted recipient traffic once rather than unavailable. Published parents remain unchanged; exact union source review and the full optimized native cycle are pending.
 
