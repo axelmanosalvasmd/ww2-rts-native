@@ -7,6 +7,8 @@
 //!
 //! `simtest --view <messages.jsonl[.gz]|->` prints one client-view summary per raw server message.
 //!
+//! `simtest --map <authoritative-map.json>` validates a map and prints its static loading summary.
+//!
 //! `simtest --replay <trace.json>`
 //!
 //! Replays a recording from `harness/movement-trace.mjs` call by call against the movement port and prints
@@ -49,6 +51,15 @@ fn run() -> Result<(), String> {
             .and_then(|i| args.get(i + 1))
     };
     let threads = args.iter().any(|a| a == "--threads");
+    if let Some(file) = opt("--map") {
+        let map = simtest::map::load(Path::new(file))?;
+        let world = ww2_core::world::World::from_map(&map).map_err(|e| e.to_string())?;
+        println!(
+            "{}",
+            json!({"name":map.name(),"width":world.game.w,"height":world.game.h,"cells":world.game.chars.len(),"regions":world.geography().map(|g|g.regions.len()),"homes":world.geography().map(|g|g.regions.iter().filter(|r|r.home.is_some()).count()),"structures":world.structures.len(),"mines":world.mines.len()})
+        );
+        return Ok(());
+    }
     if let Some(file) = opt("--view") {
         use std::io::{BufRead, BufReader};
         let input: Box<dyn std::io::Read> = if file == "-" {
