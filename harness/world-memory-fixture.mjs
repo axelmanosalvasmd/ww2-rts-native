@@ -32,7 +32,7 @@ function record(startIndex,actions,rawLabels=false){
  const revisions=new WeakMap(),aliases=new Map(),snapshots=[];sim.setWorldRowProbe((team,row,rev)=>revisions.set(row,rev));
  const project=row=>{const d=row[4],s=d.section;return [row[0],row[1],row[2],row[3],d.ground,d.object,d.material,d.groundMaterial,bits(d.groundWear),d.trenchFront===undefined?null:bits(d.trenchFront),!!d.mine,d.mineMaterial??null,s?[s.id,s.structureId,s.state,bits(s.hp),bits(s.maxHp),s.material,s.anchor]:null,d.mineOwned??null,d.initial,d.biome??null,d.landmark??null,d.rail??null,d.station??null,revisions.get(row)];};
  const rows=vs=>{const a=[...vs].map(project);return {count:a.length,hash:hash(a)};};
- const wrecks=rs=>rs.map(r=>[r[0],bits(r[3]),bits(r[4]),r.length>6]);
+ const wrecks=rs=>Array.from(rs,r=>[r[0],bits(r[3]),bits(r[4]),r.length>6]);
  const get=a=>g.units.get(aliases.get(a.alias));
  for(const a of actions){let result=null;
   switch(a.op){
