@@ -217,6 +217,9 @@ pub struct Reserves {
     pub forced: bool,
     pub stranded: bool,
     pub exhausted: bool,
+    /// Territory service adds these fields after reserve initialization.
+    pub supply_rate: Option<f64>,
+    pub cut_for: Option<f64>,
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Stock {
@@ -308,6 +311,8 @@ impl LogisticsState {
                 forced: false,
                 stranded: false,
                 exhausted: false,
+                supply_rate: None,
+                cut_for: None,
             }
         });
         self.units.get(&u.id)
