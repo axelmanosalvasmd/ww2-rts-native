@@ -165,27 +165,10 @@ fn original_paid_dig_lifecycles() {
             let mut result = Value::Null;
             match a["op"].as_str().unwrap() {
                 "command" => {
-                    let c = &a["cmd"];
-                    let ids = c["ids"]
-                        .as_array()
-                        .unwrap()
-                        .iter()
-                        .map(|v| v.as_i64().unwrap())
-                        .collect::<Vec<_>>();
-                    let denial = if c["t"] == "dig" {
-                        m.execute_dig(
-                            a["slot"].as_u64().unwrap_or(0) as usize,
-                            &ids,
-                            FortKind::parse(c["kind"].as_str().unwrap()).unwrap(),
-                            point(c),
-                            c["dir"].as_f64(),
-                            false,
-                        )
-                        .unwrap()
-                    } else {
-                        assert_eq!(c["t"], "stop");
-                        m.execute_command(0, &Command::Stop { ids }, false).unwrap()
-                    };
+                    let command = Command::from_json(&a["cmd"]).unwrap();
+                    let denial = m
+                        .execute_command(a["slot"].as_u64().unwrap_or(0) as usize, &command, false)
+                        .unwrap();
                     result = denial.map(|d| json!(d.name())).unwrap_or(Value::Null);
                 }
                 "step" => {
@@ -194,6 +177,17 @@ fn original_paid_dig_lifecycles() {
                             .unwrap();
                     }
                 }
+                "begin" => {
+                    m.world.game.tick = a["tick"].as_i64().unwrap();
+                    m.begin_path_tick(
+                        a["budget"].as_u64().unwrap() as usize,
+                        a["retry"].as_u64().unwrap_or(1) as u32,
+                    )
+                    .unwrap();
+                }
+                "phase" => m
+                    .apply_field_work_unit(a["id"].as_u64().unwrap() as u32)
+                    .unwrap(),
                 "goal" => {
                     result = m
                         .current_dig_goal(a["id"].as_u64().unwrap() as u32)
@@ -204,6 +198,16 @@ fn original_paid_dig_lifecycles() {
                 "money" => {
                     m.start.economy.players[a["slot"].as_u64().unwrap_or(0) as usize].mp =
                         a["mp"].as_f64().unwrap()
+                }
+                "mutate" => {
+                    for cell in a["cells"].as_array().unwrap() {
+                        m.world
+                            .set_cell(
+                                cell.as_u64().unwrap() as usize,
+                                a["ch"].as_str().unwrap().as_bytes()[0],
+                            )
+                            .unwrap();
+                    }
                 }
                 "seen" => {
                     m.world.mine_seen.insert(
