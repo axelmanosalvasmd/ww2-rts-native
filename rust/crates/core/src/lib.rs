@@ -44,6 +44,7 @@ pub mod production;
 pub mod projectiles;
 
 pub mod random;
+pub mod recipient_snapshot;
 pub mod route_knowledge;
 pub mod rules;
 pub mod separation;

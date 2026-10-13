@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added an internal send-scoped Conquest projection for represented unit rows and recipient-owned economy, technology, rally, weather and finish fields. It reads canonical control, ability, recovery, firing and combat state, preserves the reference cached non-owner flag mask and hides unseen target IDs. An original-source fixture records 44 states and 132 recipient projections, including ally privacy, vehicles, cover, rounding and the distinct weapon/ability cooldowns. Missing canonical metadata returns a typed error; active air, engineering, gates and operatives remain unsupported. Plans, queued orders, terrain/fog, effects, points and the complete snapshot envelope remain pending. Native checks are pending the shared build lane.
+
 - Stacked the checked Conquest command actuator on the reviewed recruitment and recipient-routing checkpoint, retaining its complete command behavior and canonical shared control state. Combined integration checks belong to the shared CI lane.
 
 - Integrated the reviewed routing and executable command prerequisites for weapon-phase checks. Movement fixtures explicitly leave the newer territorial reserve fields absent. No production rule changed.
