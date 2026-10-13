@@ -922,7 +922,7 @@ impl Match {
             * n(w, if inf { "accInf" } else { "accVeh" }, 0.0)
             * count)
     }
-    fn set_firing_target(&mut self, id: UnitId, next: UnitId) -> Result<(), String> {
+    pub(crate) fn set_firing_target(&mut self, id: UnitId, next: UnitId) -> Result<(), String> {
         let u = self.world.game.units.get(&id).ok_or("missing shooter")?;
         let previous = self.firing.get(id).map_or(0, |s| s.target_id);
         if previous != next {
