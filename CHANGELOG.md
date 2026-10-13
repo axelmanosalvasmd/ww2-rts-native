@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Adapted command fixtures to the canonical optional territorial supply fields, preserving their absent values during integration.
+
 - Stacked the checked Conquest command actuator on the reviewed recruitment and recipient-routing checkpoint, retaining its complete command behavior and canonical shared control state. Combined integration checks belong to the shared CI lane.
 
 
