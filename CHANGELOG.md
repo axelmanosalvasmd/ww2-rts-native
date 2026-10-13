@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Normally consume cleared legacy scenario runtime `b31f8f7` into the separate ordinary caller. Preserve its five-map complete Source replay, Great Bridge tick-8400 section transition and real post-commit failure prefix. Provider bodies are unchanged; ordered caller hookup and native validation remain pending.
+
 - Normally join the cleared ordinary production and research provider `dd62df3` into verified startup publication `ccfa017` in a separate caller worktree. Preserve the real research and immediate recruitment source recorder and the ordinary nonempty training queue refusal. Actual caller hookup and combined native validation remain pending.
 
 - Verify trusted ordinary startup at `3b84f7c`: all 401 optimized workspace tests, strict Clippy, formatting and release FFI pass. An independent audit retains all 399 prior test names and passes 14 copied affected server checks. Normally incorporate schema-documentation main `4867984` without changing runtime, test, harness, header or reference source; fresh platform and Axel host review remain required.
@@ -115,6 +117,7 @@
 - Recorded four complete original ordinary tick traces with 2,429 steps, 4,810 research observations, seven commands and two immediate recruitment births. Added an actual-runner consumer and two original restored-queue failure witnesses. Observed and unobserved Source replay agree; native execution awaits the sole tick owner's research hookup. Retained unsupported restored queues rather than inventing a Conquest mode object.
 
 - Added read-only admission for canonical research and live-building production phases, including actual World context, foreign queue rows and prospective numeric overflow. Ordinary Conquest keeps immediate purchases and refuses nonempty restored training queues. World queued AIR and logistics publication remain unsupported. Training publication also checks the canonical Aviation and reserve owners before using an ID. Full tick hookup and native proof are pending.
+- Added an isolated legacy-trigger runtime provider for source-ordered public Say and canonical Destroy damage. Destroy uses the shared World/Combat damage owner and emits committed effects as they occur; LastHit stays in canonical combat history. Say validation now rejects noncanonical or unsafe execution IDs, and match preflight bounds captured point owners to the actual commander slots. The x64 pinned-source recorder captures independent falling-body inputs and Great Bridge structural section HP/state before and after tick 8400. Native compilation and the sole tick/recipient integration are pending.
 
 - Prepared a separate normal union of frozen ordered-event PR #194 and the consolidated original-source frontier `dfcc0bf`. Preserved the one TickEvent/TickFailure result, producer emission sinks, original World component bodies, approved ABI 2 and the optimized test profile with debug assertions and overflow checks. Migrated the inherited quiet engineering consumer to require empty owned events, and report accepted recipient traffic once rather than unavailable. Published parents remain unchanged; exact union source review and the full optimized native cycle are pending.
 
