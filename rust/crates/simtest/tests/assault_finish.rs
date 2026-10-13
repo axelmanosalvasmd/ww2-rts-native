@@ -292,7 +292,7 @@ fn first_finish_freezes_clock_reveal_story_and_source_reason() {
             "tutorial"
         ]
     );
-    m.options.mode = Mode::World;
+    m.options.mode = Mode::Classic;
     assert!(m.apply_assault_victory(0.05).is_err());
     assert!(m.sample_match_tick().is_err());
     assert!(m.match_result().is_err());

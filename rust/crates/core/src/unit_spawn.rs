@@ -249,7 +249,10 @@ pub fn initial_unit(
     initial_fields(rules, catalog, kind, id, owner, at, false)
 }
 
-pub(crate) fn initial_aircraft(
+/// Explicit physical aircraft fields for controlled scene restoration or staged publication.
+/// This does not register a sortie, resolve an air base, scatter, or admit aircraft execution.
+/// A restored source row without an air object may normalize the unused physical field to Base.
+pub fn initial_aircraft(
     rules: &Rules,
     catalog: &Catalog,
     kind: usize,

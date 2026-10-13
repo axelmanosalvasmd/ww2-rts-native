@@ -37,7 +37,7 @@ fn seen(game: &Game, owner: usize, visible: &[u32], unit: &Unit) -> bool {
 fn rounded(n: f64) -> f64 {
     math::round(n * 10.0) / 10.0
 }
-fn bound(u: &Unit) -> BoundUnit {
+pub(crate) fn bound(u: &Unit) -> BoundUnit {
     BoundUnit {
         id: u.id,
         kind: u.kind,
@@ -517,7 +517,7 @@ impl<'a> WorldRoutingContext<'a> {
         }
     }
 }
-fn validate_world_context(
+pub(crate) fn validate_world_context(
     context: WorldRoutingContext<'_>,
     memory: &world_memory::WorldMemory,
     owner: usize,
