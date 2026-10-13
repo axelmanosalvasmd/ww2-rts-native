@@ -104,8 +104,11 @@ impl crate::match_runtime::Match {
         if game.tick < 0 || game.tick >= 9_007_199_254_740_351 {
             return Err("invalid tick clock".into());
         }
-        if self.options.mode != crate::economy::Mode::Conquest {
+        if self.options.mode != crate::economy::Mode::Conquest || game.mode.is_some() {
             return Err("tick execution currently requires ordinary Conquest".into());
+        }
+        if self.options.logistics || self.convoys.is_some() {
+            return Err("reserve and convoy tick phases are not connected".into());
         }
         let boundary = game.tick as u64 + 1;
         self.validate_command_tick(boundary)?;

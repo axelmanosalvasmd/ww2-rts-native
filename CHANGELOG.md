@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added source-written full-tick reaction replay and whole-admission regression coverage. The separate runner now refuses enabled logistics, canonical convoy state and nonordinary internal mode state before queue or clock mutation while those phases remain disconnected. Native compilation and execution remain pending.
+
 - Documented the separate ordinary reaction tick source composition, actual source fixtures and retained unsupported boundaries. Combined native replay remains pending.
 
 - Normal-merged the verified operative runtime, fixture repairs and documentation into the separate reaction source assembly. Preserved the new reaction sites and original added traces; native proof of this reaction composition remains pending.

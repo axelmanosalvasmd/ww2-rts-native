@@ -58,6 +58,48 @@ fn snapshot(m: &Match) -> Value {
         "players":m.start.economy.players.iter().map(|p|json!([bits(p.mp),bits(p.vp),bits(p.inc)])).collect::<Vec<_>>(),
         "points":m.start.points.iter().enumerate().map(|(i,p)|json!([p.owner.map_or(-1,|v|v as i64),p.capper.map_or(-1,|v|v as i64),bits(p.progress),p.cut,p.contested,p.on_point,m.capture_ticks[i]])).collect::<Vec<_>>()})
 }
+fn packed(point: Option<Point>) -> Value {
+    point.map_or(Value::Null, |point| json!([bits(point.x), bits(point.z)]))
+}
+fn source_truth(value: &Value) -> bool {
+    match value {
+        Value::Null => false,
+        Value::Bool(value) => *value,
+        Value::Number(value) => value.as_f64().unwrap() != 0.0,
+        _ => true,
+    }
+}
+fn reaction_snapshot(m: &Match) -> Value {
+    use ww2_core::match_commands::MoveOutcome;
+    json!(
+        m.world
+            .game
+            .units
+            .values()
+            .map(|unit| {
+                let control = &m.commands.units[&unit.id];
+                let combat = m.combat.get(unit.id).expect("canonical combat history");
+                json!({
+                    "id":unit.id,"react":bits(control.react),"drift":unit.drift,
+                    "rallyDrift":control.rally_drift,"reverse":packed(unit.reverse),
+                    "retreating":unit.retreating,"hitBy":combat.hit_by.unwrap_or(0),
+                    "hitAt":bits(combat.hit_at),"hitFrom":packed(unit.hit_from),
+                    "shotAt":unit.shot_at.map(bits),"worldGoal":packed(unit.world_goal),
+                    "amove":packed(unit.amove),"orders":control.orders.len(),
+                    "attack":control.attack_id,"holdPos":unit.hold_pos,"holdFire":control.hold_fire,
+                    "autoRetreat":control.auto_retreat,"auto":control.auto_cast,
+                    "nade":packed(control.nade),"enter":control.enter.map_or(-1,|cell|cell as i64),
+                    "fireAt":control.fire_at.map_or(-1,|cell|cell as i64),"board":unit.board,
+                    "build":unit.build,"dig":unit.dig,"entrench":unit.entrench,
+                    "moveOutcome":control.outcome.map(|outcome|match outcome {
+                        MoveOutcome::Interrupted=>"interrupted",MoveOutcome::Moving=>"moving",
+                        MoveOutcome::Unreachable=>"unreachable",MoveOutcome::Arrived=>"completed",
+                    }),"moveOutcomeTick":control.outcome_tick
+                })
+            })
+            .collect::<Vec<_>>()
+    )
+}
 #[test]
 fn connected_tick_phases_match_actual_reference_steps() {
     let fixture: Value = serde_json::from_str(include_str!("fixtures/match-tick.json")).unwrap();
@@ -65,7 +107,19 @@ fn connected_tick_phases_match_actual_reference_steps() {
         let mut m = make(c);
         let input = &c["input"];
         for unit in m.world.game.units.values_mut() {
-            unit.hold_pos = true;
+            unit.hold_pos = input["holdPosition"].as_bool().unwrap_or(true);
+        }
+        if let Some(hold_fire) = input["holdFire"].as_bool() {
+            for control in m.commands.units.values_mut() {
+                control.hold_fire = hold_fire;
+            }
+        }
+        // Match owns the input queue. Advance only its empty boundaries to reach
+        // the source's explicit initial clock without running any unit phase.
+        for boundary in 1..=input["startTick"].as_u64().unwrap_or(0) {
+            assert_eq!(m.commands.pending_commands(), 0);
+            assert!(m.apply_commands(boundary, false).unwrap().is_empty());
+            m.world.game.tick = boundary as i64;
         }
         if let Some(keep) = input["keep"].as_array() {
             m.world
@@ -131,6 +185,38 @@ fn connected_tick_phases_match_actual_reference_steps() {
             }];
             u.path_gen += 1;
         }
+        if let Some(rows) = input["fields"].as_array() {
+            for row in rows {
+                let id = row[0].as_u64().unwrap() as u32;
+                let fields = row[1].as_object().unwrap();
+                for (name, value) in fields {
+                    match name.as_str() {
+                        "holdPos" => {
+                            m.world.game.units.get_mut(&id).unwrap().hold_pos =
+                                value.as_bool().unwrap()
+                        }
+                        "holdFire" => {
+                            m.commands.units.get_mut(&id).unwrap().hold_fire =
+                                value.as_bool().unwrap()
+                        }
+                        "react" => {
+                            m.commands.units.get_mut(&id).unwrap().react = value.as_f64().unwrap()
+                        }
+                        "drift" => {
+                            m.world.game.units.get_mut(&id).unwrap().drift = source_truth(value);
+                            m.commands.units.get_mut(&id).unwrap().rally_drift =
+                                value.as_str() == Some("rally");
+                        }
+                        "cooldown" => m.firing.initialize(id).cooldown = value.as_f64().unwrap(),
+                        "auto" => {
+                            m.commands.units.get_mut(&id).unwrap().auto_cast =
+                                value.as_bool().unwrap()
+                        }
+                        _ => panic!("unmapped actual reaction fixture field {name}"),
+                    }
+                }
+            }
+        }
         if let Some(changes) = input["changes"].as_array() {
             for row in changes {
                 m.world
@@ -189,6 +275,16 @@ fn connected_tick_phases_match_actual_reference_steps() {
             assert!(
                 report
                     .phases
+                    .contains(&ww2_core::match_tick::TickPhase::Reactions)
+            );
+            assert!(
+                !report
+                    .unavailable
+                    .contains(&ww2_core::match_tick::TickPhase::Reactions)
+            );
+            assert!(
+                report
+                    .phases
                     .contains(&ww2_core::match_tick::TickPhase::Firing)
             );
             assert!(
@@ -211,8 +307,16 @@ fn connected_tick_phases_match_actual_reference_steps() {
                         .1;
                     state["combatState"] = json!(format!("{value:016x}"));
                 }
-                if c["retirement"] == true {
+                if expected
+                    .peek()
+                    .is_some_and(|row| row.get("deaths").is_some())
+                {
                     state["deaths"] = json!(deaths);
+                }
+                if expected
+                    .peek()
+                    .is_some_and(|row| row.get("story").is_some())
+                {
                     state["story"] = json!(
                         m.story
                             .iter()
@@ -324,10 +428,21 @@ fn connected_tick_phases_match_actual_reference_steps() {
                         "chars":String::from_utf8(m.world.game.chars.clone()).unwrap(),"burnt":m.world.burnt
                     });
                 }
+                let mut expected_state = expected.next().unwrap().clone();
+                if c["reaction"] == true {
+                    state["reactions"] = reaction_snapshot(&m);
+                    for row in expected_state["reactions"].as_array_mut().unwrap() {
+                        // The component oracle applies source truthiness to drift.
+                        // Keep rally intent separate so an intercepted rally is checked.
+                        row["rallyDrift"] = json!(row["drift"] == "rally");
+                        row["drift"] = json!(source_truth(&row["drift"]));
+                    }
+                }
                 assert_eq!(
                     state,
-                    *expected.next().unwrap(),
-                    "army {} tick {}",
+                    expected_state,
+                    "case {} army {} tick {}",
+                    c.get("name").unwrap_or(&Value::Null),
                     c["army"],
                     report.tick
                 );
@@ -345,6 +460,105 @@ fn rejected_clock_does_not_consume_a_tick() {
     assert!(m.advance_tick().is_err());
     assert_eq!(snapshot(&m), before);
     assert!(m.tick_state.fault().is_none());
+}
+
+#[test]
+fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
+    use ww2_core::{match_commands::Command, orders::OrderKey};
+    let fixture: Value = serde_json::from_str(include_str!("fixtures/match-tick.json")).unwrap();
+    for actor in ["garrison", "rail", "riding", "logistics", "convoys", "mode"] {
+        let mut m = make(&fixture["cases"][0]);
+        let id = *m.world.game.units.keys().next().unwrap();
+        let rail_kind = m.rules.kinds.iter().position(|kind| kind.rail).unwrap();
+        let unit = m.world.game.units.get_mut(&id).unwrap();
+        unit.x = 25.0;
+        unit.z = 25.0;
+        unit.repath = 0.5;
+        unit.sprint = 0.25;
+        match actor {
+            "garrison" => {
+                unit.garrison = Some(166);
+                unit.hp = 34.0;
+            }
+            "rail" => unit.kind = rail_kind,
+            "riding" => unit.riding = true,
+            "logistics" => m.options.logistics = true,
+            "convoys" => m.convoys = ww2_core::supply_convoys::ConvoyState::setup(true),
+            "mode" => m.world.game.mode = Some(ww2_core::game::ModeKind::World),
+            _ => unreachable!(),
+        }
+        let control = m.commands.units.get_mut(&id).unwrap();
+        control.react = 0.75;
+        control.auto_retreat = true;
+        m.firing.initialize(id).cooldown = 1.0;
+        m.firing.initialize(id).retarget = 0.3;
+        m.abilities.initialize(id).cooldown = 2.0;
+        m.abilities.initialize(id).buff = 1.0;
+        m.enqueue_command(
+            OrderKey {
+                tick: 1,
+                issuer: 0,
+                sequence: 1,
+            },
+            Command::Stop {
+                ids: vec![i64::from(id)],
+            },
+        )
+        .unwrap();
+        m.enqueue_command(
+            OrderKey {
+                tick: 2,
+                issuer: 0,
+                sequence: 2,
+            },
+            Command::Stop {
+                ids: vec![i64::from(id)],
+            },
+        )
+        .unwrap();
+        let before = snapshot(&m);
+        let units = m.world.game.units.clone();
+        let controls = m.commands.units.clone();
+        let firing = m.firing.clone();
+        let abilities = m.abilities.clone();
+        let recovery = m.recovery.clone();
+        let combat = m.combat.clone();
+        let support = m
+            .start
+            .players
+            .iter()
+            .map(|player| player.support.clone())
+            .collect::<Vec<_>>();
+        let error = m.advance_tick().unwrap_err();
+        assert!(
+            error.contains(match actor {
+                "garrison" => "automatic garrison retreat tick exit",
+                "logistics" | "convoys" => "reserve and convoy tick phases",
+                "mode" => "ordinary Conquest",
+                _ => "rail or carrier tick actor",
+            }),
+            "{actor}: {error}"
+        );
+        assert_eq!(snapshot(&m), before, "{actor}");
+        assert_eq!(m.world.game.units, units, "{actor}");
+        assert_eq!(m.commands.units, controls, "{actor}");
+        assert_eq!(m.firing, firing, "{actor}");
+        assert_eq!(m.abilities, abilities, "{actor}");
+        assert_eq!(m.recovery, recovery, "{actor}");
+        assert_eq!(m.combat, combat, "{actor}");
+        assert_eq!(
+            m.start
+                .players
+                .iter()
+                .map(|player| player.support.clone())
+                .collect::<Vec<_>>(),
+            support,
+            "{actor}"
+        );
+        assert_eq!(m.commands.next_tick(), Some(1), "{actor}");
+        assert_eq!(m.commands.pending_commands(), 2, "{actor}");
+        assert!(m.tick_state.fault().is_none(), "{actor}");
+    }
 }
 
 #[test]
