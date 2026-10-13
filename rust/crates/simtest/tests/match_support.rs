@@ -523,6 +523,23 @@ fn support_arrival_preflights_shared_ids_and_initializes_actual_birth_owners() {
     assert!(m.step_support_strikes(&actors, 0.05).is_err());
     assert_eq!(protected_support(&m), before);
     m.recovery.remove(id);
+    m.aviation.anti_air.insert(
+        id,
+        ww2_core::match_aviation::AntiAirRuntime {
+            shot: Some(0.35),
+            reserve: Some(0.5),
+        },
+    );
+    let before = protected_support(&m);
+    assert_eq!(
+        m.validate_support_tick_phases(&actors, 0.05, 1),
+        Err(ww2_core::match_support::SupportError::Invalid(
+            "drop metadata identity occupied"
+        ))
+    );
+    assert!(m.step_support_strikes(&actors, 0.05).is_err());
+    assert_eq!(protected_support(&m), before);
+    m.aviation.remove(id);
     m.validate_support_tick_phases(&actors, 0.05, 1).unwrap();
     m.step_support_strikes(&actors, 0.05).unwrap();
     assert_eq!(m.next_unit_id, id + 3);

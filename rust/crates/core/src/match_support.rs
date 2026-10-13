@@ -428,7 +428,9 @@ impl Match {
                     u32::try_from(staged.len()).map_err(|_| SupportError::Invalid("drop count"))?,
                 )
                 .ok_or(SupportError::Invalid("drop identity exhausted"))?;
-            if self.combat.get(id).is_some()
+            if self.aviation.planes.contains_key(&id)
+                || self.aviation.anti_air.contains_key(&id)
+                || self.combat.get(id).is_some()
                 || self.firing.get(id).is_some()
                 || self.abilities.get(id).is_some()
                 || self.recovery.get(id).is_some()
@@ -850,6 +852,8 @@ impl Match {
         // possible publications before interception or population can suppress a birth.
         for id in self.next_unit_id..end {
             if self.world.game.units.contains_key(&id)
+                || self.aviation.planes.contains_key(&id)
+                || self.aviation.anti_air.contains_key(&id)
                 || self.commands.units.contains_key(&id)
                 || self.recruit_metadata.contains_key(&id)
                 || self.combat.get(id).is_some()

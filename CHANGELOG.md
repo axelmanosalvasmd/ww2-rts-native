@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reject stale aviation/AA metadata at shared smoke/drop IDs before support advances or publishes Para actors. Independent review found that an orphan AA cadence could otherwise attach to a fresh ground actor; the no-write regression now covers this owner.
+
 - Composed the checked aircraft and engineering providers for off-map support. Aircraft and Para publication now check and initialize canonical ability/recovery rows, support exposes read-only next-clock admission, and its AA facade calls the single aviation actuator. A new unchanged-source recorder covers 4 coupled scenes, 1,603 checkpoints and 1,484 phase calls. Native successor verification is pending.
 
 - Prepared a separate composition of checked aircraft and engineering providers for off-map support. Retained aircraft command preflight and ground field-work cancellation, all canonical startup metadata, and exact pending-drop kinds in shared recruitment admission. World initializes an empty aviation owner without enabling its aircraft phases. Combined native verification remains pending.
