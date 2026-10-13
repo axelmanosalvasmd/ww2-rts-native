@@ -5,7 +5,7 @@ import {execFileSync} from 'node:child_process';
 import {resolve} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 assert.equal(process.arch,'x64');assert.equal(process.version,'v24.21.0');
-const reference=resolve(process.env.WW2_REFERENCE??'/Users/judiazm/Projects/ww2-rts-native/reference/ww2-rts');
+const reference=resolve(process.env.WW2_REFERENCE??fileURLToPath(new URL('../reference/ww2-rts',import.meta.url)));
 const pin='e4e579a838aabae3b1d9dadbc17a0a87147bc52d';
 const git=args=>execFileSync('git',['-C',reference,...args],{encoding:'utf8'}).trim();
 const clean=()=>{assert.equal(git(['rev-parse','HEAD']),pin);assert.equal(git(['status','--porcelain','--untracked-files=no']),'');};clean();

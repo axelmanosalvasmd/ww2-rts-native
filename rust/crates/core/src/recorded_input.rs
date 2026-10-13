@@ -20,3 +20,6 @@ impl CompanionJournalId {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod mixed_tests;

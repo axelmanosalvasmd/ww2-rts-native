@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added mixed handler replay and forward/reverse arrival tests through the real Match command queue. Per-operation snapshots compare represented canonical values and float bits; source reaction timers are explicitly excluded. Native execution remains pending.
+
 - Captured 24 mixed recorded gameplay operations with 23 unchanged original JavaScript handler calls, including same-batch purchase/ability, research, support, movement and trusted companion inputs. The fixed-seed 328,556-byte fixture regenerates exactly on x64 Node 24.21.0. Host ownership checks are labeled separately; native replay remains pending.
 
 - Documented the single recorded gameplay dispatcher, source command boundary, canonical transaction ownership and safe internal companion journal binding. Combined native and room integration remain unfinished.
