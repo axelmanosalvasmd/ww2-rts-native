@@ -177,6 +177,18 @@ Three focused tests compare 37 original-JavaScript traces comprising 217 income 
 
 Invalid slots or region indices, duplicate unit IDs, unknown catalog names, non-finite input and negative dt return errors before a wallet changes. This is a deliberate typed-input boundary in place of unchecked JavaScript objects. The fixture calls the unchanged source income block and `worldIncome` at `e4e579a`; it is component evidence, not a running match or end-to-end mode proof. Full economy and mode rows stay in progress. The server, wire snapshots, ABI and formation-only rules hash are unchanged.
 
+## Authoritative ordinary-map loading (2026-10-12)
+
+`map::AuthoritativeMap::from_json` accepts original authoritative JSON bytes supplied by its caller. The core performs no file, network or engine I/O. It validates ordinary legacy maps and version-2 layers, retains the complete original JSON, and exposes typed spawns, capture points, buildings, legacy triggers and normalized layers. This is separate from the server's public map projections. Those projections have already lost hidden mines, materials and scripts; the format has no provenance marker, so the caller must guarantee that the input is the original authoritative document.
+
+`initialize_terrain` uses `Rules::compiled` and the compiled catalog to build physical flags, optional height levels, house kinds, cell HP, stone-bridge toughness, deterministic starting wear, trench directions and naval shoals. Mines remain a separate layer, so their presence does not replace the underlying physical flags. Material maps use ordered keys. `TerrainState::query_game` supplies the existing movement, vision and navigation query state, with players, units and structural sections empty. It does not create a playable match or initialize structural graphs, scenario execution, mode state or match randomness.
+
+The bounded validator returns `Unsupported` whenever a `world`, `scenario` or `structures` property is present, including empty values. Legacy timed triggers are retained and checked against their migrated scenario bounds, but no trigger executes. Invalid supported fields return field-specific errors, without promising the JavaScript's exact error strings. JSON input is capped at 16 MiB before parsing; this is a core resource bound, separate from the reference editor's 8 MB HTTP limit. No server endpoint or C interface changes in this slice.
+
+The recorder checks reference `e4e579a838aabae3b1d9dadbc17a0a87147bc52d` and a clean tracked source tree. It executes the original `createGame` initialization statements up to height initialization, then returns before structural setup, starting units and mode changes. All 33 authored maps and 15 valid boundary maps match the original source document, normalized layers and materials, flags, heights, house kinds, HP and wear float bits, trench-direction float bits and shoal masks. Another 55 cases record validation rejection, and three record the unsupported property boundary. The fixture includes the 1024 by 1024 size limit and Unicode string-length cases.
+
+Issue #35 tracks this slice. The local workspace tests, strict Clippy, formatting and fixture regeneration checks pass on macOS. This is component evidence, not full `validateMap` parity, spawn-to-point reachability, mode behavior, match startup, structural destruction or Unreal integration. The affected map rows remain in progress until their complete behavior and integration checks pass. No performance measurement is claimed.
+
 ## Terrain navigation regions (2026-10-12)
 
 `navigation.rs` ports `shared/navigation.js`: chunk-local connected regions, directed portals, region routes and limited next-leg selection. It is the coarse prerequisite for fine A*, not a complete unit pathfinder. A `TerrainView` supplies only borrowed flags, heights and version/change information; the planner cannot consult hidden terrain through another game object.
@@ -196,6 +208,14 @@ The implementation preserves the reference's float32 path scores, score-only hea
 The original `findPath` produces 1,175 oracle searches across all 33 authored maps and crafted terrain cases: 914 found routes, 163 unreachable results and 98 budget exhaustions. Every waypoint and resolved endpoint matches bit for bit, as do expansion counts and outcomes. Repeated searches after mine, fire and bunker changes are included. The recorder verifies the exact reference pin and rejects tracked changes. At that stage, vehicle clearance, automatic recipient-view selection, retry policy, request scheduling and movement integration remained separate work. No performance claim was made.
 
 
+
+## Pure projectile flight and contact helpers (2026-10-12)
+
+`rust/crates/core/src/projectiles.rs` provides typed, standalone versions of all pure helpers in the pinned `shared/projectiles.js`: profile selection, flight position and velocity, launch solutions, box/body/naval-hull sweeps, segment distance, crossed-cell traversal and material ricochet response. The module has no game-state, renderer or networking dependency. Projectile and material constants stay beside these helpers for now; they are not part of the compiled catalog or the public rules hash.
+
+The port keeps source arithmetic, x/y/z slab order, corner-cell order, strict earliest-hit comparisons, box-before-cap ties and bounded rotational pieces. Trigonometry and two/three-argument hypot use the core's own math; square roots use the same hardware operation as the math module. The checked API rejects nonfinite inputs, reversed bounds, negative radii/lengths and nonpositive explicit flight durations. Grid dimensions are limited to 2^26 cells per side with an area fitting `usize`; hull angle wrapping allows at most 4,096 full-turn reductions. These limits prevent malformed input from overflowing indexing or keeping a tick in an unbounded loop.
+
+`harness/projectile-fixture.mjs` calls the original helpers with x64 Node 24.21.0, refuses a changed reference pin or tracked source tree, and records exact floating-point bits. Six focused tests pass in debug and release on the Mac, covering 941 oracle cases: all profile/material constants, precedence, zero/negative elapsed time, launch arcs, tangent and corner contacts, translating bodies, rotating naval hulls, grid-cell order and ricochet thresholds. Strict core Clippy and formatting checks pass. This is pure-helper evidence only. Combat firing, flight expiry, game-world contact selection, damage, terrain changes and random scatter are not connected yet; CMB-48, CMB-49, CMB-50 and CMB-160 remain in progress.
 
 ## Ground-vehicle pathfinding (2026-10-12)
 
