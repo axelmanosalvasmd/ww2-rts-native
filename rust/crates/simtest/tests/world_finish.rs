@@ -125,7 +125,12 @@ fn prepared_world_removal_sample_matches_exact_original_survivors_without_public
                     for injected in [id+10_000,0]{
                         m.world.game.units.get_mut(&id).unwrap().id=injected;
                         let malformed=protected(&m);
-                        assert!(m.prepare_world_finish_after_removal(&wallets,&regions,&survivors,&removed).is_err());
+                        let mut claimed_survivors=survivors.clone();
+                        for u in &mut claimed_survivors{if u.id==id{u.id=injected;}}
+                        let claimed_removed=removed.iter().map(|removed|if *removed==id{injected}else{*removed}).collect::<Vec<_>>();
+                        // Match the injected value ID in the claims. The earlier coverage-only
+                        // guard accepted this witness even though actual mutation uses the map key.
+                        assert!(m.prepare_world_finish_after_removal(&wallets,&regions,&claimed_survivors,&claimed_removed).is_err());
                         assert_eq!(protected(&m),malformed,"invalid canonical key/ID must remain unchanged");
                     }
                     m.world.game.units.get_mut(&id).unwrap().id=id;
