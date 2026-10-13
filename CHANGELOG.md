@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Joined the source-reviewed carrier component to corrected engineering input ancestry in a separate recorded-carrier tree. Existing command variants and canonical metadata remain intact; parser, scheduler and native proof follow on this isolated branch.
+
 - Resolved strict compiler-lint findings in the engineering proof tree: redundant copies, casts and reference layers, independent ability fixture flags, and the existing optional delivery-cursor branch. The full release workspace suite passed before this cleanup; all required gates are rerunning at the final code checkpoint.
 
 - Fixed the inherited World memory recorder to collect remembered-wreck iterators as arrays before JSON serialization. Source regeneration verifies four traces and 119 actions; only the collection projections changed. Runtime memory and cache behavior are unchanged.
@@ -36,6 +38,15 @@
 - Corrected inherited ability and recovery fixture constructors to use the checked command owner’s explicit 4,096-order capacity and tick-one queue initialization. Their former Default calls did not exist on this combined ancestry. Native verification remains pending.
 
 - Preserved invalid-coordinate refusal precedence for typed aimed abilities over the new unsupported-project preflight. The existing project-boundary regression now includes a nonfinite typed aim; raw JSON behavior is unchanged. Native proof remains pending.
+- Added an actual-source full-carrier refusal with a paid Dig still active, followed by unload and successful boarding. The replay now requires refusal to preserve the job and spent wallet before successful admission cancels it without refund. Native proof is pending.
+
+- Fixed manual unload to retain missing cargo IDs until the source early-loop prune, preserving occupied seats and cargo flags between those phases. Added an actual-source unload-before-prune trace after independent review found the gap. Native verification is pending.
+
+- Integrated the captured-membership prerequisite's building-wreck lifecycle correction, passing explicit full-current membership as the original wreckBuilding does. Carrier behavior and its source fixture are unchanged; native verification remains pending.
+
+- Kept carrier per-unit validation local to its actor, carrier and live cargo while command admission still preflights all current units. Added a 4,096-entry cargo resource bound without changing ground-carrier seat rules or the source fixture.
+
+- Added a bounded ordinary Match carrier component using canonical board/cargo/riding state, own-seat reservations, recipient-aware routes, paid Dig cancellation, physical ground boarding, riding pose updates and manual unload. The pinned-source recorder covers 14 traces and 66 actions, including stable selection ties, a hidden obstacle and carrier/grid flag receipts. Boats, rail, garrison exits, unrepresented building/entrench work and wrecked-carrier ejection remain explicit unsupported boundaries; command parser/scheduler attachment and native verification are pending.
 
 - Applied the ability owner’s narrow paid-work cancellation fix to the Dig integration. Accepted manual aimed abilities remove the canonical job without refund; unsupported project state rejects before selection writes. Updated the original-source fixture and retained focused paid-work and refusal regressions. Native proof remains pending.
 

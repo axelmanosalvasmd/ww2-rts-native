@@ -249,3 +249,7 @@ The Match command phase stores and validates the three stance switches and execu
 ### Typed ability-flight follow-up
 
 The canonical Match flight store now retains each grenade/satchel's actual typed ability blast profile. The shared physical salvo launcher serves ordinary firing and barrage, and ordered physical grenade tickets are pruned after flight resolution without a second blast. The new unchanged-source fixture records 30 traces and 210 checkpoints across represented grenade/satchel and barrage kinds, partial ammo, garrison origins and FPS duration requests. Native verification remains pending. Full ability command admission, payment/cooldowns, operative counters and tick attachment are separate owners, so the broader ability/FPS rows remain in progress. No unlinked legacy grenade or new external contract is claimed.
+
+### Ground carrier component checkpoint
+
+The canonical Match carrier component now covers ordinary ground carrier selection/reservations, owner-memory path selection, nearby physical boarding, riding pose/timer updates, stale cargo cleanup and manual unload. Its actual-source recorder has 14 traces and 66 actions, including paid Dig cancellation, selection ties, a hidden obstacle and cargo/grid receipts. Native proof and command/tick/scheduler attachment are pending. Boats, rail, garrison exits, unrepresented build/entrench work and thrown ejection are explicitly unsupported; broader carrier, rider and transport rows retain their existing scope/status.
