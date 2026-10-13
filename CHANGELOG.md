@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Collapsed the shared finish validation condition after strict Clippy flagged its nested form during the first native gates. Validation order and outcome are unchanged.
+
 - Formatted the independently reviewed Assault finish and actor-rejection checkpoint with the pinned workspace formatter before its scheduled native gates. Source behavior and original fixtures are unchanged; native verification is in progress.
 
 - Corrected Assault finish's shared sample actor guard after independent review: the hidden local-defender sentinel belongs only to World. The original controlled neutral-bunker observation is retained as unrepresented, with sampler and late-phase atomic refusal checks plus a malformed-actor regression. Ordinary commander outcomes are unchanged; no full neutral-actor parity is claimed, and native checks remain pending.
