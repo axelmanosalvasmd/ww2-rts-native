@@ -126,7 +126,9 @@ impl Match {
     /// This reads only project-owned facts. It does not refresh sight, spend, recount or sort turns.
     /// Common terrain, combat and runner admission remain the caller's responsibility.
     pub fn validate_field_project_tick(&self, current_order: &[UnitId]) -> Result<(), String> {
-        if self.options.mode != Mode::Conquest || self.world.game.mode.is_some() {
+        if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
+            || self.world.game.mode.is_some()
+        {
             return Err("field-project tick supports ordinary Conquest only".into());
         }
         let game = &self.world.game;

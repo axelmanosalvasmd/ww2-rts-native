@@ -222,7 +222,11 @@ impl Match {
         if winner || player.out || player.away {
             return Ok(Some(Denial::Blocked));
         }
-        if self.options.mode != crate::economy::Mode::Conquest || self.world.game.mode.is_some() {
+        if !matches!(
+            self.options.mode,
+            crate::economy::Mode::Default | crate::economy::Mode::Conquest
+        ) || self.world.game.mode.is_some()
+        {
             return Ok(Some(Denial::Unsupported));
         }
         let defs = definitions().map_err(|e| e.to_string())?;

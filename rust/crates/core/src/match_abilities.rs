@@ -115,7 +115,10 @@ impl Match {
         )
     }
     pub(crate) fn validate_abilities(&self) -> Result<(), String> {
-        if self.options.mode != crate::economy::Mode::Conquest
+        if !matches!(
+            self.options.mode,
+            crate::economy::Mode::Default | crate::economy::Mode::Conquest
+        ) || self.world.game.mode.is_some()
             || self.world.game.tick < 0
             || self.world.game.tick as u64
                 > 9_007_199_254_740_991u64
