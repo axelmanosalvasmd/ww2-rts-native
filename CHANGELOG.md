@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-- Added an unmodified full-step source oracle for shared projects: seven cases, 25 actions, 193 steps and 215 snapshots verify payment once, joins/sweep timing, late dead-worker removal, Stop without refund, completion and real retry-limit-one route failure. Three native admission guards and the sole-runner replay specification are written; native execution and full tick composition remain pending.
+- Source review closed two preclock gaps: paid descriptors now enforce the existing six-cell executor bound, and potential queued new members reserve cached crew capacity except when the next tick performs the source twentieth-tick recount. Added source-counter and malformed-descriptor guard coverage; native execution remains pending.
+
+- Added an unmodified full-step source oracle for shared projects: seven cases, 25 actions, 193 steps and 215 snapshots verify payment once, joins/sweep timing, late dead-worker removal, Stop without refund, completion and real retry-limit-one route failure. Four native admission guards and the sole-runner replay specification are written; native execution and full tick composition remain pending.
 
 - Added read-only mass-project tick admission for current actor order, canonical membership and paid jobs, waiting Join shape, source clock/counter capacity and the ordinary Conquest boundary. It preserves stale-project command denial and leaves the early recount and per-unit work phases with the sole tick owner; native verification and full-step fixture evidence are pending.
 

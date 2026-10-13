@@ -78,7 +78,7 @@ fn paid(m: &mut Match, id: UnitId) {
                 pattern: Pattern::Line,
                 fort: FortKind::Trench,
                 from: Point { x: 25.0, z: 25.0 },
-                to: Point { x: 33.0, z: 25.0 },
+                to: Point { x: 41.0, z: 25.0 },
                 back: u.at(),
             },
             |_| true,
@@ -119,7 +119,7 @@ fn project_tick_admission_reads_paid_and_dead_workers_without_recounting() {
 
 #[test]
 fn malformed_project_tick_facts_reject_before_any_clock_or_work_write() {
-    for variant in 0..7 {
+    for variant in 0..9 {
         let (mut m, id) = scene();
         paid(&mut m, id);
         let mut current = order(&m);
@@ -131,6 +131,16 @@ fn malformed_project_tick_facts_reject_before_any_clock_or_work_write() {
             4 => current.push(id),
             5 => m.options.mode = Mode::World,
             6 => m.world.game.mode = Some(ModeKind::Classic),
+            7 => {
+                let job = m.field_works.jobs.get_mut(&id).unwrap();
+                while job.cells.len() < 7 {
+                    job.cells.push(job.cells[0]);
+                }
+            }
+            8 => {
+                m.field_works.projects.records.get_mut(&1).unwrap().id = 2;
+                m.field_works.projects.sequence = 2;
+            }
             _ => unreachable!(),
         }
         let before = state(&m, id);
@@ -182,4 +192,36 @@ fn stale_project_join_is_admitted_for_the_source_waiting_denial() {
     let before = state(&m, id);
     assert!(m.validate_field_project_tick(&current).is_err());
     assert_eq!(state(&m, id), before);
+}
+
+#[test]
+fn cached_crew_capacity_is_reserved_until_the_actual_twentieth_tick_sweep() {
+    let (mut m, id) = scene();
+    paid(&mut m, id);
+    m.drop_field_work_job(id).unwrap();
+    m.cancel_field_work(id).unwrap();
+    m.field_works.projects.records.get_mut(&1).unwrap().crew = SAFE_INTEGER as usize;
+    m.commands
+        .units
+        .get_mut(&id)
+        .unwrap()
+        .orders
+        .push_back(Command::Entrench {
+            ids: vec![i64::from(id)],
+            queue: false,
+            order: ProjectOrder::Join {
+                project: 1,
+                at: Some(Point { x: 25.0, z: 25.0 }),
+            },
+        });
+    let current = order(&m);
+    let before = state(&m, id);
+    assert!(m.validate_field_project_tick(&current).is_err());
+    assert_eq!(state(&m, id), before);
+    // Tick twenty recounts the cached crew from live and waiting references before joining.
+    m.world.game.tick = 19;
+    m.validate_field_project_tick(&current).unwrap();
+    m.world.game.tick = 20;
+    m.recount_field_projects().unwrap();
+    assert_eq!(m.field_works.project(1).unwrap().crew, 1);
 }

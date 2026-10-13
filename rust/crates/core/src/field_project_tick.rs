@@ -71,6 +71,7 @@ impl FieldWorksRuntime {
                 || job.reach.is_some_and(|n| !n.is_finite() || n < 0.0)
                 || job.from.is_some_and(|p| !position(p))
                 || job.cells.is_empty()
+                || job.cells.len() > 6
                 || job.original_cells.is_some_and(|n| n < job.cells.len())
                 || job.cells.iter().any(|c| {
                     c.cell >= cells
@@ -146,6 +147,7 @@ impl Match {
             return Err("invalid field-project tick interval".into());
         }
         self.field_works.validate_tick_records(game, dt)?;
+        let mut joining = BTreeMap::<u64, BTreeSet<UnitId>>::new();
         for &id in current_order {
             let u = &game.units[&id];
             let control = self
@@ -202,8 +204,32 @@ impl Match {
                     {
                         return Err("invalid field-project waiting order".into());
                     }
+                    if (game.tick + 1) % 20 != 0
+                        && u.hp > 0.0
+                        && self.field_works.membership(id) != Some(*project)
+                        && self
+                            .field_works
+                            .project(*project)
+                            .is_some_and(|p| !p.jobs.is_empty())
+                    {
+                        joining.entry(*project).or_default().insert(id);
+                    }
                     // An absent listed project is an ordinary later Blocked denial, not a schema error.
                 }
+            }
+        }
+        // Reserve room for distinct potential waiting members. The source's twentieth-tick
+        // sweep replaces cached crew counts before any waiting Join executes.
+        for (project, ids) in joining {
+            if self
+                .field_works
+                .project(project)
+                .unwrap()
+                .crew
+                .checked_add(ids.len())
+                .is_none_or(|n| n as u64 > SAFE_INTEGER as u64)
+            {
+                return Err("field-project waiting crew capacity exhausted".into());
             }
         }
         Ok(())
