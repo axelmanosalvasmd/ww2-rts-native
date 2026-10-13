@@ -1,5 +1,14 @@
 # Three Crossroads Native: design decisions
 
+## Legacy public Say recipient projection (2026-10-13, source checkpoint)
+
+The existing Source `snapshotFor` applies Scenario recipient permission before ordinary shot geometry. Migrated legacy Say messages use `scenarioRecipients:"public"`, side zero, their original text/localized fields, execution identity and emission tick. They have no position. The borrowed native adapter validates the producer-owned typed row, preserves its place in the caller's chronological batch and sends it unchanged to selected ordinary commander seats. It permits older buffered emission ticks and refuses future ticks or malformed public metadata before any receipt, memory or fog publication. Ordinary Firing, Support and Environment visibility, hidden-identity removal and signed-zero normalization remain unchanged.
+
+The canonical migrated legacy state contains no objectives, groups or deferred reinforcements, so its represented HUD is exactly `scenario:{version:1,objectives:[]}`. Snapshot admission invokes the provider's read-only legacy preflight. General scenario blocks are not admitted, and this change must be composed with the actual legacy tick emitter before the former blanket Scenario refusal can be narrowed. It does not drain producers, own a second event buffer or change ABI 2, startup tables or spectator policy.
+
+The original five-map fixture separates raw emissions and public boundary inputs from actual per-seat Source snapshot results. The consumer uses canonical legacy message generation and those independent inputs, preserving Match/World/Fog and normal RNG identities. It compares only the supported selected Scenario and shot fields; it does not claim ordinary gameplay, terrain destruction or RNG replay. Unsettled post-Destroy bodies remain outside complete-frame admission. A focused ordering test uses an actual intro emission around an existing public shell row, then checks that a later malformed or future Say refuses the entire batch without recipient publication. Native compilation and coherent host delivery verification remain pending. Axel acknowledgment 038's concrete host review, bridge structure comparison and exact-head platform gates remain required before adoption.
+
+
 ## Startup public-map optional fields (2026-10-13, source successor)
 
 The exact `08b378d` startup attempt compiles and reaches the public-map helper, then fails its unconditional `mineMaterials == []` assertion with null versus array. No test passes, and no later gate runs; the raw failure stays at `/private/tmp/ww2-pure-startup-native-08b378d/startup-first.log`. Direct calls to unchanged pinned `mapForClient` match the complete committed Default and El Alamein JSON projections, and both omit `layers.mineMaterials`. Source `world-layers.js:75` replaces that list only if it exists; it does not add an empty field to a rows-only map.

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add internal selected-seat projection of the original public legacy Say shot row and empty legacy Scenario objective HUD. Validate the complete batch before recipient publication, retain older buffered message ticks and preserve ordinary visibility filtering for other effects. Legacy-only admission requires the canonical provider preflight and actual tick caller; AIR, falling actors, ambiguous throws, general scenarios and public transport adoption remain outside this slice. The selected Source comparison and malformed/future message rollback checks are written; native verification is pending.
+
 - Correct the startup test's optional mine-material assertion after the exact `08b378d` native attempt compiled and failed before any test passed. Original `mapForClient` and both complete committed Default/El Alamein assets omit `layers.mineMaterials`; the helper now requires an empty array only when that optional field exists. Complete map equality still protects field presence, and private-mine/material/script exclusions remain unchanged. Production output and admission are untouched; the failed log is preserved and fresh native verification remains pending.
 
 - Track the trusted host's interim refusal of all five legacy-trigger maps explicitly in MODE-79 and MAP-14, as Axel acknowledgment 036 requires. Preserve the original Source target of running their triggers in every mode; host Scenario actuation/admission and the separate authoring-format decision remain pending. Strengthen the startup refusal regression with actual before/after lobby equality, and capture only map width in its private-mine iterator. No runtime or admission rule changes; native verification remains pending.

@@ -186,7 +186,6 @@ impl<'a> SnapshotCache<'a> {
                 SnapshotCapability::Fog,
                 SnapshotCapability::ShotsAndFlights,
                 SnapshotCapability::TeamEffects,
-                SnapshotCapability::Scenario,
                 SnapshotCapability::Logistics,
             ],
         })

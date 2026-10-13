@@ -7,6 +7,12 @@ use crate::{
 use std::collections::BTreeSet;
 
 pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, SnapshotError> {
+    state
+        .preflight_legacy_scenario()
+        .map_err(|_| SnapshotError::Unsupported {
+            unit: 0,
+            capability: SnapshotCapability::Scenario,
+        })?;
     let g = &state.world.game;
     for slot in 0..g.players.len() {
         state
@@ -59,6 +65,10 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
     let mut result = Vec::with_capacity(g.players.len());
     for slot in 0..g.players.len() {
         let mut fields = Map::new();
+        if state.scenario.is_some() {
+            // The admitted migrated engine has no authored objectives.
+            fields.insert("scenario".into(), json!({"version":1,"objectives":[]}));
+        }
         fields.insert("army".into(), json!({"pop":pop,"income":income}));
         fields.insert("wx".into(), json!(wx.map(r)));
         let player = state
