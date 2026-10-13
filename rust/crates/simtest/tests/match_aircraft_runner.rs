@@ -236,3 +236,50 @@ fn aircraft_runner_admission_refuses_unrepresented_phases_before_queue_or_clock_
         assert!(m.validate_command_tick(1).is_ok());
     }
 }
+
+#[test]
+fn post_command_aircraft_admission_keeps_the_old_clock_and_the_advanced_queue() {
+    let f = fixture();
+    let mut m = make(&f["traces"][0]);
+    m.enqueue_command(
+        OrderKey {
+            tick: 1,
+            issuer: 0,
+            sequence: 1,
+        },
+        Command::from_json(&json!({"t":"move","orders":[[1000,25,25]]})).unwrap(),
+    )
+    .unwrap();
+    m.validate_aircraft_runner_boundary(1).unwrap();
+    let dispatched = m.apply_commands(1, false).unwrap();
+    assert_eq!(dispatched.len(), 1);
+    assert!(dispatched[0].denial.is_none());
+    assert_eq!(m.world.game.tick, 0);
+    assert_eq!(m.commands.next_tick(), Some(2));
+    assert!(m.validate_aircraft_runner_boundary(1).is_err());
+    let before = format!(
+        "{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}",
+        m.world.game.units,
+        m.aviation,
+        m.commands.units,
+        m.start.random.snapshot(),
+        m.start.economy.players,
+        m.world.game.tick,
+        m.commands.next_tick()
+    );
+    m.validate_aircraft_runner_state(1).unwrap();
+    assert!(m.validate_aircraft_runner_state(2).is_err());
+    assert_eq!(
+        before,
+        format!(
+            "{:?}|{:?}|{:?}|{:?}|{:?}|{:?}|{:?}",
+            m.world.game.units,
+            m.aviation,
+            m.commands.units,
+            m.start.random.snapshot(),
+            m.start.economy.players,
+            m.world.game.tick,
+            m.commands.next_tick()
+        )
+    );
+}

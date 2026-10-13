@@ -3,10 +3,19 @@ use crate::{grid::UnitId, match_aviation::AviationError, match_runtime::Match};
 impl Match {
     /// Pure complete-current admission for the sole recorded runner boundary.
     /// Commands retain ordinary denial semantics; their AIR branches preflight before selection writes.
-    /// Call again after boundary publication, before prior capture or clock mutation.
+    /// After dispatch, use validate_aircraft_runner_state before prior capture or clock mutation.
     pub fn validate_aircraft_runner_boundary(&self, boundary: u64) -> Result<(), AviationError> {
         self.validate_command_tick(boundary)
             .map_err(AviationError::Actuation)?;
+        self.validate_aircraft_runner_state(boundary)
+    }
+
+    /// Pure complete-current check after boundary dispatch while Game still has the old clock.
+    /// The command owner has advanced its queue already; its next boundary is not rechecked here.
+    pub fn validate_aircraft_runner_state(
+        &self,
+        prospective_tick: u64,
+    ) -> Result<(), AviationError> {
         if self.aviation.planes.keys().any(|id| {
             self.world
                 .game
@@ -22,7 +31,7 @@ impl Match {
             return Err(AviationError::Invalid("orphan aircraft runtime identity"));
         }
         let actors = self.world.game.units.keys().copied().collect::<Vec<_>>();
-        self.validate_aircraft_tick_phases(&actors, self.rules.movement.tick, boundary)
+        self.validate_aircraft_tick_phases(&actors, self.rules.movement.tick, prospective_tick)
     }
 
     /// Admit the represented aircraft turns, late AA and retirement before the next clock.

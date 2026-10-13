@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Split aircraft queued-boundary admission from post-command current-state admission. The tick owner correctly identified that dispatch advances the queue while Game still has the old clock, so reusing the queued-boundary check would reject accepted ticks. A focused consumer dispatches a real aircraft Move and checks the separate pure state validator without advancing the clock or mutating canonical state. Native verification remains pending.
+
 - Corrected the guard consumer's pending-count query to use its actual MatchCommands owner. Independent source review identified this method-owner mistake before any native build; the canonical queue remains private.
 
 - Source review caught a private command-queue access in the new aircraft guard consumer. It now uses the existing public pending-count and command-boundary checks with a real queued order, preserving command-owner privacy. The automatic-weapon refusal scene now carries an active patrol mission so it reaches the actual unsupported Source phase instead of legitimately returning home. Native checks remain unrun.
