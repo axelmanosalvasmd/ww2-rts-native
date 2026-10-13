@@ -23,16 +23,17 @@ const bits=n=>{const b=Buffer.alloc(8);b.writeDoubleBE(n);return b.toString('hex
 const hash=v=>{let h=0xcbf29ce484222325n;for(const b of Buffer.from(JSON.stringify(v)))h=BigInt.asUintN(64,(h^BigInt(b))*0x100000001b3n);return h.toString(16).padStart(16,'0');};
 const runs=vs=>{const out=[];for(const v of vs){if(out.length&&out.at(-1)[0]===v)out.at(-1)[1]++;else out.push([v,1]);}return out;};
 const cases=[];
-function record(startIndex,actions,rawLabels=false){
+function record(startIndex,actions,rawLabels=false,authoredMines=[]){
  const c=starts.cases[startIndex],map=structuredClone(c.map);if(map.world.regionMapRuns){map.world.regionMap=map.world.regionMapRuns.flatMap(([v,n])=>Array(n).fill(v));delete map.world.regionMapRuns;}
  let mapShape=null;
- if(rawLabels){const labels=generateWorldMap({size:'huge',seed:1,players:2,teams:[0,1],scenery:false}).world.regionMap;map.w=512;map.h=512;map.rows=Array(512).fill('.'.repeat(512));map.heights=Array(512).fill('0'.repeat(512));map.world.regionMap=labels;mapShape={w:512,h:512,regionMapRuns:runs(labels)};}
+ if(rawLabels){const labels=generateWorldMap({size:'huge',seed:1,players:2,teams:[0,1],scenery:false}).world.regionMap;map.w=512;map.h=512;map.rows=Array(512).fill('.'.repeat(512));map.heights=Array(512).fill('0'.repeat(512));map.world.regionMap=labels;mapShape={w:512,h:512,regionMapRuns:runs(labels),authoredMines};}
+ for(const cell of authoredMines){const y=Math.floor(cell/map.w),x=cell%map.w;map.rows[y]=map.rows[y].slice(0,x)+'N'+map.rows[y].slice(x+1);}
  const old=Math.random;Math.random=()=>environmentSeed(c.seed)/4294967296;let g;
  try{g=sim.createGame(map,c.players.map(p=>p.name),c.settings.shuffle,c.players.map(p=>p.team),c.players.map(p=>p.faction),{mode:'world',army:c.settings.army,weather:c.settings.living?c.settings.weather:false,weatherSeed:c.weatherSeed,tech:c.settings.tech,logistics:false});}finally{Math.random=old;}
  const revisions=new WeakMap(),aliases=new Map(),snapshots=[];sim.setWorldRowProbe((team,row,rev)=>revisions.set(row,rev));
  const project=row=>{const d=row[4],s=d.section;return [row[0],row[1],row[2],row[3],d.ground,d.object,d.material,d.groundMaterial,bits(d.groundWear),d.trenchFront===undefined?null:bits(d.trenchFront),!!d.mine,d.mineMaterial??null,s?[s.id,s.structureId,s.state,bits(s.hp),bits(s.maxHp),s.material,s.anchor]:null,d.mineOwned??null,d.initial,d.biome??null,d.landmark??null,d.rail??null,d.station??null,revisions.get(row)];};
  const rows=vs=>{const a=[...vs].map(project);return {count:a.length,hash:hash(a)};};
- const wrecks=rs=>rs.map(r=>[r[0],bits(r[3]),bits(r[4]),r.length>6]);
+ const wrecks=rs=>Array.from(rs,r=>[r[0],bits(r[3]),bits(r[4]),r.length>6]);
  const get=a=>g.units.get(aliases.get(a.alias));
  for(const a of actions){let result=null;
   switch(a.op){
@@ -91,13 +92,13 @@ record(4,[
  {op:'region',index:0,fields:{team:1,progress:.921,capper:1,contested:false}},{op:'regions',slot:0},
  {op:'remove',alias:'base'},{op:'regions',slot:0},{op:'reveal',value:true},{op:'regions',slot:0},{op:'read',slot:0,full:false},{op:'route',slot:0},
  {op:'reveal',value:false},{op:'read',slot:0,full:false},{op:'route',slot:-1},
-],true);
+],true,[230500]);
 record(4,[
  {op:'clearUnits'},{op:'spawn',alias:'eye',owner:0,kind:'rifle',x:41,z:41},{op:'vision',tick:1},
  {op:'wreck',id:9001,x:43.14,z:41.26,moving:true},{op:'route',slot:0},{op:'wreckRead',slot:0},
  {op:'move',alias:'eye',x:901,z:901},{op:'wreck',id:9001,x:905.1,z:905.2,moving:true},{op:'wreckRead',slot:0},{op:'route',slot:0},{op:'tick',tick:2},{op:'route',slot:0},
- {op:'removeWreck',id:9001},{op:'wreckRead',slot:0},{op:'reveal',value:true},{op:'wreckRead',slot:0},
- {op:'reveal',value:false},{op:'move',alias:'eye',x:41,z:41},{op:'wreckRead',slot:0},
+ {op:'move',alias:'eye',x:41,z:41},{op:'removeWreck',id:9001},{op:'wreckRead',slot:0},{op:'reveal',value:true},{op:'wreckRead',slot:0},
+ {op:'reveal',value:false},{op:'move',alias:'eye',x:901,z:901},{op:'wreckRead',slot:0},
  {op:'spawn',alias:'post',owner:0,kind:'bunker',x:45,z:41},{op:'fire',c:10261,value:true},{op:'tick',tick:3},{op:'route',slot:0},
  {op:'move',alias:'post',x:49,z:41},{op:'route',slot:0},{op:'move',alias:'post',x:49,z:41,fields:{hp:0}},{op:'remove',alias:'post'},{op:'route',slot:0},
  {op:'wet',value:1},{op:'route',slot:0},{op:'wet',value:0},{op:'route',slot:0},
