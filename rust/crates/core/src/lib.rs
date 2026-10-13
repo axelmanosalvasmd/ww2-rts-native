@@ -11,15 +11,19 @@ pub mod fog;
 pub mod formation;
 pub mod game;
 pub mod grid;
+pub mod legacy_scenario;
+
 pub mod logistics;
 pub mod map;
 pub mod math;
 pub mod movement;
 pub mod navigation;
+pub mod objectives;
 pub mod path_requests;
 
 pub mod orders;
 pub mod pathfinding;
+pub mod production;
 pub mod projectiles;
 
 pub mod random;
@@ -36,3 +40,5 @@ pub mod vehicle;
 mod vehicle_navigation;
 pub mod vision;
 pub mod weather;
+pub mod weather_runtime;
+pub mod world;
