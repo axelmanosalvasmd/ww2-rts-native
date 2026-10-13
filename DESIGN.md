@@ -14,7 +14,7 @@ The goal is thousands of units per battle and a public release later. ww2-rts#64
 
 ## Architecture (2026-10-11, pending step 1)
 
-Mass field projects use the single FieldWorksRuntime owner for unpaid ordered segments, unit membership and paid Dig records. Monotonic project IDs let BTreeMap retain source creation order; segment Vec order preserves middle-first allocation and strict first-distance ties within the next crew-sized window. A source-listed project can become archived while unit references still need its identity. Cancellation removes membership and paid work together without a refund, while cached active/crew counters keep the source recount timing. Pattern/source fixtures and Match integration are under development; no native project or complete engineering claim is made yet.
+Mass field projects use the single FieldWorksRuntime owner for unpaid ordered segments, unit membership and paid Dig records. Monotonic project IDs let BTreeMap retain source creation order; segment Vec order preserves middle-first allocation and strict first-distance ties within the next crew-sized window. A source-listed project can become archived while unit references still need its identity. Cancellation removes membership and paid work together without a refund, while cached active/crew counters keep the source recount timing. Typed Match admission and phase providers share the existing command queue and paid-cell executor. A failed Dig route drops only paid work; accepted replacement commands cancel membership too. Source fixtures cover 25 traces and 137 actions. Native comparison and runner integration remain pending; no complete engineering claim is made yet.
 
 Two programs talking over the network, as today. Only the rules core decides outcomes.
 

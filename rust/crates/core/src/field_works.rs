@@ -10,6 +10,8 @@ use crate::{
 };
 #[path = "match_engineering.rs"]
 mod match_engineering;
+#[path = "match_projects.rs"]
+mod match_projects;
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -18,8 +20,8 @@ use std::{
 #[path = "field_projects.rs"]
 mod projects;
 pub use projects::{
-    Pattern, PreparedProject, PreparedSegment, Project, ProjectId, ProjectRequest, Segment,
-    SegmentPreparation, entrench_plan, line_fort, segment_cost,
+    Pattern, PreparedProject, PreparedSegment, Project, ProjectId, ProjectMaterial, ProjectOrder,
+    ProjectRequest, Segment, SegmentPreparation, entrench_plan, line_fort, segment_cost,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -365,6 +367,11 @@ impl FieldWorksRuntime {
     /// Accepted replacement commands, retreat and retirement call this. Paid work has no refund.
     pub fn cancel(&mut self, unit: u32) -> Option<Dig> {
         self.projects.members.remove(&unit);
+        self.drop_paid_job(unit)
+    }
+    /// A failed Dig route drops its paid segment, retaining the shared project membership.
+    /// The source cached active counter changes at the next recount, without a refund.
+    pub fn drop_paid_job(&mut self, unit: u32) -> Option<Dig> {
         self.jobs.remove(&unit)
     }
     pub fn prepare_start<'a>(

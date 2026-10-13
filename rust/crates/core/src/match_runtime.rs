@@ -498,6 +498,24 @@ pub(crate) fn cancel_field_work_state(
 }
 
 impl Match {
+    /// Source failed Dig routing clears only paid work. The squad remains on its shared project.
+    pub fn drop_field_work_job(&mut self, id: u32) -> Result<(), String> {
+        let unit = self
+            .world
+            .game
+            .units
+            .get_mut(&id)
+            .ok_or("missing dropped field-work unit")?;
+        if unit.id != id
+            || unit.dig != self.field_works.is_active(id)
+            || unit.entrench != self.field_works.membership(id).is_some()
+        {
+            return Err("unrepresented or inconsistent field-work activity".into());
+        }
+        self.field_works.drop_paid_job(id);
+        unit.dig = false;
+        Ok(())
+    }
     /// Cancel current paid work without a refund. The descriptor is removed before its activity flag.
     pub fn cancel_field_work(&mut self, id: u32) -> Result<(), String> {
         let unit = self

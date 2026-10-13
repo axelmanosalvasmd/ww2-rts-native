@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Separated failed Dig route cleanup from accepted replacement cancellation. A retry-limit drop removes only the paid job and Dig flag, preserving shared-project membership, cached active timing and the paid wallet; the queue-owner source review found the earlier full-cancellation mismatch. An actual unreachable-route source trace and native replay are being added.
+
+- Connected typed Entrench intent to the existing recorded queue and shared field-work owner. New and allied joins stage control changes, queued joins retain project identity, per-unit allocation rechecks sight and pays the buildable segment, and waiting plans read real unpaid/active work. Full native/source replay and tick assembly remain pending; construction, fill and concrete stay explicit exclusions.
+
 - Joined the real engineering/input source ancestry into the isolated mass-project checkpoint, preserving its singular paid-job cancellation and the checked ability/recovery defaults. Engineering gates and combined mass-project verification remain pending.
 
 - Added source-order mass field-work patterns and shared project identity to the single FieldWorksRuntime owner. Paid segments use proportional prices and the existing canonical Dig/terrain execution; cancellation removes membership and its flags synchronously without refund or eager source-counter changes. Match command/tick assembly and native differential checks are pending.

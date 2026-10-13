@@ -12,6 +12,37 @@ use std::f64::consts::PI;
 pub type ProjectId = u64;
 const SAFE_INTEGER: u64 = 9_007_199_254_740_991;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ProjectMaterial {
+    Fort(FortKind),
+    Fill,
+    Wall,
+    Invalid,
+}
+impl ProjectMaterial {
+    pub fn parse(name: &str) -> Self {
+        match name {
+            "fill" => Self::Fill,
+            "wall" => Self::Wall,
+            _ => FortKind::parse(name).map_or(Self::Invalid, Self::Fort),
+        }
+    }
+}
+/// Normalized recorded intent. Invalid fields survive parsing so source selection effects occur in order.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum ProjectOrder {
+    New {
+        pattern: Option<Pattern>,
+        material: ProjectMaterial,
+        from: Option<Point>,
+        to: Option<Point>,
+    },
+    Join {
+        project: ProjectId,
+        at: Option<Point>,
+    },
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Project {
     pub id: ProjectId,
@@ -118,7 +149,17 @@ impl FieldWorksRuntime {
         self.projects.records.values().filter(|p| p.listed)
     }
     pub fn retained_projects(&self) -> impl Iterator<Item = &Project> {
-        self.projects.records.values()
+        let references: BTreeSet<_> = self
+            .projects
+            .members
+            .values()
+            .copied()
+            .chain(self.jobs.values().filter_map(|j| j.project))
+            .collect();
+        self.projects
+            .records
+            .values()
+            .filter(move |p| p.listed || references.contains(&p.id))
     }
     pub fn project(&self, id: ProjectId) -> Option<&Project> {
         self.projects.records.get(&id).filter(|p| p.listed)
@@ -330,6 +371,9 @@ impl FieldWorksRuntime {
                 .is_some_and(|id| !self.projects.records.contains_key(&id))
         }) {
             return Err(Error::InvalidInput);
+        }
+        if !self.projects.records.values().any(|p| p.listed) {
+            return Ok(());
         }
         for p in self.projects.records.values_mut().filter(|p| p.listed) {
             p.active = 0;

@@ -18,7 +18,7 @@ try {
  const workBlock=one('    if (u.dig) {\n      if (dist(u, u.dig) >','\n\n    // grenade order:');
  const marker='  setupStructures(g, map);';assert.equal(source.split(marker).length,2);
  let code=source.replace(marker,marker+'\n  return g;').replace(/from '(\.\/[^']+)'/g,(_,p)=>`from '${pathToFileURL(join(reference,'shared',p)).href}'`);
- code+=`\nexport const massHooks={joinProject,takeDigJob,startQueuedOrders,beginPathTick,cellOf,fortCells,recount(g){${recountBlock}},mass(g,u){${mass}},work(g,u,dt){${workBlock}},setCell};\n`;
+ code+=`\nexport const massHooks={joinProject,takeDigJob,startQueuedOrders,beginPathTick,requestStepPath,performStepPath,findPath,cellOf,fortCells,recount(g){${recountBlock}},mass(g,u){${mass}},work(g,u,dt){${workBlock}},setCell};\n`;
  writeFileSync(join(temp,'sim.mjs'),code);const sim=await import(pathToFileURL(join(temp,'sim.mjs'))),H=sim.massHooks,grid=await import(pathToFileURL(join(reference,'shared/grid.js')));
  const buf=new DataView(new ArrayBuffer(8)),bits=v=>{buf.setFloat64(0,v,false);return buf.getBigUint64(0,false).toString(16).padStart(16,'0');};
  const at=v=>({x:bits(v.x),z:bits(v.z)}),job=j=>({kind:j.kind,...at(j),dir:bits(j.dir),front:bits(j.front)});
@@ -49,6 +49,7 @@ try {
    else if(a.op==='take'){const u=g.units.get(a.id);assert.ok(u.entrench?.jobs.length);H.takeDigJob(g,u);}
    else if(a.op==='mass')for(const id of a.ids){const u=g.units.get(id);if(u.hp>0&&!u.operative&&!u.riding)H.mass(g,u);}
    else if(a.op==='work'){const u=g.units.get(a.id);H.beginPathTick(g);if(u.hp>0&&!u.operative&&!u.riding)H.work(g,u,a.dt);}
+   else if(a.op==='pathBegin'){g.pathBudget=a.budget;g.pathRetryLimit=a.retryLimit;H.beginPathTick(g);}
    else if(a.op==='queued')H.startQueuedOrders(g,g.units.get(a.id));
    else if(a.op==='recount')H.recount(g);
    else if(a.op==='prime')Object.assign(g.units.get(a.id),structuredClone(a.changes));
@@ -60,6 +61,7 @@ try {
    else throw Error(a.op);
    grid.rebuildGrid(g);results.push(result);save();
   }
+  if(options.assertPathDrop){assert.equal(g.pathStats.failed,1);assert.equal(g.pathStats.dropped,1);assert.equal(g.pathStats.calls,1);}
   const inputUnits=units.map(u=>Object.fromEntries(Object.entries(u).map(([k,v])=>[k,['x','z','hp','supp','repath','cd'].includes(k)?bits(v):k==='orders'?v.map(encodeCommand):k==='path'?v.map(at):structuredClone(v)])));
   const inputActions=actions.map(a=>{const v=structuredClone(a);if(v.cmd)v.cmd=encodeCommand(v.cmd);if(v.dt!==undefined)v.dt=bits(v.dt);if(v.changes)for(const k of ['x','z','hp','mp','repath'])if(v.changes[k]!==undefined)v.changes[k]=bits(v.changes[k]);return v;});
   traces.push({name,map,mode:'conquest',units:inputUnits,mp:g.players.map((_,slot)=>bits(options.mp?.[slot]??100)),tech:options.tech??false,initializationRandom,actions:inputActions,results,snapshots});
@@ -85,6 +87,7 @@ try {
  record('busy-digger-waits-and-duplicate-join-is-idempotent',[U(1)],[cmd([1,1]),prime(1,{attackId:99}),massAction([1]),prime(1,{attackId:0}),massAction([1,1])]);
  {const actions=[cmd([1,2],{x:25,z:25,x2:41,z2:25}),massAction([1,2]),{op:'atDig',id:1},work(1),work(1),work(1),work(1),massAction([1]),recount(20),{op:'atDig',id:2},work(2),work(2),work(2),work(2),massAction([1,2]),recount(40)];record('completed-digger-waits-for-other-paid-segment',[U(1),U(2,'rifle',0,41,15)],actions);}
  record('edge-segment-admits-and-pays-prorated-cells',[U(1,'rifle',0,3,3)],[cmd([1],{x:0,z:6,x2:0,z2:6}),massAction([1])],{mp:[15,100,100]});
+ {const map={name:'Paid segment across water',w:30,h:30,rows:Array(30).fill('.'.repeat(15)+'W'+'.'.repeat(14)),spawns:[{x:0,y:0},{x:29,y:29}],points:[{x:14,y:10}]};record('unreachable-paid-segment-drops-job-keeps-project',[U(1),U(2,'rifle',2,49,15)],[cmd([1],{x:45,z:25,x2:45,z2:25}),massAction([1]),{op:'pathBegin',budget:4096,retryLimit:1},work(1,.05),recount(19),massAction([1]),recount(20)],{map,assertPathDrop:true});}
  const byName=name=>traces.find(t=>t.name===name);
  assert.equal(byName('full-queue-admission-does-not-create-project').results[0],'queueFull');
  assert.equal(byName('no-money-wait-keeps-job-and-full-price-admission').results[1],'mp');
@@ -97,7 +100,8 @@ try {
  assert.equal(byName('project-identity-sequence-and-unpaid-replacement').snapshots.at(-1).retainedProjects.length,2);
  assert.equal(byName('edge-segment-admits-and-pays-prorated-cells').results[0],null);
  assert.equal(byName('edge-segment-admits-and-pays-prorated-cells').snapshots.at(-1).wallets[0],bits(0));
- clean();const content=JSON.stringify({reference:pin,node:process.version,arch:process.arch,scope:'Original pattern/cost functions and shared-project commands, joins, takes, queued starts, recount, mass assignment and dig execution. No full tick, movement or retirement claim.',plans,costs,traces})+'\n';
+ const dropped=byName('unreachable-paid-segment-drops-job-keeps-project');assert.equal(dropped.results[0],null);assert.equal(dropped.snapshots[4].units[0].dig,null);assert.equal(dropped.snapshots[4].units[0].entrench,1);assert.equal(dropped.snapshots[4].projects[0].active,1);assert.equal(dropped.snapshots[4].wallets[0],bits(77));assert.equal(dropped.snapshots[4].story[0].mpSpent,bits(23));assert.equal(dropped.snapshots[7].wallets[0],bits(77));assert.equal(dropped.snapshots[4].units[0].control.moveOutcome,'unreachable');assert.equal(dropped.snapshots[4].units[0].control.repath,bits(1));assert.deepEqual(dropped.snapshots[4].units[0].path,[]);assert.equal(dropped.snapshots[5].projects[0].active,0);assert.equal(dropped.snapshots[6].units[0].entrench,null);assert.equal(dropped.snapshots[7].projects.length,0);
+ clean();const content=JSON.stringify({reference:pin,node:process.version,arch:process.arch,scope:'Original pattern/cost functions and shared-project commands, joins, takes, queued starts, recount, mass assignment, dig execution and actual paid-job route failure. No full tick, movement or retirement claim.',plans,costs,traces})+'\n';
  const path=join(root,'rust/crates/core/tests/fixtures/mass-entrenchment.json');if(process.argv.includes('--check'))assert.equal(readFileSync(path,'utf8'),content);else writeFileSync(path,content);
  console.error(`${process.argv.includes('--check')?'Verified':'Recorded'} ${plans.length} mass plans, ${costs.length} segment costs, ${traces.length} traces, ${traces.reduce((n,t)=>n+t.actions.length,0)} actions, ${traces.reduce((n,t)=>n+t.snapshots.length,0)} snapshots`);
 }finally{Math.random=originalRandom;rmSync(temp,{recursive:true,force:true});clean();}

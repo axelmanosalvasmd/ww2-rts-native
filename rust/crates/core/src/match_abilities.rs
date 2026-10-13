@@ -476,7 +476,9 @@ impl Match {
                 1.
             };
             if self.logistics.can_fire(id, count)
-                && (u.build || u.entrench || u.dig != self.field_works.is_active(id))
+                && (u.build
+                    || u.entrench != self.field_works.membership(id).is_some()
+                    || u.dig != self.field_works.is_active(id))
             {
                 return Ok(true);
             }
