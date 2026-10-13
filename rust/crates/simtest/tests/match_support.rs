@@ -190,6 +190,10 @@ fn actual_support_admission_strikes_and_timers_match_source() {
             } else {
                 let tick = action["tick"].as_i64().unwrap();
                 for current in last + 1..=tick {
+                    let prior = (
+                        m.support.strikes.iter().map(|s| s.live).collect::<Vec<_>>(),
+                        m.support.covers.len(),
+                    );
                     m.world.game.tick = current;
                     m.support.events.clear();
                     m.step_support_strikes(
@@ -202,6 +206,20 @@ fn actual_support_admission_strikes_and_timers_match_source() {
                     )
                     .unwrap();
                     m.advance_support_timers(0.05).unwrap();
+                    if current < tick {
+                        assert!(
+                            m.support.events.is_empty(),
+                            "unexpected effect on unsampled tick {current}"
+                        );
+                        assert_eq!(
+                            (
+                                m.support.strikes.iter().map(|s| s.live).collect::<Vec<_>>(),
+                                m.support.covers.len()
+                            ),
+                            prior,
+                            "unexpected lifetime transition on unsampled tick {current}"
+                        );
+                    }
                 }
                 last = tick;
                 None
@@ -215,7 +233,7 @@ fn actual_support_admission_strikes_and_timers_match_source() {
             count += 1;
         }
     }
-    assert_eq!(count, 900);
+    assert_eq!(count, 1400);
 }
 #[test]
 fn unsupported_air_and_invalid_membership_do_not_charge_or_publish() {
@@ -301,4 +319,98 @@ fn mixed_move_and_support_share_one_recorded_boundary_order() {
         );
         assert_eq!(m.start.economy.players[1].mp, wallet);
     }
+}
+
+#[test]
+fn ground_support_preflight_preserves_denials_and_the_unconsumed_boundary() {
+    use ww2_core::{match_commands::Command, orders::OrderKey};
+    let f = fixture();
+    let mut m = make(&f["traces"][0]);
+    m.start.economy.players[0].mp = 0.0;
+    m.enqueue_command(
+        OrderKey {
+            tick: 1,
+            issuer: 0,
+            sequence: 1,
+        },
+        Command::from_json(&json!({"t":"support","kind":"artillery","x":41,"z":41})).unwrap(),
+    )
+    .unwrap();
+    m.enqueue_command(
+        OrderKey {
+            tick: 2,
+            issuer: 0,
+            sequence: 2,
+        },
+        Command::from_json(&json!({"t":"support","kind":"para","x":41,"z":41})).unwrap(),
+    )
+    .unwrap();
+    let before = (
+        m.world.game.tick,
+        m.start.economy.players.clone(),
+        m.story.clone(),
+        m.support.clone(),
+        m.start.players[0].support.clone(),
+        m.commands.pending_commands(),
+        m.commands.next_tick(),
+        m.next_unit_id,
+        m.start.random.snapshot(),
+    );
+    m.validate_ground_support_tick(1).unwrap();
+    assert_eq!(
+        before,
+        (
+            m.world.game.tick,
+            m.start.economy.players.clone(),
+            m.story.clone(),
+            m.support.clone(),
+            m.start.players[0].support.clone(),
+            m.commands.pending_commands(),
+            m.commands.next_tick(),
+            m.next_unit_id,
+            m.start.random.snapshot(),
+        )
+    );
+    assert_eq!(
+        m.apply_commands(1, false).unwrap()[0].denial,
+        Some(ww2_core::match_commands::Denial::Manpower)
+    );
+    assert!(m.support.strikes.is_empty());
+    m.world.game.tick = 1;
+    let pending = m.commands.pending_commands();
+    let next_tick = m.commands.next_tick();
+    assert!(m.validate_ground_support_tick(2).is_err());
+    assert_eq!(m.commands.pending_commands(), pending);
+    assert_eq!(m.commands.next_tick(), next_tick);
+    assert_eq!(m.world.game.tick, 1);
+    assert_eq!(m.start.economy.players[0].mp, 0.0);
+    assert!(m.support.strikes.is_empty());
+}
+
+#[test]
+fn ordinary_default_alias_keeps_support_activation_and_timer_order() {
+    let f = fixture();
+    let mut explicit = make(&f["traces"][0]);
+    let mut default = make(&f["traces"][0]);
+    default.options.mode = Mode::Default;
+    for m in [&mut explicit, &mut default] {
+        m.admit_support(0, "cover", Point { x: 41.0, z: 41.0 }, Some(0.3))
+            .unwrap();
+        m.support.strikes[0].delay = 0.05;
+        m.validate_ground_support_tick(1).unwrap();
+        m.step_ground_support_phase(&[1], 0.05).unwrap();
+        assert!(m.support.strikes.is_empty());
+        assert_eq!(m.support.covers.len(), 1);
+        let duration = Catalog::compiled()
+            .unwrap()
+            .support("cover")
+            .unwrap()
+            .get("dur")
+            .unwrap()
+            .number()
+            .unwrap();
+        assert_eq!(m.support.covers[0].remaining, duration - 0.05);
+        assert!(m.start.players[0].support["artillery"] < 0.0);
+    }
+    assert_eq!(snapshot(&mut default), snapshot(&mut explicit));
 }

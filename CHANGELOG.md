@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Normal-merged the reviewed ground-support tick provider into a separate continuation of frozen reaction source c22969b. Preserved its canonical strike, event and cooldown ownership; actual caller wiring and combined native proof remain pending.
+
 - Updated the inherited operative design note to reflect its completed coherent Mac proof. Reaction composition still awaits its own native cycle.
 
 - Fixed accepted ground retreat to commit its real route endpoint to canonical control state. A preceding Move previously left a stale endpoint, preventing home arrival from clearing retreat state. The added actual-source Move-to-retreat trace completes at home on tick 53; the full recorder now has 19 traces, 2,474 ticks and 354 checkpoints. Combined native proof remains pending.
@@ -28,6 +30,17 @@
 - Aligned the tick consumer's optional control projection with the original recorder's observed fields. Ability and Dig cases enqueue commands but do not record control rows; the first native run added those extra rows and failed an otherwise exact tick-one comparison. Dedicated command traces still compare every recorded control row. Runtime scheduling and original fixtures are unchanged; full gates are restarting.
 
 - Fixed the ordered-retirement regression's snapshot setup to supply every live unit's canonical firing timer. The first composed native run passed 30 library and two field-work tests, then the new regression panicked on its empty timer map before exercising retirement. Runtime retirement and source fixtures are unchanged; complete gates are restarting at the corrected checkpoint.
+- Added source-written ground-support tick preparation over the checked component. Read-only boundary checks preserve ordinary admission denials and refuse unsupported aircraft/coarse strike contexts before clock changes. The late helper preserves captured membership and strike-before-timer ordering; Default and Conquest share only the absent-mode ordinary context. The unchanged full-step recorder reproduces 13 traces, 2,705 ticks and 153 checkpoints, including raw timers/effects and source draw accounting. Native preflight regressions await separate tick composition and native proof.
+
+- Integrated the checked ground-support component into a separate source-only tick-provider tree. Frozen tick behavior remains unchanged; the future support phase caller and native composition checks remain pending.
+
+- Verified bounded Conquest ground support against 60 original-source traces and 1,400 checkpoints, including every effect/lifetime transition and unsampled-tick silence checks. Three support, three combat and three firing debug regressions pass; all 158 locked release workspace tests, strict workspace Clippy, formatting and release FFI build pass. Aircraft support and complete tick integration remain separate.
+
+- Fixed the captured-membership prerequisite's building-wreck lifecycle call to pass explicit full-current membership. The original source wreckBuilding uses current units; captured support blast actors remain separate. This closes the first native compile failure, with the 60-trace/1,400-checkpoint source fixture unchanged. Native gates are in progress.
+
+- Closed the support replay consumer gap on unsampled ticks: unexpected effects or premature strike/cover lifetime transitions now fail immediately. This strengthens the same 60-trace, 1,400-checkpoint source fixture without changing runtime code; native proof is pending.
+
+- Fixed support oracle sampling that missed arrival events after repeated floating-point delay subtraction. The original-source recorder now captures every effect, strike activation/removal and cover expiry, with 60 traces and 1,400 checkpoints. Ground runtime code is unchanged from 8604e01; native verification is pending.
 
 - Updated the operative tick replay after central control state gained the reaction timer. Trusted fixture patches now set canonical `UnitControl.react`, and operative rows compare its exact preserved value. Ordinary reaction execution remains unavailable and its timer remains outside this bounded projection. No runtime phase or gameplay state was added; native verification is pending.
 
