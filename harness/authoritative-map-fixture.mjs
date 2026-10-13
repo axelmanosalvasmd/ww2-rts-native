@@ -136,7 +136,7 @@ try {
     ['material-duplicate', m => { m.layers.materials.push({ c: 21, material: 'soil' }); }],
     ['material-name', m => { m.layers.mineMaterials[0].material = 'glass'; }], ['material-cell', m => { m.layers.groundMaterials[0].c = 400; }],
   ]) { const m = layered(); fn(m); record(`invalid:layer-${name}`, m); }
-  edit('unsupported:structures', m => { m.structures = []; }, 'structures');
+  edit('boundary:empty-structures', m => { m.structures = []; });
   edit('unsupported:scenario', m => { m.scenario = { version: 1 }; }, 'scenario');
   edit('unsupported:world', m => { m.world = {}; }, 'world');
   Math.random = originalRandom;
