@@ -230,6 +230,13 @@ fn patch(m: &mut Match, id: u32, value: &Value) {
     if let Some(v) = value["built"].as_f64() {
         u.built = Some(v);
     }
+    if let Some(v) = value.get("operative") {
+        m.commands.units.get_mut(&id).unwrap().operative =
+            v.as_str().is_some_and(|s| !s.is_empty()) || v.as_bool() == Some(true);
+    }
+    if let Some(v) = value["riding"].as_u64() {
+        u.riding = v != 0;
+    }
     if let Some(v) = value["holdFire"].as_bool() {
         m.commands.units.get_mut(&id).unwrap().hold_fire = v;
     }
@@ -502,4 +509,231 @@ fn unavailable_weapon_and_invalid_late_metadata_refuse_before_mutation() {
     );
     assert_eq!(format!("{:?}", m.world.game.units), before);
     assert!(m.aviation.events.is_empty());
+}
+
+fn aircraft_command_fixture() -> Value {
+    let mut text = String::new();
+    flate2::read::GzDecoder::new(&include_bytes!("fixtures/match-aircraft-commands.json.gz")[..])
+        .read_to_string(&mut text)
+        .unwrap();
+    serde_json::from_str(&text).unwrap()
+}
+fn command_scene(trace: &Value) -> Match {
+    use ww2_core::{
+        game::Traffic,
+        match_commands::{Command, Facing, MoveOutcome},
+    };
+    let mut m = scene(trace);
+    for (&id, u) in &mut m.world.game.units {
+        u.path = vec![Point { x: 9.0, z: 10.0 }];
+        u.traffic = Some(Traffic {
+            goal: Point { x: 6.0, z: 7.0 },
+            legs: Vec::new(),
+            passing: false,
+            by: 888,
+            until: 20.0,
+        });
+        u.traffic_wait = 5.0;
+        u.world_goal = Some(Point { x: 19.0, z: 20.0 });
+        u.entrench = true;
+        u.attack = true;
+        u.retreating = true;
+        let c = m.commands.units.get_mut(&id).unwrap();
+        c.follow = 777;
+        c.orders
+            .push_back(Command::from_json(&json!({"t":"move","orders":[[id,8,8]]})).unwrap());
+        c.face = Some(Facing {
+            angle: 0.75,
+            at: Point { x: 22.0, z: 23.0 },
+        });
+        c.outcome = Some(MoveOutcome::Moving);
+        c.outcome_tick = Some(3);
+        c.attack_id = 777;
+        m.firing.get_mut(id).unwrap().target_id = 555;
+    }
+    m
+}
+fn command_snapshot(m: &Match) -> Value {
+    use ww2_core::match_commands::{Command, MoveOutcome};
+    let point = |p: Point| json!({"x":bits(p.x),"z":bits(p.z)});
+    json!(m.world.game.units.values().map(|u| {
+        let c=&m.commands.units[&u.id];
+        let f=m.firing.get(u.id).unwrap();
+        let a=m.aviation.planes.get(&u.id);
+        let orders=c.orders.iter().map(|o|match o {
+            Command::Move{orders,control_ids,attack_move,..}=>json!({"t":if *attack_move{"amove"}else{"move"},"orders":orders.iter().map(|o|json!([o.unit,o.at.x,o.at.z])).collect::<Vec<_>>(),"ids":control_ids,"target":null,"x":null,"z":null}),
+            _=>panic!("unexpected waiting aircraft order"),
+        }).collect::<Vec<_>>();
+        let air=a.map(|a|json!({"state":state_name(u.air.unwrap()),"fuel":bits(a.fuel),"ammo":bits(a.ammo),"timer":bits(a.timer),"ang":bits(a.orbit),"mission":a.mission.map(|m|json!({"kind":m.kind.name(),"id":m.target.unwrap_or(0),"x":bits(m.at.x),"z":bits(m.at.z)}))}));
+        json!({"id":u.id,"owner":u.owner,"kind":m.rules.kinds[u.kind].name,"at":point(u.at()),"rot":bits(u.rot),"hp":bits(u.hp),"path":u.path.iter().map(|p|json!({"x":p.x,"z":p.z})).collect::<Vec<_>>(),"follow":c.follow,"orders":orders,"face":c.face.map(|f|json!({"a":bits(f.angle),"x":bits(f.at.x),"z":bits(f.at.z)})),"traffic":u.traffic.is_some(),"trafficWait":bits(u.traffic_wait),"worldGoal":u.world_goal.map(point),"entrench":u.entrench,"outcome":c.outcome.map(|o|match o{MoveOutcome::Interrupted=>"interrupted",MoveOutcome::Moving=>"moving",MoveOutcome::Unreachable=>"unreachable",MoveOutcome::Arrived=>"arrived"}),"outcomeTick":c.outcome_tick,"attackId":c.attack_id,"targetId":f.target_id,"retreating":u.retreating,"holdFire":c.hold_fire,"holdPos":u.hold_pos,"autoRetreat":c.auto_retreat,"air":air})
+    }).collect::<Vec<_>>())
+}
+#[test]
+fn typed_aircraft_commands_match_original_selection_and_distinct_cleanup() {
+    use ww2_core::match_commands::Command;
+    let f = aircraft_command_fixture();
+    let mut checkpoints = 0;
+    for trace in f["traces"].as_array().unwrap() {
+        let mut m = command_scene(trace);
+        assert_json(
+            &command_snapshot(&m),
+            &trace["initial"],
+            &format!("{} initial", trace["name"]),
+        );
+        checkpoints += 1;
+        let paths = m
+            .world
+            .game
+            .units
+            .iter()
+            .filter(|(_, u)| u.air.is_some())
+            .map(|(id, u)| (*id, u.path_gen))
+            .collect::<Vec<_>>();
+        for (i, frame) in trace["frames"].as_array().unwrap().iter().enumerate() {
+            let denial = match Command::from_json(&frame["command"]) {
+                Ok(cmd) => m
+                    .execute_command(frame["owner"].as_u64().unwrap() as usize, &cmd, false)
+                    .unwrap(),
+                Err(denial) => Some(denial),
+            };
+            assert_eq!(
+                json!(denial.map(|d| d.name())),
+                frame["denial"],
+                "{} action {i}",
+                trace["name"]
+            );
+            assert_json(
+                &command_snapshot(&m),
+                &frame["expected"],
+                &format!("{} action {i}", trace["name"]),
+            );
+            for &(id, generation) in &paths {
+                assert_eq!(m.world.game.units[&id].path_gen, generation);
+            }
+            assert_eq!(m.commands.path_requests().used(), 0);
+            assert_eq!(m.commands.path_requests().queue_len(), 0);
+            assert_eq!(m.commands.path_requests().pending_len(), 0);
+            assert!(m.aviation.events.is_empty());
+            assert!(m.firing.events.is_empty());
+            checkpoints += 1;
+        }
+    }
+    assert_eq!(f["traces"].as_array().unwrap().len(), 70);
+    assert_eq!(checkpoints, 145);
+    assert_eq!(checkpoints, f["checkpoints"].as_u64().unwrap());
+}
+#[test]
+fn unsupported_mixed_aircraft_selections_reject_before_supply_or_control_writes() {
+    use ww2_core::match_commands::{Command, Denial};
+    let f = aircraft_command_fixture();
+    let trace = f["traces"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|t| t["name"] == "fighter-base-attack-air")
+        .unwrap();
+    let commands = [
+        json!({"t":"move","orders":[[1002,20,21],[1000,22,23]]}),
+        json!({"t":"stop","ids":[1002,1000]}),
+        json!({"t":"attack","ids":[1002,1000],"target":1002}),
+        json!({"t":"move","queue":true,"orders":[[1002,20,21],[1000,22,23]]}),
+        json!({"t":"retreat","ids":[1000,1002]}),
+        json!({"t":"stance","ids":[1002,1000],"key":"holdFire","on":false}),
+    ];
+    for (index, raw) in commands.iter().enumerate() {
+        let mut m = command_scene(trace);
+        m.world.game.units.get_mut(&1000).unwrap().air = Some(PlaneState::Out);
+        if index <= 1 {
+            m.commands.units.get_mut(&1000).unwrap().hold_fire = false;
+        }
+        patch(
+            &mut m,
+            1002,
+            &json!({"logistics":{"ammo":100,"ammoMax":100,"ammoPrice":0.01,"ammoCredit":0,"provisions":120,"fuel":180,"emergency":60,"warning":null,"forced":true,"stranded":false,"exhausted":false}}),
+        );
+        if index == 2 {
+            m.world.game.units.get_mut(&1002).unwrap().owner = 1;
+            m.grid.update(1002, &m.world.game.units[&1002]);
+        }
+        m.commands.units.get_mut(&1002).unwrap().supply_hold = true;
+        let before = command_snapshot(&m);
+        let reserves = m.logistics.get(1002).unwrap().clone();
+        let command = Command::from_json(raw).unwrap();
+        assert_eq!(
+            m.execute_command(0, &command, false).unwrap(),
+            Some(Denial::Unsupported),
+            "case {index}"
+        );
+        assert_eq!(command_snapshot(&m), before, "case {index}");
+        assert_eq!(m.logistics.get(1002).unwrap(), &reserves);
+        assert!(m.commands.units[&1002].supply_hold);
+        assert!(!m.commands.units[&1002].supply_escape);
+        assert_eq!(m.commands.path_requests().used(), 0);
+    }
+    for missing_physical in [false, true] {
+        let mut m = command_scene(trace);
+        if missing_physical {
+            m.world.game.units.get_mut(&1000).unwrap().air = None;
+        } else {
+            m.aviation.planes.remove(&1000);
+        }
+        let units = format!("{:?}", m.world.game.units);
+        let controls = m.commands.units.clone();
+        let raw = json!({"t":"move","orders":[[1002,20,21],[1000,22,23]]});
+        let result = m.execute_command(0, &Command::from_json(&raw).unwrap(), false);
+        if missing_physical {
+            assert!(result.is_err());
+        } else {
+            assert_eq!(result.unwrap(), Some(Denial::Unsupported));
+        }
+        assert_eq!(format!("{:?}", m.world.game.units), units);
+        assert_eq!(m.commands.units, controls);
+        assert_eq!(m.commands.path_requests().used(), 0);
+    }
+    let mut m = command_scene(trace);
+    assert!(m.start_queued_orders(1000, false).is_err());
+    m.commands.units.get_mut(&1000).unwrap().orders.clear();
+    m.start_queued_orders(1000, false).unwrap();
+    m.prepare_unit_commands(1000, false).unwrap();
+}
+
+#[test]
+fn aircraft_commands_replay_on_the_single_recorded_boundary_queue() {
+    use ww2_core::{match_commands::Command, orders::OrderKey};
+    let f = aircraft_command_fixture();
+    let trace = f["traces"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|t| t["name"] == "recorded-plane-command-sequence")
+        .unwrap();
+    let frames = trace["frames"].as_array().unwrap();
+    for arrival in [[0, 1, 2, 3], [3, 1, 0, 2], [2, 0, 3, 1]] {
+        let mut m = command_scene(trace);
+        for index in arrival {
+            m.enqueue_command(
+                OrderKey {
+                    tick: 1,
+                    issuer: 0,
+                    sequence: index as u64 + 1,
+                },
+                Command::from_json(&frames[index]["command"]).unwrap(),
+            )
+            .unwrap();
+        }
+        let results = m.apply_commands(1, false).unwrap();
+        assert_eq!(results.len(), 4);
+        assert!(results.iter().all(|r| r.denial.is_none()));
+        assert_eq!(
+            results.iter().map(|r| r.key.sequence).collect::<Vec<_>>(),
+            [1, 2, 3, 4]
+        );
+        assert_json(
+            &command_snapshot(&m),
+            &frames[3]["expected"],
+            "boundary replay",
+        );
+        assert_eq!(m.commands.pending_commands(), 0);
+        assert_eq!(m.commands.path_requests().used(), 0);
+    }
 }

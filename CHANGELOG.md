@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Connected bounded aircraft Move/Attack/Stop/Escort/Retreat and hold-fire controls to the existing recorded command dispatcher. Prepared aircraft selections validate before convoy, supply or control writes; aircraft branches bypass ground routes and recipient Fog reads. The unchanged source command oracle records 70 traces and 145 checkpoints, with distinct cleanup, clamping, target denials and mixed selection behavior. Queued aircraft, automatic/ground weapons and ground branches of the new variants remain explicit unsupported phases. Source/native queue and atomicity consumers are added; native proof remains pending.
+
 - Consumed the independently reviewed building-wreck lifecycle compile repair: this caller explicitly passes full-current membership, as the original source does. Ground support gates passed on the provider; this aviation/command continuation still awaits its own native proof.
 
 - Fixed the pending aviation consumer's raw JSON number comparison: integral source numbers and Rust floating representations now compare exact f64 bits, with only JSON zero normalization. Canonical state bit strings remain exact. Runtime and the 18-constructor/42-trace/3,410-checkpoint fixture are unchanged; native proof remains pending.

@@ -128,7 +128,7 @@ struct AircraftStep {
     firing: FiringUnit,
 }
 impl Match {
-    fn validate_aviation(&self) -> Result<(), AviationError> {
+    pub(crate) fn validate_aviation(&self) -> Result<(), AviationError> {
         let g = &self.world.game;
         if !matches!(self.options.mode, Mode::Default | Mode::Conquest) || g.mode.is_some() {
             return Err(AviationError::Unsupported(
@@ -350,9 +350,9 @@ impl Match {
         });
         Ok(id)
     }
-    /// The single recorded command dispatcher remains the caller.
-    pub fn send_aircraft_mission(
-        &mut self,
+    /// Pure admission for whole-selection command preflight.
+    pub(crate) fn validate_aircraft_mission(
+        &self,
         owner: usize,
         id: UnitId,
         mission: PlaneMission,
@@ -414,6 +414,18 @@ impl Match {
             }) {
                 return Ok(false);
             }
+        }
+        Ok(true)
+    }
+    /// The single recorded command dispatcher remains the caller.
+    pub fn send_aircraft_mission(
+        &mut self,
+        owner: usize,
+        id: UnitId,
+        mission: PlaneMission,
+    ) -> Result<bool, AviationError> {
+        if !self.validate_aircraft_mission(owner, id, mission)? {
+            return Ok(false);
         }
         self.aviation.planes.get_mut(&id).unwrap().mission = Some(mission);
         self.world.game.units.get_mut(&id).unwrap().air = Some(PlaneState::Out);
