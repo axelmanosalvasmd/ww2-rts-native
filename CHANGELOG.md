@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Tightened the shared sample actor guard after independent review: the hidden local-defender sentinel is accepted only in World. The controlled Assault neutral-bunker source trace remains recorded but is explicitly outside represented native actors; its native checks now require atomic refusal. A malformed-actor regression protects the ordinary publication boundary. Valid commander behavior is unchanged; native checks remain pending.
+
 - Incorporated the World provider's first native test import repair into the extracted shared scene fixture, using the actual world-map module for WorldMapInput. Runtime behavior is unchanged; combined native checks remain pending.
 
 - Enabled eligible World endings through canonical Match finish, story, timeline and reveal after staged region capture, income and home updates. Territory thresholds take priority over last-nation victory; draws and the first region captured this tick use source location rules. An actual-constructor JavaScript recorder covers 15 traces and 16 phases on Huge and Massive maps, and three earlier finish-refusal fixtures now test acceptance. Fort/gate seizure, owned-army/building removal and retired tick facts still reject the whole operation before mutation; native checks are pending the managed slot.

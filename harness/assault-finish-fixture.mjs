@@ -38,7 +38,7 @@ if(action.spend)story.tally(g,action.spend[0],'mpSpent',action.spend[1]);
 if(action.periodic)sim.__periodic(g);
 sim.__assaultFinish(g,action.dt??sim.TICK);
 steps.push({action,expected:encode({timeLeft:g.mode.timeLeft,winner:g.winner,reason:g.endReason??null,endAt:g.endAt??null,endTick:g.endTick??null,reveal:!!g.reveal,timeline:g.timeline??[],story:g.players.map((_,i)=>g.story?.[i]??Object.fromEntries(story.STORY_KEYS.map(k=>[k,0]))),fallen:g.fallen??{},report:g.winner===null?null:story.storyResult(g)})});}
-cases.push({name,map,teams,defender,steps});}
+cases.push({name,map,teams,defender,represented:!actions.some(a=>a.neutral),steps});}
 trace('timer-and-decided-freeze',[0,1],1,[{tick:1,periodic:true,spend:[0,2.5],points:[[0,0],[1,1]]},{tick:200,periodic:true,timeLeft:.025},{tick:400,periodic:true,dt:100,bunkers:[[null,0]],spend:[0,99],death:{owner:1,by:0,at:{x:1,z:2}}}]);
 trace('last-bunker-before-expired-clock',[0,1],1,[{tick:200,periodic:true,timeLeft:0,bunkers:[[null,0]],death:{owner:1,by:0,at:{x:-.05,z:17.25}}}]);
 trace('no-fallen-falls-back-to-center',[0,1],1,[{tick:4,bunkers:[[null,-1]]}]);
