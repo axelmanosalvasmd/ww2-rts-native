@@ -204,15 +204,13 @@ impl SetupExpected {
 fn check_public_map(map: &Value) {
     assert!(map.get("triggers").is_none());
     assert!(map.get("scenario").is_none());
-    for key in ["rows"] {
-        assert!(
-            map[key]
-                .as_array()
-                .unwrap()
-                .iter()
-                .all(|row| !row.as_str().unwrap().contains('N'))
-        );
-    }
+    assert!(
+        map["rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|row| !row.as_str().unwrap().contains('N'))
+    );
     for key in ["objects", "mines"] {
         assert!(
             map["layers"][key]

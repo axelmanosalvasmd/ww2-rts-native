@@ -1,5 +1,9 @@
 # Three Crossroads Native: design decisions
 
+## Startup privacy assertion lint closure (2026-10-13)
+
+The exact `81cd1ef` cycle passes its real WebSocket and ClientView lifecycle test and formatting, then strict Clippy refuses the test helper's one-element loop over `rows`. The successor reads `map["rows"]` directly and retains the identical array/type and hidden-mine assertion. It changes no runtime, core, FFI, map asset, lifecycle order or admission guard. The actual lifecycle pass belongs to `81cd1ef`; the full workspace and release FFI did not run in that stopped cycle. Raw logs remain at `/private/tmp/ww2-pure-startup-native-81cd1ef/`. Fresh strict lint, coherent workspace and exact-head platform checks remain required.
+
 ## Startup public-map optional fields (2026-10-13, source successor)
 
 The exact `08b378d` startup attempt compiles and reaches the public-map helper, then fails its unconditional `mineMaterials == []` assertion with null versus array. No test passes, and no later gate runs; the raw failure stays at `/private/tmp/ww2-pure-startup-native-08b378d/startup-first.log`. Direct calls to unchanged pinned `mapForClient` match the complete committed Default and El Alamein JSON projections, and both omit `layers.mineMaterials`. Source `world-layers.js:75` replaces that list only if it exists; it does not add an empty field to a rows-only map.
@@ -2390,3 +2394,5 @@ The four new tests are source-written and have not run natively. They cover pres
 Axel's acknowledgment 034 and Root's 035 retain concrete host/envelope review before merge, exact-head three-platform checks and the unchanged approved six-call ABI 2 header. This continuation adds no wire fields, C interface or privacy decision. Source freeze, independent peer review, native proof and final host review remain required.
 
 The inherited `7e26c58` startup attempt has a separate actual Scenario-admission failure in its El-Alamein test setup, recorded in Root acknowledgment 035. This ingress consumer uses the supported default authored map. The isolated ingress tree normally retains source-reviewed startup successor `81cd1ef`: genuine Scenario refusal and publication rollback, full private-map exclusions, complete supported Default lifecycle, and the optional mine-material assertion corrected after the actual `08b378d` failure. Startup production and ingress bodies remain unchanged by this convergence. The new combined source still needs its own native cycle; neither failed parent attempt is reported as a passing result.
+
+The same isolated tree also normally retains Root's independently reviewed startup lint closure `3b84f7c`. Its privacy test checks the same complete rows array directly instead of looping over one constant key. The ingress producer, queue forwarding accessor, lobby gates, feedback and four new tests remain byte-identical to the reviewed source freeze. Earlier parent lifecycle or strict results do not substitute for a fresh combined native run.

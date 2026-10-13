@@ -2,9 +2,13 @@
 
 ## Unreleased
 
+- Retained the root-reviewed startup test lint closure `3b84f7c` through normal ancestry in the commander-ingress candidate. Only the identical direct rows privacy assertion changes beyond its repaired startup parent; ingress production and all four new tests retain their source-reviewed bytes. Exact-head combined native proof remains pending.
+
 - Normally retained the independently source-reviewed startup test successor `81cd1ef` in the isolated commander-ingress candidate. It preserves genuine Scenario refusal and supported Default lifecycle/privacy assertions, including optional mine-material field presence. Ingress and startup production bodies remain unchanged by this convergence; combined native verification is pending.
 
 - Added the first commander input path for already trusted native rooms: Move, attack-move, Stop and Stance use the existing core parser and recorded queue. The host assigns the current stable seat and next simulation boundary, reserves sequence numbers above existing same-seat keys, and preserves preloaded/future inputs and reconnect ownership. Real tick denials retain the existing four-per-second feedback throttle. Unsupported actor exits and other command families remain guarded. Four focused admission/socket tests are written but unrun; original-source checks reproduce 93 command traces, 344 steps and two route-recovery branches. Native and host review remain pending.
+
+- Replace the startup privacy test's one-element rows loop with the same direct assertion. The real socket and ClientView lifecycle passes at `81cd1ef`, then strict Clippy stops on that loop; this successor retains every privacy and lifecycle assertion and needs the remaining native and platform checks.
 
 - Correct the startup test's optional mine-material assertion after the exact `08b378d` native attempt compiled and failed before any test passed. Original `mapForClient` and both complete committed Default/El Alamein assets omit `layers.mineMaterials`; the helper now requires an empty array only when that optional field exists. Complete map equality still protects field presence, and private-mine/material/script exclusions remain unchanged. Production output and admission are untouched; the failed log is preserved and fresh native verification remains pending.
 
