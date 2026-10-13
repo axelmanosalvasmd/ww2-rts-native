@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Normally retain the source-cleared World tick plan and unchanged eight-trace original recorder in a separate caller continuation from the final runtime bundle. Actual World actor adapters and caller admission are under development; no World tick or native acceptance is claimed.
+
 - Normally include final main `d1f2fb5` in the separate internal runtime bundle. Its tree is identical to the already incorporated ordered-event head `a068dd8`, so provider, ABI 2 and CI source bytes are unchanged. Combined native verification and interface review before publication remain pending.
 
 - Normally join source-cleared Ground and construction successor `bf293cc` with the trusted room and Human bundle `32670c2` in a separate checkout. Keep the accepted six-command Cover regression, canonical queues, chronological event receipts, private recipient projections and immutable parent evidence. Source files merge without conflicts; combined native verification and publication remain pending.
@@ -102,6 +104,10 @@
 - Normally joined the source-reviewed construction and GroundAttack continuation with the final ordered-event frontier and consolidated original providers. Retained canonical paid-work cancellation, command observers, original source fixtures, approved ABI 2 and the optimized test profile. Resolved shared command, World transaction and typed timeline conflicts without adding mode capabilities, and removed a duplicate route endpoint assignment introduced by automatic merge. This new combined source requires owner review and its own native proof; earlier parent results remain separate.
 
 - Addressed the first combined construction/GroundAttack compiler failures before any tests ran: restored the paired ability-test control binding, retained routing query lifetimes, and committed the new observation receipt only into the temporary construction draft before search. Applied the exact checked PR #193 canonical support snapshot/factory migration to Game.strikes and SupportTiming, retaining original fixture bytes and explicit raw/AIR refusals. The failed strict log contains 11 compiler errors; formatting had passed, and fresh compilation plus all native tests remain pending.
+
+- Independently verified the internal World plan and maintained recorder at `4f8d9f9`: all 8 traces and 116 original steps pass pristine replay, the seven earlier case projections remain identical, and 203,578 patches reconstruct the captured state losslessly. The phase/actor/supply/retirement gaps are source-reviewed; no native World runner or interface change is claimed.
+
+- Prepared an internal World tick integration plan from the actual pinned controller and accepted split/epilogue providers. Recorded concrete actor, path-version, unknown-terrain, timer/payment, production, supply, rail and retirement seams before any caller interface change. Reused the maintained World source recorder instead of adding a second suite: 8 traces, 116 original steps and 1,512 phase entries pass original/pristine comparison and lossless delta reconstruction, including post-finish income/capture and neutral guard behavior. Its seven earlier case projections remain unchanged. This evidence is source-only and native World dispatch remains pending. Frozen original-constructor and ordinary candidates are unchanged.
 
 - Normally retained verified main `8f27227` in the separate construction/GroundAttack candidate, including the accepted recipient-known terrain traffic adapter. Existing dispatch, path callbacks, ordered output and source fixtures remain intact. Corrected the sole caller receipt to report connected TrafficKnowledge once instead of listing it as unavailable; the existing actual-runner regression protects that truthful receipt. Combined native verification remains pending and no frozen proof branch changed.
 
