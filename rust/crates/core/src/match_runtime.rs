@@ -392,6 +392,7 @@ pub struct BuildingCell {
 /// Authoritative Conquest startup state. Tick execution is added independently.
 /// Live terrain and units have a single owner in `world.game`.
 pub struct Match {
+    pub field_works: crate::field_works::FieldWorksRuntime,
     pub abilities: crate::match_abilities::AbilityState,
     pub recovery: crate::match_recovery::RecoveryState,
     pub commands: crate::match_commands::MatchCommands,
@@ -427,6 +428,21 @@ pub struct Match {
 }
 
 impl Match {
+    /// Cancel current paid work without a refund. The descriptor is removed before its activity flag.
+    pub fn cancel_field_work(&mut self, id: u32) -> Result<(), String> {
+        let unit = self
+            .world
+            .game
+            .units
+            .get(&id)
+            .ok_or("missing field-work unit")?;
+        if unit.dig != self.field_works.is_active(id) {
+            return Err("unrepresented or inconsistent field-work activity".into());
+        }
+        self.field_works.cancel(id);
+        self.world.game.units.get_mut(&id).unwrap().dig = false;
+        Ok(())
+    }
     pub fn new(map: &crate::map::AuthoritativeMap, options: MatchOptions) -> Result<Self, String> {
         let rules = Rules::compiled().map_err(|e| e.to_string())?;
         let start = StartPlan::prepare(map, &options, &rules)?;
@@ -460,6 +476,7 @@ impl Match {
         };
         let player_count = start.players.len();
         let mut result = Self {
+            field_works: crate::field_works::FieldWorksRuntime::default(),
             abilities: crate::match_abilities::AbilityState::default(),
             recovery: crate::match_recovery::RecoveryState::default(),
             commands: crate::match_commands::MatchCommands::new(4096),
