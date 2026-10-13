@@ -18,8 +18,10 @@ pub mod legacy_scenario;
 
 pub mod logistics;
 pub mod map;
+pub mod match_abilities;
 pub mod match_combat;
 pub mod match_commands;
+pub mod match_recovery;
 
 pub mod match_routing;
 pub mod match_runtime;

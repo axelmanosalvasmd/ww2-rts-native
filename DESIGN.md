@@ -677,3 +677,9 @@ The recorder executes the original direct damage, suppression, local contact, bl
 ## Match Conquest recruitment (2026-10-13)
 
 The native Match now stages immediate Conquest ground/naval recruitment through canonical production, wallets, IDs, unit insertion, grid updates and shared command controls. Owner-bound remembered routing is required for rallies; unreachable searches still admit an empty path as in the source. Air placement and pending supports without exact kind metadata fail explicitly before payment. [Recruitment design and evidence](docs/runtime/recruitment.md) records the transaction, control ownership, original-source fixture and remaining boundaries. No public interface or server match admission changed.
+
+## Conquest ability and recovery ownership (2026-10-13, execution pending)
+
+`Match.abilities` owns source ability cooldown, buff and AP state, plus automatic/walked flags for an aimed order. `UnitControl.nade` remains the only aimed point, while Game owns sprint and health. `Match.recovery` owns only previous health, wound/heal ticks and reinforcement progress. Logistics retains physical provisions. Starting and recruited units initialize these rows at their existing publication boundary.
+
+The planned recovery phase uses a captured late-list frame: prepare base/depot/aid membership, perform cadence-ten healing and mine sweeping, allow supply/network refresh, then reinforce against the prepared membership. The frame excludes later births and preserves earlier depot access on a beat that changes cut-off status. Medic choices retain maintained grid order. Firing owns flight geometry, IDs and random draws and will borrow ability buff/AP, so the ability actuator must not construct a second projectile registry. These are internal state prerequisites; native execution and checks are pending. No ABI or wire interface changes.
