@@ -300,3 +300,7 @@ Wall clock and scheduling
 ## Retirement and wreck lifecycle evidence
 
 The combat adapter removes dead units through the maintained grid without rebuilding surviving buckets. A focused mid-tick removal regression preserves the surviving query order. Its original-source fixture covers vehicle wreck initialization, motion, final Q cells, scorch and the oldest-hull cap among nine traces with 35 actions. MOV-106 remains in progress pending full tick scheduling and client presentation. Thrown carrier escape in MOV-76 remains outside this slice.
+
+## Prepared birth routing evidence (source stage)
+
+MOV-29 and MOV-51 now have source-written consumers for an admitted Conquest rally purchase and a legal World training completion. The routing owner prepares the newborn's borrowed sight at the existing lazy keys. Query, Fog and delivery ledgers publish only with the physical unit transaction. Search-cache forks retain canonical history on rejected publication and rebind matching preview buffers for successful incremental routing. Actual birth-view oracle replay and native consumer checks remain pending. The earlier revealed 33-buy evidence does not establish newborn sight, and these full behavior rows remain incomplete.

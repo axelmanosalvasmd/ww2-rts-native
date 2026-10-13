@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Recorded the prepared birth-routing and training evidence boundary in the movement and base parity inventories. Full rows remain in progress while original birth replay and native consumer checks are pending.
+
 - Retained World training’s incremental route history through the routing owner’s preview-aware path fork. Exact recipient buffers rebind before search; the fork moves only with successful queue, unit and memory publication. Native proof remains pending.
 
 - Bound detached recruitment search history to the routing owner’s preview buffers before search. Exact recipient identities retain incremental graph history, while failed previews still leave canonical caches unchanged. Native and birth-oracle checks remain pending.

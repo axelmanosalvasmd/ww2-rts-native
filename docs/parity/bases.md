@@ -131,3 +131,7 @@ The wallet and population foundation is implemented as a component, with 37 orig
 - The server passes `tech: room.tech !== false` and keeps `tech` in saved settings (`server.js:381`, `:419`), while DESIGN.md:94-95 says the server always turns tech on. Is there a lobby control the native client must offer (NET)?
 - Should the Rust port keep the Sudden Death no-refund queue wipe and the Conquest-cost basis for bounty and upkeep, or record them as deliberate changes in DESIGN.md?
 - Supply lines sit between BASE (income) and LOG (logistics). BASE-05 should live in one section only; please pick.
+
+## Prepared recruitment and training observations (source stage)
+
+The BASE-18 and BASE-21 follow-ups now prepare owner routing with the admitted newborn before payment or paid-head consumption. The final transaction validates the same admission or completion, then publishes the actual unit and canonical combat, firing, ability and recovery defaults once. Preview failures preserve wallet, queue, physical units, observation ledgers and existing path history. Original birth-view replay, independent provider review and native consumer verification are pending; the full behavior rows stay in progress.
