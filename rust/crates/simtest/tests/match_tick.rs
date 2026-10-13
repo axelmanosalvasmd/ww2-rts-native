@@ -108,6 +108,16 @@ fn connected_tick_phases_match_actual_reference_steps() {
             u.x = row[1].as_f64().unwrap();
             u.z = row[2].as_f64().unwrap();
         }
+        if let Some(rows) = input["hp"].as_array() {
+            for row in rows {
+                m.world
+                    .game
+                    .units
+                    .get_mut(&(row[0].as_u64().unwrap() as u32))
+                    .unwrap()
+                    .hp = row[1].as_f64().unwrap();
+            }
+        }
         for row in input["paths"].as_array().unwrap() {
             let u = m
                 .world
@@ -210,6 +220,48 @@ fn connected_tick_phases_match_actual_reference_steps() {
                                 .into_iter()
                                 .map(|key| bits(row.value(key)))
                                 .collect::<Vec<_>>())
+                            .collect::<Vec<_>>()
+                    );
+                }
+                if c["abilityRecovery"] == true {
+                    state["abilityRecovery"] = json!(
+                        m.world
+                            .game
+                            .units
+                            .values()
+                            .map(|unit| {
+                                let ability = m.abilities.get(unit.id).unwrap();
+                                let recovery = m.recovery.get(unit.id).unwrap();
+                                let control = &m.commands.units[&unit.id];
+                                json!([
+                                    unit.id,
+                                    bits(ability.cooldown),
+                                    bits(ability.buff),
+                                    ability.ap,
+                                    control.nade.map(|at| [bits(at.x), bits(at.z)]),
+                                    ability.aimed_auto,
+                                    ability.aimed_walked,
+                                    recovery.hp_was.map(bits),
+                                    recovery.wound_at,
+                                    recovery.heal_at,
+                                    bits(recovery.reinforcement)
+                                ])
+                            })
+                            .collect::<Vec<_>>()
+                    );
+                    state["grenades"] = json!(
+                        m.firing
+                            .grenades
+                            .iter()
+                            .map(|ticket| {
+                                json!([
+                                    ticket.flight,
+                                    bits(ticket.at.x),
+                                    bits(ticket.at.z),
+                                    bits(ticket.remaining),
+                                    ticket.owner
+                                ])
+                            })
                             .collect::<Vec<_>>()
                     );
                 }

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Expanded the unchanged original-step tick recorder to ten traces, 1,940 ticks and 102 checkpoints. New cases protect boundary grenade launch/ticket expiry and paid infantry reinforcement on ticks 40 and 80, with exact ability/recovery rows and wallet/story charges. The eight earlier traces are unchanged. Native comparison of this assembly is pending.
+
 - Connected checked ordinary Conquest ability timers, autocast, aimed execution and grenade tickets to their ordered tick sites. Prepared recovery runs healing before point supply and reinforcement afterward. Paid field jobs still refuse before advancing the tick until their actuator is integrated; other unavailable systems and server start refusal remain explicit. Combined native proof is pending.
 
 - Integrated the checked canonical ability, recovery and provision providers into the separate tick assembly, retaining the existing point-phase split and one metadata initialization per starting unit. Individual provider checks do not establish combined tick readiness; ordered phase wiring and combined native proof remain pending.
