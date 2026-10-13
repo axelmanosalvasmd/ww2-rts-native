@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Restore explicit flat source/native scene terrain before registering elimination fixtures. This prevents unrelated bootstrap geometry from contaminating debris comparisons when the transition harness does not claim matched startup random streams.
+
 - Warm real World route memory before rollback witnesses and preserve remembered rows, route buffers, versions, fire/bunker and wreck views on refusal. Assert the nonfinite story failure reaches its named post-wreck finish guard.
 
 - Add a local-defender garrison to the actual World collapse oracle. Its canonical actor and damaged survivor remain present; the test uses an explicit source-only owner adapter for the internal sentinel, without adding a transport or ordinary-owner fallback.

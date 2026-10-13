@@ -12,7 +12,7 @@ if(process.arch!=='x64'||process.version!=='v24.21.0')throw Error('Use x64 Node 
 registerHooks({load(url,ctx,next){const out=next(url,ctx);if(url!==pathToFileURL(`${ref}/shared/sim.js`).href)return out;const source=String(out.source);
  const periodic='  if (g.winner === null && (g.tick === 1 || g.tick % SAMPLE_EVERY === 0)) sample(g, isStructure(g));';
  if(source.split(periodic).length!==2)throw Error('Sample source anchor moved');
- return {...out,source:source+`\nexport {stepWorld as __stepWorld,worldIncome as __worldIncome,validateWorldMap as __validateWorldMap,registerBuildingStructure as __registerBuildingStructure};\nexport function __periodic(g){${periodic}}\n`};}});
+ return {...out,source:source+`\nexport {stepWorld as __stepWorld,worldIncome as __worldIncome,validateWorldMap as __validateWorldMap,registerBuildingStructure as __registerBuildingStructure,setCell as __setCell};\nexport function __periodic(g){${periodic}}\n`};}});
 const sim=await import(pathToFileURL(`${ref}/shared/sim.js`));
 const {rebuildGrid}=await import(pathToFileURL(`${ref}/shared/grid.js`));
 const {STORY_KEYS,storyResult}=await import(pathToFileURL(`${ref}/shared/story.js`));
@@ -29,6 +29,9 @@ function record(name,{teams=[5,1,5],regions={},players={},units=[],nodes=[],step
  let g;const old=Math.random;Math.random=()=>.5;try{g=sim.createGame(map,teams.map((_,i)=>`Commander ${i}`),false,teams,teams.map(()=>0),{mode:'world',tech:false,weather:false,logistics:false,supply:true});}finally{Math.random=old;}
  g.units=new Map(units.map(u=>[u.id,{garrison:-1,supp:0,rot:0,path:[],cargo:[],...structuredClone(u)}]));g.nodes=structuredClone(nodes);
  g.seed=123456789;g.nextId=1000;g.wind={a:.7,v:.6};g.wx={rain:0,wet:0};g.fallingSections=[];
+ // Restore explicit flat scene terrain, removing unrelated bootstrap structures before physics.
+ g.structures.clear();g.structuralCells.clear();
+ for(let c=0;c<g.chars.length;c++)if(g.chars[c]!=='.')sim.__setCell(g,c,'.');
  for(const u of g.units.values())if(u.cells.length){for(const c of u.cells)sim.mutateWorldCell(g,c,{object:'K'});sim.__registerBuildingStructure(g,u);}
  for(const u of g.units.values())if(u.postRegisterHp!==undefined)u.hp=u.postRegisterHp;
  g.newCells=[];g.cellJournal=[];g.shots=[];g.tick=40;g.winner=null;g.timeline=[];g.reveal=false;

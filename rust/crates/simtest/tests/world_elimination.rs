@@ -83,6 +83,17 @@ fn row(v: &ww2_core::world::CellRow) -> Value {
 
 fn setup(m: &mut Match, f: &Value, case: &Value) -> Vec<u32> {
     world_scene::reset(m, f, &case["input"]);
+    // Same explicit restored terrain as the source fixture, before registering actual sections.
+    m.world.structures.clear();
+    m.world.sections.clear();
+    m.world.game.sections.clear();
+    m.world.detached_sections.clear();
+    for cell in 0..m.world.game.chars.len() {
+        if m.world.game.chars[cell] != b'.' {
+            m.world.set_cell(cell, b'.').unwrap();
+        }
+    }
+
     m.environment = Default::default();
     m.start.environment_seed = 123456789;
     m.next_unit_id = 1000;
