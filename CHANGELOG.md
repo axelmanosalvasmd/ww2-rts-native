@@ -4,6 +4,10 @@
 
 - Added the internal Rust recipient view and reference protocol replay from PR #16 without its C interface. The decoder retains received units, raw terrain rows, fog masks and HUD messages, with bounded atomic validation and held-set resync checks. All 1,236 recorded Conquest and World message states have direct browser expectations. ABI 1 and its header remain unchanged; PR #16's six proposed C calls still await Axel's approval.
 
+- Recorded the ground-vehicle pathfinding design, exact fixture coverage and remaining integration work for issue #34. MOV-27 and MOV-28 are now in progress; the earlier infantry/naval stage remains documented.
+
+- Added ground-vehicle fine pathfinding for all 12 non-rail vehicle types. The search uses conservative turning clearance, exact destination clearance, road-aware costs and smoothing, and current wear, wetness and hazards from the supplied terrain. The existing oracle suite now matches 1,529 pinned JavaScript searches, including all 1,175 previous infantry/naval results and 354 vehicle cases. A cache regression checks reuse, direct and historical terrain edits in their original order, missing-history rebuilds, recipient changes and source replacement at unchanged versions. Aircraft, trains, structures, automatic recipient-view selection, request scheduling and movement integration remain outside this slice. No ABI or wire interface changed.
+
 - Added versioned match random streams and a bounded tick-order queue. Terrain, weather, combat, off-map support and each AI seat have separate seeded streams; saved stream states resume exactly. Orders apply in tick, issuer and sequence order regardless of arrival order, with explicit duplicate, past-tick and capacity errors. These are core building blocks, not a full match loop or a new wire protocol.
 
 - Recorded embedded map delivery and its 96 live HTTP comparisons in the design and server parity inventory. NET-11 remains in progress: public projections are served, while raw editor reads, map writes and authoritative world loading are still missing.
