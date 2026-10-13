@@ -399,6 +399,7 @@ pub struct Match {
     pub building_rallies: BTreeMap<u32, Option<Point>>,
     pub scenario: Option<crate::legacy_scenario::LegacyScenario>,
     pub logistics: crate::logistics::LogisticsState,
+    pub firing: crate::match_firing::FiringState,
     pub capture_ticks: Vec<Option<i64>>,
     pub next_unit_id: u32,
     pub rules: Rules,
@@ -447,6 +448,7 @@ impl Match {
             building_rallies: BTreeMap::new(),
             scenario,
             logistics: crate::logistics::LogisticsState::default(),
+            firing: crate::match_firing::FiringState::default(),
             capture_ticks: vec![None; map.points().len()],
             next_unit_id,
             rules,
@@ -455,6 +457,7 @@ impl Match {
         for unit in result.world.game.units.values() {
             let control = crate::match_commands::UnitControl::new(unit, &result.rules)?;
             result.commands.insert(unit.id, control);
+            result.firing.initialize(unit.id);
         }
         result.grid.rebuild(&result.world.game.units);
         Ok(result)
