@@ -57,6 +57,16 @@ pub enum Command {
         stance: Stance,
         on: bool,
     },
+    Ability {
+        ids: Vec<i64>,
+        at: Option<Point>,
+        queue: bool,
+        automatic: bool,
+    },
+    Autocast {
+        ids: Vec<i64>,
+        on: bool,
+    },
     Unsupported,
 }
 
@@ -83,6 +93,8 @@ pub struct UnitControl {
     pub rally_drift: bool,
     /// Operatives reject ordinary squad orders.
     pub operative: bool,
+    /// World local guards return here in the guard phase, owned by tick scheduling.
+    pub guard_home: Option<Point>,
 }
 impl UnitControl {
     /// Prepare before publishing a spawned unit or charging a wallet.
@@ -120,6 +132,7 @@ impl UnitControl {
             nade: None,
             rally_drift: false,
             operative: false,
+            guard_home: None,
         })
     }
 }
@@ -156,6 +169,10 @@ pub enum Denial {
     Needs,
     QueueFull,
     Unsupported,
+    Ammo,
+    Cooldown,
+    Retreating,
+    Munitions,
 }
 impl Denial {
     pub fn name(self) -> &'static str {
@@ -164,6 +181,10 @@ impl Denial {
             Self::Needs => "needs",
             Self::QueueFull => "queueFull",
             Self::Unsupported => "unsupported",
+            Self::Ammo => "ammo",
+            Self::Cooldown => "cooldown",
+            Self::Retreating => "retreating",
+            Self::Munitions => "mun",
         }
     }
 }
@@ -230,6 +251,32 @@ impl Command {
                     face,
                 })
             }
+            Some("ability") => {
+                let at = object
+                    .get("x")
+                    .and_then(|x| x.as_f64())
+                    .filter(|x| x.is_finite())
+                    .zip(
+                        object
+                            .get("z")
+                            .and_then(|z| z.as_f64())
+                            .filter(|z| z.is_finite()),
+                    )
+                    .map(|(x, z)| Point { x, z });
+                Ok(Self::Ability {
+                    ids,
+                    at,
+                    queue: object.get("queue").and_then(|v| v.as_bool()) == Some(true),
+                    automatic: false,
+                })
+            }
+            Some("autocast") => Ok(Self::Autocast {
+                ids,
+                on: object
+                    .get("on")
+                    .and_then(|v| v.as_bool())
+                    .ok_or(Denial::Blocked)?,
+            }),
             Some("stop") => Ok(Self::Stop { ids }),
             Some("stance") => {
                 let stance = match object.get("key").and_then(|v| v.as_str()) {
@@ -310,13 +357,15 @@ impl crate::match_runtime::Match {
         let kind = self.rules.kinds.get(u.kind)?;
         let control = self.commands.units.get(&id)?;
         let forced = self.logistics.get(id).is_some_and(|r| r.forced);
-        let allowed_forced = matches!(
-            command,
-            Command::Move {
-                attack_move: false,
-                ..
-            } | Command::Stop { .. }
-        );
+        let allowed_forced = self.logistics.get(id).is_some_and(|r| r.stranded)
+            && matches!(command, Command::Ability { .. })
+            || matches!(
+                command,
+                Command::Move {
+                    attack_move: false,
+                    ..
+                } | Command::Stop { .. }
+            );
         (u.owner == owner
             && !kind.structure
             && !kind.rail
@@ -341,6 +390,9 @@ impl crate::match_runtime::Match {
         if matches!(command, Command::Unsupported) {
             return Ok(Some(Denial::Unsupported));
         }
+        if matches!(command, Command::Ability { .. } | Command::Autocast { .. }) {
+            self.validate_abilities()?;
+        }
         let limit = 50.max(self.world.game.units.len());
         let controlled: Vec<_> = match command {
             Command::Move {
@@ -350,7 +402,10 @@ impl crate::match_runtime::Match {
             } => control_ids
                 .clone()
                 .unwrap_or_else(|| orders.iter().map(|o| o.unit).collect()),
-            Command::Stop { ids } | Command::Stance { ids, .. } => ids.clone(),
+            Command::Stop { ids }
+            | Command::Stance { ids, .. }
+            | Command::Ability { ids, .. }
+            | Command::Autocast { ids, .. } => ids.clone(),
             Command::Unsupported => unreachable!(),
         };
         if matches!(
@@ -376,6 +431,9 @@ impl crate::match_runtime::Match {
                     return Err("unit path identity exhausted".into());
                 }
             }
+        }
+        if !self.intercept_convoy_movement(owner, command, &controlled)? {
+            return Ok(Some(Denial::Blocked));
         }
         // The source applies forced supply holds before ordinary ownership filtering.
         for raw in &controlled {
@@ -413,6 +471,18 @@ impl crate::match_runtime::Match {
             .any(|id| self.world.game.units[id].air.is_some())
         {
             return Ok(Some(Denial::Unsupported));
+        }
+        if let Command::Ability {
+            at,
+            queue,
+            automatic,
+            ..
+        } = command
+        {
+            if self.unrepresented_ability_work(&selected, *at, *queue, *automatic)? {
+                return Ok(Some(Denial::Unsupported));
+            }
+            self.preflight_ability_selection(&selected, *at, *queue, *automatic)?;
         }
         for id in &selected {
             self.commands
@@ -454,6 +524,34 @@ impl crate::match_runtime::Match {
                 ..
             } => {
                 return self.move_command(owner, orders, *attack_move, *queue, *together, *face);
+            }
+            Command::Ability {
+                ids,
+                at,
+                queue,
+                automatic,
+            } => {
+                let ordered = ids
+                    .iter()
+                    .take(limit)
+                    .map(|id| self.eligible_command_unit(*id, owner, command))
+                    .collect::<Vec<_>>();
+                return self.apply_ability_selection(owner, &ordered, *at, *queue, *automatic);
+            }
+            Command::Autocast { on, .. } => {
+                let ready: Vec<_> = selected
+                    .into_iter()
+                    .filter(|id| {
+                        self.ability_kind(*id)
+                            .is_ok_and(|kind| kind != crate::match_abilities::AbilityKind::None)
+                    })
+                    .collect();
+                if ready.is_empty() {
+                    return Ok(Some(Denial::Needs));
+                }
+                for id in ready {
+                    self.commands.units.get_mut(&id).unwrap().auto_cast = *on;
+                }
             }
             Command::Unsupported => unreachable!(),
         }
@@ -799,6 +897,12 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
             RequestKind::World => u.world_goal.filter(|at| {
                 u.path.is_empty() && crate::math::hypot(at.x - u.x, at.z - u.z) > 0.25
             }),
+            RequestKind::Nade => self
+                .match_state
+                .commands
+                .units
+                .get(&id)
+                .and_then(|c| c.nade),
             RequestKind::Amove if !u.retreating => u.amove.filter(|at| {
                 u.path.is_empty()
                     && crate::math::hypot(at.x - u.x, at.z - u.z) >= 2.5
@@ -872,6 +976,12 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
             match update.request.kind {
                 crate::path_requests::RequestKind::World => u.world_goal = None,
                 crate::path_requests::RequestKind::Amove => u.amove = None,
+                crate::path_requests::RequestKind::Nade => {
+                    self.match_state.commands.units.get_mut(&u.id).unwrap().nade = None;
+                    let ability = self.match_state.abilities.get_mut(u.id).unwrap();
+                    ability.aimed_auto = false;
+                    ability.aimed_walked = false;
+                }
                 _ => {}
             }
             u.stuck = 0.0;
@@ -1073,6 +1183,7 @@ impl crate::match_runtime::Match {
             crate::path_requests::RequestKind::Recovery
                 | crate::path_requests::RequestKind::World
                 | crate::path_requests::RequestKind::Amove
+                | crate::path_requests::RequestKind::Nade
         ) {
             return Err("unsupported command path request".into());
         }
