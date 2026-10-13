@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Connected canonical construction to the single ordinary tick: paired admission before input and after publication, worker capture after autocast, and ordered completion/repair before late unit capture. The actual construction receipt is now reported once; accepted builder retreat uses the provider's paired cleanup instead of the old blanket refusal. The 29-case source fixture and construction consumer remain unchanged pending owned event migration and combined native proof.
+
 - Normally joined the source-reviewed construction provider and ordered-event caller in a separate assembly. Both canonical producer sinks and paired builder cleanup remain intact; construction scheduling, consumer event migration and combined native proof are pending. Frozen ordered-event and AIR candidates are unchanged.
 
 - Resumed the ordered tick output checkpoint with direct producer emission sinks, per-command dispatch observers and one caller-owned failure payload. Committed section, blast, burn and retirement effects remain available when a later operation fails; removal facts and completed wreck/bounty/lifecycle prefixes are reported separately. The new unchanged-source replay covers 3 complete traces, 375 steps and 103 chronological shots across firing, ground support, aircraft AA and late fire damage. Native compilation, failure regressions and host integration are pending; frozen AIR evidence and original fixtures are preserved.
