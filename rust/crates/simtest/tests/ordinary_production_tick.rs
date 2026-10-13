@@ -321,7 +321,10 @@ fn original_ordinary_research_and_immediate_buy_ticks() {
                 1
             );
             assert!(!report.unavailable.contains(&TickPhase::Research));
-            assert!(!report.unavailable.contains(&TickPhase::Production));
+            // Ordinary Buy is immediate boundary publication. Empty building queues
+            // do not establish a queued-training phase in this controller scope.
+            assert!(report.unavailable.contains(&TickPhase::Production));
+            assert!(!report.phases.contains(&TickPhase::Production));
             assert_eq!(
                 projection(&m),
                 frame["after"],

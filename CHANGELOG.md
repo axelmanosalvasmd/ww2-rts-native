@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Align the inherited ordinary research consumer with its approved phase scope. It now requires Research connected and Production still unavailable, since ordinary Buy is an immediate boundary operation and restored ordinary queues refuse. Keep all 2,429 complete Source steps, real boundary births, outputs and setup unchanged. World queued training retains its separate live-building receipt; native execution remains pending.
+
 - Remove private queue-field access from the new cross-crate World admission test after exact source recheck. Compare the public next boundary, pending count, controls and path requests; preserve the separately recorded Technology setup and all wallet, lab, event and fault assertions. No queue API or runtime changes are added, and native compilation is still pending.
 
 - Normally compose the source-reviewed rally drift presence correction with the World caller. Preserve actual movement retirement and require both drift presence and its rally subtype when a later reaction reads it. A new reaction route clears the retired subtype; the mixed-order reader follows the same presence rule. Original 129-step Source history is retained, with native verification pending.
