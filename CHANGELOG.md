@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Correct the scuttling atomicity regression to use the recorded startup scene with two live owned units. The first engineering native check passed the orphan-membership guard, then found that the original selected scene contained only one owned unit before the actuator ran. Runtime and Source fixtures are unchanged; fresh combined gates remain pending.
+
 - Converge the engineering replay with the three reviewed timeline test adapters. Preserve both parents' runtime, recorded Source fixtures and strict comparisons; fresh verification of this combined head is pending.
 
 - Adapted the two remaining obsolete timeline test serializers after full release compilation found the mass-project helper still reading struct fields. A repository-wide audit also found the same access in the companion-tick helper. Both now serialize actual Conquest samples and explicitly refuse Territories. Runtime, fixtures and strict assertions are unchanged. The changed ground-support debug consumer passed at `0420c51`; no release tests ran there. Original checks reproduce seven mass-project cases (193 steps, 215 snapshots) and fifteen companion traces (506 steps). Fresh combined gates remain pending.

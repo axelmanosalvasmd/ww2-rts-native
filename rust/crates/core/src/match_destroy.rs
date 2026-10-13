@@ -51,7 +51,13 @@ mod tests {
         let fixture: Value =
             serde_json::from_str(include_str!("../tests/fixtures/recipient-snapshot.json"))
                 .unwrap();
-        let mut state = crate::recipient_snapshot::tests::initialize(&fixture["cases"][0]);
+        let scene = fixture["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|case| case["name"] == "untouched-startup")
+            .unwrap();
+        let mut state = crate::recipient_snapshot::tests::initialize(scene);
         let owned = state
             .world
             .game
