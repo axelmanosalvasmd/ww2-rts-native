@@ -393,6 +393,7 @@ pub struct BuildingCell {
 /// Live terrain and units have a single owner in `world.game`.
 pub struct Match {
     pub combat: crate::match_combat::CombatState,
+    pub companions: crate::companions::Companions,
     pub commands: crate::match_commands::MatchCommands,
     pub world: World,
     pub start: StartPlan,
@@ -409,7 +410,6 @@ pub struct Match {
     pub scenario: Option<crate::legacy_scenario::LegacyScenario>,
     pub firing: crate::match_firing::FiringState,
     pub logistics: crate::logistics::LogisticsState,
-    pub firing: crate::match_firing::FiringState,
     pub capture_ticks: Vec<Option<i64>>,
     /// Capture story counts only. Combat and spending counters are not integrated yet.
     pub capture_counts: Vec<f64>,
@@ -454,6 +454,7 @@ impl Match {
         let player_count = start.players.len();
         let mut result = Self {
             combat: crate::match_combat::CombatState::default(),
+            companions: crate::companions::Companions::default(),
             commands: crate::match_commands::MatchCommands::new(4096),
             grid: SpatialGrid::new(&world.game.units, 16.0),
             recipients: Vec::new(),
@@ -470,7 +471,6 @@ impl Match {
             scenario,
             firing: crate::match_firing::FiringState::default(),
             logistics: crate::logistics::LogisticsState::default(),
-            firing: crate::match_firing::FiringState::default(),
             capture_ticks: vec![None; map.points().len()],
             capture_counts: vec![0.0; player_count],
             finish: None,

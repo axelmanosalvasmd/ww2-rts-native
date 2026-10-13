@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added internal first-person companion entry, validated input and press counters, deterministic movement/collision, loadout timers, ordinary-command squad following, death hooks and atomic source-ordered respawn batches. Five FPS tests pass in debug and release against 17 original JavaScript traces with 536 operations, exact float bits and maintained-grid queries; two recruitment and two startup tests also pass. Strict workspace Clippy and formatting pass. The replay caught routing observation sorting the gameplay grid during squad commands; observation now uses a separate current-position index. Fixed the stacked dependency's duplicate firing field and stale fixture defaults, and gave the source fixture a valid capture point. Fire rays, damage, grenade effects, full match scheduling, server/client integration and the pending hit-direction privacy proposal remain separate; no C or network interface changed.
+
 - Fixed publication validation rejecting unrelated casualties with negative HP before source death removal. Existing units accept finite negative health, while new drafts and staged squad HP stay nonnegative. An added original-source buy trace protects the admission behavior.
 
 - Added explicit World actor staging and publication policy to the shared unit guard while keeping ordinary commander checks strict. Three focused regressions now cover refused/aborted batches, ordered HP/payment publication and the World-only neutral identity; native verification is pending.
