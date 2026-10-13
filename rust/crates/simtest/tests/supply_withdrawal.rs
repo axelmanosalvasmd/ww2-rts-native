@@ -82,7 +82,7 @@ fn setup(base: &Value, trace: &Value) -> (Match, u32) {
         read_point(actor),
     )
     .unwrap();
-    let reserve = instance.prepare_new_unit_reserves(&unit).unwrap().unwrap();
+    let reserve = instance.prepare_new_unit_reserves(&unit).unwrap();
     let control = UnitControl::new(&unit, &instance.rules).unwrap();
     instance.world.game.units.insert(id, unit);
     instance.grid.update(id, &instance.world.game.units[&id]);
@@ -91,7 +91,9 @@ fn setup(base: &Value, trace: &Value) -> (Match, u32) {
     instance.firing.initialize(id);
     instance.abilities.initialize(id);
     instance.recovery.initialize(id);
-    instance.logistics.insert(id, reserve);
+    if let Some(reserve) = reserve {
+        instance.logistics.insert(id, reserve);
+    }
     instance.next_unit_id += 1;
     if let Some(field) = trace.get("fieldStart") {
         use ww2_core::field_works::{FortKind, StartRequest};
