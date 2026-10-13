@@ -548,7 +548,39 @@ fn original_dressed_geography_and_ordered_rail_paths() {
         let bare = world_generation::generate_from_terrain_seed(seed, size, &teams).unwrap();
         full_invariants(&world, &bare, &teams);
         let input = world.into_world_map_input();
-        assert_eq!(hash(input.chars), row["charsHash"]);
+        assert_eq!(hash(input.chars.iter().copied()), row["charsHash"]);
+        let loaded = ww2_core::map::AuthoritativeMap::from_world(input.clone()).unwrap();
+        let live = ww2_core::world::World::from_map(&loaded).unwrap();
+        assert_eq!(live.geography(), loaded.geography());
+        assert!(live.game.units.is_empty() && live.game.players.is_empty());
+        assert_eq!(
+            hash(live.game.flags.iter().flat_map(|f| f.to_le_bytes())),
+            row["terrain"]["flagsHash"]
+        );
+        assert_eq!(
+            hash(live.game.house.iter().copied()),
+            row["terrain"]["houseHash"]
+        );
+        assert_eq!(
+            hash(
+                live.game
+                    .cell_hp
+                    .iter()
+                    .flat_map(|f| f.to_bits().to_le_bytes())
+            ),
+            row["terrain"]["cellHpHash"]
+        );
+        assert_eq!(
+            hash(
+                live.game
+                    .wear
+                    .as_ref()
+                    .unwrap()
+                    .iter()
+                    .flat_map(|f| f.to_bits().to_le_bytes())
+            ),
+            row["terrain"]["wearHash"]
+        );
         assert_eq!(
             input.geography.generator_version,
             Some(world_generation::WORLD_GENERATOR_VERSION)

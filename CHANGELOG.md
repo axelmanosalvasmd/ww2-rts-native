@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Connected full generator output to typed World map inputs, retaining authored landmark tags, region and cell biomes and ordered rail metadata for later loader validation.
+- Connected full generator output to typed World map inputs, retaining authored landmark tags, region and cell biomes and ordered rail metadata. The generated-to-loader test compares physical terrain flags, house kinds, health and wear against original static initialization.
 
 - Added pure World biome dressing, towns, church/factory/mine-head landmarks and ordered rail overlays after base geography. Scenery uses independent recorded-seed streams; rails draw nothing. Original source fixtures record 20 Huge/Massive cases with scenery enabled and disabled. Match setup, visibility delivery and rail operations remain separate.
 - Adapted bare World geography to the agreed landmark and region-biome input fields, supplying empty landmarks and absent biome hints for this partial generator stage.
