@@ -154,6 +154,64 @@ fn build(m: &mut Match, id: u32) -> u32 {
 }
 #[test]
 fn rare_placement_rejects_after_draft_routes_without_publishing_or_warming_live_fog() {
+    // Restored orphan AIR rows cannot be reused by a paid static site.
+    for plane in [false, true] {
+        let (mut m, worker) = scene();
+        let site = m.next_unit_id;
+        if plane {
+            m.aviation.planes.insert(
+                site,
+                crate::match_aviation::AircraftRuntime {
+                    fuel: 1.0,
+                    ammo: 1.0,
+                    timer: 0.0,
+                    orbit: 0.0,
+                    mission: None,
+                    downed: false,
+                },
+            );
+        } else {
+            m.aviation
+                .anti_air
+                .insert(site, crate::match_aviation::AntiAirRuntime::default());
+        }
+        let snapshot = |m: &Match| {
+            format!(
+                "{:?}",
+                (
+                    (&m.world, &m.grid),
+                    (&m.commands.units, &m.commands.paths, &m.commands.requests),
+                    (&m.recipients, &m.routing_fog),
+                    (&m.story, &m.start.economy.players),
+                    (&m.combat, &m.firing, &m.abilities, &m.recovery),
+                    (
+                        &m.production,
+                        &m.building_cells,
+                        &m.building_rallies,
+                        &m.recruit_metadata,
+                        &m.field_works
+                    ),
+                    (
+                        &m.aviation,
+                        m.next_unit_id,
+                        m.start.random.snapshot(),
+                        m.start.environment_seed,
+                        m.start.wind
+                    ),
+                )
+            )
+        };
+        let before = snapshot(&m);
+        let command = Command::Build {
+            ids: vec![i64::from(worker)],
+            kind: "flakpos".into(),
+            at: Some(Point { x: 32.0, z: 24.0 }),
+            direction: None,
+            queue: false,
+        };
+        assert!(m.execute_command(0, &command, false).is_err());
+        assert_eq!(snapshot(&m), before);
+    }
     let (mut m, id) = scene();
     let unit = m.world.game.units[&id].clone();
     m.command_route(0, &unit, Point { x: 30.0, z: 30.0 })

@@ -932,6 +932,8 @@ impl Match {
             || self.recruit_metadata.contains_key(&id)
             || self.production.building(id).is_some()
             || self.building_rallies.contains_key(&id)
+            || self.aviation.planes.contains_key(&id)
+            || self.aviation.anti_air.contains_key(&id)
         {
             return Err("stale construction newborn identity".into());
         }

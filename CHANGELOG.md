@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added the aircraft and anti-air registries to construction newborn-ID admission after independent merge review found that an orphan AIR row could survive a paid static birth. Extended the existing placement rollback test to preserve all represented state for either orphan registry. Native execution remains pending.
+
 - Prepared a separate construction proof branch by normally joining the checked AIR caller. Build/Assist and Board/Unload/aircraft command variants remain on the single queue and path scheduler; the original construction fixture is unchanged. Construction phase wiring and combined native checks remain pending.
 
 - Corrected construction source-review findings: invalid Assist targets and unlisted Build kinds retain prior follow state, and Pillbox object slit definitions retain the raw finite direction instead of normalizing it. Added the finite-angle boundary check; native proof remains pending.
