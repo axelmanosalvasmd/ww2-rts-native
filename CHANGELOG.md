@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Normal-merged the verified reaction closure into the support/project continuation. The 64 debug and 227 release Vostro results belong to that frozen predecessor; this broader caller still awaits native proof. No Rust or harness file changed in this evidence merge.
+
 - Wrote a native mass-project replay consumer for the frozen original-source full-step fixture: seven cases, 193 real runner steps and 215 checkpoints. It preserves startup actors, canonical project and paid-work identities, payments and income, queued joins, death cleanup, Stop, completion and route-drop facts. It uses the sole runner and fresh-scene clock/path configuration, preserving native random streams. Formatting and source-fixture checks pass; native execution remains pending.
 
 - Normal-merged the mass-project admission helper's checked documentation handoff. Its four debug guards and 214 release workspace tests establish the helper, not the new full tick composition; caller/runtime and recorder files are unchanged by this evidence merge.
@@ -21,6 +23,12 @@
 - Connected ground support admission and late strikes to the separate ordinary tick continuation. The actual captured actor list feeds strikes after projectiles; the canonical phase then decays covers and cooldowns once before living weather. Updated the earlier whole-admission regression to refuse aircraft support, while ordinary ground support is now represented. Combined native replay remains pending.
 
 - Normal-merged the reviewed ground-support tick provider into a separate continuation of frozen reaction source c22969b. Preserved its canonical strike, event and cooldown ownership; actual caller wiring and combined native proof remain pending.
+- Removed the stale source-only label from the verified reaction parity note. Only documentation changed from tested e14cde9.
+
+- Verified the ordinary reaction tick assembly on Vostro (Linux x86_64): 64 affected debug tests, all 227 workspace release tests, strict Clippy, formatting and release FFI pass at e14cde9. Independent source review and 19 original-step traces (2,474 ticks, 354 checkpoints) pass, including paid-work cancellation and repaired retreat completion. Ground support and mass-project descendants retain separate pending native proof; server match start remains refused.
+
+- Normal-merged the operative documentation closure into reaction evidence. No Rust, harness or fixture changed from tested reaction head e14cde9.
+
 - Repaired two reaction consumer checks exposed by the first Vostro debug run: observe the lazy Combat stream through a test-only clone before the first real draw, and compare the absent pace NaN sentinel by bits before whole-unit equality. Runtime, fixtures and live RNG remain unchanged; full native gates are pending.
 
 - Updated the inherited operative design note to reflect its completed coherent Mac proof. Reaction composition still awaits its own native cycle.
@@ -36,6 +44,8 @@
 - Added source-written ordinary reaction tick sites: timer decay, automatic retreat before autocast and reaction before movement. Factored the existing pure retreat predicate for pre-clock unsupported exit admission and consumed the canonical paid-work cancellation provider. Seven new actual-source cases expand the recorder to 18 traces, 2,274 ticks and 154 checkpoints; combined native proof remains pending.
 
 - Accepted ground retreat now cancels the canonical paid field-work descriptor after route preflight, without refund; refused routes retain the job. Construction and unrepresented mass projects remain explicit refusals.
+- Updated the inherited operative design note to reflect its completed coherent Mac proof, preserving the pending platform and transport boundaries. Rust and harness trees are unchanged.
+
 - Normal-merged the checked engineering evidence into the operative closure. Only documentation changed from compiled head 3a40f7b; all Rust and harness trees remain identical.
 
 - Verified the coherent Conquest engineering, ability/recovery and operative tick assembly on the Mac: all 225 workspace release tests, 73 affected debug tests at the same runtime, strict Clippy, formatting and release FFI pass. Independent hash-checked debug/release binaries pass 42 tests. Original replays cover 2,185 ordinary ticks and 506 operative ticks. Recorded the retained operative owner cleanup and concrete fixture/oracle repairs; ordinary reactions, supply orchestration, operative geometry/settlement interoperability and full match start remain separate.
