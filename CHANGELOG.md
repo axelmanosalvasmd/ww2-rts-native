@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Set the support-coherence integration test's macro recursion limit to 256, as recommended by the actual compiler failure. Restored the exact original flat projection after two insufficient factoring attempts; the limit affects test compilation only, with no production, Source fixture or assertion changes.
+
 - Factored aircraft and mission readback out of the support actor projection after the native retry located a remaining nested JSON macro expansion limit. This is a test-only compiler repair with identical fields and Source expectations.
 
 - Split the support-coherence replay's actor JSON projection into bounded objects after its first native compilation exceeded the macro recursion limit. All compared fields, production code and Source fixtures remain unchanged.
