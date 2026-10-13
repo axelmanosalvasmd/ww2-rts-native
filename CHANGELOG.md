@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added idempotent explicit initialization for production buildings so Match startup can expose empty canonical queues and zero progress immediately. Reinitializing a building preserves paid jobs; player research rows already start with empty lab lists.
+
 - Added canonical production queues and player research outside `Game`. Construction-mode recruitment uses the existing wallets and population rules; paid job IDs, original-charge refunds, one-unit-per-step training, ordered lab capacity and pause/resume match 12 original-JavaScript traces (114 actions, 922 advance calls). Typed completion requests leave unit creation and placement to the match runner. Empty building state initializes lazily; malformed inputs and duplicate IDs fail before mutation. Instant recruitment, placement/rally orders, building lifecycle, statistics, persistence and public wire/ABI integration remain separate.
 
 - Added a standalone combat damage and suppression component with catalog-backed role, armor, veterancy, retreat and threat rules. Six focused tests compare 3,828 original JavaScript cases and actual mutation order, including health, XP, death impulse, hit memory and rider requests. The component returns ordered effects for later integration; it does not fire weapons, sample terrain cover, place riders, remove dead units or change the ABI. Documented the source's zero-damage effects, building modifier replacement and missing-rider cargo behavior, with the affected combat rows still in progress.

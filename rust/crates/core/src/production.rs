@@ -195,6 +195,14 @@ impl ProductionState {
             next_job: 0,
         })
     }
+    /// Register a newly placed building's empty queue and zero progress. Repeated
+    /// initialization preserves existing paid jobs and progress.
+    pub fn initialize_building(&mut self, id: u32) -> Result<&BuildingProduction, Error> {
+        if id == 0 {
+            return Err(Error::InvalidInput("building ID"));
+        }
+        Ok(self.buildings.entry(id).or_default())
+    }
     pub fn building(&self, id: u32) -> Option<&BuildingProduction> {
         self.buildings.get(&id)
     }

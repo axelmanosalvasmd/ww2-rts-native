@@ -147,6 +147,9 @@ fn production_research_and_refunds_match_original_source_traces() {
             })
             .collect();
         let mut state = ProductionState::new(tech).unwrap();
+        for unit in a(&config["units"]) {
+            state.initialize_building(n(&unit["id"]) as u32).unwrap();
+        }
         let mut wallets = EconomyState {
             players: a(&config["players"])
                 .iter()
@@ -284,6 +287,10 @@ fn production_research_and_refunds_match_original_source_traces() {
 #[test]
 fn invalid_inputs_do_not_change_canonical_jobs_or_wallets() {
     let mut state = ProductionState::new(vec![TechState::new(1, 0, 0, 0).unwrap()]).unwrap();
+    assert!(state.initialize_building(0).is_err());
+    let empty = state.initialize_building(1).unwrap();
+    assert!(empty.jobs().is_empty());
+    assert_eq!(empty.progress(), 0.0);
     state
         .record_paid(
             1,
@@ -295,6 +302,8 @@ fn invalid_inputs_do_not_change_canonical_jobs_or_wallets() {
         )
         .unwrap();
     let initial = state.clone();
+    state.initialize_building(1).unwrap();
+    assert_eq!(state, initial);
     let wallets = EconomyState {
         players: vec![PlayerEconomy::default()],
     };
