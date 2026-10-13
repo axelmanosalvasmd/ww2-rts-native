@@ -283,6 +283,8 @@ impl Match {
         self.grid.update(id, &self.world.game.units[&id]);
         self.commands.insert(id, control);
         self.combat.initialize(id);
+        self.abilities.initialize(id);
+        self.recovery.initialize(id);
         self.recruit_metadata.insert(id, metadata);
         self.next_unit_id = next;
         Ok(CompletedRecruitUnit {
