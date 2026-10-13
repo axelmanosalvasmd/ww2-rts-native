@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added authored structural validation and separate static structural initialization to the Rust core. All 33 authored maps match 574 structures and 11,955 sections from the reference, including IDs, order, supports, anchors, materials and health. The new fixture covers 59 accepted maps, 36 rejected maps and eight support traversals. Structured query state now fills `Game.sections`; damage, collapse, falling bodies, repairs and playable match startup remain unimplemented. Updated the former empty-structures rejection test and fixture to accept it, while world and scenario properties remain explicitly unsupported.
+
 - Documented the authoritative ordinary-map loader and its verified static terrain scope in DESIGN and the map parity inventory (issue #35). Affected rows remain in progress; world/scenario/structure fields, match initialization and integration remain explicit gaps.
 
 - Added an in-memory authoritative ordinary-map loader to the Rust core. It retains original authoring metadata, hidden mines and material layers; validates legacy and version-2 ordinary maps; and initializes static terrain for movement, navigation and vision queries. All 33 authored maps and 15 boundary maps match the pinned JavaScript terrain, including house kinds, HP and wear float bits, heights, trench directions and naval shoals. The fixture also records 55 rejected maps and three explicitly unsupported variants. Authored structural graphs, authored scenarios, World Conquest validation, structural execution and full match startup remain unimplemented; callers must supply original authoritative JSON, since a stripped client projection has no detectable provenance marker.

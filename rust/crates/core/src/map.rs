@@ -3,8 +3,7 @@
 //! This is not a client-map importer or a match constructor. Client projections erase mines,
 //! triggers and scenarios irreversibly. Callers must supply the original authoritative document;
 //! the format has no provenance marker that could distinguish a stripped projection.
-//! World Conquest, authored structural graphs and scenarios have separate validators and return
-//! `Unsupported` here. Unknown authoring properties are retained in `source()` for later systems.
+//! World Conquest and scenarios have separate validators and return `Unsupported` here. Unknown authoring properties are retained in `source()` for later systems.
 use std::{collections::BTreeMap, fmt};
 
 use serde_json::Value;
@@ -146,6 +145,7 @@ pub struct AuthoritativeMap {
     assault_time: Option<usize>,
     naval: bool,
     trench_facing: bool,
+    structures: Vec<crate::structures::StructureDefinition>,
 }
 impl AuthoritativeMap {
     /// Validate original server authoring JSON. Never pass a `mapForClient` projection here.
@@ -182,7 +182,8 @@ impl AuthoritativeMap {
             })
             .transpose()?;
         let layers = normalize_layers(&source, w, h, &chars)?;
-        for feature in ["structures", "scenario", "world"] {
+        let structures = crate::structures::parse(source.get("structures"), w, h, &layers)?;
+        for feature in ["scenario", "world"] {
             if source.get(feature).is_some() {
                 return Err(MapError::Unsupported { feature });
             }
@@ -443,6 +444,20 @@ impl AuthoritativeMap {
             assault_time,
             naval,
             trench_facing,
+            structures,
+        })
+    }
+    /// Authored structural definitions, in source order. Implicit sections are built later.
+    pub fn structures(&self) -> &[crate::structures::StructureDefinition] {
+        &self.structures
+    }
+    /// Initialize authoritative structural graphs after the original static terrain phase.
+    pub fn initialize_structures(&self) -> Result<crate::structures::StructuredTerrain> {
+        let mut terrain = self.initialize_terrain()?;
+        let structures = crate::structures::initialize(&self.structures, &mut terrain);
+        Ok(crate::structures::StructuredTerrain {
+            terrain,
+            structures,
         })
     }
     pub fn name(&self) -> &str {
