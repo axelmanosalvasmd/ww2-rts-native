@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Sorted the additive World module declarations with the pinned formatter after the strict check found their order. The 167 release workspace tests and strict Clippy already pass; the format and FFI gates follow on this formatting-only correction.
+
 - Corrected the World region test import to the canonical world-map typed input module after the first native compile. No phase behavior changed.
 
 - Integrated the checked World recipient-memory dependency into the live-region branch, preserving its sole memory owner, journal reset and private region projection alongside canonical lock and capture-time fields. Combined native checks are queued.
