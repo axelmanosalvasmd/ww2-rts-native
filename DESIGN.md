@@ -1,6 +1,6 @@
 # Three Crossroads Native: design decisions
 
-## Quiet and active recipient consumer convergence (2026-10-13, native checks pending)
+## Quiet and active recipient consumer convergence (2026-10-13)
 
 This branch normally merges published quiet `677d264` (PR #172) with active-list `cf818236` (PR #165). Both parents remain intact. The union retains the current World birth metadata identity guard and its startup tests, the quiet whole-admission rollback regression, active remembered-list and stale-publication regressions, and every original harness fixture. This is a real provider convergence; neither parent's earlier native result proves this combined source.
 
@@ -9,6 +9,8 @@ The active collector's fallible replay now lives once in private `ObservedMemory
 The Match terrain preflight uses the same facts builder with `observer: None` and a local observation grid only when replay is needed. It no longer clones the recipient or terrain memory. Shared delivery admits every seat before canonical list publication or terrain/Fog collection. Existing staged-observer preparation, source-frame/prior-memory validation, immutable Environment borrows and list batch publication stay unchanged. Their component transactions remain owned by the existing provider. No Match or World is cloned, and no terrain algorithm is duplicated.
 
 A focused receipt regression checks discarded read-only preparation, deferred empty registration and unchanged-key pending retention. Both full quiet rollback and active full-output/late-seat failure tests remain in the combined source. Ordinary Conquest actor admission and omissions are unchanged; complete World envelopes, active shot/flight/air/engineering/scenario/logistics projections, spectators, transport, list versions/deltas and joint contract adoption remain separate. No external C or wire schema changes are introduced.
+
+Compiled `1ab2314d235825a2de548f885fd17ade6efb0118` passes 29 affected debug tests and every locked/offline release workspace test (215) on Vostro Linux x86_64 with Rust 1.99.0. Strict workspace/all-target Clippy, formatting and release FFI pass. An immutable exact-head archive with SHA256 `9b9a46f675c789ac38b59bc4ba0625aa5ba0785794e1de6b4d5c17cae937caf7` was staged to a fresh source directory. Both-profile package cleanup preceded fresh core compilation. The retained raw log records four fresh core compilations and `ALL_GATES_PASS`; its SHA256 is `3605d60b6a828291a5173bbdd1d03d9f937fdcf9e7f76707f77365e421599d87`, independently checked by the author. The new receipt-action guard passes in both profiles. Source evidence retains 73 cached states with 219 partial and 219 quiet full results, 11 active-list frames with 33 full results, 13 delivery steps with 39 reads, and five list traces with 92 actions. This documentation successor changes no tested Rust or harness file. Fresh platform checks remain a separate merge gate.
 
 ## Quiet snapshot convergence (2026-10-13)
 

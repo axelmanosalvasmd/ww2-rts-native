@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified the normally merged quiet and active recipient snapshot consumers on Vostro Linux x86_64 at compiled `1ab2314`: 29 focused debug tests, all 215 locked/offline release workspace tests, strict Clippy, formatting and release FFI pass. Both the deferred receipt-action regression and quiet/active whole-admission guards pass. This evidence update preserves all tested Rust and harness files; transport and unsupported actor/mode projections remain separate.
+
 - Normally converged the verified quiet snapshot and active-list providers, retaining their original fixtures, rollback tests, staged observation and canonical list guards. Both now use one immutable terrain preparation without a component preview copy. Actual collection preserves deferred registration, acknowledgment and source-frame capture; a focused regression distinguishes empty registration from an unchanged-key no-op. World birth metadata identity checks remain intact. This combined source needs its own review and native proof.
 
 - Merged the published quiet-snapshot evidence into the verified active-list delivery, preserving every tested Rust and harness file. The draft now has a real quiet-provider ancestor; broader staged-observation and World-memory prerequisites remain explicit, and convergence with the newer root stack is separate.
