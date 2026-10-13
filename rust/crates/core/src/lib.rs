@@ -29,6 +29,7 @@ pub mod map;
 pub mod match_abilities;
 pub mod match_combat;
 pub mod match_commands;
+mod match_destroy;
 pub mod match_end;
 pub mod match_firing;
 pub mod match_ground_support;

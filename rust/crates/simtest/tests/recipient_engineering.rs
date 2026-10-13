@@ -244,7 +244,6 @@ fn actual_engineering_commands_ticks_and_recipient_reads() {
     let fixture: Value = serde_json::from_str(&text).unwrap();
     let mut states = 0;
     let mut ticks = 0;
-    let mut source_only_destroy = 0;
     for case in fixture["cases"].as_array().unwrap() {
         let name = case["name"].as_str().unwrap();
         let ids = case["setup"]["spawns"]
@@ -268,12 +267,6 @@ fn actual_engineering_commands_ticks_and_recipient_reads() {
         for record in case["records"].as_array().unwrap() {
             let action = &record["action"];
             if action["op"] == "command" {
-                if action["command"]["t"] == "destroy" {
-                    // The original destroy/dead-row witness is recorded without
-                    // patched health. This ancestry has no canonical Destroy actuator.
-                    source_only_destroy += 1;
-                    break;
-                }
                 let denial = match Command::from_json(&action["command"]) {
                     Ok(command) => state
                         .execute_command(action["slot"].as_u64().unwrap() as usize, &command, false)
@@ -326,5 +319,5 @@ fn actual_engineering_commands_ticks_and_recipient_reads() {
             }
         }
     }
-    assert_eq!((states, ticks, source_only_destroy), (509, 479, 2));
+    assert_eq!((states, ticks), (513, 481));
 }
