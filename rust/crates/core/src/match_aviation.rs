@@ -294,6 +294,8 @@ impl Match {
             || self.aviation.anti_air.contains_key(&id)
             || self.combat.get(id).is_some()
             || self.firing.get(id).is_some()
+            || self.abilities.get(id).is_some()
+            || self.recovery.get(id).is_some()
         {
             return Err(AviationError::Invalid(
                 "occupied aircraft metadata identity",
@@ -354,6 +356,8 @@ impl Match {
             self.aviation.planes.insert(u.id, runtime);
             self.combat.initialize(u.id).hit_by = Some(0);
             self.firing.initialize(u.id);
+            self.abilities.initialize(u.id);
+            self.recovery.initialize(u.id);
             if let Some(r) = reserves.clone() {
                 self.logistics.insert(u.id, r);
             }

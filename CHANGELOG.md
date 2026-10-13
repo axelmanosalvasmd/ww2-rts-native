@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Composed the checked aircraft and engineering providers for off-map support. Aircraft and Para publication now check and initialize canonical ability/recovery rows, support exposes read-only next-clock admission, and its AA facade calls the single aviation actuator. A new unchanged-source recorder covers 4 coupled scenes, 1,603 checkpoints and 1,484 phase calls. Native successor verification is pending.
+
 - Prepared a separate composition of checked aircraft and engineering providers for off-map support. Retained aircraft command preflight and ground field-work cancellation, all canonical startup metadata, and exact pending-drop kinds in shared recruitment admission. World initializes an empty aviation owner without enabling its aircraft phases. Combined native verification remains pending.
 
 - Verified the bounded on-map aviation component on Vostro Linux x86_64 at code head d159ca0: nine focused debug tests, all 174 release workspace tests, strict workspace/all-target Clippy, formatting and release FFI build pass after both profile cleans. Native replay matches all 18 aircraft constructors and 42 traces with 3,410 checkpoints. The proof required two test-literal fixes and two equivalent supply-test wallet-copy fixes, with no runtime or fixture changes. Recorded-command, aircraft retirement and sole tick integration are separate native-pending continuations; automatic, ground-target and area aircraft weapons remain unsupported.

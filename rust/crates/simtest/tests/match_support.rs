@@ -410,7 +410,7 @@ fn mixed_move_and_support_share_one_recorded_boundary_order() {
 }
 
 #[test]
-fn default_mode_alias_uses_ordinary_support_and_missing_air_actuation_is_explicit() {
+fn default_mode_alias_uses_ordinary_support_and_invalid_air_registry_is_explicit() {
     let f = fixture();
     for mode in [Mode::Default, Mode::Conquest] {
         let mut m = make_with_mode(&f["traces"][0], mode);
@@ -429,7 +429,7 @@ fn default_mode_alias_uses_ordinary_support_and_missing_air_actuation_is_explici
         );
         assert!(matches!(
             m.step_support_anti_air(&[1], 0.05),
-            Err(ww2_core::match_support::SupportError::Unsupported(_))
+            Err(ww2_core::match_support::SupportError::Invalid(_))
         ));
         assert_eq!(
             (
@@ -439,5 +439,103 @@ fn default_mode_alias_uses_ordinary_support_and_missing_air_actuation_is_explici
             ),
             before
         );
+    }
+}
+
+fn protected_support(m: &Match) -> Vec<String> {
+    vec![
+        format!("{:?}", m.world),
+        format!("{:?}", m.environment),
+        format!("{:?}", m.start.random.snapshot()),
+        format!("{:?}", m.start.economy.players),
+        format!("{:?}", m.start.players),
+        format!("{:?}", m.commands.units),
+        format!("{:?}", m.support),
+        format!("{:?}", m.aviation),
+        format!("{:?}", m.combat),
+        format!("{:?}", m.firing),
+        format!("{:?}", m.abilities),
+        format!("{:?}", m.recovery),
+        format!("{:?}", m.logistics),
+        format!("{:?}", m.story),
+        format!("{:?}", (m.start.environment_seed, m.next_unit_id)),
+    ]
+}
+
+#[test]
+fn support_before_clock_rejects_malformed_state_without_publication() {
+    let f = fixture();
+    for malformed in ["height", "clock", "air", "cover", "story"] {
+        let mut m = make(&f["traces"][0]);
+        let actors = m.world.game.units.keys().copied().collect::<Vec<_>>();
+        m.validate_support_tick_phases(&actors, 0.05, 1).unwrap();
+        match malformed {
+            "height" => m.world.game.height = Some(Vec::new()),
+            "air" => {
+                m.world.game.units.get_mut(&actors[0]).unwrap().air =
+                    Some(ww2_core::game::PlaneState::Station)
+            }
+            "cover" => m.support.covers.push(FighterCover {
+                team: 1,
+                owner: 99,
+                at: Point { x: 41.0, z: 41.0 },
+                radius: 40.0,
+                remaining: 60.0,
+            }),
+            "story" => m.story[0].support_calls = f64::NAN,
+            "clock" => (),
+            _ => unreachable!(),
+        }
+        let before = protected_support(&m);
+        assert!(
+            m.validate_support_tick_phases(&actors, 0.05, if malformed == "clock" { 2 } else { 1 })
+                .is_err(),
+            "{malformed}"
+        );
+        assert_eq!(protected_support(&m), before, "{malformed}");
+        if malformed == "height" {
+            assert!(
+                m.admit_support(0, "para", Point { x: 41.0, z: 41.0 }, None)
+                    .is_err()
+            );
+            assert_eq!(protected_support(&m), before);
+        }
+    }
+}
+
+#[test]
+fn support_arrival_preflights_shared_ids_and_initializes_actual_birth_owners() {
+    let f = fixture();
+    let mut m = make(&f["traces"][0]);
+    m.admit_support(1, "para", Point { x: 41.0, z: 41.0 }, None)
+        .unwrap();
+    m.world.game.strikes[0].runtime.as_mut().unwrap().delay = 0.0;
+    let actors = m.world.game.units.keys().copied().collect::<Vec<_>>();
+    let id = m.next_unit_id;
+    m.recovery.initialize(id);
+    let before = protected_support(&m);
+    assert_eq!(
+        m.validate_support_tick_phases(&actors, 0.05, 1),
+        Err(ww2_core::match_support::SupportError::Invalid(
+            "drop metadata identity occupied"
+        ))
+    );
+    assert!(m.step_support_strikes(&actors, 0.05).is_err());
+    assert_eq!(protected_support(&m), before);
+    m.recovery.remove(id);
+    m.validate_support_tick_phases(&actors, 0.05, 1).unwrap();
+    m.step_support_strikes(&actors, 0.05).unwrap();
+    assert_eq!(m.next_unit_id, id + 3);
+    for born in id..m.next_unit_id {
+        assert_eq!(
+            m.abilities.get(born),
+            Some(&ww2_core::match_abilities::AbilityUnit::default())
+        );
+        assert_eq!(
+            m.recovery.get(born),
+            Some(&ww2_core::match_recovery::RecoveryUnit::default())
+        );
+        assert!(m.combat.get(born).is_some());
+        assert!(m.firing.get(born).is_some());
     }
 }

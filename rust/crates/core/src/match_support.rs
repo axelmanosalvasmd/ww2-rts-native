@@ -111,6 +111,13 @@ impl SupportState {
         std::mem::take(&mut self.events)
     }
 }
+fn support_aviation_error(error: crate::match_aviation::AviationError) -> SupportError {
+    match error {
+        crate::match_aviation::AviationError::Unsupported(s) => SupportError::Unsupported(s),
+        crate::match_aviation::AviationError::Invalid(s) => SupportError::Invalid(s),
+        crate::match_aviation::AviationError::Actuation(s) => SupportError::Actuation(s),
+    }
+}
 fn number(v: &Value, key: &str) -> Result<f64, SupportError> {
     v.get(key)
         .and_then(Value::number)
@@ -137,8 +144,10 @@ fn strip(s: &Strike, along: f64, side: f64) -> Point {
     }
 }
 impl Match {
-    fn validate_support(&self) -> Result<(), SupportError> {
-        if !matches!(self.options.mode, Mode::Default | Mode::Conquest) {
+    pub(crate) fn validate_support(&self) -> Result<(), SupportError> {
+        if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
+            || self.world.game.mode.is_some()
+        {
             return Err(SupportError::Unsupported(
                 "support currently requires Conquest",
             ));
@@ -233,6 +242,10 @@ impl Match {
             z: math::min(self.world.game.h as f64 * CELL, math::max(0.0, at.z)),
         };
         if kind == SupportKind::Para {
+            self.validate_support_environment(
+                u64::try_from(self.world.game.tick)
+                    .map_err(|_| SupportError::Invalid("invalid support clock"))?,
+            )?;
             let observation = crate::grid::SpatialGrid::new(&self.world.game.units, 16.0);
             let game = &self.world.game;
             if game.units.values().any(|u| {
@@ -415,7 +428,11 @@ impl Match {
                     u32::try_from(staged.len()).map_err(|_| SupportError::Invalid("drop count"))?,
                 )
                 .ok_or(SupportError::Invalid("drop identity exhausted"))?;
-            if self.combat.get(id).is_some() || self.firing.get(id).is_some() {
+            if self.combat.get(id).is_some()
+                || self.firing.get(id).is_some()
+                || self.abilities.get(id).is_some()
+                || self.recovery.get(id).is_some()
+            {
                 return Err(SupportError::Invalid("drop metadata identity occupied"));
             }
             let kind = self
@@ -477,6 +494,8 @@ impl Match {
         publication.publish_with(|unit, _| {
             self.combat.initialize(unit.id).hit_by = Some(0);
             self.firing.initialize(unit.id);
+            self.abilities.initialize(unit.id);
+            self.recovery.initialize(unit.id);
             if let Some(Some(record)) = reserves.remove(&unit.id) {
                 self.logistics.insert(unit.id, record);
             }
@@ -738,10 +757,8 @@ impl Match {
         };
         Ok(true)
     }
-    /// Run the source strike phase using the tick's captured late unit membership.
-    /// Phase failures can follow committed earlier effects; the tick owner poisons failed ticks.
-    pub fn step_support_strikes(
-        &mut self,
+    fn validate_support_strike_inputs(
+        &self,
         unit_order: &[u32],
         dt: f64,
     ) -> Result<(), SupportError> {
@@ -773,24 +790,138 @@ impl Match {
                 return Err(SupportError::Invalid("invalid support actor"));
             }
         }
-        let smoke_count = self
+        let births = self.world.game.strikes.iter().try_fold(0_u32, |count, s| {
+            let timing = s.runtime.as_ref().unwrap();
+            let ready = !s.live && timing.kind == SupportKind::Para && timing.delay - dt <= 0.0;
+            let slots = if ready {
+                u32::try_from(
+                    definition(SupportKind::Para)?
+                        .get("units")
+                        .and_then(Value::array)
+                        .ok_or(SupportError::Invalid("invalid drop roster"))?
+                        .len(),
+                )
+                .map_err(|_| SupportError::Invalid("drop count"))?
+            } else {
+                0
+            };
+            count
+                .checked_add(slots)
+                .ok_or(SupportError::Invalid("drop count"))
+        })?;
+        let smoke_ids = self.world.game.strikes.iter().try_fold(0_u32, |count, s| {
+            let timing = s.runtime.as_ref().unwrap();
+            let slots = if timing.kind == SupportKind::Smoke && timing.delay - dt <= 0.0 {
+                number(definition(SupportKind::Smoke)?, "clouds")? as u32
+            } else {
+                0
+            };
+            count
+                .checked_add(slots)
+                .ok_or(SupportError::Invalid("smoke count"))
+        })?;
+        let identities = births
+            .checked_add(smoke_ids)
+            .ok_or(SupportError::Invalid("support identity exhausted"))?;
+        let end = self
+            .next_unit_id
+            .checked_add(identities)
+            .ok_or(SupportError::Invalid("drop identity exhausted"))?;
+        let ready_covers = self
             .world
             .game
             .strikes
             .iter()
             .filter(|s| {
-                s.runtime
-                    .as_ref()
-                    .is_some_and(|t| t.kind == SupportKind::Smoke && t.delay - dt <= 0.0)
+                let timing = s.runtime.as_ref().unwrap();
+                !s.live && timing.kind == SupportKind::Cover && timing.delay - dt <= 0.0
             })
-            .count()
-            * 5;
-        self.next_unit_id
-            .checked_add(
-                u32::try_from(smoke_count)
-                    .map_err(|_| SupportError::Invalid("smoke identity exhausted"))?,
-            )
-            .ok_or(SupportError::Invalid("smoke identity exhausted"))?;
+            .count();
+        if self
+            .support
+            .covers
+            .len()
+            .checked_add(ready_covers)
+            .is_none_or(|n| n > 4096)
+        {
+            return Err(SupportError::Invalid("cover capacity exhausted"));
+        }
+        // Smoke and drop identities share the source allocator. This upper bound admits all
+        // possible publications before interception or population can suppress a birth.
+        for id in self.next_unit_id..end {
+            if self.world.game.units.contains_key(&id)
+                || self.commands.units.contains_key(&id)
+                || self.recruit_metadata.contains_key(&id)
+                || self.combat.get(id).is_some()
+                || self.firing.get(id).is_some()
+                || self.abilities.get(id).is_some()
+                || self.recovery.get(id).is_some()
+                || self.logistics.get(id).is_some()
+            {
+                return Err(SupportError::Invalid("drop metadata identity occupied"));
+            }
+        }
+        Ok(())
+    }
+    fn validate_support_environment(&self, tick: u64) -> Result<(), SupportError> {
+        let order: Vec<_> = self.world.game.units.keys().copied().collect();
+        let mut seed = self.start.environment_seed;
+        let mut next_id = self.next_unit_id;
+        let context = environment::Context {
+            tick,
+            seed: &mut seed,
+            next_id: &mut next_id,
+            unit_order: &order,
+            grid: &self.grid,
+            rain: self.world.game.rain,
+            wet: self.world.game.wet.unwrap_or(0.0),
+            wind_angle: self.start.wind.0,
+            wind_strength: self.start.wind.1,
+        };
+        self.environment
+            .validate_context(&self.world, &context)
+            .map_err(|e| SupportError::Actuation(e.to_string()))
+    }
+    /// Pure admission before the caller advances its clock. The sole tick owner schedules phases.
+    /// Owned aircraft turn and AA guards reject unsupported missions before any support writes.
+    pub fn validate_support_tick_phases(
+        &self,
+        actors: &[u32],
+        dt: f64,
+        prospective_tick: u64,
+    ) -> Result<(), SupportError> {
+        if u64::try_from(self.world.game.tick)
+            .ok()
+            .and_then(|tick| tick.checked_add(1))
+            != Some(prospective_tick)
+        {
+            return Err(SupportError::Invalid(
+                "support phase requires the next tick",
+            ));
+        }
+        self.validate_support_strike_inputs(actors, dt)?;
+        for story in &self.story {
+            story.validate().map_err(SupportError::Actuation)?;
+        }
+        self.validate_support_environment(prospective_tick)?;
+        self.validate_aircraft_turns(dt)
+            .map_err(support_aviation_error)?;
+        self.validate_aircraft_anti_air(actors, dt)
+            .map_err(support_aviation_error)?;
+        Ok(())
+    }
+    /// Run the source strike phase using the tick's captured late unit membership.
+    /// Phase failures can follow committed earlier effects; the tick owner poisons failed ticks.
+    pub fn step_support_strikes(
+        &mut self,
+        unit_order: &[u32],
+        dt: f64,
+    ) -> Result<(), SupportError> {
+        self.validate_support_strike_inputs(unit_order, dt)?;
+        self.validate_support_environment(
+            u64::try_from(self.world.game.tick)
+                .map_err(|_| SupportError::Invalid("invalid support clock"))?,
+        )?;
         let mut pending = vec![0.0; self.start.players.len()];
         for s in &self.world.game.strikes {
             if !s.live {
@@ -925,25 +1056,16 @@ impl Match {
         self.world.game.strikes = strikes;
         result
     }
-    /// Continuous fire against actual on-map aircraft awaits canonical sortie metadata.
-    /// Passing off-map aircraft are already actuated by the strike interception phase.
-    pub fn step_support_anti_air(&self, unit_order: &[u32], dt: f64) -> Result<(), SupportError> {
+    /// Compatibility facade for the single late on-map AA actuator.
+    /// A composed caller invokes this facade or Aviation directly, once between strikes and timers.
+    pub fn step_support_anti_air(
+        &mut self,
+        unit_order: &[u32],
+        dt: f64,
+    ) -> Result<(), SupportError> {
         self.validate_support()?;
-        if !dt.is_finite()
-            || dt < 0.0
-            || unit_order.windows(2).any(|ids| ids[0] >= ids[1])
-            || unit_order
-                .iter()
-                .any(|id| !self.world.game.units.contains_key(id))
-        {
-            return Err(SupportError::Invalid("invalid anti-air phase"));
-        }
-        if self.world.game.units.values().any(|u| u.air.is_some()) {
-            return Err(SupportError::Unsupported(
-                "on-map aircraft anti-air requires sortie metadata",
-            ));
-        }
-        Ok(())
+        self.step_aircraft_anti_air(unit_order, dt)
+            .map_err(support_aviation_error)
     }
     /// Covers and cooldowns decay after strike activation and anti-air, in source order.
     pub fn advance_support_timers(&mut self, dt: f64) -> Result<(), SupportError> {
