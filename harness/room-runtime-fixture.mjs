@@ -44,12 +44,13 @@ Math.random = () => .5;
 const map = {name: 'Internal ordinary room', w: 100, h: 60, rows: Array(60).fill('.'.repeat(100)), spawns: [{x: 2, y: 2}, {x: 97, y: 57}], points: [{x: 50, y: 30}]};
 const options = {weather: 'clear', tech: false, logistics: false};
 const traces = [];
-function run(name, actions, {winner = null, starting = false} = {}) {
+function run(name, actions, {winner = null, starting = false, scoreAtGoal = false} = {}) {
   nowMs = 0; monotonicNs = 0n; sampleNs = 0n;
   const g = sim.createGame(map, ['A', 'B'], false, [0, 1], [0, 1], options);
   // Explicit restored quiet actors, retaining the real constructor's terrain and player state.
   g.units.clear(); g.nextId = 1;
   for (const [owner, x, z] of [[0, 41, 41], [1, 181, 101]]) Object.assign(sim.internals.spawnUnit(g, owner, 'rifle'), {x, z});
+  if (scoreAtGoal) g.players[0].vp = g.winVp;
   if (winner !== null) { g.winner = winner; g.reveal = true; g.endReason = 'vp'; g.endAt = {x: 100, z: 60}; }
   const initial = encode(g, {runs: true});
   let events = [], writes = [], steps = 0, caches = 0, samples = [], activeAction;
@@ -97,7 +98,7 @@ function run(name, actions, {winner = null, starting = false} = {}) {
     else if (input.op === 'complete') { const write = pending.get(input.id); assert.ok(write); pending.delete(input.id); write.callback(); }
     else if (input.op === 'transient') { g.shots.push({f: 0, t: 0, x: 100, z: 60, pub: true}); g.newCells.push([2020, 'T']); }
     else assert.fail(`unknown action ${input.op}`);
-    observations.push({input, before, expected: {state: room.state, tick: g.tick, held: g.held ?? 0, paused: room.pause ? {reason: room.pause.reason, by: room.pause.by, until: room.pause.until} : null,
+    observations.push({input, before, expected: {state: room.state, tick: g.tick, winner: g.winner, held: g.held ?? 0, paused: room.pause ? {reason: room.pause.reason, by: room.pause.by, until: room.pause.until} : null,
       away: g.players.map(p => !!p.away), steps, caches, shots: g.shots.length, cells: g.newCells.length, due: Number(api.due()),
       ...(input.op === 'poll' ? {dropped: Number(api.due()) !== before.due + steps * Math.round(sim.TICK * 1e9)} : {}),
       sockets: originals.map(ws => ({label: ws.label, inflight: ws.inflight ?? 0, owed: !!ws.owed})),
@@ -107,7 +108,7 @@ function run(name, actions, {winner = null, starting = false} = {}) {
   }
   traces.push({name, scope: 'Actual tickRooms/room-tick/sim.step/snapshot producers and socket callbacks. Final lobby/cleanup and empty watcher/operative consumers are explicit hooks; no HTTP server or public start.',
     scene: {names: ['A', 'B'], teams: [0, 1], factions: [0, 1], shuffle: false, options,
-      constructorRandom: .5, replaceStartupActors: [{owner: 0, type: 'rifle', x: 41, z: 41}, {owner: 1, type: 'rifle', x: 181, z: 101}], restoredWinner: winner, starting},
+      constructorRandom: .5, replaceStartupActors: [{owner: 0, type: 'rifle', x: 41, z: 41}, {owner: 1, type: 'rifle', x: 181, z: 101}], restoredWinner: winner, scoreAtGoal, starting},
     initial, observations});
 }
 try {
@@ -118,6 +119,7 @@ try {
   run('backpressure-stale-socket', [{op: 'room'}, {op: 'queue', slot: 1, units: 262144}, {op: 'room'}, {op: 'reconnect', slot: 1, replace: true}, {op: 'complete', id: 1}]);
   run('no-eligible-detaches-transients-once', [{op: 'ready', slot: 0, value: 3}, {op: 'ready', slot: 1, value: 3}, {op: 'transient'}, {op: 'room'}, {op: 'room'}, {op: 'room'}, {op: 'room'}]);
   run('catchup-four-backlog-drop', [{op: 'poll', ns: 0}, {op: 'poll', ns: 1000000000}, {op: 'poll', ns: 1000000001}, {op: 'poll', ns: 1050000000}]);
+  run('winning-step-forces-snapshot-before-hold', [{op: 'room'}, {op: 'room'}, {op: 'room'}], {scoreAtGoal: true});
   run('ending-hold-120-callbacks', Array.from({length: 121}, (_, i) => ({op: 'room', now: i * 50})), {winner: 0});
 } finally { Math.random = originalRandom; Date.now = originalNow; process.hrtime.bigint = originalNs; }
 const trace = name => traces.find(t => t.name === name).observations;
@@ -149,6 +151,11 @@ assert.equal(held.reduce((n, o) => n + o.expected.steps, 0), 60);
 assert.equal(held[118].expected.state, 'play'); assert.equal(held[119].expected.state, 'lobby');
 assert.equal(held[119].expected.held, 120); assert.equal(held[120].expected.steps, 0);
 assert.equal(held.reduce((n, o) => n + o.expected.samples.length, 0), 0);
+const winning = trace('winning-step-forces-snapshot-before-hold');
+assert.equal(winning[0].expected.tick, 1); assert.equal(winning[0].expected.winner, 0);
+assert.equal(winning[0].expected.samples[0].sent, true); assert.equal(winning[0].expected.writes.length, 2);
+assert.equal(winning[1].expected.steps, 0); assert.equal(winning[1].expected.held, 1);
+assert.equal(winning[2].expected.steps, 1); assert.equal(winning[2].expected.samples.length, 0);
 clean();
 const output = JSON.stringify({format: 1, reference: pin, node: process.version, arch: process.arch, map,
   clocks: 'Controlled host milliseconds and monotonic polling nanoseconds. Timing reads advance 10 microseconds per read for reproducibility, not a performance measurement.',

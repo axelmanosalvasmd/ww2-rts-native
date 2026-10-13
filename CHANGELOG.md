@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added the regular winning-step boundary to the original room fixture. Initial VP at the actual goal lets real simulation decide victory on odd tick 1, forcing its snapshot before the half-speed hold. The fixture now has nine traces, 160 actions and 81 actual simulation steps; native consumption remains pending.
+
 - Added an original room callback recorder with eight traces, 157 actions and 79 actual simulation steps. It covers pause/resume, reconnect and deadline continuation, the starting gate, selected and stalled sockets, stale write completion, empty-recipient transient draining, four-tick catch-up and the 120-callback ending hold. Final lobby/seat cleanup and empty spectator/operative consumers are explicit hooks. Native host consumption remains pending.
 
 - Extended the original snapshot recorder's partial-field boundary to include the newly represented canonical `works` field. Fresh `244931d` native checks compiled and passed all four selected-delivery tests, then two older exact-key tests rejected that added field. Regenerated 219 partial results from unchanged pinned Source; every prior fixture byte remains identical after removing only the new recorded fields. Runtime and strict equality assertions are unchanged; fresh combined native proof remains pending.
