@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Routed source Tech inputs (tier, inf, guns and armor) through canonical research admission in the recorded command dispatcher. Lab, wallet and MP-spent publication share the production guard; denied research uses the existing exact source reasons. Source and native mixed-input proof remain pending.
+
 - Strengthened companion stale-metadata regression snapshots to include full represented units, controls, companion registry, metadata, wallets and random-stream state, plus ordered, unordered, heavy and owner spatial queries. Native checks remain pending.
 
 - Reserved canonical ability/recovery identities before companion Join or any respawn batch publishes, and initialized their exact source defaults in both publication callbacks. Added recorded-queue ownership and away-seat checks plus stale metadata atomicity coverage. Native checks remain pending.

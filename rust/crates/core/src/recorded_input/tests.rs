@@ -96,6 +96,21 @@ fn journal_binding_and_raw_buy_validation() {
     let id = CompanionJournalId::new(u64::MAX).unwrap();
     assert_eq!(id.get(), u64::MAX);
     assert_eq!(id.registry_key(), "journal-companion:18446744073709551615");
+    for (raw, kind) in [
+        ("tier", crate::economy::Technology::Tier),
+        ("inf", crate::economy::Technology::Infantry),
+        ("guns", crate::economy::Technology::Guns),
+        ("armor", crate::economy::Technology::Armor),
+    ] {
+        assert_eq!(
+            Command::from_json(&json!({"t":"tech","kind":raw})),
+            Ok(Command::Technology { kind })
+        );
+    }
+    assert_eq!(
+        Command::from_json(&json!({"t":"tech","kind":"unlock"})),
+        Err(Denial::Blocked)
+    );
     for kind in ["companionJoin", "companionInput", "join", "fps"] {
         assert_eq!(
             Command::from_json(&json!({"t":kind,"identity":7})),

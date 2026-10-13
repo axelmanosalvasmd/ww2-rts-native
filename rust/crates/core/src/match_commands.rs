@@ -42,6 +42,9 @@ pub enum Stance {
 /// Internal recorded input. This is not a WebSocket or C interface.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Command {
+    Technology {
+        kind: crate::economy::Technology,
+    },
     Buy {
         kind: String,
         from: Option<u32>,
@@ -299,6 +302,15 @@ impl Command {
                 rows.iter().map(|v| safe_id(v).unwrap_or(-1)).collect()
             });
         match object.get("t").and_then(|v| v.as_str()) {
+            Some("tech") => Ok(Self::Technology {
+                kind: match object.get("kind").and_then(|v| v.as_str()) {
+                    Some("tier") => crate::economy::Technology::Tier,
+                    Some("inf") => crate::economy::Technology::Infantry,
+                    Some("guns") => crate::economy::Technology::Guns,
+                    Some("armor") => crate::economy::Technology::Armor,
+                    _ => return Err(Denial::Blocked),
+                },
+            }),
             Some("buy") => Ok(Self::Buy {
                 kind: object
                     .get("unit")
@@ -530,6 +542,15 @@ impl crate::match_runtime::Match {
         if matches!(command, Command::Unsupported) {
             return Ok(Some(Denial::Unsupported));
         }
+        if let Command::Technology { kind } = command {
+            return match self.request_research(owner, *kind) {
+                Ok(_) => Ok(None),
+                Err(crate::match_runtime::ProductionStepError::Production(
+                    crate::production::Error::Denied(d),
+                )) => Ok(Some(d.into())),
+                Err(e) => Err(format!("recorded research: {e:?}")),
+            };
+        }
         if let Command::Buy { kind, from } = command {
             if kind == "worldbase" {
                 return Ok(Some(Denial::Blocked));
@@ -579,7 +600,8 @@ impl crate::match_runtime::Match {
             | Command::Stance { ids, .. }
             | Command::Ability { ids, .. }
             | Command::Autocast { ids, .. } => ids.clone(),
-            Command::Buy { .. }
+            Command::Technology { .. }
+            | Command::Buy { .. }
             | Command::CompanionJoin { .. }
             | Command::CompanionInput { .. }
             | Command::Support { .. }
@@ -717,7 +739,8 @@ impl crate::match_runtime::Match {
                     self.commands.units.get_mut(&id).unwrap().auto_cast = *on;
                 }
             }
-            Command::Buy { .. }
+            Command::Technology { .. }
+            | Command::Buy { .. }
             | Command::CompanionJoin { .. }
             | Command::CompanionInput { .. }
             | Command::Support { .. }
