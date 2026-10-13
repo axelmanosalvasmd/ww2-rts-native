@@ -17,3 +17,6 @@ impl CompanionJournalId {
         format!("journal-companion:{}", self.get())
     }
 }
+
+#[cfg(test)]
+mod tests;

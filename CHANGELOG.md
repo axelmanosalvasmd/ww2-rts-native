@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reserved canonical ability/recovery identities before companion Join or any respawn batch publishes, and initialized their exact source defaults in both publication callbacks. Added recorded-queue ownership and away-seat checks plus stale metadata atomicity coverage. Native checks remain pending.
+
 - Added recorded Buy and trusted companion Join/Input dispatch to the existing command queue. Journal identities are nonzero integers with fixed safe registry keys; raw JSON cannot create companion bindings. Purchase denials retain production precedence, including invalid explicit makers. Combined source fixtures and native verification remain in progress.
 
 - Combined recorded-buy owned routing and story preflight with canonical ability/recovery publication and stale-row admission. Combined native verification remains pending.

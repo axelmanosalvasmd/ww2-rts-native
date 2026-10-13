@@ -609,7 +609,11 @@ impl Match {
         draft.control.auto_cast = false;
         draft.control.auto_retreat = false;
         draft.control.hold_fire = true;
-        if self.firing.get(id).is_some() || self.combat.get(id).is_some() {
+        if self.firing.get(id).is_some()
+            || self.combat.get(id).is_some()
+            || self.abilities.get(id).is_some()
+            || self.recovery.get(id).is_some()
+        {
             return Err("companion unit metadata identity already exists".into());
         }
         Ok(draft)
@@ -657,6 +661,8 @@ impl Match {
         publication.publish_with(|u, _| {
             self.firing.initialize(u.id);
             self.combat.initialize(u.id);
+            self.abilities.initialize(u.id);
+            self.recovery.initialize(u.id);
         });
         op.unit_id = unit;
         self.companions
@@ -753,6 +759,8 @@ impl Match {
         let ids = publication.publish_with(|u, _| {
             self.firing.initialize(u.id);
             self.combat.initialize(u.id);
+            self.abilities.initialize(u.id);
+            self.recovery.initialize(u.id);
         });
         for (companion, unit, weapon) in bodies {
             self.companions
