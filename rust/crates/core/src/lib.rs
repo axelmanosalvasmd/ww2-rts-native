@@ -18,6 +18,7 @@ pub mod fog;
 pub mod formation;
 pub mod game;
 pub mod grid;
+pub mod human_commander;
 pub mod human_commander_inputs;
 pub mod human_commander_timing;
 pub mod legacy_scenario;

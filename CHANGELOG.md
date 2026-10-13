@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Defined the detached ordinary human commander facts used by the independent observation producer and runtime: ordered visibility, own motion plans, sightings, current public stop controls and owner hurt batches with original event ordinals. No Match, transport or queue interface changes; the complete human-state runtime and producer remain in progress.
+
 - Added detached ordinary human input helpers for duplicate-order filtering, first matching formation groups, camera and selection changes, keys and clicks. The unchanged Source oracle covers 31 cases and 79 emitted input rows, including raw command extensions, duplicate and missing IDs, minimap moves and exact screen boundaries. Native tests are written but not run; alert scheduling, timed input execution, policy and Match hookup remain pending.
 
 - Fixed the human timing stream's long-run accumulator: the Source keeps a floating-point Number rather than wrapping its seed to 32 bits after every draw. Three original fractions around draw 4,917,759 protect the first precision-boundary divergence. The focused native regression is written but not run.
