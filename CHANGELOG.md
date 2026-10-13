@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Corrected the spawn oracle total to include the six Classic/World control cases. All source row comparisons passed; the old final count assertion expected 769 instead of 775 spawns.
+
 - Documented the checked regional lookup and explicit post-rails snapshot projection boundaries, including the first native log failure and remaining mutable-terrain hook consumers.
 
 - Reused the shared mode-aware control initializer for World startup and removed its private ability-cost lookup. Guard overrides stay canonical. Native proof of this updated startup dependency is pending.
