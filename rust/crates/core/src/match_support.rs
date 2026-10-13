@@ -1,5 +1,5 @@
 //! Off-map support on canonical Conquest wallets, cooldowns and terrain.
-//! Plane interception, paratrooper spawning and recon visibility are separate actuators.
+//! Strike geometry/timing, flak, payloads and drops share canonical Game, combat and publication state.
 
 use crate::{
     catalog::{Catalog, Value},
@@ -19,6 +19,7 @@ pub enum SupportKind {
     Strafe,
     Bombing,
     Dive,
+    Para,
     Artillery,
     Smoke,
     Cover,
@@ -30,6 +31,7 @@ impl SupportKind {
             Self::Strafe => "strafe",
             Self::Bombing => "bombing",
             Self::Dive => "dive",
+            Self::Para => "para",
             Self::Artillery => "artillery",
             Self::Smoke => "smoke",
             Self::Cover => "cover",
@@ -41,6 +43,8 @@ pub enum SupportDenial {
     Blocked,
     Cooldown,
     Manpower,
+    Unseen,
+    Population,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SupportError {
@@ -76,6 +80,7 @@ pub struct FighterCover {
 pub enum SupportEvent {
     Shell(Point),
     Bomb(Point),
+    Chutes(Point),
     SmokeShells(Point),
     Plane {
         kind: SupportKind,
@@ -133,7 +138,7 @@ fn strip(s: &Strike, along: f64, side: f64) -> Point {
 }
 impl Match {
     fn validate_support(&self) -> Result<(), SupportError> {
-        if self.options.mode != Mode::Conquest {
+        if !matches!(self.options.mode, Mode::Default | Mode::Conquest) {
             return Err(SupportError::Unsupported(
                 "support currently requires Conquest",
             ));
@@ -175,7 +180,7 @@ impl Match {
         Ok(())
     }
     /// Admit one recorded command. The caller's existing command queue owns ordering.
-    /// Unsupported plane kinds return before any payment or cooldown change.
+    /// Entire admission, including drop visibility/population, precedes payment.
     pub fn admit_support(
         &mut self,
         owner: usize,
@@ -200,14 +205,10 @@ impl Match {
             "strafe" => SupportKind::Strafe,
             "bombing" => SupportKind::Bombing,
             "dive" => SupportKind::Dive,
+            "para" => SupportKind::Para,
             "artillery" => SupportKind::Artillery,
             "smoke" => SupportKind::Smoke,
             "cover" => SupportKind::Cover,
-            "para" => {
-                return Err(SupportError::Unsupported(
-                    "support plane actuator is unavailable",
-                ));
-            }
             _ => return Ok(Some(SupportDenial::Blocked)),
         };
         let def = definition(kind)?;
@@ -231,6 +232,47 @@ impl Match {
             x: math::min(self.world.game.w as f64 * CELL, math::max(0.0, at.x)),
             z: math::min(self.world.game.h as f64 * CELL, math::max(0.0, at.z)),
         };
+        if kind == SupportKind::Para {
+            let observation = crate::grid::SpatialGrid::new(&self.world.game.units, 16.0);
+            let game = &self.world.game;
+            if game.units.values().any(|u| {
+                u.owner >= game.players.len()
+                    || u.kind >= self.rules.kinds.len()
+                    || ![u.x, u.z, u.hp].iter().all(|v| v.is_finite())
+            }) {
+                return Err(SupportError::Invalid("invalid para visibility state"));
+            }
+            if !crate::vision::team_sees(
+                game,
+                &self.rules,
+                &observation,
+                game.players[owner].team,
+                at,
+            ) {
+                return Ok(Some(SupportDenial::Unseen));
+            }
+            let pending = game
+                .strikes
+                .iter()
+                .filter(|s| s.owner == owner && !s.live)
+                .try_fold(0.0, |pop, s| {
+                    let timing = s
+                        .runtime
+                        .as_ref()
+                        .ok_or(SupportError::Invalid("missing drop metadata"))?;
+                    Ok::<_, SupportError>(
+                        pop + economy::drop_pop(timing.kind.name())
+                            .map_err(|e| SupportError::Actuation(e.to_string()))?,
+                    )
+                })?;
+            let (population, cap) = self.support_population(owner, pending)?;
+            if population
+                + economy::drop_pop("para").map_err(|e| SupportError::Actuation(e.to_string()))?
+                > cap
+            {
+                return Ok(Some(SupportDenial::Population));
+            }
+        }
         let direction = direction.filter(|d| d.is_finite()).unwrap_or_else(|| {
             math::atan2(
                 at.z - self.start.players[owner].spawn.z,
@@ -293,6 +335,156 @@ impl Match {
         self.world.game.strikes.push(strike);
         story.commit();
         Ok(None)
+    }
+    fn support_population(&self, owner: usize, pending: f64) -> Result<(f64, f64), SupportError> {
+        let game = &self.world.game;
+        let queues: Vec<Vec<&str>> = game
+            .units
+            .values()
+            .map(|u| {
+                self.production
+                    .building(u.id)
+                    .map_or_else(Vec::new, |b| b.queue().collect())
+            })
+            .collect();
+        let mut units = Vec::new();
+        for (u, queue) in game.units.values().zip(&queues) {
+            let kind = self
+                .rules
+                .kinds
+                .get(u.kind)
+                .ok_or(SupportError::Invalid("invalid population kind"))?;
+            units.push(crate::economy_state::Unit {
+                id: u.id.into(),
+                owner: Some(u.owner),
+                kind: &kind.name,
+                hp: u.hp,
+                built: u.built.unwrap_or(0.0),
+                queue,
+            });
+        }
+        let context = crate::economy_state::Context {
+            mode: crate::economy_state::ModeContext {
+                kind: self.options.mode,
+                ..Default::default()
+            },
+            army: self.options.army,
+            units: &units,
+            drops: &[],
+            points: &[],
+            nodes: &[],
+            world: None,
+        };
+        let population = self
+            .start
+            .economy
+            .population(&context, owner)
+            .map_err(|e| SupportError::Actuation(e.to_string()))?;
+        let cap = self
+            .start
+            .economy
+            .population_cap(&context, owner)
+            .map_err(|e| SupportError::Actuation(e.to_string()))?;
+        Ok((population + pending, cap))
+    }
+    fn drop_support(&mut self, strike: &Strike, pending: f64) -> Result<(), SupportError> {
+        if self.start.economy.players[strike.owner].out {
+            return Ok(());
+        }
+        let def = definition(SupportKind::Para)?;
+        let roster = def
+            .get("units")
+            .and_then(Value::array)
+            .ok_or(SupportError::Invalid("invalid drop roster"))?;
+        let (mut population, cap) = self.support_population(strike.owner, pending)?;
+        let mut staged = Vec::new();
+        let mut reserves = std::collections::BTreeMap::new();
+        let mut placer = crate::unit_spawn::SpawnPlacer::new();
+        for (index, row) in roster.iter().enumerate() {
+            let name = row
+                .string()
+                .ok_or(SupportError::Invalid("invalid drop unit"))?;
+            let cost =
+                economy::pop_use(name).map_err(|e| SupportError::Actuation(e.to_string()))?;
+            if population + cost > cap {
+                continue;
+            }
+            let id = self
+                .next_unit_id
+                .checked_add(
+                    u32::try_from(staged.len()).map_err(|_| SupportError::Invalid("drop count"))?,
+                )
+                .ok_or(SupportError::Invalid("drop identity exhausted"))?;
+            if self.combat.get(id).is_some() || self.firing.get(id).is_some() {
+                return Err(SupportError::Invalid("drop metadata identity occupied"));
+            }
+            let kind = self
+                .rules
+                .kind(name)
+                .ok_or(SupportError::Invalid("drop kind"))?;
+            let angle =
+                strike.dir + index as f64 * 2.0 * std::f64::consts::PI / roster.len() as f64;
+            let target = Point {
+                x: strike.x + math::cos(angle) * number(def, "spread")?,
+                z: strike.z + math::sin(angle) * number(def, "spread")?,
+            };
+            let cell = placer
+                .nearest_free(
+                    crate::match_runtime::terrain_view(&self.world.game),
+                    target,
+                    crate::game::MOVE,
+                    None,
+                )
+                .map_err(|e| SupportError::Actuation(format!("drop placement: {e:?}")))?;
+            let pose = Point {
+                x: (cell % self.world.game.w) as f64 * CELL + CELL / 2.0,
+                z: (cell / self.world.game.w) as f64 * CELL + CELL / 2.0,
+            };
+            let draft = crate::unit_publication::StagedUnit::ordinary(
+                &self.world.game,
+                &self.rules,
+                strike.owner,
+                kind,
+                id,
+                u32::try_from(self.world.game.units.len() + staged.len())
+                    .map_err(|_| SupportError::Invalid("drop scatter index"))?,
+                self.start.players[strike.owner].spawn,
+                Some(pose),
+            )
+            .map_err(|e| SupportError::Actuation(format!("drop draft: {e:?}")))?;
+            reserves.insert(
+                id,
+                self.prepare_new_unit_reserves(&draft.unit)
+                    .map_err(SupportError::Actuation)?,
+            );
+            staged.push(draft);
+            population += cost;
+        }
+        let positions: Vec<_> = staged.iter().map(|s| s.unit.at()).collect();
+        let publication = crate::unit_publication::prepare_publication(
+            crate::unit_publication::PublicationParts {
+                units: &mut self.world.game.units,
+                grid: &mut self.grid,
+                controls: &mut self.commands.units,
+                recruitment: &mut self.recruit_metadata,
+                next_id: &mut self.next_unit_id,
+            },
+            &self.rules,
+            self.start.players.len(),
+            staged,
+        )
+        .map_err(|e| SupportError::Actuation(format!("drop publication: {e:?}")))?;
+        publication.publish_with(|unit, _| {
+            self.combat.initialize(unit.id).hit_by = Some(0);
+            self.firing.initialize(unit.id);
+            if let Some(Some(record)) = reserves.remove(&unit.id) {
+                self.logistics.insert(unit.id, record);
+            }
+        });
+        self.support
+            .events
+            .extend(positions.into_iter().map(SupportEvent::Chutes));
+        Ok(())
     }
     fn blast_support(
         &mut self,
@@ -365,7 +557,7 @@ impl Match {
     fn dig_support(&mut self, at: Point, radius: f64) -> Result<(), SupportError> {
         let first = self.world.game.cell_of(at.x, at.z);
         let mut hole = first.into_iter().collect::<Vec<_>>();
-        let n = math::ceil(radius / CELL) as i32;
+        let n = (radius / CELL).ceil() as i32;
         for dy in -n..=n {
             for dx in -n..=n {
                 if let Some(c) = self
@@ -417,8 +609,8 @@ impl Match {
             if u.hp <= 0.0
                 || u.air.is_some()
                 || u.riding
-                || math::abs(dx * cx + dz * cz) > number(def, "len")? / 2.0
-                || math::abs(-dx * cz + dz * cx) > number(def, "width")? / 2.0
+                || (dx * cx + dz * cz).abs() > number(def, "len")? / 2.0
+                || (-dx * cz + dz * cx).abs() > number(def, "width")? / 2.0
             {
                 continue;
             }
@@ -538,10 +730,9 @@ impl Match {
         timing.left = if timing.kind == SupportKind::Recon {
             self.start.random.next_fraction(StreamId::OffMap) * timing.left
         } else if timing.kind == SupportKind::Bombing {
-            math::floor(
-                self.start.random.next_fraction(StreamId::OffMap)
-                    * number(definition(timing.kind)?, "shells")?,
-            )
+            (self.start.random.next_fraction(StreamId::OffMap)
+                * number(definition(timing.kind)?, "shells")?)
+            .floor()
         } else {
             0.0
         };
@@ -600,6 +791,13 @@ impl Match {
                     .map_err(|_| SupportError::Invalid("smoke identity exhausted"))?,
             )
             .ok_or(SupportError::Invalid("smoke identity exhausted"))?;
+        let mut pending = vec![0.0; self.start.players.len()];
+        for s in &self.world.game.strikes {
+            if !s.live {
+                pending[s.owner] += economy::drop_pop(s.runtime.as_ref().unwrap().kind.name())
+                    .map_err(|e| SupportError::Actuation(e.to_string()))?;
+            }
+        }
         let mut strikes = std::mem::take(&mut self.world.game.strikes);
         let result = (|| {
             for s in &mut strikes {
@@ -617,12 +815,15 @@ impl Match {
                 }
                 if !s.live {
                     s.live = true;
+                    pending[s.owner] -= economy::drop_pop(kind.name())
+                        .map_err(|e| SupportError::Actuation(e.to_string()))?;
                     if matches!(
                         kind,
                         SupportKind::Recon
                             | SupportKind::Strafe
                             | SupportKind::Bombing
                             | SupportKind::Dive
+                            | SupportKind::Para
                     ) {
                         self.support.events.push(SupportEvent::Plane {
                             kind,
@@ -634,6 +835,9 @@ impl Match {
                             s.runtime = Some(timing);
                             continue;
                         }
+                    }
+                    if kind == SupportKind::Para {
+                        self.drop_support(s, pending[s.owner])?;
                     }
                     if kind == SupportKind::Dive {
                         let at = Point { x: s.x, z: s.z };
@@ -720,6 +924,26 @@ impl Match {
         }
         self.world.game.strikes = strikes;
         result
+    }
+    /// Continuous fire against actual on-map aircraft awaits canonical sortie metadata.
+    /// Passing off-map aircraft are already actuated by the strike interception phase.
+    pub fn step_support_anti_air(&self, unit_order: &[u32], dt: f64) -> Result<(), SupportError> {
+        self.validate_support()?;
+        if !dt.is_finite()
+            || dt < 0.0
+            || unit_order.windows(2).any(|ids| ids[0] >= ids[1])
+            || unit_order
+                .iter()
+                .any(|id| !self.world.game.units.contains_key(id))
+        {
+            return Err(SupportError::Invalid("invalid anti-air phase"));
+        }
+        if self.world.game.units.values().any(|u| u.air.is_some()) {
+            return Err(SupportError::Unsupported(
+                "on-map aircraft anti-air requires sortie metadata",
+            ));
+        }
+        Ok(())
     }
     /// Covers and cooldowns decay after strike activation and anti-air, in source order.
     pub fn advance_support_timers(&mut self, dt: f64) -> Result<(), SupportError> {

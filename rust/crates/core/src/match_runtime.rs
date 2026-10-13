@@ -827,7 +827,7 @@ impl Match {
     }
 }
 
-fn terrain_view(game: &Game) -> TerrainView<'_> {
+pub(crate) fn terrain_view(game: &Game) -> TerrainView<'_> {
     TerrainView {
         width: game.w,
         height: game.h,
