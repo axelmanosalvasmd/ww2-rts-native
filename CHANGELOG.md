@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added a bounded on-map aviation actuator with canonical staged aircraft publication, held patrol/escort and fighter air-target missions, flight/orbit/home/rearm transitions, and continuous AA over captured shooters and fresh grid targets. The unchanged prototype oracle records 18 constructors, 42 traces and 3,410 checkpoints, including exact grid-order ties and every effect call. Independent review fixed a killed fighter firing later in the same AA phase. Native validation, automatic/ground aircraft weapons, retirement and tick/recorded-command integration remain pending.
+
 - Added an explicit staged aircraft spawn path while retaining ordinary UnsupportedAir admission. Shared unit defaults and scatter are factored once; aircraft still scatter before their authoritative air-base override and start parked with auto-retreat off. The unchanged source oracle records 18 aircraft constructors. Native validation and actual sortie/AA runtime remain pending.
 
 - Added actual paratrooper admission and delivery through current-position visibility, pending population and shared prepared unit publication, with canonical reserves/combat/firing metadata. All eight off-map support kinds now have source actuators. The source oracle passes 268 traces and 5,922 checkpoints, including multi-flak ammunition/forced-stranded states and carrier/rider strafing order. Fixed the ordinary Conquest Default mode alias. Native differential verification and complete tick hookup are pending; continuous anti-air against on-map aircraft remains an explicit unsupported sortie prerequisite.
