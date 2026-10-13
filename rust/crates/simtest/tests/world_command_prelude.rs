@@ -534,3 +534,134 @@ fn physical_local_threat_uses_canonical_visibility_and_implicit_lookup_refuses()
     assert_eq!(m.start.random.snapshot(), rng);
     assert_eq!(m.start.environment_seed, environment_seed);
 }
+
+#[test]
+fn local_world_spacing_reaction_publishes_the_real_cover_route_endpoint() {
+    let mut m = scene();
+    let guards: Vec<_> = m
+        .world
+        .game
+        .units
+        .values()
+        .filter(|u| u.owner == LOCAL_DEFENDER_OWNER && m.rules.kinds[u.kind].name == "rifle")
+        .take(2)
+        .map(|u| u.id)
+        .collect();
+    assert_eq!(
+        guards.len(),
+        2,
+        "actual constructor supplies both local actors"
+    );
+    let (lower, reacting) = (guards[0], guards[1]);
+    assert!(lower < reacting);
+    let game = &m.world.game;
+    let mut patch = None;
+    'find: for y in (8..game.h - 8).step_by(8) {
+        for x in (8..game.w - 8).step_by(8) {
+            let at = Point {
+                x: x as f64 * 2.0 + 1.0,
+                z: y as f64 * 2.0 + 1.0,
+            };
+            let open = (y - 5..=y + 5).all(|z| {
+                (x - 5..=x + 5).all(|x| {
+                    let cell = z * game.w + x;
+                    game.chars[cell] == b'.' && game.height.as_ref().is_none_or(|h| h[cell] == 0)
+                })
+            });
+            let clear = game.units.values().all(|u| {
+                guards.contains(&u.id) || ww2_core::math::hypot(u.x - at.x, u.z - at.z) > 20.0
+            });
+            if open && clear {
+                patch = Some((at, y * game.w + x + 2));
+                break 'find;
+            }
+        }
+    }
+    let (at, cover_cell) = patch.expect("real World map has a flat unoccupied open patch");
+    let cover_at = Point {
+        x: at.x + 4.0,
+        z: at.z,
+    };
+    for (id, x) in [(lower, at.x - 1.0), (reacting, at.x)] {
+        let unit = m.world.game.units.get_mut(&id).unwrap();
+        unit.x = x;
+        unit.z = at.z;
+        unit.hold_pos = false;
+        assert!(unit.path.is_empty() && unit.hit_from.is_none() && unit.world_goal.is_none());
+        assert!(!unit.retreating && !unit.build && !unit.dig && !unit.entrench);
+        m.grid.update(id, unit);
+        let control = m.commands.units.get_mut(&id).unwrap();
+        control.react = 0.0;
+        assert!(control.orders.is_empty());
+        assert_eq!(control.attack_id, 0);
+        assert_eq!(m.firing.get(id).unwrap().target_id, 0);
+    }
+    m.world.set_cell(cover_cell, b'T').unwrap();
+    assert_eq!(
+        m.world.game.cell_of(cover_at.x, cover_at.z),
+        Some(cover_cell)
+    );
+    assert_eq!(
+        ww2_core::terrain::cover_rank(&m.world.game, &m.rules, at, None),
+        3
+    );
+    assert_eq!(
+        ww2_core::terrain::cover_rank(&m.world.game, &m.rules, cover_at, None),
+        0
+    );
+    m.refresh_world_visibility().unwrap();
+    assert!(
+        m.world_runtime.as_ref().unwrap().memory.team(-1).is_none(),
+        "visibility does not invent a routing read"
+    );
+    let stale_end = at;
+    m.commands.units.get_mut(&reacting).unwrap().route_end = Some(stale_end);
+    let generation = m.world.game.units[&reacting].path_gen;
+    let grid = format!("{:?}", m.grid);
+    let requests = format!("{:?}", m.commands.path_requests());
+    let rng = m.start.random.snapshot();
+    let environment_seed = m.start.environment_seed;
+    let wallets = m.start.economy.clone();
+    let tick = m.world.game.tick;
+    m.react_unit(reacting).unwrap();
+    let unit = &m.world.game.units[&reacting];
+    assert_eq!(
+        unit.at(),
+        at,
+        "a reaction assigns a route before physical movement"
+    );
+    assert!(unit.drift);
+    assert_eq!(unit.path_gen, generation + 1);
+    assert!(
+        !unit.path.is_empty(),
+        "real World search must succeed for the authored cover"
+    );
+    assert_eq!(unit.path.last().copied(), Some(cover_at));
+    assert_eq!(
+        m.commands.units[&reacting].route_end,
+        unit.path.last().copied()
+    );
+    assert_ne!(m.commands.units[&reacting].route_end, Some(stale_end));
+    assert_eq!(m.commands.units[&reacting].react, 1.0);
+    let routing = m.world_routing(LOCAL_DEFENDER_OWNER).unwrap();
+    assert_ne!(
+        routing.query().navigation().flags[cover_cell] & ww2_core::game::TRENCH,
+        0
+    );
+    assert!(
+        m.world_runtime
+            .as_ref()
+            .unwrap()
+            .memory
+            .team(-1)
+            .unwrap()
+            .contains_cell(cover_cell)
+    );
+    assert_eq!(format!("{:?}", m.grid), grid);
+    assert_eq!(format!("{:?}", m.commands.path_requests()), requests);
+    assert_eq!(m.commands.pending_commands(), 0);
+    assert_eq!(m.start.economy, wallets);
+    assert_eq!(m.start.random.snapshot(), rng);
+    assert_eq!(m.start.environment_seed, environment_seed);
+    assert_eq!(m.world.game.tick, tick);
+}

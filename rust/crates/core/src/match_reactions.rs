@@ -485,7 +485,11 @@ impl Match {
     }
 
     fn assign_reaction_route(&mut self, mut u: Unit, to: Point, back: bool) -> Result<(), String> {
+        if !self.commands.units.contains_key(&u.id) {
+            return Err("missing reaction route control".into());
+        }
         let route = self.command_route(u.owner, &u, to)?;
+        let route_end = route.route_end;
         u.path = route.waypoints;
         u.path_gen = u
             .path_gen
@@ -510,6 +514,11 @@ impl Match {
                 }
             }
         }
+        self.commands
+            .units
+            .get_mut(&u.id)
+            .expect("admitted reaction control")
+            .route_end = Some(route_end);
         self.world.game.units.insert(u.id, u);
         Ok(())
     }

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Preserve the actual findPath endpoint when a spacing or cover reaction publishes its accepted route. The existing canonical control is admitted before routing; endpoint publication occurs with the final Unit/control commit, with no inferred outcome or second route store. A real World spacing reaction now checks cold-to-warm memory, the authored cover endpoint and unchanged random state, bringing the continuation to eight source-written tests. Native execution remains pending.
+
 - Normally compose the source-reviewed World ground actor/lifecycle and routing providers into the separate sole-caller continuation. Preserve emitted prefixes, canonical local visibility, real recovery, lazy World terrain reads, full-memory retry versions and region march/home rules. Shared commands and reactions merge without source conflicts. Whole World admission remains closed until reached inactive-phase policies and complete caller review are finished; combined native verification remains pending.
 
 - Extend the existing physical destination and reaction helpers to validated World actors without adding a player seat or choosing a remembered routing view. World spacing threat selection borrows the canonical local visibility vector; the implicit local lookup refuses instead of indexing a missing commander. Keep ordinary owner bounds and Player visibility checks unchanged. Add two real-World-constructor witnesses for idle local reactions and visible armed threats, bringing this continuation to seven source-written tests. Whole World admission and native verification remain pending.
