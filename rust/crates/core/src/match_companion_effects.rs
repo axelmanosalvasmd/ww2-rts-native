@@ -2,17 +2,88 @@
 use crate::{
     combat::CombatEvent,
     companion_ray,
-    companions::{Input, SAFE_INTEGER, WEAPONS},
+    companions::{Input, OPERATIVE, SAFE_INTEGER, WEAPONS},
     economy::Mode,
     environment,
+    game::{CELL, Point},
     match_combat::{DamageWorld, ExplosionSource},
-    match_firing::{LaunchEvent, SmallArmsEvent, SmallArmsHit},
+    match_firing::{AbilityBlast, LaunchEvent, SmallArmsEvent, SmallArmsHit},
     match_runtime::Match,
+    math,
     random::StreamId,
 };
 use std::collections::BTreeSet;
 
 impl Match {
+    /// Resolve an admitted grenade press. The companion phase owns press counts,
+    /// input expiry and sprint priority; the canonical firing owner publishes flight state.
+    pub fn throw_companion(
+        &mut self,
+        unit: u32,
+        input: &Input,
+        winner_decided: bool,
+    ) -> Result<u64, String> {
+        let companion = self.check_companion(unit)?;
+        let op = &self.companions.records[&companion];
+        let body = &self.companions.soldiers[&unit];
+        let u = &self.world.game.units[&unit];
+        if self.options.mode != Mode::Conquest
+            || winner_decided
+            || self.finish.is_some()
+            || !op.online
+            || self.start.economy.players[op.owner].out
+            || u.hp <= 0.0
+            || body.nades == 0
+            || body.nade_time > 0.0
+        {
+            return Err("companion grenade is not ready".into());
+        }
+        if ![input.forward, input.strafe, input.yaw, input.pitch]
+            .iter()
+            .all(|v| v.is_finite())
+            || input.forward.abs() > 1.0
+            || input.strafe.abs() > 1.0
+            || input.yaw.abs() > 1e4
+            || input.pitch.abs() > 1.45
+            || input.weapon > 1
+        {
+            return Err("invalid companion grenade input".into());
+        }
+        let distance = math::max(3.0, math::min(24.0, 13.0 + input.pitch * 16.0));
+        let at = Point {
+            x: math::max(
+                0.5,
+                math::min(
+                    self.world.game.w as f64 * CELL - 0.5,
+                    u.x + math::cos(input.yaw) * distance,
+                ),
+            ),
+            z: math::max(
+                0.5,
+                math::min(
+                    self.world.game.h as f64 * CELL - 0.5,
+                    u.z + math::sin(input.yaw) * distance,
+                ),
+            ),
+        };
+        // Source duration uses the requested distance before map-edge clipping.
+        let duration = 0.45 + distance / 20.0;
+        let rifle = self
+            .rules
+            .kind("rifle")
+            .ok_or("missing rifle grenade profile")?;
+        let blast = AbilityBlast::from_unit(rifle, &self.rules)?;
+        let flight = self.launch_ability_flight(unit, at, blast, Some(duration), None)?;
+        let body = self
+            .companions
+            .soldiers
+            .get_mut(&unit)
+            .expect("checked soldier");
+        body.nades -= 1;
+        body.nade_time = OPERATIVE.nade_cd;
+        Ok(flight)
+    }
+
     /// Resolve an admitted fire trigger. The surrounding companion phase owns
     /// input expiry, movement and reload/sprint/weapon priority.
     pub fn fire_companion(

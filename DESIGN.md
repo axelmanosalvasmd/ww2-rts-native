@@ -1,5 +1,9 @@
 # Three Crossroads Native: design decisions
 
+## Companion grenade publication follow-up (2026-10-13, source written)
+
+`Match::throw_companion` retains the pinned pitch-to-distance rule and clips the landing point to the map only after selecting the duration. It delegates flight allocation, the rifle grenade blast profile, trajectory and Flight-before-Throw events to the canonical typed ability-flight helper. The FPS body spends one grenade and sets its one-second timer after successful launch; firing magazines, weapon cooldown, wallets, combat counters and random streams stay unchanged. Press counting, input expiry and sprint priority remain in the surrounding companion phase. The source fixture supplies nine traces, 11 launches and 77 trajectory samples; native replay and dependency integration remain pending. Contact and blast settlement belong to the shared firing driver and have separate verification. The physical driver currently admits explicit Conquest only; the default mode alias is refused before grenade publication and remains a separate extension.
+
 The plan, its evidence and its open work are issue #1. This file records what was decided and why, and the measurements as they come in. Paths such as `shared/sim.js` refer to the JavaScript game in `reference/ww2-rts`.
 
 ## Why native (2026-10-11)

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Prepared explicit-Conquest companion grenade publication through the shared typed flight primitive, with source range clamping, duration before map-edge clipping and grenade counters committed after launch. Replay checks cover nine source traces, 11 launches and 77 trajectory samples, plus atomic rejection cases. Dependency integration and native checks are pending; the shared flight driver does not support the default mode alias yet.
+
 - Added source-written infantry body geometry, sampled first-person ray preparation and canonical seeded shot publication using generic hurt and existing small-arms fields. The original recorder checks 49 traces, 39 squad geometry cases and 66 operations, including carried-target contact coordinates. Native compilation/replay and typed grenade actuation remain pending; no network or C interface changed.
 
 - Extracted canonical single-target generic hurt for FPS and other direct effects, retaining source damage reductions and rider disembarkation without projectile armor, shooter XP or radial impulse. Hurt records keep the contact position before rider movement; explosions add radial impulse afterward. The shared source diff is independently reviewed; native regression verification is pending.

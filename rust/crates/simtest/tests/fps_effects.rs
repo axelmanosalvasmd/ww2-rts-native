@@ -999,3 +999,232 @@ fn canonical_fire_rejects_invalid_metadata_and_exhausted_counters_atomically() {
         );
     }
 }
+
+fn point3_json(p: ww2_core::projectiles::Point3) -> Value {
+    json!({"x":p.x,"y":p.y,"z":p.z})
+}
+
+#[test]
+fn companion_grenades_match_source_launches_clamps_and_trajectory_without_spending_fire() {
+    let f = fixture();
+    let traces: Vec<_> = f["traces"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|t| t["category"] == "grenade")
+        .collect();
+    assert_eq!(traces.len(), 9);
+    let mut launches = 0;
+    let mut samples = 0;
+    for trace in traces {
+        let context = trace["name"].as_str().unwrap();
+        let mut snapshot = trace["initial"].clone();
+        let initial = decoded(&snapshot);
+        let mut m = native_match(&f, &initial);
+        // The canonical physical-flight driver is currently admitted only in the
+        // explicit ordinary Conquest mode. Geometry and source rows are unchanged.
+        m.options.mode = Mode::Conquest;
+        m.firing.next_flight = n(&initial["game"]["nextFlight"]) as u64;
+        let random = m.start.random.snapshot();
+        let economics = m.start.economy.clone();
+        let companion_counts = m.companions.records.clone();
+        for op in trace["operations"].as_array().unwrap() {
+            let mut args = match op["op"].as_str().unwrap() {
+                "throw" => json!({"unit":op["unit"],"input":op["input"]}),
+                "set_tick" => json!({"tick":op["tick"]}),
+                "patch_unit" => json!({"id":op["id"],"fields":op["fields"]}),
+                "sample_flight" => json!({"id":op["id"],"times":op["times"]}),
+                other => panic!("unexpected grenade operation: {other}"),
+            };
+            restore(&mut args, &op["argumentFloatBits"], "");
+            apply_delta(&mut snapshot, &op["delta"]);
+            let expected = decoded(&snapshot);
+            assert!(decoded(&op["rng"]).as_array().unwrap().is_empty());
+            match op["op"].as_str().unwrap() {
+                "throw" => {
+                    let unit = id(&args["unit"]);
+                    let mut aim = Input {
+                        forward: 0.0,
+                        strafe: 0.0,
+                        yaw: 0.0,
+                        pitch: 0.0,
+                        fire: false,
+                        ads: false,
+                        crouch: false,
+                        sprint: false,
+                        weapon: 0,
+                    };
+                    aim.yaw = n(&args["input"]["yaw"]);
+                    aim.pitch = n(&args["input"]["pitch"]);
+                    let old_body = m.companions.soldiers[&unit].clone();
+                    let cooldown = m.firing.get(unit).unwrap().cooldown;
+                    let retained: Vec<_> = m
+                        .firing
+                        .flights
+                        .iter()
+                        .map(|(id, p)| (*id, format!("{p:?}")))
+                        .collect();
+                    let flight = m
+                        .throw_companion(unit, &aim, false)
+                        .unwrap_or_else(|e| panic!("{context}: {e}"));
+                    launches += 1;
+                    let body = &m.companions.soldiers[&unit];
+                    assert_eq!(body.nades, old_body.nades - 1);
+                    assert_eq!(body.nade_time.to_bits(), 1.0f64.to_bits());
+                    assert_eq!(body.mags, old_body.mags);
+                    assert_eq!(body.reload.to_bits(), old_body.reload.to_bits());
+                    assert_eq!(
+                        m.firing.get(unit).unwrap().cooldown.to_bits(),
+                        cooldown.to_bits()
+                    );
+                    assert_eq!(
+                        m.firing.next_flight,
+                        n(&expected["game"]["nextFlight"]) as u64
+                    );
+                    let order: Vec<_> = m.firing.flights.keys().copied().collect();
+                    exact(&json!(order), &expected["flightOrder"], context);
+                    for (id, before) in retained {
+                        assert_eq!(
+                            format!("{:?}", m.firing.flights[&id]),
+                            before,
+                            "{context}: registration changed retained flight {id}"
+                        );
+                    }
+                    let p = &m.firing.flights[&flight];
+                    let source = expected["flights"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .find(|p| n(&p["id"]) as u64 == flight)
+                        .unwrap();
+                    let blast = p.blast_source.unwrap();
+                    let actual = json!({"id":p.id,"owner":p.owner,"shooter":p.shooter,
+                        "kind":m.rules.kinds[p.source_kind].name,
+                        "x":p.solution.origin.x,"y":p.solution.origin.y,"z":p.solution.origin.z,
+                        "vx":p.solution.velocity.x,"vy":p.solution.velocity.y,"vz":p.solution.velocity.z,
+                        "gravity":p.solution.gravity,"stamp":p.solution.stamp,
+                        "launched":p.launched,"last":p.last,"expires":p.expires,
+                        "energy":p.energy,"sequence":p.sequence,"maxContacts":p.max_contacts,
+                        "near":p.near,"launchOrigin":point3_json(p.launch_origin),
+                        "startCell":p.start_cell,"explosive":p.explosive,"blastRadius":p.blast_radius,
+                        "effect":p.effect,"sent":p.sent,
+                        "inf":blast.infantry,"veh":blast.vehicle,"terrain":blast.terrain,
+                        "supp":blast.suppression});
+                    let mut wanted = Value::Object(serde_json::Map::new());
+                    for key in actual.as_object().unwrap().keys() {
+                        wanted[key] = match key.as_str() {
+                            "inf" | "veh" | "terrain" | "supp" => {
+                                source["blastSource"][key].clone()
+                            }
+                            _ => source[key].clone(),
+                        };
+                    }
+                    exact(&actual, &wanted, context);
+                    let tickets: Vec<_> = m
+                        .firing
+                        .grenades
+                        .iter()
+                        .map(|ticket| {
+                            json!({"x":ticket.at.x,"z":ticket.at.z,"t":ticket.remaining,
+                            "owner":ticket.owner,"flight":ticket.flight})
+                        })
+                        .collect();
+                    let source_tickets: Vec<_> = expected["nades"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|ticket| {
+                            json!({"x":ticket["x"],"z":ticket["z"],"t":ticket["t"],
+                            "owner":ticket["owner"],"flight":ticket["flight"]})
+                        })
+                        .collect();
+                    exact(&json!(tickets), &json!(source_tickets), context);
+                    let shots: Vec<_> = m
+                        .firing
+                        .events
+                        .iter()
+                        .map(|shot| shot.to_json(&m.rules))
+                        .collect();
+                    exact(&json!(shots), &expected["shots"], context);
+                }
+                "set_tick" => m.world.game.tick = n(&args["tick"]) as i64,
+                "patch_unit" => {
+                    let fields = args["fields"].as_object().unwrap();
+                    assert_eq!(fields.len(), 1);
+                    m.companions
+                        .soldiers
+                        .get_mut(&id(&args["id"]))
+                        .unwrap()
+                        .nade_time = n(&fields["nadeT"]);
+                }
+                "sample_flight" => {
+                    let p = &m.firing.flights[&(n(&args["id"]) as u64)];
+                    let actual: Vec<_> = args["times"].as_array().unwrap().iter().map(|time| {
+                        let time = n(time);
+                        samples += 1;
+                        json!({"time":time,
+                            "position":point3_json(ww2_core::projectiles::flight_at(p.solution,time).unwrap()),
+                            "velocity":point3_json(ww2_core::projectiles::velocity_at(p.solution,time).unwrap())})
+                    }).collect();
+                    exact(&json!(actual), &decoded(&op["result"]), context);
+                }
+                other => panic!("unexpected grenade operation: {other}"),
+            }
+            assert_eq!(
+                m.start.random.snapshot(),
+                random,
+                "{context}: grenade spent RNG"
+            );
+            assert_eq!(
+                m.start.economy, economics,
+                "{context}: grenade spent wallet or army resources"
+            );
+            assert_eq!(
+                m.companions.records, companion_counts,
+                "{context}: grenade counted as fire"
+            );
+        }
+    }
+    assert_eq!(launches, 11);
+    assert_eq!(samples, 77);
+}
+
+#[test]
+fn companion_grenade_rejection_preserves_counters_flights_events_and_randomness() {
+    for failure in [
+        "flight capacity",
+        "stale flight ID",
+        "missing combat",
+        "invalid pitch",
+        "empty grenades",
+        "default mode alias",
+    ] {
+        let (mut m, mut aim, shooter, _) = seeded_fire_match();
+        m.options.mode = Mode::Conquest;
+        match failure {
+            "flight capacity" => m.firing.next_flight = 9_007_199_254_740_991,
+            "stale flight ID" => {
+                m.firing
+                    .suppressed
+                    .insert(m.firing.next_flight, Default::default());
+            }
+            "missing combat" => {
+                m.combat.remove(shooter);
+            }
+            "invalid pitch" => aim.pitch = f64::NAN,
+            "empty grenades" => m.companions.soldiers.get_mut(&shooter).unwrap().nades = 0,
+            "default mode alias" => m.options.mode = Mode::Default,
+            _ => unreachable!(),
+        }
+        let before = guard_state(&m);
+        assert!(
+            m.throw_companion(shooter, &aim, false).is_err(),
+            "{failure}"
+        );
+        assert_eq!(
+            guard_state(&m),
+            before,
+            "{failure}: rejected grenade mutated state"
+        );
+    }
+}
