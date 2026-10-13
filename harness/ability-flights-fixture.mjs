@@ -55,7 +55,7 @@ for(const [kind,def] of [...grenades,...barrages])for(const variation of ['plain
  if(variation==='ammo-low'&&def.w?.perModel)u.hp=def.hpPer*2;
  if(variation==='ammo-low')u.logistics={ammo:2,ammoMax:20,ammoPrice:1,ammoCredit:0,provisions:120,forced:false,stranded:false,exhausted:false};
  g.players[0].visible=new Set([2,3]);g.players[1].visible=new Set([1]);grid.rebuildGrid(g);g.nextId=1000;
- const input=[...g.units.values()].map(u=>({id:u.id,kind:u.type,owner:u.owner,x:u.x,z:u.z,rot:u.rot,hp:u.hp,still:u.still,supp:u.supp,xp:u.xp,hitBy:null,hitAt:u.hitAt,hitFrom:null,target:0,shotAt:null,logistics:u.logistics?structuredClone(u.logistics):null,hold:false,attack:0,aim:u.aim,cooldown:0,retarget:0}));
+ const input=[...g.units.values()].map(u=>({id:u.id,kind:u.type,owner:u.owner,x:u.x,z:u.z,rot:u.rot,hp:u.hp,still:u.still,supp:u.supp,xp:u.xp,hitBy:u.hitBy??null,hitAt:u.hitAt,hitFrom:null,target:0,shotAt:null,logistics:u.logistics?structuredClone(u.logistics):null,hold:false,attack:0,aim:u.aim,cooldown:0,retarget:0}));
  const at=variation==='edge'?{x:160,z:48}:{x:targetX,z:u.z},random=combatRandom(701);g.tick=1;const saved=Math.random;Math.random=()=>random.next();try{
   if(def.ab.id==='barrage')sim.launchSalvo(g,u,at,def.ab.shells);
   else{u.nade=at;sim.__abilityLaunch(g,u);}

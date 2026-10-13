@@ -1135,7 +1135,6 @@ impl Match {
             flag(w, "shellTerrain"),
         )
         .map_err(|e| format!("projectile profile: {e:?}"))?;
-        let duration = None;
         let mut random = self.start.random.clone();
         let mut flights = Vec::with_capacity(count as usize);
         let first_id = self.firing.next_flight;
@@ -1171,18 +1170,16 @@ impl Match {
                 at,
                 profile.speed.unwrap_or(1.0),
                 profile.gravity,
-                duration,
+                None,
             )
             .map_err(|e| format!("launch solution: {e:?}"))?;
             let delay = 0.0;
             let born = g.tick as f64 * 0.05 + delay;
             let expires = born
-                + duration.unwrap_or_else(|| {
-                    math::max(
-                        solution.duration + 0.15,
-                        n(w, "range", 20.0) / profile.speed.unwrap_or(1.0),
-                    )
-                });
+                + math::max(
+                    solution.duration + 0.15,
+                    n(w, "range", 20.0) / profile.speed.unwrap_or(1.0),
+                );
             if !born.is_finite() || !expires.is_finite() {
                 return Err("invalid flight lifetime".into());
             }
