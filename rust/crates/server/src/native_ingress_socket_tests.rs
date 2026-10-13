@@ -123,6 +123,8 @@ async fn socket_controls_use_owned_slot_and_survive_same_token_takeover() {
         let start = replacement.until(|m| m["t"] == "start");
         assert_eq!(start["matchId"], epoch);
         assert_eq!(start["you"], 0);
+        assert_eq!(replacement.view.unit_count(), 0);
+        replacement.until(|m| m["t"] == "s");
         assert_ne!(replacement.view.unit(owned).unwrap().flags & 2048, 0);
         // A replaced socket's last attempted bytes cannot acquire the new seat.
         let stale = json!({"t":"stance","ids":[owned],"key":"holdFire","on":false})

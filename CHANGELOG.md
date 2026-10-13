@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Correct the commander socket test's reconnect lifecycle after `82e3540` passed two admission tests and one lobby test, then failed by reading a unit immediately after start. Start resets the decoder's unit rows and carries no units; the test now checks that empty baseline and waits for the first actual snapshot before checking the retained held-fire flag. Runtime, decoder and original fixtures are unchanged. The failed log is retained; fresh native verification is pending.
+
 - Retained the root-reviewed startup test lint closure `3b84f7c` through normal ancestry in the commander-ingress candidate. Only the identical direct rows privacy assertion changes beyond its repaired startup parent; ingress production and all four new tests retain their source-reviewed bytes. Exact-head combined native proof remains pending.
 
 - Normally retained the independently source-reviewed startup test successor `81cd1ef` in the isolated commander-ingress candidate. It preserves genuine Scenario refusal and supported Default lifecycle/privacy assertions, including optional mine-material field presence. Ingress and startup production bodies remain unchanged by this convergence; combined native verification is pending.
