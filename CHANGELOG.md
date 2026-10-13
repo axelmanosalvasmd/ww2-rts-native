@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Accept the existing ordinary Default alias in canonical ability, recovery and shared-project guards when Game has no mode object. Three original-source mode cases execute three accepted commands and six full steps, including capture, income and VP victory; omitted mode and explicit Conquest match. Literal empty-string mode retains its distinct optional Tech and Logistics boundary. A real paid-job provider admission test is written; native and combined caller checks remain pending.
+
 - Connected canonical mass-project admission, early recount and per-unit segment allocation immediately before paid field work in the separate continuation. Retirement and accepted retreat now validate both paid-job and project-membership parity before sole cancellation. Construction remains excluded; native full-step comparison is being written and no combined proof is claimed.
 
 - Normal-merged the corrected source mass-project tick provider into a separate ground-support descendant, preserving the newer ability admission regression and actual operative/reaction caller. Canonical jobs and memberships remain singular; combined native proof is pending.
