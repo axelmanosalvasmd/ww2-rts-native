@@ -8,6 +8,9 @@ use crate::{
     rules::Rules,
     world::{World, WorldError},
 };
+#[path = "match_engineering.rs"]
+mod match_engineering;
+
 use std::{
     collections::{BTreeMap, BTreeSet},
     sync::OnceLock,

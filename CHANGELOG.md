@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added a staged Match ordinary-dig actuator using the canonical wallet, terrain and field-work job owner, with real sight checks, garrison exit, synchronous activity projection and story counters. Eight original-source traces cover 31 admission and lifecycle actions. Native proof, typed Dig dispatch and live tick binding remain pending.
+
 - Reserved shared command denial names for source manpower, maximum, missing-builder and visibility refusals, allowing the separate ordinary-dig actuator to use the single dispatcher enum. No gameplay handler or queue changes are included; native actuator proof remains pending.
 
 - Added one shared field-work cancellation helper for staged transactions borrowing wallet/story and unit state separately. Match delegates to the same implementation, including identity and activity checks before mutation. Native checks remain pending.
