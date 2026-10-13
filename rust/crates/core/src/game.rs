@@ -12,6 +12,9 @@ use crate::rules::Rules;
 /// Metres per map cell (`CELL`).
 pub const CELL: f64 = 2.0;
 
+/// Internal World local actor. It is never a commander slot or a raw wire owner.
+pub const LOCAL_DEFENDER_OWNER: usize = u32::MAX as usize;
+
 // Cell flag bits (`shared/sim.js`, the line after `CELL`), the ones the passes read.
 pub const MOVE: u16 = 1;
 pub const SIGHT: u16 = 2;
@@ -105,7 +108,7 @@ pub struct Unit {
     pub id: UnitId,
     /// Index into `Rules::kinds`.
     pub kind: usize,
-    /// The owning player's slot, an index into `Game::players`.
+    /// Commander slot in `Game::players`, or LOCAL_DEFENDER_OWNER only in World mode.
     pub owner: usize,
     pub x: f64,
     pub z: f64,
@@ -287,6 +290,8 @@ pub struct Section {
 /// A burnt-out vehicle (`g.wrecks`): cover for infantry once it has settled.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Wreck {
+    /// Durable unit identity, absent in query-only fixtures.
+    pub id: Option<u32>,
     /// Settled obstruction cell (`w.c`), absent for unregistered or moving wrecks.
     pub cell: Option<usize>,
     pub x: f64,
@@ -347,7 +352,11 @@ pub struct Game {
 
 impl Game {
     pub fn team_of(&self, u: &Unit) -> Team {
-        self.players[u.owner].team
+        if self.mode == Some(ModeKind::World) && u.owner == LOCAL_DEFENDER_OWNER {
+            -1
+        } else {
+            self.players[u.owner].team
+        }
     }
 
     /// The cell under a point, or `None` off the map (`cellOf`).
@@ -366,6 +375,12 @@ impl Game {
 
     /// Two players on one team; a player is allied with itself (`allied`, for players that exist).
     pub fn allied(&self, a: usize, b: usize) -> bool {
+        if self.mode == Some(ModeKind::World)
+            && a == LOCAL_DEFENDER_OWNER
+            && b == LOCAL_DEFENDER_OWNER
+        {
+            return true;
+        }
         match (self.players.get(a), self.players.get(b)) {
             (Some(a), Some(b)) => a.team == b.team,
             _ => false,

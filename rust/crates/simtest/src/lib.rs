@@ -6,6 +6,7 @@
 pub mod check;
 pub mod codec;
 pub mod load;
+pub mod map;
 pub mod replay;
 pub mod view;
 pub mod workload;
