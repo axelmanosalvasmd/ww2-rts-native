@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Admitted owned aircraft as ordinary firing context at their source off-map bases and during entry or return. Aircraft require canonical sortie, combat, firing and control metadata; ordinary actors keep their map bounds. Prior-pose capture now validates context before writing. The original whole-step recorder covers 12 aircraft cases and 24 before/after contexts with no generic flights or shots. Added focused context and atomic-refusal tests; native checks and tick integration remain pending.
+
 - Restored the source's forced-unit stance exclusion after independent command review caught an overbroad eligibility arm. The source names legacy command alternatives, while actual stance commands use t=stance and remain excluded. Added the real forced-ground stance regression; the command oracle now passes 71 traces and 147 checkpoints. Native command proof remains pending.
 
 - Connected bounded aircraft Move/Attack/Stop/Escort/Retreat and hold-fire controls to the existing recorded command dispatcher. Prepared aircraft selections validate before convoy, supply or control writes; aircraft branches bypass ground routes and recipient Fog reads. The unchanged source command oracle records 70 traces and 145 checkpoints, with distinct cleanup, clamping, target denials and mixed selection behavior. Queued aircraft, automatic/ground weapons and ground branches of the new variants remain explicit unsupported phases. Source/native queue and atomicity consumers are added; native proof remains pending.

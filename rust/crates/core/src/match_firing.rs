@@ -307,6 +307,7 @@ impl Match {
         if !(0..9_007_199_254_740_351).contains(&self.world.game.tick) {
             return Err("invalid prior-pose tick".into());
         }
+        self.validate_firing_units()?;
         self.firing.prior = self
             .world
             .game
@@ -317,7 +318,28 @@ impl Match {
         self.firing.prior_tick = Some(self.world.game.tick + 1);
         Ok(())
     }
+    /// Admit aircraft as observed context only. Their canonical sortie owner
+    /// validates physical state and metadata; this does not admit air weapons.
+    pub(crate) fn validate_aircraft_firing_context(&self) -> Result<(), String> {
+        if self
+            .world
+            .game
+            .units
+            .values()
+            .any(|u| u.air.is_some() || self.rules.kinds.get(u.kind).is_some_and(|kind| kind.air))
+        {
+            self.validate_aviation()
+                .map_err(|error| error.to_string())?;
+            if self.world.game.units.values().any(|u| {
+                u.air.is_some() && (u.x.abs() > 1_073_741_824.0 || u.z.abs() > 1_073_741_824.0)
+            }) {
+                return Err("aircraft firing context exceeds environment position bounds".into());
+            }
+        }
+        Ok(())
+    }
     fn validate_firing_units(&self) -> Result<(), String> {
+        self.validate_aircraft_firing_context()?;
         for (&id, u) in &self.world.game.units {
             if u.id != id
                 || u.kind >= self.rules.kinds.len()
@@ -325,7 +347,8 @@ impl Match {
                 || ![u.x, u.z, u.hp, u.rot, u.supp]
                     .iter()
                     .all(|n| n.is_finite())
-                || self.world.game.cell_of(u.x, u.z).is_none()
+                || (self.world.game.cell_of(u.x, u.z).is_none()
+                    && !(u.air.is_some() && self.rules.kinds[u.kind].air))
                 || u.cells
                     .as_ref()
                     .is_some_and(|c| c.iter().any(|&c| c as usize >= self.world.game.flags.len()))

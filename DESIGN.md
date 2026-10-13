@@ -1,5 +1,13 @@
 # Three Crossroads Native: design decisions
 
+## Aircraft in ordinary firing context (2026-10-13)
+
+The source aircraft base may lie outside the map, and aircraft enter and return through off-map positions. The ordinary firing phase still observes those actors and captures their prior poses even when there are no projectiles. Its map-cell validation previously rejected this legitimate context before any ground weapon work could run.
+
+`validate_aircraft_firing_context` reuses the canonical aviation owner's physical identity, kind/state, owner, finite sortie fields, combat, firing and control validation. It admits off-map positions only for those validated aircraft, with the environment adapter's existing absolute coordinate limit of 1,073,741,824. Ground actors still need a valid map cell. Prior-pose capture performs this validation before changing its history. This is context admission only: per-unit ordinary air weapon and timer execution still refuse, the aircraft owner advances its own timers, and generic flight contact continues excluding airborne unit bodies. No new aircraft projectile, ground-attack, area-attack or visibility behavior is introduced.
+
+The recorder executes unchanged source `step` for fighter, attacker and bomber in Base, Rearm, entering Out and returning Home states. Twelve cases capture 24 before/after contexts with original poses, sortie metadata and firing fields. Every case retains two actors and aircraft HP, with no generic flights or shots. The native tests use those source contexts to exercise prior capture, shared claims and empty flight stepping, plus refusal before firing-state changes for missing/mismatched aircraft metadata, out-of-range positions and off-map ground actors. Native execution and actual tick consumption remain pending. These checks do not establish whole-tick or live-projectile parity.
+
 The plan, its evidence and its open work are issue #1. This file records what was decided and why, and the measurements as they come in. Paths such as `shared/sim.js` refer to the JavaScript game in `reference/ww2-rts`.
 
 ## Why native (2026-10-11)
