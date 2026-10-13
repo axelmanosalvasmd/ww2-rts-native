@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added an explicit staged aircraft spawn path while retaining ordinary UnsupportedAir admission. Shared unit defaults and scatter are factored once; aircraft still scatter before their authoritative air-base override and start parked with auto-retreat off. The unchanged source oracle records 18 aircraft constructors. Native validation and actual sortie/AA runtime remain pending.
+
 - Added actual paratrooper admission and delivery through current-position visibility, pending population and shared prepared unit publication, with canonical reserves/combat/firing metadata. All eight off-map support kinds now have source actuators. The source oracle passes 268 traces and 5,922 checkpoints, including multi-flak ammunition/forced-stranded states and carrier/rider strafing order. Fixed the ordinary Conquest Default mode alias. Native differential verification and complete tick hookup are pending; continuous anti-air against on-map aircraft remains an explicit unsupported sortie prerequisite.
 
 - Strengthened aircraft oracle sampling to capture actual arrival, payload, interception and removal events, continuing through recon and fighter-cover expiry. The source recorder passes 188 traces and 4,212 checkpoints. Native proof remains pending.
