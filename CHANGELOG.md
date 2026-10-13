@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added a pure complete-current aircraft runner boundary hook, rejecting orphan sortie/AA identities before queue or clock mutation. Shared canonical aircraft scene helpers now serve both component and actual-runner consumers. The new recorder retains ten unchanged Source full-step traces (4,972 steps, 9,965 observed AIR/AA calls); the new native consumer calls only advance_tick and compares every step without copying phase outputs into Match. The sole caller still awaits its owner's scheduling change, and native checks remain unrun.
+
 - Normal-merged the verified aircraft provider into a separate checked SupportMass caller descendant without changing its scheduler. Preserved newer command siblings, field-work retirement sidecars and captured-burn fixtures, retaining all 51 environment cases (270 actions). Aircraft births now stage canonical Ability and Recovery defaults and refuse occupied sidecar IDs. Ground support remains its existing authority pending the support owner's migration; actual aircraft runner consumption and native proof remain pending.
 
 - Corrected the inherited ground-support scope note to acknowledge the mass-project phase in this coherent head. Rust and harness trees remain identical to tested 0f7850d.

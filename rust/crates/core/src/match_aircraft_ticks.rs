@@ -1,6 +1,30 @@
 //! Aircraft unit-phase hooks for the sole Match tick owner, without clock or scheduling ownership.
 use crate::{grid::UnitId, match_aviation::AviationError, match_runtime::Match};
 impl Match {
+    /// Pure complete-current admission for the sole recorded runner boundary.
+    /// Commands retain ordinary denial semantics; their AIR branches preflight before selection writes.
+    /// Call again after boundary publication, before prior capture or clock mutation.
+    pub fn validate_aircraft_runner_boundary(&self, boundary: u64) -> Result<(), AviationError> {
+        self.validate_command_tick(boundary)
+            .map_err(AviationError::Actuation)?;
+        if self.aviation.planes.keys().any(|id| {
+            self.world
+                .game
+                .units
+                .get(id)
+                .is_none_or(|u| u.air.is_none())
+        }) || self
+            .aviation
+            .anti_air
+            .keys()
+            .any(|id| !self.world.game.units.contains_key(id))
+        {
+            return Err(AviationError::Invalid("orphan aircraft runtime identity"));
+        }
+        let actors = self.world.game.units.keys().copied().collect::<Vec<_>>();
+        self.validate_aircraft_tick_phases(&actors, self.rules.movement.tick, boundary)
+    }
+
     /// Admit the represented aircraft turns, late AA and retirement before the next clock.
     /// The tick owner still validates other phases and applies queued inputs in their own order.
     pub fn validate_aircraft_tick_phases(
