@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Extend the separately reviewed ordinary Default alias to typed Dig admission, requiring absent Game mode and preserving real job, wallet and terrain-read checks. The new regression replays an actual source paid Dig command against both canonical aliases and protects existing paid work on refused mode contexts. Native execution remains pending.
+
 - Accept the existing ordinary Default alias in canonical ability, recovery and shared-project guards when Game has no mode object. Three original-source mode cases execute three accepted commands and six full steps, including capture, income and VP victory; omitted mode and explicit Conquest match. Literal empty-string mode retains its distinct optional Tech and Logistics boundary. A real paid-job provider admission test is written; native and combined caller checks remain pending.
 
 - Connected canonical mass-project admission, early recount and per-unit segment allocation immediately before paid field work in the separate continuation. Retirement and accepted retreat now validate both paid-job and project-membership parity before sole cancellation. Construction remains excluded; native full-step comparison is being written and no combined proof is claimed.
