@@ -192,6 +192,7 @@ impl Match {
             })
             .collect::<Result<BTreeSet<_>, _>>()?;
         let scenario_state = scenario.state();
+        let player_count = self.world.game.players.len();
         if point_ids.len() != self.start.points.len()
             || scenario_state
                 .owners
@@ -201,6 +202,17 @@ impl Match {
                 != point_ids
             || scenario_state.owners.values().flatten().any(|owner| {
                 *owner < -1 || (*owner >= 0 && *owner as usize >= self.world.game.players.len())
+            })
+            || scenario_state.captured.iter().any(|capture| {
+                let Some((point, owner)) = capture.rsplit_once(':') else {
+                    return true;
+                };
+                let Ok(owner_slot) = owner.parse::<usize>() else {
+                    return true;
+                };
+                !point_ids.contains(point)
+                    || owner_slot >= player_count
+                    || owner_slot.to_string() != owner
             })
         {
             return Err("legacy scenario point state does not match this match".into());
@@ -299,6 +311,16 @@ mod tests {
             state.scenario.as_ref().unwrap().state().triggers["legacy:2@match"].count,
             1
         );
+        let mut persisted = state.scenario.as_ref().unwrap().state().clone();
+        let point = persisted.owners.keys().next().unwrap().clone();
+        persisted.captured.insert(format!("{point}:99"));
+        state
+            .scenario
+            .as_mut()
+            .unwrap()
+            .restore_state(persisted)
+            .unwrap();
+        assert!(state.preflight_legacy_scenario().is_err());
     }
 
     #[test]

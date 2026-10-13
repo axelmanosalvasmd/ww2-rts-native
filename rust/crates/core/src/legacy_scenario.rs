@@ -95,6 +95,7 @@ impl std::error::Error for LegacyError {}
 
 /// Validate the only public Say payload that migrated legacy triggers can emit.
 pub fn validate_public_say(action: &SayAction) -> Result<(), LegacyError> {
+    const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
     let mut keys = action.localized.keys();
     let Some(language) = keys.next() else {
         return Err(LegacyError::InvalidState);
@@ -104,12 +105,19 @@ pub fn validate_public_say(action: &SayAction) -> Result<(), LegacyError> {
         || action.text.is_empty()
         || action.localized.get("en") != Some(&action.text)
         || action.side != 0
-        || action.at_tick > 9_007_199_254_740_991
-        || !action.execution.starts_with("scenario:")
-        || match action.execution["scenario:".len()..].parse::<u64>() {
-            Ok(execution) => execution == 0,
-            Err(_) => true,
-        }
+        || action.at_tick > MAX_SAFE_INTEGER
+    {
+        return Err(LegacyError::InvalidState);
+    }
+    let Some(suffix) = action.execution.strip_prefix("scenario:") else {
+        return Err(LegacyError::InvalidState);
+    };
+    let Ok(execution) = suffix.parse::<u64>() else {
+        return Err(LegacyError::InvalidState);
+    };
+    if execution == 0
+        || execution > MAX_SAFE_INTEGER
+        || action.execution != format!("scenario:{execution}")
     {
         return Err(LegacyError::InvalidState);
     }
@@ -434,5 +442,30 @@ mod tests {
             0
         );
         assert_eq!(scenario.state.next_execution, 2);
+    }
+
+    #[test]
+    fn public_say_rejects_noncanonical_or_unsafe_execution_ids() {
+        let mut action = SayAction {
+            text: "message".into(),
+            localized: BTreeMap::from([("en".into(), "message".into())]),
+            execution: "scenario:1".into(),
+            at_tick: 0,
+            side: 0,
+        };
+        assert_eq!(validate_public_say(&action), Ok(()));
+        for execution in [
+            "scenario:+1",
+            "scenario:01",
+            "scenario:9007199254740992",
+            "scenario:18446744073709551616",
+        ] {
+            action.execution = execution.into();
+            assert_eq!(
+                validate_public_say(&action),
+                Err(LegacyError::InvalidState),
+                "accepted {execution}"
+            );
+        }
     }
 }
