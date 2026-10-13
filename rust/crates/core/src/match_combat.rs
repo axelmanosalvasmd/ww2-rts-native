@@ -159,7 +159,11 @@ impl DamageWorld<'_> {
             u.id != *id
                 || u.kind >= self.rules.kinds.len()
                 || u.owner >= g.players.len()
-                || ![u.x, u.z, u.hp, u.supp].iter().all(|v| v.is_finite())
+                || ![u.x, u.z, u.hp, u.supp, u.rot, u.sprint]
+                    .iter()
+                    .all(|v| v.is_finite())
+                || u.sprint < 0.
+                || u.supp < 0.
                 || u.garrison.is_some_and(|c| c >= g.chars.len())
         }) {
             return Err(CombatError::InvalidInput("unit"));
@@ -176,6 +180,14 @@ impl DamageWorld<'_> {
                 .combat
                 .get(id)
                 .ok_or(CombatError::InvalidInput("unit combat metadata"))?;
+            combat::retreat_protected(combat::RetreatState {
+                retreating: u.retreating,
+                forced: self.logistics.get(id).is_some_and(|r| r.forced),
+                stranded: self.logistics.get(id).is_some_and(|r| r.stranded),
+                move_speed: u.move_speed,
+                vx: u.vx.unwrap_or(0.),
+                vz: u.vz.unwrap_or(0.),
+            })?;
             if !m.xp.is_finite()
                 || m.xp < 0.
                 || !m.hit_at.is_finite()
