@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Integrated World memory with the canonical command, firing and reaction startup ancestry. Memory journal defaults and bounded World observation behavior are retained; final combined native checks remain pending.
+- Integrated World memory with the canonical command, firing and reaction startup ancestry. Memory journal defaults and bounded World observation behavior are retained. Final local checks pass: 24 focused debug tests, 170 locked release workspace tests, strict Clippy, formatting and release FFI; hosted platform checks remain pending.
 
 - Kept the new validation note scoped to World recipient memory and its release FFI check; earlier generator evidence is unchanged.
 
@@ -39,7 +39,7 @@
 - Added checked absolute World journal cursors and prefix trimming, with an explicit zero-epoch startup reset that preserves ordinary journal drains. World runtime now owns lazy shared team terrain memory, stable accepted-row revisions, separate commander delivery and route cursors, and canonical region contested state. Native integration and original-source verification are pending.
 
 - Fixed the missing rail track-position type annotation found by the first World native compile. Added checked World region/economy projections and optional rail/station snapshot fields with atomic post-rails row annotation after the original startup oracle found missing metadata. Mutable-terrain callers still need to invoke the explicit projection hook. Updated the crafted source case to test floating-column lookup on nonmultiple dimensions; full native acceptance remains pending.
-- Integrated World startup with the reviewed command, firing and reaction ancestry, preserving canonical publication defaults and both sets of evidence. Final combined native checks remain pending.
+- Integrated World startup with the reviewed command, firing and reaction ancestry, preserving canonical publication defaults and both sets of evidence. The merged local checks pass: 20 focused debug tests, 166 locked release workspace tests, strict Clippy, formatting and release FFI. Hosted platform checks remain pending.
 
 - Verified the merged bounded World constructor with 160 locked release workspace tests, strict Clippy, formatting and release FFI. Five original startups cover 2,761 units, canonical combat/firing metadata, home ownership, visibility, terrain log order and rails; all 63 ordinary startup records remain unchanged. Parity rows stay in progress for live World and server integration.
 
