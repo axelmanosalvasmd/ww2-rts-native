@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Normal-merged the checked ordinary Default runner into the separate carrier integration, preserving the new riding/boarding sites and canonical command siblings. The 240-test predecessor proof remains distinct from the uncompiled carrier composition; no frozen proof branch changed.
+
 - Added source-written carrier tick admission and actual early riding/late boarding sites in a separate integration tree. Canonical pose/grid and ability cooldown update before the rider continues; OnFoot prunes stale cargo and Boarded skips the remaining turn. Existing validators preflight active reciprocal relations and queued Board goals, retaining missing/dead target clearing while refusing thrown ejection and boat/rail/garrison transport. Native composition remains pending.
 
 - Joined the checked combined tick runner and recorded ground carrier provider in a separate full-step oracle/consumer tree. Both Entrench and Board/Unload remain in the single command queue; existing phase bodies are retained. Carrier tick hooks, the new source capture and combined native proof remain pending.
@@ -26,6 +28,21 @@
 
 
 - Added a bounded ordinary Match carrier component using canonical board/cargo/riding state, own-seat reservations, recipient-aware routes, paid Dig cancellation, physical ground boarding, riding pose updates and manual unload. The pinned-source recorder covers 14 traces and 66 actions, including stable selection ties, a hidden obstacle and carrier/grid flag receipts. Boats, rail, garrison exits, unrepresented building/entrench work and wrecked-carrier ejection remain explicit unsupported boundaries; command parser/scheduler attachment and native verification are pending.
+- Independently replayed the Default proof's copied core, support and mass-project binaries in both profiles: all 80 test executions pass, with seven artifact hashes, 13 compiled-source hashes and 13 gate-log hashes verified. This documentation closure changes no Rust or harness file.
+
+- Verified the ordinary Default caller and provider assembly on the Mac at `07250fdf`: all 240 locked workspace release tests, 40 distinct focused debug tests, strict all-target Clippy, formatting and the release FFI build pass without source repairs. All 13 original support traces now run unchanged through 2,705 ticks and 153 checkpoints, including Default's 45 ticks and nine checkpoints; the seven mass-project cases also pass. Raw empty-string feature defaults, unsupported modes, AIR/logistics scope and hosted or Unreal acceptance remain separate.
+
+- Normal-merged the sole tick owner's immutable Default guard and reviewed provider aliases into the separate actual-source consumer. The checked support/project ancestry and all provider bodies are preserved; combined native checks are pending.
+
+- Consume all 13 unchanged original-source ground-support traces through the actual typed mode, including the 45-step Default case. The complete consumer checks 2,705 ticks and 153 recorded checkpoints; the obsolete Default-refusal test is removed. Provider and sole caller aliases are integrated separately; this new combined native proof is pending.
+
+- Admitted the ordinary Default alias in the sole tick guard after the real called providers were audited and their reviewed guard aliases were normally merged. Game.mode must remain absent; existing options, raw source configuration, RNG and order sequencing are unchanged. The actual Default replay and first composed native proof remain pending.
+
+- Normal-merged the reviewed ordinary Default provider aliases into a separate successor of the verified support/project closure. Existing Source configuration and canonical state remain unchanged; the sole caller guard and actual Default replay are separate source changes with native proof pending.
+
+- Corrected the inherited ground-support scope note to acknowledge the mass-project phase in this coherent head. Rust and harness trees remain identical to tested 0f7850d.
+
+- Verified the combined ground-support and mass-project tick assembly on the Mac (arm64): all 239 workspace release tests, 78 affected debug tests at the same runtime, strict Clippy, formatting and release FFI pass. Independent hash-checked copies pass 28 debug/release tests. Actual runner replay covers 12 Conquest support traces (2,660 ticks, 144 checkpoints), real Default refusal and seven project cases (193 ticks, 215 snapshots). Recorded two consumer-only compile repairs; Default alias, carriers, aircraft and full match start remain separate.
 
 - Raised the ground-support test crate's macro expansion limit for its complete canonical unit projection after the first native compiler reached serde_json's default recursion ceiling. All observed fields and runtime behavior remain unchanged; native checks continue at the repaired source.
 
@@ -42,6 +59,9 @@
 - Added a source-written whole-scene admission test for configured tick 18 and the next real runner boundary. It checks empty-queue restoration, unchanged RNG/wallet, running/primed/pending-input refusal and invalid-clock atomicity; native execution is pending.
 
 - Added deterministic initial tick path configuration with the unchanged 4,096/20 defaults. Trusted fresh scenes stage an empty command-queue restore and clock together before any writes; pending, running or faulted queues cannot be rewound. The actual mass retry-one source scene can now use the sole scheduler without manual phase calls. Combined native proof remains pending.
+- Extend the separately reviewed ordinary Default alias to typed Dig admission, requiring absent Game mode and preserving real job, wallet and terrain-read checks. The new regression replays an actual source paid Dig command against both canonical aliases and protects existing paid work on refused mode contexts. Native execution remains pending.
+
+- Accept the existing ordinary Default alias in canonical ability, recovery and shared-project guards when Game has no mode object. Three original-source mode cases execute three accepted commands and six full steps, including capture, income and VP victory; omitted mode and explicit Conquest match. Literal empty-string mode retains its distinct optional Tech and Logistics boundary. A real paid-job provider admission test is written; native and combined caller checks remain pending.
 
 - Connected canonical mass-project admission, early recount and per-unit segment allocation immediately before paid field work in the separate continuation. Retirement and accepted retreat now validate both paid-job and project-membership parity before sole cancellation. Construction remains excluded; native full-step comparison is being written and no combined proof is claimed.
 

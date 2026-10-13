@@ -10,6 +10,9 @@ use crate::{
 };
 
 fn scene() -> (Match, UnitId) {
+    scene_mode(Mode::Conquest)
+}
+fn scene_mode(mode: Mode) -> (Match, UnitId) {
     let value = serde_json::json!({"name":"Project tick admission","w":40,"h":40,
         "rows":vec![".".repeat(40);40],"spawns":[{"x":0,"y":0},{"x":39,"y":39}],
         "points":[{"x":20,"y":20}]});
@@ -18,7 +21,7 @@ fn scene() -> (Match, UnitId) {
         &map,
         MatchOptions {
             seed: 701,
-            mode: Mode::Conquest,
+            mode,
             players: (0..2)
                 .map(|team| PlayerConfig {
                     name: format!("P{team}"),
@@ -224,4 +227,123 @@ fn cached_crew_capacity_is_reserved_until_the_actual_twentieth_tick_sweep() {
     m.world.game.tick = 20;
     m.recount_field_projects().unwrap();
     assert_eq!(m.field_works.project(1).unwrap().crew, 1);
+}
+
+fn alias_state(m: &Match) -> String {
+    format!(
+        "{:?}:{:?}:{:?}:{:?}:{:?}:{:?}:{:?}",
+        m.world.game,
+        m.field_works,
+        m.commands.units,
+        m.abilities,
+        m.recovery,
+        m.start.economy,
+        m.story
+    )
+}
+
+#[test]
+fn ordinary_default_provider_admission_preserves_real_jobs_and_actuators() {
+    let source: serde_json::Value =
+        serde_json::from_slice(include_bytes!("../tests/fixtures/ordinary-mode-alias.json"))
+            .unwrap();
+    assert_eq!(source["cases"][0]["steps"], source["cases"][1]["steps"]);
+    assert_eq!(source["cases"][0]["steps"][0]["expected"]["winner"], 0);
+    assert_eq!(source["cases"][2]["steps"][0]["expected"]["tech"], false);
+    assert_eq!(
+        source["cases"][2]["steps"][0]["expected"]["logisticsEnabled"],
+        false
+    );
+    let (mut default, first) = scene_mode(Mode::Default);
+    let (mut conquest, other_first) = scene_mode(Mode::Conquest);
+    assert_eq!(first, other_first);
+    assert!(default.world.game.mode.is_none() && conquest.world.game.mode.is_none());
+    assert_eq!(alias_state(&default), alias_state(&conquest));
+    for m in [&mut default, &mut conquest] {
+        let raw = &source["cases"][0]["command"]["command"];
+        let stance = Command::from_json(raw).unwrap();
+        assert_eq!(m.execute_command(0, &stance, false).unwrap(), None);
+        paid(m, first);
+        let current = order(m);
+        let before = alias_state(m);
+        m.validate_abilities().unwrap();
+        m.prepare_recovery(&current).unwrap();
+        m.validate_field_project_tick(&current).unwrap();
+        assert_eq!(alias_state(m), before);
+        let second = m
+            .world
+            .game
+            .units
+            .values()
+            .find(|u| u.owner == 0 && u.id != first && m.rules.kinds[u.kind].name == "rifle")
+            .unwrap()
+            .id;
+        assert_eq!(
+            m.execute_entrench(
+                0,
+                &[i64::from(second)],
+                ProjectOrder::Join {
+                    project: 1,
+                    at: None
+                },
+                false,
+                false
+            )
+            .unwrap(),
+            None
+        );
+        assert_eq!(m.field_works.membership(second), Some(1));
+        assert!(m.field_works.is_active(first));
+        m.advance_ability_timers(first, 0.05).unwrap();
+        let frame = m.prepare_recovery(&current).unwrap();
+        m.heal_and_sweep(&frame, 0.05).unwrap();
+        m.reinforce(&frame, 0.05).unwrap();
+        let hq = m
+            .world
+            .game
+            .units
+            .values()
+            .find(|u| u.owner == 0 && m.rules.kinds[u.kind].name == "hq")
+            .unwrap()
+            .id;
+        assert_eq!(m.repair_building_sections(hq, 1.0).unwrap(), 0.0);
+        m.validate_field_project_tick(&current).unwrap();
+    }
+    assert_eq!(alias_state(&default), alias_state(&conquest));
+    assert_eq!(
+        default.start.random.snapshot(),
+        conquest.start.random.snapshot()
+    );
+    // A mode alias never represents a construction context or a synthetic mode object.
+    for (mode, game_mode) in [
+        (Mode::World, None),
+        (Mode::Classic, None),
+        (Mode::Default, Some(ModeKind::Assault)),
+        (Mode::Conquest, Some(ModeKind::Classic)),
+    ] {
+        default.options.mode = mode;
+        default.world.game.mode = game_mode;
+        let current = order(&default);
+        let before = alias_state(&default);
+        assert!(default.validate_abilities().is_err());
+        assert!(default.prepare_recovery(&current).is_err());
+        assert!(default.validate_field_project_tick(&current).is_err());
+        assert!(
+            default
+                .execute_entrench(
+                    0,
+                    &[i64::from(first)],
+                    ProjectOrder::Join {
+                        project: 1,
+                        at: None
+                    },
+                    false,
+                    false
+                )
+                .unwrap()
+                .is_some()
+        );
+        assert!(default.repair_building_sections(first, 1.0).is_err());
+        assert_eq!(alias_state(&default), before);
+    }
 }
