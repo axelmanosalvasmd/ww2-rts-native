@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Corrected the engineering replay to the coordinated command constructor and checked excluded work through parse plus dispatch. Queued digs and known excluded forts are represented inputs whose dispatcher returns unsupported. Native execution remains pending.
+
 - Joined the typed Dig dispatcher and canonical request/cancellation hooks into the engineering proof tree. Added unchanged-state checks for queued digs and excluded fort kinds at the parser boundary. Native execution remains queued.
 - Preserved invalid-coordinate refusal precedence for typed aimed abilities over the new unsupported-project preflight. The existing project-boundary regression now includes a nonfinite typed aim; raw JSON behavior is unchanged. Native proof remains pending.
 

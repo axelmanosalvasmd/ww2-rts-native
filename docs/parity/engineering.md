@@ -207,3 +207,6 @@ The staged adapter uses the singular Match.field_works owner and the shared sync
 
 
 The Match recorder was extended to 12 traces and 47 actions. It now uses original beginPathTick and requestStepPath for immediate routing, FIFO deferral, cancellation of a deferred job and failed-route job dropping. Those source results are verified; the corresponding native consumer awaits the coordinated input/routing dependency and native lease.
+
+
+The coordinated source proof tree includes the typed Dig dispatcher and canonical request/drop and Move/Stop cancellation hooks. The native fixture consumer uses that parser and dispatcher directly. Compilation and execution are still unverified; actual unit-loop binding remains pending.

@@ -92,7 +92,7 @@ fn make(case: &Value) -> Match {
             visible: Vec::new(),
         })
         .collect();
-    m.commands = MatchCommands::default();
+    m.commands = MatchCommands::new(4096);
     m.abilities = AbilityState::default();
     m.firing = FiringState::default();
     m.combat = CombatState::default();
@@ -242,7 +242,11 @@ fn admission_guards_reject_before_payment_or_cancellation() {
         json!({"t":"dig","ids":[1],"kind":"bridge","x":20,"z":20}),
         json!({"t":"dig","ids":[1],"kind":"wall","x":20,"z":20}),
     ] {
-        assert_eq!(Command::from_json(&raw), Err(Denial::Unsupported));
+        let command = Command::from_json(&raw).unwrap();
+        assert_eq!(
+            m.execute_command(0, &command, false).unwrap(),
+            Some(Denial::Unsupported)
+        );
         assert_eq!(snapshot(&m), before);
     }
     assert_eq!(
