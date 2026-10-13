@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified the coherent ground-carrier component on Vostro at 8ef9c7e: nine focused debug tests, all 208 release workspace tests, strict Clippy, formatting and the release FFI build pass. The 14-trace, 66-action original-source oracle is unchanged. Recorded Board/Unload dispatch and tick attachment remain separate.
+
 - Merged the checked engineering dependency into a separate carrier source successor, preserving the carrier component and its 14-trace, 66-action oracle. Carrier native and recorded-command consumer checks remain pending; the frozen original checkpoint is unchanged.
 
 - Added an actual-source full-carrier refusal with a paid Dig still active, followed by unload and successful boarding. The replay now requires refusal to preserve the job and spent wallet before successful admission cancels it without refund. Native proof is pending.
