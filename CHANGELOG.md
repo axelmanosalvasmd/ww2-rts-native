@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Added typed World size, region, immutable geography and terrain inputs for the native generator-to-loader handoff. Validation and mutable World initialization follow separately; no wire or ABI interface changes.
+- Added typed World size, region, immutable geography and terrain inputs for the native generator-to-loader handoff. Validation and mutable World initialization follow separately; no wire or ABI interface changes. Region biome labels and explicit landmark building tags now accompany the typed handoff.
 
 - Added per-player observed terrain memory with filtering before storage, stable row revisions, canonical full-route order and a separate snapshot outbox. Three original-source traces match 117 actions, including hidden mines, unseen removals, building cancellation, allied/live/ruin footprints, reveal, teams and reconnect reads. Invalid shapes, exhausted revisions and mismatched route recipients reject before memory changes. World Conquest memory, real visibility wiring, snapshot serialization and Match integration remain separate; MOV-29 and MAP-100 stay in progress.
 

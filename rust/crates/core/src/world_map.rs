@@ -1,6 +1,6 @@
 //! Typed authoritative geography exchanged between the native generator and map loader.
 //! These records are authoring data, not live ownership, capture progress or a Match.
-use crate::map::{Layers, Spawn};
+use crate::map::{Building, Layers, Spawn};
 use serde_json::Value;
 use std::collections::BTreeMap;
 
@@ -32,6 +32,7 @@ pub struct WorldRegion {
     pub home: Option<usize>,
     pub kind: Option<String>,
     pub name: Option<String>,
+    pub biome: Option<String>,
     /// Original generator hint. Runtime ownership is resolved from actual match players later.
     pub team: Option<i32>,
 }
@@ -58,5 +59,6 @@ pub struct WorldMapInput {
     /// Normalized authoritative layers. None explicitly selects the source's rows-only migration.
     pub layers: Option<Layers>,
     pub spawns: Vec<Spawn>,
+    pub buildings: Vec<Building>,
     pub geography: WorldDefinition,
 }
