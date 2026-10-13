@@ -98,7 +98,7 @@ impl PathRequestContext for Context {
         self.searches
             .push(json!([r.unit, r.goal.x, r.goal.z, outcome]));
         self.calls += 1;
-        self.failed += u64::from(outcome == "failed");
+        self.failed += u64::from(outcome == "failed" || outcome == "failed-success");
         self.deferred += u64::from(outcome == "deferred");
         Ok(SearchOutcome {
             path: if outcome == "invalid" {
@@ -106,12 +106,12 @@ impl PathRequestContext for Context {
                     x: f64::NAN,
                     z: 0.0,
                 }]
-            } else if outcome == "success" {
+            } else if outcome == "success" || outcome == "failed-success" {
                 vec![r.goal]
             } else {
                 Vec::new()
             },
-            failed: outcome == "failed",
+            failed: outcome == "failed" || outcome == "failed-success",
         })
     }
     fn apply(&mut self, update: PathUpdate) {
@@ -288,7 +288,7 @@ fn fifo_budget_retries_and_recovery_match_original_scheduler() {
     }
     assert_eq!(
         (actions, searches, dropped),
-        (594, 201, 20),
+        (606, 207, 22),
         "reference coverage changed"
     );
 }

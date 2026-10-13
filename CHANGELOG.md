@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed path requests that return a usable route after an earlier fallback attempt increments the failure count. The scheduler now retains the route and applies the reference retry accounting independently. Two original-source cases cover route retention, retry-limit cancellation and recovery behavior; the fixture now matches 606 actions, 207 searches and 22 drops. Non-finite returned waypoints remain rejected.
+
 - Added a deterministic FIFO path-request scheduler with per-tick search budgets, stale/dead request removal, one pending request per unit and goal/version retry limits. Callback adapters supply current goals, real search results and unit updates; the scheduler has no hidden terrain or combat reads. An original-source oracle matches 594 actions, 201 searches and 20 order drops, including queue replacements, zero-budget stale removal, direct-command retry resets and empty recovery paths. Movement integration and full order eligibility remain separate work.
 
 - Recorded embedded map delivery and its 96 live HTTP comparisons in the design and server parity inventory. NET-11 remains in progress: public projections are served, while raw editor reads, map writes and authoritative world loading are still missing.

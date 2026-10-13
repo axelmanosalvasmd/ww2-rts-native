@@ -33,9 +33,9 @@ function scenario(name) {
     pathFailures.delete(u); // The original findPath entry clears this before searching.
     const outcome=u.result??'success';
     searches.push([u.id,to.x,to.z,outcome]);g.pathStats.calls++;
-    if(outcome==='failed')g.pathStats.failed++;
+    if(outcome==='failed'||outcome==='failed-success')g.pathStats.failed++;
     if(outcome==='deferred')g.pathStats.deferred++;
-    return outcome==='success'?[{...to}]:[];
+    return outcome==='success'||outcome==='failed-success'?[{...to}]:[];
   }
   const active=(u,kind)=>kind==='recovery'||(['build','board','attackId'].includes(kind)?u[field(kind)]!==0:['enter','fireAt'].includes(kind)?u[field(kind)]!==-1:u[field(kind)]!==null);
   const current=(g,u,kind)=>u.hp>0&&u.eligible&&active(u,kind)?u.goals[kind]??null:null;
@@ -101,6 +101,12 @@ for(const kind of kinds) {
   step=scenario(`drop-kind-${kind}`);step({op:'unit',id:1});step({op:'begin',tick:7,budget:100,retry:2});step({op:'result',id:1,value:'failed'});
   for(let i=0;i<3;i++)step({op:'request',id:1,kind,goal:goal(11,21)});
 }
+// A known-terrain wrapper can count an earlier failed attempt, then return a
+// nonempty path. The original scheduler retains both signals independently.
+step=scenario('failed-attempt-with-returned-path');step({op:'unit',id:1});step({op:'begin',tick:8,budget:100,retry:2});step({op:'result',id:1,value:'failed-success'});
+step({op:'request',id:1,kind:'world',goal:goal(11,21)});step({op:'request',id:1,kind:'world',goal:goal(11,21)});
+step=scenario('recovery-with-failed-attempt-and-returned-path');step({op:'unit',id:1});step({op:'begin',tick:9,budget:100,retry:2});step({op:'result',id:1,value:'failed-success'});
+for(const kind of ['world','recovery','world','world'])step({op:'request',id:1,kind,goal:goal(11,21)});
 step=scenario('default-twenty-retries');step({op:'unit',id:1});step({op:'begin',tick:20});step({op:'result',id:1,value:'failed'});
 for(let i=0;i<20;i++)step({op:'request',id:1,kind:'amove',goal:goal(11,21)});
 step=scenario('unit-replacement-clears-weak-failure-state');step({op:'unit',id:1});step({op:'begin',tick:20,budget:100,retry:2});step({op:'result',id:1,value:'failed'});step({op:'request',id:1,kind:'world',goal:goal(11,21)});

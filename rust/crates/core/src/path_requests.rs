@@ -105,8 +105,9 @@ pub struct PathUpdate {
 #[derive(Clone, Debug)]
 pub struct SearchOutcome {
     pub path: Vec<Point>,
-    /// True only when reference `stats.failed` would advance. Fine-search budget
-    /// exhaustion is deferred and must leave this false.
+    /// True when reference `stats.failed` advances, even if a later fallback
+    /// returns a nonempty path. Fine-search budget exhaustion alone is deferred
+    /// and must leave this false.
     pub failed: bool,
 }
 
@@ -300,7 +301,7 @@ impl PathRequests {
         let previous = self.failures.remove(&request.unit);
         self.used += 1;
         let result = context.search(request).map_err(SchedulerError::Search)?;
-        if result.path.iter().any(|&p| !valid_goal(p)) || result.failed && !result.path.is_empty() {
+        if result.path.iter().any(|&p| !valid_goal(p)) {
             return Err(SchedulerError::InvalidSearchResult);
         }
         let mut update = PathUpdate {
