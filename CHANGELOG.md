@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Corrected two stale construction assembly statements found by independent source review: the real phase hooks and consumer event migration are attached. The source recorder independently reproduces 29 cases, 113 actions, 1,919 steps and 2,013 snapshots; combined native verification remains pending.
+
 - Normally incorporated the reviewed ordered-event test-helper lint repair into the separate construction assembly. The predecessor passes 105 debug and 270 release tests with final lint/format/FFI checks, while this construction caller still awaits its own combined proof. Runtime and source fixtures are unchanged by this annotation merge.
 
 - Migrated the construction replay to the caller's chronological event result. Its declared quiet scenes compare direct environment effects in order and reject unexpected producer families instead of filtering them away. Original source fixture and all existing state comparisons are unchanged; the combined construction runner has not compiled or run natively.
