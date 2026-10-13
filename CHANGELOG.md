@@ -2,11 +2,15 @@
 
 ## Unreleased
 
+- Normally incorporated the reviewed ordered-event test-helper lint repair into the separate construction assembly. The predecessor passes 105 debug and 270 release tests with final lint/format/FFI checks, while this construction caller still awaits its own combined proof. Runtime and source fixtures are unchanged by this annotation merge.
+
 - Migrated the construction replay to the caller's chronological event result. Its declared quiet scenes compare direct environment effects in order and reject unexpected producer families instead of filtering them away. Original source fixture and all existing state comparisons are unchanged; the combined construction runner has not compiled or run natively.
 
 - Connected canonical construction to the single ordinary tick: paired admission before input and after publication, worker capture after autocast, and ordered completion/repair before late unit capture. The actual construction receipt is now reported once; accepted builder retreat uses the provider's paired cleanup instead of the old blanket refusal. The 29-case source fixture and construction consumer remain unchanged pending owned event migration and combined native proof.
 
 - Normally joined the source-reviewed construction provider and ordered-event caller in a separate assembly. Both canonical producer sinks and paired builder cleanup remain intact; construction scheduling, consumer event migration and combined native proof are pending. Frozen ordered-event and AIR candidates are unchanged.
+
+- Marked the shared aircraft component snapshot wrapper as intentionally unused by the detached-event runner test, fixing its strict-lint failure after all 105 focused debug tests and 270 release workspace tests passed at `625705e`. The annotation changes no helper body, runtime, input or fixture. Final lint, formatting and release FFI checks remain pending; the original failure is preserved.
 
 - Resumed the ordered tick output checkpoint with direct producer emission sinks, per-command dispatch observers and one caller-owned failure payload. Committed section, blast, burn and retirement effects remain available when a later operation fails; removal facts and completed wreck/bounty/lifecycle prefixes are reported separately. The new unchanged-source replay covers 3 complete traces, 375 steps and 103 chronological shots across firing, ground support, aircraft AA and late fire damage. Native compilation, failure regressions and host integration are pending; frozen AIR evidence and original fixtures are preserved.
 
