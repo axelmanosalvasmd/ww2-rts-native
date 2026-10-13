@@ -41,6 +41,15 @@ pub(crate) struct VehicleNavigation {
     serial: u64,
 }
 impl VehicleNavigation {
+    pub(crate) fn rebind_terrain(&mut self, source: TerrainView<'_>, prepared: TerrainView<'_>) {
+        let old = Identity::new(source);
+        for entry in self.classes.values_mut() {
+            if entry.identity == old {
+                entry.identity = Identity::new(prepared);
+            }
+        }
+    }
+
     pub(crate) fn cloned_buffers(&self, cloned: &Self) -> Vec<(usize, usize)> {
         self.classes
             .iter()
