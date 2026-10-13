@@ -237,6 +237,11 @@ fn original_match_buy_placement_path_and_grid() {
                     let (reason, unit) = match result {
                         Ok(done) => {
                             admitted += 1;
+                            assert_eq!(
+                                m.combat.get(done.unit),
+                                Some(&ww2_core::match_combat::UnitCombat::default()),
+                                "recruits must enter combat with canonical default metadata"
+                            );
                             let u = &m.world.game.units[&done.unit];
                             let control = &m.commands.units[&done.unit];
                             let failed = done.route_status == Some(PathStatus::Unreachable);

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Initialized canonical combat metadata when Match recruitment publishes a new unit, so its first combat event passes admission. Existing original-source recruitment traces now check each admitted unit has the source defaults.
+
 - Preserved terminal projectile blast direction through terrain damage so section debris receives the source impulse direction. Added explicit direction admission and an original-source directed-blast regression.
 
 - Tightened public combat-event admission after independent review: negative suppression and unknown nonnegative last-hit owners reject the whole batch before health mutation. The expanded atomicity regression passes in debug and release.
