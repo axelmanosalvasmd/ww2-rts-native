@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified the ordinary Default caller and provider assembly on the Mac at `07250fdf`: all 240 locked workspace release tests, 40 distinct focused debug tests, strict all-target Clippy, formatting and the release FFI build pass without source repairs. All 13 original support traces now run unchanged through 2,705 ticks and 153 checkpoints, including Default's 45 ticks and nine checkpoints; the seven mass-project cases also pass. Raw empty-string feature defaults, unsupported modes, AIR/logistics scope and hosted or Unreal acceptance remain separate.
+
 - Normal-merged the sole tick owner's immutable Default guard and reviewed provider aliases into the separate actual-source consumer. The checked support/project ancestry and all provider bodies are preserved; combined native checks are pending.
 
 - Consume all 13 unchanged original-source ground-support traces through the actual typed mode, including the 45-step Default case. The complete consumer checks 2,705 ticks and 153 recorded checkpoints; the obsolete Default-refusal test is removed. Provider and sole caller aliases are integrated separately; this new combined native proof is pending.
