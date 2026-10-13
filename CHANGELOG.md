@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed two aircraft AA test duration literals rejected by the first Vostro compilation. They now use Rust's required 0.05 spelling. Runtime and source fixtures are unchanged; no native tests ran before that compiler failure, and the renewed native proof remains pending.
+
 - Consumed the independently reviewed building-wreck lifecycle compile repair: this caller explicitly passes full-current membership, as the original source does. Ground support gates passed on the provider; this aviation/command continuation still awaits its own native proof.
 
 - Fixed the pending aviation consumer's raw JSON number comparison: integral source numbers and Rust floating representations now compare exact f64 bits, with only JSON zero normalization. Canonical state bit strings remain exact. Runtime and the 18-constructor/42-trace/3,410-checkpoint fixture are unchanged; native proof remains pending.

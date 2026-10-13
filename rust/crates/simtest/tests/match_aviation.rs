@@ -492,14 +492,18 @@ fn unavailable_weapon_and_invalid_late_metadata_refuse_before_mutation() {
     let mut m = scene(trace);
     m.combat.get_mut(1001).unwrap().xp = -1.0;
     let before = snapshot(&m, &[]);
-    assert!(matches!(m.step_aircraft_anti_air(&[1000,1001],.05),Err(AviationError::Invalid(_))));
+    assert!(matches!(
+        m.step_aircraft_anti_air(&[1000, 1001], 0.05),
+        Err(AviationError::Invalid(_))
+    ));
     assert_eq!(snapshot(&m, &[]), before);
     m.combat.get_mut(1001).unwrap().xp = 0.0;
     m.aviation.planes.remove(&1001);
     let before = format!("{:?}", m.world.game.units);
-    assert!(
-        matches!(m.step_aircraft_anti_air(&[1000,1001],.05),Err(AviationError::Unsupported(_)))
-    );
+    assert!(matches!(
+        m.step_aircraft_anti_air(&[1000, 1001], 0.05),
+        Err(AviationError::Unsupported(_))
+    ));
     assert_eq!(format!("{:?}", m.world.game.units), before);
     assert!(m.aviation.events.is_empty());
 }
