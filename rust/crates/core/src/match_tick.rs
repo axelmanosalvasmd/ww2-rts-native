@@ -35,6 +35,7 @@ pub enum TickPhase {
     Scenario,
     LivingWeather,
     FireFlood,
+    Recovery,
     PointSupply,
     SupplyNetwork,
     Reinforcement,
@@ -123,6 +124,10 @@ impl crate::match_runtime::Match {
                 return Err("invalid tick unit".into());
             }
         }
+        self.validate_abilities()?;
+        if !self.field_works.jobs().is_empty() || game.units.values().any(|u| u.dig) {
+            return Err("ordinary field-work tick actuator is not connected".into());
+        }
         let mut identities = std::collections::BTreeSet::new();
         for smoke in &game.smokes {
             if !identities.insert(smoke.id) || smoke.remaining.is_none_or(|v| !v.is_finite()) {
@@ -210,6 +215,10 @@ impl crate::match_runtime::Match {
             unit.repath -= dt;
             unit.sprint -= dt;
             self.advance_firing_timers(id, dt)?;
+            self.advance_ability_timers(id, dt)?;
+            self.apply_autocast(id)?;
+            // Ordinary field work attaches here before aimed ability execution.
+            self.step_aimed_ability(id)?;
             self.apply_attack_move(id)?;
             let before = self.world.game.units[&id].at();
             if let Some(result) = self.move_unit_with_command_routes(id, factor)? {
@@ -222,6 +231,7 @@ impl crate::match_runtime::Match {
         }
         phases.extend([
             TickPhase::UnitOrders,
+            TickPhase::Abilities,
             TickPhase::Movement,
             TickPhase::Firing,
         ]);
@@ -230,6 +240,7 @@ impl crate::match_runtime::Match {
         movement::infantry_progress(&mut self.world.game, &self.rules, &moved);
         phases.push(TickPhase::Separation);
         self.step_firing_flights()?;
+        self.advance_firing_grenades(dt)?;
         self.advance_firing_salvos(dt)?;
         phases.push(TickPhase::Projectiles);
 
@@ -277,9 +288,14 @@ impl crate::match_runtime::Match {
             .smokes
             .retain(|s| s.remaining.is_some_and(|t| t > 0.0));
         phases.push(TickPhase::FireFlood);
+        let recovery = self.prepare_recovery(&unit_order)?;
+        self.heal_and_sweep(&recovery, dt)?;
+        phases.push(TickPhase::Recovery);
         self.apply_point_supply(&unit_order)?;
         phases.push(TickPhase::PointSupply);
-        // Recovery/network/reinforcement attach before this ordered retirement.
+        // Network refresh attaches between point supply and prepared reinforcement.
+        self.reinforce(&recovery, dt)?;
+        phases.push(TickPhase::Reinforcement);
         let death = self.tick_retirement(&unit_order)?;
         environment.extend(death.shots);
         phases.push(TickPhase::Death);
@@ -301,7 +317,6 @@ impl crate::match_runtime::Match {
                 TickPhase::Research,
                 TickPhase::UnitReserves,
                 TickPhase::Production,
-                TickPhase::Abilities,
                 TickPhase::AirRail,
                 TickPhase::Riding,
                 TickPhase::Reactions,
@@ -311,7 +326,6 @@ impl crate::match_runtime::Match {
                 TickPhase::Support,
                 TickPhase::Scenario,
                 TickPhase::SupplyNetwork,
-                TickPhase::Reinforcement,
                 TickPhase::Convoys,
             ],
         })
