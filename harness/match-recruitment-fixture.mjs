@@ -43,6 +43,9 @@ run('instant-maker-and-order',[
  {op:'buy',kind:'rifle',from:999},{op:'buy',kind:'rifle',maker:'hq',owner:1},{op:'buy',kind:'engineer'},{op:'buy',kind:'tiger'},
  {op:'maker',maker:'hq',fields:{hp:0}},{op:'buy',kind:'rifle'},{op:'maker',maker:'barracks',fields:{built:.5}},{op:'buy',kind:'rifle'},
 ]);
+run('unrelated-negative-hp-casualty',[
+ {op:'maker',maker:'hq',owner:1,fields:{hp:-7}},{op:'buy',kind:'rifle'},
+]);
 run('personal-and-building-rally',[
  {op:'player',fields:{rally:{x:45,z:35}}},{op:'buy',kind:'rifle'},
  {op:'rally',maker:'barracks',to:{x:17,z:43}},{op:'buy',kind:'rifle',maker:'barracks'},

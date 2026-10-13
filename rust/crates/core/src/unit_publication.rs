@@ -2,9 +2,9 @@
 //! Wallets, story and other unit systems remain with their single owners.
 use crate::{
     catalog::Catalog,
-    game::{Game, Point, Unit},
+    game::{Game, LOCAL_DEFENDER_OWNER, ModeKind, Point, Unit},
     grid::{SpatialGrid, UnitId},
-    match_commands::UnitControl,
+    match_commands::{Command, UnitControl},
     match_runtime::RecruitMetadata,
     navigation::{TerrainView, Versions},
     rules::Rules,
@@ -24,6 +24,12 @@ pub struct StagedUnit {
     pub control: UnitControl,
     pub recruitment: Option<RecruitMetadata>,
 }
+/// A spawn source is resolved by the authoritative commander or World actor owner.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum SpawnActor {
+    Commander { owner: usize, spawn: Point },
+    WorldLocalDefender { spawn: Point },
+}
 impl StagedUnit {
     /// Run ordinary source scatter before a final pose override. Explicit IDs and
     /// indices let a caller stage a source-ordered respawn batch before any payment.
@@ -38,9 +44,38 @@ impl StagedUnit {
         player_spawn: Point,
         pose_override: Option<Point>,
     ) -> Result<Self, PublicationError> {
-        if owner >= game.players.len() {
-            return Err(PublicationError::Invalid("spawn owner"));
-        }
+        Self::ordinary_with_actor(
+            game,
+            rules,
+            SpawnActor::Commander {
+                owner,
+                spawn: player_spawn,
+            },
+            kind,
+            id,
+            scatter_index,
+            pose_override,
+        )
+    }
+    /// World actors use the same scatter and initializer without a commander seat.
+    /// World ability/guard overrides are staged by their authoritative owner.
+    #[allow(clippy::too_many_arguments)]
+    pub fn ordinary_with_actor(
+        game: &Game,
+        rules: &Rules,
+        actor: SpawnActor,
+        kind: usize,
+        id: UnitId,
+        scatter_index: u32,
+        pose_override: Option<Point>,
+    ) -> Result<Self, PublicationError> {
+        let (owner, player_spawn) = match actor {
+            SpawnActor::Commander { owner, spawn } if owner < game.players.len() => (owner, spawn),
+            SpawnActor::WorldLocalDefender { spawn } if game.mode == Some(ModeKind::World) => {
+                (LOCAL_DEFENDER_OWNER, spawn)
+            }
+            _ => return Err(PublicationError::Invalid("spawn actor")),
+        };
         if let Some(at) = pose_override {
             if !finite(at) {
                 return Err(PublicationError::Invalid("spawn override"));
@@ -104,14 +139,13 @@ pub struct PreparedPublication<'a> {
 fn finite(p: Point) -> bool {
     p.x.is_finite() && p.z.is_finite()
 }
-fn valid_unit(u: &Unit, rules: &Rules, players: usize) -> bool {
+fn valid_unit(u: &Unit, rules: &Rules, players: usize, world: bool) -> bool {
     u.id != 0
-        && u.owner < players
+        && (u.owner < players || (world && u.owner == LOCAL_DEFENDER_OWNER))
         && u.kind < rules.kinds.len()
         && finite(u.at())
         && u.rot.is_finite()
         && u.hp.is_finite()
-        && u.hp >= 0.0
         && u.supp.is_finite()
         && u.path.iter().all(|p| finite(*p))
         && u.world_goal.is_none_or(finite)
@@ -120,6 +154,16 @@ fn valid_control(c: &UnitControl) -> bool {
     c.aim.is_finite()
         && c.route_end.is_none_or(finite)
         && c.face.is_none_or(|f| f.angle.is_finite() && finite(f.at))
+        && c.nade.is_none_or(finite)
+        && c.orders.iter().all(|command| match command {
+            Command::Move { orders, face, .. } => {
+                face.is_none_or(f64::is_finite)
+                    && orders
+                        .iter()
+                        .all(|order| order.unit != 0 && finite(order.at))
+            }
+            _ => true,
+        })
 }
 pub fn prepare_publication<'a>(
     parts: PublicationParts<'a>,
@@ -127,11 +171,34 @@ pub fn prepare_publication<'a>(
     players: usize,
     staged: Vec<StagedUnit>,
 ) -> Result<PreparedPublication<'a>, PublicationError> {
+    prepare(parts, rules, players, staged, false)
+}
+/// Only the actual World mode admits the named local defender actor. All other
+/// invalid owners remain errors, including arbitrary integers outside player slots.
+pub fn prepare_world_publication<'a>(
+    parts: PublicationParts<'a>,
+    rules: &Rules,
+    players: usize,
+    mode: Option<ModeKind>,
+    staged: Vec<StagedUnit>,
+) -> Result<PreparedPublication<'a>, PublicationError> {
+    if mode != Some(ModeKind::World) {
+        return Err(PublicationError::Invalid("World publication mode"));
+    }
+    prepare(parts, rules, players, staged, true)
+}
+fn prepare<'a>(
+    parts: PublicationParts<'a>,
+    rules: &Rules,
+    players: usize,
+    staged: Vec<StagedUnit>,
+    world: bool,
+) -> Result<PreparedPublication<'a>, PublicationError> {
     if players == 0 || players > 6 || *parts.next_id == 0 {
         return Err(PublicationError::Invalid("publication players/allocator"));
     }
     for (id, u) in parts.units.iter() {
-        if *id != u.id || !valid_unit(u, rules, players) || *id >= *parts.next_id {
+        if *id != u.id || !valid_unit(u, rules, players, world) || *id >= *parts.next_id {
             return Err(PublicationError::Invalid("existing unit/allocator"));
         }
     }
@@ -146,7 +213,8 @@ pub fn prepare_publication<'a>(
     let mut next = *parts.next_id;
     for draft in &staged {
         if draft.unit.id != next
-            || !valid_unit(&draft.unit, rules, players)
+            || !valid_unit(&draft.unit, rules, players, world)
+            || draft.unit.hp < 0.0
             || !valid_control(&draft.control)
             || parts.units.contains_key(&next)
             || parts.controls.contains_key(&next)
