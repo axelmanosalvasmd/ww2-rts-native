@@ -99,7 +99,8 @@ impl Match {
         }
         // These are current authoritative actors, not a reconstruction of the captured list.
         for (&id, u) in &game.units {
-            if u.id != id
+            if id == 0
+                || u.id != id
                 || u.kind >= self.rules.kinds.len()
                 || !u.hp.is_finite()
                 || u.built.is_some_and(|value| !value.is_finite())
