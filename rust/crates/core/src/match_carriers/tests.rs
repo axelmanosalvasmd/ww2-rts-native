@@ -442,7 +442,7 @@ fn late_invalid_board_goal_rejects_before_observation_or_fifo_service() {
             "{}{:?}{:?}{:?}{recipients:?}",
             atomic(m),
             m.commands.requests,
-            m.commands.path_tick,
+            m.commands.inspected_path_tick(),
             m.routing_fog,
         )
     };

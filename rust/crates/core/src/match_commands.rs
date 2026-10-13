@@ -899,6 +899,10 @@ impl MatchCommands {
     pub fn path_requests(&self) -> &PathRequests {
         &self.requests
     }
+    #[cfg(test)]
+    pub(crate) fn inspected_path_tick(&self) -> Option<i64> {
+        self.path_tick
+    }
 }
 impl crate::match_runtime::Match {
     fn move_command(

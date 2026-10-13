@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Repaired the recorded-carrier guard test's private command-field access found by the first native compile. A test-only read accessor preserves the path-tick snapshot without changing runtime field visibility or source behavior. No native tests ran before this compiler error; verification is restarting at the repaired head.
+
 - Fixed deferred Board error handling found by independent review: queued callback facts now validate before recipient observation or scheduler mutation. A late malformed or unsupported carrier leaves both queued requests, represented memory/Fog, unit paths and retry/budget state intact on refusal. Native verification is pending.
 
 - Connected Board and Unload to the existing recorded command parser and dispatcher, and attached live carrier goals to the shared path scheduler. The pinned-source fixture now has 19 traces and 97 actions, including immediate searches, moved deferred goals, retry drops and paid-work refusal. Native replay and full tick attachment remain pending.
