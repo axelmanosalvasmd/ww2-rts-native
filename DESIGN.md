@@ -40,6 +40,12 @@ Runtime/test head `26113c5dd97c2a1c9d6b945599c63ad8c16bb0a3` passes 28 affected 
 
 The plan, its evidence and its open work are issue #1. This file records what was decided and why, and the measurements as they come in. Paths such as `shared/sim.js` refer to the JavaScript game in `reference/ww2-rts`.
 
+## Original room callback fixture
+
+`harness/room-runtime-fixture.mjs` starts from the pinned actual Default constructor (the JavaScript mode option is omitted), then explicitly restores two quiet rifle actors. It executes the unchanged original `tickRooms`, pause, resume, ending-hold, trimming, backpressure and polling callback bodies extracted through unique source anchors. The original `createRoomTick`, `sim.step`, empty-seat AI scheduler, shared snapshot cache, recipient producers and TickMeter execute directly. Socket `send` is a controlled capture of actual serialized messages and actual write callbacks. The fixture records eight traces, 157 actions and 79 simulation steps, including 60 half-speed ending steps across 120 eligible callbacks.
+
+The recorder uses controlled host milliseconds, polling nanoseconds and a ten-microsecond increment per timing read for reproducibility. Those samples verify callback accounting; they are not performance measurements. A decided winner is explicit restored input, not evidence of natural victory. The empty-recipient case explicitly supplies a transient batch to test its detach boundary, not an implemented combat producer. Final lobby and offline-seat cleanup consumers, and empty spectator/operative callbacks, remain labeled hooks. No HTTP/WebSocket server is started, no public match start is admitted, and no network or complete lifecycle readiness is claimed. The exact source fixture must be consumed by the actual internal Rust Hub, canonical Match, clock and selected delivery pipeline before native integration proof or publication.
+
 ## Why native (2026-10-11)
 
 Measured in ww2-rts:
