@@ -39,7 +39,7 @@ impl FieldWorksRuntime {
             if id != project.id {
                 return Err("field-work project identity mismatch".into());
             }
-            if !project.listed && !references.contains(&id) {
+            if self.project(id).is_none() && !references.contains(&id) {
                 continue;
             }
             if id == 0
@@ -107,7 +107,6 @@ impl FieldWorksRuntime {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::recipient_snapshot::{DeliveryState, SnapshotCapability, SnapshotError};
     use serde_json::Value;
 

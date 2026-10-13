@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed two inherited compile errors found by the fresh selected-delivery Vostro check at `4071c71`, before any tests ran. Snapshot admission now uses the canonical listed-project getter without exposing private state; the recovery fixture keeps one `actor_order: None`. Removed an unused snapshot test import. Source reanchor and a fresh combined native cycle remain pending.
+
 - Normally merged the canonical engineering and common actor-admission prerequisite into selected delivery. Shared actor checks no longer project skipped private wallets; selected preflight owns those recipient-local checks. Preserved both parents' source fixtures and admission regressions. Combined source review and native proof remain pending.
 
 - Added a selected-delivery regression for a skipped malformed private wallet. Global cache admission accepts the represented actor frame; only a selected recipient's private projection may reject it. The existing all-seat API still validates every private recipient. The shared actor helper now preserves that boundary; combined native proof remains pending.
