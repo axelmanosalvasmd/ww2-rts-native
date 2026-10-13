@@ -171,7 +171,7 @@ fn world_retreat_completion_selects_goal_radius_and_keeps_the_forced_endpoint_ru
         let rng = m.start.random.snapshot();
         let environment_seed = m.start.environment_seed;
         let tick = m.world.game.tick;
-        let requests = format!("{:?}", m.commands.requests);
+        let requests = format!("{:?}", m.commands.path_requests());
         let grid = format!("{:?}", m.grid);
         m.prepare_unit_commands(id, false).unwrap();
         let unit = &m.world.game.units[&id];
@@ -197,7 +197,7 @@ fn world_retreat_completion_selects_goal_radius_and_keeps_the_forced_endpoint_ru
                 Some(MoveResult::Unreachable { tick: -1 })
             );
         }
-        assert_eq!(format!("{:?}", m.commands.requests), requests);
+        assert_eq!(format!("{:?}", m.commands.path_requests()), requests);
         assert_eq!(format!("{:?}", m.grid), grid);
         assert_eq!(m.world.game.tick, tick);
         assert_eq!(m.start.random.snapshot(), rng);

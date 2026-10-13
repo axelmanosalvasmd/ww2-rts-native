@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Correct the new World command prelude test to inspect the canonical request state through the existing public MatchCommands accessor. Independent source review caught two cross-crate reads of its private field before compilation; runtime, fixture and comparisons are unchanged. Native execution remains pending.
+
 - Add the actual World guard-home snap and voluntary retreat completion rule to the separate caller continuation. A displaced guard clears only its path and attack intent before command completion, without updating the grid. Voluntary World retreat uses the 15-metre home radius; forced and ordinary completion keep the endpoint/path/speed condition. Reuse the existing staged support timer body for inert World cooldowns, with read-only key, team, finite-output and active-effect guards. Four real-World-constructor tests are written and formatted but not run. Whole World tick admission remains closed while actor and routing providers are assembled.
 
 - Normally retain the source-cleared World tick plan and unchanged eight-trace original recorder in a separate caller continuation from the final runtime bundle. Actual World actor adapters and caller admission are under development; no World tick or native acceptance is claimed.
