@@ -1,5 +1,5 @@
-//! Internal represented Conquest projections. This is not a complete `s` message
-//! or a network contract. Unsupported canonical fields remain explicit.
+//! Internal Conquest projections and an explicitly admitted quiet seat envelope.
+//! Unsupported canonical actors remain explicit. No transport contract is added.
 use crate::{
     catalog::Catalog,
     combat,
@@ -10,6 +10,8 @@ use crate::{
     weather::{WeatherRow, WeatherRules},
 };
 use serde_json::{Map, Value, json};
+#[path = "recipient_snapshot/composition.rs"]
+mod composition;
 #[path = "recipient_snapshot/delivery.rs"]
 mod delivery;
 #[path = "recipient_snapshot/owners.rs"]
@@ -18,6 +20,7 @@ mod owners;
 mod public_state;
 #[path = "recipient_snapshot/support.rs"]
 mod support;
+pub use composition::{QuiescentDeliveryFrame, SupportedSeatSnapshot};
 pub use delivery::{DeliveryFrame, DeliveryState};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -557,7 +560,7 @@ mod tests {
                 weather_seed: Some(1),
                 living_weather: true,
                 map_key: None,
-                tech: true,
+                tech: case["publicState"]["tech"].as_bool().unwrap_or(true),
                 supply: true,
                 logistics: false,
                 sandbox: false,
