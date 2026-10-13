@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Recorded two original World recipient views holding two removed cached unit objects. Added focused retention drop, invalid-final-fact and success tests that preserve route allocation identities and World ledgers. Original x64 recorder equality passes; native execution remains pending.
+
+- Added prepared World cached-unit retention for ordered removal transactions. The guard validates current IDs/owners/kinds and finite final HP/pose, then updates only matching cached rows after deletion. Drop preserves memory, route buffers, visibility and cursors; elimination/wreck integration and native checks remain pending.
+
 - Added a fourth original World birth case with a different team’s warmed vehicle history, four accepted prebirth changes and a postbirth reroute. The recorder now covers 14 births, 12 prebirth searches and one cross-team reroute; native success/abort cache-lifetime checks remain pending.
 
 - Kept World search histories bound to every team array moved by a successful preview, including teams not read in that transaction. Consumer source review found the selected-team-only mapping could discard other warmed incremental histories.
