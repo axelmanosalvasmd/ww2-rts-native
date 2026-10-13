@@ -281,7 +281,9 @@ impl Match {
             .iter()
             .filter_map(|raw| u32::try_from(*raw).ok())
             .any(|id| {
-                self.convoys.trucks.contains_key(&id)
+                self.convoys
+                    .as_ref()
+                    .is_some_and(|state| state.trucks.contains_key(&id))
                     && self
                         .world
                         .game
@@ -567,5 +569,77 @@ mod tests {
             before
         );
         assert_eq!(m.firing.target_claims().collect::<Vec<_>>(), claims);
+    }
+    #[test]
+    fn convoy_retreat_outside_troop_cap_refuses_before_follow_or_routing() {
+        use crate::supply_convoys::{ConvoyState, StoreId, Truck, TruckState};
+        let mut m = scene();
+        let truck = crate::unit_spawn::initial_unit(
+            &m.rules,
+            Catalog::compiled().unwrap(),
+            m.rules.kind("lorry").unwrap(),
+            4,
+            0,
+            Point { x: 8., z: 8. },
+        )
+        .unwrap();
+        m.commands.insert(
+            4,
+            crate::match_commands::UnitControl::new(&truck, &m.rules).unwrap(),
+        );
+        m.world.game.units.insert(4, truck);
+        m.combat.initialize(4);
+        m.firing.initialize(4);
+        m.abilities.initialize(4);
+        m.recovery.initialize(4);
+        let mut convoys = ConvoyState::default();
+        convoys.trucks.insert(
+            4,
+            Truck {
+                state: TruckState::Idle,
+                cargo: crate::logistics::Stock::default(),
+                target: None,
+                origin: StoreId::Source(0),
+                timer: 0.,
+                manual: false,
+                hold: false,
+                route: vec![],
+                destination: None,
+                route_failure: None,
+                retry: None,
+            },
+        );
+        m.convoys = Some(convoys);
+        m.commands.units.get_mut(&1).unwrap().follow = 77;
+        let before = format!(
+            "{:?}",
+            (
+                &m.world.game.units,
+                &m.commands.units,
+                &m.commands.requests,
+                &m.routing_fog,
+                &m.convoys
+            )
+        );
+        let mut ids = vec![1; 50];
+        ids.push(4);
+        assert_eq!(
+            m.execute_command(0, &Command::Retreat { ids }, false)
+                .unwrap(),
+            Some(crate::match_commands::Denial::Unsupported)
+        );
+        assert_eq!(
+            format!(
+                "{:?}",
+                (
+                    &m.world.game.units,
+                    &m.commands.units,
+                    &m.commands.requests,
+                    &m.routing_fog,
+                    &m.convoys
+                )
+            ),
+            before
+        );
     }
 }
