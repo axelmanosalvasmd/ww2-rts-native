@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified the internal recipient snapshot and canonical movement checkpoint on Vostro Linux x86_64 at 91737e3: nine focused debug tests, all 164 release workspace tests, strict workspace/all-target Clippy, formatting and release FFI pass after clean package builds. Original source fixtures cover 70 states/210 cached projections, 13 delivery steps/39 reads and 58 command traces/259 steps. Full message envelopes, support actors and transport remain separate; three-platform Actions evidence is still required by integration.
+
 - Fixed a strict Clippy assertion in the snapshot delivery regression by using is_empty. All focused debug and release workspace tests passed on the prior frozen head; the fresh head still needs the remaining native gates.
 
 - Added canonical optional movement-result tails to UnitControl and the owner-only snapshot reader. Actual path failure and completion operations record their tick; later move, stop and reaction intents preserve the previous tail. Extended the original command oracle to 58 traces and 259 steps, including 518 recipient movement observations and two retained recovery/replan branches. All 246 prior steps are unchanged apart from added result/recipient observations. Cached snapshot fixtures remain 70 states and 210 recipients. Native verification is pending the managed Rust lane; no complete envelope, wire or ABI change was added.
