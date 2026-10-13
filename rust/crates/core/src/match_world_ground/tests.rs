@@ -132,6 +132,10 @@ fn unit(m: &mut Match, raw: &Value) {
 fn setup(m: &mut Match, input: &Value) {
     m.world.game.units.clear();
     m.commands.units.clear();
+    // Each recorder case constructs a fresh source Game and its derived caches.
+    m.commands.paths = crate::pathfinding::Pathfinding::new();
+    m.commands.requests = Default::default();
+    m.commands.path_tick = None;
     m.building_cells.clear();
     m.world.game.tick = input["tick"].as_i64().unwrap_or(400);
     m.world.game.vision_tick = Some(0);

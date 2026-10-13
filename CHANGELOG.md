@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Restore fresh derived path and request caches between independent World ground oracle scenes, matching their separate original Game instances while retaining incremental history within each scene. This test-only source correction has not run native checks.
+
 - Validate World ground actor team binding through the shared game-only actor helper before path preparation, retaining one canonical actor policy and using the complete coordinated prerequisite. This source-only follow-up has not run native checks.
 
 - Add source-backed World ground route, home, march and traffic adapters over the existing actor policy and scheduler. Retry failures use the full accepted team-memory version, unknown World cover uses its remembered open baseline, and neutral traffic reads the existing local actor visibility without a commander seat. Deferred movement observations publish memory, Fog, ledger and rebound path history only when traffic or a search actually reads terrain. Replace the earlier test that deliberately refused unknown World cover. Original x64 recordings cover 58 policy/contact cases, 24 route-history reads and five retry attempts; native checks and whole World caller integration are pending. Active AIR, rail, enabled logistics and unconnected tactical paths remain refused.
