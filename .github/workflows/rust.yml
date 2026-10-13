@@ -1,0 +1,62 @@
+name: Rust
+
+on:
+  push:
+    paths:
+      - 'rust/**'
+      - '.github/workflows/rust.yml'
+  pull_request:
+    paths:
+      - 'rust/**'
+      - '.github/workflows/rust.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rust-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Rust (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-15]
+    defaults:
+      run:
+        shell: bash
+        working-directory: rust
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned Rust toolchain
+        # With no toolchain argument, rustup reads rust/rust-toolchain.toml.
+        run: |
+          rustup toolchain install --profile minimal --component rustfmt --component clippy --no-self-update
+          rustc --version
+          cargo --version
+      - name: Check formatting
+        run: cargo fmt --all --check
+      - name: Check Clippy
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      - name: Test the workspace
+        run: cargo test --locked --workspace
+      - name: Build the release C library
+        run: cargo build --locked -p ww2-ffi --release
+      - name: Link and replay the C formation fixture on Linux
+        if: runner.os == 'Linux'
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror -pedantic \
+            -I crates/ffi/include crates/ffi/examples/link_check.c \
+            target/release/libww2_ffi.a \
+            -lgcc_s -lutil -lrt -lpthread -lm -ldl -lc \
+            -o target/link_check
+          ./target/link_check crates/core/tests/fixtures/formation.txt
