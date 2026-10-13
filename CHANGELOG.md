@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added shared mode-aware UnitControl initialization using compiled ability costs, and selected it from the staged factory's actual Game mode. The original spawn oracle preserves all 55 earlier scenarios and adds six Classic/World spawns for absent, paid and free abilities. This source-only prerequisite still awaits native verification; World startup can remove its private cost lookup.
+
 - Preserved canonical recruited combat defaults through the shared publication callback when integrating the reviewed combat ancestry. Fresh combat identities reject before payment; production stepping remains under implementation.
 - Verified shared unit publication with 130 workspace tests, five release transaction/recruitment tests, strict Clippy/formatting and independent review. Original JavaScript regeneration matches six traces and 33 buys, including the negative-HP casualty regression; World/FPS execution and training remain separate integrations.
 
