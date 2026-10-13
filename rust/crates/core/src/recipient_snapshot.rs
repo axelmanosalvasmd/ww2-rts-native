@@ -955,3 +955,18 @@ pub(crate) mod tests {
         ));
     }
 }
+
+impl Match {
+    /// Read-only admission of the currently supported ordinary actor frame.
+    /// Trusted attachment validates every seat before installing the match.
+    pub fn preflight_ordinary_snapshot(&self) -> Result<(), SnapshotError> {
+        composition::admit_actors(self, &[])?;
+        let cache = SnapshotCache::new(self)?;
+        for slot in 0..self.world.game.players.len() {
+            cache.recipient(slot)?;
+            self.preflight_observed_terrain(slot)
+                .map_err(|_| SnapshotError::Rules)?;
+        }
+        Ok(())
+    }
+}

@@ -161,6 +161,15 @@ impl crate::match_runtime::Match {
         }
     }
 
+    /// Read-only admission for a trusted host before attaching this match.
+    /// This is the same guard used before the first tick mutation.
+    pub fn validate_tick_state(&self) -> Result<(), String> {
+        if let Some(fault) = self.tick_state.fault() {
+            return Err(format!("tick runner faulted: {fault}"));
+        }
+        self.validate_tick_input()
+    }
+
     fn validate_tick_input(&self) -> Result<(), String> {
         let game = &self.world.game;
         if game.tick < 0 || game.tick >= 9_007_199_254_740_351 {

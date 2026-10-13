@@ -1,6 +1,11 @@
+use crate::room_runtime::{FrameKind, RoomRuntime};
+use crate::snapshot_backpressure::{CompletionContext, SeatBackpressure, WriteTicket};
+use crate::snapshot_lists::{ListScope, SnapshotDelivery};
+use crate::tick_timing::{CatchUpClock, TickSample};
 use serde_json::{Value, json};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, time::Instant};
 use tokio::sync::{mpsc, watch};
+use ww2_core::{match_runtime::Match, recipient_snapshot::SelectedSeat};
 
 const MAX_PLAYERS: usize = 6;
 const MAX_SPECTATORS: usize = 8;
@@ -13,17 +18,43 @@ pub(crate) struct Connection {
 }
 
 #[derive(Debug)]
+pub(crate) struct SnapshotWrite {
+    pub room: String,
+    pub epoch: u64,
+    pub slot: usize,
+    pub connection_id: u64,
+    pub ticket: WriteTicket,
+    pub json: String,
+}
+
+#[derive(Debug)]
 pub(crate) enum Output {
     Json(Value),
+    Snapshot(SnapshotWrite),
     Close(u16, &'static str),
 }
 
 impl Connection {
+    fn ready(&self) -> bool {
+        !self.tx.is_closed() && !*self.cancel.borrow()
+    }
     pub fn send(&self, msg: Value) {
         self.output(Output::Json(msg));
     }
     pub fn close(&self, code: u16, reason: &'static str) {
         self.output(Output::Close(code, reason));
+    }
+    fn snapshot(&self, write: SnapshotWrite) -> Result<(), SnapshotWrite> {
+        match self.tx.try_send(Output::Snapshot(write)) {
+            Ok(()) => Ok(()),
+            Err(error) => {
+                let _ = self.cancel.send(true);
+                let Output::Snapshot(write) = error.into_inner() else {
+                    unreachable!()
+                };
+                Err(write)
+            }
+        }
     }
     fn output(&self, msg: Output) {
         if self.tx.try_send(msg).is_err() {
@@ -31,6 +62,15 @@ impl Connection {
             let _ = self.cancel.send(true);
         }
     }
+}
+
+struct SnapshotAccount {
+    room: String,
+    epoch: u64,
+    slot: usize,
+    delivery: SnapshotDelivery,
+    pressure: SeatBackpressure,
+    full_terrain: bool,
 }
 
 struct Person {
@@ -43,6 +83,7 @@ struct Person {
     level: &'static str,
     disconnected: Option<u64>,
     denies: Vec<u64>,
+    rtt: Option<f64>,
 }
 
 impl Person {
@@ -55,6 +96,11 @@ impl Person {
             }
         }
     }
+}
+
+struct AttachedRuntime {
+    epoch: u64,
+    runtime: RoomRuntime,
 }
 
 struct Room {
@@ -71,6 +117,7 @@ struct Room {
     sandbox: bool,
     defender: usize,
     empty_since: Option<u64>,
+    native: Option<AttachedRuntime>,
 }
 
 impl Room {
@@ -160,7 +207,7 @@ impl Room {
             "map":if self.mode == "world" { "world" } else { &self.map },"state":"lobby",
             "humans":self.players.iter().filter(|p| !p.ai && p.connection.is_some()).count(),
             "ai":self.players.iter().filter(|p| p.ai).count(),"occupied":self.players.len(),
-            "capacity":self.capacity(maps),"joinable":self.players.len() < self.capacity(maps)
+            "capacity":self.capacity(maps),"joinable":self.native.is_none() && self.players.len() < self.capacity(maps)
         });
         if self.mode == "world" {
             v["worldSize"] = json!(self.world_size);
@@ -183,6 +230,7 @@ impl Room {
             return false;
         }
         let host = self.is_host(id);
+        let attached = self.native.is_some();
         let me = if let Some(i) = seated {
             &mut self.players[i]
         } else {
@@ -190,6 +238,9 @@ impl Room {
         };
         if t == "ping" {
             if msg.get("x").is_none() && msg.get("z").is_none() {
+                if let Some(rtt) = msg["rtt"].as_f64().filter(|v| v.is_finite()) {
+                    me.rtt = Some(rtt.round().clamp(0.0, 9999.0));
+                }
                 let mut pong = json!({"t":"pong"});
                 if let Some(c) = msg.get("c") {
                     pong["c"] = c.clone();
@@ -215,6 +266,28 @@ impl Room {
             me.deny(t, reason, now);
             return false;
         }
+        if attached
+            && matches!(
+                t,
+                "addAi"
+                    | "level"
+                    | "kick"
+                    | "team"
+                    | "faction"
+                    | "map"
+                    | "mode"
+                    | "worldSize"
+                    | "army"
+                    | "sandbox"
+                    | "weather"
+                    | "defender"
+                    | "spectate"
+                    | "sit"
+            )
+        {
+            me.deny(t, "blocked", now);
+            return false;
+        }
         let slot = integer(&msg["slot"]).and_then(|v| usize::try_from(v).ok());
         let val = msg["v"].as_str();
         match t {
@@ -230,6 +303,7 @@ impl Room {
                     level: "normal",
                     disconnected: None,
                     denies: Vec::new(),
+                    rtt: None,
                 });
             }
             "level" if host && matches!(val, Some("easy" | "normal" | "hard")) => {
@@ -439,6 +513,10 @@ pub(crate) struct Hub {
     maps: Value,
     max_rooms: usize,
     public_url: String,
+    accounts: BTreeMap<u64, SnapshotAccount>,
+    next_epoch: u64,
+    clock: CatchUpClock,
+    stopped: bool,
 }
 impl Hub {
     pub fn new(max_rooms: usize, public_url: String) -> Self {
@@ -448,6 +526,525 @@ impl Hub {
             maps: serde_json::from_str(include_str!("map-catalog.json")).unwrap(),
             max_rooms,
             public_url,
+            accounts: BTreeMap::new(),
+            next_epoch: 0,
+            clock: CatchUpClock::new(0),
+            stopped: false,
+        }
+    }
+    pub fn attach_native(&mut self, code: &str, state: Match, now: u64) -> Result<u64, String> {
+        if self.stopped {
+            return Err("server stopped".into());
+        }
+        let room = self.rooms.get(code).ok_or("room does not exist")?;
+        if room.native.is_some() {
+            return Err("room already has a native runtime".into());
+        }
+        if !room.spectators.is_empty()
+            || room.players.is_empty()
+            || room.players.iter().any(|p| p.ai)
+        {
+            return Err("native attachment needs commander human seats without spectators".into());
+        }
+        if state.start.players.len() != room.players.len()
+            || state.options.players.len() != room.players.len()
+            || state.world.game.players.len() != room.players.len()
+            || room.players.iter().enumerate().any(|(slot, person)| {
+                let start = &state.start.players[slot].config;
+                let config = &state.options.players[slot];
+                let live = &state.world.game.players[slot];
+                start.team != person.team as i32
+                    || config.team != start.team
+                    || live.slot != slot
+                    || live.team != start.team
+                    || start.faction as usize != person.faction
+                    || config.faction != start.faction
+            })
+        {
+            return Err("native match seats disagree with the room roster".into());
+        }
+        let epoch = self
+            .next_epoch
+            .checked_add(1)
+            .ok_or("native runtime epoch exhausted")?;
+        // Canonical runtime admission completes before changing the room or accounts.
+        let mut runtime = RoomRuntime::new(state, now)?;
+        let mut pauses = Vec::new();
+        for (slot, person) in room.players.iter().enumerate() {
+            if person
+                .connection
+                .as_ref()
+                .is_none_or(|connection| !connection.ready())
+                && let Some(message) = runtime.auto_pause(slot, &person.name, now)?
+            {
+                pauses.push(message);
+            }
+        }
+        let room = self.rooms.get_mut(code).unwrap();
+        room.native = Some(AttachedRuntime { epoch, runtime });
+        self.next_epoch = epoch;
+        for (slot, person) in room.players.iter().enumerate() {
+            if let Some(connection) = &person.connection {
+                self.accounts.insert(
+                    connection.id,
+                    SnapshotAccount {
+                        room: code.into(),
+                        epoch,
+                        slot,
+                        delivery: SnapshotDelivery::default(),
+                        pressure: SeatBackpressure::default(),
+                        full_terrain: true,
+                    },
+                );
+            }
+        }
+        for message in pauses {
+            for person in room.people() {
+                if let Some(connection) = &person.connection {
+                    connection.send(message.clone());
+                }
+            }
+        }
+        Ok(epoch)
+    }
+    pub fn native_status(&self, code: &str) -> Result<crate::NativeRoomStatus, String> {
+        if self.stopped {
+            return Err("server stopped".into());
+        }
+        let native = self
+            .rooms
+            .get(code)
+            .and_then(|room| room.native.as_ref())
+            .ok_or("native room does not exist")?;
+        Ok(crate::NativeRoomStatus {
+            epoch: native.epoch,
+            tick: native.runtime.state().world.game.tick,
+            held: native.runtime.held(),
+            ending_complete: native.runtime.held() >= 120,
+            paused: native.runtime.paused(),
+            fault: native.runtime.fault().map(str::to_owned),
+        })
+    }
+    pub fn stop(&mut self) {
+        self.stopped = true;
+    }
+    pub fn retire_connection(&mut self, id: u64) {
+        let Some(account) = self.accounts.remove(&id) else {
+            return;
+        };
+        let current = self.rooms.get(&account.room).is_some_and(|room| {
+            room.native
+                .as_ref()
+                .is_some_and(|native| native.epoch == account.epoch)
+                && room
+                    .players
+                    .get(account.slot)
+                    .and_then(|p| p.connection.as_ref())
+                    .is_some_and(|c| c.id == id)
+        });
+        if current
+            && account.pressure.inflight() != 0
+            && let Some(native) = self
+                .rooms
+                .get_mut(&account.room)
+                .and_then(|r| r.native.as_mut())
+        {
+            native
+                .runtime
+                .fault_stop("terminal socket retained snapshot reservations".into());
+        }
+    }
+    pub fn complete_snapshot(&mut self, write: &SnapshotWrite, success: bool, now: u64) {
+        let current = !self.stopped
+            && self.rooms.get(&write.room).is_some_and(|room| {
+                room.native
+                    .as_ref()
+                    .is_some_and(|native| native.epoch == write.epoch)
+                    && room
+                        .players
+                        .get(write.slot)
+                        .and_then(|p| p.connection.as_ref())
+                        .is_some_and(|c| c.id == write.connection_id)
+            });
+        let ready = self
+            .rooms
+            .get(&write.room)
+            .and_then(|room| room.players.get(write.slot))
+            .and_then(|p| p.connection.as_ref())
+            .is_some_and(Connection::ready);
+        let playing = self
+            .rooms
+            .get(&write.room)
+            .and_then(|room| room.native.as_ref())
+            .is_some_and(|native| {
+                native.epoch == write.epoch
+                    && native.runtime.fault().is_none()
+                    && native.runtime.held() < 120
+            });
+        let Some(account) = self
+            .accounts
+            .get_mut(&write.connection_id)
+            .filter(|account| {
+                account.room == write.room
+                    && account.epoch == write.epoch
+                    && account.slot == write.slot
+            })
+        else {
+            return;
+        };
+        let catch_up = match account.pressure.complete_write(
+            write.ticket,
+            CompletionContext {
+                current_socket: current && success && ready,
+                seat_present: current,
+                playing,
+                has_game: playing,
+            },
+        ) {
+            Ok(catch_up) => catch_up,
+            Err(error) => {
+                if current
+                    && let Some(native) = self
+                        .rooms
+                        .get_mut(&write.room)
+                        .and_then(|room| room.native.as_mut())
+                {
+                    native
+                        .runtime
+                        .fault_stop(format!("snapshot completion: {error}"));
+                }
+                return;
+            }
+        };
+        if current && !success {
+            if let Some(native) = self
+                .rooms
+                .get_mut(&write.room)
+                .and_then(|room| room.native.as_mut())
+            {
+                native
+                    .runtime
+                    .fault_stop("snapshot socket write failed".into());
+            }
+            return;
+        }
+        if catch_up {
+            let Some(room) = self.rooms.get_mut(&write.room) else {
+                return;
+            };
+            let full = self.accounts[&write.connection_id].full_terrain;
+            let selected = [SelectedSeat {
+                slot: write.slot,
+                full,
+                omit: false,
+            }];
+            Self::send_native_frame(room, &mut self.accounts, &selected, FrameKind::Current, now);
+        }
+    }
+    fn select_native(
+        room: &Room,
+        accounts: &mut BTreeMap<u64, SnapshotAccount>,
+        backed_up: bool,
+    ) -> Result<Vec<SelectedSeat>, String> {
+        let native = room.native.as_ref().ok_or("native runtime absent")?;
+        let mut selected = Vec::new();
+        for (slot, person) in room.players.iter().enumerate() {
+            let Some(connection) = person.connection.as_ref().filter(|c| c.ready()) else {
+                continue;
+            };
+            let account = accounts
+                .get_mut(&connection.id)
+                .filter(|account| {
+                    account.room == room.code
+                        && account.epoch == native.epoch
+                        && account.slot == slot
+                })
+                .ok_or("native snapshot account absent")?;
+            if backed_up && account.pressure.skip_snapshot() {
+                continue;
+            }
+            selected.push(SelectedSeat {
+                slot,
+                full: account.full_terrain,
+                omit: false,
+            });
+        }
+        Ok(selected)
+    }
+    fn send_native_frame(
+        room: &mut Room,
+        accounts: &mut BTreeMap<u64, SnapshotAccount>,
+        selected: &[SelectedSeat],
+        kind: FrameKind,
+        _now: u64,
+    ) -> Option<(f64, f64)> {
+        let online = room
+            .players
+            .iter()
+            .map(|p| p.connection.as_ref().is_some_and(Connection::ready))
+            .collect::<Vec<_>>();
+        let ping = room.players.iter().map(|p| p.rtt).collect::<Vec<_>>();
+        let native = room.native.as_mut()?;
+        let began = Instant::now();
+        let captured = match native.runtime.collect_frame(selected, kind) {
+            Ok(captured) => captured,
+            Err(error) => {
+                native
+                    .runtime
+                    .fault_stop(format!("snapshot collection: {error}"));
+                return None;
+            }
+        };
+        let mut build = began.elapsed().as_secs_f64() * 1000.0;
+        let mut stringify = 0.0;
+        if captured.len() != selected.len()
+            || captured
+                .iter()
+                .zip(selected)
+                .any(|(frame, seat)| frame.slot != seat.slot)
+        {
+            native
+                .runtime
+                .fault_stop("snapshot selection changed during capture".into());
+            return None;
+        }
+        for mut frame in captured {
+            let build_at = Instant::now();
+            let scope = match native.runtime.list_scope(frame.batch) {
+                Ok(scope) if scope == ListScope::Shared(frame.list_versions) => scope,
+                _ => {
+                    native
+                        .runtime
+                        .fault_stop("snapshot list batch disagrees with canonical cache".into());
+                    return None;
+                }
+            };
+            let Some(connection) = room
+                .players
+                .get(frame.slot)
+                .and_then(|p| p.connection.as_ref())
+            else {
+                native
+                    .runtime
+                    .fault_stop("snapshot seat disappeared after capture".into());
+                return None;
+            };
+            let Some(account) = accounts.get_mut(&connection.id).filter(|account| {
+                account.room == room.code
+                    && account.epoch == native.epoch
+                    && account.slot == frame.slot
+            }) else {
+                native
+                    .runtime
+                    .fault_stop("snapshot account disappeared after capture".into());
+                return None;
+            };
+            frame.message["online"] = json!(online);
+            frame.message["ping"] = json!(ping);
+            let message = match account.delivery.trim(scope, frame.message) {
+                Ok(message) => message,
+                Err(error) => {
+                    native.runtime.fault_stop(format!("snapshot trim: {error}"));
+                    return None;
+                }
+            };
+            build += build_at.elapsed().as_secs_f64() * 1000.0;
+            let stringify_at = Instant::now();
+            let json = match serde_json::to_string(&message) {
+                Ok(json) => json,
+                Err(error) => {
+                    native
+                        .runtime
+                        .fault_stop(format!("snapshot serialization: {error}"));
+                    return None;
+                }
+            };
+            stringify += stringify_at.elapsed().as_secs_f64() * 1000.0;
+            let ticket = match account.pressure.begin_write(&json) {
+                Ok(ticket) => ticket,
+                Err(error) => {
+                    native
+                        .runtime
+                        .fault_stop(format!("snapshot reservation: {error}"));
+                    return None;
+                }
+            };
+            account.full_terrain = false;
+            let write = SnapshotWrite {
+                room: room.code.clone(),
+                epoch: native.epoch,
+                slot: frame.slot,
+                connection_id: connection.id,
+                ticket,
+                json,
+            };
+            if let Err(write) = connection.snapshot(write) {
+                let drained = account.pressure.complete_write(
+                    write.ticket,
+                    CompletionContext {
+                        current_socket: false,
+                        seat_present: false,
+                        playing: false,
+                        has_game: false,
+                    },
+                );
+                let reason = match drained {
+                    Ok(_) => "snapshot enqueue failed".into(),
+                    Err(error) => format!("snapshot enqueue accounting: {error}"),
+                };
+                native.runtime.fault_stop(reason);
+                return None;
+            }
+        }
+        Some((build, stringify))
+    }
+    pub fn poll_native(&mut self, now_ms: u64, now_ns: u64) {
+        if self.stopped {
+            return;
+        }
+        let poll = match self.clock.poll(now_ns) {
+            Ok(poll) => poll,
+            Err(error) => {
+                for room in self.rooms.values_mut() {
+                    if let Some(native) = &mut room.native {
+                        native.runtime.fault_stop(format!("host clock: {error}"));
+                    }
+                }
+                return;
+            }
+        };
+        for _ in 0..poll.ticks {
+            self.expire(now_ms);
+            for code in &self.room_order {
+                let Some(room) = self.rooms.get_mut(code) else {
+                    continue;
+                };
+                let Some(native) = &mut room.native else {
+                    continue;
+                };
+                if native.runtime.fault().is_some() || native.runtime.held() >= 120 {
+                    continue;
+                }
+                let connected = room
+                    .players
+                    .iter()
+                    .map(|p| p.connection.as_ref().is_some_and(Connection::ready))
+                    .collect::<Vec<_>>();
+                let pause = match native.runtime.poll_pause(&connected, now_ms) {
+                    Ok(pause) => pause,
+                    Err(error) => {
+                        native.runtime.fault_stop(format!("native pause: {error}"));
+                        continue;
+                    }
+                };
+                if let Some(message) = pause.message {
+                    for person in &room.players {
+                        if let Some(connection) = &person.connection {
+                            connection.send(message.clone());
+                        }
+                    }
+                }
+                if pause.blocked {
+                    if pause.send_frame {
+                        match Self::select_native(room, &mut self.accounts, false) {
+                            Ok(selected) => {
+                                Self::send_native_frame(
+                                    room,
+                                    &mut self.accounts,
+                                    &selected,
+                                    FrameKind::Scheduled,
+                                    now_ms,
+                                );
+                            }
+                            Err(error) => room.native.as_mut().unwrap().runtime.fault_stop(error),
+                        }
+                    }
+                    continue;
+                }
+                let away = room.players.iter().map(|person| person.connection.is_none()).collect::<Vec<_>>();
+                let native = room.native.as_mut().unwrap();
+                if let Err(error) = native.runtime.set_away(&away) {
+                    native.runtime.fault_stop(error);
+                    continue;
+                }
+                let ending = match native.runtime.hold_callback() {
+                    Ok(ending) => ending,
+                    Err(error) => {
+                        native.runtime.fault_stop(error);
+                        continue;
+                    }
+                };
+                if let Some(ending) = ending {
+                    if ending.advance {
+                        if let Err(error) = native.runtime.advance_tick(&away) {
+                            native.runtime.fault_stop(error);
+                            continue;
+                        }
+                        match Self::select_native(room, &mut self.accounts, false) {
+                            Ok(selected) => {
+                                Self::send_native_frame(
+                                    room,
+                                    &mut self.accounts,
+                                    &selected,
+                                    FrameKind::Scheduled,
+                                    now_ms,
+                                );
+                            }
+                            Err(error) => room.native.as_mut().unwrap().runtime.fault_stop(error),
+                        }
+                    }
+                    // The bounded host keeps its finished runtime. Public result/lobby
+                    // transition is a separate admission, without inferred story output.
+                    continue;
+                }
+                let began = Instant::now();
+                let report = match native.runtime.advance_tick(&away) {
+                    Ok(report) => report,
+                    Err(error) => {
+                        native.runtime.fault_stop(error);
+                        continue;
+                    }
+                };
+                let step = began.elapsed().as_secs_f64() * 1000.0;
+                let sent = native.runtime.should_snapshot(report.tick);
+                let snapshot_at = Instant::now();
+                let mut costs = (0.0, 0.0);
+                if sent {
+                    match Self::select_native(room, &mut self.accounts, true) {
+                        Ok(selected) => {
+                            let Some(value) = Self::send_native_frame(
+                                room,
+                                &mut self.accounts,
+                                &selected,
+                                FrameKind::Scheduled,
+                                now_ms,
+                            ) else {
+                                continue;
+                            };
+                            costs = value;
+                        }
+                        Err(error) => {
+                            room.native.as_mut().unwrap().runtime.fault_stop(error);
+                            continue;
+                        }
+                    }
+                }
+                let sample = TickSample {
+                    sent,
+                    durations: [
+                        began.elapsed().as_secs_f64() * 1000.0,
+                        step,
+                        0.0,
+                        snapshot_at.elapsed().as_secs_f64() * 1000.0,
+                        costs.0,
+                        costs.1,
+                    ],
+                };
+                let native = room.native.as_mut().unwrap();
+                if let Err(error) = native.runtime.record_timing(sample, now_ms) {
+                    native.runtime.fault_stop(error);
+                }
+            }
         }
     }
     pub fn directory(&self) -> Value {
@@ -462,7 +1059,7 @@ impl Hub {
         msg: Value,
         now: u64,
     ) {
-        if !msg.is_object() {
+        if self.stopped || !msg.is_object() {
             return;
         }
         if *joined {
@@ -515,6 +1112,7 @@ impl Hub {
                 sandbox: false,
                 defender: 0,
                 empty_since: None,
+                native: None,
             }
         });
         let token: Vec<_> = msg["token"]
@@ -537,6 +1135,11 @@ impl Hub {
             p.name = name;
             p.disconnected = None;
         } else {
+            if room.native.is_some() {
+                connection.send(json!({"t":"deny","cmd":"join","reason":"blocked"}));
+                connection.close(1008, "native roster fixed");
+                return;
+            }
             let p = Person {
                 token,
                 name,
@@ -547,6 +1150,7 @@ impl Hub {
                 level: "normal",
                 disconnected: None,
                 denies: Vec::new(),
+                rtt: None,
             };
             if room.has_seat(&self.maps) && msg["spectate"] != true {
                 room.add_seat(p);
@@ -558,6 +1162,24 @@ impl Hub {
                 return;
             }
         }
+        if let Some(native) = &room.native {
+            let slot = room
+                .players
+                .iter()
+                .position(|p| p.connection.as_ref().is_some_and(|c| c.id == connection.id))
+                .unwrap();
+            self.accounts.insert(
+                connection.id,
+                SnapshotAccount {
+                    room: code.into(),
+                    epoch: native.epoch,
+                    slot,
+                    delivery: SnapshotDelivery::default(),
+                    pressure: SeatBackpressure::default(),
+                    full_terrain: true,
+                },
+            );
+        }
         *joined = true;
         room.empty_since = None;
         room.broadcast(&self.maps, &self.public_url);
@@ -566,15 +1188,27 @@ impl Hub {
         }
     }
     pub fn disconnected(&mut self, code: &str, id: u64, now: u64) {
+        let active = !self.stopped;
         let Some(room) = self.rooms.get_mut(code) else {
             return;
         };
         let mut changed = false;
-        for p in &mut room.players {
+        let mut pauses = Vec::new();
+        for (slot, p) in room.players.iter_mut().enumerate() {
             if p.connection.as_ref().is_some_and(|c| c.id == id) {
                 p.connection = None;
                 p.disconnected = Some(now);
                 changed = true;
+                if active && let Some(native) = &mut room.native
+                    && native.runtime.fault().is_none()
+                    && native.runtime.held() < 120
+                {
+                    match native.runtime.auto_pause(slot, &p.name, now) {
+                        Ok(Some(message)) => pauses.push(message),
+                        Ok(None) => {}
+                        Err(error) => native.runtime.fault_stop(error),
+                    }
+                }
             }
         }
         let size = room.spectators.len();
@@ -582,6 +1216,13 @@ impl Hub {
             .retain(|p| !p.connection.as_ref().is_some_and(|c| c.id == id));
         changed |= size != room.spectators.len();
         if changed {
+            for message in pauses {
+                for person in room.people() {
+                    if let Some(connection) = &person.connection {
+                        connection.send(message.clone());
+                    }
+                }
+            }
             if !room.people().any(|p| p.connection.is_some()) {
                 room.empty_since = Some(now);
             }
@@ -589,12 +1230,18 @@ impl Hub {
         }
     }
     pub fn expire(&mut self, now: u64) {
+        if self.stopped {
+            return;
+        }
         self.rooms.retain(|_, room| {
             if room
                 .empty_since
                 .is_some_and(|at| now.saturating_sub(at) > 60_000)
             {
                 return false;
+            }
+            if room.native.is_some() {
+                return true;
             }
             let size = room.players.len();
             room.players.retain(|p| {
@@ -787,3 +1434,7 @@ mod tests {
         assert_eq!(h.rooms["ABC"].lobby(a.id, &h.maps, "")["state"], "lobby");
     }
 }
+
+#[cfg(test)]
+#[path = "native_lobby_tests.rs"]
+pub(crate) mod native_tests;

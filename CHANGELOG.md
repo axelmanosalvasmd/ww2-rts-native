@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Save the unfinished trusted room/server integration before the requested pause. Preserve current source and unexecuted tests, record known attachment, reconnect, socket-failure and lifecycle gaps in `docs/checkpoints/2026-10-13-pause.md`, and make no compiled or full-server readiness claim.
+
+- Add the source-written native room runtime over the existing Match, selected recipient collector, global raw list versions and host timing. Add read-only attachment admission, one caller effect batch, source pause/resume and 120-callback ending decisions. Transport integration and coherent native verification remain pending; public start and complete gameplay are not enabled.
+
 - Normally merge the verified host timing, snapshot delta, list-version and socket-accounting providers into the engineering delivery branch. Preserve each provider's original fixtures and existing code; the new room integration and combined native proof are pending.
 
 - Added host tick catch-up with the source's four-tick cap and backlog drop, plus snapshot cadence from rolling timing percentiles. Snapshot phases are recorded only on scheduled snapshot ticks; sustained spare capacity recovers the interval. Timing inputs and counter capacity are checked before mutation. The original-source recorder covers 8 meter traces with 747 samples and 7 clock traces with 34 polls. The combined server checkpoint passes 23 debug tests, 173 release workspace tests, strict Clippy, formatting and release FFI at 315f46a. Actual room-loop wiring remains pending; AI keeps its recorded schedule.
