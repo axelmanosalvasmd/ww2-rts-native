@@ -513,7 +513,7 @@ impl Match {
     ) -> Result<bool, String> {
         use crate::{
             combat::{Impact, WeaponDamage},
-            match_combat::{ContactTarget, ExplosionSource, FlightSource},
+            match_combat::{ContactTarget, FlightSource},
         };
         p.sequence = p
             .sequence
