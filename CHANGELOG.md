@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Connected source-reviewed aircraft turns and canonical off-map support to the single ordinary tick caller in a separate source assembly. Aircraft continue before ground timers/work/riding; late captured strikes run before one Aviation AA pass and one cover/cooldown decay. Queue-boundary and post-command state guards remain distinct. Replaced the old bombing-refusal test with actual queue/payment/timer assertions because that capability is now attached; combined native proof is pending.
+
 - Normally incorporated the checked carrier closure into the separate aircraft source union, preserving the accepted Board route endpoint repair and all proof evidence. Rust aircraft/support providers remain their reviewed bodies; real AIR scheduling and combined native checks remain pending.
 
 - Normally merged the source-reviewed coherent support provider into the separate aircraft dependency union. All off-map strikes now use canonical Game.strikes and its timing metadata; migrated existing ground/FPS projections and retained the ground-only guard/default assertions without changing original fixtures. AIR scheduling and coherent native proof remain pending, and frozen carrier/native branches are unchanged.
