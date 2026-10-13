@@ -250,14 +250,14 @@ fn all_producers_admit_before_any_recipient_memory_or_delivery_changes() {
         Err(SnapshotError::InvalidRecipient)
     ));
     assert_eq!(delivery, before);
-    for slot in 0..3 {
+    for (slot, remembered) in wrecks.iter().enumerate() {
         assert_eq!(
             state
                 .recipient_routing(slot)
                 .unwrap()
                 .remembered_wreck_rows()
                 .unwrap(),
-            wrecks[slot]
+            *remembered
         );
     }
     let frame = delivery
