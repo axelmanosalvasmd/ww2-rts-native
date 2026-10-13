@@ -119,6 +119,16 @@ async fn real_socket_maintenance_uses_trusted_runtime_and_public_start_stays_den
             frame["held"][0].as_u64().unwrap() as usize,
             frame["units"].as_array().unwrap().len()
         );
+        // A real socket drop pauses once. Its same-token replacement resumes
+        // before maintenance needs to discover the replacement connection.
+        drop(replacement);
+        assert_eq!(b.until("pause")["paused"], true);
+        assert!(host.block_on(control.inspect("ABC")).unwrap().paused);
+        let mut reconnected = Client::open(address, "a");
+        let resumed = host.block_on(control.inspect("ABC")).unwrap();
+        assert!(!resumed.paused);
+        assert!(resumed.fault.is_none());
+        assert!(reconnected.until("s")["units"].is_array());
     })
     .await
     .unwrap();
@@ -157,4 +167,33 @@ async fn dropped_control_receipt_preserves_existing_serve_lobby() {
     .unwrap();
     let _ = stop.send(());
     server.await.unwrap().unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn aborted_serve_invalidates_retained_control_on_the_same_hub() {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let (ready, received) = oneshot::channel();
+    let server = tokio::spawn(serve_with_native_control(
+        listener,
+        Config::default(),
+        std::future::pending(),
+        Some(ready),
+    ));
+    let control = received.await.unwrap();
+    tokio::task::spawn_blocking(move || {
+        let _client = Client::open(address, "a");
+    })
+    .await
+    .unwrap();
+    server.abort();
+    assert!(server.await.unwrap_err().is_cancelled());
+    assert_eq!(control.inspect("ABC").await.unwrap_err(), "server stopped");
+    assert_eq!(
+        control
+            .attach("ABC", lobby::native_tests::native_match())
+            .await
+            .unwrap_err(),
+        "server stopped"
+    );
 }

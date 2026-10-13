@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Wire trusted room reconnect, abort-safe shutdown, canonical ending results and connection-scoped write accounting. Read-only attachment now validates every seat's ordinary lists before publication. Expected send and enqueue loss disconnects the affected seat instead of faulting the match. The old enqueue-fault regression is replaced with healthy-peer delivery, drop pause and full reconnect coverage. Original Source roster replay passes 3 traces and 11 operations; 7 Hub and 3 socket tests are written, with native verification pending.
+
 - Save the unfinished trusted room/server integration before the requested pause. Preserve current source and unexecuted tests, record known attachment, reconnect, socket-failure and lifecycle gaps in `docs/checkpoints/2026-10-13-pause.md`, and make no compiled or full-server readiness claim.
 
 - Add the source-written native room runtime over the existing Match, selected recipient collector, global raw list versions and host timing. Add read-only attachment admission, one caller effect batch, source pause/resume and 120-callback ending decisions. Transport integration and coherent native verification remain pending; public start and complete gameplay are not enabled.

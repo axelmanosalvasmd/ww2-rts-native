@@ -9,6 +9,7 @@ use std::collections::BTreeSet;
 use ww2_core::{
     environment::Effect,
     match_runtime::Match,
+    match_story::MatchResult,
     match_tick::TickReport,
     recipient_snapshot::{DeliveryState, SelectedSeat},
 };
@@ -264,6 +265,27 @@ impl RoomRuntime {
         self.pause = None;
         self.pause_message(now_ms)
     }
+    /// A replacement connection resumes only the drop pause owned by its stable seat.
+    pub fn resume_drop(&mut self, slot: usize, now_ms: u64) -> Result<Option<Value>, String> {
+        self.running()?;
+        if slot >= self.state.world.game.players.len() {
+            return Err("invalid native resume seat".into());
+        }
+        let same_drop = self
+            .pause
+            .as_ref()
+            .is_some_and(|pause| pause.reason == PauseReason::Drop && pause.slot == slot);
+        Ok(same_drop.then(|| self.resume(now_ms)))
+    }
+
+    /// Freeze the canonical report after the final hold step, before releasing the runtime.
+    pub fn finished_result(&self) -> Result<MatchResult, String> {
+        self.running()?;
+        self.state
+            .match_result()?
+            .ok_or_else(|| "native result requires a finished match".into())
+    }
+
     /// connected includes an AI takeover, matching the Source drop-resume gate.
     pub fn poll_pause(&mut self, connected: &[bool], now_ms: u64) -> Result<PausePoll, String> {
         if connected.len() != self.state.world.game.players.len() {

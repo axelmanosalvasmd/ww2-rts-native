@@ -23,7 +23,7 @@ use std::{
     future::Future,
     sync::{
         Arc,
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     time::Instant,
 };
@@ -50,6 +50,13 @@ impl Default for Config {
         }
     }
 }
+struct ServeLifetime(Arc<AtomicBool>);
+impl Drop for ServeLifetime {
+    fn drop(&mut self) {
+        self.0.store(true, Ordering::Release);
+    }
+}
+
 #[derive(Clone)]
 struct Server {
     hub: Arc<Mutex<Hub>>,
@@ -108,11 +115,12 @@ pub async fn serve_with_native_control(
     shutdown: impl Future<Output = ()> + Send + 'static,
     ready: Option<oneshot::Sender<NativeRoomControl>>,
 ) -> std::io::Result<()> {
+    let hub = Hub::new(config.max_rooms.clamp(1, 256), config.public_url);
+    // Dropping or aborting this future invalidates the same stopped authority
+    // used under the Hub lock, even when graceful shutdown never runs.
+    let _lifetime = ServeLifetime(hub.stop_authority());
     let server = Server {
-        hub: Arc::new(Mutex::new(Hub::new(
-            config.max_rooms.clamp(1, 256),
-            config.public_url,
-        ))),
+        hub: Arc::new(Mutex::new(hub)),
         next: Arc::new(AtomicU64::new(1)),
         clock: Instant::now(),
     };

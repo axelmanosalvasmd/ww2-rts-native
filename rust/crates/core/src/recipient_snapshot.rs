@@ -893,6 +893,89 @@ pub(crate) mod tests {
             _ => assert_eq!(actual, expected, "{path}"),
         }
     }
+    fn attachment_scene() -> Match {
+        let fixture: Value =
+            serde_json::from_str(include_str!("../tests/fixtures/recipient-selected.json"))
+                .unwrap();
+        initialize(&fixture["initial"])
+    }
+    fn attachment_observation_state(m: &Match) -> (String, Vec<String>, String) {
+        (
+            format!("{:?}", m.recipients),
+            (0..m.world.game.players.len())
+                .map(|slot| {
+                    format!(
+                        "{:?}",
+                        m.world.pending(crate::world::Recipient::Player(slot))
+                    )
+                })
+                .collect(),
+            format!("{:?}", m.routing_fog),
+        )
+    }
+    #[test]
+    fn ordinary_attachment_rejects_malformed_mine_cells_without_publication() {
+        let mut m = attachment_scene();
+        m.preflight_ordinary_snapshot().unwrap();
+        let cell = m.world.game.chars.len();
+        m.world.mine_seen.insert(cell, 1);
+        let before = attachment_observation_state(&m);
+        assert!(m.ordinary_snapshot_raw_lists().is_ok());
+        assert_eq!(m.preflight_ordinary_snapshot(), Err(SnapshotError::Rules));
+        assert_eq!(attachment_observation_state(&m), before);
+        assert_eq!(m.world.mine_seen.get(&cell), Some(&1));
+        m.world.mine_seen.remove(&cell);
+        m.preflight_ordinary_snapshot().unwrap();
+        assert_eq!(attachment_observation_state(&m), before);
+    }
+    #[test]
+    fn ordinary_attachment_rejects_late_retained_wreck_without_display_facts() {
+        let mut m = attachment_scene();
+        m.preflight_ordinary_snapshot().unwrap();
+        let owner = m.world.game.players.len() - 1;
+        m.world.game.wrecks.push(crate::game::Wreck {
+            id: Some(88),
+            cell: None,
+            x: 800.,
+            z: 400.,
+            moving: false,
+        });
+        m.world.game.reveal = true;
+        assert_eq!(m.observed_wrecks(owner).unwrap().len(), 1);
+        m.world.game.reveal = false;
+        m.world.game.wrecks.clear();
+        assert_eq!(m.ordinary_snapshot_raw_lists().unwrap().wrecks, json!([]));
+        assert!(m.prepare_ordinary_recipient_lists(&[0, 1]).is_ok());
+        assert_eq!(
+            m.recipient_routing(owner).unwrap().remembered_wreck_rows(),
+            Err("missing observed wreck display facts: 88".into())
+        );
+        let before = attachment_observation_state(&m);
+        assert_eq!(m.preflight_ordinary_snapshot(), Err(SnapshotError::Rules));
+        assert_eq!(attachment_observation_state(&m), before);
+
+        // Correct current facts replace the retained query during preparation,
+        // but admission still leaves the canonical memory unchanged.
+        m.world.game.wrecks.push(crate::game::Wreck {
+            id: Some(88),
+            cell: None,
+            x: 800.,
+            z: 400.,
+            moving: false,
+        });
+        m.environment.wreck_metadata.insert(
+            88,
+            crate::environment::WreckMetadata {
+                kind: m.rules.kind("tank").unwrap(),
+                owner,
+                rotation: 0.,
+                motion: None,
+            },
+        );
+        m.world.game.reveal = true;
+        m.preflight_ordinary_snapshot().unwrap();
+        assert_eq!(attachment_observation_state(&m), before);
+    }
     #[test]
     fn represented_fields_match_actual_cached_reference_snapshots() {
         let fixture: Value =
@@ -962,11 +1045,16 @@ impl Match {
     pub fn preflight_ordinary_snapshot(&self) -> Result<(), SnapshotError> {
         composition::admit_actors(self, &[])?;
         let cache = SnapshotCache::new(self)?;
-        for slot in 0..self.world.game.players.len() {
+        let owners = (0..self.world.game.players.len()).collect::<Vec<_>>();
+        for &slot in &owners {
             cache.recipient(slot)?;
             self.preflight_observed_terrain(slot)
                 .map_err(|_| SnapshotError::Rules)?;
         }
+        // Prepare the same ordered lists as delivery without publishing their
+        // remembered rows or acknowledging any World observations.
+        self.prepare_ordinary_recipient_lists(&owners)
+            .map_err(|_| SnapshotError::Rules)?;
         Ok(())
     }
 }
