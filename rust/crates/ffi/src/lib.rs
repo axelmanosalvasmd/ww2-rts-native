@@ -7,7 +7,7 @@
 //! - It runs inside `catch_unwind`. A panic returns `WW2_ERR_PANIC`; nothing unwinds into C or C++.
 //! - A null pointer is an error, except where its length is 0, since nothing is read or written then.
 //! - After a failure, `ww2_last_error` copies a readable message for the calling thread.
-//! - Results go into arrays the caller owns, so nothing returned here needs freeing.
+//! - Results go into arrays the caller owns. View handles are released with `ww2_view_free`.
 //!
 //! This crate holds the interface's `unsafe` code; `ww2-core` has none.
 
@@ -19,9 +19,12 @@ use std::panic::{self, AssertUnwindSafe};
 
 use ww2_core::formation::{self, Item, Shape};
 
+mod view;
+pub use view::*;
+
 /// The interface version. It changes whenever a function signature or a struct layout in this header
 /// changes. The Unreal plugin refuses to start when `ww2_abi_version()` differs from this.
-pub const WW2_ABI_VERSION: u32 = 1;
+pub const WW2_ABI_VERSION: u32 = 2;
 
 /// Success.
 pub const WW2_OK: i32 = 0;
@@ -33,6 +36,12 @@ pub const WW2_ERR_NULL_POINTER: i32 = -2;
 pub const WW2_ERR_BAD_ARGUMENT: i32 = -3;
 /// The caller's buffer is too small.
 pub const WW2_ERR_CAPACITY: i32 = -4;
+/// The message is not valid UTF-8, JSON, or a valid server message.
+pub const WW2_ERR_PARSE: i32 = -5;
+/// The message cannot be applied before the view receives a start message.
+pub const WW2_ERR_WRONG_STATE: i32 = -6;
+/// A previous panic poisoned this handle. Only ww2_view_free is allowed.
+pub const WW2_ERR_POISONED: i32 = -7;
 
 /// Formation shapes, in the Formation menu's order (`SHAPES` in `shared/formation.js`). Ranks of up to
 /// ten, or as many as fit the drag.
@@ -127,6 +136,12 @@ fn guard(body: impl FnOnce() -> Result<(), Failure>) -> i32 {
 /// # Safety
 /// A non-null `ptr` must point to `len` initialized `T`s that stay unchanged during the call.
 unsafe fn input<'a, T>(ptr: *const T, len: usize, name: &str) -> Result<&'a [T], Failure> {
+    if len > isize::MAX as usize / std::mem::size_of::<T>().max(1) {
+        return Err(Failure {
+            code: WW2_ERR_BAD_ARGUMENT,
+            message: format!("{name} length exceeds the addressable range"),
+        });
+    }
     if len == 0 {
         return Ok(&[]);
     }
