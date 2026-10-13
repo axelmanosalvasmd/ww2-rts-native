@@ -95,6 +95,9 @@ impl StartPlan {
         options: &MatchOptions,
         rules: &Rules,
     ) -> Result<Self, String> {
+        if map.geography().is_some() {
+            return Err("native startup does not yet initialize World matches".into());
+        }
         if !matches!(options.mode, Mode::Default | Mode::Conquest) {
             return Err("native startup currently supports Conquest".into());
         }
@@ -392,11 +395,15 @@ pub struct BuildingCell {
 /// Authoritative Conquest startup state. Tick execution is added independently.
 /// Live terrain and units have a single owner in `world.game`.
 pub struct Match {
+    pub combat: crate::match_combat::CombatState,
+    pub environment: crate::environment::EnvironmentRuntime,
     pub commands: crate::match_commands::MatchCommands,
     pub world: World,
     pub start: StartPlan,
     pub options: MatchOptions,
     pub grid: SpatialGrid,
+    pub(crate) recipients: Vec<crate::match_routing::RecipientRouting>,
+    pub(crate) routing_fog: crate::fog::Fog,
     pub building_cells: BTreeMap<usize, BuildingCell>,
     pub production: crate::production::ProductionState,
     pub building_rallies: BTreeMap<u32, Option<Point>>,
@@ -406,6 +413,10 @@ pub struct Match {
     pub scenario: Option<crate::legacy_scenario::LegacyScenario>,
     pub logistics: crate::logistics::LogisticsState,
     pub capture_ticks: Vec<Option<i64>>,
+    /// Capture story counts only. Combat and spending counters are not integrated yet.
+    pub capture_counts: Vec<f64>,
+    pub finish: Option<crate::conquest_end::ConquestFinish>,
+    pub timeline: Vec<crate::conquest_end::ConquestSample>,
     pub next_unit_id: u32,
     pub rules: Rules,
 }
@@ -444,8 +455,12 @@ impl Match {
         };
         let player_count = start.players.len();
         let mut result = Self {
+            combat: crate::match_combat::CombatState::default(),
+            environment: crate::environment::EnvironmentRuntime::default(),
             commands: crate::match_commands::MatchCommands::new(4096),
             grid: SpatialGrid::new(&world.game.units, 16.0),
+            recipients: Vec::new(),
+            routing_fog: crate::fog::Fog::default(),
             world,
             start,
             options,
@@ -458,15 +473,20 @@ impl Match {
             scenario,
             logistics: crate::logistics::LogisticsState::default(),
             capture_ticks: vec![None; map.points().len()],
+            capture_counts: vec![0.0; player_count],
+            finish: None,
+            timeline: Vec::new(),
             next_unit_id,
             rules,
         };
         result.setup_bases()?;
         for unit in result.world.game.units.values() {
+            result.combat.initialize(unit.id);
             let control = crate::match_commands::UnitControl::new(unit, &result.rules)?;
             result.commands.insert(unit.id, control);
         }
         result.grid.rebuild(&result.world.game.units);
+        result.initialize_recipient_routing()?;
         Ok(result)
     }
 
@@ -479,6 +499,8 @@ impl Match {
         winner_decided: bool,
     ) -> Result<Vec<crate::objectives::Captured>, String> {
         use crate::{economy_state as economy, objectives};
+        self.validate_conquest_finish_state()?;
+        let winner_decided = winner_decided || self.finish.is_some();
         let dt = self.rules.movement.tick;
         let game = &self.world.game;
         if game.tick < 0
@@ -589,6 +611,7 @@ impl Match {
         if !winner_decided {
             for event in &captured {
                 self.capture_ticks[event.objective_index] = Some(game.tick);
+                self.capture_counts[event.owner] += 1.0;
             }
         }
         Ok(captured)

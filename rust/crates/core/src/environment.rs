@@ -9,6 +9,9 @@ use crate::{
     weather_runtime::environment_random,
     world::{Appearance, CellChange, World, WorldError},
 };
+#[path = "environment_lifecycle.rs"]
+mod lifecycle;
+pub use lifecycle::WreckMetadata;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::OnceLock;
 
@@ -69,12 +72,25 @@ pub struct Collapse {
 pub enum Effect {
     Hurt(Hurt),
     Collapse(Collapse),
-    LastHit { unit: u32, owner: i32 },
+    BuildingCollapse {
+        unit: u32,
+        owner: usize,
+        position: Point,
+    },
+    LastHit {
+        unit: u32,
+        owner: i32,
+    },
 }
 impl Effect {
     pub fn to_json(&self) -> serde_json::Value {
         use serde_json::json;
         match self {
+            Self::BuildingCollapse {
+                unit,
+                owner,
+                position,
+            } => json!({"k":"collapse","t":unit,"to":owner,"x":position.x,"z":position.z}),
             Self::LastHit { unit, owner } => json!({"lastHit":[unit,owner]}),
             Self::Hurt(h) => {
                 let mut v = json!({"t":h.unit,"to":h.owner,"x":h.at.x,"z":h.at.z,"k":"hurt","kill":h.killed});
@@ -161,6 +177,7 @@ pub struct EnvironmentRuntime {
     contacts: Vec<String>,
     contact_members: BTreeSet<String>,
     falling_sections: Vec<FallingSection>,
+    pub(crate) wreck_metadata: BTreeMap<u32, WreckMetadata>,
 }
 impl EnvironmentRuntime {
     pub fn contacts(&self) -> &[String] {
@@ -376,6 +393,14 @@ fn flammable(w: &World, c: usize, wet: f64) -> bool {
                 && wet < 0.35)
 }
 impl EnvironmentRuntime {
+    /// Validate shared producers and reserve headroom before a larger composed transaction.
+    pub fn validate_context(
+        &self,
+        world: &World,
+        ctx: &Context<'_>,
+    ) -> Result<(), EnvironmentError> {
+        check(world, ctx).map(|_| ())
+    }
     pub fn ignite(
         &mut self,
         w: &mut World,
