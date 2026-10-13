@@ -487,7 +487,7 @@ impl Match {
             packet,
         };
         let (_, commit) = preview.prepare_publication(&mut self.world)?;
-        commit.commit();
+        commit.commit_with_paths(&mut self.commands.paths);
         *memory = staged;
         Ok(view)
     }

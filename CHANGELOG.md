@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Preserve canonical path-cache history when a human observation publishes prepared routing arrays. Rebind the selected recipient's storage only after packet and receipt validation, keeping other recipients' caches intact. The original-reader check adds two route-history scenes and 24 route queries; four native observer tests are written but remain unrun pending the coherent state and planner proof.
+
 - Pause the human observer at source checkpoint `e529409`. The original-reader check records four scenes, 48 views and three hurt batches; no native test or coherent build has run. The owner cleared the `404a948` producer repairs and navigation cleared its borrowed accessor; the final filtered-packet successor still needs independent review and native acceptance. Single-seat publication is implemented, while all-seat delivery coordination remains separate.
 
 - Rebuild the human commander's strategic packet from validated camera-filtered detached rows, with original screen memory in the observation oracle. Keep current packet facts and research intact, and refuse forged rows without reading Game.
