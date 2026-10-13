@@ -420,6 +420,7 @@ fn ordered_damage_riders_terrain_and_death_match_original_source() {
                             profile,
                             a["owner"].as_i64().unwrap_or(1) as i32,
                             a["contact"].as_str(),
+                            (!a["direction"].is_null()).then(|| point(&a["direction"])),
                             None,
                             &mut timers,
                         )
