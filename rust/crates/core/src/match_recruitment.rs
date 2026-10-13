@@ -508,7 +508,7 @@ impl RecruitParts<'_> {
                 "purchase facts changed during routing preparation",
             ));
         }
-        let mut control = crate::match_commands::UnitControl::new(&placed.unit, &self.rules)
+        let mut control = crate::match_commands::UnitControl::new(&placed.unit, self.rules)
             .map_err(|_| RecruitError::InvalidState("unit control metadata"))?;
         control.aim = placed.aim;
         control.rally_drift = placed.rally.is_some();
@@ -522,7 +522,7 @@ impl RecruitParts<'_> {
         let publication = crate::unit_publication::prepare_publication(
             crate::unit_publication::PublicationParts {
                 units: &mut self.game.units,
-                grid: &mut self.grid,
+                grid: self.grid,
                 controls: &mut self.commands.units,
                 recruitment: self.recruit_metadata,
                 next_id: self.next_unit_id,
