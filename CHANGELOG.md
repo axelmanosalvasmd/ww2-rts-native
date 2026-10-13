@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified the ordinary Match digging provider on macOS arm64: seven focused debug tests, all 206 release workspace tests, strict workspace/all-target Clippy, formatting and the release FFI build pass. Independent copied-binary replay passes both Match digging tests and both primitive tests. Actual unit-loop/server integration remains a separate pending proof.
+
 - Resolved strict compiler-lint findings in the engineering proof tree: redundant copies, casts and reference layers, independent ability fixture flags, and the existing optional delivery-cursor branch. The full release workspace suite passed before this cleanup; all required gates are rerunning at the final code checkpoint.
 
 - Fixed the inherited World memory recorder to collect remembered-wreck iterators as arrays before JSON serialization. Source regeneration verifies four traces and 119 actions; only the collection projections changed. Runtime memory and cache behavior are unchanged.
