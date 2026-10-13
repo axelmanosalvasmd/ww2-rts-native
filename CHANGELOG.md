@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Restored the ordinary Conquest logistics initialization call after the shared startup refactor. The native supply regressions exposed empty reserves and an absent convoy service. Initialization again runs after bases, metadata and recipient routing; disabled logistics and other modes keep their existing limits. Combined native verification is pending.
+
 - Fixed two snapshot dependency compilation omissions: initialized the seven canonical World Match owners and supplied the recovery fixture's full-current actor-order argument. Restored the World-only refusal for unrepresented logistics startup. Existing publication callbacks and snapshot mode limits are preserved. Combined native verification is pending.
 
 - Added a quiet snapshot admission regression for an invalid remembered-mine cell. The existing shared routing guard rejects it before terrain or fog acknowledgments change; no runtime behavior changed.
