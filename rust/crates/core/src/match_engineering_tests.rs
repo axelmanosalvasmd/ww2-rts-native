@@ -194,6 +194,17 @@ fn original_paid_dig_lifecycles() {
                             .unwrap();
                     }
                 }
+                "begin" => {
+                    m.world.game.tick = a["tick"].as_i64().unwrap();
+                    m.begin_path_tick(
+                        a["budget"].as_u64().unwrap() as usize,
+                        a["retry"].as_u64().unwrap_or(1) as u32,
+                    )
+                    .unwrap();
+                }
+                "phase" => m
+                    .apply_field_work_unit(a["id"].as_u64().unwrap() as u32)
+                    .unwrap(),
                 "goal" => {
                     result = m
                         .current_dig_goal(a["id"].as_u64().unwrap() as u32)
@@ -204,6 +215,16 @@ fn original_paid_dig_lifecycles() {
                 "money" => {
                     m.start.economy.players[a["slot"].as_u64().unwrap_or(0) as usize].mp =
                         a["mp"].as_f64().unwrap()
+                }
+                "mutate" => {
+                    for cell in a["cells"].as_array().unwrap() {
+                        m.world
+                            .set_cell(
+                                cell.as_u64().unwrap() as usize,
+                                a["ch"].as_str().unwrap().as_bytes()[0],
+                            )
+                            .unwrap();
+                    }
                 }
                 "seen" => {
                     m.world.mine_seen.insert(

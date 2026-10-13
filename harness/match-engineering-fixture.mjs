@@ -16,7 +16,7 @@ try {
  const start='    // digging: walk to the spot',end='    // grenade order:',a=code.indexOf(start),b=code.indexOf(end,a);assert.ok(a>=0&&b>a);
  const work=code.slice(a,b),marker='  setupStructures(g, map);';assert.equal(code.split(marker).length,2);
  code=code.replace(marker,marker+'\n  return g;').replace(/from '(\.\/[^']+)'/g,(_,p)=>`from '${pathToFileURL(join(reference,'shared',p)).href}'`);
- code+=`\nexport const engineeringHooks={goal(g,u){const p=currentPathGoal(g,u,'dig');return p?{x:p.x,z:p.z}:null;},phase(g,u){const dt=.05;${work}}};\n`;
+ code+=`\nexport const engineeringHooks={beginPathTick,goal(g,u){const p=currentPathGoal(g,u,'dig');return p?{x:p.x,z:p.z}:null;},phase(g,u){const dt=.05;${work}}};\n`;
  writeFileSync(join(temp,'sim.mjs'),code);const sim=await import(pathToFileURL(join(temp,'sim.mjs'))),grid=await import(pathToFileURL(join(reference,'shared/grid.js')));
  const data=new DataView(new ArrayBuffer(8)),encode=v=>{if(typeof v==='number'){data.setFloat64(0,v);return data.getBigUint64(0).toString(16).padStart(16,'0');}return Array.isArray(v)?v.map(encode):v&&typeof v==='object'?Object.fromEntries(Object.entries(v).map(([k,x])=>[k,encode(x)])):v;};
  const blank=()=>({name:'Engineering',w:40,h:40,rows:Array(40).fill('.'.repeat(40)),spawns:[{x:0,y:0},{x:39,y:39}],points:[{x:20,y:20}]}),unit=(id=1,type='rifle',extra={})=>({id,type,x:20,z:23,...extra}),dig=(kind='trench',extra={})=>({op:'command',cmd:{t:'dig',ids:[1],kind,x:20,z:20,...extra}}),step=n=>({op:'step',id:1,n}),traces=[];
@@ -30,8 +30,11 @@ try {
   for(const action of actions){let result=null;
    if(action.op==='command')result=sim.command(g,action.slot??0,action.cmd)??null;
    else if(action.op==='step'){const u=g.units.get(action.id);assert.ok(!u.dig||Math.hypot(u.x-u.dig.x,u.z-u.dig.z)<= (u.dig.reach??3),'fixture work must be in reach');for(let n=0;n<action.n;n++)sim.engineeringHooks.phase(g,u);}
+   else if(action.op==='begin'){g.tick=action.tick;g.pathBudget=action.budget;g.pathRetryLimit=action.retry??1;sim.engineeringHooks.beginPathTick(g);}
+   else if(action.op==='phase')sim.engineeringHooks.phase(g,g.units.get(action.id));
    else if(action.op==='goal')result=sim.engineeringHooks.goal(g,g.units.get(action.id));
    else if(action.op==='prime'){Object.assign(g.units.get(action.id),action.fields);grid.rebuildGrid(g);}
+   else if(action.op==='mutate')for(const cell of action.cells)sim.internals.setCell(g,cell,action.ch);
    else if(action.op==='seen')g.mineSeen.set(action.cell,action.mask);
    else if(action.op==='money')g.players[action.slot??0].mp=action.mp;
    else throw Error(action.op);
@@ -47,6 +50,10 @@ try {
  record('one-hospital-and-refused-replacement',[unit(),unit(2,'engineer',{x:24,z:23})],[dig('aid'),dig('aid',{ids:[2],x:24}),step(241),dig('aid',{ids:[2],x:24})]);
  {const map=blank();map.rows[10]='..........B'+'.'.repeat(29);record('garrison-exit-and-retained-controls',[unit(1,'rifle',{x:21,z:21,garrison:410,stuck:2,drift:true,reverse:{x:10,z:10},path:[{x:30,z:30}],repath:1})],[dig('wire',{x:23,z:21,dir:0})],{map});}
  {const map=blank();map.rows[10]='........NNNN'+'.'.repeat(28);record('demine-cached-canonical-goal',[unit(1,'engineer',{x:1,z:21})],[{op:'seen',cell:408,mask:1},{op:'seen',cell:409,mask:1},dig('demine',{dir:0}),{op:'goal',id:1},{op:'prime',id:1,fields:{x:2}},{op:'goal',id:1}],{map});}
+ record('actual-dig-route-request',[unit(1,'rifle',{x:5,z:20})],[dig(),{op:'begin',tick:10,budget:1},{op:'phase',id:1}]);
+ record('queued-dig-route-served',[unit(1,'rifle',{x:5,z:20})],[dig(),{op:'begin',tick:10,budget:0},{op:'phase',id:1},{op:'begin',tick:11,budget:1}]);
+ record('queued-dig-route-cancelled',[unit(1,'rifle',{x:5,z:20})],[dig(),{op:'begin',tick:10,budget:0},{op:'phase',id:1},{op:'command',cmd:{t:'stop',ids:[1]}},{op:'begin',tick:11,budget:1}]);
+ record('failed-dig-route-drops-job',[unit(1,'rifle',{x:5,z:21})],[dig(),{op:'mutate',cells:[361,362,363,401,403,441,442,443],ch:'W'},{op:'begin',tick:10,budget:1,retry:1},{op:'phase',id:1}]);
  clean();const content=JSON.stringify({reference:pin,node:process.version,arch:process.arch,traces})+'\n',path=join(root,'rust/crates/core/tests/fixtures/match-engineering.json');
  if(process.argv.includes('--check'))assert.equal(readFileSync(path,'utf8'),content);else writeFileSync(path,content);
  console.log(`${process.argv.includes('--check')?'Verified':'Recorded'} ${traces.length} Match engineering traces, ${traces.reduce((n,t)=>n+t.rows.length,0)} actions`);

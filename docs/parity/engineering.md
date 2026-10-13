@@ -204,3 +204,6 @@ The Match combat adapter initializes vehicle wreck motion and destroys building 
 ## Ordinary Match digging adapter evidence
 
 The staged adapter uses the singular Match.field_works owner and the shared synchronous cancellation helper. Its recorder calls the original command function and unchanged in-reach work block: eight traces and 31 actions cover replacement, refusal, first selected ID, real team sight, hospital limits, garrison exit, completion at 20 Hz and cached demine goals. Source fixture regeneration passes. Native execution, typed Dig dispatch and actual unit-loop binding remain pending; this checkpoint does not complete an engineering parity row. Shared mass-entrenchment, concrete, bridges, filling and construction remain outside this bounded actuator.
+
+
+The Match recorder was extended to 12 traces and 47 actions. It now uses original beginPathTick and requestStepPath for immediate routing, FIFO deferral, cancellation of a deferred job and failed-route job dropping. Those source results are verified; the corresponding native consumer awaits the coordinated input/routing dependency and native lease.
