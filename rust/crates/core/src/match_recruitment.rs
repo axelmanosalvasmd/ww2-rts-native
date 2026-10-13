@@ -113,7 +113,7 @@ macro_rules! recruit_parts {
 impl Match {
     /// Execute recorded Conquest purchases against the canonical finish and seat state.
     /// Routing borrows the actual refreshed recipient projection, never a copied view.
-    pub(crate) fn recorded_buy(
+    pub fn recorded_buy(
         &mut self,
         slot: usize,
         kind: &str,

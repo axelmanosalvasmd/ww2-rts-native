@@ -7,6 +7,10 @@
 - Combined recorded-buy owned routing and story preflight with canonical ability/recovery publication and stale-row admission. Combined native verification remains pending.
 
 - Combined Ability and Autocast with the single recorded command enum, retaining Support dispatch. Fresh recruitment prepares canonical ability and recovery defaults beside combat and firing, with stale-row rejection before payment. Ability native proof remains pending.
+- Exposed the canonical owner-bound recorded-buy actuator through the Rust API so it can be verified before input-dispatch integration. Its gate, routing and transaction behavior is unchanged; the C ABI and wire interfaces are unchanged.
+
+- Fixed crate-local recorded-buy test imports found by independent source review before the first native compile. Combat, firing and path-status assertions now resolve within the core crate. Native verification remains pending.
+
 - Added recorded-buy replay coverage using the existing six original-source traces and 33 commands, now recording source MP-spending counters. Owned routing, denial outcomes and fresh combat/firing publication are compared without a second fixture; atomic tests cover stale metadata, story preflight and blocked seats. Rust verification remains pending.
 
 - Added an internal recorded-buy actuator that gates canonical finish and seats, borrows owned recipient routing through disjoint recruitment fields, and preflights exact MP-spending story updates before payment. Combat and firing rows remain canonical publication callbacks. This source prerequisite awaits native verification and the recorded command consumer.
