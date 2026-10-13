@@ -267,9 +267,6 @@ fn startup_rejects_incomplete_features_and_keeps_failed_force_setup_atomic() {
     o.mode = Mode::Classic;
     invalid.push(o);
     let mut o = base.clone();
-    o.logistics = true;
-    invalid.push(o);
-    let mut o = base.clone();
     o.players.clear();
     invalid.push(o);
     let mut o = base.clone();

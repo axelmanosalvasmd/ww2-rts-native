@@ -280,6 +280,14 @@ impl Match {
         let initial_tech =
             TechState::new(1, 0, 0, 0).map_err(|e| format!("World research: {e:?}"))?;
         let mut result = Self {
+            field_works: crate::field_works::FieldWorksRuntime::default(),
+            convoys: None,
+            supply_net: crate::supply_network::GroundSupplyNetwork::default(),
+            supply_routes: crate::supply_routes::SupplyRouting::default(),
+            support: crate::match_support::SupportState::default(),
+            companions: crate::companions::Companions::default(),
+            abilities: crate::match_abilities::AbilityState::default(),
+            recovery: crate::match_recovery::RecoveryState::default(),
             combat: crate::match_combat::CombatState::default(),
             environment: crate::environment::EnvironmentRuntime::default(),
             firing: crate::match_firing::FiringState::default(),
@@ -355,6 +363,13 @@ impl Match {
     }
     fn publish_world_unit(&mut self, draft: StagedUnit) -> Result<u32, String> {
         let id = draft.unit.id;
+        if self.combat.get(id).is_some()
+            || self.firing.get(id).is_some()
+            || self.abilities.get(id).is_some()
+            || self.recovery.get(id).is_some()
+        {
+            return Err("World birth metadata identity occupied".into());
+        }
         let mode = self.world.game.mode;
         prepare_world_publication(
             PublicationParts {
@@ -373,6 +388,8 @@ impl Match {
         .publish_with(|unit, _| {
             self.combat.initialize(unit.id);
             self.firing.initialize(unit.id);
+            self.abilities.initialize(unit.id);
+            self.recovery.initialize(unit.id);
         });
         Ok(id)
     }

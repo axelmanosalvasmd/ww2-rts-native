@@ -205,34 +205,39 @@ fn original_match_buy_placement_path_and_grid() {
                     let r = &stage["routing"];
                     let rows: Vec<_> = r["rows"]
                         .as_array()
-                        .unwrap()
-                        .iter()
+                        .into_iter()
+                        .flatten()
                         .map(|id| row(&case["rows"][id.as_u64().unwrap() as usize - 1]))
                         .collect();
                     let (memory, route) = &mut recipients[slot];
                     route.apply_rows(step as u64 + 1, &rows).unwrap();
                     let query = route.query();
                     let mut fires = vec![false; m.world.game.w * m.world.game.h];
-                    for c in r["fires"].as_array().unwrap() {
+                    for c in r["fires"].as_array().into_iter().flatten() {
                         fires[c.as_u64().unwrap() as usize] = true;
                     }
-                    let bunkers: Vec<_> =
-                        r["bunkers"].as_array().unwrap().iter().map(point).collect();
+                    let bunkers: Vec<_> = r["bunkers"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .map(point)
+                        .collect();
                     let live = LiveRouting {
                         fires: &fires,
                         bunkers: &bunkers,
-                        wetness: r["wet"].as_f64().unwrap(),
-                        roads: r["roads"].as_bool().unwrap(),
+                        wetness: r["wet"].as_f64().unwrap_or(0.0),
+                        roads: r["roads"].as_bool().unwrap_or(false),
                     };
-                    let routing =
+                    let routing = (!r.is_null()).then(|| {
                         RecruitRouting::new(memory, m.world.game.players[slot].team, &query, live)
-                            .unwrap();
+                            .unwrap()
+                    });
                     let result = m.recruit(
                         slot,
                         action["kind"].as_str().unwrap(),
                         action["from"].as_u64().map(|id| id as u32),
                         winner,
-                        Some(routing),
+                        routing,
                     );
                     let (reason, unit) = match result {
                         Ok(done) => {
@@ -241,6 +246,11 @@ fn original_match_buy_placement_path_and_grid() {
                                 m.combat.get(done.unit),
                                 Some(&ww2_core::match_combat::UnitCombat::default()),
                                 "recruits must enter combat with canonical default metadata"
+                            );
+                            assert_eq!(
+                                m.firing.get(done.unit),
+                                Some(&ww2_core::match_firing::FiringUnit::default()),
+                                "recruits must publish canonical target and timer defaults"
                             );
                             let u = &m.world.game.units[&done.unit];
                             let control = &m.commands.units[&done.unit];
@@ -267,7 +277,7 @@ fn original_match_buy_placement_path_and_grid() {
     assert!(admitted > 0 && failed_paths > 0);
 }
 fn unchanged(m: &Match) -> Value {
-    json!({"next":m.next_unit_id,"money":m.start.economy.players.iter().map(|p|bits(p.mp)).collect::<Vec<_>>(),"units":m.world.game.units.keys().collect::<Vec<_>>(),"metadata":format!("{:?}",m.recruit_metadata),"controls":format!("{:?}",m.commands.units),"unit_state":format!("{:?}",m.world.game.units),"wallets":format!("{:?}",m.start.economy),"grid":m.grid.in_order(&m.world.game.units,(0.0,0.0),1000.0,|_,_|true)})
+    json!({"next":m.next_unit_id,"money":m.start.economy.players.iter().map(|p|bits(p.mp)).collect::<Vec<_>>(),"units":m.world.game.units.keys().collect::<Vec<_>>(),"metadata":format!("{:?}",m.recruit_metadata),"firing":format!("{:?}",m.firing),"controls":format!("{:?}",m.commands.units),"unit_state":format!("{:?}",m.world.game.units),"wallets":format!("{:?}",m.start.economy),"grid":m.grid.in_order(&m.world.game.units,(0.0,0.0),1000.0,|_,_|true)})
 }
 #[test]
 fn malformed_or_unsupported_staging_never_publishes() {
@@ -342,4 +352,12 @@ fn malformed_or_unsupported_staging_never_publishes() {
     assert_eq!(unchanged(&m), before);
     m.world.game.strikes[0].kind = StrikeKind::Recon;
     assert!(m.recruit(0, "rifle", None, false, None).is_ok());
+    m.player_rallies[0] = None;
+    m.firing.initialize(m.next_unit_id);
+    let before = unchanged(&m);
+    assert!(matches!(
+        m.recruit(0, "rifle", None, false, None),
+        Err(RecruitError::InvalidState(_))
+    ));
+    assert_eq!(unchanged(&m), before);
 }
