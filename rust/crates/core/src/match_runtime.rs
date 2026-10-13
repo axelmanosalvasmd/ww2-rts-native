@@ -392,3 +392,516 @@ pub struct BuildingCell {
 /// Authoritative Conquest startup state. Tick execution is added independently.
 /// Live terrain and units have a single owner in `world.game`.
 pub struct Match {
+    pub abilities: crate::match_abilities::AbilityState,
+    pub recovery: crate::match_recovery::RecoveryState,
+    pub commands: crate::match_commands::MatchCommands,
+    pub combat: crate::match_combat::CombatState,
+    pub environment: crate::environment::EnvironmentRuntime,
+    pub world: World,
+    pub start: StartPlan,
+    pub options: MatchOptions,
+    pub grid: SpatialGrid,
+    pub(crate) recipients: Vec<crate::match_routing::RecipientRouting>,
+    pub(crate) routing_fog: crate::fog::Fog,
+    pub building_cells: BTreeMap<usize, BuildingCell>,
+    pub production: crate::production::ProductionState,
+    pub building_rallies: BTreeMap<u32, Option<Point>>,
+    pub player_rallies: Vec<Option<Point>>,
+    pub recruit_metadata: BTreeMap<u32, RecruitMetadata>,
+    produced_placer: crate::produced_units::ProducedPlacer,
+    pub scenario: Option<crate::legacy_scenario::LegacyScenario>,
+    pub logistics: crate::logistics::LogisticsState,
+    pub convoys: Option<crate::supply_convoys::ConvoyState>,
+    pub supply_net: crate::supply_network::GroundSupplyNetwork,
+    pub(crate) supply_routes: crate::supply_routes::SupplyRouting,
+    pub firing: crate::match_firing::FiringState,
+    pub capture_ticks: Vec<Option<i64>>,
+    pub tick_state: crate::match_tick::TickState,
+    /// Canonical source counters. Event owners must record accepted effects exactly once.
+    pub story: Vec<crate::match_story::PlayerStory>,
+    pub fallen: crate::match_story::FallenLocations,
+    pub finish: Option<crate::conquest_end::ConquestFinish>,
+    pub timeline: Vec<crate::conquest_end::ConquestSample>,
+    pub next_unit_id: u32,
+    pub rules: Rules,
+}
+
+impl Match {
+    pub fn new(map: &crate::map::AuthoritativeMap, options: MatchOptions) -> Result<Self, String> {
+        let rules = Rules::compiled().map_err(|e| e.to_string())?;
+        let start = StartPlan::prepare(map, &options, &rules)?;
+        let mut world = World::from_map(map).map_err(|e| e.to_string())?;
+        let next_unit_id = start.spawn_initial_force(&mut world.game, &rules)?;
+        for slot in 0..start.players.len() {
+            world.register_recipient(crate::world::Recipient::Player(slot));
+        }
+        let initial_tech =
+            TechState::new(1, 0, 0, 0).map_err(|e| format!("initial research: {e:?}"))?;
+        let production =
+            crate::production::ProductionState::new(vec![initial_tech; start.players.len()])
+                .map_err(|e| e.to_string())?;
+        let scenario = if map.triggers().is_empty() {
+            None
+        } else {
+            let owners = start
+                .points
+                .iter()
+                .map(|p| {
+                    Ok(crate::legacy_scenario::PointOwner {
+                        id: p
+                            .id
+                            .as_str()
+                            .ok_or("legacy scenario needs string point identities")?,
+                        owner: -1,
+                    })
+                })
+                .collect::<Result<Vec<_>, String>>()?;
+            crate::legacy_scenario::LegacyScenario::from_map(map, &owners)
+        };
+        let player_count = start.players.len();
+        let mut result = Self {
+            abilities: crate::match_abilities::AbilityState::default(),
+            recovery: crate::match_recovery::RecoveryState::default(),
+            commands: crate::match_commands::MatchCommands::new(4096),
+            combat: crate::match_combat::CombatState::default(),
+            environment: crate::environment::EnvironmentRuntime::default(),
+            grid: SpatialGrid::new(&world.game.units, 16.0),
+            recipients: Vec::new(),
+            routing_fog: crate::fog::Fog::default(),
+            world,
+            start,
+            options,
+            building_cells: BTreeMap::new(),
+            production,
+            building_rallies: BTreeMap::new(),
+            player_rallies: vec![None; player_count],
+            recruit_metadata: BTreeMap::new(),
+            produced_placer: crate::produced_units::ProducedPlacer::new(),
+            scenario,
+            logistics: crate::logistics::LogisticsState::default(),
+            convoys: None,
+            supply_net: crate::supply_network::GroundSupplyNetwork::default(),
+            supply_routes: crate::supply_routes::SupplyRouting::default(),
+            firing: crate::match_firing::FiringState::default(),
+            capture_ticks: vec![None; map.points().len()],
+            tick_state: crate::match_tick::TickState::default(),
+            story: vec![crate::match_story::PlayerStory::default(); player_count],
+            fallen: crate::match_story::FallenLocations::default(),
+            finish: None,
+            timeline: Vec::new(),
+            next_unit_id,
+            rules,
+        };
+        result.setup_bases()?;
+        for unit in result.world.game.units.values() {
+            result.combat.initialize(unit.id);
+            result.firing.initialize(unit.id);
+            result.abilities.initialize(unit.id);
+            result.recovery.initialize(unit.id);
+            let control = crate::match_commands::UnitControl::new(unit, &result.rules)?;
+            result.commands.insert(unit.id, control);
+            result.firing.initialize(unit.id);
+            result.combat.initialize(unit.id);
+        }
+        result.grid.rebuild(&result.world.game.units);
+        result.initialize_recipient_routing()?;
+        result.initialize_logistics()?;
+        Ok(result)
+    }
+
+    /// Run the source's late Conquest point-supply, capture and income phases.
+    /// `unit_order` is the tick's captured list, so newly spawned units wait until the next tick.
+    /// This phase does not advance the clock, apply combat or decide a winner.
+    pub fn apply_point_economy(
+        &mut self,
+        unit_order: &[u32],
+        winner_decided: bool,
+    ) -> Result<Vec<crate::objectives::Captured>, String> {
+        self.staged_point_phase(unit_order, winner_decided, true, true)
+    }
+
+    /// Run point connectivity before reinforcement and dead-unit terrain effects.
+    /// The tick runner calls capture/income afterward without recomputing this beat.
+    pub fn apply_point_supply(&mut self, unit_order: &[u32]) -> Result<(), String> {
+        self.staged_point_phase(unit_order, self.finish.is_some(), true, false)?;
+        Ok(())
+    }
+
+    /// Run capture and income against the cut flags computed in the earlier phase.
+    /// Canonical finish state controls VP and capture-story freezing.
+    pub fn apply_point_capture_income(
+        &mut self,
+        unit_order: &[u32],
+    ) -> Result<Vec<crate::objectives::Captured>, String> {
+        self.staged_point_phase(unit_order, self.finish.is_some(), false, true)
+    }
+
+    fn staged_point_phase(
+        &mut self,
+        unit_order: &[u32],
+        winner_decided: bool,
+        supply: bool,
+        capture_income: bool,
+    ) -> Result<Vec<crate::objectives::Captured>, String> {
+        use crate::{economy_state as economy, objectives};
+        self.validate_conquest_finish_state()?;
+        let winner_decided = winner_decided || self.finish.is_some();
+        let dt = self.rules.movement.tick;
+        let game = &self.world.game;
+        if game.tick < 0
+            || game.players.len() != self.start.economy.players.len()
+            || self.start.players.len() != self.start.economy.players.len()
+            || self.capture_ticks.len() != self.start.points.len()
+        {
+            return Err("invalid Conquest phase state".into());
+        }
+        let mut seen = std::collections::BTreeSet::new();
+        if unit_order.iter().any(|id| !seen.insert(*id)) {
+            return Err("duplicate unit in tick order".into());
+        }
+        let list: Vec<_> = unit_order
+            .iter()
+            .filter_map(|id| game.units.get(id))
+            .collect();
+        if list.iter().any(|u| u.kind >= self.rules.kinds.len()) {
+            return Err("unknown kind in tick unit list".into());
+        }
+        let players: Vec<_> = self
+            .start
+            .players
+            .iter()
+            .zip(&self.start.economy.players)
+            .map(|(p, e)| objectives::ObjectivePlayer {
+                team: e.team,
+                out: e.out,
+                spawn: p.spawn,
+            })
+            .collect();
+        let units: Vec<_> = list
+            .iter()
+            .map(|u| {
+                objectives::ObjectiveUnit::from_unit(
+                    u,
+                    &self.rules.kinds[u.kind].name,
+                    self.logistics.get(u.id).is_some_and(|r| r.forced),
+                )
+            })
+            .collect();
+        let mut points = self.start.points.clone();
+        let mut wallets = self.start.economy.clone();
+        let mut placer = SpawnPlacer::new();
+        let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
+        let cfg = catalog.table("CFG").map_err(|e| e.to_string())?;
+        let supply_beat = number(field(cfg, "supply")?, "every")? as i64;
+        if supply && self.options.supply && game.tick % supply_beat == 1 {
+            objectives::supply_lines(
+                terrain_view(game),
+                &mut points,
+                &units,
+                &players,
+                &mut placer,
+            )
+            .map_err(|e| format!("point supply: {e:?}"))?;
+        }
+        let captured = if capture_income {
+            let captured = objectives::capture_points(&mut points, &units, &players, dt)
+                .map_err(|e| format!("point capture: {e:?}"))?;
+            let queues: Vec<Vec<&str>> = list
+                .iter()
+                .map(|u| {
+                    self.production
+                        .building(u.id)
+                        .map_or_else(Vec::new, |p| p.queue().collect())
+                })
+                .collect();
+            let income_units: Vec<_> = list
+                .iter()
+                .zip(&queues)
+                .map(|(u, queue)| economy::Unit {
+                    id: u.id as u64,
+                    owner: Some(u.owner),
+                    kind: &self.rules.kinds[u.kind].name,
+                    hp: u.hp,
+                    // Missing built never passes the source's >= 1 check. This finite projection
+                    // is equivalent for income and leaves the canonical unit field absent.
+                    built: u.built.unwrap_or(0.0),
+                    queue,
+                })
+                .collect();
+            let income_points: Vec<_> = points
+                .iter()
+                .map(|p| economy::Point {
+                    owner: p.owner,
+                    cut: p.cut,
+                    mp: p.mp,
+                    vp: p.vp,
+                })
+                .collect();
+            wallets
+                .advance_income(
+                    &economy::Context {
+                        mode: economy::ModeContext::default(),
+                        army: self.options.army,
+                        units: &income_units,
+                        drops: &[],
+                        points: &income_points,
+                        nodes: &[],
+                        world: None,
+                    },
+                    dt,
+                    winner_decided,
+                )
+                .map_err(|e| e.to_string())?;
+            captured
+        } else {
+            Vec::new()
+        };
+        let changes: Vec<_> = captured
+            .iter()
+            .map(|event| crate::match_story::StoryChange {
+                slot: Some(event.owner),
+                key: crate::match_story::StoryKey::Captures,
+                amount: 1.0,
+            })
+            .collect();
+        let story_updates =
+            crate::match_story::prepare_story_updates(&mut self.story, winner_decided, &changes)?;
+        self.start.points = points;
+        self.start.economy = wallets;
+        story_updates.commit();
+        if !winner_decided {
+            for event in &captured {
+                self.capture_ticks[event.objective_index] = Some(game.tick);
+            }
+        }
+        Ok(captured)
+    }
+
+    fn setup_bases(&mut self) -> Result<(), String> {
+        let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
+        let point_radius = number(
+            catalog.table("CFG").map_err(|e| e.to_string())?,
+            "pointRadius",
+        )?;
+        let mut placer = SpawnPlacer::new();
+        for owner in 0..self.start.players.len() {
+            let spawn = self.start.players[owner].spawn;
+            let mut avoid: Vec<(Point, f64)> = self
+                .start
+                .points
+                .iter()
+                .map(|p| (p.at, point_radius + 5.0))
+                .collect();
+            avoid.extend(
+                self.world
+                    .game
+                    .units
+                    .values()
+                    .filter(|u| self.rules.kinds[u.kind].structure)
+                    .map(|u| (u.at(), self.rules.kinds[u.kind].radius + 9.0)),
+            );
+            for name in ["hq", "barracks"] {
+                let cell = if let Some(cell) = find_site(
+                    &self.world.game,
+                    Point {
+                        x: spawn.x - 3.0,
+                        z: spawn.z - 3.0,
+                    },
+                    3,
+                    &avoid,
+                ) {
+                    cell
+                } else {
+                    let game = &self.world.game;
+                    let x =
+                        (spawn.x / CELL).floor() - 1.0 + if name == "barracks" { 4.0 } else { 0.0 };
+                    let x = x.min(game.w as f64 - 3.0).max(0.0) as usize;
+                    let y = ((spawn.z / CELL).floor() - 1.0)
+                        .min(game.h as f64 - 3.0)
+                        .max(0.0) as usize;
+                    let cell = y * game.w + x;
+                    let Some(cells) = footprint(game, cell, 3) else {
+                        continue;
+                    };
+                    if cells.iter().any(|&c| game.chars[c] == b'K') {
+                        continue;
+                    }
+                    for c in cells {
+                        self.world.set_cell(c, b'.').map_err(|e| e.to_string())?;
+                    }
+                    cell
+                };
+                let at = self.place_starting_building(owner, name, cell, &mut placer)?;
+                avoid.push((at, 12.0));
+            }
+        }
+        let game = &mut self.world.game;
+        for unit in game.units.values_mut() {
+            let kind = &self.rules.kinds[unit.kind];
+            if kind.structure || kind.air {
+                continue;
+            }
+            let x = (unit.x / CELL).floor() as usize;
+            let y = (unit.z / CELL).floor() as usize;
+            if x < game.w && y < game.h && game.flags[y * game.w + x] & MOVE != 0 {
+                let view = TerrainView {
+                    width: game.w,
+                    height: game.h,
+                    flags: &game.flags,
+                    heights: game.height.as_deref(),
+                    world_known: false,
+                    knowledge_id: 0,
+                    versions: Versions::default(),
+                    changed: None,
+                    changes: &[],
+                };
+                let c = placer
+                    .nearest_free(view, unit.at(), kind.block(), None)
+                    .map_err(|e| format!("base clearance: {e:?}"))?;
+                unit.x = (c % game.w) as f64 * CELL + CELL / 2.0;
+                unit.z = (c / game.w) as f64 * CELL + CELL / 2.0;
+            }
+        }
+        Ok(())
+    }
+
+    fn place_starting_building(
+        &mut self,
+        owner: usize,
+        name: &str,
+        cell: usize,
+        placer: &mut SpawnPlacer,
+    ) -> Result<Point, String> {
+        let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
+        let definition = catalog.unit(name).map_err(|e| e.to_string())?;
+        let size = number(definition, "size")? as usize;
+        let max_hp = number(definition, "hpPer")?;
+        let cells =
+            footprint(&self.world.game, cell, size).ok_or("building footprint is outside map")?;
+        let level = |c: usize| self.world.game.height.as_ref().map_or(0, |h| h[c]);
+        let top = cells
+            .iter()
+            .map(|&c| level(c))
+            .max()
+            .ok_or("empty building footprint")?;
+        for &c in &cells {
+            if self.world.game.height.as_ref().map_or(0, |h| h[c]) < top {
+                self.world.set_level(c, top).map_err(|e| e.to_string())?;
+            }
+            self.world.set_cell(c, b'K').map_err(|e| e.to_string())?;
+        }
+        let kind = self.rules.kind(name).ok_or("unknown building kind")?;
+        let at = placer
+            .scatter_position(
+                terrain_view(&self.world.game),
+                &self.rules.kinds[kind],
+                self.start.players[owner].spawn,
+                self.world.game.units.len() as u32,
+            )
+            .map_err(|e| format!("building spawn: {e:?}"))?
+            .point;
+        let id = self.next_unit_id;
+        self.next_unit_id = id.checked_add(1).ok_or("unit ID capacity exhausted")?;
+        let mut unit = unit_spawn::initial_unit(&self.rules, catalog, kind, id, owner, at)
+            .map_err(|e| format!("building unit: {e:?}"))?;
+        let at = foot_center(&self.world.game, cell, size);
+        unit.x = at.x;
+        unit.z = at.z;
+        unit.cells = Some(cells.iter().map(|&c| c as u32).collect());
+        unit.built = Some(1.0);
+        unit.hp = max_hp;
+        self.world.game.units.insert(id, unit);
+        self.production
+            .initialize_building(id)
+            .map_err(|e| e.to_string())?;
+        self.building_rallies.insert(id, None);
+        for &c in &cells {
+            self.building_cells.insert(
+                c,
+                BuildingCell {
+                    unit: id,
+                    owner,
+                    at,
+                },
+            );
+        }
+        self.world
+            .register_building_structure(id, &cells, max_hp, max_hp)
+            .map_err(|e| e.to_string())?;
+        Ok(at)
+    }
+}
+
+fn terrain_view(game: &Game) -> TerrainView<'_> {
+    TerrainView {
+        width: game.w,
+        height: game.h,
+        flags: &game.flags,
+        heights: game.height.as_deref(),
+        world_known: false,
+        knowledge_id: 0,
+        versions: Versions::default(),
+        changed: None,
+        changes: &[],
+    }
+}
+fn footprint(game: &Game, cell: usize, size: usize) -> Option<Vec<usize>> {
+    let (x, y) = (cell % game.w, cell / game.w);
+    (x + size <= game.w && y + size <= game.h).then(|| {
+        (0..size)
+            .flat_map(|dy| (0..size).map(move |dx| (y + dy) * game.w + x + dx))
+            .collect()
+    })
+}
+fn foot_center(game: &Game, cell: usize, size: usize) -> Point {
+    Point {
+        x: (cell % game.w) as f64 * CELL + size as f64 * CELL / 2.0,
+        z: (cell / game.w) as f64 * CELL + size as f64 * CELL / 2.0,
+    }
+}
+fn find_site(game: &Game, at: Point, size: usize, avoid: &[(Point, f64)]) -> Option<usize> {
+    let x = at.x.max(0.0).min(game.w as f64 * CELL - 1.0);
+    let z = at.z.max(0.0).min(game.h as f64 * CELL - 1.0);
+    let start = (z / CELL).floor() as usize * game.w + (x / CELL).floor() as usize;
+    let mut seen = vec![false; game.w * game.h];
+    seen[start] = true;
+    let mut queue = vec![start];
+    let mut index = 0;
+    while index < queue.len() && index < 4000 {
+        let cell = queue[index];
+        let at = foot_center(game, cell, size);
+        if let Some(cells) = footprint(game, cell, size) {
+            let level = |c: usize| game.height.as_ref().map_or(0, |h| h[c]);
+            let min = cells.iter().map(|&c| level(c)).min().unwrap();
+            let max = cells.iter().map(|&c| level(c)).max().unwrap();
+            if cells
+                .iter()
+                .all(|&c| game.flags[c] & MOVE == 0 && !b"WF=KOAQ".contains(&game.chars[c]))
+                && i16::from(max) - i16::from(min) <= 1
+                && avoid
+                    .iter()
+                    .all(|(p, r)| math::hypot(p.x - at.x, p.z - at.z) >= *r)
+            {
+                return Some(cell);
+            }
+        }
+        let (x, y) = (cell % game.w, cell / game.w);
+        for (nx, ny) in [
+            (x as isize + 1, y as isize),
+            (x as isize - 1, y as isize),
+            (x as isize, y as isize + 1),
+            (x as isize, y as isize - 1),
+        ] {
+            if nx < 0 || ny < 0 || nx as usize >= game.w || ny as usize >= game.h {
+                continue;
+            }
+            let c = ny as usize * game.w + nx as usize;
+            if !seen[c] {
+                seen[c] = true;
+                queue.push(c);
+            }
+        }
+        index += 1;
+    }
+    None
+}
