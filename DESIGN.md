@@ -860,3 +860,5 @@ The unchanged source command and timed-work block produce eight Match traces wit
 
 
 The Match engineering recorder now includes the original path scheduler rather than a route stub. Twelve traces with 47 actions cover immediate requests, deferred FIFO service, cancellation before a deferred request is served, and a real failed search that drops the paid job at the retry limit. The native consumer requires the input owner's Dig current-goal and drop hooks and remains unexecuted until that immutable dependency and the scheduled native lease arrive.
+
+The field-work component's route result is a Point. The source ordinary dig goal aliases its full job descriptor, while distant reach work returns a point. The recorder projects both to x and z at the route boundary and compares the complete descriptor separately in job snapshots. This preserves source goal coordinates and cached approaches without introducing a duplicate job payload into the typed route API.
