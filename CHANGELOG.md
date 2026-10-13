@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified owner-bound World knowledge on the merged startup head: nine core debug tests, two World memory debug tests and all 164 locked release workspace tests pass, including 120 original-source actions, journal/revision atomic guards and hidden-knowledge checks. Strict workspace Clippy, formatting and the release FFI build pass. World battle-loop, commands, full snapshots and wire integration remain unfinished.
+
 - Merged the checked final World startup dependency into the recipient-memory branch, preserving canonical combat/firing fields, empty memory, uncontested regions and journal reset. The prior memory head passes six core tests and both 120-action debug/hidden-knowledge tests; combined release gates follow.
 
 - Recorded the expanded four-trace World knowledge evidence: 120 actions, 27 route reads, 16 terrain deliveries, nine region reads and six wreck reads. Core atomic guards and startup checks pass; full memory replay, release and strict lint checks remain pending.
