@@ -37,6 +37,7 @@ pub mod match_commands;
 mod match_destroy;
 pub mod match_end;
 pub mod match_firing;
+pub mod match_ground_orders;
 pub mod match_ground_support;
 pub mod match_logistics;
 pub mod match_reactions;

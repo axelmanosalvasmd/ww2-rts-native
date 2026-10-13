@@ -125,6 +125,8 @@ pub enum Command {
         ids: Vec<i64>,
         target: i64,
         queue: bool,
+        /// Waiting display anchor, never the current attack destination.
+        at: Option<Point>,
     },
     Escort {
         ids: Vec<i64>,
@@ -562,6 +564,7 @@ impl Command {
                 ids,
                 target: object.get("target").and_then(safe_id).unwrap_or(-1),
                 queue: object.get("queue").and_then(|v| v.as_bool()) == Some(true),
+                at: None,
             }),
             Some("escort") => Ok(Self::Escort {
                 ids,
@@ -589,6 +592,7 @@ impl Command {
     }
     fn valid(&self) -> bool {
         match self {
+            Self::Attack { at, .. } => at.is_none_or(|p| p.x.is_finite() && p.z.is_finite()),
             Self::Dig {
                 ids, at, direction, ..
             } => {
@@ -726,6 +730,33 @@ impl crate::match_runtime::Match {
         }
         if matches!(command, Command::Unsupported) {
             return Ok(Some(Denial::Unsupported));
+        }
+        if let Command::Attack {
+            ids, target, queue, ..
+        } = command
+        {
+            if !ids
+                .iter()
+                .take(50.max(self.world.game.units.len()))
+                .any(|raw| {
+                    self.eligible_command_unit(*raw, owner, command)
+                        .is_some_and(|id| self.is_aircraft_command_unit(id))
+                })
+            {
+                return self.ground_attack_command(owner, ids, *target, *queue);
+            }
+        }
+        if let Command::Retreat { ids } = command {
+            if !ids
+                .iter()
+                .take(50.max(self.world.game.units.len()))
+                .any(|raw| {
+                    self.eligible_command_unit(*raw, owner, command)
+                        .is_some_and(|id| self.is_aircraft_command_unit(id))
+                })
+            {
+                return self.ground_retreat_command(owner, ids);
+            }
         }
         if let Command::Destroy { ids, id } = command {
             return self.execute_destroy(owner, ids, *id);
@@ -1425,11 +1456,11 @@ impl crate::match_runtime::Match {
         search_route(&mut self.commands.paths, terrain, rules, kind, u, to).map(|r| r.result)
     }
 }
-struct CommandRoute {
-    result: crate::pathfinding::PathResult,
-    failed: bool,
+pub(crate) struct CommandRoute {
+    pub(crate) result: crate::pathfinding::PathResult,
+    pub(crate) failed: bool,
 }
-fn search_route(
+pub(crate) fn search_route(
     paths: &mut Pathfinding,
     terrain: crate::pathfinding::PathTerrain<'_>,
     rules: crate::pathfinding::PathRules,
@@ -1483,7 +1514,7 @@ fn search_route(
     }
     Ok(CommandRoute { result, failed })
 }
-fn physical_navigation(game: &crate::game::Game) -> crate::navigation::TerrainView<'_> {
+pub(crate) fn physical_navigation(game: &crate::game::Game) -> crate::navigation::TerrainView<'_> {
     crate::navigation::TerrainView {
         width: game.w,
         height: game.h,
@@ -1519,6 +1550,15 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
         use crate::path_requests::RequestKind;
         if kind == RequestKind::Dig {
             return self.match_state.current_dig_goal(id);
+        }
+        if kind == RequestKind::AttackId {
+            return match self.match_state.current_attack_goal(id) {
+                Ok(goal) => goal,
+                Err(error) => {
+                    self.error = Some(error);
+                    None
+                }
+            };
         }
         if kind == RequestKind::Board {
             return match self.match_state.current_board_goal(id) {
@@ -1627,6 +1667,15 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
                 crate::path_requests::RequestKind::World => u.world_goal = None,
                 crate::path_requests::RequestKind::Amove => u.amove = None,
                 crate::path_requests::RequestKind::Board => u.board = 0,
+                crate::path_requests::RequestKind::AttackId => {
+                    u.attack = false;
+                    self.match_state
+                        .commands
+                        .units
+                        .get_mut(&u.id)
+                        .unwrap()
+                        .attack_id = 0
+                }
                 crate::path_requests::RequestKind::Nade => {
                     self.match_state.commands.units.get_mut(&u.id).unwrap().nade = None;
                     let ability = self.match_state.abilities.get_mut(u.id).unwrap();
@@ -1676,8 +1725,11 @@ impl crate::match_runtime::Match {
             return Err("unit path identity exhausted".into());
         }
         // current_goal cannot report errors through the scheduler's Option API.
-        // Validate Board callbacks before observation or FIFO service can write.
+        // Validate Board and Attack callbacks before observation or FIFO service can write.
         for request in self.commands.requests.queued_requests() {
+            if request.kind == crate::path_requests::RequestKind::AttackId {
+                self.current_attack_goal(request.unit)?;
+            }
             if request.kind == crate::path_requests::RequestKind::Board {
                 self.current_board_goal(request.unit)?;
             }
@@ -1919,6 +1971,7 @@ impl crate::match_runtime::Match {
                 | crate::path_requests::RequestKind::Nade
                 | crate::path_requests::RequestKind::Dig
                 | crate::path_requests::RequestKind::Board
+                | crate::path_requests::RequestKind::AttackId
         ) {
             return Err("unsupported command path request".into());
         }
@@ -1933,6 +1986,9 @@ impl crate::match_runtime::Match {
             .is_some_and(|u| u.path_gen == u64::MAX)
         {
             return Err("unit path identity exhausted".into());
+        }
+        if kind == crate::path_requests::RequestKind::AttackId {
+            self.current_attack_goal(id)?;
         }
         if kind == crate::path_requests::RequestKind::Board {
             self.current_board_goal(id)?;
