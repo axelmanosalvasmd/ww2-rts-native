@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix the staged Buy rollback witness to send actual source Move order rows through the canonical parser, so it warms and compares real command routes.
+
 - Correct the paid Dig fixture direction projection to use its scalar type.
 
 - Fix command proof readers to allow movement-only setup rows and compare paid Dig numbers with the original JSON integer spelling. Native commander execution and policy replay checks pass; remaining combined checks are pending.

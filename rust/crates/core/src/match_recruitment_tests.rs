@@ -414,7 +414,7 @@ fn rejected_final_preflight_discards_staged_sight_and_purchase() {
         m.player_rallies[0] = Some(Point { x: 35.0, z: 35.0 });
         m.world.game.tick += 1;
         let warm =
-            crate::match_commands::Command::from_json(&json!({"t":"move","ids":[1],"x":61,"z":41}))
+            crate::match_commands::Command::from_json(&json!({"t":"move","orders":[[1,61,41]]}))
                 .unwrap();
         assert_eq!(m.execute_command(0, &warm, false).unwrap(), None);
         assert!(!m.world.game.units[&1].path.is_empty());
@@ -456,7 +456,7 @@ fn rejected_final_preflight_discards_staged_sight_and_purchase() {
     // as the control branch that never attempted a preview does.
     m.story[0].mp_spent = 0.0;
     let reroute =
-        crate::match_commands::Command::from_json(&json!({"t":"move","ids":[1],"x":65,"z":45}))
+        crate::match_commands::Command::from_json(&json!({"t":"move","orders":[[1,65,45]]}))
             .unwrap();
     assert_eq!(m.execute_command(0, &reroute, false).unwrap(), None);
     assert_eq!(control.execute_command(0, &reroute, false).unwrap(), None);
