@@ -3,6 +3,9 @@ pub use crate::objectives::Objective;
 #[path = "match_recruitment.rs"]
 mod recruitment;
 pub use recruitment::{CompletedRecruitUnit, RecruitError, RecruitMetadata, RecruitRouting};
+#[path = "match_production.rs"]
+mod production_step;
+pub use production_step::{CompletedTrainingUnit, ProductionStepError};
 use std::collections::BTreeMap;
 
 use crate::{

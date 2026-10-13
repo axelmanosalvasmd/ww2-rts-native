@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added Match research admission with canonical wallet/lab/spending guards, early research advancement and source-positioned single-building training publication. Conquest explicitly refuses nonempty queues; legal World queues use actual region ownership and remembered routing. A real-constructor source recorder covers five cases, 54 actions, 12 commands and three full ticks, with native checks limited to production phases. Aircraft, logistics-enabled completion and remaining mode/dispatcher integration stay explicit boundaries; native verification is pending.
+
 - Joined the source World-memory producer for queued-training routing, retaining checked ordinary recipient evidence and the separate World native acceptance boundary. No live-terrain fallback was added.
 
 - Split canonical production into early research and staged single-building training operations, retaining component advance and its original-source traces. Research admission now holds wallet and lab mutations until an explicit commit, so Match can preflight spending records. Focused source-backed tests cover both schedules and dropped admission/completion guards; native verification is pending.
