@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added an original World nations-finish transition to the region phase oracle, proving its atomic refusal separately from World-share and draw finishes. The expanded recorder covers 20 traces and 39 transitions; native checks remain queued.
+
 - Recorded 19 original World capture/income traces with 38 transitions and added native comparison, current-depot and atomic-error tests. Independent source/oracle review passes; native verification is queued. Documented retained tick facts and the unsupported fort, elimination and finish consequences.
 
 - Corrected the live region and relocated home coordinates to the source's cell centers after independent source review caught the missing half-cell offset, before fixture or native acceptance.

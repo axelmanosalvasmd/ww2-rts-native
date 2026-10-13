@@ -69,6 +69,7 @@ record('explicit retained depot facts',{units:[unit(20,0,'depot',0,{built:1})],n
 record('unsupported fort transfer',{units:[unit(1,0),unit(20,-1,'gate',2,{open:true,gateT:4})],supported:false,steps:[{dt:8}]});
 record('unsupported army elimination',{regions:{0:{team:-1,progress:0}},units:[unit(1,0)],supported:false,steps:[{dt:.05}]});
 record('unsupported World finish',{regions:Object.fromEntries(Array.from({length:39},(_,i)=>[i,{team:0,progress:1}])),supported:false,steps:[{dt:0}]});
+record('unsupported nations finish',{regions:{63:{team:-1,progress:0}},supported:false,steps:[{dt:0}]});
 record('unsupported draw finish',{regions:{0:{team:-1,progress:0},63:{team:-1,progress:0}},supported:false,steps:[{dt:0}]});
 const output=JSON.stringify({reference:pin,node:process.version,definitions,cases})+'\n';
 const path=fileURLToPath(new URL('../rust/crates/simtest/tests/fixtures/world-region.json',import.meta.url));

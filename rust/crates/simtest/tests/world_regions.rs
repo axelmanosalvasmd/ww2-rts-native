@@ -381,7 +381,7 @@ fn original_world_capture_income_transitions_and_explicit_consequences() {
             }
         }
     }
-    assert_eq!(transitions, 38);
+    assert_eq!(transitions, 39);
 }
 
 #[test]
