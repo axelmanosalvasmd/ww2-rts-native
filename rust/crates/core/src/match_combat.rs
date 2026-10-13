@@ -1109,10 +1109,13 @@ pub struct DeathResult {
     pub shots: Vec<environment::Effect>,
 }
 impl crate::match_runtime::Match {
-    /// Finish this tick's dead represented ground units in the caller's captured source order.
-    /// Story/fallen, firing/control retirement and convoy hooks are returned to their owners.
-    /// Metadata is retained while projectile sources may still refer to XP.
-    pub fn retire_dead(&mut self, unit_order: &[UnitId]) -> Result<DeathResult, CombatError> {
+    /// Read-only admission for the ordinary death phase at the caller's prospective clock.
+    /// Seed and ID copies allow the whole tick to reject before advancing canonical state.
+    pub fn validate_dead_retirement(
+        &self,
+        unit_order: &[UnitId],
+        prospective_tick: u64,
+    ) -> Result<(), CombatError> {
         if self.world.game.tick < 0 || !matches!(self.options.mode, Mode::Default | Mode::Conquest)
         {
             return Err(CombatError::InvalidInput("death mode/tick"));
@@ -1133,10 +1136,7 @@ impl crate::match_runtime::Match {
         let bounty = number(cfg, "bounty")?;
         for id in &ordered {
             let u = &self.world.game.units[id];
-            if u.owner >= self.start.economy.players.len()
-                || u.kind >= self.rules.kinds.len()
-                || u.air.is_some()
-            {
+            if u.owner >= self.start.economy.players.len() || u.kind >= self.rules.kinds.len() {
                 return Err(CombatError::InvalidInput("unsupported dead unit"));
             }
             let m = self
@@ -1155,6 +1155,18 @@ impl crate::match_runtime::Match {
             {
                 return Err(CombatError::InvalidInput("death impulse"));
             }
+        }
+        if self
+            .world
+            .game
+            .units
+            .values()
+            .any(|u| u.air.is_some() || self.rules.kinds.get(u.kind).is_some_and(|kind| kind.air))
+            || !self.aviation.planes.is_empty()
+            || !self.aviation.anti_air.is_empty()
+        {
+            self.validate_aviation()
+                .map_err(|_| CombatError::InvalidInput("aircraft retirement registry"))?;
         }
         let mut wallets = self
             .start
@@ -1189,10 +1201,12 @@ impl crate::match_runtime::Match {
             .mutation_capacity(self.world.game.chars.len() as u64 * 64 + 4096)
             .map_err(environment::EnvironmentError::from)?;
         let all = self.world.game.units.keys().copied().collect::<Vec<_>>();
+        let mut seed = self.start.environment_seed;
+        let mut next_id = self.next_unit_id;
         let ctx = environment::Context {
-            tick: self.world.game.tick as u64,
-            seed: &mut self.start.environment_seed,
-            next_id: &mut self.next_unit_id,
+            tick: prospective_tick,
+            seed: &mut seed,
+            next_id: &mut next_id,
             unit_order: &all,
             grid: &self.grid,
             rain: self.world.game.rain,
@@ -1206,6 +1220,26 @@ impl crate::match_runtime::Match {
             .collect::<Vec<_>>();
         self.environment
             .validate_retirement(&self.world, &facts, &ctx)?;
+        Ok(())
+    }
+
+    /// Finish represented ground and registered aircraft deaths in captured source order.
+    /// Story/fallen, firing/control retirement and convoy hooks remain with their owners.
+    /// Combat and firing metadata stay retained while projectile sources may refer to them.
+    pub fn retire_dead(&mut self, unit_order: &[UnitId]) -> Result<DeathResult, CombatError> {
+        self.validate_dead_retirement(unit_order, self.world.game.tick as u64)?;
+        let ordered = unit_order
+            .iter()
+            .copied()
+            .filter(|id| self.world.game.units.contains_key(id))
+            .collect::<Vec<_>>();
+        let bounty = number(
+            Catalog::compiled()
+                .map_err(|_| CombatError::Rules)?
+                .table("CFG")
+                .map_err(|_| CombatError::Rules)?,
+            "bounty",
+        )?;
         let mut result = DeathResult::default();
         for id in ordered {
             let Some(u) = self
@@ -1234,7 +1268,10 @@ impl crate::match_runtime::Match {
                 wind_strength: self.start.wind.1,
             };
             let def = definition(u.kind, &self.rules)?;
-            let effects = if flag(def, "building") {
+            let effects = if u.air.is_some() {
+                // The source excludes AIR from hull wreck creation. Its AA event already exists.
+                Vec::new()
+            } else if flag(def, "building") {
                 self.environment
                     .wreck_building(&mut self.world, &u, &mut ctx)?
             } else {
@@ -1252,6 +1289,7 @@ impl crate::match_runtime::Match {
                     result.shots.push(effect);
                 }
             }
+            self.aviation.remove(u.id);
             self.logistics.remove(u.id);
             self.production.remove_building(u.id);
             self.building_rallies.remove(&u.id);

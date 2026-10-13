@@ -300,3 +300,6 @@ Wall clock and scheduling
 ## Retirement and wreck lifecycle evidence
 
 The combat adapter removes dead units through the maintained grid without rebuilding surviving buckets. A focused mid-tick removal regression preserves the surviving query order. Its original-source fixture covers vehicle wreck initialization, motion, final Q cells, scorch and the oldest-hull cap among nine traces with 35 actions. MOV-106 remains in progress pending full tick scheduling and client presentation. Thrown carrier escape in MOV-76 remains outside this slice.
+
+
+The bounded aircraft retirement follow-up uses the actual aviation registry and the existing ordinary death consumer. Its seven-case original recorder includes finite off-map Base aircraft and a real AA kill followed by retirement without a hull or a second plane-down tally. The prospective-clock guard is read only. Two native tests and independent review remain pending; no full aviation or tick row is marked done.
