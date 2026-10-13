@@ -1,4 +1,4 @@
-//! Actual reference steps over friendly matches, avoiding unavailable combat actuators.
+//! Actual reference steps over friendly matches and the connected ordered phases.
 use serde_json::{Value, json};
 use ww2_core::{
     economy::{Faction, Mode},
@@ -54,17 +54,39 @@ fn snapshot(m: &Match) -> Value {
     let g = &m.world.game;
     json!({"tick":g.tick,"visionTick":g.vision_tick,"seed":m.start.environment_seed,"wind":[bits(m.start.wind.0),bits(m.start.wind.1)],
         "units":g.units.values().map(|u|json!([u.id,bits(u.x),bits(u.z),bits(u.rot),bits(u.hp),bits(u.supp),bits(u.stuck),bits(u.repath),bits(u.sprint),u.path.iter().map(|p|json!([bits(p.x),bits(p.z)])).collect::<Vec<_>>()])).collect::<Vec<_>>(),
+        "weapons":g.units.values().map(|u|{let w=m.firing.get(u.id).expect("canonical weapon row");json!([u.id,w.target_id,bits(w.cooldown),bits(w.retarget),bits(m.commands.units[&u.id].aim)])}).collect::<Vec<_>>(),
         "players":m.start.economy.players.iter().map(|p|json!([bits(p.mp),bits(p.vp),bits(p.inc)])).collect::<Vec<_>>(),
         "points":m.start.points.iter().enumerate().map(|(i,p)|json!([p.owner.map_or(-1,|v|v as i64),p.capper.map_or(-1,|v|v as i64),bits(p.progress),p.cut,p.contested,p.on_point,m.capture_ticks[i]])).collect::<Vec<_>>()})
 }
 #[test]
-fn connected_tick_phases_match_actual_friendly_reference_steps() {
+fn connected_tick_phases_match_actual_reference_steps() {
     let fixture: Value = serde_json::from_str(include_str!("fixtures/match-tick.json")).unwrap();
     for c in fixture["cases"].as_array().unwrap() {
         let mut m = make(c);
         let input = &c["input"];
         for unit in m.world.game.units.values_mut() {
             unit.hold_pos = true;
+        }
+        if let Some(keep) = input["keep"].as_array() {
+            m.world
+                .game
+                .units
+                .retain(|id, _| keep.iter().any(|v| v.as_u64() == Some(u64::from(*id))));
+        }
+        if let Some(owners) = input["owners"].as_array() {
+            for row in owners {
+                m.world
+                    .game
+                    .units
+                    .get_mut(&(row[0].as_u64().unwrap() as u32))
+                    .unwrap()
+                    .owner = row[1].as_u64().unwrap() as usize;
+            }
+        }
+        if input["disableAuto"] == true {
+            for control in m.commands.units.values_mut() {
+                control.auto_cast = false;
+            }
         }
         m.start.environment_seed = input["seed"].as_u64().unwrap() as u32;
         m.start.wind = (
@@ -139,11 +161,31 @@ fn connected_tick_phases_match_actual_friendly_reference_steps() {
         for _ in 0..c["ticks"].as_u64().unwrap_or(200) {
             let report = m.advance_tick().unwrap();
             assert!(!report.unavailable.is_empty());
+            assert!(
+                report
+                    .phases
+                    .contains(&ww2_core::match_tick::TickPhase::Firing)
+            );
+            assert!(
+                report
+                    .phases
+                    .contains(&ww2_core::match_tick::TickPhase::Projectiles)
+            );
             if expected
                 .peek()
                 .is_some_and(|e| e["tick"].as_i64() == Some(report.tick))
             {
                 let mut state = snapshot(&m);
+                if c["enemy"] == true {
+                    let random = m.start.random.snapshot();
+                    let value = random
+                        .streams
+                        .iter()
+                        .find(|(stream, _)| *stream == ww2_core::random::StreamId::Combat)
+                        .unwrap()
+                        .1;
+                    state["combatState"] = json!(format!("{value:016x}"));
+                }
                 if input["commands"].is_array() {
                     use ww2_core::match_commands::MoveOutcome;
                     state["control"] = json!(

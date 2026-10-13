@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Connected reviewed Conquest weapon timers, per-unit target/launch actions and post-separation flight/salvo steps to the staged tick. Prior poses include boundary command effects before clock advancement. Seven actual-source traces now record 1,025 ticks and 64 checkpoints, including opposing squads receiving suppression and damage with the recorded Combat random stream. Combined native validation is pending; abilities, air/rail, riders and ground terrain effects remain explicit gaps alongside the other unavailable phases.
+
 - Assembled the reviewed firing, recruitment and command ancestry with the staged Conquest tick adapters, preserving canonical metadata initialization and the owned phase loop. Combined native checks remain pending.
 
 - Updated the Conquest parity evidence for the source-written command, route and environment assembly, distinguishing its six original-step traces and independent source review from pending combined native checks and remaining actuators.

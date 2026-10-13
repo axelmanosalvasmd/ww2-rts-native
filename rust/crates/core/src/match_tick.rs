@@ -20,9 +20,13 @@ pub enum TickPhase {
     UnitReserves,
     UnitOrders,
     Production,
+    Abilities,
+    AirRail,
+    Riding,
     Reactions,
     TrafficKnowledge,
     Movement,
+    GroundEffects,
     Firing,
     Construction,
     Separation,
@@ -92,8 +96,11 @@ impl crate::match_runtime::Match {
 
     fn validate_tick_input(&self) -> Result<(), String> {
         let game = &self.world.game;
-        if game.tick < 0 || game.tick >= 9_007_199_254_740_991 {
+        if game.tick < 0 || game.tick >= 9_007_199_254_740_351 {
             return Err("invalid tick clock".into());
+        }
+        if self.options.mode != crate::economy::Mode::Conquest {
+            return Err("tick execution currently requires ordinary Conquest".into());
         }
         self.validate_command_tick(game.tick as u64 + 1)?;
         if !self.rules.movement.tick.is_finite() || self.rules.movement.tick <= 0.0 {
@@ -132,6 +139,7 @@ impl crate::match_runtime::Match {
         let commands = self.apply_commands(self.world.game.tick as u64 + 1, winner_decided)?;
         let mut environment = self.tick_environment_phase(EnvironmentPhase::StructureSync)?;
         self.grid.rebuild(&self.world.game.units);
+        self.capture_firing_prior()?;
         let prior = self
             .world
             .game
@@ -160,6 +168,8 @@ impl crate::match_runtime::Match {
         // These are the source defaults for an ordinary Conquest match.
         let paths = self.begin_path_tick(4096, 20)?;
         phases.push(TickPhase::Paths);
+        let claim_order = self.world.game.units.keys().copied().collect::<Vec<_>>();
+        self.begin_firing_tick(&claim_order)?;
         let mut moved = Vec::new();
         let mut last_id = None;
         loop {
@@ -198,17 +208,29 @@ impl crate::match_runtime::Match {
             }
             unit.repath -= dt;
             unit.sprint -= dt;
+            self.advance_firing_timers(id, dt)?;
             self.apply_attack_move(id)?;
+            let before = self.world.game.units[&id].at();
             if let Some(result) = self.move_unit_with_command_routes(id, factor)? {
                 moved.push(result);
             }
-            // Firing attaches here, after this unit's actual moved facts.
+            let unit = &self.world.game.units[&id];
+            let moving = !unit.path.is_empty()
+                || crate::math::hypot(unit.x - before.x, unit.z - before.z) > 0.001;
+            self.apply_unit_firing(id, moving, dt)?;
         }
-        phases.extend([TickPhase::UnitOrders, TickPhase::Movement]);
+        phases.extend([
+            TickPhase::UnitOrders,
+            TickPhase::Movement,
+            TickPhase::Firing,
+        ]);
         let unit_order: Vec<_> = self.world.game.units.keys().copied().collect();
         separation::separate_crowds(&mut self.world.game, &self.rules, &mut self.grid);
         movement::infantry_progress(&mut self.world.game, &self.rules, &moved);
         phases.push(TickPhase::Separation);
+        self.step_firing_flights()?;
+        self.advance_firing_salvos(dt)?;
+        phases.push(TickPhase::Projectiles);
 
         let game = &mut self.world.game;
         let mut smokes: Vec<_> = game
@@ -274,11 +296,13 @@ impl crate::match_runtime::Match {
                 TickPhase::Research,
                 TickPhase::UnitReserves,
                 TickPhase::Production,
+                TickPhase::Abilities,
+                TickPhase::AirRail,
+                TickPhase::Riding,
                 TickPhase::Reactions,
                 TickPhase::TrafficKnowledge,
-                TickPhase::Firing,
+                TickPhase::GroundEffects,
                 TickPhase::Construction,
-                TickPhase::Projectiles,
                 TickPhase::Support,
                 TickPhase::Scenario,
                 TickPhase::SupplyNetwork,
