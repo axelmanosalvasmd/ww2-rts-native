@@ -285,6 +285,19 @@ fn ordinary_context(m: &Match) -> crate::match_routing::RecipientContext<'_> {
         environment: &m.environment,
     }
 }
+fn world_context(m: &Match) -> crate::match_world_memory::WorldRoutingContext<'_> {
+    let runtime = m.world_runtime.as_ref().unwrap();
+    crate::match_world_memory::WorldRoutingContext {
+        world: &m.world,
+        environment: &m.environment,
+        rules: &m.rules,
+        start: &m.start,
+        rails: &runtime.rails,
+        regions: &runtime.regions,
+        known_buildings: &runtime.known_buildings,
+        local_defender: &runtime.local_defender,
+    }
+}
 fn observation_state(m: &Match) -> String {
     let rows = m
         .recipients
@@ -378,6 +391,35 @@ fn malformed_wrecks_and_changed_prepared_facts_do_not_publish_observation() {
         );
         assert_eq!(before, observation_state(&m));
     }
+    let mut world = load(&f["cases"][2]);
+    eye(&mut world, &json!({"id":777,"x":41.,"z":41.}));
+    world.world.game.tick = 1;
+    world.refresh_world_visibility().unwrap();
+    wreck(
+        &mut world,
+        &json!({"id":9001,"x":43.,"z":41.,"moving":false}),
+    );
+    let mut memory = world.world_runtime.as_ref().unwrap().memory.clone();
+    let preview = crate::match_world_memory::prepare_world_routing(
+        world_context(&world),
+        &mut memory,
+        0,
+        None,
+    )
+    .unwrap();
+    let before = observation_state(&world);
+    world
+        .environment
+        .wreck_metadata
+        .get_mut(&9001)
+        .unwrap()
+        .rotation = 0.7;
+    assert!(
+        preview
+            .prepare_publication(&mut world.world, &world.environment)
+            .is_err()
+    );
+    assert_eq!(before, observation_state(&world));
     let mut m = load(&f["cases"][0]);
     eye(&mut m, &json!({"id":777,"alias":"eye","x":41.,"z":41.}));
     m.world.game.tick = 1;
