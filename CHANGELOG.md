@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed the production differential fixture’s paid-job cost projection to compare MP and Fuel by IEEE bits on both sides. This removes the JSON integer-versus-float mismatch found in the coupled engineering release run without changing production arithmetic or runtime behavior.
+
 - Carried the routing owner’s all-team World buffer mapping repair and 14-case original birth fixture into both consumers. The real training replay keeps its three-case scope; provider cross-team success/history coverage remains separately labeled, with native checks pending.
 
 - Added a fourth original World birth case with a different team’s warmed vehicle history, four accepted prebirth changes and a postbirth reroute. The recorder now covers 14 births, 12 prebirth searches and one cross-team reroute; native success/abort cache-lifetime checks remain pending.
