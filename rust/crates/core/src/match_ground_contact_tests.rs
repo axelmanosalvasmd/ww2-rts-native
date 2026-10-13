@@ -14,6 +14,23 @@ fn number(v: &Value) -> f64 {
 fn bits(v: &Value) -> u64 {
     u64::from_str_radix(v["bits"].as_str().unwrap(), 16).unwrap()
 }
+// JSON has one numeric domain; compare its IEEE value, retaining type and shape.
+fn exact_json_numbers(a: &Value, b: &Value) -> bool {
+    match (a, b) {
+        (Value::Number(a), Value::Number(b)) => {
+            a.as_f64().unwrap().to_bits() == b.as_f64().unwrap().to_bits()
+        }
+        (Value::Array(a), Value::Array(b)) => {
+            a.len() == b.len() && a.iter().zip(b).all(|(a, b)| exact_json_numbers(a, b))
+        }
+        (Value::Object(a), Value::Object(b)) => {
+            a.len() == b.len()
+                && a.iter()
+                    .all(|(key, a)| b.get(key).is_some_and(|b| exact_json_numbers(a, b)))
+        }
+        _ => a == b,
+    }
+}
 fn fixture() -> Value {
     serde_json::from_str(include_str!("../tests/fixtures/ground-contact.json")).unwrap()
 }
@@ -145,12 +162,16 @@ fn vehicle_wear_matches_actual_source_full_step_contacts() {
                         && data.station.is_none()
                         && data.trench_front.is_none()
                 );
-                assert_eq!(
-                    serde_json::json!([actual.cell, char::from(actual.ch).to_string(),
+                assert!(
+                    exact_json_numbers(
+                        &serde_json::json!([actual.cell, char::from(actual.ch).to_string(),
                     actual.height, actual.state, {"ground":char::from(data.ground).to_string(),
                     "object":char::from(data.object).to_string(),"material":data.material,
                     "groundMaterial":data.ground_material,"groundWear":f64::from(data.ground_wear)}]),
-                    *source
+                        source
+                    ),
+                    "{}: complete numeric-semantic cell row",
+                    case["name"]
                 );
                 assert_eq!(actual.cell, source[0].as_u64().unwrap() as usize);
                 assert_eq!(char::from(actual.ch).to_string(), source[1]);
@@ -236,4 +257,17 @@ fn unavailable_contact_and_capacity_denials_preserve_world() {
         assert_eq!(m.world.new_cells(), new_cells);
         assert_eq!(m.world.versions, versions);
     }
+}
+
+#[test]
+fn numeric_readback_preserves_signed_zero_types_and_absence() {
+    use serde_json::json;
+    assert!(exact_json_numbers(
+        &json!([0, {"wear":1}]),
+        &json!([0.0, {"wear":1.0}])
+    ));
+    assert!(!exact_json_numbers(&json!(-0.0), &json!(0.0)));
+    assert!(!exact_json_numbers(&json!(0), &json!("0000000000000000")));
+    assert!(!exact_json_numbers(&json!({}), &json!({"wear":null})));
+    assert!(!exact_json_numbers(&json!([0, 1]), &json!([1, 0])));
 }

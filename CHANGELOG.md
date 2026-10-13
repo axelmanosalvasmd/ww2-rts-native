@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Compare complete ground-contact JSON rows by IEEE numeric value while retaining array order, field presence and nonnumeric types. The frozen contact run passed the refusal test and stopped on Source integer zero versus native floating zero in the mud row. Signed zero and tagged bit strings remain distinct. Runtime, recorder and fixture values are unchanged; this test-only successor has not run natively.
+
 - Connect actual moved-vehicle ground wear to the canonical World owner. Preserve Float32 wear, wet and below-sea multipliers, look-only journal updates, both mud-transition rows, and dust after terrain contact. The frozen construction warm-route failure showed the missing real contact at cell 792. An unchanged Source full-step recorder covers six scenes and 12 steps; two native component tests and the existing full construction replay await execution. Crushing and hostile mine detonation remain explicit unsupported boundaries, with the broader GroundEffects phase still unavailable.
 
 - Detach authored construction prime values before injecting them into Source. Later repair ticks had mutated the saved input reserves, so native replay began with depleted provisions before the repair command. Regeneration changes only two recorded action inputs back to the authored 0.001 and 0.002; all 2,013 expected snapshots across 29 cases remain identical. Construction and logistics rules are unchanged. The frozen native failure is retained; this successor has not run natively.
