@@ -804,3 +804,11 @@ Rally interception uses the firing owner's claim-aware target setter. Retreat fo
 ## Server component frontier integration (2026-10-13)
 
 PR #137 consolidates the recipient delta, list history, socket backpressure and host timing providers from #115, #124 and #128 onto main `13a8d1f`, which includes the approved ABI 2 and reviewed core frontier. The normal merge changes no server Rust source, recorder or fixture bytes. Only additive changelog entries conflicted; both histories are retained. The six approved recipient-view calls and generated header remain identical to main. The earlier 23 server debug and 173 workspace release tests are branch-local evidence; fresh combined-head Linux, Windows and macOS checks are pending. Room-loop callbacks, complete simulation, public match admission, wire and privacy decisions remain outside this component frontier.
+
+## Rust CI duration limit (2026-10-13)
+
+The combined snapshot frontier at 6a5d4d6 ran the full debug workspace suite on GitHub-hosted Ubuntu 24.04, Windows 2025 and macOS 15. Run 38443050411 reached the World-memory tests while earlier tests were still passing, then all three jobs were cancelled by the workflow's 20-minute limit. The preserved logs contain no assertion failure. A timeout is not evidence that the remaining tests pass.
+
+The job limit is now 40 minutes so the expanded suite can finish. The platform matrix, pinned toolchain, commands, failure policy and release C-link gate are unchanged. New heads still need fresh checks. GitHub's job timeout setting cancels work at its limit; it does not impose a minimum run duration (https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idtimeout-minutes).
+
+PR #147 also incorporates the central workflow checkpoint `76cbe6df3398010c9c268b46d5c1770138bb3bba` while retaining the merged server and traffic records. Its 40-minute full-suite job budget changes only CI admission time, not simulation scheduling or test coverage. Fresh platform checks must run on this combined head; no duplicate local suite is used.
