@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added canonical ground support strikes and team fighter cover to the internal Conquest recipient cache, validated shared finish fields, and kept Assault and World snapshots refused. The original cached-source recorder now checks 72 states and 216 recipient projections, including real support command admission and mixed actor rounding. Combined native validation is pending; complete seat envelopes, active flights/shots and remaining list/work providers stay explicit boundaries.
+
 - Integrated verified ground support and shared finish prerequisites into the separate snapshot composition branch. Preserved ability, recovery and firing initialization at the prepared publication callbacks after the shared startup refactor, keeping one publication authority. The combined branch still needs native validation; this does not enable another snapshot mode.
 
 - Added canonical optional movement-result tails to UnitControl and the owner-only snapshot reader. Actual path failure and completion operations record their tick; later move, stop and reaction intents preserve the previous tail. Extended the original command oracle to 58 traces and 259 steps, including 518 recipient movement observations and two retained recovery/replan branches. All 246 prior steps are unchanged apart from added result/recipient observations. Cached snapshot fixtures remain 70 states and 210 recipients. Native verification is pending the managed Rust lane; no complete envelope, wire or ABI change was added.

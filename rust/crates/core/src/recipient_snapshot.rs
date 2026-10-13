@@ -16,6 +16,8 @@ mod delivery;
 mod owners;
 #[path = "recipient_snapshot/public_state.rs"]
 mod public_state;
+#[path = "recipient_snapshot/support.rs"]
+mod support;
 pub use delivery::{DeliveryFrame, DeliveryState};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -76,6 +78,8 @@ impl<'a> SnapshotCache<'a> {
         if state.options.mode != Mode::Conquest
             || state.world.game.mode.is_some()
             || state.world.geography().is_some()
+            || state.assault.is_some()
+            || state.world_runtime.is_some()
         {
             return Err(SnapshotError::UnsupportedMode);
         }
@@ -120,6 +124,11 @@ impl<'a> SnapshotCache<'a> {
             .collect::<Result<_, _>>()?;
         let owners = owners::capture(state)?;
         let public = public_state::capture(state)?;
+        let support = support::capture(state)?;
+        let mut public = public;
+        for (fields, support) in public.iter_mut().zip(support) {
+            fields.extend(support);
+        }
         Ok(Self {
             state,
             rows,
@@ -441,6 +450,21 @@ fn economy_fields(state: &Match, slot: usize) -> Result<Map<String, Value>, Snap
         state.finish.map_or(Value::Null, |end| json!(end.winner)),
     );
     if let Some(end) = state.finish {
+        finite(&[end.end_at.x, end.end_at.z])?;
+        if end.end_tick < 0
+            || end.end_tick > 9_007_199_254_740_991
+            || !(-1..6).contains(&end.winner)
+            || (end.winner >= 0
+                && !state
+                    .world
+                    .game
+                    .players
+                    .iter()
+                    .any(|p| p.team == end.winner))
+            || (end.winner == -1) != (end.reason == crate::match_end::EndReason::Draw)
+        {
+            return Err(SnapshotError::Rules);
+        }
         fields.insert(
             "end".into(),
             json!({"reason":end.reason.as_str(),"x":end.end_at.x,"z":end.end_at.z}),
@@ -688,6 +712,44 @@ mod tests {
             p.visible.sort_unstable();
         }
         if let Some(public) = case["publicState"].as_object() {
+            m.support.strikes = public["strikes"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|s| crate::match_support::SupportStrike {
+                    kind: match s["kind"].as_str().unwrap() {
+                        "artillery" => crate::match_support::SupportKind::Artillery,
+                        "smoke" => crate::match_support::SupportKind::Smoke,
+                        "cover" => crate::match_support::SupportKind::Cover,
+                        _ => panic!("unsupported fixture strike"),
+                    },
+                    owner: s["owner"].as_u64().unwrap() as usize,
+                    at: Point {
+                        x: n(s, "x"),
+                        z: n(s, "z"),
+                    },
+                    direction: n(s, "dir"),
+                    delay: n(s, "t"),
+                    left: n(s, "left"),
+                    next: n(s, "next"),
+                    live: s["live"].as_bool().unwrap_or(false),
+                })
+                .collect();
+            m.support.covers = public["covers"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|c| crate::match_support::FighterCover {
+                    team: c["team"].as_i64().unwrap() as i32,
+                    owner: c["owner"].as_u64().unwrap() as usize,
+                    at: Point {
+                        x: n(c, "x"),
+                        z: n(c, "z"),
+                    },
+                    radius: n(c, "r"),
+                    remaining: n(c, "t"),
+                })
+                .collect();
             m.options.army = match public["army"].as_str().unwrap() {
                 "standard" => ArmySize::Standard,
                 "large" => ArmySize::Large,

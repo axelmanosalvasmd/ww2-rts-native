@@ -18,8 +18,8 @@ rows[9]=rows[9].slice(0,9)+'B'+rows[9].slice(10);
 const map={name:'Snapshot fixture',w:20,h:20,rows,spawns:[{x:1,y:1},{x:18,y:18},{x:1,y:18}],points:[{x:10,y:10}]};
 assert.ok(process.argv.slice(2).every(arg=>arg==='--check'));
 const cases=[];
-const publicState=(g,army='standard')=>({army,wx:g.wx,wind:g.wind,support:g.players.map(p=>p.sup),points:g.points.map(q=>({owner:q.owner,capper:q.capper,progress:q.progress,cut:q.cut,needs:q.needs,contested:q.contested,onPoint:q.onPoint})),smokes:g.smokes,fires:[...g.fires]});
-const fields=['tick','units','mp','mun','fuel','inc','fuelInc','upkeep','out','vp','winner','end','rally','tech','weather','plans','orders','queues','productionJobs','army','wx','sup','points','smokes','fires','movement'];
+const publicState=(g,army='standard')=>({army,wx:g.wx,wind:g.wind,support:g.players.map(p=>p.sup),strikes:g.strikes,covers:g.covers??[],points:g.points.map(q=>({owner:q.owner,capper:q.capper,progress:q.progress,cut:q.cut,needs:q.needs,contested:q.contested,onPoint:q.onPoint})),smokes:g.smokes,fires:[...g.fires]});
+const fields=['tick','units','mp','mun','fuel','inc','fuelInc','upkeep','out','vp','winner','end','rally','tech','weather','plans','orders','queues','productionJobs','army','wx','sup','points','smokes','fires','movement','strikes','covers'];
 for(const kind of ['rifle','sniper','tank','halftrack','engineer','bunker']) {
  for(const placement of ['open','trench','cover','near-corner','near-vehicle','near-wrap','deleted-target','finished']) {
   if(placement==='finished' && kind!=='rifle')continue;
@@ -73,7 +73,7 @@ for (const name of ['idle','path','goal','amove','attack-hidden','attack-seen','
  cases.push({name:'owner:'+name,map,tick:g.tick,chars:g.chars.join(''),inputs,publicState:publicState(g),players:g.players.map(p=>({team:p.team,visible:[...p.visible],mp:p.mp,mun:p.mun,fuel:p.fuel,inc:p.inc,vp:p.vp,rally:p.rally,fuelInc:p.fuelInc,upkeep:p.upkeep})),outputs});
 }
 
-for (const name of ['standard','large','massive','endless','visible-contest','hidden-contest','deleted-contest','cut','needs-enemy','needs-ally','wx-rounding','support-rounding','current-effects','reveal-effects']) {
+for (const name of ['standard','large','massive','endless','visible-contest','hidden-contest','deleted-contest','cut','needs-enemy','needs-ally','wx-rounding','support-rounding','current-effects','reveal-effects','support-calls','support-actors']) {
  const prior=Math.random;Math.random=()=>.5;let g;const army=['standard','large','massive','endless'].includes(name)?name:'standard';try{g=sim.createGame(map,['A','Ally','Enemy'],false,[0,0,1],[0,1,2],{mode:'conquest',weather:'clear',tech:true,logistics:false,army});}finally{Math.random=prior;}
  const own=[...g.units.values()].find(u=>u.owner===0&&!sim.UNITS[u.type].structure),enemy=[...g.units.values()].find(u=>u.owner===2&&!sim.UNITS[u.type].structure);
  g.players.forEach(p=>p.visible=new Set());
@@ -82,6 +82,8 @@ for (const name of ['standard','large','massive','endless','visible-contest','hi
  if(name.startsWith('needs')){g.points.push({...g.points[0],owner:name==='needs-ally'?1:2});Object.assign(g.points[0],{needs:1,owner:-1});}
  if(name==='wx-rounding'){g.wx={rain:.15,wet:.25};g.wind={a:-.05,v:.15};}
  if(name==='support-rounding'){g.players.forEach((p,i)=>Object.keys(p.sup).forEach((k,j)=>p.sup[k]=i?-.15:j+.15));}
+ if(name==='support-calls'){g.players.forEach(p=>p.mp=1000);for(const [owner,kind] of [[0,'artillery'],[1,'smoke'],[2,'cover']])assert.equal(sim.command(g,owner,{t:'support',kind,x:14.15+owner,z:16.25,dir:-.05}),undefined);}
+ if(name==='support-actors'){g.strikes=[{kind:'artillery',owner:2,x:14.15,z:16.25,dir:-.05,t:-.15,left:3,next:.5,live:true},{kind:'smoke',owner:0,x:24.25,z:26.15,dir:1.05,t:2.15,left:8,next:0,live:false}];g.covers=[{team:0,owner:1,x:12.15,z:14.25,r:27.15,t:2.01},{team:1,owner:2,x:22.25,z:24.15,r:28.25,t:.01},{team:0,owner:0,x:32.15,z:34.25,r:29.15,t:-.01}];}
  if(name.endsWith('effects')){g.smokes=[{id:1,x:own.x,z:own.z,r:1.15,t:8},{id:2,x:enemy.x,z:enemy.z,r:2.25,t:5}];g.fires.set(5*20+5,4);g.fires.set(17*20+17,7);g.fires.set(5*20+5,6);if(name==='reveal-effects')g.reveal=true;}
  const inputs=[...g.units.values()].map(u=>Object.fromEntries(['id','type','owner','x','z','rot','aim','hp','supp','cd','cooldown','targetId','still','shotAt','dust','buff','ap','reinf','healAt','retreating','holdFire','holdPos','autoRetreat','auto','xp','built','moveSpeed','vx','vz','travelDir','cargo','riding','garrison','amove','path','worldGoal','attackId','board','fireAt','nade','enter','orders','queue','productionJobs','prog','rally'].filter(k=>u[k]!==undefined).map(k=>[k,u[k]])));
  const cache=sim.snapshotCache(g);
