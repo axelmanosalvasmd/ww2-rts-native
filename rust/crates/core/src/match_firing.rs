@@ -1888,7 +1888,7 @@ impl Match {
             z: target.z + cz * k,
         }
     }
-    fn aim_point(&self, shooter: &Unit, target: &Unit) -> Point {
+    pub(crate) fn aim_point(&self, shooter: &Unit, target: &Unit) -> Point {
         let Some(cells) = &target.cells else {
             return self.hull_point(shooter.at(), target);
         };

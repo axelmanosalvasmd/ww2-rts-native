@@ -396,6 +396,8 @@ pub struct BuildingCell {
 /// Live terrain and units have a single owner in `world.game`.
 pub struct Match {
     pub support: crate::match_support::SupportState,
+    pub abilities: crate::match_abilities::AbilityState,
+    pub recovery: crate::match_recovery::RecoveryState,
     pub combat: crate::match_combat::CombatState,
     pub environment: crate::environment::EnvironmentRuntime,
     pub companions: crate::companions::Companions,
@@ -461,6 +463,8 @@ impl Match {
         let player_count = start.players.len();
         let mut result = Self {
             support: crate::match_support::SupportState::default(),
+            abilities: crate::match_abilities::AbilityState::default(),
+            recovery: crate::match_recovery::RecoveryState::default(),
             combat: crate::match_combat::CombatState::default(),
             environment: crate::environment::EnvironmentRuntime::default(),
             companions: crate::companions::Companions::default(),
@@ -492,6 +496,9 @@ impl Match {
         result.setup_bases()?;
         for unit in result.world.game.units.values() {
             result.combat.initialize(unit.id);
+            result.firing.initialize(unit.id);
+            result.abilities.initialize(unit.id);
+            result.recovery.initialize(unit.id);
             let control = crate::match_commands::UnitControl::new(unit, &result.rules)?;
             result.commands.insert(unit.id, control);
         }
