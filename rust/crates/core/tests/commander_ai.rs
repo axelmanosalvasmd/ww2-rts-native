@@ -77,6 +77,8 @@ fn input(row: &Value) -> Input {
                 riding: u["flags"].as_u64().unwrap() & 262_144 != 0,
                 build: truthy(&u["build"]),
                 dig: truthy(&u["dig"]),
+                entrench: truthy(&u["entrench"]),
+                garrison: u["garrison"].as_i64().is_some_and(|v| v >= 0),
                 enter: u["enter"].as_i64().is_some_and(|v| v >= 0),
                 fire_at: u["fireAt"].as_i64().is_some_and(|v| v >= 0),
                 nade: truthy(&u["nade"]),
@@ -93,6 +95,13 @@ fn input(row: &Value) -> Input {
                 locked: truthy(&p["locked"]),
             })
             .collect(),
+        chars: array(&frame["chars"])
+            .iter()
+            .flat_map(|run| {
+                std::iter::repeat_n(run[0].as_str().unwrap().as_bytes()[0], integer(&run[1]))
+            })
+            .collect(),
+        manpower: number(&frame["me"]["mp"]),
         flags: array(&frame["flags"])
             .iter()
             .flat_map(|run| {
@@ -123,6 +132,7 @@ fn aim_bits(value: Option<Aim>) -> Option<(usize, u64)> {
 fn command_bits(commands: &[Command]) -> Vec<(bool, Vec<(i64, u64, u64)>)> {
     commands
         .iter()
+        .filter(|c| !matches!(c, Command::Cover { .. }))
         .map(|c| {
             let Command::Move {
                 orders,
@@ -154,7 +164,7 @@ fn original_thinker_orders_aim_and_waypoint_draws_match() {
         records["reference"],
         "e4e579a838aabae3b1d9dadbc17a0a87147bc52d"
     );
-    assert_eq!(array(&records["cases"]).len(), 55);
+    assert_eq!(array(&records["cases"]).len(), 60);
     let mut draws = 0;
     let mut pending = 0;
     for row in array(&records["cases"]) {
@@ -182,6 +192,21 @@ fn original_thinker_orders_aim_and_waypoint_draws_match() {
             .iter()
             .map(|v| Command::from_json(v).unwrap())
             .collect();
+        let actual_cover: Vec<_> = result
+            .commands
+            .iter()
+            .filter_map(|c| match c {
+                Command::Cover { ids } => Some(serde_json::json!({"t":"cover","ids":ids})),
+                _ => None,
+            })
+            .collect();
+        let expected_cover: Vec<_> = array(&row["expected"]["pendingCommands"])
+            .iter()
+            .filter(|c| c["t"] == "cover")
+            .cloned()
+            .collect();
+        assert_eq!(actual_cover, expected_cover, "holder {name}");
+
         assert_eq!(
             command_bits(&result.commands),
             command_bits(&expected),
@@ -214,8 +239,8 @@ fn original_thinker_orders_aim_and_waypoint_draws_match() {
     }
     assert_eq!(draws, 270);
     assert_eq!(
-        pending, 1,
-        "source holder cover remains explicitly unported"
+        pending, 2,
+        "actual quiet holder cover orders retained and compared"
     );
 }
 

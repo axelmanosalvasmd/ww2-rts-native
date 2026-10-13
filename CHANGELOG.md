@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added immediate infantry Take Cover through the existing recorded command queue and quiet commander holder policy. The original thinker oracle now has 60 cases with 270 waypoint draws; ten actual Cover command cases extend the existing command oracle to 66 traces and 256 steps. Native checks are pending. Queued Cover, active job cancellation and garrison handling remain unsupported; funded fortification and nearby-house holder choices are refused by this bounded policy.
+
 - Reject an exhausted signed Match clock before the opening commander can queue an unrepresentable next tick or publish a delivered-view marker. The terminal-clock guard leaves policy memory, RNG and pending commands unchanged.
 
 - Retained the source holder's pending cover order in the AI fixture alongside the 55 movement cases and 270 waypoint draws. The comparator covers opening movement only; holder cover and garrison orders remain unported rather than disappearing from the recorded source log.

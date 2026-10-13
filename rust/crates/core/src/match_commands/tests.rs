@@ -128,6 +128,7 @@ fn set(m: &mut Match, id: u32, fields: &Value) {
     let c = m.commands.units.get_mut(&id).unwrap();
     for (key, value) in fields.as_object().unwrap() {
         match key.as_str() {
+            "retreating" => u.retreating = value.as_bool().unwrap(),
             "holdPos" => u.hold_pos = value.as_bool().unwrap(),
             "x" => u.x = value.as_f64().unwrap(),
             "z" => u.z = value.as_f64().unwrap(),
@@ -261,7 +262,7 @@ fn original_command_and_waiting_order_phases() {
             count += 1;
         }
     }
-    assert_eq!(count, 246);
+    assert_eq!(count, 256);
 }
 #[test]
 fn ordered_match_boundary_and_whole_command_rejection() {
@@ -360,4 +361,44 @@ fn detached_recovery_and_empty_immediate_replan_preserve_routes() {
             case["kind"]
         );
     }
+}
+
+#[test]
+fn immediate_cover_uses_the_recorded_queue_and_refuses_unrepresented_jobs() {
+    let f: Value =
+        serde_json::from_slice(include_bytes!("../../tests/fixtures/match-commands.json")).unwrap();
+    let case = f["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == "cover-run-to-trench")
+        .unwrap();
+    let mut m = initial(case);
+    m.world.game.tick = 0;
+    m.enqueue_command(
+        crate::orders::OrderKey {
+            tick: 1,
+            issuer: 0,
+            sequence: 1,
+        },
+        Command::Cover { ids: vec![1] },
+    )
+    .unwrap();
+    let results = m.apply_commands(1, false).unwrap();
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].denial, None);
+    assert!(!m.world.game.units[&1].path.is_empty());
+    let mut m = initial(case);
+    m.world.game.units.get_mut(&1).unwrap().dig = true;
+    let before = snapshot(&m);
+    assert_eq!(
+        m.execute_command(0, &Command::Cover { ids: vec![1] }, false)
+            .unwrap(),
+        Some(Denial::Unsupported)
+    );
+    assert_eq!(snapshot(&m), before);
+    assert_eq!(
+        Command::from_json(&json!({"t":"cover","ids":[1],"queue":true})).unwrap(),
+        Command::Unsupported
+    );
 }

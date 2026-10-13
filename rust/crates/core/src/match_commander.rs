@@ -607,6 +607,7 @@ impl Match {
                 .and_then(|v| v.number())
                 .unwrap_or(0.0) as u16
         };
+        let mut chars = initial.chars.clone();
         let mut flags: Vec<_> = initial
             .chars
             .iter()
@@ -621,6 +622,7 @@ impl Match {
                 } else {
                     ch
                 };
+                chars[c] = ch;
                 flag(ch)
             })
             .collect();
@@ -631,7 +633,9 @@ impl Match {
             } else {
                 row.data.ground
             };
-            flags[row.cell] = flag(if row.ch == b'N' { surface } else { row.ch });
+            let ch = if row.ch == b'N' { surface } else { row.ch };
+            chars[row.cell] = ch;
+            flags[row.cell] = flag(ch);
         }
         let players = g
             .players
@@ -685,6 +689,8 @@ impl Match {
                 riding: u.riding,
                 build: u.build,
                 dig: u.dig,
+                entrench: u.entrench,
+                garrison: u.garrison.is_some(),
                 enter: false,
                 fire_at: false,
                 nade: false,
@@ -722,6 +728,8 @@ impl Match {
             units,
             points,
             flags,
+            chars,
+            manpower: self.start.economy.players[owner].mp,
         })
         .map_err(|e| format!("commander observation: {e:?}"))
     }

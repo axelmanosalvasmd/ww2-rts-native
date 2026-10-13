@@ -133,6 +133,11 @@ record('busy-and-source-eligible-flags', { units: [
 record('neutral-infantry-already-captures', { units: [unit(1, 'rifle', { x: 55, z: 21 }), unit(2, 'tank', { x: 55, z: 21 }), unit(3)] });
 record('own-cut-infantry-already-holds', { points: [point(55, 21, { owner: 0, cut: true }), openingSentinel()], units: [unit(1, 'rifle', { x: 55, z: 21 }), unit(2, 'tank', { x: 55, z: 21 }), unit(3)] });
 record('out-seat', { out: true });
+for (const [name,fields] of [
+ ['already-covered',{cover:1}], ['trench-covered',{cover:2}], ['entrenching',{entrench:{}}],
+ ['garrisoned',{garrison:100}], ['two-holders',{}],
+]) record(`holder-${name}`, { points:[point(55,21,{owner:0}),openingSentinel()],
+ units:[unit(1,'rifle',{x:55,z:21,...fields}),unit(2,'rifle',{x:55,z:21})] });
 // Producer rows use actual initialization and observation without a synthetic
 // decoded-frame overlay. Recorded raw intent edits are replayable by native Match.
 const producer = [];

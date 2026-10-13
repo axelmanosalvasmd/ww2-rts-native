@@ -124,6 +124,22 @@ trace('hidden-physical-change',maps[0],[{kind:'rifle',x:5,z:5},{kind:'rifle',own
  {set:[[1,{x:45,z:5,path:[],worldGoal:null}]],tick:2,command:{t:'move',orders:[[1,55,5]]}},
 ]);
 for(const [kind,def]of Object.entries(sim.UNITS).filter(([,d])=>!d.air))trace('type-'+kind,maps[0],[{kind,x:13,z:23},{kind:'rifle',owner:1,x:53,z:23}],[{command:{t:'move',orders:[[1,25,23]]}},{command:{t:'amove',orders:[[1,35,23]]}},{command:{t:'stop',ids:[1]}}]);
+
+// Immediate Cover uses the real command body and existing route oracle.
+const coverCases=[
+ ['open-no-cover',maps[0],[{kind:'rifle',x:25,z:23}],[{command:{t:'cover',ids:[1]}}]],
+ ['wrong-kind',maps[1],[{kind:'tank',x:25,z:23,fields:{follow:77}}],[{command:{t:'cover',ids:[1]}}]],
+ ['wrong-owner',maps[1],[{kind:'rifle',owner:1,x:25,z:23}],[{command:{t:'cover',ids:[1]}}]],
+ ['retreating',maps[1],[{kind:'rifle',x:25,z:23,fields:{retreating:true,follow:77}}],[{command:{t:'cover',ids:[1]}}]],
+ ['trench-stays',maps[1],[{kind:'rifle',x:21,z:23,fields:{path:[{x:45,z:23}],targetId:99}}],[{command:{t:'cover',ids:[1]}}]],
+ ['wood-stays',maps[1],[{kind:'rifle',x:41,z:23,fields:{worldGoal:{x:55,z:23},follow:77}}],[{command:{t:'cover',ids:[1]}}]],
+ ['run-to-trench',maps[1],[{kind:'rifle',x:27,z:23}],[{command:{t:'cover',ids:[1]}}]],
+ ['two-squads',maps[1],[{kind:'rifle',x:27,z:23},{kind:'mg',x:27,z:25}],[{command:{t:'cover',ids:[1,2]}}]],
+ ['duplicate-selected',maps[1],[{kind:'rifle',x:27,z:23}],[{command:{t:'cover',ids:[1,1]}}]],
+ ['visible-threat',maps[1],[{kind:'rifle',x:27,z:23},{kind:'rifle',owner:1,x:37,z:25}],[{command:{t:'cover',ids:[1]}}]],
+];
+for(const [name,map,initial,actions] of coverCases) trace('cover-'+name,map,initial,actions);
+
 const movement=[];
 for(const kind of ['rifle','tank']) {
  const map=makeMap('disconnected',flat().map(r=>r.slice(0,16)+'B'+r.slice(17)));

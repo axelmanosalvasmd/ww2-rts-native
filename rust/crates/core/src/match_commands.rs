@@ -49,6 +49,9 @@ pub enum Command {
         together: bool,
         face: Option<f64>,
     },
+    Cover {
+        ids: Vec<i64>,
+    },
     Stop {
         ids: Vec<i64>,
     },
@@ -155,6 +158,8 @@ pub enum Denial {
     Blocked,
     Needs,
     QueueFull,
+    NoCover,
+    Retreating,
     Unsupported,
 }
 impl Denial {
@@ -163,6 +168,8 @@ impl Denial {
             Self::Blocked => "blocked",
             Self::Needs => "needs",
             Self::QueueFull => "queueFull",
+            Self::NoCover => "noCover",
+            Self::Retreating => "retreating",
             Self::Unsupported => "unsupported",
         }
     }
@@ -229,6 +236,9 @@ impl Command {
                     together: object.get("together").and_then(|v| v.as_bool()) == Some(true),
                     face,
                 })
+            }
+            Some("cover") if object.get("queue").and_then(|v| v.as_bool()) != Some(true) => {
+                Ok(Self::Cover { ids })
             }
             Some("stop") => Ok(Self::Stop { ids }),
             Some("stance") => {
@@ -304,7 +314,12 @@ impl crate::match_runtime::Match {
         }
         Ok(results)
     }
-    fn eligible_command_unit(&self, id: i64, owner: usize, command: &Command) -> Option<UnitId> {
+    pub(crate) fn eligible_command_unit(
+        &self,
+        id: i64,
+        owner: usize,
+        command: &Command,
+    ) -> Option<UnitId> {
         let id = u32::try_from(id).ok()?;
         let u = self.world.game.units.get(&id)?;
         let kind = self.rules.kinds.get(u.kind)?;
@@ -341,6 +356,9 @@ impl crate::match_runtime::Match {
         if matches!(command, Command::Unsupported) {
             return Ok(Some(Denial::Unsupported));
         }
+        if let Command::Cover { ids } = command {
+            return self.execute_cover_command(owner, ids);
+        }
         let limit = 50.max(self.world.game.units.len());
         let controlled: Vec<_> = match command {
             Command::Move {
@@ -351,7 +369,7 @@ impl crate::match_runtime::Match {
                 .clone()
                 .unwrap_or_else(|| orders.iter().map(|o| o.unit).collect()),
             Command::Stop { ids } | Command::Stance { ids, .. } => ids.clone(),
-            Command::Unsupported => unreachable!(),
+            Command::Unsupported | Command::Cover { .. } => unreachable!(),
         };
         if matches!(
             command,
@@ -455,7 +473,7 @@ impl crate::match_runtime::Match {
             } => {
                 return self.move_command(owner, orders, *attack_move, *queue, *together, *face);
             }
-            Command::Unsupported => unreachable!(),
+            Command::Unsupported | Command::Cover { .. } => unreachable!(),
         }
         Ok(None)
     }

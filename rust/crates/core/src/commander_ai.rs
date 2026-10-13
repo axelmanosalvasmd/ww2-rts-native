@@ -77,6 +77,8 @@ pub struct UnitObservation {
     pub riding: bool,
     pub build: bool,
     pub dig: bool,
+    pub entrench: bool,
+    pub garrison: bool,
     pub enter: bool,
     pub fire_at: bool,
     pub nade: bool,
@@ -100,11 +102,14 @@ pub struct Input {
     pub units: Vec<UnitObservation>,
     pub points: Vec<PointObservation>,
     pub flags: Vec<u16>,
+    pub chars: Vec<u8>,
+    pub manpower: f64,
 }
 #[derive(Clone, Copy, Debug, PartialEq)]
 struct Kind {
     combat: bool,
     infantry: bool,
+    garrisons: bool,
     health: f64,
     unsupported: bool,
 }
@@ -134,6 +139,7 @@ pub enum PolicyError {
     UnsupportedProfile,
     UnsupportedHealth,
     UnsupportedSuppression,
+    UnsupportedHolder,
     InvalidFraction,
     ExhaustedFractions,
 }
@@ -154,6 +160,8 @@ impl Observation {
         if !(20..=1024).contains(&input.width)
             || !(20..=1024).contains(&input.height)
             || input.flags.len() != cells
+            || input.chars.len() != cells
+            || !input.manpower.is_finite()
         {
             return Err(PolicyError::Dimensions);
         }
@@ -239,6 +247,7 @@ impl Observation {
             kinds.push(Kind {
                 combat,
                 infantry: is("infantry"),
+                garrisons: is("garrisons"),
                 health,
                 unsupported: is("air") || is("naval") || is("medic"),
             });
@@ -428,6 +437,7 @@ fn plan_inner(
             until: now + level.commit(),
         });
     }
+    let mut holder_commands = Vec::new();
     let mut holding = vec![0usize; input.points.len()];
     let mut pending: Vec<Vec<u32>> = vec![Vec::new(); input.points.len()];
     for (u, d) in mine {
@@ -451,6 +461,33 @@ fn plan_inner(
             }
             holding[i] += 1;
             if holding[i] == 1 {
+                if input.players.iter().any(|p| p.team != me.team)
+                    && !u.dig
+                    && !u.entrench
+                    && !u.garrison
+                    && !matches!(u.cover, 1 | 2)
+                {
+                    let p = input.points[i].at;
+                    let r = observation.radius + 3.0;
+                    let house = d.garrisons
+                        && input.chars.iter().enumerate().any(|(c, ch)| {
+                            if *ch != b'B' {
+                                return false;
+                            }
+                            let x = (c % input.width) as f64;
+                            let y = (c / input.width) as f64;
+                            x + 1.0 > (p.x - r) / CELL
+                                && x <= (p.x + r) / CELL
+                                && y + 1.0 > (p.z - r) / CELL
+                                && y <= (p.z + r) / CELL
+                        });
+                    if input.manpower != 0.0 || house {
+                        return Err(PolicyError::UnsupportedHolder);
+                    }
+                    holder_commands.push(Command::Cover {
+                        ids: vec![i64::from(u.id)],
+                    });
+                }
                 continue;
             }
         }
@@ -513,7 +550,7 @@ fn plan_inner(
             }
         }
     }
-    let mut commands = Vec::new();
+    let mut commands = holder_commands;
     if !normal.is_empty() {
         commands.push(move_command(normal, false));
     }

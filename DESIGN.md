@@ -682,3 +682,11 @@ The pinned original command bodies currently provide 56 traces and 246 recorded 
 ## Match Conquest recruitment (2026-10-13)
 
 The native Match now stages immediate Conquest ground/naval recruitment through canonical production, wallets, IDs, unit insertion, grid updates and shared command controls. Owner-bound remembered routing is required for rallies; unreachable searches still admit an empty path as in the source. Air placement and pending supports without exact kind metadata fail explicitly before payment. [Recruitment design and evidence](docs/runtime/recruitment.md) records the transaction, control ownership, original-source fixture and remaining boundaries. No public interface or server match admission changed.
+
+## Quiet holder Cover continuation (2026-10-13)
+
+The first idle infantry holder of an allied Conquest point now emits the source's `cover` order through the existing typed command queue. The policy reads only detached seat facts, including own manpower and remembered terrain characters. It refuses a holder with nonzero manpower or a nearby remembered house instead of skipping paid fortification or garrison decisions. Entrenching, garrisoned and already covered holders do not emit Cover, as in the source. This remains an opening policy, not the full commander.
+
+The immediate actuator shares the existing threat, held-destination, cover-rank and recipient path helpers. Prepared routes are staged in one temporary Game copy so later selected squads see earlier destinations, while all paths are checked before committing units. Path identity increments are preflighted, including duplicate selected IDs. Denials retain the source's wrong-kind, retreat and no-cover order for supported states. Active dig, mass entrenchment, building jobs and garrison cancellation are refused before mutation until their canonical owner callbacks are integrated. Queued Cover remains unsupported.
+
+Source generation and exact regeneration cover ten Cover command cases plus five holder guards. The existing 55 opening cases and 246 command steps remain in the fixtures. Native tests, Clippy and combined integration are pending; no complete AI or fortification parity is claimed.

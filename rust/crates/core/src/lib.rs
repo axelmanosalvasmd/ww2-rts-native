@@ -23,6 +23,7 @@ pub mod map;
 pub mod match_combat;
 pub mod match_commander;
 pub mod match_commands;
+pub mod match_cover;
 pub mod match_firing;
 pub mod match_routing;
 pub mod match_runtime;
