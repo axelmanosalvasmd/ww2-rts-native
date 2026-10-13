@@ -392,11 +392,14 @@ pub struct BuildingCell {
 /// Authoritative Conquest startup state. Tick execution is added independently.
 /// Live terrain and units have a single owner in `world.game`.
 pub struct Match {
+    pub combat: crate::match_combat::CombatState,
     pub commands: crate::match_commands::MatchCommands,
     pub world: World,
     pub start: StartPlan,
     pub options: MatchOptions,
     pub grid: SpatialGrid,
+    pub(crate) recipients: Vec<crate::match_routing::RecipientRouting>,
+    pub(crate) routing_fog: crate::fog::Fog,
     pub building_cells: BTreeMap<usize, BuildingCell>,
     pub production: crate::production::ProductionState,
     pub building_rallies: BTreeMap<u32, Option<Point>>,
@@ -406,6 +409,7 @@ pub struct Match {
     pub scenario: Option<crate::legacy_scenario::LegacyScenario>,
     pub firing: crate::match_firing::FiringState,
     pub logistics: crate::logistics::LogisticsState,
+    pub firing: crate::match_firing::FiringState,
     pub capture_ticks: Vec<Option<i64>>,
     /// Capture story counts only. Combat and spending counters are not integrated yet.
     pub capture_counts: Vec<f64>,
@@ -449,8 +453,11 @@ impl Match {
         };
         let player_count = start.players.len();
         let mut result = Self {
+            combat: crate::match_combat::CombatState::default(),
             commands: crate::match_commands::MatchCommands::new(4096),
             grid: SpatialGrid::new(&world.game.units, 16.0),
+            recipients: Vec::new(),
+            routing_fog: crate::fog::Fog::default(),
             world,
             start,
             options,
@@ -463,6 +470,7 @@ impl Match {
             scenario,
             firing: crate::match_firing::FiringState::default(),
             logistics: crate::logistics::LogisticsState::default(),
+            firing: crate::match_firing::FiringState::default(),
             capture_ticks: vec![None; map.points().len()],
             capture_counts: vec![0.0; player_count],
             finish: None,
@@ -477,8 +485,10 @@ impl Match {
         }
         for &id in result.world.game.units.keys() {
             result.firing.initialize(id);
+            result.combat.initialize(id);
         }
         result.grid.rebuild(&result.world.game.units);
+        result.initialize_recipient_routing()?;
         Ok(result)
     }
 

@@ -3,6 +3,16 @@
 ## Unreleased
 
 - Added the native Match Conquest victory phase and finish bookkeeping: team VP in slot order, latest still-held capture location, 0.1 m end rounding, first-winner preservation, reveal and exact Conquest timeline fields. Canonical point accounting now freezes VP and capture story counts after the winner while ownership and manpower can continue. Three focused tests compare 12 original-JavaScript traces (24 assembled-match checkpoints) and invalid-state atomicity; existing startup and point-income tests pass. Other modes, command refusal, remaining story counters, result transport and the full battle loop remain unfinished.
+- Added the executable Conquest movement command phase over the canonical Match queue and control rows: Move, attack-move, Stop, stance validation, eight waiting orders and real recipient-bound route searches. The original JavaScript recorder supplies 56 traces and 246 steps, including malformed whole orders, forced supply holds, garrison exit and deferred retries. Three focused native tests pass in debug and release, including two original recovery/replan branches, ordering and counter-exhaustion guards. Empty replans retain the old route. Automatic reactions, aircraft, other command kinds, wire and C integration remain separate.
+
+
+- Added the shared combat metadata prerequisite for command recent-hit queries, matching the combat lane state at c5c1383. The command phase does not duplicate hit memory.
+- Added the current Match visibility, hull/footprint range and line-of-sight query used by attack-move. Weapon target selection, firing and projectile execution remain in progress.
+
+- Added one canonical Match control row for aim, ability and retreat switches, attack intent, facing and waiting orders. Startup prepares the rows from unit definitions; recruitment can stage them before charging. Command execution is the next part of this lane, and no wire or C interface changed.
+
+- Added canonical chosen-target and weapon-timer state to Match for the firing integration. Unit health and position, command aim and combat hit history retain their existing owners; the firing phase is still in progress.
+- Added the Match-owned recipient routing API, current-position Conquest discovery facts, source-key caching and separate fog-filtered fire hazards. The source recorder covers 123 actions, including same-key bunker membership and removal retention. This prerequisite is awaiting serialized native tests; remembered wreck projection and integrated command/tick consumers follow in this branch.
 
 - Connected Conquest point supply, capture and income to the assembled Match, using the tick's ordered unit list and one canonical objective/reserve state. Eight original-source traces compare 72 phases across all armies, allied and enemy teams, disconnection, supply obstruction, post-decision VP freezing and units spawned during a tick. Capture timestamps follow source winner gating; malformed input leaves objectives and wallets unchanged. This phase does not advance the clock or implement the remaining match systems.
 
@@ -12,7 +22,6 @@
 
 - Connected immediate Conquest ground/naval recruitment to Match with staged placement, owner-observed rally routes, exact MP charges, monotonic IDs, canonical control rows and maintained spatial indexing. Five original-source traces cover 32 buy commands; failed routes still buy, while malformed placement/routing leaves full wallet, unit, control, metadata and ID state untouched. Air, ambiguous pending support kinds and later Match systems remain explicit boundaries.
 
-- Added one canonical Match control row for aim, ability and retreat switches, attack intent, facing and waiting orders. Startup prepares the rows from unit definitions; recruitment can stage them before charging. Command execution is the next part of this lane, and no wire or C interface changed.
 
 
 - Added authoritative terrain blasts, progressive section/building damage, support failure, ignition, burning, flooding and section-debris movement/settlement. Forty-four original JavaScript traces compare 253 actions across all 33 maps, including shared building HP, beam/contact deduplication, mine clearing, float32 assignment boundaries, garrison evacuation, bridge casualties and the 96-body overflow path. A separate debris oracle checks 54 mass cases, 21 constructors and 540 body states. Fires retain insertion order while borrowing the shared environment seed, and canonical smoke now has optional remaining lifetime. Independent review found and fixed fire-escape path counter exhaustion before partial damage. Full match scheduling, vehicle wreck production/settlement, repairs and wire/ABI exports remain unfinished.
@@ -22,7 +31,6 @@
 - Added ground production door placement with ordered exit rings, vehicle clearance, occupancy checks, origin-region fallback, heading and spawn ghosts. Two focused tests compare 934 projections from the unchanged JavaScript on 43 terrains, including all 44 non-air kinds and 33 authored maps. Recruitment receives a placed Unit and an explicit rally routing request; wallet/ID changes, path execution, full unit-state initialization and air-base production remain outside the helper.
 
 - Add Conquest recruitment preparation with canonical population, queue and maker checks. Placement failure drops the request without payment; successful commit charges MP once. Two focused tests cover 266 original-JavaScript buy commands and aborted transactions. Other modes, placement and Match integration remain separate.
-- Added canonical chosen-target and weapon-timer state to Match for the firing integration. Unit health and position, command aim and combat hit history retain their existing owners; the firing phase is still in progress.
 
 
 - Added per-player observed terrain memory with filtering before storage, stable row revisions, canonical full-route order and a separate snapshot outbox. Three original-source traces match 117 actions, including hidden mines, unseen removals, building cancellation, allied/live/ruin footprints, reveal, teams and reconnect reads. Invalid shapes, exhausted revisions and mismatched route recipients reject before memory changes. World Conquest memory, real visibility wiring, snapshot serialization and Match integration remain separate; MOV-29 and MAP-100 stay in progress.
