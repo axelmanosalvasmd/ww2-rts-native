@@ -79,3 +79,5 @@ pub mod match_world_rails;
 
 pub mod match_world_memory;
 pub mod world_memory;
+
+pub mod staged_observer;
