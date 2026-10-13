@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added actual Match birth-observation replay using the shared 13-case original recorder. It covers recorded Conquest buys, prewarmed incremental routes and legal World training completion, checking observation, wallet/story and all four metadata defaults. Fog-only warming stays in provider checks; native consumer execution remains pending.
+
 - Corrected the new birth replay to call the canonical byte-based World cell setter. Source recording remains unchanged; native compilation and replay are still pending.
 
 - Checked ordered fire membership and mine ownership/discovery maps before prepared routing commits. Independent source review found these facts can change without advancing a terrain key; rejected preparations retain the original recipient and World ledgers.
