@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verify trusted ordinary startup at `3b84f7c`: all 401 optimized workspace tests, strict Clippy, formatting and release FFI pass. An independent audit retains all 399 prior test names and passes 14 copied affected server checks. Normally incorporate schema-documentation main `4867984` without changing runtime, test, harness, header or reference source; fresh platform and Axel host review remain required.
+
 - Replace the startup privacy test's one-element rows loop with the same direct assertion. The real socket and ClientView lifecycle passes at `81cd1ef`, then strict Clippy stops on that loop; this successor retains every privacy and lifecycle assertion and needs the remaining native and platform checks.
 
 - Correct the startup test's optional mine-material assertion after the exact `08b378d` native attempt compiled and failed before any test passed. Original `mapForClient` and both complete committed Default/El Alamein assets omit `layers.mineMaterials`; the helper now requires an empty array only when that optional field exists. Complete map equality still protects field presence, and private-mine/material/script exclusions remain unchanged. Production output and admission are untouched; the failed log is preserved and fresh native verification remains pending.
@@ -105,6 +107,9 @@
 - Bring source-reviewed human commander timing, raw input helpers and detached common view types into the isolated observation producer branch. Native acceptance remains pending.
 
 - Prepare a separate human commander observation branch by normally combining checked commander `be1cb2c` with ordinary Default `262926e`. Retain both Cover and Entrench dispatch and canonical owners; this new union has no native acceptance yet.
+- Record both owners' acceptance of the startup-table v1 content/schema candidate and its strict revision/refusal policy. Delivery remains unagreed, and the six ABI 2 calls, runtime producer and Unreal adoption are unchanged. No content, schema or inventory bytes changed.
+
+- Add an unagreed startup-table content/schema proposal for consumer review: all 47 compiled tables plus 17 source-derived public constants, a portable generator, exact field inventory and independent table/formation hashes. Table transport, additional FFI calls and Unreal adoption remain pending explicit agreement.
 
 - Prepared a separate normal union of frozen ordered-event PR #194 and the consolidated original-source frontier `dfcc0bf`. Preserved the one TickEvent/TickFailure result, producer emission sinks, original World component bodies, approved ABI 2 and the optimized test profile with debug assertions and overflow checks. Migrated the inherited quiet engineering consumer to require empty owned events, and report accepted recipient traffic once rather than unavailable. Published parents remain unchanged; exact union source review and the full optimized native cycle are pending.
 
