@@ -121,6 +121,15 @@ fn prepared_world_removal_sample_matches_exact_original_survivors_without_public
                     }
                 }
                 assert_eq!(protected(&m),before,"preparation must not publish any staged phase");
+                if let Some(id)=m.world.game.units.keys().next().copied(){
+                    for injected in [id+10_000,0]{
+                        m.world.game.units.get_mut(&id).unwrap().id=injected;
+                        let malformed=protected(&m);
+                        assert!(m.prepare_world_finish_after_removal(&wallets,&regions,&survivors,&removed).is_err());
+                        assert_eq!(protected(&m),malformed,"invalid canonical key/ID must remain unchanged");
+                    }
+                    m.world.game.units.get_mut(&id).unwrap().id=id;
+                }
             }
         }
     }
