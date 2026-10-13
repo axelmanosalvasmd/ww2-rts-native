@@ -21,6 +21,7 @@ pub mod formation;
 pub mod game;
 pub mod grid;
 pub mod legacy_scenario;
+pub mod legacy_scenario_runtime;
 pub mod match_companion_effects;
 mod match_companion_tick;
 pub mod match_companions;
