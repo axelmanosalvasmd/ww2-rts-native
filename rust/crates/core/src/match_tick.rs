@@ -140,6 +140,7 @@ impl crate::match_runtime::Match {
         }
         self.validate_abilities()?;
         self.prepare_companion_tick()?;
+        self.validate_reaction_tick_actors()?;
         if self
             .field_works
             .jobs()
@@ -173,6 +174,31 @@ impl crate::match_runtime::Match {
         Ok(())
     }
 
+    fn validate_reaction_tick_actors(&self) -> Result<(), String> {
+        for (&id, unit) in &self.world.game.units {
+            if unit.hp <= 0.0 || self.commands.units.get(&id).is_some_and(|c| c.operative) {
+                continue;
+            }
+            let kind = self
+                .rules
+                .kinds
+                .get(unit.kind)
+                .ok_or("invalid reaction kind")?;
+            if kind.rail || unit.riding {
+                return Err("rail or carrier tick actor is not connected".into());
+            }
+            if unit.garrison.is_some() && self.automatic_retreat_candidate(id)? {
+                return Err("automatic garrison retreat tick exit is not connected".into());
+            }
+            if (unit.build || unit.entrench) && self.automatic_retreat_candidate(id)? {
+                return Err(
+                    "construction or mass-project retreat tick exit is not connected".into(),
+                );
+            }
+        }
+        Ok(())
+    }
+
     fn run_tick(&mut self) -> Result<TickReport, String> {
         use crate::{movement, separation, vision, weather_runtime};
         let dt = self.rules.movement.tick;
@@ -182,6 +208,7 @@ impl crate::match_runtime::Match {
         // Boundary joins are included in prior poses and the same live unit loop.
         self.prepare_companion_tick()?;
         self.validate_tick_capabilities()?;
+        self.validate_reaction_tick_actors()?;
         let mut environment = self.tick_environment_phase(EnvironmentPhase::StructureSync)?;
         self.grid.rebuild(&self.world.game.units);
         self.capture_firing_prior()?;
@@ -266,10 +293,13 @@ impl crate::match_runtime::Match {
             unit.sprint -= dt;
             self.advance_firing_timers(id, dt)?;
             self.advance_ability_timers(id, dt)?;
+            self.decrement_reaction_timer(id, dt)?;
+            self.automatic_retreat_unit(id)?;
             self.apply_autocast(id)?;
             self.apply_field_work_unit(id)?;
             self.step_aimed_ability(id)?;
             self.apply_attack_move(id)?;
+            self.react_unit(id)?;
             let before = self.world.game.units[&id].at();
             if let Some(result) = self.move_unit_with_command_routes(id, factor)? {
                 moved.push(result);
@@ -283,6 +313,7 @@ impl crate::match_runtime::Match {
             TickPhase::UnitOrders,
             TickPhase::Abilities,
             TickPhase::FieldWork,
+            TickPhase::Reactions,
             TickPhase::Movement,
             TickPhase::Firing,
         ]);
@@ -374,7 +405,6 @@ impl crate::match_runtime::Match {
                 TickPhase::Production,
                 TickPhase::AirRail,
                 TickPhase::Riding,
-                TickPhase::Reactions,
                 TickPhase::TrafficKnowledge,
                 TickPhase::GroundEffects,
                 TickPhase::Construction,

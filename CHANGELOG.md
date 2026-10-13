@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added source-written ordinary reaction tick sites: timer decay, automatic retreat before autocast and reaction before movement. Factored the existing pure retreat predicate for pre-clock unsupported exit admission and consumed the canonical paid-work cancellation provider. Seven new actual-source cases expand the recorder to 18 traces, 2,274 ticks and 154 checkpoints; combined native proof remains pending.
+
 - Accepted ground retreat now cancels the canonical paid field-work descriptor after route preflight, without refund; refused routes retain the job. Construction and unrepresented mass projects remain explicit refusals.
 
 - Updated the operative tick replay after central control state gained the reaction timer. Trusted fixture patches now set canonical `UnitControl.react`, and operative rows compare its exact preserved value. Ordinary reaction execution remains unavailable and its timer remains outside this bounded projection. No runtime phase or gameplay state was added; native verification is pending.
