@@ -42,6 +42,18 @@ pub enum Stance {
 /// Internal recorded input. This is not a WebSocket or C interface.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Command {
+    Buy {
+        kind: String,
+        from: Option<u32>,
+    },
+    /// Trusted room binding. Raw gameplay JSON cannot select a journal identity.
+    CompanionJoin {
+        identity: crate::recorded_input::CompanionJournalId,
+    },
+    CompanionInput {
+        identity: crate::recorded_input::CompanionJournalId,
+        input: serde_json::Value,
+    },
     Support {
         kind: String,
         at: Point,
@@ -192,6 +204,13 @@ pub enum Denial {
     Retreating,
     Munitions,
     Manpower,
+    Tier,
+    Fuel,
+    Population,
+    Maximum,
+    SuddenDeath,
+    Unseen,
+    NotWaiting,
 }
 impl Denial {
     pub fn name(self) -> &'static str {
@@ -205,6 +224,13 @@ impl Denial {
             Self::Retreating => "retreating",
             Self::Munitions => "mun",
             Self::Manpower => "mp",
+            Self::Tier => "tier",
+            Self::Fuel => "fuel",
+            Self::Population => "pop",
+            Self::Maximum => "max",
+            Self::SuddenDeath => "suddenDeath",
+            Self::Unseen => "unseen",
+            Self::NotWaiting => "notWaiting",
         }
     }
 }
@@ -212,6 +238,26 @@ impl Denial {
 pub struct CommandResult {
     pub key: crate::orders::OrderKey,
     pub denial: Option<Denial>,
+}
+
+impl From<crate::production::Denial> for Denial {
+    fn from(value: crate::production::Denial) -> Self {
+        use crate::production::Denial as P;
+        match value {
+            P::Blocked => Self::Blocked,
+            P::Needs => Self::Needs,
+            P::Tier => Self::Tier,
+            P::Mp => Self::Manpower,
+            P::Mun => Self::Munitions,
+            P::Fuel => Self::Fuel,
+            P::Pop => Self::Population,
+            P::Max => Self::Maximum,
+            P::QueueFull => Self::QueueFull,
+            P::SuddenDeath => Self::SuddenDeath,
+            P::Unseen => Self::Unseen,
+            P::NotWaiting => Self::NotWaiting,
+        }
+    }
 }
 
 impl Command {
@@ -253,6 +299,24 @@ impl Command {
                 rows.iter().map(|v| safe_id(v).unwrap_or(-1)).collect()
             });
         match object.get("t").and_then(|v| v.as_str()) {
+            Some("buy") => Ok(Self::Buy {
+                kind: object
+                    .get("unit")
+                    .and_then(|v| v.as_str())
+                    .ok_or(Denial::Blocked)?
+                    .into(),
+                // Present invalid maker values cannot select the default maker.
+                // No canonical unit has ID zero, so source admission returns Needs
+                // at maker selection after checking resources and population.
+                from: object.get("from").map(|value| {
+                    value
+                        .as_f64()
+                        .filter(|n| {
+                            n.is_finite() && n.fract() == 0.0 && *n > 0.0 && *n <= u32::MAX as f64
+                        })
+                        .map_or(0, |n| n as u32)
+                }),
+            }),
             Some("support") => Ok(Self::Support {
                 kind: object
                     .get("kind")
@@ -427,6 +491,36 @@ impl crate::match_runtime::Match {
         command: &Command,
         winner_decided: bool,
     ) -> Result<Option<Denial>, String> {
+        let winner_decided = winner_decided || self.finish.is_some();
+        // FPS inputs have source gates of their own, including away commanders.
+        // Resolve the safe journal key through the one canonical registry. Its
+        // internal CompanionId is allocated at dispatch and need not match it.
+        match command {
+            Command::CompanionJoin { identity } => {
+                let key = identity.registry_key();
+                if self
+                    .companions
+                    .get(&key)
+                    .is_some_and(|row| row.owner != owner)
+                {
+                    return Ok(None);
+                }
+                self.join_companion(&key, owner, winner_decided)?;
+                return Ok(None);
+            }
+            Command::CompanionInput { identity, input } => {
+                let key = identity.registry_key();
+                if self
+                    .companions
+                    .get(&key)
+                    .is_some_and(|row| row.owner == owner)
+                {
+                    self.companion_input(&key, input, winner_decided);
+                }
+                return Ok(None);
+            }
+            _ => {}
+        }
         let Some(player) = self.start.economy.players.get(owner) else {
             return Ok(Some(Denial::Blocked));
         };
@@ -435,6 +529,21 @@ impl crate::match_runtime::Match {
         }
         if matches!(command, Command::Unsupported) {
             return Ok(Some(Denial::Unsupported));
+        }
+        if let Command::Buy { kind, from } = command {
+            if kind == "worldbase" {
+                return Ok(Some(Denial::Blocked));
+            }
+            return match self.recorded_buy(owner, kind, *from) {
+                Ok(_) => Ok(None),
+                Err(crate::match_recruitment::RecruitError::Admission(
+                    crate::production::Error::Denied(d),
+                )) => Ok(Some(d.into())),
+                Err(crate::match_recruitment::RecruitError::Placement(
+                    crate::produced_units::Error::UnsupportedAir,
+                )) => Ok(Some(Denial::Unsupported)),
+                Err(e) => Err(format!("recorded buy: {e:?}")),
+            };
         }
         if let Command::Support {
             kind,
@@ -470,7 +579,11 @@ impl crate::match_runtime::Match {
             | Command::Stance { ids, .. }
             | Command::Ability { ids, .. }
             | Command::Autocast { ids, .. } => ids.clone(),
-            Command::Support { .. } | Command::Unsupported => unreachable!(),
+            Command::Buy { .. }
+            | Command::CompanionJoin { .. }
+            | Command::CompanionInput { .. }
+            | Command::Support { .. }
+            | Command::Unsupported => unreachable!(),
         };
         if matches!(
             command,
@@ -604,7 +717,11 @@ impl crate::match_runtime::Match {
                     self.commands.units.get_mut(&id).unwrap().auto_cast = *on;
                 }
             }
-            Command::Support { .. } | Command::Unsupported => unreachable!(),
+            Command::Buy { .. }
+            | Command::CompanionJoin { .. }
+            | Command::CompanionInput { .. }
+            | Command::Support { .. }
+            | Command::Unsupported => unreachable!(),
         }
         Ok(None)
     }

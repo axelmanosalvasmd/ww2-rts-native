@@ -41,6 +41,7 @@ pub mod objectives;
 pub mod path_requests;
 
 pub mod orders;
+pub mod recorded_input;
 pub mod pathfinding;
 pub mod produced_units;
 pub mod production;

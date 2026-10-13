@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added recorded Buy and trusted companion Join/Input dispatch to the existing command queue. Journal identities are nonzero integers with fixed safe registry keys; raw JSON cannot create companion bindings. Purchase denials retain production precedence, including invalid explicit makers. Combined source fixtures and native verification remain in progress.
+
 - Combined recorded-buy owned routing and story preflight with canonical ability/recovery publication and stale-row admission. Combined native verification remains pending.
 
 - Combined Ability and Autocast with the single recorded command enum, retaining Support dispatch. Fresh recruitment prepares canonical ability and recovery defaults beside combat and firing, with stale-row rejection before payment. Ability native proof remains pending.
