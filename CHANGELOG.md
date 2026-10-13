@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add Conquest recruitment preparation with canonical population, queue and maker checks. Placement failure drops the request without payment; successful commit charges MP once. Two focused tests cover 266 original-JavaScript buy commands and aborted transactions. Other modes, placement and Match integration remain separate.
+
 - Added per-player observed terrain memory with filtering before storage, stable row revisions, canonical full-route order and a separate snapshot outbox. Three original-source traces match 117 actions, including hidden mines, unseen removals, building cancellation, allied/live/ruin footprints, reveal, teams and reconnect reads. Invalid shapes, exhausted revisions and mismatched route recipients reject before memory changes. World Conquest memory, real visibility wiring, snapshot serialization and Match integration remain separate; MOV-29 and MAP-100 stay in progress.
 
 - Added authoritative Conquest startup from validated maps, with recorded purpose-specific random streams, team spawn allocation, army-scaled wallets, weather and environment state, starting troops, raised base pads, private building footprints, production/research rows and legacy trigger state (issue #69). The original `createGame` oracle matches 63 cases across all 33 authored maps and three synthetic maps: 663 initial troops, 438 bases and 3,942 logged cells. It compares final units, terrain bits, sections, logs, recipient pending state and startup metadata. Logistics-enabled startup and other modes are explicitly rejected; full tick execution, unrepresented unit systems and server match hosting remain unfinished.
