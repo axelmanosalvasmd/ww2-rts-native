@@ -2,6 +2,7 @@
 
 use crate::{
     catalog::Catalog,
+    economy::{self, AbilityCost, Mode},
     game::{Point, Unit},
     grid::UnitId,
     orders::OrderQueue,
@@ -41,6 +42,33 @@ pub enum Stance {
 /// Internal recorded input. This is not a WebSocket or C interface.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Command {
+    Dig {
+        ids: Vec<i64>,
+        kind: crate::field_works::FortKind,
+        at: Point,
+        direction: Option<f64>,
+        queue: bool,
+    },
+    Technology {
+        kind: crate::economy::Technology,
+    },
+    Buy {
+        kind: String,
+        from: Option<u32>,
+    },
+    /// Trusted room binding. Raw gameplay JSON cannot select a journal identity.
+    CompanionJoin {
+        identity: crate::recorded_input::CompanionJournalId,
+    },
+    CompanionInput {
+        identity: crate::recorded_input::CompanionJournalId,
+        input: serde_json::Value,
+    },
+    Support {
+        kind: String,
+        at: Point,
+        direction: Option<f64>,
+    },
     Move {
         orders: Vec<MoveOrder>,
         control_ids: Option<Vec<i64>>,
@@ -99,23 +127,35 @@ pub struct UnitControl {
 impl UnitControl {
     /// Prepare before publishing a spawned unit or charging a wallet.
     pub fn new(unit: &Unit, rules: &Rules) -> Result<Self, String> {
+        Self::new_for_mode(unit, rules, Mode::Default)
+    }
+    /// Paid construction-mode abilities start off; free abilities start on.
+    pub fn new_for_mode(unit: &Unit, rules: &Rules, mode: Mode) -> Result<Self, String> {
         let kind = rules
             .kinds
             .get(unit.kind)
             .ok_or("unknown control unit kind")?;
         let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
         let definition = catalog.unit(&kind.name).map_err(|e| e.to_string())?;
-        let ability = definition
-            .get("ab")
-            .and_then(|a| a.get("id"))
+        let ability = definition.get("ab").ok_or("missing unit ability")?;
+        let ability_id = ability
+            .get("id")
             .and_then(|v| v.string())
             .ok_or("missing unit ability")?;
+        let cost = economy::ab_cost(
+            mode,
+            AbilityCost {
+                id: ability_id,
+                munitions: ability.get("mun").and_then(|v| v.number()),
+            },
+        )
+        .map_err(|e| e.to_string())?;
         if !unit.rot.is_finite() {
             return Err("nonfinite unit aim".into());
         }
         Ok(Self {
             aim: unit.rot,
-            auto_cast: ability != "none",
+            auto_cast: ability_id != "none" && cost == 0.0,
             auto_retreat: !kind.air,
             attack_id: 0,
             follow: 0,
@@ -173,6 +213,16 @@ pub enum Denial {
     Cooldown,
     Retreating,
     Munitions,
+    Manpower,
+    Tier,
+    Fuel,
+    Population,
+    Maximum,
+    SuddenDeath,
+    Unseen,
+    NotWaiting,
+    NoBuilders,
+    NotVisible,
 }
 impl Denial {
     pub fn name(self) -> &'static str {
@@ -185,6 +235,16 @@ impl Denial {
             Self::Cooldown => "cooldown",
             Self::Retreating => "retreating",
             Self::Munitions => "mun",
+            Self::Manpower => "mp",
+            Self::Tier => "tier",
+            Self::Fuel => "fuel",
+            Self::Population => "pop",
+            Self::Maximum => "max",
+            Self::SuddenDeath => "suddenDeath",
+            Self::Unseen => "unseen",
+            Self::NotWaiting => "notWaiting",
+            Self::NoBuilders => "noBuilders",
+            Self::NotVisible => "notVisible",
         }
     }
 }
@@ -192,6 +252,26 @@ impl Denial {
 pub struct CommandResult {
     pub key: crate::orders::OrderKey,
     pub denial: Option<Denial>,
+}
+
+impl From<crate::production::Denial> for Denial {
+    fn from(value: crate::production::Denial) -> Self {
+        use crate::production::Denial as P;
+        match value {
+            P::Blocked => Self::Blocked,
+            P::Needs => Self::Needs,
+            P::Tier => Self::Tier,
+            P::Mp => Self::Manpower,
+            P::Mun => Self::Munitions,
+            P::Fuel => Self::Fuel,
+            P::Pop => Self::Population,
+            P::Max => Self::Maximum,
+            P::QueueFull => Self::QueueFull,
+            P::SuddenDeath => Self::SuddenDeath,
+            P::Unseen => Self::Unseen,
+            P::NotWaiting => Self::NotWaiting,
+        }
+    }
 }
 
 impl Command {
@@ -233,6 +313,91 @@ impl Command {
                 rows.iter().map(|v| safe_id(v).unwrap_or(-1)).collect()
             });
         match object.get("t").and_then(|v| v.as_str()) {
+            Some("dig") => {
+                let at = Point {
+                    x: object
+                        .get("x")
+                        .and_then(|v| v.as_f64())
+                        .filter(|n| n.is_finite())
+                        .ok_or(Denial::Blocked)?,
+                    z: object
+                        .get("z")
+                        .and_then(|v| v.as_f64())
+                        .filter(|n| n.is_finite())
+                        .ok_or(Denial::Blocked)?,
+                };
+                let name = match object.get("kind") {
+                    None | Some(serde_json::Value::Null) => "trench",
+                    Some(value) => value.as_str().ok_or(Denial::Blocked)?,
+                };
+                let kind = match crate::field_works::FortKind::parse(name) {
+                    Ok(kind) => kind,
+                    Err(crate::field_works::Error::UnsupportedKind) => {
+                        return Ok(Self::Unsupported);
+                    }
+                    Err(_) => return Err(Denial::Blocked),
+                };
+                Ok(Self::Dig {
+                    ids,
+                    kind,
+                    at,
+                    direction: object
+                        .get("dir")
+                        .and_then(|v| v.as_f64())
+                        .filter(|n| n.is_finite()),
+                    queue: object.get("queue").and_then(|v| v.as_bool()) == Some(true),
+                })
+            }
+            Some("tech") => Ok(Self::Technology {
+                kind: match object.get("kind").and_then(|v| v.as_str()) {
+                    Some("tier") => crate::economy::Technology::Tier,
+                    Some("inf") => crate::economy::Technology::Infantry,
+                    Some("guns") => crate::economy::Technology::Guns,
+                    Some("armor") => crate::economy::Technology::Armor,
+                    _ => return Err(Denial::Blocked),
+                },
+            }),
+            Some("buy") => Ok(Self::Buy {
+                kind: object
+                    .get("unit")
+                    .and_then(|v| v.as_str())
+                    .ok_or(Denial::Blocked)?
+                    .into(),
+                // Present invalid maker values cannot select the default maker.
+                // No canonical unit has ID zero, so source admission returns Needs
+                // at maker selection after checking resources and population.
+                from: object.get("from").map(|value| {
+                    value
+                        .as_f64()
+                        .filter(|n| {
+                            n.is_finite() && n.fract() == 0.0 && *n > 0.0 && *n <= u32::MAX as f64
+                        })
+                        .map_or(0, |n| n as u32)
+                }),
+            }),
+            Some("support") => Ok(Self::Support {
+                kind: object
+                    .get("kind")
+                    .and_then(|v| v.as_str())
+                    .ok_or(Denial::Blocked)?
+                    .into(),
+                at: Point {
+                    x: object
+                        .get("x")
+                        .and_then(|v| v.as_f64())
+                        .filter(|v| v.is_finite())
+                        .ok_or(Denial::Blocked)?,
+                    z: object
+                        .get("z")
+                        .and_then(|v| v.as_f64())
+                        .filter(|v| v.is_finite())
+                        .ok_or(Denial::Blocked)?,
+                },
+                direction: object
+                    .get("dir")
+                    .and_then(|v| v.as_f64())
+                    .filter(|v| v.is_finite()),
+            }),
             Some("move" | "amove") if object.contains_key("orders") => {
                 let face = object
                     .get("face")
@@ -299,6 +464,17 @@ impl Command {
     }
     fn valid(&self) -> bool {
         match self {
+            Self::Dig {
+                ids, at, direction, ..
+            } => {
+                ids.iter().all(|id| id.unsigned_abs() <= 9007199254740991)
+                    && at.x.is_finite()
+                    && at.z.is_finite()
+                    && direction.is_none_or(|v| v.is_finite())
+            }
+            Self::Support { at, direction, .. } => {
+                at.x.is_finite() && at.z.is_finite() && direction.is_none_or(|v| v.is_finite())
+            }
             Self::Move { orders, face, .. } => {
                 orders.iter().all(|o| {
                     o.unit.unsigned_abs() <= 9007199254740991
@@ -381,6 +557,36 @@ impl crate::match_runtime::Match {
         command: &Command,
         winner_decided: bool,
     ) -> Result<Option<Denial>, String> {
+        let winner_decided = winner_decided || self.finish.is_some();
+        // FPS inputs have source gates of their own, including away commanders.
+        // Resolve the safe journal key through the one canonical registry. Its
+        // internal CompanionId is allocated at dispatch and need not match it.
+        match command {
+            Command::CompanionJoin { identity } => {
+                let key = identity.registry_key();
+                if self
+                    .companions
+                    .get(&key)
+                    .is_some_and(|row| row.owner != owner)
+                {
+                    return Ok(None);
+                }
+                self.join_companion(&key, owner, winner_decided)?;
+                return Ok(None);
+            }
+            Command::CompanionInput { identity, input } => {
+                let key = identity.registry_key();
+                if self
+                    .companions
+                    .get(&key)
+                    .is_some_and(|row| row.owner == owner)
+                {
+                    self.companion_input(&key, input, winner_decided);
+                }
+                return Ok(None);
+            }
+            _ => {}
+        }
         let Some(player) = self.start.economy.players.get(owner) else {
             return Ok(Some(Denial::Blocked));
         };
@@ -389,6 +595,61 @@ impl crate::match_runtime::Match {
         }
         if matches!(command, Command::Unsupported) {
             return Ok(Some(Denial::Unsupported));
+        }
+        if let Command::Dig {
+            ids,
+            kind,
+            at,
+            direction,
+            queue,
+        } = command
+        {
+            if *queue {
+                return Ok(Some(Denial::Unsupported));
+            }
+            return self.execute_dig(owner, ids, *kind, *at, *direction, winner_decided);
+        }
+        if let Command::Technology { kind } = command {
+            return match self.request_research(owner, *kind) {
+                Ok(_) => Ok(None),
+                Err(crate::match_runtime::ProductionStepError::Production(
+                    crate::production::Error::Denied(d),
+                )) => Ok(Some(d.into())),
+                Err(e) => Err(format!("recorded research: {e:?}")),
+            };
+        }
+        if let Command::Buy { kind, from } = command {
+            if kind == "worldbase" {
+                return Ok(Some(Denial::Blocked));
+            }
+            return match self.recorded_buy(owner, kind, *from) {
+                Ok(_) => Ok(None),
+                Err(crate::match_runtime::RecruitError::Admission(
+                    crate::production::Error::Denied(d),
+                )) => Ok(Some(d.into())),
+                Err(crate::match_runtime::RecruitError::Placement(
+                    crate::produced_units::Error::UnsupportedAir,
+                )) => Ok(Some(Denial::Unsupported)),
+                Err(e) => Err(format!("recorded buy: {e:?}")),
+            };
+        }
+        if let Command::Support {
+            kind,
+            at,
+            direction,
+        } = command
+        {
+            return match self.admit_support(owner, kind, *at, *direction) {
+                Ok(denial) => Ok(denial.map(|d| match d {
+                    crate::match_support::SupportDenial::Blocked => Denial::Blocked,
+                    crate::match_support::SupportDenial::Cooldown => Denial::Cooldown,
+                    crate::match_support::SupportDenial::Manpower => Denial::Manpower,
+                })),
+                Err(crate::match_support::SupportError::Unsupported(_)) => {
+                    Ok(Some(Denial::Unsupported))
+                }
+                Err(e) => Err(e.to_string()),
+            };
         }
         if matches!(command, Command::Ability { .. } | Command::Autocast { .. }) {
             self.validate_abilities()?;
@@ -406,7 +667,13 @@ impl crate::match_runtime::Match {
             | Command::Stance { ids, .. }
             | Command::Ability { ids, .. }
             | Command::Autocast { ids, .. } => ids.clone(),
-            Command::Unsupported => unreachable!(),
+            Command::Dig { .. }
+            | Command::Technology { .. }
+            | Command::Buy { .. }
+            | Command::CompanionJoin { .. }
+            | Command::CompanionInput { .. }
+            | Command::Support { .. }
+            | Command::Unsupported => unreachable!(),
         };
         if matches!(
             command,
@@ -419,6 +686,9 @@ impl crate::match_runtime::Match {
             let mut advances: BTreeMap<UnitId, u64> = BTreeMap::new();
             for raw in rows {
                 if let Some(id) = self.eligible_command_unit(raw, owner, command) {
+                    if self.world.game.units[&id].dig != self.field_works.is_active(id) {
+                        return Err("unrepresented or inconsistent field-work activity".into());
+                    }
                     *advances.entry(id).or_default() += 1;
                 }
             }
@@ -497,6 +767,7 @@ impl crate::match_runtime::Match {
                     return Ok(Some(Denial::Needs));
                 }
                 for id in selected {
+                    self.cancel_field_work(id)?;
                     self.stop_command_unit(id);
                 }
             }
@@ -553,7 +824,13 @@ impl crate::match_runtime::Match {
                     self.commands.units.get_mut(&id).unwrap().auto_cast = *on;
                 }
             }
-            Command::Unsupported => unreachable!(),
+            Command::Dig { .. }
+            | Command::Technology { .. }
+            | Command::Buy { .. }
+            | Command::CompanionJoin { .. }
+            | Command::CompanionInput { .. }
+            | Command::Support { .. }
+            | Command::Unsupported => unreachable!(),
         }
         Ok(None)
     }
@@ -704,6 +981,7 @@ impl crate::match_runtime::Match {
             .and_then(|v| v.number())
             .ok_or("missing reverse distance")?;
         for r in destinations {
+            self.cancel_field_work(r.id)?;
             let mut u = self.world.game.units[&r.id].clone();
             let engaged = self
                 .firing
@@ -877,6 +1155,7 @@ fn cell_at(v: crate::navigation::TerrainView<'_>, at: Point) -> Option<usize> {
 struct RequestContext<'a> {
     match_state: &'a mut crate::match_runtime::Match,
     shootable: BTreeMap<UnitId, bool>,
+    error: Option<String>,
 }
 impl crate::path_requests::PathRequestContext for RequestContext<'_> {
     type Error = String;
@@ -886,6 +1165,9 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
         kind: crate::path_requests::RequestKind,
     ) -> Option<Point> {
         use crate::path_requests::RequestKind;
+        if kind == RequestKind::Dig {
+            return self.match_state.current_dig_goal(id);
+        }
         let u = self.match_state.world.game.units.get(&id)?;
         if u.hp <= 0.0 {
             return None;
@@ -960,6 +1242,13 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
         })
     }
     fn apply(&mut self, update: crate::path_requests::PathUpdate) {
+        if update.dropped.is_some()
+            && update.request.kind == crate::path_requests::RequestKind::Dig
+            && let Err(error) = self.match_state.cancel_field_work(update.request.unit)
+        {
+            self.error = Some(error);
+            return;
+        }
         let u = self
             .match_state
             .world
@@ -1032,14 +1321,17 @@ impl crate::match_runtime::Match {
             tick_seconds: self.rules.movement.tick,
         };
         let mut requests = std::mem::take(&mut self.commands.requests);
-        let result = requests.begin_tick(
-            config,
-            &mut RequestContext {
-                match_state: self,
-                shootable,
-            },
-        );
+        let mut context = RequestContext {
+            match_state: self,
+            shootable,
+            error: None,
+        };
+        let result = requests.begin_tick(config, &mut context);
+        let error = context.error.take();
         self.commands.requests = requests;
+        if let Some(error) = error {
+            return Err(error);
+        }
         if result.is_ok() {
             self.commands.path_tick = Some(self.world.game.tick);
         }
@@ -1184,6 +1476,7 @@ impl crate::match_runtime::Match {
                 | crate::path_requests::RequestKind::World
                 | crate::path_requests::RequestKind::Amove
                 | crate::path_requests::RequestKind::Nade
+                | crate::path_requests::RequestKind::Dig
         ) {
             return Err("unsupported command path request".into());
         }
@@ -1201,18 +1494,24 @@ impl crate::match_runtime::Match {
         }
         let shootable = self.command_shootable()?;
         let mut requests = std::mem::take(&mut self.commands.requests);
+        let mut context = RequestContext {
+            match_state: self,
+            shootable,
+            error: None,
+        };
         let result = requests.request(
             crate::path_requests::Request {
                 unit: id,
                 goal,
                 kind,
             },
-            &mut RequestContext {
-                match_state: self,
-                shootable,
-            },
+            &mut context,
         );
+        let error = context.error.take();
         self.commands.requests = requests;
+        if let Some(error) = error {
+            return Err(error);
+        }
         result.map_err(|e| format!("command path request: {e:?}"))
     }
 }

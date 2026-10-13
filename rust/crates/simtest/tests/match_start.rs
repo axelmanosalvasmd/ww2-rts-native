@@ -1,4 +1,6 @@
 //! Original createGame startup, with troop capture before starting bases are stamped.
+#[path = "common/startup.rs"]
+mod startup;
 use serde_json::{Value, json};
 use ww2_core::{
     economy::{Faction, Mode, Technology},
@@ -40,29 +42,7 @@ fn terrain(instance: &Match) -> Value {
     use ww2_core::world::Recipient;
     let w = &instance.world;
     let g = &w.game;
-    let row = |r: &ww2_core::world::CellRow| {
-        let d = &r.data;
-        let mut data = json!({"ground":char::from(d.ground).to_string(),"object":char::from(d.object).to_string(),"material":d.material,"groundMaterial":d.ground_material,"groundWear":d.ground_wear});
-        if let Some(front) = d.trench_front {
-            data["trenchFront"] = json!(front);
-        }
-        if d.mine {
-            data["mine"] = json!(true);
-            if let Some(m) = &d.mine_material {
-                data["mineMaterial"] = json!(m);
-            }
-        }
-        if let Some(s) = &d.section {
-            data["section"] = json!({"id":s.id,"structureId":s.structure_id,"state":s.state,"hp":s.hp,"maxHp":s.max_hp,"material":s.material,"anchor":s.anchor});
-        }
-        json!([
-            r.cell,
-            char::from(r.ch).to_string(),
-            r.height,
-            r.state,
-            data
-        ])
-    };
+    use startup::row;
     let buildings: Vec<_> = w
         .structures
         .iter()
