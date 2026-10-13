@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Documented the single recorded gameplay dispatcher, source command boundary, canonical transaction ownership and safe internal companion journal binding. Combined native and room integration remain unfinished.
+
 - Routed source Tech inputs (tier, inf, guns and armor) through canonical research admission in the recorded command dispatcher. Lab, wallet and MP-spent publication share the production guard; denied research uses the existing exact source reasons. Source and native mixed-input proof remain pending.
 
 - Strengthened companion stale-metadata regression snapshots to include full represented units, controls, companion registry, metadata, wallets and random-stream state, plus ordered, unordered, heavy and owner spatial queries. Native checks remain pending.
