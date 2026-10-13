@@ -220,10 +220,10 @@ fn compare(
             "{context}: wallet {slot}"
         );
     }
-    // snapshotFor reads terrain but does not call fogFor. Preserve those exact
-    // collector side effects instead of adding a new fog delivery read.
+    // The original snapshotFor collects terrain and fog for every seat.
+    // Retain those reads even though the focused comparison omits their payloads.
     let frame = delivery
-        .capture_with_lists(state, &[false; 3], &[true; 3], &[])
+        .capture_with_lists(state, &[false; 3], &[false; 3], &[])
         .unwrap_or_else(|e| panic!("{context}: {e:?}"));
     for slot in 0..3 {
         let actual = frame.recipient(slot).unwrap().into_json();

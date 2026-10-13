@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Corrected the engineering replay draft to retain the original snapshotFor fog reads. Its focused payload comparison still covers engineering rows; no native proof is claimed.
+
 - Added a source-written engineering snapshot consumer using canonical staged actors, actual command admission, the single tick runner and recipient collectors. It covers 509 recorded states and 479 full ticks, preserves actual Default options and leaves the two unrepresented Destroy witnesses source-only. Native verification awaits the collector dependency and CI lease.
 
 - Added an original-source engineering snapshot recorder with five cases, 481 full ticks and 1,539 recipient results. It records mixed project segment kinds, allied paid work, queued join anchors after project deletion, unrounded work coordinates, progress tails and dead-worker omission after an actual destroy command. Native replay remains pending.
