@@ -164,7 +164,7 @@ fn original_thinker_orders_aim_and_waypoint_draws_match() {
         records["reference"],
         "e4e579a838aabae3b1d9dadbc17a0a87147bc52d"
     );
-    assert_eq!(array(&records["cases"]).len(), 60);
+    assert_eq!(array(&records["cases"]).len(), 62);
     let mut draws = 0;
     let mut pending = 0;
     for row in array(&records["cases"]) {
@@ -181,6 +181,34 @@ fn original_thinker_orders_aim_and_waypoint_draws_match() {
         let mut source = state(row);
         let failures = source.point_failures.clone();
         let fractions: Vec<_> = array(&row["random"]).iter().map(number).collect();
+        if row["expectedNativeError"] == "UnsupportedHolder" {
+            let before_state = source.clone();
+            assert_eq!(
+                commander_ai::plan_with_fractions(
+                    &observation,
+                    &mut source,
+                    level(&row["level"]),
+                    &fractions
+                ),
+                Err(PolicyError::UnsupportedHolder)
+            );
+            assert_eq!(
+                source, before_state,
+                "{name}: unsupported holder leaves private memory unchanged"
+            );
+            let mut random = MatchRandom::new(778);
+            let before_random = random.clone();
+            assert_eq!(
+                commander_ai::plan(&observation, &mut source, level(&row["level"]), &mut random),
+                Err(PolicyError::UnsupportedHolder)
+            );
+            assert_eq!(
+                random, before_random,
+                "{name}: unsupported holder leaves RNG unchanged"
+            );
+            assert_eq!(source, before_state);
+            continue;
+        }
         let result = commander_ai::plan_with_fractions(
             &observation,
             &mut source,
@@ -239,8 +267,8 @@ fn original_thinker_orders_aim_and_waypoint_draws_match() {
     }
     assert_eq!(draws, 270);
     assert_eq!(
-        pending, 2,
-        "actual quiet holder cover orders retained and compared"
+        pending, 4,
+        "actual quiet holder and unsupported garrison orders retained"
     );
 }
 

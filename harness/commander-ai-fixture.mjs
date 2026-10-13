@@ -86,11 +86,11 @@ function record(name, options = {}) {
       return undefined;
     } });
   } finally { Math.random = oldRandom; }
-  // Holder behavior remains pending in native, but its actual source commands stay in the record.
+  // Keep actual holder commands, including branches explicitly refused by the bounded native policy.
   if (otherCommands.some(c => !['cover', 'garrison'].includes(c.t))) throw Error(`Unsupported full-thinker branch in ${name}: ${JSON.stringify(otherCommands)}`);
   const emitted = commands.reduce((n, c) => n + c.orders.length, 0);
   if (draws !== emitted) throw Error(`Unexpected non-waypoint randomness in ${name}`);
-  cases.push({ name, slot, level, startupDraws, frame: {
+  cases.push({ name, slot, level, startupDraws, ...(options.expectedNativeError ? {expectedNativeError:options.expectedNativeError} : {}), frame: {
     w: view.w, h: view.h, tick: view.tick, chars: runs(chars), flags: runs(flags), height: runs(height),
     players: view.players.map(p => ({ slot: p.slot, team: p.team, faction: p.faction, spawn: p.spawn, out: p.out })),
     points: view.points, units,
@@ -138,6 +138,10 @@ for (const [name,fields] of [
  ['garrisoned',{garrison:100}], ['two-holders',{}],
 ]) record(`holder-${name}`, { points:[point(55,21,{owner:0}),openingSentinel()],
  units:[unit(1,'rifle',{x:55,z:21,...fields}),unit(2,'rifle',{x:55,z:21})] });
+for (const [name,fields] of [['covered',{cover:1}],['entrenching',{entrench:{}}]]) {
+ record(`holder-${name}-house`, {points:[point(55,21,{owner:0}),openingSentinel()],
+ units:[unit(1,'rifle',{x:55,z:21,...fields})], terrain:[[507,'B']], expectedNativeError:'UnsupportedHolder'});
+}
 // Producer rows use actual initialization and observation without a synthetic
 // decoded-frame overlay. Recorded raw intent edits are replayable by native Match.
 const producer = [];

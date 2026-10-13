@@ -461,15 +461,11 @@ fn plan_inner(
             }
             holding[i] += 1;
             if holding[i] == 1 {
-                if input.players.iter().any(|p| p.team != me.team)
-                    && !u.dig
-                    && !u.entrench
-                    && !u.garrison
-                    && !matches!(u.cover, 1 | 2)
-                {
+                if input.players.iter().any(|p| p.team != me.team) {
                     let p = input.points[i].at;
                     let r = observation.radius + 3.0;
-                    let house = d.garrisons
+                    let house = !u.garrison
+                        && d.garrisons
                         && input.chars.iter().enumerate().any(|(c, ch)| {
                             if *ch != b'B' {
                                 return false;
@@ -484,9 +480,11 @@ fn plan_inner(
                     if input.manpower != 0.0 || house {
                         return Err(PolicyError::UnsupportedHolder);
                     }
-                    holder_commands.push(Command::Cover {
-                        ids: vec![i64::from(u.id)],
-                    });
+                    if !u.dig && !u.entrench && !u.garrison && !matches!(u.cover, 1 | 2) {
+                        holder_commands.push(Command::Cover {
+                            ids: vec![i64::from(u.id)],
+                        });
+                    }
                 }
                 continue;
             }
