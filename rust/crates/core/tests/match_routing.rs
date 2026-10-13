@@ -4,10 +4,11 @@ use ww2_core::{
     catalog::Catalog,
     economy::{Faction, Mode},
     economy_state::ArmySize,
-    game::{PlaneState, Point, Smoke},
+    game::{PlaneState, Point, Smoke, Wreck},
     map::AuthoritativeMap,
     match_runtime::{BuildingCell, Match, MatchOptions, PlayerConfig},
     observed_memory::ObservedRow,
+    pathfinding::{PathRules, Pathfinding},
     unit_spawn, vision,
     weather::WeatherChoice,
     world::{CellChange, Recipient},
@@ -35,7 +36,7 @@ fn options() -> MatchOptions {
         army: ArmySize::Standard,
         weather: WeatherChoice::Map,
         weather_seed: None,
-        living_weather: false,
+        living_weather: true,
         map_key: None,
         tech: false,
         supply: false,
@@ -97,6 +98,13 @@ fn equal(a: &Value, b: &Value) -> bool {
     }
 }
 
+fn wrecks(rows: &[Wreck]) -> Value {
+    json!(
+        rows.iter()
+            .map(|w| json!([w.id.unwrap(), bits(w.x), bits(w.z), w.moving]))
+            .collect::<Vec<_>>()
+    )
+}
 fn output(instance: &Match, slot: usize) -> Value {
     let state = instance.recipient_routing(slot).unwrap();
     let r = state.knowledge();
@@ -104,7 +112,7 @@ fn output(instance: &Match, slot: usize) -> Value {
     let nav = q.navigation();
     let live = state.live();
     let n = instance.world.game.w * instance.world.game.h;
-    json!({"chars":(0..n).map(|c|char::from(r.cell(c).unwrap().character)).collect::<String>(),"flags":runs(nav.flags.iter().map(|v|json!(v))),"height":runs(nav.heights.unwrap().iter().map(|v|json!(v))),"hp":runs((0..n).map(|c|json!(bits(f64::from(r.cell(c).unwrap().cell_hp.unwrap()))))),"version":nav.versions.knowledge,"changes":nav.changes.iter().map(|c|json!([c.from,c.to,c.cells])).collect::<Vec<_>>(),"fires":live.fires.iter().enumerate().filter_map(|(c,v)|v.then_some(c)).collect::<Vec<_>>(),"bunkers":live.bunkers.iter().map(|p|[bits(p.x),bits(p.z)]).collect::<Vec<_>>()})
+    json!({"wetness":live.wetness,"wrecks":wrecks(state.wrecks()),"chars":(0..n).map(|c|char::from(r.cell(c).unwrap().character)).collect::<String>(),"flags":runs(nav.flags.iter().map(|v|json!(v))),"height":runs(nav.heights.unwrap().iter().map(|v|json!(v))),"hp":runs((0..n).map(|c|json!(bits(f64::from(r.cell(c).unwrap().cell_hp.unwrap()))))),"version":nav.versions.knowledge,"changes":nav.changes.iter().map(|c|json!([c.from,c.to,c.cells])).collect::<Vec<_>>(),"fires":live.fires.iter().enumerate().filter_map(|(c,v)|v.then_some(c)).collect::<Vec<_>>(),"bunkers":live.bunkers.iter().map(|p|[bits(p.x),bits(p.z)]).collect::<Vec<_>>()})
 }
 #[test]
 fn actual_match_visibility_memory_and_owned_routing_match_source() {
@@ -120,6 +128,7 @@ fn actual_match_visibility_memory_and_owned_routing_match_source() {
         let map = AuthoritativeMap::from_json(&serde_json::to_vec(&case["map"]).unwrap()).unwrap();
         let mut instance = Match::new(&map, options()).unwrap();
         let mut aliases = BTreeMap::new();
+        let mut finders: [Pathfinding; 2] = std::array::from_fn(|_| Pathfinding::new());
         for (at, (a, s)) in case["actions"]
             .as_array()
             .unwrap()
@@ -258,6 +267,7 @@ fn actual_match_visibility_memory_and_owned_routing_match_source() {
                         .iter()
                         .position(|v| Some(v.name.as_str()) == a["name"].as_str())
                 }
+                "wet" => instance.world.game.wet = Some(a["value"].as_f64().unwrap()),
                 "mine" => {
                     let c = idx(&a["c"]);
                     if let Some(v) = a["owner"].as_i64() {
@@ -301,6 +311,27 @@ fn actual_match_visibility_memory_and_owned_routing_match_source() {
                         a["team"].as_i64().unwrap() as i32
                 }
                 "reveal" => instance.world.game.reveal = a["value"].as_bool().unwrap(),
+                "wreck" => {
+                    let w = Wreck {
+                        id: Some(a["id"].as_u64().unwrap() as u32),
+                        cell: None,
+                        x: a["x"].as_f64().unwrap(),
+                        z: a["z"].as_f64().unwrap(),
+                        moving: a["moving"].as_bool().unwrap(),
+                    };
+                    if let Some(old) = instance.world.game.wrecks.iter_mut().find(|v| v.id == w.id)
+                    {
+                        *old = w;
+                    } else {
+                        instance.world.game.wrecks.push(w);
+                    }
+                }
+                "removeWreck" => instance
+                    .world
+                    .game
+                    .wrecks
+                    .retain(|w| w.id != Some(a["id"].as_u64().unwrap() as u32)),
+                "wreckRead" => result = wrecks(&instance.observed_wrecks(idx(&a["slot"])).unwrap()),
                 "read" => {
                     result = json!(
                         instance
@@ -315,6 +346,66 @@ fn actual_match_visibility_memory_and_owned_routing_match_source() {
                     let slot = idx(&a["slot"]);
                     instance.refresh_recipient_routing(slot).unwrap();
                     result = output(&instance, slot);
+                    if !a["path"].is_null() {
+                        let p = &a["path"];
+                        let unit =
+                            &instance.world.game.units[&aliases[p["alias"].as_str().unwrap()]];
+                        let state = instance.recipient_routing(slot).unwrap();
+                        let query = state.query();
+                        let path = finders[slot]
+                            .find_path(
+                                query.path_terrain(state.live()).unwrap(),
+                                PathRules::compiled().unwrap(),
+                                &instance.rules.kinds[unit.kind],
+                                unit.at(),
+                                Point {
+                                    x: p["goal"]["x"].as_f64().unwrap(),
+                                    z: p["goal"]["z"].as_f64().unwrap(),
+                                },
+                                None,
+                            )
+                            .unwrap();
+                        result["expansions"] = json!(path.expansions);
+                        result["path"] = json!(
+                            path.waypoints
+                                .iter()
+                                .map(|p| [bits(p.x), bits(p.z)])
+                                .collect::<Vec<_>>()
+                        );
+                        result["end"] = json!([bits(path.route_end.x), bits(path.route_end.z)]);
+                    }
+
+                    if !a["cover"].is_null() {
+                        let at = &a["cover"]["at"];
+                        let from = &a["cover"]["from"];
+                        let state = instance.recipient_routing(slot).unwrap();
+                        result["cover"] = json!(
+                            state
+                                .knowledge()
+                                .cover_rank(
+                                    Point {
+                                        x: at["x"].as_f64().unwrap(),
+                                        z: at["z"].as_f64().unwrap()
+                                    },
+                                    Some(Point {
+                                        x: from["x"].as_f64().unwrap(),
+                                        z: from["z"].as_f64().unwrap()
+                                    }),
+                                    state.wrecks()
+                                )
+                                .unwrap()
+                        );
+                    }
+                    if case["name"] == "current-position-discovery-and-cached-fire-fog" && at == 7 {
+                        assert!(
+                            !instance
+                                .recipient_sees(0, Point { x: 15.0, z: 11.0 })
+                                .unwrap()
+                        );
+                        let state = instance.recipient_routing(0).unwrap();
+                        assert_eq!(state.knowledge().cell(207).unwrap().character, b'.');
+                        assert!(state.live().fires[207]);
+                    }
                 }
                 v => panic!("unknown {v}"),
             }
@@ -337,6 +428,11 @@ fn actual_match_visibility_memory_and_owned_routing_match_source() {
                     equal(&rows, &s["memories"][slot]["rows"]),
                     "{label} slot{slot} memory\nactual {rows}\nexpected {}",
                     s["memories"][slot]["rows"]
+                );
+                assert_eq!(
+                    wrecks(state.remembered_wrecks()),
+                    s["memories"][slot]["wrecks"],
+                    "{label} slot{slot} wreck memory"
                 );
                 assert_eq!(
                     json!(instance.world.pending(Recipient::Player(slot)).unwrap()),
@@ -369,7 +465,7 @@ fn actual_match_visibility_memory_and_owned_routing_match_source() {
             count += 1;
         }
     }
-    assert_eq!(count, 123);
+    assert_eq!(count, 162);
 }
 
 #[test]
@@ -395,6 +491,30 @@ fn malformed_context_cannot_change_owned_memory_routes_or_pending() {
     m.world.game.units.first_entry().unwrap().get_mut().kind = usize::MAX;
     assert!(m.refresh_recipient_routing(0).is_err());
     m.world.game.units.first_entry().unwrap().get_mut().kind = kind;
+    m.world.game.players[0].slot = 1;
+    assert!(m.refresh_recipient_routing(0).is_err());
+    m.world.game.players[0].slot = 0;
+    m.world.game.wrecks.push(Wreck {
+        id: None,
+        cell: None,
+        x: 5.0,
+        z: 5.0,
+        moving: false,
+    });
+    assert!(m.observed_wrecks(0).is_err());
+    assert!(m.refresh_recipient_routing(0).is_err());
+    m.world.game.wrecks[0].id = Some(77);
+    m.world.game.wrecks.push(m.world.game.wrecks[0].clone());
+    assert!(m.observed_wrecks(0).is_err());
+    m.world.game.wrecks.clear();
+    m.world.game.mode = Some(ww2_core::game::ModeKind::World);
+    assert!(m.refresh_recipient_routing(0).is_err());
+    m.world.game.mode = None;
+    let units = std::mem::take(&mut m.world.game.units);
+    let kinds = std::mem::take(&mut m.rules.kinds);
+    assert!(m.refresh_recipient_routing(0).is_err());
+    m.rules.kinds = kinds;
+    m.world.game.units = units;
     assert_eq!(output(&m, 0), before);
     assert_eq!(m.recipient_routing(0).unwrap().remembered(), rows);
     assert_eq!(m.world.pending(Recipient::Player(0)), Some(&pending));
