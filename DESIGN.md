@@ -576,3 +576,7 @@ The recorder exports the unchanged pinned JavaScript functions and compares 934 
 ## Match command state
 
 `Match.commands.units` owns the fields absent from `Game::Unit`: aim, automatic ability/retreat switches, attack intent, following, facing and waiting orders. Existing routes, positions and hold-position state remain on Unit. Dynamically selected target and firing timers belong to firing state; hit memory and XP belong to combat state. A prepared `UnitControl` can be inserted without failure after recruitment commits its wallet transaction. Conquest ability switches use the source free-ability default; Classic ability costs remain outside the Conquest constructor. The typed command enum is an internal recorded input, not a new wire schema.
+
+## Match Conquest recruitment (2026-10-13)
+
+The native Match now stages immediate Conquest ground/naval recruitment through canonical production, wallets, IDs, unit insertion, grid updates and shared command controls. Owner-bound remembered routing is required for rallies; unreachable searches still admit an empty path as in the source. Air placement and pending supports without exact kind metadata fail explicitly before payment. [Recruitment design and evidence](docs/runtime/recruitment.md) records the transaction, control ownership, original-source fixture and remaining boundaries. No public interface or server match admission changed.

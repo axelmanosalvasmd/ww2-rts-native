@@ -1,26 +1,61 @@
 //! Canonical control intent and tick-boundary commands for native Conquest.
 
+use crate::{
+    catalog::Catalog,
+    game::{Point, Unit},
+    grid::UnitId,
+    orders::OrderQueue,
+    path_requests::PathRequests,
+    pathfinding::Pathfinding,
+    rules::Rules,
+};
 use std::collections::{BTreeMap, VecDeque};
-use crate::{catalog::Catalog, game::{Point, Unit}, grid::UnitId, orders::OrderQueue, pathfinding::Pathfinding, path_requests::PathRequests, rules::Rules};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct Facing { pub angle: f64, pub at: Point }
+pub struct Facing {
+    pub angle: f64,
+    pub at: Point,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum MoveOutcome { Interrupted, Moving, Unreachable, Arrived }
+pub enum MoveOutcome {
+    Interrupted,
+    Moving,
+    Unreachable,
+    Arrived,
+}
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct MoveOrder { pub unit: UnitId, pub at: Point }
+pub struct MoveOrder {
+    pub unit: UnitId,
+    pub at: Point,
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Stance { HoldFire, HoldPosition, AutoRetreat }
+pub enum Stance {
+    HoldFire,
+    HoldPosition,
+    AutoRetreat,
+}
 
 /// Internal recorded input. This is not a WebSocket or C interface.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Command {
-    Move { orders: Vec<MoveOrder>, attack_move: bool, queue: bool, together: bool, face: Option<f64> },
-    Stop { ids: Vec<UnitId> },
-    Stance { ids: Vec<UnitId>, stance: Stance, on: bool },
+    Move {
+        orders: Vec<MoveOrder>,
+        attack_move: bool,
+        queue: bool,
+        together: bool,
+        face: Option<f64>,
+    },
+    Stop {
+        ids: Vec<UnitId>,
+    },
+    Stance {
+        ids: Vec<UnitId>,
+        stance: Stance,
+        on: bool,
+    },
     Unsupported,
 }
 
@@ -51,12 +86,40 @@ pub struct UnitControl {
 impl UnitControl {
     /// Prepare before publishing a spawned unit or charging a wallet.
     pub fn new(unit: &Unit, rules: &Rules) -> Result<Self, String> {
-        let kind = rules.kinds.get(unit.kind).ok_or("unknown control unit kind")?;
+        let kind = rules
+            .kinds
+            .get(unit.kind)
+            .ok_or("unknown control unit kind")?;
         let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
         let definition = catalog.unit(&kind.name).map_err(|e| e.to_string())?;
-        let ability = definition.get("ab").and_then(|a| a.get("id")).and_then(|v| v.string()).ok_or("missing unit ability")?;
-        if !unit.rot.is_finite() { return Err("nonfinite unit aim".into()); }
-        Ok(Self { aim: unit.rot, auto_cast: ability != "none", auto_retreat: !kind.air, attack_id: 0, follow: 0, hold_fire: false, face: None, orders: VecDeque::new(), outcome: None, outcome_tick: None, route_end: None, supply_hold: false, supply_escape: false, enter: None, fire_at: None, nade: None, rally_drift: false, operative: false })
+        let ability = definition
+            .get("ab")
+            .and_then(|a| a.get("id"))
+            .and_then(|v| v.string())
+            .ok_or("missing unit ability")?;
+        if !unit.rot.is_finite() {
+            return Err("nonfinite unit aim".into());
+        }
+        Ok(Self {
+            aim: unit.rot,
+            auto_cast: ability != "none",
+            auto_retreat: !kind.air,
+            attack_id: 0,
+            follow: 0,
+            hold_fire: false,
+            face: None,
+            orders: VecDeque::new(),
+            outcome: None,
+            outcome_tick: None,
+            route_end: None,
+            supply_hold: false,
+            supply_escape: false,
+            enter: None,
+            fire_at: None,
+            nade: None,
+            rally_drift: false,
+            operative: false,
+        })
     }
 }
 
@@ -71,8 +134,24 @@ impl MatchCommands {
         let mut queue = OrderQueue::new(capacity);
         // Match startup is tick zero; commands first execute at tick one.
         queue.advance().expect("initial empty tick");
-        Self { units: BTreeMap::new(), queue, paths: Pathfinding::new(), requests: PathRequests::new() }
+        Self {
+            units: BTreeMap::new(),
+            queue,
+            paths: Pathfinding::new(),
+            requests: PathRequests::new(),
+        }
+    }
+    pub fn next_tick(&self) -> Option<u64> {
+        self.queue.next_tick()
+    }
+    pub fn pending_commands(&self) -> usize {
+        self.queue.len()
+    }
+    pub fn path_requests(&self) -> &PathRequests {
+        &self.requests
     }
     /// Publish an already prepared row after the caller commits its spawn transaction.
-    pub fn insert(&mut self, id: UnitId, row: UnitControl) { self.units.insert(id, row); }
+    pub fn insert(&mut self, id: UnitId, row: UnitControl) {
+        self.units.insert(id, row);
+    }
 }

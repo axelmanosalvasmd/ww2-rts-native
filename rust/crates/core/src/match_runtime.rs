@@ -1,5 +1,8 @@
 //! Native match startup. The setup plan is shared by the authoritative constructor.
 pub use crate::objectives::Objective;
+#[path = "match_recruitment.rs"]
+mod recruitment;
+pub use recruitment::{CompletedRecruitUnit, RecruitError, RecruitMetadata, RecruitRouting};
 use std::collections::BTreeMap;
 
 use crate::{
@@ -397,6 +400,9 @@ pub struct Match {
     pub building_cells: BTreeMap<usize, BuildingCell>,
     pub production: crate::production::ProductionState,
     pub building_rallies: BTreeMap<u32, Option<Point>>,
+    pub player_rallies: Vec<Option<Point>>,
+    pub recruit_metadata: BTreeMap<u32, RecruitMetadata>,
+    produced_placer: crate::produced_units::ProducedPlacer,
     pub scenario: Option<crate::legacy_scenario::LegacyScenario>,
     pub logistics: crate::logistics::LogisticsState,
     pub capture_ticks: Vec<Option<i64>>,
@@ -436,6 +442,7 @@ impl Match {
                 .collect::<Result<Vec<_>, String>>()?;
             crate::legacy_scenario::LegacyScenario::from_map(map, &owners)
         };
+        let player_count = start.players.len();
         let mut result = Self {
             commands: crate::match_commands::MatchCommands::new(4096),
             grid: SpatialGrid::new(&world.game.units, 16.0),
@@ -445,6 +452,9 @@ impl Match {
             building_cells: BTreeMap::new(),
             production,
             building_rallies: BTreeMap::new(),
+            player_rallies: vec![None; player_count],
+            recruit_metadata: BTreeMap::new(),
+            produced_placer: crate::produced_units::ProducedPlacer::new(),
             scenario,
             logistics: crate::logistics::LogisticsState::default(),
             capture_ticks: vec![None; map.points().len()],

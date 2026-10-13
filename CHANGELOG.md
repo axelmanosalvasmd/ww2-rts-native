@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Connected immediate Conquest ground/naval recruitment to Match with staged placement, owner-observed rally routes, exact MP charges, monotonic IDs, canonical control rows and maintained spatial indexing. Five original-source traces cover 32 buy commands; failed routes still buy, while malformed placement/routing leaves payment and IDs untouched. Air, ambiguous pending support kinds and later Match systems remain explicit boundaries.
+
 - Connected Conquest point supply, capture and income to the assembled Match, using the tick's ordered unit list and one canonical objective/reserve state. Eight original-source traces compare 72 phases across all armies, allied and enemy teams, disconnection, supply obstruction, post-decision VP freezing and units spawned during a tick. Capture timestamps follow source winner gating; malformed input leaves objectives and wallets unchanged. This phase does not advance the clock or implement the remaining match systems.
 
 - Added canonical objective state and standalone capture-point and point-supply phases. Four focused tests compare 214 original-JavaScript capture traces (1,165 checkpoints) and 223 supply states, including exact capture progress, event order and control/reached masks. Preserved allied ownership, sequential prerequisites, forced-reserve guards, circular safe zones, MOVE-only supply seeds and square point-connectivity checks. Inputs are validated before objective mutation. Match scheduling, story application, income, refill networks and win/loss integration remain unfinished; no ABI or wire interface changed.
