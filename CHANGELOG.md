@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Extended the original recruitment replay to verify ability and recovery defaults at the shared publication boundary, preserving same-batch buy-to-ability admission. Combined native execution remains pending.
+
 - Connected canonical ability buff and AP state to committed ordinary weapon launches: suppressive fire uses half damage, 2.5 times suppression and half the firing interval; qualifying AP uses perfect launch accuracy and is spent after successful launch preflight. Salvos keep their existing path. Five original-source firing cases and native consumers cover the payload, AP retention and no-ammo behavior; native execution remains pending.
 
 - Merged the byte-identical typed-flight convergence and checked publication prerequisite, retaining ability/recovery defaults inside the infallible recruitment publication callback. The combined ability proof remains pending.
