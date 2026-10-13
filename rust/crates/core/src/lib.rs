@@ -23,6 +23,7 @@ pub mod random;
 pub mod rules;
 pub mod separation;
 pub mod sort;
+pub mod structures;
 pub mod terrain;
 pub mod traffic;
 pub mod vehicle;

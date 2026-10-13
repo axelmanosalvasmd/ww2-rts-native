@@ -159,7 +159,7 @@ fn authoritative_maps_match_pinned_validation_and_static_terrain() {
     }
     assert_eq!(
         (authored, terrain_count, rejected, unsupported),
-        (33, 48, 55, 3)
+        (33, 49, 55, 2)
     );
 }
 

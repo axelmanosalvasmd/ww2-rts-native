@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added authored structural validation and separate static structural initialization to the Rust core. All 33 authored maps match 574 structures and 11,955 sections from the reference, including IDs, order, supports, anchors, materials and health. The new fixture covers 59 accepted maps, 36 rejected maps and eight support traversals. Structured query state now fills `Game.sections`; damage, collapse, falling bodies, repairs and playable match startup remain unimplemented. Updated the former empty-structures rejection test and fixture to accept it, while world and scenario properties remain explicitly unsupported.
+
 - Ported pure weather planning, map mood/default selection, one-time transitions, warning rows, effect descriptions, AI caution and presentation road masks to `weather.rs`. Canonical values come from the compiled catalog; the explicit plan seed preserves the reference's local mulberry32 sequence. Five focused tests compare 158 metadata cases, 5,682 plans, 590 transition rows, 231 synthetic roads and all 33 authored public maps with the original JavaScript helpers. Existing movement/sight logic, Game fields, ABI and rules hash are unchanged. Full match initialization, living rain/wet ground and snapshot/client integration remain pending.
 
 - Recorded the standalone request scheduler, its 606-action oracle and remaining integration work in the design and movement inventory. MOV-40 and MOV-41 remain in progress until live-order eligibility and actual movement use the scheduler.
