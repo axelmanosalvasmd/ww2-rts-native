@@ -296,6 +296,12 @@ fn administrative_removal_retains_captured_flight_xp_and_paid_metadata_has_no_re
         true,
     );
     order.push(15);
+    world_scene::update_unit(
+        &mut m,
+        &json!({"id":16,"owner":0,"type":"engineer","x":801.0,"z":421.0,"built":1.0}),
+        true,
+    );
+    order.push(16);
     // A persistence witness imports a proven ordinary flight into World without launching or stepping it.
     let mut flight = captured.clone();
     flight.shooter = 12;
@@ -356,6 +362,26 @@ fn administrative_removal_retains_captured_flight_xp_and_paid_metadata_has_no_re
         )
         .unwrap();
     assert!(m.production.building(40).unwrap().rows()[0].job.charge.mp > 0.0);
+    let work = m
+        .field_works
+        .prepare_start(
+            &m.world,
+            &mut m.start.economy.players[0],
+            ww2_core::field_works::StartRequest {
+                control_eligible: true,
+                owner: 0,
+                unit: 16,
+                kind: ww2_core::field_works::FortKind::Trench,
+                at: ww2_core::game::Point { x: 801.0, z: 421.0 },
+                direction: Some(0.0),
+            },
+            |_| true,
+        )
+        .unwrap();
+    assert!(work.cost() > 0.0);
+    work.commit(&mut m.field_works);
+    m.world.game.units.get_mut(&16).unwrap().dig = true;
+
     let survivor = m.production.building(15).unwrap().clone();
     m.logistics.insert(
         12,
@@ -383,6 +409,7 @@ fn administrative_removal_retains_captured_flight_xp_and_paid_metadata_has_no_re
     assert_eq!(m.firing.flights.get(&flight.id), Some(&flight));
     assert_eq!(m.combat.get(12).unwrap().xp, 4.5);
     assert!(m.production.building(40).is_none());
+    assert!(!m.field_works.is_active(16));
     assert!(m.logistics.get(12).is_none());
     assert_eq!(m.production.building(15), Some(&survivor));
     assert_eq!(m.commands.units[&14], survivor_control);

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Extend administrative cleanup proof with an actual paid trench job and assert its descriptor is canceled without restoring the charged wallet.
+
 - Seed an actual logged terrain mutation in the recipient draft guard regression, so acknowledgement changes a real pending index rather than an empty set.
 
 - Document the bounded World elimination API, ephemeral staging tradeoff, owner cleanup and exact exclusions. Strengthen metadata proof with real charged production queues, a preserved survivor queue/control and an imported source-compared active flight; native execution remains pending.
