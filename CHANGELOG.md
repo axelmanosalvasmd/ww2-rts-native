@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Updated the inherited operative design note to reflect its completed coherent Mac proof. Reaction composition still awaits its own native cycle.
+
 - Fixed accepted ground retreat to commit its real route endpoint to canonical control state. A preceding Move previously left a stale endpoint, preventing home arrival from clearing retreat state. The added actual-source Move-to-retreat trace completes at home on tick 53; the full recorder now has 19 traces, 2,474 ticks and 354 checkpoints. Combined native proof remains pending.
 
 - Added source-written full-tick reaction replay and whole-admission regression coverage. The separate runner now refuses enabled logistics, canonical convoy state and nonordinary internal mode state before queue or clock mutation while those phases remain disconnected. Native compilation and execution remain pending.
