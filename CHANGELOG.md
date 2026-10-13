@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Normally include the source-reviewed production admission and original research recorder in the separate World caller. Preserve ordinary restored-queue refusals and existing World publication ownership. Actual phase wiring and coherent native verification remain pending.
+
 - Preserve the actual findPath endpoint when a spacing or cover reaction publishes its accepted route. The existing canonical control is admitted before routing; endpoint publication occurs with the final Unit/control commit, with no inferred outcome or second route store. A real World spacing reaction now checks cold-to-warm memory, the authored cover endpoint and unchanged random state, bringing the continuation to eight source-written tests. Native execution remains pending.
 
 - Normally compose the source-reviewed World ground actor/lifecycle and routing providers into the separate sole-caller continuation. Preserve emitted prefixes, canonical local visibility, real recovery, lazy World terrain reads, full-memory retry versions and region march/home rules. Shared commands and reactions merge without source conflicts. Whole World admission remains closed until reached inactive-phase policies and complete caller review are finished; combined native verification remains pending.
@@ -261,6 +263,10 @@
 - Admit the actual typed Default alias in ordinary snapshots without rewriting mode state. Genuine mode objects remain refused. The invalid bare Dig flag test now checks canonical activity refusal.
 
 - Combine the actual Default tick and typed snapshot prerequisites for active engineering recipient views. Preserve the single startup initialization, staged observer receipt and canonical unit/job owners; the combined native proof is pending.
+
+- Recorded four complete original ordinary tick traces with 2,429 steps, 4,810 research observations, seven commands and two immediate recruitment births. Added an actual-runner consumer and two original restored-queue failure witnesses. Observed and unobserved Source replay agree; native execution awaits the sole tick owner's research hookup. Retained unsupported restored queues rather than inventing a Conquest mode object.
+
+- Added read-only admission for canonical research and live-building production phases, including actual World context, foreign queue rows and prospective numeric overflow. Ordinary Conquest keeps immediate purchases and refuses nonempty restored training queues. World queued AIR and logistics publication remain unsupported. Training publication also checks the canonical Aviation and reserve owners before using an ID. Full tick hookup and native proof are pending.
 
 - Prepared a separate normal union of frozen ordered-event PR #194 and the consolidated original-source frontier `dfcc0bf`. Preserved the one TickEvent/TickFailure result, producer emission sinks, original World component bodies, approved ABI 2 and the optimized test profile with debug assertions and overflow checks. Migrated the inherited quiet engineering consumer to require empty owned events, and report accepted recipient traffic once rather than unavailable. Published parents remain unchanged; exact union source review and the full optimized native cycle are pending.
 
