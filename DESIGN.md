@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## Trusted startup scene admission repair (2026-10-13, source successor)
+
+The exact `7e26c58` first native startup test compiles, then refuses its El Alamein attachment as Scenario. The original map has 246 private mine cells and one three-second message trigger (`reference/ww2-rts/maps/el-alamein.json:278`). Source converts legacy triggers into a Scenario in `shared/scenarios.js:7-10,88`; native startup likewise preserves them in `match_runtime.rs:635-652`. The existing complete snapshot guard at `recipient_snapshot/composition.rs:198-200` explicitly refuses canonical Scenario state. That guard is retained. The failure is recorded in `/private/tmp/ww2-pure-startup-native-7e26c58/startup-first.log`; no test passed in that attempt.
+
+The lifecycle successor uses the unchanged, supported authored Default map and keeps every real socket and ClientView assertion for full start, delta Fog, terrain, unit publication/retirement, resync, reconnect ordering and replacement identity. Before that lifecycle, a real El Alamein attachment must still refuse with Scenario, leave room/accounts/identity unpublished, and emit no partial start or snapshot. Its complete committed `mapForClient` projection is checked separately for hidden mines, associated materials and authoring scripts. The test does not clear Scenario or modify either map. Scenario host integration remains unfinished implementation work, not accepted game completion. Production startup code, core admission, FFI and original fixtures are unchanged; focused independent source review and a fresh coherent native cycle remain required.
+
 ## Pure RTI, Human and startup publication candidate (2026-10-13, source only)
 
 This separate candidate normally includes current main `d1f2fb5` into the source-cleared RTI and Human baseline `32670c2`. Main has the same source tree as already incorporated ordered-event `a068dd8`. Only the seven server startup files from `d9941e3` to reviewed `7784525` are extracted; each remains byte-identical to the reviewed startup source. The earlier combined Ground ancestry is not imported. Core, Human observations, event ownership, receipt APIs, original fixtures, ABI 2 and the optimized test profile remain the baseline providers.

@@ -169,7 +169,7 @@ impl SetupExpected {
                 .map(|player| player.spawn)
                 .collect(),
             weather: state.start.weather.now.name(),
-            public_map: serde_json::from_str(include_str!("maps/el-alamein.json")).unwrap(),
+            public_map: serde_json::from_str(include_str!("maps/default.json")).unwrap(),
         }
     }
     fn check(&self, start: &Value, slot: usize, identity: u64) {
@@ -198,28 +198,31 @@ impl SetupExpected {
         assert_eq!(start["spawn"], start["spawns"][slot]);
         assert!(start["cells"].is_array());
         assert!(start["fog"]["v"].is_string() && start["fog"]["e"].is_string());
-        assert!(start["map"].get("triggers").is_none());
-        assert!(start["map"].get("scenario").is_none());
-        for key in ["rows"] {
-            assert!(
-                start["map"][key]
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .all(|row| !row.as_str().unwrap().contains('N'))
-            );
-        }
-        for key in ["objects", "mines"] {
-            assert!(
-                start["map"]["layers"][key]
-                    .as_array()
-                    .unwrap()
-                    .iter()
-                    .all(|row| !row.as_str().unwrap().contains('N'))
-            );
-        }
-        assert_eq!(start["map"]["layers"]["mineMaterials"], json!([]));
+        check_public_map(&start["map"]);
     }
+}
+fn check_public_map(map: &Value) {
+    assert!(map.get("triggers").is_none());
+    assert!(map.get("scenario").is_none());
+    for key in ["rows"] {
+        assert!(
+            map[key]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|row| !row.as_str().unwrap().contains('N'))
+        );
+    }
+    for key in ["objects", "mines"] {
+        assert!(
+            map["layers"][key]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|row| !row.as_str().unwrap().contains('N'))
+        );
+    }
+    assert_eq!(map["layers"]["mineMaterials"], json!([]));
 }
 async fn native<T>(control: &NativeRoomControl, change: impl FnOnce(&mut RoomRuntime) -> T) -> T {
     let mut hub = control.server.hub.lock().await;
@@ -258,8 +261,9 @@ async fn actual_socket_start_decode_mutations_resync_reconnect_and_new_match() {
         a.until(|message| message["t"] == "lobby" && message["mapName"] == "el-alamein");
         a.send(json!({"t":"start"}));
         assert_eq!(a.until(|message| message["t"] == "deny")["cmd"], "start");
-        let state = setup("el-alamein");
-        let expected = SetupExpected::new(&state);
+        b.until(|message| message["t"] == "lobby" && message["mapName"] == "el-alamein");
+        let scripted = setup("el-alamein");
+        assert!(scripted.scenario.is_some());
         let authored = crate::authoritative_maps::load("el-alamein").unwrap();
         assert!(
             authored.source()["rows"]
@@ -269,6 +273,56 @@ async fn actual_socket_start_decode_mutations_resync_reconnect_and_new_match() {
                 .any(|row| row.as_str().unwrap().contains('N'))
         );
         assert!(!authored.triggers().is_empty());
+        let public = crate::maps::public_map("el-alamein").unwrap();
+        assert_eq!(
+            public,
+            serde_json::from_str::<Value>(include_str!("maps/el-alamein.json")).unwrap(),
+            "complete pinned private-mine mapForClient projection"
+        );
+        check_public_map(&public);
+        let hidden = authored.source()["rows"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .enumerate()
+            .flat_map(|(z, row)| {
+                row.as_str()
+                    .unwrap()
+                    .bytes()
+                    .enumerate()
+                    .filter_map(move |(x, cell)| {
+                        (cell == b'N').then_some(z * authored.dimensions().0 + x)
+                    })
+            })
+            .collect::<std::collections::BTreeSet<_>>();
+        for key in ["materials", "objectMaterials"] {
+            if let Some(materials) = public["layers"][key].as_array() {
+                assert!(
+                    materials
+                        .iter()
+                        .all(|row| { !hidden.contains(&(row["c"].as_u64().unwrap() as usize)) })
+                );
+            }
+        }
+        let refusal = host.block_on(control.attach("ABC", scripted)).unwrap_err();
+        assert!(refusal.contains("capability: Scenario"), "{refusal}");
+        host.block_on(async {
+            let hub = control.server.hub.lock().await;
+            assert!(hub.rooms["ABC"].native.is_none());
+            assert!(hub.accounts.is_empty());
+            assert_eq!(hub.next_epoch, 0);
+        });
+        // The next actual packet is the requested default lobby, not a partial
+        // start or snapshot from the refused scripted attachment.
+        a.send(json!({"t":"map","name":"default"}));
+        for receiver in [&mut a, &mut b] {
+            let message = receiver.receive();
+            assert_eq!(message["t"], "lobby");
+            assert_eq!(message["mapName"], "default");
+        }
+        let state = setup("default");
+        assert!(state.scenario.is_none());
+        let expected = SetupExpected::new(&state);
         let victim = state
             .world
             .game
@@ -495,7 +549,7 @@ async fn actual_socket_start_decode_mutations_resync_reconnect_and_new_match() {
                 .unwrap()
                 .ending_complete
         );
-        let next = setup("el-alamein");
+        let next = setup("default");
         let next_expected = SetupExpected::new(&next);
         let new_identity = host.block_on(control.attach("ABC", next)).unwrap();
         assert!(new_identity > identity);
