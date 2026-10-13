@@ -15,6 +15,23 @@ fn quiet_state(m: &ww2_core::match_runtime::Match) -> Value {
     })
 }
 
+fn detached_units(
+    m: &ww2_core::match_runtime::Match,
+) -> (BTreeMap<u32, ww2_core::game::Unit>, Vec<(u32, u64)>) {
+    let mut units = m.world.game.units.clone();
+    let pace = units
+        .values_mut()
+        .map(|unit| {
+            let bits = unit.pace.to_bits();
+            // Normalize only the detached comparison value. The live absent-pace
+            // sentinel remains unchanged and is checked independently by bits.
+            unit.pace = 0.0;
+            (unit.id, bits)
+        })
+        .collect();
+    (units, pace)
+}
+
 #[test]
 fn actual_ground_support_ticks_match_source_effects_and_lifetimes() {
     let fixture = common::fixture();
@@ -158,7 +175,7 @@ fn default_support_case_remains_a_read_only_runner_refusal() {
     )
     .unwrap();
     let before = (
-        m.world.game.units.clone(),
+        detached_units(&m),
         m.start.economy.players.clone(),
         m.story.clone(),
         m.start.players[0].support.clone(),
@@ -173,7 +190,7 @@ fn default_support_case_remains_a_read_only_runner_refusal() {
     assert_eq!(
         before,
         (
-            m.world.game.units.clone(),
+            detached_units(&m),
             m.start.economy.players.clone(),
             m.story.clone(),
             m.start.players[0].support.clone(),
