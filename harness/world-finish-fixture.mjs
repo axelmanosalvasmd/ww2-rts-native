@@ -37,9 +37,13 @@ function record(name,{teams=[5,1,5],regions={},players={},units=[],steps,support
   for(const change of step.changeRegions??[])Object.assign(g.world.regions[change.index],change);
   rebuildGrid(g);const order=step.order??[...g.units.keys()],list=order.map(id=>g.units.get(id));
   const before=snapshot();if(step.periodic)sim.__periodic(g);
+  const removed=[];const sourceDelete=g.units.delete;
+  g.units.delete=function(id){removed.push(id);return sourceDelete.call(this,id);};
   for(const p of g.players)sim.__worldIncome(g,p,list,step.dt);
   sim.__stepWorld(g,list,step.dt);
-  records.push({...step,tick:g.tick,order,before,after:snapshot()});
+  g.units.delete=sourceDelete;
+  const postWreckUnits=[...g.units.values()].map(u=>({id:u.id,owner:u.owner,type:u.type,hp:u.hp}));
+  records.push({...step,tick:g.tick,order,before,after:snapshot(),removed,postWreckUnits});
  }
  cases.push({name,input:{teams,army:'standard',regions,players,units,nodes:[]},supported,steps:records});
 }

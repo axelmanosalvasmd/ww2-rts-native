@@ -154,6 +154,14 @@ impl Match {
         Ok(())
     }
     pub(crate) fn match_sample(&self) -> Result<MatchSample, String> {
+        if self.world.game.mode.is_some(){self.validate_sample_units()?;}
+        self.match_sample_with_units(self.world.game.units.values().map(|u| (u.owner,u.kind,u.hp)))
+    }
+    /// A staged World wreck may change surviving HP before its final sample is published.
+    /// This is the same source sampler, using checked post-effect unit facts.
+    pub(crate) fn match_sample_with_units(
+        &self, units: impl IntoIterator<Item=(usize,usize,f64)>,
+    ) -> Result<MatchSample, String> {
         let players = &self.start.economy.players;
         let n = players.iter().map(|p| p.team).max().ok_or("sample needs players")? as usize + 1;
         let t = math::round(self.world.game.tick as f64 / 20.0);
@@ -166,13 +174,15 @@ impl Match {
             for value in &mut vp { *value = value.floor(); }
             Ok(MatchSample::Conquest {t, vp})
         } else {
-            self.validate_sample_units()?;
             let mut points = vec![0.0; n];
             let mut structures = vec![0.0; n];
             for p in &self.start.points { if let Some(owner) = p.owner { points[players[owner].team as usize] += 1.0; } }
-            for u in self.world.game.units.values() {
-                if u.hp > 0.0 && self.rules.kinds[u.kind].structure && (self.options.mode == Mode::World || self.rules.kinds[u.kind].name == "bunker")
-                    && let Some(owner) = players.get(u.owner)
+            for (owner,kind,hp) in units {
+                if kind >= self.rules.kinds.len() || !hp.is_finite()
+                    || (owner>=players.len() && !(self.options.mode==Mode::World && owner==LOCAL_DEFENDER_OWNER))
+                { return Err("invalid Match sample unit".into()); }
+                if hp > 0.0 && self.rules.kinds[kind].structure && (self.options.mode == Mode::World || self.rules.kinds[kind].name == "bunker")
+                    && let Some(owner) = players.get(owner)
                 { structures[owner.team as usize] += 1.0; }
             }
             Ok(MatchSample::Territories {t, points, structures})
@@ -181,11 +191,16 @@ impl Match {
     /// Prepare all fallible finish work before an actuator changes its timer or other state.
     /// The caller publishes this pair immediately under exclusive Match ownership.
     pub(crate) fn prepare_match_finish(&self, winner: i32, reason: EndReason, at: Option<Point>) -> Result<(MatchFinish, MatchSample), String> {
+        self.prepare_match_finish_using(winner,reason,at,||self.match_sample())
+    }
+    pub(crate) fn prepare_match_finish_using(
+        &self, winner:i32, reason:EndReason, at:Option<Point>, sample:impl FnOnce()->Result<MatchSample,String>,
+    )->Result<(MatchFinish,MatchSample),String> {
         if winner != -1 && !self.start.economy.players.iter().any(|p| p.team == winner) { return Err("unknown winning team".into()); }
         let at = at.unwrap_or(Point {x: self.world.game.w as f64 * CELL / 2.0, z: self.world.game.h as f64 * CELL / 2.0});
         let end_at = Point {x: math::round(at.x * 10.0) / 10.0, z: math::round(at.z * 10.0) / 10.0};
         if !end_at.x.is_finite() || !end_at.z.is_finite() { return Err("invalid Match end position".into()); }
-        Ok((MatchFinish {winner, reason: if winner == -1 {EndReason::Draw} else {reason}, end_at, end_tick: self.world.game.tick}, self.match_sample()?))
+        Ok((MatchFinish {winner, reason: if winner == -1 {EndReason::Draw} else {reason}, end_at, end_tick: self.world.game.tick}, sample()?))
     }
     pub(crate) fn publish_match_finish(&mut self, prepared: (MatchFinish, MatchSample)) -> MatchFinish {
         self.timeline.push(prepared.1);

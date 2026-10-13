@@ -71,3 +71,58 @@ fn canonical_world_result_stays_decided_and_source_story_stays_frozen(){
     assert!(m.apply_world_capture_income(&[],0.05).is_err());assert!(!m.sample_match_tick().unwrap());m.record_spending(0,100.0).unwrap();assert_eq!(protected(&m),before);assert_eq!(m.match_result().unwrap().unwrap(),result);
     // Later World tick continuation and result transport remain outside this undecided actuator.
 }
+
+fn number_bits(v:&Value)->f64{f64::from_bits(u64::from_str_radix(v.as_str().unwrap(),16).unwrap())}
+#[test]
+fn prepared_world_removal_sample_matches_exact_original_survivors_without_publication(){
+    use ww2_core::match_world_end::WorldFinishUnitFacts;
+    let f=fixture();let mut compared=0;let mut removed_count=0;
+    for scene in [&f,&f["massive"]] {
+        let mut m=make_match(scene,scene["cases"][0]["input"]["teams"].as_array().unwrap());
+        for case in scene["cases"].as_array().unwrap(){
+            reset(&mut m,scene,&case["input"]);
+            for step in case["steps"].as_array().unwrap(){
+                m.world.game.tick=step["tick"].as_i64().unwrap();
+                let mut wallets=m.start.economy.clone();
+                for (p,raw) in wallets.players.iter_mut().zip(step["after"]["players"].as_array().unwrap()){p.out=raw[6].as_bool().unwrap();}
+                let mut regions=m.world_runtime.as_ref().unwrap().regions.clone();
+                for (r,raw) in regions.iter_mut().zip(step["after"]["regions"].as_array().unwrap()){
+                    r.team=number_bits(&raw[0]) as i32;r.progress=number_bits(&raw[1]);
+                    r.capper=if raw[2].is_null(){None}else{Some(number_bits(&raw[2]) as usize)};
+                    r.cap_tick=if raw[5].is_null(){None}else{Some(number_bits(&raw[5]) as i64)};
+                }
+                let survivors=step["postWreckUnits"].as_array().unwrap().iter().map(|u|WorldFinishUnitFacts{
+                    id:u["id"].as_u64().unwrap() as u32,
+                    owner:if u["owner"].as_i64().unwrap()<0{ww2_core::game::LOCAL_DEFENDER_OWNER}else{u["owner"].as_u64().unwrap() as usize},
+                    kind:m.rules.kind(u["type"].as_str().unwrap()).unwrap(),hp:u["hp"].as_f64().unwrap(),
+                }).collect::<Vec<_>>();
+                let removed=step["removed"].as_array().unwrap().iter().map(|v|v.as_u64().unwrap() as u32).collect::<Vec<_>>();
+                let before=protected(&m);
+                let prepared=m.prepare_world_finish_after_removal(&wallets,&regions,&survivors,&removed);
+                if case["name"].as_str().unwrap().contains("fort transfer"){
+                    assert!(prepared.is_err()); // Owner transfer remains outside this removal-only guard.
+                }else{
+                    let actual=prepared.unwrap().map(|(end,sample)|{
+                        assert_eq!(encode(samples(&[sample])[0].clone()),*step["after"]["timeline"].as_array().unwrap().last().unwrap());
+                        encode(json!({"winner":end.winner,"reason":end.reason.as_str(),"endAt":{"x":end.end_at.x,"z":end.end_at.z},"endTick":end.end_tick}))
+                    }).unwrap_or(Value::Null);
+                    assert_eq!(actual,step["after"]["finish"],"{} prepared finish",case["name"]);
+                    compared+=1;removed_count+=removed.len();
+                    if !survivors.is_empty(){
+                        let mut bad=survivors.clone();bad.push(survivors[0]);assert!(m.prepare_world_finish_after_removal(&wallets,&regions,&bad,&removed).is_err());
+                        bad=survivors.clone();bad[0].hp=f64::NAN;assert!(m.prepare_world_finish_after_removal(&wallets,&regions,&bad,&removed).is_err());
+                        bad=survivors.clone();bad[0].kind=m.rules.kinds.len();assert!(m.prepare_world_finish_after_removal(&wallets,&regions,&bad,&removed).is_err());
+                    }
+                    if !removed.is_empty(){
+                        assert!(m.prepare_world_finish_after_removal(&wallets,&regions,&survivors,&[]).is_err());
+                        let mut bad=removed.clone();bad.push(removed[0]);assert!(m.prepare_world_finish_after_removal(&wallets,&regions,&survivors,&bad).is_err());
+                        let mut active=wallets.clone();active.players[m.world.game.units[&removed[0]].owner].out=false;
+                        assert!(m.prepare_world_finish_after_removal(&active,&regions,&survivors,&removed).is_err());
+                    }
+                }
+                assert_eq!(protected(&m),before,"preparation must not publish any staged phase");
+            }
+        }
+    }
+    assert_eq!(compared,15);assert_eq!(removed_count,2);
+}

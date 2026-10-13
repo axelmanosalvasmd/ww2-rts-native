@@ -2,9 +2,12 @@
 
 ## Unreleased
 
+- Integrated the source-only shared post-wreck finish facts API into the separate World elimination branch. It validates complete survivor/removal coverage and prepares source samples before any canonical wreck publication; native acceptance remains pending.
+
 - Added internal ephemeral World publication drafts and maintained-grid copies for the approved administrative elimination boundary. Publication preserves authoritative terrain allocations, initial geography and ordered mutation history. No live elimination caller or native verification is claimed yet.
 
 - Prepared the World elimination branch with the shared finish successor and checked firing/supply dependencies. Preserved the shared skirmish completion helper, initializing ordinary Conquest logistics after recipient setup and retaining World-only refusal. The new combined ancestry awaits native checks.
+- Added owned World finish preparation from exact staged post-wreck survivors and ordered removals. Complete unit coverage, unchanged owners/kinds and finite HP validate before any canonical publication; final samples use the existing shared timeline. The original recorder now includes actual Map deletion order and surviving HP/kind facts for the elimination consumer. Native checks and complete elimination/wreck integration remain pending.
 
 - Converged the World finish successor with the region provider's verified final ancestry. Provider changes since its import repair are declaration formatting and evidence prose; its runtime body is unchanged. The successor still needs its own combined native proof.
 

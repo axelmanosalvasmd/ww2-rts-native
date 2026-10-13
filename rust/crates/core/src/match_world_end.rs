@@ -5,12 +5,69 @@ use crate::{
     game::{CELL,ModeKind,Point}, match_end::{EndReason,MatchFinish,MatchSample},
     match_runtime::Match, match_world::RegionState,
 };
+use std::collections::{BTreeMap,BTreeSet};
+
+/// Ephemeral source unit values after staged World elimination and building wrecks.
+/// These facts are not another unit store; the actuator owns and immediately commits the
+/// corresponding World/environment/grid changes after this finish preparation succeeds.
+#[derive(Clone,Copy,Debug,PartialEq)]
+pub struct WorldFinishUnitFacts {
+    pub id:u32,
+    pub owner:usize,
+    pub kind:usize,
+    pub hp:f64,
+}
+
+fn validate_transition(
+    current:&[WorldFinishUnitFacts], survivors:&[WorldFinishUnitFacts], removed:&[u32],
+    removable_owners:&BTreeSet<usize>,
+)->Result<(),String> {
+    let by_id=current.iter().map(|u|(u.id,u)).collect::<BTreeMap<_,_>>();
+    if by_id.len()!=current.len(){return Err("duplicate canonical World unit identity".into());}
+    let mut seen=BTreeSet::new();
+    for after in survivors {
+        let before=by_id.get(&after.id).ok_or("unknown staged World survivor")?;
+        if !seen.insert(after.id) || after.owner!=before.owner || after.kind!=before.kind || !after.hp.is_finite() {
+            return Err("invalid staged World survivor".into());
+        }
+    }
+    for id in removed {
+        let before=by_id.get(id).ok_or("unknown staged World removal")?;
+        if !seen.insert(*id) || !removable_owners.contains(&before.owner) {
+            return Err("invalid staged World removal".into());
+        }
+    }
+    if seen.len()!=current.len(){return Err("incomplete staged World unit coverage".into());}
+    Ok(())
+}
 impl Match {
     /// Owned preparation retains no canonical borrow across region/wallet/home/story commits.
     /// This is internal to the region actuator, not a shortcut past its side-effect preflight.
     pub(crate) fn prepare_world_finish(
         &self, wallets: &EconomyState, regions: &[RegionState],
     ) -> Result<Option<(MatchFinish,MatchSample)>,String> {
+        let units=self.world.game.units.values().map(|u|WorldFinishUnitFacts{id:u.id,owner:u.owner,kind:u.kind,hp:u.hp}).collect::<Vec<_>>();
+        self.prepare_world_finish_with_units(wallets,regions,&units)
+    }
+    /// Prepare against actual post-wreck survivors, before any canonical removal or terrain
+    /// publication. Every current ID must occur exactly once as a survivor or ordered removal.
+    /// Owners and kinds cannot change; finite surviving HP may change through real wreck effects.
+    pub fn prepare_world_finish_after_removal(
+        &self, wallets:&EconomyState, regions:&[RegionState],
+        survivors:&[WorldFinishUnitFacts], removed:&[u32],
+    )->Result<Option<(MatchFinish,MatchSample)>,String> {
+        if self.options.mode!=Mode::World || self.world.game.mode!=Some(ModeKind::World){return Err("World finish requires explicit canonical World mode".into());}
+        if self.finish.is_some(){return Ok(None);}
+        self.validate_match_finish_state()?;
+        self.validate_sample_units()?;
+        let current=self.world.game.units.values().map(|u|WorldFinishUnitFacts{id:u.id,owner:u.owner,kind:u.kind,hp:u.hp}).collect::<Vec<_>>();
+        let removable=wallets.players.iter().enumerate().filter(|(_,p)|p.out && !regions.iter().any(|r|r.team==p.team)).map(|(slot,_)|slot).collect();
+        validate_transition(&current,survivors,removed,&removable)?;
+        self.prepare_world_finish_with_units(wallets,regions,survivors)
+    }
+    fn prepare_world_finish_with_units(
+        &self, wallets:&EconomyState, regions:&[RegionState], units:&[WorldFinishUnitFacts],
+    )->Result<Option<(MatchFinish,MatchSample)>,String> {
         if self.options.mode != Mode::World || self.world.game.mode != Some(ModeKind::World) {
             return Err("World finish requires explicit canonical World mode".into());
         }
@@ -26,7 +83,7 @@ impl Match {
             if p.team!=self.start.economy.players[slot].team || [p.mp,p.mun,p.fuel,p.inc].into_iter().chain(p.fuel_inc).chain(p.upkeep).any(|v|!v.is_finite()) {
                 return Err("invalid staged World finish commander".into());
             }
-            if !regions.iter().any(|r|r.team==p.team) && (!p.out || self.world.game.units.values().any(|u|u.owner==slot)) {
+            if !regions.iter().any(|r|r.team==p.team) && (!p.out || units.iter().any(|u|u.owner==slot)) {
                 return Err("World finish requires completed army elimination".into());
             }
         }
@@ -62,6 +119,6 @@ impl Match {
         let at=if winner==-1{None}else{regions.iter().position(|r|r.cap_tick==Some(self.world.game.tick)).map(|i|Point{
             x:(geography.regions[i].x as f64+0.5)*CELL,z:(geography.regions[i].y as f64+0.5)*CELL,
         })};
-        Ok(Some(self.prepare_match_finish(winner,reason,at)?))
+        Ok(Some(self.prepare_match_finish_using(winner,reason,at,||self.match_sample_with_units(units.iter().map(|u|(u.owner,u.kind,u.hp))))?))
     }
 }
