@@ -23,6 +23,9 @@ pub struct RegionState {
     pub progress: f64,
     pub capper: Option<usize>,
     pub contested: bool,
+    /// Absent until the live source phase computes production locks.
+    pub locked: Option<bool>,
+    pub cap_tick: Option<i64>,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct ResourceNode {
@@ -256,6 +259,8 @@ impl Match {
                     progress: if r.home.is_some() { 1.0 } else { 0.0 },
                     capper: None,
                     contested: false,
+                    locked: None,
+                    cap_tick: None,
                 })
             })
             .collect::<Result<Vec<_>, String>>()?;
@@ -295,10 +300,10 @@ impl Match {
             combat: crate::match_combat::CombatState::default(),
             environment: crate::environment::EnvironmentRuntime::default(),
             firing: crate::match_firing::FiringState::default(),
+            assault: None,
             recipients: Vec::new(),
             routing_fog: crate::fog::Fog::default(),
             tick_state: crate::match_tick::TickState::default(),
-            fallen: crate::match_story::FallenLocations::default(),
             world_runtime: Some(runtime),
             commands: crate::match_commands::MatchCommands::new(4096),
             grid: SpatialGrid::new(&world.game.units, 16.0),
@@ -316,6 +321,7 @@ impl Match {
             logistics: crate::logistics::LogisticsState::default(),
             capture_ticks: Vec::new(),
             story: vec![crate::match_story::PlayerStory::default(); count],
+            fallen: crate::match_story::FallenLocations::default(),
             finish: None,
             timeline: Vec::new(),
             next_unit_id: 1,

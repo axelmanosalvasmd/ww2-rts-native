@@ -21,6 +21,7 @@ use ww2_core::{
     match_abilities::AbilityState,
     match_combat::CombatState,
     match_commands::{MatchCommands, UnitControl},
+    match_end::MatchSample,
     match_firing::{FiringState, LiveFlight},
     match_recovery::RecoveryState,
     match_runtime::{Match, MatchOptions, PlayerConfig},
@@ -644,7 +645,11 @@ impl Projection {
         let timeline = json!(
             m.timeline
                 .iter()
-                .map(|s| json!({"t":s.t,"vp":s.vp}))
+                .map(|s| match s {
+                    MatchSample::Conquest { t, vp } => json!({"t":t,"vp":vp}),
+                    MatchSample::Territories { .. } =>
+                        panic!("companion-tick fixture cannot represent a Territories timeline"),
+                })
                 .collect::<Vec<_>>()
         );
         let empty_timeline = json!([]);

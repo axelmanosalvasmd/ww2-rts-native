@@ -108,6 +108,7 @@ impl Match {
         let home = self.reaction_home(id)?;
         let route = self.command_route(u.owner, &u, home)?;
         crate::match_runtime::cancel_field_work_state(&mut self.field_works, &mut u)?;
+        self.commands.requests.clear_failures(id);
         // The source retreat reset assigns targetId directly; its existing claim
         // remains until the next tick's claim rebuild.
         self.firing.initialize(id).target_id = 0;
@@ -140,6 +141,7 @@ impl Match {
         c.nade = None;
         c.enter = None;
         c.fire_at = None;
+        c.route_end = Some(route.route_end);
         c.outcome = Some(MoveOutcome::Interrupted);
         c.outcome_tick = Some(self.world.game.tick);
         self.world.game.units.insert(id, u);

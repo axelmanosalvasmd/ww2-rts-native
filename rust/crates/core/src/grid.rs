@@ -46,6 +46,19 @@ pub struct SpatialGrid {
 }
 
 impl SpatialGrid {
+    /// Administrative preparation preserves bucket and encounter order without a rebuild.
+    pub(crate) fn clone_for_transaction(&self) -> Self {
+        Self {
+            size: self.size,
+            buckets: self.buckets.clone(),
+            heavy_buckets: self.heavy_buckets.clone(),
+            records: self.records.clone(),
+            owners: self.owners.clone(),
+            next_order: self.next_order,
+            moved: self.moved.clone(),
+        }
+    }
+
     /// An index over `units` with buckets `size` metres square (16 in the game).
     pub fn new<U: Placed>(units: &BTreeMap<UnitId, U>, size: f64) -> Self {
         let mut grid = SpatialGrid {

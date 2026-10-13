@@ -84,6 +84,7 @@ impl TestWorld {
             path: points(&v["path"]),
             world_goal: (!v["worldGoal"].is_null()).then(|| point(&v["worldGoal"])),
             orders: points(&v["orders"]),
+            orders_pending: !v["orders"].as_array().unwrap().is_empty(),
             amove: (!v["amove"].is_null()).then(|| point(&v["amove"])),
             stuck: v["stuck"].as_f64().unwrap(),
         }

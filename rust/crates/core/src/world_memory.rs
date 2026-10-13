@@ -54,6 +54,7 @@ pub struct KnownRegion {
     pub contested: bool,
 }
 
+#[derive(Clone)]
 pub struct TeamMemory {
     rows: Vec<WorldRow>,
     positions: BTreeMap<usize, usize>,
@@ -66,11 +67,15 @@ pub struct TeamMemory {
     path_at: Option<u64>,
     routes: RouteKnowledge,
     pub(crate) regions: Vec<KnownRegion>,
-    pub(crate) wrecks: Vec<Wreck>,
+    pub(crate) wrecks: Vec<crate::recipient_lists::RememberedWreck>,
+    pub(crate) wreck_queries: Vec<Wreck>,
 }
 impl TeamMemory {
     pub fn rows(&self) -> &[WorldRow] {
         &self.rows
+    }
+    pub fn contains_cell(&self, cell: usize) -> bool {
+        self.positions.contains_key(&cell)
     }
     pub fn version(&self) -> u64 {
         self.version
@@ -79,7 +84,20 @@ impl TeamMemory {
         &self.regions
     }
     pub fn remembered_wrecks(&self) -> &[Wreck] {
-        &self.wrecks
+        &self.wreck_queries
+    }
+    pub fn remembered_wreck_rows(&self) -> Result<Vec<crate::recipient_lists::WreckRow>, String> {
+        self.wrecks
+            .iter()
+            .map(|row| {
+                row.display.clone().ok_or_else(|| {
+                    format!(
+                        "missing observed World wreck display facts: {}",
+                        row.query.id.unwrap_or(0)
+                    )
+                })
+            })
+            .collect()
     }
     pub fn query(&self) -> RouteQuery<'_> {
         self.routes.query()
@@ -93,7 +111,7 @@ impl TeamMemory {
             .ok_or("World memory cursor exhausted".into())
     }
 }
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct Sent {
     revisions: BTreeMap<usize, (i32, u64)>,
     at: Option<u64>,
@@ -105,7 +123,7 @@ pub(crate) struct BoundUnit {
     pub hp: f64,
     pub at: Point,
 }
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct WorldLive {
     pub(crate) tick: Option<i64>,
     pub(crate) units: Vec<BoundUnit>,
@@ -129,7 +147,7 @@ impl WorldLive {
     }
 }
 /// Lazy source-order team memories. Local actor routing has no sent cursor.
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct WorldMemory {
     pub(crate) teams: Vec<(i32, TeamMemory)>,
     sent: BTreeMap<usize, Sent>,
@@ -139,6 +157,17 @@ pub struct WorldMemory {
     visible_cells: BTreeMap<i32, (Option<i64>, Vec<usize>)>,
 }
 impl WorldMemory {
+    pub(crate) fn validate_binding(&self, world: &World) -> Result<(), String> {
+        let binding = (
+            world.game.w,
+            world.game.h,
+            world.initial().chars.as_ptr() as usize,
+        );
+        if self.binding.is_some_and(|old| old != binding) {
+            return Err("World memory belongs to another terrain".into());
+        }
+        Ok(())
+    }
     pub fn team(&self, team: i32) -> Option<&TeamMemory> {
         self.teams.iter().find(|(t, _)| *t == team).map(|(_, m)| m)
     }
@@ -158,6 +187,19 @@ impl WorldMemory {
         team: i32,
         rails: &crate::match_world_rails::WorldRails,
     ) -> Result<usize, String> {
+        let (count, receipt) = self.refresh_impl(world, rules, team, rails, None, false)?;
+        receipt.commit(world)?;
+        Ok(count)
+    }
+    pub(crate) fn refresh_impl(
+        &mut self,
+        world: &World,
+        rules: &Rules,
+        team: i32,
+        rails: &crate::match_world_rails::WorldRails,
+        observer: Option<crate::staged_observer::StagedObserver<'_>>,
+        capture_frame: bool,
+    ) -> Result<(usize, crate::world::ObservationReceipt), String> {
         validate(world, rules, team)?;
         if rails
             .rail_at
@@ -174,15 +216,13 @@ impl WorldMemory {
         let station_at = rails.station_at.iter().copied().collect::<BTreeMap<_, _>>();
         let g = &world.game;
         let binding = (g.w, g.h, world.initial().chars.as_ptr() as usize);
-        if self.binding.is_some_and(|b| b != binding) {
-            return Err("World memory belongs to another terrain".into());
-        }
+        self.validate_binding(world)?;
         let end = world.journal_end().map_err(|e| e.to_string())?;
         let key = (g.vision_tick, g.terrain_version, g.reveal);
         let same_key = self.team(team).is_some_and(|m| m.key == Some(key));
-        let fog = self.fog.team(g, rules, team);
+        let fog = self.fog.team_with_observer(g, rules, team, observer);
         if same_key {
-            return Ok(0);
+            return Ok((0, world.defer_journal_trim(None, capture_frame)?));
         }
         let vis = fog.vis.clone();
         let fog_key = fog.key;
@@ -291,6 +331,7 @@ impl WorldMemory {
                     routes,
                     regions: Vec::new(),
                     wrecks: Vec::new(),
+                    wreck_queries: Vec::new(),
                 },
             ));
         }
@@ -312,12 +353,11 @@ impl WorldMemory {
         m.seen = Some(vis);
         m.journal_at = Some(end);
         self.binding = Some(binding);
-        if world.journal().len() >= 65536 && trim_at > base {
-            world
-                .trim_journal_before(trim_at)
-                .map_err(|e| e.to_string())?;
-        }
-        Ok(count as usize)
+        let trim = (world.journal().len() >= 65536 && trim_at > base).then_some(trim_at);
+        Ok((
+            count as usize,
+            world.defer_journal_trim(trim, capture_frame)?,
+        ))
     }
     /// A full read preserves first insertion order; incremental reads resolve
     /// the current row identity at each log entry. Route reads use another cursor.
