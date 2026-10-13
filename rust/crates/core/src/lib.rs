@@ -20,3 +20,4 @@ pub mod terrain;
 pub mod traffic;
 pub mod vehicle;
 pub mod vision;
+pub mod weather;

@@ -124,6 +124,14 @@ Decided now so release stays cheap:
 3. Unreal game: terrain, units, effects, HUD, sound, then the FPS view, with the browser client still working alongside.
 4. Retire the JavaScript client and Node server in ww2-rts.
 
+## Weather planning and public helpers (2026-10-13)
+
+`weather.rs` ports map mood/default selection, seeded weather plans, the single planned transition, warning rows, effect descriptions, AI caution and the presentation road mask from `shared/weather.js`. Weather multipliers, their ordering and the warning interval come from the compiled catalog. Existing movement speed and sight functions are unchanged. Plan state is separate from `Game` and can be held by a future match aggregate.
+
+The planner takes an explicit `u32` seed and preserves the reference's private three-draw mulberry32 sequence. It does not consume the new global match streams. A future match initializer can draw and record one plan seed; that integration is not implemented here. `WeatherPlan.at` is a simulation tick, including for map defaults, whose reference helper expresses its transition in seconds. Typed weather names reject unknown values; metadata and lobby-choice adapters retain the reference fallback to the map's default. Road masks require a nonempty rectangular ASCII terrain view and describe the client's road appearance, not simulation road flags.
+
+The fixture calls the original JavaScript helpers for 158 metadata cases, 5,682 seeded/explicit plans, 590 warning and transition rows, every weather description and AI caution value, and 231 synthetic road cases. It checks road-mask fingerprints for all 33 existing public authored-map projections, reusing those committed inputs rather than copying them. Local focused tests compare plans, rows, masks and floating-point AI caution bits exactly. Living rain, wet-ground changes, full match initialization, server snapshots and client integration remain outside this slice.
+
 ## Deterministic match inputs (2026-10-13)
 
 The core now has versioned random-stream state and a bounded order queue for the future match loop. The seed is recorded once. Terrain, weather, combat, off-map support and each AI seat derive a separate stream from that seed and a stable purpose key. Additional draws by one AI cannot consume another purpose's draws. Version 1 uses the wrapping integer operations in [Sebastiano Vigna's SplitMix64 reference](https://prng.di.unimi.it/splitmix64.c). It generates a 53-bit fraction for game probabilities and uses rejection sampling for bounded integers. This is simulation randomness, not a source for authentication tokens. Unknown snapshot versions and duplicate or unordered stream entries are rejected.

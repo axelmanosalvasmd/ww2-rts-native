@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Ported pure weather planning, map mood/default selection, one-time transitions, warning rows, effect descriptions, AI caution and presentation road masks to `weather.rs`. Canonical values come from the compiled catalog; the explicit plan seed preserves the reference's local mulberry32 sequence. Five focused tests compare 158 metadata cases, 5,682 plans, 590 transition rows, 231 synthetic roads and all 33 authored public maps with the original JavaScript helpers. Existing movement/sight logic, Game fields, ABI and rules hash are unchanged. Full match initialization, living rain/wet ground and snapshot/client integration remain pending.
+
 - Added versioned match random streams and a bounded tick-order queue. Terrain, weather, combat, off-map support and each AI seat have separate seeded streams; saved stream states resume exactly. Orders apply in tick, issuer and sequence order regardless of arrival order, with explicit duplicate, past-tick and capacity errors. These are core building blocks, not a full match loop or a new wire protocol.
 
 - Recorded embedded map delivery and its 96 live HTTP comparisons in the design and server parity inventory. NET-11 remains in progress: public projections are served, while raw editor reads, map writes and authoritative world loading are still missing.
