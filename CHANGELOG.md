@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Marked the bounded Conquest ability, healing and mine-detection parity rows in progress, with source-only evidence and explicit pending native checks. Paid modes, full tick integration and field construction remain separate.
+
 - Extended recruitment identity admission to reject stale combat, ability and recovery rows before charging or publishing a new unit. This preserves default metadata for a buy followed by an ability in the same recorded-input batch. Native combined verification remains pending.
 
 - Wrote the aimed ground-ability phase against the shared physical-flight and salvo producers, including current-ammo rechecks, automatic route retention and budgeted walks. Smoke admission rejects IDs already held by a smoke cloud or wreck before changing selected units. Fixed cadence healing to use ten ticks of elapsed time and added original-source proof (23 recovery traces, 133 actions). Incoming flight/provision dependencies and native differential checks remain pending.
