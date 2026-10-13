@@ -337,7 +337,10 @@ impl Match {
     pub fn step_supply_convoys(&mut self, winner_decided: bool) -> Result<(), String> {
         self.step_supply_convoys_with_dt(winner_decided, self.rules.movement.tick)
     }
-    fn validate_supply(&self) -> Result<(), String> {
+    pub(crate) fn validate_supply(&self) -> Result<(), String> {
+        self.validate_supply_with_exit(None)
+    }
+    pub(crate) fn validate_supply_with_exit(&self, exiting: Option<u32>) -> Result<(), String> {
         if !matches!(
             self.options.mode,
             crate::economy::Mode::Default | crate::economy::Mode::Conquest
@@ -437,7 +440,7 @@ impl Match {
                 .map_err(|e| e.to_string())?
                 .unit(&self.rules.kinds[u.kind].name)
                 .map_err(|e| e.to_string())?;
-            if u.garrison.is_some() {
+            if u.garrison.is_some() && exiting != Some(u.id) {
                 return Err("supply garrison entry is not represented".into());
             }
             queued_points(&self.commands.units[&u.id], u.id)?;
@@ -449,6 +452,19 @@ impl Match {
             }
         }
         Ok(())
+    }
+    /// Withdrawal exits its house before requesting the existing physical hook.
+    pub(crate) fn withdrawal_handoff(
+        &mut self,
+        id: u32,
+        at: Point,
+        entity: Option<u32>,
+    ) -> Result<bool, String> {
+        self.with_supply_world(|_, _, _, world| {
+            use supply_convoys::World;
+            let unit = world.unit(id).expect("withdrawal unit preflight");
+            Ok(world.handoff(&unit, at, entity, 15.0))
+        })
     }
     fn step_supply_convoys_with_dt(&mut self, winner_decided: bool, dt: f64) -> Result<(), String> {
         if self.convoys.is_none() || winner_decided {

@@ -98,6 +98,7 @@ impl Match {
             .ok_or("reaction path identity exhausted")?;
         let home = self.reaction_home(id)?;
         let route = self.command_route(u.owner, &u, home)?;
+        self.commands.requests.clear_failures(id);
         // The source retreat reset assigns targetId directly; its existing claim
         // remains until the next tick's claim rebuild.
         self.firing.initialize(id).target_id = 0;
@@ -129,6 +130,7 @@ impl Match {
         c.nade = None;
         c.enter = None;
         c.fire_at = None;
+        c.route_end = Some(route.route_end);
         c.outcome = Some(MoveOutcome::Interrupted);
         c.outcome_tick = Some(self.world.game.tick);
         self.world.game.units.insert(id, u);
