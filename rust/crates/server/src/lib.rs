@@ -244,7 +244,7 @@ async fn socket_loop(
     let (cancel, mut cancelled) = watch::channel(false);
     let Ok(id) = server
         .next
-        .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
+        .try_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
     else {
         close(&mut socket, 1013, "connection identity exhausted").await;
         return;

@@ -3,7 +3,7 @@ use ww2_core::{
     economy::{Faction, Mode},
     economy_state::ArmySize,
     match_runtime::{MatchOptions, PlayerConfig},
-    weather::WeatherChoice,
+    weather::{WeatherChoice, WeatherKind},
 };
 
 pub(crate) fn native_match() -> Match {
@@ -21,7 +21,7 @@ pub(crate) fn native_match() -> Match {
                 .collect(),
             shuffle: false,
             army: ArmySize::Standard,
-            weather: WeatherChoice::Clear,
+            weather: WeatherChoice::Fixed(WeatherKind::Clear),
             weather_seed: Some(1),
             living_weather: false,
             map_key: Some("default".into()),
@@ -283,10 +283,10 @@ fn final_hold_frame_precedes_result_and_old_tickets_survive_new_attachment() {
     let (mut h, _, mut ra, _, mut rb) = room();
     let mut state = native_match();
     state
-        .record_story_tally(0, ww2_core::match_story::StoryKey::Kills, 3.4)
+        .record_story_tally(Some(0), ww2_core::match_story::StoryKey::Kills, 3.4)
         .unwrap();
     state
-        .record_story_tally(1, ww2_core::match_story::StoryKey::Losses, 2.4)
+        .record_story_tally(Some(1), ww2_core::match_story::StoryKey::Losses, 2.4)
         .unwrap();
     state.start.economy.players[0].vp = state.start.win_vp;
     let victory = state.apply_conquest_victory().unwrap().unwrap();

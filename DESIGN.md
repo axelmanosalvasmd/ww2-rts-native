@@ -2,6 +2,8 @@
 
 ## Room-host output ownership regressions (2026-10-13, source checkpoint)
 
+The first `7b0f5a8` native attempt stopped at server test compilation: the weather choice requires `Fixed(WeatherKind::Clear)`, and per-player story tallies require `Some(slot)`. The corrections retain the intended clear weather and player ownership. The compiler also reports `AtomicU64::fetch_update` as deprecated in Rust 1.99. Its documented alias `try_update` retains the same relaxed orderings and checked identity increment. No tests passed in that failed attempt.
+
 Two focused host tests exercise the real Match constructor, staged unit publication, ordinary rifle firing and registered building-section reconciliation. They do not insert expected events. An earlier rifle emits committed Flight events before a later mover exhausts its path identity. The host retains that typed failure prefix once and refuses another tick or capture, without consuming a future queued command. A successful section Hurt stays pending through Current captures, appears once in Scheduled output, and is discarded at an empty Scheduled boundary.
 
 The tests and module include passed independent source review at the `853db25` integration checkpoint. They have not yet compiled or run. One frozen room-runtime tree will receive the affected native tests and full release, lint, formatting and FFI checks. Public match admission and complete ordinary-combat delivery remain separate work.

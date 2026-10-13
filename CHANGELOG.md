@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fix the first room-host compile errors by using fixed clear weather and explicit player story slots in the lifecycle tests. Use the pinned Rust toolchain's `try_update` atomic alias with the same ordering and overflow check. The failed compile ran no tests; native verification remains pending.
+
 - Add two room-host regressions using actual rifle Flight and building-section Hurt events. They check retained failure output, refusal after a tick fault, Current capture without delivery, Scheduled delivery once and empty scheduled discard. Source review is clear; native verification is pending.
 
 - Compose the trusted room host with chronological tick output and ordinary recipient shot projection. Preserve successful scheduled batches, current-frame catch-up isolation and typed late-failure event/retirement prefixes. Unsupported AIR, persistent flight/falling actors and ambiguous throws remain explicit frame refusals. The combined native proof is pending.
