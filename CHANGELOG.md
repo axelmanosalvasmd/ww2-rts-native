@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified the bounded World region phase: nine affected debug tests and all 167 locked release workspace tests pass, alongside strict Clippy, formatting, release FFI and 20 original-source traces with 39 transitions. Independent source/oracle review and a copied release-binary replay are clear. Fort seizure, army removal, World finish, logistics and the full World tick remain separate.
+
 - Sorted the additive World module declarations with the pinned formatter after the strict check found their order. The 167 release workspace tests and strict Clippy already pass; the format and FFI gates follow on this formatting-only correction.
 
 - Corrected the World region test import to the canonical world-map typed input module after the first native compile. No phase behavior changed.
