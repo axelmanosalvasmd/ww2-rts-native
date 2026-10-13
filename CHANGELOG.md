@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Merged the checked engineering dependency into a separate carrier source successor, preserving the carrier component and its 14-trace, 66-action oracle. Carrier native and recorded-command consumer checks remain pending; the frozen original checkpoint is unchanged.
+
 - Added an actual-source full-carrier refusal with a paid Dig still active, followed by unload and successful boarding. The replay now requires refusal to preserve the job and spent wallet before successful admission cancels it without refund. Native proof is pending.
 
 - Fixed manual unload to retain missing cargo IDs until the source early-loop prune, preserving occupied seats and cargo flags between those phases. Added an actual-source unload-before-prune trace after independent review found the gap. Native verification is pending.
@@ -11,6 +13,40 @@
 - Kept carrier per-unit validation local to its actor, carrier and live cargo while command admission still preflights all current units. Added a 4,096-entry cargo resource bound without changing ground-carrier seat rules or the source fixture.
 
 - Added a bounded ordinary Match carrier component using canonical board/cargo/riding state, own-seat reservations, recipient-aware routes, paid Dig cancellation, physical ground boarding, riding pose updates and manual unload. The pinned-source recorder covers 14 traces and 66 actions, including stable selection ties, a hidden obstacle and carrier/grid flag receipts. Boats, rail, garrison exits, unrepresented building/entrench work and wrecked-carrier ejection remain explicit unsupported boundaries; command parser/scheduler attachment and native verification are pending.
+- Resolved strict compiler-lint findings in the engineering proof tree: redundant copies, casts and reference layers, independent ability fixture flags, and the existing optional delivery-cursor branch. The full release workspace suite passed before this cleanup; all required gates are rerunning at the final code checkpoint.
+
+- Fixed the inherited World memory recorder to collect remembered-wreck iterators as arrays before JSON serialization. Source regeneration verifies four traces and 119 actions; only the collection projections changed. Runtime memory and cache behavior are unchanged.
+- Restored the World-only logistics preflight lost while integrating the Conquest supply adapter. Ordinary Conquest still initializes logistics; World rejects it before creating state, as the existing startup regression requires.
+
+- Integrated the ground supply adapter with checked World startup and memory. World keeps empty convoy/network defaults and its explicit logistics refusal; final combined native checks remain pending.
+
+- Carried the checked ability-flight recorder prerequisites: direct-launch cases use the actual catalog ability range, and actor inputs preserve the source incoming-hit sentinel. The old inputs placed short-range abilities outside the unchanged source phase guard and replaced the hit sentinel with null. Runtime defaults and geometry are unchanged.
+- Fixed the production differential fixture’s paid-job cost projection to compare MP and Fuel by IEEE bits on both sides. This removes the JSON integer-versus-float mismatch found in the coupled engineering release run without changing production arithmetic or runtime behavior.
+
+- Carried the routing owner’s all-team World buffer mapping repair and 14-case original birth fixture into both consumers. The real training replay keeps its three-case scope; provider cross-team success/history coverage remains separately labeled, with native checks pending.
+
+- Added the existing flight-fixture comparison path to numeric mismatch diagnostics so the coupled native proof can identify missing represented values directly. Core release tests passed before the inherited simtest comparison stopped.
+
+- Corrected the inherited non-finite aimed-command guard to retain the source follow reset on a blocked command. Its full snapshot still verifies unchanged work, wallet, terrain and random state; the valid unsupported-project refusal remains unchanged.
+
+- Joined the checked ordinary-launch buff/AP provider dependency after the coupled release replay found the missing flight payload adjustment. The source multiplier, suppression, rate, naval AP restriction and deferred AP consumption retain their reviewed behavior and launch-refusal guard.
+
+- Carried the verified provider repair for ordered ability refusal results into the engineering union after its release replay exposed lost ineligible selections. Fixture visibility lists now meet the canonical sorted recipient contract. The existing field-work cancellation remains singular and unchanged.
+
+- Removed a duplicated smoke-duration field from an inherited routing fixture. The release workspace compiler exposed the duplicate after the focused engineering and command tests passed.
+
+- Updated inherited native fixture consumers for the complete damage ordering context and ordered pending-cell set. The recovery fixture keeps the existing full actor list, and recruitment snapshots preserve the same cell contents. Native proof is restarting after these test compiler errors.
+
+- Split the existing ability fixture control projection into a local JSON value to fit the macro recursion limit when the engineering library tests compile. The represented fields and expected fixture values are unchanged.
+
+- Repaired the engineering union compiler boundaries: recruitment errors use the existing public re-export, section retirement supplies the source full-list ordering option, and recovery validates optional section maxima before arithmetic. The first native compile exposed these inherited mismatches; the coupled proof is restarting at the repaired checkpoint.
+
+- Corrected the engineering replay to the coordinated command constructor and checked excluded work through parse plus dispatch. Queued digs and known excluded forts are represented inputs whose dispatcher returns unsupported. Native execution remains pending.
+
+- Joined the typed Dig dispatcher and canonical request/cancellation hooks into the engineering proof tree. Added unchanged-state checks for queued digs and excluded fort kinds at the parser boundary. Native execution remains queued.
+- Corrected inherited ability and recovery fixture constructors to use the checked command owner’s explicit 4,096-order capacity and tick-one queue initialization. Their former Default calls did not exist on this combined ancestry. Native verification remains pending.
+
+- Preserved invalid-coordinate refusal precedence for typed aimed abilities over the new unsupported-project preflight. The existing project-boundary regression now includes a nonfinite typed aim; raw JSON behavior is unchanged. Native proof remains pending.
 
 - Applied the ability owner’s narrow paid-work cancellation fix to the Dig integration. Accepted manual aimed abilities remove the canonical job without refund; unsupported project state rejects before selection writes. Updated the original-source fixture and retained focused paid-work and refusal regressions. Native proof remains pending.
 
@@ -233,6 +269,9 @@
 - Fixed publication validation rejecting unrelated casualties with negative HP before source death removal. Existing units accept finite negative health, while new drafts and staged squad HP stay nonnegative. An added original-source buy trace protects the admission behavior.
 
 - Added explicit World actor staging and publication policy to the shared unit guard while keeping ordinary commander checks strict. Three focused regressions now cover refused/aborted batches, ordered HP/payment publication and the World-only neutral identity; native verification is pending.
+- Fixed the field-work recorder route projection to compare the requested Point coordinates. The source ordinary dig goal aliases its full job object; copying that object had incorrectly compared job metadata with the typed route point. Job snapshots and source motion remain unchanged.
+
+- Added ordinary paid field-work placement and timed terrain execution for trenches, sandbags, wire, traps, Gun Pits, mines, known-mine clearing and Field Hospitals. Canonical dig records retain source cell order, visibility masking, engineer pace, per-cell ground checks and float32 trench fronts; prepared admission spends once and refused replacements preserve paid work. The original JavaScript recorder covers 22 traces and 367 actions. Dispatcher, routing and story integration, queues/shared projects, bridges, concrete buildings and fill work remain pending.
 
 - Added the native Match Conquest victory phase and finish bookkeeping: team VP in slot order, latest still-held capture location, 0.1 m end rounding, first-winner preservation, reveal and exact Conquest timeline fields. Canonical point accounting now freezes VP and capture story counts after the winner while ownership and manpower can continue. Three focused tests compare 12 original-JavaScript traces (24 assembled-match checkpoints) and invalid-state atomicity; existing startup and point-income tests pass. Other modes, command refusal, remaining story counters, result transport and the full battle loop remain unfinished.
 - Reserved two path-identity increments before a movement block, covering a replacement route followed by a physical obstruction. Exhaustion rejects before unit mutation instead of risking a debug overflow or release wrap.

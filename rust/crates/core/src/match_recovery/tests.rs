@@ -315,7 +315,7 @@ fn make(case: &Value) -> (Match, Vec<u32>) {
     m.firing = FiringState::default();
     m.combat = CombatState::default();
     m.recovery = RecoveryState::default();
-    m.commands = MatchCommands::default();
+    m.commands = MatchCommands::new(4096);
     m.logistics = LogisticsState::default();
     m.story = vec![PlayerStory::default(); 3];
     m.grid = SpatialGrid::new(&m.world.game.units, 16.);
@@ -325,6 +325,8 @@ fn make(case: &Value) -> (Match, Vec<u32>) {
     }
     for p in &mut m.world.game.players {
         p.visible = order.clone();
+        p.visible.sort_unstable();
+        p.visible.dedup();
     }
     m.options.logistics = case["logistics"].as_bool().unwrap();
     m.convoys = ConvoyState::setup(m.options.logistics);
@@ -487,6 +489,7 @@ fn represented_recovery_phases_match_original_source() {
                         owner: Some(a["owner"].as_i64().unwrap_or(1) as i32),
                         contact_id: Some(&contact),
                         direction: None,
+                        actor_order: None,
                         debit_entity: true,
                         skip_buildings: &skip,
                         memory: None,

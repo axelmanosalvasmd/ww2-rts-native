@@ -64,7 +64,7 @@ fn make(case: &Value) -> Match {
             players: (0..2)
                 .map(|slot| PlayerConfig {
                     name: format!("p{slot}"),
-                    team: slot as i32,
+                    team: slot,
                     faction: Faction::try_from(slot as u8).unwrap(),
                 })
                 .collect(),
@@ -92,7 +92,7 @@ fn make(case: &Value) -> Match {
             visible: Vec::new(),
         })
         .collect();
-    m.commands = MatchCommands::default();
+    m.commands = MatchCommands::new(4096);
     m.abilities = AbilityState::default();
     m.firing = FiringState::default();
     m.combat = CombatState::default();
@@ -237,6 +237,22 @@ fn admission_guards_reject_before_payment_or_cancellation() {
     )
     .unwrap();
     let before = snapshot(&m);
+    for raw in [
+        json!({"t":"dig","ids":[1],"kind":"trench","x":20,"z":20,"queue":true}),
+        json!({"t":"dig","ids":[1],"kind":"bridge","x":20,"z":20}),
+        json!({"t":"dig","ids":[1],"kind":"wall","x":20,"z":20}),
+    ] {
+        let command = Command::from_json(&raw).unwrap();
+        assert_eq!(
+            m.execute_command(0, &command, false).unwrap(),
+            Some(Denial::Unsupported)
+        );
+        assert_eq!(snapshot(&m), before);
+    }
+    assert_eq!(
+        Command::from_json(&json!({"t":"dig","ids":[1],"kind":"unknown","x":20,"z":20})),
+        Err(Denial::Blocked)
+    );
     m.world.game.units.get_mut(&1).unwrap().x = f64::NAN;
     assert_eq!(m.current_dig_goal(1), None);
     m.world.game.units.get_mut(&1).unwrap().x = 20.;

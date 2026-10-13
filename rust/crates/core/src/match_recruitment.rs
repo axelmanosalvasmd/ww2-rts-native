@@ -346,7 +346,7 @@ impl RecruitParts<'_> {
         let placed = self
             .produced_placer
             .produce(
-                &self.rules,
+                self.rules,
                 catalog,
                 view,
                 &game.units,
@@ -477,7 +477,7 @@ impl RecruitParts<'_> {
             route_end = Some(path.route_end);
             route_status = Some(path.status);
         }
-        let mut control = crate::match_commands::UnitControl::new(&placed.unit, &self.rules)
+        let mut control = crate::match_commands::UnitControl::new(&placed.unit, self.rules)
             .map_err(|_| RecruitError::InvalidState("unit control metadata"))?;
         control.aim = placed.aim;
         control.rally_drift = placed.rally.is_some();
@@ -491,12 +491,12 @@ impl RecruitParts<'_> {
         let publication = crate::unit_publication::prepare_publication(
             crate::unit_publication::PublicationParts {
                 units: &mut self.world.game.units,
-                grid: &mut self.grid,
+                grid: self.grid,
                 controls: &mut self.commands.units,
-                recruitment: &mut self.recruit_metadata,
+                recruitment: self.recruit_metadata,
                 next_id: self.next_unit_id,
             },
-            &self.rules,
+            self.rules,
             count,
             vec![crate::unit_publication::StagedUnit {
                 unit: placed.unit,

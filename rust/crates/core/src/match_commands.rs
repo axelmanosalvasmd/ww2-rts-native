@@ -629,10 +629,10 @@ impl crate::match_runtime::Match {
             }
             return match self.recorded_buy(owner, kind, *from) {
                 Ok(_) => Ok(None),
-                Err(crate::match_recruitment::RecruitError::Admission(
+                Err(crate::match_runtime::RecruitError::Admission(
                     crate::production::Error::Denied(d),
                 )) => Ok(Some(d.into())),
-                Err(crate::match_recruitment::RecruitError::Placement(
+                Err(crate::match_runtime::RecruitError::Placement(
                     crate::produced_units::Error::UnsupportedAir,
                 )) => Ok(Some(Denial::Unsupported)),
                 Err(e) => Err(format!("recorded buy: {e:?}")),
@@ -802,11 +802,18 @@ impl crate::match_runtime::Match {
                 return self.move_command(owner, orders, *attack_move, *queue, *together, *face);
             }
             Command::Ability {
+                ids,
                 at,
                 queue,
                 automatic,
-                ..
-            } => return self.apply_ability_selection(owner, &selected, *at, *queue, *automatic),
+            } => {
+                let ordered = ids
+                    .iter()
+                    .take(limit)
+                    .map(|id| self.eligible_command_unit(*id, owner, command))
+                    .collect::<Vec<_>>();
+                return self.apply_ability_selection(owner, &ordered, *at, *queue, *automatic);
+            }
             Command::Autocast { on, .. } => {
                 let ready: Vec<_> = selected
                     .into_iter()

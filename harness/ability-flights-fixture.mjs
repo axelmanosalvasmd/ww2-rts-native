@@ -48,14 +48,15 @@ for(const [kind,def] of [...grenades,...barrages])for(const variation of ['plain
  g.units.clear();g.claims=new Map();g.nextId=1;g.seed=123;g.wind={a:0,v:.5};g.wx={rain:0,wet:0};
  const u=sim.internals.spawnUnit(g,0,kind),t=sim.internals.spawnUnit(g,1,naval?'gunboat':'rifle'),other=sim.internals.spawnUnit(g,1,naval?'gunboat':'tank');
  Object.assign(u,{x:25,z:naval?30:15,rot:0,aim:0,still:20,cooldown:0,retarget:0,targetId:0,holdFire:false,attackId:0,auto:false,buff:0,ap:false});
- Object.assign(t,{x:35,z:u.z,rot:Math.PI,still:20});Object.assign(other,{x:34,z:u.z+3,rot:0,still:20});
+ const targetX=u.x+Math.min(10,def.ab.range??10);
+ Object.assign(t,{x:targetX,z:u.z,rot:Math.PI,still:20});Object.assign(other,{x:targetX-1,z:u.z+3,rot:0,still:20});
  if(variation==='edge'){Object.assign(u,{x:145,z:45});Object.assign(t,{x:153,z:45});Object.assign(other,{x:154,z:47});}
  if(variation==='garrison')u.garrison=Math.floor(u.z/2)*g.w+Math.floor(u.x/2);
  if(variation==='ammo-low'&&def.w?.perModel)u.hp=def.hpPer*2;
  if(variation==='ammo-low')u.logistics={ammo:2,ammoMax:20,ammoPrice:1,ammoCredit:0,provisions:120,forced:false,stranded:false,exhausted:false};
  g.players[0].visible=new Set([2,3]);g.players[1].visible=new Set([1]);grid.rebuildGrid(g);g.nextId=1000;
- const input=[...g.units.values()].map(u=>({id:u.id,kind:u.type,owner:u.owner,x:u.x,z:u.z,rot:u.rot,hp:u.hp,still:u.still,supp:u.supp,xp:u.xp,hitBy:null,hitAt:u.hitAt,hitFrom:null,target:0,shotAt:null,logistics:u.logistics?structuredClone(u.logistics):null,hold:false,attack:0,aim:u.aim,cooldown:0,retarget:0}));
- const at=variation==='edge'?{x:160,z:48}:{x:35,z:u.z},random=combatRandom(701);g.tick=1;const saved=Math.random;Math.random=()=>random.next();try{
+ const input=[...g.units.values()].map(u=>({id:u.id,kind:u.type,owner:u.owner,x:u.x,z:u.z,rot:u.rot,hp:u.hp,still:u.still,supp:u.supp,xp:u.xp,hitBy:u.hitBy??null,hitAt:u.hitAt,hitFrom:null,target:0,shotAt:null,logistics:u.logistics?structuredClone(u.logistics):null,hold:false,attack:0,aim:u.aim,cooldown:0,retarget:0}));
+ const at=variation==='edge'?{x:160,z:48}:{x:targetX,z:u.z},random=combatRandom(701);g.tick=1;const saved=Math.random;Math.random=()=>random.next();try{
   if(def.ab.id==='barrage')sim.launchSalvo(g,u,at,def.ab.shells);
   else{u.nade=at;sim.__abilityLaunch(g,u);}
  }finally{Math.random=saved;}

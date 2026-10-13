@@ -268,7 +268,7 @@ fn make(case: &Value) -> (Match, Vec<u32>) {
         p.mun = 0.;
         p.fuel = 0.;
     }
-    m.commands = MatchCommands::default();
+    m.commands = MatchCommands::new(4096);
     m.abilities = AbilityState::default();
     m.firing = FiringState::default();
     m.firing.next_flight = 2000;
@@ -304,6 +304,8 @@ fn make(case: &Value) -> (Match, Vec<u32>) {
     }
     for p in &mut m.world.game.players {
         p.visible = order.clone();
+        p.visible.sort_unstable();
+        p.visible.dedup();
     }
     // Match::new initialized the old world. Bind fresh observation state to this
     // component fixture's actual initial terrain, without a public restore API.
@@ -352,8 +354,10 @@ fn snapshot(m: &Match, order: &[u32], shots: &[Value]) -> Value {
     let units=order.iter().map(|id|{
         let u=&g.units[id];let c=&m.commands.units[id];let a=m.abilities.get(*id).unwrap();let f=m.firing.get(*id).unwrap();
         let outcome=c.outcome.map(|o|match o{MoveOutcome::Interrupted=>"interrupted",MoveOutcome::Moving=>"moving",MoveOutcome::Unreachable=>"unreachable",MoveOutcome::Arrived=>"completed"});
-        let mut nade=c.nade.map(at).unwrap_or(Value::Null);if !nade.is_null(){if a.aimed_auto{nade["auto"]=json!(true);}if a.aimed_walked{nade["walked"]=json!(true);}}
-        json!({"id":id,"hp":u.hp,"x":u.x,"z":u.z,"cd":a.cooldown,"buff":a.buff,"ap":a.ap,"sprint":u.sprint,"supp":u.supp,"nade":nade,"path":u.path.iter().copied().map(at).collect::<Vec<_>>(),"retreating":u.retreating,"logistics":m.logistics.get(*id).map(|r|json!({"ammo":r.ammo,"forced":r.forced,"stranded":r.stranded})),"control":{"follow":c.follow,"auto":c.auto_cast,"autoRetreat":c.auto_retreat,"holdFire":c.hold_fire,"holdPos":u.hold_pos,"attackId":c.attack_id,"targetId":f.target_id,"orders":orders(&c.orders),"face":c.face.is_some(),"entrench":u.entrench,"dig":u.dig,"build":u.build,"enter":c.enter.map_or(-1,|v|v as i64),"board":u.board,"amove":u.amove.map(at),"fireAt":c.fire_at.map_or(-1,|v|v as i64),"stuck":u.stuck,"drift":u.drift,"reverse":u.reverse.map(at),"repath":u.repath,"cooldown":f.cooldown,"retarget":f.retarget,"traffic":u.traffic.is_some(),"trafficWait":u.traffic_wait,"moveOutcome":outcome,"moveOutcomeTick":c.outcome_tick,"moveResult":if c.outcome==Some(MoveOutcome::Unreachable){json!(["unreachable",c.outcome_tick])}else{Value::Null},"worldGoal":u.world_goal.map(at),"garrison":u.garrison.map_or(-1,|v|v as i64),"shotAt":u.shot_at}})
+        let mut nade=c.nade.map(at).unwrap_or(Value::Null);if !nade.is_null(){if a.aimed_auto{nade["auto"]=json!(true);}
+        if a.aimed_walked{nade["walked"]=json!(true);}}
+        let control = json!({"follow":c.follow,"auto":c.auto_cast,"autoRetreat":c.auto_retreat,"holdFire":c.hold_fire,"holdPos":u.hold_pos,"attackId":c.attack_id,"targetId":f.target_id,"orders":orders(&c.orders),"face":c.face.is_some(),"entrench":u.entrench,"dig":u.dig,"build":u.build,"enter":c.enter.map_or(-1,|v|v as i64),"board":u.board,"amove":u.amove.map(at),"fireAt":c.fire_at.map_or(-1,|v|v as i64),"stuck":u.stuck,"drift":u.drift,"reverse":u.reverse.map(at),"repath":u.repath,"cooldown":f.cooldown,"retarget":f.retarget,"traffic":u.traffic.is_some(),"trafficWait":u.traffic_wait,"moveOutcome":outcome,"moveOutcomeTick":c.outcome_tick,"moveResult":if c.outcome==Some(MoveOutcome::Unreachable){json!(["unreachable",c.outcome_tick])}else{Value::Null},"worldGoal":u.world_goal.map(at),"garrison":u.garrison.map_or(-1,|v|v as i64),"shotAt":u.shot_at});
+        json!({"id":id,"hp":u.hp,"x":u.x,"z":u.z,"cd":a.cooldown,"buff":a.buff,"ap":a.ap,"sprint":u.sprint,"supp":u.supp,"nade":nade,"path":u.path.iter().copied().map(at).collect::<Vec<_>>(),"retreating":u.retreating,"logistics":m.logistics.get(*id).map(|r|json!({"ammo":r.ammo,"forced":r.forced,"stranded":r.stranded})),"control":control})
     }).collect::<Vec<_>>();
     let flights=m.firing.flights.values().map(|p|json!({"id":p.id,"owner":p.owner,"shooter":p.shooter,"kind":m.rules.kinds[p.source_kind].name,"x":p.solution.origin.x,"y":p.solution.origin.y,"z":p.solution.origin.z,"vx":p.solution.velocity.x,"vy":p.solution.velocity.y,"vz":p.solution.velocity.z,"gravity":p.solution.gravity,"launched":p.launched,"last":p.last,"expires":p.expires,"energy":p.energy,"sequence":p.sequence,"maxContacts":p.max_contacts,"near":p.near,"launchOrigin":{"x":p.launch_origin.x,"y":p.launch_origin.y,"z":p.launch_origin.z},"startCell":p.start_cell,"explosive":p.explosive,"blastRadius":p.blast_radius,"blastSource":p.blast_source.as_ref().map(blast),"effect":p.effect,"sent":p.sent,"intended":p.intended,"damageScale":p.damage_scale,"ap":p.armor_piercing,"apMultiplier":p.ap_multiplier,"apNaval":p.ap_naval,"suppression":p.suppression,"suppressionScale":p.suppression_scale,"terrain":p.terrain,"scar":p.scar})).collect::<Vec<_>>();
     json!({"tick":g.tick,"units":units,"wallets":m.start.economy.players.iter().map(|p|json!({"mp":p.mp,"mun":p.mun,"fuel":p.fuel})).collect::<Vec<_>>(),"smokes":g.smokes.iter().map(|s|json!({"id":s.id,"x":s.x,"z":s.z,"r":s.r,"t":s.remaining})).collect::<Vec<_>>(),"shots":shots,"flights":flights,"salvos":m.firing.salvos.iter().map(|s|json!({"x":s.at.x,"z":s.at.z,"owner":s.owner,"left":s.left,"next":s.next,"spread":s.spread,"every":s.every})).collect::<Vec<_>>(),"nades":m.firing.grenades.iter().map(|s|json!({"x":s.at.x,"z":s.at.z,"t":s.remaining,"owner":s.owner,"flight":s.flight})).collect::<Vec<_>>(),"nextId":m.next_unit_id,"nextFlight":m.firing.next_flight,"combatSeed":701,"combatRandomState":state,"randomCalls":draws})
@@ -502,6 +506,28 @@ fn conquest_abilities_match_original_source_phases() {
                 Some(crate::match_commands::Denial::Unsupported)
             );
             assert_eq!(snapshot(&m, &order, &[]), before);
+            assert_eq!(
+                m.execute_command(
+                    0,
+                    &Command::Ability {
+                        ids: vec![1],
+                        at: Some(Point {
+                            x: f64::NAN,
+                            z: 15.
+                        }),
+                        queue: false,
+                        automatic: false,
+                    },
+                    false,
+                )
+                .unwrap(),
+                Some(crate::match_commands::Denial::Blocked),
+                "invalid typed aim retains coordinate refusal precedence",
+            );
+            // Source mine releases follow before refusing a non-finite aimed command.
+            let mut invalid_expected = before.clone();
+            invalid_expected["units"][0]["control"]["follow"] = json!(0);
+            assert_eq!(snapshot(&m, &order, &[]), invalid_expected);
             unsupported_work += 1;
             continue;
         }
@@ -711,4 +737,33 @@ fn manual_aimed_ability_cancels_real_paid_work_without_refund() {
     assert!(!m.world.game.units[&1].dig);
     assert_eq!(m.start.economy.players[0].mp, initial_mp - cost);
     assert_eq!(m.world.game.chars, terrain);
+}
+
+#[test]
+fn rejected_ap_launch_preserves_loaded_round_ammunition_and_random_stream() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/match-ability.json")).unwrap();
+    let case = fixture["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|v| v["name"] == "loaded-ap-consumed-after-qualifying-fire")
+        .unwrap();
+    let (mut m, order) = make(case);
+    let command = command(&case["actions"][0]["cmd"], false);
+    assert_eq!(m.execute_command(0, &command, false).unwrap(), None);
+    assert!(m.abilities.get(1).unwrap().ap);
+    m.begin_firing_tick(&order).unwrap();
+    m.firing.next_flight = 9_007_199_254_740_991;
+    let ability = *m.abilities.get(1).unwrap();
+    let ammo = m.logistics.get(1).cloned();
+    let random = m.start.random.snapshot();
+    let error = m.apply_unit_firing(1, false, 0.05).unwrap_err();
+    assert!(error.contains("flight ID exhausted"), "{error}");
+    assert_eq!(m.abilities.get(1), Some(&ability));
+    assert_eq!(m.logistics.get(1), ammo.as_ref());
+    assert_eq!(m.start.random.snapshot(), random);
+    assert_eq!(m.firing.next_flight, 9_007_199_254_740_991);
+    assert!(m.firing.flights.is_empty());
+    assert!(m.firing.take_events().is_empty());
 }
