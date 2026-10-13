@@ -395,12 +395,13 @@ impl EconomyState {
                     let own: Vec<_> = regions.iter().filter(|r| r.team == team).collect();
                     let mut region_mp = 0.0;
                     for r in &own {
-                        region_mp += number(tuning, "regionMP")?
-                            + if r.kind == RegionKind::City {
-                                number(tuning, "cityMP")?
-                            } else {
-                                0.0
-                            };
+                        // Preserve the source's left-to-right reduction, including the zero.
+                        region_mp += number(tuning, "regionMP")?;
+                        region_mp += if r.kind == RegionKind::City {
+                            number(tuning, "cityMP")?
+                        } else {
+                            0.0
+                        };
                     }
                     mp_base += region_mp / mates;
                     fuel_base += own

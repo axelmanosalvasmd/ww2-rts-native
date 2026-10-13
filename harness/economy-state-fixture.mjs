@@ -26,6 +26,7 @@ const income = slice('  const teamVp = (t) =>', '  stepConvoys(g, dt, supplyHook
 const run = new Function('CFG', 'UNITS', 'WORLD_TUNING', 'allied', 'CELL', `${region}\n${world}\nreturn (g, dt) => { const list = [...g.units.values()]; ${income}\n};`)(sim.CFG, sim.UNITS, WORLD_TUNING, sim.allied, sim.CELL);
 const bits = n => { const b = Buffer.alloc(8); b.writeDoubleBE(n); return b.toString('hex'); };
 const clone = v => structuredClone(v);
+const expected = g => g.players.map((p,slot) => ({wallet:['mp','mun','fuel','vp','inc','fuelInc','upkeep'].map(k => p[k] === undefined ? null : bits(p[k])),population:bits(sim.popOf(g,slot)),cap:bits(sim.popCap(g,slot))}));
 const player = (team, vp, extra = {}) => ({ team, vp, mp: 103.25, mun: 9.5, fuel: 8.75, inc: 123, ...extra });
 const unit = (id, owner, type, extra = {}) => ({ id, owner, type, hp: 100, built: 1, queue: [], ...extra });
 const base = {
@@ -56,10 +57,22 @@ for (const mode of modes) for (const army of Object.keys(sim.CFG.armies)) {
     for (const path of step.set) { set(input,path); if (path[0] === 'players') set({players},path); }
     const g = makeGame(step.winner);
     run(g, step.dt);
-    trace.push({set:step.set,dt:step.dt,winner:!!step.winner, expected:players.map((p,slot) => ({wallet:['mp','mun','fuel','vp','inc','fuelInc','upkeep'].map(k => p[k] === undefined ? null : bits(p[k])),population:bits(sim.popOf(g,slot)),cap:bits(sim.popCap(g,slot))}))});
+    trace.push({set:step.set,dt:step.dt,winner:!!step.winner, expected:expected(g)});
   }
   scenarios.push({mode,army,trace});
 }
+// A city after two non-city regions exposes reassociation of (sum + regionMP) + cityMP.
+const groupingBase = {
+  players:[player(0,0,{mp:0,mun:0,fuel:0,inc:0})], units:[], strikes:[], points:[], nodes:[],
+  regions:[{team:0,kind:'other'},{team:0,kind:'other'},{team:0,kind:'city'}],
+};
+const groupingGame = {
+  ...clone(groupingBase), units:new Map(), mode:{kind:'world'}, army:sim.CFG.armies.standard,
+  world:{regions:groupingBase.regions}, winner:null,
+};
+groupingGame.players[0].slot = 0;
+run(groupingGame,1);
+scenarios.push({mode:{kind:'world'},army:'standard',base:groupingBase,trace:[{set:[],dt:1,winner:false,expected:expected(groupingGame)}]});
 // Exercise the World cap clamp before army scaling, all teammates out, and zero seats gained.
 const capCases = [
   {teams:[0,0,1], out:[false,false,false], away:[false,true,false], owned:100, army:'large', slot:0},
@@ -71,4 +84,4 @@ const data = JSON.stringify({reference:pin,base,scenarios,capCases,preview})+'\n
 const dest = `${root}/rust/crates/core/tests/fixtures/economy-state.json`;
 if (process.argv.includes('--check')) { if (readFileSync(dest,'utf8') !== data) throw Error('Economy fixture differs'); }
 else writeFileSync(dest,data);
-console.log(`${process.argv.includes('--check')?'Checked':'Recorded'} ${scenarios.length} traces, ${scenarios.length * steps.length} income steps, ${capCases.length} World cap cases`);
+console.log(`${process.argv.includes('--check')?'Checked':'Recorded'} ${scenarios.length} traces, ${scenarios.reduce((n,s) => n+s.trace.length,0)} income steps, ${capCases.length} World cap cases`);

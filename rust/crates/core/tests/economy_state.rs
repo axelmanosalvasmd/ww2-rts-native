@@ -138,9 +138,9 @@ fn bits(actual: f64, expected: &Value, label: &str) {
 #[test]
 fn income_and_population_match_original_javascript_traces() {
     let f = fixture();
-    assert_eq!(a(&f["scenarios"]).len(), 36);
+    assert_eq!(a(&f["scenarios"]).len(), 37);
     for scenario in a(&f["scenarios"]) {
-        let mut input = f["base"].clone();
+        let mut input = scenario.get("base").unwrap_or(&f["base"]).clone();
         let mut state = EconomyState {
             players: players(&input["players"]),
         };
