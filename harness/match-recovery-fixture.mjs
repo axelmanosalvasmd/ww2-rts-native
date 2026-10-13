@@ -52,7 +52,7 @@ try {
    else if(a.op==='fire'){if(a.value===null)g.fires.delete(a.c);else g.fires.set(a.c,a.value);}
    else if(a.op==='mineOwner')g.mines.set(a.c,a.owner);
    else if(a.op==='convoys'){g.logisticsEnabled=true;H.setupConvoys(g);}
-   else if(a.op==='store')g.convoys.stores.set(a.id,{...a.value,id:a.id,buckets:new Map(a.buckets??[])});
+   else if(a.op==='store')g.convoys.stores.set(a.id,{...a.value,id:a.id,buckets:new Map(structuredClone(a.buckets??[]))});
    else throw Error(a.op);
    grid.rebuildGrid(g);results.push(result);snapshots.push(structuredClone(snapshot()));
   }

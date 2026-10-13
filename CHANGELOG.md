@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed recovery recorder input aliasing: source provision spending now mutates cloned stock, preserving the recorded cache action's five provisions for independent native replay. Output snapshots retain the actual source mutations.
+
 - Used a canonical cache identity in the recovery stock fixture, retaining the original cache-first provision behavior so its native consumer can use the real convoy state. Native replay remains pending.
 
 - Matched recovery aid-owner validation to the canonical unsigned owner type, preserving out-of-range rejection without an impossible negative-owner branch. Native checks remain pending.
