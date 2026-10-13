@@ -208,6 +208,18 @@ impl Match {
         }
         Ok(())
     }
+    /// Admit an ordered recovery loop before it changes health, stock or wallets.
+    /// Canonical store/reserve numbers remain trusted source-owned state.
+    pub fn validate_support_provisions(&self) -> Result<(), String> {
+        if self.convoys.is_none() {
+            return Ok(());
+        }
+        self.validate_supply()?;
+        for owner in 0..self.start.players.len() {
+            self.validate_recipient(owner)?;
+        }
+        Ok(())
+    }
     /// Spend from nearby real stores first, then the current unit's own provisions.
     pub fn spend_support_provisions(
         &mut self,

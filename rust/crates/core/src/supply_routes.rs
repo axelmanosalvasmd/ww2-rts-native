@@ -360,6 +360,7 @@ fn refresh_danger(
     let fresh = state.known_id != Some(identity) || state.flags.len() != v.flags.len();
     if fresh {
         state.known_id = Some(identity);
+        state.paths = Pathfinding::new();
         state.base = v.flags.to_vec();
         state.flags = v.flags.to_vec();
         state.heights = v
