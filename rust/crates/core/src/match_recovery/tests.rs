@@ -257,6 +257,7 @@ fn insert(m: &mut Match, v: &Value, order: &mut Vec<u32>) {
         .filter(|id| *id != 0)
         .map(|id| id as u32);
     m.firing.initialize(id);
+    m.abilities.initialize(id);
     if !v["logistics"].is_null() {
         m.logistics.insert(id, reserves(&v["logistics"]));
     }
@@ -315,6 +316,7 @@ fn make(case: &Value) -> (Match, Vec<u32>) {
     m.firing = FiringState::default();
     m.combat = CombatState::default();
     m.recovery = RecoveryState::default();
+    m.abilities = crate::match_abilities::AbilityState::default();
     m.commands = MatchCommands::new(4096);
     m.logistics = LogisticsState::default();
     m.story = vec![PlayerStory::default(); 3];

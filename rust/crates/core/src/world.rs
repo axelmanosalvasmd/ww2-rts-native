@@ -258,6 +258,10 @@ pub struct World {
     soak: Vec<i64>,
     soak_members: BTreeSet<i64>,
 }
+#[path = "world_transaction.rs"]
+mod transaction;
+pub(crate) use transaction::WorldTransaction;
+
 /// Deferred recipient effects, checked before an infallible publication.
 pub(crate) struct ObservationReceipt {
     frame: Option<ObservationSource>,
@@ -449,6 +453,7 @@ impl World {
             action,
         })
     }
+
     /// Immutable authoring geography. Live team ownership belongs to a future mode state.
     pub fn geography(&self) -> Option<&crate::world_map::WorldDefinition> {
         self.geography.as_ref()

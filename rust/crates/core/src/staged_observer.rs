@@ -38,10 +38,10 @@ impl<'a> StagedObserver<'a> {
                 .built
                 .is_some_and(|v| !v.is_finite() || !(0.0..=1.0).contains(&v))
             || unit.garrison.is_some_and(|c| c >= game.house.len())
-            || unit
-                .cells
-                .as_ref()
-                .is_some_and(|cs| cs.iter().any(|c| *c as usize >= game.chars.len()))
+            || unit.cells.as_ref().is_some_and(|cs| {
+                cs.iter()
+                    .any(|c| !usize::try_from(*c).is_ok_and(|c| c < game.chars.len()))
+            })
         {
             return Err("invalid staged sight observer".into());
         }

@@ -298,6 +298,10 @@ fn actual_engineering_commands_ticks_and_recipient_reads() {
                         report.environment().next().is_none(),
                         "{name}: unexpected outside effects"
                     );
+                    assert!(
+                        report.events.is_empty(),
+                        "{name}: unexpected committed tick events"
+                    );
                     assert!(report.phases.contains(&TickPhase::FieldProjects));
                     assert!(report.phases.contains(&TickPhase::FieldWork));
                     assert_eq!(

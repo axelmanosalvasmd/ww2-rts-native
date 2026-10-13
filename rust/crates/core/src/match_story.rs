@@ -343,10 +343,10 @@ impl Match {
             } else {
                 None
             },
-            mode: if self.world.game.mode.is_none() {
-                "conquest"
-            } else {
-                "assault"
+            mode: match self.options.mode {
+                crate::economy::Mode::World => "world",
+                crate::economy::Mode::Assault => "assault",
+                _ => "conquest",
             },
         }))
     }

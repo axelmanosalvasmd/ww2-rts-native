@@ -67,16 +67,16 @@ pub enum Stance {
 /// Internal recorded input. This is not a WebSocket or C interface.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Command {
-    Destroy {
-        ids: Vec<i64>,
-        id: Option<i64>,
-    },
     Board {
         ids: Vec<i64>,
         target: Option<i64>,
     },
     Unload {
         ids: Vec<i64>,
+    },
+    Destroy {
+        ids: Vec<i64>,
+        id: Option<i64>,
     },
     Entrench {
         ids: Vec<i64>,
@@ -117,6 +117,12 @@ pub enum Command {
         queue: bool,
         together: bool,
         face: Option<f64>,
+    },
+    Cover {
+        ids: Vec<i64>,
+        queue: bool,
+        /// Display anchor for a waiting order, never its eventual cover destination.
+        at: Option<Point>,
     },
     Stop {
         ids: Vec<i64>,
@@ -168,6 +174,8 @@ pub struct UnitControl {
     pub outcome_tick: Option<i64>,
     pub move_result: Option<MoveResult>,
     pub route_end: Option<Point>,
+    pub supply_started: bool,
+    pub supply_retry: Option<u64>,
     pub supply_hold: bool,
     pub supply_escape: bool,
     pub enter: Option<usize>,
@@ -223,6 +231,8 @@ impl UnitControl {
             outcome_tick: None,
             move_result: None,
             route_end: None,
+            supply_started: false,
+            supply_retry: None,
             supply_hold: false,
             supply_escape: false,
             enter: None,
@@ -266,10 +276,11 @@ pub enum Denial {
     Blocked,
     Needs,
     QueueFull,
+    NoCover,
+    Retreating,
     Unsupported,
     Ammo,
     Cooldown,
-    Retreating,
     Munitions,
     Manpower,
     Tier,
@@ -288,10 +299,11 @@ impl Denial {
             Self::Blocked => "blocked",
             Self::Needs => "needs",
             Self::QueueFull => "queueFull",
+            Self::NoCover => "noCover",
+            Self::Retreating => "retreating",
             Self::Unsupported => "unsupported",
             Self::Ammo => "ammo",
             Self::Cooldown => "cooldown",
-            Self::Retreating => "retreating",
             Self::Munitions => "mun",
             Self::Manpower => "mp",
             Self::Tier => "tier",
@@ -371,10 +383,6 @@ impl Command {
                 rows.iter().map(|v| safe_id(v).unwrap_or(-1)).collect()
             });
         match object.get("t").and_then(|v| v.as_str()) {
-            Some("destroy") => Ok(Self::Destroy {
-                ids,
-                id: object.get("id").and_then(safe_id),
-            }),
             Some("board") => Ok(Self::Board {
                 ids,
                 target: object
@@ -382,6 +390,10 @@ impl Command {
                     .then(|| object.get("target").and_then(safe_id).unwrap_or(-1)),
             }),
             Some("unload") => Ok(Self::Unload { ids }),
+            Some("destroy") => Ok(Self::Destroy {
+                ids,
+                id: object.get("id").and_then(safe_id),
+            }),
             Some("entrench") => {
                 use crate::field_works::{Pattern, ProjectMaterial, ProjectOrder};
                 let number = |key: &str| {
@@ -531,6 +543,11 @@ impl Command {
                     face,
                 })
             }
+            Some("cover") => Ok(Self::Cover {
+                ids,
+                queue: object.get("queue").and_then(|v| v.as_bool()) == Some(true),
+                at: None,
+            }),
             Some("ability") => {
                 let at = object
                     .get("x")
@@ -607,6 +624,7 @@ impl Command {
                         && o.at.z.is_finite()
                 }) && face.is_none_or(|a| a.is_finite())
             }
+            Self::Cover { at, .. } => at.is_none_or(|p| p.x.is_finite() && p.z.is_finite()),
             _ => true,
         }
     }
@@ -738,17 +756,20 @@ impl crate::match_runtime::Match {
         if matches!(command, Command::Unsupported) {
             return Ok(Some(Denial::Unsupported));
         }
-        if let Command::Destroy { ids, id } = command {
-            return self.execute_destroy(owner, ids, *id);
-        }
         if let Command::Board { ids, target } = command {
             return self.carrier_board_command(owner, ids, *target, winner_decided);
         }
         if let Command::Unload { ids } = command {
             return self.carrier_unload_command(owner, ids, winner_decided);
         }
+        if let Command::Destroy { ids, id } = command {
+            return self.execute_destroy(owner, ids, *id);
+        }
         if let Command::Entrench { ids, order, queue } = command {
             return self.execute_entrench(owner, ids, *order, *queue, winner_decided);
+        }
+        if let Command::Cover { ids, queue, .. } = command {
+            return self.execute_cover_command(owner, ids, *queue);
         }
         if let Command::Dig {
             ids,
@@ -826,9 +847,9 @@ impl crate::match_runtime::Match {
             | Command::Attack { ids, .. }
             | Command::Escort { ids, .. }
             | Command::Retreat { ids } => ids.clone(),
-            Command::Destroy { .. }
-            | Command::Board { .. }
+            Command::Board { .. }
             | Command::Unload { .. }
+            | Command::Destroy { .. }
             | Command::Entrench { .. }
             | Command::Dig { .. }
             | Command::Technology { .. }
@@ -836,6 +857,7 @@ impl crate::match_runtime::Match {
             | Command::CompanionJoin { .. }
             | Command::CompanionInput { .. }
             | Command::Support { .. }
+            | Command::Cover { .. }
             | Command::Unsupported => unreachable!(),
         };
         let selected_ids: Vec<_> = match command {
@@ -1179,9 +1201,9 @@ impl crate::match_runtime::Match {
                     self.commands.units.get_mut(&id).unwrap().auto_cast = *on;
                 }
             }
-            Command::Destroy { .. }
-            | Command::Board { .. }
+            Command::Board { .. }
             | Command::Unload { .. }
+            | Command::Destroy { .. }
             | Command::Entrench { .. }
             | Command::Dig { .. }
             | Command::Technology { .. }
@@ -1189,6 +1211,7 @@ impl crate::match_runtime::Match {
             | Command::CompanionJoin { .. }
             | Command::CompanionInput { .. }
             | Command::Support { .. }
+            | Command::Cover { .. }
             | Command::Unsupported => unreachable!(),
         }
         Ok(None)
@@ -1436,11 +1459,11 @@ impl crate::match_runtime::Match {
         search_route(&mut self.commands.paths, terrain, rules, kind, u, to).map(|r| r.result)
     }
 }
-struct CommandRoute {
-    result: crate::pathfinding::PathResult,
+pub(crate) struct CommandRoute {
+    pub(crate) result: crate::pathfinding::PathResult,
     failed: bool,
 }
-fn search_route(
+pub(crate) fn search_route(
     paths: &mut Pathfinding,
     terrain: crate::pathfinding::PathTerrain<'_>,
     rules: crate::pathfinding::PathRules,
@@ -1451,6 +1474,7 @@ fn search_route(
     let mut result = paths
         .find_path(terrain, rules, kind, u.at(), to, None)
         .map_err(|e| format!("command path: {e:?}"))?;
+    let live_route_end = result.route_end;
     let mut failed = result.status == crate::pathfinding::PathStatus::Unreachable;
     if result.waypoints.first().is_some_and(|p| {
         !crate::pathfinding::walkable(terrain.navigation, u.at(), *p, kind.block(), 0.9)
@@ -1487,6 +1511,7 @@ fn search_route(
                 .is_some_and(|p| crate::pathfinding::walkable(nav, at, *p, kind.block(), 0.9))
             {
                 result = next;
+                result.route_end = live_route_end;
                 result.waypoints.insert(0, at);
                 break;
             }
@@ -2084,7 +2109,13 @@ impl crate::match_runtime::Match {
             .get_mut(&id)
             .ok_or("missing moving control")?;
         let mut error = None;
-        let moved = crate::movement::move_unit_with_routes(
+        let traffic_knowledge = crate::traffic_knowledge::TrafficKnowledge::observed(
+            query.navigation(),
+            self.recipients[owner].knowledge(),
+            self.recipients[owner].wrecks(),
+        )
+        .map_err(|e| format!("movement recipient traffic: {e:?}"))?;
+        let moved = crate::movement::move_unit_with_knowledge(
             &mut self.world.game,
             &self.rules,
             &mut self.grid,
@@ -2138,7 +2169,9 @@ impl crate::match_runtime::Match {
                     }
                 }
             },
-        );
+            &traffic_knowledge,
+        )
+        .map_err(|e| format!("movement recipient traffic: {e:?}"))?;
         if let Some(error) = error {
             return Err(error);
         }

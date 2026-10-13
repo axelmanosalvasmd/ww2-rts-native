@@ -524,6 +524,7 @@ impl crate::match_runtime::Match {
             TickPhase::Riding,
             TickPhase::Aircraft,
             TickPhase::Reactions,
+            TickPhase::TrafficKnowledge,
             TickPhase::Movement,
             TickPhase::Firing,
         ]);
@@ -640,7 +641,6 @@ impl crate::match_runtime::Match {
                 TickPhase::UnitReserves,
                 TickPhase::Production,
                 TickPhase::Rail,
-                TickPhase::TrafficKnowledge,
                 TickPhase::GroundEffects,
                 TickPhase::Construction,
                 TickPhase::Scenario,

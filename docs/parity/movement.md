@@ -74,6 +74,10 @@ The standalone `path_requests.rs` scheduler matches 606 original-source action c
 | MOV-43 | Pathing with no players (the editor) skips mine avoidance and knowledge views | sim.js:3069, 3098 | port | none | TOOL | Port test.js "Editor reachability uses terrain without a match's player or mine state" (86-88) | todo |
 | MOV-44 | `nearestFree`: breadth-first 4-neighbour search from the clamped cell for a cell free of the block mask; with an origin, only cells in the origin's region | sim.js:2884-2905 | port | none | MOV-36 | test-horde-navigation.mjs:28-31; native origin-restricted placement matches 513 original nearest-free queries | in progress |
 
+## Match ground traffic component
+
+Match now feeds its owner's remembered terrain and settled wreck projection to voluntary steering and waypoint skips. Physical speed, infantry step acceptance, hull contact and live spatial positions retain the source inputs. The original-source fixture has 12 traces, 63 steps and 65 movement calls. It checks the component at recorded before-states, with persistent recipient memory, rather than claiming a whole autonomous match. Vostro Linux x86_64 verification at runtime head `8e812fe` passes 13 focused debug tests, 143 release workspace tests, strict Clippy, formatting and release FFI. World traffic, terrain effects and later full-tick acceptance remain open.
+
 ## Orders that move units
 
 The native Match command lane now executes ground Move, attack-move and Stop through its recorded deterministic queue. Authoritative destination settlement remains separate from owner-bound route searches. Its source recorder contains 56 traces and 246 steps; three focused native tests pass in debug and release, including every checkpoint and two movement replan branches. Aircraft, World placement bypass, automatic reactions and full tick integration remain unfinished.
@@ -101,7 +105,7 @@ The native Match command lane now executes ground Move, attack-move and Stop thr
 | MOV-58 | Passing a stopped unit: four checked legs around it; afterwards resume the furthest kept waypoint with a clear segment, else replan | local-traffic.js:134-160, 184-196 | port | none | | test-engine-movement.js:96 'a tank passes a stationary protected unit and resumes its retained destination'; lab 'parked', 'passing-redirect' | in progress |
 | MOV-59 | No candidate: blocked, `replan` after 3 s waiting; a stuck, non-waiting unit in front makes this one give way; gridlock with a friend for 3 s starts a 2 s ghost | local-traffic.js:126-133, 171, 201 | port | none | MOV-60 | test-engine-movement.js:143-146 | in progress |
 | MOV-60 | Ghost rule: `startGhost` sets ghost until tick + round(seconds / dt); `ghostPair` lets own or allied pairs pass when either is a ghost. Set by stepOut (4 s), traffic gridlock (2 s) and `driveVehicle` when a friend blocks a unit stuck over 3 s (2 s); used by traffic, separation and the swept unit check | local-traffic.js:4-9; movement.js:11-12, 53; sim.js:1096, 1099, 5212; CFG sim.js:52 | port | none | | test-horde-navigation.mjs:46-74 | in progress |
-| MOV-61 | Traffic privacy: traffic sees only units the side can see and only remembered terrain (open width, clear legs, cover rank) | sim.js:5487-5495 | port | none | MOV-29, CMB | test-engine-traffic-privacy.js:204 'unobserved terrain cannot change the initial voluntary trajectory', 219 | in progress |
+| MOV-61 | Traffic privacy: traffic sees only units the side can see and only remembered terrain (open width, clear legs, cover rank) | sim.js:5487-5495 | component: borrowed owner terrain in real Match movement; World and full tick pending | none | MOV-29, CMB | test-engine-traffic-privacy.js:204 'unobserved terrain cannot change the initial voluntary trajectory', 219 | in progress |
 
 ## Crowd separation
 
@@ -302,6 +306,8 @@ Wall clock and scheduling
 8. Route hashes in test-path-performance.mjs and tools/bench-move.mjs hash `JSON.stringify` output; the Rust comparison needs JS-identical number formatting (shortest round-trip, same exponent style).
 
 ## Retirement and wreck lifecycle evidence
+
+The separate ordinary AIR caller is now natively checked at `db3da8d`: ten unchanged full-source traces contain 4,972 steps and 9,965 observed AIR/AA calls. The actual runner compares prior poses, skipped ground timers, sortie state, captured AA membership, retirement, story, wallets and naturally retained native randomness. Final Mac arm64 evidence is 56 simulation debug tests, all 267 release workspace tests, strict Clippy, formatting and release FFI; the unchanged core has 57 preliminary debug passes at `2d3b860`. Independent hashed copies execute 38 tests in each profile without failure. The bounded component and actual caller are connected, while automatic/ground/area weapons, other modes and full hosted match behavior keep MOV-83 through MOV-86 unfinished.
 
 The bounded on-map aircraft component matches 18 original constructors and 42 helper traces with 3,410 checkpoints, covering held missions, movement/orbit/home/rearm and continuous AA including grid-order ties, canonical rounds, XP and dead later shooters. Exact code d159ca0 passes nine focused debug tests, all 174 release workspace tests, strict Clippy, formatting and release FFI build on Vostro Linux x86_64. Recorded-command, retirement and sole tick continuations remain native-pending; automatic, ground-target and area weapons are unsupported. MOV-83 through MOV-86 remain unfinished.
 

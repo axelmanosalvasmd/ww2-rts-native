@@ -69,7 +69,8 @@ impl<'a> RecruitRouting<'a> {
     }
 }
 struct RecruitParts<'a> {
-    world: &'a mut crate::world::World,
+    game: &'a mut crate::game::Game,
+    versions: Versions,
     start: &'a mut super::StartPlan,
     options: &'a super::MatchOptions,
     rules: &'a crate::rules::Rules,
@@ -110,13 +111,12 @@ impl RecruitFacts<'_> {
     }
 }
 fn admission_facts<'a>(
-    world: &crate::world::World,
+    game: &crate::game::Game,
     start: &super::StartPlan,
     options: &super::MatchOptions,
     rules: &'a crate::rules::Rules,
     player_rallies: &[Option<crate::game::Point>],
 ) -> Result<RecruitFacts<'a>, RecruitError> {
-    let game = &world.game;
     let count = start.players.len();
     if count != game.players.len()
         || count != start.economy.players.len()
@@ -186,11 +186,27 @@ struct StagedRecruit {
     request: production::RecruitRequest,
     kind_index: usize,
     placed: crate::produced_units::ProducedPlacement,
+    route_end: Option<crate::game::Point>,
+    route_status: Option<PathStatus>,
 }
 macro_rules! recruit_parts {
     ($m:expr) => {
+        recruit_parts!(
+            $m,
+            &mut $m.world.game,
+            Versions {
+                infantry: $m.world.versions.infantry,
+                vehicle: $m.world.versions.vehicle,
+                naval: $m.world.versions.naval,
+                obstruction: $m.world.versions.obstruction,
+                knowledge: 0,
+            }
+        )
+    };
+    ($m:expr, $game:expr, $versions:expr) => {
         RecruitParts {
-            world: &mut $m.world,
+            game: $game,
+            versions: $versions,
             start: &mut $m.start,
             options: &$m.options,
             rules: &$m.rules,
@@ -231,20 +247,75 @@ impl Match {
         self.validate_conquest_finish_state()
             .map_err(RecruitError::Story)?;
         let staged = recruit_parts!(self).stage(slot, kind, from, false)?;
+        self.finish_recorded_buy(staged)
+    }
+    fn finish_recorded_buy(
+        &mut self,
+        mut staged: StagedRecruit,
+    ) -> Result<CompletedRecruitUnit, RecruitError> {
+        let slot = staged.slot;
         if staged.placed.rally.is_none() {
-            return recruit_parts!(self).finish(staged, None);
+            return recruit_parts!(self).finish(staged);
         }
-        self.refresh_recipient_routing(slot)
+        let result = (|| {
+            let versions = Versions {
+                infantry: self.world.versions.infantry,
+                vehicle: self.world.versions.vehicle,
+                naval: self.world.versions.naval,
+                obstruction: self.world.versions.obstruction,
+                knowledge: 0,
+            };
+            let observer = crate::staged_observer::StagedObserver::new(
+                &self.world.game,
+                &self.rules,
+                staged.placed.unit.id,
+                slot,
+                &staged.placed.unit,
+            )
             .map_err(RecruitError::Routing)?;
-        let recipient = &self.recipients[slot];
-        let query = recipient.query();
-        let routing = RecruitRouting {
-            slot,
-            team: self.world.game.players[slot].team,
-            query: &query,
-            live: recipient.live(),
-        };
-        recruit_parts!(self).finish(staged, Some(routing))
+            let preview = crate::match_routing::prepare_recipient_routing(
+                crate::match_routing::RecipientContext {
+                    world: &self.world,
+                    environment: &self.environment,
+                    rules: &self.rules,
+                    building_cells: &self.building_cells,
+                    start: &self.start,
+                    options: &self.options,
+                },
+                self.recipients
+                    .get_mut(slot)
+                    .ok_or_else(|| RecruitError::Routing("invalid routing recipient".into()))?,
+                &mut self.routing_fog,
+                slot,
+                Some(observer),
+            )
+            .map_err(RecruitError::Routing)?;
+            let mut paths = preview.fork_paths(&self.commands.paths);
+            let query = preview.query();
+            let routing = RecruitRouting {
+                slot,
+                team: self.world.game.players[slot].team,
+                query: &query,
+                live: preview.live(),
+            };
+            route_recruit(
+                &self.world.game,
+                &self.rules,
+                &mut paths,
+                &mut staged,
+                Some(routing),
+            )?;
+            let (game, routing_commit) = preview
+                .prepare_publication(&mut self.world, &self.environment)
+                .map_err(RecruitError::Routing)?;
+            let done = recruit_parts!(self, game, versions).finish(staged)?;
+            routing_commit.commit();
+            Ok((done, paths))
+        })();
+        result.map(|(done, paths)| {
+            self.commands.paths = paths;
+            done
+        })
     }
     /// Public component actuator retaining explicit winner and recipient inputs.
     pub fn recruit(
@@ -256,8 +327,12 @@ impl Match {
         routing: Option<RecruitRouting<'_>>,
     ) -> Result<CompletedRecruitUnit, RecruitError> {
         let mut parts = recruit_parts!(self);
-        let staged = parts.stage(slot, kind, from, winner_decided)?;
-        parts.finish(staged, routing)
+        let mut staged = parts.stage(slot, kind, from, winner_decided)?;
+        let mut paths = parts.commands.paths.clone();
+        route_recruit(parts.game, parts.rules, &mut paths, &mut staged, routing)?;
+        let done = parts.finish(staged)?;
+        parts.commands.paths = paths;
+        Ok(done)
     }
 }
 impl RecruitParts<'_> {
@@ -279,9 +354,9 @@ impl RecruitParts<'_> {
         if winner_decided || wallet.away || wallet.out {
             return Err(production::Error::Denied(Denial::Blocked).into());
         }
-        let game = &self.world.game;
+        let game = &*self.game;
         let facts = admission_facts(
-            self.world,
+            self.game,
             self.start,
             self.options,
             self.rules,
@@ -335,13 +410,7 @@ impl RecruitParts<'_> {
         }
         let catalog = Catalog::compiled().map_err(|e| RecruitError::Admission(e.into()))?;
         let mut view = terrain_view(game);
-        view.versions = Versions {
-            infantry: self.world.versions.infantry,
-            vehicle: self.world.versions.vehicle,
-            naval: self.world.versions.naval,
-            obstruction: self.world.versions.obstruction,
-            knowledge: 0,
-        };
+        view.versions = self.versions;
         let placed = self
             .produced_placer
             .produce(
@@ -375,7 +444,7 @@ impl RecruitParts<'_> {
         drop(
             crate::unit_publication::prepare_publication(
                 crate::unit_publication::PublicationParts {
-                    units: &mut self.world.game.units,
+                    units: &mut self.game.units,
                     grid: self.grid,
                     controls: &mut self.commands.units,
                     recruitment: self.recruit_metadata,
@@ -399,25 +468,25 @@ impl RecruitParts<'_> {
             request,
             kind_index,
             placed,
+            route_end: None,
+            route_status: None,
         })
     }
-    fn finish(
-        &mut self,
-        staged: StagedRecruit,
-        routing: Option<RecruitRouting<'_>>,
-    ) -> Result<CompletedRecruitUnit, RecruitError> {
+    fn finish(&mut self, staged: StagedRecruit) -> Result<CompletedRecruitUnit, RecruitError> {
         let StagedRecruit {
             slot,
             kind,
             from,
             winner_decided,
             request: admitted,
-            kind_index,
-            mut placed,
+            placed,
+            route_end,
+            route_status,
+            ..
         } = staged;
-        let game = &self.world.game;
+        let game = &*self.game;
         let facts = admission_facts(
-            self.world,
+            self.game,
             self.start,
             self.options,
             self.rules,
@@ -439,43 +508,6 @@ impl RecruitParts<'_> {
                 "purchase facts changed during routing preparation",
             ));
         }
-        let mut route_end = None;
-        let mut route_status = None;
-        if let Some(rally) = placed.rally {
-            let routing = routing.ok_or(RecruitError::InvalidState(
-                "rally routing recipient missing",
-            ))?;
-            let nav = routing.query.navigation();
-            if routing.slot != slot
-                || routing.team != game.players[slot].team
-                || nav.width != game.w
-                || nav.height != game.h
-                || nav.world_known
-            {
-                return Err(RecruitError::InvalidState(
-                    "rally routing recipient mismatch",
-                ));
-            }
-            let path = self
-                .commands
-                .paths
-                .find_path(
-                    routing
-                        .query
-                        .path_terrain(routing.live)
-                        .map_err(RecruitError::Knowledge)?,
-                    PathRules::compiled().map_err(|e| RecruitError::Admission(e.into()))?,
-                    &self.rules.kinds[kind_index],
-                    placed.unit.at(),
-                    rally.destination,
-                    None,
-                )
-                .map_err(RecruitError::Path)?;
-            placed.unit.path = path.waypoints;
-            placed.unit.path_gen = 1;
-            route_end = Some(path.route_end);
-            route_status = Some(path.status);
-        }
         let mut control = crate::match_commands::UnitControl::new(&placed.unit, self.rules)
             .map_err(|_| RecruitError::InvalidState("unit control metadata"))?;
         control.aim = placed.aim;
@@ -489,7 +521,7 @@ impl RecruitParts<'_> {
         let id = placed.unit.id;
         let publication = crate::unit_publication::prepare_publication(
             crate::unit_publication::PublicationParts {
-                units: &mut self.world.game.units,
+                units: &mut self.game.units,
                 grid: self.grid,
                 controls: &mut self.commands.units,
                 recruitment: self.recruit_metadata,
@@ -528,6 +560,53 @@ impl RecruitParts<'_> {
             route_status,
         })
     }
+}
+
+fn route_recruit(
+    game: &crate::game::Game,
+    rules: &crate::rules::Rules,
+    paths: &mut crate::pathfinding::Pathfinding,
+    staged: &mut StagedRecruit,
+    routing: Option<RecruitRouting<'_>>,
+) -> Result<(), RecruitError> {
+    let mut route_end = None;
+    let mut route_status = None;
+    if let Some(rally) = staged.placed.rally {
+        let routing = routing.ok_or(RecruitError::InvalidState(
+            "rally routing recipient missing",
+        ))?;
+        let nav = routing.query.navigation();
+        if routing.slot != staged.slot
+            || routing.team != game.players[staged.slot].team
+            || nav.width != game.w
+            || nav.height != game.h
+            || nav.world_known
+        {
+            return Err(RecruitError::InvalidState(
+                "rally routing recipient mismatch",
+            ));
+        }
+        let path = paths
+            .find_path(
+                routing
+                    .query
+                    .path_terrain(routing.live)
+                    .map_err(RecruitError::Knowledge)?,
+                PathRules::compiled().map_err(|e| RecruitError::Admission(e.into()))?,
+                &rules.kinds[staged.kind_index],
+                staged.placed.unit.at(),
+                rally.destination,
+                None,
+            )
+            .map_err(RecruitError::Path)?;
+        staged.placed.unit.path = path.waypoints;
+        staged.placed.unit.path_gen = 1;
+        route_end = Some(path.route_end);
+        route_status = Some(path.status);
+    }
+    staged.route_end = route_end;
+    staged.route_status = route_status;
+    Ok(())
 }
 
 #[cfg(test)]

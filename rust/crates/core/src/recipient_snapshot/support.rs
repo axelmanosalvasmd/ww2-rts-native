@@ -181,4 +181,49 @@ mod tests {
         ));
         assert_eq!(delivery, before);
     }
+    #[test]
+    fn unrepresented_support_rows_reject_before_delivery_mutation() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/recipient-snapshot.json"))
+                .unwrap();
+        let case = fixture["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["name"] == "public:support-actors")
+            .unwrap();
+        let mut state = super::super::tests::initialize(case);
+        let mut delivery = DeliveryState::new(&state).unwrap();
+        let before = delivery.clone();
+        let original = state.world.game.strikes[0].clone();
+        state.world.game.strikes[0].runtime = None;
+        assert!(matches!(
+            delivery.capture(&mut state, &[false; 3], &[false; 3]),
+            Err(SnapshotError::Unsupported {
+                capability: SnapshotCapability::TeamEffects,
+                ..
+            })
+        ));
+        assert_eq!(delivery, before);
+        state.world.game.strikes[0] = original;
+        state.world.game.strikes[0].kind = crate::game::StrikeKind::Recon;
+        assert!(matches!(
+            delivery.capture(&mut state, &[false; 3], &[false; 3]),
+            Err(SnapshotError::Unsupported {
+                capability: SnapshotCapability::TeamEffects,
+                ..
+            })
+        ));
+        assert_eq!(delivery, before);
+        state.world.game.strikes[0].runtime.as_mut().unwrap().kind =
+            crate::match_support::SupportKind::Recon;
+        assert!(matches!(
+            delivery.capture(&mut state, &[false; 3], &[false; 3]),
+            Err(SnapshotError::Unsupported {
+                capability: SnapshotCapability::TeamEffects,
+                ..
+            })
+        ));
+        assert_eq!(delivery, before);
+    }
 }
