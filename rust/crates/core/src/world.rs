@@ -66,6 +66,53 @@ impl Appearance {
         }
     }
 }
+/// Map-like timers with explicit first-insertion order, as required by fire RNG traversal.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct OrderedFires {
+    order: Vec<usize>,
+    timers: BTreeMap<usize, f64>,
+}
+impl OrderedFires {
+    pub fn insert(&mut self, cell: usize, timer: f64) -> Option<f64> {
+        if !self.timers.contains_key(&cell) {
+            self.order.push(cell);
+        }
+        self.timers.insert(cell, timer)
+    }
+    pub fn remove(&mut self, cell: &usize) -> Option<f64> {
+        let old = self.timers.remove(cell);
+        if old.is_some() {
+            self.order.retain(|c| c != cell);
+        }
+        old
+    }
+    pub fn contains_key(&self, cell: &usize) -> bool {
+        self.timers.contains_key(cell)
+    }
+    pub fn get(&self, cell: &usize) -> Option<&f64> {
+        self.timers.get(cell)
+    }
+    pub fn len(&self) -> usize {
+        self.timers.len()
+    }
+    pub fn is_empty(&self) -> bool {
+        self.timers.is_empty()
+    }
+    pub fn iter(&self) -> impl Iterator<Item = (&usize, &f64)> {
+        self.order.iter().map(|c| (c, &self.timers[c]))
+    }
+    pub fn clear(&mut self) {
+        self.order.clear();
+        self.timers.clear();
+    }
+}
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct FailureMetadata {
+    pub impulse: Option<f64>,
+    pub failed_at: Option<f64>,
+    pub direction: Option<crate::game::Point>,
+    pub settled_at: Option<f64>,
+}
 #[derive(Clone, Debug, PartialEq)]
 pub struct SectionMetadata {
     pub id: String,
@@ -75,6 +122,7 @@ pub struct SectionMetadata {
     pub supports: Vec<String>,
     pub rubble: Vec<usize>,
     pub appearance: Appearance,
+    pub failure: FailureMetadata,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct DetachedSection {
@@ -154,7 +202,7 @@ pub struct World {
     pub mines: BTreeMap<usize, i32>,
     pub mine_seen: BTreeMap<usize, u32>,
     pub aid: BTreeMap<usize, usize>,
-    pub fires: BTreeMap<usize, f64>,
+    pub fires: OrderedFires,
     pub structures: Vec<WorldStructure>,
     pub sections: BTreeMap<usize, SectionMetadata>,
     pub detached_sections: BTreeMap<String, DetachedSection>,
@@ -293,7 +341,7 @@ impl World {
             mines,
             mine_seen: BTreeMap::new(),
             aid: BTreeMap::new(),
-            fires: BTreeMap::new(),
+            fires: OrderedFires::default(),
             structures: Vec::new(),
             sections: BTreeMap::new(),
             detached_sections: BTreeMap::new(),
@@ -335,6 +383,7 @@ impl World {
                         anchor: section.anchor,
                         supports: section.supports,
                         rubble: section.rubble,
+                        failure: FailureMetadata::default(),
                         appearance: match section.state {
                             SectionState::Damaged => Appearance::Damaged,
                             SectionState::Burning => Appearance::Burning,
@@ -367,6 +416,45 @@ impl World {
         self.detached_sections
             .get(id)
             .map(|section| (&section.metadata, &section.state))
+    }
+    pub(crate) fn section_by_id_mut(
+        &mut self,
+        id: &str,
+    ) -> Option<(&mut SectionMetadata, &mut Section)> {
+        if let Some(cell) = self
+            .sections
+            .iter()
+            .find_map(|(c, m)| (m.id == id).then_some(*c))
+        {
+            let meta = self.sections.get_mut(&cell)?;
+            return self
+                .game
+                .sections
+                .get_mut(&(cell as u32))
+                .map(|state| (meta, state));
+        }
+        self.detached_sections
+            .get_mut(id)
+            .map(|s| (&mut s.metadata, &mut s.state))
+    }
+    pub(crate) fn append_journal(&mut self, cell: usize) {
+        self.journal.push(cell);
+    }
+    pub(crate) fn mutation_capacity(&self, count: u64) -> Result<(), WorldError> {
+        self.capacity()?;
+        if count > u64::from(u32::MAX - self.game.terrain_version)
+            || [
+                self.versions.infantry,
+                self.versions.vehicle,
+                self.versions.naval,
+                self.versions.obstruction,
+            ]
+            .iter()
+            .any(|v| v.checked_add(count).is_none())
+        {
+            return Err(WorldError::VersionExhausted);
+        }
+        Ok(())
     }
     pub fn initial(&self) -> &InitialTerrain {
         &self.initial
@@ -472,7 +560,7 @@ impl World {
             "soil"
         })
     }
-    fn max_hp(&self, c: usize) -> f64 {
+    pub fn max_hp(&self, c: usize) -> f64 {
         if let Some(section) = self.game.sections.get(&(c as u32))
             && !section.failed
             && let Some(max) = section.max_hp
@@ -693,6 +781,7 @@ impl World {
                     anchor: true,
                     supports,
                     rubble: Vec::new(),
+                    failure: FailureMetadata::default(),
                     appearance: Appearance::Intact,
                 },
             );
