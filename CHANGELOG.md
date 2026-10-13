@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Extended recruitment identity admission to reject stale combat, ability and recovery rows before charging or publishing a new unit. This preserves default metadata for a buy followed by an ability in the same recorded-input batch. Native combined verification remains pending.
+
 - Wrote the aimed ground-ability phase against the shared physical-flight and salvo producers, including current-ammo rechecks, automatic route retention and budgeted walks. Smoke admission rejects IDs already held by a smoke cloud or wreck before changing selected units. Fixed cadence healing to use ten ticks of elapsed time and added original-source proof (23 recovery traces, 133 actions). Incoming flight/provision dependencies and native differential checks remain pending.
 
 - Added immediate canonical medic route replacement and captured-frame reinforcement with actual provision hooks and spending tallies. Corrected the recovery recorder to capture separate frames on cadence ticks 9 and 10 (23 traces, 133 actions). Native differential verification and aimed-flight execution remain pending.

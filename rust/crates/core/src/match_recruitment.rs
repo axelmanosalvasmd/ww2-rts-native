@@ -190,6 +190,9 @@ impl Match {
         if self.recruit_metadata.contains_key(&self.next_unit_id)
             || self.commands.units.contains_key(&self.next_unit_id)
             || self.firing.get(self.next_unit_id).is_some()
+            || self.combat.get(self.next_unit_id).is_some()
+            || self.abilities.get(self.next_unit_id).is_some()
+            || self.recovery.get(self.next_unit_id).is_some()
         {
             return Err(RecruitError::InvalidState(
                 "recruit metadata ID already exists",
