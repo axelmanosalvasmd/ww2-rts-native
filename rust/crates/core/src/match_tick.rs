@@ -166,7 +166,11 @@ impl crate::match_runtime::Match {
         if game.tick < 0 || game.tick >= 9_007_199_254_740_351 {
             return Err("invalid tick clock".into());
         }
-        if self.options.mode != crate::economy::Mode::Conquest || game.mode.is_some() {
+        if !matches!(
+            self.options.mode,
+            crate::economy::Mode::Default | crate::economy::Mode::Conquest
+        ) || game.mode.is_some()
+        {
             return Err("tick execution currently requires ordinary Conquest".into());
         }
         if self.options.logistics || self.convoys.is_some() {
@@ -199,6 +203,7 @@ impl crate::match_runtime::Match {
         }
         self.validate_abilities()?;
         self.prepare_companion_tick()?;
+        self.validate_carrier_tick()?;
         self.validate_reaction_tick_actors()?;
         let current_order = game.units.keys().copied().collect::<Vec<_>>();
         self.validate_field_project_tick(&current_order)?;
@@ -242,8 +247,13 @@ impl crate::match_runtime::Match {
                 .kinds
                 .get(unit.kind)
                 .ok_or("invalid reaction kind")?;
-            if kind.rail || unit.riding {
-                return Err("rail or carrier tick actor is not connected".into());
+            if kind.rail {
+                return Err("rail tick actor is not connected".into());
+            }
+            // The canonical carrier preflight admits riding; Source skips this
+            // ordinary reaction/timer block after the early pose update.
+            if unit.riding {
+                continue;
             }
             if unit.garrison.is_some() && self.automatic_retreat_candidate(id)? {
                 return Err("automatic garrison retreat tick exit is not connected".into());
@@ -265,6 +275,7 @@ impl crate::match_runtime::Match {
         // Boundary joins are included in prior poses and the same live unit loop.
         self.prepare_companion_tick()?;
         self.validate_tick_capabilities()?;
+        self.validate_carrier_tick()?;
         self.validate_reaction_tick_actors()?;
         self.validate_ground_support_tick(boundary)
             .map_err(|error| format!("ground support boundary: {error}"))?;
@@ -340,6 +351,18 @@ impl crate::match_runtime::Match {
             // Reserve adapters attach before this pre-timer order phase.
             self.prepare_unit_commands(id, winner_decided)?;
             let unit = self.world.game.units.get(&id).expect("current unit");
+            let kind = &self.rules.kinds[unit.kind];
+            if kind.building && (!kind.weapon || unit.built.is_some_and(|built| built < 1.0)) {
+                continue;
+            }
+            match self.apply_unit_riding(id, dt)? {
+                crate::match_carriers::RidingOutcome::Riding => continue,
+                crate::match_carriers::RidingOutcome::OnFoot => {}
+                crate::match_carriers::RidingOutcome::UnsupportedEjection => {
+                    return Err("thrown carrier ejection tick phase is not connected".into());
+                }
+            }
+            let unit = self.world.game.units.get(&id).expect("current unit");
             if !movement::reaches_block(&self.rules, unit) {
                 continue;
             }
@@ -363,6 +386,14 @@ impl crate::match_runtime::Match {
             self.apply_project_unit(id)?;
             self.apply_field_work_unit(id)?;
             self.step_aimed_ability(id)?;
+            // Entry-building execution remains excluded. Boarding uses its live
+            // owner-view goal and the one already-started path scheduler.
+            if matches!(
+                self.apply_unit_boarding_with_routes(id)?,
+                crate::match_carriers::BoardingOutcome::Boarded { .. }
+            ) {
+                continue;
+            }
             self.apply_attack_move(id)?;
             self.react_unit(id)?;
             let before = self.world.game.units[&id].at();
@@ -378,6 +409,7 @@ impl crate::match_runtime::Match {
             TickPhase::UnitOrders,
             TickPhase::Abilities,
             TickPhase::FieldWork,
+            TickPhase::Riding,
             TickPhase::Reactions,
             TickPhase::Movement,
             TickPhase::Firing,
@@ -470,7 +502,6 @@ impl crate::match_runtime::Match {
                 TickPhase::UnitReserves,
                 TickPhase::Production,
                 TickPhase::AirRail,
-                TickPhase::Riding,
                 TickPhase::TrafficKnowledge,
                 TickPhase::GroundEffects,
                 TickPhase::Construction,
