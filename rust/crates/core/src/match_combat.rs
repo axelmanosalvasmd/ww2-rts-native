@@ -58,3 +58,1141 @@ impl CombatState {
 pub trait RetargetSink {
     fn reset_retarget(&mut self, unit: UnitId);
 }
+
+use crate::{
+    catalog::{Catalog, Value},
+    combat::{
+        self, CombatContext, CombatEvent, CombatSource, Impact, SuppressionInput, UnitCombatState,
+    },
+    economy::Mode,
+    environment::{self, Blast, DamageContext, EnvironmentRuntime},
+    game::{Point, TRENCH},
+    grid::SpatialGrid,
+    logistics::LogisticsState,
+    math,
+    navigation::{TerrainView, Versions},
+    production::ProductionState,
+    rules::Rules,
+    unit_spawn::SpawnPlacer,
+    world::World,
+};
+use std::collections::BTreeSet;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CombatError {
+    InvalidInput(&'static str),
+    Rules,
+    Damage(combat::Error),
+    Environment(environment::EnvironmentError),
+}
+impl std::fmt::Display for CombatError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{self:?}")
+    }
+}
+impl std::error::Error for CombatError {}
+impl From<combat::Error> for CombatError {
+    fn from(e: combat::Error) -> Self {
+        Self::Damage(e)
+    }
+}
+impl From<environment::EnvironmentError> for CombatError {
+    fn from(e: environment::EnvironmentError) -> Self {
+        Self::Environment(e)
+    }
+}
+/// Immutable projectile source identity. Its XP stays in CombatState after unit removal.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FlightSource {
+    pub shooter: UnitId,
+    pub kind: usize,
+    pub owner: i32,
+    pub airborne: bool,
+}
+/// Borrowed canonical fields. Destructure Match to construct this view beside the firing sink.
+pub struct DamageWorld<'a> {
+    pub world: &'a mut World,
+    pub combat: &'a mut CombatState,
+    pub grid: &'a mut SpatialGrid,
+    pub rules: &'a Rules,
+    pub logistics: &'a LogisticsState,
+    pub production: &'a ProductionState,
+    pub mode: Mode,
+    pub tech_enabled: bool,
+    pub environment: &'a mut EnvironmentRuntime,
+    pub environment_seed: &'a mut u32,
+    pub next_id: &'a mut u32,
+    pub unit_order: &'a [u32],
+    pub wind_angle: f64,
+    pub wind_strength: f64,
+}
+fn definition(kind: usize, rules: &Rules) -> Result<&'static Value, CombatError> {
+    let name = &rules
+        .kinds
+        .get(kind)
+        .ok_or(CombatError::InvalidInput("kind"))?
+        .name;
+    Catalog::compiled()
+        .map_err(|_| CombatError::Rules)?
+        .unit(name)
+        .map_err(|_| CombatError::Rules)
+}
+fn number(v: &Value, key: &str) -> Result<f64, CombatError> {
+    v.get(key)
+        .and_then(Value::number)
+        .filter(|v| v.is_finite())
+        .ok_or(CombatError::Rules)
+}
+fn flag(v: &Value, key: &str) -> bool {
+    v.get(key).and_then(Value::boolean).unwrap_or(false)
+}
+impl DamageWorld<'_> {
+    fn validate(&self) -> Result<(), CombatError> {
+        let g = &self.world.game;
+        if g.tick < 0
+            || g.tick as u64 > 9_007_199_254_740_941
+            || !matches!(self.mode, Mode::Default | Mode::Conquest)
+        {
+            return Err(CombatError::InvalidInput("combat mode/tick"));
+        }
+        if g.units.iter().any(|(id, u)| {
+            u.id != *id
+                || u.kind >= self.rules.kinds.len()
+                || u.owner >= g.players.len()
+                || ![u.x, u.z, u.hp, u.supp, u.rot, u.sprint]
+                    .iter()
+                    .all(|v| v.is_finite())
+                || u.supp < 0.
+                || u.garrison.is_some_and(|c| c >= g.chars.len())
+        }) {
+            return Err(CombatError::InvalidInput("unit"));
+        }
+        let ids: BTreeSet<_> = self.unit_order.iter().copied().collect();
+        if ids.len() != self.unit_order.len()
+            || ids.len() != g.units.len()
+            || ids.iter().any(|id| !g.units.contains_key(id))
+        {
+            return Err(CombatError::InvalidInput("unit order"));
+        }
+        for (&id, u) in &g.units {
+            let m = self
+                .combat
+                .get(id)
+                .ok_or(CombatError::InvalidInput("unit combat metadata"))?;
+            combat::retreat_protected(combat::RetreatState {
+                retreating: u.retreating,
+                forced: self.logistics.get(id).is_some_and(|r| r.forced),
+                stranded: self.logistics.get(id).is_some_and(|r| r.stranded),
+                move_speed: u.move_speed,
+                vx: u.vx.unwrap_or(0.),
+                vz: u.vz.unwrap_or(0.),
+            })?;
+            if !m.xp.is_finite()
+                || m.xp < 0.
+                || !m.hit_at.is_finite()
+                || m.at_hit.is_some_and(|v| !v.is_finite())
+                || m.carrier.is_some() != u.riding
+                || m.carrier == Some(0)
+            {
+                return Err(CombatError::InvalidInput("combat metadata"));
+            }
+        }
+        Ok(())
+    }
+    fn source(&self, source: FlightSource) -> Result<(), CombatError> {
+        if source.kind >= self.rules.kinds.len()
+            || source.owner >= 0 && source.owner as usize >= self.world.game.players.len()
+        {
+            return Err(CombatError::InvalidInput("source identity"));
+        }
+        let m = self
+            .combat
+            .get(source.shooter)
+            .ok_or(CombatError::InvalidInput("source metadata"))?;
+        if !m.xp.is_finite() || m.xp < 0. {
+            return Err(CombatError::InvalidInput("source XP"));
+        }
+        Ok(())
+    }
+    fn environment_preflight(&mut self) -> Result<(), CombatError> {
+        let ctx = environment::Context {
+            tick: self.world.game.tick as u64,
+            seed: self.environment_seed,
+            next_id: self.next_id,
+            unit_order: self.unit_order,
+            grid: self.grid,
+            rain: self.world.game.rain,
+            wet: self.world.game.wet.unwrap_or(0.),
+            wind_angle: self.wind_angle,
+            wind_strength: self.wind_strength,
+        };
+        self.environment.validate_context(self.world, &ctx)?;
+        Ok(())
+    }
+    fn alliance(&self, owner: i32, target: usize) -> bool {
+        usize::try_from(owner)
+            .ok()
+            .is_some_and(|owner| self.world.game.allied(owner, target))
+    }
+    fn context(&self, owner: i32, target: usize) -> CombatContext {
+        CombatContext {
+            tick: self.world.game.tick as f64,
+            mode: self.mode,
+            horde_defenders: 0,
+            allied: self.alliance(owner, target),
+            tech_enabled: self.tech_enabled,
+            attacker_tech: usize::try_from(owner)
+                .ok()
+                .and_then(|o| self.production.player(o).map(|p| p.tech())),
+            defender_tech: self.production.player(target).map(|p| p.tech()),
+        }
+    }
+    fn target(&self, id: UnitId) -> Result<UnitCombatState<'_>, CombatError> {
+        let g = &self.world.game;
+        let u = g
+            .units
+            .get(&id)
+            .ok_or(CombatError::InvalidInput("target"))?;
+        let m = self
+            .combat
+            .get(id)
+            .ok_or(CombatError::InvalidInput("target metadata"))?;
+        let reserves = self.logistics.get(id);
+        Ok(UnitCombatState {
+            id,
+            owner: u.owner as i32,
+            kind: &self.rules.kinds[u.kind].name,
+            hp: u.hp,
+            xp: m.xp,
+            at: u.at(),
+            rotation: u.rot,
+            retreat: combat::RetreatState {
+                retreating: u.retreating,
+                forced: reserves.is_some_and(|r| r.forced),
+                stranded: reserves.is_some_and(|r| r.stranded),
+                move_speed: u.move_speed,
+                vx: u.vx.unwrap_or(0.),
+                vz: u.vz.unwrap_or(0.),
+            },
+            garrisoned: u.garrison.is_some(),
+            in_trench: self.rules.kinds[u.kind].infantry
+                && g.cell_of(u.x, u.z)
+                    .is_some_and(|c| g.flags[c] & TRENCH != 0),
+            // The source timer can expire below zero; only its positive state affects combat.
+            sprint: math::max(0., u.sprint),
+            suppression: u.supp,
+            hit_by: m.hit_by,
+            cargo: &m.cargo,
+        })
+    }
+    /// Apply a complete component event batch after resolving every fallible rider placement.
+    pub fn apply_events(
+        &mut self,
+        events: &[CombatEvent],
+        retarget: &mut dyn RetargetSink,
+        suppressed: &mut BTreeSet<UnitId>,
+    ) -> Result<(), CombatError> {
+        self.validate()?;
+        let mut rider_positions = BTreeMap::new();
+        let mut placer = SpawnPlacer::new();
+        for event in events {
+            let (id, finite) = match event {
+                CombatEvent::Health { unit, value } => (*unit, value.is_finite()),
+                CombatEvent::Suppression { unit, value } => {
+                    (*unit, value.is_finite() && *value >= 0.)
+                }
+                CombatEvent::LastHit { unit, owner } => (
+                    *unit,
+                    *owner < 0 || (*owner as usize) < self.world.game.players.len(),
+                ),
+                CombatEvent::ResetRetarget { unit } | CombatEvent::SuppressionRecord { unit } => {
+                    (*unit, true)
+                }
+                CombatEvent::DeathImpulse { unit, value } => (
+                    *unit,
+                    value.direction.is_finite() && value.magnitude.is_finite(),
+                ),
+                CombatEvent::HitSource {
+                    unit, tick, from, ..
+                } => (
+                    *unit,
+                    tick.is_finite() && from.x.is_finite() && from.z.is_finite(),
+                ),
+                CombatEvent::AntiTankHit { unit, tick } => (*unit, tick.is_finite()),
+                CombatEvent::Experience { shooter, value } => {
+                    if !value.is_finite() || *value < 0. || self.combat.get(*shooter).is_none() {
+                        return Err(CombatError::InvalidInput("source experience"));
+                    }
+                    continue;
+                }
+                CombatEvent::DisembarkRider {
+                    carrier,
+                    rider,
+                    minimum_suppression,
+                } => {
+                    if !minimum_suppression.is_finite()
+                        || *minimum_suppression < 0.
+                        || !self.world.game.units.contains_key(carrier)
+                    {
+                        return Err(CombatError::InvalidInput("rider event"));
+                    }
+                    if let Some(u) = self.world.game.units.get(rider) {
+                        if self.combat.get(*rider).is_none() {
+                            return Err(CombatError::InvalidInput("rider metadata"));
+                        }
+                        let g = &self.world.game;
+                        let c = placer
+                            .nearest_free(
+                                TerrainView {
+                                    width: g.w,
+                                    height: g.h,
+                                    flags: &g.flags,
+                                    heights: g.height.as_deref(),
+                                    world_known: false,
+                                    knowledge_id: 0,
+                                    versions: Versions::default(),
+                                    changed: None,
+                                    changes: &[],
+                                },
+                                u.at(),
+                                self.rules.kinds[u.kind].block(),
+                                None,
+                            )
+                            .map_err(|_| CombatError::InvalidInput("rider placement"))?;
+                        rider_positions.insert(
+                            *rider,
+                            Point {
+                                x: (c % g.w) as f64 * 2. + 1.,
+                                z: (c / g.w) as f64 * 2. + 1.,
+                            },
+                        );
+                    }
+                    continue;
+                }
+            };
+            if !finite || !self.world.game.units.contains_key(&id) || self.combat.get(id).is_none()
+            {
+                return Err(CombatError::InvalidInput("combat event"));
+            }
+        }
+        for event in events {
+            match *event {
+                CombatEvent::Health { unit, value } => {
+                    self.world.game.units.get_mut(&unit).unwrap().hp = value
+                }
+                CombatEvent::DisembarkRider {
+                    carrier,
+                    rider,
+                    minimum_suppression,
+                } => {
+                    if let Some(&at) = rider_positions.get(&rider) {
+                        self.combat
+                            .get_mut(carrier)
+                            .unwrap()
+                            .cargo
+                            .retain(|id| *id != rider);
+                        self.combat.get_mut(rider).unwrap().carrier = None;
+                        let u = self.world.game.units.get_mut(&rider).unwrap();
+                        u.riding = false;
+                        u.x = at.x;
+                        u.z = at.z;
+                        u.supp = math::max(u.supp, minimum_suppression);
+                        self.grid.update(rider, u);
+                    }
+                }
+                CombatEvent::LastHit { unit, owner } => {
+                    self.combat.get_mut(unit).unwrap().last_hit = Some(owner)
+                }
+                CombatEvent::DeathImpulse { unit, value } => {
+                    self.combat.get_mut(unit).unwrap().death_impulse = Some(value)
+                }
+                CombatEvent::ResetRetarget { unit } => retarget.reset_retarget(unit),
+                CombatEvent::HitSource {
+                    unit,
+                    shooter,
+                    tick,
+                    from,
+                } => {
+                    let m = self.combat.get_mut(unit).unwrap();
+                    m.hit_by = Some(shooter);
+                    m.hit_at = tick;
+                    self.world.game.units.get_mut(&unit).unwrap().hit_from = Some(from);
+                }
+                CombatEvent::AntiTankHit { unit, tick } => {
+                    self.combat.get_mut(unit).unwrap().at_hit = Some(tick)
+                }
+                CombatEvent::Experience { shooter, value } => {
+                    self.combat.get_mut(shooter).unwrap().xp = value
+                }
+                CombatEvent::SuppressionRecord { unit } => {
+                    suppressed.insert(unit);
+                }
+                CombatEvent::Suppression { unit, value } => {
+                    self.world.game.units.get_mut(&unit).unwrap().supp = value
+                }
+            }
+        }
+        Ok(())
+    }
+    pub fn direct_hit(
+        &mut self,
+        source: FlightSource,
+        target: UnitId,
+        impact: Impact,
+        retarget: &mut dyn RetargetSink,
+    ) -> Result<f64, CombatError> {
+        self.validate()?;
+        self.source(source)?;
+        if source.kind >= self.rules.kinds.len()
+            || source.shooter != impact.shooter
+            || source.owner != impact.owner
+        {
+            return Err(CombatError::InvalidInput("flight identity"));
+        }
+        let xp = self
+            .combat
+            .get(source.shooter)
+            .ok_or(CombatError::InvalidInput("flight source metadata"))?
+            .xp;
+        let t = self.target(target)?;
+        let result = combat::flight_damage(
+            self.context(source.owner, t.owner as usize),
+            impact,
+            CombatSource {
+                kind: &self.rules.kinds[source.kind].name,
+                xp,
+                airborne: source.airborne,
+            },
+            &t,
+        )?;
+        self.apply_events(&result.events, retarget, &mut BTreeSet::new())?;
+        Ok(result.damage)
+    }
+    /// Cover values are sampled by the firing/contact producer from canonical terrain.
+    pub fn suppress(
+        &mut self,
+        target: UnitId,
+        mut input: SuppressionInput,
+        retarget: &mut dyn RetargetSink,
+        suppressed: &mut BTreeSet<UnitId>,
+    ) -> Result<(), CombatError> {
+        self.validate()?;
+        input.already_suppressed = suppressed.contains(&target);
+        let t = self.target(target)?;
+        let events =
+            combat::flight_suppress(self.context(input.owner, t.owner as usize), input, &t)?;
+        self.apply_events(&events, retarget, suppressed)
+    }
+    /// Apply environment LastHit to the same canonical combat owner history; return shot effects.
+    pub fn environment_effects(
+        &mut self,
+        effects: Vec<environment::Effect>,
+    ) -> Vec<environment::Effect> {
+        effects
+            .into_iter()
+            .filter_map(|effect| match effect {
+                environment::Effect::LastHit { unit, owner } => {
+                    self.combat.initialize(unit).last_hit = Some(owner);
+                    None
+                }
+                other => Some(other),
+            })
+            .collect()
+    }
+    pub fn terrain_blast(
+        &mut self,
+        blast: Blast,
+        hit: &mut DamageContext<'_>,
+    ) -> Result<Vec<environment::Effect>, CombatError> {
+        self.validate()?;
+        let mut ctx = environment::Context {
+            tick: self.world.game.tick as u64,
+            seed: self.environment_seed,
+            next_id: self.next_id,
+            unit_order: self.unit_order,
+            grid: self.grid,
+            rain: self.world.game.rain,
+            wet: self.world.game.wet.unwrap_or(0.),
+            wind_angle: self.wind_angle,
+            wind_strength: self.wind_strength,
+        };
+        let effects = self
+            .environment
+            .damage_cells(self.world, blast, &mut ctx, hit)?;
+        self.environment.reconcile_wreck_metadata(self.world);
+        Ok(self.environment_effects(effects))
+    }
+    pub fn section_hit(
+        &mut self,
+        cell: usize,
+        damage: f64,
+        hit: &DamageContext<'_>,
+    ) -> Result<(f64, Vec<environment::Effect>), CombatError> {
+        self.validate()?;
+        let mut ctx = environment::Context {
+            tick: self.world.game.tick as u64,
+            seed: self.environment_seed,
+            next_id: self.next_id,
+            unit_order: self.unit_order,
+            grid: self.grid,
+            rain: self.world.game.rain,
+            wet: self.world.game.wet.unwrap_or(0.),
+            wind_angle: self.wind_angle,
+            wind_strength: self.wind_strength,
+        };
+        let (taken, effects) = self
+            .environment
+            .damage_section(self.world, cell, damage, &mut ctx, hit)?;
+        Ok((taken, self.environment_effects(effects)))
+    }
+}
+
+/// Source explosion values from a catalog weapon/support entry. No dynamic action JSON is accepted.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ExplosionSource {
+    pub infantry: f64,
+    pub vehicle: f64,
+    pub terrain: Option<f64>,
+    pub suppression: f64,
+    pub scar: f64,
+    pub anti_garrison: Option<f64>,
+    pub weapon_kind: Option<usize>,
+    pub off_map_support: bool,
+}
+impl ExplosionSource {
+    pub fn weapon(kind: usize, rules: &Rules) -> Result<Self, CombatError> {
+        let v = definition(kind, rules)?
+            .get("w")
+            .ok_or(CombatError::InvalidInput("weapon"))?;
+        Self::from_catalog(v, Some(kind), false)
+    }
+    pub fn support(name: &str) -> Result<Self, CombatError> {
+        let v = Catalog::compiled()
+            .map_err(|_| CombatError::Rules)?
+            .table("SUPPORT")
+            .map_err(|_| CombatError::Rules)?
+            .get(name)
+            .ok_or(CombatError::InvalidInput("support"))?;
+        Self::from_catalog(v, None, true)
+    }
+    fn from_catalog(
+        v: &Value,
+        weapon_kind: Option<usize>,
+        off_map_support: bool,
+    ) -> Result<Self, CombatError> {
+        Ok(Self {
+            infantry: number(v, "inf")?,
+            vehicle: number(v, "veh")?,
+            terrain: v.get("terrain").and_then(Value::number),
+            suppression: number(v, "supp")?,
+            scar: v.get("scar").and_then(Value::number).unwrap_or(0.),
+            anti_garrison: v.get("antiGarrison").and_then(Value::number),
+            weapon_kind,
+            off_map_support,
+        })
+    }
+    fn checked(self) -> Result<(), CombatError> {
+        if ![
+            self.infantry,
+            self.vehicle,
+            self.suppression,
+            self.scar,
+            self.terrain.unwrap_or(0.),
+            self.anti_garrison.unwrap_or(1.),
+        ]
+        .iter()
+        .all(|v| v.is_finite() && *v >= 0. && *v <= 100_000.)
+        {
+            Err(CombatError::InvalidInput("explosion profile"))
+        } else {
+            Ok(())
+        }
+    }
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ContactTarget {
+    Unit(UnitId),
+    Cell(usize),
+}
+impl DamageWorld<'_> {
+    /// Resolve the original local-contact damage. Flight motion/selection remains with firing.
+    #[allow(clippy::too_many_arguments)]
+    pub fn local_contact(
+        &mut self,
+        source: FlightSource,
+        target: ContactTarget,
+        impact: Impact,
+        contact_id: &str,
+        blast_source: Option<ExplosionSource>,
+        retarget: &mut dyn RetargetSink,
+    ) -> Result<(f64, Vec<environment::Effect>), CombatError> {
+        self.validate()?;
+        self.source(source)?;
+        if source.owner != impact.owner
+            || source.shooter != impact.shooter
+            || ![
+                impact.energy,
+                impact.damage_scale.unwrap_or(1.),
+                impact.direction.x,
+                impact.direction.z,
+            ]
+            .iter()
+            .all(|v| v.is_finite())
+            || impact.energy < 0.
+            || impact.damage_scale.is_some_and(|v| v < 0.)
+        {
+            return Err(CombatError::InvalidInput("contact impact"));
+        }
+
+        self.environment_preflight()?;
+        if let ContactTarget::Unit(id) = target {
+            return Ok((
+                if blast_source.is_some() {
+                    0.
+                } else {
+                    self.direct_hit(source, id, impact, retarget)?
+                },
+                Vec::new(),
+            ));
+        }
+        let ContactTarget::Cell(c) = target else {
+            unreachable!()
+        };
+        if c >= self.world.game.chars.len() {
+            return Err(CombatError::InvalidInput("contact cell"));
+        }
+        let meta = self.world.sections.get(&c);
+        let entity = meta
+            .and_then(|m| {
+                self.world
+                    .structures
+                    .iter()
+                    .find(|s| s.id == m.structure_id)
+                    .and_then(|s| s.entity_id)
+            })
+            .filter(|id| self.world.game.units.contains_key(id));
+        if let Some(id) = entity
+            && blast_source.is_none()
+            && self.alliance(source.owner, self.world.game.units[&id].owner)
+        {
+            return Ok((0., Vec::new()));
+        }
+        if entity.is_none() && self.world.game.cell_hp[c] <= 0. {
+            return Ok((0., Vec::new()));
+        }
+        let cfg = Catalog::compiled()
+            .map_err(|_| CombatError::Rules)?
+            .table("CFG")
+            .map_err(|_| CombatError::Rules)?;
+        let weapon = definition(source.kind, self.rules)?
+            .get("w")
+            .ok_or(CombatError::InvalidInput("weapon"))?;
+        let damage = if let Some(id) = entity.filter(|_| blast_source.is_none()) {
+            let u = &self.world.game.units[&id];
+            let xp = self.combat.get(id).unwrap().xp;
+            let def = definition(u.kind, self.rules)?;
+            let small = impact.weapon.vehicle < 20.;
+            let base = if !small {
+                impact.weapon.vehicle
+            } else {
+                impact.weapon.infantry
+                    * number(cfg.get("classic").ok_or(CombatError::Rules)?, "smallArms")?
+            };
+            let slit = if let Some(s) = def.get("slit") {
+                (if small { number(s, "smallArms")? } else { 1. })
+                    * if math::cos(u.rot) * impact.direction.x
+                        + math::sin(u.rot) * impact.direction.z
+                        > 0.
+                    {
+                        number(s, "rear")?
+                    } else {
+                        1.
+                    }
+            } else {
+                1.
+            };
+            base * impact.damage_scale.unwrap_or(1.)
+                * impact.energy
+                * (1.
+                    - number(cfg, "vetArmor")?
+                        * f64::from(combat::veterancy(&self.rules.kinds[u.kind].name, xp)?))
+                * slit
+        } else {
+            blast_source
+                .and_then(|p| p.terrain)
+                .or_else(|| weapon.get("shellTerrain").and_then(Value::number))
+                .or_else(|| weapon.get("veh").and_then(Value::number))
+                .unwrap_or(0.)
+                * impact.energy
+                * 0.25
+        };
+        if !damage.is_finite() || damage < 0. {
+            return Err(CombatError::InvalidInput("contact damage"));
+        }
+        if meta.is_some() {
+            let before = entity.map(|id| self.world.game.units[&id].hp);
+            let skip = BTreeSet::new();
+            let mut hit = DamageContext::plain(&skip);
+            hit.owner = Some(source.owner);
+            hit.contact_id = Some(contact_id);
+            hit.direction = Some(impact.direction);
+            let (taken, effects) = self.section_hit(c, damage, &hit)?;
+            if let Some(id) = entity
+                && let Some(before) = before.filter(|v| *v > 0.)
+                && !self.alliance(source.owner, self.world.game.units[&id].owner)
+            {
+                let after = self.world.game.units[&id].hp;
+                let cost = number(
+                    definition(self.world.game.units[&id].kind, self.rules)?,
+                    "cost",
+                )?;
+                self.combat
+                    .get_mut(source.shooter)
+                    .ok_or(CombatError::InvalidInput("source metadata"))?
+                    .xp += math::max(0., math::min(before, before - after))
+                    + if after <= 0. { cost * 0.2 } else { 0. };
+            }
+            Ok((taken, effects))
+        } else {
+            let hp = f64::from(self.world.game.cell_hp[c]);
+            let at = Point {
+                x: (c % self.world.game.w) as f64 * 2. + 1.,
+                z: (c / self.world.game.w) as f64 * 2. + 1.,
+            };
+            let skip = BTreeSet::new();
+            let mut hit = DamageContext::plain(&skip);
+            hit.owner = Some(source.owner);
+            hit.contact_id = Some(contact_id);
+            hit.direction = Some(impact.direction);
+            let effects = if damage > 0. {
+                self.terrain_blast(
+                    Blast {
+                        at,
+                        radius: 0.,
+                        damage,
+                        scar: 0.,
+                    },
+                    &mut hit,
+                )?
+            } else {
+                Vec::new()
+            };
+            Ok((
+                math::max(0., hp - f64::from(self.world.game.cell_hp[c])),
+                effects,
+            ))
+        }
+    }
+    /// Terminal blast damages the supplied source-order live unit collection, then terrain.
+    #[allow(clippy::too_many_arguments)]
+    pub fn explosion(
+        &mut self,
+        at: Point,
+        radius: f64,
+        profile: ExplosionSource,
+        owner: i32,
+        contact_id: Option<&str>,
+        direction: Option<Point>,
+        memory: Option<&mut environment::DamageMemory>,
+        retarget: &mut dyn RetargetSink,
+    ) -> Result<Vec<environment::Effect>, CombatError> {
+        self.validate()?;
+        self.environment_preflight()?;
+        profile.checked()?;
+        if direction.is_some_and(|d| !d.x.is_finite() || !d.z.is_finite()) {
+            return Err(CombatError::InvalidInput("blast direction"));
+        }
+        for u in self.world.game.units.values() {
+            if u.kind >= self.rules.kinds.len() || !u.rot.is_finite() {
+                return Err(CombatError::InvalidInput("blast unit pose"));
+            }
+        }
+
+        if profile
+            .weapon_kind
+            .is_some_and(|k| k >= self.rules.kinds.len())
+            || owner >= 0 && owner as usize >= self.world.game.players.len()
+        {
+            return Err(CombatError::InvalidInput("blast identity"));
+        }
+        if ![at.x, at.z, radius].iter().all(|v| v.is_finite()) || radius <= 0. || radius > 4096. {
+            return Err(CombatError::InvalidInput("blast geometry"));
+        }
+        let cfg = Catalog::compiled()
+            .map_err(|_| CombatError::Rules)?
+            .table("CFG")
+            .map_err(|_| CombatError::Rules)?;
+        let mut effects = Vec::new();
+        let mut skip = BTreeSet::new();
+        let ids = self.unit_order.to_vec();
+        for id in ids {
+            let u = &self.world.game.units[&id];
+            let distance = math::hypot(u.x - at.x, u.z - at.z);
+            let def = definition(u.kind, self.rules)?;
+            let carrier = self.combat.get(id).unwrap().carrier;
+            let on_deck = carrier
+                .and_then(|c| self.world.game.units.get(&c))
+                .is_some_and(|c| definition(c.kind, self.rules).is_ok_and(|d| flag(d, "riders")));
+            if distance > radius || u.hp <= 0. || u.air.is_some() || u.riding && !on_deck {
+                continue;
+            }
+            let fall = 1. - distance / radius * 0.5;
+            if flag(def, "building")
+                && self
+                    .world
+                    .structures
+                    .iter()
+                    .any(|s| s.entity_id == Some(id))
+            {
+                if profile.terrain.is_some_and(|d| d != 0.) {
+                    continue;
+                }
+                let structure = self
+                    .world
+                    .structures
+                    .iter()
+                    .find(|s| s.entity_id == Some(id))
+                    .unwrap();
+                let mut cells = structure
+                    .cells
+                    .iter()
+                    .zip(&structure.section_ids)
+                    .filter_map(|(c, id)| {
+                        self.world
+                            .section_by_id(id)
+                            .filter(|(_, s)| !s.failed)
+                            .map(|_| *c)
+                    })
+                    .collect::<Vec<_>>();
+                cells.sort_by(|a, b| {
+                    let pos = |c: usize| Point {
+                        x: (c % self.world.game.w) as f64 * 2. + 1.,
+                        z: (c / self.world.game.w) as f64 * 2. + 1.,
+                    };
+                    let a = pos(*a);
+                    let b = pos(*b);
+                    math::hypot(a.x - at.x, a.z - at.z)
+                        .total_cmp(&math::hypot(b.x - at.x, b.z - at.z))
+                });
+                if let Some(&c) = cells.first() {
+                    let skip_cells = BTreeSet::new();
+                    let mut hit = DamageContext::plain(&skip_cells);
+                    hit.owner = Some(owner);
+                    hit.contact_id = contact_id;
+                    hit.direction = Some(Point {
+                        x: u.x - at.x,
+                        z: u.z - at.z,
+                    });
+                    let (_, e) = self.section_hit(
+                        c,
+                        profile.terrain.unwrap_or(profile.vehicle) * fall,
+                        &hit,
+                    )?;
+                    effects.extend(e);
+                }
+                skip.insert(id);
+                continue;
+            }
+            let target = self.target(id)?;
+            let context = self.context(owner, u.owner);
+            let base = if flag(def, "structure") {
+                profile.terrain.unwrap_or(profile.vehicle)
+            } else if flag(def, "infantry") {
+                profile.infantry
+            } else {
+                profile.vehicle
+            };
+            let shrug = if self.rules.kinds[u.kind].name == "bunker" && profile.off_map_support {
+                number(cfg.get("assault").ok_or(CombatError::Rules)?, "supportMul")?
+            } else {
+                1.
+            };
+            let cover = if u.garrison.is_some() {
+                profile
+                    .anti_garrison
+                    .unwrap_or(number(cfg, "trenchBlastMul")?)
+            } else if target.in_trench {
+                number(cfg, "trenchBlastMul")?
+            } else {
+                1.
+            };
+            let vet = combat::veterancy(target.kind, target.xp)?;
+            let tech = if self.tech_enabled {
+                crate::economy::tech_mul(
+                    context.attacker_tech,
+                    profile
+                        .weapon_kind
+                        .map(|k| self.rules.kinds[k].name.as_str()),
+                    context.defender_tech,
+                    target.kind,
+                )
+                .map_err(|_| CombatError::Rules)?
+            } else {
+                1.
+            };
+            let damage = base
+                * shrug
+                * fall
+                * if combat::retreat_protected(target.retreat)? {
+                    number(cfg, "retreatDamage")?
+                } else {
+                    1.
+                }
+                * cover
+                * (1. - number(cfg, "vetArmor")? * f64::from(vet))
+                * tech;
+            let mut events = Vec::new();
+            if owner >= 0 {
+                events.push(CombatEvent::LastHit { unit: id, owner });
+            }
+            events.push(CombatEvent::Health {
+                unit: id,
+                value: target.hp - damage,
+            });
+            if flag(def, "infantry") {
+                events.push(CombatEvent::Suppression {
+                    unit: id,
+                    value: math::min(
+                        100.,
+                        target.suppression
+                            + profile.suppression * (1. - number(cfg, "vetSupp")? * f64::from(vet)),
+                    ),
+                });
+            }
+            let jump = carrier.unwrap_or(id);
+            if self
+                .world
+                .game
+                .units
+                .get(&jump)
+                .is_some_and(|c| definition(c.kind, self.rules).is_ok_and(|d| flag(d, "riders")))
+                && owner >= 0
+                && !self.alliance(owner, self.world.game.units[&jump].owner)
+            {
+                for &rider in &self.combat.get(jump).unwrap().cargo {
+                    events.push(CombatEvent::DisembarkRider {
+                        carrier: jump,
+                        rider,
+                        minimum_suppression: number(cfg, "riderShock")?,
+                    });
+                }
+            }
+            events.push(CombatEvent::DeathImpulse {
+                unit: id,
+                value: DeathImpulse {
+                    direction: math::atan2(u.z - at.z, u.x - at.x),
+                    magnitude: math::max(0.25, math::min(4., profile.vehicle / 100.)),
+                },
+            });
+            self.apply_events(&events, retarget, &mut BTreeSet::new())?;
+            let u = &self.world.game.units[&id];
+            effects.push(environment::Effect::Hurt(environment::Hurt {
+                unit: id,
+                owner: u.owner,
+                at: u.at(),
+                killed: u.hp <= 0.,
+                from: Some(owner),
+                local: contact_id.is_some_and(|id| !id.is_empty()),
+            }));
+        }
+        if let Some(damage) = profile.terrain.filter(|d| *d != 0.) {
+            let mut hit = DamageContext::plain(&skip);
+            hit.owner = Some(owner);
+            hit.contact_id = contact_id;
+            hit.direction = direction;
+            hit.memory = memory;
+            let e = self.terrain_blast(
+                Blast {
+                    at,
+                    radius,
+                    damage,
+                    scar: profile.scar,
+                },
+                &mut hit,
+            )?;
+            effects.extend(e);
+        }
+        Ok(effects)
+    }
+}
+
+/// Deferred story/convoy notification after canonical removal and bounty payment.
+/// The caller uses this source snapshot; it must not look the deleted unit up again.
+#[derive(Clone, Debug, PartialEq)]
+pub struct RetiredUnit {
+    pub unit: crate::game::Unit,
+    pub last_hit: Option<i32>,
+    pub enemy_killer: Option<usize>,
+}
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct DeathResult {
+    pub retired: Vec<RetiredUnit>,
+    pub shots: Vec<environment::Effect>,
+}
+impl crate::match_runtime::Match {
+    /// Finish this tick's dead represented ground units in the caller's captured source order.
+    /// Story/fallen, firing/control retirement and convoy hooks are returned to their owners.
+    /// Metadata is retained while projectile sources may still refer to XP.
+    pub fn retire_dead(&mut self, unit_order: &[UnitId]) -> Result<DeathResult, CombatError> {
+        if self.world.game.tick < 0 || !matches!(self.options.mode, Mode::Default | Mode::Conquest)
+        {
+            return Err(CombatError::InvalidInput("death mode/tick"));
+        }
+        let mut seen = BTreeSet::new();
+        if unit_order.iter().any(|id| !seen.insert(*id)) {
+            return Err(CombatError::InvalidInput("death order"));
+        }
+        let ordered = unit_order
+            .iter()
+            .copied()
+            .filter(|id| self.world.game.units.contains_key(id))
+            .collect::<Vec<_>>();
+        let cfg = Catalog::compiled()
+            .map_err(|_| CombatError::Rules)?
+            .table("CFG")
+            .map_err(|_| CombatError::Rules)?;
+        let bounty = number(cfg, "bounty")?;
+        for id in &ordered {
+            let u = &self.world.game.units[id];
+            if u.owner >= self.start.economy.players.len()
+                || u.kind >= self.rules.kinds.len()
+                || u.air.is_some()
+            {
+                return Err(CombatError::InvalidInput("unsupported dead unit"));
+            }
+            let m = self
+                .combat
+                .get(u.id)
+                .ok_or(CombatError::InvalidInput("death metadata"))?;
+            if !u.hp.is_finite()
+                || m.last_hit.is_some_and(|owner| {
+                    owner >= 0 && owner as usize >= self.start.economy.players.len()
+                })
+            {
+                return Err(CombatError::InvalidInput("death attribution"));
+            }
+            if let Some(impulse) = m.death_impulse
+                && (!impulse.direction.is_finite() || !impulse.magnitude.is_finite())
+            {
+                return Err(CombatError::InvalidInput("death impulse"));
+            }
+        }
+        let mut wallets = self
+            .start
+            .economy
+            .players
+            .iter()
+            .map(|p| p.mp)
+            .collect::<Vec<_>>();
+        if wallets.iter().any(|v| !v.is_finite()) {
+            return Err(CombatError::InvalidInput("bounty wallet"));
+        }
+        for id in &ordered {
+            let u = &self.world.game.units[id];
+            let killer = self
+                .combat
+                .get(u.id)
+                .unwrap()
+                .last_hit
+                .and_then(|o| usize::try_from(o).ok())
+                .filter(|o| {
+                    self.start.economy.players[*o].team != self.start.economy.players[u.owner].team
+                        && !self.start.economy.players[*o].out
+                });
+            if let Some(k) = killer {
+                wallets[k] += number(definition(u.kind, &self.rules)?, "cost")? * bounty;
+                if !wallets[k].is_finite() {
+                    return Err(CombatError::InvalidInput("bounty overflow"));
+                }
+            }
+        }
+        self.world
+            .mutation_capacity(self.world.game.chars.len() as u64 * 64 + 4096)
+            .map_err(environment::EnvironmentError::from)?;
+        let all = self.world.game.units.keys().copied().collect::<Vec<_>>();
+        let ctx = environment::Context {
+            tick: self.world.game.tick as u64,
+            seed: &mut self.start.environment_seed,
+            next_id: &mut self.next_unit_id,
+            unit_order: &all,
+            grid: &self.grid,
+            rain: self.world.game.rain,
+            wet: self.world.game.wet.unwrap_or(0.),
+            wind_angle: self.start.wind.0,
+            wind_strength: self.start.wind.1,
+        };
+        let facts = ordered
+            .iter()
+            .map(|id| &self.world.game.units[id])
+            .collect::<Vec<_>>();
+        self.environment
+            .validate_retirement(&self.world, &facts, &ctx)?;
+        let mut result = DeathResult::default();
+        for id in ordered {
+            let Some(u) = self
+                .world
+                .game
+                .units
+                .get(&id)
+                .filter(|u| u.hp <= 0.)
+                .cloned()
+            else {
+                continue;
+            };
+            let metadata = self.combat.get(u.id).unwrap().clone();
+            self.world.game.units.remove(&u.id);
+            self.grid.remove_unit(u.id);
+            let current = self.world.game.units.keys().copied().collect::<Vec<_>>();
+            let mut ctx = environment::Context {
+                tick: self.world.game.tick as u64,
+                seed: &mut self.start.environment_seed,
+                next_id: &mut self.next_unit_id,
+                unit_order: &current,
+                grid: &self.grid,
+                rain: self.world.game.rain,
+                wet: self.world.game.wet.unwrap_or(0.),
+                wind_angle: self.start.wind.0,
+                wind_strength: self.start.wind.1,
+            };
+            let def = definition(u.kind, &self.rules)?;
+            let effects = if flag(def, "building") {
+                self.environment
+                    .wreck_building(&mut self.world, &u, &mut ctx)?
+            } else {
+                self.environment.spawn_vehicle_wreck(
+                    &mut self.world,
+                    &u,
+                    metadata.death_impulse,
+                    &mut ctx,
+                )?
+            };
+            for effect in effects {
+                if let environment::Effect::LastHit { unit, owner } = effect {
+                    self.combat.initialize(unit).last_hit = Some(owner);
+                } else {
+                    result.shots.push(effect);
+                }
+            }
+            self.logistics.remove(u.id);
+            self.production.remove_building(u.id);
+            self.building_rallies.remove(&u.id);
+            // Source buildingCells retains historical ruin ownership/position after retirement.
+            let enemy = metadata
+                .last_hit
+                .and_then(|owner| usize::try_from(owner).ok())
+                .filter(|owner| {
+                    self.start.economy.players[*owner].team
+                        != self.start.economy.players[u.owner].team
+                });
+            if let Some(killer) = enemy.filter(|k| !self.start.economy.players[*k].out) {
+                self.start.economy.players[killer].mp += number(def, "cost")? * bounty;
+            }
+            result.retired.push(RetiredUnit {
+                unit: u,
+                last_hit: metadata.last_hit,
+                enemy_killer: enemy,
+            });
+        }
+        Ok(result)
+    }
+}

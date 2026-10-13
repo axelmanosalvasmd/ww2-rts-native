@@ -27,6 +27,8 @@ pub mod match_cover;
 pub mod match_firing;
 pub mod match_routing;
 pub mod match_runtime;
+pub mod match_story;
+pub mod match_tick;
 pub mod math;
 pub mod movement;
 pub mod navigation;
@@ -50,6 +52,7 @@ pub mod structures;
 pub mod supply_convoys;
 pub mod terrain;
 pub mod traffic;
+pub mod unit_publication;
 pub mod unit_spawn;
 pub mod vehicle;
 mod vehicle_navigation;
@@ -60,3 +63,11 @@ pub mod world;
 pub mod world_generation;
 
 pub mod world_map;
+
+pub mod match_world;
+pub mod match_world_rails;
+
+pub mod match_world_memory;
+pub mod world_memory;
+
+pub mod staged_observer;

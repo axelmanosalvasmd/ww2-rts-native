@@ -953,6 +953,7 @@ dependencies = [
  "axum",
  "serde_json",
  "tokio",
+ "ww2-core",
 ]
 
 [[package]]

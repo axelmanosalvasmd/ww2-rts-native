@@ -18,6 +18,7 @@ pub enum WorldError {
     InvalidChange,
     InvalidTerrain,
     VersionExhausted,
+    InvalidJournalCursor,
 }
 impl std::fmt::Display for WorldError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -29,6 +30,7 @@ impl std::fmt::Display for WorldError {
                 Self::InvalidChange => "invalid terrain change",
                 Self::InvalidTerrain => "terrain does not match its authoritative map",
                 Self::VersionExhausted => "terrain version capacity exhausted",
+                Self::InvalidJournalCursor => "journal cursor is outside the retained range",
             }
         )
     }
@@ -159,6 +161,9 @@ pub struct CellData {
     pub mine: bool,
     pub mine_material: Option<String>,
     pub section: Option<SectionRow>,
+    /// Optional World rail facts captured when this row was logged or observed.
+    pub rail: Option<u8>,
+    pub station: Option<usize>,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct CellRow {
@@ -215,10 +220,191 @@ pub struct World {
     new_cells: Vec<CellRow>,
     pending: BTreeMap<Recipient, BTreeSet<usize>>,
     journal: Vec<usize>,
+    journal_base: u64,
     soak: Vec<i64>,
     soak_members: BTreeSet<i64>,
 }
+/// Deferred recipient effects, checked before an infallible publication.
+pub(crate) struct ObservationReceipt {
+    frame: Option<ObservationSource>,
+    action: ObservationAction,
+}
+#[derive(PartialEq)]
+struct ObservationSource {
+    initial: usize,
+    shape: (usize, usize),
+    key: (i64, Option<i64>, u32, bool),
+    weather: (Option<usize>, u64, Option<u64>),
+    log: usize,
+    journal: (u64, usize),
+    units: Vec<ObservationUnit>,
+    players: Vec<(usize, i32, Vec<u32>)>,
+    smokes: Vec<crate::game::Smoke>,
+    strikes: Vec<crate::game::Strike>,
+    wrecks: Vec<crate::game::Wreck>,
+}
+#[derive(PartialEq)]
+struct ObservationUnit {
+    id: u32,
+    kind: usize,
+    owner: usize,
+    values: [u64; 3],
+    built: Option<u64>,
+    garrison: Option<usize>,
+    air: Option<crate::game::PlaneState>,
+    cells: Option<Vec<usize>>,
+}
+enum ObservationAction {
+    None,
+    Acknowledge {
+        recipient: Recipient,
+        indices: Vec<usize>,
+        prior: Option<BTreeSet<usize>>,
+    },
+    Trim {
+        prefix: usize,
+        at: u64,
+    },
+}
+/// Locks only the source delivery ledger, leaving Game available for unit publication.
+pub(crate) struct PreparedObservation<'a> {
+    pending: &'a mut BTreeMap<Recipient, BTreeSet<usize>>,
+    log_len: usize,
+    journal: &'a mut Vec<usize>,
+    base: &'a mut u64,
+    action: ObservationAction,
+}
+impl PreparedObservation<'_> {
+    pub(crate) fn commit(self) {
+        match self.action {
+            ObservationAction::None => {}
+            ObservationAction::Acknowledge {
+                recipient, indices, ..
+            } => {
+                let pending = self
+                    .pending
+                    .entry(recipient)
+                    .or_insert_with(|| (0..self.log_len).collect());
+                for index in indices {
+                    pending.remove(&index);
+                }
+            }
+            ObservationAction::Trim { prefix, at } => {
+                self.journal.drain(..prefix);
+                *self.base = at;
+            }
+        }
+    }
+}
+impl ObservationReceipt {
+    pub(crate) fn prepare(
+        self,
+        world: &mut World,
+    ) -> Result<(&mut Game, PreparedObservation<'_>), String> {
+        if self
+            .frame
+            .as_ref()
+            .is_some_and(|frame| *frame != world.observation_source())
+        {
+            return Err("observation source changed before publication".into());
+        }
+        if let ObservationAction::Acknowledge {
+            recipient, prior, ..
+        } = &self.action
+            && prior.as_ref() != world.pending(*recipient)
+        {
+            return Err("observation pending ledger changed before publication".into());
+        }
+        Ok((
+            &mut world.game,
+            PreparedObservation {
+                pending: &mut world.pending,
+                log_len: world.log.len(),
+                journal: &mut world.journal,
+                base: &mut world.journal_base,
+                action: self.action,
+            },
+        ))
+    }
+    /// Used only by the ordinary immediate wrappers after their existing validations.
+    pub(crate) fn commit(self, world: &mut World) -> Result<(), String> {
+        let (_, prepared) = self.prepare(world)?;
+        prepared.commit();
+        Ok(())
+    }
+}
 impl World {
+    fn observation_source(&self) -> ObservationSource {
+        let g = &self.game;
+        ObservationSource {
+            initial: self.initial.chars.as_ptr() as usize,
+            shape: (g.w, g.h),
+            key: (g.tick, g.vision_tick, g.terrain_version, g.reveal),
+            weather: (g.weather, g.rain.to_bits(), g.wet.map(f64::to_bits)),
+            log: self.log.len(),
+            journal: (self.journal_base, self.journal.len()),
+            units: g
+                .units
+                .values()
+                .map(|u| ObservationUnit {
+                    id: u.id,
+                    kind: u.kind,
+                    owner: u.owner,
+                    values: [u.x.to_bits(), u.z.to_bits(), u.hp.to_bits()],
+                    built: u.built.map(f64::to_bits),
+                    garrison: u.garrison,
+                    air: u.air,
+                    cells: u.cells.clone(),
+                })
+                .collect(),
+            players: g
+                .players
+                .iter()
+                .map(|p| (p.slot, p.team, p.visible.clone()))
+                .collect(),
+            smokes: g.smokes.clone(),
+            strikes: g.strikes.clone(),
+            wrecks: g.wrecks.clone(),
+        }
+    }
+    pub(crate) fn defer_observation(
+        &self,
+        ack: Option<(Recipient, Vec<usize>)>,
+        capture_frame: bool,
+    ) -> ObservationReceipt {
+        let action = ack.map_or(ObservationAction::None, |(recipient, indices)| {
+            ObservationAction::Acknowledge {
+                recipient,
+                indices,
+                prior: self.pending(recipient).cloned(),
+            }
+        });
+        ObservationReceipt {
+            frame: capture_frame.then(|| self.observation_source()),
+            action,
+        }
+    }
+    pub(crate) fn defer_journal_trim(
+        &self,
+        at: Option<u64>,
+        capture_frame: bool,
+    ) -> Result<ObservationReceipt, String> {
+        let action = if let Some(at) = at {
+            let end = self.journal_end().map_err(|e| e.to_string())?;
+            if at < self.journal_base || at > end {
+                return Err("invalid deferred World journal trim".into());
+            }
+            let prefix = usize::try_from(at - self.journal_base)
+                .map_err(|_| "invalid World journal prefix")?;
+            ObservationAction::Trim { prefix, at }
+        } else {
+            ObservationAction::None
+        };
+        Ok(ObservationReceipt {
+            frame: capture_frame.then(|| self.observation_source()),
+            action,
+        })
+    }
     /// Immutable authoring geography. Live team ownership belongs to a future mode state.
     pub fn geography(&self) -> Option<&crate::world_map::WorldDefinition> {
         self.geography.as_ref()
@@ -354,6 +540,7 @@ impl World {
             new_cells: Vec::new(),
             pending: BTreeMap::new(),
             journal: Vec::new(),
+            journal_base: 0,
             soak,
             soak_members,
         };
@@ -468,11 +655,92 @@ impl World {
     pub fn take_new_cells(&mut self) -> Vec<CellRow> {
         std::mem::take(&mut self.new_cells)
     }
+    /// Attach explicit World facts to only the new rows in this source operation.
+    /// Validate the complete ordered projection before updating any snapshot.
+    /// Live rail state remains caller-owned. Later terrain writers must use this
+    /// projection hook as well if their logged rows need World rail metadata.
+    pub fn annotate_recent_rows(
+        &mut self,
+        start: usize,
+        fields: &[(usize, Option<u8>, Option<usize>)],
+    ) -> Result<(), WorldError> {
+        let regions = self
+            .geography
+            .as_ref()
+            .ok_or(WorldError::InvalidChange)?
+            .regions
+            .len();
+        let count = self
+            .game
+            .w
+            .checked_mul(self.game.h)
+            .ok_or(WorldError::InvalidChange)?;
+        if count == 0
+            || count != self.game.flags.len()
+            || count != self.cell_state.len()
+            || count != self.game.chars.len()
+            || start > self.new_cells.len()
+            || fields.len() != self.new_cells.len() - start
+        {
+            return Err(WorldError::InvalidChange);
+        }
+        let mut plan = Vec::with_capacity(fields.len());
+        for (offset, &(cell, rail, station)) in fields.iter().enumerate() {
+            let row = &self.new_cells[start + offset];
+            let index = self
+                .log_indexes
+                .get(&cell)
+                .copied()
+                .ok_or(WorldError::InvalidChange)?;
+            if cell >= count
+                || row.cell != cell
+                || station.is_some_and(|station| station >= regions)
+                || self.log.get(index).is_none_or(|row| row.cell != cell)
+            {
+                return Err(WorldError::InvalidChange);
+            }
+            plan.push((start + offset, index, rail, station));
+        }
+        for (row, index, rail, station) in plan {
+            self.new_cells[row].data.rail = rail;
+            self.new_cells[row].data.station = station;
+            self.log[index].data.rail = rail;
+            self.log[index].data.station = station;
+        }
+        Ok(())
+    }
     pub fn journal(&self) -> &[usize] {
         &self.journal
     }
-    pub fn take_journal(&mut self) -> Vec<usize> {
+    pub fn journal_base(&self) -> u64 {
+        self.journal_base
+    }
+    pub fn journal_end(&self) -> Result<u64, WorldError> {
+        self.journal_base
+            .checked_add(self.journal.len() as u64)
+            .ok_or(WorldError::VersionExhausted)
+    }
+    /// Remove only a checked, already-consumed prefix. Absolute cursors survive trimming.
+    pub fn trim_journal_before(&mut self, at: u64) -> Result<(), WorldError> {
+        let end = self.journal_end()?;
+        if at < self.journal_base || at > end {
+            return Err(WorldError::InvalidJournalCursor);
+        }
+        let count = usize::try_from(at - self.journal_base)
+            .map_err(|_| WorldError::InvalidJournalCursor)?;
+        self.journal.drain(..count);
+        self.journal_base = at;
+        Ok(())
+    }
+    /// Begin a new source journal epoch, used after static World setup.
+    pub fn reset_journal(&mut self) -> Vec<usize> {
+        self.journal_base = 0;
         std::mem::take(&mut self.journal)
+    }
+    /// Legacy ordinary-map drain. This resets the epoch, preserving its original behavior.
+    /// Active World memories instead use checked prefix trimming.
+    pub fn take_journal(&mut self) -> Vec<usize> {
+        self.reset_journal()
     }
     pub fn soak(&self) -> &[i64] {
         &self.soak
@@ -648,6 +916,8 @@ impl World {
                     None
                 },
                 section,
+                rail: None,
+                station: None,
             },
         })
     }
@@ -1008,5 +1278,37 @@ impl World {
             None
         };
         Ok(Mutation { logged_index })
+    }
+}
+
+#[cfg(test)]
+mod journal_tests {
+    use super::*;
+    #[test]
+    fn checked_prefix_and_epoch_reset() {
+        let input = serde_json::json!({"name":"guard map","w":20,"h":20,"rows":vec![".".repeat(20);20],"spawns":[{"x":0,"y":0},{"x":19,"y":19}],"points":[{"x":10,"y":10}]});
+        let map = AuthoritativeMap::from_json(&serde_json::to_vec(&input).unwrap()).unwrap();
+        let mut world = World::from_map(&map).unwrap();
+        world.reset_journal();
+        world.touch(1).unwrap();
+        world.touch(2).unwrap();
+        world.trim_journal_before(1).unwrap();
+        assert_eq!(world.journal_base(), 1);
+        assert_eq!(world.journal(), &[2]);
+        assert_eq!(world.journal_end(), Ok(2));
+        assert_eq!(
+            world.trim_journal_before(0),
+            Err(WorldError::InvalidJournalCursor)
+        );
+        world.journal_base = u64::MAX;
+        assert_eq!(
+            world.trim_journal_before(u64::MAX),
+            Err(WorldError::VersionExhausted)
+        );
+        assert_eq!(world.journal(), &[2]);
+        assert_eq!(world.journal_base(), u64::MAX);
+        assert_eq!(world.take_journal(), vec![2]);
+        assert_eq!(world.journal_base(), 0);
+        assert_eq!(world.journal_end(), Ok(0));
     }
 }

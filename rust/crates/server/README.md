@@ -1,6 +1,6 @@
 # Rust lobby server
 
-This is the first standalone `ww2-server` slice. It hosts lobbies and sessions over HTTP and WebSocket. It does not start or simulate matches. The reference is `ww2-rts` commit `e4e579a`, with the existing JSON `t` messages and optional `hello.proto: 0` from the protocol draft.
+This is the first standalone `ww2-server` slice. It hosts lobbies and sessions over HTTP and WebSocket. It does not start or simulate rooms. Its Rust library can construct native authored matches from a separate private map catalogue. The reference is `ww2-rts` commit `e4e579a`, with the existing JSON `t` messages and optional `hello.proto: 0` from the protocol draft.
 
 From `rust/`:
 
@@ -22,7 +22,7 @@ The address follows `--bind`, then `WW2_BIND`, then `HOST` and `PORT`, in that o
 - `name`, `addAi`, `level`, `kick`, `team`, `faction`, `map`, `mode`, `worldSize`, `army`, `sandbox`, `weather`, `defender`, `spectate`, and `sit` follow reference lobby ownership and validation. Host means the first connected human seat, then the first offline human seat, then the first connected spectator if no human seat exists. A numeric `host: -1` can therefore coexist with `amHost: true` for an observer.
 - Latency `ping` returns `pong` with the same `c`. Map pings are ignored in the lobby. A disconnected human keeps its seat for 10 seconds; reconnect cancels expiry. Spectators release their identity immediately. An empty room expires after 60 seconds. The state transitions accept an explicit monotonic time; production maintenance runs every 100 ms.
 
-The lobby JSON preserves the reference fields, with `proto: 0` added. `rules` is absent because no rules core is linked. `result`, `hordeBest`, and `saves` remain empty because this process cannot produce them.
+The lobby JSON preserves the reference fields, with `proto: 0` added. `rules` remains absent until the match handshake has a complete compatibility hash; the current FFI hash covers formations only. `result`, `hordeBest`, and `saves` remain empty because this process cannot produce them.
 
 ## Explicit limits
 
@@ -34,7 +34,7 @@ Axum's WebSocket transport does not negotiate permessage-deflate here, so messag
 
 ## Rebuilding the embedded maps
 
-`harness/map-assets.mjs` checks that the source checkout is clean and exactly `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`, then imports that checkout's `mapForClient`. It writes client-safe map JSON, the Rust include index and the lobby catalogue together. No raw map is copied into the crate. Keep these assets separate from future authoritative map loading.
+`harness/map-assets.mjs` checks that the source checkout is clean and exactly `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`, then imports that checkout's `mapForClient`. It writes client-safe map JSON, the Rust include index and the lobby catalogue together. These files remain public projections. Private authoring data lives in the separate `authoritative-maps` directory and is never selected by HTTP handlers.
 
 ```sh
 node harness/map-assets.mjs
@@ -60,3 +60,16 @@ node harness/map-delivery-check.mjs
 The live harness compares 38 lobby and directory checkpoints from the two processes, normalizing only the draft `proto` addition and the deployment-specific `publicUrl`. It verifies all 33 catalogue entries against the source maps, then checks Rust version refusals, malformed-message survival, explicit start refusal and oversize closure. Rust unit tests cover stale socket isolation, reconnect expiry boundaries, observer hosting, permission checks, numeric JSON types, capacity, denial throttling and Unicode token separation. The map harness makes 96 exact HTTP comparisons, including all 33 maps with both URL forms, invalid names, missing maps, raw traversal paths, method errors and credential refusal. It also verifies reproducible embedded assets and checks legacy and layered World map projection rules against the pinned function. None of the 33 authored files is a generated World Conquest match; runtime World map generation remains outside this slice. These tests establish compatibility for the listed HTTP and lobby cases, not full protocol parity or a playable match.
 
 Dependency APIs were checked against the official [Axum 0.8.9 WebSocket documentation](https://docs.rs/axum/0.8.9/axum/extract/ws/index.html) and [Tokio 1.53.2 TCP listener documentation](https://docs.rs/tokio/1.53.2/tokio/net/struct.TcpListener.html). crates.io metadata identified those stable releases before they were pinned. `serde_json` stays on the workspace's 1.0.154 version.
+
+## Native authored-match construction
+
+`authoritative_maps::load(name)` returns a validated immutable original map, and `create_match(name, options)` constructs independent canonical core state. The binary embeds all 33 original maps, including hidden mines and authoring triggers. Neither function reads files or invokes Node at runtime. Room start remains explicitly refused until the real simulation and snapshot pipeline are integrated.
+
+The private assets are generated separately:
+
+```sh
+WW2_REFERENCE=/path/to/pinned/ww2-rts node harness/server-authored-maps.mjs
+WW2_REFERENCE=/path/to/pinned/ww2-rts node harness/server-authored-maps.mjs --check
+```
+
+HTTP `/maps` routes keep using `mapForClient` projections from their own index. Editor headers still receive 403; they cannot unlock the private native match catalogue.
