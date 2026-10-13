@@ -1,0 +1,11 @@
+# Ground support tick composition
+
+This separate continuation normally merges the reviewed ground-support provider into source-cleared reaction head `c22969b`, preserving that frozen native candidate. The sole Match runner and canonical clock/input queue remain the only scheduler. Combined native proof is pending.
+
+Before consuming any boundary command, the runner calls `validate_ground_support_tick(T)`. It validates current canonical support facts and refuses aircraft support on that boundary. Unknown commands, cooldowns and payment denials retain ordinary admission semantics. Enabled logistics, convoy state, nonordinary internal modes and on-map aircraft retain their separate early guards. After boundary dispatch, the same support state is checked before prior poses and clock advancement.
+
+The late actor IDs are captured before crowd separation. After flights, grenades and salvos, `step_ground_support_phase` executes ground strikes using those IDs. Aircraft admission makes the intervening source anti-air phase inert. The same canonical helper then advances covers and raw cooldowns before living weather, using radio ownership from before the later point update. It replaces the earlier timer-only call: cooldowns decay exactly once, including negative values and newly activated covers. Smoke births use the existing allocator and canonical smoke rows; later weather owns drift and lifetime.
+
+Support events remain in `SupportState.events`; this composition adds no event copy or transport contract. A connected phase failure faults the runner because earlier unit phases may have committed. The actual full-source support recorder has 13 traces, 2,705 ticks and 153 checkpoints; its additive native consumer is being written against actual `advance_tick`. Ordinary ground/reaction and operative source fixtures remain separate checks.
+
+Aircraft, paratroopers, coarse strikes without canonical ground metadata, logistics/convoy scheduling, construction and mass projects remain excluded. This does not establish complete support parity, operative geometry interoperability, grenade settlement, server match admission, Unreal presentation or platform checks. No public ABI, wire or privacy decision changes.

@@ -49,6 +49,11 @@ pub enum Command {
     Unload {
         ids: Vec<i64>,
     },
+    Entrench {
+        ids: Vec<i64>,
+        order: crate::field_works::ProjectOrder,
+        queue: bool,
+    },
     Dig {
         ids: Vec<i64>,
         kind: crate::field_works::FortKind,
@@ -108,6 +113,8 @@ pub enum Command {
 /// Only fields absent from Unit live here. Routes, positions and hold_pos remain in Unit.
 #[derive(Clone, Debug, PartialEq)]
 pub struct UnitControl {
+    /// Seconds until another idle reaction may choose a destination (`u.react`).
+    pub react: f64,
     pub aim: f64,
     pub auto_cast: bool,
     pub auto_retreat: bool,
@@ -161,6 +168,7 @@ impl UnitControl {
             return Err("nonfinite unit aim".into());
         }
         Ok(Self {
+            react: 0.0,
             aim: unit.rot,
             auto_cast: ability_id != "none" && cost == 0.0,
             auto_retreat: !kind.air,
@@ -327,6 +335,52 @@ impl Command {
                     .then(|| object.get("target").and_then(safe_id).unwrap_or(-1)),
             }),
             Some("unload") => Ok(Self::Unload { ids }),
+            Some("entrench") => {
+                use crate::field_works::{Pattern, ProjectMaterial, ProjectOrder};
+                let number = |key: &str| {
+                    object
+                        .get(key)
+                        .and_then(|v| v.as_f64())
+                        .filter(|v| v.is_finite())
+                };
+                let at = number("x").zip(number("z")).map(|(x, z)| Point { x, z });
+                let order = if object.contains_key("join") {
+                    ProjectOrder::Join {
+                        project: object
+                            .get("join")
+                            .and_then(safe_id)
+                            .and_then(|id| u64::try_from(id).ok())
+                            .unwrap_or(0),
+                        at,
+                    }
+                } else {
+                    ProjectOrder::New {
+                        pattern: object
+                            .get("pattern")
+                            .and_then(|v| v.as_str())
+                            .and_then(Pattern::parse),
+                        material: ProjectMaterial::parse(
+                            object.get("fort").and_then(|v| v.as_str()).unwrap_or(
+                                if object.get("fort").is_none_or(|v| v.is_null()) {
+                                    "trench"
+                                } else {
+                                    ""
+                                },
+                            ),
+                        ),
+                        from: at,
+                        to: at.map(|p| Point {
+                            x: number("x2").unwrap_or(p.x),
+                            z: number("z2").unwrap_or(p.z),
+                        }),
+                    }
+                };
+                Ok(Self::Entrench {
+                    ids,
+                    order,
+                    queue: object.get("queue").and_then(|v| v.as_bool()) == Some(true),
+                })
+            }
             Some("dig") => {
                 let at = Point {
                     x: object
@@ -621,6 +675,9 @@ impl crate::match_runtime::Match {
         if let Command::Unload { ids } = command {
             return self.carrier_unload_command(owner, ids, winner_decided);
         }
+        if let Command::Entrench { ids, order, queue } = command {
+            return self.execute_entrench(owner, ids, *order, *queue, winner_decided);
+        }
         if let Command::Dig {
             ids,
             kind,
@@ -694,6 +751,7 @@ impl crate::match_runtime::Match {
             | Command::Autocast { ids, .. } => ids.clone(),
             Command::Board { .. }
             | Command::Unload { .. }
+            | Command::Entrench { .. }
             | Command::Dig { .. }
             | Command::Technology { .. }
             | Command::Buy { .. }
@@ -713,7 +771,10 @@ impl crate::match_runtime::Match {
             let mut advances: BTreeMap<UnitId, u64> = BTreeMap::new();
             for raw in rows {
                 if let Some(id) = self.eligible_command_unit(raw, owner, command) {
-                    if self.world.game.units[&id].dig != self.field_works.is_active(id) {
+                    if self.world.game.units[&id].dig != self.field_works.is_active(id)
+                        || self.world.game.units[&id].entrench
+                            != self.field_works.membership(id).is_some()
+                    {
                         return Err("unrepresented or inconsistent field-work activity".into());
                     }
                     *advances.entry(id).or_default() += 1;
@@ -853,6 +914,7 @@ impl crate::match_runtime::Match {
             }
             Command::Board { .. }
             | Command::Unload { .. }
+            | Command::Entrench { .. }
             | Command::Dig { .. }
             | Command::Technology { .. }
             | Command::Buy { .. }
@@ -1286,7 +1348,7 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
     fn apply(&mut self, update: crate::path_requests::PathUpdate) {
         if update.dropped.is_some()
             && update.request.kind == crate::path_requests::RequestKind::Dig
-            && let Err(error) = self.match_state.cancel_field_work(update.request.unit)
+            && let Err(error) = self.match_state.drop_field_work_job(update.request.unit)
         {
             self.error = Some(error);
             return;
@@ -1468,7 +1530,7 @@ impl crate::match_runtime::Match {
                 || c.fire_at.is_some()
                 || c.nade.is_some()
                 || u.dig
-                || u.entrench
+                || self.project_goal(id)?.is_some()
                 || u.build
                 || c.enter.is_some()
                 || u.board != 0

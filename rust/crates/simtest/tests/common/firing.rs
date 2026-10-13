@@ -24,12 +24,15 @@ fn point(v: &Value) -> Point {
     }
 }
 pub fn make(c: &Value) -> Match {
+    make_with_mode(c, Mode::Conquest)
+}
+pub fn make_with_mode(c: &Value, mode: Mode) -> Match {
     let map = AuthoritativeMap::from_json(&serde_json::to_vec(&c["map"]).unwrap()).unwrap();
     let mut m = Match::new(
         &map,
         MatchOptions {
             seed: 701,
-            mode: Mode::Conquest,
+            mode,
             players: (0..2)
                 .map(|team| PlayerConfig {
                     name: format!("P{team}"),

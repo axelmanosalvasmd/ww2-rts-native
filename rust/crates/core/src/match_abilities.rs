@@ -476,7 +476,9 @@ impl Match {
                 1.
             };
             if self.logistics.can_fire(id, count)
-                && (u.build || u.entrench || u.dig != self.field_works.is_active(id))
+                && (u.build
+                    || u.entrench != self.field_works.membership(id).is_some()
+                    || u.dig != self.field_works.is_active(id))
             {
                 return Ok(true);
             }
@@ -565,9 +567,16 @@ impl Match {
         if self
             .world
             .game
-            .smokes
-            .iter()
-            .any(|s| (self.next_unit_id..smoke_end).contains(&s.id))
+            .units
+            .range(self.next_unit_id..smoke_end)
+            .next()
+            .is_some()
+            || self
+                .world
+                .game
+                .smokes
+                .iter()
+                .any(|s| (self.next_unit_id..smoke_end).contains(&s.id))
             || self.world.game.wrecks.iter().any(|w| {
                 w.id.is_some_and(|id| (self.next_unit_id..smoke_end).contains(&id))
             })
