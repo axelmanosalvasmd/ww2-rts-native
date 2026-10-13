@@ -3,6 +3,8 @@
 ## Unreleased
 
 - Exposed the canonical target setter inside the core so reaction phases keep shared volley claims consistent when intercepting rally movement.
+- Fixed expired sprint timers below zero rejecting real Match damage and suppression. The canonical timer remains unchanged; only the pure helper projection clamps its inactive value. Added an original-source negative-timer trace. Combined verification is queued.
+
 
 - Connected ordinary ground and naval target acquisition, aim, cooldowns, per-model fire and physical salvo launches to Match. The Rust replay matches 66 original-source traces across 264 phases, including cover, moving fire, visibility, hold-fire, incoming threats and veterancy. Flights keep immutable launch solutions and shared volley identities. Contact stepping and damage hookup remain in progress; air, rail, operative, beam and active ability/terrain fire are explicitly unsupported by this phase.
 

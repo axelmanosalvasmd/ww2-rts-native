@@ -162,7 +162,6 @@ impl DamageWorld<'_> {
                 || ![u.x, u.z, u.hp, u.supp, u.rot, u.sprint]
                     .iter()
                     .all(|v| v.is_finite())
-                || u.sprint < 0.
                 || u.supp < 0.
                 || u.garrison.is_some_and(|c| c >= g.chars.len())
         }) {
@@ -279,7 +278,8 @@ impl DamageWorld<'_> {
             in_trench: self.rules.kinds[u.kind].infantry
                 && g.cell_of(u.x, u.z)
                     .is_some_and(|c| g.flags[c] & TRENCH != 0),
-            sprint: u.sprint,
+            // The source timer can expire below zero; only its positive state affects combat.
+            sprint: math::max(0., u.sprint),
             suppression: u.supp,
             hit_by: m.hit_by,
             cargo: &m.cargo,
