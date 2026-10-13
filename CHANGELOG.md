@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified the coherent Conquest engineering, ability/recovery and operative tick assembly on the Mac: all 225 workspace release tests, 73 affected debug tests at the same runtime, strict Clippy, formatting and release FFI pass. Independent hash-checked debug/release binaries pass 42 tests. Original replays cover 2,185 ordinary ticks and 506 operative ticks. Recorded the retained operative owner cleanup and concrete fixture/oracle repairs; ordinary reactions, supply orchestration, operative geometry/settlement interoperability and full match start remain separate.
+
 - Restored the routing fixture's `Smoke.remaining: None` initializer after equivalent parent fixes merged without that required field. Both checked parents retain the same vision-only lifetime value. The coherent proof passed all 73 focused debug tests before the release compiler exposed this fixture-only omission; runtime and original recorder outputs are unchanged.
 
 - Released retained operative control, firing and path-request state at the existing no-flight Combat cleanup boundary. The first full operative replay reached tick three after death and found stranded owner rows whose Combat backing had been collected. All shooter metadata remains while any canonical flight references it; strict orphan admission, the recorded queue and allocator remain unchanged. The death-delay regression now covers collection and continued ticks, with complete gates pending.

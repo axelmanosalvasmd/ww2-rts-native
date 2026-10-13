@@ -79,6 +79,8 @@ Admission and message capability helpers do not install a new server role or its
 
 From FPS-MVP.md:59 and DESIGN.md:49-52, not in code: mobile FPS controls, classes, inventory, prone, per-limb hitboxes, player-controlled vehicles, building damage from the operative's weapons, permanent hosting, World Conquest companions. `tools/serve-mvp.mjs` (Cloudflare quick-tunnel preview on port 3100, four rooms) is a developer launcher, not a feature (FPS-MVP.md:47-55).
 
+The bounded Conquest tick assembly at `3a40f7b` now calls actual operative turns, respawn and ordered death callbacks. Its unchanged-source replay covers 15 traces, 576 operations and 506 ticks with 10 Combat draws. Coherent Mac evidence is 225 workspace release tests, 73 affected debug tests at the same runtime, and 42 independently rerun copied-binary tests. The rows remain in progress: room admission/transport, Unreal presentation, ordinary jump/crouch targeting interoperability and grenade settlement are not established. [Caller boundaries and proof](../runtime/fps-tick.md).
+
 ## Doc and code contradictions
 
 - **Weapon numbers.** FPS-MVP.md:17, DESIGN.md:49 and CHANGELOG.md:300 say one rifle, 6 infantry damage, one shot per 0.65 s, 36 m. Code: rifle 8 damage, 0.32 s, 60 m, plus an SMG (shared/sim.js:2044-2047).
