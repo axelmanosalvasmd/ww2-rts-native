@@ -7,10 +7,9 @@ use crate::{
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
 use ww2_core::{
-    environment::Effect,
     match_runtime::Match,
     match_story::MatchResult,
-    match_tick::TickReport,
+    match_tick::{TickEvent, TickFailure, TickReport},
     recipient_snapshot::{DeliveryState, SelectedSeat},
 };
 
@@ -56,7 +55,8 @@ pub struct RoomRuntime {
     meter: TickMeter,
     batch: u64,
     last_versions: Option<(u64, ListVersions)>,
-    pending_effects: Vec<Effect>,
+    pending_events: Vec<TickEvent>,
+    tick_failure: Option<TickFailure>,
     fault: Option<String>,
     pause: Option<Pause>,
     pause_sent_at: u64,
@@ -80,7 +80,8 @@ impl RoomRuntime {
             meter,
             batch: 0,
             last_versions: None,
-            pending_effects: Vec::new(),
+            pending_events: Vec::new(),
+            tick_failure: None,
             fault: None,
             pause: None,
             pause_sent_at: now_ms,
@@ -97,6 +98,10 @@ impl RoomRuntime {
     }
     pub fn fault(&self) -> Option<&str> {
         self.fault.as_deref()
+    }
+    /// A poisoned tick retains its committed event and retirement prefix exactly once.
+    pub fn tick_failure(&self) -> Option<&TickFailure> {
+        self.tick_failure.as_ref()
     }
     pub fn fault_stop(&mut self, reason: String) {
         if self.fault.is_none() {
@@ -126,10 +131,12 @@ impl RoomRuntime {
         self.set_away(away)?;
         match self.state.advance_tick() {
             Ok(mut report) => {
-                self.pending_effects.append(&mut report.environment);
+                self.pending_events.append(&mut report.events);
                 Ok(report)
             }
-            Err(reason) => {
+            Err(failure) => {
+                let reason = failure.reason.clone();
+                self.tick_failure = Some(failure);
                 self.fault_stop(reason.clone());
                 Err(reason)
             }
@@ -158,7 +165,7 @@ impl RoomRuntime {
         self.running()?;
         if selected.is_empty() {
             if kind == FrameKind::Scheduled {
-                self.pending_effects.clear();
+                self.pending_events.clear();
             }
             return Ok(Vec::new());
         }
@@ -171,14 +178,14 @@ impl RoomRuntime {
         let versions = lists
             .capture(batch, Some(&raw.wrecks), raw.nodes.as_ref())
             .map_err(|e| e.to_string())?;
-        let effects = if kind == FrameKind::Scheduled {
-            self.pending_effects.as_slice()
+        let events = if kind == FrameKind::Scheduled {
+            self.pending_events.as_slice()
         } else {
             &[]
         };
         let frame = self
             .delivery
-            .capture_selected_with_lists(&mut self.state, selected, effects)
+            .capture_selected_with_tick_events(&mut self.state, selected, events)
             .map_err(|e| format!("native snapshot: {e:?}"))?
             .ok_or("selected native frame unexpectedly absent")?;
         let mut captured = Vec::with_capacity(selected.len());
@@ -198,7 +205,7 @@ impl RoomRuntime {
         self.batch = batch;
         self.last_versions = Some((batch, versions));
         if kind == FrameKind::Scheduled {
-            self.pending_effects.clear();
+            self.pending_events.clear();
         }
         Ok(captured)
     }

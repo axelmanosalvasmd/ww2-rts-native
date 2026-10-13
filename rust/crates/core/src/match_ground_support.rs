@@ -2,7 +2,10 @@
 //! This module does not advance the clock or consume the recorded command queue.
 
 use crate::{
-    catalog::Catalog, match_commands::Command, match_runtime::Match, match_support::SupportError,
+    catalog::Catalog,
+    match_commands::Command,
+    match_runtime::Match,
+    match_support::{SupportError, SupportKind},
 };
 
 impl Match {
@@ -33,10 +36,17 @@ impl Match {
     }
 
     fn validate_ground_support_state(&self) -> Result<(), SupportError> {
-        self.validate_support()?;
-        if !self.world.game.strikes.is_empty() {
+        self.validate_support_metadata()?;
+        if self.world.game.strikes.iter().any(|strike| {
+            strike.runtime.as_ref().is_none_or(|timing| {
+                !matches!(
+                    timing.kind,
+                    SupportKind::Artillery | SupportKind::Smoke | SupportKind::Cover
+                )
+            })
+        }) {
             return Err(SupportError::Unsupported(
-                "coarse support strikes lack canonical ground metadata",
+                "support strikes require canonical ground metadata",
             ));
         }
         if self
@@ -50,6 +60,12 @@ impl Match {
                 "on-map aircraft support phase is unavailable",
             ));
         }
+        Ok(())
+    }
+
+    /// Common canonical player/cooldown/cover bindings, independent of strike kind.
+    pub(crate) fn validate_support_metadata(&self) -> Result<(), SupportError> {
+        self.validate_support()?;
         let kinds = Catalog::compiled()
             .and_then(|catalog| catalog.table("SUPPORT"))
             .map_err(|e| SupportError::Actuation(e.to_string()))?

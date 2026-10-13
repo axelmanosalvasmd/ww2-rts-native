@@ -553,6 +553,7 @@ pub fn load_game(g: &Value, rules: &Rules) -> Result<Loaded> {
                 return Ok(Strike {
                     live,
                     kind: StrikeKind::Other,
+                    runtime: None,
                     owner: 0,
                     x: f64::NAN,
                     z: f64::NAN,
@@ -566,6 +567,7 @@ pub fn load_game(g: &Value, rules: &Rules) -> Result<Loaded> {
             Ok(Strike {
                 live,
                 kind: StrikeKind::Recon,
+                runtime: None,
                 owner,
                 x: num(s, "x")?,
                 z: num(s, "z")?,

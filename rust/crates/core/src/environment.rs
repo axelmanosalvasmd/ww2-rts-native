@@ -333,7 +333,44 @@ fn near(w: &World, c: usize) -> [Option<usize>; 4] {
         (c % width + 1 < width).then_some(c + 1),
     ]
 }
+// World construction establishes these shapes. Public terrain arrays can later be
+// replaced, so every environment admission rechecks them before indexing or writes.
+fn check_terrain(w: &World) -> Result<(), EnvironmentError> {
+    let g = &w.game;
+    let n =
+        g.w.checked_mul(g.h)
+            .ok_or(EnvironmentError::InvalidInput("terrain shape"))?;
+    if g.w == 0
+        || g.h == 0
+        || g.w > (1usize << 26)
+        || g.h > (1usize << 26)
+        || [
+            g.chars.len(),
+            g.flags.len(),
+            g.house.len(),
+            g.cell_hp.len(),
+            w.mine_layer.len(),
+            w.surface_wear.len(),
+            w.burnt.len(),
+            w.scar.len(),
+            w.cell_state.len(),
+        ]
+        .iter()
+        .any(|len| *len != n)
+        || g.ground.as_ref().is_none_or(|v| v.len() != n)
+        || g.objects.as_ref().is_none_or(|v| v.len() != n)
+        || g.wear.as_ref().is_none_or(|v| v.len() != n)
+        || g.height.as_ref().is_some_and(|v| v.len() != n)
+        || g.trench_front.as_ref().is_some_and(|v| v.len() != n)
+        || g.tough.as_ref().is_some_and(|v| v.len() != n)
+        || w.shoal.as_ref().is_some_and(|v| v.len() != n)
+    {
+        return Err(EnvironmentError::InvalidInput("terrain shape"));
+    }
+    Ok(())
+}
 fn check(w: &World, ctx: &Context<'_>) -> Result<&'static Tuning, EnvironmentError> {
+    check_terrain(w)?;
     if ctx.tick > 9_007_199_254_740_941 || ctx.tick.checked_add(50).is_none() {
         return Err(EnvironmentError::InvalidInput("tick"));
     }
@@ -470,6 +507,21 @@ impl EnvironmentRuntime {
         ctx: &mut Context<'_>,
         hit: &DamageContext<'_>,
     ) -> Result<(f64, Vec<Effect>), EnvironmentError> {
+        let mut out = Vec::new();
+        let taken =
+            self.damage_section_emitting(w, c, damage, ctx, hit, &mut |effect| out.push(effect))?;
+        Ok((taken, out))
+    }
+    /// Emit each committed effect in source order, including the prefix before an error.
+    pub fn damage_section_emitting(
+        &mut self,
+        w: &mut World,
+        c: usize,
+        damage: f64,
+        ctx: &mut Context<'_>,
+        hit: &DamageContext<'_>,
+        out: &mut dyn FnMut(Effect),
+    ) -> Result<f64, EnvironmentError> {
         check(w, ctx)?;
         check_damage_actors(w, hit)?;
         if c >= w.game.chars.len() || damage.is_nan() || damage == f64::NEG_INFINITY {
@@ -481,9 +533,7 @@ impl EnvironmentRuntime {
         {
             return Err(EnvironmentError::InvalidInput("direction"));
         }
-        let mut out = Vec::new();
-        let taken = self.damage_section_inner(w, c, damage, ctx, hit, &mut out)?;
-        Ok((taken, out))
+        self.damage_section_inner(w, c, damage, ctx, hit, out)
     }
     fn damage_section_inner(
         &mut self,
@@ -492,7 +542,7 @@ impl EnvironmentRuntime {
         damage: f64,
         ctx: &mut Context<'_>,
         hit: &DamageContext<'_>,
-        out: &mut Vec<Effect>,
+        out: &mut dyn FnMut(Effect),
     ) -> Result<f64, EnvironmentError> {
         if damage <= 0. || w.game.sections.get(&(c as u32)).is_none_or(|s| s.failed) {
             return Ok(0.);
@@ -549,12 +599,12 @@ impl EnvironmentRuntime {
                 u.hp -= taken;
             }
             if let Some(owner) = hit.owner.filter(|o| *o >= 0) {
-                out.push(Effect::LastHit { unit: id, owner });
+                out(Effect::LastHit { unit: id, owner });
             }
         }
         w.game.cell_hp[c] = hp as f32;
         if let Some(id) = entity.filter(|_| taken > 0.) {
-            out.push(hurt(
+            out(hurt(
                 w,
                 id,
                 hit.owner,
@@ -652,7 +702,7 @@ impl EnvironmentRuntime {
         ctx: &mut Context<'_>,
         direction: Option<Point>,
         actor_order: Option<&[u32]>,
-        out: &mut Vec<Effect>,
+        out: &mut dyn FnMut(Effect),
     ) -> Result<(), EnvironmentError> {
         if w.section_by_id(id).unwrap().1.failed {
             return Ok(());
@@ -695,7 +745,7 @@ impl EnvironmentRuntime {
         let impulse = meta.failure.impulse.unwrap_or(1.);
         let rotation = math::atan2(dir.z, dir.x);
         let collapse_id = format!("collapse:{id}:{}", ctx.tick);
-        out.push(Effect::Collapse(Collapse {
+        out(Effect::Collapse(Collapse {
             id: collapse_id.clone(),
             at: ctx.tick as f64 * 0.05,
             position: at,
@@ -739,7 +789,7 @@ impl EnvironmentRuntime {
                 let u = w.game.units.get_mut(&uid).unwrap();
                 u.garrison = None;
                 u.hp -= t.unit_hp[u.kind] * t.evict;
-                out.push(hurt(w, uid, None, false, None));
+                out(hurt(w, uid, None, false, None));
             }
         }
         if was == b'=' {
@@ -752,7 +802,7 @@ impl EnvironmentRuntime {
                     && w.game.cell_of(u.x, u.z) == Some(c)
                 {
                     w.game.units.get_mut(&uid).unwrap().hp = 0.;
-                    out.push(hurt(w, uid, None, false, None));
+                    out(hurt(w, uid, None, false, None));
                 }
             }
         }
@@ -766,13 +816,24 @@ impl EnvironmentRuntime {
         into: Option<u8>,
         ctx: &mut Context<'_>,
     ) -> Result<Vec<Effect>, EnvironmentError> {
+        let mut out = Vec::new();
+        self.wreck_cell_emitting(w, c, into, ctx, &mut |effect| out.push(effect))?;
+        Ok(out)
+    }
+    /// Emit each committed effect in source order, including the prefix before an error.
+    pub fn wreck_cell_emitting(
+        &mut self,
+        w: &mut World,
+        c: usize,
+        into: Option<u8>,
+        ctx: &mut Context<'_>,
+        out: &mut dyn FnMut(Effect),
+    ) -> Result<(), EnvironmentError> {
         check(w, ctx)?;
         if c >= w.game.chars.len() || into.is_some_and(|ch| !b".D+MWFBH#TXY=RNAQKO".contains(&ch)) {
             return Err(EnvironmentError::InvalidInput("wreck cell"));
         }
-        let mut out = Vec::new();
-        self.wreck_inner(w, c, into, ctx, None, &mut out)?;
-        Ok(out)
+        self.wreck_inner(w, c, into, ctx, None, out)
     }
     fn wreck_inner(
         &mut self,
@@ -781,7 +842,7 @@ impl EnvironmentRuntime {
         into: Option<u8>,
         ctx: &mut Context<'_>,
         actor_order: Option<&[u32]>,
-        out: &mut Vec<Effect>,
+        out: &mut dyn FnMut(Effect),
     ) -> Result<(), EnvironmentError> {
         if w.game.sections.get(&(c as u32)).is_some_and(|s| !s.failed) {
             let skip = BTreeSet::new();
@@ -811,7 +872,7 @@ impl EnvironmentRuntime {
                 }
             },
         )?;
-        out.push(Effect::Collapse(Collapse {
+        out(Effect::Collapse(Collapse {
             id: format!("collapse:{}:{c}", ctx.tick),
             at: ctx.tick as f64 * 0.05,
             position: at,
@@ -847,7 +908,7 @@ impl EnvironmentRuntime {
                 let u = w.game.units.get_mut(&id).unwrap();
                 u.garrison = None;
                 u.hp -= t.unit_hp[u.kind] * t.evict;
-                out.push(hurt(w, id, None, false, None));
+                out(hurt(w, id, None, false, None));
             }
         }
         if crate::map::flags(into) & MOVE != 0 {
@@ -855,7 +916,7 @@ impl EnvironmentRuntime {
                 let u = &w.game.units[&id];
                 if u.hp > 0. && u.air.is_none() && w.game.cell_of(u.x, u.z) == Some(c) {
                     w.game.units.get_mut(&id).unwrap().hp = 0.;
-                    out.push(hurt(w, id, None, false, None));
+                    out(hurt(w, id, None, false, None));
                 }
             }
         }
@@ -868,6 +929,19 @@ impl EnvironmentRuntime {
         ctx: &mut Context<'_>,
         hit: &mut DamageContext<'_>,
     ) -> Result<Vec<Effect>, EnvironmentError> {
+        let mut out = Vec::new();
+        self.damage_cells_emitting(w, blast, ctx, hit, &mut |effect| out.push(effect))?;
+        Ok(out)
+    }
+    /// Emit each committed effect in source order, including the prefix before an error.
+    pub fn damage_cells_emitting(
+        &mut self,
+        w: &mut World,
+        blast: Blast,
+        ctx: &mut Context<'_>,
+        hit: &mut DamageContext<'_>,
+        out: &mut dyn FnMut(Effect),
+    ) -> Result<(), EnvironmentError> {
         let t = check(w, ctx)?;
         check_damage_actors(w, hit)?;
         let Blast {
@@ -899,7 +973,6 @@ impl EnvironmentRuntime {
         let r = (radius / 2.).ceil() as i64;
         let x0 = (at.x / 2.).floor() as i64;
         let y0 = (at.z / 2.).floor() as i64;
-        let mut out = Vec::new();
         let mut buildings: Vec<(u32, Vec<(usize, f64)>)> = Vec::new();
         for y in (y0 - r).max(0)..=(y0 + r).min(w.game.h as i64 - 1) {
             for x in (x0 - r).max(0)..=(x0 + r).min(w.game.w as i64 - 1) {
@@ -981,7 +1054,7 @@ impl EnvironmentRuntime {
                         f64::from(w.game.wear.as_ref().unwrap()[c]) + amount / t.trench_hp;
                     w.game.wear.as_mut().unwrap()[c] = next_wear as f32;
                     if next_wear >= 1. {
-                        self.wreck_inner(w, c, Some(b'+'), ctx, hit.actor_order, &mut out)?;
+                        self.wreck_inner(w, c, Some(b'+'), ctx, hit.actor_order, out)?;
                         continue;
                     }
                 }
@@ -1009,7 +1082,7 @@ impl EnvironmentRuntime {
                             buildings.push((id, vec![(c, amount)]));
                         }
                     } else {
-                        self.damage_section_inner(w, c, amount, ctx, hit, &mut out)?;
+                        self.damage_section_inner(w, c, amount, ctx, hit, out)?;
                     }
                     continue;
                 }
@@ -1017,7 +1090,7 @@ impl EnvironmentRuntime {
                     let next_hp = f64::from(w.game.cell_hp[c]) - amount;
                     w.game.cell_hp[c] = next_hp as f32;
                     if next_hp <= 0. {
-                        self.wreck_inner(w, c, None, ctx, hit.actor_order, &mut out)?;
+                        self.wreck_inner(w, c, None, ctx, hit.actor_order, out)?;
                     } else {
                         w.touch(c)?;
                     }
@@ -1036,25 +1109,26 @@ impl EnvironmentRuntime {
                 if left <= 0. {
                     break;
                 }
-                left -= self.damage_section_inner(w, c, left, ctx, hit, &mut out)?;
+                left -= self.damage_section_inner(w, c, left, ctx, hit, out)?;
             }
         }
-        Ok(out)
+        Ok(())
     }
     fn dent(&self, w: &mut World, c: usize, t: &Tuning) -> Result<(), EnvironmentError> {
         w.game
             .height
             .get_or_insert_with(|| vec![0; w.game.w * w.game.h]);
-        let target = level(w, c) - 1;
-        if target < t.min_level
+        // Source subtraction uses Numbers, not the Int8 terrain storage width.
+        let target = i16::from(level(w, c)) - 1;
+        if target < i16::from(t.min_level)
             || near(w, c)
                 .into_iter()
                 .flatten()
-                .any(|n| level(w, n) - target > 1)
+                .any(|n| i16::from(level(w, n)) - target > 1)
         {
             return Ok(());
         }
-        w.set_level(c, target)?;
+        w.set_level(c, target as i8)?;
         Ok(())
     }
     /// Ordinary burning uses the complete current actor order.
@@ -1064,7 +1138,19 @@ impl EnvironmentRuntime {
         dt: f64,
         ctx: &mut Context<'_>,
     ) -> Result<Vec<Effect>, EnvironmentError> {
-        self.burn_inner(w, dt, ctx, None)
+        let mut out = Vec::new();
+        self.burn_emitting(w, dt, ctx, &mut |effect| out.push(effect))?;
+        Ok(out)
+    }
+    /// Emit each committed effect in source order, including the prefix before an error.
+    pub fn burn_emitting(
+        &mut self,
+        w: &mut World,
+        dt: f64,
+        ctx: &mut Context<'_>,
+        out: &mut dyn FnMut(Effect),
+    ) -> Result<(), EnvironmentError> {
+        self.burn_inner(w, dt, ctx, None, out)
     }
     /// Burning after late births uses the source's earlier captured actor list.
     /// Context keeps all current units for validation, garrison eviction and live
@@ -1076,7 +1162,20 @@ impl EnvironmentRuntime {
         ctx: &mut Context<'_>,
         actor_order: &[u32],
     ) -> Result<Vec<Effect>, EnvironmentError> {
-        self.burn_inner(w, dt, ctx, Some(actor_order))
+        let mut out = Vec::new();
+        self.burn_captured_emitting(w, dt, ctx, actor_order, &mut |effect| out.push(effect))?;
+        Ok(out)
+    }
+    /// Emit captured burning effects in source order, retaining the prefix on error.
+    pub fn burn_captured_emitting(
+        &mut self,
+        w: &mut World,
+        dt: f64,
+        ctx: &mut Context<'_>,
+        actor_order: &[u32],
+        out: &mut dyn FnMut(Effect),
+    ) -> Result<(), EnvironmentError> {
+        self.burn_inner(w, dt, ctx, Some(actor_order), out)
     }
     fn burn_inner(
         &mut self,
@@ -1084,7 +1183,8 @@ impl EnvironmentRuntime {
         dt: f64,
         ctx: &mut Context<'_>,
         actor_order: Option<&[u32]>,
-    ) -> Result<Vec<Effect>, EnvironmentError> {
+        out: &mut dyn FnMut(Effect),
+    ) -> Result<(), EnvironmentError> {
         let t = check(w, ctx)?;
         let skip = BTreeSet::new();
         let mut hit = DamageContext::plain(&skip);
@@ -1093,7 +1193,6 @@ impl EnvironmentRuntime {
         if !dt.is_finite() || !(0.0..=7200.).contains(&dt) {
             return Err(EnvironmentError::InvalidInput("burn dt"));
         }
-        let mut out = Vec::new();
         let wx = math::cos(ctx.wind_angle);
         let wz = math::sin(ctx.wind_angle);
         for &id in actor_order.unwrap_or(ctx.unit_order) {
@@ -1109,7 +1208,7 @@ impl EnvironmentRuntime {
             let u = w.game.units.get_mut(&id).unwrap();
             u.hp -= t.inf * dt;
             u.supp = math::min(100., u.supp + t.supp * dt);
-            out.push(hurt(w, id, None, false, None));
+            out(hurt(w, id, None, false, None));
             let u = &w.game.units[&id];
             if u.garrison.is_none() && u.path.is_empty() {
                 let at = u.at();
@@ -1188,7 +1287,7 @@ impl EnvironmentRuntime {
                     * (0.2 + 0.8 * material(w.material_name(c, false).unwrap()).1)
                     * (1. - ctx.rain * 0.7);
                 hit.direction = Some(Point { x: wx, z: wz });
-                self.damage_section_inner(w, c, amount, ctx, &hit, &mut out)?;
+                self.damage_section_inner(w, c, amount, ctx, &hit, out)?;
                 if w.game.sections.get(&(c as u32)).is_some_and(|s| s.failed) {
                     w.burnt[c] = 1;
                     continue;
@@ -1210,12 +1309,12 @@ impl EnvironmentRuntime {
                 w.append_journal(c);
             }
             if ch == b'H' || ch == b'O' {
-                self.wreck_inner(w, c, Some(b'.'), ctx, actor_order, &mut out)?;
+                self.wreck_inner(w, c, Some(b'.'), ctx, actor_order, out)?;
             } else {
                 w.touch(c)?;
             }
         }
-        Ok(out)
+        Ok(())
     }
     pub fn flood(&mut self, w: &mut World) -> Result<(), EnvironmentError> {
         w.mutation_capacity(w.game.chars.len() as u64 * 4)?;

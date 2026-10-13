@@ -504,6 +504,17 @@ impl DamageWorld<'_> {
         blast: Blast,
         hit: &mut DamageContext<'_>,
     ) -> Result<Vec<environment::Effect>, CombatError> {
+        let mut effects = Vec::new();
+        self.terrain_blast_emitting(blast, hit, &mut |effect| effects.push(effect))?;
+        Ok(effects)
+    }
+    /// Emit committed terrain effects even if a later mutation fails.
+    pub fn terrain_blast_emitting(
+        &mut self,
+        blast: Blast,
+        hit: &mut DamageContext<'_>,
+        emit: &mut dyn FnMut(environment::Effect),
+    ) -> Result<(), CombatError> {
         self.validate()?;
         let mut ctx = environment::Context {
             tick: self.world.game.tick as u64,
@@ -516,11 +527,17 @@ impl DamageWorld<'_> {
             wind_angle: self.wind_angle,
             wind_strength: self.wind_strength,
         };
-        let effects = self
-            .environment
-            .damage_cells(self.world, blast, &mut ctx, hit)?;
+        let combat = &mut self.combat;
+        let result = self.environment.damage_cells_emitting(
+            self.world,
+            blast,
+            &mut ctx,
+            hit,
+            &mut |effect| absorb_environment_effect(combat, effect, emit),
+        );
         self.environment.reconcile_wreck_metadata(self.world);
-        Ok(self.environment_effects(effects))
+        result?;
+        Ok(())
     }
     pub fn section_hit(
         &mut self,
@@ -528,6 +545,18 @@ impl DamageWorld<'_> {
         damage: f64,
         hit: &DamageContext<'_>,
     ) -> Result<(f64, Vec<environment::Effect>), CombatError> {
+        let mut effects = Vec::new();
+        let taken =
+            self.section_hit_emitting(cell, damage, hit, &mut |effect| effects.push(effect))?;
+        Ok((taken, effects))
+    }
+    pub fn section_hit_emitting(
+        &mut self,
+        cell: usize,
+        damage: f64,
+        hit: &DamageContext<'_>,
+        emit: &mut dyn FnMut(environment::Effect),
+    ) -> Result<f64, CombatError> {
         self.validate()?;
         let mut ctx = environment::Context {
             tick: self.world.game.tick as u64,
@@ -540,10 +569,28 @@ impl DamageWorld<'_> {
             wind_angle: self.wind_angle,
             wind_strength: self.wind_strength,
         };
-        let (taken, effects) = self
-            .environment
-            .damage_section(self.world, cell, damage, &mut ctx, hit)?;
-        Ok((taken, self.environment_effects(effects)))
+        let combat = &mut self.combat;
+        Ok(self.environment.damage_section_emitting(
+            self.world,
+            cell,
+            damage,
+            &mut ctx,
+            hit,
+            &mut |effect| absorb_environment_effect(combat, effect, emit),
+        )?)
+    }
+}
+
+pub(crate) fn absorb_environment_effect(
+    combat: &mut CombatState,
+    effect: environment::Effect,
+    emit: &mut dyn FnMut(environment::Effect),
+) {
+    match effect {
+        environment::Effect::LastHit { unit, owner } => {
+            combat.initialize(unit).last_hit = Some(owner);
+        }
+        other => emit(other),
     }
 }
 
@@ -630,6 +677,29 @@ impl DamageWorld<'_> {
         blast_source: Option<ExplosionSource>,
         retarget: &mut dyn RetargetSink,
     ) -> Result<(f64, Vec<environment::Effect>), CombatError> {
+        let mut effects = Vec::new();
+        let taken = self.local_contact_emitting(
+            source,
+            target,
+            impact,
+            contact_id,
+            blast_source,
+            retarget,
+            &mut |effect| effects.push(effect),
+        )?;
+        Ok((taken, effects))
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub fn local_contact_emitting(
+        &mut self,
+        source: FlightSource,
+        target: ContactTarget,
+        impact: Impact,
+        contact_id: &str,
+        blast_source: Option<ExplosionSource>,
+        retarget: &mut dyn RetargetSink,
+        emit: &mut dyn FnMut(environment::Effect),
+    ) -> Result<f64, CombatError> {
         self.validate()?;
         self.source(source)?;
         if source.owner != impact.owner
@@ -650,14 +720,11 @@ impl DamageWorld<'_> {
 
         self.environment_preflight()?;
         if let ContactTarget::Unit(id) = target {
-            return Ok((
-                if blast_source.is_some() {
-                    0.
-                } else {
-                    self.direct_hit(source, id, impact, retarget)?
-                },
-                Vec::new(),
-            ));
+            return Ok(if blast_source.is_some() {
+                0.
+            } else {
+                self.direct_hit(source, id, impact, retarget)?
+            });
         }
         let ContactTarget::Cell(c) = target else {
             unreachable!()
@@ -679,10 +746,10 @@ impl DamageWorld<'_> {
             && blast_source.is_none()
             && self.alliance(source.owner, self.world.game.units[&id].owner)
         {
-            return Ok((0., Vec::new()));
+            return Ok(0.);
         }
         if entity.is_none() && self.world.game.cell_hp[c] <= 0. {
-            return Ok((0., Vec::new()));
+            return Ok(0.);
         }
         let cfg = Catalog::compiled()
             .map_err(|_| CombatError::Rules)?
@@ -740,7 +807,7 @@ impl DamageWorld<'_> {
             hit.owner = Some(source.owner);
             hit.contact_id = Some(contact_id);
             hit.direction = Some(impact.direction);
-            let (taken, effects) = self.section_hit(c, damage, &hit)?;
+            let taken = self.section_hit_emitting(c, damage, &hit, emit)?;
             if let Some(id) = entity
                 && let Some(before) = before.filter(|v| *v > 0.)
                 && !self.alliance(source.owner, self.world.game.units[&id].owner)
@@ -756,7 +823,7 @@ impl DamageWorld<'_> {
                     .xp += math::max(0., math::min(before, before - after))
                     + if after <= 0. { cost * 0.2 } else { 0. };
             }
-            Ok((taken, effects))
+            Ok(taken)
         } else {
             let hp = f64::from(self.world.game.cell_hp[c]);
             let at = Point {
@@ -768,8 +835,8 @@ impl DamageWorld<'_> {
             hit.owner = Some(source.owner);
             hit.contact_id = Some(contact_id);
             hit.direction = Some(impact.direction);
-            let effects = if damage > 0. {
-                self.terrain_blast(
+            if damage > 0. {
+                self.terrain_blast_emitting(
                     Blast {
                         at,
                         radius: 0.,
@@ -777,14 +844,10 @@ impl DamageWorld<'_> {
                         scar: 0.,
                     },
                     &mut hit,
-                )?
-            } else {
-                Vec::new()
-            };
-            Ok((
-                math::max(0., hp - f64::from(self.world.game.cell_hp[c])),
-                effects,
-            ))
+                    emit,
+                )?;
+            }
+            Ok(math::max(0., hp - f64::from(self.world.game.cell_hp[c])))
         }
     }
     /// Apply source generic hurt without projectile armor, XP or radial impulse.
@@ -956,6 +1019,32 @@ impl DamageWorld<'_> {
             retarget,
         )
     }
+    #[allow(clippy::too_many_arguments)]
+    pub fn explosion_emitting(
+        &mut self,
+        at: Point,
+        radius: f64,
+        profile: ExplosionSource,
+        owner: i32,
+        contact_id: Option<&str>,
+        direction: Option<Point>,
+        memory: Option<&mut environment::DamageMemory>,
+        retarget: &mut dyn RetargetSink,
+        emit: &mut dyn FnMut(environment::Effect),
+    ) -> Result<(), CombatError> {
+        self.explosion_membership_emitting(
+            at,
+            radius,
+            profile,
+            owner,
+            contact_id,
+            direction,
+            memory,
+            self.unit_order,
+            retarget,
+            emit,
+        )
+    }
     /// Apply direct unit and terrain-list consequences to captured current-unit membership.
     /// Metadata, grid and environment validation still use the complete canonical unit order.
     #[allow(clippy::too_many_arguments)]
@@ -971,6 +1060,35 @@ impl DamageWorld<'_> {
         actor_order: &[UnitId],
         retarget: &mut dyn RetargetSink,
     ) -> Result<Vec<environment::Effect>, CombatError> {
+        let mut effects = Vec::new();
+        self.explosion_membership_emitting(
+            at,
+            radius,
+            profile,
+            owner,
+            contact_id,
+            direction,
+            memory,
+            actor_order,
+            retarget,
+            &mut |effect| effects.push(effect),
+        )?;
+        Ok(effects)
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub fn explosion_membership_emitting(
+        &mut self,
+        at: Point,
+        radius: f64,
+        profile: ExplosionSource,
+        owner: i32,
+        contact_id: Option<&str>,
+        direction: Option<Point>,
+        memory: Option<&mut environment::DamageMemory>,
+        actor_order: &[UnitId],
+        retarget: &mut dyn RetargetSink,
+        emit: &mut dyn FnMut(environment::Effect),
+    ) -> Result<(), CombatError> {
         self.validate()?;
         self.environment_preflight()?;
         let actors: BTreeSet<_> = actor_order.iter().copied().collect();
@@ -1002,7 +1120,6 @@ impl DamageWorld<'_> {
         if ![at.x, at.z, radius].iter().all(|v| v.is_finite()) || radius <= 0. || radius > 4096. {
             return Err(CombatError::InvalidInput("blast geometry"));
         }
-        let mut effects = Vec::new();
         let mut skip = BTreeSet::new();
         let ids = actor_order.to_vec();
         for id in ids {
@@ -1064,19 +1181,19 @@ impl DamageWorld<'_> {
                         x: u.x - at.x,
                         z: u.z - at.z,
                     });
-                    let (_, e) = self.section_hit(
+                    self.section_hit_emitting(
                         c,
                         profile.terrain.unwrap_or(profile.vehicle) * fall,
                         &hit,
+                        emit,
                     )?;
-                    effects.extend(e);
                 }
                 skip.insert(id);
                 continue;
             }
             let mut hurt = self.hurt(id, profile, fall, owner, retarget)?;
             hurt.local = contact_id.is_some_and(|id| !id.is_empty());
-            effects.push(environment::Effect::Hurt(hurt));
+            emit(environment::Effect::Hurt(hurt));
             let u = &self.world.game.units[&id];
             let impulse = CombatEvent::DeathImpulse {
                 unit: id,
@@ -1094,7 +1211,7 @@ impl DamageWorld<'_> {
             hit.contact_id = contact_id;
             hit.direction = direction;
             hit.memory = memory;
-            let e = self.terrain_blast(
+            self.terrain_blast_emitting(
                 Blast {
                     at,
                     radius,
@@ -1102,10 +1219,10 @@ impl DamageWorld<'_> {
                     scar: profile.scar,
                 },
                 &mut hit,
+                emit,
             )?;
-            effects.extend(e);
         }
-        Ok(effects)
+        Ok(())
     }
 }
 
@@ -1121,6 +1238,16 @@ pub struct RetiredUnit {
 pub struct DeathResult {
     pub retired: Vec<RetiredUnit>,
     pub shots: Vec<environment::Effect>,
+}
+/// Ordered removal facts remain available if wreck or lifecycle work fails.
+/// Counts distinguish completed generic retirements from completed caller callbacks.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct RetirementProgress {
+    pub removed: Vec<RetiredUnit>,
+    pub completed: usize,
+    pub companions_notified: usize,
+    pub stories_notified: usize,
+    pub routes_retained: usize,
 }
 impl crate::match_runtime::Match {
     /// Validate every captured potential removal, including living garrisons
@@ -1161,10 +1288,13 @@ impl crate::match_runtime::Match {
         Ok(())
     }
 
-    /// Finish this tick's dead represented ground units in the caller's captured source order.
-    /// Story/fallen, firing/control retirement and convoy hooks are returned to their owners.
-    /// Metadata is retained while projectile sources may still refer to XP.
-    pub fn retire_dead(&mut self, unit_order: &[UnitId]) -> Result<DeathResult, CombatError> {
+    /// Read-only admission for the ordinary death phase at the caller's prospective clock.
+    /// Seed and ID copies allow the whole tick to reject before advancing canonical state.
+    pub fn validate_dead_retirement(
+        &self,
+        unit_order: &[UnitId],
+        prospective_tick: u64,
+    ) -> Result<(), CombatError> {
         if self.world.game.tick < 0 || !matches!(self.options.mode, Mode::Default | Mode::Conquest)
         {
             return Err(CombatError::InvalidInput("death mode/tick"));
@@ -1186,10 +1316,7 @@ impl crate::match_runtime::Match {
         let bounty = number(cfg, "bounty")?;
         for id in &ordered {
             let u = &self.world.game.units[id];
-            if u.owner >= self.start.economy.players.len()
-                || u.kind >= self.rules.kinds.len()
-                || u.air.is_some()
-            {
+            if u.owner >= self.start.economy.players.len() || u.kind >= self.rules.kinds.len() {
                 return Err(CombatError::InvalidInput("unsupported dead unit"));
             }
             let m = self
@@ -1208,6 +1335,18 @@ impl crate::match_runtime::Match {
             {
                 return Err(CombatError::InvalidInput("death impulse"));
             }
+        }
+        if self
+            .world
+            .game
+            .units
+            .values()
+            .any(|u| u.air.is_some() || self.rules.kinds.get(u.kind).is_some_and(|kind| kind.air))
+            || !self.aviation.planes.is_empty()
+            || !self.aviation.anti_air.is_empty()
+        {
+            self.validate_aviation()
+                .map_err(|_| CombatError::InvalidInput("aircraft retirement registry"))?;
         }
         let mut wallets = self
             .start
@@ -1242,10 +1381,12 @@ impl crate::match_runtime::Match {
             .mutation_capacity(self.world.game.chars.len() as u64 * 64 + 4096)
             .map_err(environment::EnvironmentError::from)?;
         let all = self.world.game.units.keys().copied().collect::<Vec<_>>();
+        let mut seed = self.start.environment_seed;
+        let mut next_id = self.next_unit_id;
         let ctx = environment::Context {
-            tick: self.world.game.tick as u64,
-            seed: &mut self.start.environment_seed,
-            next_id: &mut self.next_unit_id,
+            tick: prospective_tick,
+            seed: &mut seed,
+            next_id: &mut next_id,
             unit_order: &all,
             grid: &self.grid,
             rain: self.world.game.rain,
@@ -1259,7 +1400,50 @@ impl crate::match_runtime::Match {
             .collect::<Vec<_>>();
         self.environment
             .validate_retirement(&self.world, &facts, &ctx)?;
-        let mut result = DeathResult::default();
+        Ok(())
+    }
+
+    /// Finish represented ground and registered aircraft deaths in captured source order.
+    /// Story/fallen, firing/control retirement and convoy hooks remain with their owners.
+    /// Combat and firing metadata stay retained while projectile sources may refer to them.
+    pub fn retire_dead(&mut self, unit_order: &[UnitId]) -> Result<DeathResult, CombatError> {
+        let mut progress = RetirementProgress::default();
+        let mut shots = Vec::new();
+        self.retire_dead_emitting(unit_order, &mut progress, &mut |effect| shots.push(effect))?;
+        Ok(DeathResult {
+            retired: progress.removed,
+            shots,
+        })
+    }
+    pub fn retire_dead_emitting(
+        &mut self,
+        unit_order: &[UnitId],
+        progress: &mut RetirementProgress,
+        emit: &mut dyn FnMut(environment::Effect),
+    ) -> Result<(), CombatError> {
+        if !progress.removed.is_empty()
+            || progress.completed != 0
+            || progress.companions_notified != 0
+            || progress.stories_notified != 0
+            || progress.routes_retained != 0
+        {
+            return Err(CombatError::InvalidInput(
+                "retirement progress already used",
+            ));
+        }
+        self.validate_dead_retirement(unit_order, self.world.game.tick as u64)?;
+        let ordered = unit_order
+            .iter()
+            .copied()
+            .filter(|id| self.world.game.units.contains_key(id))
+            .collect::<Vec<_>>();
+        let bounty = number(
+            Catalog::compiled()
+                .map_err(|_| CombatError::Rules)?
+                .table("CFG")
+                .map_err(|_| CombatError::Rules)?,
+            "bounty",
+        )?;
         for id in ordered {
             let Some(mut u) = self
                 .world
@@ -1275,6 +1459,19 @@ impl crate::match_runtime::Match {
             self.retire_unit_sidecars(&mut u)?;
             self.world.game.units.remove(&u.id);
             self.grid.remove_unit(u.id);
+            let enemy = metadata
+                .last_hit
+                .and_then(|owner| usize::try_from(owner).ok())
+                .filter(|owner| {
+                    self.start.economy.players[*owner].team
+                        != self.start.economy.players[u.owner].team
+                });
+            progress.removed.push(RetiredUnit {
+                unit: u,
+                last_hit: metadata.last_hit,
+                enemy_killer: enemy,
+            });
+            let u = &progress.removed.last().unwrap().unit;
             let current = self.world.game.units.keys().copied().collect::<Vec<_>>();
             let mut ctx = environment::Context {
                 tick: self.world.game.tick as u64,
@@ -1288,44 +1485,37 @@ impl crate::match_runtime::Match {
                 wind_strength: self.start.wind.1,
             };
             let def = definition(u.kind, &self.rules)?;
-            let effects = if flag(def, "building") {
-                self.environment
-                    .wreck_building(&mut self.world, &u, &mut ctx)?
-            } else {
-                self.environment.spawn_vehicle_wreck(
+            let combat = &mut self.combat;
+            let mut absorb = |effect| absorb_environment_effect(combat, effect, emit);
+            if u.air.is_some() {
+                // The source excludes AIR from hull wreck creation. Its AA event already exists.
+            } else if flag(def, "building") {
+                self.environment.wreck_building_emitting(
                     &mut self.world,
-                    &u,
+                    u,
+                    &mut ctx,
+                    &mut absorb,
+                )?;
+            } else {
+                self.environment.spawn_vehicle_wreck_emitting(
+                    &mut self.world,
+                    u,
                     metadata.death_impulse,
                     &mut ctx,
-                )?
-            };
-            for effect in effects {
-                if let environment::Effect::LastHit { unit, owner } = effect {
-                    self.combat.initialize(unit).last_hit = Some(owner);
-                } else {
-                    result.shots.push(effect);
-                }
+                    &mut absorb,
+                )?;
             }
+            self.aviation.remove(u.id);
             self.logistics.remove(u.id);
             self.production.remove_building(u.id);
             self.building_rallies.remove(&u.id);
             // Source buildingCells retains historical ruin ownership/position after retirement.
-            let enemy = metadata
-                .last_hit
-                .and_then(|owner| usize::try_from(owner).ok())
-                .filter(|owner| {
-                    self.start.economy.players[*owner].team
-                        != self.start.economy.players[u.owner].team
-                });
+
             if let Some(killer) = enemy.filter(|k| !self.start.economy.players[*k].out) {
                 self.start.economy.players[killer].mp += number(def, "cost")? * bounty;
             }
-            result.retired.push(RetiredUnit {
-                unit: u,
-                last_hit: metadata.last_hit,
-                enemy_killer: enemy,
-            });
+            progress.completed += 1;
         }
-        Ok(result)
+        Ok(())
     }
 }
