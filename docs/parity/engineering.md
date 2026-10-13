@@ -2,7 +2,7 @@
 
 Source: `reference/ww2-rts` at e4e579a. Evidence paths are relative to that folder. Units: MP, seconds, metres; one cell is 2 m; levels are 2.5 m. Cell letters: T trench, # sandbags, X wire, Y tank traps, N mine overlay, = bridge, A Field Hospital, + crater, R rubble, Q vehicle wreck, K building footprint, B house, H hedge, O woods, M mud, F ford, W river, D road. JS tests are cited as file plus check name or assertion message.
 
-Conquest recovery/repair work is source-written in `match_recovery.rs`, including canonical section restoration, immediate medic routing and team mine detection. The recorder reproduces 23 traces and 133 actions from the original helpers and captured late phases. Native differential verification and incoming provision-hook integration remain pending. This does not implement paid field construction, general building crews or bridge placement.
+Conquest recovery/repair in `match_recovery.rs` now compares all 23 original-source traces and 133 actions, including canonical section restoration, actual cache-first provisions, immediate medic routing and team mine detection. The compiled provider head `1f9a16b` passes two recovery debug/release checks, the 177-test release workspace suite and independent review. Captured-frame timing and complete tick/engineering/transport integration remain separate. [Phase API and checks](../runtime/abilities-recovery.md).
 
 ## Field fortifications (FORTS)
 
