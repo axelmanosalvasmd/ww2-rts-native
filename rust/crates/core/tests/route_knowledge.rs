@@ -236,6 +236,7 @@ fn recipient_projection_matches_original_helpers() {
                 .unwrap()
                 .iter()
                 .map(|w| Wreck {
+                    cell: None,
                     x: number(&w["x"]),
                     z: number(&w["z"]),
                     moving: w["moving"].as_bool().unwrap(),
