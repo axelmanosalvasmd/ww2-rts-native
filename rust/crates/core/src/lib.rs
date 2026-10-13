@@ -26,6 +26,7 @@ pub mod match_companions;
 pub mod logistics;
 pub mod map;
 pub mod match_abilities;
+mod match_carrier_tick;
 pub mod match_carriers;
 pub mod match_combat;
 pub mod match_commands;

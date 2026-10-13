@@ -564,7 +564,10 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
                 unit.hp = 34.0;
             }
             "rail" => unit.kind = rail_kind,
-            "riding" => unit.riding = true,
+            "riding" => {
+                unit.riding = true;
+                m.combat.get_mut(id).unwrap().carrier = Some(900);
+            }
             "logistics" => m.options.logistics = true,
             "convoys" => m.convoys = ww2_core::supply_convoys::ConvoyState::setup(true),
             "mode" => m.world.game.mode = Some(ww2_core::game::ModeKind::World),
@@ -618,7 +621,8 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
                 "garrison" => "automatic garrison retreat tick exit",
                 "logistics" | "convoys" => "reserve and convoy tick phases",
                 "mode" => "ordinary Conquest",
-                _ => "rail or carrier tick actor",
+                "riding" => "thrown carrier ejection tick phase",
+                _ => "rail tick actor",
             }),
             "{actor}: {error}"
         );

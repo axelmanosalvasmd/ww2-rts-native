@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added source-written carrier tick admission and actual early riding/late boarding sites in a separate integration tree. Canonical pose/grid and ability cooldown update before the rider continues; OnFoot prunes stale cargo and Boarded skips the remaining turn. Existing validators preflight active reciprocal relations and queued Board goals, retaining missing/dead target clearing while refusing thrown ejection and boat/rail/garrison transport. Native composition remains pending.
+
 - Joined the checked combined tick runner and recorded ground carrier provider in a separate full-step oracle/consumer tree. Both Entrench and Board/Unload remain in the single command queue; existing phase bodies are retained. Carrier tick hooks, the new source capture and combined native proof remain pending.
 
 - Verified recorded ground carrier commands on Vostro at 45e0607: 12 focused debug tests, all 211 release workspace tests, strict Clippy, formatting and release FFI pass. Merged the published carrier evidence ancestry using documentation-only changes; Rust and harness files remain identical to the compiled head. Full tick attachment and three-platform CI remain separate.
