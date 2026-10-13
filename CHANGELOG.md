@@ -2,8 +2,21 @@
 
 ## Unreleased
 
+- Add the complete original engineering snapshot replay to the selected-delivery/scuttle union: five cases, 481 actual ticks and 513 states. Runtime and frozen Source consumer bodies are retained; the coherent native cycle is pending.
+
 - Converge real selected-recipient delivery with engineering projections and recorded scuttling. Preserve the exact shared compile fixes and original Source works-field fixture extension; this combined native proof is pending.
 
+- Normally merged the source-reviewed Destroy actuator and closed both engineering replay tails. The consumer now retains all five unchanged source cases, 513 snapshots and 481 full steps, including dead-worker omission and actual retirement. Combined native verification remains pending.
+
+- Require the engineering replay runner to return no outside environment effects before passing an empty effect batch to the snapshot collector. This protects the focused quiet scene boundary; native execution is pending.
+
+- Normally merged the independently source-reviewed engineering snapshot collector into the separate replay consumer. Existing recorder and consumer bodies are unchanged; the combined native gate and scoped Destroy continuation remain pending.
+
+- Corrected the engineering replay draft to retain the original snapshotFor fog reads. Its focused payload comparison still covers engineering rows; no native proof is claimed.
+
+- Added a source-written engineering snapshot consumer using canonical staged actors, actual command admission, the single tick runner and recipient collectors. It covers 509 recorded states and 479 full ticks, preserves actual Default options and leaves the two unrepresented Destroy witnesses source-only. Native verification awaits the collector dependency and CI lease.
+
+- Added an original-source engineering snapshot recorder with five cases, 481 full ticks and 1,539 recipient results. It records mixed project segment kinds, allied paid work, queued join anchors after project deletion, unrounded work coordinates, progress tails and dead-worker omission after an actual destroy command. Native replay remains pending.
 - Add recorded Source scuttling through the canonical command path. Owned live non-riding selections get zero HP and an own-owner last hit, while work, controls and wallets stay unchanged until the next retirement phase. Preflight the complete selection before writes; add an atomic missing-metadata regression.
 
 - Extended the original snapshot recorder's partial-field boundary to include the newly represented canonical `works` field. Fresh `244931d` native checks compiled and passed all four selected-delivery tests, then two older exact-key tests rejected that added field. Regenerated 219 partial results from unchanged pinned Source; every prior fixture byte remains identical after removing only the new recorded fields. Runtime and strict equality assertions are unchanged; fresh combined native proof remains pending.
