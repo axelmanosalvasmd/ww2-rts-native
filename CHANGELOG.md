@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Initialized canonical weapon targets and timers when Match recruitment publishes a unit, and rejects a stale firing row before payment. The existing recruitment source replay checks default rows immediately after each admitted buy; invalid staging snapshots include firing state.
+
 - Verified the ordinary Conquest weapon/contact phase: three focused tests pass in debug and release against 114 original-source traces and 588 checkpoints, including lower-ID ties and invalid-input atomicity. All 136 workspace tests, strict Clippy, formatting and release FFI build pass. Air, rail, FPS, support, beams and active ability/terrain fire remain separate; wire, ABI and the reference pin are unchanged.
 
 - Fixed the firing oracle retaining consumed ammo in its input record and moving a synthetic target outside the arena. The atomicity assertion compares the existing NaN pace sentinel by bits. Internal shot JSON now matches JavaScript zero serialization while retaining trajectory signs. All three focused native tests pass across 114 source traces and 588 checkpoints; release and workspace checks pass.
