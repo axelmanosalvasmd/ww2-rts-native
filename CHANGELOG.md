@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Recorded the exact verified snapshot runtime head and immutable archive hash in DESIGN, replacing pending native status for the completed represented fields. Tested Rust and harness files remain unchanged.
+
 - Verified the internal recipient snapshot and canonical movement checkpoint on Vostro Linux x86_64 at 91737e3: nine focused debug tests, all 164 release workspace tests, strict workspace/all-target Clippy, formatting and release FFI pass after clean package builds. Original source fixtures cover 70 states/210 cached projections, 13 delivery steps/39 reads and 58 command traces/259 steps. Full message envelopes, support actors and transport remain separate; three-platform Actions evidence is still required by integration.
 
 - Fixed a strict Clippy assertion in the snapshot delivery regression by using is_empty. All focused debug and release workspace tests passed on the prior frozen head; the fresh head still needs the remaining native gates.
