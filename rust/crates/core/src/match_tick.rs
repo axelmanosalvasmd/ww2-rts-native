@@ -218,6 +218,16 @@ impl crate::match_runtime::Match {
         }
     }
 
+    /// Read-only admission for a trusted host before attaching this match.
+    /// This is the same guard used before the first tick mutation.
+    pub fn validate_tick_state(&self) -> Result<(), String> {
+        if let Some(fault) = self.tick_state.fault() {
+            return Err(format!("tick runner faulted: {fault}"));
+        }
+        self.validate_tick_input()?;
+        self.require_detached_tick_events()
+    }
+
     fn require_detached_tick_events(&self) -> Result<(), String> {
         if !self.firing.events.is_empty()
             || !self.support.events.is_empty()

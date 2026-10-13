@@ -295,6 +295,10 @@ fn actual_engineering_commands_ticks_and_recipient_reads() {
                         .unwrap_or_else(|e| panic!("{name}: {e}"));
                     assert!(report.commands.is_empty());
                     assert!(
+                        report.environment().next().is_none(),
+                        "{name}: unexpected outside effects"
+                    );
+                    assert!(
                         report.events.is_empty(),
                         "{name}: unexpected committed tick events"
                     );

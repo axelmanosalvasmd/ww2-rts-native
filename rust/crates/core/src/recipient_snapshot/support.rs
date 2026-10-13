@@ -2,23 +2,26 @@ use super::*;
 
 pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, SnapshotError> {
     let g = &state.world.game;
+    // Read the single canonical actor list in Source insertion order. Query-only
+    // coarse strikes cannot stand in for actual runtime kind and timing facts.
     let mut strikes = Vec::with_capacity(g.strikes.len());
     for strike in &g.strikes {
-        let unsupported = || SnapshotError::Unsupported {
+        let timing = strike.runtime.as_ref().ok_or(SnapshotError::Unsupported {
             unit: 0,
             capability: SnapshotCapability::TeamEffects,
-        };
-        let timing = strike.runtime.as_ref().ok_or_else(unsupported)?;
-        if !matches!(
-            timing.kind,
-            crate::match_support::SupportKind::Artillery
-                | crate::match_support::SupportKind::Smoke
-                | crate::match_support::SupportKind::Cover
-        ) {
-            return Err(unsupported());
-        }
-        if strike.kind != crate::game::StrikeKind::Other {
-            return Err(unsupported());
+        })?;
+        if strike.kind != crate::game::StrikeKind::Other
+            || !matches!(
+                timing.kind,
+                crate::match_support::SupportKind::Artillery
+                    | crate::match_support::SupportKind::Smoke
+                    | crate::match_support::SupportKind::Cover
+            )
+        {
+            return Err(SnapshotError::Unsupported {
+                unit: 0,
+                capability: SnapshotCapability::TeamEffects,
+            });
         }
         if strike.owner >= g.players.len() {
             return Err(SnapshotError::InvalidRecipient);
@@ -146,6 +149,16 @@ mod tests {
         ));
         assert_eq!(delivery, before);
         state.support.covers[0].remaining = 2.01;
+        let timing = state.world.game.strikes[0].runtime.take().unwrap();
+        assert!(matches!(
+            delivery.capture(&mut state, &[false; 3], &[false; 3]),
+            Err(SnapshotError::Unsupported {
+                capability: SnapshotCapability::TeamEffects,
+                ..
+            })
+        ));
+        assert_eq!(delivery, before);
+        state.world.game.strikes[0].runtime = Some(timing);
         state.world.game.strikes[0].owner = usize::MAX;
         assert!(matches!(
             capture(&state),
