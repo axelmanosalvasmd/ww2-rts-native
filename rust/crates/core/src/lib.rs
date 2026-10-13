@@ -15,6 +15,7 @@ pub mod map;
 pub mod math;
 pub mod movement;
 pub mod navigation;
+pub mod observed_memory;
 pub mod path_requests;
 
 pub mod orders;

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added per-player observed terrain memory with filtering before storage, stable row revisions, canonical full-route order and a separate snapshot outbox. Three original-source traces match 117 actions, including hidden mines, unseen removals, building cancellation, allied/live/ruin footprints, reveal, teams and reconnect reads. Invalid shapes, exhausted revisions and mismatched route recipients reject before memory changes. World Conquest memory, real visibility wiring, snapshot serialization and Match integration remain separate; MOV-29 and MAP-100 stay in progress.
+
 - Added idempotent explicit initialization for production buildings so Match startup can expose empty canonical queues and zero progress immediately. Reinitializing a building preserves paid jobs; player research rows already start with empty lab lists.
 
 - Added canonical production queues and player research outside `Game`. Construction-mode recruitment uses the existing wallets and population rules; paid job IDs, original-charge refunds, one-unit-per-step training, ordered lab capacity and pause/resume match 12 original-JavaScript traces (114 actions, 922 advance calls). Typed completion requests leave unit creation and placement to the match runner. Empty building state initializes lazily; malformed inputs and duplicate IDs fail before mutation. Instant recruitment, placement/rally orders, building lifecycle, statistics, persistence and public wire/ABI integration remain separate.
