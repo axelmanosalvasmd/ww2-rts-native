@@ -15,7 +15,7 @@ use ww2_core::{
     produced_units::{ProduceInput, ProducedPlacer, ProductionBuilding},
     route_knowledge::{LiveRouting, RouteQuery},
     staged_observer::StagedObserver,
-    world::{CellChange, Recipient},
+    world::Recipient,
 };
 fn context(m: &Match) -> RecipientContext<'_> {
     RecipientContext {
@@ -268,11 +268,7 @@ fn original_produce_unit_sees_birth_only_at_source_lazy_cache_boundaries() {
                     m.world
                         .set_cell(
                             idx(&h["change"]["c"]),
-                            CellChange {
-                                ch: h["change"]["ch"].as_str().unwrap().as_bytes()[0],
-                                height: None,
-                                state: None,
-                            },
+                            h["change"]["ch"].as_str().unwrap().as_bytes()[0],
                         )
                         .unwrap();
                 }
@@ -436,11 +432,7 @@ fn aborts_keep_recipient_buffers_receipts_fog_and_prewarmed_search_history() {
             m.world
                 .set_cell(
                     idx(&h["change"]["c"]),
-                    CellChange {
-                        ch: h["change"]["ch"].as_str().unwrap().as_bytes()[0],
-                        height: None,
-                        state: None,
-                    },
+                    h["change"]["ch"].as_str().unwrap().as_bytes()[0],
                 )
                 .unwrap();
         }
