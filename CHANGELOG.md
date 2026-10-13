@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added standalone supply stores, payer-owned stock and donation grants, automatic fleet and job scheduling, route continuation/repair, loading/delivery/return, convoy commands, support spending and recipient projections. Original JavaScript fixtures cover 12 startup/runtime traces with 540 steps, six payer pools and five support cases. Reserves now carry optional territorial supply rate and cut-off duration. Fixed clustered member ordering, unusable-truck command mutation and delivery after alliances change during the port review. Match hookup, supply-network/path algorithms, mandatory withdrawal and wire delivery remain separate; Game, ABI and rules hash are unchanged.
+
 - Added ground production door placement with ordered exit rings, vehicle clearance, occupancy checks, origin-region fallback, heading and spawn ghosts. Two focused tests compare 934 projections from the unchanged JavaScript on 43 terrains, including all 44 non-air kinds and 33 authored maps. Recruitment receives a placed Unit and an explicit rally routing request; wallet/ID changes, path execution, full unit-state initialization and air-base production remain outside the helper.
 
 - Add Conquest recruitment preparation with canonical population, queue and maker checks. Placement failure drops the request without payment; successful commit charges MP once. Two focused tests cover 266 original-JavaScript buy commands and aborted transactions. Other modes, placement and Match integration remain separate.
