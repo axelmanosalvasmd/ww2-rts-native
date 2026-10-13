@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Clarified that future World tick integration retains existing random streams, core math and ordered phase facts. Controlled source traces do not prove native random replay, and post-finish dispatch remains outside the bounded region adapter.
+
 - Recorded the actual World controller order in seven original-source traces: 114 ticks and 1,486 phase entries. The plan preserves retired tick facts, later convoy births, neutral actor membership, regional supply, capture and finish timing. Native World dispatch remains guarded; no scheduler or runtime interface changed.
 
 - Restore explicit flat source/native scene terrain before registering elimination fixtures. This prevents unrelated bootstrap geometry from contaminating debris comparisons when the transition harness does not claim matched startup random streams.
