@@ -63,6 +63,8 @@ pub enum Command {
 /// Only fields absent from Unit live here. Routes, positions and hold_pos remain in Unit.
 #[derive(Clone, Debug, PartialEq)]
 pub struct UnitControl {
+    /// Seconds until another idle reaction may choose a destination (`u.react`).
+    pub react: f64,
     pub aim: f64,
     pub auto_cast: bool,
     pub auto_retreat: bool,
@@ -102,6 +104,7 @@ impl UnitControl {
             return Err("nonfinite unit aim".into());
         }
         Ok(Self {
+            react: 0.0,
             aim: unit.rot,
             auto_cast: ability != "none",
             auto_retreat: !kind.air,

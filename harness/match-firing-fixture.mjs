@@ -52,7 +52,7 @@ for(const shooter of ['rifle','mg','sniper','at','tank','flamer','mortar','howit
  if(variation.endsWith('cover')){const c=Math.floor(t.z/2)*g.w+Math.floor(t.x/2);sim.setCell(g,c,'#');}
  if(variation==='hurt'){Object.assign(u,{supp:55,xp:sim.UNITS[shooter].cost*5,hitBy:3,hitAt:1,hitFrom:{x:other.x,z:other.z}});Object.assign(other,{targetId:1,shotAt:1});}
  g.players[0].visible=new Set(variation==='unseen'?[]:[2,3]);g.players[1].visible=new Set([1]);grid.rebuildGrid(g);
- const input=[...g.units.values()].map(u=>({id:u.id,kind:u.type,owner:u.owner,x:u.x,z:u.z,rot:u.rot,hp:u.hp,still:u.still,supp:u.supp,xp:u.xp,hitBy:u.hitBy??null,hitAt:u.hitAt,hitFrom:u.hitFrom??null,target:u.targetId,shotAt:u.shotAt??null,logistics:u.logistics??null,hold:u.holdFire,attack:u.attackId,aim:u.aim,cooldown:u.cooldown,retarget:u.retarget}));
+ const input=[...g.units.values()].map(u=>({id:u.id,kind:u.type,owner:u.owner,x:u.x,z:u.z,rot:u.rot,hp:u.hp,still:u.still,supp:u.supp,xp:u.xp,hitBy:u.hitBy??null,hitAt:u.hitAt,hitFrom:u.hitFrom??null,target:u.targetId,shotAt:u.shotAt??null,logistics:u.logistics?structuredClone(u.logistics):null,hold:u.holdFire,attack:u.attackId,aim:u.aim,cooldown:u.cooldown,retarget:u.retarget}));
  g.nextId=1000;
  const random=combatRandom(701);const steps=[];
  const run=variation.startsWith('flight'), checkpoints=run?[1,2,11,21,41,81,121,161]:[1,2,11,21];
@@ -64,7 +64,7 @@ for(const shooter of ['rifle','mg','sniper','at','tank','flamer','mortar','howit
    if(variation==='flight-expiry'){for(const p of g.flights.values())p.vy=80;}
    if(variation==='flight-dead-shooter'){g.units.delete(1);grid.rebuildGrid(g);}
   }
-  if(variation==='flight-motion'&&tick>1){t.z+=.15;t.rot+=.025;grid.rebuildGrid(g);}
+  if(variation==='flight-motion'&&tick>1){t.z+=tick<80?.15:-.15;t.rot+=.025;grid.rebuildGrid(g);}
   if(!run||tick===1)g.shots=[];
   g.claims=new Map();for(const v of g.units.values())if(v.targetId&&v.hp>0)sim.claim(g,v,v.targetId,1);u.cooldown-=.05;u.retarget-=.05;
   const old=Math.random;Math.random=()=>random.next();try{
