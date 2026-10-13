@@ -272,6 +272,20 @@ fn connected_tick_phases_match_actual_reference_steps() {
                 ]));
             }
             assert!(!report.unavailable.is_empty());
+            assert_eq!(
+                report
+                    .phases
+                    .iter()
+                    .filter(|phase| **phase == ww2_core::match_tick::TickPhase::TrafficKnowledge)
+                    .count(),
+                1,
+                "recipient traffic is connected exactly once",
+            );
+            assert!(
+                !report
+                    .unavailable
+                    .contains(&ww2_core::match_tick::TickPhase::TrafficKnowledge)
+            );
             assert!(
                 report
                     .phases

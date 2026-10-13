@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Normally retained verified main `8f27227` in the separate construction/GroundAttack candidate, including the accepted recipient-known terrain traffic adapter. Existing dispatch, path callbacks, ordered output and source fixtures remain intact. Corrected the sole caller receipt to report connected TrafficKnowledge once instead of listing it as unavailable; the existing actual-runner regression protects that truthful receipt. Combined native verification remains pending and no frozen proof branch changed.
+
 - Prepared the source-reviewed construction/ground caller for a coherent native cycle by normally retaining the ordered-event publication parent, current main and the central 40-minute CI budget. Core and simulation consumer bytes remain exactly `c501e12`; the approved ABI 2 header and server provider bytes come from those accepted parents. New combined native and platform results remain pending, and earlier ABI 1 branch FFI evidence is not an ABI 2 consumer result.
 
 - Adapted the three remaining construction, aircraft and carrier replay timeline readers to the shared MatchSample enum after independent source review found their obsolete struct-field accesses in the normal union. Each preserves the original Conquest `{t, vp}` projection and explicitly refuses Territories. Runtime, inputs, original fixtures and every state comparison are unchanged; this combined head still awaits native compilation.
@@ -591,6 +593,17 @@
 
 - Preserved canonical recruited combat defaults through the shared publication callback when integrating the reviewed combat ancestry. Fresh combat identities reject before payment; production stepping remains under implementation.
 - Preserved recruited combat metadata in the shared publication callback and rejected occupied combat IDs before charging during integration.
+- Included the approved central CI fix `76cbe6d` in the PR #147 refresh, raising the full Rust job limit from 20 to 40 minutes. Preserved additive server, traffic and CI documentation; traffic and ABI 2 source remain unchanged.
+
+- Refreshed PR #147 again after server PR #137 merged into main `a173dc7`. Preserved both additive changelog histories and all traffic code; no Rust conflict occurred. Fresh combined-head platform checks replace the earlier green run.
+
+- Refreshed PR #147 recipient ground traffic onto ABI 2 main `13a8d1f` by a normal merge. Preserved both module exports and design/changelog histories, the published traffic behavior and the exact approved header. Only documentation and module exports conflicted; combined-head platform checks remain pending.
+
+- Verified recipient terrain traffic steering on the Vostro Linux x86_64 lane: 13 focused debug tests, 143 release workspace tests, strict Clippy, formatting and release FFI pass at runtime head 8e812fe. Recorded exact archive/log hashes in DESIGN; World and full match acceptance remain separate.
+
+- Corrected the inherited command fixture’s reserve initializer to include absent supply-rate and cutoff state. The fresh Vostro traffic compile exposed the missing fields before tests; runtime traffic and source captures are unchanged.
+
+- Added borrowed recipient terrain to Match ground traffic steering and waypoint skipping while retaining physical speed and collision checks. The original-source recorder supplies 12 traces, 63 steps and 65 movement calls, including queues, passes, remembered edits and hidden physical contacts. Unit remains the sole owner of traffic and path-cache state; invalid knowledge errors propagate without losing the moving unit. World traffic, terrain effects and full match integration remain separate.
 
 
 - Refreshed the consolidated server delta, list, backpressure and timing frontier in PR #137 onto ABI 2 main `13a8d1f`. Preserved both changelog histories and all server source, original-source recorders and fixtures. Only additive changelog entries conflicted; fresh combined-head platform checks remain pending.

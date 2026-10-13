@@ -7,8 +7,9 @@
 use crate::game::{Game, LaneScan, Point, Pose, Traffic, Unit};
 use crate::grid::{SpatialGrid, UnitId};
 use crate::math;
+use crate::route_knowledge::KnowledgeError;
 use crate::rules::{Rules, UnitKind};
-use crate::terrain::{cover_rank, walkable};
+use crate::traffic_knowledge::TrafficKnowledge;
 use crate::vision::{airborne, or_one};
 
 /// What traffic lets a unit do this tick (`trafficStep`'s result).
@@ -147,16 +148,29 @@ fn waits_on(g: &Game, v: &Unit, u_id: UnitId) -> bool {
 }
 
 /// Open ground at a point for this kind (the traffic context's `open`).
-fn open(g: &Game, block: u16, x: f64, z: f64) -> bool {
-    g.cell_of(x, z).is_some_and(|c| g.flags[c] & block == 0)
+fn open(g: &Game, knowledge: &TrafficKnowledge<'_>, block: u16, x: f64, z: f64) -> bool {
+    knowledge.open(g, block, x, z)
 }
 
 /// Open ground across the route at (x, z), up to `need` on each side (`laneWidth`).
-fn lane_width(g: &Game, block: u16, x: f64, z: f64, nx: f64, nz: f64, need: f64) -> f64 {
+#[allow(clippy::too_many_arguments)]
+fn lane_width(
+    g: &Game,
+    knowledge: &TrafficKnowledge<'_>,
+    block: u16,
+    x: f64,
+    z: f64,
+    nx: f64,
+    nz: f64,
+    need: f64,
+) -> f64 {
     let mut width = 0.0;
     for side in [1.0, -1.0] {
         let mut k = 0.5;
-        while k <= need && width < need && open(g, block, x + nx * k * side, z + nz * k * side) {
+        while k <= need
+            && width < need
+            && open(g, knowledge, block, x + nx * k * side, z + nz * k * side)
+        {
             width += 0.5;
             k += 0.5;
         }
@@ -166,7 +180,13 @@ fn lane_width(g: &Game, block: u16, x: f64, z: f64, nx: f64, nz: f64, need: f64)
 
 /// Where the route ahead first runs through ground too narrow for two of these hulls to pass, and where that
 /// ends (`oneLane`).
-fn one_lane(g: &Game, rules: &Rules, u: &Unit, kind: &UnitKind) -> Option<(Point, Point)> {
+fn one_lane(
+    g: &Game,
+    knowledge: &TrafficKnowledge<'_>,
+    rules: &Rules,
+    u: &Unit,
+    kind: &UnitKind,
+) -> Option<(Point, Point)> {
     let lane = &rules.movement.lane;
     let block = kind.block();
     let need = 0.96 * kind.radius + 2.0 * kind.body_radius() + lane.margin;
@@ -182,7 +202,7 @@ fn one_lane(g: &Game, rules: &Rules, u: &Unit, kind: &UnitKind) -> Option<(Point
         while s < d {
             let x = at.x + (p.x - at.x) * s / d;
             let z = at.z + (p.z - at.z) * s / d;
-            if lane_width(g, block, x, z, nx, nz, need) < need {
+            if lane_width(g, knowledge, block, x, z, nx, nz, need) < need {
                 entry.get_or_insert(Point { x, z });
                 exit = Some(Point { x, z });
             } else if let Some(entry) = entry {
@@ -200,14 +220,20 @@ fn one_lane(g: &Game, rules: &Rules, u: &Unit, kind: &UnitKind) -> Option<(Point
 }
 
 /// The route's next one-lane stretch, looked for again every half second or on a new route (`laneAhead`).
-fn lane_ahead(g: &Game, rules: &Rules, u: &mut Unit, kind: &UnitKind) -> Option<(Point, Point)> {
+fn lane_ahead(
+    g: &Game,
+    knowledge: &TrafficKnowledge<'_>,
+    rules: &Rules,
+    u: &mut Unit,
+    kind: &UnitKind,
+) -> Option<(Point, Point)> {
     let tick = g.tick as f64;
     let stale = match &u.lane_scan {
         Some(scan) => scan.path != u.path_gen || tick >= scan.until,
         None => true,
     };
     if stale {
-        let lane = one_lane(g, rules, u, kind);
+        let lane = one_lane(g, knowledge, rules, u, kind);
         u.lane_scan = Some(LaneScan {
             path: u.path_gen,
             until: tick + 10.0,
@@ -228,6 +254,7 @@ pub fn seen_by(g: &Game, slot: usize, v: &Unit) -> bool {
 /// (`laneHolder`).
 fn lane_holder(
     g: &Game,
+    knowledge: &TrafficKnowledge<'_>,
     rules: &Rules,
     grid: &SpatialGrid,
     u: &mut Unit,
@@ -235,7 +262,7 @@ fn lane_holder(
 ) -> Option<UnitId> {
     let lr = &rules.movement.lane;
     let own = heading(u)?;
-    let (entry, exit) = lane_ahead(g, rules, u, kind)?;
+    let (entry, exit) = lane_ahead(g, knowledge, rules, u, kind)?;
     let u: &Unit = u;
     // Its nose already in it (or past its start): drive on through. Further than the hold point: carry on.
     let before = (entry.x - u.x) * own.x + (entry.z - u.z) * own.z;
@@ -299,6 +326,21 @@ pub fn traffic_step(
     goal: Option<Point>,
     dt: f64,
 ) -> Steer {
+    traffic_step_with_knowledge(g, rules, grid, u, goal, dt, &TrafficKnowledge::physical())
+        .expect("physical traffic cannot fail")
+}
+
+/// Steering with explicit remembered terrain. An invalid knowledge query aborts the turn.
+#[allow(clippy::too_many_arguments)]
+pub fn traffic_step_with_knowledge(
+    g: &Game,
+    rules: &Rules,
+    grid: &SpatialGrid,
+    u: &mut Unit,
+    goal: Option<Point>,
+    dt: f64,
+    knowledge: &TrafficKnowledge<'_>,
+) -> Result<Steer, KnowledgeError> {
     let tr = &rules.movement.traffic;
     let kind = &rules.kinds[u.kind];
     let tick = g.tick as f64;
@@ -308,7 +350,7 @@ pub fn traffic_step(
         _ => {
             u.traffic = None;
             u.traffic_wait = 0.0;
-            return Steer::go(goal);
+            return Ok(Steer::go(goal));
         }
     };
     let block = kind.block();
@@ -317,19 +359,19 @@ pub fn traffic_step(
     } else {
         0.9
     };
-    let clear = |a: Point, b: Point| walkable(g, rules, a, b, block, half);
+    let clear = |a: Point, b: Point| knowledge.clear(g, rules, a, b, block, half);
     let rank = |at: Point, from: Option<Point>| {
         if kind.infantry {
-            cover_rank(g, rules, at, from)
+            knowledge.cover_rank(g, rules, at, from)
         } else {
-            3
+            Ok(3)
         }
     };
     let d = length(u.at(), goal);
     let dx = (goal.x - u.x) / or_one(d);
     let dz = (goal.z - u.z) / or_one(d);
     let holder = if !kind.infantry && u.traffic.is_none() && !u.path.is_empty() {
-        lane_holder(g, rules, grid, u, kind)
+        lane_holder(g, knowledge, rules, grid, u, kind)
     } else {
         None
     };
@@ -420,11 +462,11 @@ pub fn traffic_step(
         && (conflict.is_none() || follow)
     {
         u.queued_behind = holder;
-        return Steer {
+        return Ok(Steer {
             blocked: true,
             waiting: true,
             ..Steer::default()
-        };
+        });
     }
     // The one in front is stuck without waiting on anyone, likely on this unit: give way.
     let give_way = holder.is_some()
@@ -442,7 +484,7 @@ pub fn traffic_step(
         u.traffic = None;
         u.traffic_wait = 0.0;
         u.traffic_entered = !u.path.is_empty();
-        return Steer::go(Some(u.path.first().copied().unwrap_or(goal)));
+        return Ok(Steer::go(Some(u.path.first().copied().unwrap_or(goal))));
     }
     if let Some(by) = u.traffic.as_ref().map(|t| t.by) {
         let v = g.units.get(&by);
@@ -488,32 +530,32 @@ pub fn traffic_step(
                     u.traffic_entered = false;
                     if let Some(resume) = resume {
                         u.path.drain(..resume);
-                        return Steer::go(u.path.first().copied());
+                        return Ok(Steer::go(u.path.first().copied()));
                     }
                     u.repath = 0.0;
-                    return Steer {
+                    return Ok(Steer {
                         goal: u.path.first().copied(),
                         replan: true,
                         ..Steer::default()
-                    };
+                    });
                 }
             }
             let traffic = u.traffic.as_ref().expect("still passing");
             if tick * dt < traffic.until {
-                return Steer {
+                return Ok(Steer {
                     goal: Some(traffic.goal),
                     yielding: true,
                     ..Steer::default()
-                };
+                });
             }
             u.traffic = None;
         }
         let Some(traffic) = &u.traffic else {
-            return Steer {
+            return Ok(Steer {
                 goal: u.path.first().copied(),
                 replan: true,
                 ..Steer::default()
-            };
+            });
         };
         let arrived = length(here, traffic.goal) < 0.4;
         let safe = match v {
@@ -526,32 +568,32 @@ pub fn traffic_step(
             u.traffic = None;
             u.traffic_entered = false;
         } else if !arrived {
-            return Steer {
+            return Ok(Steer {
                 goal: Some(traffic.goal),
                 yielding: true,
                 ..Steer::default()
-            };
+            });
         } else {
-            return Steer {
+            return Ok(Steer {
                 blocked: true,
                 yielding: true,
                 ..Steer::default()
-            };
+            });
         }
     }
     let Some(conflict) = conflict else {
         u.traffic_wait = math::max(0.0, u.traffic_wait - dt);
         u.traffic_entered = !u.path.is_empty();
-        return Steer::go(Some(goal));
+        return Ok(Steer::go(Some(goal)));
     };
     // Waiting in a queue is not gridlock: it neither ages priority, leads to a ghost, nor asks for a new route.
     if follow {
         u.queued_behind = conflict.id;
-        return Steer {
+        return Ok(Steer {
             blocked: true,
             waiting: true,
             ..Steer::default()
-        };
+        });
     }
     // Stable priority remains for the whole maneuver. The other unit can see the yielded lane.
     let conflict_kind = &rules.kinds[conflict.kind];
@@ -563,16 +605,16 @@ pub fn traffic_step(
                 && !protected(conflict)
                 && !conflict.path.is_empty())
     {
-        return Steer::go(Some(goal));
+        return Ok(Steer::go(Some(goal)));
     }
     u.traffic_wait += dt;
     if u.traffic_wait < tr.wait {
-        return Steer {
+        return Ok(Steer {
             blocked: true,
             ..Steer::default()
-        };
+        });
     }
-    let min_cover = rank(u.at(), u.hit_from);
+    let min_cover = rank(u.at(), u.hit_from)?;
     let side = if u.id < conflict.id { 1.0 } else { -1.0 };
     let distance = radius_pair(kind, conflict_kind) + 0.7;
     let occupied = |at: Point| {
@@ -599,7 +641,7 @@ pub fn traffic_step(
     }
     let here = u.at();
     for at in candidates {
-        if !clear(here, at) || occupied(at) || rank(at, u.hit_from) > min_cover {
+        if !clear(here, at) || occupied(at) || rank(at, u.hit_from)? > min_cover {
             continue;
         }
         if conflict.path.is_empty() {
@@ -620,13 +662,16 @@ pub fn traffic_step(
             };
             let legs = vec![at, pass, corner, exit];
             let mut previous = here;
-            let safe = legs.iter().all(|&point| {
-                let safe = clear(previous, point)
+            let mut safe = true;
+            for &point in &legs {
+                safe = clear(previous, point)
                     && !occupied(point)
-                    && rank(point, u.hit_from) <= min_cover;
+                    && rank(point, u.hit_from)? <= min_cover;
                 previous = point;
-                safe
-            });
+                if !safe {
+                    break;
+                }
+            }
             if !safe {
                 continue;
             }
@@ -638,11 +683,11 @@ pub fn traffic_step(
                 until: tick * dt + tr.max_yield,
             });
             u.traffic_entered = false;
-            return Steer {
+            return Ok(Steer {
                 goal: Some(at),
                 yielding: true,
                 ..Steer::default()
-            };
+            });
         }
         u.traffic = Some(Traffic {
             goal: at,
@@ -652,17 +697,17 @@ pub fn traffic_step(
             until: tick * dt + tr.max_yield,
         });
         u.traffic_entered = false;
-        return Steer {
+        return Ok(Steer {
             goal: Some(at),
             yielding: true,
             ..Steer::default()
-        };
+        });
     }
-    Steer {
+    Ok(Steer {
         blocked: true,
         replan: u.traffic_wait >= tr.replan,
         ..Steer::default()
-    }
+    })
 }
 
 /// Remembers where a unit on its route has been, a point every metre and a half, the last 20

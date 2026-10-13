@@ -2239,7 +2239,13 @@ impl crate::match_runtime::Match {
             .get_mut(&id)
             .ok_or("missing moving control")?;
         let mut error = None;
-        let moved = crate::movement::move_unit_with_routes(
+        let traffic_knowledge = crate::traffic_knowledge::TrafficKnowledge::observed(
+            query.navigation(),
+            self.recipients[owner].knowledge(),
+            self.recipients[owner].wrecks(),
+        )
+        .map_err(|e| format!("movement recipient traffic: {e:?}"))?;
+        let moved = crate::movement::move_unit_with_knowledge(
             &mut self.world.game,
             &self.rules,
             &mut self.grid,
@@ -2293,7 +2299,9 @@ impl crate::match_runtime::Match {
                     }
                 }
             },
-        );
+            &traffic_knowledge,
+        )
+        .map_err(|e| format!("movement recipient traffic: {e:?}"))?;
         if let Some(error) = error {
             return Err(error);
         }
