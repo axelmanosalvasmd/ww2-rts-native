@@ -435,7 +435,8 @@ impl WorldRecipientMetadata {
         out["home"] = json!([number(p.home.x), number(p.home.z)]);
         let regions:Vec<_>=p.regions.iter().map(|r| {
             let mut row=json!({"id":r.id,"team":r.team,"x":number(r.at.x),"z":number(r.at.z),"progress":number(r.progress),"capper":r.capper.map_or(-1,|c|c as i64),"locked":r.locked,"contested":r.contested});
-            if let Some(name)=&r.name {row["name"]=json!(name);} if let Some(kind)=&r.kind {row["kind"]=json!(kind);}
+            if let Some(name)=&r.name {row["name"]=json!(name);}
+            if let Some(kind)=&r.kind {row["kind"]=json!(kind);}
             if let Some(b)=r.bounds {row["bounds"]=json!(b.map(number));} else {row["runs"]=json!(r.runs);}
             row
         }).collect();
