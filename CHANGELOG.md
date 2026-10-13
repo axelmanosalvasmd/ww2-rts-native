@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Matched carrier pre-clock admission to the actual early actuator for idle ordinary ground actors. Independent review confirmed finite negative suppression could otherwise fail only after clock/input mutation. The regression now preserves queued boundaries, all unit fields and timers for that case; idle operative and skipped building turns retain their source gates. Native composition remains pending.
+
 - Fixed a carrier tick admission shortcut found by independent review: a nonriding Game unit with a retained carrier relation now reaches canonical parity validation before commands, clock or timers mutate. The whole-admission regression preserves both queued boundaries and all canonical timers on refusal. Native execution remains pending.
 
 - Normal-merged the checked ordinary Default runner into the separate carrier integration, preserving the new riding/boarding sites and canonical command siblings. The 240-test predecessor proof remains distinct from the uncompiled carrier composition; no frozen proof branch changed.

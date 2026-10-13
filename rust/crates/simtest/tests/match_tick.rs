@@ -554,6 +554,7 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
         "rail",
         "riding",
         "reverse riding",
+        "idle suppression",
         "logistics",
         "convoys",
         "mode",
@@ -577,6 +578,7 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
                 m.combat.get_mut(id).unwrap().carrier = Some(900);
             }
             "reverse riding" => m.combat.get_mut(id).unwrap().carrier = Some(900),
+            "idle suppression" => unit.supp = -1.0,
             "logistics" => m.options.logistics = true,
             "convoys" => m.convoys = ww2_core::supply_convoys::ConvoyState::setup(true),
             "mode" => m.world.game.mode = Some(ww2_core::game::ModeKind::World),
@@ -631,7 +633,7 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
                 "logistics" | "convoys" => "reserve and convoy tick phases",
                 "mode" => "ordinary Conquest",
                 "riding" => "thrown carrier ejection tick phase",
-                "reverse riding" => "invalid canonical carrier unit",
+                "reverse riding" | "idle suppression" => "invalid canonical carrier unit",
                 _ => "rail tick actor",
             }),
             "{actor}: {error}"
