@@ -92,6 +92,9 @@ impl StartPlan {
         options: &MatchOptions,
         rules: &Rules,
     ) -> Result<Self, String> {
+        if map.geography().is_some() {
+            return Err("native startup does not yet initialize World matches".into());
+        }
         if !matches!(options.mode, Mode::Default | Mode::Conquest) {
             return Err("native startup currently supports Conquest".into());
         }
