@@ -277,6 +277,21 @@ impl Match {
         if self.ground_orders_open().is_err() {
             return Ok(Some(Denial::Unsupported));
         }
+        if ids
+            .iter()
+            .filter_map(|raw| u32::try_from(*raw).ok())
+            .any(|id| {
+                self.convoys.trucks.contains_key(&id)
+                    && self
+                        .world
+                        .game
+                        .units
+                        .get(&id)
+                        .is_some_and(|u| u.owner == owner)
+            })
+        {
+            return Ok(Some(Denial::Unsupported));
+        }
         let command = Command::Retreat { ids: ids.to_vec() };
         let selected = self.ground_order_rows(owner, ids, &command)?;
         for &id in &selected {
@@ -440,9 +455,8 @@ impl Match {
         self.ground_order_identity(id)?;
         let c = &self.commands.units[&id];
         let target = c.attack_id;
-        self.world.game.units.get_mut(&id).unwrap().attack = target != 0;
-        let u = &self.world.game.units[&id];
         if target == 0 || c.nade.is_some() {
+            self.world.game.units.get_mut(&id).unwrap().attack = target != 0;
             return Ok(());
         }
         let Some(t) = self.world.game.units.get(&target) else {
@@ -471,12 +485,15 @@ impl Match {
             }
             self.set_firing_target(id, target)?;
             let u = self.world.game.units.get_mut(&id).unwrap();
+            u.attack = true;
             u.path.clear();
             u.path_gen += 1;
         } else if !self.logistics.get(id).is_some_and(|r| r.forced) && u.repath <= 0. {
             let at = t.at();
             self.request_command_path(id, at, RequestKind::AttackId)?;
         }
+        self.world.game.units.get_mut(&id).unwrap().attack =
+            self.commands.units[&id].attack_id != 0;
         Ok(())
     }
 }
@@ -535,5 +552,20 @@ mod tests {
             format!("{:?}", (&m.world.game.units, &m.commands.units)),
             before
         );
+    }
+
+    #[test]
+    fn explicit_attack_refuses_malformed_visible_target_before_flag_or_claim_writes() {
+        let mut m = scene();
+        m.commands.units.get_mut(&1).unwrap().attack_id = 3;
+        m.world.game.units.get_mut(&3).unwrap().x = f64::NAN;
+        let before = format!("{:?}", (&m.world.game.units, &m.commands.units));
+        let claims = m.firing.target_claims().collect::<Vec<_>>();
+        assert!(m.apply_ground_attack(1).is_err());
+        assert_eq!(
+            format!("{:?}", (&m.world.game.units, &m.commands.units)),
+            before
+        );
+        assert_eq!(m.firing.target_claims().collect::<Vec<_>>(), claims);
     }
 }

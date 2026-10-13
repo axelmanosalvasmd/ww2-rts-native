@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Paused ground-order implementation at the user's request and saved its native consumer draft. Source review repairs refuse missing selected control rows and active convoy Retreat before mutation, and stage direct Attack projection after target validation. The draft describes 23 command-prefix cases and 20 quiet full-step cases in both arrival orders; no Cargo or native execution ran. GroundAttack tick wiring, final repair review and the garrison Retreat observation overlay remain pending.
+
 - Added a source-written ordinary ground Attack/Retreat provider to the single recorded queue. Attack keeps live target intent, eight waiting orders and admission anchors; accepted replacements cancel paid/shared work without refunds. Retreat reuses the canonical reset and clears live route retry failures. The unchanged JavaScript capture covers 26 cases, 44 commands, 28 full steps and 102 snapshots. Native replay and the sole tick hookup are pending; garrison retreat, mixed AIR groups and construction remain explicit limits.
 
 - Normally joined the verified engineering baseline and source-reviewed AIR/carrier caller in a separate ground Attack/Retreat provider tree. Destroy, carrier and mass-project commands retain the single queue. The broader source union requires fresh native proof; frozen parents are unchanged.
