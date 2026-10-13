@@ -221,6 +221,9 @@ fn snapshot(m: &mut Match) -> Value {
 }
 fn compare(a: &Value, b: &Value, path: &str) {
     if b.is_number() {
+        if b.as_f64() == Some(0.0) && a.as_f64() == Some(0.0) {
+            return;
+        }
         assert_eq!(
             a.as_f64().unwrap().to_bits(),
             b.as_f64().unwrap().to_bits(),
@@ -297,11 +300,13 @@ fn assembled_match_targeting_and_launches_match_original_source() {
                 }
                 if c["variation"] == "flight-motion" && current > 1 {
                     let t = m.world.game.units.get_mut(&2).unwrap();
-                    t.z += 0.15;
+                    t.z += if current < 80 { 0.15 } else { -0.15 };
                     t.rot += 0.025;
                     m.grid.rebuild(&m.world.game.units);
                 }
-                m.begin_firing_tick(&[1, 2, 3]).unwrap();
+                m.begin_firing_tick(&[1, 2, 3]).unwrap_or_else(|e| {
+                    panic!("{} {} tick {current}: {e}", c["shooter"], c["variation"])
+                });
                 m.advance_firing_timers(1, 0.05).unwrap();
                 if !run || current == 1 {
                     m.apply_unit_firing(1, c["variation"] == "moving", 0.05)
@@ -360,7 +365,15 @@ fn unsupported_modes_and_later_bad_payloads_leave_firing_unchanged() {
     assert_eq!(m.combat, combat);
     assert_eq!(m.start.random.snapshot(), random);
     m.world.game.tick = 1;
-    assert_eq!(m.world.game.units, world.units);
+    let mut actual = m.world.game.units.clone();
+    let mut expected = world.units;
+    for (&id, u) in &mut actual {
+        let other = expected.get_mut(&id).unwrap();
+        assert_eq!(u.pace.to_bits(), other.pace.to_bits());
+        u.pace = 0.0;
+        other.pace = 0.0;
+    }
+    assert_eq!(actual, expected);
     assert_eq!(m.world.game.chars, world.chars);
     m.options.mode = Mode::World;
     m.world.game.units.get_mut(&1).unwrap().owner = u32::MAX as usize;

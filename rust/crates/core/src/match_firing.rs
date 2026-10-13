@@ -114,11 +114,29 @@ pub struct ContactEvent {
     pub impulse: f64,
     pub material: &'static str,
 }
+// JSON.stringify renders both zero signs as 0; keep trajectory math untouched.
+fn normalize_json_zero(value: &mut serde_json::Value) {
+    use serde_json::Value;
+    match value {
+        Value::Number(n) if n.as_f64() == Some(0.0) => *value = Value::from(0),
+        Value::Array(a) => {
+            for v in a {
+                normalize_json_zero(v);
+            }
+        }
+        Value::Object(o) => {
+            for v in o.values_mut() {
+                normalize_json_zero(v);
+            }
+        }
+        _ => {}
+    }
+}
 impl LaunchEvent {
     /// Internal reference-event projection for oracle/producer use, not a new network contract.
     pub fn to_json(&self, rules: &crate::rules::Rules) -> serde_json::Value {
         use serde_json::json;
-        match self {
+        let mut value = match self {
             Self::Flight {
                 id,
                 kind,
@@ -171,7 +189,9 @@ impl LaunchEvent {
                 }
                 v
             }
-        }
+        };
+        normalize_json_zero(&mut value);
+        value
     }
     fn from_flight(p: &LiveFlight) -> Self {
         Self::Flight {

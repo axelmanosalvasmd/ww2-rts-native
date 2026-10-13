@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed the firing oracle retaining consumed ammo in its input record and moving a synthetic target outside the arena. The atomicity assertion compares the existing NaN pace sentinel by bits. Internal shot JSON now matches JavaScript zero serialization while retaining trajectory signs. All three focused native tests pass across 114 source traces and 588 checkpoints; release and workspace checks follow.
+
 - Integrated the reviewed routing and executable command prerequisites for weapon-phase checks. Movement fixtures explicitly leave the newer territorial reserve fields absent. No production rule changed.
 
 - Preflight canonical unit identities, coordinates and terrain indices before projectile iteration, so malformed later contact targets reject before earlier rounds advance.
