@@ -17,6 +17,7 @@ use std::collections::BTreeMap;
 
 /// One owner's remembered rows and routing projection. Refresh through Match;
 /// consumers borrow this state separately from mutable units or path scratch.
+#[derive(Clone, Debug)]
 pub struct RecipientRouting {
     memory: ObservedMemory,
     routes: RouteKnowledge,
@@ -54,7 +55,7 @@ impl RecipientRouting {
         self.memory.full_rows()
     }
 }
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct BoundUnit {
     id: u32,
     kind: usize,
@@ -561,10 +562,12 @@ pub(crate) fn refresh_recipient_parts(
     let g = &world.game;
     refresh_wrecks(state, g, rules, &observation_grid, owner);
     state.wrecks = state.wreck_memory.clone();
-    let fog = fog.team(g, rules, g.players[owner].team);
     state.fires.fill(false);
-    for &c in world.fires.iter().map(|(cell, _)| cell) {
-        state.fires[c] = fog.vis[c] != 0;
+    if !world.fires.is_empty() {
+        let fog = fog.team(g, rules, g.players[owner].team);
+        for &c in world.fires.iter().map(|(cell, _)| cell) {
+            state.fires[c] = fog.vis[c] != 0;
+        }
     }
     state.bound_units = g
         .units

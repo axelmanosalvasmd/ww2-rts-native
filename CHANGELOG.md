@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Added the source-only paid ordinary-construction provider: one canonical builder site identity, typed Build/Assist and normalized waiting orders, exact worker capture and ordered completion/repair. Rare accepted placements stage World, grid and observation/path caches before routes, share the immutable authored snapshot, and publish in place after all guards. Empty fire lists preserve lazy fog warming. Immediate Build/Assist clears prior retry failure rows only after a committed route; queued and rejected operations retain them. Repair now preflights every logged terrain layer and aggregate capacity before progress, story or health writes; existing raw fixture loaders retain numeric build identities. Original source recording covers 28 cases, 108 actions, 1,917 full steps and 2,006 snapshots. Real runner integration, independent final review and native checks remain pending; depot/coastal/cache/cancel lifecycle and Classic/World caller admission remain future work.
+
 - Normal-merged the sole tick owner's immutable Default guard and reviewed provider aliases into the separate actual-source consumer. The checked support/project ancestry and all provider bodies are preserved; combined native checks are pending.
 
 - Consume all 13 unchanged original-source ground-support traces through the actual typed mode, including the 45-step Default case. The complete consumer checks 2,705 ticks and 153 recorded checkpoints; the obsolete Default-refusal test is removed. Provider and sole caller aliases are integrated separately; this new combined native proof is pending.

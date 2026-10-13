@@ -117,6 +117,7 @@ impl From<KnowledgeError> for ObservedError {
 
 /// Keep this producer with its player across snapshots and reconnects. Recreate
 /// it and the corresponding RouteKnowledge when a new initial map is installed.
+#[derive(Clone, Debug)]
 pub struct ObservedMemory {
     slot: usize,
     identity: u64,

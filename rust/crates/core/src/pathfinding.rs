@@ -136,14 +136,50 @@ pub struct PathResult {
     pub expansions: usize,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Pathfinding {
     navigation: Navigation,
     scratch: Scratch,
     vehicles: VehicleNavigation,
 }
 
-#[derive(Default)]
+impl Clone for Pathfinding {
+    /// Fork derived search history for a transaction. External terrain buffers
+    /// keep their identities; owned vehicle buffers are rebound to this copy.
+    /// Publish this value with the terrain preview on success, or drop on error.
+    fn clone(&self) -> Self {
+        let vehicles = self.vehicles.clone();
+        let mut navigation = self.navigation.clone();
+        navigation.rebind_flags(&self.vehicles.cloned_buffers(&vehicles));
+        Self {
+            navigation,
+            scratch: self.scratch.clone(),
+            vehicles,
+        }
+    }
+}
+
+impl Pathfinding {
+    /// The routing guard validated that these arrays belong to the same
+    /// recipient. Keep old versions so the next search applies its change log.
+    pub(crate) fn fork_for_terrain(
+        &self,
+        source: TerrainView<'_>,
+        prepared: TerrainView<'_>,
+    ) -> Self {
+        let mut fork = self.clone();
+        fork.rebind_terrain(source, prepared);
+        fork
+    }
+    pub(crate) fn rebind_terrain(&mut self, source: TerrainView<'_>, prepared: TerrainView<'_>) {
+        let vehicle_buffers = self.vehicles.buffers_for(source);
+        self.navigation
+            .rebind_terrain(source, prepared, &vehicle_buffers);
+        self.vehicles.rebind_terrain(source, prepared);
+    }
+}
+
+#[derive(Clone, Debug, Default)]
 struct Scratch {
     scores: Vec<f32>,
     came: Vec<usize>,
@@ -719,7 +755,7 @@ fn cliff_clear(v: TerrainView<'_>, a: Point, b: Point) -> bool {
     x == ex && y == ey
 }
 
-#[derive(Default)]
+#[derive(Clone, Debug, Default)]
 struct Heap(Vec<(f64, usize)>);
 impl Heap {
     fn push(&mut self, score: f64, cell: usize) {

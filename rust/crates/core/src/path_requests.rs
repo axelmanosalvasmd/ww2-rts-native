@@ -158,12 +158,12 @@ pub struct TickReport {
     pub discarded: usize,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct Pending {
     token: u64,
     request: Request,
 }
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct Failure {
     incarnation: u64,
     request: Request,
@@ -171,7 +171,7 @@ struct Failure {
     count: u32,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct PathRequests {
     queue: VecDeque<Pending>,
     pending: BTreeMap<UnitId, Pending>,

@@ -163,6 +163,7 @@ fn valid_unit(u: &Unit, rules: &Rules, players: usize, world: bool) -> bool {
 }
 fn valid_control(c: &UnitControl) -> bool {
     c.aim.is_finite()
+        && c.build_target.is_none_or(|id| id != 0)
         && c.route_end.is_none_or(finite)
         && c.face.is_none_or(|f| f.angle.is_finite() && finite(f.at))
         && c.nade.is_none_or(finite)
@@ -228,6 +229,8 @@ fn prepare<'a>(
             || !valid_unit(&draft.unit, rules, players, world)
             || draft.unit.hp < 0.0
             || !valid_control(&draft.control)
+            || crate::match_construction::validate_build_activity(&draft.unit, &draft.control)
+                .is_err()
             || parts.units.contains_key(&next)
             || parts.controls.contains_key(&next)
             || parts.recruitment.contains_key(&next)
