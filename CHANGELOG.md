@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Consolidated the verified World provider frontier in PR #191 onto main `13a8d1f`, preserving all World core and test bytes and the approved ABI 2 header. Resolved only additive changelog history; the broader prerequisite stack and its remaining World runner limits are explicit. Fresh combined-head platform checks are pending.
+
 - Verified the canonical World continuation provider at `e84ed4b`: all 37 affected debug tests and 214 locked release workspace tests pass, with strict Clippy, formatting and release FFI. Original checks cover six closing scenes with 12 transition pairs and the unchanged playing-state split. No repairs were needed; the sole World controller and server ending hold remain separate.
 
 - Clarified that the existing convoy call takes an explicit decided argument, which the sole runner must derive from its canonical finish at that source site. No runtime or fixture change.
@@ -253,6 +255,8 @@
 - Added shared mode-aware UnitControl initialization using compiled ability costs, and selected it from the staged factory's actual Game mode. The original spawn oracle preserves all 55 earlier scenarios and adds six Classic/World spawns for absent, paid and free abilities. The merged native checks verify all 775 spawn rows; World startup uses this shared initializer.
 
 - Preserved canonical recruited combat defaults through the shared publication callback when integrating the reviewed combat ancestry. Fresh combat identities reject before payment; production stepping remains under implementation.
+- Refreshed the consolidated Rust frontier in PR #119 onto merged ABI 2 main `d88ef6d`. Preserved all core behavior, both changelog histories, the six approved recipient-view calls and the exact header. Only additive changelog entries conflicted; combined-tree platform checks are rerun on the refreshed head.
+
 - Added canonical Match ground reactions, automatic retreat and idle spacing using shared command destinations, owner-known routes, firing targets and combat hit history. Three focused tests pass in debug and release, comparing 51 unchanged-source reaction/retreat cases and checking atomic rejection. Only the missing reaction timer is added to UnitControl. Air, carrier and garrison retreat exits remain explicit unsupported paths. Complete tick hookup remains separate. Adapted routing to canonical ordered-fire iteration and filled absent reserve defaults in the merged command fixture. At checkpoint ab0394d, strict Clippy stopped on two unused helpers in its inherited firing milestone. Final merged checks are pending.
 - Verified the bounded Conquest ability/recovery provider at exact runtime/test head `1f9a16b`: 13 core debug checks (four ability, two recovery), three firing and two recruitment debug checks, all 177 locked release workspace tests, strict Clippy, formatting and release FFI. Independent source and debug/release replay checks pass. Added phase API documentation and kept full tick/engineering/other-mode/ABI/transport parity in progress; final evidence commits preserve Rust/harness trees.
 
@@ -438,6 +442,11 @@
 
 - Added ordinary paid field-work placement and timed terrain execution for trenches, sandbags, wire, traps, Gun Pits, mines, known-mine clearing and Field Hospitals. Canonical dig records retain source cell order, visibility masking, engineer pace, per-cell ground checks and float32 trench fronts; prepared admission spends once and refused replacements preserve paid work. The original JavaScript recorder covers 22 traces and 367 actions. Dispatcher, routing and story integration, queues/shared projects, bridges, concrete buildings and fill work remain pending.
 
+- Refreshed PR #16 onto main `242997f` with the approved ABI 2 header and six view calls unchanged. Recorded Axel's reported Linux UE 5.8.3 guard, build, replay and live shadow checks on `03a49ac`: 1,236 replay messages, 7,650 rows, 61 edge checks, 18 formation tests and 2,230 live snapshots passed. The consumer source is unpublished; packaged Linux, Windows and macOS builds and authoritative decoder adoption remain pending. Earlier pending-verification entries describe their original checkpoints.
+
+- Documented the ABI mismatch path for the staged consumer update: the Rust export returns version 2 directly, and an ABI 1 consumer must reject it against its own version constant before making other calls. No library version-mismatch error code or current Unreal guard verification is claimed.
+
+- Refreshed PR #16 against the landed Rust recipient decoder and current main, retaining the exact ABI 2 header, six view calls and formation signatures. Recorded Axel's explicit client-consumption approval and Julio's Rust-side approval for staged adoption. PR merge and current Unreal build/link/runtime verification remain pending; no broader interface, gameplay or privacy decision is changed.
 - Added the native Match Conquest victory phase and finish bookkeeping: team VP in slot order, latest still-held capture location, 0.1 m end rounding, first-winner preservation, reveal and exact Conquest timeline fields. Canonical point accounting now freezes VP and capture story counts after the winner while ownership and manpower can continue. Three focused tests compare 12 original-JavaScript traces (24 assembled-match checkpoints) and invalid-state atomicity; existing startup and point-income tests pass. Other modes, command refusal, remaining story counters, result transport and the full battle loop remain unfinished.
 
 - Added complete event-adapter preflight for canonical retreat velocities, pose, suppression and sprint values so malformed later blast targets fail before earlier unit damage. Focused native checks pass.
