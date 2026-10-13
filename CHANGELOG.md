@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verified shared finish and the explicit Assault timer/bunker phase: 17 affected debug tests and all 165 locked release workspace tests pass, along with strict workspace Clippy, formatting and release FFI. The original recorder retains 11 traces and 22 phases, with 20 represented checkpoints and two neutral-actor refusals. Full Assault ticking, server admission and three-platform CI remain pending.
+
 - Collapsed the shared finish validation condition after strict Clippy flagged its nested form during the first native gates. Validation order and outcome are unchanged.
 
 - Formatted the independently reviewed Assault finish and actor-rejection checkpoint with the pinned workspace formatter before its scheduled native gates. Source behavior and original fixtures are unchanged; native verification is in progress.
