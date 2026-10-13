@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Run branch verification through pull requests and main verification after merge, avoiding duplicate push and pull-request CI jobs for the same change.
+
 - Added Rust CI on Ubuntu 24.04, Windows 2025 and macOS 15 for the pinned toolchain: formatting, strict Clippy, workspace tests and the release C library. Linux also links the existing C caller and replays the formation fixture. Rust and workflow changes trigger the checks; manual runs are available.
 
 - Issue #2 measured on the Vostro (i5-12400, Ubuntu 24.04, x64 Node 24.21.0, rustc 1.99.0; median of three 200-tick runs; load average 3.2 to 4.0, so not idle). Ported work per tick (movement, separation and a quarter of vision and fog) at 400, 1,000 and 2,000 units: Node 5.4, 14.6 and 35.7 ms; Rust on one thread 1.8, 6.7 and 18.9 ms; Rust with threads 1.6, 6.0 and 17.2 ms. At 2,000 units fog is 7.9 times faster threaded and vision 6.6 times, movement 2.1 times and separation 1.4 times on one thread. Full table and reading in `DESIGN.md` ("Sim test (#2)"); the confidence row for a native server is updated with it, and the README status no longer says no code exists.
