@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Clarified that the existing convoy call takes an explicit decided argument, which the sole runner must derive from its canonical finish at that source site. No runtime or fixture change.
+
 - Compare continuing World phases with six original-source closing scenes and 12 tail transitions, including recapture with old timestamps, relocated homes, depot payments, ordered elimination and frozen terminal history. Add malformed terminal, incomplete current-order and late fort atomic checks. Independent review caught a zero-ID actor guard bypass after finish; the shared validator now rejects it before either phase publishes. Native checks are pending. Documented the sole runner's final captured/current tail contract and the original convoy guard.
 
 - Allow the same bounded World income and region phases to continue after a valid canonical finish. Admission validates terminal metadata, reveal and clock provenance; region captures leave timestamps and story frozen while income, homes and administrative elimination continue. Replaced the old finished-phase refusal test with first-result and story preservation. Original closing-phase comparison and native proof are pending.
