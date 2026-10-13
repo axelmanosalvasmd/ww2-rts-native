@@ -407,9 +407,15 @@ fn compare(
             s["riding"],
             "riding"
         );
+        for (k, b) in [("holdFire", c.hold_fire), ("holdPos", u.hold_pos)] {
+            let expected = s.get(k).expect("recorded Source stance");
+            assert!(
+                expected.is_boolean() || expected.is_null(),
+                "{context}: {k} must be a boolean or unset Source stance"
+            );
+            same!(b, expected.as_bool().unwrap_or(false), k);
+        }
         for (k, b) in [
-            ("holdFire", c.hold_fire),
-            ("holdPos", u.hold_pos),
             ("auto", c.auto_cast),
             ("autoRetreat", c.auto_retreat),
             ("retreating", u.retreating),
