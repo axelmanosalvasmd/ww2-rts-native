@@ -4,6 +4,7 @@ use crate::{
     game::Point,
     map::AuthoritativeMap,
     match_runtime::{Match, MatchOptions, PlayerConfig, RecruitError},
+    pathfinding::PathStatus,
     weather::WeatherChoice,
 };
 use serde_json::{Value, json};
@@ -148,12 +149,12 @@ fn recorded_buy_matches_original_commands_with_owned_routing() {
                             admitted += 1;
                             assert_eq!(
                                 m.combat.get(done.unit),
-                                Some(&ww2_core::match_combat::UnitCombat::default()),
+                                Some(&crate::match_combat::UnitCombat::default()),
                                 "recruits must enter combat with canonical default metadata"
                             );
                             assert_eq!(
                                 m.firing.get(done.unit),
-                                Some(&ww2_core::match_firing::FiringUnit::default()),
+                                Some(&crate::match_firing::FiringUnit::default()),
                                 "recruits must publish canonical target and timer defaults"
                             );
                             let u = &m.world.game.units[&done.unit];

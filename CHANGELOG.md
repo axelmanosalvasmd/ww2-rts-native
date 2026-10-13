@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed crate-local recorded-buy test imports found by independent source review before the first native compile. Combat, firing and path-status assertions now resolve within the core crate. Native verification remains pending.
+
 - Added recorded-buy replay coverage using the existing six original-source traces and 33 commands, now recording source MP-spending counters. Owned routing, denial outcomes and fresh combat/firing publication are compared without a second fixture; atomic tests cover stale metadata, story preflight and blocked seats. Rust verification remains pending.
 
 - Added an internal recorded-buy actuator that gates canonical finish and seats, borrows owned recipient routing through disjoint recruitment fields, and preflights exact MP-spending story updates before payment. Combat and firing rows remain canonical publication callbacks. This source prerequisite awaits native verification and the recorded command consumer.
