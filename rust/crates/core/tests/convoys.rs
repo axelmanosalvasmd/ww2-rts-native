@@ -781,6 +781,8 @@ fn local_service_matches_original_javascript() {
                 dt,
                 if kind == "source-rate" {
                     [2.0, 6.0, 1.0][i]
+                } else if kind == "nearest-recovery" {
+                    4.0
                 } else {
                     8.0
                 }
@@ -814,6 +816,13 @@ fn local_service_matches_original_javascript() {
                 assert_eq!(recipient.provisions, 30.0);
                 assert_eq!(recipient.fuel, Some(60.0));
                 assert!(recipient.forced && recipient.stranded && recipient.exhausted);
+            } else if kind == "nearest-recovery" {
+                assert!(r.recovered(1));
+                assert!(recipient.ammo < recipient.ammo_max);
+                assert!(recipient.provisions < 120.0);
+                assert!(recipient.fuel.unwrap() < 180.0);
+                assert!(recipient.emergency.unwrap() < 60.0);
+                assert!(!recipient.forced && !recipient.stranded && !recipient.exhausted);
             } else {
                 assert_eq!(recipient.provisions, 120.0);
                 assert_eq!(recipient.ammo, recipient.ammo_max);
@@ -822,6 +831,9 @@ fn local_service_matches_original_javascript() {
                 assert!(!recipient.forced && !recipient.stranded && !recipient.exhausted);
             }
             if kind == "nearest-recovery" {
+                let farther = state.stores[0].available(0, false);
+                assert!(farther.ammo >= recipient.ammo_price);
+                assert!(farther.provisions > 0.0 && farther.fuel > 0.0);
                 assert_eq!(state.stores[0], before[0]);
                 assert!(state.stores[1].total().provisions < before[1].total().provisions);
             }

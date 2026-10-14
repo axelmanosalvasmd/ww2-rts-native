@@ -85,7 +85,7 @@ for(const kind of ['source-rate','finite-continuation','nearest-recovery','store
  else if(kind==='store-filter'){add(3,0,{owner:2});add(4,1,{active:false});add(5,2);}
  else add(3,kind==='radius-inclusive'?15:kind==='radius-outside'?15.001:1,{source:kind==='source-rate',stock:kind==='source-rate'?empty():{ammo:100,provisions:200,fuel:300}});
  const initial=structuredClone({stores:projection(g).stores,units:projection(g).units}),steps=[];
- const intervals=kind==='source-rate'?[2,6,1]:[8];
+ const intervals=kind==='source-rate'?[2,6,1]:kind==='nearest-recovery'?[4]:[8];
  for(const dt of intervals){g.tick++;S.stepConvoys(g,dt,hooks);assert.equal(g.convoys.nextSchedule,40);assert.equal(g.convoys.events.length,0);assert.equal(g.convoys.jobs.size,0);assert.equal(g.units.size,initial.units.length);steps.push({tick:g.tick,dt,stores:structuredClone(projection(g).stores),units:structuredClone(projection(g).units)});}
  localService.push({kind,handoff,initial,steps});
 }
