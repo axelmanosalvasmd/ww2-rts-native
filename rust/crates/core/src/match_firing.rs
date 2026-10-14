@@ -139,7 +139,7 @@ pub struct ContactEvent {
     pub material: &'static str,
 }
 // JSON.stringify renders both zero signs as 0; keep trajectory math untouched.
-fn normalize_json_zero(value: &mut serde_json::Value) {
+pub(crate) fn normalize_json_zero(value: &mut serde_json::Value) {
     use serde_json::Value;
     match value {
         Value::Number(n) if n.as_f64() == Some(0.0) => *value = Value::from(0),

@@ -1,7 +1,9 @@
-//! Lobby transport and private native match construction. Room simulation is not enabled.
+//! Lobby transport and trusted native room attachment. Public match start remains unavailable.
 pub mod authoritative_maps;
 mod lobby;
 mod maps;
+mod native_startup;
+pub mod room_runtime;
 pub mod snapshot_backpressure;
 pub mod snapshot_delta;
 pub mod snapshot_lists;
@@ -22,15 +24,16 @@ use std::{
     future::Future,
     sync::{
         Arc,
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     time::Instant,
 };
 use tokio::{
     net::TcpListener,
-    sync::{Mutex, mpsc, watch},
+    sync::{Mutex, mpsc, oneshot, watch},
     time::{Duration, MissedTickBehavior},
 };
+use ww2_core::match_runtime::Match;
 
 const MAX_MESSAGE: usize = 16 * 1024;
 
@@ -48,6 +51,13 @@ impl Default for Config {
         }
     }
 }
+struct ServeLifetime(Arc<AtomicBool>);
+impl Drop for ServeLifetime {
+    fn drop(&mut self) {
+        self.0.store(true, Ordering::Release);
+    }
+}
+
 #[derive(Clone)]
 struct Server {
     hub: Arc<Mutex<Hub>>,
@@ -60,6 +70,34 @@ impl Server {
     }
 }
 
+/// Trusted host access to the same Hub used by HTTP, sockets and maintenance.
+/// Attachment validates the lobby setup and sends its ordinary commander start handshake.
+#[derive(Clone)]
+pub struct NativeRoomControl {
+    server: Server,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NativeRoomStatus {
+    pub epoch: u64,
+    pub tick: i64,
+    pub held: u16,
+    pub ending_complete: bool,
+    pub paused: bool,
+    pub fault: Option<String>,
+}
+impl NativeRoomControl {
+    pub async fn attach(&self, code: &str, state: Match) -> Result<u64, String> {
+        self.server
+            .hub
+            .lock()
+            .await
+            .attach_native(code, state, self.server.now())
+    }
+    pub async fn inspect(&self, code: &str) -> Result<NativeRoomStatus, String> {
+        self.server.hub.lock().await.native_status(code)
+    }
+}
+
 /// Serve a bound listener; callers can bind port zero and inspect its actual local address.
 /// Graceful shutdown also stops the expiration task and closes upgraded sockets.
 pub async fn serve(
@@ -67,22 +105,45 @@ pub async fn serve(
     config: Config,
     shutdown: impl Future<Output = ()> + Send + 'static,
 ) -> std::io::Result<()> {
+    serve_with_native_control(listener, config, shutdown, None).await
+}
+
+/// Serve with an optional host control receipt. Dropping the receipt receiver
+/// leaves the ordinary server running. Shutdown invalidates the shared control.
+pub async fn serve_with_native_control(
+    listener: TcpListener,
+    config: Config,
+    shutdown: impl Future<Output = ()> + Send + 'static,
+    ready: Option<oneshot::Sender<NativeRoomControl>>,
+) -> std::io::Result<()> {
+    let hub = Hub::new(config.max_rooms.clamp(1, 256), config.public_url);
+    // Dropping or aborting this future invalidates the same stopped authority
+    // used under the Hub lock, even when graceful shutdown never runs.
+    let _lifetime = ServeLifetime(hub.stop_authority());
     let server = Server {
-        hub: Arc::new(Mutex::new(Hub::new(
-            config.max_rooms.clamp(1, 256),
-            config.public_url,
-        ))),
+        hub: Arc::new(Mutex::new(hub)),
         next: Arc::new(AtomicU64::new(1)),
         clock: Instant::now(),
     };
+    if let Some(ready) = ready {
+        let _ = ready.send(NativeRoomControl {
+            server: server.clone(),
+        });
+    }
+    let shutdown_server = server.clone();
+    let final_server = server.clone();
     let (stop, mut expired) = watch::channel(false);
     let maintenance = server.clone();
     let task = tokio::spawn(async move {
-        let mut interval = tokio::time::interval(Duration::from_millis(100));
+        let mut interval = tokio::time::interval(Duration::from_millis(10));
         interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
         loop {
             tokio::select! {
-                _ = interval.tick() => maintenance.hub.lock().await.expire(maintenance.now()),
+                _ = interval.tick() => {
+                    let now_ns = maintenance.clock.elapsed().as_nanos().min(u128::from(u64::MAX)) as u64;
+                    let mut hub = maintenance.hub.lock().await;
+                    hub.poll_native(maintenance.now(), now_ns);
+                },
                 _ = expired.changed() => break,
             }
         }
@@ -100,11 +161,17 @@ pub async fn serve(
     let result = axum::serve(listener, app)
         .with_graceful_shutdown(async move {
             shutdown.await;
+            shutdown_server.hub.lock().await.stop();
             let _ = stop.send(true);
         })
         .await;
     task.abort();
+    maintenance_stop(&final_server).await;
     result
+}
+
+async fn maintenance_stop(server: &Server) {
+    server.hub.lock().await.stop();
 }
 
 type App = (Server, watch::Receiver<bool>);
@@ -166,17 +233,24 @@ async fn socket_loop(
     server: Server,
     mut stop: watch::Receiver<bool>,
 ) {
+    if *stop.borrow() {
+        close(&mut socket, 1001, "server shutdown").await;
+        return;
+    }
     if !(3..=12).contains(&code.len()) || !code.bytes().all(|b| b.is_ascii_alphanumeric()) {
         close(&mut socket, 1008, "bad room").await;
         return;
     }
     let (tx, mut rx) = mpsc::channel(64);
     let (cancel, mut cancelled) = watch::channel(false);
-    let connection = Connection {
-        id: server.next.fetch_add(1, Ordering::Relaxed),
-        tx,
-        cancel,
+    let Ok(id) = server
+        .next
+        .try_update(Ordering::Relaxed, Ordering::Relaxed, |id| id.checked_add(1))
+    else {
+        close(&mut socket, 1013, "connection identity exhausted").await;
+        return;
     };
+    let connection = Connection { id, tx, cancel };
     let mut joined = false;
     loop {
         tokio::select! {
@@ -186,6 +260,20 @@ async fn socket_loop(
             Some(output) = rx.recv() => {
                 match output {
                     Output::Json(v) => if socket.send(Message::Text(v.to_string().into())).await.is_err() { break; },
+                    Output::Snapshot(mut write) => {
+                        let message = Message::Text(std::mem::take(&mut write.json).into());
+                        let result = tokio::select! {
+                            result = socket.send(message) => Some(result.is_ok()),
+                            _ = stop.changed() => None,
+                            _ = cancelled.changed() => None,
+                        };
+                        let mut hub = server.hub.lock().await;
+                        if result.is_none() {
+                            hub.disconnected(&code, connection.id, server.now());
+                        }
+                        hub.complete_snapshot(&write, result == Some(true), server.now());
+                        if result != Some(true) { break; }
+                    }
                     Output::Close(c,r) => { close(&mut socket,c,r).await; break; }
                 }
             }
@@ -209,11 +297,17 @@ async fn socket_loop(
             }
         }
     }
-    server
-        .hub
-        .lock()
-        .await
-        .disconnected(&code, connection.id, server.now());
+    // Close admission before draining reservations. No fresh catch-up may be
+    // produced by terminal cleanup, including an old replaced connection.
+    rx.close();
+    let mut hub = server.hub.lock().await;
+    hub.disconnected(&code, connection.id, server.now());
+    while let Ok(output) = rx.try_recv() {
+        if let Output::Snapshot(write) = output {
+            hub.complete_snapshot(&write, false, server.now());
+        }
+    }
+    hub.retire_connection(connection.id);
 }
 
 #[cfg(test)]
@@ -226,3 +320,7 @@ mod tests {
         assert_eq!(room_query("room=%zz"), None);
     }
 }
+
+#[cfg(test)]
+#[path = "native_socket_tests.rs"]
+mod native_socket_tests;
