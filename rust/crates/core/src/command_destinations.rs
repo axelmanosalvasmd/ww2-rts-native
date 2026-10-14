@@ -1,4 +1,4 @@
-//! Conquest move destinations from `endSpots` and its helpers at `e4e579a`.
+//! Physical move destinations from `endSpots` and its helpers at `e4e579a`.
 //! Server placement reads the authoritative game, as the source does. Capture
 //! centers and hit times are explicit inputs absent from Game. Path searches
 //! separately use recipient knowledge; placement does not choose their view.
@@ -126,6 +126,13 @@ fn terrain<'a>(context: &'a Context<'_>) -> TerrainView<'a> {
         changes: &[],
     }
 }
+fn valid_owner(game: &Game, owner: usize) -> bool {
+    if game.mode == Some(ModeKind::World) {
+        crate::match_actor::checked_game_owner(game, owner).is_ok()
+    } else {
+        owner < game.players.len()
+    }
+}
 fn validate(context: &Context<'_>, view: TerrainView<'_>) -> Result<(), Error> {
     let n = view
         .width
@@ -152,7 +159,7 @@ fn validate(context: &Context<'_>, view: TerrainView<'_>) -> Result<(), Error> {
     {
         return Err(Error::InvalidShape);
     }
-    if view.world_known || context.game.mode == Some(ModeKind::World) {
+    if view.world_known {
         return Err(Error::UnsupportedWorld);
     }
     if context.points.iter().any(|p| !finite(*p))
@@ -172,7 +179,7 @@ fn validate(context: &Context<'_>, view: TerrainView<'_>) -> Result<(), Error> {
     for u in context.game.units.values() {
         if !finite(u.at())
             || u.kind >= context.rules.kinds.len()
-            || u.owner >= context.game.players.len()
+            || !valid_owner(context.game, u.owner)
             || !u.hp.is_finite()
             || u.path.iter().any(|p| !finite(*p))
             || u.hit_from.is_some_and(|p| !finite(p))
@@ -205,7 +212,41 @@ pub fn threat_for(context: &Context<'_>, id: UnitId, at: Point) -> Result<Option
     }
     threat(context, Behavior::compiled()?, unit(context, id)?, at)
 }
+/// Physical placement uses the selected actor's canonical visibility, including World locals.
+/// This borrowed input does not refresh visibility or choose a remembered routing view.
+pub fn threat_for_with_visibility(
+    context: &Context<'_>,
+    id: UnitId,
+    at: Point,
+    visible: &[UnitId],
+) -> Result<Option<Point>, Error> {
+    validate(context, terrain(context))?;
+    if !finite(at) {
+        return Err(Error::InvalidInput);
+    }
+    threat_visible(
+        context,
+        Behavior::compiled()?,
+        unit(context, id)?,
+        at,
+        |id| visible.contains(&id),
+    )
+}
 fn threat(context: &Context<'_>, b: Behavior, u: &Unit, at: Point) -> Result<Option<Point>, Error> {
+    let player = context
+        .game
+        .players
+        .get(u.owner)
+        .ok_or(Error::UnsupportedWorld)?;
+    threat_visible(context, b, u, at, |id| player.sees(id))
+}
+fn threat_visible(
+    context: &Context<'_>,
+    b: Behavior,
+    u: &Unit,
+    at: Point,
+    sees: impl Fn(UnitId) -> bool,
+) -> Result<Option<Point>, Error> {
     let g = context.game;
     let mut best = None;
     let mut best_distance = 50.0;
@@ -216,7 +257,7 @@ fn threat(context: &Context<'_>, b: Behavior, u: &Unit, at: Point) -> Result<Opt
                 && v.air.is_none()
                 && context.rules.kinds[v.kind].weapon
                 && !g.allied(v.owner, u.owner)
-                && g.players[u.owner].sees(id)
+                && sees(id)
         })
     {
         let v = &g.units[&id];
@@ -254,7 +295,7 @@ pub fn held_destinations(
     owner: usize,
 ) -> Result<Vec<Point>, Error> {
     validate(context, terrain(context))?;
-    if !finite(at) || !radius.is_finite() || radius < 0.0 || owner >= context.game.players.len() {
+    if !finite(at) || !radius.is_finite() || radius < 0.0 || !valid_owner(context.game, owner) {
         return Err(Error::InvalidInput);
     }
     Ok(held_spots(

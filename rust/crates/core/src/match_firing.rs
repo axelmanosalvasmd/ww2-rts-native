@@ -173,7 +173,7 @@ impl LaunchEvent {
                 time,
                 expires,
             } => {
-                let mut v = json!({"k":"flight","kind":rules.kinds[*kind].name,"flight":id,"seq":0,"f":shooter,"fo":owner,"x":at.x,"y":at.y,"z":at.z,"v":[velocity.x,velocity.y,velocity.z],"gravity":gravity,"time":time,"expires":expires,"local":true});
+                let mut v = json!({"k":"flight","kind":rules.kinds[*kind].name,"flight":id,"seq":0,"f":shooter,"fo":crate::game::source_owner_json(*owner),"x":at.x,"y":at.y,"z":at.z,"v":[velocity.x,velocity.y,velocity.z],"gravity":gravity,"time":time,"expires":expires,"local":true});
                 if let Some(effect) = effect {
                     v["effect"] = json!(effect);
                 }
@@ -186,16 +186,16 @@ impl LaunchEvent {
                 count,
                 spread,
             } => {
-                json!({"f":shooter,"fo":owner,"x":at.x,"z":at.z,"k":"salvo","n":count,"r":spread,"physical":true,"local":true})
+                json!({"f":shooter,"fo":crate::game::source_owner_json(*owner),"x":at.x,"z":at.z,"k":"salvo","n":count,"r":spread,"physical":true,"local":true})
             }
             Self::Throw { shooter, owner, at } => {
-                json!({"f":shooter,"fo":owner,"x":at.x,"z":at.z,"k":"throw","physical":true,"local":true})
+                json!({"f":shooter,"fo":crate::game::source_owner_json(*owner),"x":at.x,"z":at.z,"k":"throw","physical":true,"local":true})
             }
             Self::SmallArms(e) => {
-                let mut value = json!({"k":e.effect,"f":e.shooter,"fo":e.owner,"x":e.at.x,"y":e.at.y,"z":e.at.z});
+                let mut value = json!({"k":e.effect,"f":e.shooter,"fo":crate::game::source_owner_json(e.owner),"x":e.at.x,"y":e.at.y,"z":e.at.z});
                 if let Some(hit) = e.hit {
                     value["t"] = json!(hit.target);
-                    value["to"] = json!(hit.owner);
+                    value["to"] = crate::game::source_owner_json(hit.owner);
                     value["hit"] = json!(true);
                     if let Some(man) = hit.man {
                         value["m"] = json!(man);
@@ -213,12 +213,12 @@ impl LaunchEvent {
                 json!({"k":"expiry","flight":id,"seq":sequence,"time":time,"x":at.x,"y":at.y,"z":at.z,"local":true})
             }
             Self::Contact(e) => {
-                let mut v = json!({"k":"contact","kind":rules.kinds[e.kind].name,"flight":e.flight,"seq":e.sequence,"contactId":e.contact_id,"time":e.time,"x":e.at.x,"y":e.at.y,"z":e.at.z,"f":e.shooter,"fo":e.owner,"hit":e.hit,"kill":e.killed,"terminal":e.terminal,"explosive":e.explosive,"normal":[e.normal.x,e.normal.y,e.normal.z],"direction":[e.direction.x,e.direction.y,e.direction.z],"impulse":e.impulse,"material":e.material,"local":true});
+                let mut v = json!({"k":"contact","kind":rules.kinds[e.kind].name,"flight":e.flight,"seq":e.sequence,"contactId":e.contact_id,"time":e.time,"x":e.at.x,"y":e.at.y,"z":e.at.z,"f":e.shooter,"fo":crate::game::source_owner_json(e.owner),"hit":e.hit,"kill":e.killed,"terminal":e.terminal,"explosive":e.explosive,"normal":[e.normal.x,e.normal.y,e.normal.z],"direction":[e.direction.x,e.direction.y,e.direction.z],"impulse":e.impulse,"material":e.material,"local":true});
                 if let Some(id) = e.target {
                     v["t"] = json!(id);
                 }
                 if let Some(owner) = e.target_owner {
-                    v["to"] = json!(owner);
+                    v["to"] = crate::game::source_owner_json(owner);
                 }
                 if let Some(effect) = e.effect {
                     v["effect"] = json!(effect);
@@ -336,13 +336,18 @@ fn dist(a: Point, b: Point) -> f64 {
 impl Match {
     fn supported_firing_mode(&self) -> Result<(), String> {
         if !matches!(
-            self.options.mode,
-            crate::economy::Mode::Default | crate::economy::Mode::Conquest
-        ) || self.world.game.mode.is_some()
-        {
+            (self.options.mode, self.world.game.mode),
+            (
+                crate::economy::Mode::Default | crate::economy::Mode::Conquest,
+                None
+            ) | (
+                crate::economy::Mode::World,
+                Some(crate::game::ModeKind::World)
+            )
+        ) {
             return Err("weapon execution requires ordinary Conquest mode".into());
         }
-        Ok(())
+        self.validate_actor_mode()
     }
     /// Capture poses before the tick advances and before weather or environment movement.
     pub fn capture_firing_prior(&mut self) -> Result<(), String> {
@@ -386,7 +391,7 @@ impl Match {
         for (&id, u) in &self.world.game.units {
             if u.id != id
                 || u.kind >= self.rules.kinds.len()
-                || u.owner >= self.world.game.players.len()
+                || crate::match_actor::checked_game_owner(&self.world.game, u.owner).is_err()
                 || ![u.x, u.z, u.hp, u.rot, u.supp]
                     .iter()
                     .all(|n| n.is_finite())
@@ -745,9 +750,8 @@ impl Match {
         }
         Ok(true)
     }
-    /// Advance every live round after the source unit loop and crowd separation.
-    /// New rounds born at this tick have no traveled interval until the next tick.
-    pub fn step_firing_flights(&mut self) -> Result<(), String> {
+    /// Read-only unit and active-flight admission shared by the caller and actuator.
+    pub(crate) fn validate_firing_tick_state(&self) -> Result<(), String> {
         self.supported_firing_mode()?;
         if !(0..=9_007_199_254_740_351).contains(&self.world.game.tick) {
             return Err("invalid flight tick".into());
@@ -758,7 +762,7 @@ impl Match {
                 || id == 0
                 || id > 9_007_199_254_740_991
                 || p.source_kind >= self.rules.kinds.len()
-                || p.owner >= self.world.game.players.len()
+                || crate::match_actor::checked_game_owner(&self.world.game, p.owner).is_err()
                 || self.combat.get(p.shooter).is_none()
                 || p.start_cell >= self.world.game.flags.len()
                 || p.max_contacts > 16
@@ -814,6 +818,13 @@ impl Match {
                 }
             }
         }
+        Ok(())
+    }
+
+    /// Advance every live round after the source unit loop and crowd separation.
+    /// New rounds born at this tick have no traveled interval until the next tick.
+    pub fn step_firing_flights(&mut self) -> Result<(), String> {
+        self.validate_firing_tick_state()?;
         let now = self.world.game.tick as f64 * 0.05;
         let tick_start = now - 0.05;
         let ids: Vec<_> = self.firing.flights.keys().copied().collect();
@@ -1310,7 +1321,7 @@ impl Match {
         if self.firing.salvos.iter().any(|s| {
             s.left == 0
                 || s.left > 4096
-                || s.owner >= self.world.game.players.len()
+                || crate::match_actor::checked_game_owner(&self.world.game, s.owner).is_err()
                 || ![s.at.x, s.at.z, s.next, s.every, s.spread]
                     .iter()
                     .all(|v| v.is_finite())
@@ -1340,7 +1351,7 @@ impl Match {
         let g = &self.world.game;
         let u = &g.units[&id];
         if u.kind >= self.rules.kinds.len()
-            || u.owner >= self.world.game.players.len()
+            || crate::match_actor::checked_game_owner(&self.world.game, u.owner).is_err()
             || ![u.x, u.z, u.hp, u.rot, u.supp]
                 .iter()
                 .all(|v| v.is_finite())
@@ -1379,6 +1390,24 @@ impl Match {
     }
     /// Run one unit's source targeting/firing block after its movement and grid update.
     /// Timer decay is caller-owned through advance_firing_timers before movement.
+    /// The same metadata guard used at the real weapon turn, without any mutation.
+    pub(crate) fn validate_firing_weapon_metadata(&self, u: &Unit) -> Result<(), String> {
+        if self
+            .firing
+            .get(u.id)
+            .is_some_and(|r| !r.cooldown.is_finite() || !r.retarget.is_finite())
+            || self
+                .combat
+                .get(u.id)
+                .is_some_and(|r| !r.xp.is_finite() || r.xp < 0.0 || !r.hit_at.is_finite())
+            || u.hit_from
+                .is_some_and(|p| !p.x.is_finite() || !p.z.is_finite())
+        {
+            return Err("invalid canonical weapon metadata".into());
+        }
+        Ok(())
+    }
+
     pub fn apply_unit_firing(&mut self, id: UnitId, moving: bool, dt: f64) -> Result<(), String> {
         self.supported_firing_mode()?;
         if !dt.is_finite() || dt < 0.0 {
@@ -1391,26 +1420,14 @@ impl Match {
             return Ok(());
         }
         if u.kind >= self.rules.kinds.len()
-            || u.owner >= self.world.game.players.len()
+            || crate::match_actor::checked_game_owner(&self.world.game, u.owner).is_err()
             || ![u.x, u.z, u.hp, u.rot, u.supp]
                 .iter()
                 .all(|v| v.is_finite())
         {
             return Err("invalid canonical weapon unit".into());
         }
-        if self
-            .firing
-            .get(id)
-            .is_some_and(|r| !r.cooldown.is_finite() || !r.retarget.is_finite())
-            || self
-                .combat
-                .get(id)
-                .is_some_and(|r| !r.xp.is_finite() || r.xp < 0.0 || !r.hit_at.is_finite())
-            || u.hit_from
-                .is_some_and(|p| !p.x.is_finite() || !p.z.is_finite())
-        {
-            return Err("invalid canonical weapon metadata".into());
-        }
+        self.validate_firing_weapon_metadata(u)?;
         let kind = &self.rules.kinds[u.kind];
         let control = self
             .commands
@@ -1443,11 +1460,12 @@ impl Match {
         }
         let hull = !kind.infantry && !kind.structure && !moving;
         if hull {
+            let actor = self.actor_policy(u.owner)?;
             let target = self
                 .firing
                 .get(id)
                 .and_then(|s| self.world.game.units.get(&s.target_id))
-                .filter(|t| t.hp > 0.0 && self.world.game.players[u.owner].sees(t.id));
+                .filter(|t| t.hp > 0.0 && actor.sees(t.id));
             let seen = target.map(Unit::at);
             let danger = target.is_some_and(|t| {
                 self.weapon(t)
@@ -1693,7 +1711,7 @@ impl Match {
         let u = self.world.game.units.get(&id).ok_or("missing shooter")?;
         let previous = self.firing.get(id).map_or(0, |s| s.target_id);
         if previous != next {
-            let team = self.world.game.players[u.owner].team;
+            let team = self.actor_policy(u.owner)?.team;
             for (target, sign) in [(previous, -1.0), (next, 1.0)] {
                 if let Some(t) = self.world.game.units.get(&target) {
                     let amount = self.volley(u, t)?;
@@ -1722,7 +1740,7 @@ impl Match {
             let target = self.firing.get(u.id).map_or(0, |s| s.target_id);
             if let Some(t) = self.world.game.units.get(&target) {
                 *claims
-                    .entry((target, self.world.game.players[u.owner].team))
+                    .entry((target, self.actor_policy(u.owner)?.team))
                     .or_default() += self.volley(u, t)?;
             }
         }
@@ -1752,7 +1770,7 @@ impl Match {
             return Ok(());
         }
         if u.kind >= self.rules.kinds.len()
-            || u.owner >= self.world.game.players.len()
+            || crate::match_actor::checked_game_owner(&self.world.game, u.owner).is_err()
             || ![u.x, u.z, u.hp, u.rot, u.supp]
                 .iter()
                 .all(|v| v.is_finite())
@@ -1783,12 +1801,13 @@ impl Match {
         let u = &g.units[&id];
         let w = self.weapon(u)?.ok_or("unarmed target selection")?;
         let current = self.firing.get(id).map_or(0, |s| s.target_id);
-        let team = g.players[u.owner].team;
+        let actor = self.actor_policy(u.owner)?;
+        let team = actor.team;
         let salvo = flag(w, "salvo");
         let pool = if salvo {
             self.grid
                 .unordered(&g.units, (u.x, u.z), n(w, "range", 0.0) + 6.0, |_, t| {
-                    !t.riding && !g.allied(t.owner, u.owner) && g.players[u.owner].sees(t.id)
+                    !t.riding && !g.allied(t.owner, u.owner) && actor.sees(t.id)
                 })
         } else {
             vec![]
@@ -1797,12 +1816,7 @@ impl Match {
             &g.units,
             (u.x, u.z),
             n(w, "range", 0.0) + if g.naval { 55.0 } else { 0.0 },
-            |_, t| {
-                t.hp > 0.0
-                    && t.air.is_none()
-                    && !g.allied(t.owner, u.owner)
-                    && g.players[u.owner].sees(t.id)
-            },
+            |_, t| t.hp > 0.0 && t.air.is_none() && !g.allied(t.owner, u.owner) && actor.sees(t.id),
         );
         let mut best = 0;
         let mut best_score = f64::INFINITY;
@@ -1994,8 +2008,8 @@ impl Match {
             || g.h == 0
             || u.kind >= self.rules.kinds.len()
             || t.kind >= self.rules.kinds.len()
-            || u.owner >= g.players.len()
-            || t.owner >= g.players.len()
+            || crate::match_actor::checked_game_owner(g, u.owner).is_err()
+            || crate::match_actor::checked_game_owner(g, t.owner).is_err()
             || ![u.x, u.z, u.rot, t.x, t.z, t.rot, t.hp]
                 .iter()
                 .all(|v| v.is_finite())
@@ -2016,7 +2030,7 @@ impl Match {
             || t.riding
             || g.allied(t.owner, u.owner)
             || dist(u.at(), self.hull_point(u.at(), t)) > range
-            || !g.players.get(u.owner).is_some_and(|p| p.sees(t.id))
+            || !self.actor_policy(u.owner)?.sees(t.id)
         {
             return Ok(false);
         }
@@ -2413,9 +2427,8 @@ impl Match {
         });
         Ok((first..end).collect())
     }
-    /// Run after step_firing_flights, before the salvo timer phase. Linked tickets
-    /// expire/prune with source timing and never apply a second grenade blast.
-    pub fn advance_firing_grenades(&mut self, dt: f64) -> Result<(), String> {
+    /// Read-only linked-ticket admission without a timer write or effect emission.
+    pub(crate) fn validate_firing_grenade_step(&self, dt: f64) -> Result<(), String> {
         self.supported_firing_mode()?;
         if !dt.is_finite()
             || !(0.0..=640.0).contains(&dt)
@@ -2423,12 +2436,19 @@ impl Match {
                 !n.remaining.is_finite()
                     || !(0.0..=640.0).contains(&n.remaining)
                     || ![n.at.x, n.at.z].iter().all(|v| v.is_finite())
-                    || n.owner >= self.world.game.players.len()
+                    || crate::match_actor::checked_game_owner(&self.world.game, n.owner).is_err()
                     || n.flight == 0
             })
         {
             return Err("invalid grenade timer step".into());
         }
+        Ok(())
+    }
+
+    /// Run after step_firing_flights, before the salvo timer phase. Linked tickets
+    /// expire/prune with source timing and never apply a second grenade blast.
+    pub fn advance_firing_grenades(&mut self, dt: f64) -> Result<(), String> {
+        self.validate_firing_grenade_step(dt)?;
         for n in &mut self.firing.grenades {
             n.remaining -= dt;
         }
@@ -2438,3 +2458,7 @@ impl Match {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "world_ground_actor_tests.rs"]
+mod world_ground_actor_tests;

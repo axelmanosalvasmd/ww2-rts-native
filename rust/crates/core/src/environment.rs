@@ -90,10 +90,12 @@ impl Effect {
                 unit,
                 owner,
                 position,
-            } => json!({"k":"collapse","t":unit,"to":owner,"x":position.x,"z":position.z}),
+            } => {
+                json!({"k":"collapse","t":unit,"to":crate::game::source_owner_json(*owner),"x":position.x,"z":position.z})
+            }
             Self::LastHit { unit, owner } => json!({"lastHit":[unit,owner]}),
             Self::Hurt(h) => {
-                let mut v = json!({"t":h.unit,"to":h.owner,"x":h.at.x,"z":h.at.z,"k":"hurt","kill":h.killed});
+                let mut v = json!({"t":h.unit,"to":crate::game::source_owner_json(h.owner),"x":h.at.x,"z":h.at.z,"k":"hurt","kill":h.killed});
                 if let Some(o) = h.from {
                     v["fo"] = json!(o);
                 }
@@ -121,7 +123,7 @@ impl Effect {
                     v["t"] = json!(t);
                 }
                 if let Some(o) = c.owner {
-                    v["to"] = json!(o);
+                    v["to"] = crate::game::source_owner_json(o);
                 }
                 v
             }

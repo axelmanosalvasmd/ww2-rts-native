@@ -182,19 +182,91 @@ impl Match {
                     return Err(ProductionStepError::InvalidState("training rally position"));
                 }
                 for job in row.jobs() {
-                    let kind = self
-                        .rules
-                        .kind(&job.kind)
-                        .ok_or(ProductionStepError::InvalidState("training unit kind"))?;
-                    if self.rules.kinds[kind].air {
-                        return Err(ProductionStepError::InvalidState(
-                            "aircraft training is not connected",
-                        ));
-                    }
+                    crate::match_world_tick::validate_world_future_birth(&self.rules, &job.kind)
+                        .map_err(ProductionStepError::Control)?;
                 }
             }
         }
         Ok(())
+    }
+    /// Recorded World Buy queues training, without an immediate birth. Canonical
+    /// production admission precedes publication checks and atomic MP-spent payment.
+    pub(crate) fn recorded_world_buy(
+        &mut self,
+        slot: usize,
+        kind: &str,
+        from: Option<u32>,
+    ) -> Result<u64, ProductionStepError> {
+        if self.finish.is_some()
+            || self
+                .start
+                .economy
+                .players
+                .get(slot)
+                .is_none_or(|p| p.away || p.out)
+        {
+            return Err(production::Error::Denied(production::Denial::Blocked).into());
+        }
+        let phase = self
+            .validate_world_phase_context(0.0)
+            .map_err(ProductionStepError::Control)?;
+        self.validate_world_path_service()
+            .map_err(ProductionStepError::Routing)?;
+        self.validate_production_phases(0.0)?;
+        let count = self.production_step_context()?;
+        let units = units(&self.world.game, &self.rules, count)?;
+        let context = context(
+            &self.options,
+            self.world.game.naval,
+            &units,
+            Some(&phase.regions),
+        );
+        let registered = self
+            .production
+            .buildings()
+            .map(|(id, _)| id)
+            .collect::<Vec<_>>();
+        let prepared = self.production.prepare_queue_unit(
+            &context,
+            &mut self.start.economy,
+            slot,
+            self.start.players[slot].config.faction,
+            kind,
+            from,
+        )?;
+        crate::match_world_tick::validate_world_future_birth(&self.rules, kind)
+            .map_err(ProductionStepError::Control)?;
+        let building = prepared.building();
+        if !registered.contains(&building) {
+            return Err(ProductionStepError::InvalidState(
+                "canonical producer state missing",
+            ));
+        }
+        if !self.building_rallies.contains_key(&building) {
+            return Err(ProductionStepError::InvalidState(
+                "canonical training rally missing",
+            ));
+        }
+        if self.building_rallies[&building]
+            .into_iter()
+            .chain(self.player_rallies[slot])
+            .any(|at| !at.x.is_finite() || !at.z.is_finite())
+        {
+            return Err(ProductionStepError::InvalidState("training rally position"));
+        }
+        let story = crate::match_story::prepare_story_updates(
+            &mut self.story,
+            false,
+            &[crate::match_story::StoryChange {
+                slot: Some(slot),
+                key: crate::match_story::StoryKey::MpSpent,
+                amount: prepared.charge().mp,
+            }],
+        )
+        .map_err(ProductionStepError::Control)?;
+        let job = prepared.commit();
+        story.commit();
+        Ok(job)
     }
     /// Typed source `tech` admission. Global command gates precede the research
     /// denials. Wallet, lab and canonical MP-spent story publish together.
@@ -293,6 +365,10 @@ impl Match {
                 return Err(ProductionStepError::InvalidState(
                     "canonical training rally missing",
                 ));
+            }
+            for job in self.production.building(building).unwrap().jobs() {
+                crate::match_world_tick::validate_world_future_birth(&self.rules, &job.kind)
+                    .map_err(ProductionStepError::Control)?;
             }
         }
         let regions = self.production_regions()?;

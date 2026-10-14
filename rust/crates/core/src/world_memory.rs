@@ -168,6 +168,21 @@ impl WorldMemory {
         }
         Ok(())
     }
+    /// Source cached unit Maps retain the same moving objects. Update facts only
+    /// for existing memberships, without discovery, keys, buffers or cursors.
+    pub(crate) fn update_cached_ground_unit(&mut self, unit: &crate::game::Unit, rules: &Rules) {
+        for live in self.lives.values_mut() {
+            if let Some(old) = live.units.iter_mut().find(|u| u.id == unit.id) {
+                *old = crate::match_world_memory::bound(unit);
+                live.bunkers = live
+                    .units
+                    .iter()
+                    .filter(|u| rules.kinds[u.kind].name == "bunker" && u.hp > 0.0)
+                    .map(|u| u.at)
+                    .collect();
+            }
+        }
+    }
     pub fn team(&self, team: i32) -> Option<&TeamMemory> {
         self.teams.iter().find(|(t, _)| *t == team).map(|(_, m)| m)
     }

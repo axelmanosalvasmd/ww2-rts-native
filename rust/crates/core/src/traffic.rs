@@ -247,7 +247,7 @@ fn lane_ahead(
 pub fn seen_by(g: &Game, slot: usize, v: &Unit) -> bool {
     g.reveal
         || g.allied(v.owner, slot)
-        || (g.players[slot].sees(v.id) && (v.air.is_none() || airborne(v)))
+        || (g.players.get(slot).is_some_and(|p| p.sees(v.id)) && (v.air.is_none() || airborne(v)))
 }
 
 /// The oncoming friend that has the one-lane stretch ahead of `u`, if `u` should hold short of it for one
@@ -278,7 +278,7 @@ fn lane_holder(
             && !v.riding
             && !v.path.is_empty()
             && g.allied(u.owner, v.owner)
-            && seen_by(g, u.owner, v)
+            && knowledge.seen_by(g, u.owner, v)
             && (v.x - u.x) * own.x + (v.z - u.z) * own.z > 0.0
             && heading(v).is_some_and(|h| h.x * own.x + h.z * own.z < -0.3)
     });
@@ -387,7 +387,7 @@ pub fn traffic_step_with_knowledge(
             && !v.riding
             && v.garrison.is_none()
             && !ghost_pair(g, v, u_now, friend(v))
-            && seen_by(g, u_now.owner, v)
+            && knowledge.seen_by(g, u_now.owner, v)
     };
     // a squad steers around vehicles only
     let nearby = if kind.infantry {
