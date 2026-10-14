@@ -1,5 +1,13 @@
 # Three Crossroads Native: design decisions
 
+## World movement without a memory copy when movement reads none (2026-10-14, Vostro)
+
+Each World ground move used to prepare a private copy of the team's remembered terrain before moving: it cloned `WorldMemory`, refreshed every visible cell and rebuilt route knowledge, then discarded the copy unless movement read terrain or asked for a route. For a team with no memory yet (the local defender on the first move of a tick) that is a full rebuild of all 91,700 cells of the `world_tick` map, about 70 ms. Counters over the first eight steps of `world_tick::original_world_steps_use_the_actual_runner_and_explicit_whole_admission` showed 1,720 such preparations, 211 of each step's 215 for team -1, and every one started from an empty memory.
+
+`move_world_unit_without_memory` now runs the same movement step first on a copy of the unit, with physical traffic terrain whose every read marks a flag and a route callback that only records that it was called. If movement read no terrain and requested no route, its result cannot depend on remembered terrain, so it equals what the prepared path would produce; the trial is kept with the same grid update, reinsertion and cached-unit update the prepared path performs when it reads nothing. Otherwise the trial is dropped (Game and the grid are untouched until a trial is kept) and the unchanged prepared path runs. The context validation the prepared path performs first runs on both paths.
+
+A temporary differential check ran the prepared path on a snapshot after every kept trial and required bit-identical `Moved`, units and grid, and that the prepared path committed no memory: 12,469 moves matched in `world_tick` and 248 in the rest of the workspace, with 1 fallback. Vostro, `ci-test`: that test went from 972 s to 51.7 s.
+
 ## Two-client final base after ownership #209 (2026-10-14, source plan)
 
 Prepare an ordinary merge of ownership main `4917049ebfbdcb34319cf8bbe9b6329f2fa204cd`, tree `b86d765fa7141f36df9c513b82f2d8361b657c6e`, into frozen two-client head `35e929a105689452d9663503f2db4c99a815895b`, from common base `9f0190efb6df68eb55ad5f3b42f45a159e659342`. The actual startup conflict contains only the two appended child-module registrations. Proposed resolution retains the complete main file and ownership registration, then appends exactly A's original three lines. Both new socket tests remain frozen; no runtime/helper/old-test, fixture, header, reference, CI, crate layout, instruction or compiler/linker setting changes relative to main.
