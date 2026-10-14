@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Put the ground-contact module declaration in rustfmt order. The frozen `b45ed53` native run passed all six focused contact, construction and ground-order tests, then formatting exited 1 on this declaration alone. Module bodies, fixtures and test behavior are unchanged; final gates for this successor remain pending.
+
 - Create the five extra HQs in the two ground-retreat scenes through real Source building placement and matching native World registration/publication. Their earlier generic births omitted footprints and failed whole-tick retirement admission. Use valid nonoverlapping sites while preserving finished-own-HQ selection and the physical garrison-exit choice change. Source regeneration covers 28 cases, 48 commands, 30 steps and 110 snapshots; all other 26 cases and all recorded orders are unchanged. Production guards and nearest-HQ behavior are unchanged; native execution of this successor remains pending.
 
 - Compare complete ground-contact JSON rows by IEEE numeric value while retaining array order, field presence and nonnumeric types. The frozen contact run passed the refusal test and stopped on Source integer zero versus native floating zero in the mud row. Signed zero and tagged bit strings remain distinct. Runtime, recorder and fixture values are unchanged; this test-only successor has not run natively.
