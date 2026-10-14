@@ -237,6 +237,10 @@ pub fn patch(m: &mut Match, id: u32, value: &Value) {
 }
 pub fn scene(trace: &Value) -> Match {
     let mut m = make(&trace["map"]);
+    for id in m.world.game.units.keys().copied().collect::<Vec<_>>() {
+        m.production.remove_building(id);
+        m.building_rallies.remove(&id);
+    }
     m.world.game.units.clear();
     m.commands.units.clear();
     m.recruit_metadata.clear();
@@ -279,6 +283,10 @@ pub fn scene(trace: &Value) -> Match {
                 m.firing.initialize(u.id);
                 m.abilities.initialize(u.id);
                 m.recovery.initialize(u.id);
+                if m.rules.kinds[u.kind].building {
+                    m.production.initialize_building(u.id).unwrap();
+                    m.building_rallies.insert(u.id, None);
+                }
             });
             id
         };

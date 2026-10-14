@@ -50,7 +50,8 @@ async fn both_seated_sockets_move_and_stop_owned_units_in_one_match() {
             };
             (unit.id, origin, goal)
         });
-        let expected = SetupExpected::new(&state);
+        let mut expected = SetupExpected::new(&state);
+        expected.public_map = serde_json::from_str(include_str!("maps/default.json")).unwrap();
         let epoch = host.block_on(control.attach("ABC", state)).unwrap();
         for (slot, client) in clients.iter_mut().enumerate() {
             let start = client.until(|message| message["t"] == "start");
