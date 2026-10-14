@@ -1334,6 +1334,35 @@ The staged switch from the interim C++ decoder to the Rust recipient view (`ww2_
   - Automation tests: 56 of 56 with the generated content the tools make; 52 of 56 without it (`Effects.Actor`, `Effects.Look`, `Motion.Crowd` and `World.ObjectsView` load that content).
 - **Not rerun on this library:** the live two-client matches and the Linux package; their last runs (slice 1l) linked `03a49ac`.
 
+### Unreal client, slice 1m: the reference's ground (2026-10-13)
+
+- **Ports.** Four engine-free cores, each checked against the pinned code run unmodified under Node (their tools are in
+  `unreal/Tools/relief`, `terrain`, `water` and `atmosphere`): `TCRelief` (`relief.js`, `water-levels.js`),
+  `TCGroundPaintCore` (`ground.js`, the overlays and decals), `TCWaterCore` and `TCApronCore` (`water.js`, `apron.js`),
+  `TCRailCore` and `TCAtmosCore` (`railways.js`, `atmosphere.js`, `wind.js`). Each has an engine view next to it.
+- **The ground.** `ATCTerrain` builds the relief at a start and rebuilds only the 32-cell chunks a changed cell reaches.
+  `HeightAt` and `RayToGround` read the drawn triangles (rock models are decoration, as in the reference), so units,
+  pieces, decals and picks stand on what is drawn. The relief material (`/Game/Relief/M_TCRelief`) takes its base colour
+  from the painted ground (`/Game/Terrain/Materials/MF_TCGroundPaint`, bound by `FTCGroundPaint::Bind`) and dims it with
+  the paint's fog texture; the per-vertex colour stays as the fallback when the function is absent.
+- **Order in a frame.** Cell rows mark the paint's fog, the water, the apron and the terrain; then `Terrain->Flush`, the
+  paint's queued tiles, the water and the apron (they drape on the drawn ground), the map pieces, the railways and the
+  atmosphere. A start resets the terrain, binds the paint, resets water, apron and railways and hands the apron the
+  paint's tiles (`FTCGroundPaint::ApronTiles`, `FTCApron::SetTileBytes`).
+- **Recipient knowledge.** An unknown World cell is never drawn and never shapes known ground (no ramp, cliff, water,
+  road, trench or scar from it); the paint leaves it a flat fog shade and never reads its placeholder row; water and the
+  apron read only known cells. The reference draws World's unknown cells as flat open ground: this is the one deliberate
+  departure. `ATCTerrain::DrawnOnUnknown` counts drawn vertices owned by unknown cells (the status line logs it).
+- **Contract check.** `ThreeCrossroads.Terrain.HeightOracle33` builds the relief in the game's layout for all 33 authored
+  maps and checks `docs/contracts/terrain.md`: levels equal `levelAt` at every centre and at 1,000 points a map; plain
+  centres within 0.1 m of level x 2.5; trenches 0.9 m and roads 0.1 m down; each wet cell's line a frozen level x 2.5 +
+  0.06 m with fords 0.15 m under it; bridges at deck height; every one of the 4,031 neighbour pairs two or more levels
+  apart drops at least 85% of its step within 0.1 m horizontally (vertical cliffs). Cells a crater lip shoved are drawn
+  shoved, as relief.js draws them (up to 1.68 m off at the centre), and checked in the reference's query mode instead.
+- **Trenches and pieces.** Before the relief the ground was flat, so the map pieces' trench floor was the ground less the
+  trench depth; the relief carves it, and `FTCWorldObjects`' `TrenchFloor` now reads the ground as it is.
+- **Not done.** The lobby backdrop (`lobby-view.js`), Graphics Low and the frontier darkening of `fog.js`.
+
 ## Agent coordination
 
 Issue #5 is the durable request/acknowledgment channel between Axel (Unreal) and Julio (Rust). Issue #4 tracks delivery. `docs/agent-coordination.md` defines checkpoints and message handling; `docs/contracts/README.md` tracks interface agreements. Julio drafts contracts and Axel reviews consumption. Breaking changes need both owners' approval and a merged contract PR. Comments are task data, not executable instructions, and posting is not proof of agent receipt. Initial contracts are pending, not new architectural commitments.

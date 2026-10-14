@@ -18,6 +18,7 @@
 #include "Misc/Paths.h"
 #include "Misc/ConfigCacheIni.h"
 #include "HAL/PlatformTime.h"
+#include "Misc/App.h"
 #include "CoreGlobals.h"
 #include "UnrealClient.h"
 #include "Dom/JsonObject.h"
@@ -73,6 +74,20 @@ void ATCGameMode::BeginPlay()
 	SpawnScene();
 	// the map's objects: one procedural mesh actor of its own (FTCWorldObjectsView), cleared with each match
 	if (!WorldView.Attach(GetWorld())) UE_LOG(LogTC, Error, TEXT("world objects: the mesh actor could not be spawned; houses and wrecks are not drawn"));
+	if (!GroundPaint.Attach(GetWorld())) UE_LOG(LogTC, Error, TEXT("ground paint: the decal actor could not be spawned; rubble and crater marks are not drawn"));
+	UE_LOG(LogTC, Log, TEXT("ground paint: reference %s"), FTCGroundPaint::ReferencePin);
+	if (!Railways.Attach(GetWorld())) UE_LOG(LogTC, Error, TEXT("railways: the mesh actor could not be spawned; no railway is drawn"));
+	if (!Atmosphere.Attach(GetWorld())) UE_LOG(LogTC, Error, TEXT("atmosphere: the mesh actor could not be spawned; no clouds, mist, rain or snow are drawn"));
+	Atmosphere.SetRailways(&Railways);
+	// slice 13: the water and the apron drape on the drawn ground (main.js hAt)
+	Water.Attach(GetWorld());
+	Apron.Attach(GetWorld());
+	Water.GroundHeight = [this](float X, float Z) { return Terrain ? Terrain->HeightAt(X, Z) : 0.f; };
+	Apron.GroundHeight = Water.GroundHeight;
+	Apron.Objects = &WorldObjects;
+	FParse::Value(FCommandLine::Get(), TEXT("TCWaterShots="), WaterShotsDir);
+	// slice 13 lead glue: the cloud shade and the wet ground cover the apron too (atmosphere.js cloudApron, coverApron)
+	if (AActor* ApronActor = Apron.HolderActor()) Atmosphere.AddGroundActor(ApronActor);
 	UE_LOG(LogTC, Log, TEXT("world objects, lobby settings and saves: reference %s / %s / %s"), FTCWorldObjects::ReferencePin, FTCLobbySettings::ReferencePin, FTCPersistence::ReferencePin);
 
 	const TCHAR* Cmd = FCommandLine::Get();
@@ -150,6 +165,7 @@ void ATCGameMode::BeginPlay()
 	if (!FParse::Value(Cmd, TEXT("TCLobbyCheckMode="), LobbyCheckMode)) LobbyCheckMode = TEXT("conquest");
 	// slice 9 switches (TCSlice9Checks.cpp)
 	FParse::Value(Cmd, TEXT("TCHostMap="), HostMap);
+	FParse::Value(Cmd, TEXT("TCHostWeather="), HostWeather);
 	bCapturePlay = FParse::Param(Cmd, TEXT("TCCapturePlay"));
 	bObjectivesLog = FParse::Param(Cmd, TEXT("TCObjectivesLog"));
 	bKeyCheck = FParse::Param(Cmd, TEXT("TCKeyCheck"));
@@ -170,6 +186,8 @@ void ATCGameMode::BeginPlay()
 	FParse::Value(Cmd, TEXT("TCCloseShotAfter="), CloseShotAfter);
 	FParse::Value(Cmd, TEXT("TCCloseShotFile="), CloseShotFile);
 	FParse::Value(Cmd, TEXT("TCWorldShotAfter="), WorldShotAfter);
+	FParse::Value(Cmd, TEXT("TCTourFile="), TourFile);
+	FParse::Value(Cmd, TEXT("TCTourDir="), TourDir);
 	FParse::Value(Cmd, TEXT("TCWorldShotFile="), WorldShotFile);
 	FParse::Value(Cmd, TEXT("TCSpawnOwn="), SpawnOwn, false); // a list: do not stop at the comma
 	FParse::Value(Cmd, TEXT("TCCombatShotAfter="), CombatShotAfter);
@@ -227,6 +245,11 @@ void ATCGameMode::EndPlay(const EEndPlayReason::Type Reason)
 	RustShadow.End();
 	TokenStore.Reset(); // releases the token file's lock
 	WorldView.Detach();
+	GroundPaint.Detach();
+	Railways.Detach();
+	Atmosphere.Detach();
+	Water.Detach();
+	Apron.Detach();
 	Super::EndPlay(Reason);
 }
 
@@ -252,7 +275,12 @@ void ATCGameMode::ClearMatchPresentation()
 	// map clears the ground's mesh sections (ATCTerrain::ResetFrom with W = H = 0).
 	if (Units) { Units->Draw(State, UnitTable, Terrain, TSet<int32>(), 0.f); Units->Reset(); }
 	if (Terrain) Terrain->ResetFrom(State);
+	Water.ResetFrom(State);
+	Apron.ResetFrom(State);
 	State.bMapReset = false;
+	Railways.Reset(State);
+	Atmosphere.StopMatch();
+	AtmosphereStart = -1;
 	Recruit.Clear();
 	Build.Clear();
 	Logistics.Clear();
@@ -265,6 +293,7 @@ void ATCGameMode::ClearMatchPresentation()
 	RegionAlerts.Reset();
 	WorldObjects.Clear();
 	WorldView.Reset();
+	GroundPaint.Clear();
 	bArmyRally = false;
 	SupplyAlerts.Reset();
 	PlanKinds.Reset();
@@ -337,8 +366,10 @@ void ATCGameMode::OnMessage(const FJsonObject& M, int32 Bytes)
 		Field.ApplySnapshot(M);     // the works, rows, smokes and cells for the fortification placement view
 		Powers.ApplySnapshot(M);    // support cooldowns, MP and Munitions, mode, seats out, home, airfields, strikes
 		WorldObjects.ApplySnapshot(M); // this side's cell memory (houses, walls, damage stages) and the wrecks it was sent
+		GroundPaint.ApplySnapshot(M);  // the same cell rows repaint the ground round them (queued, a few tiles a frame)
 		Progress.ApplySnapshot(M); // tech, lab, wallet, mode, seats out (nothing before a start)
 		WorldRec.ApplySnapshot(M, State); // World: regions, stations, score, recovery offer; the region alerts against the last
+		Railways.ApplySnapshot(M); Railways.ApplyCells(M); // center(id) from this snapshot; the explored track (applyCells)
 		TakeSlice8Notices();
 		// client/main.js applySnapshot: the seat just went out, so every aim ends
 		if (Powers.WentOut(State.You))
@@ -392,6 +423,8 @@ void ATCGameMode::OnMessage(const FJsonObject& M, int32 Bytes)
 			else { UE_LOG(LogTC, Log, TEXT("start weather: no weather row in this start")); }
 		}
 		if (!WorldObjects.ApplyStart(M, State)) UE_LOG(LogTC, Error, TEXT("world objects: the start's map could not be read; no houses or wrecks this match"));
+		Terrain->SetCellSource(&WorldObjects); // relief: the physical grid (a known mine drawn as what lies under it)
+		if (!GroundPaint.ApplyStart(M, State)) UE_LOG(LogTC, Error, TEXT("ground paint: the start's map could not be read; the ground keeps its plain colours this match"));
 		const double StartAt = FPlatformTime::Seconds();
 		Persistence.ApplyStart(M, StartAt); // a pending load is answered by this start
 		if (Persistence.Status().Outcome == ETCPersistenceOutcome::Loaded && Persistence.Status().AnsweredAt == StartAt)
@@ -403,6 +436,17 @@ void ATCGameMode::OnMessage(const FJsonObject& M, int32 Bytes)
 		StartsReceived++;
 		if (MatchSeenAt < 0) MatchSeenAt = FPlatformTime::Seconds();
 		Terrain->ResetFrom(State); State.bMapReset = false;
+		GroundPaint.Bind(Terrain->GroundMaterialInstance()); // the relief draws the paint and its fog (MF_TCGroundPaint)
+		Water.ResetFrom(State);
+		Apron.ResetFrom(State);
+		Railways.Reset(State); Railways.ApplyCells(M); // main.js startGame: createRailways on a World map, railways.cells(m.cells)
+		// slice 13 lead glue: the apron continues the painted ground with the paint's own tinted tiles (apron.js reads
+		// ground.js groundLook().tiles); without them it keeps the reference's flat pre-load colours
+		{
+			TArray<TArray<uint8>> TileRgba; TArray<int32> TileSizes;
+			if (GroundPaint.ApronTiles(TileRgba, TileSizes)) Apron.SetTileBytes(TileRgba, TileSizes);
+			else UE_LOG(LogTC, Warning, TEXT("apron: no paint tiles this match; flat colours"));
+		}
 		Units->Reset();
 		OnCombatStart(); // the alert feed's match and the effects reset (Client/TCAlerts.cpp)
 		// client/main.js startGame: audio.start({ faction: facOf(me), slot: me }) at every start (a reconnect included);
@@ -558,6 +602,12 @@ void ATCGameMode::RunHostLobby(double Now)
 		const FTCLobbyRequest Mp = Lobby.Plan(ETCLobbySetting::Map, -1, HostMap);
 		if (Mp.Message.IsValid() && SendCommand(Mp.Message.ToSharedRef())) Lobby.NoteSent(Mp, Now);
 		UE_LOG(LogTC, Log, TEXT("host: asked for map %s (room had %s): %s"), *HostMap, *State.LobbyMap, Mp.Message.IsValid() ? TEXT("sent") : *Mp.Note);
+	}
+	if (!HostWeather.IsEmpty())
+	{
+		// -TCHostWeather: the lobby's Weather select (server.js 'weather': the host, outside play)
+		TSharedRef<FJsonObject> Wx = MakeShared<FJsonObject>(); Wx->SetStringField(TEXT("t"), TEXT("weather")); Wx->SetStringField(TEXT("v"), HostWeather);
+		UE_LOG(LogTC, Log, TEXT("host: asked for weather %s: %s"), *HostWeather, SendCommand(Wx) ? TEXT("sent") : *LastSendProblemText);
 	}
 	for (int32 I = State.LobbyPlayers; I < 1 + HostStartAi; I++) PC->PressButton(ETCUiAction::AddAi);
 	for (int32 I = 0; I < HostTeams.Num(); I++)
@@ -745,7 +795,8 @@ void ATCGameMode::Tick(float DeltaSeconds)
 		if (LightingStart != StartsReceived)
 		{
 			LightingStart = StartsReceived;
-			Lighting->StartMatch(State.Map.Name, FString(), State.Weather.Now, FMath::DegreesToRadians(-90.f - (LightPC ? LightPC->ViewYaw() : -90.f)));
+			// main.js atmos.start({ key: lobbyState?.mapName }): the mood also reads the lobby's map key
+			Lighting->StartMatch(State.Map.Name, State.LobbyMap, State.Weather.Now, FMath::DegreesToRadians(-90.f - (LightPC ? LightPC->ViewYaw() : -90.f)));
 		}
 		Lighting->SetWeather(State.Weather.Now);
 		if (State.Wx.bKnown) Lighting->SetShower((float)State.Wx.Rain, (float)State.Wx.Wet);
@@ -756,12 +807,26 @@ void ATCGameMode::Tick(float DeltaSeconds)
 		if (State.DirtyCells.Num() || State.FogDirtyCells.Num())
 		{
 			WorldView.MarkFog(WorldObjects, State.FogDirtyCells); // the pieces on those cells are dimmed like the ground
+			GroundPaint.MarkFog(State.FogDirtyCells);             // the ground's fog texels fade to their new look
+			Water.MarkCells(State, State.DirtyCells, State.FogDirtyCells);
+			Apron.MarkCells(State, State.DirtyCells, State.FogDirtyCells);
 			Terrain->MarkCells(State.DirtyCells, State.FogDirtyCells); State.DirtyCells.Reset(); State.FogDirtyCells.Reset();
 		}
 		Terrain->Flush(State);
+		// the painted ground: queued tiles, the fog fade, and the decals on the heights as drawn
+		GroundPaint.Tick(State, DeltaSeconds, Terrain->IsEndRevealed(), [this](float X, float Z) { return Terrain->HeightAt(X, Z); });
+		// after the ground: the water drapes raised spans on it and the apron follows its edge heights
+		Water.Flush(State, FPlatformTime::Seconds() - BeganAt, Terrain->IsEndRevealed());
+		Apron.Flush(State, Terrain->IsEndRevealed());
+		if (!WaterShotsDir.IsEmpty()) WaterShotsTick();
 		// after the ground: the pieces stand on the heights as drawn
 		WorldObjects.Update(*Terrain, &UnitTable);
 		WorldView.Draw(WorldObjects, State, Terrain);
+		Railways.Frame(DeltaSeconds, State, Terrain); // railways.frame(dt): at most two rebuilds a second
+		// atmosphere.js start at each new match, then update(dt) with the weather row, snapshot wx and the camera target
+		ATCPlayerController* AtmosPC = Cast<ATCPlayerController>(GetWorld()->GetFirstPlayerController());
+		if (AtmosphereStart != StartsReceived) { AtmosphereStart = StartsReceived; Atmosphere.StartMatch(State, State.LobbyMap, Terrain); }
+		Atmosphere.Update(DeltaSeconds, State, Terrain, AtmosPC, AtmosPC ? AtmosPC->ViewFocus() : FVector2D(State.Map.W, State.Map.H));
 	}
 	// client/feedback.js show: the save's sentence over the hint for 2 s (the hint is inside the HUD the lobby hides)
 	for (const FTCPersistenceFeedback& F : Persistence.TakeFeedback())
@@ -783,6 +848,15 @@ void ATCGameMode::Tick(float DeltaSeconds)
 	RunSlice9Switches(Now);
 	RunSlice10Switches(Now);
 	RunSlice11Switches(Now);
+	RunSlice13Switches(Now);
+	// slice 13 lead: frame times while a match is on screen (the first 10 s after each start counted apart)
+	if (State.bHasMatch)
+	{
+		if (FramesStart != StartsReceived) { FramesStart = StartsReceived; FramesStartAt = Now; }
+		const double Ms = FApp::GetDeltaTime() * 1000.0;
+		if (Now - FramesStartAt < 10.0) FramesSettling.Add(Ms);
+		else { FramesMatch.Add(Ms); FramesWindow.Add(Ms); }
+	}
 	bool bStatusNow = false;
 	if (Now - LastReport >= 5.0)
 	{
@@ -836,11 +910,20 @@ void ATCGameMode::Tick(float DeltaSeconds)
 		UE_LOG(LogTC, Log, TEXT("status+++: world objects: %d houses, %d pieces (%d pickable, %d on cells this side does not know), %d wrecks, instanced components %d (%d triangles, %d regions queued), grid mismatches %d | own garrisoned %d | pause %s"),
 			WorldObjects.HouseCount(), WorldObjects.ShapeCount(), WorldObjects.PickableCount(), OnUnknown, WorldObjects.Wrecks().Num(), WorldView.SectionsDrawn(), WorldView.TrianglesDrawn(), WorldView.Queued(),
 			WorldObjects.GridMismatches(State), Garrisoned, State.bPaused ? *State.PauseText : TEXT("running"));
+		UE_LOG(LogTC, Log, TEXT("status+++: %s"), *GroundPaint.StatusLine());
+		// slice 13 lead: the terrain round's views and the recipient-knowledge check (no drawn vertex on an unknown cell)
+		int32 ReliefVerts = 0, ReliefUnowned = 0;
+		const int32 ReliefOnUnknown = Terrain ? Terrain->DrawnOnUnknown(State, &ReliefVerts, &ReliefUnowned) : 0;
+		UE_LOG(LogTC, Log, TEXT("status terrain: relief cells drawn %d of %d known (%d on the map), vertices %d (no cell %d), vertices on unknown cells %d | water %d triangles, %d builds | apron %d columns, %d shapes | railways %d halves, %d sleepers, stations %d of %d | atmosphere mist %d, banks %d, falling %d, ground mirrored %d | %s"),
+			Terrain ? Terrain->CellsDrawn() : 0, State.Map.Known.CountSetBits(), State.Map.W * State.Map.H, ReliefVerts, ReliefUnowned, ReliefOnUnknown,
+			Water.TrianglesDrawn(), Water.GeometryBuilds(), Apron.Columns(), Apron.Shapes(), Railways.HalfCount(), Railways.SleeperCount(), Railways.StationsBuilt(), Railways.StationCount(),
+			Atmosphere.MistSheets(), Atmosphere.BankSheets(), Atmosphere.FallPoints(), Atmosphere.GroundSectionsMirrored(), *FrameTimesLine());
+		FramesWindow = FFrameTimes();
 	}
 	if (ExitAfter >= 0 && Now - BeganAt >= ExitAfter)
 	{
 		ExitAfter = -1;
-		UE_LOG(LogTC, Log, TEXT("exit switch: quitting"));
+		UE_LOG(LogTC, Log, TEXT("exit switch: quitting; %s"), *FrameTimesLine());
 		FPlatformMisc::RequestExit(false, TEXT("TCExitAfter"));
 	}
 }
@@ -1619,4 +1702,61 @@ float ATCGameMode::EpilogueFrame(float DeltaSeconds, ATCPlayerController* PC)
 	const double Screen = O.EpilogueFrame(DeltaSeconds, Cam);
 	if (PC && bGliding) PC->EpilogueCamera(FVector2D(Cam.X, Cam.Z), (float)Cam.Dist);
 	return (float)Screen;
+}
+
+// -TCWaterShots=<dir>: poses the camera over the nearest known water, at each edge looking out, at a corner and at the
+// widest zoom on three headings, and saves a frame without the HUD at each (2.5 s apart, so the view settles).
+void ATCGameMode::WaterShotsTick()
+{
+	ATCPlayerController* PC = Cast<ATCPlayerController>(GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr);
+	if (!PC || !State.bHasMatch || State.Map.W <= 0) return;
+	const double Now = FPlatformTime::Seconds();
+	const float Wm = State.Map.W * 2.f, Hm = State.Map.H * 2.f;
+	if (WaterShotStep < 0) { WaterShotStep = 0; WaterShotAt = Now + 6.0; return; } // the ground and textures settle first
+	if (Now < WaterShotAt || FScreenshotRequest::IsScreenshotRequested()) return;
+	// nearest known water cell to the map's centre
+	FVector2D WaterAt(Wm / 2, Hm / 2);
+	double Best = 1e30;
+	for (int32 C = 0; C < State.Map.W * State.Map.H; C++)
+		if (State.Map.Known[C] && TCWaterCore::IsWet(State.Map.Chars[C]))
+		{
+			const FVector2D P((C % State.Map.W + 0.5) * 2.0, (C / State.Map.W + 0.5) * 2.0);
+			const double D = FVector2D::DistSquared(P, FVector2D(Wm / 2, Hm / 2));
+			if (D < Best) { Best = D; WaterAt = P; }
+		}
+	struct FPose { const TCHAR* Name; FVector2D Focus; float Yaw, Dist; };
+	const FPose Poses[] = {
+		{ TEXT("water-close"), WaterAt, -90.f, 40.f }, { TEXT("water-gameplay"), WaterAt, -90.f, 85.f }, { TEXT("water-wide"), WaterAt, -60.f, 200.f },
+		{ TEXT("edge-north-looking-out"), FVector2D(Wm / 2, 6), -90.f, 85.f }, { TEXT("edge-east-looking-out"), FVector2D(Wm - 6, Hm / 2), 0.f, 200.f },
+		{ TEXT("edge-south-looking-out"), FVector2D(Wm / 2, Hm - 6), 90.f, 140.f }, { TEXT("corner-southwest-diagonal"), FVector2D(6, Hm - 6), 135.f, 160.f },
+		{ TEXT("widest-heading-north"), FVector2D(Wm / 2, Hm / 2), -90.f, 100000.f }, { TEXT("widest-heading-northeast"), FVector2D(Wm / 2, Hm / 2), -45.f, 100000.f },
+		{ TEXT("widest-heading-west"), FVector2D(Wm / 2, Hm / 2), 180.f, 100000.f } };
+	const int32 Count = UE_ARRAY_COUNT(Poses);
+	// even steps pose the camera, odd steps take the frame of the pose before
+	const int32 I = WaterShotStep / 2;
+	if (I >= Count) { if (WaterShotStep == 2 * Count) { UE_LOG(LogTC, Log, TEXT("water shots: done (%d)"), Count); WaterShotStep++; } return; }
+	if (AHUD* Hud = PC->GetHUD()) Hud->bShowHUD = false;
+	if (WaterShotStep % 2 == 0)
+	{
+		PC->FocusOn(Poses[I].Focus);
+		PC->SetViewYawForChecks(Poses[I].Yaw);
+		PC->ZoomTo(Poses[I].Dist);
+		WaterShotAt = Now + 2.5;
+	}
+	else
+	{
+		const FString File = FPaths::Combine(WaterShotsDir, FString::Printf(TEXT("%s-%s.png"), *State.Map.Name.Replace(TEXT(" "), TEXT("-")).ToLower(), Poses[I].Name));
+		FScreenshotRequest::RequestScreenshot(File, false, false);
+		UE_LOG(LogTC, Log, TEXT("water shots: %s: focus (%.1f, %.1f) yaw %.0f distance %.0f m (asked %.0f); water %d triangles, %d geometry builds; apron %d columns, %d shapes"),
+			*File, Poses[I].Focus.X, Poses[I].Focus.Y, PC->ViewYaw(), PC->ViewDistance(), Poses[I].Dist, Water.TrianglesDrawn(), Water.GeometryBuilds(), Apron.Columns(), Apron.Shapes());
+		WaterShotAt = Now + 0.5;
+	}
+	WaterShotStep++;
+}
+
+// Slice 13 lead: frame times as the status line and the exit switch print them (milliseconds)
+FString ATCGameMode::FrameTimesLine() const
+{
+	return FString::Printf(TEXT("frame ms: match %lld frames mean %.2f worst %.1f | last window %lld mean %.2f worst %.1f | settling %lld mean %.2f worst %.1f"),
+		FramesMatch.N, FramesMatch.Mean(), FramesMatch.Worst, FramesWindow.N, FramesWindow.Mean(), FramesWindow.Worst, FramesSettling.N, FramesSettling.Mean(), FramesSettling.Worst);
 }

@@ -106,8 +106,10 @@ public:
 	bool StoneDeck(int X, int Y) const override { return In(X, Y) && Objects.StoneDeckMask[Y * Objects.W + X] != 0; }
 	bool Spoil(int X, int Y) const override { return In(X, Y) && Objects.SpoilCells.Contains(Y * Objects.W + X); }
 	double Ground(double X, double Z) const override { return Ground_.HeightAt((float)X, (float)Z); }
-	// the native ground is not carved: the reference's carved trench floor is TRENCH_DEPTH under it
-	double TrenchFloor(double X, double Z) const override { return Ground(X, Z) - TCWorldCore::TrenchDepth; }
+	// slice 13 lead glue: the relief (World/TCRelief.h) carves trench cells TRENCH_DEPTH down as client/relief.js does, so
+	// the ground at a trench centre is the carved floor structures.js reads (before slice 13 the flat placeholder ground was
+	// not carved and this answered Ground - TRENCH_DEPTH; with the relief that sank the parapets into the ground)
+	double TrenchFloor(double X, double Z) const override { return Ground(X, Z); }
 
 private:
 	bool In(int X, int Y) const { return X >= 0 && Y >= 0 && X < Objects.W && Y < Objects.H; }

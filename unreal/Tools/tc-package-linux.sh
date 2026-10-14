@@ -251,12 +251,18 @@ verify() {
 		ThreeCrossroads/Content/Models/Materials/Look/M_TCGroundLambert.uasset ThreeCrossroads/Content/Models/Materials/Look/M_TCLookLine.uasset \
 		ThreeCrossroads/Content/Models/Materials/Look/M_TCLookRing.uasset ThreeCrossroads/Content/Models/Materials/Look/MPC_TCLook.uasset ThreeCrossroads/Content/World/Materials/M_TCWorldSurface.uasset \
 		ThreeCrossroads/Content/World/Materials/M_TCWorldLeaf.uasset ThreeCrossroads/Content/Effects/Materials/M_TCFxSprite.uasset \
-		ThreeCrossroads/Content/Effects/Textures/T_FxAtlas.uasset ThreeCrossroads/Content/Audio/SFX/tankgun.uasset; do
+		ThreeCrossroads/Content/Effects/Textures/T_FxAtlas.uasset ThreeCrossroads/Content/Audio/SFX/tankgun.uasset \
+		ThreeCrossroads/Content/Relief/M_TCRelief.uasset ThreeCrossroads/Content/Terrain/Materials/MF_TCGroundPaint.uasset \
+		ThreeCrossroads/Content/Terrain/Materials/M_TCGroundPaint.uasset ThreeCrossroads/Content/Terrain/Materials/M_TCCraterDecal.uasset \
+		ThreeCrossroads/Content/Terrain/Materials/M_TCRubbleDecal.uasset ThreeCrossroads/Content/Water/M_TCWater.uasset \
+		ThreeCrossroads/Content/Water/M_TCApron.uasset ThreeCrossroads/Content/Atmosphere/Materials/M_TCAtmosGround.uasset \
+		ThreeCrossroads/Content/Atmosphere/Materials/M_TCAtmosMist.uasset ThreeCrossroads/Content/Atmosphere/Materials/M_TCAtmosFall.uasset \
+		ThreeCrossroads/Content/Atmosphere/Materials/M_TCAtmosBird.uasset; do
 		grep -q "^$need"$'\t' "$manifest" || die "verify: $need is not in the package (see the cook settings in Config/DefaultGame.ini)"
 	done
 	local meshes; meshes="$(grep -c '^ThreeCrossroads/Content/Models/Meshes/.*\.uasset'$'\t' "$manifest" || true)"
 	(( meshes > 0 )) || die "verify: no model meshes (Content/Models/Meshes) in the package"
-	say "verify: the cook holds the models ($meshes meshes), soldiers, far figures, light, rings, world and effects materials, sounds and the Spanish dictionary"
+	say "verify: the cook holds the models ($meshes meshes), soldiers, far figures, light, rings, world and effects materials, the terrain's relief, paint, water, apron and atmosphere materials (slice 13), sounds and the Spanish dictionary"
 	# the Rust view's startup self-check replays this stream; without it the replay is skipped (the edge checks still
 	# run), so a package must carry it, unchanged from the install it was built with
 	local fx="$root/$PROJECT_NAME/$FIXTURE_REL" name

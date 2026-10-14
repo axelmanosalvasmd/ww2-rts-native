@@ -127,6 +127,7 @@
 //                   each refused here with nothing sent
 //   Slice 9 (TCSlice9Checks.cpp):
 //   -TCHostMap=M    with -TCHostStart: pick map M first (the lobby's Map select, server.js 'map')
+//   -TCHostWeather=W with -TCHostStart: pick weather W first (the lobby's Weather select, server.js 'weather')
 //   -TCCapturePlay  scripted play for a Conquest check: every 4 s the own ground army (selected directly) is split into
 //                   groups sent through the right click's move path to the capture points this team does not own,
 //                   nearest first. Not a player: the log says what it sent
@@ -183,6 +184,13 @@
 //                   roof or gable 8, a wall 1, a tree 1), and the shot waits (up to 90 s, a try a second) for a spot
 //                   with at least one house in sight. Every world shot now deselects, saves <file>-nohud.png first,
 //                   then the same view with the HUD
+//   Slice 13 (TCSlice13Checks.cpp):
+//   -TCTourFile=F -TCTourDir=D  a camera tour for the terrain side by sides: one pose per line of F ("name seconds x z
+//                   distance yaw", seconds of match time = tick / 20; x "frontier": where the known world ends toward the map's centre; distance wF: a share
+//                   of the widest view), each saved without the HUD to D/name.png 2.5 s after it is set; the log has the
+//                   camera, the frame times and the terrain status (unreal/Tools/compare/tour-reference.mjs takes the
+//                   browser's half from the same file)
+//   -TCWaterShots=D  the water child's fixed poses over the nearest water, the edges and the widest view, saved to D
 // Language: -TCLang=en|es for one run (Client/TCLocale.h). Sound: Client/TCAudio.h (no sound under -nosound or without
 //   an audio device, as the browser's suspended context; LogTC "audio: play" names each sound that started and its asset)
 // The host's -TCHostStart presses the lobby's Mode, Add AI and Start buttons (ATCPlayerController::PressButton).
@@ -207,6 +215,11 @@
 #include "Client/TCWorldRecovery.h"
 #include "Client/TCMatchOptions.h"
 #include "World/TCWorldObjects.h"
+#include "World/TCGroundPaint.h"
+#include "World/TCRailways.h"
+#include "World/TCAtmosphere.h"
+#include "World/TCWater.h"
+#include "World/TCApron.h"
 #include "Client/TCAlerts.h"
 #include "Client/TCEffects.h"
 #include "TCGameMode.generated.h"
@@ -279,6 +292,34 @@ public:
 	FTCPersistence Persistence;
 	FTCWorldObjects WorldObjects;
 	FTCWorldObjectsView WorldView;
+	// Slice 13 (paint): the painted ground (client/ground.js, the fog of surfaces.js and fog.js, the rubble and crater
+	// decals), fed every start and snapshot; the relief material reads it through MF_TCGroundPaint (Bind).
+	FTCGroundPaint GroundPaint;
+	// Slice 13 water and apron (World/TCWater.h, World/TCApron.h): client/water.js and client/apron.js, fed next to the
+	// terrain (ResetFrom after its ResetFrom, MarkCells with its cells, Flush after its Flush).
+	FTCWater Water;
+	FTCApron Apron;
+	// -TCWaterShots=<dir>: verification captures of the water and the land past the edge (no HUD), then nothing more
+	FString WaterShotsDir;
+	int32 WaterShotStep = -1;
+	double WaterShotAt = -1;
+	void WaterShotsTick();
+	// Slice 13 lead: frame times while a match is drawn (FApp's delta per tick), the whole match and the last status
+	// window; frames in the first 10 s after a start (the whole-map paint and relief build) are kept apart as "settling".
+	struct FFrameTimes { int64 N = 0; double Sum = 0, Worst = 0; void Add(double Ms) { N++; Sum += Ms; Worst = FMath::Max(Worst, Ms); } double Mean() const { return N ? Sum / N : 0; } };
+	FFrameTimes FramesMatch, FramesWindow, FramesSettling;
+	double FramesStartAt = -1;
+	int32 FramesStart = -1;
+	FString FrameTimesLine() const;
+	// Slice 13 verification switch (TCSlice13Checks.cpp): -TCTourFile, -TCTourDir
+	void RunSlice13Switches(double Now);
+	struct FTourPose { FString Name; double At = 0, X = 0, Z = 0, Dist = 0, Yaw = -90, Asked = 0; bool bFrontier = false, bWideShare = false; };
+	TArray<FTourPose> Tour;
+	FString TourFile, TourDir;
+	int32 TourStep = 0, TourShots = 0;
+	double TourShotAt = -1;
+	bool bTourRead = false, TourDone = false;
+	FFrameTimes TourFrames;
 	// Slice 1h: HQ tiers and Armory research (FTCProgression: the panel, availability and the ready announcements, fed
 	// every start and snapshot), World Conquest's regions, score, alerts and the Restore card (FTCWorldRecovery, fed every
 	// start and snapshot) and the lobby's Weather, Sandbox and seat removal (FTCMatchOptions, fed every lobby). The
@@ -297,6 +338,12 @@ public:
 	UPROPERTY() TObjectPtr<ATCTerrain> Terrain;
 	UPROPERTY() TObjectPtr<class ATCLighting> Lighting;
 	int32 LightingStart = -1; // the StartsReceived the light was set up for
+	// slice 13 (railways and atmosphere): client/railways.js on World maps, client/atmosphere.js over every match; each
+	// spawns an actor of its own for its meshes (Attach in BeginPlay, Detach in EndPlay)
+	FTCRailways Railways;
+	FTCAtmosphere Atmosphere;
+	int32 AtmosphereStart = -1; // the StartsReceived the atmosphere was started for
+	FString HostWeather;       // -TCHostWeather: the lobby's Weather select before the start
 	UPROPERTY() TObjectPtr<ATCUnitRenderer> Units;
 
 	// Slice 9 glue (parity gaps 4, 5, 10 and 13). The alert feed and history (client/alerts.js lines: four for 6 s;

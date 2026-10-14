@@ -266,6 +266,8 @@ public:
 	void ZoomTo(float Metres) { SkipIntro(); Distance = Metres; }
 	FVector2D ViewFocus() const { return Focus; }
 	float ViewYaw() const { return Yaw; }
+	// A verification switch's heading (degrees, the camera's yaw); the player turns with Q, E and the middle button.
+	void SetViewYawForChecks(float Degrees) { SkipIntro(); Yaw = Degrees; }
 	float ViewDistance() const { return Distance; }
 	// The widest view (client/camera.js wide): the distance and focus at which the whole map fits the window with a 4%
 	// margin, and whether it has been measured for the current map, heading and window.
