@@ -29,6 +29,7 @@ pub enum TickPhase {
     AntiAir,
     Rail,
     Riding,
+    GroundAttack,
     Reactions,
     TrafficKnowledge,
     Movement,
@@ -302,6 +303,8 @@ impl crate::match_runtime::Match {
         self.validate_production_phases(self.rules.movement.tick)
             .map_err(|error| format!("production admission: {error:?}"))?;
         self.validate_carrier_tick()?;
+        self.validate_construction_tick()?;
+        self.validate_ground_attacks()?;
         self.validate_reaction_tick_actors()?;
         self.validate_field_project_tick(&current_order)?;
         if self
@@ -350,9 +353,6 @@ impl crate::match_runtime::Match {
             if unit.garrison.is_some() && self.automatic_retreat_candidate(id)? {
                 return Err("automatic garrison retreat tick exit is not connected".into());
             }
-            if unit.build && self.automatic_retreat_candidate(id)? {
-                return Err("construction retreat tick exit is not connected".into());
-            }
         }
         Ok(())
     }
@@ -376,6 +376,7 @@ impl crate::match_runtime::Match {
         self.validate_aircraft_runner_state(boundary)
             .map_err(|error| format!("aircraft published state: {error}"))?;
         self.validate_carrier_tick()?;
+        self.validate_ground_attacks()?;
         self.validate_reaction_tick_actors()?;
         let current_order = self.world.game.units.keys().copied().collect::<Vec<_>>();
         self.validate_support_metadata()
@@ -386,6 +387,7 @@ impl crate::match_runtime::Match {
         self.validate_production_phases(dt)
             .map_err(|error| format!("production published state: {error:?}"))?;
         self.preflight_legacy_scenario()?;
+        self.validate_construction_tick()?;
         self.tick_environment_phase(EnvironmentPhase::StructureSync, events)?;
         self.grid.rebuild(&self.world.game.units);
         self.capture_firing_prior()?;
@@ -427,6 +429,7 @@ impl crate::match_runtime::Match {
         phases.push(TickPhase::Paths);
         let claim_order = self.world.game.units.keys().copied().collect::<Vec<_>>();
         self.begin_firing_tick(&claim_order)?;
+        let mut construction = self.begin_construction_tick()?;
         let mut moved = Vec::new();
         let mut last_id = None;
         loop {
@@ -501,6 +504,7 @@ impl crate::match_runtime::Match {
             self.decrement_reaction_timer(id, dt)?;
             self.automatic_retreat_unit(id)?;
             self.apply_autocast(id)?;
+            self.step_construction_worker(id, &mut construction)?;
             self.apply_project_unit(id)?;
             self.apply_field_work_unit(id)?;
             let result = self.step_aimed_ability(id);
@@ -515,11 +519,14 @@ impl crate::match_runtime::Match {
                 continue;
             }
             self.apply_attack_move(id)?;
+            self.apply_ground_attack(id)?;
             self.react_unit(id)?;
-            let before = self.world.game.units[&id].at();
+            let before = self.world.game.units[&id].pose();
+            let before_dust = self.world.game.units[&id].dust;
             if let Some(result) = self.move_unit_with_command_routes(id, factor)? {
                 moved.push(result);
             }
+            self.apply_moved_ground_contact(id, before, before_dust)?;
             let unit = &self.world.game.units[&id];
             let moving = !unit.path.is_empty()
                 || crate::math::hypot(unit.x - before.x, unit.z - before.z) > 0.001;
@@ -533,11 +540,14 @@ impl crate::match_runtime::Match {
             TickPhase::FieldWork,
             TickPhase::Riding,
             TickPhase::Aircraft,
+            TickPhase::GroundAttack,
             TickPhase::Reactions,
             TickPhase::TrafficKnowledge,
             TickPhase::Movement,
             TickPhase::Firing,
         ]);
+        self.finish_construction_tick(construction)?;
+        phases.push(TickPhase::Construction);
         let unit_order: Vec<_> = self.world.game.units.keys().copied().collect();
         separation::separate_crowds(&mut self.world.game, &self.rules, &mut self.grid);
         movement::infantry_progress(&mut self.world.game, &self.rules, &moved);
@@ -668,7 +678,6 @@ impl crate::match_runtime::Match {
                 TickPhase::Production,
                 TickPhase::Rail,
                 TickPhase::GroundEffects,
-                TickPhase::Construction,
                 TickPhase::SupplyNetwork,
                 TickPhase::Convoys,
             ],

@@ -7,6 +7,7 @@ use serde_json::{Value, json};
 use std::io::Read;
 use ww2_core::{
     match_commands::Command,
+    match_end::MatchSample,
     match_runtime::Match,
     match_story::StoryKey,
     match_tick::{TickEvent, TickPathConfig},
@@ -64,11 +65,10 @@ fn snapshot(m: &Match, events: &[TickEvent]) -> Value {
         }).collect::<Vec<_>>(),
         "points":m.start.points.iter().enumerate().map(|(i,p)|json!({"owner":p.owner.map_or(-1,|v|v as i64),"capper":p.capper.map_or(-1,|v|v as i64),"progress":bits(p.progress),"cut":p.cut,"onPoint":p.on_point,"contested":p.contested,"capTick":m.capture_ticks[i]})).collect::<Vec<_>>(),
         "story":m.story.iter().map(|p|StoryKey::ALL.map(|k|bits(p.value(k)))).collect::<Vec<_>>(),
-        "shots":aircraft["events"],"timeline":m.timeline.iter().map(|s|match s {
-                        ww2_core::match_end::MatchSample::Conquest { t, vp } => json!({"t":t,"vp":vp}),
-                        ww2_core::match_end::MatchSample::Territories { .. } =>
-                            panic!("aircraft-runner fixture cannot represent a Territories timeline"),
-                    }).collect::<Vec<_>>(),"seed":f64::from(m.start.environment_seed as i32),"wind":{"a":m.start.wind.0,"v":m.start.wind.1},
+        "shots":aircraft["events"],"timeline":m.timeline.iter().map(|s| match s {
+                    MatchSample::Conquest { t, vp } => json!({"t":t,"vp":vp}),
+                    MatchSample::Territories { .. } => panic!("AIR runner fixture cannot represent a Territories timeline"),
+                }).collect::<Vec<_>>(),"seed":f64::from(m.start.environment_seed as i32),"wind":{"a":m.start.wind.0,"v":m.start.wind.1},
         "flightCount":m.firing.flights.len(),"nadeCount":m.firing.grenades.len(),"salvoCount":m.firing.salvos.len(),"strikeCount":g.strikes.len(),"coverCount":m.support.covers.len(),"smokeCount":g.smokes.len(),"wreckCount":g.wrecks.len()})
 }
 #[test]

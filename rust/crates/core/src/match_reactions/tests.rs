@@ -116,6 +116,10 @@ fn make(f: &Value, c: &Value) -> Match {
         u.dig = truth(&v["dig"]);
         u.entrench = truth(&v["entrench"]);
         let mut control = UnitControl::new(&u, &m.rules).unwrap();
+        control.build_target = v["build"]
+            .as_u64()
+            .filter(|id| *id != 0)
+            .map(|id| u32::try_from(id).unwrap());
         control.react = v["react"].as_f64().unwrap();
         control.hold_fire = truth(&v["holdFire"]);
         control.auto_retreat = truth(&v["autoRetreat"]);

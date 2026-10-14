@@ -25,7 +25,7 @@ pub trait Placed {
 
 type Cell = (i64, i64);
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct Record {
     id: UnitId,
     cell: Cell,
@@ -34,6 +34,7 @@ struct Record {
     order: u64,
 }
 
+#[derive(Debug)]
 pub struct SpatialGrid {
     size: f64,
     buckets: HashMap<Cell, Vec<Record>>,

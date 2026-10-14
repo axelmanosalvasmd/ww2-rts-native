@@ -186,6 +186,7 @@ fn make(case: &Value) -> Match {
     m.world.game.rain = 0.;
     m.world.game.wet = Some(0.);
     m.combat = CombatState::default();
+    m.commands.units.clear();
     m.start.environment_seed = 123;
     m.start.wind = (0., 0.5);
     m.next_unit_id = 1000;
@@ -224,6 +225,8 @@ fn make(case: &Value) -> Match {
         });
         m.abilities.initialize(id);
         m.recovery.initialize(id);
+        let control = ww2_core::match_commands::UnitControl::new(&u, &m.rules).unwrap();
+        m.commands.insert(id, control);
         m.world.game.units.insert(id, u);
     }
     m.grid = SpatialGrid::new(&m.world.game.units, 16.);

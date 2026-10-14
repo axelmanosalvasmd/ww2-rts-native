@@ -287,7 +287,8 @@ fn connected_tick_phases_match_actual_reference_steps() {
                     .iter()
                     .filter(|phase| **phase == ww2_core::match_tick::TickPhase::TrafficKnowledge)
                     .count(),
-                1
+                1,
+                "recipient traffic is connected exactly once",
             );
             assert!(
                 !report

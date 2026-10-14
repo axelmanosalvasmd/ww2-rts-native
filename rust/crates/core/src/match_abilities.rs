@@ -161,6 +161,7 @@ impl Match {
                 .units
                 .get(&id)
                 .ok_or("missing ability control")?;
+            crate::match_construction::validate_build_activity(unit, control)?;
             if control
                 .nade
                 .is_some_and(|p| !p.x.is_finite() || !p.z.is_finite())
@@ -466,6 +467,7 @@ impl Match {
         }
         for &id in selected {
             let u = &self.world.game.units[&id];
+            crate::match_construction::validate_build_activity(u, &self.commands.units[&id])?;
             let kind = self.ability_kind(id)?;
             if !kind.aimed() || u.retreating || self.abilities.get(id).unwrap().cooldown > 0. {
                 continue;
@@ -479,8 +481,7 @@ impl Match {
                 1.
             };
             if self.logistics.can_fire(id, count)
-                && (u.build
-                    || u.entrench != self.field_works.membership(id).is_some()
+                && (u.entrench != self.field_works.membership(id).is_some()
                     || u.dig != self.field_works.is_active(id))
             {
                 return Ok(true);
