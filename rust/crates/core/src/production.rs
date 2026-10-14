@@ -210,6 +210,30 @@ impl PreparedRecruit<'_, '_> {
         }
     }
 }
+/// Construction admission holds the canonical queue and wallet unchanged until
+/// the caller has validated publication context and spending statistics.
+#[must_use = "prepare publication and spending, then commit, or drop unchanged"]
+pub struct PreparedQueueUnit<'a, 'facts> {
+    state: &'a mut ProductionState,
+    wallets: &'a mut EconomyState,
+    _context: &'a Context<'facts>,
+    slot: usize,
+    building: u32,
+    job: ProductionJob,
+}
+impl PreparedQueueUnit<'_, '_> {
+    pub fn building(&self) -> u32 {
+        self.building
+    }
+    pub fn charge(&self) -> Price {
+        self.job.charge
+    }
+    pub fn commit(self) -> u64 {
+        self.wallets.players[self.slot].mp -= self.job.charge.mp;
+        self.wallets.players[self.slot].fuel -= self.job.charge.fuel;
+        self.state.commit_paid(self.building, self.job)
+    }
+}
 /// Research admission holds both canonical queues and the payer wallet without
 /// mutation, allowing the match to validate its spending record before commit.
 #[must_use = "prepare story spending and commit, or drop unchanged"]
@@ -357,6 +381,10 @@ impl ProductionState {
     /// Record a job after another authoritative operation already paid for it, such
     /// as World recovery. This does not debit a wallet or perform purchase admission.
     pub fn record_paid(&mut self, id: u32, kind: &str, charge: Price) -> Result<u64, Error> {
+        let job = self.prepare_paid(id, kind, charge)?;
+        Ok(self.commit_paid(id, job))
+    }
+    fn prepare_paid(&self, id: u32, kind: &str, charge: Price) -> Result<ProductionJob, Error> {
         if id == 0
             || !valid_charge(charge)
             || self
@@ -367,18 +395,16 @@ impl ProductionState {
             return Err(Error::InvalidInput("paid job"));
         }
         train_time(kind)?;
-        let n = self.allocate()?;
-        self.buildings
-            .entry(id)
-            .or_default()
-            .jobs
-            .push(ProductionJob {
-                id: n,
-                kind: kind.into(),
-                charge,
-            });
-        self.next_job = n;
-        Ok(n)
+        Ok(ProductionJob {
+            id: self.allocate()?,
+            kind: kind.into(),
+            charge,
+        })
+    }
+    fn commit_paid(&mut self, id: u32, job: ProductionJob) -> u64 {
+        self.next_job = job.id;
+        self.buildings.entry(id).or_default().jobs.push(job);
+        self.next_job
     }
     fn validate(&self, c: &Context<'_>, wallets: &EconomyState) -> Result<(), Error> {
         if wallets.players.len() != self.players.len() {
@@ -623,6 +649,20 @@ impl ProductionState {
         kind: &str,
         from: Option<u32>,
     ) -> Result<u64, Error> {
+        Ok(self
+            .prepare_queue_unit(c, wallets, slot, faction, kind, from)?
+            .commit())
+    }
+    /// Reuse construction admission without publishing a job, debit or new ID.
+    pub fn prepare_queue_unit<'a, 'facts>(
+        &'a mut self,
+        c: &'a Context<'facts>,
+        wallets: &'a mut EconomyState,
+        slot: usize,
+        faction: Faction,
+        kind: &str,
+        from: Option<u32>,
+    ) -> Result<PreparedQueueUnit<'a, 'facts>, Error> {
         self.validate(c, wallets)?;
         self.slot(slot)?;
         if !c.mode.kind.is_construction() {
@@ -700,11 +740,15 @@ impl ProductionState {
                 Denial::Needs
             });
         };
-        let job = self.record_paid(id, kind, price)?;
-        let p = &mut wallets.players[slot];
-        p.mp -= price.mp;
-        p.fuel -= price.fuel;
-        Ok(job)
+        let job = self.prepare_paid(id, kind, price)?;
+        Ok(PreparedQueueUnit {
+            state: self,
+            wallets,
+            _context: c,
+            slot,
+            building: id,
+            job,
+        })
     }
     /// Only waiting jobs on a living, finished, owned producer can be cancelled.
     /// The returned original charge is also the amount the match subtracts from spent statistics.

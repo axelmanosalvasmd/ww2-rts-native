@@ -32,7 +32,7 @@ fn rejects_a_view_from_another_recipient() {
 }
 
 #[test]
-fn unknown_cover_is_a_fatal_error_without_losing_the_moving_unit() {
+fn unknown_world_cover_uses_open_baseline_without_losing_the_moving_unit() {
     let rules = Rules::compiled().unwrap();
     let catalog = Catalog::compiled().unwrap();
     let mut world = world();
@@ -63,22 +63,69 @@ fn unknown_cover_is_a_fatal_error_without_losing_the_moving_unit() {
     .unwrap();
     world.game.units.insert(1, rifle);
     world.game.units.insert(2, tank);
-    let mut grid = SpatialGrid::new(&world.game.units, 16.0);
+    let start = world.game.units[&1].at();
+    let cell = world.game.cell_of(start.x, start.z).unwrap();
+    // Use physical known-open terrain as an independent baseline, not another
+    // World memory projection. Source traffic steers and walks on unknown ground.
+    let mut baseline = world.game.clone();
+    let mut baseline_grid = SpatialGrid::new(&baseline.units, 16.0);
+    let expected = movement::move_unit_with_routes(
+        &mut baseline,
+        &rules,
+        &mut baseline_grid,
+        1,
+        1.0,
+        &mut |_, _, _, _, _| panic!("bounded contact does not replan"),
+    )
+    .unwrap();
+    assert_ne!(baseline.units[&1].at(), start);
+    let expected_rows = baseline
+        .units
+        .values()
+        .map(|u| row(u, &rules))
+        .collect::<Vec<_>>();
     let knowledge = RouteKnowledge::world(32, 24, 7, rules.clone()).unwrap();
     let query = knowledge.query();
     let input = TrafficKnowledge::observed(query.navigation(), &knowledge, &[]).unwrap();
-    let result = movement::move_unit_with_knowledge(
-        &mut world.game,
-        &rules,
-        &mut grid,
-        1,
-        1.0,
-        &mut |_, _, _, _, _| panic!("cover error precedes routing"),
-        &input,
-    );
-    assert_eq!(result, Err(KnowledgeError::UnknownCell));
-    assert_eq!(world.game.units.len(), 2);
-    assert_eq!(world.game.units[&1].at(), Point { x: 21.0, z: 23.0 });
+    for character in *b".#" {
+        // Passable cover changes physical rank, but neither infantry speed nor
+        // the unobserved traffic projection may change because of that cover.
+        world.set_cell(cell, character).unwrap();
+        assert_eq!(
+            TrafficKnowledge::physical()
+                .cover_rank(&world.game, &rules, start, None)
+                .unwrap(),
+            if character == b'#' { 1 } else { 3 }
+        );
+        let remembered = knowledge.cell(cell).unwrap();
+        assert!(!remembered.known);
+        assert_eq!(remembered.character, b'.');
+        assert_eq!(remembered.flags, 0);
+        assert_eq!(input.cover_rank(&world.game, &rules, start, None), Ok(3));
+        let mut game = world.game.clone();
+        let mut grid = SpatialGrid::new(&game.units, 16.0);
+        let result = movement::move_unit_with_knowledge(
+            &mut game,
+            &rules,
+            &mut grid,
+            1,
+            1.0,
+            &mut |_, _, _, _, _| panic!("bounded contact does not replan"),
+            &input,
+        );
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Some(expected));
+        assert_eq!(game.units.len(), 2);
+        assert_eq!(game.units.keys().copied().collect::<Vec<_>>(), vec![1, 2]);
+        assert_eq!(game.units[&1].at(), baseline.units[&1].at());
+        assert_eq!(
+            game.units
+                .values()
+                .map(|u| row(u, &rules))
+                .collect::<Vec<_>>(),
+            expected_rows
+        );
+    }
 }
 
 fn number(v: &serde_json::Value) -> f64 {

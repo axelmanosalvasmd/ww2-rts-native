@@ -23,7 +23,7 @@ impl Match {
             return Ok(());
         }
         // The workload mover raised dust before this Source contact boundary.
-        // Restore that later effect even if a fallible contact cannot complete.
+        // Undo its premature dust even if a fallible contact cannot complete.
         self.world.game.units.get_mut(&id).unwrap().dust = before_dust;
         let g = &self.world.game;
         let unit = &g.units[&id];
@@ -32,13 +32,12 @@ impl Match {
             .kinds
             .get(unit.kind)
             .ok_or("unknown ground-contact kind")?;
-        if !matches!(
-            self.options.mode,
-            crate::economy::Mode::Default | crate::economy::Mode::Conquest
-        ) || g.mode.is_some()
-            || unit.owner >= g.players.len()
-        {
-            return Err("moved ground contact currently requires ordinary owned actors".into());
+        self.actor_policy(unit.owner)?;
+        if self.uses_world_routes() {
+            self.validate_world_ground_actor(unit)?;
+            if profile.naval || profile.structure {
+                return Err("unsupported World ground-contact profile".into());
+            }
         }
         let Some(c) = g.cell_of(unit.x, unit.z) else {
             return Ok(());
@@ -66,14 +65,18 @@ impl Match {
         {
             return Err("moved vehicle crushing is not connected".into());
         }
-        if ch == b'N'
-            && !self
-                .world
-                .mines
-                .get(&c)
-                .is_some_and(|owner| *owner >= 0 && g.allied(*owner as usize, unit.owner))
-        {
-            return Err("moved hostile mine detonation is not connected".into());
+        if ch == b'N' {
+            let source_owner = self.world.mines.get(&c).copied().unwrap_or(-1);
+            let owner = if source_owner >= 0 {
+                Some(source_owner as usize)
+            } else if source_owner == -1 && self.uses_world_routes() {
+                Some(crate::game::LOCAL_DEFENDER_OWNER)
+            } else {
+                None
+            };
+            if !owner.is_some_and(|owner| g.allied(owner, unit.owner)) {
+                return Err("moved hostile mine detonation is not connected".into());
+            }
         }
         if profile.infantry {
             return Ok(());
@@ -131,3 +134,7 @@ impl Match {
 #[cfg(test)]
 #[path = "match_ground_contact_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "match_world_contact_tests.rs"]
+mod world_tests;
