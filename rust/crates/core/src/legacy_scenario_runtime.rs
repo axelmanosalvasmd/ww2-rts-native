@@ -127,6 +127,16 @@ fn emit_destroy(
     let unit_order: Vec<_> = world.game.units.keys().copied().collect();
     let skipped = BTreeSet::new();
     let mut hit = DamageContext::plain(&skipped);
+    let width = world.game.w;
+    let execution = destroy.execution.as_str();
+    let contact_ids: Vec<_> = (y0..=y1)
+        .flat_map(|y| {
+            (x0..=x1).map(move |x| {
+                let cell = y * width + x;
+                format!("{execution}:{cell}")
+            })
+        })
+        .collect();
     let mut damage = DamageWorld {
         world,
         combat,
@@ -143,11 +153,12 @@ fn emit_destroy(
         wind_angle,
         wind_strength,
     };
+    let mut contact_id_index = 0;
     for y in y0..=y1 {
         for x in x0..=x1 {
             let cell = y * damage.world.game.w + x;
-            let contact_id = format!("{}:{cell}", destroy.execution);
-            hit.contact_id = Some(&contact_id);
+            hit.contact_id = Some(&contact_ids[contact_id_index]);
+            contact_id_index += 1;
             let mut output = |effect| emit(LegacyScenarioEmission::Environment(effect));
             damage
                 .terrain_blast_emitting(

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed the first coherent legacy caller compile failure: the reusable Destroy damage context borrowed a cell contact ID that was dropped at the end of that cell (`E0597`, `contact_id does not live long enough`). Contact IDs now live through the full blast loop and remain assigned in the original y/x cell order; the same damage context, callback sequence, emissions and failure prefix are unchanged. No Cargo rerun has been performed.
+
 - Update the trusted startup socket regression for actual validated legacy Scenario admission. Run the complete lifecycle on authored El Alamein and require both real ClientViews to decode its tick-60 public Say and empty-objective HUD, preserving every Source metadata field and public-map privacy check. Replace the obsolete Scenario refusal with a genuinely misbound trusted Default-map attachment that preserves lobby/accounts/identity and emits no partial start or snapshot. Keep terrain, Fog, unit retirement/publication, resync, reconnect and replacement assertions. No production/core/FFI changes; coherent native verification remains pending.
 
 - Compose the actual ordinary Research/legacy Scenario caller with the public Say and canonical falling readers. Narrow Scenario snapshot admission to the validated migrated legacy state, preserve chronological public rows and add the fifth-family consumer arms. Extend the existing contiguous five-map replay with all 21 selected boundaries, 42 seat results and 14 Say rows, including actual Bridge bodies at ticks 8400/8401 and the retained 516-section comparison. Original input-only and falling/motion fixtures remain intact; source review and coherent native validation are pending. No FFI, packet shape, spectator or privacy-policy change.
