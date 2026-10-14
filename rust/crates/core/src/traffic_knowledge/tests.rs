@@ -32,7 +32,7 @@ fn rejects_a_view_from_another_recipient() {
 }
 
 #[test]
-fn unknown_cover_is_a_fatal_error_without_losing_the_moving_unit() {
+fn unknown_world_cover_uses_open_baseline_without_losing_the_moving_unit() {
     let rules = Rules::compiled().unwrap();
     let catalog = Catalog::compiled().unwrap();
     let mut world = world();
@@ -73,10 +73,10 @@ fn unknown_cover_is_a_fatal_error_without_losing_the_moving_unit() {
         &mut grid,
         1,
         1.0,
-        &mut |_, _, _, _, _| panic!("cover error precedes routing"),
+        &mut |_, _, _, _, _| panic!("bounded contact does not replan"),
         &input,
     );
-    assert_eq!(result, Err(KnowledgeError::UnknownCell));
+    assert!(result.is_ok());
     assert_eq!(world.game.units.len(), 2);
     assert_eq!(world.game.units[&1].at(), Point { x: 21.0, z: 23.0 });
 }

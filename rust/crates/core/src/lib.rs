@@ -41,6 +41,7 @@ pub(crate) mod existing_observers;
 pub mod logistics;
 pub mod map;
 pub mod match_abilities;
+pub mod match_actor;
 pub mod match_aircraft_commands;
 pub mod match_aircraft_ticks;
 pub mod match_aviation;
@@ -112,9 +113,11 @@ pub mod world_generation;
 pub mod world_map;
 
 pub mod match_world;
+pub mod match_world_ground;
 pub mod match_world_phases;
 pub mod match_world_rails;
 pub mod match_world_regions;
+pub mod match_world_tick;
 
 pub mod match_world_memory;
 pub mod world_memory;
