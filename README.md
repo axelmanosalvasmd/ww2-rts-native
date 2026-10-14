@@ -7,3 +7,4 @@ Evidence images for issue #4 checkpoints. Captured offscreen from local, uncommi
 - slice-1k: reference models in live play and browser-vs-Unreal comparison sheets (left: reference three.js, right: Unreal)
 - slice-1l: lighting matched, reference map objects and scenery, animation, sprite effects, close-up soldier comparisons
 - slice-1m: Rust decoder default, polish (rings, tracers, damage smoke, tossed bodies), Spanish, packaged client frames
+- slice-1n: terrain (relief, painted ground, water, apron, railways, atmosphere); left browser reference, right Unreal
