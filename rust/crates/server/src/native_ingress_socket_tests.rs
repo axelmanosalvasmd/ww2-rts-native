@@ -120,6 +120,7 @@ async fn socket_controls_use_owned_slot_and_survive_same_token_takeover() {
         a.send(json!({"t":"attack","ids":[owned],"target":foreign}));
         assert_eq!(a.until(|m| m["t"] == "deny")["reason"], "blocked");
         let mut replacement = Receiver::open(address, "a");
+        assert_eq!(a.until(|m| m["t"] == "replaced"), json!({"t":"replaced"}));
         let start = replacement.until(|m| m["t"] == "start");
         assert_eq!(start["matchId"], epoch);
         assert_eq!(start["you"], 0);
@@ -135,7 +136,6 @@ async fn socket_controls_use_owned_slot_and_survive_same_token_takeover() {
         frame.extend(mask);
         frame.extend(stale.iter().enumerate().map(|(i, byte)| byte ^ mask[i % 4]));
         let _ = a.socket.write_all(&frame);
-        a.until(|m| m["t"] == "replaced");
         replacement.send(json!({"t":"move","orders":[[owned,goal.x,goal.z]],"slot":1}));
         replacement.until(|m| {
             m["t"] == "s"

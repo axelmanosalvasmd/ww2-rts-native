@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Reorder the socket takeover witness after PR #198's Windows run reported an aborted JSON read. Receive and assert the real notification before attempting that write, and demand no later reads from the retired socket. Keep the strict shared receiver, current decoder/control assertions and direct-Hub stale-connection admission test unchanged. The failed log is retained; fresh exact-head native and platform verification is required.
+
 - Answer Axel's ingress review 044 in the design notes: attached seat indices remain stable across takeover, the 120-callback hold is terminal post-win handling, and mixed eligible unsupported actors cause a temporary whole-command service refusal. Record the exact garrison/work guard scope separately from the prototype's per-unit command behavior. Runtime, tests, wire and native evidence are unchanged; final-head platform checks remain required.
 
 - Correct the detached Human observation document's stale native status after Axel's acknowledgment 042. All four component tests passed in the 401-test Linux, Windows and macOS run for merged PR #196. Broader Human behavior approval and actual host scheduler integration remain pending; runtime and fixtures are unchanged.
