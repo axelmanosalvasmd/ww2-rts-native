@@ -91,6 +91,17 @@ impl Catalog {
             .map_err(Clone::clone)
     }
 
+    pub(crate) fn tables(&self) -> &BTreeMap<String, Value> {
+        self.root
+            .get("tables")
+            .and_then(Value::object)
+            .expect("admitted catalog")
+    }
+
+    pub(crate) fn format(&self) -> Option<f64> {
+        self.root.get("format").and_then(Value::number)
+    }
+
     pub fn table(&self, name: &str) -> Result<&Value, CatalogError> {
         self.root
             .get("tables")
@@ -118,7 +129,7 @@ impl Catalog {
     }
 }
 
-fn decode(json: serde_json::Value) -> Result<Value, CatalogError> {
+pub(crate) fn decode(json: serde_json::Value) -> Result<Value, CatalogError> {
     use serde_json::Value as J;
     Ok(match json {
         J::Null => Value::Null,
