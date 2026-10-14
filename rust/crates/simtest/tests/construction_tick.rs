@@ -42,6 +42,37 @@ fn tagged(v: Value) -> Value {
         v => v,
     }
 }
+// The recorder encodes declared undefined properties as null before JSON serialization.
+// Recover only the optional wire-presence differences found in the complete Source frame audit.
+fn recorded_effects_json(recorded: &Value) -> Value {
+    Value::Array(
+        recorded
+            .as_array()
+            .expect("recorded Source effect frame")
+            .iter()
+            .map(|effect| {
+                let mut row = effect.as_object().expect("recorded Source effect").clone();
+                let kind = row
+                    .get("k")
+                    .and_then(Value::as_str)
+                    .expect("recorded Source effect kind");
+                let hurt = kind == "hurt";
+                let section_collapse =
+                    kind == "collapse" && row.get("section").is_some_and(Value::is_string);
+                if hurt {
+                    for key in ["fo", "local"] {
+                        if row.get(key).is_some_and(Value::is_null) {
+                            row.remove(key);
+                        }
+                    }
+                } else if section_collapse && row.get("to").is_some_and(Value::is_null) {
+                    row.remove("to");
+                }
+                Value::Object(row)
+            })
+            .collect(),
+    )
+}
 fn refresh(m: &mut Match) {
     m.grid.rebuild(&m.world.game.units);
     ww2_core::vision::update_vision(&mut m.world.game, &m.rules, &m.grid);
@@ -407,9 +438,15 @@ fn compare(
             s["riding"],
             "riding"
         );
+        for (k, b) in [("holdFire", c.hold_fire), ("holdPos", u.hold_pos)] {
+            let expected = s.get(k).expect("recorded Source stance");
+            assert!(
+                expected.is_boolean() || expected.is_null(),
+                "{context}: {k} must be a boolean or unset Source stance"
+            );
+            same!(b, expected.as_bool().unwrap_or(false), k);
+        }
         for (k, b) in [
-            ("holdFire", c.hold_fire),
-            ("holdPos", u.hold_pos),
             ("auto", c.auto_cast),
             ("autoRetreat", c.auto_retreat),
             ("retreating", u.retreating),
@@ -630,7 +667,11 @@ fn compare(
             "timeline"
         );
     }
-    same!(tagged(effects.clone()), e["shots"], "environment effects");
+    same!(
+        tagged(effects.clone()),
+        recorded_effects_json(&e["shots"]),
+        "environment effects"
+    );
     assert!(m.firing.events.is_empty() && m.support.events.is_empty());
     let falling=m.environment.falling_sections().iter().map(|s|{let b=&s.body;tagged(json!({"id":b.id,"kind":b.kind.as_str(),"x":b.x,"y":b.y,"z":b.z,"vx":b.vx,"vy":b.vy,"vz":b.vz,"dir":b.dir,"material":b.material,"mass":b.mass,"radius":b.radius,"origin":{"x":b.origin.x,"z":b.origin.z},"gravity":b.gravity,"drag":b.drag,"stamp":b.stamp,"born":b.born,"contacts":b.contacts,"settled":b.settled,"tilt":b.tilt,"section":s.section,"c":s.cell,"bridge":s.bridge,"at":s.at,"until":s.until,"impulse":s.impulse}))}).collect::<Vec<_>>();
     same!(json!(falling), e["falling"], "actual falling sections");
@@ -830,16 +871,15 @@ fn original_paid_construction_replays_full_match_ticks() {
                     let position = |phase| report.phases.iter().position(|p| *p == phase).unwrap();
                     assert!(position(TickPhase::Firing) < position(TickPhase::Construction));
                     assert!(position(TickPhase::Construction) < position(TickPhase::Separation));
-                    effects = json!(
-                        report
-                            .events
-                            .iter()
-                            .map(|event| match event {
-                                TickEvent::Environment(effect) => effect.to_json(),
-                                other => panic!("{name}: unexpected producer in quiet construction scene: {other:?}"),
-                            })
-                            .collect::<Vec<_>>()
-                    );
+                    effects
+                        .as_array_mut()
+                        .expect("owned construction caller effect batch")
+                        .extend(report.events.iter().map(|event| match event {
+                            TickEvent::Environment(effect) => effect.to_json(),
+                            other => panic!(
+                                "{name}: unexpected producer in quiet construction scene: {other:?}"
+                            ),
+                        }));
                     steps += 1;
                 }
                 patch(&mut expected, &c["patches"][next]);

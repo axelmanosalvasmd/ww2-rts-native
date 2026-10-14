@@ -82,8 +82,8 @@ try{
     if(a.as){const fresh=[...g.units.values()].filter(u=>!beforeIds.has(u.id));assert.equal(fresh.length,1);aliases[a.as]=fresh[0].id;}
     assert.equal(g.seed>>>0,beforeSeed,`${name}: construction command changed environment seed`);save();
    }else if(a.op==='prime'){
-    for(const [who,values]of Object.entries(a.units??{}))Object.assign(g.units.get(aliases[who]),values);
-    for(const [slot,values]of Object.entries(a.players??{}))Object.assign(g.players[Number(slot)],values);
+    for(const [who,values]of Object.entries(a.units??{}))Object.assign(g.units.get(aliases[who]),structuredClone(values));
+    for(const [slot,values]of Object.entries(a.players??{}))Object.assign(g.players[Number(slot)],structuredClone(values));
     rebuildGrid(g);sim.internals.updateVision(g);assert.equal(g.seed>>>0,beforeSeed);save();
    }else if(a.op==='steps'||a.op==='until'){
     count=0;const done=()=>{const u=g.units.get(aliases[a.target]);return a.condition==='finished'?u?.built>=1:a.condition==='progress'?(u?.built??0)>0:a.condition==='digEmpty'?!u?.dig:a.condition==='buildEmpty'?!u?.build:false;};

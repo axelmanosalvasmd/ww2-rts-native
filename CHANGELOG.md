@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Checkpoint a source-only normal merge of frozen World caller `7f9c886` and Ground contact `b6cbf40` for the Linux handoff. Preserve both parent implementations and evidence. The imported contact call runs after movement and before firing, but its ordinary-mode guard still refuses moved World actors. No World contact admission change, combined native acceptance or new Source replay belongs to this checkpoint; development stopped at the user's handoff request.
+
 - Normally retain the reviewed Ground diagnostic closure and exact missing-Firing test setup repair in the separate World caller. The same inherited setup still retained startup row 4; remove that row explicitly before the intended malformed-metadata dispatch, preserving all refusal assertions. Four source-reviewed lint forms keep short-circuit evaluation order. This avoids carrying known diagnostic and test failures into the first World workspace gate; combined native execution remains pending.
 
 - Align the inherited ordinary research consumer with its approved phase scope. It now requires Research connected and Production still unavailable, since ordinary Buy is an immediate boundary operation and restored ordinary queues refuse. Keep all 2,429 complete Source steps, real boundary births, outputs and setup unchanged. World queued training retains its separate live-building receipt; native execution remains pending.
@@ -163,6 +165,24 @@
 - Bring source-reviewed human commander timing, raw input helpers and detached common view types into the isolated observation producer branch. Native acceptance remains pending.
 
 - Prepare a separate human commander observation branch by normally combining checked commander `be1cb2c` with ordinary Default `262926e`. Retain both Cover and Entrench dispatch and canonical owners; this new union has no native acceptance yet.
+
+- Put the ground-contact module declaration in rustfmt order. The frozen `b45ed53` native run passed all six focused contact, construction and ground-order tests, then formatting exited 1 on this declaration alone. Module bodies, fixtures and test behavior are unchanged; final gates for this successor remain pending.
+
+- Create the five extra HQs in the two ground-retreat scenes through real Source building placement and matching native World registration/publication. Their earlier generic births omitted footprints and failed whole-tick retirement admission. Use valid nonoverlapping sites while preserving finished-own-HQ selection and the physical garrison-exit choice change. Source regeneration covers 28 cases, 48 commands, 30 steps and 110 snapshots; all other 26 cases and all recorded orders are unchanged. Production guards and nearest-HQ behavior are unchanged; native execution of this successor remains pending.
+
+- Compare complete ground-contact JSON rows by IEEE numeric value while retaining array order, field presence and nonnumeric types. The frozen contact run passed the refusal test and stopped on Source integer zero versus native floating zero in the mud row. Signed zero and tagged bit strings remain distinct. Runtime, recorder and fixture values are unchanged; this test-only successor has not run natively.
+
+- Connect actual moved-vehicle ground wear to the canonical World owner. Preserve Float32 wear, wet and below-sea multipliers, look-only journal updates, both mud-transition rows, and dust after terrain contact. The frozen construction warm-route failure showed the missing real contact at cell 792. An unchanged Source full-step recorder covers six scenes and 12 steps; two native component tests and the existing full construction replay await execution. Crushing and hostile mine detonation remain explicit unsupported boundaries, with the broader GroundEffects phase still unavailable.
+
+- Detach authored construction prime values before injecting them into Source. Later repair ticks had mutated the saved input reserves, so native replay began with depleted provisions before the repair command. Regeneration changes only two recorded action inputs back to the authored 0.001 and 0.002; all 2,013 expected snapshots across 29 cases remain identical. Construction and logistics rules are unchanged. The frozen native failure is retained; this successor has not run natively.
+
+- Retain the construction test caller's effect batch across ticks, commands and authored priming, matching the unchanged Source capture lifetime. Append only actual ordered TickReport events and reset only for a new case. All 29 cases are append-only: seven emissions across three boundaries produce 24 retained row occurrences. Producers, failure payloads, Source recorder and fixtures are unchanged; the frozen empty-batch failure is preserved and this successor has not run natively.
+
+- Corrected construction effect readback for private Source undefined sentinels: omit only null Hurt owner/local fields and null owner on section-collapse rows when comparing public event JSON. The complete 29-case audit covers 24 retained row occurrences; required fields, explicit false, numeric zero, event order and all other assertions stay exact. Source recorder, fixtures, wire producers and partial-failure ownership are unchanged. The frozen native failure remains recorded; this successor has not run natively.
+
+- Compare only the two optional Source stance switches by their effective boolean value in the full construction replay. Source unset Hold Fire and Hold Position produce the same off flags as native false; the reader rejects missing fields and values outside boolean/null. Recorder, fixture, other exact assertions and gameplay are unchanged. The frozen native failure remains recorded; this successor has not run natively.
+
+- Rebuilt command-control rows for the replacement actors in the original combat/death scene, using the same constructor as canonical startup. The combined workspace stopped with three combat tests passing and one missing-control refusal; the construction retirement guard and expected Source outputs remain unchanged. This test setup repair has not run natively.
 
 - Established the missing-Firing-row setup in the GroundAttack admission regression by explicitly removing actor 4's retained startup row before dispatch. The pure Ground/construction `ac2919c` workspace attempt passed 95 core tests and failed this first assertion; its six-order queued Cover test passed. Runtime guards, original fixtures and subsequent control/capacity refusal assertions are unchanged. Fresh native verification remains pending.
 
