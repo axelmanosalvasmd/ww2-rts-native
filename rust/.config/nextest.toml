@@ -1,0 +1,11 @@
+# cargo-nextest settings. CI runs `cargo nextest run --profile ci`.
+# Local runs can keep using `cargo test`; both run the same tests.
+
+[profile.ci]
+# Report every failing test instead of stopping at the first one.
+fail-fast = false
+# Print a failing test's output as it fails and again in the summary.
+failure-output = "immediate-final"
+# Flag tests slower than 2 minutes; never kill them, since the slowest
+# replay tests take about a minute on CI runners.
+slow-timeout = { period = "120s" }
