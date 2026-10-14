@@ -1,5 +1,4 @@
-#[path = "common/aviation.rs"]
-mod common;
+use crate::shared::aviation as common;
 use common::{
     aircraft_phase_snapshot, assert_json, bits, make, mission, patch, scene, snapshot, state_name,
 };
