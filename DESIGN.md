@@ -1,5 +1,15 @@
 # Three Crossroads Native: design decisions
 
+## Legacy snapshot oracle field coverage (2026-10-14, Vostro)
+
+At isolated Legacy head `0f85210f80309b7915da61f57c68f556aa57c850`, both existing snapshot/support fixture comparisons reproduce PR #202's field-count failures: 27 versus 26 for `rifle:open` recipient zero, and 25 versus 24 for actual support admission. Temporary diagnostic output identifies exactly one additional native key, `falling:[]`. The Legacy falling projection introduces it; no World successor is needed to reproduce the failure.
+
+Pinned Source `shared/sim.js:6075` always returns a falling array. All 219 original complete outputs already contain `falling:[]`, but the recorder's selected field list omits it. Extend that list with the now represented field and regenerate only this bounded snapshot fixture with x64 Node 24.21.0 against clean `e4e579a`. The recorder and its deterministic `--check` both pass under a 6 GiB memory cap. Comparison with the retained original fixture verifies that only those 219 selected fields are added across 73 cases; all original values, optional fields, complete outputs and 11 active-list frames remain identical.
+
+The recursive exact object/array/numeric comparison and both original tests remain unchanged. There is no field suppression, fabricated native expected state, runtime repair, new test or ABI/wire decision. The research, Scenario and visible-falling recorders/fixtures retain their original bytes. Failed commands, raw diagnostic logs, the original fixture and preservation checks remain outside the repository at `/tmp/legacy-focused-b99d9f00/`. Focused successor tests, strict lint/formatting, independent Legacy/host review, full workspace, release FFI/C replay and final-SHA platform gates remain pending at this checkpoint.
+
+Locally acknowledge issue #5 requests 038/040 and 050: retain actual Say/Destroy chronology, observed cell delivery, bridge section HP, public-map privacy and genuine rollback, with concrete host review and exact-head proof still required. Later terrain, #199 and draft #201 replies change no authority for this correction; privacy, role and public-start guards remain intact. No public reply, publication or merge is performed.
+
 ## Focused Legacy assembly on current main (2026-10-14, source only)
 
 This normal merge joins main `514e15f485e1b0aab949ab4f314c7c8514b64aff` and Legacy `84eaa6ea451c04b6fb404ea88aa854d1af5e9a1f` in an isolated worktree. Only additive CHANGELOG and DESIGN histories conflicted; both are retained. The automatic source merge keeps main's Human observation receipt and path-history code, trusted host/input, internal table producer and terrain evidence. It adds the Legacy module beside those registrations. No Ground or World successor source is imported.

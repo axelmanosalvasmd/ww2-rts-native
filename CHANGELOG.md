@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Correct the snapshot recorder's selected field list after the isolated Legacy head reproduces both original snapshot/support comparisons failing on one extra `falling` field. Regenerate the bounded fixture from unchanged pinned Source, adding its actual empty falling arrays to all 219 selected outputs across 73 cases. Preserve every original field, complete output, active-list trace and exact assertion. Runtime, larger research/Scenario fixtures, reference and ABI 2/header are unchanged; focused native checks and final review/workspace/platform gates remain pending at this correction checkpoint.
+
 - Normally merge Legacy `84eaa6ea` onto main `514e15f4` in an isolated source-only candidate. Retain both additive documentation histories, the repaired research recorder/setup, early research, chronological Say/Destroy, canonical falling/lifetime repairs and the real El Alamein socket lifecycle. Preserve main's Human receipts/path history, host/input, tables and terrain without importing Ground or World successors. Correct stale research, falling and Scenario parity descriptions without marking rows accepted. The 12 leaf passes and earlier combined host review remain parent evidence; all assembled-head native, independent review and platform gates are pending. No build, test, replay, recorder or publication runs in this phase.
 
 - Record Vostro project registration and the explicit approval to retry the consolidated PR publication and separate diagnostic backup. Preserve pending validation and the original failures.
