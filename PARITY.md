@@ -37,6 +37,7 @@ Some rows were written before this rule and propose copying a JavaScript acciden
 | [fps.md](docs/parity/fps.md) | FPS | The first-person companion: entry, permissions, input, weapons, squad, death and respawn | 40 |
 | [interface.md](docs/parity/interface.md) | IF | What the client needs from the rules through the C interface, and the determinism rules the core must meet | 31 |
 | [tools.md](docs/parity/tools.md) | TOOL | Developer tools and the test suite: port, reuse, replace or retire; parity harness building blocks | 65 |
+| [client.md](docs/parity/client.md) | CLI | The Unreal client's presentation and input: session and rooms, lobby, match flow, camera, selection, orders, HUD, minimap, markers, alerts, fog, terrain and world drawing, units, effects, audio, languages, settings, the Tutorial, editor tools, the companion, diagnostics, and how the client consumes the core | 140 |
 | [protocol-messages.md](docs/parity/protocol-messages.md) | | The WebSocket protocol as implemented: 60 client-to-server and 11 server-to-client message types | |
 | [client-imports.md](docs/parity/client-imports.md) | | Every client import from `shared/`, and every rule the client copies instead of importing | |
 
