@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Answer Axel's ingress review 044 in the design notes: attached seat indices remain stable across takeover, the 120-callback hold is terminal post-win handling, and mixed eligible unsupported actors cause a temporary whole-command service refusal. Record the exact garrison/work guard scope separately from the prototype's per-unit command behavior. Runtime, tests, wire and native evidence are unchanged; final-head platform checks remain required.
+
 - Correct the detached Human observation document's stale native status after Axel's acknowledgment 042. All four component tests passed in the 401-test Linux, Windows and macOS run for merged PR #196. Broader Human behavior approval and actual host scheduler integration remain pending; runtime and fixtures are unchanged.
 
 - Publish the bounded trusted-room commander input candidate after `17179f2` passes all 405 optimized workspace tests, strict Clippy, formatting and release FFI. All 401 inherited test names remain, alongside four ingress regressions. Normally join main `92fb7fe` with no Rust, harness, reference or CI file changes from the tested head, and correct the README trusted-host status. Final-head platform checks and Axel input review remain pending.
