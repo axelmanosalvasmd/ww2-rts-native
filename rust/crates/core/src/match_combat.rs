@@ -1260,6 +1260,13 @@ impl crate::match_runtime::Match {
                 .units
                 .get(&id)
                 .ok_or(CombatError::InvalidInput("death sidecar unit"))?;
+            let control = self
+                .commands
+                .units
+                .get(&id)
+                .ok_or(CombatError::InvalidInput("death construction control"))?;
+            crate::match_construction::validate_build_activity(unit, control)
+                .map_err(|_| CombatError::InvalidInput("death construction activity"))?;
             if unit.id != id
                 || self.abilities.get(id).is_none()
                 || self.recovery.get(id).is_none()
@@ -1281,8 +1288,13 @@ impl crate::match_runtime::Match {
         {
             return Err(CombatError::InvalidInput("death sidecar state"));
         }
-        crate::match_runtime::cancel_field_work_state(&mut self.field_works, unit)
-            .map_err(|_| CombatError::InvalidInput("death field work"))?;
+        let control = self
+            .commands
+            .units
+            .get_mut(&unit.id)
+            .ok_or(CombatError::InvalidInput("death construction control"))?;
+        crate::match_runtime::cancel_owned_work_state(&mut self.field_works, unit, control)
+            .map_err(|_| CombatError::InvalidInput("death owned work"))?;
         self.abilities.remove(unit.id);
         self.recovery.remove(unit.id);
         Ok(())

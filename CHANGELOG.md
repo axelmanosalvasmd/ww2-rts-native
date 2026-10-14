@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Assemble the focused Ground stream by normally merging frozen `b6cbf406` onto main `514e15f4`. Retain construction, Attack/Retreat, moved-vehicle contact and their existing-observer/routing/Fog prerequisites, all original fixtures and current-main Human, host, input, table and terrain providers. Only one CHANGELOG and four DESIGN hunks conflict; both histories are preserved. No builds, recorders or publication run here. Ground's earlier 381-test result is parent evidence only; candidate validation and the retained ingress correction remain pending. The separate World ability guard changes Classic refusal precedence and needs a capped reproduction before correction; this assembly leaves its assertion and ordinary guard unchanged.
+
 - Record Vostro project registration and the explicit approval to retry the consolidated PR publication and separate diagnostic backup. Preserve pending validation and the original failures.
 
 - Save the Linux development handoff with exact pushed input/table/terrain, Ground, research/scenario and World checkpoints, known Windows/research failures, stopped-by-user validation and restart commands. Stop local Mac jobs for the transfer; preserve source and compact evidence before removing task caches and temporary copies. This checkpoint does not mark unfinished gameplay or platform checks complete.
@@ -148,6 +150,145 @@
 - Record both owners' acceptance of the startup-table v1 content/schema candidate and its strict revision/refusal policy. Delivery remains unagreed, and the six ABI 2 calls, runtime producer and Unreal adoption are unchanged. No content, schema or inventory bytes changed.
 
 - Add an unagreed startup-table content/schema proposal for consumer review: all 47 compiled tables plus 17 source-derived public constants, a portable generator, exact field inventory and independent table/formation hashes. Table transport, additional FFI calls and Unreal adoption remain pending explicit agreement.
+- Put the ground-contact module declaration in rustfmt order. The frozen `b45ed53` native run passed all six focused contact, construction and ground-order tests, then formatting exited 1 on this declaration alone. Module bodies, fixtures and test behavior are unchanged; final gates for this successor remain pending.
+
+- Create the five extra HQs in the two ground-retreat scenes through real Source building placement and matching native World registration/publication. Their earlier generic births omitted footprints and failed whole-tick retirement admission. Use valid nonoverlapping sites while preserving finished-own-HQ selection and the physical garrison-exit choice change. Source regeneration covers 28 cases, 48 commands, 30 steps and 110 snapshots; all other 26 cases and all recorded orders are unchanged. Production guards and nearest-HQ behavior are unchanged; native execution of this successor remains pending.
+
+- Compare complete ground-contact JSON rows by IEEE numeric value while retaining array order, field presence and nonnumeric types. The frozen contact run passed the refusal test and stopped on Source integer zero versus native floating zero in the mud row. Signed zero and tagged bit strings remain distinct. Runtime, recorder and fixture values are unchanged; this test-only successor has not run natively.
+
+- Connect actual moved-vehicle ground wear to the canonical World owner. Preserve Float32 wear, wet and below-sea multipliers, look-only journal updates, both mud-transition rows, and dust after terrain contact. The frozen construction warm-route failure showed the missing real contact at cell 792. An unchanged Source full-step recorder covers six scenes and 12 steps; two native component tests and the existing full construction replay await execution. Crushing and hostile mine detonation remain explicit unsupported boundaries, with the broader GroundEffects phase still unavailable.
+
+- Detach authored construction prime values before injecting them into Source. Later repair ticks had mutated the saved input reserves, so native replay began with depleted provisions before the repair command. Regeneration changes only two recorded action inputs back to the authored 0.001 and 0.002; all 2,013 expected snapshots across 29 cases remain identical. Construction and logistics rules are unchanged. The frozen native failure is retained; this successor has not run natively.
+
+- Retain the construction test caller's effect batch across ticks, commands and authored priming, matching the unchanged Source capture lifetime. Append only actual ordered TickReport events and reset only for a new case. All 29 cases are append-only: seven emissions across three boundaries produce 24 retained row occurrences. Producers, failure payloads, Source recorder and fixtures are unchanged; the frozen empty-batch failure is preserved and this successor has not run natively.
+
+- Corrected construction effect readback for private Source undefined sentinels: omit only null Hurt owner/local fields and null owner on section-collapse rows when comparing public event JSON. The complete 29-case audit covers 24 retained row occurrences; required fields, explicit false, numeric zero, event order and all other assertions stay exact. Source recorder, fixtures, wire producers and partial-failure ownership are unchanged. The frozen native failure remains recorded; this successor has not run natively.
+
+- Compare only the two optional Source stance switches by their effective boolean value in the full construction replay. Source unset Hold Fire and Hold Position produce the same off flags as native false; the reader rejects missing fields and values outside boolean/null. Recorder, fixture, other exact assertions and gameplay are unchanged. The frozen native failure remains recorded; this successor has not run natively.
+
+- Rebuilt command-control rows for the replacement actors in the original combat/death scene, using the same constructor as canonical startup. The combined workspace stopped with three combat tests passing and one missing-control refusal; the construction retirement guard and expected Source outputs remain unchanged. This test setup repair has not run natively.
+
+- Established the missing-Firing-row setup in the GroundAttack admission regression by explicitly removing actor 4's retained startup row before dispatch. The pure Ground/construction `ac2919c` workspace attempt passed 95 core tests and failed this first assertion; its six-order queued Cover test passed. Runtime guards, original fixtures and subsequent control/capacity refusal assertions are unchanged. Fresh native verification remains pending.
+
+- Prepare a pure Ground and construction candidate from source-cleared `bf293cc`, normally joined with final main `d1f2fb5`. Apply only the four reviewed Core lint edits from `64dd57d`: preserve short-circuit order in the Attack, Retreat and forced-row let-chains, and use the existing control map membership query. Retain the earlier combined `d9941e3` strict failure, which reported four diagnostics before any tests ran. Exact-head native and three-platform checks remain pending.
+
+- Fixed queued Cover after accepted waiting Attack, Assist and shared-project Join orders in the combined construction/GroundAttack caller. Cover now inherits the stored waiting anchor with the existing finite-coordinate check, rather than failing the boundary or querying a changed target. A real recorded-batch regression is written; native execution remains pending.
+
+- Normally joined the source-reviewed construction and GroundAttack continuation with the final ordered-event frontier and consolidated original providers. Retained canonical paid-work cancellation, command observers, original source fixtures, approved ABI 2 and the optimized test profile. Resolved shared command, World transaction and typed timeline conflicts without adding mode capabilities, and removed a duplicate route endpoint assignment introduced by automatic merge. This new combined source requires owner review and its own native proof; earlier parent results remain separate.
+
+- Addressed the first combined construction/GroundAttack compiler failures before any tests ran: restored the paired ability-test control binding, retained routing query lifetimes, and committed the new observation receipt only into the temporary construction draft before search. Applied the exact checked PR #193 canonical support snapshot/factory migration to Game.strikes and SupportTiming, retaining original fixture bytes and explicit raw/AIR refusals. The failed strict log contains 11 compiler errors; formatting had passed, and fresh compilation plus all native tests remain pending.
+
+- Normally retained verified main `8f27227` in the separate construction/GroundAttack candidate, including the accepted recipient-known terrain traffic adapter. Existing dispatch, path callbacks, ordered output and source fixtures remain intact. Corrected the sole caller receipt to report connected TrafficKnowledge once instead of listing it as unavailable; the existing actual-runner regression protects that truthful receipt. Combined native verification remains pending and no frozen proof branch changed.
+
+- Prepared the source-reviewed construction/ground caller for a coherent native cycle by normally retaining the ordered-event publication parent, current main and the central 40-minute CI budget. Core and simulation consumer bytes remain exactly `c501e12`; the approved ABI 2 header and server provider bytes come from those accepted parents. New combined native and platform results remain pending, and earlier ABI 1 branch FFI evidence is not an ABI 2 consumer result.
+
+- Adapted the three remaining construction, aircraft and carrier replay timeline readers to the shared MatchSample enum after independent source review found their obsolete struct-field accesses in the normal union. Each preserves the original Conquest `{t, vp}` projection and explicitly refuses Territories. Runtime, inputs, original fixtures and every state comparison are unchanged; this combined head still awaits native compilation.
+
+- Migrated the inherited quiet engineering snapshot consumer to require an empty owned TickEvent result, preserving its original source fixture and state comparisons. Ground full-step checks now require exactly one typed GroundAttack receipt instead of matching a planned Debug name. These integration consumers have not run on this combined source head.
+
+- Normally joined the source-reviewed ground Attack/Retreat provider with the separate construction and ordered-event caller. Both parents retain their single command queue, path scheduler, paired work cancellation, immutable placement drafts and prepared observation receipts. GroundAttack now validates before input and after publication, executes after attack-move before reactions, and reports one typed receipt. The original ground capture covers 28 cases, 48 commands, 30 full steps and 110 snapshots; combined construction/ground native compilation and tests remain pending. Automatic garrison retreat, logistics and unrepresented modes remain refused.
+
+- Corrected two stale construction assembly statements found by independent source review: the real phase hooks and consumer event migration are attached. The source recorder independently reproduces 29 cases, 113 actions, 1,919 steps and 2,013 snapshots; combined native verification remains pending.
+
+- Normally incorporated the reviewed ordered-event test-helper lint repair into the separate construction assembly. The predecessor passes 105 debug and 270 release tests with final lint/format/FFI checks, while this construction caller still awaits its own combined proof. Runtime and source fixtures are unchanged by this annotation merge.
+
+- Migrated the construction replay to the caller's chronological event result. Its declared quiet scenes compare direct environment effects in order and reject unexpected producer families instead of filtering them away. Original source fixture and all existing state comparisons are unchanged; the combined construction runner has not compiled or run natively.
+
+- Connected canonical construction to the single ordinary tick: paired admission before input and after publication, worker capture after autocast, and ordered completion/repair before late unit capture. The actual construction receipt is now reported once; accepted builder retreat uses the provider's paired cleanup instead of the old blanket refusal. The 29-case source fixture and construction consumer remain unchanged pending owned event migration and combined native proof.
+
+- Normally joined the source-reviewed construction provider and ordered-event caller in a separate assembly. Both canonical producer sinks and paired builder cleanup remain intact; construction scheduling, consumer event migration and combined native proof are pending. Frozen ordered-event and AIR candidates are unchanged.
+- Retained the newly published AIR frontier by normal merge so the event closure has one accepted parent instead of a misleading crisscross comparison. Runtime, event source fixtures and the approved ABI 2 header are unchanged; exact combined platform checks remain pending.
+
+- Verified ordered tick outputs on the Mac (arm64): 105 focused debug tests and all 270 release workspace tests pass at `625705e`; final strict Clippy, formatting and release FFI pass at the annotation-only `ad90eac`. Independent hashed copies pass 105 tests in each profile. Three original complete traces reproduce 375 steps and 103 chronological shots, including real launch/route-failure and section/later-origin failure witnesses. The publication closure normally retains current main, approved ABI 2 and the central 40-minute CI budget; its fresh combined platform and host checks remain separate from the earlier ABI 1 branch library proof.
+
+- Normally incorporated the current main server-helper frontier into the ordered-event closure. Core event code and fixtures remain unchanged; complete combined platform verification is pending, and component evidence does not establish an attached room loop.
+
+- Normally joined the published AIR parent and approved ABI 2 ancestry into a separate ordered-event closure. Core event bodies and original fixtures remain the verified event predecessor; the combined publication head awaits fresh platform checks. The earlier event static-library result remains ABI 1 branch evidence, not ABI 2 consumer proof.
+
+
+- Marked the shared aircraft component snapshot wrapper as intentionally unused by the detached-event runner test, fixing its strict-lint failure after all 105 focused debug tests and 270 release workspace tests passed at `625705e`. The annotation changes no helper body, runtime, input or fixture. Final lint, formatting and release FFI checks remain pending; the original failure is preserved.
+
+- Resumed the ordered tick output checkpoint with direct producer emission sinks, per-command dispatch observers and one caller-owned failure payload. Committed section, blast, burn and retirement effects remain available when a later operation fails; removal facts and completed wreck/bounty/lifecycle prefixes are reported separately. The new unchanged-source replay covers 3 complete traces, 375 steps and 103 chronological shots across firing, ground support, aircraft AA and late fire damage. Native compilation, failure regressions and host integration are pending; frozen AIR evidence and original fixtures are preserved.
+
+- Checkpointed unverified ordered tick output work at the user's pause. A transient TickEvent sequence and TickFailure payload are written, with AIR, ground-support and operative consumer migrations; no compile, native test or complete mixed-event Source replay has run for this branch. The late-failure ownership regression, per-command observer hooks, host bridge and complete emission-order audit are unfinished. Existing AIR proof and original fixtures remain preserved; this checkpoint is not integration-ready.
+
+- Added the aircraft and anti-air registries to construction newborn-ID admission after independent merge review found that an orphan AIR row could survive a paid static birth. Extended the existing placement rollback test to preserve all represented state for either orphan registry. Native execution remains pending.
+
+- Prepared a separate construction proof branch by normally joining the checked AIR caller. Build/Assist and Board/Unload/aircraft command variants remain on the single queue and path scheduler; the original construction fixture is unchanged. Construction phase wiring and combined native checks remain pending.
+
+- Corrected construction source-review findings: invalid Assist targets and unlisted Build kinds retain prior follow state, and Pillbox object slit definitions retain the raw finite direction instead of normalizing it. Added the finite-angle boundary check; native proof remains pending.
+
+- Added the source-only paid ordinary-construction provider: one canonical builder site identity, typed Build/Assist and normalized waiting orders, exact worker capture and ordered completion/repair. Rare accepted placements stage World, grid and observation/path caches before routes, share the immutable authored snapshot, and publish in place after all guards. Empty fire lists preserve lazy fog warming. Immediate Build/Assist clears prior retry failure rows only after a committed route; queued and rejected operations retain them. Repair now preflights every logged terrain layer and aggregate capacity before progress, story or health writes; existing raw fixture loaders retain numeric build identities. Original source recording covers 29 cases, 113 actions, 1,919 full steps and 2,013 snapshots. Real runner integration, independent final review and native checks remain pending; depot/coastal/cache/cancel lifecycle and Classic/World caller admission remain future work.
+- Applied the published 40-minute CI job limit from PR #192 to AIR PR #188. Its prior run `38442565009` passed formatting and strict Clippy on all platforms before all three jobs exceeded 20 minutes during workspace tests; no assertion failure appears in the preserved logs. Remaining tests and release builds still require fresh completion. Runtime, gates and approved ABI 2 remain unchanged.
+
+- Refreshed AIR PR #188 onto the landed server-provider main `a173dc7`, retaining unchanged AIR/core/tick code and canonical server provider bytes. Both additive documentation histories are preserved; fresh combined checks are required.
+
+- Refreshed the published AIR and ordinary-tick frontier in PR #188 onto main `13a8d1f`, preserving checked aircraft, support, carrier and Default caller code. Retained both additive changelog histories and the approved ABI 2 header. No future ordered-event or construction code was imported; fresh platform checks cover the combined head.
+
+
+- Verified the ordinary AIR/support caller on Mac arm64 at db3da8d: 56 final focused simulation debug tests, all 267 release workspace tests, strict Clippy, formatting and release FFI pass. The unchanged core's 57 debug passes remain attributed to 2d3b860. Independent hashed copies pass 38 debug and 38 release tests. Recorded both actual test dependency repairs and preserved their failing logs; the full-source AIR replay covers 10 traces and 4,972 steps. Logistics, unsupported aircraft weapons, later construction/event output, hosted platform checks and full room startup remain separate.
+
+- Restored the verified coherent support recorder and fixture together after the AIR union retained an older ground-only fixture schema. The actual AIR runner's three debug tests now pass, but all eight support tests failed in setup because their restored factory requires the coherent `units` array. This repair copies the checked provider's original files exactly; runtime, guards, RNG and the separate ground full-step fixture are unchanged. The failed log and 35 preceding debug passes are retained; final combined proof remains pending.
+
+- Clarified that the new prepared garrison exit provider serves manual Retreat only. Automatic retreat still uses its existing explicit garrison refusal; caller integration must not infer that capability or add manual follow clearing.
+
+- Updated the movement parity note to the final source-only ground-order inventory: 28 cases, 48 commands, 30 full steps and 110 snapshots. GroundAttack caller and native proof remain pending.
+
+- Corrected ordinary Retreat to select its nearest HQ after the prepared physical garrison exit, matching the source exit-before-home order. Reused the existing home selector and expanded the original source capture with the two-HQ witness. The same native replay now includes garrison exits and preserves the canonical timeline enum; native verification and the sole GroundAttack hook remain pending.
+
+- Added genuine prepared garrison exits to ordinary ground Retreat. Existing actor sight replaces the original row once, group exits retain the first cached terrain/fog frame, and later routes see updated live actor poses. Publication keeps one validated source receipt and the existing retreat authority. A real warmed-cache group capture extends the unchanged earlier 26 cases to 27 cases, 47 commands, 29 full steps and 107 states; native verification and tick hookup remain pending.
+
+- Resumed the paused ground-order lane. Independent source readback found that its convoy refusal guard treated optional canonical convoy state as a direct value; the guard now reads the existing Option without changing uncapped owned selection or refusal order. Added a focused guard for an owned convoy row beyond the ordinary troop cap, protecting follow, route requests and fog on refusal. Native verification remains pending.
+
+- Paused ground-order implementation at the user's request and saved its native consumer draft. Source review repairs refuse missing selected control rows and active convoy Retreat before mutation, and stage direct Attack projection after target validation. The draft describes 23 command-prefix cases and 20 quiet full-step cases in both arrival orders; no Cargo or native execution ran. GroundAttack tick wiring, final repair review and the garrison Retreat observation overlay remain pending.
+
+- Added a source-written ordinary ground Attack/Retreat provider to the single recorded queue. Attack keeps live target intent, eight waiting orders and admission anchors; accepted replacements cancel paid/shared work without refunds. Retreat reuses the canonical reset and clears live route retry failures. The unchanged JavaScript capture covers 26 cases, 44 commands, 28 full steps and 102 snapshots. Native replay and the sole tick hookup are pending; garrison retreat, mixed AIR groups and construction remain explicit limits.
+
+- Normally joined the verified engineering baseline and source-reviewed AIR/carrier caller in a separate ground Attack/Retreat provider tree. Destroy, carrier and mass-project commands retain the single queue. The broader source union requires fresh native proof; frozen parents are unchanged.
+
+- Correct the scuttling atomicity regression to use the recorded startup scene with two live owned units. The first engineering native check passed the orphan-membership guard, then found that the original selected scene contained only one owned unit before the actuator ran. Runtime and Source fixtures are unchanged; fresh combined gates remain pending.
+
+- Converge the engineering replay with the three reviewed timeline test adapters. Preserve both parents' runtime, recorded Source fixtures and strict comparisons; fresh verification of this combined head is pending.
+
+- Adapted the two remaining obsolete timeline test serializers after full release compilation found the mass-project helper still reading struct fields. A repository-wide audit also found the same access in the companion-tick helper. Both now serialize actual Conquest samples and explicitly refuse Territories. Runtime, fixtures and strict assertions are unchanged. The changed ground-support debug consumer passed at `0420c51`; no release tests ran there. Original checks reproduce seven mass-project cases (193 steps, 215 snapshots) and fifteen companion traces (506 steps). Fresh combined gates remain pending.
+
+- Adapted the inherited ground-support test helper to the canonical timeline enum. Actual Conquest samples retain the original `{t, vp}` shape; Territories samples explicitly refuse in this Default/Conquest recorder. Runtime and Source fixtures are unchanged. The fresh `8f32198` check passed all 34 focused debug tests, then full release compilation found the obsolete struct-field accesses before any release tests ran. The unchanged original recorder reproduces 13 traces, 2,705 ticks and 153 checkpoints. Fresh release and strict gates remain pending.
+
+- Add the complete original engineering snapshot replay to the selected-delivery/scuttle union: five cases, 481 actual ticks and 513 states. Runtime and frozen Source consumer bodies are retained; the coherent native cycle is pending.
+
+- Converge real selected-recipient delivery with engineering projections and recorded scuttling. Preserve the exact shared compile fixes and original Source works-field fixture extension; this combined native proof is pending.
+
+- Normally merged the source-reviewed Destroy actuator and closed both engineering replay tails. The consumer now retains all five unchanged source cases, 513 snapshots and 481 full steps, including dead-worker omission and actual retirement. Combined native verification remains pending.
+
+- Require the engineering replay runner to return no outside environment effects before passing an empty effect batch to the snapshot collector. This protects the focused quiet scene boundary; native execution is pending.
+
+- Normally merged the independently source-reviewed engineering snapshot collector into the separate replay consumer. Existing recorder and consumer bodies are unchanged; the combined native gate and scoped Destroy continuation remain pending.
+
+- Corrected the engineering replay draft to retain the original snapshotFor fog reads. Its focused payload comparison still covers engineering rows; no native proof is claimed.
+
+- Added a source-written engineering snapshot consumer using canonical staged actors, actual command admission, the single tick runner and recipient collectors. It covers 509 recorded states and 479 full ticks, preserves actual Default options and leaves the two unrepresented Destroy witnesses source-only. Native verification awaits the collector dependency and CI lease.
+
+- Added an original-source engineering snapshot recorder with five cases, 481 full ticks and 1,539 recipient results. It records mixed project segment kinds, allied paid work, queued join anchors after project deletion, unrounded work coordinates, progress tails and dead-worker omission after an actual destroy command. Native replay remains pending.
+- Add recorded Source scuttling through the canonical command path. Owned live non-riding selections get zero HP and an own-owner last hit, while work, controls and wallets stay unchanged until the next retirement phase. Preflight the complete selection before writes; add an atomic missing-metadata regression.
+
+- Extended the original snapshot recorder's partial-field boundary to include the newly represented canonical `works` field. Fresh `244931d` native checks compiled and passed all four selected-delivery tests, then two older exact-key tests rejected that added field. Regenerated 219 partial results from unchanged pinned Source; every prior fixture byte remains identical after removing only the new recorded fields. Runtime and strict equality assertions are unchanged; fresh combined native proof remains pending.
+
+- Fixed two inherited compile errors found by the fresh selected-delivery Vostro check at `4071c71`, before any tests ran. Snapshot admission now uses the canonical listed-project getter without exposing private state; the recovery fixture keeps one `actor_order: None`. Removed an unused snapshot test import. Source reanchor and a fresh combined native cycle remain pending.
+
+- Normally merged the canonical engineering and common actor-admission prerequisite into selected delivery. Shared actor checks no longer project skipped private wallets; selected preflight owns those recipient-local checks. Preserved both parents' source fixtures and admission regressions. Combined source review and native proof remain pending.
+
+- Added a selected-delivery regression for a skipped malformed private wallet. Global cache admission accepts the represented actor frame; only a selected recipient's private projection may reject it. The existing all-seat API still validates every private recipient. The shared actor helper now preserves that boundary; combined native proof remains pending.
+
+- Added ordered selected-seat snapshot delivery. Empty selection bypasses caches and collectors; invalid or duplicate seats refuse before publication. Only selected seats collect terrain, fog and remembered lists, while skipped seats retain pending cells, outboxes, fog acknowledgments and wreck memory. The original room callback and full/omitted-mask collectors reproduce 11 actions with 16 recipient results. Native verification remains pending.
+
+- Verified the normally merged quiet and active recipient snapshot consumers on Vostro Linux x86_64 at compiled `1ab2314`: 29 focused debug tests, all 215 locked/offline release workspace tests, strict Clippy, formatting and release FFI pass. Both the deferred receipt-action regression and quiet/active whole-admission guards pass. This evidence update preserves all tested Rust and harness files; transport and unsupported actor/mode projections remain separate.
+
+- Keep common snapshot actor admission independent of unselected private wallets. Delivery preflight still validates every selected recipient before writes. Add an orphan project-membership regression proving no terrain, fog, list or receipt owner changes on refusal.
+
+- Add real paid and shared engineering work to ordinary recipient snapshots: allied unrounded work rows, activity flags, digging progress, current plans and queued project anchors. Validate all canonical project/member/job bindings before delivery. Preserve quiet-frame refusal of active work; original Source replay and combined native verification are pending.
+- Admit the actual typed Default alias in ordinary snapshots without rewriting mode state. Genuine mode objects remain refused. The invalid bare Dig flag test now checks canonical activity refusal.
+
+- Combine the actual Default tick and typed snapshot prerequisites for active engineering recipient views. Preserve the single startup initialization, staged observer receipt and canonical unit/job owners; the combined native proof is pending.
 
 - Prepared a separate normal union of frozen ordered-event PR #194 and the consolidated original-source frontier `dfcc0bf`. Preserved the one TickEvent/TickFailure result, producer emission sinks, original World component bodies, approved ABI 2 and the optimized test profile with debug assertions and overflow checks. Migrated the inherited quiet engineering consumer to require empty owned events, and report accepted recipient traffic once rather than unavailable. Published parents remain unchanged; exact union source review and the full optimized native cycle are pending.
 
@@ -1011,6 +1152,18 @@
 - Added shared mode-aware UnitControl initialization using compiled ability costs, and selected it from the staged factory's actual Game mode. The original spawn oracle preserves all 55 earlier scenarios and adds six Classic/World spawns for absent, paid and free abilities. The merged native checks verify all 775 spawn rows; World startup uses this shared initializer.
 
 - Preserved canonical recruited combat defaults through the shared publication callback when integrating the reviewed combat ancestry. Fresh combat identities reject before payment; production stepping remains under implementation.
+- Preserved recruited combat metadata in the shared publication callback and rejected occupied combat IDs before charging during integration.
+- Included the approved central CI fix `76cbe6d` in the PR #147 refresh, raising the full Rust job limit from 20 to 40 minutes. Preserved additive server, traffic and CI documentation; traffic and ABI 2 source remain unchanged.
+
+- Refreshed PR #147 again after server PR #137 merged into main `a173dc7`. Preserved both additive changelog histories and all traffic code; no Rust conflict occurred. Fresh combined-head platform checks replace the earlier green run.
+
+- Refreshed PR #147 recipient ground traffic onto ABI 2 main `13a8d1f` by a normal merge. Preserved both module exports and design/changelog histories, the published traffic behavior and the exact approved header. Only documentation and module exports conflicted; combined-head platform checks remain pending.
+
+- Verified recipient terrain traffic steering on the Vostro Linux x86_64 lane: 13 focused debug tests, 143 release workspace tests, strict Clippy, formatting and release FFI pass at runtime head 8e812fe. Recorded exact archive/log hashes in DESIGN; World and full match acceptance remain separate.
+
+- Corrected the inherited command fixture’s reserve initializer to include absent supply-rate and cutoff state. The fresh Vostro traffic compile exposed the missing fields before tests; runtime traffic and source captures are unchanged.
+
+- Added borrowed recipient terrain to Match ground traffic steering and waypoint skipping while retaining physical speed and collision checks. The original-source recorder supplies 12 traces, 63 steps and 65 movement calls, including queues, passes, remembered edits and hidden physical contacts. Unit remains the sole owner of traffic and path-cache state; invalid knowledge errors propagate without losing the moving unit. World traffic, terrain effects and full match integration remain separate.
 
 - Allow 40 minutes for the full three-platform Rust CI job. The combined snapshot frontier reached World-memory tests with no assertion failures before its previous 20-minute limit cancelled all three jobs. Formatting, strict Clippy, the complete debug suite, release FFI build and Linux C replay remain required.
 
@@ -1949,8 +2102,8 @@
 - Corrected the base World geography design date to the local development date, October 12.
 
 
-
 - Added pure seeded base World geography for Huge and Massive maps: relief, rivers and tributaries, lakes and crossings, regions, roads, woods, town blocks, homes, names and weighted territories. Ten bare-geography maps match pinned JavaScript fingerprints and metadata; 80 source stress settings reproduce twice and meet wide-route connectivity, channel and home-space checks. Generation consumes one recorded Terrain-stream seed and uses core math. Biomes, landmark dressing, rails, World match setup and client delivery remain unfinished.
+
 
 
 

@@ -136,7 +136,7 @@ pub struct PathResult {
     pub expansions: usize,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Pathfinding {
     navigation: Navigation,
     scratch: Scratch,
@@ -179,7 +179,7 @@ impl Pathfinding {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 struct Scratch {
     scores: Vec<f32>,
     came: Vec<usize>,
@@ -755,7 +755,7 @@ fn cliff_clear(v: TerrainView<'_>, a: Point, b: Point) -> bool {
     x == ex && y == ey
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 struct Heap(Vec<(f64, usize)>);
 impl Heap {
     fn push(&mut self, score: f64, cell: usize) {
