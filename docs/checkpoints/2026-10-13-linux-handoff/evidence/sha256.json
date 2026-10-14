@@ -1,0 +1,58 @@
+{
+  "local-ci-handoff.json": {
+    "bytes": 17335,
+    "sha256": "716fd88845fcde5ccdf91864c775ef6a365fe76fe1e9e64c8edc440c770e93f1"
+  },
+  "input-tables-terrain-source.json": {
+    "bytes": 6255,
+    "sha256": "661f67a72fe8187a6f32f324173c8807f3442bdc16f5f7e2d0a87fc15db2d335"
+  },
+  "world-ground-handoff.json": {
+    "bytes": 2022,
+    "sha256": "04d46bca7c5991c3c53424f766e001f917b7af0d3b6c7d6648ffc4506cac24d1"
+  },
+  "table-lf-checkout.json": {
+    "bytes": 4313,
+    "sha256": "45c5f3319f65ab6cdd0f3573adc338c49a5f91bfd981f539a3dc461f34e40314"
+  },
+  "ground-b6-stopped.txt.gz": {
+    "bytes": 14498,
+    "sha256": "bf3db28f7c43cf086948e4d37528de10599c4b42c9785d687d0dc22d8b53d5d4",
+    "uncompressed": {
+      "bytes": 131799,
+      "sha256": "3da27c72efad7bd895feb6ada494059d404b2ac7525ad11b6ced0af57bdeaebf"
+    }
+  },
+  "legacy-158-research.txt.gz": {
+    "bytes": 1122,
+    "sha256": "5056a0480345c10ac6de247baa2e6bd99c063d51fa0345ccc317baaed8d36e0a",
+    "uncompressed": {
+      "bytes": 2567,
+      "sha256": "fdb5d2658f698ec828423556db22477df1e1409ea991281d827a10d38a7e46a1"
+    }
+  },
+  "legacy-443-compile.txt.gz": {
+    "bytes": 544,
+    "sha256": "247bf2f81fdc5629f6457a096171b8a43697d9d0df46317884e1df655ca349bb",
+    "uncompressed": {
+      "bytes": 1015,
+      "sha256": "6fcfd3c0c863a0a858bbc2bc91bc51ebcb5478e4b28fa8f9d6bb8d735366fcbf"
+    }
+  },
+  "windows-ingress-failure.txt.gz": {
+    "bytes": 14673,
+    "sha256": "ab6920297870de4215ca3bf7489f4ad2c5077abb15b1ffaeff93579b0c99d6c8",
+    "uncompressed": {
+      "bytes": 84346,
+      "sha256": "177134dd1cb8e16f1ffe6fa02f8557eccda3d2568eb362a370bbb46e3dbbe8e5"
+    }
+  },
+  "windows-tables-failure.txt.gz": {
+    "bytes": 11197,
+    "sha256": "3d38395ff7cba4973d3dbfc1b9d5a5ccf76360975d74b01a7848caef5db65d57",
+    "uncompressed": {
+      "bytes": 64591,
+      "sha256": "d215ebc06b6d60509e11ebcc589960e80ad81d23e8e0aa4fe18abe7b10592c19"
+    }
+  }
+}

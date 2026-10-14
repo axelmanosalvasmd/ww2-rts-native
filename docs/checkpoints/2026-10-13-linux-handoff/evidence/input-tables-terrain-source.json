@@ -1,0 +1,185 @@
+{
+  "head": "0ee71badc23df7c74c34de968540c631c0cbb0ef",
+  "parents": [
+    "1f0336692301a5c5108aaeeec904e377d0c938f4",
+    "88d4005fe21f165076dc62d13d2c15153dd23224"
+  ],
+  "first_merge_head": "1f0336692301a5c5108aaeeec904e377d0c938f4",
+  "constituents": {
+    "main": "92fb7fe66eb7f788c83449ae67223984b969f177",
+    "ingress": "22eae725da1d029b4c99c25154bcdef679c3007c",
+    "table": "1748508fb342963e60d4979d111de21bfe7ebf83",
+    "terrain": "88d4005fe21f165076dc62d13d2c15153dd23224"
+  },
+  "checks": [
+    {
+      "reference": "22eae725da1d029b4c99c25154bcdef679c3007c",
+      "path": "rust/crates/server",
+      "blob_or_tree": "eaee2fa6a8deb71930496532a1aff3df93c1c8b3",
+      "identical": true
+    },
+    {
+      "reference": "22eae725da1d029b4c99c25154bcdef679c3007c",
+      "path": "rust/crates/core/src/match_commands.rs",
+      "blob_or_tree": "b05103f7f9277e1e475755c39ce58488ca2dd46c",
+      "identical": true
+    },
+    {
+      "reference": "1748508fb342963e60d4979d111de21bfe7ebf83",
+      "path": ".gitattributes",
+      "blob_or_tree": "d86fe423947fa8c58f83a9344e4c7e34b1e8b970",
+      "identical": true
+    },
+    {
+      "reference": "1748508fb342963e60d4979d111de21bfe7ebf83",
+      "path": "rust/crates/core/src/catalog.rs",
+      "blob_or_tree": "35c4d186c61665cec6b6153d6a51654f676f4714",
+      "identical": true
+    },
+    {
+      "reference": "1748508fb342963e60d4979d111de21bfe7ebf83",
+      "path": "rust/crates/core/src/lib.rs",
+      "blob_or_tree": "7a310ba52a3e079ec473107a972796643290b57b",
+      "identical": true
+    },
+    {
+      "reference": "1748508fb342963e60d4979d111de21bfe7ebf83",
+      "path": "rust/crates/core/src/startup_tables.rs",
+      "blob_or_tree": "993c345309843483bd3390243abbaab5726529ea",
+      "identical": true
+    },
+    {
+      "reference": "1748508fb342963e60d4979d111de21bfe7ebf83",
+      "path": "rust/crates/core/data/startup-table-additions.json",
+      "blob_or_tree": "f0fbc4369f2d59bfd4a9102b798d48d6190a469d",
+      "identical": true
+    },
+    {
+      "reference": "1748508fb342963e60d4979d111de21bfe7ebf83",
+      "path": "rust/crates/core/tests/startup_tables.rs",
+      "blob_or_tree": "a445c8f7bb200ec4f394720ad73362fec61e84b8",
+      "identical": true
+    },
+    {
+      "reference": "1748508fb342963e60d4979d111de21bfe7ebf83",
+      "path": "rust/crates/core/tests/fixtures/startup-table-values.json",
+      "blob_or_tree": "ec0a8ea7e8727fdcbe98609d6dd89abb8d4892c1",
+      "identical": true
+    },
+    {
+      "reference": "1748508fb342963e60d4979d111de21bfe7ebf83",
+      "path": "rust/crates/core/tests/fixtures/startup-tables.json",
+      "blob_or_tree": "fbb161a5a911a89f348b5340dcb125936278a751",
+      "identical": true
+    },
+    {
+      "reference": "1748508fb342963e60d4979d111de21bfe7ebf83",
+      "path": "harness/rules-fixture.mjs",
+      "blob_or_tree": "db0852088a0a165eecf016078771451f5c8b6e8b",
+      "identical": true
+    },
+    {
+      "reference": "88d4005fe21f165076dc62d13d2c15153dd23224",
+      "path": "rust/crates/simtest",
+      "blob_or_tree": "a95cb0823780859b8d366d5eb18bd5a0c86eb573",
+      "identical": true
+    },
+    {
+      "reference": "88d4005fe21f165076dc62d13d2c15153dd23224",
+      "path": "harness/terrain-height-fixture.mjs",
+      "blob_or_tree": "b7f69df9fc06b897cc10dfe1a11e0c21dfeb2112",
+      "identical": true
+    },
+    {
+      "reference": "88d4005fe21f165076dc62d13d2c15153dd23224",
+      "path": "harness/terrain-world-scout-fixture.mjs",
+      "blob_or_tree": "46cfffd473c4425a31afee394376206841efb171",
+      "identical": true
+    },
+    {
+      "reference": "88d4005fe21f165076dc62d13d2c15153dd23224",
+      "path": "docs/fixtures/terrain",
+      "blob_or_tree": "b6188abc7475e7db3bada32335bc60907c8a1ff1",
+      "identical": true
+    },
+    {
+      "reference": "88d4005fe21f165076dc62d13d2c15153dd23224",
+      "path": "docs/contracts/terrain.md",
+      "blob_or_tree": "c56338a17f635b048f9ab6d56bedbd9dfd324e8b",
+      "identical": true
+    },
+    {
+      "reference": "92fb7fe66eb7f788c83449ae67223984b969f177",
+      "path": "rust/crates/ffi",
+      "blob_or_tree": "bd7063d2c70c491140b43bba8a850a2bd6e45909",
+      "identical": true
+    },
+    {
+      "reference": "92fb7fe66eb7f788c83449ae67223984b969f177",
+      "path": "rust/Cargo.lock",
+      "blob_or_tree": "45c304c89618e85d3ff5a2698d086784fa516ea1",
+      "identical": true
+    },
+    {
+      "reference": "92fb7fe66eb7f788c83449ae67223984b969f177",
+      "path": "rust/Cargo.toml",
+      "blob_or_tree": "eb74dd1f66f4da0ec5f3f7c7477a22ffb5fdcaf3",
+      "identical": true
+    },
+    {
+      "reference": "92fb7fe66eb7f788c83449ae67223984b969f177",
+      "path": "rust/rust-toolchain.toml",
+      "blob_or_tree": "87f098eb69c0e5a61f25d0a5f7c5741b11f5c686",
+      "identical": true
+    },
+    {
+      "reference": "92fb7fe66eb7f788c83449ae67223984b969f177",
+      "path": "reference",
+      "blob_or_tree": "b50cd61adf5f30ac0ca67cf2d58162e80ca5774c",
+      "identical": true
+    },
+    {
+      "reference": "92fb7fe66eb7f788c83449ae67223984b969f177",
+      "path": ".github",
+      "blob_or_tree": "74a9e22b3a3142067f24de6579e48674ba083839",
+      "identical": true
+    },
+    {
+      "reference": "92fb7fe66eb7f788c83449ae67223984b969f177",
+      "path": "docs/contracts/startup-tables",
+      "blob_or_tree": "afee4c7c4600b35395bf38ef3941926ef1377acf",
+      "identical": true
+    }
+  ],
+  "core_difference_from_table": [
+    "rust/crates/core/src/match_commands.rs"
+  ],
+  "approved_header_sha256": "bf203f16eca88562cfc6e53efccc48bf260d3a44750d7300f00694723ec69499",
+  "expected_inventory": {
+    "main": 401,
+    "tables": 3,
+    "ingress": 4,
+    "terrain": 2,
+    "combined": 410,
+    "executed_combined": false
+  },
+  "native_provenance": {
+    "ingress": {
+      "head": "17179f2a82f2e186dca84afaec4af21a8ecbb641",
+      "tests": 405,
+      "changed_socket_test_needs_new_run": true
+    },
+    "tables": {
+      "head": "b68289136e0572fdc0fcbc705514a509083c167b",
+      "tests": 368,
+      "LF_successor_needs_platform_proof": true
+    },
+    "terrain": {
+      "head": "a81b4f2b03bfbbe0a19094bfd6e3efa00bf80f1b",
+      "tests": 367
+    }
+  },
+  "source_status": "clean",
+  "combined_native_platform": "pending",
+  "author_cargo_or_publication": false
+}

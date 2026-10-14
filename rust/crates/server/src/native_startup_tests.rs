@@ -591,3 +591,6 @@ async fn actual_socket_start_decode_mutations_resync_reconnect_and_new_match() {
     let _ = stop.send(());
     server.await.unwrap().unwrap();
 }
+
+#[path = "native_ingress_socket_tests.rs"]
+mod ingress;

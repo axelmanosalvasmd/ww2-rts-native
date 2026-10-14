@@ -23,7 +23,7 @@ The simulation's axes (east, south, up) form a left-handed set, as Unreal's X, Y
 
 Two height queries exist, and gameplay uses only these (MAP-56):
 
-- `levelAt(x, z)`: the cell's level times 2.5 m, a step function. Sight, high ground and vision use it.
+- `levelAt(x, z)`: the cell's integer level, a step function. Its height in metres is that level times 2.5. Sight, high ground and vision use it.
 - `heightAt(x, z)`: bilinear interpolation between cell centres. Slopes and the companion's footing use it.
 
 The core exposes both on the client view, so overlays, picking checks and the companion agree with the server.
@@ -59,7 +59,7 @@ v0 keeps the map file format at the pin (MAP-04 to MAP-19): the row format, the 
 
 ## Fixtures
 
-Pending, produced by the core once it loads maps: cell-centre heights for all 33 maps; `heightAt` and `levelAt` at 1,000 points per map; the cell rows of a recorded World Conquest scouting run.
+The [maintained fixture lane](../fixtures/terrain/README.md) now contains original-source captures for all 33 maps (661,799 cell centres and 33,000 query points) and a recorded World scouting history (17 receipts, 273,678 complete cell rows). Native equality and release export passed on macOS arm64 at `a81b4f2`, with an independent copied-binary and artifact audit. [The verification manifest](../fixtures/terrain/native-verification.json) records producing identity, counts, output hashes and refusal checks. Artifact publication and Unreal consumption remain separate. The fixtures distinguish raw integer `levelAt`, its derived height in metres and interpolated `heightAt`; they do not establish rendered-mesh parity or whole World tick support.
 
 ## Answered on #5 (2026-10-12)
 

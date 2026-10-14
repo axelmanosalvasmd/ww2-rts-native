@@ -1,3 +1,4 @@
+use crate::commander_ingress::CommanderIngress;
 use crate::room_runtime::{FrameKind, RoomRuntime};
 use crate::snapshot_backpressure::{CompletionContext, SeatBackpressure, WriteTicket};
 use crate::snapshot_lists::{ListScope, SnapshotDelivery};
@@ -138,6 +139,7 @@ impl Person {
 
 struct AttachedRuntime {
     epoch: u64,
+    ingress: CommanderIngress,
     runtime: RoomRuntime,
     startup: crate::native_startup::NativeStartup,
 }
@@ -414,7 +416,31 @@ impl Room {
             }
             return false;
         }
-        // Public gameplay and setup admission remain unavailable in this trusted-host slice.
+        if CommanderIngress::recognizes(t)
+            && let Some(native) = &mut self.native
+        {
+            // The current connection was resolved from the stable roster above.
+            // Paused rooms ignore ordinary orders just like the Source callback.
+            if native.runtime.paused() || !me.connection.as_ref().is_some_and(Connection::ready) {
+                return false;
+            }
+            let Some(slot) = seated else {
+                return false;
+            };
+            let denial = if me.ai || native.runtime.fault().is_some() {
+                Some(ww2_core::match_commands::Denial::Blocked)
+            } else {
+                native
+                    .ingress
+                    .enqueue(native.runtime.state_mut(), slot, msg)
+                    .err()
+            };
+            if let Some(denial) = denial {
+                me.deny(t, denial.name(), now);
+            }
+            return false;
+        }
+        // Other gameplay and public setup admission remain unavailable.
         if UNAVAILABLE.contains(&t) {
             let reason = match t {
                 "start" | "restart" => "scenario",
@@ -761,6 +787,7 @@ impl Hub {
         let room = self.rooms.get_mut(code).unwrap();
         room.native = Some(AttachedRuntime {
             epoch,
+            ingress: CommanderIngress::default(),
             runtime,
             startup,
         });
@@ -1123,6 +1150,7 @@ impl Hub {
                     continue;
                 };
                 if native.runtime.fault().is_some() || native.runtime.held() >= 120 {
+                    native.ingress.discard_feedback();
                     continue;
                 }
                 let connected = room
@@ -1214,11 +1242,17 @@ impl Hub {
                 let report = match native.runtime.advance_tick(&away) {
                     Ok(report) => report,
                     Err(error) => {
+                        native.ingress.discard_feedback();
                         native.runtime.fault_stop(error);
                         continue;
                     }
                 };
                 let step = began.elapsed().as_secs_f64() * 1000.0;
+                for (slot, command, denial) in native.ingress.complete(&report.commands) {
+                    if let Some(person) = room.players.get_mut(slot) {
+                        person.deny(command, denial.name(), now_ms);
+                    }
+                }
                 let sent = native.runtime.should_snapshot(report.tick);
                 let snapshot_at = Instant::now();
                 let mut costs = (0.0, 0.0);
@@ -1762,3 +1796,7 @@ pub(crate) mod native_tests;
 #[cfg(test)]
 #[path = "native_startup_tests.rs"]
 mod native_startup_tests;
+
+#[cfg(test)]
+#[path = "native_ingress_lobby_tests.rs"]
+mod native_ingress_tests;
