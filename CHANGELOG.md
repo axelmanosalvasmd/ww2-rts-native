@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Record Root's exact `c09eb985` Vostro proof: 410 optimized tests passed, zero failed or ignored, across 103 result sections; release FFI, strict C linking and 32 formation cases/215 spots with zero differences. Formatting and strict Clippy passed on unchanged source; Root independently checked 731 tracked-file hashes and all 410 names. Public run 38492494443 has 410/0/0 on Ubuntu, Windows and macOS. Earlier recovery-stopped runs and separate Ground/Legacy/World, constructor-RNG and full-game gaps retain their own status.
+
+- Record the explicit PR #198 merge at `514e15f4`, whose tree equals verified `c09eb985`. GitHub marked #197 and #200 merged through provider ancestry, not separate merge commands. Keep the approved ABI 2 header, reference pin and runtime/harness source unchanged.
+
+- Correct stale unpublished-consumer and missing-client-inventory wording for Axel's draft PR #201 at `9551d3976e9145c81030cf5a81ec7f0764b04d12`, explicitly not for merge or adoption. Distinguish owner-reported Linux build/automation on Rust `92fb7fe` from earlier live/package evidence on `03a49ac`; accept no client rows and retain fresh live, Windows/macOS, input/physical, decoder and rules-query gaps. Table transport #199 remains unagreed and unimplemented.
+
 - Record Vostro project registration and the explicit approval to retry the consolidated PR publication and separate diagnostic backup. Preserve pending validation and the original failures.
 
 - Save the Linux development handoff with exact pushed input/table/terrain, Ground, research/scenario and World checkpoints, known Windows/research failures, stopped-by-user validation and restart commands. Stop local Mac jobs for the transfer; preserve source and compact evidence before removing task caches and temporary copies. This checkpoint does not mark unfinished gameplay or platform checks complete.
