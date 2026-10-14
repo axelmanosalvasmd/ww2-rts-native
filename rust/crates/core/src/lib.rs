@@ -1,6 +1,8 @@
 //! The ww2-rts rules core. It holds no engine, networking or file-system code; the server and the
 //! Unreal client reach it as a library (`AGENTS.md`).
 
+#![cfg_attr(test, recursion_limit = "256")]
+
 pub mod assault_runtime;
 pub mod catalog;
 pub mod client_view;
@@ -32,6 +34,7 @@ use crate as core_api;
 #[path = "../tests/support/human_commander_facts.rs"]
 mod human_commander_test_facts;
 pub mod legacy_scenario;
+pub mod legacy_scenario_runtime;
 pub mod match_companion_effects;
 mod match_companion_tick;
 pub mod match_companions;
@@ -40,6 +43,7 @@ pub(crate) mod existing_observers;
 pub mod logistics;
 pub mod map;
 pub mod match_abilities;
+pub mod match_actor;
 pub mod match_aircraft_commands;
 pub mod match_aircraft_ticks;
 pub mod match_aviation;
@@ -111,9 +115,11 @@ pub mod world_generation;
 pub mod world_map;
 
 pub mod match_world;
+pub mod match_world_ground;
 pub mod match_world_phases;
 pub mod match_world_rails;
 pub mod match_world_regions;
+pub mod match_world_tick;
 
 pub mod match_world_memory;
 pub mod world_memory;

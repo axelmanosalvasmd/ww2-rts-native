@@ -13,7 +13,9 @@ use ww2_core::{
     match_story::{StoryChange, StoryKey, prepare_story_updates},
     production::{Context, Denial, Error, JobStatus, UnitView},
     random::MatchRandom,
-    unit_publication::{PublicationParts, StagedUnit, prepare_publication},
+    unit_publication::{
+        PublicationParts, StagedUnit, prepare_publication, prepare_world_publication,
+    },
     weather::WeatherChoice,
 };
 fn fixture() -> Value {
@@ -196,10 +198,13 @@ fn buy(m: &mut Match, slot: usize, kind: &str, from: Option<u32>) -> Result<(), 
 // Finished armory fixture setup reuses shared source scatter/publication, then
 // stamps its authored footprint. This is not a paid native construction command.
 fn armory(m: &mut Match, slot: usize, cell: usize) -> u32 {
-    let kind = m.rules.kind("armory").unwrap();
+    finished_building(m, slot, cell, "armory")
+}
+fn finished_building(m: &mut Match, slot: usize, cell: usize, name: &str) -> u32 {
+    let kind = m.rules.kind(name).unwrap();
     let size = Catalog::compiled()
         .unwrap()
-        .unit("armory")
+        .unit(name)
         .unwrap()
         .get("size")
         .unwrap()
@@ -227,20 +232,25 @@ fn armory(m: &mut Match, slot: usize, cell: usize) -> u32 {
         .collect();
     draft.unit.built = Some(1.0);
     draft.unit.cells = Some(cells.iter().map(|c| *c as u32).collect());
-    prepare_publication(
-        PublicationParts {
-            units: &mut m.world.game.units,
-            grid: &mut m.grid,
-            controls: &mut m.commands.units,
-            recruitment: &mut m.recruit_metadata,
-            next_id: &mut m.next_unit_id,
-        },
-        &m.rules,
-        m.start.players.len(),
-        vec![draft],
-    )
-    .unwrap()
-    .publish_with(|u, _| {
+    let parts = PublicationParts {
+        units: &mut m.world.game.units,
+        grid: &mut m.grid,
+        controls: &mut m.commands.units,
+        recruitment: &mut m.recruit_metadata,
+        next_id: &mut m.next_unit_id,
+    };
+    let publication = if m.options.mode == Mode::World {
+        prepare_world_publication(
+            parts,
+            &m.rules,
+            m.start.players.len(),
+            m.world.game.mode,
+            vec![draft],
+        )
+    } else {
+        prepare_publication(parts, &m.rules, m.start.players.len(), vec![draft])
+    };
+    publication.unwrap().publish_with(|u, _| {
         m.combat.initialize(u.id);
         m.firing.initialize(u.id);
         m.abilities.initialize(u.id);
@@ -423,7 +433,7 @@ fn original_match_research_and_world_training_phases() {
 }
 fn unchanged(m: &Match) -> String {
     format!(
-        "{:?}{:?}{:?}{:?}{:?}{:?}{:?}{:?}{:?}{:?}{}",
+        "{:?}{:?}{:?}{:?}{:?}{:?}{:?}{:?}{:?}{:?}{}{:?}",
         m.production,
         m.start.economy,
         m.world.game.units,
@@ -434,7 +444,15 @@ fn unchanged(m: &Match) -> String {
         m.recovery,
         m.story,
         m.recruit_metadata,
-        m.next_unit_id
+        m.next_unit_id,
+        (
+            &m.grid,
+            m.start.random.snapshot(),
+            m.start.environment_seed,
+            m.world.game.tick,
+            &m.building_rallies,
+            &m.player_rallies
+        )
     )
 }
 #[test]
@@ -482,5 +500,390 @@ fn aborted_completion_and_research_publish_nothing() {
             "nonempty Conquest training queue"
         ))
     ));
+    assert_eq!(unchanged(&m), before);
+}
+
+#[test]
+fn production_phase_admission_is_read_only_and_rejects_foreign_rows() {
+    let f = fixture();
+    let mut m = make(&f["cases"][0]);
+    m.request_research(0, Technology::Tier).unwrap();
+    let before = unchanged(&m);
+    m.validate_production_phases(0.05).unwrap();
+    assert_eq!(unchanged(&m), before);
+    m.production.initialize_building(u32::MAX - 1).unwrap();
+    let before = unchanged(&m);
+    assert!(m.validate_production_phases(0.05).is_err());
+    assert_eq!(unchanged(&m), before);
+}
+
+#[test]
+fn recorded_world_buy_pays_once_and_publishes_only_at_training_completion() {
+    use ww2_core::{
+        match_commands::{Command, Denial as CommandDenial},
+        orders::OrderKey,
+    };
+    let f = fixture();
+    let mut m = make(&f["cases"][2]);
+    let hq = resolve(&m, 0, "hq");
+    let foreign = resolve(&m, 1, "hq");
+    let next = m.next_unit_id;
+    let wallet = m.start.economy.players[0].clone();
+    let spent = m.story[0].mp_spent;
+    let random = m.start.random.snapshot();
+    let engineer = ww2_core::economy::price_of(Mode::World, "engineer").unwrap();
+    let rifle = ww2_core::economy::price_of(Mode::World, "rifle").unwrap();
+    // Reverse arrival order must still publish the one recorded boundary in key order.
+    for (sequence, kind, from) in [
+        (3, "engineer", Some(foreign)),
+        (2, "rifle", None),
+        (1, "engineer", Some(hq)),
+    ] {
+        m.enqueue_command(
+            OrderKey {
+                tick: 1,
+                issuer: 0,
+                sequence,
+            },
+            Command::Buy {
+                kind: kind.into(),
+                from,
+            },
+        )
+        .unwrap();
+    }
+    assert_eq!(m.production.next_job_id(), 0);
+    assert_eq!(m.start.economy.players[0], wallet);
+    let results = m.apply_commands(1, false).unwrap();
+    assert_eq!(
+        results.iter().map(|r| r.key.sequence).collect::<Vec<_>>(),
+        [1, 2, 3]
+    );
+    assert_eq!(
+        results.iter().map(|r| r.denial).collect::<Vec<_>>(),
+        [None, None, Some(CommandDenial::QueueFull)]
+    );
+    let jobs = m.production.building(hq).unwrap().rows();
+    assert_eq!(
+        jobs.iter()
+            .map(|r| (r.job.id, r.job.kind.as_str(), r.status))
+            .collect::<Vec<_>>(),
+        [
+            (1, "engineer", JobStatus::Active),
+            (2, "rifle", JobStatus::Waiting)
+        ]
+    );
+    assert_eq!(jobs[0].job.charge, engineer);
+    assert_eq!(jobs[1].job.charge, rifle);
+    assert_eq!(m.production.next_job_id(), 2);
+    assert_eq!(m.next_unit_id, next);
+    assert!(!m.world.game.units.contains_key(&next));
+    assert_eq!(
+        m.start.economy.players[0].mp,
+        wallet.mp - engineer.mp - rifle.mp
+    );
+    assert_eq!(
+        m.start.economy.players[0].fuel,
+        wallet.fuel - engineer.fuel - rifle.fuel
+    );
+    assert_eq!(m.story[0].mp_spent, spent + engineer.mp + rifle.mp);
+    let paid = (m.start.economy.clone(), m.story.clone());
+    assert!(m.step_training(hq, 11.0).unwrap().is_none());
+    assert_eq!(m.next_unit_id, next);
+    let done = m.step_training(hq, 1.0).unwrap().unwrap();
+    assert_eq!(done.unit, next);
+    assert_eq!(done.completion.job_id, 1);
+    assert_eq!(done.completion.building, hq);
+    assert_eq!(done.completion.kind, "engineer");
+    assert_eq!(
+        m.rules.kinds[m.world.game.units[&next].kind].name,
+        "engineer"
+    );
+    assert!(m.commands.units.contains_key(&next));
+    assert!(!m.commands.units[&next].hold_fire);
+    assert!(!m.commands.units[&next].auto_cast);
+    m.validate_production_phases(0.05).unwrap();
+    assert_eq!(m.combat.get(next), Some(&Default::default()));
+    assert_eq!(
+        m.production.building(hq).unwrap().rows()[0].job,
+        jobs[1].job
+    );
+    assert_eq!((m.start.economy.clone(), m.story.clone()), paid);
+    assert_eq!(m.start.random.snapshot(), random);
+
+    let buy = Command::Buy {
+        kind: "engineer".into(),
+        from: Some(hq),
+    };
+    for fault in [
+        "story", "rally", "producer", "mode", "away", "out", "winner",
+    ] {
+        let story = m.story.clone();
+        let rally = m.building_rallies[&hq];
+        let production = m.production.clone();
+        match fault {
+            "story" => m.story[0].mp_spent = f64::NAN,
+            "rally" => {
+                m.building_rallies.insert(
+                    hq,
+                    Some(Point {
+                        x: f64::NAN,
+                        z: 0.0,
+                    }),
+                );
+            }
+            "producer" => {
+                m.production.remove_building(hq);
+            }
+            "mode" => m.world.game.mode = None,
+            "away" => m.start.economy.players[0].away = true,
+            "out" => m.start.economy.players[0].out = true,
+            "winner" => {}
+            _ => unreachable!(),
+        }
+        let before = unchanged(&m);
+        let result = m.execute_command(0, &buy, fault == "winner");
+        if matches!(fault, "away" | "out" | "winner") {
+            assert_eq!(result.unwrap(), Some(CommandDenial::Blocked));
+        } else {
+            assert!(result.is_err(), "{fault}: {result:?}");
+        }
+        assert_eq!(unchanged(&m), before, "{fault}: partial publication");
+        m.story = story;
+        m.building_rallies.insert(hq, rally);
+        m.production = production;
+        m.world.game.mode = Some(ww2_core::game::ModeKind::World);
+        m.start.economy.players[0].away = false;
+        m.start.economy.players[0].out = false;
+    }
+    while m.production.building(hq).unwrap().jobs().len() < 5 {
+        assert_eq!(m.execute_command(0, &buy, false).unwrap(), None);
+    }
+    let before = unchanged(&m);
+    assert_eq!(
+        m.execute_command(0, &buy, false).unwrap(),
+        Some(CommandDenial::QueueFull)
+    );
+    assert_eq!(unchanged(&m), before);
+    m.start.economy.players[0].mp = 0.0;
+    let before = unchanged(&m);
+    assert_eq!(
+        m.execute_command(0, &buy, false).unwrap(),
+        Some(CommandDenial::Manpower)
+    );
+    assert_eq!(unchanged(&m), before);
+}
+
+fn world_barracks_scene() -> (Match, u32) {
+    let mut m = make(&fixture()["cases"][2]);
+    m.request_research(0, Technology::Tier).unwrap();
+    assert_eq!(m.step_research(60.0).unwrap(), [(0, Technology::Tier)]);
+    assert_eq!(m.production.player(0).unwrap().tech().tier(), 2);
+    let cell = 20 * m.world.game.w + 20;
+    let barracks = finished_building(&mut m, 0, cell, "barracks");
+    m.validate_tick_state().unwrap();
+    (m, barracks)
+}
+
+#[test]
+fn world_buy_refuses_unsupported_newborn_before_payment() {
+    use ww2_core::match_commands::{Command, Denial as CommandDenial};
+    let (mut m, barracks) = world_barracks_scene();
+    let command = Command::Buy {
+        kind: "mortar".into(),
+        from: Some(barracks),
+    };
+    // Canonical resource denial still precedes future-birth support.
+    m.start.economy.players[0].mp = 0.0;
+    let before = unchanged(&m);
+    assert_eq!(
+        m.execute_command(0, &command, false).unwrap(),
+        Some(CommandDenial::Manpower)
+    );
+    assert_eq!(unchanged(&m), before);
+    m.start.economy.players[0].mp = 5000.125;
+    let before = unchanged(&m);
+    let result = m.execute_command(0, &command, false);
+    if result == Ok(None) {
+        // Bounded failure witness: actual completion, then the next admission.
+        let born = m.step_training(barracks, 20.0).unwrap().unwrap();
+        assert!(!m.commands.units[&born.unit].hold_fire);
+        eprintln!(
+            "unsupported Buy admitted: MP-spent={}, newborn={}, next admission={:?}",
+            m.story[0].mp_spent,
+            born.unit,
+            m.validate_tick_state()
+        );
+    }
+    assert!(
+        matches!(&result, Err(error) if error.contains("World automatic salvo tick actuator is not connected")),
+        "unsupported future birth must fail its actuator guard: {result:?}"
+    );
+    assert_eq!(unchanged(&m), before);
+    m.enqueue_command(
+        ww2_core::orders::OrderKey {
+            tick: 1,
+            issuer: 0,
+            sequence: 1,
+        },
+        command,
+    )
+    .unwrap();
+    let before = unchanged(&m);
+    assert!(
+        m.validate_tick_state()
+            .unwrap_err()
+            .contains("World automatic salvo tick actuator is not connected")
+    );
+    assert_eq!(unchanged(&m), before);
+    assert_eq!(m.commands.pending_commands(), 1);
+    assert_eq!(m.commands.next_tick(), Some(1));
+    drop(m);
+
+    // Restored jobs protect the same future-birth admission boundary.
+    let (mut m, barracks) = world_barracks_scene();
+    // An existing authored salvo actor remains supported when it holds fire.
+    let kind = m.rules.kind("mortar").unwrap();
+    let mut actor = StagedUnit::ordinary(
+        &m.world.game,
+        &m.rules,
+        0,
+        kind,
+        m.next_unit_id,
+        m.world.game.units.len() as u32,
+        m.start.players[0].spawn,
+        None,
+    )
+    .unwrap();
+    assert!(!actor.control.hold_fire && !actor.control.auto_cast);
+    actor.control.hold_fire = true;
+    prepare_world_publication(
+        PublicationParts {
+            units: &mut m.world.game.units,
+            grid: &mut m.grid,
+            controls: &mut m.commands.units,
+            recruitment: &mut m.recruit_metadata,
+            next_id: &mut m.next_unit_id,
+        },
+        &m.rules,
+        m.start.players.len(),
+        m.world.game.mode,
+        vec![actor],
+    )
+    .unwrap()
+    .publish_with(|u, _| {
+        m.combat.initialize(u.id);
+        m.firing.initialize(u.id);
+        m.abilities.initialize(u.id);
+        m.recovery.initialize(u.id);
+    });
+    m.validate_tick_state().unwrap();
+    m.production
+        .record_paid(
+            barracks,
+            "mortar",
+            Price {
+                mp: 180.0,
+                fuel: 0.0,
+            },
+        )
+        .unwrap();
+    let before = unchanged(&m);
+    let production = m.validate_production_phases(0.05);
+    let admission = m.validate_tick_state();
+    let training = m.step_training(barracks, 20.0);
+    eprintln!(
+        "restored mortar: production={production:?}, tick admission={admission:?}, training={training:?}"
+    );
+    assert!(
+        matches!(production, Err(ProductionStepError::Control(ref reason)) if reason == "World automatic salvo tick actuator is not connected"),
+        "restored mortar must fail its production actuator guard"
+    );
+    assert!(
+        matches!(admission, Err(ref reason) if reason.contains("World automatic salvo tick actuator is not connected")),
+        "restored mortar must fail its whole-tick actuator guard"
+    );
+    assert!(
+        matches!(training, Err(ProductionStepError::Control(ref reason)) if reason == "World automatic salvo tick actuator is not connected"),
+        "restored mortar must fail its training actuator guard"
+    );
+    assert_eq!(unchanged(&m), before);
+}
+
+#[test]
+fn world_unknown_buy_is_a_denial_without_aborting_remaining_boundary_orders() {
+    use ww2_core::{
+        match_commands::{Command, Denial as CommandDenial},
+        orders::OrderKey,
+    };
+    let mut m = make(&fixture()["cases"][2]);
+    let hq = resolve(&m, 0, "hq");
+    let unknown = Command::from_json(&json!({"t":"buy", "unit":"bogus"})).unwrap();
+    let before = unchanged(&m);
+    let direct = m.execute_command(0, &unknown, false);
+    assert_eq!(unchanged(&m), before);
+    assert!(matches!(
+        m.production
+            .record_paid(hq, "bogus", Price { mp: 0.0, fuel: 0.0 }),
+        Err(Error::Catalog(_))
+    ));
+    assert_eq!(unchanged(&m), before);
+    for (sequence, command) in [
+        (
+            2,
+            Command::Buy {
+                kind: "engineer".into(),
+                from: Some(hq),
+            },
+        ),
+        (1, unknown),
+    ] {
+        m.enqueue_command(
+            OrderKey {
+                tick: 1,
+                issuer: 0,
+                sequence,
+            },
+            command,
+        )
+        .unwrap();
+    }
+    let boundary = m.apply_commands(1, false);
+    eprintln!("unknown World Buy: direct={direct:?}, boundary={boundary:?}");
+    assert_eq!(direct, Ok(Some(CommandDenial::Blocked)));
+    let results = boundary.unwrap();
+    assert_eq!(
+        results
+            .iter()
+            .map(|r| (r.key.sequence, r.denial))
+            .collect::<Vec<_>>(),
+        [(1, Some(CommandDenial::Blocked)), (2, None)]
+    );
+    assert_eq!(m.commands.pending_commands(), 0);
+    assert_eq!(m.commands.next_tick(), Some(2));
+    assert_eq!(m.production.next_job_id(), 1);
+    let jobs = m.production.building(hq).unwrap().rows();
+    assert_eq!(jobs.len(), 1);
+    assert_eq!((jobs[0].job.id, jobs[0].job.kind.as_str()), (1, "engineer"));
+    assert_eq!(m.start.economy.players[0].mp, 4940.125);
+    assert_eq!(m.story[0].mp_spent, 60.0);
+}
+
+#[test]
+fn ordinary_training_refusal_precedes_research_progress() {
+    let f = fixture();
+    let mut m = make(&f["cases"][0]);
+    m.request_research(0, Technology::Tier).unwrap();
+    let barracks = resolve(&m, 0, "barracks");
+    m.production
+        .record_paid(barracks, "rifle", Price { mp: 0.0, fuel: 0.0 })
+        .unwrap();
+    let before = unchanged(&m);
+    assert_eq!(
+        m.validate_production_phases(0.05),
+        Err(ProductionStepError::InvalidState(
+            "nonempty Conquest training queue"
+        ))
+    );
     assert_eq!(unchanged(&m), before);
 }

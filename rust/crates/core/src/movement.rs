@@ -16,7 +16,8 @@
 //! - crushing, ground wear and the mud it makes, and mines going off under a unit (the workload turns
 //!   crushing and wear off, and asserts the terrain never changes); with wear unchanged, `touch` only
 //!   tells clients about a cell whose look changed, and the workload checks none did;
-//! - World Conquest's road march (`marchMul`, 1 here), riders following their carrier, trains and planes;
+//! - the default entry point uses march factor one; Match supplies the World factor explicitly.
+//!   Riders following their carrier, trains and planes remain separate;
 //! - the default entry points use the physical map, as in the frozen workload.
 //!   Match uses `move_unit_with_knowledge` for remembered traffic decisions.
 
@@ -137,12 +138,30 @@ pub fn move_unit_with_knowledge(
     routes: &mut impl FnMut(&Game, &Rules, &mut Unit, Point, RouteRequest),
     knowledge: &TrafficKnowledge<'_>,
 ) -> Result<Option<Moved>, KnowledgeError> {
+    move_unit_with_march(g, rules, grid, id, supp_speed, routes, knowledge, 1.0)
+}
+/// The caller supplies the validated World march policy at the unit's actual turn.
+/// The ordinary entry point keeps its existing multiplier of one.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn move_unit_with_march(
+    g: &mut Game,
+    rules: &Rules,
+    grid: &mut SpatialGrid,
+    id: UnitId,
+    supp_speed: f64,
+    routes: &mut impl FnMut(&Game, &Rules, &mut Unit, Point, RouteRequest),
+    knowledge: &TrafficKnowledge<'_>,
+    march: f64,
+) -> Result<Option<Moved>, KnowledgeError> {
+    if !march.is_finite() || march < 0.0 {
+        return Err(KnowledgeError::InvalidValue);
+    }
     // The unit is out of the map while it moves. The reference reads it there only through `waitsOn`, which
     // stops at it either way (its `queuedBehind` is 0 by then), and every query skips it.
     let Some(mut u) = g.units.remove(&id) else {
         return Ok(None);
     };
-    let speed = block(g, rules, grid, &mut u, supp_speed, routes, knowledge);
+    let speed = block(g, rules, grid, &mut u, supp_speed, routes, knowledge, march);
     grid.update(id, &u);
     let infantry = rules.kinds[u.kind].infantry;
     g.units.insert(id, u);
@@ -162,6 +181,7 @@ fn block(
     supp_speed: f64,
     routes: &mut impl FnMut(&Game, &Rules, &mut Unit, Point, RouteRequest),
     knowledge: &TrafficKnowledge<'_>,
+    march: f64,
 ) -> Result<f64, KnowledgeError> {
     let m = &rules.movement;
     let dt = m.tick;
@@ -204,12 +224,13 @@ fn block(
     } else {
         supp_speed
     };
-    // (the reference multiplies by `marchMul` last: World Conquest's road march, not ported, 1 elsewhere)
+    // Source applies the caller's World march multiplier last.
     let speed = top
         * order
         * speed_mul(g, rules, u)
         * (1.0 - m.slope[usize::from(!kind.infantry)] * math::min(1.0, math::max(0.0, grade)))
-        * weather_speed(g, rules, kind);
+        * weather_speed(g, rules, kind)
+        * march;
     remember_position(u);
     let goal = u.path.first().copied();
     let steer = if kind.naval || kind.structure {

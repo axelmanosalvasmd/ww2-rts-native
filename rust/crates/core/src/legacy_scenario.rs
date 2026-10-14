@@ -56,6 +56,13 @@ pub struct SayAction {
     pub at_tick: u64,
     pub side: usize,
 }
+impl SayAction {
+    /// The exact public Source shot row for a migrated legacy Say action.
+    pub fn shot_json(&self) -> serde_json::Value {
+        use serde_json::json;
+        json!({"k":"say","text":self.text,"localized":self.localized,"scenarioRecipients":"public","scenarioSide":self.side,"pub":true,"execution":self.execution,"atTick":self.at_tick})
+    }
+}
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DestroyAction {
     pub bounds: [usize; 4],
@@ -65,6 +72,11 @@ pub struct DestroyAction {
 pub enum LegacyAction {
     Say(SayAction),
     Destroy(DestroyAction),
+}
+#[derive(Debug, PartialEq, Eq)]
+pub enum LegacyStepError<E> {
+    Scenario(LegacyError),
+    Emit(E),
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum LegacyError {
@@ -80,6 +92,37 @@ impl std::fmt::Display for LegacyError {
     }
 }
 impl std::error::Error for LegacyError {}
+
+/// Validate the only public Say payload that migrated legacy triggers can emit.
+pub fn validate_public_say(action: &SayAction) -> Result<(), LegacyError> {
+    const MAX_SAFE_INTEGER: u64 = 9_007_199_254_740_991;
+    let mut keys = action.localized.keys();
+    let Some(language) = keys.next() else {
+        return Err(LegacyError::InvalidState);
+    };
+    if language != "en"
+        || keys.next().is_some()
+        || action.text.is_empty()
+        || action.localized.get("en") != Some(&action.text)
+        || action.side != 0
+        || action.at_tick > MAX_SAFE_INTEGER
+    {
+        return Err(LegacyError::InvalidState);
+    }
+    let Some(suffix) = action.execution.strip_prefix("scenario:") else {
+        return Err(LegacyError::InvalidState);
+    };
+    let Ok(execution) = suffix.parse::<u64>() else {
+        return Err(LegacyError::InvalidState);
+    };
+    if execution == 0
+        || execution > MAX_SAFE_INTEGER
+        || action.execution != format!("scenario:{execution}")
+    {
+        return Err(LegacyError::InvalidState);
+    }
+    Ok(())
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct LegacyScenario {
@@ -130,6 +173,23 @@ impl LegacyScenario {
     }
     pub fn state(&self) -> &LegacyState {
         &self.state
+    }
+    /// Check that persisted mutable state still belongs to this fixed legacy-trigger set.
+    pub fn validate_legacy_subset(&self) -> Result<(), LegacyError> {
+        if self.triggers.iter().enumerate().any(|(i, trigger)| {
+            trigger.id != format!("legacy:{i}")
+                || !trigger.at.is_finite()
+                || trigger.at < 0.0
+                || trigger.actions.is_empty()
+                || trigger.actions.iter().any(|action| match action {
+                    ActionDefinition::Say { text } => text.is_empty(),
+                    ActionDefinition::Destroy { .. } => false,
+                })
+        }) {
+            return Err(LegacyError::InvalidState);
+        }
+        let mut checked = self.clone();
+        checked.restore_state(checked.state.clone())
     }
     /// Restore typed state without accepting arbitrary scenario definitions or action payloads.
     pub fn restore_state(&mut self, state: LegacyState) -> Result<(), LegacyError> {
@@ -187,12 +247,32 @@ impl LegacyScenario {
         tick: u64,
         points: &[PointOwner<'_>],
     ) -> Result<Vec<LegacyAction>, LegacyError> {
+        let mut actions = Vec::new();
+        self.step_emitting(tick, points, |action| {
+            actions.push(action);
+            Ok::<(), std::convert::Infallible>(())
+        })
+        .map_err(|error| match error {
+            LegacyStepError::Scenario(error) => error,
+            LegacyStepError::Emit(never) => match never {},
+        })?;
+        Ok(actions)
+    }
+
+    /// Evaluate triggers in source order and actuate each trigger before considering the next.
+    /// If an actuator fails, the already committed state and output prefix remain intact.
+    pub fn step_emitting<E>(
+        &mut self,
+        tick: u64,
+        points: &[PointOwner<'_>],
+        emit: impl FnMut(LegacyAction) -> Result<(), E>,
+    ) -> Result<(), LegacyStepError<E>> {
         if tick > 9_007_199_254_740_991 {
-            return Err(LegacyError::TickOutOfRange);
+            return Err(LegacyStepError::Scenario(LegacyError::TickOutOfRange));
         }
         let now = tick as f64 * 0.05;
         if !now.is_finite() {
-            return Err(LegacyError::TickOutOfRange);
+            return Err(LegacyStepError::Scenario(LegacyError::TickOutOfRange));
         }
         for (id, old) in &mut self.state.owners {
             // The source reserves region-prefixed targets for World regions, even if a
@@ -208,7 +288,7 @@ impl LegacyScenario {
             }
             *old = owner;
         }
-        let mut effects = Vec::new();
+        let mut emit = emit;
         let mut budget = 4096usize;
         for trigger in &self.triggers {
             let key = format!("{}@match", trigger.id);
@@ -242,7 +322,7 @@ impl LegacyScenario {
             state.next = now;
             state.execution = Some(execution.clone());
             for (i, action) in trigger.actions.iter().enumerate() {
-                effects.push(match action {
+                let effect = match action {
                     ActionDefinition::Say { text } => LegacyAction::Say(SayAction {
                         text: text.clone(),
                         localized: BTreeMap::from([("en".into(), text.clone())]),
@@ -254,10 +334,11 @@ impl LegacyScenario {
                         bounds: *bounds,
                         execution: format!("{execution}:{i}"),
                     }),
-                });
+                };
+                emit(effect).map_err(LegacyStepError::Emit)?;
             }
         }
-        Ok(effects)
+        Ok(())
     }
     /// Exact migrated schema for persistence/fixture adapters. This is output only.
     pub fn definition_json(&self) -> serde_json::Value {
@@ -304,11 +385,87 @@ impl LegacyAction {
         use serde_json::json;
         match self {
             Self::Say(s) => {
-                json!({"kind":"say","row":{"k":"say","text":s.text,"localized":s.localized,"scenarioRecipients":"public","scenarioSide":s.side,"pub":true,"execution":s.execution,"atTick":s.at_tick}})
+                json!({"kind":"say","row":s.shot_json()})
             }
             Self::Destroy(d) => {
                 json!({"kind":"damage","action":{"kind":"destroy","box":d.bounds},"execution":d.execution})
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn actuator_error_keeps_committed_trigger_prefix() {
+        let mut scenario = LegacyScenario {
+            triggers: vec![
+                LegacyTrigger {
+                    id: "first".into(),
+                    at: 0.0,
+                    actions: vec![ActionDefinition::Say {
+                        text: "first".into(),
+                    }],
+                },
+                LegacyTrigger {
+                    id: "second".into(),
+                    at: 0.0,
+                    actions: vec![ActionDefinition::Say {
+                        text: "second".into(),
+                    }],
+                },
+            ],
+            state: LegacyState {
+                triggers: BTreeMap::new(),
+                owners: BTreeMap::new(),
+                captured: BTreeSet::new(),
+                next_execution: 1,
+            },
+        };
+        let mut emitted = Vec::new();
+        let result = scenario.step_emitting(0, &[], |action| {
+            emitted.push(action);
+            Err::<(), _>("actuator failed")
+        });
+
+        assert_eq!(result, Err(LegacyStepError::Emit("actuator failed")));
+        assert_eq!(emitted.len(), 1);
+        assert_eq!(scenario.state.triggers["first@match"].count, 1);
+        assert_eq!(
+            scenario
+                .state
+                .triggers
+                .get("second@match")
+                .map_or(0, |state| state.count),
+            0
+        );
+        assert_eq!(scenario.state.next_execution, 2);
+    }
+
+    #[test]
+    fn public_say_rejects_noncanonical_or_unsafe_execution_ids() {
+        let mut action = SayAction {
+            text: "message".into(),
+            localized: BTreeMap::from([("en".into(), "message".into())]),
+            execution: "scenario:1".into(),
+            at_tick: 0,
+            side: 0,
+        };
+        assert_eq!(validate_public_say(&action), Ok(()));
+        for execution in [
+            "scenario:+1",
+            "scenario:01",
+            "scenario:9007199254740992",
+            "scenario:18446744073709551616",
+        ] {
+            action.execution = execution.into();
+            assert_eq!(
+                validate_public_say(&action),
+                Err(LegacyError::InvalidState),
+                "accepted {execution}"
+            );
         }
     }
 }

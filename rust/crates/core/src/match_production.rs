@@ -132,6 +132,142 @@ impl Match {
             Ok(None)
         }
     }
+    /// Admit research and live-building progression before the caller advances its clock.
+    /// Publication still validates the actual placement at each building's later turn.
+    pub fn validate_production_phases(&self, dt: f64) -> Result<(), ProductionStepError> {
+        let count = self.production_step_context()?;
+        let regions = self.production_regions()?;
+        let units = units(&self.world.game, &self.rules, count)?;
+        let context = context(
+            &self.options,
+            self.world.game.naval,
+            &units,
+            regions.as_deref(),
+        );
+        self.production
+            .validate_phases(&context, &self.start.economy, dt)?;
+        for (id, row) in self.production.buildings() {
+            let unit = self
+                .world
+                .game
+                .units
+                .get(&id)
+                .ok_or(ProductionStepError::InvalidState(
+                    "production building missing",
+                ))?;
+            if !self.rules.kinds[unit.kind].building {
+                return Err(ProductionStepError::InvalidState(
+                    "production row is not a building",
+                ));
+            }
+            if !row.jobs().is_empty() {
+                if self.options.mode != Mode::World {
+                    return Err(ProductionStepError::InvalidState(
+                        "nonempty Conquest training queue",
+                    ));
+                }
+                if self.options.logistics
+                    || unit.owner >= count
+                    || !self.building_rallies.contains_key(&id)
+                {
+                    return Err(ProductionStepError::InvalidState(
+                        "training publication context",
+                    ));
+                }
+                if self.building_rallies[&id]
+                    .into_iter()
+                    .chain(self.player_rallies[unit.owner])
+                    .any(|at| !at.x.is_finite() || !at.z.is_finite())
+                {
+                    return Err(ProductionStepError::InvalidState("training rally position"));
+                }
+                for job in row.jobs() {
+                    crate::match_world_tick::validate_world_future_birth(&self.rules, &job.kind)
+                        .map_err(ProductionStepError::Control)?;
+                }
+            }
+        }
+        Ok(())
+    }
+    /// Recorded World Buy queues training, without an immediate birth. Canonical
+    /// production admission precedes publication checks and atomic MP-spent payment.
+    pub(crate) fn recorded_world_buy(
+        &mut self,
+        slot: usize,
+        kind: &str,
+        from: Option<u32>,
+    ) -> Result<u64, ProductionStepError> {
+        if self.finish.is_some()
+            || self
+                .start
+                .economy
+                .players
+                .get(slot)
+                .is_none_or(|p| p.away || p.out)
+        {
+            return Err(production::Error::Denied(production::Denial::Blocked).into());
+        }
+        let phase = self
+            .validate_world_phase_context(0.0)
+            .map_err(ProductionStepError::Control)?;
+        self.validate_world_path_service()
+            .map_err(ProductionStepError::Routing)?;
+        self.validate_production_phases(0.0)?;
+        let count = self.production_step_context()?;
+        let units = units(&self.world.game, &self.rules, count)?;
+        let context = context(
+            &self.options,
+            self.world.game.naval,
+            &units,
+            Some(&phase.regions),
+        );
+        let registered = self
+            .production
+            .buildings()
+            .map(|(id, _)| id)
+            .collect::<Vec<_>>();
+        let prepared = self.production.prepare_queue_unit(
+            &context,
+            &mut self.start.economy,
+            slot,
+            self.start.players[slot].config.faction,
+            kind,
+            from,
+        )?;
+        crate::match_world_tick::validate_world_future_birth(&self.rules, kind)
+            .map_err(ProductionStepError::Control)?;
+        let building = prepared.building();
+        if !registered.contains(&building) {
+            return Err(ProductionStepError::InvalidState(
+                "canonical producer state missing",
+            ));
+        }
+        if !self.building_rallies.contains_key(&building) {
+            return Err(ProductionStepError::InvalidState(
+                "canonical training rally missing",
+            ));
+        }
+        if self.building_rallies[&building]
+            .into_iter()
+            .chain(self.player_rallies[slot])
+            .any(|at| !at.x.is_finite() || !at.z.is_finite())
+        {
+            return Err(ProductionStepError::InvalidState("training rally position"));
+        }
+        let story = crate::match_story::prepare_story_updates(
+            &mut self.story,
+            false,
+            &[crate::match_story::StoryChange {
+                slot: Some(slot),
+                key: crate::match_story::StoryKey::MpSpent,
+                amount: prepared.charge().mp,
+            }],
+        )
+        .map_err(ProductionStepError::Control)?;
+        let job = prepared.commit();
+        story.commit();
+        Ok(job)
+    }
     /// Typed source `tech` admission. Global command gates precede the research
     /// denials. Wallet, lab and canonical MP-spent story publish together.
     pub fn request_research(
@@ -230,6 +366,10 @@ impl Match {
                     "canonical training rally missing",
                 ));
             }
+            for job in self.production.building(building).unwrap().jobs() {
+                crate::match_world_tick::validate_world_future_birth(&self.rules, &job.kind)
+                    .map_err(ProductionStepError::Control)?;
+            }
         }
         let regions = self.production_regions()?;
         let completion = {
@@ -270,6 +410,9 @@ impl Match {
             || self.firing.get(id).is_some()
             || self.abilities.get(id).is_some()
             || self.recovery.get(id).is_some()
+            || self.aviation.planes.contains_key(&id)
+            || self.aviation.anti_air.contains_key(&id)
+            || self.logistics.get(id).is_some()
         {
             return Err(ProductionStepError::InvalidState(
                 "training metadata identity occupied",
