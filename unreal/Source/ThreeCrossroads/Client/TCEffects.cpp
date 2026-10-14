@@ -2958,6 +2958,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCEffectsDispatchTest, "ThreeCrossroads.Effect
 
 bool FTCEffectsDispatchTest::RunTest(const FString& Parameters)
 {
+	const FTCGraphicsLevelScope HighLevel(ETCGraphicsLevel::High); // round 15 (gfxlow): the expectations are High's (shake, LOD 110 m), not the saved level's
 	// fx.js snapshot's branches the recorded streams do not reach (they carry only physical flights at this pin), each
 	// checked for what it draws and, above all, for what it must not draw for a shooter this side does not hold.
 	using namespace TCFxTest;

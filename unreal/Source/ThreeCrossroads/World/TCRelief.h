@@ -72,6 +72,10 @@ namespace TCRelief
 		void Build();
 		// Cells whose level, character, road or knowledge changed (relief.js update).
 		void Update(const std::vector<int>& Cells);
+		// Round 15: relief.js gfx.onChange: low = gfx.low || map.world; material.userData.setLow(low); rebuildGeometry().
+		// The cells stay as read; every row is planned again (rock models and bands of the level), the fans are redone
+		// and every part is emitted again (TakeRebuilt lists them). False when the level is the one built.
+		bool SetLow(bool bNewLow);
 		// Parts emitted since the last call.
 		std::vector<int> TakeRebuilt();
 

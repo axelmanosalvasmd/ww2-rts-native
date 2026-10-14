@@ -1,4 +1,5 @@
 #include "Client/TCModelCompare.h"
+#include "Client/TCGraphics.h"
 #include "Client/TCUnitRenderer.h"
 #include "Client/TCUnitTable.h"
 #include "Net/TCMatchState.h"
@@ -265,6 +266,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCUnitModelsRendererTest, "ThreeCrossroads.Mod
 
 bool FTCUnitModelsRendererTest::RunTest(const FString& Parameters)
 {
+	const FTCGraphicsLevelScope HighLevel(ETCGraphicsLevel::High); // round 15 (gfxlow): the expectations are High's (shake, LOD 110 m), not the saved level's
 	using namespace TCModelCompareImpl;
 	// adoption: every unit type of the pinned UNITS table belongs to exactly one batch, the pilot first
 	static const TCHAR* Types[] = { TEXT("rifle"), TEXT("mg"), TEXT("at"), TEXT("tank"), TEXT("rocket"), TEXT("flak"), TEXT("fighter"), TEXT("attacker"), TEXT("flaktrack"), TEXT("mortar"), TEXT("sniper"),

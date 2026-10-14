@@ -222,10 +222,17 @@
 #include "World/TCApron.h"
 #include "World/TCFogFrontier.h"
 #include "Client/TCAlerts.h"
+#include "Client/TCEndReport.h"
+#include "Client/TCBossBar.h"
+#include "Client/TCKeys.h"
 #include "Client/TCEffects.h"
 #include "Client/TCWarMap.h"
 #include "Client/TCLobbyBackdrop.h"
 #include "Client/TCTutorial.h"
+#include "Client/TCMatchControls.h"
+#include "Client/TCRoomBrowser.h"
+// round 15 (lobby): the lobby and match controls glue below is declared (Client/TCMatchControls.cpp defines it)
+#define TC_HAS_LOBBY_GLUE 1
 #include "Client/TCScenarioText.h"
 #include "Net/TCConnection.h"
 #include "Net/TCToken.h"
@@ -236,6 +243,7 @@
 
 class FTCConnection;
 class FTCTokenStore;
+struct FTCUiCommand; // round 15 (lobby): Client/TCPlayerController.h
 class FJsonObject;
 class ATCTerrain;
 class ATCUnitRenderer;
@@ -332,7 +340,7 @@ public:
 	FString FrameTimesLine() const;
 	// Slice 13 verification switch (TCSlice13Checks.cpp): -TCTourFile, -TCTourDir
 	void RunSlice13Switches(double Now);
-	struct FTourPose { FString Name; double At = 0, X = 0, Z = 0, Dist = 0, Yaw = -90, Asked = 0; bool bFrontier = false, bWideShare = false; FString UnitType; int32 UnitId = -1; bool bHud = false; };
+	struct FTourPose { FString Name; double At = 0, X = 0, Z = 0, Dist = 0, Yaw = -90, Asked = 0; bool bFrontier = false, bWideShare = false; FString UnitType; int32 UnitId = -1; bool bHud = false; bool bTurned = false; };
 	TArray<FTourPose> Tour;
 	FString TourFile, TourDir;
 	int32 TourStep = 0, TourShots = 0;
@@ -383,6 +391,26 @@ public:
 	// fires, smokes and falling sections, drawn by Effects; the alerts.js snapshot alerts and the teammates' map pings
 	// (AlertFeed), which go to the feed above through PushAlert. Glue in Client/TCAlerts.cpp.
 	FTCAlerts AlertFeed;
+	FTCStatsOverlay Stats;
+	bool bStatsLoaded = false;
+	// Round 15 (alerts scope): the lobby's report card (its details open state, Client/TCEndReport.h) and the Horde
+	// boss bar (Client/TCBossBar.h), both drawn by ATCHUD from State; the feed above also draws every PushAlert.
+	FTCEndReport EndReport;
+	FTCBossBar BossBar;
+	// Round 15: F2's stats overlay (client/stats.js, saved as 'ww2-stats'; -TCPerf shows every number, as '?perf') and
+	// its numbers (client/perf.js: snapshots, latency pings, frames), Client/TCKeys.h
+	FTCPerf Perf;
+	FTCStatsOverlay& StatsOverlay()
+	{
+		if (!bStatsLoaded) { bStatsLoaded = true; Stats.Load(FTCSettingsStore::Game().Get(TEXT("ww2-stats")), FParse::Param(FCommandLine::Get(), TEXT("TCPerf"))); }
+		return Stats;
+	}
+	// stats.toggle(): show or hide, then save()
+	void ToggleStats()
+	{
+		StatsOverlay().Toggle();
+		if (const TOptional<FString> Saved = Stats.SaveText()) FTCSettingsStore::Game().Set(TEXT("ww2-stats"), *Saved);
+	}
 	// Round 14, tutorial and scenario guidance (Client/TCTutorial.h, Client/TCScenarioText.h; the glue is defined in
 	// Client/TCTutorial.cpp): the goal box, the collapse banner and the damaged buildings' smoke (objectives.js), the
 	// Tutorial's progress as the snapshots tell it, the Controls sheet at the first match (CLI-127), and the lobby's
@@ -391,6 +419,23 @@ public:
 	FTCTutorialProgress Tutorial;
 	FTCControlsOnboarding Onboarding;
 	void EnterTutorialRoom();
+	// Round 15, lobby and match controls (Client/TCMatchControls.h, Client/TCRoomBrowser.h; the glue is defined in
+	// Client/TCMatchControls.cpp): Watch as a spectator / Take a seat, the Name field, the invite link and Copy, the Room
+	// box, the match menu (Pause, Save, Restart, End, Hand <name> to AI, Leave), Send next wave, the sandbox panel, and
+	// the room directory (public-lobby.js) inside the client.
+	FTCMatchControls Controls;
+	FTCRoomBrowser Rooms;
+	FTCTextFields Form;
+	bool bRoomBrowserOpen = false;
+	TArray<FTCControlRow> LobbyControlRows() const;
+	TArray<FTCControlRow> BrowserRows() const;
+	TArray<FTCControlRow> MatchControlRows() const;
+	// A click on a MatchControl button (FTCUiCommand::Unit names it, Group the seat; bBack: a right click)
+	bool RunControl(const FTCUiCommand& Command, bool bBack);
+	// A key while a text field is typed in: true when taken
+	bool ControlsKey(const FKey& Key, bool bPressed, bool bShift);
+	// A map click with the sandbox spawn aim armed
+	bool ControlsSpawnAt(FVector2D Ground);
 	UPROPERTY() TObjectPtr<ATCEffects> Effects;
 	// Parity gap 9 (Client/TCAudio.h): the world's sound subsystem, null when there is no game world.
 	UTCAudio* Audio() const;
@@ -467,6 +512,21 @@ private:
 	void TutorialFrame(float Dt);
 	void TutorialClear();
 	FTCTutorialDriver TutorialDriver;
+	// Round 15 (lobby): see Controls above
+	void ControlsSwitches(const TCHAR* Cmd, FTCConnection::FSettings& Settings);
+	void ControlsMessage(const FString& T, const FJsonObject& M);
+	void ControlsOpened();
+	void ControlsFrame();
+	bool ControlsSend(const FTCControlRequest& Request);
+	void ControlsCommitField(ETCTextField Which, bool bCancelled);
+	void ControlsGoRoom(const FTCControlRequest& Request);
+	bool ControlsEnter(const FTCRoomEntry& Entry, bool bKeepSeat);
+	FString ControlsRoom() const;
+	bool bControlsDeferConnect = false, bQuickPlayPending = false, bControlsShift = false;
+	int32 QuickPlayAnswers = 0, ControlsStep = 0;
+	double ControlsStepAt = -1.0;
+	FString NoticeText, ControlsShotDir;
+	TArray<FTCControlsStep> ControlsScript;
 	bool bTutorialDrive = false, bTutorialEndShot = false, bTutorialButtonPressed = false, bTutorialLobbyShot = false, bTutorialOnboardShot = false, bTutorialJumped = false;
 	FString TutorialShotDir, TutorialShotTag;
 	int32 TutorialShotStep = -2, TutorialPlumeBursts = 0;

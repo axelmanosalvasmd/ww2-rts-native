@@ -1547,6 +1547,8 @@ public:
 	// ---------- state, for checks and the status line ----------
 	bool HasMap() const { return Core.MapW() > 0; }
 	int32 PixelsPerCell() const { return Core.PixelsPerCell(); }
+	// Round 15: the start painted at Graphics Low's texel count (ground.js gfx.low ? 1280 : 2048).
+	bool StartedLow() const { return bStartedLow; }
 	int32 TilesQueued() const { return Core.PendingTiles(); }
 	bool Textured() const { return Core.Textured(); }
 	int32 RubbleDecals() const { return Rubble.Count(); }
@@ -1598,6 +1600,7 @@ private:
 	int32 RubbleSectionVerts = -1, CraterSectionVerts = -1;
 	// the start's identity (a reconnect to the same match keeps nothing special here: the ground repaints in full)
 	int32 Starts = 0, Snapshots = 0, RowsApplied = 0;
+	bool bStartedLow = false;
 	double LastPaintMs = 0, LastUploadMs = 0;
 };
 #endif // TC_GROUND_PAINT_CORE_ONLY

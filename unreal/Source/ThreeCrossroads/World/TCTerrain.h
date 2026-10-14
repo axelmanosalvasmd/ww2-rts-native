@@ -12,6 +12,10 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "World/TCRelief.h"
+#include "Client/TCGraphics.h"
+
+// round 15 (gfxlow glue): ATCTerrain follows the Graphics level (ReliefLow); the tests check it when this is defined
+#define TC_GFXLOW_GLUE 1
 #include "Commandlets/Commandlet.h"
 #include "TCTerrain.generated.h"
 
@@ -69,6 +73,10 @@ public:
 	const TCRelief::FRelief& Relief() const { return ReliefCore; }
 	// Vertices uploaded for a chunk (0: none), for tests.
 	int32 SectionVertices(int32 Chunk) const { return SectionVerts.IsValidIndex(Chunk) ? SectionVerts[Chunk] : 0; }
+	// Round 15 (gfxlow glue): the relief is drawn at its low variant (Graphics Low or a World map, client/main.js), and
+	// the changes of level applied in the middle of a match (relief.js gfx.onChange: setLow, rebuildGeometry).
+	bool ReliefLow() const { return ReliefCore.bLow; }
+	int32 ReliefLevelSwitches() const { return ReliefSwitches; }
 
 	int32 MaxChunksPerFrame = 24;
 	static constexpr int32 ChunkCells = 32;
@@ -89,6 +97,8 @@ public:
 private:
 
 	TCRelief::FRelief ReliefCore;
+	FTCGraphicsWatch GfxWatch;        // round 15: relief.js subscribes rebuildGeometry to gfx.onChange
+	int32 ReliefSwitches = 0;
 	const FTCWorldObjects* CellSource = nullptr;
 	int32 W = 0, H = 0, ChunksX = 0, ChunksY = 0, MeshedTotal = 0, DrawnCells = 0;
 	TArray<uint8> StartRows;          // the map rows at the start (ground.js town check on an authored map)

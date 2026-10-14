@@ -351,6 +351,7 @@ namespace TCAtmosCore
 #include "CoreMinimal.h"
 #include "UObject/StrongObjectPtr.h"
 #include "Client/TCLighting.h"
+#include "Client/TCGraphics.h"
 #include "World/TCRailways.h"
 
 class FTCMatchState;
@@ -408,8 +409,11 @@ public:
 	const FTCWeatherLook& Look() const { return Cur; }
 	FString FallKind() const { return FallNow; }
 	float FallFade() const { return FallA; }
-	int32 MistSheets() const { return MistOn ? FMath::Min((int32)Sites.size(), TCAtmosCore::MistCap) : 0; }
-	int32 BankSheets() const { return BanksOn ? FMath::Min((int32)BankAt.size(), TCAtmosCore::BankCap) : 0; }
+	// round 15: the sheets made for the level now (atmosphere.js applyGfx mist.count, banks.count)
+	int32 MistSheets() const { return MistOn ? MistBuilt : 0; }
+	int32 BankSheets() const { return BanksOn ? BanksBuilt : 0; }
+	int32 FallPointsDrawn() const { return FallNow.IsEmpty() ? 0 : FallDrawn; }
+	int32 GraphicsSwitches() const { return LevelSwitches; }
 	bool CloudsOn() const { return bCloudsShown; }
 	bool CoverOn() const { return bCoverShown; }
 	int32 GroundSectionsMirrored() const { return MirroredSections; }
@@ -423,6 +427,8 @@ private:
 	void Blend();
 	void ApplyMood();
 	void SwapFall(const FString& Kind);
+	void BuildFall();
+	void BuildSheets();
 	void SyncGround(const ATCTerrain* Terrain, bool bForce);
 	void UpdateSheets(double T);
 	void UpdateBirds(double T, const ATCTerrain* Terrain);
@@ -444,6 +450,10 @@ private:
 	std::vector<TCAtmosCore::FFlight> Flight;
 	std::vector<float> Phases;
 	bool MistOn = false, BanksOn = false, bCloudsShown = false, bCoverShown = false;
+	// Graphics (round 15): the level the sheets and the fall were made for, their counts, the change event
+	FTCGraphicsWatch GfxWatch;
+	bool GfxLow = false;
+	int32 MistBuilt = 0, BanksBuilt = 0, FallDrawn = 0, LevelSwitches = 0;
 	FString FallNow;      // the fall drawn now ('' none)
 	float FallA = 0.f;    // how far it has faded in
 	double FallVel[3] = { 0, 0, 0 };

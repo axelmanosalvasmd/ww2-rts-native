@@ -100,6 +100,10 @@ void ATCGameMode::RunSlice13Switches(double Now)
 			if (Best == MAX_int32) { UE_LOG(LogTC, Warning, TEXT("tour: %s: no living %s of seat %d; the pose's own target"), *P.Name, *P.UnitType, Seat); }
 			else P.UnitId = Best;
 		}
+		// round 15 (hudfit): a share of the widest view is a share of the widest view at the pose's heading. Turn first and
+		// read it once the controller has measured the widest view at that heading in its next tick (as the war map
+		// tour does); before, a pose right after a heading change read the previous heading's widest view
+		if (P.bWideShare && !P.bTurned) { PC->SetViewYawForChecks((float)P.Yaw); P.bTurned = true; return; }
 		const float Dist = P.bWideShare ? (float)(PC->WideDistance() * P.Dist) : (float)P.Dist;
 		PC->FocusOn(Focus);
 		PC->SetViewYawForChecks((float)P.Yaw);

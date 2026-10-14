@@ -108,6 +108,8 @@ public:
 	bool StoneDeck(int X, int Y) const override { return In(X, Y) && Objects.StoneDeckMask[Y * Objects.W + X] != 0; }
 	bool Spoil(int X, int Y) const override { return In(X, Y) && Objects.SpoilCells.Contains(Y * Objects.W + X); }
 	double Ground(double X, double Z) const override { return Ground_.HeightAt((float)X, (float)Z); }
+	// round 15: structures.js C.low (gfx.low when the pieces are built)
+	bool Low() const override { return Objects.bLow; }
 	// slice 13 lead glue: the relief (World/TCRelief.h) carves trench cells TRENCH_DEPTH down as client/relief.js does, so
 	// the ground at a trench centre is the carved floor structures.js reads (before slice 13 the flat placeholder ground was
 	// not carved and this answered Ground - TRENCH_DEPTH; with the relief that sank the parapets into the ground)
@@ -130,6 +132,8 @@ public:
 	int Level(int X, int Y) const override { return Objects.LevelAt(X, Y); }
 	double Ground(double X, double Z) const override { return Ground_.HeightAt((float)X, (float)Z); }
 	bool Skip(int Cell) const override { return Objects.RailCells.Contains(Cell); }
+	// round 15: props.js place() and visible() read gfx.low
+	bool Low() const override { return Objects.bLow; }
 
 private:
 	const FTCWorldObjects& Objects;
@@ -268,6 +272,10 @@ bool FTCWorldObjects::ApplyStart(const FJsonObject& M, const FTCMatchState& Stat
 	bWrecksDirty = true;
 
 	Pending.Reset(); Shaped.Reset(); bWhole = true;
+	// round 15: a start lays out at the level of the moment (structures.js C.low, props.js gfx.low); later changes
+	// arrive through the watch
+	GfxWatch.TakeChanged();
+	bLow = FTCGraphics::Get().IsLow();
 	Foot.clear(); Blocks.clear(); Rects.clear(); TintIndex.clear(); Tints.clear();
 	Houses.Reset();
 	HouseType.Init(-1, N);
@@ -538,6 +546,16 @@ void FTCWorldObjects::Update(const ATCTerrain& Ground, const FTCUnitTable* Table
 	const double T0 = FPlatformTime::Seconds();
 	const FSource Src(*this, Ground);
 	const bool bStart = bWhole;
+	// round 15: a change of Graphics level (gfx.onChange): structures.js rebuild() lays every piece again (whole, as
+	// old.low !== C.low), props.js refresh() places every prop again; the candidates stay
+	bool bLevelChanged = false;
+	if (GfxWatch.TakeChanged() && FTCGraphics::Get().IsLow() != bLow)
+	{
+		bLow = FTCGraphics::Get().IsLow();
+		bLevelChanged = true;
+		LevelSwitchCount++;
+		bWhole = true;
+	}
 	const bool bAny = bWhole || Pending.Num() > 0;
 	if (bAny)
 	{
@@ -676,6 +694,7 @@ void FTCWorldObjects::Update(const ATCTerrain& Ground, const FTCUnitTable* Table
 	}
 	else
 	{
+		if (bLevelChanged) { PlaceProps(Live, nullptr, 0); Shaped.Reset(); }
 		if (Shaped.Num()) { PlaceProps(Live, &Shaped, 3); Shaped.Reset(); }
 		if (bNodesChanged)
 		{
@@ -690,6 +709,9 @@ void FTCWorldObjects::Update(const ATCTerrain& Ground, const FTCUnitTable* Table
 		}
 	}
 	UpdateMs = (FPlatformTime::Seconds() - T0) * 1000.0;
+	if (bLevelChanged)
+		UE_LOG(LogTC, Log, TEXT("world objects: graphics %s mid-match: %d pieces relaid, %d of %d props shown, in %.1f ms"),
+			bLow ? TEXT("low") : TEXT("high"), ShapeCount(), PropsShown(), (int32)Candidates.size(), UpdateMs);
 	if (bStart)
 		UE_LOG(LogTC, Log, TEXT("world objects: %d houses on %d blocks, %d pieces (%d pickable), %d stone deck cells, %d named buildings; scenery %d candidates, %d shown; laid out in %.1f ms"),
 			Houses.Num(), (int32)Blocks.size(), ShapeCount(), PickableCount(), StoneCells(), Named.Num(), (int32)Candidates.size(), PropsShown(), UpdateMs);
@@ -992,15 +1014,17 @@ void FTCWorldObjectsView::LoadAssets()
 		Out.bLoaded = true;
 	};
 	// round 14 lead glue: Graphics Low (Client/TCGraphics.h) as structures.js and props.js read gfx.low when they build:
-	// no sandbag, chunk or rail shadows, no tree or bush shadows. Read when the assets load (a later switch of level
-	// applies from the next process start)
+	// no sandbag, chunk or rail shadows, no tree or bush shadows. Round 15: read here for the first components and again
+	// on every change of level (ApplyShadowLevel, from Draw)
+	GfxWatch.TakeChanged();
 	const bool bLowShadows = !FTCGraphics::Get().Budget().bPropShadows;
+	bShadowsLow = bLowShadows;
 	PieceAssets.SetNum(TCWorldCore::PieceCount);
 	for (int32 K = 0; K < TCWorldCore::PieceCount; K++)
 	{
 		const TCWorldCore::EPiece Kind = (TCWorldCore::EPiece)K;
 		Load(FString::Printf(TEXT("piece/%s|-1"), ANSI_TO_TCHAR(TCWorldCore::PieceName(Kind))), PieceAssets[K]);
-		PieceAssets[K].bShadow = bShadows && TCWorldCore::PieceShadow(Kind, bLowShadows);
+		PieceAssets[K].bShadow = bShadows && PieceCastsShadow(Kind, bLowShadows);
 		PieceAssets[K].bTrim = IsTrim(Kind);
 	}
 	PropAssets.SetNum(TCScatterCore::PropCount);
@@ -1009,7 +1033,7 @@ void FTCWorldObjectsView::LoadAssets()
 		const TCScatterCore::EProp Kind = (TCScatterCore::EProp)K;
 		Load(FTCScatter::CatalogKey(Kind), PropAssets[K]);
 		// props.js refresh: grass and crops are too low to shade anything; Low drops tree and bush shadows too
-		PropAssets[K].bShadow = bShadows && !bLowShadows && Kind != TCScatterCore::EProp::Grass && Kind != TCScatterCore::EProp::Crop;
+		PropAssets[K].bShadow = bShadows && PropCastsShadow(Kind, bLowShadows);
 	}
 	int32 Loaded = 0, World = 0;
 	for (const FKindAsset& A : PieceAssets) { Loaded += A.bLoaded ? 1 : 0; World += A.bWorldMaterials ? 1 : 0; }
@@ -1017,6 +1041,28 @@ void FTCWorldObjectsView::LoadAssets()
 	UE_LOG(LogTC, Log, TEXT("world objects: %d of %d piece and prop models loaded, %d with the world materials (%d material slots fell back to the catalog's: untinted, no fog)"),
 		Loaded, PieceAssets.Num() + PropAssets.Num(), World, MissingWorldMaterials);
 	if (MissingWorldMaterials) UE_LOG(LogTC, Error, TEXT("world objects: /Game/World materials missing; run unreal/Tools/world/make-world-materials.py"));
+}
+
+void FTCWorldObjectsView::ApplyShadowLevel(bool bLow)
+{
+	using namespace TCWorldObjectsImpl;
+	// light.js applyGfx and the builders' flush: the shadow casters of each kind at the new level, on the components
+	// already drawn (props.js refresh sets castShadow; structures.js rebuild flushes its meshes again)
+	bShadowsLow = bLow;
+	ShadowTurned = 0;
+	for (int32 K = 0; K < PieceAssets.Num(); K++) PieceAssets[K].bShadow = bShadows && PieceCastsShadow((TCWorldCore::EPiece)K, bLow);
+	for (int32 K = 0; K < PropAssets.Num(); K++) PropAssets[K].bShadow = bShadows && PropCastsShadow((TCScatterCore::EProp)K, bLow);
+	for (TPair<uint64, FComp>& P : Comps)
+	{
+		UHierarchicalInstancedStaticMeshComponent* C = P.Value.Comp.Get();
+		if (!C) continue;
+		const int32 Layer = (int32)((P.Key >> 16) & 0xffff), Kind = (int32)(P.Key & 0xffff);
+		const TArray<FKindAsset>& Assets = Layer == LayerPieces ? PieceAssets : PropAssets;
+		if (!Assets.IsValidIndex(Kind)) continue;
+		const bool bWant = Assets[Kind].bShadow;
+		if (C->CastShadow != bWant) { C->SetCastShadow(bWant); ShadowTurned++; }
+	}
+	UE_LOG(LogTC, Log, TEXT("world view: graphics %s: shadows turned on %d components (tree and bush shadows %s)"), bLow ? TEXT("low") : TEXT("high"), ShadowTurned, bLow ? TEXT("off") : TEXT("on"));
 }
 
 const FTCWorldObjectsView::FKindAsset& FTCWorldObjectsView::PieceAsset(TCWorldCore::EPiece Kind) { return PieceAssets[(int32)Kind]; }
@@ -1239,6 +1285,9 @@ void FTCWorldObjectsView::Draw(FTCWorldObjects& Model, const FTCMatchState& Stat
 	using namespace TCWorldObjectsImpl;
 	if (!Actor.IsValid() || !Model.HasMap()) return;
 	LoadAssets();
+	// round 15: a change of Graphics level turns the shadows of what is drawn now (the model relays and replaces at its
+	// own Update; the chunks it marks rebuild below)
+	if (GfxWatch.TakeChanged() && bAssetsLoaded && FTCGraphics::Get().IsLow() != bShadowsLow) ApplyShadowLevel(FTCGraphics::Get().IsLow());
 	const int32 Chunks = Model.ChunkCount();
 	if (Model.Generation() != DrawnGen)
 	{

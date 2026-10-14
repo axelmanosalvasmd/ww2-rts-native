@@ -3,6 +3,8 @@
 #include "Client/TCPersistence.h"
 #include "HAL/IConsoleManager.h"
 #include "Misc/ConfigCacheIni.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogTCGraphics, Log, All);
 
@@ -50,7 +52,46 @@ double FTCGraphicsBudget::ScreenPercentage(double Dpr) const
 FTCGraphics& FTCGraphics::Get()
 {
 	static FTCGraphics Game;
+	static bool bScheduleRead = false;
+	if (!bScheduleRead)
+	{
+		bScheduleRead = true;
+		FString Spec;
+		if (FParse::Value(FCommandLine::Get(), TEXT("TCGraphicsAt="), Spec, false))
+		{
+			Game.Schedule = ParseSchedule(Spec);
+			UE_LOG(LogTCGraphics, Log, TEXT("graphics: %d switches scheduled (-TCGraphicsAt=%s)"), Game.Schedule.Num(), *Spec);
+		}
+	}
 	return Game;
+}
+
+TArray<TPair<double, ETCGraphicsLevel>> FTCGraphics::ParseSchedule(const FString& Spec)
+{
+	TArray<TPair<double, ETCGraphicsLevel>> Out;
+	TArray<FString> Items;
+	Spec.ParseIntoArray(Items, TEXT(","));
+	for (const FString& Item : Items)
+	{
+		FString L, T;
+		if (!Item.Split(TEXT("@"), &L, &T)) continue;
+		L.TrimStartAndEndInline(); T.TrimStartAndEndInline();
+		if ((L != TEXT("low") && L != TEXT("high")) || !T.IsNumeric()) continue;
+		Out.Add({ FCString::Atod(*T), L == TEXT("low") ? ETCGraphicsLevel::Low : ETCGraphicsLevel::High });
+	}
+	Out.StableSort([](const TPair<double, ETCGraphicsLevel>& A, const TPair<double, ETCGraphicsLevel>& B) { return A.Key < B.Key; });
+	return Out;
+}
+
+void FTCGraphics::RunSchedule(double MatchSeconds)
+{
+	while (Schedule.Num() && MatchSeconds >= Schedule[0].Key)
+	{
+		const TPair<double, ETCGraphicsLevel> Next = Schedule[0];
+		Schedule.RemoveAt(0);
+		UE_LOG(LogTCGraphics, Log, TEXT("graphics: -TCGraphicsAt switch to %s at match %.2f s (scheduled %.2f s)"), LexToString(Next.Value), MatchSeconds, Next.Key);
+		Set(Next.Value, false);
+	}
 }
 
 FTCGraphics::FTCGraphics() : HighBudget(FTCGraphicsBudget::For(ETCGraphicsLevel::High)), LowBudget(FTCGraphicsBudget::For(ETCGraphicsLevel::Low))
@@ -86,11 +127,37 @@ void FTCGraphics::Load()
 	SlowFor = 0;
 }
 
-void FTCGraphics::Set(ETCGraphicsLevel Level)
+FTCGraphicsLevelScope::FTCGraphicsLevelScope(ETCGraphicsLevel Level) : Was(FTCGraphics::Get().Level()) { FTCGraphics::Get().Set(Level, false); }
+FTCGraphicsLevelScope::~FTCGraphicsLevelScope() { FTCGraphics::Get().Set(Was, false); }
+
+FTCGraphicsWatch::~FTCGraphicsWatch()
+{
+	if (Handle.IsValid() && Graphics) Graphics->OnChanged.Remove(Handle);
+}
+
+bool FTCGraphicsWatch::TakeChanged()
+{
+	if (!Handle.IsValid())
+	{
+		if (!Graphics) Graphics = &FTCGraphics::Get();
+		Count = MakeShared<int32>(0);
+		// the lambda holds the counter, not this object, so a moved or copied owner never leaves a dangling subscriber
+		Handle = Graphics->OnChanged.AddLambda([C = Count](ETCGraphicsLevel) { ++*C; });
+		Taken = 0;
+		return false;
+	}
+	if (*Count == Taken) return false;
+	Taken = *Count;
+	return true;
+}
+
+void FTCGraphics::Set(ETCGraphicsLevel Level, bool bSave)
 {
 	if (Level == Current) return;
 	Current = Level;
-	Write(LevelKey, LexToString(Level));
+	if (bSave) Write(LevelKey, LexToString(Level));
+	ChangeCount++;
+	UE_LOG(LogTCGraphics, Log, TEXT("graphics: level %s (change %d)%s"), LexToString(Current), ChangeCount, bSave ? TEXT("") : TEXT(", not saved"));
 	OnChanged.Broadcast(Current);
 }
 
@@ -135,8 +202,12 @@ TArray<FString> FTCGraphics::ApplyEngine(double DevicePixelRatio) const
 	{
 		if (IConsoleVariable* V = IConsoleManager::Get().FindConsoleVariable(Name))
 		{
-			V->Set(*Value, ECVF_SetByGameSetting);
-			Lines.Add(FString::Printf(TEXT("%s %s"), Name, *Value));
+			// round 15: by code, as the lobby backdrop sets r.ScreenPercentage (TCLobbyBackdrop, by code): a game setting
+			// is lower priority and was ignored after any backdrop had shown ("Value remains '100'" in the round 15 log),
+			// so Low's 75% never applied mid-match. The line reports the value read back.
+			V->Set(*Value, ECVF_SetByCode);
+			const FString Now = V->GetString();
+			Lines.Add(Now == Value || FCString::Atod(*Now) == FCString::Atod(*Value) ? FString::Printf(TEXT("%s %s"), Name, *Value) : FString::Printf(TEXT("%s %s (asked %s)"), Name, *Now, *Value));
 		}
 	};
 	SetVar(TEXT("r.ScreenPercentage"), FString::SanitizeFloat(B.ScreenPercentage(DevicePixelRatio)));
@@ -214,6 +285,34 @@ bool FTCGraphicsTest::RunTest(const FString&)
 	// labels
 	TestEqual(TEXT("menu label"), FTCGraphics::MenuLabel(ETCGraphicsLevel::Low), FString(TEXT("Graphics: Low")));
 	TestEqual(TEXT("gore label"), FTCGraphics::GoreLabel(false), FString(TEXT("Gore: Off")));
+
+	// round 15: the change event the world builders watch (gfx.onChange), the unsaved switch and the schedule
+	{
+		FTCGraphics S{ FString() };
+		FTCGraphicsWatch A(&S), B(&S);
+		TestFalse(TEXT("a watch subscribes at its first look"), A.TakeChanged());
+		TestTrue(TEXT("subscribed"), A.Subscribed() && !B.Subscribed());
+		S.Set(ETCGraphicsLevel::Low, false);
+		TestTrue(TEXT("the watch sees the change"), A.TakeChanged());
+		TestFalse(TEXT("once"), A.TakeChanged());
+		TestFalse(TEXT("a watch that subscribed after the change saw nothing"), B.TakeChanged());
+		S.Set(ETCGraphicsLevel::High, false); S.Set(ETCGraphicsLevel::Low, false);
+		TestTrue(TEXT("two changes, one look"), A.TakeChanged() && !A.TakeChanged());
+		TestEqual(TEXT("events counted"), A.Events(), 3);
+		TestTrue(TEXT("B saw the two after it subscribed"), B.TakeChanged() && B.Events() == 2);
+		{
+			FTCGraphicsWatch C(A); // a copy subscribes on its own and ends with itself
+			C.TakeChanged();
+			S.Set(ETCGraphicsLevel::High, false);
+			TestTrue(TEXT("the copy sees it"), C.TakeChanged());
+		}
+		S.Set(ETCGraphicsLevel::Low, false); // the copy is gone: no dangling subscriber
+		TestTrue(TEXT("the original still sees it"), A.TakeChanged());
+		TestEqual(TEXT("changes counted by the source"), S.Changes(), 5);
+		const auto Plan = FTCGraphics::ParseSchedule(TEXT("high@120, low@60,bad@3,low@x,medium@4"));
+		TestEqual(TEXT("schedule: two valid items"), Plan.Num(), 2);
+		TestTrue(TEXT("schedule sorted by time"), Plan.Num() == 2 && Plan[0].Key == 60.0 && Plan[0].Value == ETCGraphicsLevel::Low && Plan[1].Key == 120.0);
+	}
 	return true;
 }
 

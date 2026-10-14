@@ -14,6 +14,10 @@ public class ThreeCrossroads : ModuleRules
 		PrivateDependencyModuleNames.AddRange(new string[] { "MeshDescription", "StaticMeshDescription" });
 		// round 14 (warmap): the war map's runtime font (SlateCore) and the lobby backdrop's map request (HTTP)
 		PrivateDependencyModuleNames.AddRange(new string[] { "SlateCore", "HTTP" });
+		// round 15 (lobby): the invite link's Copy button (the system clipboard, FPlatformApplicationMisc)
+		PrivateDependencyModuleNames.Add("ApplicationCore");
+		// round 15 (alerts): the stats overlay's draw calls and triangles (client/perf.js renderer.info), GNumDrawCallsRHI
+		PrivateDependencyModuleNames.AddRange(new string[] { "RHI" });
 		PublicIncludePaths.Add(ModuleDirectory);
 	}
 }

@@ -220,29 +220,9 @@ void FTCAtmosphere::StartMatch(const FTCMatchState& State, const FString& MapKey
 	Flight = Flights(MW, MH);
 	Phases = BirdPhases();
 
-	if (!Sheets.IsValid()) Sheets = NewMesh(TEXT("AtmosSheets"), TCAtmos::SortMist, true);
-	UProceduralMeshComponent* SheetMesh = Sheets.Get();
-	// the mist and the banks: unit planes (three's PlaneGeometry(1, 1) laid flat), placed every frame
-	auto Planes = [SheetMesh](int32 Section, int32 N, UMaterialInterface* Mat)
-	{
-		TArray<FVector> V; TArray<int32> I; TArray<FVector> Nrm; TArray<FVector2D> UV;
-		for (int32 K = 0; K < N; K++)
-		{
-			const int32 B = V.Num();
-			// PlaneGeometry: (-0.5, 0.5) uv (0, 1), (0.5, 0.5) uv (1, 1), (-0.5, -0.5) uv (0, 0), (0.5, -0.5) uv (1, 0)
-			for (int32 Q = 0; Q < 4; Q++) { V.Add(FVector::ZeroVector); Nrm.Add(FVector::UpVector); UV.Add(FVector2D(Q % 2, Q < 2 ? 1 : 0)); }
-			I.Append({ B + 0, B + 2, B + 1, B + 2, B + 3, B + 1 });
-		}
-		if (!SheetMesh) return;
-		SheetMesh->CreateMeshSection_LinearColor(Section, V, I, Nrm, UV, {}, {}, false);
-		if (Mat) SheetMesh->SetMaterial(Section, Mat);
-	};
 	MistOn = MoodRow.bMist && Sites.size() > 0;
-	// atmosphere.js applyGfx: mist.count min(sites, low ? 18 : MIST_CAP), banks min(bankAt, low ? 26 : BANK_CAP)
-	// (Client/TCGraphics.h; here at the match's start: a change of level takes the new counts at the next match)
-	const FTCGraphicsBudget& Gfx = FTCGraphics::Get().Budget();
-	Planes(0, MistOn ? FMath::Min((int32)Sites.size(), FMath::Min(MistCap, Gfx.MistCap)) : 0, MistMat.Get());
-	Planes(1, FMath::Min((int32)BankAt.size(), FMath::Min(BankCap, Gfx.BankCap)), BankMat.Get());
+	GfxWatch.TakeChanged(); // subscribed before the level is read (gfx.onChange(applyGfx))
+	BuildSheets();
 
 	if (!BirdMesh.IsValid()) BirdMesh = NewMesh(TEXT("AtmosBirds"), TCAtmos::SortBirds, true);
 	if (UProceduralMeshComponent* B = BirdMesh.Get())
@@ -262,6 +242,36 @@ void FTCAtmosphere::StartMatch(const FTCMatchState& State, const FString& MapKey
 	LoggedState.Reset();
 	UE_LOG(LogTC, Log, TEXT("atmosphere: start on '%s' (key '%s'): mood %s, weather %s; mist %d sheets, fog banks %d, birds %d, fall '%s'; clouds %.3f; reference %hs"),
 		*State.Map.Name, *MapKey, *MoodRow.Name.ToString(), *WxNow, MistSheets(), (int32)BankAt.size(), (int32)Flight.size(), *FallNow, FMath::Min(0.32f, MoodRow.Clouds * Cur.Clouds), ReferencePin);
+}
+
+void FTCAtmosphere::BuildSheets()
+{
+	using namespace TCAtmosImpl;
+	if (!Sheets.IsValid()) Sheets = NewMesh(TEXT("AtmosSheets"), TCAtmos::SortMist, true);
+	UProceduralMeshComponent* SheetMesh = Sheets.Get();
+	// the mist and the banks: unit planes (three's PlaneGeometry(1, 1) laid flat), placed every frame
+	auto Planes = [SheetMesh](int32 Section, int32 N, UMaterialInterface* Mat)
+	{
+		TArray<FVector> V; TArray<int32> I; TArray<FVector> Nrm; TArray<FVector2D> UV;
+		for (int32 K = 0; K < N; K++)
+		{
+			const int32 B = V.Num();
+			// PlaneGeometry: (-0.5, 0.5) uv (0, 1), (0.5, 0.5) uv (1, 1), (-0.5, -0.5) uv (0, 0), (0.5, -0.5) uv (1, 0)
+			for (int32 Q = 0; Q < 4; Q++) { V.Add(FVector::ZeroVector); Nrm.Add(FVector::UpVector); UV.Add(FVector2D(Q % 2, Q < 2 ? 1 : 0)); }
+			I.Append({ B + 0, B + 2, B + 1, B + 2, B + 3, B + 1 });
+		}
+		if (!SheetMesh) return;
+		SheetMesh->CreateMeshSection_LinearColor(Section, V, I, Nrm, UV, {}, {}, false);
+		if (Mat) SheetMesh->SetMaterial(Section, Mat);
+	};
+	// atmosphere.js applyGfx: mist.count min(sites, low ? 18 : MIST_CAP), banks min(bankAt, low ? 26 : BANK_CAP)
+	// (Client/TCGraphics.h); round 15: at the start and again on every change of level (Update)
+	const FTCGraphicsBudget& Gfx = FTCGraphics::Get().Budget();
+	GfxLow = FTCGraphics::Get().IsLow();
+	MistBuilt = MistOn ? FMath::Min((int32)Sites.size(), FMath::Min(MistCap, Gfx.MistCap)) : 0;
+	BanksBuilt = FMath::Min((int32)BankAt.size(), FMath::Min(BankCap, Gfx.BankCap));
+	Planes(0, MistBuilt, MistMat.Get());
+	Planes(1, BanksBuilt, BankMat.Get());
 }
 
 void FTCAtmosphere::SetHazeDistances(float Near, float Far)
@@ -319,6 +329,16 @@ void FTCAtmosphere::SwapFall(const FString& Kind)
 	const FFall& F = Fall(Index);
 	// it falls on the wind it started in (client/wind.js): the slant never changes under a fall already on screen
 	FallVelocity(F, WindNow.X, WindNow.Z, FallVel);
+	BuildFall();
+	UE_LOG(LogTC, Log, TEXT("atmosphere: %s falls (%d points, %d drawn, velocity %.2f, %.2f, %.2f m/s on the wind %.2f, %.2f)"), *Kind, F.N, FallDrawn, FallVel[0], FallVel[1], FallVel[2], WindNow.X, WindNow.Z);
+}
+
+void FTCAtmosphere::BuildFall()
+{
+	using namespace TCAtmosImpl;
+	const int32 Index = FallIndex(TCHAR_TO_UTF8(*FallNow));
+	if (Index < 0) return;
+	const FFall& F = Fall(Index);
 	std::vector<float> Pos, Rnd;
 	FallData(F, Pos, Rnd);
 	if (!FallMesh.IsValid()) FallMesh = NewMesh(TEXT("AtmosFall"), TCAtmos::SortFall, false);
@@ -330,8 +350,9 @@ void FTCAtmosphere::SwapFall(const FString& Kind)
 	// UV0 = aRand.xy, UV1 = aRand.zw, vertex colour = the corner (gl_PointCoord)
 	TArray<FVector> V; TArray<int32> I; TArray<FVector2D> U0, U1; TArray<FLinearColor> Col;
 	V.Reserve(F.N * 4); I.Reserve(F.N * 6);
-	// atmosphere.js applyGfx: fall.geometry.setDrawRange(0, low ? ceil(n / 3) : n) (a change of level takes it at the next fall)
+	// atmosphere.js applyGfx: fall.geometry.setDrawRange(0, low ? ceil(n / 3) : n) (round 15: again on a change of level)
 	const int32 Drawn = FTCGraphics::Get().Budget().FallParticles(F.N);
+	FallDrawn = Drawn;
 	for (int32 K = 0; K < Drawn; K++)
 	{
 		const FVector P = ToUe(Pos[K * 3] * F.Box[0], Pos[K * 3 + 1] * F.Box[1], Pos[K * 3 + 2] * F.Box[2]);
@@ -359,7 +380,6 @@ void FTCAtmosphere::SwapFall(const FString& Kind)
 		FallMat->SetVectorParameterValue(TEXT("Color"), TCLook::HexLinear(F.Color));
 		FallMat->SetScalarParameterValue(TEXT("Streak"), F.Streak);
 	}
-	UE_LOG(LogTC, Log, TEXT("atmosphere: %s falls (%d points, velocity %.2f, %.2f, %.2f m/s on the wind %.2f, %.2f)"), *Kind, F.N, FallVel[0], FallVel[1], FallVel[2], WindNow.X, WindNow.Z);
 }
 
 void FTCAtmosphere::SyncGround(const ATCTerrain* Terrain, bool bForce)
@@ -441,6 +461,16 @@ void FTCAtmosphere::Update(float Dt, const FTCMatchState& State, const ATCTerrai
 	}
 	T = FMath::Fmod(T + Dt, 10000.0);
 	SyncGround(Terrain, false);
+	// round 15: gfx.onChange(applyGfx): the mist and bank counts and the fall's draw range follow a change of level in
+	// the middle of a match (clouds, birds and the dust fall read the level every frame below)
+	if (GfxWatch.TakeChanged() && FTCGraphics::Get().IsLow() != GfxLow)
+	{
+		BuildSheets();
+		if (!FallNow.IsEmpty()) BuildFall();
+		LevelSwitches++;
+		UE_LOG(LogTC, Log, TEXT("atmosphere: graphics %s mid-match: mist %d sheets, fog banks %d, fall '%s' %d points drawn, clouds %s, birds %s"), GfxLow ? TEXT("low") : TEXT("high"),
+			MistBuilt, BanksBuilt, *FallNow, FallDrawn, FTCGraphics::Get().Budget().bCloudShadows ? TEXT("on") : TEXT("off"), FTCGraphics::Get().Budget().bBirds ? TEXT("on") : TEXT("off"));
+	}
 
 	// ease toward the weather (about 8 s to settle), as ATCLighting eases the light
 	const float K = 1.f - FMath::Exp(-Dt / 2.5f);
@@ -874,6 +904,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCAtmosphereOracleTest, "ThreeCrossroads.World
 bool FTCAtmosphereOracleTest::RunTest(const FString& Parameters)
 {
 	using namespace TCAtmosTests;
+	const FTCGraphicsLevelScope HighLevel(ETCGraphicsLevel::High); // round 15: the oracle is atmosphere.js on High
 	FString Error;
 	const TSharedPtr<FJsonObject> Root = LoadFixture(Error);
 	if (!Root.IsValid()) { AddError(Error); return false; }

@@ -1224,6 +1224,24 @@ void FRelief::Build()
 	for (const FPart& P : Parts) { Stats.Vertices += P.Vertices(); Stats.Triangles += (int)(P.Idx.size() / 3); }
 }
 
+bool FRelief::SetLow(bool bNewLow)
+{
+	if (bNewLow == bLow) return false;
+	bLow = bNewLow;
+	if (N <= 0) return false;
+	// relief.js rebuildGeometry() with no touched set: the rows' walls and rocks, the centre fans, every part
+	for (int Z = 0; Z < H; Z++) PlanRow(Z);
+	const size_t Before = Rebuilt.size();
+	Fans();
+	Rebuilt.resize(Before);
+	Stats.PartsRebuilt = 0;
+	for (int P = 0; P < (int)Parts.size(); P++) { EmitPart(P); Rebuilt.push_back(P); Stats.PartsRebuilt++; }
+	Stats.CliffEdges = CliffEdgesNow();
+	Stats.Vertices = Stats.Triangles = 0;
+	for (const FPart& P : Parts) { Stats.Vertices += P.Vertices(); Stats.Triangles += (int)(P.Idx.size() / 3); }
+	return true;
+}
+
 int FRelief::CliffEdgesNow() const
 {
 	int Sum = 0;

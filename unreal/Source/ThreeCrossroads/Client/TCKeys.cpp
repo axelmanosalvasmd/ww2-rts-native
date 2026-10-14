@@ -3,6 +3,11 @@
 #include "Net/TCMatchState.h"
 #include "InputCoreTypes.h"
 #include "Containers/StringConv.h"
+#include "Client/TCLocale.h"
+#include "Dom/JsonObject.h"
+#include "Dom/JsonValue.h"
+#include "Serialization/JsonReader.h"
+#include "Serialization/JsonSerializer.h"
 
 const TCHAR* LexToString(ETCKeyContext Context)
 {
@@ -378,6 +383,300 @@ bool FTCDoubleClick::Click(double PressTime, FVector2D At)
 	return false;
 }
 
+// ---------------------------------------------------------------------------------------------------------------------
+// Round 15: client/main.js keydown's order for F1, F2 and the table (M), client/perf.js and client/stats.js
+
+ETCKeyRoute TCKeys::Route(const FString& Code, bool bHudShown, bool bRepeat, bool bControlsOpen, bool bStatsSheetOpen)
+{
+	// if (e.code === 'F1' && !$('hud').classList.contains('hidden')) { ...; toggle; return }
+	if (Code == TEXT("F1") && bHudShown) return ETCKeyRoute::ControlsSheet;
+	// if (e.code === 'F2' && !hidden) { e.preventDefault(); if (!e.repeat) stats.toggle(); return }
+	if (Code == TEXT("F2") && bHudShown) return bRepeat ? ETCKeyRoute::Swallowed : ETCKeyRoute::StatsToggle;
+	// if (controlsSheet.open || stats.isOpen()) return
+	if (bControlsOpen || bStatsSheetOpen) return ETCKeyRoute::Swallowed;
+	return ETCKeyRoute::Table;
+}
+
+bool TCKeys::RunsInLobby(const FString& Id)
+{
+	// the browser runs any table action without a match; in the lobby only M changes anything a player can see or hear
+	return Id == TEXT("mute");
+}
+
+namespace
+{
+	double JsRoundN(double V) { return FMath::FloorToDouble(V + 0.5); } // Math.round
+	FString Num(double V) { return FTCObjectives::JsNumber(V); }
+}
+
+void FTCPerf::Net(int32 InBytes, double NowMs)
+{
+	if (LastSnap) GapMs = FMath::Max(GapMs, NowMs - LastSnap);
+	LastSnap = NowMs; Snaps++; Bytes += InBytes;
+}
+
+void FTCPerf::Pinged(double C) { Out.Add(C, C); }
+
+TOptional<double> FTCPerf::Pong(const FJsonObject& M, double NowMs)
+{
+	double C = 0;
+	const TSharedPtr<FJsonValue> V = M.TryGetField(TEXT("c"));
+	if (!V.IsValid() || V->Type != EJson::Number || !FMath::IsFinite(C = V->AsNumber())) return TOptional<double>();
+	const double Rtt = JsRoundN(NowMs - C);
+	// out.delete(m.c): the stamp as the JSON brought it back (a double's text can lose its last digits here)
+	double Key = 0; bool bFound = false;
+	for (const TPair<double, double>& P : Out) if (FMath::Abs(P.Key - C) < 0.01) { Key = P.Key; bFound = true; break; }
+	if (bFound) { Out.Remove(Key); Done.Add(false); if (Done.Num() > Pings) Done.RemoveAt(0); }
+	Rtts.Add(Rtt); if (Rtts.Num() > Pings) Rtts.RemoveAt(0);
+	Stat.Ping = Rtt;
+	const TArray<TSharedPtr<FJsonValue>>* Srv = nullptr;
+	if (M.TryGetArrayField(TEXT("srv"), Srv) && Srv)
+	{
+		// [stat.srvTick, stat.srvEvery] = m.srv (a missing or non-number entry is undefined, shown as n/a)
+		auto At = [Srv](int32 I) { return Srv->IsValidIndex(I) && (*Srv)[I].IsValid() && (*Srv)[I]->Type == EJson::Number ? TOptional<double>((*Srv)[I]->AsNumber()) : TOptional<double>(); };
+		Stat.SrvTick = At(0); Stat.SrvEvery = At(1);
+	}
+	return Rtt;
+}
+
+void FTCPerf::RollPings(double NowMs)
+{
+	for (auto It = Out.CreateIterator(); It; ++It)
+		if (NowMs - It.Value() > LostAfter) { It.RemoveCurrent(); Done.Add(true); if (Done.Num() > Pings) Done.RemoveAt(0); }
+	int32 Lost = 0;
+	for (bool B : Done) Lost += B;
+	Stat.Loss = Done.Num() ? TOptional<double>(JsRoundN((double)Lost / Done.Num() * 1000) / 10) : TOptional<double>();
+	double D = 0;
+	for (int32 I = 1; I < Rtts.Num(); I++) D += FMath::Abs(Rtts[I] - Rtts[I - 1]);
+	Stat.Jitter = Rtts.Num() > 1 ? TOptional<double>(JsRoundN(D / (Rtts.Num() - 1))) : TOptional<double>();
+}
+
+bool FTCPerf::Frame(double StartMs, double NowMs, double BusyMs, int64 Calls, int64 Tris, int32 Units, int32 Fx, int32 Corpses)
+{
+	if (Since < 0) Since = StartMs; // perf.js: since = performance.now() when the module loads
+	Frames++; Busy += BusyMs;
+	if (LastStart) Worst = FMath::Max(Worst, StartMs - LastStart);
+	LastStart = StartMs;
+	Stat.Calls = Calls; Stat.Tris = Tris; Stat.Units = Units; Stat.Fx = Fx; Stat.Corpses = Corpses;
+	const double Span = NowMs - Since;
+	if (Span < 1000) return false;
+	Stat.Fps = JsRoundN(Frames * 10000 / Span) / 10;
+	Stat.Ms = JsRoundN(Span / Frames * 10) / 10;
+	Stat.Worst = JsRoundN(Worst * 10) / 10;
+	Stat.Cpu = JsRoundN(Busy / Frames * 10) / 10;
+	Stat.Snaps = JsRoundN(Snaps * 10000 / Span) / 10;
+	Stat.Bytes = Snaps ? (int32)JsRoundN(Bytes / Snaps) : 0;
+	Stat.Kbs = JsRoundN(Bytes / Span * 10) / 10;
+	Stat.Gap = JsRoundN(LastSnap ? FMath::Max(GapMs, NowMs - LastSnap) : 0);
+	RollPings(NowMs);
+	Frames = Snaps = 0; Busy = Bytes = GapMs = Worst = 0; Since = NowMs;
+	return true;
+}
+
+const TArray<FTCStatDef>& FTCStatsOverlay::Defs()
+{
+	static const TArray<FTCStatDef> D = {
+		{ TEXT("Performance"), TEXT("fps"), TEXT("FPS"), TEXT("Frame rate"), nullptr },
+		{ TEXT("Performance"), TEXT("frame"), TEXT("Frame"), TEXT("Frame time"), TEXT("Average over the last second") },
+		{ TEXT("Performance"), TEXT("worst"), TEXT("Worst"), TEXT("Worst frame"), TEXT("Longest in the last second: hitches") },
+		{ TEXT("Performance"), TEXT("cpu"), TEXT("JS"), TEXT("Script time"), TEXT("Game code per frame") },
+		{ TEXT("Performance"), TEXT("calls"), TEXT("Draws"), TEXT("Draw calls"), nullptr },
+		{ TEXT("Performance"), TEXT("tris"), TEXT("Tris"), TEXT("Triangles"), nullptr },
+		{ TEXT("Performance"), TEXT("scale"), TEXT("Res"), TEXT("Render scale and graphics"), nullptr },
+		{ TEXT("Performance"), TEXT("mem"), TEXT("Mem"), TEXT("Memory"), TEXT("Chrome and Edge only") },
+		{ TEXT("Network"), TEXT("ping"), TEXT("Ping"), TEXT("Ping"), TEXT("Round trip to the server") },
+		{ TEXT("Network"), TEXT("jitter"), TEXT("Jitter"), TEXT("Jitter"), TEXT("How much the ping swings") },
+		{ TEXT("Network"), TEXT("loss"), TEXT("Loss"), TEXT("Loss"), TEXT("Pings unanswered after 3 s, last minute") },
+		{ TEXT("Network"), TEXT("snaps"), TEXT("Upd"), TEXT("Updates per second"), TEXT("Game state messages received") },
+		{ TEXT("Network"), TEXT("gap"), TEXT("Gap"), TEXT("Longest update gap"), TEXT("Longest wait in the last second: stalls") },
+		{ TEXT("Network"), TEXT("size"), TEXT("Size"), TEXT("Update size"), nullptr },
+		{ TEXT("Network"), TEXT("kbs"), TEXT("Down"), TEXT("Download rate"), nullptr },
+		{ TEXT("Network"), TEXT("server"), TEXT("Server"), TEXT("Server tick"), TEXT("Slowest 5% of ticks that send an update; over 40 ms it sends fewer") },
+		{ TEXT("Game"), TEXT("units"), TEXT("Units"), TEXT("Units"), nullptr },
+		{ TEXT("Game"), TEXT("fx"), TEXT("FX"), TEXT("Effect particles"), nullptr },
+		{ TEXT("Game"), TEXT("corpses"), TEXT("Bodies"), TEXT("Bodies"), nullptr },
+	};
+	return D;
+}
+
+TArray<FString> FTCStatsOverlay::Preset(const FString& Name)
+{
+	if (Name == TEXT("Basic")) return { TEXT("fps"), TEXT("ping"), TEXT("loss") };
+	if (Name == TEXT("Performance")) return { TEXT("fps"), TEXT("frame"), TEXT("worst"), TEXT("cpu"), TEXT("calls"), TEXT("tris"), TEXT("mem") };
+	if (Name == TEXT("Network")) return { TEXT("ping"), TEXT("jitter"), TEXT("loss"), TEXT("snaps"), TEXT("gap"), TEXT("kbs"), TEXT("server") };
+	TArray<FString> All;
+	if (Name == TEXT("Everything")) for (const FTCStatDef& D : Defs()) All.Add(D.Id);
+	return All;
+}
+
+void FTCStatsOverlay::Load(const TOptional<FString>& Saved, bool bForced)
+{
+	S = FTCStatsSettings();
+	bForcedAll = bForced;
+	TSharedPtr<FJsonObject> O;
+	if (Saved.IsSet())
+	{
+		// try { saved = JSON.parse(...) } catch {}; a value that is not an object keeps every default
+		const TSharedRef<TJsonReader<>> R = TJsonReaderFactory<>::Create(*Saved);
+		if (!FJsonSerializer::Deserialize(R, O)) O.Reset();
+	}
+	if (O.IsValid())
+	{
+		bool B = false;
+		if (O->HasTypedField<EJson::Boolean>(TEXT("show")) && O->TryGetBoolField(TEXT("show"), B)) S.bShow = B;
+		if (O->HasTypedField<EJson::Boolean>(TEXT("warn")) && O->TryGetBoolField(TEXT("warn"), B)) S.bWarn = B;
+		const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
+		if (O->HasTypedField<EJson::Array>(TEXT("stats")) && O->TryGetArrayField(TEXT("stats"), Arr))
+		{
+			// IDS.filter((id) => saved.stats.includes(id)): the table's order, strings only
+			S.Stats.Reset();
+			for (const FTCStatDef& D : Defs())
+				if (Arr->ContainsByPredicate([&D](const TSharedPtr<FJsonValue>& V) { return V.IsValid() && V->Type == EJson::String && V->AsString() == D.Id; })) S.Stats.Add(D.Id);
+		}
+		// if (saved[key] in CHOICES[key]) s[key] = saved[key]: a string that names a choice (a number never does)
+		auto Choice = [&O](const TCHAR* Key, std::initializer_list<const TCHAR*> Opts, FString& Out)
+		{
+			FString V;
+			if (!O->HasTypedField<EJson::String>(Key) || !O->TryGetStringField(Key, V)) return;
+			for (const TCHAR* Opt : Opts) if (V == Opt) { Out = V; return; }
+		};
+		Choice(TEXT("pos"), { TEXT("tl"), TEXT("tc"), TEXT("tr") }, S.Pos);
+		Choice(TEXT("layout"), { TEXT("list"), TEXT("line") }, S.Layout);
+		Choice(TEXT("size"), { TEXT("s"), TEXT("m"), TEXT("l") }, S.Size);
+		Choice(TEXT("bg"), { TEXT("panel"), TEXT("clear"), TEXT("none") }, S.Bg);
+	}
+	if (bForced) { S.bShow = true; S.Stats = Preset(TEXT("Everything")); } // '?perf' (-TCPerf here)
+}
+
+TOptional<FString> FTCStatsOverlay::SaveText() const
+{
+	if (bForcedAll) return TOptional<FString>();
+	// JSON.stringify(settings): show, stats, pos, layout, size, bg, warn (DEFAULTS' order)
+	TArray<FString> Q;
+	for (const FString& Id : S.Stats) Q.Add(FString::Printf(TEXT("\"%s\""), *Id));
+	return FString::Printf(TEXT("{\"show\":%s,\"stats\":[%s],\"pos\":\"%s\",\"layout\":\"%s\",\"size\":\"%s\",\"bg\":\"%s\",\"warn\":%s}"),
+		S.bShow ? TEXT("true") : TEXT("false"), *FString::Join(Q, TEXT(",")), *S.Pos, *S.Layout, *S.Size, *S.Bg, S.bWarn ? TEXT("true") : TEXT("false"));
+}
+
+FString FTCStatsOverlay::Show(const FString& Id, const FTCPerfStats& St)
+{
+	auto K = [](double N) { return N >= 1000 ? FTCObjectives::JsToFixed(N / 1000, 1) + TEXT("k") : Num(N); };
+	auto Ms = [](const TOptional<double>& N) { return N.IsSet() ? Num(*N) + TEXT(" ms") : FString(TEXT("n/a")); };
+	if (Id == TEXT("fps")) return Num(St.Fps);
+	if (Id == TEXT("frame")) return Ms(St.Ms);
+	if (Id == TEXT("worst")) return Ms(St.Worst);
+	if (Id == TEXT("cpu")) return Ms(St.Cpu);
+	if (Id == TEXT("calls")) return Num((double)St.Calls);
+	if (Id == TEXT("tris")) return K((double)St.Tris);
+	if (Id == TEXT("scale")) return FString::Printf(TEXT("%sx %s"), *Num(St.Scale), *St.Gfx);
+	if (Id == TEXT("mem")) return St.Mem.IsSet() ? Num(*St.Mem) + TEXT(" MB") : FString(TEXT("n/a"));
+	if (Id == TEXT("ping")) return Ms(St.Ping);
+	if (Id == TEXT("jitter")) return Ms(St.Jitter);
+	if (Id == TEXT("loss")) return St.Loss.IsSet() ? Num(*St.Loss) + TEXT("%") : FString(TEXT("n/a"));
+	if (Id == TEXT("snaps")) return Num(St.Snaps) + TEXT("/s");
+	if (Id == TEXT("gap")) return Ms(St.Gap);
+	if (Id == TEXT("size")) return FTCObjectives::JsToFixed(St.Bytes / 1000.0, 1) + TEXT(" kB");
+	if (Id == TEXT("kbs")) return Num(St.Kbs) + TEXT(" kB/s");
+	if (Id == TEXT("server")) return St.SrvTick.IsSet() ? Num(*St.SrvTick) + TEXT(" ms") : FString(TEXT("n/a"));
+	if (Id == TEXT("units")) return Num(St.Units);
+	if (Id == TEXT("fx")) return K(St.Fx);
+	if (Id == TEXT("corpses")) return Num(St.Corpses);
+	return FString();
+}
+
+int32 FTCStatsOverlay::Warn(const FString& Id, const FTCPerfStats& St)
+{
+	// band(v, amber, red, low): 0 fine, 1 amber, 2 red; null is fine; low marks numbers where less is worse
+	auto Band = [](const TOptional<double>& V, double Amber, double Red, bool bLow = false) { if (!V.IsSet()) return 0; const double X = *V; return bLow ? (X < Red ? 2 : X < Amber ? 1 : 0) : (X > Red ? 2 : X > Amber ? 1 : 0); };
+	if (Id == TEXT("fps")) return Band(St.Fps, 50, 30, true);
+	if (Id == TEXT("frame")) return Band(St.Ms, 20, 33);
+	if (Id == TEXT("worst")) return Band(St.Worst, 33, 66);
+	if (Id == TEXT("cpu")) return Band(St.Cpu, 12, 20);
+	if (Id == TEXT("ping")) return Band(St.Ping, 80, 150);
+	if (Id == TEXT("jitter")) return Band(St.Jitter, 15, 40);
+	if (Id == TEXT("loss")) return Band(St.Loss, 0, 5);
+	if (Id == TEXT("snaps")) return Band(St.Snaps, 7, 4, true);
+	if (Id == TEXT("gap")) return Band(St.Gap, 200, 400);
+	if (Id == TEXT("server")) return Band(St.SrvTick, 25, 40);
+	return 0;
+}
+
+TArray<FTCStatsOverlay::FRow> FTCStatsOverlay::Rows(const FTCPerfStats& St) const
+{
+	TArray<FRow> Out;
+	for (const FTCStatDef& D : Defs())
+		if (S.Stats.Contains(D.Id)) Out.Add({ D.Tag, TC_T(Show(D.Id, St)), S.bWarn ? Warn(D.Id, St) : 0 });
+	return Out;
+}
+
+FTCPaint FTCStatsOverlay::Layout(const FTCPerfStats& St, float TopTl, float TopTc, float TopTr, const FBox2D& Strip, float LeftOfTr, float RightOfTl, float ViewW, const FTCMeasure& Measure) const
+{
+	FTCPaint P;
+	if (!S.bShow) return P;
+	// stats.css: 14 px (12 small, 17 large), padding 5px 9px (4px 7px, 6px 11px); no background: no side padding
+	const float Px = S.Size == TEXT("s") ? 12.f : S.Size == TEXT("l") ? 17.f : 14.f;
+	const float PadY = S.Size == TEXT("s") ? 4.f : S.Size == TEXT("l") ? 6.f : 5.f, PadX = S.Bg == TEXT("none") ? 0.f : S.Size == TEXT("s") ? 7.f : S.Size == TEXT("l") ? 11.f : 9.f;
+	const float LineH = Px * 1.35f, Gap = 8.f, ColGap = 14.f;
+	const TArray<FRow> R = Rows(St);
+	// the content: a grid of tag and value columns (list), or the stats wrapped in one line (line)
+	struct FCell { FString Text; float X = 0, Y = 0; FLinearColor C; ETCPaintAlign A = ETCPaintAlign::Left; };
+	TArray<FCell> Cells;
+	float W = 0, H = 0;
+	const FLinearColor Amber = TCCss::Brass, RedC = TCCss::RedHi;
+	auto ValC = [&](int32 Warn) { return Warn == 2 ? RedC : Warn == 1 ? Amber : TCCss::Text; };
+	if (!R.Num())
+	{
+		const FString T = TC_T(FString(TEXT("No stats picked. Menu > Stats overlay")));
+		Cells.Add({ T, 0, 0, TCCss::Text });
+		W = Measure(T, Px, false, 0.f); H = LineH;
+	}
+	else if (S.Layout == TEXT("list"))
+	{
+		float TagW = 0, ValW = 0;
+		for (const FRow& Row : R) { TagW = FMath::Max(TagW, Measure(Row.Tag, Px, false, 0.f)); ValW = FMath::Max(ValW, Measure(Row.Value, Px, false, 0.f)); }
+		for (int32 I = 0; I < R.Num(); I++)
+		{
+			Cells.Add({ R[I].Tag, 0, I * LineH, TCCss::Dim });
+			Cells.Add({ R[I].Value, TagW + ColGap + ValW, I * LineH, ValC(R[I].Warn), ETCPaintAlign::Right });
+		}
+		W = TagW + ColGap + ValW; H = R.Num() * LineH;
+	}
+	else
+	{
+		// layout-line: max-width from the room beside the panels at its sides (at least 160), wrapping between stats
+		const float Room = S.Pos == TEXT("tl") ? LeftOfTr : S.Pos == TEXT("tr") ? ViewW - RightOfTl : 2 * FMath::Min(ViewW / 2 - RightOfTl, LeftOfTr - ViewW / 2);
+		const float MaxW = FMath::Min(FMath::Max(160.f, Room - 16.f), ViewW - 2 * Gap) - 2 * PadX - 2;
+		float X = 0, Y = 0;
+		for (const FRow& Row : R)
+		{
+			const float Tw = Measure(Row.Tag, Px, false, 0.f), Vw = Measure(Row.Value, Px, false, 0.f), Iw = Tw + 5 + Vw;
+			if (X > 0 && X + ColGap + Iw > MaxW) { X = 0; Y += LineH; }
+			const float At = X > 0 ? X + ColGap : 0.f;
+			Cells.Add({ Row.Tag, At, Y, TCCss::Dim });
+			Cells.Add({ Row.Value, At + Tw + 5, Y, ValC(Row.Warn) });
+			X = At + Iw; W = FMath::Max(W, X);
+		}
+		H = Y + LineH;
+	}
+	const float Border = S.Bg == TEXT("none") ? 0.f : 1.f, BoxW = W + 2 * PadX + 2 * Border, BoxH = H + 2 * PadY + 2 * Border;
+	// left var(--gap) (+2 px without a background), right likewise, or centred
+	const float X0 = S.Pos == TEXT("tl") ? Gap + (S.Bg == TEXT("none") ? 2.f : 0.f) : S.Pos == TEXT("tr") ? ViewW - Gap - (S.Bg == TEXT("none") ? 2.f : 0.f) - BoxW : (ViewW - BoxW) / 2;
+	// place(): under its panel (6 px), else 52 px; a box that would run into the score strip goes under it
+	const float Under = S.Pos == TEXT("tl") ? TopTl : S.Pos == TEXT("tr") ? TopTr : TopTc;
+	float Y0 = Under >= 0 ? Under + 6.f : 52.f;
+	if (Strip.bIsValid && S.Pos != TEXT("tc") && X0 < Strip.Max.X && X0 + BoxW > Strip.Min.X && Y0 < Strip.Max.Y) Y0 = Strip.Max.Y + 6.f;
+	if (S.Bg == TEXT("panel")) { P.Rect(X0, Y0, BoxW, BoxH, TCCss::PanelSolid, TEXT("stats:box")); P.Frame(X0, Y0, BoxW, BoxH, TCCss::Line, 1.f, TEXT("stats:frame")); }
+	else if (S.Bg == TEXT("clear")) { P.Rect(X0, Y0, BoxW, BoxH, TCCss::Rgba(25, 28, 30, 0.5f), TEXT("stats:box")); P.Frame(X0, Y0, BoxW, BoxH, TCCss::LineSoft, 1.f, TEXT("stats:frame")); }
+	for (const FCell& C : Cells)
+	{
+		const float Tx = X0 + Border + PadX + C.X, Ty = Y0 + Border + PadY + C.Y;
+		if (S.Bg == TEXT("none")) { FTCPaintItem& Sh = P.Text(C.Text, Tx, Ty + 1.f, Px, TCCss::Rgba(0, 0, 0, 0.95f), false, C.A, TEXT("stats:shadow")); Sh.Size.Y = LineH; }
+		FTCPaintItem& T = P.Text(C.Text, Tx, Ty, Px, C.C, false, C.A, C.C.Equals(TCCss::Dim) ? TEXT("stats:tag") : TEXT("stats:value"));
+		T.Size.Y = LineH;
+	}
+	return P;
+}
+
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Client/TCArmyCommands.h"
@@ -613,6 +912,101 @@ bool FTCKeysSelectionTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("too late"), D.Click(11.2, FVector2D(103, 98)));
 	TestFalse(TEXT("too far"), D.Click(11.4, FVector2D(120, 98)));
 	TestTrue(TEXT("near the last one and in time"), D.Click(11.6, FVector2D(121, 99)));
+	return true;
+}
+
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCKeysF2MTest, "ThreeCrossroads.Keys.F2AndM", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+bool FTCKeysF2MTest::RunTest(const FString&)
+{
+	// client/main.js keydown: F1 and F2 first while the HUD shows (F2 not on a repeat), then the open sheets swallow keys
+	TestTrue(TEXT("F1 in a match"), TCKeys::Route(TEXT("F1"), true, false, false, false) == ETCKeyRoute::ControlsSheet);
+	TestTrue(TEXT("F1 repeated still toggles"), TCKeys::Route(TEXT("F1"), true, true, false, false) == ETCKeyRoute::ControlsSheet);
+	TestTrue(TEXT("F1 with the Controls sheet open closes it"), TCKeys::Route(TEXT("F1"), true, false, true, false) == ETCKeyRoute::ControlsSheet);
+	TestTrue(TEXT("F2 in a match"), TCKeys::Route(TEXT("F2"), true, false, false, false) == ETCKeyRoute::StatsToggle);
+	TestTrue(TEXT("F2 over the Controls sheet still toggles"), TCKeys::Route(TEXT("F2"), true, false, true, false) == ETCKeyRoute::StatsToggle);
+	TestTrue(TEXT("F2 repeated: nothing"), TCKeys::Route(TEXT("F2"), true, true, false, false) == ETCKeyRoute::Swallowed);
+	TestTrue(TEXT("F2 in the lobby: the table (no binding)"), TCKeys::Route(TEXT("F2"), false, false, false, false) == ETCKeyRoute::Table);
+	TestTrue(TEXT("M with the Controls sheet open: stops there"), TCKeys::Route(TEXT("KeyM"), true, false, true, false) == ETCKeyRoute::Swallowed);
+	TestTrue(TEXT("M with the stats sheet open: stops there"), TCKeys::Route(TEXT("KeyM"), true, false, false, true) == ETCKeyRoute::Swallowed);
+	TestTrue(TEXT("M in the lobby: the table"), TCKeys::Route(TEXT("KeyM"), false, false, false, false) == ETCKeyRoute::Table);
+	// keys.js: M is 'mute' with no modifier in every context; Shift+M is 'fort:demine'; Ctrl+M and Alt+M nothing
+	const TArray<ETCKeyContext> Army = { ETCKeyContext::Army }, Classic = { ETCKeyContext::Classic, ETCKeyContext::Building }, Aim = { ETCKeyContext::Army, ETCKeyContext::Targeting };
+	for (const TArray<ETCKeyContext>& C : { Army, Classic, Aim })
+	{
+		const FTCKeyBinding* B = TCKeys::Match(TEXT("KeyM"), false, false, false, C);
+		TestTrue(TEXT("M is mute"), B && B->Id == TEXT("mute") && B->Label == TEXT("M") && B->Help == TEXT("Toggle audio"));
+		const FTCKeyBinding* Sh = TCKeys::Match(TEXT("KeyM"), true, false, false, C);
+		TestTrue(TEXT("Shift+M is demine"), Sh && Sh->Id == TEXT("fort:demine"));
+		TestNull(TEXT("Ctrl+M"), TCKeys::Match(TEXT("KeyM"), false, true, false, C));
+		TestNull(TEXT("Alt+M"), TCKeys::Match(TEXT("KeyM"), false, false, true, C));
+	}
+	TestNull(TEXT("F2 is not in the table"), TCKeys::Match(TEXT("F2"), false, false, false, Army));
+	TestTrue(TEXT("only mute runs in the lobby"), TCKeys::RunsInLobby(TEXT("mute")) && !TCKeys::RunsInLobby(TEXT("alert")) && !TCKeys::RunsInLobby(TEXT("stop")));
+	// stats.js: DEFAULTS, toggle (F2), save and load
+	FTCStatsOverlay O;
+	O.Load(TOptional<FString>());
+	TestFalse(TEXT("hidden by default"), O.Settings().bShow);
+	TestEqual(TEXT("defaults saved"), O.SaveText().Get(TEXT("")), FString(TEXT("{\"show\":false,\"stats\":[\"fps\",\"ping\",\"loss\"],\"pos\":\"tl\",\"layout\":\"list\",\"size\":\"m\",\"bg\":\"panel\",\"warn\":true}")));
+	O.Toggle();
+	TestTrue(TEXT("F2 shows it"), O.Settings().bShow);
+	TestEqual(TEXT("menu label"), O.MenuLabel(), FString(TEXT("Stats overlay: On")));
+	FTCStatsOverlay L;
+	L.Load(O.SaveText());
+	TestTrue(TEXT("survives a restart"), L.Settings().bShow);
+	L.Load(FString(TEXT("{\"show\":true,\"stats\":[\"loss\",\"fps\",\"bogus\",3],\"pos\":\"tr\",\"layout\":\"line\",\"size\":7,\"bg\":\"none\",\"warn\":\"yes\"}")));
+	TestEqual(TEXT("stats in table order, unknown dropped"), FString::Join(L.Settings().Stats, TEXT(",")), FString(TEXT("fps,loss")));
+	TestTrue(TEXT("choices: named ones taken, others default"), L.Settings().Pos == TEXT("tr") && L.Settings().Layout == TEXT("line") && L.Settings().Size == TEXT("m") && L.Settings().Bg == TEXT("none") && L.Settings().bWarn);
+	L.Load(FString(TEXT("[1,2]")));
+	TestFalse(TEXT("not an object: defaults"), L.Settings().bShow);
+	L.Load(FString(TEXT("{broken")));
+	TestTrue(TEXT("unparsable: defaults"), !L.Settings().bShow && L.Settings().Stats.Num() == 3);
+	L.Load(TOptional<FString>(), true);
+	TestTrue(TEXT("?perf: all shown, nothing saved"), L.Settings().bShow && L.Settings().Stats.Num() == 19 && !L.SaveText().IsSet());
+	// perf.js: the second's roll
+	FTCPerf Pf;
+	double T = 0;
+	Pf.Pinged(100.0);
+	for (int32 F = 0; F < 60; F++) { Pf.Frame(T, T + 4, 4, 900, 250000, 40, 1200, 6); T += F == 30 ? 50 : 16; if (F % 6 == 0) Pf.Net(5200, T); }
+	TSharedPtr<FJsonObject> Pong = MakeShared<FJsonObject>();
+	Pong->SetNumberField(TEXT("c"), 100.0);
+	TArray<TSharedPtr<FJsonValue>> Srv = { MakeShared<FJsonValueNumber>(31), MakeShared<FJsonValueNumber>(2) };
+	Pong->SetArrayField(TEXT("srv"), Srv);
+	TestTrue(TEXT("pong rtt"), Pf.Pong(*Pong, 148.4).Get(-1) == 48.0);
+	const bool bRolled = Pf.Frame(T, 1000.0 + 1, 4, 900, 250000, 40, 1200, 6);
+	TestTrue(TEXT("rolled after a second"), bRolled);
+	const FTCPerfStats& St = Pf.Stats();
+	TestTrue(TEXT("fps = round(frames * 10000 / span) / 10"), St.Fps == FMath::FloorToDouble(61 * 10000.0 / 1001.0 + 0.5) / 10);
+	TestTrue(TEXT("worst: the 50 ms frame"), St.Worst == 50.0);
+	TestTrue(TEXT("loss 0%, ping 48, server 31"), St.Loss.Get(-1) == 0.0 && St.Ping.Get(-1) == 48.0 && St.SrvTick.Get(-1) == 31.0 && !St.Jitter.IsSet());
+	TestEqual(TEXT("size"), FTCStatsOverlay::Show(TEXT("size"), St), FString(TEXT("5.2 kB")));
+	TestEqual(TEXT("tris"), FTCStatsOverlay::Show(TEXT("tris"), St), FString(TEXT("250.0k")));
+	TestEqual(TEXT("fx"), FTCStatsOverlay::Show(TEXT("fx"), St), FString(TEXT("1.2k")));
+	TestEqual(TEXT("mem n/a"), FTCStatsOverlay::Show(TEXT("mem"), St), FString(TEXT("n/a")));
+	TestEqual(TEXT("worst is red over 66? amber over 33"), FTCStatsOverlay::Warn(TEXT("worst"), St), 1);
+	TestEqual(TEXT("server 31 ms amber"), FTCStatsOverlay::Warn(TEXT("server"), St), 1);
+	// a ping never answered counts as lost after 3 s
+	Pf.Pinged(1500.0);
+	Pf.Frame(4600, 4601, 4, 900, 1, 1, 1, 1);
+	TestTrue(TEXT("loss 50%"), Pf.Stats().Loss.Get(-1) == 50.0);
+	TestEqual(TEXT("loss red over 5"), FTCStatsOverlay::Warn(TEXT("loss"), Pf.Stats()), 2);
+	// the box: list layout under the top-left panel, 52 px without one, below the strip when it would run into it
+	{
+		FTCLocale::FScopedLanguage En(ETCLanguage::English);
+		const FTCMeasure M = FTCPaint::ApproxMeasure();
+		const FTCPaint Box = O.Layout(St, -1, -1, -1, FBox2D(ForceInit), 1280, 0, 1280, M);
+		TestEqual(TEXT("tags"), Box.TextsOf(TEXT("stats:tag")), TArray<FString>{ TEXT("FPS"), TEXT("Ping"), TEXT("Loss") });
+		const FTCPaintItem* B = Box.Find(TEXT("stats:box"));
+		TestTrue(TEXT("at 8, 52"), B && B->Pos.X == 8.f && B->Pos.Y == 52.f);
+		const FTCPaint Under = O.Layout(St, -1, -1, -1, FBox2D(FVector2D(0, 6), FVector2D(1280, 90)), 1280, 0, 1280, M);
+		TestTrue(TEXT("under the strip"), Under.Find(TEXT("stats:box")) && Under.Find(TEXT("stats:box"))->Pos.Y == 96.f);
+		FTCStatsOverlay E;
+		E.Load(FString(TEXT("{\"show\":true,\"stats\":[]}")));
+		TestEqual(TEXT("none picked"), E.Layout(St, -1, -1, -1, FBox2D(ForceInit), 1280, 0, 1280, M).TextsOf(TEXT("stats:value")), TArray<FString>{ TEXT("No stats picked. Menu > Stats overlay") });
+		FTCStatsOverlay Hidden;
+		Hidden.Load(TOptional<FString>());
+		TestEqual(TEXT("hidden: nothing"), Hidden.Layout(St, -1, -1, -1, FBox2D(ForceInit), 1280, 0, 1280, M).Items.Num(), 0);
+	}
 	return true;
 }
 

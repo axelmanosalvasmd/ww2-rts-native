@@ -2,6 +2,7 @@
 #include "World/TCFogFrontier.h"
 #include "ThreeCrossroads.h"
 #include "Net/TCMatchState.h"
+#include "Client/TCGraphics.h"
 #include "Engine/World.h"
 #include "Engine/Texture2D.h"
 #include "GameFramework/Actor.h"
@@ -233,7 +234,10 @@ void FTCWater::BindMaterial()
 	D->SetTextureParameterValue(TEXT("Fog"), Fog.Texture());
 	D->SetVectorParameterValue(TEXT("Size"), FLinearColor(W * TCWaterCore::Cell, H * TCWaterCore::Cell, 0, 0));
 	D->SetScalarParameterValue(TEXT("FogGamma"), FogGamma);
-	D->SetScalarParameterValue(TEXT("Low"), 0.f); // the native client draws the High preset (no gfx.low)
+	// round 15: water.js setLow (WATER_LOW on gfx.low: the drift frozen, the ripple read in place), again on every change
+	GfxWatch.TakeChanged(); // subscribed before the level is read, so no change can fall between
+	bDrawnLow = FTCGraphics::Get().IsLow();
+	D->SetScalarParameterValue(TEXT("Low"), bDrawnLow ? 1.f : 0.f);
 	for (int32 S = 0; S < Mesh->GetNumSections(); S++) Mesh->SetMaterial(S, D);
 }
 
@@ -328,8 +332,17 @@ void FTCWater::Flush(const FTCMatchState& State, double NowSeconds, bool bReveal
 		if (Core.GeometryChanged) SendGeometry();
 	}
 	if (!MID.IsValid() && Material.IsValid()) BindMaterial();
-	// wraps every 1000 s, where every speed in the shader lands on a whole cycle (water.js tick)
-	if (MID.IsValid()) MID->SetScalarParameterValue(TEXT("Time"), (float)FMath::Fmod(NowSeconds, 1000.0));
+	// round 15: gfx.onChange(setLow): a change of level mid-match redefines WATER_LOW at once
+	if (GfxWatch.TakeChanged() && MID.IsValid() && FTCGraphics::Get().IsLow() != bDrawnLow)
+	{
+		bDrawnLow = FTCGraphics::Get().IsLow();
+		MID->SetScalarParameterValue(TEXT("Low"), bDrawnLow ? 1.f : 0.f);
+		LowSwitches++;
+		UE_LOG(LogTC, Log, TEXT("water: graphics %s mid-match: the drift %s"), bDrawnLow ? TEXT("low") : TEXT("high"), bDrawnLow ? TEXT("frozen") : TEXT("runs again"));
+	}
+	// wraps every 1000 s, where every speed in the shader lands on a whole cycle (water.js tick); water.js tick only
+	// moves uTime on High (if (!gfx.low)), so on Low the clock stands where it was
+	if (MID.IsValid() && !bDrawnLow) { LastTime = (float)FMath::Fmod(NowSeconds, 1000.0); MID->SetScalarParameterValue(TEXT("Time"), LastTime); }
 }
 
 float FTCWater::WaterAt(float X, float Z) const

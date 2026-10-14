@@ -89,6 +89,7 @@ const TCHAR* LexToString(ETCUiAction Action)
 	{
 	case ETCUiAction::AddAi: return TEXT("add AI");
 	case ETCUiAction::Tutorial: return TEXT("tutorial");
+	case ETCUiAction::MatchControl: return TEXT("match control");
 	case ETCUiAction::NextMode: return TEXT("mode");
 	case ETCUiAction::Start: return TEXT("start");
 	case ETCUiAction::End: return TEXT("end match");
@@ -157,6 +158,7 @@ const TCHAR* LexToString(ETCAim Aim)
 	case ETCAim::Field: return TEXT("field works");
 	case ETCAim::Support: return TEXT("support");
 	case ETCAim::Rail: return TEXT("rail");
+	case ETCAim::Spawn: return TEXT("spawn");
 	default: return TEXT("none");
 	}
 }
@@ -180,6 +182,7 @@ FString FTCUiCommand::Describe() const
 	case ETCUiAction::LoadSave: return FString::Printf(TEXT("load save %s"), *Unit);
 	case ETCUiAction::Research: return FString::Printf(TEXT("research %s"), *Unit);
 	case ETCUiAction::MatchOption: return FString::Printf(TEXT("option %s%s%s"), *Unit, Group >= 0 ? *FString::Printf(TEXT(" of seat %d"), Group) : TEXT(""), Job < 0 ? TEXT(" (previous)") : TEXT(""));
+	case ETCUiAction::MatchControl: return FString::Printf(TEXT("control %s%s%s"), *Unit, Group >= 0 ? *FString::Printf(TEXT(" of seat %d"), Group) : TEXT(""), Job < 0 ? TEXT(" (previous)") : TEXT(""));
 	default: return LexToString(Action);
 	}
 }
@@ -699,6 +702,7 @@ void ATCPlayerController::PlayerTick(float DeltaTime)
 		RecruitAutoFor = 0;
 		bControlsSheetOpen = false; // client/main.js: the sheet belongs to the match's HUD
 		CancelFollow();
+		UpdateCommandKeys(); // round 15: client/main.js keydown runs in the lobby too (M mutes there)
 		FVector2D Mouse;
 		if (WasInputKeyJustPressed(EKeys::LeftMouseButton) && CursorPixels(Mouse, false)) HandleHudPress(true, false, Mouse); // the lobby's buttons
 	}
@@ -739,7 +743,7 @@ bool ATCPlayerController::HandleHudPress(bool bLeft, bool bRight, FVector2D Mous
 		return true;
 	}
 	// a right click on a lobby setting's button steps back (the browser's select lists every choice; this HUD cycles)
-	if (bRight && Hud->CommandAt(Mouse, Command) && (Command.Action == ETCUiAction::LobbySetting || Command.Action == ETCUiAction::Volume || Command.Action == ETCUiAction::UiScale || (Command.Action == ETCUiAction::MatchOption && Command.Unit == LexToString(ETCMatchOption::Weather))))
+	if (bRight && Hud->CommandAt(Mouse, Command) && (Command.Action == ETCUiAction::LobbySetting || Command.Action == ETCUiAction::MatchControl || Command.Action == ETCUiAction::Volume || Command.Action == ETCUiAction::UiScale || (Command.Action == ETCUiAction::MatchOption && Command.Unit == LexToString(ETCMatchOption::Weather))))
 	{
 		Command.Job = -1;
 		RunCommand(Command);
@@ -747,6 +751,15 @@ bool ATCPlayerController::HandleHudPress(bool bLeft, bool bRight, FVector2D Mous
 	}
 	// a press on a panel's background (or a right press on another button) stops there, as on the browser's HUD
 	return Hud->PanelAt(Mouse) || Hud->CommandAt(Mouse, Command);
+}
+
+bool ATCPlayerController::InputKey(const FInputKeyEventArgs& Params)
+{
+	// round 15: a lobby or directory text field being typed in takes the key presses (Client/TCMatchControls.cpp)
+	if (Params.Event == IE_Pressed || Params.Event == IE_Repeat || Params.Event == IE_Released)
+		if (ATCGameMode* M = Mode())
+			if (M->ControlsKey(Params.Key, Params.Event != IE_Released, IsInputKeyDown(EKeys::LeftShift) || IsInputKeyDown(EKeys::RightShift))) return true;
+	return Super::InputKey(Params);
 }
 
 bool ATCPlayerController::PressButton(ETCUiAction Action)
@@ -1100,14 +1113,27 @@ TArray<ETCKeyContext> ATCPlayerController::KeyContexts(bool bLettered) const
 bool ATCPlayerController::KeyChord(const FKey& Key, bool bShift, bool bCtrl, bool bAlt)
 {
 	ATCGameMode* M = Mode();
-	if (!M || !M->State.bHasMatch) return false;
+	if (!M) return false;
 	const FString Code = TCKeys::CodeOf(Key);
 	if (Code.IsEmpty()) return false;
-	// client/main.js keydown: F1 and F2 come before everything (the HUD is shown in a match)
-	if (Code == TEXT("F1")) { RunUi(ETCUiAction::ControlsSheet); return true; }
-	if (Code == TEXT("F2")) { NoteOrder(false, TEXT("Stats overlay (F2): not in this client yet")); return true; }
+	// client/main.js keydown (round 15, TCKeys::Route): F1 and F2 come before everything while the match HUD shows (a
+	// press here is never a repeat); then an open Controls sheet takes every key; then the table
+	const ETCKeyRoute Route = TCKeys::Route(Code, M->State.bHasMatch, false, bControlsSheetOpen, false);
+	if (!M->State.bHasMatch)
+	{
+		// the lobby: the table too, where only M ('mute') does anything in this client
+		const FTCKeyBinding* B = Route == ETCKeyRoute::Table ? TCKeys::Match(Code, bShift, bCtrl, bAlt, KeyContexts(false)) : nullptr;
+		return B && TCKeys::RunsInLobby(B->Id) && RunBinding(*B, bShift);
+	}
+	if (Route == ETCKeyRoute::ControlsSheet) { RunUi(ETCUiAction::ControlsSheet); return true; }
+	if (Route == ETCKeyRoute::StatsToggle)
+	{
+		M->ToggleStats();
+		UE_LOG(LogTC, Log, TEXT("stats overlay (F2): %s"), *M->StatsOverlay().MenuLabel());
+		return true;
+	}
 	// the Controls sheet is modal: Esc closes it (the dialog's cancel) and every other key stops there
-	if (bControlsSheetOpen)
+	if (Route == ETCKeyRoute::Swallowed)
 	{
 		if (Code == TEXT("Escape")) RunUi(ETCUiAction::ControlsSheet);
 		return true;
@@ -1160,9 +1186,10 @@ bool ATCPlayerController::RunBinding(const FTCKeyBinding& B, bool bShift)
 	{
 		// client/main.js toggleMute: audio.toggleMute() (mute, or back to the volume before muting; saved)
 		UTCAudio* A = GetWorld() ? GetWorld()->GetSubsystem<UTCAudio>() : nullptr;
-		if (!A) { NoteOrder(false, TEXT("Audio (M): no sound in this run")); return true; }
+		if (!A) { UE_LOG(LogTC, Log, TEXT("audio (M): no sound subsystem in this run")); return true; }
 		A->ToggleMute();
-		NoteOrder(true, VolumeLabel());
+		// round 15: the browser shows nothing for M but the menu's slider following; this client's Volume button follows
+		UE_LOG(LogTC, Log, TEXT("audio (M): %s"), *VolumeLabel());
 		return true;
 	}
 	if (Id == TEXT("unload")) { RunUi(ETCUiAction::Unload); return true; }
@@ -1232,6 +1259,7 @@ void ATCPlayerController::CancelAim(const TCHAR* Note)
 	FieldAim.Cancel();
 	PowerAim.Cancel();
 	Formation.CancelGesture(); // cancelAim: clearFacing()
+	if (ATCGameMode* M = Mode()) M->Controls.DisarmSpawn(); // round 15: a right click stops the sandbox spawn aim
 	if (bWas && Note) NoteOrder(false, Note);
 }
 
@@ -1318,6 +1346,10 @@ bool ATCPlayerController::AimClick(bool bHasGround, FVector2D Ground, bool bShif
 	case ETCAim::Support:
 		// client/main.js mousedown with a support kind or 'area' armed (FTCSupportPowers::AimClick keeps or ends the aim)
 		return RunPowerPlan(M->Powers.AimClick(S, M->UnitTable, M->Recruit, Selected, PowerAim, bHasGround, Ground, bShift));
+	case ETCAim::Spawn:
+		// round 15: client/main.js mousedown, kind 'spawn': { t: 'spawn', unit, enemy, x, z }; the aim stays armed
+		if (M->ControlsSpawnAt(Ground)) { LastOrderAt = Ground; LastOrderTime = GetWorld()->GetTimeSeconds(); LastOrderColor = FColor(0xe8, 0xc8, 0x60); return true; }
+		return false;
 	case ETCAim::Rail:
 	{
 		// client/main.js railTo: the ground units selected now, the aim ends, then { t: 'rail', ids, x, z } (no queue)
@@ -1971,7 +2003,9 @@ FString ATCPlayerController::LanguageLabel() const
 
 FString ATCPlayerController::UiScaleLabel() const
 {
-	return FString::Printf(TEXT("%s %s"), FTCSettingsStore::UIScaleTitle(), *FTCSettingsStore::UIScaleLabel(UiScalePercent));
+	// round 15 (lead): "UI scale: 100%" as the Volume button writes its value, so TC_T's ': ' rule draws es.js's
+	// 'UI scale' (Escala de la interfaz) before the number; "UI scale 100%" matched no key and stayed English
+	return FString::Printf(TEXT("%s: %s"), FTCSettingsStore::UIScaleTitle(), *FTCSettingsStore::UIScaleLabel(UiScalePercent));
 }
 
 FString ATCPlayerController::VolumeLabel() const
@@ -2367,8 +2401,22 @@ bool ATCPlayerController::RunCommand(const FTCUiCommand& Command, bool bShift)
 		return StartFollow();
 	case ETCUiAction::Alert:
 	{
-		// client/main.js actions.alert: the newest alert's point, else the selection's centre; a follow ends
+		// round 15: a click on the lobby report's summary (report.js details) or on the alert feed (alerts.js init's
+		// mousedown, the history's summary, Previous Alert, Next Alert and its entries: FTCAlerts::Click). hooks.jump
+		// cancels a follow, then moves the camera.
+		if (Command.Unit == TEXT("report:toggle")) { M->EndReport.Toggle(); UE_LOG(LogTC, Log, TEXT("match report %s"), M->EndReport.IsOpen() ? TEXT("opened") : TEXT("closed")); return true; }
 		if (!S.bHasMatch) return false;
+		if (!Command.Unit.IsEmpty())
+		{
+			FVector2D At;
+			bool bJump = false;
+			if (!M->AlertFeed.Click(Command.Unit, At, bJump)) return false;
+			M->bAlertHistoryOpen = M->AlertFeed.bHistoryOpen;
+			UE_LOG(LogTC, Log, TEXT("alert click %s%s"), *Command.Unit, bJump ? *FString::Printf(TEXT(": look at (%.1f, %.1f)"), At.X, At.Y) : TEXT(""));
+			if (bJump) { CancelFollow(); FocusOn(At); }
+			return true;
+		}
+		// client/main.js actions.alert: the newest alert's point, else the selection's centre; a follow ends
 		CancelFollow();
 		FVector2D At;
 		if (NewestAlertAt && NewestAlertAt(At)) { FocusOn(At); return true; }
@@ -2400,6 +2448,8 @@ bool ATCPlayerController::RunCommand(const FTCUiCommand& Command, bool bShift)
 		else M->Onboarding.OnClosed(); // round 14: the dialog's close event (onboarding stores 'seen')
 		UE_LOG(LogTC, Log, TEXT("Controls sheet %s"), bControlsSheetOpen ? TEXT("open (F1 or Esc closes it)") : TEXT("closed"));
 		return true;
+	case ETCUiAction::MatchControl:
+		return M->RunControl(Command, Command.Job < 0); // round 15 (Client/TCMatchControls.cpp)
 	case ETCUiAction::Tutorial:
 		// client/public-lobby.js tutorial button: a new private room whose hello carries { tutorial: true }
 		if (S.RoomState == TEXT("play")) { NoteOrder(false, TEXT("Tutorial: leave the match first")); return false; }

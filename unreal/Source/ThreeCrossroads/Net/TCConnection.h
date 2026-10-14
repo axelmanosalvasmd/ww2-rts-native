@@ -64,6 +64,8 @@ public:
 	bool IsRunning() const { return bRunning; }
 	// The last lobby said this client watches: a reconnect asks to keep watching (client/main.js hello spectate).
 	void SetWatching(bool bInWatching) { bWatching = bInWatching; }
+	// Round 15: the Name field changed (client/main.js: the next hello sends $('name').value)
+	void SetName(const FString& Name) { Settings.Name = Name; }
 	// Closes the socket as a network drop would, so the retry path runs (a -TCDropAfter verification switch).
 	void SimulateDrop();
 

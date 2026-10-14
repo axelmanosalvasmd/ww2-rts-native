@@ -1,4 +1,5 @@
 #include "Client/TCGameMode.h"
+#include "RHIStats.h"
 #include "Client/TCGraphics.h"
 #include "Client/TCCameraPawn.h"
 #include "Client/TCPlayerController.h"
@@ -109,6 +110,23 @@ void ATCGameMode::BeginPlay()
 	FParse::Value(Cmd, TEXT("TCServer="), Settings.Url);
 	ServerUrl = Settings.Url; // round 14: the lobby backdrop fetches /maps/<name> from this server
 	FParse::Value(Cmd, TEXT("TCRoom="), Settings.Room);
+	// round 15 (lead): -TCInvite=<link> opens an invite link as the browser opens <origin>/play#<room>[&seat=..]: the
+	// link's origin gives the socket (room-session.js connects to location.host/ws), its hash the room and the seat
+	{
+		FString Invite;
+		if (FParse::Value(Cmd, TEXT("TCInvite="), Invite, false) && !Invite.IsEmpty())
+		{
+			FString InviteUrl;
+			FTCRoomAddress InviteAt;
+			if (FTCRoomBrowser::ParseInviteLink(Invite, InviteUrl, InviteAt))
+			{
+				Settings.Url = ServerUrl = InviteUrl;
+				Settings.Room = InviteAt.Room;
+				UE_LOG(LogTC, Log, TEXT("invite link: %s -> socket %s, room %s%s"), *Invite, *InviteUrl, *InviteAt.Room, InviteAt.Seat.IsEmpty() ? TEXT("") : *(TEXT(", seat ") + InviteAt.Seat));
+			}
+			else UE_LOG(LogTC, Warning, TEXT("invite link: '%s' is not an invite link (<origin>/play#<room>); ignored"), *Invite);
+		}
+	}
 	FParse::Value(Cmd, TEXT("TCName="), Settings.Name);
 	Settings.bSpectate = FParse::Param(Cmd, TEXT("TCSpectate"));
 	FTCTokenRequest TokenRequest;
@@ -220,6 +238,7 @@ void ATCGameMode::BeginPlay()
 	// round 14: -TCTutorial is the lobby's Tutorial button from the command line (a new private Tutorial room)
 	if (TCTutorialEntry::FromCommandLine(Cmd, Settings.Room, Settings.Listing)) UE_LOG(LogTC, Log, TEXT("tutorial: -TCTutorial, a new private Tutorial room %s (hello carries the listing)"), *Settings.Room);
 	TutorialSwitches(Cmd);
+	ControlsSwitches(Cmd, Settings); // round 15: the name, the hello's listing, the room's lowercase, -TCBrowse
 	TokenRequest.Server = Settings.Url;
 	TokenRequest.Room = Settings.Room;
 	TokenRequest.bSpectate = Settings.bSpectate;
@@ -228,7 +247,7 @@ void ATCGameMode::BeginPlay()
 	BaseSettings.Listing.Reset();
 	BaseSettings.Token.Reset();
 	BaseTokenRequest = TokenRequest;
-	Connect(Settings, TokenRequest);
+	if (!bControlsDeferConnect) Connect(Settings, TokenRequest); // round 15: -TCBrowse connects once a room is picked
 }
 
 bool ATCGameMode::Connect(FTCConnection::FSettings Settings, const FTCTokenRequest& InRequest)
@@ -259,6 +278,7 @@ bool ATCGameMode::Connect(FTCConnection::FSettings Settings, const FTCTokenReque
 		Lobby.OnSocketOpened();
 		Options.OnSocketOpened();
 		Persistence.OnSocketOpened(FPlatformTime::Seconds());
+		ControlsOpened();
 	};
 	Connection->OnMessage = [this](const FJsonObject& M, int32 Bytes) { OnMessage(M, Bytes); };
 	// TC_DECODER (Net/TCRustViewShadow.h): rust (the default) makes the Rust view's unit rows and held verdict the
@@ -389,8 +409,10 @@ void ATCGameMode::TakeSlice8Notices()
 void ATCGameMode::OnMessage(const FJsonObject& M, int32 Bytes)
 {
 	const FString T = M.GetStringField(TEXT("t"));
+	ControlsMessage(T, M); // round 15: lobby and match controls (Client/TCMatchControls.cpp)
 	if (T == TEXT("s"))
 	{
+		Perf.Net(Bytes, FPlatformTime::Seconds() * 1000.0); // perf.js net(size), round 15
 		const bool bDrift = State.ApplySnapshot(M);
 		RustShadow.AfterSnapshot(State, bDrift);
 		Recruit.ApplySnapshot(M); // wallet, mode, tech, army limit, queues and the rows' order (ignored before a start)
@@ -581,6 +603,7 @@ void ATCGameMode::OnMessage(const FJsonObject& M, int32 Bytes)
 	{
 		double C;
 		if (M.TryGetNumberField(TEXT("c"), C)) Rtt = FPlatformTime::Seconds() * 1000.0 - C;
+		Perf.Pong(M, FPlatformTime::Seconds() * 1000.0); // perf.js pong (round 15: the stats overlay's ping, loss, jitter, server)
 	}
 	else if (T == TEXT("replaced")) { UE_LOG(LogTC, Warning, TEXT("server: replaced. Another client presented this seat's token; this one has stopped. Give each client its own -TCSeat or -TCTokenFile.")); }
 	else if (T == TEXT("left")) { UE_LOG(LogTC, Warning, TEXT("server: left. An AI took over this army; the connection has stopped.")); }
@@ -816,6 +839,10 @@ void ATCGameMode::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 	const double Now = FPlatformTime::Seconds();
+	// round 15: perf.js frame once per frame: the frame start to start, the game thread's time of the last frame, the
+	// renderer's draw calls and triangles, and the units, effect particles and bodies (main.js's counts)
+	Perf.Frame(Now * 1000.0, Now * 1000.0, FPlatformTime::ToMilliseconds(GGameThreadTime), GNumDrawCallsRHI[0], GNumPrimitivesDrawnRHI[0], State.Units.Num(),
+		Effects ? Effects->Fx.Particles().Num() : 0, Units ? Units->ModelStats().Corpses : 0);
 	if (Connection)
 	{
 		Connection->Tick(Now);
@@ -826,7 +853,7 @@ void ATCGameMode::Tick(float DeltaSeconds)
 			Ping->SetStringField(TEXT("t"), TEXT("ping"));
 			Ping->SetNumberField(TEXT("c"), Now * 1000.0);
 			if (Rtt >= 0) Ping->SetNumberField(TEXT("rtt"), Rtt);
-			SendCommand(Ping);
+			if (SendCommand(Ping)) Perf.Pinged(Now * 1000.0); // main.js: if (sendCmd(...)) perf.pinged(c)
 		}
 	}
 	if (Lighting && State.bHasMatch)
@@ -852,6 +879,12 @@ void ATCGameMode::Tick(float DeltaSeconds)
 	if (!State.bHasMatch && !State.LobbyMap.IsEmpty()) Backdrop.Show(GetWorld(), ServerUrl, State.LobbyMap, State.Mode);
 	else if (State.bHasMatch) Backdrop.Hide();
 	Backdrop.Tick(DeltaSeconds);
+	// round 15 (hudfit): the backdrop's own light (client/lobby-view.js) while its battlefield shows, the mood otherwise
+	if (Lighting)
+	{
+		FTCLobbyLook LobbyLook;
+		Lighting->SetLobbyLook(Backdrop.Look(LobbyLook) ? &LobbyLook : nullptr);
+	}
 	if (Terrain && State.bHasMatch)
 	{
 		// round 14 (edge): fog.js snapshot() after each snapshot (the flips, the frontier around newly explored ground,
@@ -875,6 +908,9 @@ void ATCGameMode::Tick(float DeltaSeconds)
 			Apron.MarkCells(State, State.DirtyCells, State.FogDirtyCells);
 			Terrain->MarkCells(State.DirtyCells, State.FogDirtyCells); State.DirtyCells.Reset(); State.FogDirtyCells.Reset();
 		}
+		// round 15 (gfxlow glue): -TCGraphicsAt switches the level at match seconds (verification); every builder below
+		// sees the change event this frame
+		if (State.bHasMatch && State.Snapshots > 0) FTCGraphics::Get().RunSchedule(State.Tick / 20.0);
 		Terrain->Flush(State);
 		// the painted ground: queued tiles, the fog fade, and the decals on the heights as drawn
 		GroundPaint.Tick(State, DeltaSeconds, Terrain->IsEndRevealed(), [this](float X, float Z) { return Terrain->HeightAt(X, Z); });
@@ -989,6 +1025,7 @@ void ATCGameMode::Tick(float DeltaSeconds)
 			Atmosphere.MistSheets(), Atmosphere.BankSheets(), Atmosphere.FallPoints(), Atmosphere.GroundSectionsMirrored(), *FrameTimesLine());
 		FramesWindow = FFrameTimes();
 	}
+	ControlsFrame(); // round 15: the room directory's refresh and the -TCControlsCheck script
 	if (ExitAfter >= 0 && Now - BeganAt >= ExitAfter)
 	{
 		ExitAfter = -1;
@@ -1658,6 +1695,8 @@ void ATCGameMode::PushAlert(const TCHAR* Kind, const FString& Text, FVector2D At
 	E.Born = GetWorld()->GetTimeSeconds();
 	E.Tick = State.Tick;
 	UE_LOG(LogTC, Log, TEXT("alert #%d at tick %d: %s (%s) at (%.1f, %.1f)"), E.Id, E.Tick, *E.Text, Kind, At.X, At.Y);
+	// round 15: every alert joins the drawn feed and its history (FTCAlerts::Mirror knows the feed's own echoes)
+	AlertFeed.Mirror(E.Kind, E.Text, At, E.Tick, FPlatformTime::Seconds());
 	Alerts.Insert(MoveTemp(E), 0);
 	if (Alerts.Num() > AlertHistoryLimit) Alerts.SetNum(AlertHistoryLimit);
 	if (AlertCursor && !Alerts.ContainsByPredicate([this](const FTCAlertEntry& A) { return A.Id == AlertCursor; })) AlertCursor = 0;
@@ -1704,23 +1743,21 @@ void ATCGameMode::TakePointAlerts()
 
 bool ATCGameMode::NewestAlertAt(FVector2D& Out) const
 {
-	// client/alerts.js newest: among the lines still showing (four, for 6 s), a unit loss first, then the newest. This
-	// client raises no unit-loss alert yet, so it is the newest line.
-	const double Now = GetWorld()->GetTimeSeconds();
-	for (int32 I = 0; I < Alerts.Num() && I < AlertLines; I++)
-		if (Now - Alerts[I].Born < AlertLineSeconds) { Out = Alerts[I].At; return true; }
-	return false;
+	// client/alerts.js newest: among the lines still showing (each kind's life), a unit loss first, then the newest with
+	// a place (round 15: the feed's own lines, every alert mirrored into them)
+	return AlertFeed.Newest(Out);
 }
 
 bool ATCGameMode::VisitAlert(int32 Step, FVector2D& Out)
 {
-	// client/alert-history.js navigate: from the cursor (none: the newest) one step older (+1) or newer (-1), clamped
-	if (!Alerts.Num()) return false;
-	const int32 Current = Alerts.IndexOfByPredicate([this](const FTCAlertEntry& A) { return A.Id == AlertCursor; });
-	const int32 Index = Current < 0 ? 0 : FMath::Clamp(Current + Step, 0, Alerts.Num() - 1);
-	AlertCursor = Alerts[Index].Id;
-	Out = Alerts[Index].At;
-	UE_LOG(LogTC, Log, TEXT("alert history: visiting #%d '%s' at (%.1f, %.1f)"), AlertCursor, *Alerts[Index].Text, Out.X, Out.Y);
+	// client/alerts.js navigate: alert-history.js navigate over the entries with a place (from the cursor, none: the
+	// newest; +1 older, -1 newer, clamped), the box opens, and the camera visits it (round 15: the feed's history)
+	const FTCAlertHistoryEntry* E = AlertFeed.Navigate(Step);
+	bAlertHistoryOpen = AlertFeed.bHistoryOpen;
+	if (!E) return false;
+	AlertCursor = E->Id;
+	Out = E->At;
+	UE_LOG(LogTC, Log, TEXT("alert history: visiting #%d '%s' at (%.1f, %.1f)"), E->Id, *E->Text, Out.X, Out.Y);
 	return true;
 }
 
@@ -1733,8 +1770,9 @@ void ATCGameMode::WireController(ATCPlayerController* PC)
 	PC->ToggleAlertHistory = [Self]()
 	{
 		if (!Self.IsValid()) return;
-		Self->bAlertHistoryOpen = !Self->bAlertHistoryOpen;
-		UE_LOG(LogTC, Log, TEXT("alert history %s (%d entries)"), Self->bAlertHistoryOpen ? TEXT("open") : TEXT("closed"), Self->Alerts.Num());
+		Self->AlertFeed.ToggleHistory(); // alerts.js toggleHistory (round 15: the feed's box)
+		Self->bAlertHistoryOpen = Self->AlertFeed.bHistoryOpen;
+		UE_LOG(LogTC, Log, TEXT("alert history %s (%d entries)"), Self->bAlertHistoryOpen ? TEXT("open") : TEXT("closed"), Self->AlertFeed.History().Entries().Num());
 	};
 	PC->VisitAlert = [Self](int32 Step, FVector2D& OutAt) { return Self.IsValid() && Self->VisitAlert(Step, OutAt); };
 	PC->PlanKindOf = [Self](int32 Id, int32& OutKind)

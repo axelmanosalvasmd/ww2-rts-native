@@ -27,6 +27,7 @@
 #include "GameFramework/Actor.h"
 #include "Commandlets/Commandlet.h"
 #include "Engine/Scene.h"
+#include "Client/TCLobbyBackdrop.h"
 #include "TCLighting.generated.h"
 
 class UDirectionalLightComponent;
@@ -156,6 +157,12 @@ public:
 	// camera.js cam.dist in metres; the haze follows it (light.js followView). Without it the distance is read from
 	// the view: along the camera's forward ray to GroundZ (cm).
 	void SetCameraDistance(float Metres) { CameraDistance = Metres; }
+	// Round 15 (hudfit): client/lobby-view.js's own light while the lobby backdrop shows (FTCLobbyLook: hemisphere and
+	// sun without shadows, no environment, its fog from 0.3 to 0.9 x the map's larger side mixed after the tone curve);
+	// null gives the mood back. The game mode passes it every frame (FTCLobbyBackdrop::Look). Not ported: three's
+	// NeutralToneMapping (M_TCLookPost's curve stays ACES filmic, at exposure 1).
+	void SetLobbyLook(const FTCLobbyLook* L);
+	bool HasLobbyLook() const { return bLobbyLook; }
 	void SetGroundZ(float Cm) { GroundZ = Cm; }
 	// the look the lights show now
 	const FTCMood& Shown() const { return Look; }
@@ -191,6 +198,8 @@ private:
 	void AimSun(float BrowserYaw);
 	void CheckSkyCapture();
 	FTCMood Base, Look;
+	bool bLobbyLook = false;
+	FTCLobbyLook LobbyLook;
 	FTCWeatherLook Cur, Goal;
 	FLinearColor HazeNow = FLinearColor::White, HazeGoal = FLinearColor::White;
 	FString WeatherKind = TEXT("clear");

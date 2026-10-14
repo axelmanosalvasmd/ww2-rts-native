@@ -171,6 +171,20 @@ public:
 	// it is the aria-label itself ('Mount up'). Give it the English title (the one the HUD shows on hover).
 	static FString TitleName(const FString& Title);
 	static FString TitleName(const FString& Title, ETCLanguage L);
+	// Native (round 15): the last order's note under the status lines (ATCPlayerController::NoteOrder) as the HUD shows
+	// it. The note is this client's own sentence (the browser shows no text for a sent order and its feedback line for a
+	// refused one), built from parts the browser has words for; in English it is drawn as it is. In Spanish each part
+	// is translated by client/es.js on its own and the native diagnostic tail is left to the log (NoteOrder logs the
+	// whole note):
+	//   '<order> sent: <n> units..., '<wire>' message, <b> bytes'  the order's name, t(order); also a lobby request
+	//   ('Start sent: ...', 'Add AI sent (...)': the button the browser labels '+ Add AI player')
+	//   '<order> not sent: <reason>'                                t(order) + ': ' + t(reason)
+	//   'Not sent: <reason>'                                        t(reason)
+	//   '<order>: nothing selected' / 'select units first'          t(order) + ': ' + t('Select a unit') (availability.js's
+	//                                                               reason for an order with nothing selected)
+	//   anything else                                               t(note)
+	static FString OrderNote(const FString& Note, ETCLanguage L);
+	static FString OrderNote(const FString& Note) { return OrderNote(Note, Language()); }
 	// The shared dictionary (Content/Data/locale-es.json), loaded on first use. When it cannot be read every text stays
 	// English and LoadError says why.
 	static bool IsLoaded();

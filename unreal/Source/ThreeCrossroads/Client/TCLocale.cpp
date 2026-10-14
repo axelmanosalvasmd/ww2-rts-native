@@ -513,6 +513,29 @@ FString FTCLocale::TitleName(const FString& Title)
 	return TitleName(Title, Language());
 }
 
+FString FTCLocale::OrderNote(const FString& Note, ETCLanguage L)
+{
+	if (L != ETCLanguage::Spanish) return Note;
+	// availability.js: no('Select a unit') for an order that needs a selection
+	static const TCHAR* const Empty[] = { TEXT(": nothing selected"), TEXT(": select units first") };
+	for (const TCHAR* E : Empty)
+		if (Note.EndsWith(E, ESearchCase::CaseSensitive))
+			return Translate(Note.LeftChop(FCString::Strlen(E)), L) + TEXT(": ") + Translate(TEXT("Select a unit"), L);
+	if (Note.StartsWith(TEXT("Not sent: "), ESearchCase::CaseSensitive)) return Translate(Note.Mid(10), L);
+	int32 At = Note.Find(TEXT(" not sent: "), ESearchCase::CaseSensitive);
+	if (At > 0) return Translate(Note.Left(At), L) + TEXT(": ") + Translate(Note.Mid(At + 11), L);
+	// a sent order or lobby request: its name ('Retreat sent: 3 units, ...', 'Start sent: conquest on ..., 3 seats', 'Add
+	// AI sent (room had 2 seats)'); the lobby's Add AI is the button the browser labels '+ Add AI player'
+	At = Note.Find(TEXT(" sent: "), ESearchCase::CaseSensitive);
+	if (At <= 0) At = Note.Find(TEXT(" sent ("), ESearchCase::CaseSensitive);
+	if (At > 0)
+	{
+		const FString Head = Note.Left(At);
+		return Translate(Head == TEXT("Add AI") ? FString(TEXT("+ Add AI player")) : Head, L);
+	}
+	return Translate(Note, L);
+}
+
 FTCLanguagePicker FTCLocale::Picker()
 {
 	// client/index.html: <select id="langSel" aria-label="Language" title="Language">; i18n.js fills the options
@@ -864,6 +887,31 @@ bool FTCLocaleSettingsTest::RunTest(const FString& Parameters)
 	TestEqualSensitive(TEXT("objective with neither"), FTCLocale::ObjectiveText(Obj->TryGetField(TEXT("d")), ETCLanguage::Spanish), FString());
 	TestEqualSensitive(TEXT("objective that is a number"), FTCLocale::ObjectiveText(Obj->TryGetField(TEXT("e")), ETCLanguage::Spanish), FString());
 	TestEqualSensitive(TEXT("objective absent"), FTCLocale::ObjectiveText(Obj->TryGetField(TEXT("z")), ETCLanguage::Spanish), FString());
+	return true;
+}
+
+
+// Round 15: the HUD's texts that stayed English in Spanish (the selection panel with nothing selected, the logistics rows'
+// heading and cut, the last order's note) now read the browser's words from client/es.js.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCLocaleOrderNoteTest, "ThreeCrossroads.Locale.OrderNote", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+bool FTCLocaleOrderNoteTest::RunTest(const FString& Parameters)
+{
+	if (!TestTrue(TEXT("locale-es.json loads"), FTCLocale::IsLoaded())) return false;
+	const ETCLanguage Es = ETCLanguage::Spanish, En = ETCLanguage::English;
+	const FString Sent = TEXT("Retreat sent: 3 units, 'retreat' message, 61 bytes");
+	TestEqualSensitive(TEXT("English is the note itself"), FTCLocale::OrderNote(Sent, En), Sent);
+	TestEqualSensitive(TEXT("a sent order: its name"), FTCLocale::OrderNote(Sent, Es), FString(TEXT("Retirada")));
+	TestEqualSensitive(TEXT("nothing selected"), FTCLocale::OrderNote(TEXT("Stop: nothing selected"), Es), FString(TEXT("Detener: Selecciona una unidad")));
+	TestEqualSensitive(TEXT("select units first"), FTCLocale::OrderNote(TEXT("Attack-move: select units first"), Es), FString(TEXT("Avance de ataque: Selecciona una unidad")));
+	TestEqualSensitive(TEXT("not sent: the reason"), FTCLocale::OrderNote(TEXT("Stop not sent: Select a unit"), Es), FString(TEXT("Detener: Selecciona una unidad")));
+	TestEqualSensitive(TEXT("a lobby request"), FTCLocale::OrderNote(TEXT("Start sent: conquest on seelow-heights, 3 seats"), Es), FString(TEXT("Empezar")));
+	TestEqualSensitive(TEXT("Add AI: the browser's button"), FTCLocale::OrderNote(TEXT("Add AI sent (room had 2 seats)"), Es), FString(TEXT("+ A")) + TCHAR(0x00F1) + TEXT("adir jugador IA"));
+	TestEqualSensitive(TEXT("Not sent: the reason"), FTCLocale::OrderNote(TEXT("Not sent: Select a unit"), Es), FString(TEXT("Selecciona una unidad")));
+	// the selection panel with nothing selected (hud.js drawSelection's heading and the Controls sheet's two lines) and
+	// the logistics rows' heading (hud.js drawLogistics), drawn through TC_T as columns
+	TestEqualSensitive(TEXT("nothing selected row"), FTCLocale::Translate(TEXT("Selection  |  Select a unit or building  |  Select units in a box"), Es),
+		FString(TEXT("Selecci")) + TCHAR(0x00F3) + TEXT("n  |  Selecciona una unidad o edificio  |  Selecciona unidades dentro de un recuadro"));
+	TestEqualSensitive(TEXT("logistics heading"), FTCLocale::Translate(TEXT("Logistics"), Es), FString(TEXT("Log")) + TCHAR(0x00ED) + TEXT("stica"));
 	return true;
 }
 

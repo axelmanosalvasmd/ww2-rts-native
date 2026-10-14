@@ -28,6 +28,15 @@
 // Storage: through FTCSettingsStore (Client/TCPersistence.h), the reference's keys mapped to the user settings file.
 // What is native here: the engine side of a level (ApplyEngine: screen percentage and the sun's shadow resolution and
 // filtering as console variables), and the subscriber list as a multicast delegate.
+//
+// Round 15 (Graphics Low completed): a change of level is applied in the middle of a match, as gfx.onChange does in the
+// browser. OnChanged is the event; the world builders hold an FTCGraphicsWatch on it (World/TCWorldObjects: props.js
+// refresh and structures.js rebuild, with the prop and piece shadows; World/TCWater: water.js setLow; World/TCAtmosphere:
+// atmosphere.js applyGfx; World/TCRelief via ATCTerrain: relief.js setLow and rebuildGeometry) and apply the new level at
+// their next update, the same frame or the next. ground.js reads gfx.low only in createGround, at a start: the
+// ground's texels follow the level from the next start (World/TCGroundPaint), as in the browser.
+// -TCGraphicsAt=<level>@<seconds>[,...] (verification): switches the level at those match seconds (RunSchedule, called
+// by the game mode once a frame with the match clock); the switch is not saved.
 #pragma once
 
 #include "CoreMinimal.h"
@@ -91,6 +100,37 @@ struct THREECROSSROADS_API FTCGraphicsBudget
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FTCGraphicsChanged, ETCGraphicsLevel);
 DECLARE_MULTICAST_DELEGATE_OneParam(FTCGoreChanged, bool);
+class FTCGraphics;
+
+// A subscription to FTCGraphics::OnChanged (gfx.onChange) for the world builders, which apply a new level at their next
+// update: TakeChanged is true once after any number of change events. It subscribes at its first TakeChanged (so a
+// builder held by a class default object never touches the settings); copies subscribe on their own; the subscription
+// ends with the object.
+class THREECROSSROADS_API FTCGraphicsWatch
+{
+public:
+	explicit FTCGraphicsWatch(FTCGraphics* Source = nullptr) : Graphics(Source) {} // null: FTCGraphics::Get()
+	FTCGraphicsWatch(const FTCGraphicsWatch& Other) : Graphics(Other.Graphics) {}
+	FTCGraphicsWatch& operator=(const FTCGraphicsWatch&) { return *this; } // keeps its own subscription
+	~FTCGraphicsWatch();
+	bool TakeChanged();                                   // a change event arrived since the last call
+	int32 Events() const { return Count.IsValid() ? *Count : 0; }
+	bool Subscribed() const { return Handle.IsValid(); }
+private:
+	FTCGraphics* Graphics = nullptr;
+	TSharedPtr<int32> Count;
+	int32 Taken = 0;
+	FDelegateHandle Handle;
+};
+
+// Holds the game's level at Level for a scope (tests whose expectations are one level's: the saved level of the machine
+// must not decide them), switching without saving and back at the end.
+struct THREECROSSROADS_API FTCGraphicsLevelScope
+{
+	explicit FTCGraphicsLevelScope(ETCGraphicsLevel Level);
+	~FTCGraphicsLevelScope();
+	ETCGraphicsLevel Was;
+};
 
 class THREECROSSROADS_API FTCGraphics
 {
@@ -103,8 +143,11 @@ public:
 	ETCGraphicsLevel Level() const { return Current; }
 	bool IsLow() const { return Current == ETCGraphicsLevel::Low; }
 	const FTCGraphicsBudget& Budget() const { return Current == ETCGraphicsLevel::Low ? LowBudget : HighBudget; }
-	// gfx.set: saves and notifies, only on a change
-	void Set(ETCGraphicsLevel Level);
+	// gfx.set: saves and notifies, only on a change (bSave false: notifies without saving, for tests and -TCGraphicsAt)
+	void Set(ETCGraphicsLevel Level) { Set(Level, true); }
+	void Set(ETCGraphicsLevel Level, bool bSave);
+	// Change events so far (each Set that changed the level).
+	int32 Changes() const { return ChangeCount; }
 	void Toggle() { Set(IsLow() ? ETCGraphicsLevel::High : ETCGraphicsLevel::Low); }
 	bool Gore() const { return bGore; }
 	void SetGore(bool bOn);
@@ -133,6 +176,11 @@ public:
 	// 3 on High). Returns the console lines it set, for logs. Call in a game world only (not in the editor).
 	TArray<FString> ApplyEngine(double DevicePixelRatio = 1.0) const;
 
+	// -TCGraphicsAt=low@60,high@120: the scheduled switches (read from the command line the first time Get() is asked).
+	// RunSchedule(match seconds) applies each one once its time has come, without saving. ParseSchedule is the reader.
+	void RunSchedule(double MatchSeconds);
+	static TArray<TPair<double, ETCGraphicsLevel>> ParseSchedule(const FString& Spec);
+	int32 ScheduledLeft() const { return Schedule.Num(); }
 	// Settings keys (client/gfx.js), through FTCSettingsStore.
 	static const TCHAR* const LevelKey;   // 'ww2-gfx'
 	static const TCHAR* const AutoKey;    // 'ww2-gfx-auto'
@@ -150,5 +198,7 @@ private:
 	ETCGraphicsLevel Current = ETCGraphicsLevel::High;
 	bool bGore = true;
 	double SlowFor = 0;
+	int32 ChangeCount = 0;
 	FTCGraphicsBudget HighBudget, LowBudget;
+	TArray<TPair<double, ETCGraphicsLevel>> Schedule;
 };

@@ -33,6 +33,7 @@
 #include "GameFramework/HUD.h"
 #include "Client/TCPlayerController.h"
 #include "Client/TCMinimap.h"
+#include "Client/TCMatchControls.h"
 #include "TCHUD.generated.h"
 
 class UFont;
@@ -81,6 +82,37 @@ private:
 	TArray<FBox2D> Panels;
 	int32 Frames = 0;
 	float BandTop = 0.f; // round 14: the score strip's bottom this frame (camera.js band)
+	FBox2D RecruitBox = FBox2D(ForceInit); // round 15 (lead): the recruit card this frame, screen pixels (the alert feed clears it)
+	// Round 15 (hudfit): client/main.js receiveStart measures camera.js's band (rig.frame: band(true)) right after
+	// buildBuyBar, before any snapshot fills #scores, and camera.js keeps that band until a wheel notch, frame() or a
+	// resize. So from a match's first frame until the controller has taken it, the HUD reports the band the
+	// reference's HUD has at that moment (StartBand), not this HUD's own panels.
+	bool bHadMatch = false, bStartBand = false;
+	int32 StartBandFrames = 0;
+	// The reference's panels at receiveStart, in CSS pixels at UI scale 1 (client/index.html): #top at top: var(--gap)
+	// 8 px holding the empty #scores panel (padding 8 px 4 px 9 px and a 1 px border: 19 px), so its bottom is 27 px;
+	// #buy at bottom: var(--gap) 8 px holding the group tabs buildCard makes with no group open (padding 7 px, a 1 px
+	// border, one .hd row of 5 + 16 + 5 px with its 1 px border and #hud .hd's 6 px margin: 50 px), absent in Classic
+	// and World (buildCard hides it). Zoomed by the UI scale like the rest of #hud.
+	static constexpr float CssGap = 8.f, CssEmptyScores = 19.f, CssBuyTabs = 50.f;
+	static FVector2D StartBand(float ScreenH, float UiScale, bool bClassic);
+	// Round 15: the reference CSS's left column (--left-w 248 px) is this HUD's narrowest match panel; the match panel
+	// keeps its own 560 px while the recruit card beside it gets at least RecruitMin px (#buy sits between the left
+	// column and the minimap at every scale, client/index.html), and narrows toward 248 px only past that.
+	static constexpr float MatchPanelW = 560.f, LeftColumnMinW = 248.f, RecruitMinW = 120.f;
+	static float MatchPanelWidth(float RoomRight);
+	// The native status column (the connection, room and tick diagnostics, the key reminder, the pause, graphics and
+	// refusal lines and the last order's note), drawn unscaled in screen pixels. Round 15: it stays in the top left
+	// corner beside the score strip, its lines wrapped at their ' | ' columns, so it no longer runs over the paper war
+	// map's top left; when it would reach the match panel there, in the top right corner above the recruit card; when
+	// neither has room, under the strip as before.
+	struct FStatusLine { FString Shown; FLinearColor Colour; };
+	static constexpr float ColumnShare = 0.26f, ColumnMinW = 240.f;
+	TArray<FString> WrapShown(const FString& Shown, float MaxWidth, UFont* Font) const;
+	// A text already in the language in use, cut to MaxWidth with '...' (the browser's text-overflow: ellipsis)
+	FString FitShown(const FString& Shown, float MaxWidth, UFont* Font) const;
+	// The kept-English log for a text drawn in Spanish that came back unchanged
+	void NoteKept(const FString& Str, const FString& Shown);
 	// Every text the HUD shows is measured and drawn through these two: client/i18n.js t() (TC_T, Client/TCLocale.h) is
 	// applied here, so a Spanish label is measured as it is drawn, while what the HUD stores (button labels for hit tests
 	// and logs), compares and logs stays English.
@@ -96,10 +128,11 @@ private:
 	// client/pings.js drawMinimap: each relayed ping's ring on the minimap (dark under chalk, growing and fading)
 	void DrawMinimapPings();
 	float Button(UFont* Font, float X, float Y, const FString& Label, ETCUiAction Action);
-	float Button(UFont* Font, float X, float Y, const FString& Label, const FTCUiCommand& Command, bool bEnabled, const FLinearColor& Fill, float MinWidth = 0.f);
+	// MaxWidth (round 15): the button is no wider, its label cut with '...' (the stored label stays whole)
+	float Button(UFont* Font, float X, float Y, const FString& Label, const FTCUiCommand& Command, bool bEnabled, const FLinearColor& Fill, float MinWidth = 0.f, float MaxWidth = 0.f);
 	void AddPanel(float X, float Y, float W, float H, const FLinearColor& Colour);
 	float DrawLobby(UFont* Font, float Y);
-	float DrawMatchPanel(UFont* Font);
+	float DrawMatchPanel(UFont* Font, float Width = MatchPanelW);
 	void DrawRecruitPanel(UFont* Font, float Left, float Bottom);
 	// A line over the ground through metre points (each leg split every 2 m so it follows the relief), Lift metres up.
 	void GroundLine(const ATCTerrain& T, const TArray<FVector2D>& Points, bool bClosed, const FLinearColor& Colour, float Thickness, float Lift = 0.3f);
@@ -115,7 +148,14 @@ private:
 	void DrawAlertFeed(UFont* Font);
 	void DrawEpilogue(UFont* Font, UFont* Big);
 	void DrawControlsSheet(UFont* Font, UFont* Big);
-	void DrawMatchReport(UFont* Font, float Top);
+	void DrawMatchReport(UFont* Font, float Top, float LobbyBottom = 0.f);
+	// Round 15 (lobby; defined in Client/TCMatchControls.cpp): rows of FTCControlRow as a panel of texts and
+	// ETCUiAction::MatchControl buttons, and the match's Menu, sandbox panel and Send next wave
+	float DrawControlRows(UFont* Font, float X, float Y, float W, const TArray<FTCControlRow>& Rows);
+	void DrawMatchControls(UFont* Font, float Top);
+	// round 15 (lead): the match controls panel's size at the UI scale (0 when there is nothing to draw), so the HUD can
+	// place it clear of the score strip and keep the status column clear of it
+	FVector2D MeasureMatchControls(UFont* Font);
 	// client/main.js drawMinimap: the capture points (owner discs, the cut cross, the locked link) and the start's spawns
 	void DrawMinimapPoints();
 	// A line over the ground drawn in dashes of Dash metres with gaps of Gap metres (client/markers.js ORDER_DASH).

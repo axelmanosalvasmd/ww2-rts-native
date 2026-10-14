@@ -125,6 +125,9 @@ enum class ETCUiAction : uint8
 	Gore,        // the menu's Gore: On or Off (client/light.js goreBtn, gfx.js setGore), saved
 	UiScale,     // the menu's UI scale slider 75% to 150% (client/hud.js uiScale): left click 5 up, right click 5 down, saved
 	Tutorial,    // lobby: the Tutorial button (client/public-lobby.js): a new private Tutorial room (ATCGameMode::EnterTutorialRoom)
+	// Round 15 (Client/TCMatchControls.h)
+	MatchControl,// lobby, match and room directory controls (Unit: the control's key, Group: a seat, Job: -1 for a right
+	             // click): ATCGameMode::RunControl
 };
 const TCHAR* LexToString(ETCUiAction Action);
 
@@ -153,6 +156,7 @@ enum class ETCAim : uint8
 	Support,     // a support call or area fire (PowerAim, FTCSupportPowers): a point kind or 'area' takes one click, a
 	             // strip kind two (the centre, then the direction)
 	Rail,        // Shift+N (World Conquest): the next left click sends the selected ground units by rail (client/main.js railTo)
+	Spawn,       // round 15: the sandbox panel's Spawn: each left click spawns one unit, a right click stops (FTCMatchControls)
 };
 const TCHAR* LexToString(ETCAim Aim);
 
@@ -247,6 +251,11 @@ public:
 	// Verification only: feed one key event into this controller's engine input (APlayerController::InputKey), as the
 	// viewport does for a physical key, so the next PlayerTick's key polling sees it. Not a physical keyboard.
 	bool InjectKey(const FKey& Key, bool bPressed);
+	// Round 15 (lobby): typing into a lobby or directory text field takes the keys first (ATCGameMode::ControlsKey)
+	virtual bool InputKey(const FInputKeyEventArgs& Params) override;
+	// Round 15: the sandbox panel's Spawn arms its aim (setAim('spawn')); the controls' notes in the order line
+	bool ArmSpawnAim(const FString& Hint) { return SetAim(ETCAim::Spawn, Hint); }
+	void ControlsNote(bool bOk, const FString& Note) { NoteOrder(bOk, Note); }
 	// A verification switch pressing a HUD button: through the HUD's hit test at the button's drawn centre when the HUD
 	// drew it last frame, else straight to RunUi (no renderer). The log says which.
 	bool PressButton(ETCUiAction Action);
@@ -321,7 +330,7 @@ public:
 	FString LanguageLabel() const;
 	// "Volume: 80%" (client/index.html: the menu's Volume slider and its number)
 	FString VolumeLabel() const;
-	// "UI scale 100%" (client/index.html: the slider's label and its number #uiScaleVal); the HUD draws at UiScale / 100
+	// "UI scale: 100%" (client/index.html: the slider's label and its number #uiScaleVal); the HUD draws at UiScale / 100
 	FString UiScaleLabel() const;
 	int32 UiScalePercent = 100;
 	// client/light.js notice(): the automatic drop to Low's message, shown for 6 s (English; the HUD translates it)

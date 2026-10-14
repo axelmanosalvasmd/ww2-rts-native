@@ -1,4 +1,5 @@
 #include "World/TCGroundPaint.h"
+#include "Client/TCGraphics.h"
 #include "ThreeCrossroads.h"
 #include "Net/TCMatchState.h"
 #include "World/TCFogFrontier.h"
@@ -262,11 +263,14 @@ bool FTCGroundPaint::ApplyStart(const FJsonObject& M, const FTCMatchState& State
 		}
 
 	const double T0 = FPlatformTime::Seconds();
-	const int32 P = FGround::PixelsPerCell(Map.W, Map.H, Map.bWorld);
+	// round 15: ground.js createGround reads gfx.low once, at the start: 1280 texels across the map on Low (2048 on
+	// High). It does not watch gfx.onChange, so a change of level mid-match paints at the next start, as in the browser.
+	bStartedLow = FTCGraphics::Get().IsLow();
+	const int32 P = FGround::PixelsPerCell(Map.W, Map.H, Map.bWorld, bStartedLow);
 	FTile Tiles[MatCount - 1];
 	const bool bTiles = LoadTiles(P, Tiles);
 	if (!bTiles) UE_LOG(LogTC, Error, TEXT("ground paint: %s; the ground is painted in the materials' flat colours (as the browser before its pictures arrive)"), *TileError);
-	Core.Start(Map, Cells, bTiles ? Tiles : nullptr);
+	Core.Start(Map, Cells, bTiles ? Tiles : nullptr, bStartedLow);
 	LastPaintMs = (FPlatformTime::Seconds() - T0) * 1000.0;
 	MakeTextures();
 	// fog: every cell takes its look at once (client/fog.js starts at the wanted alpha)
@@ -278,8 +282,8 @@ bool FTCGroundPaint::ApplyStart(const FJsonObject& M, const FTCMatchState& State
 	Rubble.Init(RubbleCapacity, true); Craters.Init(CraterCapacity, false);
 	DecalChanged.Reset(); bDecalsAll = true; bDecalMeshDirty = true;
 	Starts++; RowsApplied += (int32)Cells.size();
-	UE_LOG(LogTC, Log, TEXT("ground paint: %s %dx%d, %d px a cell (%dx%d canvas), %s, %d start cells, painted in %.0f ms; %d known cells"),
-		*State.Map.Name, Map.W, Map.H, P, Core.CanvasW(), Core.CanvasH(), Core.Textured() ? TEXT("textured") : TEXT("flat colours"), (int32)Cells.size(), LastPaintMs,
+	UE_LOG(LogTC, Log, TEXT("ground paint: %s %dx%d, %d px a cell (graphics %s, %d texels across; %dx%d canvas), %s, %d start cells, painted in %.0f ms; %d known cells"),
+		*State.Map.Name, Map.W, Map.H, P, bStartedLow ? TEXT("low") : TEXT("high"), bStartedLow ? 1280 : 2048, Core.CanvasW(), Core.CanvasH(), Core.Textured() ? TEXT("textured") : TEXT("flat colours"), (int32)Cells.size(), LastPaintMs,
 		[&]() { int32 K = 0; for (int32 C = 0; C < N; C++) K += Core.IsKnown(C) ? 1 : 0; return K; }());
 	return true;
 }

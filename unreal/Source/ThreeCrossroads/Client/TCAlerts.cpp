@@ -193,7 +193,8 @@ void FTCAlerts::StartMatch(const FTCMatchState& S)
 {
 	if (Hist.Start(S.MatchId))
 	{
-		LineList.Reset(); OwnQuiet.Reset(); LastSound.Reset(); MatchTime = 0.0;
+		// alerts.js startMatch: the lines go, the history box closes
+		LineList.Reset(); OwnQuiet.Reset(); LastSound.Reset(); MatchTime = 0.0; Echoes.Reset(); bHistoryOpen = false;
 	}
 	PingRings.Reset(); // main.js startGame: pings.reset()
 	bHasPrev = false; LastSnapTick = 0;
@@ -208,7 +209,7 @@ void FTCAlerts::StartMatch(const FTCMatchState& S)
 void FTCAlerts::Reset()
 {
 	LineList.Reset(); OwnQuiet.Reset(); LastSound.Reset(); Sounds.Reset(); Hist.Reset(); MatchTime = 0.0;
-	PingRings.Reset();
+	PingRings.Reset(); Echoes.Reset(); bHistoryOpen = false;
 	bHasPrev = false; LastSnapTick = 0;
 	PrevOrder.Reset(); PrevRows.Reset(); PrevPoints.Reset(); PrevStrikes.Reset(); PrevQueueHeads.Reset();
 	RowOrder.Reset(); RowSet.Reset(); RowXZ.Reset(); RowBuilt.Reset(); bHasHome = false;
@@ -232,6 +233,16 @@ FTCAlertPush FTCAlerts::Push(const FString& Kind, const FString& Text, bool bHas
 	FTCAlertPush A;
 	A.Kind = Kind; A.Text = Text.Left(TCMatchLimits::Text); A.bHasAt = bHasAt; A.At = bHasAt ? At : FVector2D::ZeroVector; A.N = N; A.Time = HistoryTime();
 	Hist.Add(A);
+	AddLine(A, Now);
+	if (Kind != TEXT("ping")) Sound(Kind, Now);
+	// ATCGameMode::PushAlert mirrors every alert into this feed; this one is already here
+	Echoes.Add({ A.Kind, A.Text, Now });
+	if (Echoes.Num() > 64) Echoes.RemoveAt(0);
+	return A;
+}
+
+void FTCAlerts::AddLine(const FTCAlertPush& A, double Now)
+{
 	FTCAlertLine L;
 	L.Serial = ++LineSerial; L.Alert = A; L.Born = Now;
 	LineList.Insert(L, 0);
@@ -241,8 +252,340 @@ FTCAlertPush FTCAlerts::Push(const FString& Kind, const FString& Text, bool bHas
 	int32 Seen = 0;
 	for (int32 I = 0; I < LineList.Num(); I++)
 		if (LineList[I].IsLoss() == bLoss && ++Seen > Limit) { LineList.RemoveAt(I); I--; }
-	if (Kind != TEXT("ping")) Sound(Kind, Now);
-	return A;
+}
+
+void FTCAlerts::Mirror(const FString& Kind, const FString& Text, FVector2D At, int32 Tick, double Now)
+{
+	const FString T = Text.Left(TCMatchLimits::Text);
+	const int32 E = Echoes.IndexOfByPredicate([&](const FEcho& X) { return X.Kind == Kind && X.Text == T && FMath::Abs(Now - X.Now) < 1.0; });
+	if (E != INDEX_NONE) { Echoes.RemoveAt(E); return; }
+	// alerts.js push for an alert raised outside this feed (region, supply, the game mode's point alerts): the history
+	// time is Math.max(matchTime, hooks.matchTime()), the line as any other; the game mode already played its sound
+	FTCAlertPush A;
+	A.Kind = Kind; A.Text = T; A.bHasAt = true; A.At = At; A.Time = FMath::Max(HistoryTime(), Tick / 20.0);
+	Hist.Add(A);
+	AddLine(A, Now);
+}
+
+const FTCAlertHistoryEntry* FTCAlerts::Navigate(int32 Direction)
+{
+	// alerts.js navigate: history.navigate(direction), visit, and the box opens
+	const FTCAlertHistoryEntry* E = Hist.Navigate(Direction);
+	bHistoryOpen = true;
+	return E;
+}
+
+bool FTCAlerts::Click(const FString& Tag, FVector2D& OutAt, bool& bOutJump)
+{
+	bOutJump = false;
+	FString Rest;
+	if (Tag.StartsWith(TEXT("alert:line:"), ESearchCase::CaseSensitive))
+	{
+		// init's mousedown: the line's spot, if it has one (a.x != null)
+		const int32 Serial = FCString::Atoi(*Tag.RightChop(11));
+		const FTCAlertLine* L = LineList.FindByPredicate([Serial](const FTCAlertLine& X) { return X.Serial == Serial; });
+		if (L && L->Alert.bHasAt) { OutAt = L->Alert.At; bOutJump = true; }
+		return true;
+	}
+	if (Tag == TEXT("alert:history")) { ToggleHistory(); return true; }
+	if (Tag.StartsWith(TEXT("alert:nav:"), ESearchCase::CaseSensitive))
+	{
+		const FTCAlertHistoryEntry* E = Navigate(FCString::Atoi(*Tag.RightChop(10)) >= 0 ? 1 : -1);
+		if (E && E->bHasAt) { OutAt = E->At; bOutJump = true; }
+		return true;
+	}
+	if (Tag.StartsWith(TEXT("alert:entry:"), ESearchCase::CaseSensitive))
+	{
+		// renderHistory's button: history.select(a.id), visit(entry)
+		const FTCAlertHistoryEntry* E = Hist.Select(FCString::Atoi(*Tag.RightChop(12)));
+		if (E && E->bHasAt) { OutAt = E->At; bOutJump = true; }
+		return true;
+	}
+	return false;
+}
+
+float FTCAlerts::ShownAlpha(const FTCAlertLine& L, double Now, float* OutSlide)
+{
+	// alert-in (0.18 s) or loss-in (0.22 s), ease-out from opacity 0 and 8 px (6 px) to the right; then frame()'s fade
+	const double Age = Now - L.Born, Dur = L.IsLoss() ? TCAlertLook::LossSlideIn : TCAlertLook::SlideIn;
+	if (OutSlide) *OutSlide = 0.f;
+	if (Age >= 0 && Age < Dur)
+	{
+		const float K = TCCss::EaseOut((float)(Age / Dur));
+		if (OutSlide) *OutSlide = (1.f - K) * (L.IsLoss() ? 6.f : 8.f);
+		return K;
+	}
+	return Alpha(L, Now);
+}
+
+TArray<FTCAlertRing> FTCAlerts::MinimapRings(double Now) const
+{
+	// drawPings: every line with a place but a ping's; ring(4 + ph * 14, 1 - ph) then ring(4, 1), at fade * alpha
+	TArray<FTCAlertRing> Out;
+	for (const FTCAlertLine& L : LineList)
+	{
+		if (L.Alert.Kind == TEXT("ping") || !L.Alert.bHasAt) continue;
+		const double Age = Now - L.Born, Fade = FMath::Clamp((TCAlertRules::LifeOf(L.Alert.Kind) - Age) / TCAlertRules::Fade, 0.0, 1.0);
+		const double Ph = FMath::Fmod(FMath::Max(0.0, Age), 1.2) / 1.2;
+		const FLinearColor C = TCAlertRules::ColourOf(L.Alert.Kind);
+		Out.Add({ L.Alert.At, (float)(4 + Ph * 14), (float)(Fade * (1 - Ph)), C });
+		Out.Add({ L.Alert.At, 4.f, (float)Fade, C });
+	}
+	return Out;
+}
+
+namespace
+{
+	// alerts.css: light signal red for trouble, brass for a point won, the text colour for the rest (the base alert
+	// is white on red)
+	FLinearColor LineColour(const FString& Kind)
+	{
+		if (Kind == TEXT("attack") || Kind == TEXT("unitLost") || Kind == TEXT("pointLost") || Kind == TEXT("air") || Kind == TEXT("base")) return TCCss::RedHi;
+		if (Kind == TEXT("pointWon")) return TCCss::Brass;
+		return TCCss::Text;
+	}
+	// alert-history.js matchClock: m:ss
+	FString MatchClock(double T)
+	{
+		return FString::Printf(TEXT("%d:%02d"), (int32)FMath::FloorToDouble(T / 60.0), (int32)FMath::FloorToDouble(FMath::Fmod(FMath::Max(0.0, T), 60.0)));
+	}
+}
+
+FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measure) const
+{
+	using namespace TCAlertLook;
+	FTCPaint P;
+	const double Now = In.Now;
+	const float BoxW = FMath::Min(BoxMax, In.ViewW - BoxSide), Right = In.Right;
+	const float LineBox = FontPx * LineHeight;
+	auto Hover = [&In](float X, float Y, float W, float H) { return In.bMouse && In.Mouse.X >= X && In.Mouse.X < X + W && In.Mouse.Y >= Y && In.Mouse.Y < Y + H; };
+
+	// the children, top to bottom: the loss column, the routine lines (newest first), the history box
+	TArray<const FTCAlertLine*> Losses, Routine;
+	for (const FTCAlertLine& L : LineList) (L.IsLoss() ? Losses : Routine).Add(&L);
+	if (Losses.Num() > TCAlertRules::MaxLosses) Losses.SetNum(TCAlertRules::MaxLosses);
+	if (Losses.Num() && Routine.Num() > LinesWithLoss) Routine.SetNum(LinesWithLoss);
+
+	struct FBlock { float W = 0, H = 0; TFunction<void(FTCPaint&, float X, float Y)> Paint; };
+	TArray<FBlock> Blocks;
+
+	// #lossAlerts: 380 px, 6 px between losses, 8 px under the column
+	if (Losses.Num())
+	{
+		const float W = FMath::Min(LossW, In.ViewW - LossSide), Inner = W - 1 - LossEdge - 2 * LossPadX - 1;
+		struct FLoss { const FTCAlertLine* L; FString Heading, Hint; TArray<FString> Detail, HintLines; float H; };
+		TArray<FLoss> Items;
+		float H = 0;
+		for (const FTCAlertLine* L : Losses)
+		{
+			FLoss F;
+			F.L = L;
+			F.Heading = TC_T(FString(TEXT("Unit lost"))).ToUpper(); // tr('Unit lost'), then text-transform: uppercase
+			F.Detail = FTCPaint::Wrap(TC_T(L->Alert.Text), Inner, DetailPx, true, Measure);
+			F.HintLines = FTCPaint::Wrap(TC_T(FString(TEXT("Space or click: look there"))), Inner, HintPx, false, Measure);
+			F.H = 1 + LossPadY + HeadingPx * LineHeight + LossInner + F.Detail.Num() * DetailPx * DetailLine + LossInner + HintTop + F.HintLines.Num() * HintPx * LineHeight + LossPadY + 1;
+			H += (Items.Num() ? LossGap : 0.f) + F.H;
+			Items.Add(MoveTemp(F));
+		}
+		FBlock B;
+		B.W = W; B.H = H + LossBottom;
+		B.Paint = [this, Items, W, Now, Hover](FTCPaint& Out, float X, float Y)
+		{
+			for (const FLoss& F : Items)
+			{
+				float Slide = 0.f;
+				const float A = ShownAlpha(*F.L, Now, &Slide);
+				const int32 First = Out.Items.Num();
+				const bool bHover = Hover(X, Y, W, F.H);
+				// box-shadow: 0 3px 14px rgba(0, 0, 0, 0.4), as three soft layers
+				for (int32 K = 3; K >= 1; K--) Out.Rect(X - 3.f * K, Y + 3 - 3.f * K, W + 6.f * K, F.H + 6.f * K, TCCss::Rgba(0, 0, 0, 0.4f / (K + 2)), TEXT("alert:loss-shadow"));
+				const FLinearColor Edge = bHover ? TCCss::Rgba(214, 178, 94, 0.8f) : TCCss::Hex(0xc66a57);
+				Out.Rect(X, Y, W, F.H, bHover ? TCCss::Rgba(46, 51, 55, 0.94f) : TCCss::Rgba(73, 24, 21, 0.97f), TEXT("alert:loss"));
+				Out.Frame(X, Y, W, F.H, Edge, 1.f, TEXT("alert:loss-frame"));
+				Out.Rect(X, Y, LossEdge, F.H, bHover ? Edge : TCCss::Hex(0xff9a76), TEXT("alert:loss-edge"));
+				const float Tx = X + LossEdge + LossPadX;
+				float Ty = Y + 1 + LossPadY;
+				FTCPaintItem& Hd = Out.Text(F.Heading, Tx, Ty, HeadingPx, TCCss::Hex(0xffb293), true, ETCPaintAlign::Left, TEXT("alert:loss-heading"));
+				Hd.Tracking = HeadingTrack * HeadingPx; Hd.Size.Y = HeadingPx * LineHeight;
+				Ty += Hd.Size.Y + LossInner;
+				for (const FString& D : F.Detail)
+				{
+					FTCPaintItem& Dt = Out.Text(D, Tx, Ty, DetailPx, TCCss::Hex(0xfff1e8), true, ETCPaintAlign::Left, TEXT("alert:loss-detail"));
+					Dt.Size.Y = DetailPx * DetailLine;
+					Ty += Dt.Size.Y;
+				}
+				Ty += LossInner + HintTop;
+				for (const FString& Hn : F.HintLines)
+				{
+					FTCPaintItem& Hi = Out.Text(Hn, Tx, Ty, HintPx, TCCss::Hex(0xdec4bb), false, ETCPaintAlign::Left, TEXT("alert:loss-hint"));
+					Hi.Size.Y = HintPx * LineHeight;
+					Ty += Hi.Size.Y;
+				}
+				Out.Hit(FBox2D(FVector2D(X, Y), FVector2D(X + W, Y + F.H)), FString::Printf(TEXT("alert:line:%d"), F.L->Serial), F.L->Alert.Text);
+				Out.Panels.Add(FBox2D(FVector2D(X, Y), FVector2D(X + W, Y + F.H)));
+				Out.Shift(First, FVector2D(Slide, 0));
+				Out.Fade(First, A);
+				Y += F.H + LossGap;
+			}
+		};
+		Blocks.Add(MoveTemp(B));
+	}
+	// the routine lines: padding 3px 10px, at most 320 px with an ellipsis; the newest semi-bold with the strong border
+	for (int32 I = 0; I < Routine.Num(); I++)
+	{
+		const FTCAlertLine* L = Routine[I];
+		const bool bBase = L->Alert.Kind == TEXT("base"), bNewest = I == 0, bBold = bBase || bNewest;
+		const float MaxW = FMath::Min(LineMax, BoxW) - 2 * PadX - 2;
+		const FString Text = FTCPaint::Ellipsis(TC_T(L->Alert.Text), MaxW, FontPx, bBold, Measure);
+		FBlock B;
+		B.W = FMath::Min(FMath::Min(LineMax, BoxW), Measure(Text, FontPx, bBold, 0.f) + 2 * PadX + 2);
+		B.H = LineBox + 2 * PadY + 2;
+		const float W = B.W, H = B.H;
+		B.Paint = [L, Text, W, H, Now, bBase, bNewest, bBold, LineBox, Hover](FTCPaint& Out, float X, float Y)
+		{
+			float Slide = 0.f;
+			const float A = ShownAlpha(*L, Now, &Slide);
+			const int32 First = Out.Items.Num();
+			FLinearColor Back = TCCss::Rgba(25, 28, 30, 0.9f), Edge = bNewest ? TCCss::Rgba(176, 164, 122, 0.46f) : TCCss::Rgba(176, 164, 122, 0.24f);
+			if (bBase)
+			{
+				Back = TCCss::Rgba(140, 36, 28, 0.94f); Edge = TCCss::Hex(0xd4574a);
+				// alert-base: 0.9 s ease-in-out, 4 alternate iterations after the 0.18 s slide-in
+				const double T = Now - L->Born - SlideIn;
+				if (T >= 0 && T < 4 * BasePulse)
+				{
+					const int32 Iter = (int32)(T / BasePulse);
+					const float F = (float)(T / BasePulse - Iter), K = TCCss::EaseInOut(Iter % 2 ? 1.f - F : F);
+					Back = FMath::Lerp(Back, TCCss::Rgba(200, 60, 46, 0.96f), K);
+				}
+			}
+			if (Hover(X, Y, W, H) && !(bBase && Now - L->Born < SlideIn + 4 * BasePulse)) { Back = TCCss::Rgba(46, 51, 55, 0.94f); Edge = TCCss::Rgba(214, 178, 94, 0.8f); }
+			else if (Hover(X, Y, W, H)) Edge = TCCss::Rgba(214, 178, 94, 0.8f);
+			Out.Rect(X, Y, W, H, Back, TEXT("alert:line"));
+			Out.Frame(X, Y, W, H, Edge, 1.f, TEXT("alert:line-frame"));
+			FTCPaintItem& T = Out.Text(Text, X + 1 + PadX, Y + 1 + PadY, FontPx, bBase ? FLinearColor::White : LineColour(L->Alert.Kind), bBold, ETCPaintAlign::Left, bNewest ? TEXT("alert:text-newest") : TEXT("alert:text"));
+			T.Size.Y = LineBox;
+			Out.Hit(FBox2D(FVector2D(X, Y), FVector2D(X + W, Y + H)), FString::Printf(TEXT("alert:line:%d"), L->Serial), L->Alert.Text);
+			Out.Panels.Add(FBox2D(FVector2D(X, Y), FVector2D(X + W, Y + H)));
+			Out.Shift(First, FVector2D(Slide, 0));
+			Out.Fade(First, A);
+		};
+		Blocks.Add(MoveTemp(B));
+	}
+	// the Alert history box: the summary always, the nav buttons and the list when open
+	{
+		const float W = FMath::Min(HistoryW, In.ViewW - BoxSide);
+		const float SumH = 1 + HistoryPadY + LineBox + HistoryPadY;
+		const float ButtonH = LineBox + 2 * ButtonPadY + 2, NavH = 2 * NavPad + ButtonH;
+		const TArray<FTCAlertHistoryEntry>& Entries = Hist.Entries();
+		const float ListMaxH = FMath::Min(ListMax, ListVh * In.ViewH);
+		struct FEntry { const FTCAlertHistoryEntry* E; TArray<FString> Lines; float H; };
+		TArray<FEntry> Rows;
+		float ListH = 2 * ListPad, Content = 0.f;
+		int32 First = 0;
+		if (bHistoryOpen)
+		{
+			const float TextW = W - 2 - 2 * ListPad - 2 - 2 * EntryPad;
+			for (const FTCAlertHistoryEntry& E : Entries)
+			{
+				FEntry R;
+				R.E = &E;
+				R.Lines = FTCPaint::Wrap(TC_T(FString::Printf(TEXT("%s · %s"), *MatchClock(E.Time), *E.Text)), TextW, FontPx, false, Measure);
+				R.H = 2 + 2 * EntryPad + R.Lines.Num() * LineBox;
+				Rows.Add(MoveTemp(R));
+			}
+			// the list scrolls (max-height min(30vh, 250px)): this shows a window of whole entries, the selected one in it
+			for (const FEntry& R : Rows) Content += R.H + EntryMargin;
+			Content += Rows.Num() ? EntryMargin : LineBox;
+			const int32 Sel = Rows.IndexOfByPredicate([this](const FEntry& R) { return R.E->Id == Hist.Selected(); });
+			if (Sel > 0)
+			{
+				float Run = EntryMargin;
+				for (int32 K = 0; K <= Sel; K++) Run += Rows[K].H + EntryMargin;
+				while (First < Sel && Run > ListMaxH) { Run -= Rows[First].H + EntryMargin; First++; }
+			}
+			ListH += FMath::Min(Content, ListMaxH);
+		}
+		FBlock B;
+		B.W = W;
+		B.H = SumH + (bHistoryOpen ? NavH + ListH : 0.f) + 1;
+		const float H = B.H;
+		const bool bOpen = bHistoryOpen;
+		const int32 Selected = Hist.Selected();
+		B.Paint = [W, H, SumH, ButtonH, NavH, ListH, ListMaxH, Content, Rows, First, bOpen, Selected, LineBox, &Measure, this](FTCPaint& Out, float X, float Y)
+		{
+			Out.Rect(X, Y, W, H, TCCss::Rgba(25, 28, 30, 0.96f), TEXT("alert:history"));
+			Out.Frame(X, Y, W, H, TCCss::Rgba(176, 164, 122, 0.46f), 1.f, TEXT("alert:history-frame"));
+			Out.Panels.Add(FBox2D(FVector2D(X, Y), FVector2D(X + W, Y + H)));
+			// <summary>Alert history</summary> with the details marker
+			const float Sx = X + 1 + HistoryPadX, Sy = Y + 1 + HistoryPadY;
+			FTCPaintItem& Mk = Out.Text(bOpen ? TEXT("▼") : TEXT("▶"), Sx, Sy, FontPx * 0.7f, TCCss::Text, false, ETCPaintAlign::Left, TEXT("alert:history-marker"));
+			Mk.Size.Y = LineBox;
+			FTCPaintItem& Su = Out.Text(TC_T(FString(TEXT("Alert history"))), Sx + FontPx * 0.95f, Sy, FontPx, TCCss::Text, false, ETCPaintAlign::Left, TEXT("alert:history-summary"));
+			Su.Size.Y = LineBox;
+			Out.Hit(FBox2D(FVector2D(X, Y), FVector2D(X + W, Y + SumH)), TEXT("alert:history"), TEXT("Alert history"));
+			if (!bOpen) return;
+			// the nav: Previous Alert (navigate(1)), Next Alert (navigate(-1))
+			float Bx = X + 1 + NavPad;
+			const float By = Y + SumH + NavPad;
+			for (int32 K = 0; K < 2; K++)
+			{
+				const FString Label = TC_T(FString(K == 0 ? TEXT("Previous Alert") : TEXT("Next Alert")));
+				const float Bw = Measure(Label, FontPx, false, 0.f) + 2 * ButtonPadX + 2;
+				Out.Rect(Bx, By, Bw, ButtonH, TCCss::Rgba(46, 51, 55, 0.94f), TEXT("alert:nav"));
+				Out.Frame(Bx, By, Bw, ButtonH, TCCss::Rgba(176, 164, 122, 0.24f), 1.f, TEXT("alert:nav-frame"));
+				FTCPaintItem& Bt = Out.Text(Label, Bx + 1 + ButtonPadX, By + 1 + ButtonPadY, FontPx, TCCss::Text, false, ETCPaintAlign::Left, TEXT("alert:nav-label"));
+				Bt.Size.Y = LineBox;
+				Out.Hit(FBox2D(FVector2D(Bx, By), FVector2D(Bx + Bw, By + ButtonH)), K == 0 ? TEXT("alert:nav:1") : TEXT("alert:nav:-1"), K == 0 ? TEXT("Previous Alert") : TEXT("Next Alert"));
+				Bx += Bw + NavGap;
+			}
+			// the list
+			const float Lx = X + 1 + ListPad, Lw = W - 2 - 2 * ListPad, Top = Y + SumH + NavH + ListPad, Bottom = Top + ListH - 2 * ListPad;
+			if (!Rows.Num())
+			{
+				FTCPaintItem& E = Out.Text(TC_T(FString(TEXT("No Alerts yet"))), Lx, Top, FontPx, TCCss::Text, false, ETCPaintAlign::Left, TEXT("alert:history-empty"));
+				E.Size.Y = LineBox;
+				return;
+			}
+			float Ey = Top + EntryMargin;
+			for (int32 K = First; K < Rows.Num(); K++)
+			{
+				const FEntry& R = Rows[K];
+				if (Ey + R.H > Bottom + 0.5f) break;
+				Out.Rect(Lx, Ey, Lw, R.H, TCCss::Rgba(46, 51, 55, 0.94f), TEXT("alert:entry"));
+				Out.Frame(Lx, Ey, Lw, R.H, TCCss::Rgba(176, 164, 122, 0.24f), 1.f, TEXT("alert:entry-frame"));
+				if (R.E->Id == Selected) Out.Frame(Lx, Ey, Lw, R.H, TCCss::Brass, 2.f, TEXT("alert:entry-current")); // aria-current: the 2 px brass outline inside
+				float Ty = Ey + 1 + EntryPad;
+				for (const FString& Ln : R.Lines)
+				{
+					FTCPaintItem& T = Out.Text(Ln, Lx + 1 + EntryPad, Ty, FontPx, LineColour(R.E->Kind), false, ETCPaintAlign::Left, TEXT("alert:entry-text"));
+					T.Size.Y = LineBox;
+					Ty += LineBox;
+				}
+				Out.Hit(FBox2D(FVector2D(Lx, Ey), FVector2D(Lx + Lw, Ey + R.H)), FString::Printf(TEXT("alert:entry:%d"), R.E->Id), R.E->Text);
+				Ey += R.H + EntryMargin;
+			}
+			// the list's scrollbar when it overflows
+			if (Content > ListMaxH)
+			{
+				const float Track = Bottom - Top, Thumb = FMath::Max(12.f, Track * ListMaxH / Content);
+				float Before = 0.f;
+				for (int32 K = 0; K < First; K++) Before += Rows[K].H + EntryMargin;
+				Out.Rect(X + W - 1 - 4, Top + (Track - Thumb) * FMath::Clamp(Before / FMath::Max(1.f, Content - ListMaxH), 0.f, 1.f), 3, Thumb, TCCss::Rgba(176, 164, 122, 0.46f), TEXT("alert:history-scroll"));
+			}
+		};
+		Blocks.Add(MoveTemp(B));
+	}
+	// place(): the box's bottom 13 px over the minimap, its right edge on the minimap's; children aligned right
+	float Total = 0.f;
+	for (int32 I = 0; I < Blocks.Num(); I++) Total += (I ? Gap : 0.f) + Blocks[I].H;
+	float Y = In.MinimapTop - MinimapFrame - MinimapGap - Total;
+	for (const FBlock& B : Blocks)
+	{
+		B.Paint(P, Right - B.W, Y);
+		Y += B.H + Gap;
+	}
+	return P;
 }
 
 void FTCAlerts::UnderAttack(FVector2D At, const FString& Text, const TCHAR* Kind, const FTCAlertContext& Ctx, TArray<FTCAlertPush>& Out)
@@ -485,6 +828,7 @@ bool FTCAlerts::ReceivePing(const FJsonObject& M, const FTCMatchState& S, double
 
 void FTCAlerts::Frame(double Now)
 {
+	Echoes.RemoveAll([Now](const FEcho& E) { return Now - E.Now > 2.0; });
 	LineList.RemoveAll([Now](const FTCAlertLine& L) { return TCAlertRules::LifeOf(L.Alert.Kind) - (Now - L.Born) <= 0; });
 	PingRings.Frame(Now);
 }
@@ -926,6 +1270,163 @@ bool FTCAlertsSayLanguageTest::RunTest(const FString& Parameters)
 		TestEqualSensitive(FString::Printf(TEXT("%s: no entry for lang: sh.text"), Lang), Out[1].Text, FString(C.Second));
 		TestEqualSensitive(FString::Printf(TEXT("%s: no localized at all"), Lang), Out[2].Text, FString(C.Third));
 		TestTrue(FString::Printf(TEXT("%s: the first has its place, the others none"), Lang), Out[0].bHasAt && !Out[1].bHasAt && !Out[2].bHasAt);
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCAlertsViewTest, "ThreeCrossroads.Alerts.View", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+bool FTCAlertsViewTest::RunTest(const FString&)
+{
+	// client/alerts.css with alerts.js push/frame/drawPings/place and the history box, on lines pushed at known times
+	FTCLocale::FScopedLanguage En(ETCLanguage::English);
+	const FTCMeasure M = FTCPaint::ApproxMeasure();
+	FTCAlerts A;
+	A.Push(TEXT("attack"), TEXT("Rifle Squad under attack"), true, FVector2D(60, 60), 100.0);
+	A.Push(TEXT("pointWon"), TEXT("Point captured"), true, FVector2D(50, 50), 100.5);
+	A.Push(TEXT("unitLost"), TEXT("M5 Stuart lost"), true, FVector2D(120, 120), 101.0);
+	A.Push(TEXT("base"), TEXT("Our base is under attack!"), true, FVector2D(22, 22), 101.2);
+	A.Push(TEXT("ready"), TEXT("Rifle Squad ready"), true, FVector2D(24, 30), 101.3);
+	A.Push(TEXT("event"), TEXT("No place"), false, FVector2D::ZeroVector, 101.4);
+	FTCAlertViewInput In;
+	In.Now = 102.0; In.Right = 1272.f; In.MinimapTop = 528.f; In.ViewW = 1280.f; In.ViewH = 720.f;
+	A.Frame(In.Now);
+	FTCPaint P = A.Layout(In, M);
+	TestEqual(TEXT("loss heading (tr('Unit lost'), upper-cased)"), P.TextsOf(TEXT("alert:loss-heading")), TArray<FString>{ TEXT("UNIT LOST") });
+	TestEqual(TEXT("loss detail"), P.TextsOf(TEXT("alert:loss-detail")), TArray<FString>{ TEXT("M5 Stuart lost") });
+	TestEqual(TEXT("loss hint"), P.TextsOf(TEXT("alert:loss-hint")), TArray<FString>{ TEXT("Space or click: look there") });
+	// while a loss shows, only two routine lines (nth-of-type(n+4) hidden); the newest first and semi-bold
+	TestEqual(TEXT("newest routine line"), P.TextsOf(TEXT("alert:text-newest")), TArray<FString>{ TEXT("No place") });
+	TestEqual(TEXT("the second routine line"), P.TextsOf(TEXT("alert:text")), TArray<FString>{ TEXT("Rifle Squad ready") });
+	TestEqual(TEXT("history summary"), P.TextsOf(TEXT("alert:history-summary")), TArray<FString>{ TEXT("Alert history") });
+	// order top to bottom: the loss box, the routine lines, the history box whose bottom is 13 px over the minimap
+	const FTCPaintItem* Loss = P.Find(TEXT("alert:loss"));
+	const FTCPaintItem* Newest = P.Find(TEXT("alert:text-newest"));
+	const FTCPaintItem* Hist = P.Find(TEXT("alert:history"));
+	TestTrue(TEXT("stacked: loss, routine, history"), Loss && Newest && Hist && Loss->Pos.Y < Newest->Pos.Y && Newest->Pos.Y < Hist->Pos.Y);
+	TestTrue(TEXT("history bottom = minimap top - 5 - 8"), Hist && FMath::IsNearlyEqual(Hist->Pos.Y + Hist->Size.Y, 528.f - 13.f, 0.01f));
+	TestTrue(TEXT("right edges on the minimap's"), Loss && Hist && FMath::IsNearlyEqual(Loss->Pos.X + Loss->Size.X, 1272.f, 0.01f) && FMath::IsNearlyEqual(Hist->Pos.X + Hist->Size.X, 1272.f, 0.01f));
+	TestTrue(TEXT("loss column 380 px, history 320 px"), Loss && Hist && Loss->Size.X == 380.f && Hist->Size.X == 320.f);
+	int32 LineHits = 0;
+	for (const FTCPaintHit& H : P.Hits) LineHits += H.Tag.StartsWith(TEXT("alert:line:"));
+	TestEqual(TEXT("a hit per shown line (1 loss, 2 routine)"), LineHits, 3);
+	// the slide-in: a line 0.09 s old is half way in
+	{
+		FTCAlertLine L; L.Alert.Kind = TEXT("attack"); L.Born = 0.0;
+		float Slide = 0;
+		const float Al = FTCAlerts::ShownAlpha(L, 0.09, &Slide);
+		TestTrue(TEXT("alert-in"), Al > 0.4f && Al < 0.9f && Slide > 0.5f && Slide < 8.f);
+		TestEqual(TEXT("in, steady"), FTCAlerts::ShownAlpha(L, 3.0), 1.f);
+		TestTrue(TEXT("fading: 0.3 s left of 6 s"), FMath::IsNearlyEqual(FTCAlerts::ShownAlpha(L, 5.7), 0.5f, 1e-3f));
+		L.Alert.Kind = TEXT("unitLost");
+		TestTrue(TEXT("a loss lives 12 s"), FTCAlerts::ShownAlpha(L, 11.0) == 1.f && FTCAlerts::ShownAlpha(L, 12.0) == 0.f);
+		L.Alert.Kind = TEXT("event");
+		TestTrue(TEXT("an event lives 15 s"), FTCAlerts::ShownAlpha(L, 14.0) == 1.f);
+	}
+	// the base alert: white bold on red, pulsing after its slide-in
+	{
+		FTCAlerts B;
+		B.Push(TEXT("base"), TEXT("Our base is under attack!"), true, FVector2D(22, 22), 0.0);
+		FTCAlertViewInput I2 = In;
+		I2.Now = 0.18 + 0.9; // the top of the first pulse
+		const FTCPaint Q = B.Layout(I2, M);
+		const FTCPaintItem* Line = Q.Find(TEXT("alert:line"));
+		const FTCPaintItem* Text = Q.Find(TEXT("alert:text-newest"));
+		TestTrue(TEXT("pulse at its peak: rgba(200, 60, 46, 0.96)"), Line && Line->Colour.Equals(TCCss::Rgba(200, 60, 46, 0.96f), 1e-3f));
+		TestTrue(TEXT("white, bold"), Text && Text->Colour.Equals(FLinearColor::White) && Text->bBold);
+		I2.Now = 5.0;
+		const FTCPaintItem* After = B.Layout(I2, M).Find(TEXT("alert:line"));
+		TestTrue(TEXT("after four half-cycles: rgba(140, 36, 28, 0.94)"), After && After->Colour.Equals(TCCss::Rgba(140, 36, 28, 0.94f), 1e-3f));
+	}
+	// once the loss is gone the routine lines show four at most
+	In.Now = 113.5;
+	A.Frame(In.Now);
+	A.Push(TEXT("air"), TEXT("Enemy Strafing Run incoming"), true, FVector2D(125, 125), 113.5);
+	A.Push(TEXT("pointLost"), TEXT("Point lost"), true, FVector2D(80, 20), 113.5);
+	A.Push(TEXT("ready"), TEXT("M4 Sherman ready"), true, FVector2D(30, 30), 113.5);
+	A.Push(TEXT("attack"), TEXT("Units under attack"), true, FVector2D(70, 70), 113.5);
+	A.Push(TEXT("pointWon"), TEXT("Ally captured a point"), true, FVector2D(20, 80), 113.5);
+	In.Now = 114.0; // past the 0.18 s slide-in
+	P = A.Layout(In, M);
+	TestEqual(TEXT("no loss now"), P.TextsOf(TEXT("alert:loss-detail")).Num(), 0);
+	TestEqual(TEXT("four routine lines"), P.TextsOf(TEXT("alert:text-newest")).Num() + P.TextsOf(TEXT("alert:text")).Num(), 4);
+	// colours: light red for trouble, brass for a point won
+	for (const FTCPaintItem& I : P.Items)
+	{
+		if (I.Role != TEXT("alert:text") && I.Role != TEXT("alert:text-newest")) continue;
+		if (I.Text == TEXT("Point lost") || I.Text == TEXT("Units under attack")) TestTrue(I.Text + TEXT(": light red"), I.Colour.Equals(TCCss::RedHi));
+		if (I.Text == TEXT("Ally captured a point")) TestTrue(I.Text + TEXT(": brass"), I.Colour.Equals(TCCss::Brass));
+		if (I.Text == TEXT("M4 Sherman ready")) TestTrue(I.Text + TEXT(": chalk"), I.Colour.Equals(TCCss::Text));
+	}
+	// the minimap pings: two marks per line with a place, in the kind's colour
+	const TArray<FTCAlertRing> Rings = A.MinimapRings(113.5 + 0.6);
+	TestEqual(TEXT("rings"), Rings.Num(), 2 * 4);
+	TestTrue(TEXT("spreading ring half way"), Rings.Num() && FMath::IsNearlyEqual(Rings[0].RadiusPx, 11.f, 1e-3f) && FMath::IsNearlyEqual(Rings[0].Alpha, 0.5f, 1e-3f));
+	TestTrue(TEXT("steady mark"), Rings.Num() > 1 && Rings[1].RadiusPx == 4.f && Rings[1].Alpha == 1.f && Rings[1].Colour.Equals(TCAlertRules::ColourOf(TEXT("pointWon"))));
+	// clicks: a line looks at its spot; the summary opens the history; Previous Alert visits the newest with a place
+	FVector2D At; bool bJump = false;
+	int32 Serial = -1;
+	for (const FTCPaintHit& H : P.Hits) if (H.Label == TEXT("Point lost")) Serial = FCString::Atoi(*H.Tag.RightChop(11));
+	TestTrue(TEXT("line click"), A.Click(FString::Printf(TEXT("alert:line:%d"), Serial), At, bJump) && bJump && At == FVector2D(80, 20));
+	TestTrue(TEXT("summary click"), A.Click(TEXT("alert:history"), At, bJump) && !bJump && A.bHistoryOpen);
+	TestTrue(TEXT("Previous Alert"), A.Click(TEXT("alert:nav:1"), At, bJump) && bJump && At == FVector2D(20, 80));
+	TestTrue(TEXT("again: the one before"), A.Click(TEXT("alert:nav:1"), At, bJump) && bJump && At == FVector2D(70, 70));
+	TestTrue(TEXT("Next Alert"), A.Click(TEXT("alert:nav:-1"), At, bJump) && bJump && At == FVector2D(20, 80));
+	TestFalse(TEXT("not an alert tag"), A.Click(TEXT("report:toggle"), At, bJump));
+	P = A.Layout(In, M);
+	TestEqual(TEXT("nav labels"), P.TextsOf(TEXT("alert:nav-label")), TArray<FString>{ TEXT("Previous Alert"), TEXT("Next Alert") });
+	const TArray<FString> Entries = P.TextsOf(TEXT("alert:entry-text"));
+	TestTrue(TEXT("entries: m:ss · text, newest first"), Entries.Num() >= 3 && Entries[0] == TEXT("0:00 · Ally captured a point"));
+	TestTrue(TEXT("the selected entry has the brass outline"), P.Find(TEXT("alert:entry-current")) != nullptr);
+	int32 EntryId = -1;
+	for (const FTCPaintHit& H : P.Hits) if (H.Tag.StartsWith(TEXT("alert:entry:")) && H.Label == TEXT("Point lost")) EntryId = FCString::Atoi(*H.Tag.RightChop(12));
+	TestTrue(TEXT("entry click visits it"), EntryId > 0 && A.Click(FString::Printf(TEXT("alert:entry:%d"), EntryId), At, bJump) && bJump && At == FVector2D(80, 20));
+	// the list scrolls: max-height min(30vh, 250px) holds a window of entries with the selected one in it
+	{
+		FTCAlerts C;
+		for (int32 K = 0; K < 30; K++) C.Push(TEXT("attack"), FString::Printf(TEXT("Line %d"), K), true, FVector2D(K, K), K);
+		C.bHistoryOpen = true;
+		FTCAlertViewInput I3 = In; I3.Now = 40.0;
+		for (int32 K = 0; K < 20; K++) C.Navigate(1);
+		const FTCPaint Q = C.Layout(I3, M);
+		const TArray<FString> Shown = Q.TextsOf(TEXT("alert:entry-text"));
+		TestTrue(TEXT("a window of the 30"), Shown.Num() > 3 && Shown.Num() < 30);
+		TestTrue(TEXT("the selected (the 20th newest, Line 10) is shown"), Shown.ContainsByPredicate([](const FString& S) { return S.EndsWith(TEXT("Line 10")); }));
+		TestTrue(TEXT("a scrollbar"), Q.Find(TEXT("alert:history-scroll")) != nullptr);
+		const FTCPaintItem* H = Q.Find(TEXT("alert:history"));
+		TestTrue(TEXT("history height within 28.9 + 38.9 + 258 + 1"), H && H->Size.Y <= 28.9f + 38.9f + 258.f + 1.01f);
+	}
+	// Mirror: the game mode's PushAlert gives every alert back; the feed's own is not added twice, another one joins
+	{
+		FTCAlerts C;
+		C.Push(TEXT("unitLost"), TEXT("Rifle Squad lost"), true, FVector2D(5, 5), 10.0);
+		C.Mirror(TEXT("unitLost"), TEXT("Rifle Squad lost"), FVector2D(5, 5), 200, 10.01);
+		TestEqual(TEXT("echo: one line"), C.Lines().Num(), 1);
+		TestEqual(TEXT("echo: one entry"), C.History().Entries().Num(), 1);
+		C.Mirror(TEXT("pointWon"), TEXT("Region claimed: Ardennes"), FVector2D(7, 8), 220, 10.02);
+		TestEqual(TEXT("a region alert joins"), C.Lines().Num(), 2);
+		TestTrue(TEXT("its history time is tick / 20"), C.History().Entries().Num() == 2 && C.History().Entries()[0].Time == 11.0 && C.History().Entries()[0].Text == TEXT("Region claimed: Ardennes"));
+		C.Mirror(TEXT("unitLost"), TEXT("Rifle Squad lost"), FVector2D(5, 5), 230, 10.03);
+		TestEqual(TEXT("the same text again later is a new alert"), C.Lines().Num(), 3); // two losses and the region line
+		TestEqual(TEXT("history keeps both losses"), C.History().Entries().Num(), 3);
+		TArray<FString> Sounds = C.TakeSounds();
+		TestEqual(TEXT("Mirror plays no sound (PushAlert did)"), Sounds.Num(), 1);
+	}
+	// Spanish: every element's text through spanish(), the heading upper-cased after it
+	{
+		FTCLocale::FScopedLanguage Es(ETCLanguage::Spanish);
+		FTCAlerts C;
+		C.Push(TEXT("unitLost"), TEXT("3 units lost"), true, FVector2D(5, 5), 0.0);
+		C.bHistoryOpen = true;
+		FTCAlertViewInput I4 = In; I4.Now = 1.0;
+		const FTCPaint Q = C.Layout(I4, M);
+		TestEqual(TEXT("es heading"), Q.TextsOf(TEXT("alert:loss-heading")), TArray<FString>{ TEXT("SE PIERDE UNA UNIDAD") });
+		TestEqual(TEXT("es detail ('{0} units lost')"), Q.TextsOf(TEXT("alert:loss-detail")), TArray<FString>{ TEXT("3 unidades perdidas") });
+		TestEqual(TEXT("es hint"), FString::Join(Q.TextsOf(TEXT("alert:loss-hint")), TEXT(" ")), FString(TEXT("Espacio o clic: mirar allí")));
+		TestEqual(TEXT("es summary"), Q.TextsOf(TEXT("alert:history-summary")), TArray<FString>{ TEXT("Historial de alertas") });
+		TestEqual(TEXT("es nav"), Q.TextsOf(TEXT("alert:nav-label")), TArray<FString>{ TEXT("Alerta anterior"), TEXT("Alerta siguiente") });
+		FTCAlerts Empty;
+		Empty.bHistoryOpen = true;
+		TestEqual(TEXT("es empty list"), Empty.Layout(I4, M).TextsOf(TEXT("alert:history-empty")), TArray<FString>{ TEXT("Todavía no hay alertas") });
 	}
 	return true;
 }

@@ -6,6 +6,9 @@
 #include "Client/TCLocale.h"
 #include "Client/TCGameMode.h"
 #include "Client/TCObjectives.h"
+#include "Client/TCEndReport.h"
+#include "Client/TCBossBar.h"
+#include "Client/TCAlerts.h"
 #include "Client/TCKeys.h"
 #include "Client/TCUnitRenderer.h"
 #include "Client/TCArmyCommands.h"
@@ -154,9 +157,23 @@ float ATCHUD::DrawScoreStrip(UFont* Font, UFont* Big)
 		Centred(FString::Join(TArray<FString>({ Strip.Rate, Strip.Bonus, Strip.Notice }).FilterByPredicate([](const FString& Q) { return !Q.IsEmpty(); }), TEXT("  |  ")), TextC, Font);
 	Centred(Strip.OutBanner, Red, Font);
 	if (Strip.bWeather) Centred(Strip.Weather, Strip.bWeatherTurning ? Brass : DimC, Font);
+	// round 15: hud.js drawBoss, #boss in #top under the strip (Client/TCBossBar.h): the Kaiju's health while one lives
+	M->BossBar.Snapshot(S, FPlatformTime::Seconds());
+	if (M->BossBar.Shown())
+	{
+		float BossBottom = Y;
+		const FTCPaint Boss = M->BossBar.Layout(Canvas->ClipX / 2, Y, Canvas->ClipX, FPlatformTime::Seconds(), FTCPaint::CanvasMeasure(Font), &BossBottom);
+		Boss.Draw(Canvas, Font);
+		for (const FBox2D& B : Boss.Panels) Panels.Add(ToScreen(B));
+		Y = BossBottom + 4.f;
+	}
 	// round 14: objectives.js's goal box and collapse banner as objectives.css draws them (FTCScenarioText), under the
 	// strip and its lines
 	const float Bottom = M->ScenarioText.Draw(Canvas, Big, Font, Y - 4.f);
+	// round 15: client/stats.js, F2's overlay (Client/TCKeys.h): under its panel (this HUD has no #util or #econ panel,
+	// so the top-left and top-right boxes take stats.js's 52 px; top centre goes under #top), clear of the strip
+	const FTCPaint StatsBox = M->StatsOverlay().Layout(M->Perf.Stats(), -1.f, FMath::Max(Y, Bottom + 4.f) - 4.f, -1.f, FBox2D(FVector2D(X0, Y0), FVector2D(X0 + W, Y0 + H)), Canvas->ClipX, 0.f, Canvas->ClipX, FTCPaint::CanvasMeasure(Font));
+	StatsBox.Draw(Canvas, Font);
 	return FMath::Max(Y, Bottom + 4.f);
 }
 
@@ -337,43 +354,26 @@ void ATCHUD::DrawHealthBars()
 
 void ATCHUD::DrawAlertFeed(UFont* Font)
 {
-	using namespace TCHudSlice9;
+	// round 15: client/alerts.css and alerts.js as FTCAlerts::Layout draws them (Client/TCAlerts.h): the loss column,
+	// the routine lines, the Alert history box over the minimap; each line and button is a hit for the controller
 	ATCGameMode* M = GetWorld()->GetAuthGameMode<ATCGameMode>();
-	if (!M) return;
-	const double Now = GetWorld()->GetTimeSeconds();
-	const TArray<FTCAlertEntry>& A = M->AlertHistory();
-	auto Colour = [](const FString& Kind) { return Kind == TEXT("pointWon") ? Brass : Kind == TEXT("pointLost") || Kind == TEXT("attack") ? Red : TextC; };
-	const float Right = Minimap.Rect().bIsValid ? ToUi((float)Minimap.Rect().Max.X) : Canvas->ClipX - 8.f;
-	float Bottom = Minimap.Rect().bIsValid ? ToUi((float)Minimap.Rect().Min.Y) - 6.f : Canvas->ClipY - 200.f;
-	// client/alerts.js: up to four lines, each for 6 s, newest at the bottom over the minimap
-	TArray<const FTCAlertEntry*> Shown;
-	for (int32 I = 0; I < A.Num() && Shown.Num() < ATCGameMode::AlertLines; I++) if (Now - A[I].Born < ATCGameMode::AlertLineSeconds) Shown.Add(&A[I]);
-	for (int32 I = 0; I < Shown.Num(); I++)
-	{
-		// client/alerts.js push: the text is tr(text) on its own and the hint is its own element, so each part is
-		// translated by itself (the line put together would match no Spanish key)
-		// (alerts.js:133, 136: the newest line's hint is 'Space or click: look there', and a click on it looks there)
-		const FString L = I == 0 ? FString::Printf(TEXT("%s  (%s)"), *TC_T(Shown[I]->Text), *TC_T(FString(TEXT("Space or click: look there")))) : TC_T(Shown[I]->Text);
-		float TW = 0, TH = 0;
-		ShownSize(L, TW, TH, Font, 1.f);
-		Bottom -= LineH + 4.f;
-		AddPanel(Right - TW - 2 * PadPx, Bottom, TW + 2 * PadPx, LineH + 2.f, WithAlpha(Plate, 0.85f));
-		DrawShown(L, Colour(Shown[I]->Kind), Right - TW - PadPx, Bottom + 1.f, Font, 1.f);
-		if (I == 0) Buttons.Add({ ToScreen(FBox2D(FVector2D(Right - TW - 2 * PadPx, Bottom), FVector2D(Right, Bottom + LineH + 2.f))), FTCUiCommand(ETCUiAction::Alert), L, true });
-	}
-	// client/alert-history.js: Alt+H opens the match's alerts with their time; Alt+Left and Alt+Right visit them
-	if (!M->bAlertHistoryOpen) return;
-	const int32 Rows = FMath::Min(A.Num(), 14);
-	const float W = 420.f, H = (Rows + 2) * LineH + 2 * PadPx;
-	const float X = Right - W, Y = Bottom - H - 6.f;
-	AddPanel(X, Y, W, H, Plate);
-	DrawLabel(FString::Printf(TEXT("Alert history (%d)  Alt+Left/Right visit, Alt+H closes"), A.Num()), Brass, X + PadPx, Y + PadPx, Font, 1.f);
-	if (!A.Num()) DrawLabel(TEXT("No alerts yet this match"), DimC, X + PadPx, Y + PadPx + LineH, Font, 1.f);
-	for (int32 I = 0; I < Rows; I++)
-	{
-		const bool bCur = A[I].Id == M->AlertCursor;
-		DrawShown(FString::Printf(TEXT("%s%s  %s"), bCur ? TEXT("> ") : TEXT("  "), *Clock(A[I].Tick / 20.0), *TC_T(A[I].Text)), bCur ? Brass : Colour(A[I].Kind), X + PadPx, Y + PadPx + (I + 1) * LineH, Font, 1.f);
-	}
+	if (!M || !Canvas) return;
+	FTCAlertViewInput In;
+	In.Now = FPlatformTime::Seconds(); // the alert clock (alerts.js now(); ATCGameMode::OnCombatSnapshot)
+	In.Right = Minimap.Rect().bIsValid ? ToUi((float)Minimap.Rect().Max.X) : Canvas->ClipX - 8.f;
+	In.MinimapTop = Minimap.Rect().bIsValid ? ToUi((float)Minimap.Rect().Min.Y) : Canvas->ClipY - 200.f;
+	In.ViewW = Canvas->ClipX; In.ViewH = Canvas->ClipY;
+	// round 15 (lead): at a large UI scale the recruit card (a tall column beside the minimap, hudfit) reaches above the
+	// minimap under the feed's span; the feed then stands on the card instead of the minimap, so neither covers the other
+	if (RecruitBox.bIsValid && ToUi((float)RecruitBox.Max.X) > In.Right - TCAlertLook::BoxMax && ToUi((float)RecruitBox.Min.Y) < In.MinimapTop)
+		In.MinimapTop = ToUi((float)RecruitBox.Min.Y);
+	float Mx = 0, My = 0;
+	if (APlayerController* PC = GetOwningPlayerController(); PC && PC->GetMousePosition(Mx, My)) { In.bMouse = true; In.Mouse = FVector2D(ToUi(Mx), ToUi(My)); }
+	M->AlertFeed.Frame(In.Now);
+	const FTCPaint P = M->AlertFeed.Layout(In, FTCPaint::CanvasMeasure(Font));
+	P.Draw(Canvas, Font);
+	for (const FTCPaintHit& H : P.Hits) { FTCUiCommand C(ETCUiAction::Alert); C.Unit = H.Tag; Buttons.Add({ ToScreen(H.Rect), C, H.Label, true }); }
+	for (const FBox2D& B : P.Panels) Panels.Add(ToScreen(B));
 }
 
 void ATCHUD::DrawEpilogue(UFont* Font, UFont* Big)
@@ -431,60 +431,23 @@ void ATCHUD::DrawControlsSheet(UFont* Font, UFont* Big)
 	}
 }
 
-void ATCHUD::DrawMatchReport(UFont* Font, float Top)
+void ATCHUD::DrawMatchReport(UFont* Font, float Top, float LobbyBottom)
 {
-	using namespace TCHudSlice9;
-	// client/report.js: the lobby card after a match played to the end (hidden for a host-ended one): the result line, the
-	// "decided ..." line, the chart of victory points (Conquest) or points held, its legend, and the story per player
+	// round 15: client/main.js renderLobby's result line and client/report.js's card (Client/TCEndReport.h), beside the
+	// lobby panel: hidden without a result; the report hidden for a host-ended match; its summary opens and closes it
 	ATCGameMode* M = GetWorld()->GetAuthGameMode<ATCGameMode>();
-	if (!M) return;
-	const FTCMatchState& S = M->State;
-	const FTCMatchReport& R = S.Objectives.Report();
-	if (!R.bShown) return;
-	const float X0 = 716.f, W = FMath::Min(620.f, Canvas->ClipX - X0 - 8.f);
-	if (W < 300.f) return;
-	const float ChartH = 140.f, ColW = 62.f, NameW = W - 2 * PadPx - 7 * ColW;
-	const float H = 2 * PadPx + 2 * LineH + 6.f + ChartH + 18.f + R.Sides.Num() * LineH + 6.f + (R.Rows.Num() + 1) * LineH;
-	AddPanel(X0, Top, W, H, Plate);
-	float Y = Top + PadPx;
-	const FString Line = FTCObjectives::ResultLine(S.LastMatch, S.LobbySeat);
-	DrawLabel(FString::Printf(TEXT("Last match: %s"), *Line), Line == TEXT("Victory") ? Brass : TextC, X0 + PadPx, Y, Font, 1.f); Y += LineH;
-	DrawLabel(FString::Printf(TEXT("%s, %s"), *R.What, *R.Sub), DimC, X0 + PadPx, Y, Font, 1.f); Y += LineH + 6.f;
-	// the chart: time across, value up, one line per side (the winners drawn last, on top)
-	const float Cx = X0 + PadPx + 36.f, Cw = W - 2 * PadPx - 40.f, Cy = Y;
-	DrawRect(FLinearColor(0.f, 0.f, 0.f, 0.35f), Cx, Cy, Cw, ChartH);
-	DrawLabel(R.TopLabel, DimC, X0 + PadPx, Cy, Font, 1.f);
-	DrawLabel(TEXT("0"), DimC, X0 + PadPx, Cy + ChartH - LineH, Font, 1.f);
-	DrawLabel(R.EndLabel, DimC, Cx + Cw - 70.f, Cy + ChartH + 2.f, Font, 1.f);
-	for (const FTCReportSide& Sd : R.Sides)
-	{
-		const FLinearColor C = ATCUnitRenderer::SeatColor(Sd.ColourSlot);
-		for (int32 K = 1; K < Sd.Series.Num(); K++)
-		{
-			auto Px = [&](const FVector2D& V) { return FVector2D(Cx + Cw * (float)(V.X / R.End), Cy + ChartH - ChartH * (float)(R.Top > 0 ? V.Y / R.Top : 0.0)); };
-			const FVector2D A = Px(Sd.Series[K - 1]), B = Px(Sd.Series[K]);
-			DrawLine(A.X, A.Y, B.X, B.Y, C, Sd.bWon ? 2.5f : 1.5f);
-		}
-	}
-	Y = Cy + ChartH + 18.f;
-	for (const FTCReportSide& Sd : R.Sides)
-	{
-		DrawRect(ATCUnitRenderer::SeatColor(Sd.ColourSlot), X0 + PadPx, Y + 3.f, 10.f, 10.f);
-		DrawLabel(Sd.Legend, Sd.bWon ? Brass : TextC, X0 + PadPx + 14.f, Y, Font, 1.f);
-		Y += LineH;
-	}
-	Y += 6.f;
-	static const TCHAR* const Short[] = { TEXT("Kills"), TEXT("Losses"), TEXT("Built"), TEXT("Capt."), TEXT("MP"), TEXT("Support"), TEXT("Planes") };
-	DrawLabel(TEXT("Player"), DimC, X0 + PadPx, Y, Font, 1.f);
-	for (int32 K = 0; K < 7; K++) DrawLabel(Short[K], DimC, X0 + PadPx + NameW + K * ColW, Y, Font, 1.f);
-	Y += LineH;
-	for (const FTCReportRow& Row : R.Rows)
-	{
-		DrawRect(ATCUnitRenderer::SeatColor(Row.Slot), X0 + PadPx, Y + 3.f, 10.f, 10.f);
-		DrawLabel(Row.bMe ? FString::Printf(TEXT("%s (you)"), *Row.Name) : Row.Name, Row.bMe ? Brass : TextC, X0 + PadPx + 14.f, Y, Font, 1.f);
-		for (int32 K = 0; K < 7; K++) DrawLabel(FString::FromInt(Row.Values[K]), TextC, X0 + PadPx + NameW + K * ColW, Y, Font, 1.f);
-		Y += LineH;
-	}
+	if (!M || !Canvas) return;
+	const FTCEndReportInput In = FTCEndReport::FromState(M->State);
+	M->EndReport.Sync(In);
+	float X0 = 716.f, W = FMath::Min(TCEndReportRules::CardWidth, Canvas->ClipX - X0 - 8.f);
+	// round 15 (lead): too narrow beside the 700 px lobby panel: under it, across the window (the browser's report sits
+	// in the lobby card's own column)
+	if (W < 480.f && LobbyBottom > 0.f) { X0 = 8.f; Top = LobbyBottom + 8.f; W = FMath::Min(TCEndReportRules::CardWidth, Canvas->ClipX - 16.f); }
+	if (W < 300.f || (!In.bResult && !In.Report.bShown)) return;
+	const FTCPaint P = M->EndReport.Layout(In, X0, Top, W, FTCPaint::CanvasMeasure(Font));
+	P.Draw(Canvas, Font);
+	for (const FTCPaintHit& H : P.Hits) { FTCUiCommand C(ETCUiAction::Alert); C.Unit = H.Tag; Buttons.Add({ ToScreen(H.Rect), C, H.Label, true }); }
+	for (const FBox2D& B : P.Panels) Panels.Add(ToScreen(B));
 }
 
 void ATCHUD::DrawMinimapPoints()
@@ -538,5 +501,22 @@ void ATCHUD::DrawMinimapPoints()
 				DrawLine(A.X, A.Y, B.X, B.Y, Brass, 2.f);
 			}
 		}
+	}
+	// round 15: client/alerts.js drawPings: each alert line's mark, a spreading ring and a steady one, dark under the
+	// kind's colour (4 px, then 2 px)
+	const FLinearColor Ink(FColor(0x15, 0x16, 0x0f));
+	for (const FTCAlertRing& R : M->AlertFeed.MinimapRings(FPlatformTime::Seconds()))
+	{
+		if (R.Alpha <= 0.f || !Minimap.WorldToPixel(R.At, Px)) continue;
+		constexpr int32 Segs = 24;
+		for (int32 Pass = 0; Pass < 2; Pass++)
+			for (int32 K = 0; K < Segs; K++)
+			{
+				const double A0 = 2 * PI * K / Segs, A1 = 2 * PI * (K + 1) / Segs;
+				const FVector2D B0 = Px + FVector2D(FMath::Cos(A0), FMath::Sin(A0)) * R.RadiusPx, B1 = Px + FVector2D(FMath::Cos(A1), FMath::Sin(A1)) * R.RadiusPx;
+				FLinearColor C = Pass == 0 ? Ink : R.Colour;
+				C.A = R.Alpha;
+				DrawLine(B0.X, B0.Y, B1.X, B1.Y, C, Pass == 0 ? 4.f : 2.f);
+			}
 	}
 }

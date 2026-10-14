@@ -28,6 +28,27 @@ class FTCGroundPaint;
 class FTCWater;
 class FJsonObject;
 
+// Round 15 (hudfit): the backdrop's own light, client/lobby-view.js context() and build(): a HemisphereLight (sky
+// #c9d6e4, ground #5a4a32, 0.9) and a DirectionalLight (#ffd6a8, 3.0) without shadows, placed at (W/2 - 70, 110,
+// H/2 - 50) and aimed at (W/2, 0, H/2); no scene.environment; NeutralToneMapping at exposure 1 drawn straight to the
+// canvas (no composer, so the fog mixes after tone mapping); THREE.Fog(#1a1d1f, 0.3 x the larger side, 0.9 x the
+// larger side): the far side fades into the dark. Colours are linear (three's Color.setHex from the sRGB hex). The
+// lighting actor takes it while the battlefield shows (ATCLighting::SetLobbyLook, wired by the game mode).
+struct THREECROSSROADS_API FTCLobbyLook
+{
+	static constexpr uint32 SunHex = 0xffd6a8, SkyHex = 0xc9d6e4, GroundHex = 0x5a4a32, FogHex = 0x1a1d1f;
+	static constexpr float SunIntensity = 3.f, HemiIntensity = 0.9f, FogNearShare = 0.3f, FogFarShare = 0.9f, Exposure = 1.f;
+	FLinearColor Sun, Sky, Ground, Fog;
+	float SunI = SunIntensity, HemiI = HemiIntensity, Env = 0.f;
+	float FogNear = 0.f, FogFar = 0.f;     // metres from the camera (three's view depth)
+	FVector SunDirThree = FVector::ZeroVector; // toward the sun, three's axes (x, y up, z), unit length
+	bool bShadows = false;
+	bool bHazeBeforeTone = false;            // lobby-view.js draws straight to its canvas
+	bool bNeutralToneMapping = true;          // three.NeutralToneMapping (the match draws ACES filmic)
+	// the look for a W x H metre map
+	static FTCLobbyLook For(double W, double H);
+};
+
 class THREECROSSROADS_API FTCLobbyBackdrop
 {
 public:
@@ -59,6 +80,9 @@ public:
 	// 0 until the battlefield is up, then the canvas's CSS opacity transition (0 to 0.5 over 1.6 s, ease-out)
 	float ShownOpacity() const;
 	FString StatusLine() const;
+	// Round 15: the backdrop's light (FTCLobbyLook) while its battlefield is built, else false: the lighting actor then
+	// keeps (or goes back to) the match's mood
+	bool Look(FTCLobbyLook& Out) const;
 
 	// The drift's camera for a map of W x H metres at t seconds into it, with the ground height at the aim (reference
 	// metres; X = x, Y = z, Z up). For tests and checks.

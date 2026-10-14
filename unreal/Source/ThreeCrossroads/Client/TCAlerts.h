@@ -13,7 +13,24 @@
 //   client/main.js          the hooks alerts.init gets (friend, unit names by faction, player names, point positions,
 //                           home) and when alerts.snapshot runs (not for a spectator or a seat that is out).
 // Not here: World region alerts (FTCWorldRecovery raises them) and logistics alerts (FTCLogistics). The point block
-// is ported and can be switched off where the game mode already raises point alerts (bPointAlerts).
+// is ported and can be switched off where the game mode already raises point alerts (bPointAlerts). Since round 15
+// those alerts join this feed's lines and history through Mirror (ATCGameMode::PushAlert), so the feed draws all of
+// them as alerts.js does.
+//
+// Round 15 (the presentation, client/alerts.css with alerts.js push, frame, drawPings, place and the history box):
+//   - #alerts sits over the minimap's top right (its frame's 5 px and an 8 px gap above it), a column aligned right
+//     with 3 px gaps: the loss column (#lossAlerts, newest first: "UNIT LOST", the detail at 20 px, the hint "Space or
+//     click: look there", 380 px wide in deep red with a light left edge), then the routine lines newest first (the
+//     newest semi-bold with the stronger border; while a loss shows only two of them), then the Alert history box;
+//   - each kind's colour (light red for attack, unit lost, point lost and air; brass for a point won; the base alert
+//     white and bold on red, pulsing four half-cycles), the line's ellipsis at 320 px, the 0.18 s (0.22 s for a loss)
+//     slide-in, each kind's life (event 15 s, base 10 s, unit lost 12 s, the rest 6 s) and the 0.6 s fade;
+//   - a click on a line looks at its spot (hooks.jump), on the history's summary opens or closes it, on Previous
+//     Alert or Next Alert navigates (navigate(1), navigate(-1)), on an entry selects and visits it;
+//   - the minimap pings (drawPings): a ring spreading from 4 to 18 px every 1.2 s and a steady 4 px mark, dark under
+//     the kind's colour, fading with the line;
+//   - texts: each element's text through TC_T as the page's observer translates it (the heading after tr(), then
+//     upper-cased by CSS text-transform).
 //
 // Privacy: only what this recipient's snapshots carry: its own and allied unit rows, shots that name its side, public
 // points and strikes. Nothing under fog raises an alert, because nothing under fog is in the rows compared. A unit
@@ -23,6 +40,7 @@
 #include "CoreMinimal.h"
 #include "Net/TCMatchState.h"
 #include "Client/TCWorldRecovery.h"
+#include "Client/TCEndReport.h"
 
 class FJsonObject;
 class FTCUnitTable;
@@ -131,6 +149,40 @@ private:
 	TArray<FTCPingRing> RingList;
 };
 
+// alerts.css and alerts.js place(): sizes in CSS pixels
+namespace TCAlertLook
+{
+	constexpr float MinimapFrame = 5.f, MinimapGap = 8.f;      // place(): clear the minimap's 5 px frame, then 8 px
+	constexpr float BoxMax = 380.f, BoxSide = 20.f, Gap = 3.f; // #alerts max-width min(380px, vw - 20px), gap 3px
+	constexpr float FontPx = 14.f, LineHeight = 1.35f, PadX = 10.f, PadY = 3.f, LineMax = 320.f;
+	constexpr float LossW = 380.f, LossSide = 24.f, LossGap = 6.f, LossBottom = 8.f, LossPadX = 14.f, LossPadY = 10.f, LossEdge = 4.f;
+	constexpr float HeadingPx = 13.f, HeadingTrack = 0.1f, DetailPx = 20.f, DetailLine = 1.15f, HintPx = 12.f, HintTop = 3.f, LossInner = 2.f;
+	constexpr float HistoryW = 320.f, HistoryPadY = 4.f, HistoryPadX = 10.f, NavPad = 4.f, NavGap = 4.f, ButtonPadX = 10.f, ButtonPadY = 5.f;
+	constexpr float ListPad = 4.f, EntryPad = 5.f, EntryMargin = 2.f, ListMax = 250.f, ListVh = 0.30f;
+	constexpr double SlideIn = 0.18, LossSlideIn = 0.22, BasePulse = 0.9; // alert-in, loss-in, alert-base (4 alternate)
+	constexpr int32 LinesWithLoss = 2;  // #alerts:has(> #lossAlerts:not(:empty)) > .alert:nth-of-type(n+4) { display: none }
+}
+
+// Where the feed is drawn and what the pointer is over (UI pixels; the clock is the alert clock).
+struct FTCAlertViewInput
+{
+	double Now = 0.0;
+	float Right = 0.f;        // the minimap's right edge
+	float MinimapTop = 0.f;   // the minimap's top edge (the box sits 13 px above it)
+	float ViewW = 1280.f, ViewH = 720.f;
+	bool bMouse = false;
+	FVector2D Mouse = FVector2D::ZeroVector; // :hover
+	FString Focus;            // the hit tag the keyboard (Alt+Left/Right) is on, drawn with the brass outline
+};
+
+// One minimap mark of a line (drawPings): world metres, a radius in minimap pixels.
+struct FTCAlertRing
+{
+	FVector2D At = FVector2D::ZeroVector;
+	float RadiusPx = 4.f, Alpha = 1.f;
+	FLinearColor Colour = FLinearColor::White;
+};
+
 // Where alerts are raised from and how the screen is asked (the hooks alerts.init gets).
 struct FTCAlertContext
 {
@@ -161,6 +213,24 @@ public:
 	FTCAlertPush Push(const FString& Kind, const FString& Text, bool bHasAt, FVector2D At, double Now, int32 N = 1);
 	// alerts.js frame and pings.js frame: lines and rings past their life go.
 	void Frame(double Now);
+	// Round 15: an alert the game mode raised (ATCGameMode::PushAlert, which also plays its sound) joins the lines and
+	// the history as alerts.js push would. The echo of this feed's own Push or ReceivePing (the same kind and text,
+	// pushed this frame) is recognised and not added twice. Tick: the snapshot tick it came with.
+	void Mirror(const FString& Kind, const FString& Text, FVector2D At, int32 Tick, double Now);
+
+	// Round 15: the Alert history box (alerts.js toggleHistory, navigate: navigating opens it).
+	bool bHistoryOpen = false;
+	void ToggleHistory() { bHistoryOpen = !bHistoryOpen; }
+	const FTCAlertHistoryEntry* Navigate(int32 Direction);
+	// A click on a hit of Layout: 'alert:line:<serial>' (look there), 'alert:history', 'alert:nav:<1|-1>',
+	// 'alert:entry:<id>'. True when the tag was this feed's; bOutJump with OutAt when the camera should go there.
+	bool Click(const FString& Tag, FVector2D& OutAt, bool& bOutJump);
+	// The feed as alerts.css draws it, in UI pixels; hits carry the tags Click takes.
+	FTCPaint Layout(const FTCAlertViewInput& In, const FTCMeasure& Measure) const;
+	// drawPings: the minimap marks of the lines with a place (not pings), newest first, at Now.
+	TArray<FTCAlertRing> MinimapRings(double Now) const;
+	// alerts.js frame's opacity and the slide-in (alert-in or loss-in) at Now: opacity and the x offset in pixels.
+	static float ShownAlpha(const FTCAlertLine& L, double Now, float* OutSlide = nullptr);
 
 	const TArray<FTCAlertLine>& Lines() const { return LineList; }
 	// The line's opacity now (the last FADE seconds fade out).
@@ -183,6 +253,7 @@ private:
 	struct FRow { FString Type; int32 Owner = -1; double X = 0, Z = 0; int32 Hp = 0, Flags = 0; double Built = 1; };
 	struct FStrikeKey { FString Kind; double X = 0, Z = 0; };
 	void Sound(const FString& Kind, double Now);
+	void AddLine(const FTCAlertPush& A, double Now);
 	void UnderAttack(FVector2D At, const FString& Text, const TCHAR* Kind, const FTCAlertContext& Ctx, TArray<FTCAlertPush>& Out);
 	void ReadOrder(const FTCMatchState& S, const FJsonObject* Raw);
 	double HistoryTime() const;
@@ -193,6 +264,8 @@ private:
 	int32 LineSerial = 0;
 	TMap<FString, double> LastSound;
 	TArray<FString> Sounds;
+	struct FEcho { FString Kind, Text; double Now = 0.0; };
+	TArray<FEcho> Echoes;          // this feed's own pushes, waiting for ATCGameMode::PushAlert's Mirror
 	TCWorldRecoveryCore::FAttackQuiet OwnQuiet;
 	double MatchTime = 0.0;        // alerts.js matchTime (the last accepted snapshot's tick / 20)
 	int32 LastSnapTick = 0;        // main.js lastSnap.tick (hooks.matchTime), 0 without one

@@ -367,6 +367,7 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCWorldObjectsViewTest, "ThreeCrossroads.World
 bool FTCWorldObjectsViewTest::RunTest(const FString& Parameters)
 {
 	using namespace TCScatterTests;
+	const FTCGraphicsLevelScope HighLevel(ETCGraphicsLevel::High); // round 15: the fixture's case is High (the Low cases: GraphicsLowOracle)
 	FString Error;
 	const TSharedPtr<FJsonObject> Root = LoadFixture(Error);
 	if (!Root.IsValid()) { AddError(Error); return false; }
@@ -501,6 +502,372 @@ bool FTCWorldObjectsViewTest::RunTest(const FString& Parameters)
 			}
 	TestEqual(TEXT("instances drawn: every piece and every prop shown"), Instances, A.Pieces.Num() + A.Props);
 	TestEqual(TEXT("every instanced component uses a world material"), WorldMat, Hism);
+	View.Detach();
+	return true;
+}
+
+// ---------------------------------------------------------------------------------------------------- round 15: Graphics Low
+#include "Client/TCGraphics.h"
+#include "World/TCGroundPaint.h"
+#include "World/TCRelief.h"
+#include "World/TCWater.h"
+
+namespace TCScatterTests
+{
+	// unreal/Tools/graphics/fixtures/gfx-low-oracle.json.gz (unreal/Tools/graphics/gfx-low-oracle.mjs): the pinned
+	// props.js, structures.js and gfx.js under Node on six authored maps, High, switched to Low mid-match, built on Low
+	TSharedPtr<FJsonObject> LoadLowFixture(FString& OutError)
+	{
+		const FString Path = FPaths::Combine(FPaths::ProjectDir(), TEXT("Tools/graphics/fixtures/gfx-low-oracle.json.gz"));
+		TArray<uint8> Gz;
+		if (!FFileHelper::LoadFileToArray(Gz, *Path) || Gz.Num() < 18) { OutError = TEXT("cannot read ") + Path; return nullptr; }
+		const uint32 Size = (uint32)Gz[Gz.Num() - 4] | (uint32)Gz[Gz.Num() - 3] << 8 | (uint32)Gz[Gz.Num() - 2] << 16 | (uint32)Gz[Gz.Num() - 1] << 24;
+		TArray<uint8> Raw;
+		Raw.SetNumUninitialized((int64)Size + 1);
+		if (!FCompression::UncompressMemory(NAME_Gzip, Raw.GetData(), Size, Gz.GetData(), Gz.Num())) { OutError = TEXT("cannot gunzip ") + Path; return nullptr; }
+		Raw[Size] = 0;
+		TSharedPtr<FJsonObject> Root;
+		if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(UTF8_TO_TCHAR((const ANSICHAR*)Raw.GetData())), Root) || !Root.IsValid()) { OutError = TEXT("cannot parse ") + Path; return nullptr; }
+		return Root;
+	}
+	// a map as drawn at a start: the live grid and the map file's rows are its rows
+	FInput LowInput(const FJsonObject& Case, bool bLow)
+	{
+		FInput In;
+		const FJsonObject& O = *Case.GetObjectField(TEXT("input"));
+		In.W = (int)Case.GetNumberField(TEXT("w")); In.H = (int)Case.GetNumberField(TEXT("h"));
+		In.bLow = bLow; In.bWorld = false;
+		In.Map = Rows(O, TEXT("rows")); In.Live = In.Map; In.Orig = In.Map; In.Heights = Rows(O, TEXT("heights"));
+		const TArray<TSharedPtr<FJsonValue>>* A;
+		if (O.TryGetArrayField(TEXT("buildings"), A))
+			for (const TSharedPtr<FJsonValue>& V : *A)
+			{
+				const TSharedPtr<FJsonObject>* B;
+				if (V.IsValid() && V->TryGetObject(B)) In.Bld.push_back({ (int)(*B)->GetNumberField(TEXT("x")), { (int)(*B)->GetNumberField(TEXT("y")), TCHAR_TO_UTF8(*(*B)->GetStringField(TEXT("kind"))) } });
+			}
+		if (O.TryGetArrayField(TEXT("nodes"), A)) for (const TSharedPtr<FJsonValue>& V : *A) In.Nodes.push_back({ V->AsArray()[0]->AsNumber(), V->AsArray()[1]->AsNumber() });
+		auto Xy = [&O](const TCHAR* Field, std::vector<TCScatterCore::FCellXY>& Out)
+		{
+			const TArray<TSharedPtr<FJsonValue>>* L;
+			if (O.TryGetArrayField(Field, L))
+				for (const TSharedPtr<FJsonValue>& V : *L)
+				{
+					const TSharedPtr<FJsonObject>* P;
+					if (!V.IsValid() || !V->TryGetObject(P)) continue;
+					Out.push_back(TCScatterCore::FCellXY{ (int)(*P)->GetNumberField(TEXT("x")), (int)(*P)->GetNumberField(TEXT("y")) });
+				}
+		};
+		Xy(TEXT("spawns"), In.Spawns); Xy(TEXT("points"), In.Points);
+		return In;
+	}
+	FString AtName(const TSharedPtr<FJsonValue>& V) { return V.IsValid() && V->Type == EJson::String ? V->AsString() : FString(); }
+	// a reference mesh name: a piece kind (structures.js KINDS) or a prop kind, with '-bark' for a tree's bark mesh
+	int32 PropOfMesh(const FString& Name)
+	{
+		FString K = Name;
+		K.RemoveFromEnd(TEXT("-bark"));
+		for (int32 I = 0; I < TCScatterCore::PropCount; I++) if (K == ANSI_TO_TCHAR(TCScatterCore::PropName((TCScatterCore::EProp)I))) return I;
+		return -1;
+	}
+	// piece instances per kind name for a map as drawn, at a level
+	TMap<FString, int32> PieceCounts(const FInput& In)
+	{
+		const FSrc Src(In);
+		std::map<int, int> Named;
+		for (const auto& B : In.Bld)
+		{
+			const int T = TCWorldCore::HouseTypeOf(B.second.second.c_str());
+			if (T >= 0 && B.first >= 0 && B.second.first >= 0 && B.first < In.W && B.second.first < In.H) Named[B.second.first * In.W + B.first] = T;
+		}
+		std::vector<TCWorldCore::FPiece> Pieces;
+		TCWorldCore::BuildAllPieces(Src, [&Named](int Cell) { const auto It = Named.find(Cell); return It == Named.end() ? -1 : It->second; }, Pieces);
+		TMap<FString, int32> Out;
+		for (const TCWorldCore::FPiece& P : Pieces) Out.FindOrAdd(ANSI_TO_TCHAR(TCWorldCore::PieceName(P.Kind)))++;
+		return Out;
+	}
+}
+
+// Which props and grass survive on Graphics Low, against the unmodified reference under Node on six authored maps
+// (props.js visible: odd seeds left out except crop fields, a wood's tree too; place: no grass on Low), the same
+// after a switch in the middle of a match (gfx.onChange -> refresh) and back; the prop and piece shadow casters per
+// level; the pieces structures.js builds on Low (fewer sandbags, no rubble chunks or duckboards); ground.js's texels.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCGraphicsLowOracleTest, "ThreeCrossroads.World.GraphicsLowOracle", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FTCGraphicsLowOracleTest::RunTest(const FString& Parameters)
+{
+	using namespace TCScatterTests;
+	using namespace TCScatterCore;
+	FString Error;
+	const TSharedPtr<FJsonObject> Root = LoadLowFixture(Error);
+	if (!Root.IsValid()) { AddError(Error); return false; }
+	TestEqual(TEXT("fixture reference"), Root->GetStringField(TEXT("reference")), FString(FTCScatter::ReferencePin));
+	int32 Maps = 0, Rows_ = 0, Bad = 0, ShownHigh = 0, ShownLow = 0, GrassHigh = 0, OddKept = 0, MeshRows = 0;
+	for (const TSharedPtr<FJsonValue>& V : Root->GetArrayField(TEXT("cases")))
+	{
+		const FJsonObject& Case = *V->AsObject();
+		const FString Name = Case.GetStringField(TEXT("map"));
+		const FInput High = LowInput(Case, false), Low = LowInput(Case, true);
+		FScatterMap M;
+		M.W = High.W; M.H = High.H; M.Rows = High.Map; M.Spawns = High.Spawns; M.Points = High.Points;
+		const std::vector<FCandidate> List = Candidates(M);
+		const TArray<TSharedPtr<FJsonValue>>& Want = Case.GetArrayField(TEXT("candidates"));
+		if (!TestEqual(FString::Printf(TEXT("%s: candidates"), *Name), (int32)List.size(), Want.Num())) { Bad++; continue; }
+		const FJsonObject& At = *Case.GetObjectField(TEXT("at"));
+		const TArray<TSharedPtr<FJsonValue>>& AtHigh = At.GetArrayField(TEXT("high"));
+		const TArray<TSharedPtr<FJsonValue>>& AtSwitched = At.GetArrayField(TEXT("switched"));
+		const TArray<TSharedPtr<FJsonValue>>& AtFresh = At.GetArrayField(TEXT("fresh"));
+		const TArray<TSharedPtr<FJsonValue>>& AtBack = At.GetArrayField(TEXT("back"));
+		const FLive LiveHigh(High), LiveLow(Low);
+		int32 MapLow = 0, MapHigh = 0;
+		for (int32 I = 0; I < Want.Num(); I++)
+		{
+			const TArray<TSharedPtr<FJsonValue>>& R = Want[I]->AsArray();
+			const FCandidate& C = List[(size_t)I];
+			const bool bSame = R.Num() == 5 && R[0]->AsString() == ANSI_TO_TCHAR(PropName(C.Kind)) && (int)R[1]->AsNumber() == C.Cx && (int)R[2]->AsNumber() == C.Cy
+				&& (uint32)R[3]->AsNumber() == C.Seed && ((int)R[4]->AsNumber() != 0) == C.bWood;
+			if (!bSame && Bad++ < 20) AddError(FString::Printf(TEXT("%s: candidate %d differs from props.js"), *Name, I));
+			const FPlaced PH = Place(C, LiveHigh, High.Nodes), PL = Place(C, LiveLow, Low.Nodes);
+			const FString GotH = PH.bShown ? FString(ANSI_TO_TCHAR(PropName(PH.Kind))) : FString(), GotL = PL.bShown ? FString(ANSI_TO_TCHAR(PropName(PL.Kind))) : FString();
+			Rows_ += 2;
+			if (GotH != AtName(AtHigh[I]) && Bad++ < 20) AddError(FString::Printf(TEXT("%s: candidate %d on High: '%s', props.js '%s'"), *Name, I, *GotH, *AtName(AtHigh[I])));
+			if (GotL != AtName(AtFresh[I]) && Bad++ < 20) AddError(FString::Printf(TEXT("%s: candidate %d on Low: '%s', props.js '%s'"), *Name, I, *GotL, *AtName(AtFresh[I])));
+			// the reference itself: a mid-match switch shows what a Low start shows, and switching back what High showed
+			if (AtName(AtSwitched[I]) != AtName(AtFresh[I]) && Bad++ < 20) AddError(FString::Printf(TEXT("%s: props.js switched and fresh Low differ at %d"), *Name, I));
+			if (AtName(AtBack[I]) != AtName(AtHigh[I]) && Bad++ < 20) AddError(FString::Printf(TEXT("%s: props.js back on High differs at %d"), *Name, I));
+			// the rules as stated: no grass on Low; an odd seed is never shown on Low unless it is a crop field
+			if (PL.bShown && (C.Kind == EProp::Grass || ((C.Seed & 1) && C.Kind != EProp::Crop))) OddKept++;
+			MapHigh += PH.bShown ? 1 : 0; MapLow += PL.bShown ? 1 : 0;
+			GrassHigh += PH.bShown && PH.Kind == EProp::Grass ? 1 : 0;
+		}
+		ShownHigh += MapHigh; ShownLow += MapLow;
+		AddInfo(FString::Printf(TEXT("%s: %d candidates, %d shown on High, %d on Low (props.js: the same)"), *Name, Want.Num(), MapHigh, MapLow));
+
+		// shadow casters per mesh and level (props.js refresh castShadow, structures.js flush), and the instance counts
+		const FJsonObject& PropMeshes = *Case.GetObjectField(TEXT("propMeshes"));
+		const FJsonObject& PieceMeshes = *Case.GetObjectField(TEXT("pieceMeshes"));
+		const TPair<const TCHAR*, bool> PropLevels[] = { { TEXT("high"), false }, { TEXT("switched"), true }, { TEXT("back"), false }, { TEXT("fresh"), true } };
+		for (const auto& L : PropLevels)
+		{
+			TMap<int32, int32> Count;
+			for (int32 I = 0; I < Want.Num(); I++)
+			{
+				const FPlaced P = Place(List[(size_t)I], L.Value ? (const FLiveSource&)LiveLow : (const FLiveSource&)LiveHigh, High.Nodes);
+				if (P.bShown) Count.FindOrAdd((int32)P.Kind)++;
+			}
+			for (const TSharedPtr<FJsonValue>& E : PropMeshes.GetArrayField(L.Key))
+			{
+				const TArray<TSharedPtr<FJsonValue>>& R = E->AsArray();
+				const int32 K = PropOfMesh(R[0]->AsString());
+				MeshRows++;
+				if (K < 0) { if (Bad++ < 20) AddError(FString::Printf(TEXT("%s: unknown prop mesh %s"), *Name, *R[0]->AsString())); continue; }
+				const bool bCast = (int)R[2]->AsNumber() != 0;
+				if (bCast != FTCWorldObjectsView::PropCastsShadow((EProp)K, L.Value) && Bad++ < 20) AddError(FString::Printf(TEXT("%s %s: %s casts %d in props.js"), *Name, L.Key, *R[0]->AsString(), bCast));
+				if ((int32)R[1]->AsNumber() != Count.FindRef(K) && Bad++ < 20) AddError(FString::Printf(TEXT("%s %s: %s %d instances, native %d"), *Name, L.Key, *R[0]->AsString(), (int32)R[1]->AsNumber(), Count.FindRef(K)));
+			}
+		}
+		const TPair<const TCHAR*, bool> PieceLevels[] = { { TEXT("high"), false }, { TEXT("switched"), true }, { TEXT("low"), true } };
+		for (const auto& L : PieceLevels)
+		{
+			const TMap<FString, int32> Got = PieceCounts(L.Value ? Low : High);
+			int32 Seen = 0;
+			for (const TSharedPtr<FJsonValue>& E : PieceMeshes.GetArrayField(L.Key))
+			{
+				const TArray<TSharedPtr<FJsonValue>>& R = E->AsArray();
+				const FString Kind = R[0]->AsString();
+				const int32 PK = TCWorldCore::PieceOfName(TCHAR_TO_UTF8(*Kind));
+				MeshRows++;
+				if (PK < 0) { if (Bad++ < 20) AddError(FString::Printf(TEXT("%s: unknown piece mesh %s"), *Name, *Kind)); continue; }
+				const bool bCast = (int)R[2]->AsNumber() != 0;
+				if (bCast != FTCWorldObjectsView::PieceCastsShadow((TCWorldCore::EPiece)PK, L.Value) && Bad++ < 20) AddError(FString::Printf(TEXT("%s %s: piece %s casts %d in structures.js"), *Name, L.Key, *Kind, bCast));
+				if ((int32)R[1]->AsNumber() != Got.FindRef(Kind) && Bad++ < 20) AddError(FString::Printf(TEXT("%s %s: %d %s pieces, native %d"), *Name, L.Key, (int32)R[1]->AsNumber(), *Kind, Got.FindRef(Kind)));
+				Seen += Got.FindRef(Kind);
+			}
+			int32 All = 0;
+			for (const TPair<FString, int32>& P : Got) All += P.Value;
+			if (All != Seen && Bad++ < 20) AddError(FString::Printf(TEXT("%s %s: native pieces of a kind structures.js has no mesh for"), *Name, L.Key));
+		}
+		// ground.js createGround: the texels per cell on each level (the pinned expression, evaluated by the oracle)
+		const FJsonObject& Tx = *Case.GetObjectField(TEXT("texels"));
+		TestEqual(FString::Printf(TEXT("%s: ground texels per cell, High"), *Name), TCGroundPaintCore::FGround::PixelsPerCell(High.W, High.H, false, false), (int32)Tx.GetNumberField(TEXT("high")));
+		TestEqual(FString::Printf(TEXT("%s: ground texels per cell, Low"), *Name), TCGroundPaintCore::FGround::PixelsPerCell(High.W, High.H, false, true), (int32)Tx.GetNumberField(TEXT("low")));
+		Maps++;
+	}
+	AddInfo(FString::Printf(TEXT("graphics low: %d maps, %d placements and %d mesh rows compared with the reference; shown %d on High (%d grass), %d on Low; %d differ"), Maps, Rows_, MeshRows, ShownHigh, GrassHigh, ShownLow, Bad));
+	TestTrue(TEXT("at least three authored maps"), Maps >= 3);
+	TestEqual(TEXT("grass or odd-seed props shown on Low"), OddKept, 0);
+	TestTrue(TEXT("Low leaves out more than half"), ShownLow * 2 < ShownHigh);
+	TestEqual(TEXT("rows that differ from the reference"), Bad, 0);
+	return true;
+}
+
+// A switch of level in the middle of a match through the game's own classes and FTCGraphics's change event: the
+// pieces and props relaid and placed again (equal to the reference's switched counts), their shadows turned, the
+// relief's low variant equal to a Low build (and ATCTerrain following it with the lead glue), the water's drift frozen,
+// then all of it back on High. The level is switched without saving and restored at the end.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCGraphicsSwitchTest, "ThreeCrossroads.World.GraphicsSwitch", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FTCGraphicsSwitchTest::RunTest(const FString& Parameters)
+{
+	using namespace TCScatterTests;
+	FString Error;
+	const TSharedPtr<FJsonObject> Root = LoadLowFixture(Error);
+	if (!Root.IsValid()) { AddError(Error); return false; }
+	const FJsonObject* CaseP = nullptr;
+	for (const TSharedPtr<FJsonValue>& V : Root->GetArrayField(TEXT("cases"))) if (V->AsObject()->GetStringField(TEXT("map")) == TEXT("seelow-heights")) CaseP = V->AsObject().Get();
+	if (!TestNotNull(TEXT("seelow-heights in the fixture"), CaseP)) return false;
+	const FJsonObject& Case = *CaseP;
+	FTCGraphics& G = FTCGraphics::Get();
+	const FTCGraphicsLevelScope Restore(ETCGraphicsLevel::High); // starts on High; the saved level comes back at the end
+	auto CountOf = [](const TArray<TSharedPtr<FJsonValue>>& L) { int32 N = 0; for (const TSharedPtr<FJsonValue>& V : L) N += V.IsValid() && V->Type == EJson::String ? 1 : 0; return N; };
+	auto PieceSum = [](const TArray<TSharedPtr<FJsonValue>>& L) { int32 N = 0; for (const TSharedPtr<FJsonValue>& V : L) N += (int32)V->AsArray()[1]->AsNumber(); return N; };
+	const FJsonObject& At = *Case.GetObjectField(TEXT("at"));
+	const FJsonObject& PieceMeshes = *Case.GetObjectField(TEXT("pieceMeshes"));
+
+	const FJsonObject& O = *Case.GetObjectField(TEXT("input"));
+	TSharedRef<FJsonObject> Map = MakeShared<FJsonObject>();
+	Map->SetNumberField(TEXT("w"), Case.GetNumberField(TEXT("w")));
+	Map->SetNumberField(TEXT("h"), Case.GetNumberField(TEXT("h")));
+	Map->SetStringField(TEXT("name"), TEXT("Seelow Heights"));
+	for (const TCHAR* F : { TEXT("rows"), TEXT("heights"), TEXT("spawns"), TEXT("points"), TEXT("buildings") }) Map->SetArrayField(F, O.GetArrayField(F));
+	TSharedRef<FJsonObject> M = MakeShared<FJsonObject>();
+	M->SetStringField(TEXT("t"), TEXT("start"));
+	M->SetObjectField(TEXT("map"), Map);
+	M->SetNumberField(TEXT("you"), 0);
+	M->SetNumberField(TEXT("matchId"), 15);
+	M->SetArrayField(TEXT("cells"), {});
+
+	FScratchWorld Scratch(TEXT("TCGraphicsSwitchTest"));
+	ATCTerrain* Terrain = Scratch.World->SpawnActor<ATCTerrain>(ATCTerrain::StaticClass(), FTransform::Identity);
+	if (!TestNotNull(TEXT("terrain"), Terrain)) return false;
+	FTCMatchState State;
+	TestTrue(TEXT("match state takes the start"), State.ApplyStart(*M));
+	Terrain->ResetFrom(State);
+	for (int32 I = 0; I < 64 && Terrain->ChunksQueued(); I++) Terrain->Flush(State);
+	FTCWorldObjects Objects;
+	TestTrue(TEXT("world objects take the start"), Objects.ApplyStart(*M, State));
+	Objects.Update(*Terrain, nullptr);
+	{
+		TArray<TSharedPtr<FJsonValue>> Nodes;
+		for (const TSharedPtr<FJsonValue>& N : O.GetArrayField(TEXT("nodes")))
+			Nodes.Add(MakeShared<FJsonValueArray>(TArray<TSharedPtr<FJsonValue>>{ N->AsArray()[0], N->AsArray()[1], MakeShared<FJsonValueNumber>(2), MakeShared<FJsonValueNumber>(0) }));
+		TSharedRef<FJsonObject> Snap = MakeShared<FJsonObject>();
+		Snap->SetArrayField(TEXT("nodes"), Nodes);
+		Objects.ApplySnapshot(*Snap);
+		Objects.Update(*Terrain, nullptr);
+	}
+	FTCWorldObjectsView View;
+	TestTrue(TEXT("view attaches"), View.Attach(Scratch.World));
+	auto DrawAll = [&]() { for (int32 I = 0; I < 200 && (I == 0 || View.Queued()); I++) View.Draw(Objects, State, Terrain); };
+	DrawAll();
+	auto TreeShadows = [&]() -> int32
+	{
+		int32 N = 0;
+		for (TActorIterator<AActor> It(Scratch.World); It; ++It)
+			for (UActorComponent* C : It->GetComponents())
+				if (UHierarchicalInstancedStaticMeshComponent* H = Cast<UHierarchicalInstancedStaticMeshComponent>(C))
+					if (H->GetInstanceCount() && H->CastShadow && H->GetStaticMesh() && H->GetStaticMesh()->GetName().Contains(TEXT("foliage"))) N++;
+		return N;
+	};
+	auto Drawn = [&]() -> int32
+	{
+		int32 N = 0;
+		for (TActorIterator<AActor> It(Scratch.World); It; ++It)
+			for (UActorComponent* C : It->GetComponents())
+				if (UHierarchicalInstancedStaticMeshComponent* H = Cast<UHierarchicalInstancedStaticMeshComponent>(C)) N += H->GetInstanceCount();
+		return N;
+	};
+	const int32 HighProps = CountOf(At.GetArrayField(TEXT("high"))), LowProps = CountOf(At.GetArrayField(TEXT("switched")));
+	TestEqual(TEXT("High: props shown as props.js"), Objects.PropsShown(), HighProps);
+	TestEqual(TEXT("High: pieces as structures.js"), Objects.ShapeCount(), PieceSum(PieceMeshes.GetArrayField(TEXT("high"))));
+	const int32 TreeShadowsHigh = TreeShadows();
+	TestTrue(TEXT("High: trees and bushes cast shadows"), TreeShadowsHigh > 0);
+	TestEqual(TEXT("High: every piece and prop drawn"), Drawn(), Objects.ShapeCount() + Objects.PropsShown());
+
+	// the relief: its low variant from a High build equals a Low build, part by part
+	auto SameRelief = [](const TCRelief::FRelief& A, const TCRelief::FRelief& B)
+	{
+		if (A.NumParts() != B.NumParts()) return false;
+		for (int32 P = 0; P < A.NumParts(); P++)
+			if (A.Part(P).Pos != B.Part(P).Pos || A.Part(P).Idx != B.Part(P).Idx || A.Part(P).Nrm != B.Part(P).Nrm || A.Part(P).Paint != B.Part(P).Paint) return false;
+		return true;
+	};
+	{
+		TCRelief::FRelief Switched = Terrain->Relief();
+		auto Fresh = [&Switched](bool bLow)
+		{
+			TCRelief::FRelief R;
+			R.Reset(Switched.W, Switched.H, bLow, Switched.ChunkCells, Switched.bDrawnPicks);
+			R.InLevel = Switched.InLevel; R.InFrozen = Switched.InFrozen; R.InGrid = Switched.InGrid; R.InRoad = Switched.InRoad; R.InKnown = Switched.InKnown;
+			R.Build();
+			return R;
+		};
+		const TCRelief::FRelief Low = Fresh(true), High = Fresh(false);
+		TestTrue(TEXT("relief: the start is the High variant"), !Switched.bLow && SameRelief(Switched, High));
+		TestTrue(TEXT("relief: SetLow(true) rebuilds"), Switched.SetLow(true));
+		TestEqual(TEXT("relief: every part re-emitted"), (int32)Switched.TakeRebuilt().size(), Switched.NumParts());
+		TestTrue(TEXT("relief: switched to Low equals a Low build"), SameRelief(Switched, Low));
+		TestTrue(TEXT("relief: the Low variant differs (fewer fans, lighter rocks)"), !SameRelief(Low, High) && Low.Stats.Triangles < High.Stats.Triangles);
+		TestTrue(TEXT("relief: back to High"), Switched.SetLow(false) && SameRelief(Switched, High));
+		TestFalse(TEXT("relief: no change, no rebuild"), Switched.SetLow(false));
+		AddInfo(FString::Printf(TEXT("relief Seelow Heights: High %d triangles, Low %d"), High.Stats.Triangles, Low.Stats.Triangles));
+	}
+
+	// the water: water.js setLow on the change event, the clock stands still on Low
+	FTCWater Water;
+	Water.Attach(Scratch.World);
+	Water.GroundHeight = [Terrain](float X, float Z) { return Terrain->HeightAt(X, Z); };
+	Water.ResetFrom(State);
+	Water.Flush(State, 3.0, false);
+	const bool bWaterMid = Water.MaterialInstance() != nullptr;
+	if (!bWaterMid) AddWarning(TEXT("water: no material instance (M_TCWater missing?); the water checks are skipped"));
+	float LowParam = -1.f;
+	if (bWaterMid) { Water.MaterialInstance()->GetScalarParameterValue(FName(TEXT("Low")), LowParam); TestEqual(TEXT("water: High draws the drift"), LowParam, 0.f); }
+
+	// ---- the switch: one change event, every builder applies it at its next update
+	G.Set(ETCGraphicsLevel::Low, false);
+	Terrain->Flush(State);
+	for (int32 I = 0; I < 64 && Terrain->ChunksQueued(); I++) Terrain->Flush(State);
+	Objects.Update(*Terrain, nullptr);
+	DrawAll();
+	Water.Flush(State, 5.0, false);
+	const float TimeLow = Water.TimeSent();
+	Water.Flush(State, 9.0, false);
+	TestEqual(TEXT("Low: props shown as props.js after the switch"), Objects.PropsShown(), LowProps);
+	TestEqual(TEXT("Low: pieces as structures.js after the switch"), Objects.ShapeCount(), PieceSum(PieceMeshes.GetArrayField(TEXT("switched"))));
+	TestEqual(TEXT("Low: one level switch applied"), Objects.LevelSwitches(), 1);
+	TestTrue(TEXT("Low: laid out low"), Objects.LaidOutLow());
+	TestTrue(TEXT("Low: the view's shadows follow"), View.ShadowsLow() && View.ShadowFlagsTurned() > 0);
+	TestEqual(TEXT("Low: no tree or bush shadows"), TreeShadows(), 0);
+	TestEqual(TEXT("Low: every piece and prop drawn, nothing more"), Drawn(), Objects.ShapeCount() + Objects.PropsShown());
+	if (bWaterMid)
+	{
+		Water.MaterialInstance()->GetScalarParameterValue(FName(TEXT("Low")), LowParam);
+		TestEqual(TEXT("water: Low freezes the drift"), LowParam, 1.f);
+		TestEqual(TEXT("water: the clock stands still on Low"), Water.TimeSent(), TimeLow);
+		TestEqual(TEXT("water: one switch"), Water.LevelSwitches(), 1);
+	}
+#ifdef TC_GFXLOW_GLUE
+	TestTrue(TEXT("terrain: the relief follows to its low variant (lead glue)"), Terrain->ReliefLow() && Terrain->ReliefLevelSwitches() == 1);
+#else
+	AddInfo(TEXT("terrain: built without the round 15 lead glue; ATCTerrain keeps the relief it started with"));
+#endif
+
+	// ---- and back
+	G.Set(ETCGraphicsLevel::High, false);
+	Terrain->Flush(State);
+	for (int32 I = 0; I < 64 && Terrain->ChunksQueued(); I++) Terrain->Flush(State);
+	Objects.Update(*Terrain, nullptr);
+	DrawAll();
+	Water.Flush(State, 11.0, false);
+	TestEqual(TEXT("back on High: props as props.js"), Objects.PropsShown(), CountOf(At.GetArrayField(TEXT("back"))));
+	TestEqual(TEXT("back on High: pieces"), Objects.ShapeCount(), PieceSum(PieceMeshes.GetArrayField(TEXT("high"))));
+	TestEqual(TEXT("back on High: tree and bush shadows again"), TreeShadows(), TreeShadowsHigh);
+	TestEqual(TEXT("back on High: every piece and prop drawn"), Drawn(), Objects.ShapeCount() + Objects.PropsShown());
+	if (bWaterMid) { Water.MaterialInstance()->GetScalarParameterValue(FName(TEXT("Low")), LowParam); TestEqual(TEXT("water: the drift runs again"), LowParam, 0.f); TestEqual(TEXT("water: the clock runs"), Water.TimeSent(), 11.f); }
+#ifdef TC_GFXLOW_GLUE
+	TestTrue(TEXT("terrain: back to the High relief"), !Terrain->ReliefLow() && Terrain->ReliefLevelSwitches() == 2);
+#endif
+	AddInfo(FString::Printf(TEXT("switch on Seelow Heights: props %d -> %d -> %d, pieces %d -> %d, tree shadow components %d -> 0 -> %d"), HighProps, LowProps, Objects.PropsShown(),
+		PieceSum(PieceMeshes.GetArrayField(TEXT("high"))), PieceSum(PieceMeshes.GetArrayField(TEXT("switched"))), TreeShadowsHigh, TreeShadows()));
+	Water.Detach();
 	View.Detach();
 	return true;
 }

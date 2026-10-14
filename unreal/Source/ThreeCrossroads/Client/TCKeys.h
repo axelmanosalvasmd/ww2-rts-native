@@ -4,11 +4,23 @@
 // (client/selection.js army, idle and findIdle, doubleClick). Pure client logic: nothing here reads the socket, and the
 // selection helpers read only what FTCKeyUnit carries, which the controller fills from what this seat's snapshot holds.
 // Interim until the Rust core supplies input tables through its C ABI (IF-13).
+//
+// Round 15 (alerts scope): F1, F2 and M exactly as client/main.js's keydown binds them (TCKeys::Route): F1 and F2 are
+// read before everything while the match HUD shows (F1 toggles the Controls sheet, also on a key repeat; F2 toggles the
+// stats overlay, not on a repeat); while the Controls sheet or the stats sheet is open every other key stops there;
+// the rest goes through the table, where M ('mute', any context, no modifier: Shift+M is 'fort:demine') toggles the
+// audio, also in the lobby (the browser's handler does not ask for a match), never on a repeat. F2's target is ported
+// here with it: client/stats.js (FTCStatsOverlay: the stats, presets, positions, layouts, sizes, backgrounds and the
+// amber and red warnings, the box and its placement under the HUD's panels, saved as 'ww2-stats' JSON) and
+// client/perf.js (FTCPerf: the one-second roll of the frame, network and ping numbers). The stats sheet (Menu > Stats
+// overlay) is not drawn in this client: its open state is an input here, false until it exists.
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Client/TCEndReport.h"
 
 struct FKey;
+class FJsonObject;
 
 // client/keys.js contexts: 'global' always; 'army' outside Classic or 'classic' in it; the overlays 'targeting' (an aim
 // is armed), 'recruit' (recruit mode) and 'building' (Classic with a finished own Production Building's lettered cards).
@@ -54,6 +66,114 @@ namespace TCKeys
 	FString TableText();
 	uint32 Fnv1a(const FString& Text);
 }
+
+// client/main.js keydown, before the table: what a key press does.
+enum class ETCKeyRoute : uint8
+{
+	ControlsSheet,  // F1 while the match HUD shows: open or close the Controls sheet
+	StatsToggle,    // F2 while the match HUD shows, not a repeat: stats.toggle()
+	Swallowed,      // F2 repeated, or any key while the Controls sheet or the stats sheet is open
+	Table,          // through keys.js match (a repeated key then does nothing: main.js returns on e.repeat)
+};
+
+namespace TCKeys
+{
+	// Code: the DOM code; bHudShown: the match HUD is shown (#hud not hidden); bRepeat: the browser's e.repeat.
+	ETCKeyRoute Route(const FString& Code, bool bHudShown, bool bRepeat, bool bControlsOpen, bool bStatsSheetOpen);
+	// A table binding that runs without a match (the lobby): only 'mute' does anything there in this client.
+	bool RunsInLobby(const FString& Id);
+}
+
+// client/perf.js stat: the numbers of the last one-second roll (null in JavaScript: an unset optional).
+struct FTCPerfStats
+{
+	double Fps = 0, Ms = 0, Worst = 0, Cpu = 0;
+	int64 Calls = 0, Tris = 0;
+	int32 Units = 0, Fx = 0, Corpses = 0;
+	TOptional<double> Mem, Ping, Jitter, Loss, SrvTick, SrvEvery;
+	double Snaps = 0, Kbs = 0, Gap = 0;
+	int32 Bytes = 0;
+	double Scale = 1;
+	FString Gfx = TEXT("high");
+};
+
+// client/perf.js: frames, snapshots and latency pings rolled once a second. Times in milliseconds on one clock.
+class FTCPerf
+{
+public:
+	static constexpr double LostAfter = 3000.0; // LOST_AFTER
+	static constexpr int32 Pings = 30;          // PINGS
+	// perf.net(n): one snapshot of n bytes arrived
+	void Net(int32 Bytes, double NowMs);
+	// perf.pinged(c): a latency ping stamped c went out
+	void Pinged(double C);
+	// perf.pong(m): the round trip for a pong this client sent (m.c), and the server's [p95 tick ms, snapEvery] (m.srv)
+	TOptional<double> Pong(const FJsonObject& M, double NowMs);
+	// perf.frame: once per frame. StartMs: this frame's start (start to start is the frame, waits included); BusyMs:
+	// the game code's time in it; the counts of this frame. True when the second rolled (Stats() changed).
+	bool Frame(double StartMs, double NowMs, double BusyMs, int64 Calls, int64 Tris, int32 Units, int32 Fx, int32 Corpses);
+	const FTCPerfStats& Stats() const { return Stat; }
+	FTCPerfStats& MutableStats() { return Stat; }
+	void Reset() { *this = FTCPerf(); }
+
+private:
+	FTCPerfStats Stat;
+	int32 Frames = 0, Snaps = 0;
+	double Busy = 0, Worst = 0, LastStart = 0, Bytes = 0, GapMs = 0, LastSnap = 0, Since = -1;
+	TMap<double, double> Out; // c -> sent
+	TArray<bool> Done;        // answered (false) or lost (true), the last PINGS
+	TArray<double> Rtts;
+	void RollPings(double NowMs);
+};
+
+// client/stats.js STATS: one number of the overlay.
+struct FTCStatDef
+{
+	const TCHAR* Group;
+	const TCHAR* Id;
+	const TCHAR* Tag;   // the short name in the box
+	const TCHAR* Label; // the sheet's name for it
+	const TCHAR* Hint;  // the sheet's hint, or null
+};
+
+struct FTCStatsSettings
+{
+	bool bShow = false;
+	TArray<FString> Stats = { TEXT("fps"), TEXT("ping"), TEXT("loss") }; // PRESETS.Basic
+	FString Pos = TEXT("tl"), Layout = TEXT("list"), Size = TEXT("m"), Bg = TEXT("panel");
+	bool bWarn = true;
+};
+
+class FTCStatsOverlay
+{
+public:
+	static const TArray<FTCStatDef>& Defs();
+	// PRESETS: Basic, Performance, Network, Everything
+	static TArray<FString> Preset(const FString& Name);
+	// stats.js load(storage): the saved JSON (or none) over DEFAULTS; bForced: '?perf' (show every number, save nothing)
+	void Load(const TOptional<FString>& Saved, bool bForced = false);
+	// JSON.stringify(settings), what save() writes (an empty optional when forced: nothing is saved)
+	TOptional<FString> SaveText() const;
+	// the F2 key and the sheet's switch: settings.show = !settings.show, then save
+	void Toggle() { S.bShow = !S.bShow; }
+	const FTCStatsSettings& Settings() const { return S; }
+	FTCStatsSettings& MutableSettings() { return S; }
+	// The menu button's text: 'Stats overlay: On' or 'Off'
+	FString MenuLabel() const { return FString::Printf(TEXT("Stats overlay: %s"), S.bShow ? TEXT("On") : TEXT("Off")); }
+	// The box's rows: the tag, tr(show(s)) and the warning (0 fine, 1 amber, 2 red; 0 with warnings off).
+	struct FRow { FString Tag, Value; int32 Warn = 0; };
+	TArray<FRow> Rows(const FTCPerfStats& Stat) const;
+	// show(s) in English for one stat id, and its warn(s) band
+	static FString Show(const FString& Id, const FTCPerfStats& Stat);
+	static int32 Warn(const FString& Id, const FTCPerfStats& Stat);
+	// The box as stats.css draws it, in UI pixels: under the panel its position belongs to (TopTl, TopTc, TopTr: those
+	// panels' bottoms, or a negative value for none: 52 px), dropped below the score strip when it would run into it.
+	FTCPaint Layout(const FTCPerfStats& Stat, float TopTl, float TopTc, float TopTr, const FBox2D& Strip, float LeftOfTr, float RightOfTl, float ViewW, const FTCMeasure& Measure) const;
+
+private:
+	FTCStatsSettings S;
+	bool bForcedAll = false;
+};
 
 // One held unit as the selection keys see it (client/selection.js reads v.owner, v.type, v.hp, v.flags, v.plan and
 // UNITS[v.type]). The controller fills it from FTCMatchState, its unit table, the drawn positions and the screen.

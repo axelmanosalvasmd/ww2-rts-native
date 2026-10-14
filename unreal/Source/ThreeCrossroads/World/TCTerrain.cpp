@@ -88,12 +88,14 @@ void ATCTerrain::ResetFrom(const FTCMatchState& State)
 		UE_LOG(LogTC, Log, TEXT("terrain: cleared (no match held)"));
 		return;
 	}
-	EnsureMaterial(State.Map.bWorld);
-	// client/main.js startGame: createRelief(map, physicalGrid, { low: gfx.low || !!map.world }); the native client has
-	// no graphics preset, so authored maps get the High relief and World maps the Low one, as the browser at High.
+	// client/main.js startGame: createRelief(map, physicalGrid, { low: gfx.low || !!map.world }) (round 15: the Graphics
+	// level, Client/TCGraphics.h; the watch subscribes before the level is read)
+	GfxWatch.TakeChanged();
+	const bool bLowRelief = State.Map.bWorld || FTCGraphics::Get().Budget().bReliefLow;
+	EnsureMaterial(bLowRelief);
 	const double T0 = FPlatformTime::Seconds();
 	StartRows = State.Map.Chars;
-	ReliefCore.Reset(W, H, State.Map.bWorld, ChunkCells, true);
+	ReliefCore.Reset(W, H, bLowRelief, ChunkCells, true);
 	CopyInputs(State, true); // the water lines freeze here, as createWaterLevels reads map.heights once
 	ReliefCore.Build();
 	ReliefCore.TakeRebuilt();
@@ -184,6 +186,20 @@ void ATCTerrain::Flush(const FTCMatchState& State)
 		bEndRevealed = true;
 		for (int32 C = 0; C < ChunksX * ChunksY; C++) Queue_(C, false);
 		UE_LOG(LogTC, Log, TEXT("terrain: match decided (winner %d), fog lifted on %d chunks"), State.Winner, ChunksX * ChunksY);
+	}
+	// round 15: relief.js gfx.onChange: low = gfx.low || map.world; material.userData.setLow(low); rebuildGeometry()
+	if (GfxWatch.TakeChanged())
+	{
+		const bool bLowRelief = bBuiltWorld || FTCGraphics::Get().Budget().bReliefLow;
+		const double T0 = FPlatformTime::Seconds();
+		if (ReliefCore.SetLow(bLowRelief))
+		{
+			EnsureMaterial(bLowRelief);
+			for (const int P : ReliefCore.TakeRebuilt()) Queue_(P, true);
+			ReliefSwitches++;
+			UE_LOG(LogTC, Log, TEXT("terrain: graphics %s mid-match: relief %s variant, %d vertices %d triangles, rebuilt in %.0f ms, %d chunks queued"), LexToString(FTCGraphics::Get().Level()),
+				bLowRelief ? TEXT("low") : TEXT("high"), ReliefCore.Stats.Vertices, ReliefCore.Stats.Triangles, (FPlatformTime::Seconds() - T0) * 1000.0, Queue.Num());
+		}
 	}
 	if (PendingCells.Num())
 	{

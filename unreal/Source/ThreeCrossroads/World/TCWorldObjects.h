@@ -1448,6 +1448,7 @@ namespace TCWorldCore
 #include "UObject/StrongObjectPtr.h"
 #include "Client/TCCoverPreview.h"
 #include "Client/TCModelLibrary.h"
+#include "Client/TCGraphics.h"
 #include "World/TCScatter.h"
 
 class AActor;
@@ -1581,6 +1582,11 @@ public:
 	int32 GridMismatches(const FTCMatchState& State) const;
 	// Milliseconds the last Update spent (layout, pieces and props), for the status line.
 	double LastUpdateMs() const { return UpdateMs; }
+	// Round 15: the Graphics level the pieces and props are laid out at (client/structures.js C.low, props.js gfx.low).
+	// A change of level (FTCGraphics::OnChanged) relays every piece and places every prop again at the next Update, as
+	// structures.js rebuild() and props.js refresh() do on gfx.onChange.
+	bool LaidOutLow() const { return bLow; }
+	int32 LevelSwitches() const { return LevelSwitchCount; }
 
 private:
 	class FSource;
@@ -1664,6 +1670,10 @@ private:
 
 	uint32 Gen = 0;
 	bool bLastKept = false;
+	// Graphics Low (round 15)
+	bool bLow = false;
+	int32 LevelSwitchCount = 0;
+	FTCGraphicsWatch GfxWatch;
 	FString BuiltRoom, BuiltMap;
 	int32 BuiltMatch = -1, BuiltYou = -1;
 	bool bBuiltSpectator = false;
@@ -1703,6 +1713,15 @@ public:
 	// A line for the status log: components, instances by layer, materials, fog, ghosts, wrecks.
 	FString StatusLine() const;
 
+	// Round 15: whether a piece or prop kind casts shadows at a level (structures.js flush: shadow and lowShadow;
+	// props.js refresh: never grass and crops, nothing on Low). The view sets this on its components and again on every
+	// change of level (FTCGraphics::OnChanged), so the shadows follow a switch in the middle of a match.
+	static bool PieceCastsShadow(TCWorldCore::EPiece Kind, bool bLow) { return TCWorldCore::PieceShadow(Kind, bLow); }
+	static bool PropCastsShadow(TCScatterCore::EProp Kind, bool bLow) { return !bLow && Kind != TCScatterCore::EProp::Grass && Kind != TCScatterCore::EProp::Crop; }
+	// Components whose shadow flag the last change of level turned (for logs and tests), and the level they show.
+	int32 ShadowFlagsTurned() const { return ShadowTurned; }
+	bool ShadowsLow() const { return bShadowsLow; }
+
 	int32 MaxChunksPerFrame = 8;
 	float ScenicDetailMetres = 190.f;
 	float TrimDetailMetres = 380.f;
@@ -1723,6 +1742,7 @@ private:
 		int32 Triangles = 0;
 	};
 	void LoadAssets();
+	void ApplyShadowLevel(bool bLow);
 	const FKindAsset& PieceAsset(TCWorldCore::EPiece Kind);
 	const FKindAsset& PropAsset(TCScatterCore::EProp Kind);
 	bool MaterialsFor(const FTCModelPart& Part, FKindAsset& Out);
@@ -1739,6 +1759,9 @@ private:
 	FString LibraryError;
 	bool bAssetsLoaded = false;
 	TArray<FKindAsset> PieceAssets, PropAssets;
+	FTCGraphicsWatch GfxWatch;
+	bool bShadowsLow = false;
+	int32 ShadowTurned = 0;
 	// lead fix (slice 12): FKindAsset's raw mesh and material pointers are no garbage collector references. A kind no
 	// component used yet (rubble, a crater's piece, first seen mid-match) could find its mesh or dynamic material
 	// collected, and SetStaticMesh read freed memory (both live clients crashed at once in a slice 12 match). These

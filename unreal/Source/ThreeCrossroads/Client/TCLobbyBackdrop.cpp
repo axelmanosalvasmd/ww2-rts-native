@@ -7,6 +7,7 @@
 #include "World/TCWorldObjects.h"
 #include "World/TCGroundPaint.h"
 #include "World/TCWater.h"
+#include "Client/TCGraphics.h"
 #include "Camera/CameraComponent.h"
 #include "Engine/World.h"
 #include "Engine/Canvas.h"
@@ -74,6 +75,26 @@ FString FTCLobbyBackdrop::HttpBase() const
 	int32 Slash;
 	if (U.FindChar('/', Slash)) U.LeftInline(Slash);
 	return U.IsEmpty() ? FString() : Scheme + U;
+}
+
+FTCLobbyLook FTCLobbyLook::For(double W, double H)
+{
+	FTCLobbyLook L;
+	auto Hex = [](uint32 C) { return FLinearColor(FColor((C >> 16) & 255, (C >> 8) & 255, C & 255)); };
+	L.Sun = Hex(SunHex); L.Sky = Hex(SkyHex); L.Ground = Hex(GroundHex); L.Fog = Hex(FogHex);
+	const double Side = FMath::Max(W, H);
+	L.FogNear = (float)(Side * FogNearShare); L.FogFar = (float)(Side * FogFarShare);
+	// lobby-view.js: sun.position (W/2 - 70, 110, H/2 - 50), sun.target (W/2, 0, H/2)
+	L.SunDirThree = FVector(-70.0, 110.0, -50.0).GetSafeNormal();
+	return L;
+}
+
+bool FTCLobbyBackdrop::Look(FTCLobbyLook& Out) const
+{
+	if (!bActive || !bBuilt || !Terrain.IsValid() || !State.IsValid()) return false;
+	// lobby-view.js build(): the fog and the sun are set once the world is added to the scene
+	Out = FTCLobbyLook::For(State->Map.W * FTCMatchState::CellMetres, State->Map.H * FTCMatchState::CellMetres);
+	return true;
 }
 
 void FTCLobbyBackdrop::Show(UWorld* InWorld, const FString& InServerUrl, const FString& MapName, const FString& Mode)
@@ -273,7 +294,9 @@ void FTCLobbyBackdrop::Hide()
 	bActive = false; Shown.Reset(); Problem.Reset();
 	if (SavedScreenPercentage >= 0)
 	{
-		if (IConsoleVariable* Cv = IConsoleManager::Get().FindConsoleVariable(TEXT("r.ScreenPercentage"))) Cv->Set(SavedScreenPercentage, ECVF_SetByCode);
+		// round 15 (gfxlow glue): back to the Graphics level's percentage (perf.js renderScale), not the one saved when the
+		// backdrop showed: a change of level while it showed (the lobby's menu, or the automatic drop) would be undone
+		if (IConsoleVariable* Cv = IConsoleManager::Get().FindConsoleVariable(TEXT("r.ScreenPercentage"))) Cv->Set((float)FTCGraphics::Get().Budget().ScreenPercentage(1.0), ECVF_SetByCode);
 		SavedScreenPercentage = -1.f;
 	}
 }
@@ -306,6 +329,20 @@ bool FTCLobbyBackdropDriftTest::RunTest(const FString& Parameters)
 	const double Pitch = FMath::RadiansToDegrees(FMath::Atan2(0.77, FMath::Sqrt(0.25 * 0.25 + 0.59 * 0.59)));
 	TestTrue(TEXT("looking down at about 50 degrees"), Pitch > 49.5 && Pitch < 50.5);
 	// a quarter of the east-west period later the aim is at its east reach
+	// round 15: lobby-view.js's own light and fog, not the match's mood
+	{
+		const FTCLobbyLook L = FTCLobbyLook::For(220, 240);
+		TestEqual(TEXT("fog near: 0.3 x the larger side"), L.FogNear, 72.f, 1e-4f);
+		TestEqual(TEXT("fog far: 0.9 x the larger side"), L.FogFar, 216.f, 1e-4f);
+		TestFalse(TEXT("no shadows"), L.bShadows);
+		TestFalse(TEXT("the fog mixes after the tone curve (no composer)"), L.bHazeBeforeTone);
+		TestEqual(TEXT("sun 3.0"), L.SunI, 3.f);
+		TestEqual(TEXT("hemisphere 0.9"), L.HemiI, 0.9f);
+		TestEqual(TEXT("no environment"), L.Env, 0.f);
+		TestTrue(TEXT("fog colour #1a1d1f (linear)"), L.Fog.Equals(FLinearColor(FColor(0x1a, 0x1d, 0x1f)), 1e-6f));
+		TestTrue(TEXT("the sun is up, west and north of the aim"), L.SunDirThree.Y > 0.7 && L.SunDirThree.X < 0 && L.SunDirThree.Z < 0);
+		TestEqual(TEXT("sun direction is a unit vector"), L.SunDirThree.Size(), 1.0, 1e-9);
+	}
 	FTCLobbyBackdrop::DriftPose(220, 240, 35, [](float, float) { return 2.5f; }, Eye, Aim);
 	TestEqual(TEXT("east reach"), Aim.X, 110 + 220 * 0.14, 1e-9);
 	TestEqual(TEXT("aim on the ground"), Aim.Z, 2.5, 1e-9);

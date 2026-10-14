@@ -585,6 +585,7 @@ namespace TCWaterCore
 
 #include "CoreMinimal.h"
 #include "UObject/StrongObjectPtr.h"
+#include "Client/TCGraphics.h"
 
 class AActor;
 class UWorld;
@@ -661,9 +662,18 @@ public:
 	const TCWaterCore::FWater& CoreState() const { return Core; }
 	UProceduralMeshComponent* MeshComponent() const { return Mesh.Get(); }
 	UMaterialInstanceDynamic* MaterialInstance() const { return MID.Get(); }
+	// Round 15 (Graphics Low): the level the material shows (water.js WATER_LOW), the clock it last sent (it stands
+	// still on Low), and how many changes of level it applied in the middle of a match.
+	bool DrawnLow() const { return bDrawnLow; }
+	float TimeSent() const { return LastTime; }
+	int32 LevelSwitches() const { return LowSwitches; }
 
 private:
 	TCWaterCore::FWater Core;
+	FTCGraphicsWatch GfxWatch;
+	bool bDrawnLow = false;
+	float LastTime = 0.f;
+	int32 LowSwitches = 0;
 	TArray<uint8> Chars;            // what the core reads: known cells' characters, '.' elsewhere
 	TArray<int8> Levels;            // current levels of known cells
 	TBitArray<> Known;

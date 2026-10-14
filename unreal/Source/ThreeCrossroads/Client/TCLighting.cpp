@@ -536,6 +536,47 @@ void ATCLighting::Apply(bool bForceSky)
 	}
 }
 
+void ATCLighting::SetLobbyLook(const FTCLobbyLook* L)
+{
+	if (!L)
+	{
+		if (!bLobbyLook) return;
+		bLobbyLook = false;
+		Sun->SetCastShadows(true);
+		AimSun(Yaw);
+		Apply(true);
+		UE_LOG(LogTCLook, Log, TEXT("look: the lobby backdrop's light ends: mood %s again"), *Base.Name.ToString());
+		return;
+	}
+	if (bLobbyLook && FMath::IsNearlyEqual(LobbyLook.FogNear, L->FogNear) && FMath::IsNearlyEqual(LobbyLook.FogFar, L->FogFar)) return;
+	bLobbyLook = true;
+	LobbyLook = *L;
+	// lobby-view.js: HemisphereLight(sky, ground, 0.9) and DirectionalLight(sun, 3.0), no environment, no shadows
+	FTCMood M = Base;
+	M.Sun = L->Sun; M.SunI = L->SunI; M.Top = L->Sky; M.Bottom = L->Ground; M.HemiI = L->HemiI;
+	M.Haze = L->Fog; M.HazeK = 1.f; M.Exposure = FTCLobbyLook::Exposure; M.Shadow = 0.f;
+	Look = M;
+	Sun->SetCastShadows(L->bShadows);
+	Sun->SetIntensity(M.SunI);
+	Sun->SetLightColor(M.Sun);
+	Sun->SetWorldRotation((-TCLook::ThreeToUnreal(L->SunDirThree)).Rotation());
+	TCLook::MatchUnitSun(UnitSun, Sun);
+	TCLook::SetCollection(GetWorld(), M, L->Env, 0.f, TCLook::IndirectInMaterials());
+	SkyCube = TCLook::MakeSkyCube(M, L->Env, 0.f);
+	Sky->SetCubemap(SkyCube);
+	Sky->SetIntensity(1.f);
+	Sky->SetLightColor(FLinearColor::White);
+	Sky->RecaptureSky();
+	SkyEnv = -1.f; // the mood's cube is rebuilt when the lobby look ends
+	SkyWantUp = TCLook::ExpectedDiffuse(FVector(0, 0, 1), M, L->Env, 0.f);
+	bSkyCheck = true; bSkyCaptured = false; SkyTries = 1;
+	SkyCheckAt = GetWorld() ? GetWorld()->GetRealTimeSeconds() + 0.25 : 0.0;
+	TCLook::SetPost(PostMaterial, M.Exposure, L->FogNear, L->FogFar, L->Fog, L->bHazeBeforeTone);
+	LastFogNear = L->FogNear; LastFogFar = L->FogFar;
+	UE_LOG(LogTCLook, Log, TEXT("look: the lobby backdrop's light (client/lobby-view.js): sun %.1f without shadows, hemisphere %.1f, no environment, fog #%06x from %.1f to %.1f m after the tone curve"),
+		M.SunI, M.HemiI, FTCLobbyLook::FogHex, L->FogNear, L->FogFar);
+}
+
 void ATCLighting::CheckSkyCapture()
 {
 	// The sky light's capture of a just-made transient cube can run before the cube's render resource exists, and then
@@ -580,6 +621,12 @@ void ATCLighting::Tick(float Dt)
 {
 	Super::Tick(Dt);
 	CheckSkyCapture();
+	if (bLobbyLook)
+	{
+		// round 15: the lobby backdrop's light holds; no weather easing or camera-following haze in the lobby
+		TCLook::SetPost(PostMaterial, FTCLobbyLook::Exposure, LobbyLook.FogNear, LobbyLook.FogFar, LobbyLook.Fog, LobbyLook.bHazeBeforeTone);
+		return;
+	}
 	// atmosphere.js update: ease toward the weather, about 8 s to settle
 	const float K = 1.f - FMath::Exp(-Dt / 2.5f);
 	auto Near = [](float A, float B) { return FMath::Abs(A - B) <= 5e-4f; };
