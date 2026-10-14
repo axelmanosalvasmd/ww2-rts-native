@@ -73,6 +73,18 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
                     } if orders.len() == 1 && orders[0].unit == i64::from(u.id) => {
                         (if *attack_move { 2 } else { 1 }, orders[0].at)
                     }
+                    Command::Attack {
+                        ids,
+                        target,
+                        queue: false,
+                        at: Some(at),
+                    } if ids.as_slice() == [i64::from(u.id)] => {
+                        let target = u32::try_from(*target)
+                            .ok()
+                            .and_then(|id| state.world.game.units.get(&id))
+                            .filter(|t| state.world.game.players[u.owner].sees(t.id));
+                        (4, target.map_or(*at, Unit::at))
+                    }
                     Command::Entrench {
                         ids,
                         order:
@@ -234,6 +246,65 @@ mod movement_tests {
         assert!(matches!(
             movement_rows(&state, 3),
             Err(SnapshotError::InvalidRecipient)
+        ));
+    }
+
+    #[test]
+    fn queued_attack_uses_visible_pose_then_retains_admission_anchor() {
+        let fixture: Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/recipient-snapshot.json"))
+                .unwrap();
+        let mut state = super::super::tests::initialize(&fixture["cases"][0]);
+        let anchor = Point { x: 41., z: 43. };
+        state
+            .commands
+            .units
+            .get_mut(&1)
+            .unwrap()
+            .orders
+            .push_back(Command::Attack {
+                ids: vec![1],
+                target: 3,
+                queue: false,
+                at: Some(anchor),
+            });
+        state.world.game.players[0].visible = vec![3];
+        assert_eq!(
+            capture(&state).unwrap()[0]["orders"],
+            json!([[1, 1, 4, 35., 35.]])
+        );
+        state.world.game.units.get_mut(&3).unwrap().x = 37.;
+        assert_eq!(
+            capture(&state).unwrap()[0]["orders"],
+            json!([[1, 1, 4, 37., 35.]])
+        );
+        state.world.game.players[0].visible.clear();
+        assert_eq!(
+            capture(&state).unwrap()[0]["orders"],
+            json!([[1, 1, 4, 41., 43.]])
+        );
+        state.world.game.units.remove(&3);
+        assert_eq!(
+            capture(&state).unwrap()[0]["orders"],
+            json!([[1, 1, 4, 41., 43.]])
+        );
+        if let Command::Attack { at, .. } = state
+            .commands
+            .units
+            .get_mut(&1)
+            .unwrap()
+            .orders
+            .front_mut()
+            .unwrap()
+        {
+            *at = None;
+        }
+        assert!(matches!(
+            capture(&state),
+            Err(SnapshotError::Unsupported {
+                unit: 1,
+                capability: SnapshotCapability::Orders,
+            })
         ));
     }
 }

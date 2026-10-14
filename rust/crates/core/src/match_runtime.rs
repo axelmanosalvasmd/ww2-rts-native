@@ -576,6 +576,17 @@ pub(crate) fn cancel_field_work_state(
     Ok(())
 }
 
+/// Accepted replacement orders clear the existing field owners and construction scalar together.
+pub(crate) fn cancel_owned_work_state(
+    runtime: &mut crate::field_works::FieldWorksRuntime,
+    unit: &mut crate::game::Unit,
+    control: &mut crate::match_commands::UnitControl,
+) -> Result<(), String> {
+    crate::match_construction::validate_build_activity(unit, control)?;
+    cancel_field_work_state(runtime, unit)?;
+    crate::match_construction::clear_build_activity(unit, control)
+}
+
 impl Match {
     /// Source failed Dig routing clears only paid work. The squad remains on its shared project.
     pub fn drop_field_work_job(&mut self, id: u32) -> Result<(), String> {
@@ -597,6 +608,11 @@ impl Match {
     }
     /// Cancel current paid work without a refund. The descriptor is removed before its activity flag.
     pub fn cancel_field_work(&mut self, id: u32) -> Result<(), String> {
+        let control = self
+            .commands
+            .units
+            .get_mut(&id)
+            .ok_or("missing field-work control")?;
         let unit = self
             .world
             .game
@@ -606,7 +622,7 @@ impl Match {
         if unit.id != id {
             return Err("inconsistent field-work identity".into());
         }
-        cancel_field_work_state(&mut self.field_works, unit)
+        cancel_owned_work_state(&mut self.field_works, unit, control)
     }
     pub fn new(map: &crate::map::AuthoritativeMap, options: MatchOptions) -> Result<Self, String> {
         let rules = Rules::compiled().map_err(|e| e.to_string())?;

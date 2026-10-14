@@ -4,7 +4,7 @@ use crate::math;
 use crate::navigation::{TerrainChange, TerrainView, Versions};
 use std::collections::{BTreeMap, BTreeSet};
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Identity {
     width: usize,
     height: usize,
@@ -25,7 +25,7 @@ impl Identity {
         }
     }
 }
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Entry {
     identity: Identity,
     versions: Versions,
@@ -35,7 +35,7 @@ struct Entry {
     incremental: bool,
     serial: u64,
 }
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct VehicleNavigation {
     classes: BTreeMap<(u16, u64), Entry>,
     serial: u64,
