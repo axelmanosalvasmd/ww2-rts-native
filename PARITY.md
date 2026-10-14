@@ -45,9 +45,12 @@ Each section ends with the existing limitations it found, the roadmap items it e
 ## How to use it
 
 - **Status values:** `todo`; `in progress`; `ported` (the Rust side passes the row's check); `accepted` (both owners signed off); `differs` (an approved difference, recorded in `DESIGN.md`); `dropped` (an approved removal). The tools table records a proposed decision per tool instead.
+- **NET-17 tracking:** the focused live `listing_is_creation_only` check passes both creation-only directions against pinned Node and Rust, with independent lobby/directory assertions and exact output comparison. NET-17 is `ported` for ordinary lobbies only, not `accepted`; this adds no privacy, role or public-start approval.
 - **Row IDs are stable.** A new row takes the next free number; a removed row is marked `dropped`, not renumbered, so tasks and PRs can cite IDs.
 - **Moving the pin** updates the rows its diff touches, in the same PR as the port and the parity run (`AGENTS.md`).
 - **Limitations are decisions, not tasks.** Each section lists the known bugs and leaks at the pin. The native game may fix them; a fix players would notice follows the rule above.
+
+LOG-17 (local store service) is `ported` by nine isolated original-JavaScript cases and 11 complete-reserve/ordered-inventory checkpoints. Caller-provided handoff results do not prove physical reachability, whole matches or client acceptance. See [the logistics evidence](docs/parity/logistics.md#local-service-evidence-log-17).
 
 LOG-29 (finite-store territory restock) is `ported` by six isolated original-JavaScript component cases and 30 exact ordered-inventory checkpoints. Only caller-provided rates are covered; supply-network/World providers, whole-match proof and joint acceptance remain separate. See [the logistics evidence](docs/parity/logistics.md#finite-store-restock-evidence-log-29).
 
