@@ -457,6 +457,186 @@ fn same_unit(actual: &crate::game::Unit, expected: &crate::game::Unit) {
     assert_eq!(actual, expected);
 }
 #[test]
+fn remembered_terrain_read_discards_world_trial_and_matches_prepared_move() {
+    let f = fixture();
+    let case = &f["movement"][1];
+    assert_eq!(
+        case["name"],
+        "neutral near waypoint uses remembered clear skip"
+    );
+    let mut optimized = make(&f);
+    let mut prepared = make(&f);
+    for m in [&mut optimized, &mut prepared] {
+        setup(m, &case["input"]);
+        vision_mask(m, LOCAL_DEFENDER_OWNER, &case["input"]["visibleCells"]);
+        m.begin_path_tick(4096, 3).unwrap();
+    }
+
+    let id = 7;
+    let original = optimized.world.game.units[&id].clone();
+    let original_grid =
+        optimized
+            .grid
+            .unordered(&optimized.world.game.units, (17., 17.), 50., |_, _| true);
+    let original_random = optimized.start.random.snapshot();
+    let march = optimized.world_march_multiplier(&original).unwrap();
+    let visible = optimized
+        .actor_policy(original.owner)
+        .unwrap()
+        .visible
+        .to_vec();
+    let terrain_read = std::cell::Cell::new(false);
+    let physical = TrafficKnowledge::physical()
+        .with_actor(original.owner, &visible)
+        .track_reads(&terrain_read);
+    let trial = crate::movement::trial_move_with_march(
+        &mut optimized.world.game,
+        &optimized.rules,
+        &optimized.grid,
+        id,
+        1.,
+        &mut |_, _, _, _, _| panic!("this case must read terrain without requesting a route"),
+        &physical,
+        march,
+    )
+    .unwrap()
+    .unwrap();
+    assert!(trial.succeeded());
+    assert!(
+        terrain_read.get(),
+        "the real movement trial must read terrain"
+    );
+    assert!(
+        optimized
+            .move_world_unit_without_memory(id, 1., march, original.owner, &visible)
+            .unwrap()
+            .is_none(),
+        "a terrain-reading trial must be discarded"
+    );
+    same_unit(&optimized.world.game.units[&id], &original);
+    assert_eq!(
+        optimized
+            .grid
+            .unordered(&optimized.world.game.units, (17., 17.), 50., |_, _| true),
+        original_grid
+    );
+    assert!(
+        optimized
+            .world_runtime
+            .as_ref()
+            .unwrap()
+            .memory
+            .team(-1)
+            .is_none()
+    );
+    assert_eq!(optimized.start.random.snapshot(), original_random);
+
+    let moved = optimized
+        .move_unit_with_command_routes(id, 1.)
+        .unwrap()
+        .unwrap();
+
+    // Run the original prepared branch directly on a separately constructed
+    // Match. The route callback must stay unused in this terrain-read case.
+    let runtime = prepared.world_runtime.as_mut().unwrap();
+    let preview = crate::match_world_memory::prepare_world_routing(
+        crate::match_world_memory::WorldRoutingContext {
+            world: &prepared.world,
+            environment: &prepared.environment,
+            rules: &prepared.rules,
+            start: &prepared.start,
+            rails: &runtime.rails,
+            regions: &runtime.regions,
+            known_buildings: &runtime.known_buildings,
+            local_defender: &runtime.local_defender,
+        },
+        &mut runtime.memory,
+        original.owner,
+        None,
+    )
+    .unwrap();
+    let paths = preview.fork_paths(&prepared.commands.paths);
+    let (game, mut commit) = preview
+        .prepare_publication(&mut prepared.world, &prepared.environment)
+        .unwrap();
+    let read = std::cell::Cell::new(false);
+    let query = commit.query();
+    query.path_terrain(commit.live()).unwrap();
+    let knowledge =
+        TrafficKnowledge::observed(query.navigation(), commit.knowledge(), commit.wrecks())
+            .unwrap()
+            .with_actor(original.owner, &visible)
+            .track_reads(&read);
+    let expected = crate::movement::move_unit_with_march(
+        game,
+        &prepared.rules,
+        &mut prepared.grid,
+        id,
+        1.,
+        &mut |_, _, _, _, _| panic!("prepared move must not request a route"),
+        &knowledge,
+        march,
+    )
+    .unwrap()
+    .unwrap();
+    assert!(read.get());
+    drop(knowledge);
+    drop(query);
+    commit.sync_moved_object(&game.units[&id], &prepared.rules, true);
+    commit.commit();
+    prepared.commands.paths = paths;
+
+    assert_eq!(
+        (moved.id, moved.infantry, moved.speed.to_bits()),
+        (expected.id, expected.infantry, expected.speed.to_bits())
+    );
+    same_unit(
+        &optimized.world.game.units[&id],
+        &prepared.world.game.units[&id],
+    );
+    for center in [(17., 17.), (21., 17.), (27., 17.)] {
+        assert_eq!(
+            optimized
+                .grid
+                .unordered(&optimized.world.game.units, center, 8., |_, _| true),
+            prepared
+                .grid
+                .unordered(&prepared.world.game.units, center, 8., |_, _| true)
+        );
+    }
+    let actual_memory = &optimized.world_runtime.as_ref().unwrap().memory;
+    let expected_memory = &prepared.world_runtime.as_ref().unwrap().memory;
+    let actual_team = actual_memory.team(-1).unwrap();
+    let expected_team = expected_memory.team(-1).unwrap();
+    assert_eq!(actual_team.version(), expected_team.version());
+    assert_eq!(
+        actual_team.query().navigation().versions.knowledge,
+        expected_team.query().navigation().versions.knowledge
+    );
+    let actual_bound = actual_memory
+        .live_for(original.owner)
+        .unwrap()
+        .units
+        .iter()
+        .find(|u| u.id == id)
+        .unwrap();
+    let expected_bound = expected_memory
+        .live_for(original.owner)
+        .unwrap()
+        .units
+        .iter()
+        .find(|u| u.id == id)
+        .unwrap();
+    assert_eq!(
+        (actual_bound.at.x.to_bits(), actual_bound.at.z.to_bits()),
+        (expected_bound.at.x.to_bits(), expected_bound.at.z.to_bits())
+    );
+    assert_eq!(
+        optimized.start.random.snapshot(),
+        prepared.start.random.snapshot()
+    );
+}
+#[test]
 fn lazy_world_movement_and_refusal_preserve_memory_ledger_and_history() {
     let f = fixture();
     let mut m = make(&f);
