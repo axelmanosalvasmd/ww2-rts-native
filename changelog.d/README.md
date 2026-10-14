@@ -38,6 +38,6 @@ recorded contents and index entries. It never removes Git's `index.lock`.
 Commit the resulting changelog and staged fragment deletions together.
 
 For local Rust checks after the test-binary consolidation, prefer
-`cargo nextest run --locked --workspace --cargo-profile ci-test --profile ci`
+`cargo nextest run --locked --workspace --cargo-profile ci-test`
 from `rust/`. Plain `cargo test` runs formerly separate test files in one
 process; nextest keeps each test in its own process, as CI does.
