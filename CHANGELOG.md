@@ -1,9 +1,6 @@
 # Changelog
 
 ## Unreleased
-
-- Update reconnect #211 onto merged movement optimization main `d2911267`, retaining both document histories, exact incoming core changes and the frozen socket test and registrations. The canonical incoming delta matches byte for byte with only CHANGELOG, DESIGN and PARITY excluded (6,428 bytes, SHA256 `828bea5142f741a6e5ada2488db29a74346c8b4a3eb8c58ffa854f7523b76cef`). Carry the focused 1-pass/0-fail/0-ignored/42-filtered result from `898968dd`; run no new native job. Separate exact-head review and fresh hosted gates remain required.
-
 - Normally merge landed World #202 main `9f0190ef` into reconnect `935dccdc`, retaining both complete tracking histories and the exact corrected socket test. All main runtime, tests, helpers, fixtures, CI, ABI/header and reference entries remain exact except the original test registration. Preserve the old interrupted evidence and keep prior test counts on their original heads. Under the owner's test-only policy, run only the named focused test; separate review, fresh hosted checks and the ordered per-worker head report remain required before publication.
 
 
