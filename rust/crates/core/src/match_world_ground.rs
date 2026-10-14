@@ -301,6 +301,81 @@ impl Match {
             )
         }
     }
+    /// Most World units take a movement step without reading remembered terrain
+    /// or requesting a route. Preparing that memory copies it and, for a team
+    /// with none yet, rebuilds it for every cell (about 70 ms on a 91,000-cell
+    /// map), and the copy is discarded unless movement reads it. So try the step
+    /// first with memory unavailable. If movement reads no terrain and requests
+    /// no route, its result cannot depend on that memory and is the result the
+    /// prepared path would produce: keep it. Otherwise discard the trial, which
+    /// changed nothing, and return `None` so the caller takes the prepared path.
+    fn move_world_unit_without_memory(
+        &mut self,
+        id: u32,
+        suppression: f64,
+        march: f64,
+        owner: usize,
+        visible: &[u32],
+    ) -> Result<Option<crate::movement::Moved>, String> {
+        let runtime = self.world_runtime.as_ref().ok_or("missing World runtime")?;
+        // The same checks the prepared path makes before it reads any memory.
+        crate::match_world_memory::validate_world_context(
+            crate::match_world_memory::WorldRoutingContext {
+                world: &self.world,
+                environment: &self.environment,
+                rules: &self.rules,
+                start: &self.start,
+                rails: &runtime.rails,
+                regions: &runtime.regions,
+                known_buildings: &runtime.known_buildings,
+                local_defender: &runtime.local_defender,
+            },
+            &runtime.memory,
+            owner,
+        )?;
+        let read = std::cell::Cell::new(false);
+        // Only terrain reads differ from the prepared knowledge, and each marks `read`.
+        let knowledge = crate::traffic_knowledge::TrafficKnowledge::physical()
+            .with_actor(owner, visible)
+            .track_reads(&read);
+        let mut requested = false;
+        let trial = crate::movement::trial_move_with_march(
+            &mut self.world.game,
+            &self.rules,
+            &self.grid,
+            id,
+            suppression,
+            &mut |_, _, _, _, _| requested = true,
+            &knowledge,
+            march,
+        );
+        let Ok(Some(trial)) = trial else {
+            return Ok(None);
+        };
+        if read.get() || requested || !trial.succeeded() {
+            return Ok(None);
+        }
+        let moved = crate::movement::keep_trial_move(
+            &mut self.world.game,
+            &self.rules,
+            &mut self.grid,
+            trial,
+        )
+        .map_err(|e| format!("World movement traffic: {e:?}"))?;
+        // The prepared path's `sync_moved_object` when movement read nothing.
+        let unit = self
+            .world
+            .game
+            .units
+            .get(&id)
+            .expect("movement reinserts checked unit");
+        self.world_runtime
+            .as_mut()
+            .ok_or("missing World runtime")?
+            .memory
+            .update_cached_ground_unit(unit, &self.rules);
+        Ok(Some(moved))
+    }
     /// Same canonical movement and scheduler, with deferred World observation publication.
     pub(crate) fn move_world_unit_with_routes(
         &mut self,
@@ -319,6 +394,11 @@ impl Match {
         let kind = unit.kind;
         let visible = self.actor_policy(owner)?.visible.to_vec();
         let rules = crate::pathfinding::PathRules::compiled().map_err(|e| e.to_string())?;
+        if let Some(moved) =
+            self.move_world_unit_without_memory(id, suppression, march, owner, &visible)?
+        {
+            return Ok(Some(moved));
+        }
         let runtime = self.world_runtime.as_mut().ok_or("missing World runtime")?;
         let preview = crate::match_world_memory::prepare_world_routing(
             crate::match_world_memory::WorldRoutingContext {

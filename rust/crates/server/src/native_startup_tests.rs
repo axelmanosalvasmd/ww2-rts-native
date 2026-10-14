@@ -652,3 +652,6 @@ mod ingress;
 
 #[path = "native_ownership_socket_tests.rs"]
 mod native_ownership_socket_tests;
+
+#[path = "native_two_client_socket_tests.rs"]
+mod native_two_client_socket_tests;
