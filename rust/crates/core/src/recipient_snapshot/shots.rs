@@ -4,6 +4,7 @@ use crate::{
     environment::Effect,
     game::Point,
     grid::SpatialGrid,
+    legacy_scenario::{SayAction, validate_public_say},
     match_firing::LaunchEvent,
     match_support::SupportEvent,
     match_tick::TickEvent,
@@ -17,6 +18,7 @@ pub enum ShotRef<'a> {
     Firing(&'a LaunchEvent),
     Support(&'a SupportEvent),
     Environment(&'a Effect),
+    Scenario(&'a SayAction),
 }
 
 impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
@@ -27,6 +29,7 @@ impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
             TickEvent::Firing(value) => Ok(Self::Firing(value)),
             TickEvent::Support(value) => Ok(Self::Support(value)),
             TickEvent::Environment(value) => Ok(Self::Environment(value)),
+            TickEvent::Scenario(value) => Ok(Self::Scenario(value)),
             TickEvent::Aviation(_) => Err(SnapshotError::Unsupported {
                 unit: 0,
                 capability: SnapshotCapability::Air,
@@ -199,6 +202,16 @@ fn event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
 
 fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
     match shot {
+        ShotRef::Scenario(value) => {
+            validate_public_say(value).map_err(|_| SnapshotError::Rules)?;
+            if state.scenario.is_none()
+                || state.world.game.tick < 0
+                || value.at_tick > state.world.game.tick as u64
+            {
+                return Err(SnapshotError::Rules);
+            }
+            Ok(value.shot_json())
+        }
         ShotRef::Environment(value) => effect(state, value),
         ShotRef::Support(SupportEvent::Environment(value)) => effect(state, value),
         ShotRef::Support(
@@ -385,7 +398,7 @@ fn project_shots(
     let events = shots
         .iter()
         .copied()
-        .map(|shot| event(state, shot))
+        .map(|shot| event(state, shot).map(|row| (matches!(shot, ShotRef::Scenario(_)), row)))
         .collect::<Result<Vec<_>, _>>()?;
     state
         .routing_fog
@@ -400,7 +413,13 @@ fn project_shots(
     for seat in selected {
         let visible = &fog.team(g, &state.rules, g.players[seat.slot].team).vis;
         let mut rows = Vec::new();
-        for event in &events {
+        for (public_say, event) in &events {
+            // Migrated legacy Say is public to each selected commander seat.
+            // It has no geometry and bypasses ordinary identity redaction.
+            if *public_say {
+                rows.push(event.clone());
+                continue;
+            }
             let at = Point {
                 x: event["x"].as_f64().ok_or(SnapshotError::Rules)?,
                 z: event["z"].as_f64().ok_or(SnapshotError::Rules)?,
@@ -443,6 +462,122 @@ fn project_shots(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn actual_legacy_say_keeps_public_order_and_rejects_a_later_bad_row() {
+        use crate::{
+            economy::{Faction, Mode},
+            economy_state::ArmySize,
+            legacy_scenario_runtime::{LegacyScenarioEmission, step_legacy_scenario_emitting},
+            map::AuthoritativeMap,
+            match_runtime::{MatchOptions, PlayerConfig},
+            weather::WeatherChoice,
+        };
+        let map = AuthoritativeMap::from_json(include_bytes!(
+            "../../../server/src/authoritative-maps/el-alamein.json"
+        ))
+        .unwrap();
+        let mut state = Match::new(
+            &map,
+            MatchOptions {
+                seed: 701,
+                mode: Mode::Conquest,
+                players: (0..2)
+                    .map(|team| PlayerConfig {
+                        name: format!("P{team}"),
+                        team,
+                        faction: Faction::try_from(team as u8).unwrap(),
+                    })
+                    .collect(),
+                shuffle: false,
+                army: ArmySize::Standard,
+                weather: WeatherChoice::Map,
+                weather_seed: Some(1),
+                living_weather: false,
+                map_key: None,
+                tech: false,
+                supply: false,
+                logistics: false,
+                sandbox: false,
+            },
+        )
+        .unwrap();
+        state.world.game.tick = 60;
+        let mut actions = Vec::new();
+        step_legacy_scenario_emitting(&mut state, 60, &mut |event| match event {
+            LegacyScenarioEmission::Say(action) => actions.push(action),
+            LegacyScenarioEmission::Environment(_) => panic!("the intro trigger has no Destroy"),
+        })
+        .unwrap();
+        assert_eq!(actions.len(), 1);
+        let say = &actions[0];
+        // Buffered public messages can precede the current snapshot tick.
+        state.world.game.tick = 61;
+        let shell = SupportEvent::Shell(Point { x: 1.0, z: 1.0 });
+        let selected: Vec<_> = (0..state.world.game.players.len())
+            .map(|slot| SelectedSeat {
+                slot,
+                full: false,
+                omit: false,
+            })
+            .collect();
+        let shots = [
+            ShotRef::Scenario(say),
+            ShotRef::Support(&shell),
+            ShotRef::Scenario(say),
+        ];
+        let rows = project_shots(&state, &selected, &shots).unwrap();
+        assert_eq!(rows.len(), selected.len());
+        for (_, rows) in rows {
+            assert_eq!(
+                rows,
+                json!([say.shot_json(), {"k":"shell","x":1.0,"z":1.0,"pub":true}, say.shot_json()])
+            );
+            assert!(rows[0].get("x").is_none());
+        }
+        let mut delivery = DeliveryState::new(&state).unwrap();
+        let world = format!("{:?}", state.world);
+        let recipients = format!("{:?}", state.recipients);
+        let fog = state.routing_fog.clone();
+        let acknowledgments = delivery.clone();
+        for (side, at_tick) in [(1, 60), (0, 62)] {
+            let mut invalid = say.clone();
+            invalid.side = side;
+            invalid.at_tick = at_tick;
+            let shots = [ShotRef::Scenario(say), ShotRef::Scenario(&invalid)];
+            assert!(matches!(
+                delivery.capture_selected_with_shots(&mut state, &selected, &shots),
+                Err(SnapshotError::Rules)
+            ));
+            assert_eq!(format!("{:?}", state.world), world);
+            assert_eq!(format!("{:?}", state.recipients), recipients);
+            assert_eq!(state.routing_fog, fog);
+            assert_eq!(delivery, acknowledgments);
+        }
+        // Persisted point metadata can be structurally valid yet refer to a
+        // nonexistent commander. Match-bound admission must refuse it globally.
+        let mut invalid_state = state.scenario.as_ref().unwrap().state().clone();
+        *invalid_state.owners.values_mut().next().unwrap() = Some(2);
+        state
+            .scenario
+            .as_mut()
+            .unwrap()
+            .restore_state(invalid_state)
+            .unwrap();
+        let scenario = state.scenario.as_ref().unwrap().state().clone();
+        assert!(matches!(
+            delivery.capture_selected_with_shots(&mut state, &selected, &[ShotRef::Scenario(say)]),
+            Err(SnapshotError::Unsupported {
+                capability: SnapshotCapability::Scenario,
+                ..
+            })
+        ));
+        assert_eq!(state.scenario.as_ref().unwrap().state(), &scenario);
+        assert_eq!(format!("{:?}", state.world), world);
+        assert_eq!(format!("{:?}", state.recipients), recipients);
+        assert_eq!(state.routing_fog, fog);
+        assert_eq!(delivery, acknowledgments);
+    }
 
     #[test]
     fn later_unrepresented_metadata_refuses_before_any_recipient_publication() {

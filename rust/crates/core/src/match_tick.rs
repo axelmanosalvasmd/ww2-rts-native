@@ -98,6 +98,7 @@ pub enum TickEvent {
     Support(crate::match_support::SupportEvent),
     Aviation(crate::match_aviation::AviationEvent),
     Environment(crate::environment::Effect),
+    Scenario(crate::legacy_scenario::SayAction),
 }
 
 /// A failed phase keeps the effects already emitted at their original boundaries.
@@ -267,6 +268,7 @@ impl crate::match_runtime::Match {
         if self.options.logistics || self.convoys.is_some() {
             return Err("reserve and convoy tick phases are not connected".into());
         }
+        self.preflight_legacy_scenario()?;
         self.tick_state.paths.validate()?;
         let boundary = game.tick as u64 + 1;
         self.validate_command_tick(boundary)?;
@@ -298,6 +300,8 @@ impl crate::match_runtime::Match {
             .map_err(|error| format!("support metadata admission: {error}"))?;
         self.validate_support_tick_phases(&current_order, self.rules.movement.tick, boundary)
             .map_err(|error| format!("support admission: {error}"))?;
+        self.validate_production_phases(self.rules.movement.tick)
+            .map_err(|error| format!("production admission: {error:?}"))?;
         self.validate_carrier_tick()?;
         self.validate_construction_tick()?;
         self.validate_ground_attacks()?;
@@ -381,6 +385,9 @@ impl crate::match_runtime::Match {
             .map_err(|error| format!("support published state: {error}"))?;
         self.validate_field_project_tick(&current_order)?;
         self.validate_construction_tick()?;
+        self.validate_production_phases(dt)
+            .map_err(|error| format!("production published state: {error:?}"))?;
+        self.preflight_legacy_scenario()?;
         self.tick_environment_phase(EnvironmentPhase::StructureSync, events)?;
         self.grid.rebuild(&self.world.game.units);
         self.capture_firing_prior()?;
@@ -411,6 +418,9 @@ impl crate::match_runtime::Match {
             vision::update_vision(&mut self.world.game, &self.rules, &self.grid);
             phases.push(TickPhase::Vision);
         }
+        self.step_research(dt)
+            .map_err(|error| format!("research: {error:?}"))?;
+        phases.push(TickPhase::Research);
         // Source paid counts/crew sweep precede the path scheduler and unit queues.
         self.recount_field_projects()?;
         phases.push(TickPhase::FieldProjects);
@@ -578,6 +588,23 @@ impl crate::match_runtime::Match {
             TickPhase::SupportTimers,
         ]);
 
+        if !winner_decided {
+            crate::legacy_scenario_runtime::step_legacy_scenario_emitting(
+                self,
+                tick as u64,
+                &mut |emission| match emission {
+                    crate::legacy_scenario_runtime::LegacyScenarioEmission::Say(say) => {
+                        events.push(TickEvent::Scenario(say));
+                    }
+                    crate::legacy_scenario_runtime::LegacyScenarioEmission::Environment(effect) => {
+                        events.push(TickEvent::Environment(effect));
+                    }
+                },
+            )
+            .map_err(|error| format!("legacy scenario: {error}"))?;
+            phases.push(TickPhase::Scenario);
+        }
+
         let game = &mut self.world.game;
         let mut smokes: Vec<_> = game
             .smokes
@@ -647,12 +674,10 @@ impl crate::match_runtime::Match {
             events: Vec::new(),
             retired: std::mem::take(&mut retirement.removed),
             unavailable: vec![
-                TickPhase::Research,
                 TickPhase::UnitReserves,
                 TickPhase::Production,
                 TickPhase::Rail,
                 TickPhase::GroundEffects,
-                TickPhase::Scenario,
                 TickPhase::SupplyNetwork,
                 TickPhase::Convoys,
             ],
