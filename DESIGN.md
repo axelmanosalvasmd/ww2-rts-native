@@ -1,5 +1,17 @@
 # Three Crossroads Native: design decisions
 
+## Actual-tick scene production metadata (2026-10-14, Vostro)
+
+The second final workspace run at clean `1a20b09fb772113036fc5f1be202f688099a9b58` exited 101 in `connected_tick_phases_match_actual_reference_steps`. A bounded unchanged repro also exits 101: zero passed, one failed, seven filtered out. The first attempted advance reports tick zero, no events and `Production(InvalidInput("production building missing"))`. The production validator is correct: every retained production row must resolve to a live building before the clock advances.
+
+The pinned-source recorder deletes actors excluded by `input.keep`; its queues live on those actors. The native adapter removes the actors but retains the constructor's separate production rows and rallies. Collect discarded IDs in canonical key order, remove only their rows through `remove_building`, remove their rallies and then remove the actors. Kept producers, player research/technology, wallets and the next paid-job ID retain their owners and values. No ProductionState reset or admission suppression is needed.
+
+Inspect the other actual-tick clear/retain/replacement adapters as a batch. Ordinary research, companion and ground-support scenes already remove old production rows and clear their old rallies; carrier, mass-project, engineering and legacy Scenario scenes retain constructor actors. The shared aircraft/event scene already removes production rows but leaves their rallies, and its replacement-building callback lacks canonical production initialization. Remove those discarded rallies and register replacement buildings with `initialize_building` and an empty rally. The two-HQ partial-failure event test uses this factory. Component-only scene loaders are outside this actual-tick correction.
+
+The correction adds no test file and changes no Source recorder, fixture, checkpoint, state/death/event/phase/failure comparison or environmental input. Native math/order, MatchRandom, the production guard and the reviewed room-runtime helper remain unchanged. Commands, complete logs, source hashes and 6 GiB/no-swap cap evidence are retained outside the repository in `/tmp/legacy-adapters-main-20261014/`. Post-correction focused checks and the normal Ground main merge follow; final-head full workspace, release FFI/C replay and platform gates remain Root's work.
+
+Locally acknowledge issue #5 replies 050 (`6159378286`), handoff 032 (`6160859831`) and Ground merge 037 (`6163155875`): earlier binaries and Ground-only results are not this combined head's proof. The approved ABI 2/header and broader draft-contract boundaries remain unchanged. No terrain, World, #199, #201, privacy, role or public-start work, public reply or push is included.
+
 ## Room-runtime arena production metadata (2026-10-14, Vostro)
 
 The actual full workspace run at clean Legacy head `ef7cec5ed06491e8f5e606edf2e68ffc86193bf0` exited 101. The server finished with 38 passes and two failures, both at `RoomRuntime::new` with `Production(InvalidInput("production building missing"))`, before their event assertions. A focused run of the two existing `room_runtime::tests` reproduces the same failures at that clean head. Earlier passing binaries do not establish a full workspace pass.
