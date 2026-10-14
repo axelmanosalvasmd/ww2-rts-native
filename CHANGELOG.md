@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verify focused Ground `d41cbf2` on Vostro: all 30 existing construction, contact, orders, reactions, abilities, traffic, ingress and replay tests pass under locked optimized `ci-test` with 6 GiB memory caps and six build/test threads. Preserve every runtime, test, fixture and recorder byte. PR #202's World traffic and new rally-test failures remain on its separate source; the unchanged Ground traffic and Classic ability assertions pass. Independent integration review and final-head full workspace, release FFI/C replay and platform gates remain pending.
+
 - Carry the exact ingress correction from `71f460ba` onto the focused Ground/main assembly, retaining its original repair notes below. Resolve one CHANGELOG and one DESIGN conflict without importing their unrelated `5185e171` context. The 17 distinct passes belong only to `71f460ba`; this candidate runs no native jobs and still needs Root's capped validation.
 
 - Repair the retained ingress refusal test after Ground integration: its bare `build` flag failed canonical construction validation, and its blanket automatic-exit expectation no longer applied to construction workers. Assign a rifle squad to a damaged constructor-created HQ through `execute_assist`, verify supported core retreat, and retain the temporary ingress AutoRetreat refusal, garrison guard, malformed-row rejection and no-publication assertions. On Vostro, the exact test and all 17 distinct affected ingress/construction/reaction/order tests pass under locked optimized `ci-test`; combined workspace and final platform gates remain pending. Production ingress, ABI, reference and profiles are unchanged.
