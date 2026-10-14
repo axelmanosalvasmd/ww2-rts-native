@@ -14,7 +14,22 @@ conflict on the changelog.
   changes the entry.
 - Merging main into a branch is not a change. It needs no entry.
 
-`scripts/collect-changelog.sh` moves every fragment, oldest first, to the top
-of the **Unreleased** section of `CHANGELOG.md` and deletes the fragment
-files. Run it in its own commit when cutting a release or when the folder
-grows long. This file stays.
+`scripts/collect-changelog.sh` moves every fragment to the top of the
+**Unreleased** section of `CHANGELOG.md` and deletes the fragment files.
+The final order is newest on top. Fragments with the same date sort by topic
+filename in descending order, not by creation time. Run it in its own commit
+when cutting a release or when the folder grows long. This file stays.
+
+Run one collector at a time. Before replacing `CHANGELOG.md`, the script
+saves its original and assembled contents plus each fragment's path and
+contents in a private per-worktree Git journal. If interrupted, or if Git
+cannot delete the fragments, fix the Git failure and rerun the script. It
+finishes that collection before collecting any new fragments. A retry
+refuses unrelated changelog or fragment edits, preserving the journal until
+you restore the recorded contents. It never removes Git's `index.lock`.
+Commit the resulting changelog and staged fragment deletions together.
+
+For local Rust checks after the test-binary consolidation, prefer
+`cargo nextest run --locked --workspace --cargo-profile ci-test --profile ci`
+from `rust/`. Plain `cargo test` runs formerly separate test files in one
+process; nextest keeps each test in its own process, as CI does.

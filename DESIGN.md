@@ -1,5 +1,43 @@
 # Three Crossroads Native: design decisions
 
+## Recoverable changelog collection (2026-10-14)
+
+The collector's initial Git deletion preflight cannot reserve the index.
+A late index lock after changelog replacement left the fragments present,
+and a retry copied their bullets again. Before replacement, the collector
+now publishes a private per-worktree Git journal containing the complete
+original and assembled changelog, NUL-separated fragment paths and exact
+fragment contents. Changelog replacement uses a temporary file on its own
+filesystem. Collection is a single-collector operation; concurrent collectors
+are unsupported and no new locking tool is required.
+
+A retry accepts only the recorded original or assembled changelog and
+unchanged remaining fragments. From the original state it replaces the
+changelog; from the assembled state it resumes only the owned fragment
+removals. Already removed fragments are skipped. The journal survives
+process interruption and Git deletion failure and is removed only after
+all owned deletions finish. Unrelated changelog, fragment or index edits
+that prevent safe removal refuse recovery until the recorded state is
+restored. The collector never removes Git's index lock. Identity is the
+fragment path and exact contents, not bullet text, so distinct fragments
+with identical bullets both survive collection. New fragments wait for the
+next invocation after recovery.
+
+Final order remains newest date on top, with same-date topic filenames in
+descending order, retaining the existing insertion and spacing rules. This
+clarifies Axel review 084 and owner decision 085. Their process-sharing note
+is addressed by recommending local nextest after test-binary consolidation:
+plain cargo test shares a process across formerly separate test files,
+whereas nextest isolates each test. This collector follow-up changes no test
+layout, Cargo profile, runtime, workflow or interface.
+
+The production script passed 21 owned-scratch behavior checks, including
+exact output against the original collector, ordering, dirty-input refusal,
+post-replacement process kill, late index lock, partial deletion, recovery
+refusal after unrelated edits, repeated no-op, identical legitimate bullets,
+new fragments arriving during recovery, unusual quoted paths and linked
+worktree isolation. These are collector checks, with no Cargo or native runs.
+
 ## World integration after merged Legacy #204 (2026-10-14, full validation pending)
 
 Normally merge main `113ca151eba1bf90073a14bc1d73fda7de0ce3b3` into World `1fc5fae976356dbd7d1fa6820f99731c42d8e394`, with merge base `0f267137d833976d8143b6636fcca23f04fd26e1`. Main's tree equals reviewed Legacy `71b611b7`. Independent source review and Root inspection clear exact World retention for the conflicts in `match_production.rs`, `match_tick.rs`, `simtest/tests/match_production.rs` and `ordinary_production_tick.rs`; `lib.rs`, `production.rs` and `simtest/tests/match_tick.rs` automatically retain their World blobs. All source, harness, test, fixture, dependency, profile, workflow, ABI/header and reference entries remain exact World bytes. There is no new runtime rewrite.
