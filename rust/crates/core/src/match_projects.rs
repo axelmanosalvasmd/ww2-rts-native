@@ -108,9 +108,7 @@ impl Match {
     fn prepare_project_join(&self, id: UnitId) -> Result<JoinedUnit, String> {
         self.validate_project_unit(id)?;
         let mut unit = self.world.game.units[&id].clone();
-        if unit.build {
-            return Err("unrepresented construction project".into());
-        }
+        crate::match_construction::validate_build_activity(&unit, &self.commands.units[&id])?;
         unit.path_gen = unit
             .path_gen
             .checked_add(1)
@@ -148,6 +146,7 @@ impl Match {
         unit.entrench = true;
         unit.dig = false;
         unit.build = false;
+        control.build_target = None;
         unit.board = 0;
         unit.amove = None;
         unit.attack = false;

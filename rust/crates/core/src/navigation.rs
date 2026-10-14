@@ -133,7 +133,7 @@ impl NavigationLeg<'_> {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Navigation {
     graphs: BTreeMap<(u16, usize), Graph>,
 }
@@ -254,7 +254,7 @@ fn changes_since(view: TerrainView<'_>, from: u64) -> Option<Vec<usize>> {
     None
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct Identity {
     width: usize,
     height: usize,
@@ -289,14 +289,14 @@ impl Identity {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Edge {
     region: usize,
     crossings: Vec<(usize, usize)>,
 }
 // Edges and incoming IDs preserve JavaScript Map/Set insertion order. Numeric
 // sorting here would change tied routes and incremental-update history.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Region {
     x: f64,
     y: f64,
@@ -313,14 +313,14 @@ impl Region {
         }
     }
 }
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct CachedRoute {
     start: usize,
     goal: usize,
     route: Option<Vec<usize>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Graph {
     identity: Identity,
     labels: Vec<usize>,
@@ -859,7 +859,7 @@ impl Graph {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct Entry {
     region: usize,
     cost: f64,
@@ -870,7 +870,7 @@ impl Entry {
         self.score < other.score || self.score == other.score && self.region < other.region
     }
 }
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 struct Heap(Vec<Entry>);
 impl Heap {
     fn push(&mut self, entry: Entry) {

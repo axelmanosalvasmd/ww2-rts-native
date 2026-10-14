@@ -245,7 +245,7 @@ pub struct World {
     pub structures: Vec<WorldStructure>,
     pub sections: BTreeMap<usize, SectionMetadata>,
     pub detached_sections: BTreeMap<String, DetachedSection>,
-    initial: InitialTerrain,
+    initial: std::sync::Arc<InitialTerrain>,
     geography: Option<crate::world_map::WorldDefinition>,
     pub versions: RegionVersions,
     rules: Rules,
@@ -580,7 +580,7 @@ impl World {
             structures: Vec::new(),
             sections: BTreeMap::new(),
             detached_sections: BTreeMap::new(),
-            initial,
+            initial: std::sync::Arc::new(initial),
             geography: map.geography().cloned(),
             versions: RegionVersions::default(),
             rules,
@@ -1009,6 +1009,38 @@ impl World {
         };
         Ok(Mutation { logged_index })
     }
+    /// Commit Source vehicle wear, including both rows of an open-ground mud transition.
+    pub(crate) fn apply_vehicle_wear(&mut self, c: usize, next: f32) -> Result<(), WorldError> {
+        self.preflight_cell_rows(&[c])?;
+        if !next.is_finite()
+            || !(0.0..=1.0).contains(&next)
+            || !matches!(self.game.chars[c], b'.' | b'M')
+            || self
+                .game
+                .wear
+                .as_ref()
+                .is_none_or(|v| v.len() != self.game.chars.len())
+        {
+            return Err(WorldError::InvalidChange);
+        }
+        let mud = self.game.chars[c] == b'.' && next >= 1.0;
+        self.journal_end()?
+            .checked_add(2)
+            .ok_or(WorldError::VersionExhausted)?;
+        if mud {
+            self.mutation_capacity(2)?;
+        }
+        self.game.wear.as_mut().unwrap()[c] = next;
+        if mud {
+            self.set_cell(c, b'M')?;
+            self.game.wear.as_mut().unwrap()[c] = 0.0;
+            self.cell_state[c] = self.state_of(c);
+            self.log_cell(c, false)?;
+        } else {
+            self.touch(c)?;
+        }
+        Ok(())
+    }
     /// Register a new base building after its footprint cells have been placed.
     /// Existing cell sections move to historical storage, retaining the old graph's values.
     pub fn register_building_structure(
@@ -1019,7 +1051,8 @@ impl World {
         total_max_hp: f64,
     ) -> Result<(), WorldError> {
         self.capacity()?;
-        if cells.is_empty()
+        if unit_id == 0
+            || cells.is_empty()
             || !total_hp.is_finite()
             || total_hp < 0.0
             || !total_max_hp.is_finite()
@@ -1114,6 +1147,92 @@ impl World {
             section_ids,
             entity_id: Some(unit_id),
         });
+        Ok(())
+    }
+    /// Validate every array read by cell logging before a prepared mutation batch.
+    pub(crate) fn preflight_cell_rows(&self, cells: &[usize]) -> Result<(), WorldError> {
+        let n = self
+            .game
+            .w
+            .checked_mul(self.game.h)
+            .ok_or(WorldError::InvalidTerrain)?;
+        let g = &self.game;
+        if n == 0
+            || n > u32::MAX as usize
+            || [
+                g.chars.len(),
+                g.flags.len(),
+                g.house.len(),
+                g.cell_hp.len(),
+                self.mine_layer.len(),
+                self.surface_wear.len(),
+                self.burnt.len(),
+                self.scar.len(),
+                self.cell_state.len(),
+            ]
+            .into_iter()
+            .any(|len| len != n)
+            || g.ground.as_ref().is_none_or(|v| v.len() != n)
+            || g.objects.as_ref().is_none_or(|v| v.len() != n)
+            || g.wear.as_ref().is_none_or(|v| v.len() != n)
+            || g.height.as_ref().is_some_and(|v| v.len() != n)
+            || g.tough.as_ref().is_some_and(|v| v.len() != n)
+            || g.trench_front.as_ref().is_some_and(|v| v.len() != n)
+            || g.wet.is_some_and(|v| !v.is_finite())
+            || self.shoal.as_ref().is_some_and(|v| v.len() != n)
+        {
+            return Err(WorldError::InvalidTerrain);
+        }
+        for &c in cells {
+            if c >= n
+                || !g.wear.as_ref().unwrap()[c].is_finite()
+                || g.tough.as_ref().is_some_and(|v| !v[c].is_finite())
+                || !g.cell_hp[c].is_finite()
+                || !self.surface_wear[c].is_finite()
+                || !self.scar[c].is_finite()
+            {
+                return Err(WorldError::InvalidTerrain);
+            }
+            self.cell_row(c)?;
+        }
+        Ok(())
+    }
+    /// Check the bounded static placement operation before any stamp, unit or wallet publication.
+    /// The caller retains exclusive ownership until all prepared writes have committed.
+    pub(crate) fn preflight_building_stamp(
+        &self,
+        unit_id: u32,
+        cells: &[usize],
+    ) -> Result<(), WorldError> {
+        self.preflight_cell_rows(cells)?;
+        let n = self.game.chars.len();
+        let g = &self.game;
+        if cells.is_empty()
+            || cells.len() > 9
+            || cells.iter().any(|&c| c >= n)
+            || cells.iter().copied().collect::<BTreeSet<_>>().len() != cells.len()
+            || self
+                .structures
+                .iter()
+                .any(|s| s.id == format!("building:{unit_id}"))
+        {
+            return Err(WorldError::InvalidChange);
+        }
+        for &c in cells {
+            if g.height.as_ref().is_some_and(|v| !(-2..=4).contains(&v[c]))
+                || !g.wear.as_ref().unwrap()[c].is_finite()
+                || g.tough.as_ref().is_some_and(|v| !v[c].is_finite())
+                || self.sections.contains_key(&c) != g.sections.contains_key(&(c as u32))
+                || g.sections.get(&(c as u32)).is_some_and(|s| {
+                    !s.hp.is_finite() || s.max_hp.is_some_and(|hp| !hp.is_finite())
+                })
+            {
+                return Err(WorldError::InvalidTerrain);
+            }
+            self.cell_row(c)?;
+        }
+        // Each cell may level, stamp and register its section. Reserve the whole source operation.
+        self.mutation_capacity(cells.len() as u64 * 8 + 1)?;
         Ok(())
     }
     pub fn set_level(&mut self, c: usize, height: i8) -> Result<Mutation, WorldError> {

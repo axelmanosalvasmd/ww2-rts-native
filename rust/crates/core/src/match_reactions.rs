@@ -47,6 +47,10 @@ impl Match {
             .units
             .get(&id)
             .ok_or("missing retreat unit")?;
+        self.reaction_home_for(unit)
+    }
+
+    pub(crate) fn reaction_home_for(&self, unit: &Unit) -> Result<Point, String> {
         let mut home = self
             .start
             .players
@@ -80,7 +84,7 @@ impl Match {
 
     /// Source retreat reset. Air, carrier and building exit need their own actuator.
     pub fn retreat_unit(&mut self, id: UnitId) -> Result<(), String> {
-        let mut u = self
+        let u = self
             .world
             .game
             .units
@@ -90,25 +94,41 @@ impl Match {
         if u.air.is_some() || u.riding || u.garrison.is_some() {
             return Err("air, carrier or garrison retreat is unsupported".into());
         }
-        if u.build {
-            return Err("construction retreat is unsupported".into());
-        }
         if u.id != id
             || u.dig != self.field_works.is_active(id)
             || u.entrench != self.field_works.membership(id).is_some()
         {
             return Err("unrepresented or inconsistent retreat field work".into());
         }
-        if !self.commands.units.contains_key(&id) {
-            return Err("missing retreat control".into());
-        }
+        let control = self
+            .commands
+            .units
+            .get(&id)
+            .ok_or("missing retreat control")?;
+        crate::match_construction::validate_build_activity(&u, control)?;
         u.path_gen
             .checked_add(1)
             .ok_or("reaction path identity exhausted")?;
         let home = self.reaction_home(id)?;
         let route = self.command_route(u.owner, &u, home)?;
-        crate::match_runtime::cancel_field_work_state(&mut self.field_works, &mut u)?;
-        self.commands.requests.clear_failures(id);
+        self.apply_retreat_route(u, home, route)?;
+        Ok(())
+    }
+
+    /// Commit a preflighted route through the sole retreat reset authority.
+    /// A manual command may supply an already prepared physical building exit.
+    pub(crate) fn apply_retreat_route(
+        &mut self,
+        mut u: Unit,
+        home: Point,
+        route: crate::pathfinding::PathResult,
+    ) -> Result<(), String> {
+        let id = u.id;
+        crate::match_runtime::cancel_owned_work_state(
+            &mut self.field_works,
+            &mut u,
+            self.commands.units.get_mut(&id).unwrap(),
+        )?;
         // The source retreat reset assigns targetId directly; its existing claim
         // remains until the next tick's claim rebuild.
         self.firing.initialize(id).target_id = 0;
@@ -141,10 +161,10 @@ impl Match {
         c.nade = None;
         c.enter = None;
         c.fire_at = None;
-        c.route_end = Some(route.route_end);
         c.outcome = Some(MoveOutcome::Interrupted);
         c.outcome_tick = Some(self.world.game.tick);
         self.world.game.units.insert(id, u);
+        self.commands.requests.clear_failures(id);
         Ok(())
     }
 
