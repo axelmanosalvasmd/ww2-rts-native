@@ -532,7 +532,7 @@ fn section(m: &Match, id: &str, cell: usize, entity: Option<u32>) -> Value {
         object.insert("failedAt".into(), json!(v));
     }
     if let Some(v) = meta.failure.direction {
-        object.insert("dir".into(), at(v));
+        object.insert("direction".into(), at(v));
     }
     if let Some(v) = meta.failure.settled_at {
         object.insert("settledAt".into(), json!(v));
@@ -635,7 +635,13 @@ pub fn compare_state(m: &Match, image: &Exact, shots: &[Value], context: &str, c
         "points"=>{assert!(m.start.points.is_empty());json!([])},
         "story"=>if m.story.iter().all(|s|StoryKey::ALL.into_iter().all(|k|s.value(k)==0.)){Value::Null}else{json!(m.story.iter().map(|s|StoryKey::ALL.into_iter().map(|k|(k.as_str().to_owned(),json!(s.value(k)))).collect::<serde_json::Map<_,_>>()).collect::<Vec<_>>())},
         "timeline"=>if m.timeline.is_empty(){Value::Null}else{json!(m.timeline.iter().map(|s|match s{MatchSample::Territories{t,points,structures}=>json!({"t":t,"points":points,"structures":structures}),MatchSample::Conquest{..}=>panic!("unexpected World Conquest sample")}).collect::<Vec<_>>())},
-        "fallen"=>if m.fallen.structure.is_none()&&m.fallen.bunker.is_none()&&m.fallen.hq.is_none(){Value::Null}else{let mut v=json!({});if let Some(p)=m.fallen.structure{v["structure"]=at(p);}if let Some(p)=m.fallen.bunker{v["bunker"]=at(p);}if let Some(p)=m.fallen.hq{v["hq"]=at(p);}v},
+        "fallen"=>if m.fallen.structure.is_none()&&m.fallen.bunker.is_none()&&m.fallen.hq.is_none(){Value::Null}else{
+            let mut v=json!({});
+            if let Some(p)=m.fallen.structure{v["structure"]=at(p);}
+            if let Some(p)=m.fallen.bunker{v["bunker"]=at(p);}
+            if let Some(p)=m.fallen.hq{v["hq"]=at(p);}
+            v
+        },
         "finish"=>json!({"winner":m.finish.map(|f|f.winner),"reason":m.finish.map(|f|f.reason.as_str()),"at":m.finish.map(|f|at(f.end_at)),"tick":m.finish.map(|f|f.end_tick),"reveal":m.world.game.reveal}),
         "shots"=>json!(shots),"flights"=>{assert!(m.firing.flights.is_empty());json!([])},"nades"=>{assert!(m.firing.grenades.is_empty());json!([])},"salvos"=>{assert!(m.firing.salvos.is_empty());json!([])},
         "strikes"=>{assert!(m.world.game.strikes.is_empty());json!([])},"covers"=>{assert!(m.support.covers.is_empty());json!([])},"convoys"=>{assert!(m.convoys.is_none());Value::Null},

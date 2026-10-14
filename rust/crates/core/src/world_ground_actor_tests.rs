@@ -435,10 +435,8 @@ fn catalog_object(v: Option<&crate::catalog::Value>) -> Json {
                             b(n)
                         } else if let Some(s) = v.string() {
                             json!(s)
-                        } else if let Some(b) = v.boolean() {
-                            json!(b)
                         } else {
-                            return None;
+                            json!(v.boolean()?)
                         };
                         Some((k.clone(), value))
                     })

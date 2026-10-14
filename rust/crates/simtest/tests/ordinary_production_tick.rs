@@ -382,13 +382,17 @@ fn restored_ordinary_training_queue_is_refused_before_the_clock() {
         m.production.reconcile_queue(1000, &["rifle"]).unwrap();
         let before = projection(&m);
         let rng = m.start.random.snapshot();
-        let queue = m.commands.queue.snapshot();
+        assert_eq!(m.commands.pending_commands(), 0);
+        let queue = (m.commands.next_tick(), m.commands.pending_commands());
         let failure = m.advance_tick().unwrap_err();
         assert_eq!(failure.tick, 0);
         assert!(failure.events.is_empty());
         assert!(m.tick_state.fault().is_none());
         assert_eq!(projection(&m), before);
-        assert_eq!(m.commands.queue.snapshot(), queue);
+        assert_eq!(
+            (m.commands.next_tick(), m.commands.pending_commands()),
+            queue
+        );
         assert_eq!(m.start.random.snapshot(), rng);
     }
 }
