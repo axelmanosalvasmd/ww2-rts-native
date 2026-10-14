@@ -15,7 +15,7 @@ fn bits(v: &Value) -> u64 {
     u64::from_str_radix(v["bits"].as_str().unwrap(), 16).unwrap()
 }
 // JSON has one numeric domain; compare its IEEE value, retaining type and shape.
-fn exact_json_numbers(a: &Value, b: &Value) -> bool {
+pub(super) fn exact_json_numbers(a: &Value, b: &Value) -> bool {
     match (a, b) {
         (Value::Number(a), Value::Number(b)) => {
             a.as_f64().unwrap().to_bits() == b.as_f64().unwrap().to_bits()
@@ -31,10 +31,10 @@ fn exact_json_numbers(a: &Value, b: &Value) -> bool {
         _ => a == b,
     }
 }
-fn fixture() -> Value {
+pub(super) fn fixture() -> Value {
     serde_json::from_str(include_str!("../tests/fixtures/ground-contact.json")).unwrap()
 }
-fn scene(case: &Value) -> (Match, u32, usize) {
+pub(super) fn scene(case: &Value) -> (Match, u32, usize) {
     let map =
         AuthoritativeMap::from_json(&serde_json::to_vec(&case["setup"]["map"]).unwrap()).unwrap();
     let mut m = Match::new(

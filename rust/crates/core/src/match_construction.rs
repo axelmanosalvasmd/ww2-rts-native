@@ -63,7 +63,7 @@ impl Match {
         validate_build_activity(unit, control)?;
         if unit.id != id
             || unit.kind >= self.rules.kinds.len()
-            || unit.owner >= self.world.game.players.len()
+            || crate::match_actor::checked_game_owner(&self.world.game, unit.owner).is_err()
             || ![unit.hp, unit.x, unit.z].iter().all(|v| v.is_finite())
         {
             return Err("invalid construction actor identity".into());

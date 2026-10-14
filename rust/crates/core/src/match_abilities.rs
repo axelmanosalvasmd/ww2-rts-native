@@ -57,6 +57,27 @@ pub enum AbilityKind {
     Ura,
 }
 impl AbilityKind {
+    pub(crate) fn from_definition(definition: &Value) -> Result<Self, String> {
+        Ok(
+            match definition
+                .get("ab")
+                .ok_or("missing ability definition")?
+                .get("id")
+                .and_then(Value::string)
+                .ok_or("missing ability identity")?
+            {
+                "none" => Self::None,
+                "grenade" => Self::Grenade,
+                "suppress" => Self::Suppress,
+                "ap" => Self::Ap,
+                "smoke" => Self::Smoke,
+                "barrage" => Self::Barrage,
+                "satchel" => Self::Satchel,
+                "ura" => Self::Ura,
+                _ => return Err("unsupported ground ability".into()),
+            },
+        )
+    }
     fn aimed(self) -> bool {
         matches!(self, Self::Grenade | Self::Barrage | Self::Satchel)
     }
@@ -95,31 +116,52 @@ fn dist(a: Point, b: Point) -> f64 {
     math::hypot(a.x - b.x, a.z - b.z)
 }
 impl Match {
-    pub fn ability_kind(&self, id: UnitId) -> Result<AbilityKind, String> {
-        Ok(
-            match ability(self, id)?
-                .get("id")
-                .and_then(Value::string)
-                .ok_or("missing ability identity")?
-            {
-                "none" => AbilityKind::None,
-                "grenade" => AbilityKind::Grenade,
-                "suppress" => AbilityKind::Suppress,
-                "ap" => AbilityKind::Ap,
-                "smoke" => AbilityKind::Smoke,
-                "barrage" => AbilityKind::Barrage,
-                "satchel" => AbilityKind::Satchel,
-                "ura" => AbilityKind::Ura,
-                _ => return Err("unsupported ground ability".into()),
+    fn ability_munitions_cost(&self, id: UnitId) -> Result<f64, String> {
+        let ab = ability(self, id)?;
+        let cost = crate::economy::ab_cost(
+            self.options.mode,
+            crate::economy::AbilityCost {
+                id: ab
+                    .get("id")
+                    .and_then(Value::string)
+                    .ok_or("missing ability ID")?,
+                munitions: ab.get("mun").and_then(Value::number),
             },
         )
+        .map_err(|e| e.to_string())?;
+        if !cost.is_finite() || cost < 0. {
+            return Err("invalid ability Munitions cost".into());
+        }
+        Ok(cost)
+    }
+    fn ability_munitions_available(&self, owner: usize) -> Result<f64, String> {
+        let slot = self.actor_policy(owner)?.economy_slot;
+        let balance = slot.map_or(0., |slot| self.start.economy.players[slot].mun);
+        if !balance.is_finite() {
+            return Err("invalid ability Munitions wallet".into());
+        }
+        Ok(balance)
+    }
+    // Both source resources and actor identity are preflighted before any actuator writes.
+    fn charge_ability_munitions(&mut self, owner: usize, cost: f64) {
+        if cost != 0. {
+            self.start.economy.players[owner].mun -= cost;
+        }
+    }
+    pub fn ability_kind(&self, id: UnitId) -> Result<AbilityKind, String> {
+        AbilityKind::from_definition(definition(self, id)?)
     }
     pub(crate) fn validate_abilities(&self) -> Result<(), String> {
         if !matches!(
             self.options.mode,
-            crate::economy::Mode::Default | crate::economy::Mode::Conquest
-        ) || self.world.game.mode.is_some()
-            || self.world.game.tick < 0
+            crate::economy::Mode::Default
+                | crate::economy::Mode::Conquest
+                | crate::economy::Mode::World
+        ) {
+            return Err("abilities currently require represented Conquest or World state".into());
+        }
+        self.validate_actor_mode()?;
+        if self.world.game.tick < 0
             || self.world.game.tick as u64
                 > 9_007_199_254_740_991u64
                     - u64::from(
@@ -132,12 +174,12 @@ impl Match {
                             .unwrap_or(0),
                     )
         {
-            return Err("abilities currently require represented Conquest state".into());
+            return Err("abilities require represented actor clock".into());
         }
         for (&id, unit) in &self.world.game.units {
             if id != unit.id
                 || unit.kind >= self.rules.kinds.len()
-                || unit.owner >= self.world.game.players.len()
+                || self.actor_policy(unit.owner).is_err()
                 || ![
                     unit.hp,
                     unit.x,
@@ -177,6 +219,10 @@ impl Match {
                 return Err("invalid ability ammo".into());
             }
             self.ability_kind(id)?;
+            self.ability_munitions_cost(id)?;
+            if self.options.mode == crate::economy::Mode::World {
+                self.ability_munitions_available(unit.owner)?;
+            }
         }
         Ok(())
     }
@@ -191,15 +237,17 @@ impl Match {
         row.buff -= dt;
         Ok(())
     }
-    fn ability_foes(&self, id: UnitId, at: Point, radius: f64) -> Vec<UnitId> {
+    fn ability_foes(&self, id: UnitId, at: Point, radius: f64) -> Result<Vec<UnitId>, String> {
         let u = &self.world.game.units[&id];
-        self.grid
+        let actor = self.actor_policy(u.owner)?;
+        Ok(self
+            .grid
             .radius(&self.world.game.units, (at.x, at.z), radius, |_, e| {
                 e.hp > 0.
                     && e.air.is_none()
                     && !self.world.game.allied(e.owner, u.owner)
-                    && self.world.game.players[u.owner].sees(e.id)
-            })
+                    && actor.sees(e.id)
+            }))
     }
     fn ability_clear(&self, id: UnitId, at: Point, radius: f64) -> bool {
         let owner = self.world.game.units[&id].owner;
@@ -239,7 +287,7 @@ impl Match {
                 if u.garrison.is_some() {
                     return Ok(None);
                 }
-                let mut foes = self.ability_foes(id, u.at(), n(ab, "range", 0.));
+                let mut foes = self.ability_foes(id, u.at(), n(ab, "range", 0.))?;
                 foes.retain(|enemy| {
                     let e = &self.world.game.units[enemy];
                     self.rules.kinds[e.kind].infantry
@@ -257,7 +305,7 @@ impl Match {
             AbilityKind::Suppress => {
                 let mut found = false;
                 if u.path.is_empty() {
-                    for enemy in self.ability_foes(id, u.at(), n(weapon, "range", 0.)) {
+                    for enemy in self.ability_foes(id, u.at(), n(weapon, "range", 0.))? {
                         let e = &self.world.game.units[&enemy];
                         if self.rules.kinds[e.kind].infantry
                             && !e.path.is_empty()
@@ -307,13 +355,13 @@ impl Match {
                 let radius = n(weapon, "spread", 0.) + n(weapon, "blast", 0.);
                 let mut best = None;
                 let mut most = 0;
-                for enemy in self.ability_foes(id, u.at(), n(ab, "range", 0.)) {
+                for enemy in self.ability_foes(id, u.at(), n(ab, "range", 0.))? {
                     let e = &self.world.game.units[&enemy];
                     let k = &self.rules.kinds[e.kind];
                     if dist(u.at(), e.at()) < n(weapon, "minRange", 0.) || k.building {
                         continue;
                     }
-                    let crowd = self.ability_foes(id, e.at(), radius).len();
+                    let crowd = self.ability_foes(id, e.at(), radius)?.len();
                     let dug = e.garrison.is_some()
                         || self.rules.kinds[e.kind].infantry
                             && self.world.game.flags_at(e.x, e.z) & TRENCH != 0
@@ -333,7 +381,7 @@ impl Match {
                 if let Some(t) = self.world.game.units.get(&control.attack_id) {
                     let at = self.aim_point(u, t);
                     (u.garrison.is_none()
-                        && self.world.game.players[u.owner].sees(t.id)
+                        && self.actor_policy(u.owner)?.sees(t.id)
                         && (t.garrison.is_some() || self.rules.kinds[t.kind].structure)
                         && dist(u.at(), at) <= 20.
                         && self.ability_clear(id, at, n(ab, "radius", 0.)))
@@ -371,6 +419,12 @@ impl Match {
             AutocastTarget::Instant => None,
             AutocastTarget::At(at) => Some(at),
         };
+        if self.actor_policy(owner)?.economy_slot.is_none() {
+            // Source local actors can judge autocast, but their zero Munitions
+            // cannot pay for any currently represented nonzero-cost ability.
+            self.commands.units.get_mut(&id).unwrap().follow = 0;
+            return self.apply_ability_selection(owner, &[Some(id)], at, false, true);
+        }
         self.execute_command(
             owner,
             &Command::Ability {
@@ -412,6 +466,12 @@ impl Match {
             self.clear_aimed_ability(id);
             return Ok(());
         }
+        let cost = self.ability_munitions_cost(id)?;
+        let owner = u.owner;
+        if kind.aimed() && in_range && self.ability_munitions_available(owner)? < cost {
+            self.clear_aimed_ability(id);
+            return Ok(());
+        }
         if kind.aimed() && in_range {
             if halt && u.path_gen == u64::MAX {
                 return Err("aimed path identity exhausted".into());
@@ -432,6 +492,7 @@ impl Match {
                 let blast = AbilityBlast::from_unit(u.kind, &self.rules)?;
                 self.launch_ability_flight(id, at, blast, None, Some(count as u32))?;
             }
+            self.charge_ability_munitions(owner, cost);
             self.clear_aimed_ability(id);
             self.abilities.get_mut(id).unwrap().cooldown = n(ab, "cd", 0.);
             if halt {
@@ -516,6 +577,9 @@ impl Match {
             if self.abilities.get(id).unwrap().cooldown > 0.
                 || u.retreating
                 || kind.ammo() && !self.logistics.can_fire(id, count)
+                || self.options.mode == crate::economy::Mode::World
+                    && self.ability_munitions_available(u.owner)?
+                        < self.ability_munitions_cost(id)?
             {
                 continue;
             }
@@ -599,6 +663,12 @@ impl Match {
     ) -> Result<Option<Denial>, String> {
         self.validate_abilities()?;
         let eligible: Vec<_> = selected.iter().flatten().copied().collect();
+        if eligible
+            .iter()
+            .any(|id| self.world.game.units[id].owner != owner)
+        {
+            return Err("ability selection names another actor".into());
+        }
         if self.unrepresented_ability_work(&eligible, at, queue, automatic)? {
             return Ok(Some(Denial::Unsupported));
         }
@@ -654,6 +724,13 @@ impl Match {
             }
             if u.retreating {
                 reason = Denial::Retreating;
+                continue;
+            }
+            let cost = self.ability_munitions_cost(id)?;
+            if self.options.mode == crate::economy::Mode::World
+                && self.ability_munitions_available(u.owner)? < cost
+            {
+                reason = Denial::Munitions;
                 continue;
             }
             if kind.aimed() {
@@ -727,10 +804,10 @@ impl Match {
                     _ => continue,
                 }
                 self.abilities.get_mut(id).unwrap().cooldown = n(ab, "cd", 0.);
+                self.charge_ability_munitions(owner, cost);
             }
             used = true;
         }
-        let _ = owner; // Admission already uses the canonical selected owner; Conquest ability costs are zero.
         Ok((!used).then_some(reason))
     }
 }
