@@ -1,0 +1,402 @@
+{
+  "created_utc": "2026-10-14T00:28:01.931445+00:00",
+  "ground": {
+    "head": "b6cbf406b629e33ea402c4621f43b4b12ac55581",
+    "tree": "/private/tmp/ww2-native-ground-contact-module-order",
+    "git_tree": "0f17d0af52aaa796c0b34c4526097ef137aebd01",
+    "header_sha256": "bf203f16eca88562cfc6e53efccc48bf260d3a44750d7300f00694723ec69499",
+    "source_proof": "/private/tmp/rts-pure-ground-source-proof.json",
+    "source_proof_sha256": "b0cfea6043a6be6f564866acd03149de851609e3d7ca9932a512d73077df8208",
+    "wrapper": "/private/tmp/ww2-native-cargo-2",
+    "commands": [
+      {
+        "label": "clean-default",
+        "command": [
+          "/private/tmp/ww2-native-cargo-2",
+          "clean",
+          "-p",
+          "ww2-core",
+          "-p",
+          "ww2-ffi",
+          "-p",
+          "ww2-server",
+          "-p",
+          "ww2-simtest"
+        ],
+        "head": "b6cbf406b629e33ea402c4621f43b4b12ac55581",
+        "exit": 0,
+        "elapsed_seconds": 0.1488738750340417,
+        "log": "/private/tmp/ww2-ground-native-b6cbf40/clean-default.log",
+        "sha256": "ae490d4ead1c7f6ab966cc4c0a02a42910099a741ba282508cb33e4014f6ec02"
+      },
+      {
+        "label": "clean-ci-test",
+        "command": [
+          "/private/tmp/ww2-native-cargo-2",
+          "clean",
+          "--profile",
+          "ci-test",
+          "-p",
+          "ww2-core",
+          "-p",
+          "ww2-ffi",
+          "-p",
+          "ww2-server",
+          "-p",
+          "ww2-simtest"
+        ],
+        "head": "b6cbf406b629e33ea402c4621f43b4b12ac55581",
+        "exit": 0,
+        "elapsed_seconds": 0.09150345803936943,
+        "log": "/private/tmp/ww2-ground-native-b6cbf40/clean-ci-test.log",
+        "sha256": "1165d909e7ec156846eb7595c67724f7140eb104f9e9e4cda6f7316e5b5d88d5"
+      },
+      {
+        "label": "clean-release",
+        "command": [
+          "/private/tmp/ww2-native-cargo-2",
+          "clean",
+          "--release",
+          "-p",
+          "ww2-core",
+          "-p",
+          "ww2-ffi",
+          "-p",
+          "ww2-server",
+          "-p",
+          "ww2-simtest"
+        ],
+        "head": "b6cbf406b629e33ea402c4621f43b4b12ac55581",
+        "exit": 0,
+        "elapsed_seconds": 0.06133879203116521,
+        "log": "/private/tmp/ww2-ground-native-b6cbf40/clean-release.log",
+        "sha256": "233a85dd64c4d2cffc3a2d842867a119b999955a98583f98f07d4a815f48b1c9"
+      },
+      {
+        "label": "fmt",
+        "command": [
+          "/private/tmp/ww2-native-cargo-2",
+          "fmt",
+          "--all",
+          "--",
+          "--check"
+        ],
+        "head": "b6cbf406b629e33ea402c4621f43b4b12ac55581",
+        "exit": 0,
+        "elapsed_seconds": 1.1921176250325516,
+        "log": "/private/tmp/ww2-ground-native-b6cbf40/fmt.log",
+        "sha256": "b0b6a41bee06e7437af236903a181fd6a797fbe2c9c77806149d6d6f5a2d3158"
+      },
+      {
+        "label": "strict-clippy",
+        "command": [
+          "/private/tmp/ww2-native-cargo-2",
+          "clippy",
+          "--locked",
+          "--offline",
+          "--workspace",
+          "--all-targets",
+          "--",
+          "-D",
+          "warnings"
+        ],
+        "head": "b6cbf406b629e33ea402c4621f43b4b12ac55581",
+        "exit": 0,
+        "elapsed_seconds": 9.901709541969467,
+        "log": "/private/tmp/ww2-ground-native-b6cbf40/strict-clippy.log",
+        "sha256": "0bb4183ad753d3bebecf7b734b592add372afa5e7879bf9f4fcc6abe9a181738"
+      }
+    ],
+    "status": "STOPPED_BY_USER",
+    "stopped_phase": {
+      "label": "whole-workspace-ci-test",
+      "command": [
+        "/private/tmp/ww2-native-cargo-2",
+        "test",
+        "--locked",
+        "--offline",
+        "--workspace",
+        "--profile",
+        "ci-test",
+        "--verbose"
+      ],
+      "head": "b6cbf406b629e33ea402c4621f43b4b12ac55581",
+      "exit": 143,
+      "log": "/private/tmp/ww2-ground-native-b6cbf40/whole-workspace-ci-test.log",
+      "sha256": "3da27c72efad7bd895feb6ada494059d404b2ac7525ad11b6ced0af57bdeaebf",
+      "passed_execution_lines": 289,
+      "failed_execution_lines": 0,
+      "whole_suite_complete": false,
+      "last_lines": [
+        "running 8 tests",
+        "test aircraft_commands_replay_on_the_single_recorded_boundary_queue ... ok",
+        "test unsupported_mixed_aircraft_selections_reject_before_supply_or_control_writes ... ok",
+        "test unavailable_weapon_and_invalid_late_metadata_refuse_before_mutation ... ok",
+        "test explicit_aircraft_factory_matches_original_spawn_and_preserves_ordinary_policy ... ok"
+      ]
+    },
+    "pending": [
+      "complete whole optimized workspace on Linux",
+      "release FFI"
+    ],
+    "user_requested_stop": true
+  },
+  "stopped_binaries": [
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/ww2_core-73a7d04ac3bac31b",
+      "sha256": "becb30d90a6670e1265c013cfaa6ff1e76aa599416f99581dbb45879c0ab66b8"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/authoritative_maps-70d9fab3ca1ee2c0",
+      "sha256": "db081e36f77848a7b6bbc9219fb0097d48d5759d468b4f1c7a2c558ffd992fc8"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/client_view-fa2e885813f8ed3a",
+      "sha256": "b5cbc0a3adfdf20127a2a82bd98e3ad2ef924a16e1bab1de218d09bfae5308dc"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/combat-8b94c0082206e4c6",
+      "sha256": "28209ed10dedc935a62aa1b02fb359ab6666aca12a961bcf4cd8df2f663f0065"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/commander_ai-c23cc7ef55a14aec",
+      "sha256": "6ed2044de3ab4ca5a3c47ab161ef1bdc4444c9c5116e2f113dff6cd3256502a2"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/convoys-6f0bf58e5d79ecff",
+      "sha256": "7099b988ff5bbc6ebed1daf58ed132d0ac484c13ace8f95b251bc71e3eb4e226"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/deployment-8ea0fdf6ae2570d5",
+      "sha256": "01e92e769f7f93c98aa23585632be0ba3452854261072ec1788e465340a404e2"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/economy-c05f10b175150b9d",
+      "sha256": "f9fb10b9de6e7f61370ae2ab270723088cde06a93819d8245995993a4ca1b955"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/economy_state-18a7237d55cf6596",
+      "sha256": "c34617be2de73d563894237465ee65287d0d043efa0e01e7c695cfcbedf290a6"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/environment-013a0ddc589bdc11",
+      "sha256": "32df6afd4c851a3f11e8926c855dfbc2ba700c425d68c102332644ac3824f06f"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/environment_debris-31313a6707f85e5b",
+      "sha256": "fbdae3bc624c1a1680f8a2412f582208fd680e0df0c6b1d7f644142330bfd326"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/environment_terrain-5a75ff55f7a9ba6e",
+      "sha256": "986e32207b473c085b24725c77c6548b1a5d05f0047782c7ea179bf2faca0046"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/field_projects-ef57233f7edcc96d",
+      "sha256": "f97e8e206129440f94b0a580745c546f5a1430a4d686b73dd8a2808a9ab2efe1"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/field_works-6be0dacb315d5fc6",
+      "sha256": "a6a26748ceb94000321c5ba387abab2fd80eb56e5be13e6b11977fcb878937fc"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/formation-1f8920b66027dc56",
+      "sha256": "fb5709ab5d9cfc4289021944f86c96e8cf28eb79a9e2ca0a2769f8b53888d5e7"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/grid-500d231b71ea60e0",
+      "sha256": "e3a5f073493ca1cb4f3a99ca032b8da75316e8aa7dc79972bb99b23a44bfb103"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/legacy_scenario-17e32c26332d0e50",
+      "sha256": "831c0b6fd449ebbf3fa86b73cd4fdadc8125fcee6dc9cb1c172cc7272f5b4020"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/logistics-267e5db3e4bf6a2e",
+      "sha256": "9120f0945cb620aaa1512317849ff74a5be8aa6bc96aa2d0abc7902da5c26b6f"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/match_combat-35a97cfa11a3719d",
+      "sha256": "1f28d2856df419cddb3ac869daa6fd0e168a93316ac613a4a76cd27059b04f56"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/match_routing-52d791126be893d1",
+      "sha256": "b9984bf8f980a1be7fc6a7906a3829154355ea17c515590b2316e326b826df7d"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/math-bab7c9000a3f0c5e",
+      "sha256": "6d202144c0a5f9c60df8630d9b9e4b336d79b430a303c82ec02d31bdc0510642"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/objectives-1f5736b73855c18c",
+      "sha256": "8cf7e44698ef5049bbe998234d51220b034d4a92356cc5f9b31bdc65090bdebe"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/observed_memory-cc8813797302420f",
+      "sha256": "4724e144098a35f1d93d23ee545e2469c81d176715df0ac0bc85f889b16cf32e"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/produced_units-a5e0801a324b97e4",
+      "sha256": "58fe4e4e050daad4e6953439f20f52df5d84a5a3c440853196e66764dcf02649"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/production-04f7d783ecf40401",
+      "sha256": "90876fac7f22e2d6114f0121c94056fb319fed48b3a58157a781d19b8e85bf7d"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/projectiles-2f2973e2057e3fd6",
+      "sha256": "c59d44ff28b4ef2d0e117f1ef476ef541eba700e6f6faccff5e8c5830b03e89e"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/recruitment-2649e457e019b2fe",
+      "sha256": "df836772adf4d795942809d40c8fd6ae505a95387ac019d82c7d2a47f8872b40"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/route_knowledge-e3993abead6ac258",
+      "sha256": "78e87ed92ace82bdee50e03e776837140555aa4ddb4bb10d26b11c52f9dc9404"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/runtime-2de11463449486eb",
+      "sha256": "c592c9a38c83078b80a6d8575e896e97df91237ed1f8d0a29a5314fdf9844446"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/structures-952b6fc6754c8783",
+      "sha256": "6381b077df8f7bbba2902de2a6770c1740bcf400f1d5c7a44a023cae7a4e0a78"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/supply_network-c9abc24e745fd90e",
+      "sha256": "c4557c6a396c2344d20b1faba3ce743168c399207172c0d2b18ed66b70a5671d"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/supply_routes-4e790f7aef84e718",
+      "sha256": "112c6e0d35e8ebf6ba45e989bc1fa60810b8de76dc6d767c488b078a4f4d568a"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/weather-80e80d01310f5b61",
+      "sha256": "f9f7b7cad1dda17df7be2972e8df0d80fae9dfebc42ccfb138f64a668e992fb1"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/weather_runtime-5b8ba5251c73148c",
+      "sha256": "053f2baf0edf1ae6ede77661df83ab7e02f2dd6d9999544bfa978d80c6c06317"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/world-a2073184dc514009",
+      "sha256": "44ac3fbea9dc964ea5bbf7e95e5dfdd375e23c2696fd00d81a7a7b7cc38c5c1f"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/world_generation-77da63231157b662",
+      "sha256": "c62841c90c67c2b91a412c555b4af10d9e438239ff0c732fa54d4bcf551e713a"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/world_maps-a219abc4bba137d4",
+      "sha256": "f4757497c7c9d91fc996f7459e0fd2f85e917ba5c9cb6ae36b96b43912386448"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/ww2_ffi-c86c8c9fa36899fb",
+      "sha256": "5f205c652e4382c471c64f0296e578cc0135d4fe841b10a617e2fe8b8b8130d5"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/abi-c31ee7d84089a35f",
+      "sha256": "98290426301707e2b69f26ea71c11ab40274e54098104677c24dcb54cb2c9d47"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/header-fa657273283c0a5d",
+      "sha256": "8ae840bd6e64588dcc75bdea191322ee959c4d2616a07e0d687bc7da25ec2756"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/view-3842a9bbb433a03e",
+      "sha256": "8880dde11f7c5d0310b80138925b7575f23fb721872b458bc86bd20f8235296a"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/ww2_server-ee820793e226314a",
+      "sha256": "bd9812ba1e6ac9c611c4ff8aa863b10e4afc204303c94a9dc92358b2d0e83454"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/ww2_server-1cfe4c8a53788387",
+      "sha256": "2ace8d21e294b842ab562fe1c907da914b85e89af2cb4f117a2ee6e4fee13cc2"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/simtest-8f643d536e406555",
+      "sha256": "dfe1a8286344cc241bcdba330433ad0b90cb4abe258695558f87fb2cafb0d007"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/simtest-92a7a091615d46ab",
+      "sha256": "ef2e4303558eb5717b3a648fb1039cdc63474f7db10b09236a9d6cc619856afe"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/ability_flights-f2029792dee135f4",
+      "sha256": "efb3c976e26b1a2ff4a8d1205ac91ddd6260d47e6cac7f8e13d3a26de95b4bc0"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/air_firing_context-78a558f0bdf0c804",
+      "sha256": "4a8a94a928f9e847811fbea4043d4f79e87717c937c7b2d3cbd99dbb64985bc2"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/air_retirement-60a3886b96de65b3",
+      "sha256": "3c59bb8f8fd2045b15cdf553f2568148eac892f78c19789962fca2658c271b80"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/assault_finish-6ac7dc87dcb3af05",
+      "sha256": "94536a8011732ad2336c3f9c927eadc7c634c53b4a701f082aeeda613da4d9bc"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/assault_start-9c19af1e73e74632",
+      "sha256": "6324fbd769df7197ca77181da678c945739e0074f0e170fcaf15866dc36f2d30"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/compiled_rules-45fb14bc52374089",
+      "sha256": "b5d33156798d4f0b31133ad75257a641113e2624f963ea022f0ebfe8a74bae1e"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/conquest_finish-7cc9d7e819dbdaec",
+      "sha256": "e8cbb41a78f0294c78055cedbdfc135f644d63e1fbd48f14b520919459950dd1"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/construction_tick-a786c6d2bc4eb667",
+      "sha256": "0ad0039fd1b6cca5b5ea6fd44d592156b3359e12767592d3ea05058843b0707e"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/fps_effects-6f365cd7829bb5d8",
+      "sha256": "03080391c4ce0581f47cbdfed33071d1d43a17d06a184f1c708ae5abdb25d04a"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/fps_runtime-8925f290ee27f82a",
+      "sha256": "20074ec34ad838e86741b9de9d7f8da2d6402e07e144d707d6da572a68bae6e1"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/ground_orders-35bfca072d2d7260",
+      "sha256": "230ac691689480c5aeb7fd39d26168561ba0fb02af0cabdbf3e7e161eb2c0b2e"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/ground_support_tick-c96da38eb8a26654",
+      "sha256": "95f28f792cef77a34b47b75b94ed2dfa4eed8399dc8defd469329786c86910ab"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/mass_project_tick-cc09060f3c892e75",
+      "sha256": "5739e0865824717f48aabd1213fbd3a84f096f1876918a6acdfad31c19f50e05"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/match_aircraft_runner-b37c35c79bb61208",
+      "sha256": "aa59b26e4ed18dcd13623296ff1dd5e08d4669298a9a5467492d0aecda88395f"
+    },
+    {
+      "path": "/private/tmp/ww2-ground-native-b6cbf40/stopped-copies/match_aviation-472be58058a5d9b3",
+      "sha256": "be71032d423e1cbfc543edcc5e3a065ca505fa5c6e8f08bc2b80aa37f52a6f85"
+    }
+  ],
+  "legacy": {
+    "head": "158fadbe568a44eda8ebc9584cf5a94a8639e7c4",
+    "status": "FAILED",
+    "passed": 0,
+    "failed": 2,
+    "error": "Environment InvalidInput building footprint in ordinary_production_tick; unused cell warning",
+    "manifest": "/private/tmp/ww2-legacy-native-158fadb/manifest.json",
+    "raw": "/private/tmp/ww2-legacy-native-158fadb/research-first.log"
+  },
+  "closed_proofs": {
+    "startup": "/private/tmp/ww2-pure-startup-native-3b84f7c/manifest.json",
+    "ingress": "/private/tmp/ww2-ingress-native-17179f2/manifest.json",
+    "tables": "/private/tmp/ww2-tables-native-b682891/manifest.json",
+    "terrain": "/private/tmp/ww2-terrain-a81-native-proof/index.json"
+  },
+  "local_lanes": "both idle; Ground pgid80827 exited, handle29634 exit143; no new validation/build authorized"
+}

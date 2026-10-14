@@ -1,0 +1,84 @@
+{
+  "old": {
+    "isolated_tree": "/private/tmp/ww2-table-lf-old-a6zong6k",
+    "core_autocrlf": "true",
+    "files": {
+      "docs/contracts/startup-tables/proposed-content.json": {
+        "bytes": 30619,
+        "sha256": "a6303de3978806be1a3d94902a2d0c6351aedbe92ef6c4aa0f3abc32ade3fb0f",
+        "crlf_count": 1,
+        "matches_canonical_blob": false,
+        "attributes": "docs/contracts/startup-tables/proposed-content.json: text: unspecified\ndocs/contracts/startup-tables/proposed-content.json: eol: unspecified"
+      },
+      "docs/contracts/startup-tables/proposed-content.schema.json": {
+        "bytes": 91674,
+        "sha256": "c14cf885382b7db88208443907cc44abb8d2d431ab82ab05e9b24755e79ed2af",
+        "crlf_count": 1,
+        "matches_canonical_blob": false,
+        "attributes": "docs/contracts/startup-tables/proposed-content.schema.json: text: unspecified\ndocs/contracts/startup-tables/proposed-content.schema.json: eol: unspecified"
+      },
+      "docs/contracts/startup-tables/manifest.json": {
+        "bytes": 1506,
+        "sha256": "633e29ac7da4102e41a306fd861157baa35986c7e35284cff74318b4104508b6",
+        "crlf_count": 1,
+        "matches_canonical_blob": false,
+        "attributes": "docs/contracts/startup-tables/manifest.json: text: unspecified\ndocs/contracts/startup-tables/manifest.json: eol: unspecified"
+      },
+      "docs/contracts/startup-tables/comparison-inventory.json": {
+        "bytes": 168277,
+        "sha256": "1a6a61146bead03599c1a8d22c75b00b3a21289482d3f32b48da95f8fcce67bc",
+        "crlf_count": 1,
+        "matches_canonical_blob": false,
+        "attributes": "docs/contracts/startup-tables/comparison-inventory.json: text: unspecified\ndocs/contracts/startup-tables/comparison-inventory.json: eol: unspecified"
+      },
+      "rust/crates/core/tests/fixtures/startup-tables.json": {
+        "bytes": 30618,
+        "sha256": "5de90a7990ec5e8a2903436ac4809302464be29b546d79591a2adc08c68a2efd",
+        "crlf_count": 0,
+        "matches_canonical_blob": true,
+        "attributes": "rust/crates/core/tests/fixtures/startup-tables.json: text: set\nrust/crates/core/tests/fixtures/startup-tables.json: eol: lf"
+      }
+    }
+  },
+  "fixed": {
+    "isolated_tree": "/private/tmp/ww2-table-lf-fixed-jmiy30tx",
+    "core_autocrlf": "true",
+    "files": {
+      "docs/contracts/startup-tables/proposed-content.json": {
+        "bytes": 30618,
+        "sha256": "5de90a7990ec5e8a2903436ac4809302464be29b546d79591a2adc08c68a2efd",
+        "crlf_count": 0,
+        "matches_canonical_blob": true,
+        "attributes": "docs/contracts/startup-tables/proposed-content.json: text: set\ndocs/contracts/startup-tables/proposed-content.json: eol: lf"
+      },
+      "docs/contracts/startup-tables/proposed-content.schema.json": {
+        "bytes": 91673,
+        "sha256": "02d0fd95ca75754ed99d0e0c202688aa34d35c7a604638364313c845f01c1dc2",
+        "crlf_count": 0,
+        "matches_canonical_blob": true,
+        "attributes": "docs/contracts/startup-tables/proposed-content.schema.json: text: set\ndocs/contracts/startup-tables/proposed-content.schema.json: eol: lf"
+      },
+      "docs/contracts/startup-tables/manifest.json": {
+        "bytes": 1505,
+        "sha256": "a34109af9533560aa8e725b51bd0cba517f758e82c4f3ce04c041b310f5550ac",
+        "crlf_count": 0,
+        "matches_canonical_blob": true,
+        "attributes": "docs/contracts/startup-tables/manifest.json: text: set\ndocs/contracts/startup-tables/manifest.json: eol: lf"
+      },
+      "docs/contracts/startup-tables/comparison-inventory.json": {
+        "bytes": 168276,
+        "sha256": "7a2f24cf9026c4eaea02e515dd74a8090250800db911d2f8f709769892b50763",
+        "crlf_count": 0,
+        "matches_canonical_blob": true,
+        "attributes": "docs/contracts/startup-tables/comparison-inventory.json: text: set\ndocs/contracts/startup-tables/comparison-inventory.json: eol: lf"
+      },
+      "rust/crates/core/tests/fixtures/startup-tables.json": {
+        "bytes": 30618,
+        "sha256": "5de90a7990ec5e8a2903436ac4809302464be29b546d79591a2adc08c68a2efd",
+        "crlf_count": 0,
+        "matches_canonical_blob": true,
+        "attributes": "rust/crates/core/tests/fixtures/startup-tables.json: text: set\nrust/crates/core/tests/fixtures/startup-tables.json: eol: lf"
+      }
+    }
+  }
+}
