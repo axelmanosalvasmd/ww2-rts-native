@@ -2,9 +2,13 @@
 # Move changelog fragments from changelog.d/ into CHANGELOG.md.
 #
 # Final order is newest on top, with same-date topic filenames descending.
-# A private per-worktree journal records contents and index identities so a
-# retry can finish interrupted collection without removing staged replacements.
-# Run one collector at a time, from anywhere inside the repository.
+# A private per-worktree journal supports retries after process interruption
+# or Git deletion failure. Each invocation requires exclusive access to the
+# worktree, fragment paths and Git index. Wait for it to finish before other
+# Git or worktree writes. Validation and git rm are separate operations, not
+# one atomic transaction. Checks reject changes present when validated or
+# made between retries; concurrent writes after validation are unsupported.
+# Run from anywhere inside the repository.
 set -euo pipefail
 
 root=$(git rev-parse --show-toplevel)

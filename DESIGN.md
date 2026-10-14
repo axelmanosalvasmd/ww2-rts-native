@@ -9,16 +9,17 @@ now publishes a private per-worktree Git journal containing the complete
 original and assembled changelog, NUL-separated fragment paths, exact
 fragment contents and original NUL-separated Git index entries (blob, mode,
 stage and path). Changelog replacement uses a temporary file on its own
-filesystem. Collection is a single-collector operation; concurrent collectors
-are unsupported and no new locking tool is required.
+filesystem. Each invocation requires exclusive access to the worktree,
+fragment paths and its Git index. No new locking tool is required.
 
-A retry accepts only the recorded original or assembled changelog,
+When validated, a retry accepts only the recorded original or assembled
+changelog,
 unchanged remaining fragments and their recorded index entries. From the
 original state it replaces the changelog; from the assembled state it resumes only the owned fragment
 removals. Already removed fragments are skipped. The journal survives
 process interruption and Git deletion failure and is removed only after
 all owned deletions finish. Unrelated changelog, fragment or index edits
-that prevent safe removal refuse recovery until the recorded state is
+present when checked refuse recovery until the recorded state is
 restored. The collector never removes Git's index lock. Identity is the
 fragment path and exact contents, not bullet text, so distinct fragments
 with identical bullets both survive collection. New fragments wait for the
@@ -28,9 +29,20 @@ The first recovery candidate checked only worktree contents. A staged
 replacement whose worktree file was subsequently removed could therefore
 pass Git's deletion check and be lost. Recovery now verifies every remaining
 index entry's exact blob, mode, stage and path before any fragment removal,
-even when the worktree file is missing. A changed staged entry refuses
-recovery, retaining the index, journal and assembled changelog. A missing
+even when the worktree file is missing. A changed staged entry present when
+validated refuses recovery, retaining the index, journal and assembled
+changelog. A missing
 worktree file with the original index entry may still recover normally.
+
+A separate review showed that one collector alone does not reserve the
+index: another Git writer can stage a replacement and remove its worktree
+file after validation, and the collector's later deletion can remove that
+replacement. The checks and actual git rm are separate operations, not one
+atomic transaction. Each invocation therefore requires exclusive access to
+the worktree, fragment paths and Git index, with all other Git and worktree
+writers waiting until it exits. The guards check changes present at
+validation, including changes made between retry invocations; concurrent
+changes after those checks are unsupported.
 
 Final order remains newest date on top, with same-date topic filenames in
 descending order, retaining the existing insertion and spacing rules. This
@@ -49,7 +61,9 @@ refusal after unrelated edits, repeated no-op, identical legitimate bullets,
 new fragments arriving during recovery, unusual quoted paths and linked
 worktree isolation. The added index checks retain changed blobs, modes and
 conflict stages on refusal, then recover after the original index entry is
-restored. These are collector checks, with no Cargo or native runs.
+restored. These checks do not cover concurrent writers. This documentation
+correction preserves all script commands and prior verification receipts,
+with no Cargo or native runs.
 
 ## World integration after merged Legacy #204 (2026-10-14, full validation pending)
 
