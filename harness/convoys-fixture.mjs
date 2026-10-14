@@ -47,6 +47,25 @@ for(const kind of ['source','grant','fallback','captured','dead']) {
  const result=S.supportProvision(g,u,owner,amount,{handoff:()=>true});
  support.push({kind,owner,amount,result,provisions:u.logistics.provisions,buckets:[...store.buckets],donations:[...store.donations].map(([p,r])=>[p,[...r]])});
 }
+// Empty component scenes isolate store restock from troop service, truck jobs and store synchronization.
+const finiteStores=[];
+for(const kind of ['full-rate','half-rate','zero-rate','inactive','source','partially-occupied']) {
+ const rate=kind==='half-rate'?0.5:kind==='zero-rate'?0:1;
+ const g={logisticsEnabled:true,mode:{kind:'conquest'},army:{pop:1},tick:0,w:2,chars:Array(4).fill('.'),points:[],aid:new Map(),players:[0,1].map(slot=>({slot,team:0,spawn:{x:1,z:1},out:false,away:true})),units:new Map(),winner:null};
+ const hooks={supplyRate:()=>rate}; S.setupConvoys(g); S.stepConvoys(g,0,hooks);
+ // The real empty scheduling pass leaves the next sync at tick 40. These service calls stay before it.
+ const store={id:'cache:4',owner:0,x:1,z:1,source:kind==='source',entity:null,capacity:{ammo:96,provisions:3840,fuel:5760},buckets:new Map(kind==='partially-occupied'?[[1,{ammo:24,provisions:960,fuel:3600}],[0,{ammo:24,provisions:1920,fuel:720}]]:[]),active:kind!=='inactive',support:false};
+ g.convoys.stores.set(store.id,store);
+ const initial=structuredClone(projection(g).stores),steps=[];
+ let elapsed=0;
+ for(const dt of [10,10,20,40,60]) {
+  g.tick++; elapsed+=dt; S.stepConvoys(g,dt,hooks);
+  assert.equal(g.units.size,0); assert.equal(g.convoys.stores.size,1);
+  assert.equal(g.convoys.events.length,0); assert.equal(g.convoys.jobs.size,0);
+  steps.push({tick:g.tick,dt,elapsed,stores:structuredClone(projection(g).stores)});
+ }
+ finiteStores.push({kind,rate,initial,steps});
+}
 // Record field deltas instead of duplicating the complete map of inventories on every tick.
 function differences(a,b,path=[],out=[]) {
  if(Object.is(a,b))return out;
@@ -55,4 +74,4 @@ function differences(a,b,path=[],out=[]) {
  out.push([path,b]);return out;
 }
 for(const scenario of scenarios){let previous=scenario.initial;for(const step of scenario.steps){const current=step.expected;step.delta=differences(previous,current);delete step.expected;previous=current;}}
-const output=JSON.stringify({reference:'e4e579a',scenarios,pools,support})+'\n',path=`${root}/rust/crates/core/tests/fixtures/convoys.json`;if(process.argv.includes('--check'))assert.equal(readFileSync(path,'utf8'),output);else writeFileSync(path,output);console.log(`${process.argv.includes('--check')?'Checked':'Recorded'} ${scenarios.length} startup/runtime traces, ${scenarios.reduce((n,s)=>n+s.steps.length,0)} steps, ${pools.length} payer-pool cases`);
+const output=JSON.stringify({reference:'e4e579a',scenarios,pools,support,finiteStores})+'\n',path=`${root}/rust/crates/core/tests/fixtures/convoys.json`;if(process.argv.includes('--check'))assert.equal(readFileSync(path,'utf8'),output);else writeFileSync(path,output);console.log(`${process.argv.includes('--check')?'Checked':'Recorded'} ${scenarios.length} startup/runtime traces, ${scenarios.reduce((n,s)=>n+s.steps.length,0)} steps, ${pools.length} payer-pool cases, ${finiteStores.length} finite-store cases with ${finiteStores.reduce((n,s)=>n+s.steps.length,0)} checkpoints`);
