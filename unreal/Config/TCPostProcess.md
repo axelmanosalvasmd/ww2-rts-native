@@ -13,8 +13,8 @@ defaults agree, so editor viewports, captures without `ATCLighting` and any late
 | no automatic exposure | `AutoExposureMethod = AEM_Manual`, `AutoExposureBias = 0`, physical camera exposure off: the engine's exposure is exactly 1 (`PostProcessEyeAdaptation.cpp CalculateManualAutoExposure`), and the material takes the pre-exposure off |
 | no bloom, vignette, grain, chromatic aberration, lens flare or motion blur | all at 0 (the replacing tonemapper also skips the engine tonemapper's vignette, grain and local exposure) |
 | `outputColorSpace = SRGBColorSpace`, linear working color | the same: linear scene color, the sRGB transfer in the material |
-| `scene.fog = Fog(haze, dist x 0.6 / hazeK, dist x 3.8 / hazeK)`, mixed after tone mapping in output space | the material mixes the haze (its sRGB bytes) after tone mapping by `smoothstep(near, far, view depth)` |
-| `scene.background = haze` (clear color, not tone mapped) | pixels with no geometry (scene depth past `SkyMetres`) take the haze's bytes |
+| `scene.fog = Fog(haze, dist x 0.6 / hazeK, dist x 3.8 / hazeK)`. Graphics High draws through `light.js`'s `EffectComposer` (the GTAO pass) into a linear half-float target: three r186 gives the materials no tone mapping and a linear output there (`WebGLPrograms`), the fog colour is linear (`getUnlitUniformColorSpace`), so the haze mixes in linear light and `OutputPass` tone-maps the result. Graphics Low (and `?ao=0`) draws straight to the canvas: the haze mixes after tone mapping, in output space | `HazeBeforeTone` 1 (the game, round 14): the material mixes the linear haze (`HazeLinear`) by `smoothstep(near, far, view depth)` before its ACES fit; 0 (`-TCHazeAfterTone`, the comparison commandlets): the haze's sRGB bytes after it |
+| `scene.background = haze`: on High cleared into the composer's target and tone-mapped with the scene; on Low the clear colour, not tone mapped | pixels with no geometry (scene depth past `SkyMetres`) take the linear haze before the curve (`HazeBeforeTone` 1) or the haze's bytes (0) |
 | no dynamic GI; `scene.environment` = the PMREM of `outdoorEnvironment()` | `DynamicGlobalIlluminationMethod = None`, `ReflectionMethod = None`; the environment is in the sky light (diffuse) and in the model materials (`TCLookIndirect`, specular) |
 | GTAO on High (`AO.radius 1.6`, `AO.mix 0.85`) | `AmbientOcclusionIntensity 0.85`, `AmbientOcclusionRadius 160` in the game (`0` in the comparison, whose reference draws no AO pass). The engine's SSAO only darkens sky light, and the model materials take none, so this is partial |
 
@@ -52,5 +52,8 @@ r.AllowStaticLighting=False
 - `M_TCLookPost` writes display-encoded color, as the engine's tonemapper does into the viewport's 8-bit UNORM target.
 - A target that sRGB-encodes in hardware (for example a scene capture into `RTF_RGBA8_SRGB`) would encode it twice. For such a target, set the material's `OutputLinear` to 1.
 - The comparison captures use `RTF_RGBA8` and were checked patch by patch against three (`slice-11/look`).
+- Round 14 (edge scope): the live browser on High has three's `OutputShader` program (the composer is in use) and reads
+  the snow mood in snow weather at a 140 m camera distance as fog 48 to 304 m, `#c7cdd2`; where the fog is full it
+  shows the haze tone-mapped (`201.6, 204.6, 206.9` for that row, `ThreeCrossroads.Look.Haze` for all 30 rows).
 - The game viewport's path was not checked byte for byte against the haze color (`#b9bdbc` with the day mood); the live
   screenshots of slice 11 (verification evidence kept outside the repository) were reviewed by eye only.

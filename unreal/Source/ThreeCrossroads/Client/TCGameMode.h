@@ -220,9 +220,19 @@
 #include "World/TCAtmosphere.h"
 #include "World/TCWater.h"
 #include "World/TCApron.h"
+#include "World/TCFogFrontier.h"
 #include "Client/TCAlerts.h"
 #include "Client/TCEffects.h"
+#include "Client/TCWarMap.h"
+#include "Client/TCLobbyBackdrop.h"
+#include "Client/TCTutorial.h"
+#include "Client/TCScenarioText.h"
+#include "Net/TCConnection.h"
+#include "Net/TCToken.h"
 #include "TCGameMode.generated.h"
+
+// round 14: the tutorial and scenario guidance glue below is declared (Client/TCTutorial.cpp defines it)
+#define TC_HAS_TUTORIAL_GLUE 1
 
 class FTCConnection;
 class FTCTokenStore;
@@ -299,6 +309,15 @@ public:
 	// terrain (ResetFrom after its ResetFrom, MarkCells with its cells, Flush after its Flush).
 	FTCWater Water;
 	FTCApron Apron;
+	// Round 14 (edge): client/fog.js as a whole (World's frontier darkening, the cells under delivered units lit until
+	// the next snapshot), the look every fog consumer reads (TCFogLook), the apron's fog texture and World's unknown
+	// ground. Started with each start, fed after each snapshot, faded every frame.
+	FTCFogFrontier FogFrontier;
+	int32 FogFrontierSnapshots = -1;
+	// round 14: the paper war map at the widest zoom (client/map-view.js) and the lobby's battlefield (client/lobby-view.js)
+	FTCWarMap WarMap;
+	FTCLobbyBackdrop Backdrop;
+	FString ServerUrl;
 	// -TCWaterShots=<dir>: verification captures of the water and the land past the edge (no HUD), then nothing more
 	FString WaterShotsDir;
 	int32 WaterShotStep = -1;
@@ -313,7 +332,7 @@ public:
 	FString FrameTimesLine() const;
 	// Slice 13 verification switch (TCSlice13Checks.cpp): -TCTourFile, -TCTourDir
 	void RunSlice13Switches(double Now);
-	struct FTourPose { FString Name; double At = 0, X = 0, Z = 0, Dist = 0, Yaw = -90, Asked = 0; bool bFrontier = false, bWideShare = false; };
+	struct FTourPose { FString Name; double At = 0, X = 0, Z = 0, Dist = 0, Yaw = -90, Asked = 0; bool bFrontier = false, bWideShare = false; FString UnitType; int32 UnitId = -1; bool bHud = false; };
 	TArray<FTourPose> Tour;
 	FString TourFile, TourDir;
 	int32 TourStep = 0, TourShots = 0;
@@ -364,6 +383,14 @@ public:
 	// fires, smokes and falling sections, drawn by Effects; the alerts.js snapshot alerts and the teammates' map pings
 	// (AlertFeed), which go to the feed above through PushAlert. Glue in Client/TCAlerts.cpp.
 	FTCAlerts AlertFeed;
+	// Round 14, tutorial and scenario guidance (Client/TCTutorial.h, Client/TCScenarioText.h; the glue is defined in
+	// Client/TCTutorial.cpp): the goal box, the collapse banner and the damaged buildings' smoke (objectives.js), the
+	// Tutorial's progress as the snapshots tell it, the Controls sheet at the first match (CLI-127), and the lobby's
+	// Tutorial button (a new private Tutorial room).
+	FTCScenarioText ScenarioText;
+	FTCTutorialProgress Tutorial;
+	FTCControlsOnboarding Onboarding;
+	void EnterTutorialRoom();
 	UPROPERTY() TObjectPtr<ATCEffects> Effects;
 	// Parity gap 9 (Client/TCAudio.h): the world's sound subsystem, null when there is no game world.
 	UTCAudio* Audio() const;
@@ -429,6 +456,21 @@ private:
 	void RunVerificationSwitches(double Now);
 	// The room went back to the lobby: nothing of the match stays drawn or selected.
 	void ClearMatchPresentation();
+	// Round 14: BeginPlay's connection (token, socket, decoder hooks) as a call, so the Tutorial button can open a new
+	// room; BaseSettings and BaseTokenRequest keep the command line's (no token).
+	bool Connect(FTCConnection::FSettings Settings, const FTCTokenRequest& Request);
+	FTCConnection::FSettings BaseSettings;
+	FTCTokenRequest BaseTokenRequest;
+	void TutorialSwitches(const TCHAR* Cmd);
+	void TutorialStart();
+	void TutorialSnapshot(const FJsonObject& M);
+	void TutorialFrame(float Dt);
+	void TutorialClear();
+	FTCTutorialDriver TutorialDriver;
+	bool bTutorialDrive = false, bTutorialEndShot = false, bTutorialButtonPressed = false, bTutorialLobbyShot = false, bTutorialOnboardShot = false, bTutorialJumped = false;
+	FString TutorialShotDir, TutorialShotTag;
+	int32 TutorialShotStep = -2, TutorialPlumeBursts = 0;
+	double TutorialShotAt = -1.0, TutorialStartAt = -1.0, TutorialEndAt = -1.0, TutorialLobbyAt = -1.0, TutorialButtonAfter = 0.0;
 
 	TSharedPtr<FTCConnection> Connection;
 	TSharedPtr<FTCTokenStore> TokenStore;   // holds the token file's lock while this game mode lives

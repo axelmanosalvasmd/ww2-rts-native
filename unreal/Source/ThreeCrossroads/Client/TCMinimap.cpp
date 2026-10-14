@@ -1,4 +1,5 @@
 #include "Client/TCMinimap.h"
+#include "World/TCFogFrontier.h"
 #include "ThreeCrossroads.h"
 #include "Client/TCUnitTable.h"
 #include "Client/TCUnitRenderer.h"
@@ -95,13 +96,20 @@ void FTCMinimap::Refresh(const FTCMatchState& State, const FTCUnitTable& Table, 
 	// client/fog.js snapshot: the ground under every held unit counts as seen until the next one (its centre cell;
 	// aircraft and types this client does not know light nothing)
 	Lit.Init(false, N);
-	for (const auto& Pair : State.Units)
+	// round 14: the game's fog (World/TCFogFrontier, fog.js itself) lights a building's whole footprint
+	const FTCFogFrontier* Frontier = TCFogLook::Active();
+	if (Frontier && Frontier->HasMap() && Frontier->MapW() == W && Frontier->MapH() == H)
+		for (int32 C = 0; C < N; C++) Lit[C] = Frontier->IsLit(C);
+	else
 	{
-		const FTCUnit& U = Pair.Value;
-		const FTCUnitDef* Def = Table.Find(U.Type);
-		if (!Def || Def->bAir) continue;
-		const int32 CX = FMath::FloorToInt32(U.X / MMCore::CellMetres), CZ = FMath::FloorToInt32(U.Z / MMCore::CellMetres);
-		if (CX >= 0 && CZ >= 0 && CX < W && CZ < H) Lit[CZ * W + CX] = true;
+		for (const auto& Pair : State.Units)
+		{
+			const FTCUnit& U = Pair.Value;
+			const FTCUnitDef* Def = Table.Find(U.Type);
+			if (!Def || Def->bAir) continue;
+			const int32 CX = FMath::FloorToInt32(U.X / MMCore::CellMetres), CZ = FMath::FloorToInt32(U.Z / MMCore::CellMetres);
+			if (CX >= 0 && CZ >= 0 && CX < W && CZ < H) Lit[CZ * W + CX] = true;
+		}
 	}
 
 	FTCMinimapStats S = LastStats;

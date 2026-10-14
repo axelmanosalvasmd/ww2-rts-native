@@ -124,6 +124,42 @@ private:
 	TArray<TArray<FVector2D>> Keys;
 };
 
+// The tracked hulls drawn with wheel spin and track scroll (client/wheel-motion.js wheelMesh and wheelMaterial,
+// client/track-motion.js): unreal/Tools/motion/make-wheel-tracks.py writes Content/Models/Motion/WheelTracks.json and,
+// per catalog hull with wheels, a copy of that hull carrying the reference's wheel and track data in UV4-7 on the
+// model master M_TCModelTracks (world position offset and the turned normal). Here: which catalog mesh has such a
+// copy, the loops registered in the rows the tool gave them (the shared path table, the reference's 1024 x 128
+// RGBA32F layout) and that table as a texture for the material's TrackPaths parameter. Per instance the hull carries
+// FTCPartMotion WheelTravel and WheelTurn in custom data 8 and 9 (after the catalog's 8 floats).
+class THREECROSSROADS_API FTCWheelTracks
+{
+public:
+	static constexpr int32 TravelFloat = 8, TurnFloat = 9, Floats = 10;
+	static const TCHAR* const TextureParameter; // "TrackPaths"
+	struct FHull
+	{
+		FSoftObjectPath Mesh;               // /Game/Models/Motion/Tracks/SM_<n>_hull_Tracks
+		TArray<FSoftObjectPath> Materials;  // MI_TCModelTracks_* by slot
+		TArray<int32> Loops;                // the rows of its own loops
+		int32 WheelVertices = 0, LinkVertices = 0;
+	};
+	// Reads the file (default Content/Models/Motion/WheelTracks.json) and registers its loops; false (with the reason)
+	// when it is missing or a loop does not land in its row.
+	bool Load(FString& OutError, const FString& File = FString());
+	bool IsLoaded() const { return bLoaded; }
+	const FHull* Find(const FSoftObjectPath& CatalogMesh) const { return Hulls.Find(CatalogMesh.ToString()); }
+	int32 NumHulls() const { return Hulls.Num(); }
+	const FTCTrackPaths& Paths() const { return Table; }
+	// The table as a texture (made once; the caller keeps it referenced).
+	UTexture2D* Texture();
+
+private:
+	bool bLoaded = false;
+	TMap<FString, FHull> Hulls;
+	FTCTrackPaths Table;
+	TWeakObjectPtr<UTexture2D> Made;
+};
+
 // ---------------------------------------------------------------------------------------------------------------------
 // Soldiers drawn: near, far, camouflaged, fallen
 
@@ -172,6 +208,8 @@ public:
 	bool Load(FString& OutError);
 	bool HasNear() const { return Kits.Num() > 0; }
 	bool HasFar() const { return FarData.Num() > 0; }
+	// Near men drawn in the model masters' look (unreal/Tools/motion/make-crowd-look.py), not the atlas-only materials.
+	bool HasModelLook() const { return bModelLook; }
 
 	void BeginFrame();
 	// False when the man has no figure here: the caller draws its own fallback (the catalog's rest figure).
@@ -264,6 +302,9 @@ private:
 
 	UPROPERTY(Transient) TObjectPtr<UMaterialInterface> CrowdFaded;
 	UPROPERTY(Transient) TObjectPtr<UMaterialInterface> CrowdKitFaded;
+	UPROPERTY(Transient) TObjectPtr<UMaterialInterface> CrowdLookFaded;    // make-crowd-look.py: the model look, faded
+	UPROPERTY(Transient) TObjectPtr<UMaterialInterface> CrowdKitLookFaded;
+	bool bModelLook = false;  // near men in the model masters' look (make-crowd-look.py) rather than the atlas-only one
 	UPROPERTY(Transient) TObjectPtr<UMaterialInterface> FarSolid;
 	UPROPERTY(Transient) TObjectPtr<UMaterialInterface> FarFaded;
 	UPROPERTY(Transient) TArray<TObjectPtr<UObject>> Owned; // components, textures, meshes and materials made here

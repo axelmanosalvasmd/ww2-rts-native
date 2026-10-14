@@ -1,4 +1,5 @@
 #include "Client/TCObjectives.h"
+#include "Client/TCScenarioText.h"
 #include "ThreeCrossroads.h"
 #include "Client/TCUnitTable.h"
 #include "Net/TCMatchState.h"
@@ -15,8 +16,6 @@ namespace TCObjectivesImpl
 	const TCHAR* const Star = TEXT("\u2605");        // the black star of "<star> 2<times> VP"
 	const TCHAR* const Times = TEXT("\u00D7");       // the multiplication sign
 	const TCHAR* const Minus = TEXT("\u2212");       // the minus sign of "(upkeep <minus>0.1)"
-	const TCHAR* const TickMark = TEXT("\u2713");    // a complete scenario objective
-	const TCHAR* const BulletMark = TEXT("\u2022");  // an active one
 
 	// JavaScript Math.round (halves go up).
 	double JsRound(double V) { return FMath::FloorToDouble(V + 0.5); }
@@ -636,13 +635,8 @@ FString FTCObjectives::AirStateText(const FTCAirRow& Row)
 
 FString FTCObjectives::GoalText(const FTCMatchState& S)
 {
-	using namespace TCObjectivesImpl;
-	using namespace TCObjectiveRules;
-	if (!S.ModeRow.Goal.IsEmpty()) return FString::Printf(TEXT("Objective: %s"), *S.ModeRow.Goal);
-	TArray<FString> Lines;
-	for (const FTCScenarioObjective& O : S.Scenario)
-		if (O.State == TEXT("active") || O.State == TEXT("complete")) Lines.Add(FString::Printf(TEXT("%s %s"), O.State == TEXT("complete") ? TickMark : BulletMark, *O.Text));
-	return FString::Join(Lines, TEXT("\n"));
+	// objectives.js snapshot: one source for the goal box (FTCScenarioText, round 14), which also knows its scenario class
+	return FTCScenarioText::GoalText(S).Text;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------

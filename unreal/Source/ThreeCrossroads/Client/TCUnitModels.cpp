@@ -195,7 +195,7 @@ void ATCUnitRenderer::Reset()
 		// the bodies go with the match; one empty frame clears every crowd instance now
 		Crowd->ClearCorpses();
 		Crowd->BeginFrame();
-		Crowd->EndFrame(0.f, FVector::ZeroVector, [](double, double) { return 0.0; }, LodMetres);
+		Crowd->EndFrame(0.f, FVector::ZeroVector, [](double, double) { return 0.0; }, CurrentLodMetres());
 	}
 }
 
@@ -204,9 +204,9 @@ FString ATCUnitRenderer::ModelStatusLine() const
 	if (!Library.IsLoaded()) return FString::Printf(TEXT("models off (%s)"), *LibraryError);
 	TArray<FString> On;
 	for (int32 B = 0; B < BatchCount; B++) if (IsBatchEnabled(B)) On.Add(BatchName(B));
-	return FString::Printf(TEXT("models [%s]: units %d model, %d placeholder (%d without a model); instances %d parts, %d near men, %d far men (%d faded), %d bodies, %d rings; %d in motion; %d components, %d figures"),
+	return FString::Printf(TEXT("models [%s]: units %d model, %d placeholder (%d without a model); instances %d parts, %d near men, %d far men (%d faded), %d bodies, %d rings; %d in motion (%d with turning wheels and running tracks); %d components, %d figures"),
 		On.IsEmpty() ? TEXT("none") : *FString::Join(On, TEXT(",")), Stats.ModelUnits, Stats.PlaceholderUnits, Stats.MissingModel,
-		Stats.PartInstances, Stats.CrowdMen, Stats.FarMen, Stats.FadedMen, Stats.Corpses, Stats.Rings, Stats.MovingHulls, Stats.Components, Stats.Figures);
+		Stats.PartInstances, Stats.CrowdMen, Stats.FarMen, Stats.FadedMen, Stats.Corpses, Stats.Rings, Stats.MovingHulls, Stats.WheelHulls, Stats.Components, Stats.Figures);
 }
 
 UInstancedStaticMeshComponent* ATCUnitRenderer::PartComponent(const FTCModelPart& Part, bool bFaded)
@@ -221,6 +221,8 @@ UInstancedStaticMeshComponent* ATCUnitRenderer::PartComponent(const FTCModelPart
 		PartBatches.Add(Key, nullptr);
 		return nullptr;
 	}
+	// a tracked hull takes its copy with the reference's wheel and track data (Client/TCUnitRenderer.h ApplyWheelTracks)
+	ApplyWheelTracks(Ism, Part, bFaded);
 	Ism->SetupAttachment(RootComponent);
 	// the reference's unit models cast the sun's shadow but never receive it (TCLook::UnitChannel): with the units' own
 	// sun in the world the part is drawn on channel 1, and a hidden twin on channel 0 casts its shadow
@@ -460,7 +462,8 @@ bool ATCUnitRenderer::DrawModel(const FTCMatchState& State, const FTCUnit& U, co
 	{
 		// a squad type without men in its model: the plain LOD swap, 4 m of hysteresis
 		const double Metres2 = FVector::DistSquared(Eye, At) / 10000.0;
-		S.bFar = S.bFar ? Metres2 > FMath::Square(LodMetres - 4.0) : Metres2 > FMath::Square(LodMetres + 4.0);
+		const double Lod = CurrentLodMetres(); // unit-models.js LOD.high or LOD.low by the graphics level
+		S.bFar = S.bFar ? Metres2 > FMath::Square(Lod - 4.0) : Metres2 > FMath::Square(Lod + 4.0);
 	}
 	const bool bFaded = Camouflages(U.Type) && (U.Flags & 256);
 	const TArray<float> Custom = Library.CustomData(U.Owner, Faction, bFaded ? Library.CamouflageFade : 1.f, 0.f);
@@ -506,9 +509,8 @@ bool ATCUnitRenderer::DrawModel(const FTCMatchState& State, const FTCUnit& U, co
 	for (const auto& P : Parts)
 	{
 		FFrameBatch& B = Frame.FindOrAdd(P.Key);
-		B.Floats = TCModelData::Count;
 		B.Transforms.Add(P.Value);
-		B.Data.Append(Custom);
+		AppendPartData(B, P.Key, Custom, Motion); // the catalog's floats, then a tracked hull's wheelTravel
 		Stats.PartInstances++;
 	}
 	if (bMen) DrawSquadMen(*Entry, U, Faction, S, FTransform(Facing, At), Men, Custom);
@@ -559,7 +561,7 @@ bool ATCUnitRenderer::AnimateSquad(const FTCModelEntry& Entry, const FTCUnit& U,
 	F.Root = Root.GetLocation();
 	F.Yaw = -S.Rot; // three's root.rotation.y
 	F.Eye = Eye;
-	F.LodMetres = LodMetres;
+	F.LodMetres = CurrentLodMetres(); // unit-models.js: gfx.low ? LOD.low : LOD.high
 	F.Id = U.Id; F.Flags = U.Flags; F.Cover = U.Cover; F.Suppression = U.Supp;
 	F.bHasTarget = U.Target != 0; F.bMoveFire = MovesFiring(U.Type); F.Aim = S.Aim;
 	F.bGarrisoned = (U.Flags & TCFlags::Garrisoned) != 0;

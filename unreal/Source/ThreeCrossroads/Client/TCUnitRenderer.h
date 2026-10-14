@@ -43,6 +43,8 @@ struct FTCUnitModelStats
 	int32 FadedMen = 0;          // of those: camouflaged, dithered to the reference's 0.45
 	int32 Corpses = 0;           // fallen men drawn (unit-models.js createBodies)
 	int32 MovingHulls = 0;       // units drawn with presentation motion (hull settle, swell, stride, bank)
+	int32 WheelHulls = 0;        // of those: tracked hulls drawn with wheel spin and track scroll (FTCWheelTracks)
+	float WheelTravelMax = 0.f;  // the most ground any of them has rolled (m, wheel-motion.js wheelTravel.x)
 	int32 Rings = 0;             // owner and selection rings
 	int32 Components = 0;        // instanced components alive (draw batches)
 	int32 Figures = 0;           // soldier figures made (near keyframe textures and far figures)
@@ -75,6 +77,13 @@ public:
 	static constexpr float AirAltitude = 20.f; // client/main.js AIR_ALT
 	// client/unit-models.js LOD.high: beyond this camera distance (metres) soldiers and crew guns swap to the far model
 	static constexpr float LodMetres = 110.f;
+	// The swap distance in use: LOD.high (110 m) on Graphics High, LOD.low (80 m) on Low (client/unit-models.js LOD,
+	// Client/TCGraphics.h).
+	static float CurrentLodMetres();
+	// Wheels and tracks (Client/TCUnitMotion.h FTCWheelTracks): loaded, how many hulls carry them, and why not.
+	bool WheelTracksLoaded() const { return WheelTracks.IsLoaded(); }
+	int32 WheelTrackHulls() const { return WheelTracks.NumHulls(); }
+	const FString& WheelTracksError() const { return WheelTracksWhy; }
 
 	// ----- the model path -----
 	// The adoption batches, in the order they were brought in. A type takes the model path when its batch is enabled.
@@ -145,6 +154,13 @@ private:
 	void UpdateRingLooks();
 	FLinearColor RingColorFor(const FLinearColor& Display) const;
 	UInstancedStaticMeshComponent* PartComponent(const FTCModelPart& Part, bool bFaded);
+	// A new part component (PartComponent, before its shadow twin is made): a catalog hull with wheels takes its copy
+	// carrying the reference's wheel and track data and the moving master, with the path table bound and two more
+	// floats of custom data (travel, turn). False when the part keeps the catalog's mesh (no copy, faded, or the
+	// wheel data is off: -TCNoWheelTracks, or WheelTracks.json missing).
+	bool ApplyWheelTracks(UInstancedStaticMeshComponent* Ism, const FTCModelPart& Part, bool bFaded);
+	// One part instance's custom data: the catalog's floats, then (wheel copies only) wheel-motion.js wheelTravel.
+	void AppendPartData(FFrameBatch& B, const UInstancedStaticMeshComponent* Ism, const TArray<float>& Custom, const FTCPartMotion& Motion);
 	UStaticMesh* RingMesh(float Radius);
 	void FlushModelFrame();
 	// Every 5 s of real time, one log line: the model status and the frame time since the last line (regression
@@ -162,6 +178,11 @@ private:
 	FTCUnitModelStats Stats;
 	TMap<int32, FSquad> Squads;
 	FTCUnitMotion UnitMotion;                     // vehicles, boats, the kaiju and planes (Client/TCUnitMotion.h)
+	FTCWheelTracks WheelTracks;                   // the hull copies that turn their wheels and run their tracks
+	bool bWheelTracksTried = false;
+	FString WheelTracksWhy;
+	double WheelLogAt = 0;
+	TMap<FString, TObjectPtr<UMaterialInstanceDynamic>> WheelMids; // per motion material: its MID with TrackPaths bound
 	TSet<int32> KilledIds;                        // NoteKilled, until the unit leaves the snapshot
 	UPROPERTY() TObjectPtr<UTCSoldierCrowd> Crowd; // every soldier drawn: near, far, faded and fallen
 	TMap<FString, TObjectPtr<UInstancedStaticMeshComponent>> PartBatches; // mesh path, plus "|faded"

@@ -257,12 +257,17 @@ verify() {
 		ThreeCrossroads/Content/Terrain/Materials/M_TCRubbleDecal.uasset ThreeCrossroads/Content/Water/M_TCWater.uasset \
 		ThreeCrossroads/Content/Water/M_TCApron.uasset ThreeCrossroads/Content/Atmosphere/Materials/M_TCAtmosGround.uasset \
 		ThreeCrossroads/Content/Atmosphere/Materials/M_TCAtmosMist.uasset ThreeCrossroads/Content/Atmosphere/Materials/M_TCAtmosFall.uasset \
-		ThreeCrossroads/Content/Atmosphere/Materials/M_TCAtmosBird.uasset; do
+		ThreeCrossroads/Content/Atmosphere/Materials/M_TCAtmosBird.uasset \
+		ThreeCrossroads/Content/Models/Motion/WheelTracks.json ThreeCrossroads/Content/Models/Motion/M_TCModelTracks.uasset \
+		ThreeCrossroads/Content/Models/Motion/Tracks/SM_medium_0_hull_Tracks.uasset ThreeCrossroads/Content/Models/Motion/M_InfantryCrowdLookFaded.uasset \
+		ThreeCrossroads/Content/Models/Motion/MI_InfantryCrowdLook_DE.uasset ThreeCrossroads/Content/Models/Motion/M_InfantryCrowdKitLookFaded.uasset \
+		ThreeCrossroads/Content/WarMap/WarMapData.json ThreeCrossroads/Content/WarMap/T_TCWarMapSymbols.uasset \
+		ThreeCrossroads/Content/WarMap/Fonts/F_TCWarMapMono.uasset; do
 		grep -q "^$need"$'\t' "$manifest" || die "verify: $need is not in the package (see the cook settings in Config/DefaultGame.ini)"
 	done
 	local meshes; meshes="$(grep -c '^ThreeCrossroads/Content/Models/Meshes/.*\.uasset'$'\t' "$manifest" || true)"
 	(( meshes > 0 )) || die "verify: no model meshes (Content/Models/Meshes) in the package"
-	say "verify: the cook holds the models ($meshes meshes), soldiers, far figures, light, rings, world and effects materials, the terrain's relief, paint, water, apron and atmosphere materials (slice 13), sounds and the Spanish dictionary"
+	say "verify: the cook holds the models ($meshes meshes), soldiers, far figures, light, rings, world and effects materials, the terrain's relief, paint, water, apron and atmosphere materials (slice 13), the wheel and track hulls, the near crowd's look and the paper war map (round 14), sounds and the Spanish dictionary"
 	# the Rust view's startup self-check replays this stream; without it the replay is skipped (the edge checks still
 	# run), so a package must carry it, unchanged from the install it was built with
 	local fx="$root/$PROJECT_NAME/$FIXTURE_REL" name
@@ -297,6 +302,9 @@ build() {
 	rm -f "$next/Linux/Manifest_UFSFiles_Linux.txt" "$next/Linux/Manifest_NonUFSFiles_Linux.txt"
 	install -m 755 "$HERE/linux-package/tc-client.sh" "$next/tc-client.sh"
 	install -m 644 "$HERE/linux-package/README.txt" "$next/README.txt"
+	# round 14: the paper war map's font face (Liberation Mono Bold, SIL Open Font License 1.1) ships with its licence
+	install -d "$next/licenses"
+	install -m 644 "$HERE/../Content/WarMap/Fonts/LICENSE-LiberationMono-Bold.txt" "$next/licenses/LICENSE-LiberationMono-Bold.txt"
 	{
 		echo "Three Crossroads native client, Linux x86_64, Development package"
 		echo "built_utc=$stamp"

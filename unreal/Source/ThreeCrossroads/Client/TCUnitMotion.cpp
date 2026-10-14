@@ -21,6 +21,8 @@
 #include "Serialization/JsonSerializer.h"
 #include "Client/TCEffects.h"
 #include "Client/TCLighting.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #endif
@@ -524,6 +526,71 @@ UTexture2D* FTCTrackPaths::CreateTexture() const
 	return Texture;
 }
 
+// ---------------------------------------------------------------------------------------------- wheels and tracks
+
+const TCHAR* const FTCWheelTracks::TextureParameter = TEXT("TrackPaths");
+
+bool FTCWheelTracks::Load(FString& OutError, const FString& InFile)
+{
+	bLoaded = false;
+	Hulls.Reset();
+	Table = FTCTrackPaths();
+	const FString File = InFile.IsEmpty() ? FPaths::Combine(FPaths::ProjectContentDir(), TEXT("Models/Motion/WheelTracks.json")) : InFile;
+	FString Text;
+	if (!FFileHelper::LoadFileToString(Text, *File)) { OutError = FString::Printf(TEXT("no %s (unreal/Tools/motion/make-wheel-tracks.py): wheels and tracks stand still"), *File); return false; }
+	TSharedPtr<FJsonObject> Root;
+	if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Root) || !Root.IsValid() || Root->GetStringField(TEXT("format")) != TEXT("tc-wheel-tracks-v1"))
+	{
+		OutError = FString::Printf(TEXT("%s is not a tc-wheel-tracks-v1 file"), *File);
+		return false;
+	}
+	const TSharedPtr<FJsonObject>* Data = nullptr;
+	if (!Root->TryGetObjectField(TEXT("custom_data"), Data) || (int32)(*Data)->GetNumberField(TEXT("travel")) != TravelFloat || (int32)(*Data)->GetNumberField(TEXT("turn")) != TurnFloat)
+	{
+		OutError = TEXT("WheelTracks.json: custom data is not travel 8, turn 9");
+		return false;
+	}
+	for (const TSharedPtr<FJsonValue>& V : Root->GetArrayField(TEXT("loops")))
+	{
+		const TSharedPtr<FJsonObject> L = V->AsObject();
+		TArray<FVector2D> Points;
+		for (const TSharedPtr<FJsonValue>& P : L->GetArrayField(TEXT("points")))
+		{
+			const TArray<TSharedPtr<FJsonValue>>& XY = P->AsArray();
+			if (XY.Num() == 2) Points.Add(FVector2D(XY[0]->AsNumber(), XY[1]->AsNumber()));
+		}
+		const int32 Want = (int32)L->GetNumberField(TEXT("row"));
+		const int32 Row = Table.Register(Points);
+		if (Row != Want) { OutError = FString::Printf(TEXT("WheelTracks.json: loop %d registered as row %d"), Want, Row); return false; }
+	}
+	const TSharedPtr<FJsonObject>* Meshes = nullptr;
+	if (Root->TryGetObjectField(TEXT("meshes"), Meshes))
+		for (const auto& P : (*Meshes)->Values)
+		{
+			const TSharedPtr<FJsonObject> M = P.Value->AsObject();
+			FHull H;
+			H.Mesh = FSoftObjectPath(M->GetStringField(TEXT("mesh")));
+			for (const TSharedPtr<FJsonValue>& Mat : M->GetArrayField(TEXT("materials"))) H.Materials.Add(FSoftObjectPath(Mat->AsString()));
+			for (const TSharedPtr<FJsonValue>& L : M->GetArrayField(TEXT("loops"))) H.Loops.Add((int32)L->AsNumber());
+			H.WheelVertices = (int32)M->GetNumberField(TEXT("wheel_vertices"));
+			H.LinkVertices = (int32)M->GetNumberField(TEXT("link_vertices"));
+			bool bRows = true;
+			for (const int32 R : H.Loops) bRows &= R >= 0 && R < Table.Num();
+			if (!bRows) { OutError = FString::Printf(TEXT("WheelTracks.json: %s names a loop row that is not there"), *FString(P.Key)); return false; }
+			Hulls.Add(FString(P.Key), MoveTemp(H));
+		}
+	bLoaded = true;
+	return true;
+}
+
+UTexture2D* FTCWheelTracks::Texture()
+{
+	if (UTexture2D* T = Made.Get()) return T;
+	UTexture2D* T = Table.CreateTexture();
+	Made = T;
+	return T;
+}
+
 // ---------------------------------------------------------------------------------------------- the soldier crowd
 
 namespace TCUnitMotionImpl
@@ -595,6 +662,15 @@ bool UTCSoldierCrowd::Load(FString& OutError)
 	else Problems.Add(FString::Printf(TEXT("no soldier kits (%s)"), *KitsPath));
 	CrowdFaded = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Models/Motion/M_InfantryCrowdFaded.M_InfantryCrowdFaded"));
 	CrowdKitFaded = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Models/Motion/M_InfantryCrowdKitFaded.M_InfantryCrowdKitFaded"));
+	// the near crowd in the game's model look (unreal/Tools/motion/make-crowd-look.py: unit-models.js INFANTRY_PAINT, the
+	// model textures and the reference's light, as the model masters draw it); without them the atlas-only materials
+	// of import_infantry.py, lit by the engine's sky light (measured 1.86 Delta E warmer and lighter than the reference)
+	CrowdLookFaded = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Models/Motion/M_InfantryCrowdLookFaded.M_InfantryCrowdLookFaded"));
+	CrowdKitLookFaded = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Models/Motion/M_InfantryCrowdKitLookFaded.M_InfantryCrowdKitLookFaded"));
+	// -TCCrowdAtlasLook: the atlas-only materials anyway (a verification switch, for side by sides of the two looks)
+	bModelLook = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Models/Motion/MI_InfantryCrowdLook_DE.MI_InfantryCrowdLook_DE")) != nullptr && CrowdLookFaded && CrowdKitLookFaded
+		&& !FParse::Param(FCommandLine::Get(), TEXT("TCCrowdAtlasLook"));
+	if (!bModelLook) Problems.Add(TEXT("no crowd model look (unreal/Tools/motion/make-crowd-look.py): near men take the atlas-only materials"));
 	FarSolid = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Models/Motion/M_InfantryFar.M_InfantryFar"));
 	FarFaded = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Models/Motion/M_InfantryFarFaded.M_InfantryFarFaded"));
 	if (!CrowdFaded || !CrowdKitFaded) Problems.Add(TEXT("no faded crowd materials (camouflaged near men draw solid, near bodies do not fade)"));
@@ -684,7 +760,13 @@ UTCSoldierCrowd::FNearFigure* UTCSoldierCrowd::NearFigure(const FString& FigureT
 	const FKit* Kit = Kits.Find(Key);
 	const TCHAR* Tag = FactionTag(Faction);
 	UStaticMesh* BodyMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Models/Infantry/SM_InfantryCrowdBody.SM_InfantryCrowdBody"));
-	UMaterialInterface* BodyMaterial = LoadObject<UMaterialInterface>(nullptr, *FString::Printf(TEXT("/Game/Models/Infantry/Materials/MI_InfantryCrowd_%s.MI_InfantryCrowd_%s"), Tag, Tag));
+	UMaterialInterface* BodyMaterial = bModelLook ? LoadObject<UMaterialInterface>(nullptr, *FString::Printf(TEXT("/Game/Models/Motion/MI_InfantryCrowdLook_%s.MI_InfantryCrowdLook_%s"), Tag, Tag)) : nullptr;
+	UMaterialInterface* BodyFaded = CrowdLookFaded;
+	if (!BodyMaterial)
+	{
+		BodyMaterial = LoadObject<UMaterialInterface>(nullptr, *FString::Printf(TEXT("/Game/Models/Infantry/Materials/MI_InfantryCrowd_%s.MI_InfantryCrowd_%s"), Tag, Tag));
+		BodyFaded = CrowdFaded;
+	}
 	if (!Kit || !BodyMesh || !BodyMaterial) return nullptr;
 	Made.Keys = UTCInfantryRigLibrary::BakeKeyframeTexture(FigureType, Faction, Slot);
 	if (!Made.Keys) return nullptr;
@@ -694,7 +776,7 @@ UTCSoldierCrowd::FNearFigure* UTCSoldierCrowd::NearFigure(const FString& FigureT
 	// Solid and faded draws: the faded ones (camouflage and the corpses) are made the first time they are needed
 	for (int32 Faded = 0; Faded < 2; Faded++)
 	{
-		if (Faded && (!CrowdFaded || !CrowdKitFaded)) break;
+		if (Faded && (!BodyFaded || !(bModelLook ? CrowdKitLookFaded : CrowdKitFaded))) break;
 		auto Look = [&](UMaterialInterface* Solid, UMaterialInterface* FadedParent) -> UMaterialInterface*
 		{
 			UMaterialInstanceDynamic* Mid = UMaterialInstanceDynamic::Create(Faded ? FadedParent : Solid, this);
@@ -704,7 +786,7 @@ UTCSoldierCrowd::FNearFigure* UTCSoldierCrowd::NearFigure(const FString& FigureT
 			return Mid;
 		};
 		const int32 BodyFloats = Faded ? TCCrowdData::Faded : TCCrowdData::NearSolidBody;
-		UMaterialInterface* BodyLook = Look(BodyMaterial, CrowdFaded);
+		UMaterialInterface* BodyLook = Look(BodyMaterial, BodyFaded);
 		TArray<UMaterialInterface*> BodyMats;
 		BodyMats.Init(BodyLook, BodyMesh->GetStaticMaterials().Num());
 		Made.Body[Faded] = MakeBatch(BodyMesh, BodyFloats, BodyMats);
@@ -724,8 +806,14 @@ UTCSoldierCrowd::FNearFigure* UTCSoldierCrowd::NearFigure(const FString& FigureT
 				for (const FString& N : *Names)
 				{
 					const FString Safe = N.Replace(TEXT("-"), TEXT("_"));
-					UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, *FString::Printf(TEXT("/Game/Models/Infantry/Materials/MI_InfantryCrowdKit_%s.MI_InfantryCrowdKit_%s"), *Safe, *Safe));
-					Mats.Add(Base ? Look(Base, CrowdKitFaded) : nullptr);
+					UMaterialInterface* Base = bModelLook ? LoadObject<UMaterialInterface>(nullptr, *FString::Printf(TEXT("/Game/Models/Motion/MI_InfantryCrowdKitLook_%s.MI_InfantryCrowdKitLook_%s"), *Safe, *Safe)) : nullptr;
+					UMaterialInterface* KitFaded = CrowdKitLookFaded;
+					if (!Base)
+					{
+						Base = LoadObject<UMaterialInterface>(nullptr, *FString::Printf(TEXT("/Game/Models/Infantry/Materials/MI_InfantryCrowdKit_%s.MI_InfantryCrowdKit_%s"), *Safe, *Safe));
+						KitFaded = CrowdKitFaded;
+					}
+					Mats.Add(Base ? Look(Base, KitFaded) : nullptr);
 				}
 			Made.Kit[Faded].Add({ MakeBatch(Mesh, Faded ? TCCrowdData::Faded : TCCrowdData::NearSolidKit, Mats), static_cast<float>(Bone) });
 		}
@@ -893,6 +981,9 @@ void UTCSoldierCrowd::BeginFrame()
 
 bool UTCSoldierCrowd::AddMan(const FTCSoldierDraw& Man)
 {
+	// -TCCrowdOff: every man takes the catalog's rest figure (the renderer's fallback; a verification switch)
+	static const bool bOff = FParse::Param(FCommandLine::Get(), TEXT("TCCrowdOff"));
+	if (bOff) { Now.Refused++; return false; }
 	const TArray<float> Blend12 = UTCInfantryRigLibrary::CrowdCustomData(Man.Blend);
 	const bool bDrawn = Man.bFar ? DrawFar(Man.FigureType, Man.Faction, Man.Slot, Man.Man, Blend12, Man.Fade, Man.Owner, false)
 		: DrawNear(Man.FigureType, Man.Faction, Man.Slot, Man.Man, Blend12, Man.Fade, false);
@@ -1297,5 +1388,72 @@ bool FTCMotionCrowdTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("all gone"), Crowd->NumCorpses(), 0);
 	return true;
 }
+// The tracked hull copies (unreal/Tools/motion/make-wheel-tracks.py): every one loads, keeps the catalog hull's shape,
+// carries 8 texture channels in its mesh and its render data, and its wheel and link vertices hold what the tool wrote
+// (radius > 0 for wheels, a row of the shared table for links, the travelled link position finite and on its loop).
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCMotionWheelTracksTest, "ThreeCrossroads.Motion.WheelTracks", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FTCMotionWheelTracksTest::RunTest(const FString& Parameters)
+{
+	FTCWheelTracks W;
+	FString Why;
+	if (!TestTrue(FString::Printf(TEXT("WheelTracks.json loads (%s)"), *Why), W.Load(Why))) return false;
+	TestEqual(TEXT("tracked hulls"), W.NumHulls(), 21);
+	TestTrue(TEXT("loops in the table"), W.Paths().Num() > 0 && W.Paths().Num() <= FTCTrackPaths::Rows);
+	const FString Catalog = FPaths::Combine(FPaths::ProjectContentDir(), TEXT("Models/ModelCatalog.json"));
+	FString Text;
+	FFileHelper::LoadFileToString(Text, *Catalog);
+	TSharedPtr<FJsonObject> Root;
+	FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Root);
+	int32 Checked = 0, Wheels = 0, Links = 0;
+	if (Root.IsValid())
+		for (const TSharedPtr<FJsonValue>& M : Root->GetArrayField(TEXT("models")))
+			for (const TSharedPtr<FJsonValue>& P : M->AsObject()->GetArrayField(TEXT("parts")))
+			{
+				const FSoftObjectPath CatalogMesh(P->AsObject()->GetStringField(TEXT("mesh")));
+				const FTCWheelTracks::FHull* H = W.Find(CatalogMesh);
+				if (!H) continue;
+				UStaticMesh* Copy = Cast<UStaticMesh>(H->Mesh.TryLoad());
+				UStaticMesh* Original = Cast<UStaticMesh>(CatalogMesh.TryLoad());
+				if (!TestTrue(FString::Printf(TEXT("%s loads"), *H->Mesh.ToString()), Copy && Original)) continue;
+				TestEqual(FString::Printf(TEXT("%s: triangles as the catalog hull"), *H->Mesh.ToString()), Copy->GetNumTriangles(0), Original->GetNumTriangles(0));
+				TestTrue(FString::Printf(TEXT("%s: same bounds"), *H->Mesh.ToString()), Copy->GetBoundingBox().Min.Equals(Original->GetBoundingBox().Min, 0.01) && Copy->GetBoundingBox().Max.Equals(Original->GetBoundingBox().Max, 0.01));
+				if (Copy->GetRenderData() && Copy->GetRenderData()->LODResources.Num())
+					TestEqual(FString::Printf(TEXT("%s: render data texture channels"), *H->Mesh.ToString()), (int32)Copy->GetRenderData()->LODResources[0].GetNumTexCoords(), 8);
+#if WITH_EDITOR
+				if (const FMeshDescription* D = Copy->GetMeshDescription(0))
+				{
+					FStaticMeshConstAttributes A(*D);
+					const TVertexInstanceAttributesConstRef<FVector2f> UV = A.GetVertexInstanceUVs();
+					if (!TestEqual(FString::Printf(TEXT("%s: mesh texture channels"), *H->Mesh.ToString()), UV.GetNumChannels(), 8)) continue;
+					const TVertexAttributesConstRef<FVector3f> Pos = A.GetVertexPositions();
+					int32 HW = 0, HL = 0;
+					bool bRows = true, bOnLoop = true;
+					for (const FVertexInstanceID I : D->VertexInstances().GetElementIDs())
+					{
+						if (UV.Get(I, 5).Y > 0) HW++;
+						const FVector2f T0 = UV.Get(I, 6), T1 = UV.Get(I, 7);
+						if (T0.Y < -0.5f) continue;
+						HL++;
+						const int32 Row = FMath::RoundToInt(T0.Y);
+						bRows &= H->Loops.Contains(Row);
+						const FVector3f P3 = Pos[D->GetVertexInstanceVertex(I)];
+						const FVector Three(P3.X / 100.0, P3.Z / 100.0, P3.Y / 100.0);
+						const FVector Moved = W.Paths().TrackVertex(Three, FVector4(T0.X, T0.Y, T1.X, T1.Y), 0.37, 0.25);
+						bOnLoop &= !Moved.ContainsNaN() && FVector::Dist(Moved, Three) < 5.0 && FMath::IsNearlyEqual(Moved.Z, Three.Z, 1e-9);
+					}
+					TestTrue(FString::Printf(TEXT("%s: wheel corners"), *H->Mesh.ToString()), HW > 0);
+					TestTrue(FString::Printf(TEXT("%s: link corners"), *H->Mesh.ToString()), HL > 0);
+					TestTrue(FString::Printf(TEXT("%s: links name their hull's rows"), *H->Mesh.ToString()), bRows);
+					TestTrue(FString::Printf(TEXT("%s: links stay on their side, near their loop"), *H->Mesh.ToString()), bOnLoop);
+					Wheels += HW; Links += HL;
+				}
+#endif
+				Checked++;
+			}
+	TestTrue(TEXT("every catalog hull with wheels checked"), Checked >= 21);
+	AddInfo(FString::Printf(TEXT("%d catalog parts on %d hull copies, %d loops; %d wheel and %d link vertex instances"), Checked, W.NumHulls(), W.Paths().Num(), Wheels, Links));
+	return true;
+}
+
 #endif // WITH_DEV_AUTOMATION_TESTS
 #endif // TC_UNIT_MOTION_STANDALONE

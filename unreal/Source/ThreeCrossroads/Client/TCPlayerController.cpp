@@ -1,4 +1,7 @@
 #include "Client/TCPlayerController.h"
+#include "Client/TCGraphics.h"
+#include "Client/TCPersistence.h"
+#include "Misc/App.h"
 #include "Client/TCAudio.h"
 #include "Client/TCLocale.h"
 #include "Client/TCGameMode.h"
@@ -85,6 +88,7 @@ const TCHAR* LexToString(ETCUiAction Action)
 	switch (Action)
 	{
 	case ETCUiAction::AddAi: return TEXT("add AI");
+	case ETCUiAction::Tutorial: return TEXT("tutorial");
 	case ETCUiAction::NextMode: return TEXT("mode");
 	case ETCUiAction::Start: return TEXT("start");
 	case ETCUiAction::End: return TEXT("end match");
@@ -135,6 +139,9 @@ const TCHAR* LexToString(ETCUiAction Action)
 	case ETCUiAction::PanSpeed: return TEXT("pan speed");
 	case ETCUiAction::Language: return TEXT("language");
 	case ETCUiAction::Volume: return TEXT("volume");
+	case ETCUiAction::Graphics: return TEXT("graphics");
+	case ETCUiAction::Gore: return TEXT("gore");
+	case ETCUiAction::UiScale: return TEXT("ui scale");
 	default: return TEXT("none");
 	}
 }
@@ -200,6 +207,15 @@ void ATCPlayerController::BeginPlay()
 		int32 Saved = 1;
 		if (GConfig->GetInt(TEXT("ThreeCrossroads"), TEXT("PanSpeed"), Saved, GGameUserSettingsIni) && Saved >= 0 && Saved < TCCameraFeel::PanSpeedCount) PanSpeed = Saved;
 	}
+	// client/hud.js: the UI scale as saved ('ww2-ui-scale' through the range input's rules); client/gfx.js: the level as
+	// saved, its engine side (screen percentage, shadow map) now and on every change (perf.js renderScale, light.js)
+	UiScalePercent = FTCSettingsStore::Game().UIScale();
+	if (IsLocalController() && GetWorld() && GetWorld()->IsGameWorld())
+	{
+		FTCGraphics::Get().ApplyEngine();
+		GraphicsChangedHandle = FTCGraphics::Get().OnChanged.AddWeakLambda(this, [](ETCGraphicsLevel) { FTCGraphics::Get().ApplyEngine(); });
+	}
+	UE_LOG(LogTC, Log, TEXT("settings: UI scale %d%%, graphics %s, gore %s"), UiScalePercent, LexToString(FTCGraphics::Get().Level()), FTCGraphics::Get().Gore() ? TEXT("on") : TEXT("off"));
 }
 
 ATCGameMode* ATCPlayerController::Mode() const { return GetWorld() ? GetWorld()->GetAuthGameMode<ATCGameMode>() : nullptr; }
@@ -255,6 +271,7 @@ void ATCPlayerController::StartView(FVector2D Spawn, FVector2D MapMetres)
 	Yaw = -90.f - (float)FMath::RadiansToDegrees(BrowserYaw);
 	Distance = StartDistance;
 	Wide.Key.Reset();
+	bBandStale = true; // round 14: camera.js startIntro measures the band anew
 	// client/camera.js startIntro: the glide from the widest view begins once that view is measured (UpdateCamera);
 	// a follow, a middle-drag and the zoom's anchor end; selection.reset forgets the idle walk
 	Intro = FTCCameraIntro();
@@ -319,13 +336,15 @@ void ATCPlayerController::UpdateWideView(const ATCGameMode& M, int32 VX, int32 V
 	const ATCTerrain& T = *M.Terrain;
 	const float W = T.MapW() * FTCMatchState::CellMetres, H = T.MapH() * FTCMatchState::CellMetres;
 	if (W <= 0 || H <= 0 || VX <= 0 || VY <= 0) { Wide = FWideView(); return; }
-	const FString Key = FString::Printf(TEXT("%g,%g,%g,%d,%d,%d"), W, H, Yaw, VX, VY, T.CellsDrawn());
+	// round 14: the band as last measured (camera.js band(); a resize measures it again)
+	if (bBandStale || BandViewport != FIntPoint(VX, VY)) TakeBand(VX, VY);
+	const FString Key = FString::Printf(TEXT("%g,%g,%g,%d,%d,%d,%g,%g"), W, H, Yaw, VX, VY, T.CellsDrawn(), Band.X, Band.Y);
 	if (Key == Wide.Key) return;
 	const FVector Corners[4] = {
 		FVector(0, 0, T.HeightAt(0, 0)), FVector(W, 0, T.HeightAt(W - 0.01f, 0)),
 		FVector(W, H, T.HeightAt(W - 0.01f, H - 0.01f)), FVector(0, H, T.HeightAt(0, H - 0.01f)) };
 	const FVector Middle(W / 2, H / 2, T.HeightAt(W / 2, H / 2));
-	const double Aspect = double(VX) / VY, RoomX = VX * (1 - 2 * FitMargin), RoomY = VY * (1 - 2 * FitMargin);
+	const double Aspect = double(VX) / VY, RoomX = VX * (1 - 2 * FitMargin), RoomY = (Band.Y - Band.X) - 2.0 * VY * FitMargin;
 	struct FBox { bool bOk = true; double X0 = 1e30, X1 = -1e30, Y0 = 1e30, Y1 = -1e30; };
 	auto Box = [&](double Dist)
 	{
@@ -348,11 +367,11 @@ void ATCPlayerController::UpdateWideView(const ATCGameMode& M, int32 VX, int32 V
 	}
 	const double Dist = FMath::Max<double>(MinWide, Hi);
 	const FBox B = Box(Dist);
-	// slide the target so the box's middle lands on the window's middle (perspective puts the near edge lower):
-	// the pixel mirrored about the centre from the box's middle is where the map's middle must be seen
+	// slide the target so the box's middle lands on the band's middle (perspective puts the near edge lower):
+	// camera.js shift(middle, innerWidth - boxMidX, innerHeight / 2 + bandMid - boxMidY)
 	FVector2D Hit;
 	FVector2D Target(Middle.X, Middle.Y);
-	if (FTCPinhole(Middle, Yaw, Pitch, Dist, Aspect).Ground(FVector2D(VX - (B.X0 + B.X1) / 2, VY - (B.Y0 + B.Y1) / 2), VX, VY, Middle.Z, Hit))
+	if (FTCPinhole(Middle, Yaw, Pitch, Dist, Aspect).Ground(FVector2D(VX - (B.X0 + B.X1) / 2, VY / 2.0 + (Band.X + Band.Y) / 2.0 - (B.Y0 + B.Y1) / 2), VX, VY, Middle.Z, Hit))
 		Target += FVector2D(Middle.X, Middle.Y) - Hit;
 	Wide.bValid = true;
 	Wide.Dist = (float)Dist;
@@ -409,13 +428,34 @@ void ATCPlayerController::FrameOn(FVector2D Metres)
 	ATCGameMode* M = Mode();
 	Anchor.bActive = false;
 	Focus = Metres;
+	// round 14: camera.js frame: band(true), then the point in the band's middle (two passes: the target's height
+	// follows the ground under it, which moves in the first)
+	int32 VX = 0, VY = 0;
+	GetViewportSize(VX, VY);
+	if (M && M->Terrain && M->Terrain->MapW() > 0 && VX > 0 && VY > 0) { TakeBand(VX, VY); UpdateWideView(*M, VX, VY); }
 	if (Wide.bValid) Distance = FMath::Min(Distance, Wide.Dist);
 	if (M && M->Terrain)
 	{
+		const FVector P(Metres.X, Metres.Y, M->Terrain->HeightAt(Metres.X, Metres.Y));
+		for (int32 Pass = 0; Pass < 2; Pass++)
+		{
+			TargetHeight = M->Terrain->HeightAt(Focus.X, Focus.Y);
+			FVector2D NewFocus;
+			if (VX > 0 && VY > 0 && TCCameraFeel::ShiftToPixel(Focus, TargetHeight, Yaw, Pitch, Distance, VX, VY, P, FVector2D(VX / 2.0, (Band.X + Band.Y) / 2.0), NewFocus)) Focus = NewFocus;
+			ClampFocus(*M);
+		}
 		TargetHeight = M->Terrain->HeightAt(Focus.X, Focus.Y);
 		bHeightKnown = true;
-		ClampFocus(*M);
 	}
+}
+
+void ATCPlayerController::TakeBand(int32 VX, int32 VY)
+{
+	// camera.js band(): the HUD's band, or the whole view when it leaves less than 30% of the height
+	const float Top = FMath::Max(0.f, (float)LiveBand.X), Bottom = LiveBand.Y > 0 ? FMath::Min((float)VY, (float)LiveBand.Y) : (float)VY;
+	Band = Bottom - Top >= VY * 0.3f ? FVector2D(Top, Bottom) : FVector2D(0, VY);
+	BandViewport = FIntPoint(VX, VY);
+	bBandStale = false;
 }
 
 void ATCPlayerController::SolveAnchor(int32 VX, int32 VY)
@@ -437,6 +477,8 @@ void ATCPlayerController::WheelZoom(int32 Notch, bool bHasCursor, FVector2D Mous
 	ATCGameMode* M = Mode();
 	FVector2D G;
 	const bool bPoint = bHasCursor && GroundAt(Mouse, G);
+	// round 14: camera.js wheel: band(true), the panels may have changed height since the last zoom
+	if (M && M->Terrain && M->Terrain->MapW() > 0) { TakeBand(VX, VY); UpdateWideView(*M, VX, VY); }
 	const float Farthest = Wide.bValid ? Wide.Dist : MaxDistance;
 	Distance = TCCameraFeel::ZoomedDistance(Distance, Notch, FMath::Max(TCCameraFeel::MinDistance, Farthest));
 	Anchor.bActive = false;
@@ -457,6 +499,9 @@ void ATCPlayerController::UpdateCamera(float Dt, bool bFocused)
 	ATCCameraPawn* Cam = Cast<ATCCameraPawn>(GetPawn());
 	EdgeDir.Reset();
 	if (!M || !Cam || !M->Terrain) return;
+	// round 14: in the lobby the backdrop's drifting camera (client/lobby-view.js place), else the match's 42 degrees
+	if (!M->State.bHasMatch && M->Backdrop.PlaceCamera(Cam)) return;
+	M->Backdrop.RestoreCamera(Cam);
 	const ATCTerrain& T = *M->Terrain;
 	// client/main.js keydown: a key whose press ran a shortcut (KeyChord) is not held for the camera. The press itself
 	// is read after the camera moves this frame (UpdateCommandKeys), so a key starts panning or turning one frame
@@ -593,6 +638,13 @@ void ATCPlayerController::UpdateCamera(float Dt, bool bFocused)
 void ATCPlayerController::PlayerTick(float DeltaTime)
 {
 	Super::PlayerTick(DeltaTime);
+	// client/light.js renderFrame: watchFps(min(0.1, dt), notice) on every frame drawn over a match's ground
+	if (ATCGameMode* GM = Mode())
+		if (GM->State.bHasMatch && GM->Terrain)
+		{
+			FString Notice;
+			if (FTCGraphics::Get().WatchFps(FTCGraphics::ClampFrame(FApp::GetDeltaTime()), &Notice)) { GraphicsNotice = Notice; GraphicsNoticeAt = GetWorld()->GetRealTimeSeconds(); }
+		}
 	const bool bFocused = WindowFocused();
 	CheckIntroSkip();
 	UpdateCamera(DeltaTime, bFocused);
@@ -687,7 +739,7 @@ bool ATCPlayerController::HandleHudPress(bool bLeft, bool bRight, FVector2D Mous
 		return true;
 	}
 	// a right click on a lobby setting's button steps back (the browser's select lists every choice; this HUD cycles)
-	if (bRight && Hud->CommandAt(Mouse, Command) && (Command.Action == ETCUiAction::LobbySetting || Command.Action == ETCUiAction::Volume || (Command.Action == ETCUiAction::MatchOption && Command.Unit == LexToString(ETCMatchOption::Weather))))
+	if (bRight && Hud->CommandAt(Mouse, Command) && (Command.Action == ETCUiAction::LobbySetting || Command.Action == ETCUiAction::Volume || Command.Action == ETCUiAction::UiScale || (Command.Action == ETCUiAction::MatchOption && Command.Unit == LexToString(ETCMatchOption::Weather))))
 	{
 		Command.Job = -1;
 		RunCommand(Command);
@@ -760,6 +812,8 @@ void ATCPlayerController::UpdatePointer(bool bFocused)
 	const bool bRightPress = WasInputKeyJustPressed(EKeys::RightMouseButton) && bInside && !bIntroDropRight;
 	if (bControlsSheetOpen)
 	{
+		// round 14: the onboarding sheet closes on any press on it, and that press goes no further
+		if ((bLeftPress || bRightPress) && OnboardingPress()) return;
 		// the Controls sheet is modal (client/main.js showModal): presses reach only the HUD (its Close), never the
 		// minimap or the world
 		if (bLeftPress) HandleHudPress(true, false, Mouse);
@@ -1915,6 +1969,11 @@ FString ATCPlayerController::LanguageLabel() const
 	return FString::Printf(TEXT("%s: %s"), *P.Title, O ? *O->Label : FTCLocale::Code(P.Selected));
 }
 
+FString ATCPlayerController::UiScaleLabel() const
+{
+	return FString::Printf(TEXT("%s %s"), FTCSettingsStore::UIScaleTitle(), *FTCSettingsStore::UIScaleLabel(UiScalePercent));
+}
+
 FString ATCPlayerController::VolumeLabel() const
 {
 	const UTCAudio* A = GetWorld() ? GetWorld()->GetSubsystem<UTCAudio>() : nullptr;
@@ -1956,6 +2015,16 @@ int32 ATCPlayerController::IssueStop()
 	const int32 Named = SendPlan(TCOrders::PlanStop(Selected), TEXT("Stop"), &bSent);
 	if (bSent) Feedback(TEXT("click")); // client/main.js stop: blip(330)
 	return Named;
+}
+
+bool ATCPlayerController::OnboardingPress()
+{
+	ATCGameMode* M = Mode();
+	if (!M || !bControlsSheetOpen || !M->Onboarding.OnPointerDown()) return false;
+	bControlsSheetOpen = false;
+	M->Onboarding.OnClosed();
+	UE_LOG(LogTC, Log, TEXT("Controls sheet closed by a press (onboarding: seen is stored)"));
+	return true;
 }
 
 bool ATCPlayerController::RunCommand(const FTCUiCommand& Command, bool bShift)
@@ -2328,7 +2397,14 @@ bool ATCPlayerController::RunCommand(const FTCUiCommand& Command, bool bShift)
 		// client/main.js openControls (cancelInput first) and closeControls
 		bControlsSheetOpen = !bControlsSheetOpen;
 		if (bControlsSheetOpen) CancelInput();
+		else M->Onboarding.OnClosed(); // round 14: the dialog's close event (onboarding stores 'seen')
 		UE_LOG(LogTC, Log, TEXT("Controls sheet %s"), bControlsSheetOpen ? TEXT("open (F1 or Esc closes it)") : TEXT("closed"));
+		return true;
+	case ETCUiAction::Tutorial:
+		// client/public-lobby.js tutorial button: a new private room whose hello carries { tutorial: true }
+		if (S.RoomState == TEXT("play")) { NoteOrder(false, TEXT("Tutorial: leave the match first")); return false; }
+		M->EnterTutorialRoom();
+		NoteOrder(true, TEXT("Tutorial: a new private room"));
 		return true;
 	case ETCUiAction::EdgeScroll:
 		bEdgeScroll = !bEdgeScroll;
@@ -2348,6 +2424,25 @@ bool ATCPlayerController::RunCommand(const FTCUiCommand& Command, bool bShift)
 		FTCLocale::SetLanguage(Next);
 		NoteOrder(true, LanguageLabel());
 		UE_LOG(LogTC, Log, TEXT("language picked: %s (%s)"), FTCLocale::Code(Next), *TC_T(LanguageLabel()));
+		return true;
+	}
+	case ETCUiAction::Graphics:
+		// client/light.js gfxBtn.onclick: gfx.set(gfx.low ? 'high' : 'low') (saved; everything listening relights)
+		FTCGraphics::Get().Toggle();
+		NoteOrder(true, FTCGraphics::MenuLabel(FTCGraphics::Get().Level()));
+		return true;
+	case ETCUiAction::Gore:
+		FTCGraphics::Get().SetGore(!FTCGraphics::Get().Gore());
+		NoteOrder(true, FTCGraphics::GoreLabel(FTCGraphics::Get().Gore()));
+		return true;
+	case ETCUiAction::UiScale:
+	{
+		// client/hud.js uiScale: the slider's value (75..150, step 5) applied on release and saved; this HUD steps it
+		const int32 Step = FTCSettingsStore::UIScaleStep;
+		UiScalePercent = FMath::Clamp(UiScalePercent + (Command.Job < 0 ? -Step : Step), FTCSettingsStore::UIScaleMin, FTCSettingsStore::UIScaleMax);
+		FTCSettingsStore::Game().SetUIScale(UiScalePercent);
+		UiScalePercent = FTCSettingsStore::Game().UIScale();
+		NoteOrder(true, UiScaleLabel());
 		return true;
 	}
 	case ETCUiAction::Volume:

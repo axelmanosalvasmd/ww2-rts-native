@@ -5,8 +5,9 @@
 
 Each is the reference shader of client/atmosphere.js (pin e4e579a) as a Custom node, in the reference's axes and metres
 (three's x is Unreal X, three's z is Unreal Y, three's y is Unreal Z; Unreal positions are cm). three's scene fog (the
-FOG_FADE lines) is left out: the haze is mixed after tone mapping by M_TCLookPost over everything, these layers
-included. The fog of war multiplies their colour by the cell's texel (FogMap, as the world materials do), which is
+FOG_FADE lines) is left out of the mist, fall and bird layers: the haze is mixed by M_TCLookPost over everything,
+these layers included; the ground layer (cover and cloud shade) keeps it (round 14), because there the fade lets the
+hazed ground show through and the haze over the composite alone does not. The fog of war multiplies their colour by the cell's texel (FogMap, as the world materials do), which is
 what the reference's fog overlay drawn over them does. Each layer blends as three blends it, in display space
 (DISPLAY_HLSL below).
 
@@ -43,8 +44,9 @@ if (FogOn > 0.5) {
 }
 '''
 
-# three renders straight to the canvas: every transparent layer is tone mapped in its own shader (tonemapping_fragment,
-# colorspace_fragment) and alpha-blended in display space. The engine blends translucency in linear light before
+# three renders straight to the canvas on Graphics Low: every transparent layer is tone mapped in its own shader
+# (tonemapping_fragment, colorspace_fragment) and alpha-blended in display space (on High the composer blends in linear
+# light: LinearBlend 1, round 14). The engine blends translucency in linear light before
 # M_TCLookPost tone maps. DISPLAY_HLSL turns the reference's alpha (A, for colour Col) into the linear alpha that gives
 # the same display-space result over the opaque scene behind (SceneColor), on luminance: T(x) = sRGB(ACES fit(x
 # exposure / 0.6)) for grey (three's input and output matrices keep grey), and T's inverse. Layers stacked over other
@@ -67,6 +69,10 @@ float qa = 1.0 - 0.983729 * y, qb = 0.0245786 - 0.4329510 * y, qc = -(0.00009053
 float vWant = (-qb + sqrt(max(qb * qb - 4.0 * qa * qc, 0.0))) / (2.0 * qa);
 float xWant = vWant / ek;                                         // the linear luminance that displays as want
 float alphaLin = abs(cY - dY) > 1e-5 ? saturate((xWant - dY) / (cY - dY)) : A;
+// round 14: that holds for Graphics Low only. On High light.js draws through its composer into a linear half-float
+// target, where three blends every transparent layer in linear light before OutputPass tone-maps: the engine's own
+// blend, so the reference's alpha is used as it is (LinearBlend 1, the game; ATCLighting -TCHazeAfterTone sets 0)
+if (LinearBlend > 0.5) alphaLin = A;
 '''
 
 GROUND_HLSL = '''// client/atmosphere.js coverMaterial then cloudMaterial, composited in that order (render orders 0.58, 0.6).
@@ -75,6 +81,10 @@ float ny = Normal.z;                      // the normal's up component (vN.y)
 float vy = normalize(CamPos - WorldPos).z; // normalize(vView).y
 float4 acc = float4(0.0, 0.0, 0.0, 0.0);
 float a_;
+// round 14: FOG_FADE. In the reference each layer's alpha fades with the scene fog (cover: a = acc.a * (1 - fogF);
+// cloud: alpha * (1 - fogF)), so the hazed ground shows through where the haze grows; M_TCLookPost's haze over the
+// composite alone differs by a f (1 - f) (haze - ground). FogNear and FogFar are light.js followView's (ATCLighting).
+float fogF = FogFar > FogNear ? smoothstep(FogNear, FogFar, Depth * 0.01) : 0.0;
 if (CoverOn > 0.5) {
 	float4 m = Mask.Sample(MaskSampler, xz / MapSize.xy);
 	float dry = 1.0 - m.g, flat_ = smoothstep(0.82, 0.97, ny);
@@ -94,15 +104,20 @@ if (CoverOn > 0.5) {
 	a_ = snow * 0.82;
 	acc = float4(SnowColor * a_ + acc.rgb * (1.0 - a_), a_ + acc.a * (1.0 - a_));
 }
+acc *= 1.0 - fogF; // the cover's own FOG_FADE (coverMaterial: a = acc.a * (1.0 - fogF))
 if (CloudOn > 0.5) {
 	// CLOUD_SCALE 260 m per noise tile, the second layer at 0.53 of it
 	float a = Noise.Sample(NoiseSampler, xz / 260.0 + DriftA.xy).r;
 	float b = Noise.Sample(NoiseSampler, xz / 137.8 + DriftB.xy).r;
 	float cover = smoothstep(0.46, 0.7, a * 0.72 + b * 0.28);
-	a_ = cover * Strength * (1.0 - smoothstep(FadeRadii.x, FadeRadii.y, length(xz - FadeCentre.xy)));
+	a_ = cover * Strength * (1.0 - smoothstep(FadeRadii.x, FadeRadii.y, length(xz - FadeCentre.xy))) * (1.0 - fogF);
 	acc = float4(Tint * a_ + acc.rgb * (1.0 - a_), a_ + acc.a * (1.0 - a_));
 }
 ''' + FOG_HLSL + '''
+// round 14: past the map's edge (the apron's copy of this layer) the reference's apron fog overlay (apron.js fogMesh,
+// surfaces.js fogOverlayShader) lies over the cover and the cloud shade too: the edge cell's look eases to never seen
+// between 6 and 32 m out, as M_TCApron dims the apron's own ground
+if (FogOn > 0.5) fogK = lerp(fogK, 82.0 / 255.0, smoothstep(6.0, 32.0, length(xz - clamp(xz, float2(0.0, 0.0), FogSize.xy))));
 float3 Col = acc.rgb / max(acc.a, 1e-4) * fogK;
 float A = acc.a < 0.004 ? 0.0 : acc.a;
 ''' + DISPLAY_HLSL + '''
@@ -280,7 +295,7 @@ class Maker(object):
 
     def display_inputs(self, scalar, node):
         # the opaque scene behind (linear, pre-exposed) and the mood's exposure (client/moods.js exposure)
-        return [('Scene', node(unreal.MaterialExpressionSceneColor)), ('Exposure', scalar('Exposure', 0.9))]
+        return [('Scene', node(unreal.MaterialExpressionSceneColor)), ('Exposure', scalar('Exposure', 0.9)), ('LinearBlend', scalar('LinearBlend', 1.0))]
 
     def ground(self, white, grey):
         P = unreal.MaterialProperty
@@ -294,7 +309,9 @@ class Maker(object):
                ('Time', scalar('Time', 0.0)), ('Sky', vector('Sky', (0.5, 0.5, 0.5))), ('MudColor', vector('MudColor', (0.07, 0.042, 0.019))),
                ('SnowColor', vector('SnowColor', (0.85, 0.88, 0.9))), ('DriftA', vector('DriftA', (0.0, 0.0, 0.0))), ('DriftB', vector('DriftB', (0.37, 0.61, 0.0))),
                ('Strength', scalar('Strength', 0.15)), ('Tint', vector('Tint', (0.011, 0.016, 0.029))),
-               ('FadeCentre', vector('FadeCentre', (0.0, 0.0, 0.0))), ('FadeRadii', vector('FadeRadii', (1e4, 2e4, 0.0)))]
+               ('FadeCentre', vector('FadeCentre', (0.0, 0.0, 0.0))), ('FadeRadii', vector('FadeRadii', (1e4, 2e4, 0.0))),
+               # round 14: the reference's FOG_FADE on this layer (light.js followView's fog distances, metres)
+               ('Depth', node(unreal.MaterialExpressionPixelDepth)), ('FogNear', scalar('FogNear', 1e4)), ('FogFar', scalar('FogFar', 2e4))]
         ins += self.fog_inputs(scalar, vector, texobj, white) + self.display_inputs(scalar, node)
         c = self.custom(mat, GROUND_HLSL, ins, T.CMOT_FLOAT4, -800, 0, 'client/atmosphere.js coverMaterial + cloudMaterial')
         rgb, alpha = self.split(mat, c, -450, 0)

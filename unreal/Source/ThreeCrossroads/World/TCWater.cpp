@@ -1,4 +1,5 @@
 #include "World/TCWater.h"
+#include "World/TCFogFrontier.h"
 #include "ThreeCrossroads.h"
 #include "Net/TCMatchState.h"
 #include "Engine/World.h"
@@ -99,7 +100,7 @@ FTCCellFog::~FTCCellFog() = default;
 uint8 FTCCellFog::Level(const FTCMatchState& State, bool bRevealAll, int32 C)
 {
 	// ATCTerrain::CellColor's dimming: in sight 1, explored 0.55, never seen 0.32 (FTCWorldObjectsView uses the same bytes)
-	return bRevealAll || State.CellVisible(C) ? 255 : State.CellExplored(C) ? 140 : 82;
+	return TCFogLook::Byte(State, bRevealAll, C); // round 14: the shared look (fog.js: frontier, lit cells)
 }
 
 void FTCCellFog::Reset(int32 InW, int32 InH)

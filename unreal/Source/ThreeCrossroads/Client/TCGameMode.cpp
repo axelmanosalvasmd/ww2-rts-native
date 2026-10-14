@@ -1,4 +1,5 @@
 #include "Client/TCGameMode.h"
+#include "Client/TCGraphics.h"
 #include "Client/TCCameraPawn.h"
 #include "Client/TCPlayerController.h"
 #include "Client/TCHUD.h"
@@ -88,6 +89,16 @@ void ATCGameMode::BeginPlay()
 	FParse::Value(FCommandLine::Get(), TEXT("TCWaterShots="), WaterShotsDir);
 	// slice 13 lead glue: the cloud shade and the wet ground cover the apron too (atmosphere.js cloudApron, coverApron)
 	if (AActor* ApronActor = Apron.HolderActor()) Atmosphere.AddGroundActor(ApronActor);
+	// round 14 (edge): fog.js's state for every fog consumer, the apron's fog texture, World's unknown ground
+	// -TCFogFrontierOff: the slice 13 fog (three looks from the mask, no unknown ground) for comparisons
+	if (!FParse::Param(FCommandLine::Get(), TEXT("TCFogFrontierOff")))
+	{
+		FogFrontier.Attach(GetWorld());
+		TCFogLook::SetActive(&FogFrontier);
+		Apron.SetFogSource(&FogFrontier);
+		UE_LOG(LogTC, Log, TEXT("fog frontier: reference %s"), FTCFogFrontier::ReferencePin);
+	}
+	else UE_LOG(LogTC, Log, TEXT("fog frontier: off (-TCFogFrontierOff): the three looks from the mask"));
 	UE_LOG(LogTC, Log, TEXT("world objects, lobby settings and saves: reference %s / %s / %s"), FTCWorldObjects::ReferencePin, FTCLobbySettings::ReferencePin, FTCPersistence::ReferencePin);
 
 	const TCHAR* Cmd = FCommandLine::Get();
@@ -96,6 +107,7 @@ void ATCGameMode::BeginPlay()
 	Settings.Room = TEXT("native");
 	Settings.Name = TEXT("Commander");
 	FParse::Value(Cmd, TEXT("TCServer="), Settings.Url);
+	ServerUrl = Settings.Url; // round 14: the lobby backdrop fetches /maps/<name> from this server
 	FParse::Value(Cmd, TEXT("TCRoom="), Settings.Room);
 	FParse::Value(Cmd, TEXT("TCName="), Settings.Name);
 	Settings.bSpectate = FParse::Param(Cmd, TEXT("TCSpectate"));
@@ -205,11 +217,27 @@ void ATCGameMode::BeginPlay()
 	FParse::Value(Cmd, TEXT("TCExitAfter="), ExitAfter);
 	FParse::Value(Cmd, TEXT("TCShotAfter="), ShotAfter);
 	if (!FParse::Value(Cmd, TEXT("TCShotFile="), ShotFile)) ShotFile = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Screenshots/tc-slice.png"));
-	auto Refuse = [this](const FString& Why) { SetupError = Why; UE_LOG(LogTC, Error, TEXT("not connecting: %s"), *Why); };
-	if (bTokenOnCommandLine) return Refuse(TEXT("-TCToken= is refused because the engine logs the command line and other local users can read it with ps. Treat that token as exposed. Use -TCSeat=<label>, -TCTokenFile=<absolute path> or the TC_TOKEN environment variable."));
+	// round 14: -TCTutorial is the lobby's Tutorial button from the command line (a new private Tutorial room)
+	if (TCTutorialEntry::FromCommandLine(Cmd, Settings.Room, Settings.Listing)) UE_LOG(LogTC, Log, TEXT("tutorial: -TCTutorial, a new private Tutorial room %s (hello carries the listing)"), *Settings.Room);
+	TutorialSwitches(Cmd);
+	TokenRequest.Server = Settings.Url;
+	TokenRequest.Room = Settings.Room;
+	TokenRequest.bSpectate = Settings.bSpectate;
+	if (bTokenOnCommandLine) { SetupError = TEXT("-TCToken= is refused because the engine logs the command line and other local users can read it with ps. Treat that token as exposed. Use -TCSeat=<label>, -TCTokenFile=<absolute path> or the TC_TOKEN environment variable."); UE_LOG(LogTC, Error, TEXT("not connecting: %s"), *SetupError); return; }
+	BaseSettings = Settings;
+	BaseSettings.Listing.Reset();
+	BaseSettings.Token.Reset();
+	BaseTokenRequest = TokenRequest;
+	Connect(Settings, TokenRequest);
+}
+
+bool ATCGameMode::Connect(FTCConnection::FSettings Settings, const FTCTokenRequest& InRequest)
+{
+	auto Refuse = [this](const FString& Why) { SetupError = Why; UE_LOG(LogTC, Error, TEXT("not connecting: %s"), *Why); return false; };
 	if (!Settings.Url.StartsWith(TEXT("ws://")) && !Settings.Url.StartsWith(TEXT("wss://"))) return Refuse(TEXT("-TCServer must be a ws:// or wss:// URL"));
 	if (!FTCConnection::ValidRoom(Settings.Room)) return Refuse(TEXT("-TCRoom must be 3 to 12 letters or digits"));
 
+	FTCTokenRequest TokenRequest = InRequest;
 	TokenRequest.Server = Settings.Url;
 	TokenRequest.Room = Settings.Room;
 	TokenRequest.bSpectate = Settings.bSpectate;
@@ -237,6 +265,8 @@ void ATCGameMode::BeginPlay()
 	// state's (Begin(State) attaches it to State); shadow runs it beside the C++ decoder; cpp runs no view.
 	if (FTCRustViewShadow::Requested() && RustShadow.Begin(State)) Connection->OnText = [this](const FString& Text) { RustShadow.Feed(Text); };
 	Connection->Start();
+	SetupError.Reset();
+	return true;
 }
 
 void ATCGameMode::EndPlay(const EEndPlayReason::Type Reason)
@@ -244,12 +274,15 @@ void ATCGameMode::EndPlay(const EEndPlayReason::Type Reason)
 	if (Connection) { Connection->OnMessage = nullptr; Connection->OnOpened = nullptr; Connection->OnText = nullptr; Connection->Stop(); Connection.Reset(); }
 	RustShadow.End();
 	TokenStore.Reset(); // releases the token file's lock
+	Backdrop.Hide(); // round 14
 	WorldView.Detach();
 	GroundPaint.Detach();
 	Railways.Detach();
 	Atmosphere.Detach();
 	Water.Detach();
 	Apron.Detach();
+	TCFogLook::SetActive(nullptr);
+	FogFrontier.Detach();
 	Super::EndPlay(Reason);
 }
 
@@ -275,8 +308,10 @@ void ATCGameMode::ClearMatchPresentation()
 	// map clears the ground's mesh sections (ATCTerrain::ResetFrom with W = H = 0).
 	if (Units) { Units->Draw(State, UnitTable, Terrain, TSet<int32>(), 0.f); Units->Reset(); }
 	if (Terrain) Terrain->ResetFrom(State);
+	WarMap.Clear(); // round 14
 	Water.ResetFrom(State);
 	Apron.ResetFrom(State);
+	FogFrontier.Clear(); FogFrontierSnapshots = -1;
 	State.bMapReset = false;
 	Railways.Reset(State);
 	Atmosphere.StopMatch();
@@ -300,6 +335,7 @@ void ATCGameMode::ClearMatchPresentation()
 	bHasPrevPoints = false; PrevPoints.Reset();
 	bAlertHistoryOpen = false;
 	ClearCombat();
+	TutorialClear();
 	// client/main.js receiveLobby: audio.end() (everything fades out over 0.4 s)
 	if (UTCAudio* A = Audio()) A->ReturnedToLobby();
 	State.DirtyCells.Reset(); State.FogDirtyCells.Reset();
@@ -381,6 +417,7 @@ void ATCGameMode::OnMessage(const FJsonObject& M, int32 Bytes)
 		for (const FTCPlan& P : State.Plans) PlanKinds.Add(P.Id, P.Kind);
 		TakePointAlerts();
 		OnCombatSnapshot(M); // alerts.js (units, losses, air, ready, say), the combat effects and their sounds (Client/TCAlerts.cpp)
+		TutorialSnapshot(M); // round 14: the goal box, banners, damaged buildings, the Tutorial's progress (Client/TCTutorial.cpp)
 		LogObjectives(false);
 		for (FTCLogisticsAlert& A : Logistics.TakeAlerts())
 		{
@@ -404,6 +441,7 @@ void ATCGameMode::OnMessage(const FJsonObject& M, int32 Bytes)
 		const int32 PrevMatch = State.MatchId, PrevYou = State.You, PrevW = State.Map.W, PrevH = State.Map.H;
 		const bool bHadMatch = State.bHasMatch;
 		const FString PrevMap = State.Map.Name;
+		Backdrop.Hide(); // round 14: lobby-view.js hide() frees the backdrop before the match builds its world
 		if (!State.ApplyStart(M)) { UE_LOG(LogTC, Error, TEXT("malformed start (%d bytes) ignored"), Bytes); RustShadow.AfterStart(State, false, false, StartsReceived + 1); return; }
 		Recruit.ApplyStart(M);
 		Build.ApplyStart(M);
@@ -438,7 +476,10 @@ void ATCGameMode::OnMessage(const FJsonObject& M, int32 Bytes)
 		Terrain->ResetFrom(State); State.bMapReset = false;
 		GroundPaint.Bind(Terrain->GroundMaterialInstance()); // the relief draws the paint and its fog (MF_TCGroundPaint)
 		Water.ResetFrom(State);
+		WarMap.Start(State); // round 14: the paper is painted again the next time it shows
 		Apron.ResetFrom(State);
+		// round 14 (edge): fog.js createFog at main.js startGame (the start's mask; none for a spectator of an authored map)
+		FogFrontier.Start(State); FogFrontierSnapshots = State.Snapshots;
 		Railways.Reset(State); Railways.ApplyCells(M); // main.js startGame: createRailways on a World map, railways.cells(m.cells)
 		// slice 13 lead glue: the apron continues the painted ground with the paint's own tinted tiles (apron.js reads
 		// ground.js groundLook().tiles); without them it keeps the reference's flat pre-load colours
@@ -481,6 +522,7 @@ void ATCGameMode::OnMessage(const FJsonObject& M, int32 Bytes)
 		UE_LOG(LogTC, Log, TEXT("start #%d: match %d%s, map '%s' %dx%d%s, seat %d (%s), spawn (%.0f, %.0f), %d bytes, fog %s, cells known %d, selected kept %d"), StartsReceived, State.MatchId,
 			bSameMatch ? TEXT(" (same match: reconnect)") : TEXT(""), *State.Map.Name, State.Map.W, State.Map.H, State.Map.bWorld ? TEXT(" (World: discovered cells only)") : TEXT(""),
 			State.You, SeatNote, State.Spawn.X, State.Spawn.Y, Bytes, State.bFogLifted ? TEXT("lifted") : TEXT("on"), State.Map.Known.CountSetBits(), PC ? PC->Selected.Num() : 0);
+		TutorialStart(); // round 14: objectives.js reset, the Tutorial's progress, the Controls sheet at the first match
 	}
 	else if (T == TEXT("lobby"))
 	{
@@ -801,12 +843,33 @@ void ATCGameMode::Tick(float DeltaSeconds)
 		Lighting->SetWeather(State.Weather.Now);
 		if (State.Wx.bKnown) Lighting->SetShower((float)State.Wx.Rain, (float)State.Wx.Wet);
 		if (LightPC) Lighting->SetCameraDistance(LightPC->ViewDistance());
+		// round 14: the ground layer's FOG_FADE follows the haze's distances (the frame before's; the lighting ticks after)
+		Atmosphere.SetHazeDistances(Lighting->FogNear(), Lighting->FogFar());
 	}
+	// round 14: the lobby's backdrop (client/main.js previewMap -> lobby-view.js show), never during a match; gfx.js Low
+	// hides it (lobby-view.js: "Nothing runs on Graphics Low"), read every frame so the menu's switch applies at once
+	Backdrop.bGraphicsLow = !FTCGraphics::Get().Budget().bLobbyBackdrop;
+	if (!State.bHasMatch && !State.LobbyMap.IsEmpty()) Backdrop.Show(GetWorld(), ServerUrl, State.LobbyMap, State.Mode);
+	else if (State.bHasMatch) Backdrop.Hide();
+	Backdrop.Tick(DeltaSeconds);
 	if (Terrain && State.bHasMatch)
 	{
+		// round 14 (edge): fog.js snapshot() after each snapshot (the flips, the frontier around newly explored ground,
+		// the cells under the delivered units); the cells whose look moved join the fog cells every consumer refreshes
+		if (FogFrontier.HasMap() && State.Snapshots != FogFrontierSnapshots)
+		{
+			FogFrontierSnapshots = State.Snapshots;
+			FogFrontier.Snapshot(State, State.FogDirtyCells, UnitTable);
+			State.FogDirtyCells.Append(FogFrontier.TakeChanged());
+		}
+		// fog.js frame(dt, lift): the match decided on an authored map lifts the fog (ATCTerrain's end reveal)
+		FogFrontier.Frame(DeltaSeconds, Terrain->IsEndRevealed(), State);
 		if (State.DirtyCells.Num() || State.FogDirtyCells.Num())
 		{
 			WorldView.MarkFog(WorldObjects, State.FogDirtyCells); // the pieces on those cells are dimmed like the ground
+			// round 14: map-view.js refresh() on terrain changes; the wash follows fog.js
+			if (State.DirtyCells.Num()) WarMap.MarkTerrain();
+			WarMap.MarkFog(State, State.FogDirtyCells);
 			GroundPaint.MarkFog(State.FogDirtyCells);             // the ground's fog texels fade to their new look
 			Water.MarkCells(State, State.DirtyCells, State.FogDirtyCells);
 			Apron.MarkCells(State, State.DirtyCells, State.FogDirtyCells);
@@ -822,6 +885,9 @@ void ATCGameMode::Tick(float DeltaSeconds)
 		// after the ground: the pieces stand on the heights as drawn
 		WorldObjects.Update(*Terrain, &UnitTable);
 		WorldView.Draw(WorldObjects, State, Terrain);
+		// round 14: the paper war map's fade (map-view.js frame(dt, cam.dist / rig.wide)), after the ground is current
+		if (const ATCPlayerController* MapPC = Cast<ATCPlayerController>(GetWorld()->GetFirstPlayerController()))
+			WarMap.Frame(DeltaSeconds, MapPC->HasWideView() && MapPC->WideDistance() > 0 ? MapPC->ViewDistance() / MapPC->WideDistance() : 0.f, State, Terrain, Terrain->IsEndRevealed());
 		Railways.Frame(DeltaSeconds, State, Terrain); // railways.frame(dt): at most two rebuilds a second
 		// atmosphere.js start at each new match, then update(dt) with the weather row, snapshot wx and the camera target
 		ATCPlayerController* AtmosPC = Cast<ATCPlayerController>(GetWorld()->GetFirstPlayerController());
@@ -844,6 +910,7 @@ void ATCGameMode::Tick(float DeltaSeconds)
 	if (Units && Effects) Units->NoteKilled(Effects->Fx.TakeKilledGone()); // main.js v.killed: a squad killed outright leaves bodies
 	if (Units && State.bHasMatch) Units->Draw(State, UnitTable, Terrain, PC ? PC->Selected : TSet<int32>(), ScreenDt);
 	AudioFrame(ScreenDt, PC);
+	TutorialFrame(ScreenDt); // round 14: objectives.js frame (banner, smoke), Tutorial captures and switches
 	RunVerificationSwitches(Now);
 	RunSlice9Switches(Now);
 	RunSlice10Switches(Now);
@@ -911,6 +978,8 @@ void ATCGameMode::Tick(float DeltaSeconds)
 			WorldObjects.HouseCount(), WorldObjects.ShapeCount(), WorldObjects.PickableCount(), OnUnknown, WorldObjects.Wrecks().Num(), WorldView.SectionsDrawn(), WorldView.TrianglesDrawn(), WorldView.Queued(),
 			WorldObjects.GridMismatches(State), Garrisoned, State.bPaused ? *State.PauseText : TEXT("running"));
 		UE_LOG(LogTC, Log, TEXT("status+++: %s"), *GroundPaint.StatusLine());
+		UE_LOG(LogTC, Log, TEXT("status+++: %s"), *WarMap.StatusLine()); // round 14
+		UE_LOG(LogTC, Log, TEXT("status terrain: %s"), *FogFrontier.StatusLine());
 		// slice 13 lead: the terrain round's views and the recipient-knowledge check (no drawn vertex on an unknown cell)
 		int32 ReliefVerts = 0, ReliefUnowned = 0;
 		const int32 ReliefOnUnknown = Terrain ? Terrain->DrawnOnUnknown(State, &ReliefVerts, &ReliefUnowned) : 0;

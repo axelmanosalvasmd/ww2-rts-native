@@ -154,10 +154,10 @@ float ATCHUD::DrawScoreStrip(UFont* Font, UFont* Big)
 		Centred(FString::Join(TArray<FString>({ Strip.Rate, Strip.Bonus, Strip.Notice }).FilterByPredicate([](const FString& Q) { return !Q.IsEmpty(); }), TEXT("  |  ")), TextC, Font);
 	Centred(Strip.OutBanner, Red, Font);
 	if (Strip.bWeather) Centred(Strip.Weather, Strip.bWeatherTurning ? Brass : DimC, Font);
-	TArray<FString> Goal;
-	FTCObjectives::GoalText(S).ParseIntoArrayLines(Goal);
-	for (const FString& G : Goal) Centred(G, Brass, Font);
-	return Y;
+	// round 14: objectives.js's goal box and collapse banner as objectives.css draws them (FTCScenarioText), under the
+	// strip and its lines
+	const float Bottom = M->ScenarioText.Draw(Canvas, Big, Font, Y - 4.f);
+	return FMath::Max(Y, Bottom + 4.f);
 }
 
 void ATCHUD::DrawCapturePoints(UFont* Font)
@@ -217,7 +217,7 @@ void ATCHUD::DrawCapturePoints(UFont* Font)
 				float TW = 0, TH = 0;
 				LabelSize(Tg, TW, TH, Font, 1.f);
 				DrawRect(WithAlpha(Plate, 0.8f), Top.X - TW / 2 - 4.f, Ly - 1.f, TW + 8.f, LineH);
-				DrawLabel(Tg, Tg == P.Label ? TextC : Red, Top.X - TW / 2, Ly, Font, 1.f);
+				{ FLinearColor Lc = Tg == P.Label ? TextC : Red; Lc.A *= M->WarMap.LabelFade(); DrawLabel(Tg, Lc, Top.X - TW / 2, Ly, Font, 1.f); } // round 14: fadeLabels
 				Ly += LineH;
 			}
 		}
@@ -343,8 +343,8 @@ void ATCHUD::DrawAlertFeed(UFont* Font)
 	const double Now = GetWorld()->GetTimeSeconds();
 	const TArray<FTCAlertEntry>& A = M->AlertHistory();
 	auto Colour = [](const FString& Kind) { return Kind == TEXT("pointWon") ? Brass : Kind == TEXT("pointLost") || Kind == TEXT("attack") ? Red : TextC; };
-	const float Right = Minimap.Rect().bIsValid ? (float)Minimap.Rect().Max.X : Canvas->ClipX - 8.f;
-	float Bottom = Minimap.Rect().bIsValid ? (float)Minimap.Rect().Min.Y - 6.f : Canvas->ClipY - 200.f;
+	const float Right = Minimap.Rect().bIsValid ? ToUi((float)Minimap.Rect().Max.X) : Canvas->ClipX - 8.f;
+	float Bottom = Minimap.Rect().bIsValid ? ToUi((float)Minimap.Rect().Min.Y) - 6.f : Canvas->ClipY - 200.f;
 	// client/alerts.js: up to four lines, each for 6 s, newest at the bottom over the minimap
 	TArray<const FTCAlertEntry*> Shown;
 	for (int32 I = 0; I < A.Num() && Shown.Num() < ATCGameMode::AlertLines; I++) if (Now - A[I].Born < ATCGameMode::AlertLineSeconds) Shown.Add(&A[I]);
@@ -359,7 +359,7 @@ void ATCHUD::DrawAlertFeed(UFont* Font)
 		Bottom -= LineH + 4.f;
 		AddPanel(Right - TW - 2 * PadPx, Bottom, TW + 2 * PadPx, LineH + 2.f, WithAlpha(Plate, 0.85f));
 		DrawShown(L, Colour(Shown[I]->Kind), Right - TW - PadPx, Bottom + 1.f, Font, 1.f);
-		if (I == 0) Buttons.Add({ FBox2D(FVector2D(Right - TW - 2 * PadPx, Bottom), FVector2D(Right, Bottom + LineH + 2.f)), FTCUiCommand(ETCUiAction::Alert), L, true });
+		if (I == 0) Buttons.Add({ ToScreen(FBox2D(FVector2D(Right - TW - 2 * PadPx, Bottom), FVector2D(Right, Bottom + LineH + 2.f))), FTCUiCommand(ETCUiAction::Alert), L, true });
 	}
 	// client/alert-history.js: Alt+H opens the match's alerts with their time; Alt+Left and Alt+Right visit them
 	if (!M->bAlertHistoryOpen) return;

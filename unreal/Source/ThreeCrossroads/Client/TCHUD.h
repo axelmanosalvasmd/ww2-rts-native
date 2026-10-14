@@ -66,9 +66,21 @@ public:
 
 private:
 	struct FButton { FBox2D Rect; FTCUiCommand Command; FString Label; bool bEnabled = true; };
+	// client/hud.js UI scale (#hud { zoom: var(--ui) }): the panels, buttons and text are drawn at UiNow through a canvas
+	// transform, laid out in a window of ClipX / UiNow by ClipY / UiNow; the world's own overlays, the minimap (drawn
+	// at its own size here) and the Controls sheet (a dialog outside #hud) are not. Buttons and panels are recorded in
+	// screen pixels, so the controller's hit tests need no change.
+	float UiNow = 1.f;
+	bool bUiPushed = false;
+	float UiOldClipX = 0.f, UiOldClipY = 0.f;
+	void BeginUi(float Scale);
+	void EndUi();
+	FBox2D ToScreen(const FBox2D& R) const { return FBox2D(R.Min * UiNow, R.Max * UiNow); }
+	float ToUi(float ScreenPixels) const { return ScreenPixels / UiNow; }
 	TArray<FButton> Buttons;
 	TArray<FBox2D> Panels;
 	int32 Frames = 0;
+	float BandTop = 0.f; // round 14: the score strip's bottom this frame (camera.js band)
 	// Every text the HUD shows is measured and drawn through these two: client/i18n.js t() (TC_T, Client/TCLocale.h) is
 	// applied here, so a Spanish label is measured as it is drawn, while what the HUD stores (button labels for hit tests
 	// and logs), compares and logs stays English.

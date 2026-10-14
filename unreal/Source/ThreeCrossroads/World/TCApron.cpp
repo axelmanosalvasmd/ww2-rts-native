@@ -1,6 +1,7 @@
 #include "World/TCApron.h"
 #include "World/TCWater.h"
 #include "World/TCWorldObjects.h"
+#include "World/TCFogFrontier.h"
 #include "ThreeCrossroads.h"
 #include "Net/TCMatchState.h"
 #include "Engine/World.h"
@@ -228,7 +229,8 @@ void FTCApron::BindMaterial()
 	for (int32 M = 0; M < 6 && M < TileTex.Num(); M++) D->SetTextureParameterValue(TCApronView::TileNames[M], TileTex[M].Get());
 	D->SetTextureParameterValue(TEXT("Cells"), CellTex.Get());
 	D->SetTextureParameterValue(TEXT("Noise"), NoiseTex.Get());
-	D->SetTextureParameterValue(TEXT("Fog"), Fog.Texture());
+	D->SetTextureParameterValue(TEXT("Fog"), FogTexture());
+	BoundFog = FogTexture();
 	if (TileMetres.Num() == 6)
 	{
 		D->SetVectorParameterValue(TEXT("MetersA"), FLinearColor(TileMetres[0], TileMetres[1], TileMetres[2], 0));
@@ -241,6 +243,19 @@ void FTCApron::BindMaterial()
 	D->SetScalarParameterValue(TEXT("FogGamma"), FogGamma);
 	D->SetScalarParameterValue(TEXT("Unseen"), 82.f / 255.f); // never seen: as dark as ATCTerrain's unexplored ground
 	if (Mesh->GetNumSections() > 0) Mesh->SetMaterial(0, D);
+}
+
+void FTCApron::SetFogSource(const FTCFogFrontier* InSource)
+{
+	FogSource = InSource;
+	if (MID.IsValid()) MID->SetTextureParameterValue(TEXT("Fog"), FogTexture());
+}
+
+UTexture* FTCApron::FogTexture() const
+{
+	// the frontier's texture once it holds this map (the same layout as FTCCellFog: a texel per cell, multiplier bytes)
+	if (FogSource && FogSource->Texture() && FogSource->MapW() == W && FogSource->MapH() == H) return FogSource->Texture();
+	return Fog.Texture();
 }
 
 void FTCApron::MarkCells(const FTCMatchState& State, const TSet<int32>& Shaped, const TSet<int32>& Fogged)
@@ -265,6 +280,12 @@ void FTCApron::Flush(const FTCMatchState& State, bool bRevealAll)
 	if (bRevealAll != bLastReveal) { bLastReveal = bRevealAll; bFogAll = true; }
 	if (bFogAll) { Fog.Update(State, bRevealAll, nullptr); bFogAll = false; FogCells.Reset(); }
 	else if (FogCells.Num()) { Fog.Update(State, bRevealAll, &FogCells); FogCells.Reset(); }
+	// the frontier's texture is made at its start, after this apron's material was bound: bind it once it is there
+	if (MID.IsValid())
+	{
+		UTexture* Want = FogTexture();
+		if (Want != BoundFog.Get()) { MID->SetTextureParameterValue(TEXT("Fog"), Want); BoundFog = Want; }
+	}
 	if (bCellsDirty)
 	{
 		if (bWorld) FieldCells = TCApronCore::Fields(Source); // World fields follow the ground discovered so far

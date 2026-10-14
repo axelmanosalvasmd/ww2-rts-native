@@ -16,6 +16,18 @@
 // The engine-free part (namespace TCApronCore) compiles alone with TC_APRON_CORE_ONLY defined, so the standalone
 // harness (unreal/Tools/water/harness) holds it to the Node oracle that runs the pinned apron.js and ground.js.
 //
+// The land past the edge for a player and a spectator (round 14, read from the pinned code and checked in the live
+// browser): the apron is the same ground for everyone; only its fog overlay differs. fogOverlayShader samples the
+// map's fog texture at the clamped edge (so the edge cells' look carries outward) and eases it to unseen (alpha 185)
+// between 6 and 32 m past the edge. A player sees the edge in its own fog; a spectator of an authored map has no fog
+// mask (fog.js: lifted, alpha 0), so the land is lit at the edge and darkens over those 26 m; on World the edge keeps
+// the frontier's darkness. The flat grey band from the edge that the reference's browser spectator showed in slice 13
+// is not that design: lobby-view.js rebuilds its backdrop when a lobby message arrives during a match (a spectator
+// joining always gets one after its start, and so does everyone in the room), calls setFogMap(null) and so leaves
+// every fog consumer the 1 x 1 empty fog with a size of 1 m: the overlay is then at unseen from the first metre past
+// the edge (and the same rebuild empties the match's map pieces, structures.js's shared state). The apron here keeps
+// the design; the side by sides avoid that rebuild in the browser (round 14 edge REPORT.md).
+//
 // Recipient knowledge: the apron reads the drawn ground's height along the map edge (the caller's height function,
 // which never samples an undiscovered World cell) and the edge cells' characters and levels as this client knows them
 // (an undiscovered cell reads as open ground at level 0, which is what the start map says of it, so nothing is
@@ -396,6 +408,7 @@ class UTexture;
 class UTexture2D;
 class FTCMatchState;
 class FTCWorldObjects;
+class FTCFogFrontier;
 
 // The apron as this client draws it (client/apron.js through main.js): one procedural mesh around the map with the
 // M_TCApron material (/Game/Water), its own fog of war texture and cell texture. Feed it next to ATCTerrain:
@@ -424,6 +437,10 @@ public:
 	float FogGamma = 1.f;
 	// Optional: the map's cell states and physical cells (FTCWorldObjects); without it, each cell is in its start state.
 	const FTCWorldObjects* Objects = nullptr;
+	// Optional (round 14): the fog of war as fog.js keeps it (World's frontier darkening, the cells under units lit
+	// until the next snapshot, the quarter-second fade). Set, the apron reads its texture, as fogOverlayShader reads the
+	// map's own fog texture; unset, it keeps its own three-look fog (FTCCellFog).
+	void SetFogSource(const FTCFogFrontier* InSource);
 
 	// The six tiles the paint blends (grass, dirt, mud, field, road, water) and the metres each covers. Until set,
 	// the flat colours the reference shows before its textures load. bSRGB: the textures decode sRGB (M_TCApron encodes
@@ -457,6 +474,9 @@ private:
 	bool bWorld = false, bEdgeDirty = false, bCellsDirty = false, bFogAll = true, bLastReveal = false;
 	TSet<int32> CellsChanged, FogCells;
 	FTCCellFog Fog;
+	const FTCFogFrontier* FogSource = nullptr;
+	TWeakObjectPtr<UTexture> BoundFog;
+	UTexture* FogTexture() const;
 
 	TWeakObjectPtr<AActor> Actor;
 	TStrongObjectPtr<UProceduralMeshComponent> Mesh;

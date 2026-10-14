@@ -101,7 +101,7 @@ void ATCGameMode::RunSlice11Switches(double Now)
 	if (MoveOwnAfter >= 0 && !bMovedOwn && PC && InMatch >= MoveOwnAfter && State.CanOrder())
 	{
 		double CX, CZ;
-		const TArray<int32> Ids = ArmyIds(CX, CZ);
+		const TArray<int32> Ids = ArmyIds(CX, CZ, bAttackWithTrucks); // round 14: -TCAttackWithTrucks sends the trucks too
 		if (Ids.Num())
 		{
 			bMovedOwn = true;

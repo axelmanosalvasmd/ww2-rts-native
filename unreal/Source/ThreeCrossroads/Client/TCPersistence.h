@@ -230,3 +230,69 @@ private:
 	FTCPersistenceStatus LastRequest;
 	TArray<FTCPersistenceFeedback> Pending;
 };
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Saved preferences (CLI-124): the reference keeps each in the browser's localStorage under its own key; this client
+// keeps them in one place, the user settings file (GGameUserSettingsIni, section [ThreeCrossroads]), one ini key per
+// reference key. The keys this client already saved before keep their ini names and formats (EdgeScroll, PanSpeed,
+// CoverPreview, Volume, Language), so nothing saved earlier is lost. Values the reference stores as strings are stored
+// as the same strings ('low', 'off', '1', '95'), and read back by the reference's own rule (the Read* functions).
+class THREECROSSROADS_API FTCSettingsStore
+{
+public:
+	static const TCHAR* const Section;   // "ThreeCrossroads"
+	struct FEntry
+	{
+		const TCHAR* Reference;  // the localStorage key ('ww2-gfx')
+		const TCHAR* Ini;        // the ini key ('Graphics')
+		const TCHAR* Source;     // where the reference reads and writes it
+		const TCHAR* Rule;       // how the reference reads it back
+	};
+	static TArrayView<const FEntry> Entries();
+	static const FEntry* Find(const FString& ReferenceKey);
+
+	// The game's store over the user settings file.
+	static FTCSettingsStore& Game();
+	// A store over another ini file (tests); empty: memory only.
+	explicit FTCSettingsStore(const FString& IniFile);
+
+	// The raw stored value of a reference key (unset: empty optional), as the ini holds it.
+	TOptional<FString> Get(const FString& ReferenceKey) const;
+	// Store a value (the reference's setItem) and flush the file. False for a key not in the table or a failed write.
+	bool Set(const FString& ReferenceKey, const FString& Value);
+	bool Remove(const FString& ReferenceKey);
+	// Writes the file now (Set does it already).
+	bool Flush() const;
+	const FString& File() const { return Ini; }
+
+	// The reference's read rules, from a stored value (or none).
+	// hud.js: scale.value = getItem('ww2-ui-scale') ?? 100, through <input type=range min=75 max=150 step=5>: a value
+	// that is not an HTML float becomes the midpoint 112.5, then clamped to [75, 150], then snapped to 75 + 5k (a tie goes
+	// up). Measured in Chromium 152 (round-14 evidence, ui-scale-chromium.txt).
+	static int32 ReadUIScale(const TOptional<FString>& Stored);
+	static constexpr int32 UIScaleMin = 75, UIScaleMax = 150, UIScaleStep = 5, UIScaleDefault = 100;
+	static FString UIScaleLabel(int32 Percent) { return FString::Printf(TEXT("%d%%"), Percent); } // #uiScaleVal
+	static const TCHAR* UIScaleTitle() { return TEXT("UI scale"); }
+	static const TCHAR* UIScaleTip() { return TEXT("Size of the panels, buttons and text over the battlefield"); }
+	// audio.js: parseFloat(getItem('ww2-volume')) clamped to [0, 1] when finite, else 0 if 'ww2-muted' is '1', else 0.8
+	static double ReadVolume(const TOptional<FString>& Stored, const TOptional<FString>& Muted);
+	// i18n.js: 'es' or 'en' when stored, else the system language (es* -> 'es'), else 'en'
+	static FString ReadLanguage(const TOptional<FString>& Stored, const FString& SystemLanguage);
+	// camera.js: edge on unless '0'; pan /^[012]$/ else 1
+	static bool ReadEdge(const TOptional<FString>& Stored);
+	static int32 ReadPan(const TOptional<FString>& Stored);
+	// cover-preview.js on unless '0'; gfx.js 'low' is Low; gore on unless 'off'; main.js controls seen when '1'
+	static bool ReadOnUnless(const TOptional<FString>& Stored, const TCHAR* Off) { return !Stored.IsSet() || *Stored != Off; }
+	static bool ReadIs(const TOptional<FString>& Stored, const TCHAR* On) { return Stored.IsSet() && *Stored == On; }
+
+	// This client's typed view of the keys it already saved before (their ini formats: bools as True/False).
+	int32 UIScale() const { return ReadUIScale(Get(TEXT("ww2-ui-scale"))); }
+	bool SetUIScale(int32 Percent);       // the slider's change: the sanitized value as its string
+	// The scale the HUD draws at (hud.js --ui = value / 100)
+	static float UIScaleFactor(int32 Percent) { return Percent / 100.f; }
+
+private:
+	FString Ini;
+	bool bMemoryOnly = false;
+	TMap<FString, FString> Memory;
+};

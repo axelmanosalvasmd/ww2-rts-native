@@ -18,6 +18,7 @@ target/
 /unreal/Content/Terrain/
 /unreal/Content/Water/
 /unreal/Content/Atmosphere/
+/unreal/Content/WarMap/
 /unreal/Content/Collections/
 /unreal/Content/Developers/
 *.sln

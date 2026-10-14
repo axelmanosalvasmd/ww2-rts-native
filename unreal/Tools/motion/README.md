@@ -43,8 +43,21 @@ bash unreal/Tools/motion/run.sh --unreal   # also: the crowd materials, a scratc
   `compare.mjs` (tolerances in its header).
 - `ue-check/`: `TCMotionCheck` commandlet for the scratch project: material compile, the crowd in every posture near
   and far, camouflage, bodies, vehicles from the catalog in motion, the catalog's far figure beside the crowd's.
-- `wheel-track.hlsl`: the wheel and track vertex motion as a material node, with the UV layout the importer would
-  need. Not wired (see below).
+- `make-crowd-look.py` (with `crowd-shared.py`): the near crowd in the model masters' look (round 14). The two HLSL
+  nodes and every parameter they read are taken from the patched `M_TCModel` at run time; the crowd's own data feed
+  them as `infantry-authored.js` builds a soldier (tunic tint over the cloth mask, wool or plain, the atlas with
+  `modelUV.z = 1 + cloth`) plus the grime `unit-models.js mergeParts` bakes per vertex (`LOOKS.soldier`), computed on
+  the standing build (keyframe 0). Writes `M_InfantryCrowdLook(Faded)`, `M_InfantryCrowdKitLook(Faded)` and their
+  instances. `UTCSoldierCrowd` prefers them (`-TCCrowdAtlasLook` keeps the old ones, for side by sides).
+- `make-wheel-tracks.py`: the tracked hulls again with the reference's wheel and track data (round 14; parity row
+  CLI-104: wheel spin and track scroll). For each catalog hull whose reference glb has
+  `_WHEELPIVOT`, it copies the importer's normalized glb (same vertices, checked position by position and by sha256)
+  with UV4-7 = wheel pivot, (wheel side, radius), (track phase, table row), (link side, floor), imports it with the
+  importer's Interchange settings to `/Game/Models/Motion/Tracks/`, copies the patched `M_TCModel` to
+  `M_TCModelTracks` with the world position offset and turned normal of `wheelMaterial`/`trackShader`, and writes
+  `Content/Models/Motion/WheelTracks.json` (the loops in their table rows, the hull copies). 21 hulls, 11 loops.
+- `wheels/shoot-wheels.mjs`: the reference half of the wheel comparison: `../look`'s page on a copy that sets every
+  wheel mesh's `wheelTravel` to a given travel and turn; the Unreal half is `TCLookCompare` with `-TCWheelTravel=m,rad`.
 
 ## Custom data the crowd components carry (`TCCrowdData`)
 
@@ -115,12 +128,18 @@ Crowd->SquadAlive(U.Id, Alive);
 Then the renderer's own `Figure()`, `KitFor()`, `Figures`, `Kits` and the far branch of `DrawSquadMen` can go: the
 crowd draws near men exactly as `Figure()` did (same assets, same keyframe texture), plus faded and far ones.
 
+## Wheels and tracks (round 14)
+
+`ATCUnitRenderer::ApplyWheelTracks` gives a catalog hull listed in `WheelTracks.json` its copy, `M_TCModelTracks`'s
+instance as a dynamic instance with `TrackPaths` = `FTCTrackPaths::CreateTexture()` (the loops registered in the
+file's rows; a row that does not land where the tool put it switches the copies off) and 10 floats of custom data;
+`AppendPartData` adds `FTCPartMotion::WheelTravel` and `WheelTurn` as floats 8 and 9. Checked by
+`ThreeCrossroads.Motion.WheelTracks` (every copy: the catalog hull's triangles and bounds, 8 texture channels in the
+mesh and its render data, wheel and link vertices, rows) and by pictures against the reference at the same travel.
+`-TCNoWheelTracks` draws the catalog hulls.
+
 ## Not drawn yet, and why
 
-- **Wheel spin and track scrolling.** The motion is ported and checked (`FTCPartMotion::WheelTravel/WheelTurn`,
-  `FTCTrackPaths`), but the imported hull meshes keep UV0-3 only, so they carry no wheel pivots or track data, and
-  `M_TCModel` has no vertex motion. Both belong to `unreal/Tools/models/import-models.py`; `wheel-track.hlsl` is the
-  node and the layout to add (UV4-7, custom data 8-9, a path table texture).
 - **The far figure's surface layers.** `M_InfantryFar` paints the reference's vertex colors (shape and colors match
   the catalog's far mesh exactly: same bounds, side by side in `render-far-compare.png`) with one roughness (0.9, the
   reference's `INFANTRY_PAINT`), without the wool/steel texture layers and metalness of `M_TCModel`.

@@ -1,4 +1,7 @@
 #include "Client/TCHUD.h"
+#include "Client/TCGraphics.h"
+#include "Client/TCPersistence.h"
+#include "Client/TCTutorial.h"
 #include "Client/TCGameMode.h"
 #include "Client/TCOrders.h"
 #include "Client/TCRecruitment.h"
@@ -163,14 +166,33 @@ float ATCHUD::Button(UFont* Font, float X, float Y, const FString& Label, const 
 	const FBox2D Rect(FVector2D(X, Y), FVector2D(X + FMath::Max(TW + 2 * Pad, MinWidth), Y + TH + Pad));
 	DrawRect(Fill, Rect.Min.X, Rect.Min.Y, Rect.GetSize().X, Rect.GetSize().Y);
 	DrawLabel(Label, bEnabled ? Text : Dim, X + Pad, Y + Pad / 2, Font, 1.f);
-	Buttons.Add({ Rect, Command, Label, bEnabled });
+	Buttons.Add({ ToScreen(Rect), Command, Label, bEnabled });
 	return Rect.Max.X + Pad;
 }
 
 void ATCHUD::AddPanel(float X, float Y, float W, float H, const FLinearColor& Colour)
 {
 	DrawRect(Colour, X, Y, W, H);
-	Panels.Add(FBox2D(FVector2D(X, Y), FVector2D(X + W, Y + H)));
+	Panels.Add(ToScreen(FBox2D(FVector2D(X, Y), FVector2D(X + W, Y + H))));
+}
+
+void ATCHUD::BeginUi(float Scale)
+{
+	if (bUiPushed || !Canvas || !Canvas->Canvas) return;
+	UiNow = FMath::Max(0.1f, Scale);
+	Canvas->Canvas->PushRelativeTransform(FScaleMatrix(FVector(UiNow, UiNow, 1.f)));
+	UiOldClipX = Canvas->ClipX; UiOldClipY = Canvas->ClipY;
+	Canvas->ClipX = UiOldClipX / UiNow; Canvas->ClipY = UiOldClipY / UiNow;
+	bUiPushed = true;
+}
+
+void ATCHUD::EndUi()
+{
+	if (!bUiPushed) return;
+	Canvas->Canvas->PopTransform();
+	Canvas->ClipX = UiOldClipX; Canvas->ClipY = UiOldClipY;
+	UiNow = 1.f;
+	bUiPushed = false;
 }
 
 bool ATCHUD::ButtonAt(FVector2D Pixel, ETCUiAction& OutAction) const
@@ -261,6 +283,9 @@ float ATCHUD::DrawLobby(UFont* Font, float Y)
 	// client/index.html: the page header's language picker (#langSel, title "Language"), there for everyone
 	if (const ATCPlayerController* LPC = Cast<ATCPlayerController>(GetOwningPlayerController()))
 		AddButtons({ FItem{ LPC->LanguageLabel(), FTCUiCommand(ETCUiAction::Language), true, TEXT("Language") } });
+	// round 14: client/public-lobby.html's Tutorial button (this client has no room directory, CLI-01: it sits in the
+	// room's lobby), for anyone outside a match
+	if (bLobby) AddButtons({ FItem{ TCTutorialEntry::Label(), FTCUiCommand(ETCUiAction::Tutorial), true, TCTutorialEntry::Title() } });
 	if (L.HasLobby() && bLobby)
 	{
 		const FString Info = FTCLobbySettings::ModeInfo(R.Mode);
@@ -356,7 +381,7 @@ float ATCHUD::DrawLobby(UFont* Font, float Y)
 	FVector2D Mouse(-1, -1);
 	float MX, MY;
 	const bool bMouse = GetOwningPlayerController() && GetOwningPlayerController()->GetMousePosition(MX, MY);
-	if (bMouse) Mouse = FVector2D(MX, MY);
+	if (bMouse) Mouse = FVector2D(MX, MY) / UiNow; // in the scaled panels' own pixels
 	FString Hover;
 	float RowY = Y + Pad;
 	for (const FLine& Ln : Lines)
@@ -620,6 +645,10 @@ float ATCHUD::DrawMatchPanel(UFont* Font)
 	// client has no game menu, so they sit with the Orders for every match, selection or not
 	Orders.Add({ PC->VolumeLabel(), FTCUiCommand(ETCUiAction::Volume), true, ButtonFill, TEXT("Effects, voices and alerts. M mutes (right click: quieter)") });
 	Orders.Add({ PC->LanguageLabel(), FTCUiCommand(ETCUiAction::Language), true, ButtonFill, TEXT("Language") });
+	// client/light.js: the menu's Graphics and Gore buttons; client/index.html: the UI scale slider (Client/TCGraphics.h)
+	Orders.Add({ FTCGraphics::MenuLabel(FTCGraphics::Get().Level()), FTCUiCommand(ETCUiAction::Graphics), true, FTCGraphics::Get().IsLow() ? TabOpen : ButtonFill, FTCGraphics::MenuTip() });
+	Orders.Add({ FTCGraphics::GoreLabel(FTCGraphics::Get().Gore()), FTCUiCommand(ETCUiAction::Gore), true, ButtonFill, FTCGraphics::GoreTip() });
+	Orders.Add({ PC->UiScaleLabel(), FTCUiCommand(ETCUiAction::UiScale), true, ButtonFill, FTCSettingsStore::UIScaleTip() });
 	// client/main.js renderMatchMenu: the host's Pause (Resume) match, Save match and End match (this client has no
 	// match menu: they sit with the Orders, and a watching host gets them too, as the browser's menu shows them)
 	if (S.bAmHost && S.RoomState == TEXT("play"))
@@ -649,7 +678,7 @@ float ATCHUD::DrawMatchPanel(UFont* Font)
 	FVector2D Mouse(-1, -1);
 	float MX, MY;
 	const bool bMouse = PC->GetMousePosition(MX, MY);
-	if (bMouse) Mouse = FVector2D(MX, MY);
+	if (bMouse) Mouse = FVector2D(MX, MY) / UiNow; // in the scaled panels' own pixels
 	const float H = Rows.Num() * Line + ButtonRows.Num() * RowH + (ButtonRows.Num() ? Line : 0.f) + 2 * Pad, Y0 = Canvas->ClipY - H - Gap;
 	AddPanel(8.f, Y0, W, H, Panel);
 	float Y = Y0 + Pad;
@@ -690,7 +719,7 @@ void ATCHUD::DrawRecruitPanel(UFont* Font, float Left, float Bottom)
 	// selection gets the logistics card, drawn with the selection in the match panel
 	const FTCBuildCard BuildCard = Card.Kind == ETCCardKind::NotPorted ? M->Build.BuildCard(S, PC->Selected) : FTCBuildCard();
 	if (Card.Kind == ETCCardKind::NotPorted && !BuildCard.bShown && FTCLogistics::ResumeShown(S, PC->Selected)) return;
-	const float Right = Left + FMath::Max(300.f, FMath::Min(720.f, (Minimap.Rect().bIsValid ? (float)Minimap.Rect().Min.X - 12.f : Canvas->ClipX - Gap) - Left));
+	const float Right = Left + FMath::Max(300.f, FMath::Min(720.f, (Minimap.Rect().bIsValid ? ToUi((float)Minimap.Rect().Min.X) - 12.f : Canvas->ClipX - Gap) - Left));
 	const float Width = Right - Left;
 
 	// client/hud.js drawRecruit: selecting one finished own Production Building opens the group it makes most of
@@ -850,7 +879,7 @@ void ATCHUD::DrawRecruitPanel(UFont* Font, float Left, float Bottom)
 	FVector2D Mouse(-1, -1);
 	float MX, MY;
 	const bool bMouse = PC->GetMousePosition(MX, MY);
-	if (bMouse) Mouse = FVector2D(MX, MY);
+	if (bMouse) Mouse = FVector2D(MX, MY) / UiNow; // in the scaled panels' own pixels
 	const float RowH = Line + Pad + 4.f;
 	const float H = 2 * Pad + Lines.Num() * Line + Rows.Num() * RowH + Line;
 	const float Top = Bottom - H;
@@ -919,7 +948,8 @@ void ATCHUD::DrawWorldOverlays(UFont* Font)
 	auto Label = [&](FVector2D At, const FString& L, const FLinearColor& C)
 	{
 		const FVector Sc = Project(ATCTerrain::ToWorld(At.X, At.Y, T.HeightAt(At.X, At.Y) + 1.f));
-		if (Sc.Z > 0) DrawLabel(L, C, Sc.X + 6.f, Sc.Y - 6.f, Font, 1.f);
+		FLinearColor Lc = C; Lc.A *= M->WarMap.LabelFade(); // round 14: markers.js fadeLabels while the paper war map comes
+		if (Sc.Z > 0) DrawLabel(L, Lc, Sc.X + 6.f, Sc.Y - 6.f, Font, 1.f);
 	};
 	// client/world-regions.js and markers.js, World: each region's border on the ground in its team's colour, its claim
 	// ring with the capture arc, and the label. Only regions whose claim point projects within three viewports of the
@@ -1172,6 +1202,7 @@ void ATCHUD::DrawHUD()
 	Super::DrawHUD();
 	Buttons.Reset();
 	Panels.Reset();
+	EndUi(); // a frame starts unscaled
 	Frames++;
 	ATCGameMode* M = GetWorld()->GetAuthGameMode<ATCGameMode>();
 	ATCPlayerController* PC = Cast<ATCPlayerController>(GetOwningPlayerController());
@@ -1180,6 +1211,8 @@ void ATCHUD::DrawHUD()
 	UFont* Big = GEngine->GetMediumFont() ? GEngine->GetMediumFont() : Font;
 	const FTCMatchState& S = M->State;
 	const bool bStrip = S.bHasMatch && S.Snapshots > 0;
+	// round 14: the lobby's background over its battlefield (index.html #overlay #16191b, the backdrop at opacity 0.5)
+	if (!S.bHasMatch) M->Backdrop.DrawDim(Canvas);
 	TArray<FString> Lines;
 	// the connection, room, seat and tick lines and the key reminder are this client's own diagnostics, with no browser
 	// text: drawn as they are, neither translated nor logged as Spanish gaps (Diagnostics counts them from the top)
@@ -1216,6 +1249,8 @@ void ATCHUD::DrawHUD()
 	}
 	if (!Diagnostics) Diagnostics = Lines.Num();
 	if (!S.PauseText.IsEmpty()) Lines.Add(S.PauseText);
+	// client/light.js notice(): the drop to Low's message in the status line for 6 s
+	if (!PC->GraphicsNotice.IsEmpty() && PC->GraphicsNoticeAt >= 0 && GetWorld()->GetRealTimeSeconds() - PC->GraphicsNoticeAt < FTCGraphics::NoticeSeconds) Lines.Add(PC->GraphicsNotice);
 	int32 KeyLine = INDEX_NONE;
 	if (S.bHasMatch)
 	{
@@ -1232,7 +1267,11 @@ void ATCHUD::DrawHUD()
 		View.YawDegrees = PC->ViewYaw();
 		Minimap.ViewFromCanvas(Canvas, M->Terrain, View);
 		DrawWorldOverlays(Font);
+		// round 14: the paper war map over the world and its markers, under every panel (client/map-view.js)
+		M->WarMap.Draw(Canvas, *M, *PC);
+		BeginUi(FTCSettingsStore::UIScaleFactor(PC->UiScalePercent));
 		const float StripBottom = DrawScoreStrip(Font, Big);
+		BandTop = bStrip ? StripBottom * UiNow : 0.f; // round 14: camera.js band, #top (screen pixels: the strip is drawn at the UI scale)
 		// client/camera.js showFollow: the follow chip under the strip
 		const FString Chip = PC->FollowChip();
 		if (!Chip.IsEmpty())
@@ -1247,6 +1286,7 @@ void ATCHUD::DrawHUD()
 		const float StripLeft = Canvas->ClipX / 2 - 360.f;
 		if (StripLeft < 620.f) Y = FMath::Max(Y, StripBottom + Line + 6.f);
 	}
+	else BeginUi(FTCSettingsStore::UIScaleFactor(PC->UiScalePercent));
 	for (int32 I = 0; I < Lines.Num(); I++)
 	{
 		if (I < Diagnostics || I == KeyLine) DrawShown(Lines[I], Text, 12.f, Y, Font, 1.f);
@@ -1268,13 +1308,21 @@ void ATCHUD::DrawHUD()
 	if (S.bHasMatch)
 	{
 		// the minimap (bottom right): the recruit card fits between it and the match panel
+		const float Ui = UiNow;
+		EndUi();
 		Minimap.Draw(Canvas, S, M->UnitTable, PC->Selected, View);
 		DrawMinimapOverlays();
+		BeginUi(Ui);
 		const float PanelTop = DrawMatchPanel(Font);
 		// beside the match panel when the window leaves room for the cards, else above it
-		const float Beside = 8.f + 560.f + Gap, RoomRight = Minimap.Rect().bIsValid ? (float)Minimap.Rect().Min.X - 12.f : Canvas->ClipX - Gap;
+		const float Beside = 8.f + 560.f + Gap, RoomRight = Minimap.Rect().bIsValid ? ToUi((float)Minimap.Rect().Min.X) - 12.f : Canvas->ClipX - Gap;
+		const int32 PanelsBeforeRecruit = Panels.Num();
 		if (RoomRight - Beside >= 360.f) DrawRecruitPanel(Font, Beside, Canvas->ClipY - Gap);
 		else DrawRecruitPanel(Font, 8.f, PanelTop - 4.f);
+		// round 14: camera.js band: from the top panels down to the recruit bar (#buy), the whole height when it is empty
+		float RecruitTop = Canvas->ClipY * UiNow; // screen pixels, as the panels are kept
+		for (int32 K = PanelsBeforeRecruit; K < Panels.Num(); K++) RecruitTop = FMath::Min(RecruitTop, (float)Panels[K].Min.Y);
+		PC->SetClearBand(BandTop, RecruitTop);
 		// client/alerts.js: the alert feed over the minimap and the Alt+H history
 		DrawAlertFeed(Font);
 		DrawEpilogue(Font, Big);
@@ -1286,6 +1334,7 @@ void ATCHUD::DrawHUD()
 		// client/report.js: the result card beside the lobby after a decided match
 		DrawMatchReport(Font, Y + 4.f);
 	}
+	EndUi();
 	DrawControlsSheet(Font, Big);
 
 	if (PC->bDragging && PC->bDragMoved)

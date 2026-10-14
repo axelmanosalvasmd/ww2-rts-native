@@ -1,9 +1,11 @@
 #include "World/TCWorldObjects.h"
+#include "Client/TCGraphics.h"
 #include "ThreeCrossroads.h"
 #include "Net/TCMatchState.h"
 #include "World/TCTerrain.h"
 #include "Client/TCUnitTable.h"
 #include "Client/TCCoverPreview.h"
+#include "World/TCFogFrontier.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/SceneComponent.h"
@@ -989,12 +991,16 @@ void FTCWorldObjectsView::LoadAssets()
 		if (const FStaticMeshRenderData* R = Out.Mesh->GetRenderData()) if (R->LODResources.Num()) Out.Triangles = R->LODResources[0].GetNumTriangles();
 		Out.bLoaded = true;
 	};
+	// round 14 lead glue: Graphics Low (Client/TCGraphics.h) as structures.js and props.js read gfx.low when they build:
+	// no sandbag, chunk or rail shadows, no tree or bush shadows. Read when the assets load (a later switch of level
+	// applies from the next process start)
+	const bool bLowShadows = !FTCGraphics::Get().Budget().bPropShadows;
 	PieceAssets.SetNum(TCWorldCore::PieceCount);
 	for (int32 K = 0; K < TCWorldCore::PieceCount; K++)
 	{
 		const TCWorldCore::EPiece Kind = (TCWorldCore::EPiece)K;
 		Load(FString::Printf(TEXT("piece/%s|-1"), ANSI_TO_TCHAR(TCWorldCore::PieceName(Kind))), PieceAssets[K]);
-		PieceAssets[K].bShadow = bShadows && TCWorldCore::PieceShadow(Kind, false);
+		PieceAssets[K].bShadow = bShadows && TCWorldCore::PieceShadow(Kind, bLowShadows);
 		PieceAssets[K].bTrim = IsTrim(Kind);
 	}
 	PropAssets.SetNum(TCScatterCore::PropCount);
@@ -1002,8 +1008,8 @@ void FTCWorldObjectsView::LoadAssets()
 	{
 		const TCScatterCore::EProp Kind = (TCScatterCore::EProp)K;
 		Load(FTCScatter::CatalogKey(Kind), PropAssets[K]);
-		// props.js refresh: grass and crops are too low to shade anything
-		PropAssets[K].bShadow = bShadows && Kind != TCScatterCore::EProp::Grass && Kind != TCScatterCore::EProp::Crop;
+		// props.js refresh: grass and crops are too low to shade anything; Low drops tree and bush shadows too
+		PropAssets[K].bShadow = bShadows && !bLowShadows && Kind != TCScatterCore::EProp::Grass && Kind != TCScatterCore::EProp::Crop;
 	}
 	int32 Loaded = 0, World = 0;
 	for (const FKindAsset& A : PieceAssets) { Loaded += A.bLoaded ? 1 : 0; World += A.bWorldMaterials ? 1 : 0; }
@@ -1135,7 +1141,8 @@ void FTCWorldObjectsView::WriteFog(const FTCWorldObjects& Model, const FTCMatchS
 	if (!T || FogBytes.Num() != FogW * FogH) return;
 	// ATCTerrain::CellColor's dimming: in sight 1, explored 0.55, never seen 0.32; none once an authored match is decided
 	const bool bReveal = Ground && Ground->IsEndRevealed();
-	auto Byte = [&](int32 C) -> uint8 { return bReveal || State.CellVisible(C) ? 255 : State.CellExplored(C) ? 140 : 82; };
+	// round 14: the shared look (fog.js: World's frontier darkening and the lit cells under units included)
+	auto Byte = [&](int32 C) -> uint8 { return TCFogLook::Byte(State, bReveal, C); };
 	bool bChanged = false;
 	if (Cells) { for (const int32 C : *Cells) if (FogBytes.IsValidIndex(C)) { const uint8 B = Byte(C); bChanged |= FogBytes[C] != B; FogBytes[C] = B; } }
 	else { for (int32 C = 0; C < FogBytes.Num(); C++) FogBytes[C] = Byte(C); bChanged = true; }

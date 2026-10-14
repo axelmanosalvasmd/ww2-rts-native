@@ -390,6 +390,9 @@ public:
 	// More ground for the shade and the wet ground to lie on beyond the terrain's own meshes (the apron past the map edge,
 	// cloudApron and coverApron): every procedural mesh section of the actor is mirrored.
 	void AddGroundActor(AActor* Ground);
+	// Round 14: light.js followView's fog distances (ATCLighting FogNear, FogFar, metres) for the ground layer's FOG_FADE
+	// (the cover and cloud shade fade with the haze, as atmosphere.js coverMaterial and cloudMaterial do).
+	void SetHazeDistances(float Near, float Far);
 	// main.js renderFrame: update(dt) after the weather row (setWeather), snapshot wx (setWind, setRain) and the camera
 	// target the falls follow (main.js cam: Focus in reference metres).
 	void Update(float Dt, const FTCMatchState& State, const ATCTerrain* Terrain, APlayerController* PC, FVector2D Focus);

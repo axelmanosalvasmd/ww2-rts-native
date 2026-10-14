@@ -1,4 +1,5 @@
 #include "Client/TCLighting.h"
+#include "Client/TCGraphics.h"
 #include "Misc/App.h"
 #include "Client/TCUnitRenderer.h"
 #include "Client/TCUnitTable.h"
@@ -317,14 +318,24 @@ namespace TCLook
 		return Base ? UMaterialInstanceDynamic::Create(Base, Outer) : nullptr;
 	}
 
-	void SetPost(UMaterialInstanceDynamic* Post, float Exposure, float FogNear, float FogFar, const FLinearColor& HazeLinear)
+	void SetPost(UMaterialInstanceDynamic* Post, float Exposure, float FogNear, float FogFar, const FLinearColor& HazeLinear, bool bHazeBeforeTone)
 	{
 		if (!Post) return;
 		Post->SetScalarParameterValue(TEXT("Exposure"), Exposure);
 		Post->SetScalarParameterValue(TEXT("FogNear"), FogNear);
 		Post->SetScalarParameterValue(TEXT("FogFar"), FogFar);
-		// WebGLMaterials refreshFogUniforms and WebGLBackground setClear: the haze in the output color space
+		// WebGLMaterials refreshFogUniforms and WebGLBackground setClear: drawn to the canvas, the haze is in the output
+		// color space (getUnlitUniformColorSpace: renderer.outputColorSpace); drawn into the composer's target it is the
+		// working (linear) color, mixed before OutputPass tone-maps (round 14; M_TCLookPost's HazeBeforeTone)
 		Post->SetVectorParameterValue(TEXT("Haze"), ToDisplay(HazeLinear));
+		Post->SetVectorParameterValue(TEXT("HazeLinear"), FLinearColor(HazeLinear.R, HazeLinear.G, HazeLinear.B, 1.f));
+		Post->SetScalarParameterValue(TEXT("HazeBeforeTone"), bHazeBeforeTone ? 1.f : 0.f);
+	}
+
+	FLinearColor HazeOnScreen(const FLinearColor& HazeLinear, float Exposure, bool bHazeBeforeTone)
+	{
+		const FLinearColor D = bHazeBeforeTone ? ToneMapped(HazeLinear, Exposure) : ToDisplay(HazeLinear);
+		return FLinearColor(D.R * 255.f, D.G * 255.f, D.B * 255.f, 1.f);
 	}
 
 	void SetCollection(UWorld* World, const FTCMood& M, float EnvIntensity, float EnvYaw, bool bOn)
@@ -432,6 +443,11 @@ void ATCLighting::BeginPlay()
 	PostMaterial = TCLook::MakePost(this);
 	// -TCLookOutputLinear: the post process writes linear color, for a viewport whose target sRGB-encodes in hardware
 	bOutputLinear = FParse::Param(FCommandLine::Get(), TEXT("TCLookOutputLinear"));
+	// round 14: Graphics High's composer mixes the haze in linear light before the tone curve; -TCHazeAfterTone
+	// draws the direct path's order (Graphics Low, ?ao=0), as the earlier slices did
+	bHazeAfterToneForced = FParse::Param(FCommandLine::Get(), TEXT("TCHazeAfterTone"));
+	bHazeBeforeTone = !bHazeAfterToneForced;
+	UE_LOG(LogTCLook, Log, TEXT("look: the haze mixes %s"), bHazeBeforeTone ? TEXT("in linear light before the tone curve (Graphics High: light.js's composer)") : TEXT("after the tone curve, in output space (-TCHazeAfterTone: the direct path)"));
 	if (PostMaterial) PostMaterial->SetScalarParameterValue(TEXT("OutputLinear"), bOutputLinear ? 1.f : 0.f);
 	// gfx.js High: the AO pass (light.js AO.mix 0.85); the engine's applies to the sky light only
 	TCLook::LockPostProcess(Post->Settings, PostMaterial, 0.85f);
@@ -485,7 +501,23 @@ void ATCLighting::Apply(bool bForceSky)
 	Sun->SetLightColor(Look.Sun);
 	Sun->SetShadowAmount(FMath::Clamp(Look.Shadow, 0.f, 1.f));
 	TCLook::MatchUnitSun(UnitSun, Sun);
-	const float Env = TCLook::EnvironmentIntensity(Look.SunI);
+	// light.js applyGfx: scene.environment = low ? null : the PMREM sky (Client/TCGraphics.h)
+	EnvLevel = (int32)FTCGraphics::Get().Level();
+	// round 14 lead glue: light.js renderFrame draws High through the composer (the GTAO pass, the haze mixed in linear
+	// light before the tone curve) and Low straight to the canvas (no AO pass, the haze after the curve)
+	{
+		const FTCGraphicsBudget& Gfx = FTCGraphics::Get().Budget();
+		SetHazeBeforeTone(Gfx.bAmbientOcclusion);
+		if (Post && (bAoApplied < 0 || bAoApplied != (int32)Gfx.bAmbientOcclusion))
+		{
+			bAoApplied = (int32)Gfx.bAmbientOcclusion;
+			Post->Settings.bOverride_AmbientOcclusionIntensity = true;
+			Post->Settings.AmbientOcclusionIntensity = Gfx.bAmbientOcclusion ? 0.85f : 0.f;
+			UE_LOG(LogTCLook, Log, TEXT("look: graphics %s: the AO pass %s, the haze mixes %s"), LexToString(FTCGraphics::Get().Level()), Gfx.bAmbientOcclusion ? TEXT("on (0.85)") : TEXT("off"),
+				bHazeBeforeTone ? TEXT("before the tone curve") : TEXT("after the tone curve"));
+		}
+	}
+	const float Env = FTCGraphics::Get().Budget().bEnvironment ? TCLook::EnvironmentIntensity(Look.SunI) : 0.f;
 	TCLook::SetCollection(GetWorld(), Look, Env, Yaw, TCLook::IndirectInMaterials());
 	// the sky light's cube is rebuilt only when what it holds moved by more than half a percent
 	const bool bSkyMoved = SkyEnv < 0.f || FMath::Abs(Env - SkyEnv) > 0.005f * SkyEnv || !SkyTop.Equals(Look.Top * Look.HemiI, 0.002f) || !SkyBottom.Equals(Look.Bottom * Look.HemiI, 0.002f);
@@ -561,6 +593,8 @@ void ATCLighting::Tick(float Dt)
 		HazeNow = FMath::Lerp(HazeNow, HazeGoal, K);
 		Apply(false);
 	}
+	// gfx.onChange(applyGfx): a new graphics level relights at once (the environment on or off, the sky cube with it)
+	else if (EnvLevel != (int32)FTCGraphics::Get().Level()) Apply(true);
 	if (!bViewportLogged && GEngine && GEngine->GameViewport && GEngine->GameViewport->Viewport)
 	{
 		bViewportLogged = true;
@@ -580,7 +614,7 @@ void ATCLighting::Tick(float Dt)
 	}
 	LastFogNear = Dist * 0.6f / Look.HazeK;
 	LastFogFar = Dist * 3.8f / Look.HazeK;
-	TCLook::SetPost(PostMaterial, Look.Exposure, LastFogNear, LastFogFar, Look.Haze);
+	TCLook::SetPost(PostMaterial, Look.Exposure, LastFogNear, LastFogFar, Look.Haze, bHazeBeforeTone);
 }
 
 // ------------------------------------------------------------------------------------------------- the comparison
@@ -1306,4 +1340,79 @@ bool FTCLookReferenceTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("environment below the horizon"), Rgb(OutdoorEnvironment(FVector(0, -1, 0)), FLinearColor(0.11f, 0.092f, 0.064f), 1e-5f));
 	return true;
 }
+// Round 14: the haze per mood and weather against a Node run of the pinned client/moods.js (MOODS, WEATHER_LOOK) with
+// atmosphere.js blend() and applyMood() and light.js followView() restated (haze-oracle.mjs in the round 14 edge
+// evidence, with three r186's own Color). Per row: hazeK, the haze hex light.js receives, the fog at a 140 m camera
+// distance and the haze as the canvas shows it on Graphics High, where the composer tone-maps it (0-255). The live
+// browser read snow mood, snow weather at 140 m as near 48, far 304, #c7cdd2.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCLookHazeTest, "ThreeCrossroads.Look.Haze", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+bool FTCLookHazeTest::RunTest(const FString& Parameters)
+{
+	using namespace TCLook;
+	struct FRow { const TCHAR* Mood; const TCHAR* Weather; float HazeK; uint32 Hex; float Exposure; float Near140, Far140; float High[3]; };
+	static const FRow Rows[] = {
+		{ TEXT("day"), TEXT("clear"), 1.00000000f, 0xb9bdbc, 0.900f, 84.0000000f, 532.000000f, { 189.3812f, 191.8648f, 191.2456f } },
+		{ TEXT("day"), TEXT("fog"), 2.40000000f, 0xc5c8c4, 0.900f, 35.0000000f, 221.666667f, { 197.3063f, 198.9314f, 196.7426f } },
+		{ TEXT("day"), TEXT("rain"), 1.60000000f, 0xa3a9aa, 0.900f, 52.5000000f, 332.500000f, { 171.6596f, 176.3753f, 177.1396f } },
+		{ TEXT("day"), TEXT("mud"), 1.15000000f, 0xb3b4b0, 0.900f, 73.0434783f, 462.608696f, { 184.6988f, 185.3802f, 182.6050f } },
+		{ TEXT("day"), TEXT("snow"), 1.25000000f, 0xc7cbcd, 0.900f, 67.2000000f, 425.600000f, { 198.6231f, 200.7123f, 201.7335f } },
+		{ TEXT("golden"), TEXT("clear"), 1.15000000f, 0xcdb08f, 0.950f, 73.0434783f, 462.608696f, { 204.8254f, 186.2353f, 160.1474f } },
+		{ TEXT("golden"), TEXT("fog"), 2.76000000f, 0xcac5ba, 0.950f, 30.4347826f, 192.753623f, { 202.7634f, 200.0889f, 193.8834f } },
+		{ TEXT("golden"), TEXT("rain"), 1.84000000f, 0xaea295, 0.950f, 45.6521739f, 289.130435f, { 183.5612f, 174.0632f, 162.9266f } },
+		{ TEXT("golden"), TEXT("mud"), 1.32250000f, 0xc1aa8f, 0.950f, 63.5160681f, 402.268431f, { 197.4069f, 181.2726f, 158.9534f } },
+		{ TEXT("golden"), TEXT("snow"), 1.43750000f, 0xd4c4b5, 0.950f, 58.4347826f, 370.086957f, { 207.9689f, 199.6668f, 190.9589f } },
+		{ TEXT("dawn"), TEXT("clear"), 1.35000000f, 0xcdc9c1, 1.000f, 62.2222222f, 394.074074f, { 206.9534f, 204.9960f, 200.9147f } },
+		{ TEXT("dawn"), TEXT("fog"), 3.24000000f, 0xcacbc5, 1.000f, 25.9259259f, 164.197531f, { 205.5480f, 206.0234f, 203.0632f } },
+		{ TEXT("dawn"), TEXT("rain"), 2.16000000f, 0xaeafad, 1.000f, 38.8888889f, 246.296296f, { 187.3077f, 187.9930f, 186.6125f } },
+		{ TEXT("dawn"), TEXT("mud"), 1.55250000f, 0xc1bdb4, 1.000f, 54.1062802f, 342.673108f, { 200.1537f, 197.8649f, 192.4846f } },
+		{ TEXT("dawn"), TEXT("snow"), 1.68750000f, 0xd4d3d0, 1.000f, 49.7777778f, 315.259259f, { 210.5599f, 210.1279f, 208.8146f } },
+		{ TEXT("overcast"), TEXT("clear"), 1.25000000f, 0xa8aba6, 1.000f, 67.2000000f, 425.600000f, { 182.6284f, 184.8046f, 181.1252f } },
+		{ TEXT("overcast"), TEXT("fog"), 3.00000000f, 0xc1c4bf, 1.000f, 28.0000000f, 177.333333f, { 200.4872f, 202.0760f, 199.3857f } },
+		{ TEXT("overcast"), TEXT("rain"), 2.00000000f, 0x9a9fa0, 1.000f, 42.0000000f, 266.000000f, { 170.2351f, 174.4318f, 175.2515f } },
+		{ TEXT("overcast"), TEXT("mud"), 1.43750000f, 0xa6a7a0, 1.000f, 58.4347826f, 370.086957f, { 180.7878f, 181.5346f, 176.0911f } },
+		{ TEXT("overcast"), TEXT("snow"), 1.56250000f, 0xbec1c1, 1.000f, 53.7600000f, 340.480000f, { 198.6525f, 200.3023f, 200.3002f } },
+		{ TEXT("snow"), TEXT("clear"), 1.40000000f, 0xb9bfc5, 0.950f, 60.0000000f, 380.000000f, { 192.7557f, 196.2693f, 199.6372f } },
+		{ TEXT("snow"), TEXT("fog"), 3.36000000f, 0xc5c8c6, 0.950f, 25.0000000f, 158.333333f, { 200.2139f, 201.7796f, 200.7342f } },
+		{ TEXT("snow"), TEXT("rain"), 2.24000000f, 0xa3aaaf, 0.950f, 37.5000000f, 237.500000f, { 175.4385f, 180.7475f, 184.3898f } },
+		{ TEXT("snow"), TEXT("mud"), 1.61000000f, 0xb3b5b7, 0.950f, 52.1739130f, 330.434783f, { 188.1054f, 189.4177f, 190.7111f } },
+		{ TEXT("snow"), TEXT("snow"), 1.75000000f, 0xc7cdd2, 0.950f, 48.0000000f, 304.000000f, { 201.6250f, 204.5760f, 206.9391f } },
+		{ TEXT("dust"), TEXT("clear"), 1.30000000f, 0xcdb895, 0.950f, 64.6153846f, 409.230769f, { 204.6037f, 191.8860f, 166.3150f } },
+		{ TEXT("dust"), TEXT("fog"), 3.12000000f, 0xcac6bb, 0.950f, 26.9230769f, 170.512821f, { 202.7950f, 200.6694f, 194.5386f } },
+		{ TEXT("dust"), TEXT("rain"), 2.08000000f, 0xaea698, 0.950f, 40.3846154f, 255.769231f, { 183.6831f, 177.5210f, 165.9752f } },
+		{ TEXT("dust"), TEXT("mud"), 1.49500000f, 0xc1b094, 0.950f, 56.1872910f, 355.852843f, { 197.3361f, 185.9076f, 164.1046f } },
+		{ TEXT("dust"), TEXT("snow"), 1.62500000f, 0xd4c8b8, 0.950f, 51.6923077f, 327.384615f, { 207.9842f, 201.9497f, 193.0642f } },
+	};
+	int32 Off = 0;
+	for (const FRow& R : Rows)
+	{
+		const FTCMood* M = FindMood(FName(R.Mood));
+		if (!M) { AddError(FString::Printf(TEXT("no mood %s"), R.Mood)); Off++; continue; }
+		FTCWeatherLook Goal;
+		FLinearColor Haze;
+		WeatherGoal(*M, R.Weather, 0.f, 0.f, Goal, Haze);
+		const FTCMood A = Applied(*M, Goal, Haze);
+		const float Near = 140.f * 0.6f / A.HazeK, Far = 140.f * 3.8f / A.HazeK;
+		const FLinearColor S = HazeOnScreen(A.Haze, A.Exposure, true);
+		const bool bOk = FMath::IsNearlyEqual(A.HazeK, R.HazeK, 1e-5f) && A.HazeHex == R.Hex && FMath::IsNearlyEqual(A.Exposure, R.Exposure, 1e-6f)
+			&& FMath::IsNearlyEqual(Near, R.Near140, 1e-3f) && FMath::IsNearlyEqual(Far, R.Far140, 1e-3f)
+			&& FMath::Abs(S.R - R.High[0]) < 0.05f && FMath::Abs(S.G - R.High[1]) < 0.05f && FMath::Abs(S.B - R.High[2]) < 0.05f;
+		if (!bOk)
+		{
+			Off++;
+			AddError(FString::Printf(TEXT("%s/%s: hazeK %.5f (%.5f), hex %06x (%06x), fog %.2f-%.2f (%.2f-%.2f), on screen %.2f,%.2f,%.2f (%.2f,%.2f,%.2f)"),
+				R.Mood, R.Weather, A.HazeK, R.HazeK, A.HazeHex, R.Hex, Near, Far, R.Near140, R.Far140, S.R, S.G, S.B, R.High[0], R.High[1], R.High[2]));
+		}
+		// Low (the direct path): the haze's own bytes
+		const FLinearColor L = HazeOnScreen(A.Haze, A.Exposure, false);
+		if (FMath::Abs(L.R - (float)((R.Hex >> 16) & 255)) > 0.51f || FMath::Abs(L.G - (float)((R.Hex >> 8) & 255)) > 0.51f || FMath::Abs(L.B - (float)(R.Hex & 255)) > 0.51f)
+		{
+			Off++;
+			AddError(FString::Printf(TEXT("%s/%s: Low haze %.2f,%.2f,%.2f"), R.Mood, R.Weather, L.R, L.G, L.B));
+		}
+	}
+	TestEqual(TEXT("mood and weather rows off the reference"), Off, 0);
+	TestEqual(TEXT("rows"), (int32)UE_ARRAY_COUNT(Rows), 30);
+	return true;
+}
+
 #endif // WITH_DEV_AUTOMATION_TESTS

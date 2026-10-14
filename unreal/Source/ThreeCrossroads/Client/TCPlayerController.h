@@ -120,6 +120,11 @@ enum class ETCUiAction : uint8
 	// Slice 10
 	Language,    // the language picker (client/index.html #langSel, i18n.js setLang): English or Spanish, saved
 	Volume,      // the menu's Volume (client/audio.js bind): left click 10 points up, right click 10 down, saved
+	// Round 14 (Client/TCGraphics.h, Client/TCPersistence.h FTCSettingsStore)
+	Graphics,    // the menu's Graphics: High or Low (client/light.js gfxBtn, gfx.js set), saved
+	Gore,        // the menu's Gore: On or Off (client/light.js goreBtn, gfx.js setGore), saved
+	UiScale,     // the menu's UI scale slider 75% to 150% (client/hud.js uiScale): left click 5 up, right click 5 down, saved
+	Tutorial,    // lobby: the Tutorial button (client/public-lobby.js): a new private Tutorial room (ATCGameMode::EnterTutorialRoom)
 };
 const TCHAR* LexToString(ETCUiAction Action);
 
@@ -277,6 +282,13 @@ public:
 	// The map's corners on screen as the engine projects them and as the widest-view fit's model does, at the camera's
 	// pose now, with the viewport size: the evidence that the fit measures what is drawn.
 	FString FramingCheck() const;
+	// round 14 (client/camera.js band): the clear band between the HUD's top panels and its recruit bar, in viewport
+	// pixels, reported by the HUD every frame. The widest view and FrameOn read the copy taken when the browser measures
+	// it (a start, a wheel notch, a jump to a point, a window resize): the whole window when it leaves under 30%.
+	// The browser's top panels exist from the start; here the score strip comes with the first snapshot, so the band is
+	// measured again once when it first appears.
+	void SetClearBand(float Top, float Bottom) { if (LiveBand.X <= 0 && Top > 0) bBandStale = true; LiveBand = FVector2D(Top, Bottom); }
+	FVector2D ClearBand() const { return Band; }
 
 	// Gap 13 hooks, wired by ATCGameMode (WireController) to its alert feed and history and the decoded plan rows. Each
 	// is optional; an unwired hook makes its key fall back as described.
@@ -295,6 +307,9 @@ public:
 	FString FollowChip() const;
 	// The Controls sheet (F1) is open: the HUD draws TCKeys::ControlsSheet() while this is set.
 	bool bControlsSheetOpen = false;
+	// Round 14 (CLI-127, client/main.js controlsSheet pointerdown): a press on the sheet while it opened as onboarding
+	// closes it and is swallowed (with its release). True when it was taken.
+	bool OnboardingPress();
 	// The camera intro is gliding (client/camera.js rig.intro).
 	bool IntroActive() const { return Intro.IsActive(); }
 	// The menu's settings (client/camera.js preferences): the button labels 'Edge scroll: On' and 'Pan speed: Normal'.
@@ -306,6 +321,13 @@ public:
 	FString LanguageLabel() const;
 	// "Volume: 80%" (client/index.html: the menu's Volume slider and its number)
 	FString VolumeLabel() const;
+	// "UI scale 100%" (client/index.html: the slider's label and its number #uiScaleVal); the HUD draws at UiScale / 100
+	FString UiScaleLabel() const;
+	int32 UiScalePercent = 100;
+	// client/light.js notice(): the automatic drop to Low's message, shown for 6 s (English; the HUD translates it)
+	FString GraphicsNotice;
+	double GraphicsNoticeAt = -1.0;
+	FDelegateHandle GraphicsChangedHandle;
 	// client/main.js blip(kind) and bark(voice) (client/audio.js ui and voice): Ui 'click', 'recruit' or 'error' (a
 	// numeric tone clicks), Voice 'move', 'attack', 'retreat', 'fire' or 'lost'; either may be null. Nothing plays
 	// without the sound subsystem or an audio device.
@@ -458,6 +480,10 @@ private:
 	// camera key (Shift+Q, Shift+E, a card letter on W, A, S, D, Q or E) does not also pan or turn. Until released.
 	TSet<FKey> ChordKeys;
 	FWideView Wide;
+	FVector2D LiveBand = FVector2D(0, 0), Band = FVector2D(0, 0);
+	bool bBandStale = true;
+	FIntPoint BandViewport = FIntPoint(0, 0);
+	void TakeBand(int32 VX, int32 VY);
 	// the pointer's pixel at the last gesture update (client/main.js mousemove fires only when it moves)
 	FVector2D GestureLast = FVector2D(-1, -1);
 	// IssueOrder is dispatching an attack-move gesture's or aim click's cursor, which holds only its ground

@@ -29,6 +29,9 @@ public:
 		FString Name;
 		FString Token;        // the seat's key across reconnects; never logged (see Net/TCToken.h for where it lives)
 		bool bSpectate = false;
+		// client/main.js hello listing: { public, title, tutorial }. Set only for a room this client creates (round 14:
+		// the lobby's Tutorial button, -TCTutorial); server.js reads it when the hello makes a new room.
+		TSharedPtr<FJsonObject> Listing;
 	};
 
 	static constexpr int32 MaxSendBytes = 16 * 1024; // server.js WebSocketServer maxPayload, in bytes

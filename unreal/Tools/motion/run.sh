@@ -4,8 +4,9 @@
 #
 #   bash unreal/Tools/motion/run.sh            oracles (rigOf joints, skinning, squad followers, the motion scenario)
 #                                              and the far-figure export into unreal/Content/Models/Motion
-#   bash unreal/Tools/motion/run.sh --unreal   also: the crowd materials (make-materials.py on a content-only host
-#                                              whose Content/Models is the real one), a scratch C++ project compiling
+#   bash unreal/Tools/motion/run.sh --unreal   also: the crowd materials (make-materials.py, make-crowd-look.py) and the
+#                                              tracked hulls (make-wheel-tracks.py) on a content-only host whose
+#                                              Content/Models is the real one, a scratch C++ project compiling
 #                                              copies of TCInfantryRig, TCUnitMotion and TCModelLibrary with the check
 #                                              commandlet, its automation tests and the offscreen render
 #
@@ -78,6 +79,17 @@ ln -sfn "$REPO/unreal/Content/Models" "$H/Content/Models"
 MOTION_LOG="$EVIDENCE/materials.json" nice -n 10 "$UE_ROOT/Engine/Binaries/Linux/UnrealEditor-Cmd" "$H/MotionHost.uproject" -run=pythonscript \
   -script="$HERE/make-materials.py" -unattended -nop4 -nosplash -nullrhi > "$SCRATCH/materials.log" 2>&1
 python3 -c "import json,sys; d=json.load(open('$EVIDENCE/materials.json')); print(len(d['assets']), 'materials'); sys.exit(1 if d['errors'] else 0)"
+
+echo "== the near crowd in the model masters' look, and the tracked hulls with wheel and track data (same host)"
+# make-crowd-look.py reads the patched M_TCModel (import-models.py, then look/make-look-assets.py) and import_infantry.py's
+# instances; make-wheel-tracks.py reads Content/Models/ImportProvenance.json and the glbs under unreal/Saved (ModelExport
+# from export-reference-models.mjs, ModelImport from import-models.py), checked by sha256 against the provenance
+MOTION_LOG="$EVIDENCE/crowd-look.json" nice -n 10 "$UE_ROOT/Engine/Binaries/Linux/UnrealEditor-Cmd" "$H/MotionHost.uproject" -run=pythonscript \
+  -script="$HERE/make-crowd-look.py" -unattended -nop4 -nosplash -nullrhi > "$SCRATCH/crowd-look.log" 2>&1
+python3 -c "import json,sys; d=json.load(open('$EVIDENCE/crowd-look.json')); print(len(d['assets']), 'crowd look assets'); sys.exit(1 if d['errors'] else 0)"
+MOTION_LOG="$EVIDENCE/wheel-tracks.json" MOTION_WORK="$SCRATCH/tracks" MOTION_SAVED="$REPO/unreal/Saved" nice -n 10 "$UE_ROOT/Engine/Binaries/Linux/UnrealEditor-Cmd" \
+  "$H/MotionHost.uproject" -run=pythonscript -script="$HERE/make-wheel-tracks.py" -unattended -nop4 -nosplash -nullrhi > "$SCRATCH/wheel-tracks.log" 2>&1
+python3 -c "import json,sys; d=json.load(open('$EVIDENCE/wheel-tracks.json')); print(d['catalog'], 'tracked hulls,', d['loops'], 'loops'); sys.exit(1 if d['errors'] or not d['catalog'] else 0)"
 
 echo "== scratch C++ project (copies of the client files and the check commandlet)"
 U="$SCRATCH/ue/MotionCheck"; S="$U/Source/ThreeCrossroads"

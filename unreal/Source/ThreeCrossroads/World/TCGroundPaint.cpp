@@ -1,6 +1,7 @@
 #include "World/TCGroundPaint.h"
 #include "ThreeCrossroads.h"
 #include "Net/TCMatchState.h"
+#include "World/TCFogFrontier.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
 #include "Engine/Texture2D.h"
@@ -28,6 +29,7 @@ namespace TCGroundPaintImpl
 	// client/fog.js: a change of look completes within a quarter second; the native looks are multipliers
 	constexpr float FogSeen = 1.f, FogExplored = 0.55f, FogDark = 0.32f;
 	constexpr float FogRate = (FogSeen - FogDark) / 0.25f;
+	static_assert(FogSeen > FogExplored && FogExplored > FogDark, "TCFogLook::Multiplier returns these for the three looks");
 	constexpr int32 RubbleCapacity = 2048, CraterCapacity = 1536; // rubble-decals.js, crater-decals.js CAPACITY
 
 	bool Num(const TSharedPtr<FJsonValue>& V, double& Out)
@@ -452,7 +454,8 @@ void FTCGroundPaint::FogTick(const FTCMatchState& State, float DeltaSeconds, boo
 	const int32 W = Core.MapW(), H = Core.MapH(), N = W * H;
 	UTexture2D* F = FogTex.Get();
 	if (!F || FogWant.Num() != N) return;
-	auto Look = [&](int32 C) { return bEndRevealed || State.CellVisible(C) ? FogSeen : State.CellExplored(C) ? FogExplored : FogDark; };
+	// round 14: the shared look (fog.js: World's frontier darkening and the cells under units lit until the next snapshot)
+	auto Look = [&](int32 C) { return TCFogLook::Multiplier(State, bEndRevealed, C); };
 	auto Touch = [&](int32 C)
 	{
 		const float T = Look(C);

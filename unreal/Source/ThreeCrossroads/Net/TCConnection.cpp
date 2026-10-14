@@ -104,9 +104,11 @@ void FTCConnection::Open()
 		// and which client this is. The reference server reads only t, name and token (server.js) and ignores them.
 		Hello->SetNumberField(TEXT("proto"), FTCConnection::ProtocolVersion);
 		Hello->SetStringField(TEXT("client"), FTCConnection::ClientId);
+		// round 14: the room's listing (client/main.js hello listing), e.g. the Tutorial button's private Tutorial room
+		if (Self->Settings.Listing.IsValid()) Hello->SetObjectField(TEXT("listing"), Self->Settings.Listing);
 		const ETCSendResult Sent = Self->TrySend(Hello);
 		if (Sent != ETCSendResult::Sent) { UE_LOG(LogTC, Warning, TEXT("hello %s"), LexToString(Sent)); } // never the token
-		else { UE_LOG(LogTC, Log, TEXT("hello sent: proto %d, client %s%s"), FTCConnection::ProtocolVersion, FTCConnection::ClientId, bSpectate ? TEXT(", spectate") : TEXT("")); }
+		else { UE_LOG(LogTC, Log, TEXT("hello sent: proto %d, client %s%s%s"), FTCConnection::ProtocolVersion, FTCConnection::ClientId, bSpectate ? TEXT(", spectate") : TEXT(""), Self->Settings.Listing.IsValid() ? TEXT(", listing") : TEXT("")); }
 	});
 	Current->OnConnectionError().AddLambda([Weak, Gen](const FString& Error)
 	{

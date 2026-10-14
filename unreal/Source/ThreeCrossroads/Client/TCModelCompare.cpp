@@ -334,7 +334,9 @@ bool FTCUnitModelsRendererTest::RunTest(const FString& Parameters)
 		if (!Ism || !Ism->GetStaticMesh() || !Ism->GetInstanceCount()) continue;
 		const FString Mesh = Ism->GetStaticMesh()->GetName();
 		if (Mesh == TEXT("SM_medium_0_turret")) bTurret = Ism->GetInstanceTransform(0, Turret, true);
-		if (Mesh == TEXT("SM_medium_0_hull")) { bHull = Ism->GetInstanceTransform(0, Hull, true); HullData = TArray<float>(Ism->PerInstanceSMCustomData.GetData(), Ism->NumCustomDataFloats); }
+		// the Sherman's hull is its copy with the reference's wheel and track data when unreal/Tools/motion/make-wheel-tracks.py
+		// made one (two more floats: wheel-motion.js wheelTravel), else the catalog's
+		if (Mesh == TEXT("SM_medium_0_hull") || Mesh == TEXT("SM_medium_0_hull_Tracks")) { bHull = Ism->GetInstanceTransform(0, Hull, true); HullData = TArray<float>(Ism->PerInstanceSMCustomData.GetData(), Ism->NumCustomDataFloats); }
 		if (Mesh == TEXT("SM_barracks_0_body")) bBody = Ism->GetInstanceTransform(0, Body, true);
 	}
 	TestTrue(TEXT("Sherman hull and turret instanced"), bTurret && bHull);
@@ -342,8 +344,10 @@ bool FTCUnitModelsRendererTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("hull faces +X"), Hull.GetRotation().RotateVector(FVector::ForwardVector).Equals(FVector(1, 0, 0), 1e-3));
 	TestTrue(TEXT("turret on its ring above the hull"), Turret.GetLocation().Z > 100.0 && FMath::Abs(Turret.GetLocation().X - 15.0) < 1.0);
 	const FLinearColor Seat0 = R->Models().SeatColor(0);
-	TestTrue(TEXT("hull custom data carries the owner's color"), HullData.Num() == TCModelData::Count && FMath::IsNearlyEqual(HullData[TCModelData::OwnerR], Seat0.R, 1e-5f) && FMath::IsNearlyEqual(HullData[TCModelData::OwnerB], Seat0.B, 1e-5f));
-	TestTrue(TEXT("hull custom data carries the US vehicle paint"), HullData.Num() == TCModelData::Count && FMath::IsNearlyEqual(HullData[TCModelData::VehicleR], R->Models().VehiclePaint(0).R, 1e-5f));
+	TestTrue(TEXT("hull custom data: the catalog's floats, plus travel and turn on the wheel copy"), HullData.Num() == TCModelData::Count || (R->WheelTracksLoaded() && HullData.Num() == FTCWheelTracks::Floats));
+	if (HullData.Num() == FTCWheelTracks::Floats) TestTrue(TEXT("a hull that has not moved has rolled nothing"), HullData[FTCWheelTracks::TravelFloat] == 0.f && HullData[FTCWheelTracks::TurnFloat] == 0.f);
+	TestTrue(TEXT("hull custom data carries the owner's color"), HullData.Num() >= TCModelData::Count && FMath::IsNearlyEqual(HullData[TCModelData::OwnerR], Seat0.R, 1e-5f) && FMath::IsNearlyEqual(HullData[TCModelData::OwnerB], Seat0.B, 1e-5f));
+	TestTrue(TEXT("hull custom data carries the US vehicle paint"), HullData.Num() >= TCModelData::Count && FMath::IsNearlyEqual(HullData[TCModelData::VehicleR], R->Models().VehiclePaint(0).R, 1e-5f));
 	TestTrue(TEXT("barracks half built: 0.575 of its height"), bBody && FMath::IsNearlyEqual(Body.GetScale3D().Z, 0.575, 1e-4));
 
 	// far: the squad and the gun crew swap to the far figure, the gun to its far mesh

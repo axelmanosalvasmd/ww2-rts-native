@@ -1,6 +1,7 @@
 #include "World/TCTerrain.h"
 #include "ThreeCrossroads.h"
 #include "Net/TCMatchState.h"
+#include "World/TCFogFrontier.h"
 #include "ProceduralMeshComponent.h"
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -227,7 +228,7 @@ int32 ATCTerrain::DrawnOnUnknown(const FTCMatchState& State, int32* OutVertices,
 FLinearColor ATCTerrain::CellColor(const FTCMatchState& State, int32 C) const
 {
 	const FColor Base = TCTerrainImpl::CharColor(State.Map.Chars.IsValidIndex(C) ? State.Map.Chars[C] : '.');
-	const float Fog = bEndRevealed || State.CellVisible(C) ? 1.f : State.CellExplored(C) ? 0.55f : 0.32f;
+	const float Fog = TCFogLook::Multiplier(State, bEndRevealed, C); // round 14: the shared look (fog.js)
 	const FColor Lit(FMath::Clamp(int32(Base.R * Fog), 0, 255), FMath::Clamp(int32(Base.G * Fog), 0, 255), FMath::Clamp(int32(Base.B * Fog), 0, 255));
 	return FLinearColor(Lit);
 }

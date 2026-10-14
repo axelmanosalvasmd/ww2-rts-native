@@ -6,10 +6,21 @@
 // switched off through its own localStorage key first. After unreal/Tools/atmosphere/compare/watch-reference.mjs.
 //
 //   node unreal/Tools/compare/tour-reference.mjs --origin http://127.0.0.1:<port> --room <room> --tour <file> --out <dir>
-//        [--chromium /usr/bin/chromium] [--profile <dir>] [--timeout 600] [--name RefWatch]
+//        [--chromium /usr/bin/chromium] [--profile <dir>] [--timeout 600] [--name RefWatch] [--block-maps] [--query ao=0]
+// --block-maps (round 14): the page's requests for /maps/* fail. Only the lobby's map preview asks for them during play
+// (client/main.js previewMap); without them client/lobby-view.js never rebuilds its backdrop in the middle of the match,
+// which otherwise (always, for a spectator that joins a running match) calls setFogMap(null) and empties the match's map
+// pieces through structures.js's shared state: the browser half then shows the reference's design. --query: more of
+// the page's own URL switches (ao=0: no AO composer, the direct path). Each shot logs the lobby backdrop, the map piece
+// count and whether the fog map is the match's.
 // Tour lines: "name seconds x z distance yaw" (seconds of match time, the snapshot's tick / 20; distance in metres or wF, the
-// share F of rig.wide; yaw the native heading in degrees, the browser's is -(yaw + 90) degrees). "frontier" poses are
-// skipped (native only). Writes <out>/<name>.png (only the WebGL canvas) and <out>/<name>-hud.png, and tour-log.jsonl.
+// share F of rig.wide; yaw the native heading in degrees, the browser's is -(yaw + 90) degrees). "frontier" for x (round
+// 14): the first cell nobody on this side has seen (fog.at 'dark') on the line from the mean of seat me's ground units
+// toward the map's centre, stepped back 6 m, as Client/TCSlice13Checks.cpp picks it. A spectator has no seat: seat 0
+// (or --seat N), as the native tour takes it. "unit:<type>" for x (round 14): the living unit of that type with the
+// lowest id on that seat (the same id the native tour picks). "step:<n>" for x (round 14, the Tutorial): waits for the
+// snapshot's mode.step to reach step n (1-based) and 3 s more, then centres on that step's cell (shared/tutorial.js
+// STEPS[n - 1].at, the cell its Hollis lines point to and the native client's Space jumps to). An optional 7th field ("hud") is read by the native tour only. Writes <out>/<name>.png (only the WebGL canvas) and <out>/<name>-hud.png, and tour-log.jsonl.
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -17,12 +28,14 @@ import { spawn } from 'node:child_process';
 const arg = (name, d) => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : d; };
 const origin = arg('origin'), room = arg('room'), out = arg('out'), tourFile = arg('tour');
 const chromium = arg('chromium', '/usr/bin/chromium'), timeout = +arg('timeout', 600), who = arg('name', 'RefWatch');
+const blockMaps = process.argv.includes('--block-maps'), query = arg('query', '');
+const seatArg = arg('seat', ''), gfxLevel = arg('gfx', 'high'); // round 14: --gfx low draws the browser on Graphics Low
 if (!origin || !room || !out || !tourFile) { console.error('usage: tour-reference.mjs --origin <url> --room <room> --tour <file> --out <dir>'); process.exit(2); }
 const profile = arg('profile', path.join(out, '.chromium-profile'));
 const tour = fs.readFileSync(tourFile, 'utf8').split('\n').map((l) => l.replace(/#.*/, '').trim()).filter(Boolean).map((l) => {
   const [name, t, x, z, dist, yaw] = l.split(/\s+/);
-  return { name, t: +t, x: +x, z: +z, frontier: x === 'frontier', wide: dist.startsWith('w') ? +dist.slice(1) : null, dist: dist.startsWith('w') ? null : +dist, yaw: +yaw };
-}).filter((p) => !p.frontier).sort((a, b) => a.t - b.t);
+  return { name, t: +t, x: +x, z: +z, frontier: x === 'frontier', unit: x.startsWith('unit:') ? x.slice(5) : null, step: x.startsWith('step:') ? +x.slice(5) : null, wide: dist.startsWith('w') ? +dist.slice(1) : null, dist: dist.startsWith('w') ? null : +dist, yaw: +yaw };
+}).sort((a, b) => a.t - b.t);
 fs.mkdirSync(out, { recursive: true });
 const logFile = path.join(out, 'tour-log.jsonl');
 const log = (o) => { fs.appendFileSync(logFile, JSON.stringify({ at: new Date().toISOString(), ...o }) + '\n'); console.log(JSON.stringify(o)); };
@@ -45,18 +58,20 @@ for (let i = 0; i < 50; i++) { try { const r = await fetch(`http://127.0.0.1:${p
 if (!ws) { log({ error: 'no DevTools target' }); kill(); process.exit(4); }
 await new Promise((r) => ws.addEventListener('open', r));
 // the page's own errors and console warnings go to the log too (a reference module that failed explains a missing layer)
-let consoleLines = 0;
+let consoleLines = 0, blocked = 0;
 ws.addEventListener('message', (e) => {
   const m = JSON.parse(e.data);
   if (m.id && pending.has(m.id)) { const p = pending.get(m.id); pending.delete(m.id); m.error ? p.reject(new Error(m.error.message)) : p.resolve(m.result); return; }
+  if (m.method === 'Fetch.requestPaused') { blocked++; send('Fetch.failRequest', { requestId: m.params.requestId, errorReason: 'BlockedByClient' }).catch(() => {}); return; }
   if (m.method === 'Runtime.exceptionThrown' && consoleLines++ < 200) log({ pageException: m.params.exceptionDetails?.exception?.description ?? m.params.exceptionDetails?.text });
   if (m.method === 'Runtime.consoleAPICalled' && ['error', 'warning', 'assert'].includes(m.params.type) && consoleLines++ < 200) log({ console: m.params.type, text: m.params.args.map((a) => a.value ?? a.description ?? '').join(' ').slice(0, 2000) });
 });
 await send('Page.enable'); await send('Runtime.enable');
 await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
 await send('Page.navigate', { url: origin + '/' }); await sleep(1500);
-await evaluate(`localStorage.setItem('ww2-gfx-auto', '1'); localStorage.setItem('ww2-gfx', 'high'); localStorage.setItem('ww2-controls-seen', '1'); localStorage.setItem('ww2-name', ${JSON.stringify(who)}); true`);
-await send('Page.navigate', { url: `${origin}/play?name=${encodeURIComponent(who)}#${room}` });
+await evaluate(`localStorage.setItem('ww2-gfx-auto', '1'); localStorage.setItem('ww2-gfx', ${JSON.stringify(gfxLevel)}); localStorage.setItem('ww2-controls-seen', '1'); localStorage.setItem('ww2-name', ${JSON.stringify(who)}); true`);
+if (blockMaps) await send('Fetch.enable', { patterns: [{ urlPattern: '*/maps/*', requestStage: 'Request' }] });
+await send('Page.navigate', { url: `${origin}/play?name=${encodeURIComponent(who)}${query ? '&' + query : ''}#${room}` });
 let t0 = 0;
 for (let i = 0; i < timeout * 4 && !t0; i++) {
   await sleep(250);
@@ -72,10 +87,39 @@ for (const s of tour) {
   for (;;) { const tick = await evaluate(`window.__game.snapshot ? window.__game.snapshot.tick : 0`); if (tick / 20 >= s.t) break; await sleep(200); }
   const yaw = -(s.yaw + 90) * Math.PI / 180;
   const fps0 = await evaluate(`performance.now()`);
+  if (s.frontier) {
+    // the own army as ATCGameMode::ArmyIds takes it: living ground units, no structures, aircraft, trains or supply trucks
+    // (UNITS from the page's own shared/sim.js module)
+    const f = await evaluate(`(async () => { const g = window.__game, { UNITS } = await import('/shared/sim.js'); let n = 0, x = 0, z = 0; for (const v of g.units.values()) { const d = UNITS[v.type]; if (v.owner !== (${seatArg === '' ? '(Number.isInteger(g.me) && g.me >= 0 ? g.me : 0)' : +seatArg}) || !d || d.structure || d.air || d.rail || v.type === 'truck' || !(v.hp > 0)) continue; x += v.x; z += v.z; n++; }
+      if (!n) return null; x /= n; z /= n; const W = g.fog.w * 2, H = g.fog.h * 2, tx = W / 2, tz = H / 2, len = Math.hypot(tx - x, tz - z), dx = len > 1 ? (tx - x) / len : 1, dz = len > 1 ? (tz - z) / len : 0;
+      for (let t = 0; t <= Math.max(len, 1) + 400; t += 1) { const qx = x + dx * t, qz = z + dz * t; const a = g.fog.at(qx, qz); if (a === null) break; if (a === 'dark') { const b = Math.max(0, t - 6); return [x + dx * b, z + dz * b]; } } return [x, z]; })()`);
+    log({ frontierPose: s.name, focus: f });
+    if (f) { s.x = f[0]; s.z = f[1]; }
+  }
+  if (s.step) {
+    for (;;) { const st = await evaluate(`(() => { const m = window.__game.snapshot && window.__game.snapshot.mode; return m && m.kind === 'tutorial' ? m.step : -1; })()`); if (st >= s.step - 1) break; await sleep(250); }
+    await sleep(3000);
+    const at = await evaluate(`(async () => { const { STEPS } = await import('/shared/tutorial.js'); const st = STEPS[${s.step - 1}]; return st ? st.at : null; })()`);
+    log({ stepPose: s.name, step: s.step, at, goal: await evaluate(`window.__game.snapshot.mode.goal`) });
+    if (at) { s.x = at[0] * 2 + 1; s.z = at[1] * 2 + 1; }
+  }
+  if (s.unit) {
+    const u = await evaluate(`(() => { const g = window.__game, seat = ${seatArg === '' ? '(Number.isInteger(g.me) && g.me >= 0 ? g.me : 0)' : +seatArg}; let best = null; for (const [id, v] of g.units) { if (v.type === ${JSON.stringify(s.unit)} && v.owner === seat && v.hp > 0 && (best === null || +id < best[0])) best = [+id, v.x, v.z]; } return best; })()`);
+    log({ unitPose: s.name, unit: u });
+    if (u) { s.x = u[1]; s.z = u[2]; }
+  }
   await evaluate(`(() => { const g = window.__game, c = g.cam; c.x = ${s.x}; c.z = ${s.z}; c.yaw = ${yaw}; c.dist = ${s.wide != null ? `g.rig.wide * ${s.wide}` : s.dist}; return true; })()`);
   // frames drawn while the view settles, 4 s (requestAnimationFrame intervals: the software renderer's, not a measure of the game)
   const frames = await evaluate(`new Promise((done) => { const t = []; let last = performance.now(); const end = last + 4000; const f = (now) => { t.push(now - last); last = now; if (now < end) requestAnimationFrame(f); else done(t); }; requestAnimationFrame(f); })`);
-  const state = await evaluate(`(() => { const g = window.__game, s = g.snapshot; return { mood: g.atmos.mood, weather: g.atmos.weather, wx: s && s.wx, cam: { x: g.cam.x, z: g.cam.z, dist: g.cam.dist, yaw: g.cam.yaw }, wide: g.rig.wide, paper: g.mapView ? g.mapView.fade : null }; })()`);
+  const state = await evaluate(`(() => { const g = window.__game, s = g.snapshot; return { mood: g.atmos.mood, weather: g.atmos.weather, wx: s && s.wx, cam: { x: g.cam.x, z: g.cam.z, dist: g.cam.dist, yaw: g.cam.yaw }, wide: g.rig.wide, paper: g.mapView ? g.mapView.fade : null, fog: [g.scene.fog.near, g.scene.fog.far, g.scene.fog.color.getHexString()], composer: g.renderer.info.programs.some((p) => p.name === 'OutputShader') }; })()`);
+  // the lobby backdrop's side effects (round 14): its canvas, the match's map pieces, the fog map the apron overlay reads
+  const sideEffects = await evaluate(`(() => { const g = window.__game, K = new Set(['brick','stone','gableBrick','roof','paint','pane','wall','gable','window','earth','shrub','leaves','wood','dark','rail','duck']); let pieces = 0; g.scene.traverse((o) => { if (o.isInstancedMesh && K.has(o.name)) pieces += o.count; }); const u = g.renderer.properties.get(g.apron.fogMesh.material).uniforms || {}; return { lobbyBackdrop: document.querySelectorAll('canvas.lobby-view').length, pieces, fowSize: u.fowSize?.value?.toArray(), fogMapIsMatch: u.fowMap?.value === g.fog?.texture }; })()`);
+  if (s.unit) {
+    // round 14: follow the unit to the last moment (a moving vehicle stays in the middle of the shot)
+    const u2 = await evaluate(`(() => { const g = window.__game, seat = ${seatArg === '' ? '(Number.isInteger(g.me) && g.me >= 0 ? g.me : 0)' : +seatArg}; let best = null; for (const [id, v] of g.units) { if (v.type === ${JSON.stringify(s.unit)} && v.owner === seat && v.hp > 0 && (best === null || +id < best[0])) best = [+id, v.x, v.z, v.speed ?? null]; } if (best) { g.cam.x = best[1]; g.cam.z = best[2]; } return best; })()`);
+    log({ unitFollow: s.name, unit: u2 });
+    await sleep(1500);
+  }
   await evaluate(`(() => { let st = document.getElementById('tc-hide'); if (!st) { st = document.createElement('style'); st.id = 'tc-hide'; document.head.appendChild(st); } st.textContent = 'body * { visibility: hidden !important; } canvas[data-tc-main] { visibility: visible !important; }'; return true; })()`);
   await sleep(300);
   const bare = await send('Page.captureScreenshot', { format: 'png' });
@@ -85,7 +129,7 @@ for (const s of tour) {
   const full = await send('Page.captureScreenshot', { format: 'png' });
   fs.writeFileSync(path.join(out, `${s.name}-hud.png`), Buffer.from(full.data, 'base64'));
   const ms = frames.slice(1);
-  log({ shot: s.name, pose: s, seconds: (Date.now() - t0) / 1000, matchTime: await evaluate(`window.__game.snapshot.tick / 20`), state, frames: ms.length, frameMeanMs: ms.reduce((a, b) => a + b, 0) / Math.max(1, ms.length), frameWorstMs: Math.max(0, ...ms), settledFrom: fps0 });
+  log({ shot: s.name, pose: s, seconds: (Date.now() - t0) / 1000, matchTime: await evaluate(`window.__game.snapshot.tick / 20`), state, sideEffects, mapsBlocked: blocked, frames: ms.length, frameMeanMs: ms.reduce((a, b) => a + b, 0) / Math.max(1, ms.length), frameWorstMs: Math.max(0, ...ms), settledFrom: fps0 });
 }
 kill();
 process.exit(0);

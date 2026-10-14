@@ -1,8 +1,13 @@
 // The battlefield's light and color, as the reference draws them: client/moods.js (the mood table and the weather
 // looks), client/light.js (sun, hemisphere sky fill, the outdoor environment, distance haze, tone mapping) and the
 // part of client/atmosphere.js that eases the weather into that light. three.js r186 is reproduced as the reference
-// uses it: linear working color, ACES filmic tone mapping at the mood's exposure, sRGB output, the haze mixed after
-// tone mapping and the haze as background (unreal/Config/TCPostProcess.md, unreal/Tools/look/README.md).
+// uses it: linear working color, ACES filmic tone mapping at the mood's exposure, sRGB output and the haze as
+// background (unreal/Config/TCPostProcess.md, unreal/Tools/look/README.md). Where the haze mixes depends on the
+// browser's graphics level (round 14): on High, light.js draws through an EffectComposer (the GTAO pass) into a linear
+// half-float target, where three r186 gives the materials no tone mapping and a linear output (WebGLPrograms), so
+// fog_fragment mixes the linear haze into linear light and OutputPass tone-maps the result, the haze included; on Low
+// (and ?ao=0) the scene draws straight to the canvas and the haze mixes after tone mapping, in output space. The game
+// draws High's way; -TCHazeAfterTone draws Low's.
 //
 // How each three light maps here:
 //   sun (DirectionalLight)        a movable directional light, the mood's color and intensity in lux (three's
@@ -105,9 +110,13 @@ namespace TCLook
 	UTextureCube* MakeSkyCube(const FTCMood& M, float EnvIntensity, float EnvYaw, int32 Size = 64);
 	// exposure locked at 1 and the effects three does not draw turned off; Post replaces the tonemapper
 	void LockPostProcess(FPostProcessSettings& S, UMaterialInterface* Post, float AmbientOcclusion);
-	// M_TCLookPost's parameters: exposure, haze (fog) distances in metres, the haze color (linear in, output space set)
+	// M_TCLookPost's parameters: exposure, haze (fog) distances in metres, the haze color (linear in; set both in the
+	// output space, Haze, and linear, HazeLinear) and where it mixes: bHazeBeforeTone true is Graphics High's composer
+	// (linear light, before the tone curve, the background tone-mapped too), false the direct path (after the curve)
 	UMaterialInstanceDynamic* MakePost(UObject* Outer);
-	void SetPost(UMaterialInstanceDynamic* Post, float Exposure, float FogNear, float FogFar, const FLinearColor& HazeLinear);
+	void SetPost(UMaterialInstanceDynamic* Post, float Exposure, float FogNear, float FogFar, const FLinearColor& HazeLinear, bool bHazeBeforeTone = false);
+	// the haze the reference shows where the fog is full (or nothing was drawn), as display bytes 0-255
+	FLinearColor HazeOnScreen(const FLinearColor& HazeLinear, float Exposure, bool bHazeBeforeTone);
 	// MPC_TCLook: the hemisphere and environment the model materials add
 	void SetCollection(UWorld* World, const FTCMood& M, float EnvIntensity, float EnvYaw, bool bOn = true);
 	// the model masters add their own indirect light only without static lighting (else the engine's sky light reaches them)
@@ -153,6 +162,11 @@ public:
 	FName MoodName() const { return Base.Name; }
 	float FogNear() const { return LastFogNear; }
 	float FogFar() const { return LastFogFar; }
+	// where the haze mixes (TCLook::SetPost): true unless -TCHazeAfterTone. The graphics level sets it: light.js
+	// renderFrame draws High through the composer (true) and Low straight to the canvas (false); a -TCHazeAfterTone
+	// on the command line keeps the direct path's order at every level.
+	bool HazeBeforeTone() const { return bHazeBeforeTone; }
+	void SetHazeBeforeTone(bool bBefore) { bHazeBeforeTone = bBefore && !bHazeAfterToneForced; }
 	// The engine sky light's captured diffuse for a white surface facing up, against what its cube should give
 	// (TCLook::ExpectedDiffuse), and how many captures it took. The map pieces, scenery and soldiers take their sky
 	// fill (light.js hemisphere and environment) from this capture; a capture made before the transient cube's
@@ -182,7 +196,9 @@ private:
 	FString WeatherKind = TEXT("clear");
 	float Rain = 0.f, Wet = 0.f, Yaw = 0.f, CameraDistance = -1.f, GroundZ = 0.f;
 	float SkyEnv = -1.f, LastFogNear = 0.f, LastFogFar = 0.f;
-	bool bOutputLinear = false, bViewportLogged = false;
+	bool bOutputLinear = false, bViewportLogged = false, bHazeBeforeTone = true, bHazeAfterToneForced = false;
+	int32 EnvLevel = -1; // the graphics level (Client/TCGraphics.h) the environment was last applied for
+	int32 bAoApplied = -1; // round 14 lead glue: the AO pass the post settings were last given (1 High, 0 Low)
 	FLinearColor SkyTop, SkyBottom;
 	// the sky light capture check (CheckSkyCapture): pending until the capture holds at least half the cube's light
 	bool bSkyCheck = false, bSkyCaptured = false;

@@ -12,6 +12,8 @@ public class ThreeCrossroads : ModuleRules
 		// MeshDescription, StaticMeshDescription: the unit renderer builds its owner and selection rings as static meshes
 		// at run time (UStaticMesh::BuildFromMeshDescriptions), so they draw instanced like the unit models
 		PrivateDependencyModuleNames.AddRange(new string[] { "MeshDescription", "StaticMeshDescription" });
+		// round 14 (warmap): the war map's runtime font (SlateCore) and the lobby backdrop's map request (HTTP)
+		PrivateDependencyModuleNames.AddRange(new string[] { "SlateCore", "HTTP" });
 		PublicIncludePaths.Add(ModuleDirectory);
 	}
 }

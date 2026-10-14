@@ -9,6 +9,11 @@
 #include "GameFramework/PlayerController.h"
 #include "Camera/PlayerCameraManager.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Client/TCGraphics.h"
+#include "Engine/Texture2D.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
+#include "HAL/PlatformTime.h"
 
 // The engine's basic shapes are 100 cm across (cylinder and cone 100 cm tall, centred; the cone's apex is at +Z).
 
@@ -150,7 +155,7 @@ void ATCUnitRenderer::Draw(const FTCMatchState& State, const FTCUnitTable& Table
 	if (Crowd)
 	{
 		// the soldiers and the bodies (unit-models.js createBodies: age, fade, sink, near or far each by its own distance)
-		Crowd->EndFrame(DeltaSeconds, Eye, [Terrain](double X, double Y) { return Terrain ? Terrain->HeightAt(X / 100.0, Y / 100.0) * 100.0 : 0.0; }, LodMetres);
+		Crowd->EndFrame(DeltaSeconds, Eye, [Terrain](double X, double Y) { return Terrain ? Terrain->HeightAt(X / 100.0, Y / 100.0) * 100.0 : 0.0; }, CurrentLodMetres());
 		const FTCSoldierCrowdStats& C = Crowd->Stats();
 		Stats.Corpses = C.Corpses;
 		Stats.Figures = C.NearFigures + C.FarFigures;
@@ -158,4 +163,110 @@ void ATCUnitRenderer::Draw(const FTCMatchState& State, const FTCUnitTable& Table
 		LastInstances += C.NearMen + C.FarMen + C.Corpses;
 	}
 	ReportFrame();
+	// every 5 s of real time while tracked hulls are drawn: how many turn their wheels and how far they have rolled
+	const double Real = FPlatformTime::Seconds();
+	if (Stats.WheelHulls && Real - WheelLogAt >= 5.0)
+	{
+		WheelLogAt = Real;
+		UE_LOG(LogTemp, Log, TEXT("wheels and tracks: %d hulls drawn turning their wheels, the furthest rolled %.2f m"), Stats.WheelHulls, Stats.WheelTravelMax);
+	}
+}
+
+float ATCUnitRenderer::CurrentLodMetres()
+{
+	return FTCGraphics::Get().Budget().LodMetres;
+}
+
+namespace TCWheelTracksImpl
+{
+	DEFINE_LOG_CATEGORY_STATIC(LogTCWheels, Log, All);
+	// -TCWheelTravel=<metres>,<radians>: added to every hull's travel and turn (a verification switch: the comparison
+	// pictures show the wheels and tracks of a still hull at a known travel, as the reference's wheelTravel attribute set
+	// by hand). -TCNoWheelTracks draws the catalog hulls (no motion).
+	struct FSwitches { bool bOff = false; double Travel = 0, Turn = 0; };
+	const FSwitches& Switches()
+	{
+		static const FSwitches S = []
+		{
+			FSwitches Out;
+			Out.bOff = FParse::Param(FCommandLine::Get(), TEXT("TCNoWheelTracks"));
+			FString Arg;
+			if (FParse::Value(FCommandLine::Get(), TEXT("-TCWheelTravel="), Arg, false)) // the comma is part of the value
+			{
+				FString A, B;
+				if (!Arg.Split(TEXT(","), &A, &B)) A = Arg;
+				Out.Travel = FCString::Atod(*A);
+				Out.Turn = B.IsEmpty() ? 0.0 : FCString::Atod(*B);
+			}
+			return Out;
+		}();
+		return S;
+	}
+}
+
+bool ATCUnitRenderer::ApplyWheelTracks(UInstancedStaticMeshComponent* Ism, const FTCModelPart& Part, bool bFaded)
+{
+	using namespace TCWheelTracksImpl;
+	if (!Ism || bFaded || Switches().bOff) return false;
+	if (!bWheelTracksTried)
+	{
+		bWheelTracksTried = true;
+		if (WheelTracks.Load(WheelTracksWhy))
+		{
+			const FString Extra = Switches().Travel || Switches().Turn ? FString::Printf(TEXT("; -TCWheelTravel adds %.3f m and %.3f rad"), Switches().Travel, Switches().Turn) : FString();
+			UE_LOG(LogTCWheels, Log, TEXT("wheels and tracks: %d hulls, %d loops in the path table%s"), WheelTracks.NumHulls(), WheelTracks.Paths().Num(), *Extra);
+		}
+		else
+		{
+			UE_LOG(LogTCWheels, Warning, TEXT("wheels and tracks: off (%s)"), *WheelTracksWhy);
+		}
+	}
+	const FTCWheelTracks::FHull* Hull = WheelTracks.IsLoaded() ? WheelTracks.Find(Part.Mesh) : nullptr;
+	if (!Hull) return false;
+	UStaticMesh* Mesh = Cast<UStaticMesh>(Hull->Mesh.TryLoad());
+	if (!Mesh || Mesh->GetStaticMaterials().Num() != Hull->Materials.Num())
+	{
+		UE_LOG(LogTCWheels, Warning, TEXT("wheels and tracks: %s does not load as the copy of %s; the catalog hull is drawn"), *Hull->Mesh.ToString(), *Part.Mesh.ToString());
+		return false;
+	}
+	UTexture2D* Paths = WheelTracks.Texture();
+	if (!Paths) return false;
+	ModelObjects.AddUnique(Paths);
+	TArray<UMaterialInterface*> Mats;
+	for (const FSoftObjectPath& P : Hull->Materials)
+	{
+		const FString Key = P.ToString();
+		UMaterialInstanceDynamic* Mid = nullptr;
+		if (const TObjectPtr<UMaterialInstanceDynamic>* Found = WheelMids.Find(Key)) Mid = *Found;
+		else if (UMaterialInterface* Base = Cast<UMaterialInterface>(P.TryLoad()))
+		{
+			Mid = UMaterialInstanceDynamic::Create(Base, this);
+			Mid->SetTextureParameterValue(FTCWheelTracks::TextureParameter, Paths);
+			WheelMids.Add(Key, Mid);
+			ModelObjects.Add(Mid);
+		}
+		if (!Mid) return false;
+		Mats.Add(Mid);
+	}
+	Ism->SetStaticMesh(Mesh);
+	for (int32 I = 0; I < Mats.Num(); I++) Ism->SetMaterial(I, Mats[I]);
+	Ism->SetNumCustomDataFloats(FTCWheelTracks::Floats);
+	return true;
+}
+
+void ATCUnitRenderer::AppendPartData(FFrameBatch& B, const UInstancedStaticMeshComponent* Ism, const TArray<float>& Custom, const FTCPartMotion& Motion)
+{
+	const int32 Floats = Ism ? Ism->NumCustomDataFloats : Custom.Num();
+	B.Floats = Floats;
+	B.Data.Append(Custom);
+	if (Floats == FTCWheelTracks::Floats && Custom.Num() == FTCWheelTracks::TravelFloat)
+	{
+		// wheel-motion.js moveWheels: the instance's wheelTravel (metres rolled, radians turned since first drawn)
+		const TCWheelTracksImpl::FSwitches& Sw = TCWheelTracksImpl::Switches();
+		B.Data.Add(static_cast<float>(Motion.WheelTravel + Sw.Travel));
+		B.Data.Add(static_cast<float>(Motion.WheelTurn + Sw.Turn));
+		Stats.WheelHulls++;
+		Stats.WheelTravelMax = FMath::Max(Stats.WheelTravelMax, static_cast<float>(FMath::Abs(Motion.WheelTravel + Sw.Travel)));
+	}
+	else for (int32 K = Custom.Num(); K < Floats; K++) B.Data.Add(0.f);
 }

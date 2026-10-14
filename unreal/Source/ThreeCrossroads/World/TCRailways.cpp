@@ -3,6 +3,7 @@
 #include "World/TCTerrain.h"
 #include "Net/TCMatchState.h"
 #include "Client/TCLighting.h"
+#include "World/TCFogFrontier.h"
 #include "ThreeCrossroads.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -62,7 +63,7 @@ bool FTCCellFogMap::Update(const FTCMatchState& State, const ATCTerrain* Terrain
 	bool bChanged = bNew;
 	for (int32 C = 0; C < Bytes.Num(); C++)
 	{
-		const uint8 B = bReveal || State.CellVisible(C) ? 255 : State.CellExplored(C) ? 140 : 82;
+		const uint8 B = TCFogLook::Byte(State, bReveal, C); // round 14: the shared look (fog.js)
 		if (Bytes[C] != B) { Bytes[C] = B; bChanged = true; }
 	}
 	if (!bChanged) return bNew;

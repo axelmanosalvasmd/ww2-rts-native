@@ -3,6 +3,7 @@
 #include "Client/TCUnitTable.h"
 #include "Client/TCUnitRenderer.h"
 #include "Client/TCLighting.h"
+#include "Client/TCGraphics.h"
 #include "Net/TCMatchState.h"
 #include "World/TCTerrain.h"
 #include "ThreeCrossroads.h"
@@ -572,8 +573,8 @@ float FTCCombatEffects::Ground(float X, float Z) const
 
 int32 FTCCombatEffects::Emit(ETCFxPreset Id, const FVector& P, const FVector& V, float Size, float Life)
 {
-	// fx.js emit: a particle from its preset (field by field as fx.js writes its record)
-	if (Live.Num() >= TCFxRules::Cap) { Counters.Dropped++; return -1; }
+	// fx.js emit: a particle from its preset (field by field as fx.js writes its record); cap(): Low 1600 (Client/TCGraphics.h)
+	if (Live.Num() >= FTCGraphics::Get().Budget().ParticleCap) { Counters.Dropped++; return -1; }
 	const FTCFxPreset& Pr = TCFxPresets::Get(Id);
 	FTCFxParticle& X = Live.AddDefaulted_GetRef();
 	X.Preset = Id; X.Look = Pr.Look;
@@ -595,7 +596,7 @@ int32 FTCCombatEffects::Emit(ETCFxPreset Id, const FVector& P, const FVector& V,
 int32 FTCCombatEffects::Shape(ETCFxLook Look, const FVector& P, const FVector& V, float Size, float Life)
 {
 	// a placeholder shape (support plane, canopy, falling section): not one of fx.js's sprites
-	if (Live.Num() >= TCFxRules::Cap) { Counters.Dropped++; return -1; }
+	if (Live.Num() >= FTCGraphics::Get().Budget().ParticleCap) { Counters.Dropped++; return -1; }
 	FTCFxParticle& X = Live.AddDefaulted_GetRef();
 	X.Preset = ETCFxPreset::None; X.Look = Look;
 	X.P = P; X.V = V; X.Size = Size; X.Size0 = X.Size1 = Size; X.Life = FMath::Max(1e-4f, Life);
@@ -624,7 +625,8 @@ void FTCCombatEffects::NoteShooter(int32 Id)
 void FTCCombatEffects::Kick(double X, double Z, double Size)
 {
 	// fx.js kick: bigger blasts near the camera shake it a little, more when zoomed out
-	if (Ctx_.bReduceMotion || Size < TCFxRules::ShakeMin) return;
+	// Graphics Low: no screen shake (fx.js kick: if (low() || reduceMotion || size < 3.2) return)
+	if (!FTCGraphics::Get().Budget().bScreenShake || Ctx_.bReduceMotion || Size < TCFxRules::ShakeMin) return;
 	const double A = Size * 0.035 * FMath::Max(0.0, 1.0 - FMath::Sqrt(FMath::Square(X - Ctx_.CameraFocus.X) + FMath::Square(Z - Ctx_.CameraFocus.Y)) / 70.0) * (Ctx_.CameraDistance / 60.0);
 	if (A > ShakeAmount) ShakeAmount = (float)A;
 }
@@ -654,8 +656,10 @@ void FTCCombatEffects::FitDecal(FTCFxDecal& D) const
 
 void FTCCombatEffects::Scorch(double X, double Z, double R, uint8 Kind)
 {
+	// fx.js scorch: lim = gfx.low ? 24 : DCAP, life gfx.low ? 60 : 150 (Client/TCGraphics.h)
+	const FTCGraphicsBudget& Gfx = FTCGraphics::Get().Budget();
 	int32 Slot = -1, Oldest = -1;
-	for (int32 K = 0; K < DecalPool.Num(); K++)
+	for (int32 K = 0; K < FMath::Min(DecalPool.Num(), Gfx.CraterCap); K++)
 	{
 		if (!DecalPool[K].bOn) { Slot = K; break; }
 		if (Oldest < 0 || DecalPool[K].Age > DecalPool[Oldest].Age) Oldest = K;
@@ -663,7 +667,7 @@ void FTCCombatEffects::Scorch(double X, double Z, double R, uint8 Kind)
 	if (Slot < 0) Slot = Oldest;
 	if (Slot < 0) return;
 	FTCFxDecal& D = DecalPool[Slot];
-	D.bOn = true; D.X = X; D.Z = Z; D.R = R; D.Rot = Rng.FRand() * Tau; D.Age = 0.f; D.Life = TCFxRules::DecalLife; D.Kind = Kind;
+	D.bOn = true; D.X = X; D.Z = Z; D.R = R; D.Rot = Rng.FRand() * Tau; D.Age = 0.f; D.Life = Gfx.CraterLife; D.Kind = Kind;
 	FitDecal(D);
 }
 
@@ -675,11 +679,14 @@ void FTCCombatEffects::RefitDecals()
 void FTCCombatEffects::UpdateDecals(float Dt)
 {
 	if ((RefitT -= Dt) <= 0.f) { RefitT = 2.f; RefitDecals(); } // the ground can be dug or bombed
-	for (FTCFxDecal& D : DecalPool)
+	// fx.js updateDecals: on Low the craters past the first 24 go (gfx.low && s >= 24)
+	const int32 Lim = FTCGraphics::Get().Budget().CraterCap;
+	for (int32 K = 0; K < DecalPool.Num(); K++)
 	{
+		FTCFxDecal& D = DecalPool[K];
 		if (!D.bOn) continue;
 		D.Age += Dt;
-		if (D.Age >= D.Life) D.bOn = false;
+		if (D.Age >= D.Life || K >= Lim) D.bOn = false;
 	}
 }
 
@@ -774,6 +781,7 @@ bool FTCCombatEffects::BlastNear(double X, double Z, double& OutX, double& OutZ,
 
 void FTCCombatEffects::Gore(double X, double Z, double K)
 {
+	if (!FTCGraphics::Get().Gore()) return; // round 14 lead glue: fx.js gore returns at once without gfx.gore (the menu's Gore switch)
 	// fx.js gore (gfx.gore, on by default): scraps, a red mist and a stain on the ground. Graphics High: 7 scraps.
 	const double Gy = Ground(X, Z) + 0.6;
 	const int32 N = FMath::RoundToInt(7 * K + 1);
@@ -793,6 +801,22 @@ void FTCCombatEffects::VehicleDamage(const FVector& P, double Level)
 	if (Level <= 0.0) return;
 	const int32 O = Emit(ETCFxPreset::Smoke, P, At(Rr(-0.12, 0.12), 0.3 + Level * 0.12, Rr(-0.12, 0.12)), 0.23 + Level * 0.1, 1.5 + Level * 0.4);
 	if (O >= 0) { Live[O].Alpha *= (float)FMath::Min(0.55, Level * 0.28); Tint(O, (float)(0.8 - Level * 0.06)); DamagePuffCount++; }
+}
+
+void FTCCombatEffects::Plume(const FString& Kind, double X, double Y, double Z, double Radius)
+{
+	// fx.js plume (High graphics: this client has no Low): smoke or wreck smoke rising from the roof, or three flames
+	const double Spread = Radius * 0.65;
+	if (Kind != TEXT("fire"))
+	{
+		const bool bDark = Kind == TEXT("dark");
+		for (int32 I = 0; I < 2; I++)
+			Emit(bDark ? ETCFxPreset::WreckSmoke : ETCFxPreset::Smoke, At(X + Rr(-0.4, 0.4) * Spread, Y + Rr(0, 0.6), Z + Rr(-0.4, 0.4) * Spread),
+				At(Rr(-0.4, 0.4), Rr(2.1, 2.8), Rr(-0.4, 0.4)), Radius * 0.45, bDark ? 4.0 : 4.5);
+		return;
+	}
+	for (int32 I = 0; I < 3; I++)
+		Emit(ETCFxPreset::Flame, At(X + Rr(-Spread, Spread), Y - 0.2, Z + Rr(-Spread, Spread)), At(0, Rr(0.1, 0.3), 0), Radius * 0.36, Rr(0.8, 1.1));
 }
 
 void FTCCombatEffects::VehicleDamageFrame(int32 Id, double Health, bool bKilled, bool bDetailed, float Dt, TFunctionRef<bool(FVector& OutAt)> Anchor)

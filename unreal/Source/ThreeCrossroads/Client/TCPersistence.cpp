@@ -610,3 +610,212 @@ bool FTCPersistenceReferenceTest::RunTest(const FString& Parameters)
 	return true;
 }
 #endif // WITH_DEV_AUTOMATION_TESTS
+
+// ---------------------------------------------------------------------------------------------------------------------
+// FTCSettingsStore
+#include "Misc/ConfigCacheIni.h"
+#include "Misc/CString.h"
+#include "Misc/Paths.h"
+
+const TCHAR* const FTCSettingsStore::Section = TEXT("ThreeCrossroads");
+
+TArrayView<const FTCSettingsStore::FEntry> FTCSettingsStore::Entries()
+{
+	// every localStorage key of the pinned client/ (fps and editor pages aside), CLI-124's list
+	static const FEntry Table[] = {
+		{ TEXT("ww2-name"), TEXT("Name"), TEXT("client/main.js $('name') change; public-lobby.js"), TEXT("the text, cut to 16 in the form") },
+		{ TEXT("ww2-edge"), TEXT("EdgeScroll"), TEXT("client/camera.js edgeButton"), TEXT("on unless '0' (stored here as True/False)") },
+		{ TEXT("ww2-pan"), TEXT("PanSpeed"), TEXT("client/camera.js panButton"), TEXT("/^[012]$/ else 1") },
+		{ TEXT("ww2-capture"), TEXT("CaptureMode"), TEXT("client/pointer.js"), TEXT("one of MODES else 'fullscreen'") },
+		{ TEXT("ww2-volume"), TEXT("Volume"), TEXT("client/audio.js setVolume"), TEXT("parseFloat clamped to [0, 1]") },
+		{ TEXT("ww2-muted"), TEXT("Muted"), TEXT("client/audio.js (read only: an older key)"), TEXT("'1': start at volume 0 when no volume is saved") },
+		{ TEXT("ww2-ui-scale"), TEXT("UIScale"), TEXT("client/hud.js uiScale onchange"), TEXT("range input 75..150 step 5, default 100") },
+		{ TEXT("ww2-stats"), TEXT("StatsOverlay"), TEXT("client/stats.js (main.js createStats storage)"), TEXT("the overlay switch") },
+		{ TEXT("ww2-cover"), TEXT("CoverPreview"), TEXT("client/cover-preview.js"), TEXT("on unless '0' (stored here as True/False)") },
+		{ TEXT("ww2-controls-seen"), TEXT("ControlsSeen"), TEXT("client/main.js openControls onboarding"), TEXT("'1': the Controls sheet does not open by itself") },
+		{ TEXT("ww2rts-lang"), TEXT("Language"), TEXT("client/i18n.js setLang"), TEXT("'es' or 'en', else the system language") },
+		{ TEXT("ww2-autocast"), TEXT("Autocast"), TEXT("client/abilities.js (TCAbilitiesData::AutocastStorageKey)"), TEXT("JSON of the choices per type") },
+		{ TEXT("ww2-gfx"), TEXT("Graphics"), TEXT("client/gfx.js set"), TEXT("'low' is Low, anything else High") },
+		{ TEXT("ww2-gfx-auto"), TEXT("GraphicsAutoDropped"), TEXT("client/gfx.js watchFps"), TEXT("any value: the automatic drop has happened") },
+		{ TEXT("ww2-gore"), TEXT("Gore"), TEXT("client/gfx.js setGore"), TEXT("on unless 'off'") },
+	};
+	return MakeArrayView(Table);
+}
+
+const FTCSettingsStore::FEntry* FTCSettingsStore::Find(const FString& ReferenceKey)
+{
+	for (const FEntry& E : Entries()) if (ReferenceKey == E.Reference) return &E;
+	return nullptr;
+}
+
+FTCSettingsStore& FTCSettingsStore::Game()
+{
+	static FTCSettingsStore Store{ FString() };
+	if (Store.Ini.IsEmpty() && GConfig && !GGameUserSettingsIni.IsEmpty()) { Store.Ini = GGameUserSettingsIni; Store.bMemoryOnly = false; }
+	return Store;
+}
+
+FTCSettingsStore::FTCSettingsStore(const FString& IniFile) : Ini(IniFile), bMemoryOnly(IniFile.IsEmpty()) {}
+
+namespace TCSettingsImpl
+{
+	// The game's user settings file is in the config cache and the config system saves it (Saved/Config in the editor,
+	// the user's settings folder in a packaged game). Any other file (tests) is read and written here directly, as
+	// FTCLocale::WriteStored does: the config system reads such a file but never saves it.
+	FConfigFile* Cached(const FString& Ini)
+	{
+		FConfigFile* F = GConfig ? GConfig->FindConfigFile(Ini) : nullptr;
+		return F && !F->NoSave ? F : nullptr;
+	}
+}
+
+TOptional<FString> FTCSettingsStore::Get(const FString& ReferenceKey) const
+{
+	const FEntry* E = Find(ReferenceKey);
+	if (!E) return {};
+	if (bMemoryOnly || !GConfig) { const FString* V = Memory.Find(E->Ini); return V ? TOptional<FString>(*V) : TOptional<FString>(); }
+	FString Value;
+	if (TCSettingsImpl::Cached(Ini)) { if (GConfig->GetString(Section, E->Ini, Value, Ini)) return Value; return {}; }
+	FConfigFile File;
+	if (FPaths::FileExists(Ini)) File.Read(Ini);
+	if (File.GetString(Section, E->Ini, Value)) return Value;
+	return {};
+}
+
+bool FTCSettingsStore::Set(const FString& ReferenceKey, const FString& Value)
+{
+	const FEntry* E = Find(ReferenceKey);
+	if (!E) return false;
+	if (bMemoryOnly || !GConfig) { Memory.Add(E->Ini, Value); return true; }
+	if (TCSettingsImpl::Cached(Ini))
+	{
+		GConfig->SetString(Section, E->Ini, *Value, Ini);
+		return Flush();
+	}
+	FConfigFile File;
+	if (FPaths::FileExists(Ini)) File.Read(Ini);
+	File.SetString(Section, E->Ini, *Value);
+	return File.Write(Ini, false);
+}
+
+bool FTCSettingsStore::Remove(const FString& ReferenceKey)
+{
+	const FEntry* E = Find(ReferenceKey);
+	if (!E) return false;
+	if (bMemoryOnly || !GConfig) return Memory.Remove(E->Ini) > 0;
+	if (TCSettingsImpl::Cached(Ini))
+	{
+		GConfig->RemoveKey(Section, E->Ini, Ini);
+		return Flush();
+	}
+	FConfigFile File;
+	if (FPaths::FileExists(Ini)) File.Read(Ini);
+	File.RemoveKeyFromSection(Section, E->Ini);
+	return File.Write(Ini, false);
+}
+
+bool FTCSettingsStore::Flush() const
+{
+	if (bMemoryOnly || !GConfig || !TCSettingsImpl::Cached(Ini)) return true; // other files are written by Set
+	return GConfig->Flush(false, Ini);
+}
+
+namespace TCSettingsImpl
+{
+	// HTML "valid floating-point number": -? (digits (. digits)? | . digits) ([eE] [-+]? digits)?, nothing around it
+	bool ParseHtmlFloat(const FString& S, double& Out)
+	{
+		int32 I = 0;
+		const int32 N = S.Len();
+		auto Digit = [&](int32 K) { return K < N && FChar::IsDigit(S[K]); };
+		if (I < N && S[I] == TEXT('-')) I++;
+		const int32 IntStart = I;
+		while (Digit(I)) I++;
+		const bool bInt = I > IntStart;
+		bool bFrac = false;
+		if (I < N && S[I] == TEXT('.'))
+		{
+			const int32 F = ++I;
+			while (Digit(I)) I++;
+			bFrac = I > F;
+			if (!bFrac) return false;
+		}
+		if (!bInt && !bFrac) return false;
+		if (I < N && (S[I] == TEXT('e') || S[I] == TEXT('E')))
+		{
+			I++;
+			if (I < N && (S[I] == TEXT('-') || S[I] == TEXT('+'))) I++;
+			const int32 E = I;
+			while (Digit(I)) I++;
+			if (I == E) return false;
+		}
+		if (I != N) return false;
+		Out = FCString::Atod(*S);
+		return FMath::IsFinite(Out);
+	}
+}
+
+int32 FTCSettingsStore::ReadUIScale(const TOptional<FString>& Stored)
+{
+	const FString S = Stored.IsSet() ? *Stored : FString(TEXT("100"));
+	double V = 0;
+	if (!TCSettingsImpl::ParseHtmlFloat(S, V)) V = UIScaleMin + (UIScaleMax - UIScaleMin) / 2.0; // the range's default
+	V = FMath::Clamp(V, (double)UIScaleMin, (double)UIScaleMax);
+	// step mismatch: the nearest 75 + 5k, the greater one on a tie, within the range
+	const double K = (V - UIScaleMin) / UIScaleStep, Lo = FMath::FloorToDouble(K);
+	double Snapped = UIScaleMin + UIScaleStep * (K - Lo >= 0.5 ? Lo + 1 : Lo);
+	if (Snapped > UIScaleMax) Snapped -= UIScaleStep;
+	return (int32)Snapped;
+}
+
+bool FTCSettingsStore::SetUIScale(int32 Percent)
+{
+	return Set(TEXT("ww2-ui-scale"), FString::FromInt(ReadUIScale(FString::FromInt(Percent))));
+}
+
+double FTCSettingsStore::ReadVolume(const TOptional<FString>& Stored, const TOptional<FString>& Muted)
+{
+	// parseFloat: leading whitespace, then the longest prefix that is a number (Infinity is not finite: ignored)
+	if (Stored.IsSet())
+	{
+		const FString T = Stored->TrimStart();
+		int32 I = 0;
+		const int32 N = T.Len();
+		if (I < N && (T[I] == TEXT('+') || T[I] == TEXT('-'))) I++;
+		const int32 Start = I;
+		while (I < N && FChar::IsDigit(T[I])) I++;
+		bool bDigits = I > Start;
+		if (I < N && T[I] == TEXT('.')) { I++; const int32 F = I; while (I < N && FChar::IsDigit(T[I])) I++; bDigits |= I > F; }
+		if (bDigits)
+		{
+			if (I < N && (T[I] == TEXT('e') || T[I] == TEXT('E')))
+			{
+				int32 J = I + 1;
+				if (J < N && (T[J] == TEXT('+') || T[J] == TEXT('-'))) J++;
+				const int32 E = J;
+				while (J < N && FChar::IsDigit(T[J])) J++;
+				if (J > E) I = J;
+			}
+			const double V = FCString::Atod(*T.Left(I));
+			if (FMath::IsFinite(V)) return FMath::Clamp(V, 0.0, 1.0);
+		}
+	}
+	return Muted.IsSet() && *Muted == TEXT("1") ? 0.0 : 0.8;
+}
+
+FString FTCSettingsStore::ReadLanguage(const TOptional<FString>& Stored, const FString& SystemLanguage)
+{
+	if (Stored.IsSet() && (*Stored == TEXT("es") || *Stored == TEXT("en"))) return *Stored;
+	return SystemLanguage.StartsWith(TEXT("es")) ? TEXT("es") : TEXT("en");
+}
+
+bool FTCSettingsStore::ReadEdge(const TOptional<FString>& Stored)
+{
+	// the reference stores '1' / '0'; this client's EdgeScroll key holds True / False (GConfig SetBool)
+	return !Stored.IsSet() || !(*Stored == TEXT("0") || Stored->Equals(TEXT("False"), ESearchCase::IgnoreCase));
+}
+
+int32 FTCSettingsStore::ReadPan(const TOptional<FString>& Stored)
+{
+	return Stored.IsSet() && Stored->Len() == 1 && (*Stored)[0] >= TEXT('0') && (*Stored)[0] <= TEXT('2') ? (*Stored)[0] - TEXT('0') : 1;
+}

@@ -39,6 +39,9 @@
 // those from the same raw message, aligned with FTCMatchState::Shots. A change to the decoder is requested instead.
 #pragma once
 
+// round 14: FTCCombatEffects::Plume exists (Client/TCTutorial.cpp feeds it the damaged buildings' bursts)
+#define TC_HAS_FX_PLUME 1
+
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Camera/CameraModifier.h"
@@ -348,10 +351,13 @@ public:
 	// (X, Z) (reference metres): its centre and size. unit-models.js createBodies throws a fresh body away from it.
 	bool BlastNear(double X, double Z, double& OutX, double& OutZ, double& OutSize) const;
 	// fx.js gore: a man torn by a blast (K, 0 to 1, how close he was): scraps, a red mist and a stain on the ground.
-	// gfx.js gore is on by default and this client has no setting for it.
+	// gfx.js gore is on by default; the menu's Gore switch (Client/TCGraphics.h) turns it off (round 14).
 	void Gore(double X, double Z, double K = 1.0);
 	// fx.js vehicleDamage: one puff of grey smoke from a damaged vehicle's engine deck (At: Unreal axes, metres)
 	void VehicleDamage(const FVector& At, double Level);
+	// round 14 (lead glue): fx.js plume(kind, x, y, z, radius), a roof-sized burst from one damaged building; 'smoke',
+	// 'dark' or 'fire', reference metres (x, y up, z). objectives.js owns its cadence (FTCScenarioText::Frame).
+	void Plume(const FString& Kind, double X, double Y, double Z, double Radius = 3.0);
 	// engine-presentation.js vehicleDamageFrame for one ground vehicle this frame: Health = hp / (models * hpPer),
 	// bKilled main.js v.killed, bDetailed animationInterest (root visible and its 25 m ball in view). Anchor gives the
 	// engine deck point (unit-models.js vehicleDamageAnchor, Unreal axes in metres) when a puff is due.

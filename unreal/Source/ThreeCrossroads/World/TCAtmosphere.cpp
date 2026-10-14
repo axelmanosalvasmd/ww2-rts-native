@@ -6,6 +6,7 @@
 #include "Net/TCMatchState.h"
 #include "Client/TCCameraPawn.h"
 #include "Client/TCPlayerController.h"
+#include "Client/TCGraphics.h"
 #include "ThreeCrossroads.h"
 #include "ProceduralMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -208,6 +209,10 @@ void FTCAtmosphere::StartMatch(const FTCMatchState& State, const FString& MapKey
 	if (BirdMat) BirdMat->SetVectorParameterValue(TEXT("Color"), TCLook::HexLinear(0x2b2622));
 	// the mood's tone mapping exposure: each layer blends in display space as three's canvas does (make-atmosphere-assets.py)
 	for (UMaterialInstanceDynamic* M : { GroundMat.Get(), MistMat.Get(), BankMat.Get(), BirdMat.Get(), FallMat.Get() }) if (M) M->SetScalarParameterValue(TEXT("Exposure"), MoodRow.Exposure);
+	// round 14: Graphics High's composer blends these layers in linear light (the engine's blend); -TCHazeAfterTone
+	// (ATCLighting: the direct path, Low) keeps the display-space emulation
+	const float LinearBlend = FParse::Param(FCommandLine::Get(), TEXT("TCHazeAfterTone")) ? 0.f : 1.f;
+	for (UMaterialInstanceDynamic* M : { GroundMat.Get(), MistMat.Get(), BankMat.Get(), BirdMat.Get(), FallMat.Get() }) if (M) M->SetScalarParameterValue(TEXT("LinearBlend"), LinearBlend);
 	ApplyMood();
 
 	Sites = MoodRow.bMist ? MistSites(W, H, Ch, Cell, Height, MistCap) : std::vector<FSheet>();
@@ -233,8 +238,11 @@ void FTCAtmosphere::StartMatch(const FTCMatchState& State, const FString& MapKey
 		if (Mat) SheetMesh->SetMaterial(Section, Mat);
 	};
 	MistOn = MoodRow.bMist && Sites.size() > 0;
-	Planes(0, MistOn ? FMath::Min((int32)Sites.size(), MistCap) : 0, MistMat.Get());
-	Planes(1, FMath::Min((int32)BankAt.size(), BankCap), BankMat.Get());
+	// atmosphere.js applyGfx: mist.count min(sites, low ? 18 : MIST_CAP), banks min(bankAt, low ? 26 : BANK_CAP)
+	// (Client/TCGraphics.h; here at the match's start: a change of level takes the new counts at the next match)
+	const FTCGraphicsBudget& Gfx = FTCGraphics::Get().Budget();
+	Planes(0, MistOn ? FMath::Min((int32)Sites.size(), FMath::Min(MistCap, Gfx.MistCap)) : 0, MistMat.Get());
+	Planes(1, FMath::Min((int32)BankAt.size(), FMath::Min(BankCap, Gfx.BankCap)), BankMat.Get());
 
 	if (!BirdMesh.IsValid()) BirdMesh = NewMesh(TEXT("AtmosBirds"), TCAtmos::SortBirds, true);
 	if (UProceduralMeshComponent* B = BirdMesh.Get())
@@ -254,6 +262,15 @@ void FTCAtmosphere::StartMatch(const FTCMatchState& State, const FString& MapKey
 	LoggedState.Reset();
 	UE_LOG(LogTC, Log, TEXT("atmosphere: start on '%s' (key '%s'): mood %s, weather %s; mist %d sheets, fog banks %d, birds %d, fall '%s'; clouds %.3f; reference %hs"),
 		*State.Map.Name, *MapKey, *MoodRow.Name.ToString(), *WxNow, MistSheets(), (int32)BankAt.size(), (int32)Flight.size(), *FallNow, FMath::Min(0.32f, MoodRow.Clouds * Cur.Clouds), ReferencePin);
+}
+
+void FTCAtmosphere::SetHazeDistances(float Near, float Far)
+{
+	if (UMaterialInstanceDynamic* M = GroundMat.Get())
+	{
+		M->SetScalarParameterValue(TEXT("FogNear"), Near);
+		M->SetScalarParameterValue(TEXT("FogFar"), Far);
+	}
 }
 
 void FTCAtmosphere::AddGroundActor(AActor* Ground)
@@ -313,7 +330,9 @@ void FTCAtmosphere::SwapFall(const FString& Kind)
 	// UV0 = aRand.xy, UV1 = aRand.zw, vertex colour = the corner (gl_PointCoord)
 	TArray<FVector> V; TArray<int32> I; TArray<FVector2D> U0, U1; TArray<FLinearColor> Col;
 	V.Reserve(F.N * 4); I.Reserve(F.N * 6);
-	for (int32 K = 0; K < F.N; K++)
+	// atmosphere.js applyGfx: fall.geometry.setDrawRange(0, low ? ceil(n / 3) : n) (a change of level takes it at the next fall)
+	const int32 Drawn = FTCGraphics::Get().Budget().FallParticles(F.N);
+	for (int32 K = 0; K < Drawn; K++)
 	{
 		const FVector P = ToUe(Pos[K * 3] * F.Box[0], Pos[K * 3 + 1] * F.Box[1], Pos[K * 3 + 2] * F.Box[2]);
 		const int32 B = V.Num();
@@ -443,7 +462,7 @@ void FTCAtmosphere::Update(float Dt, const FTCMatchState& State, const ATCTerrai
 	else FallA = FMath::Min(1.f, FallA + Dt / 3.f);
 
 	bCoverShown = Cur.Wet + Cur.Sheen + Cur.Mud + Cur.Cover > 0.004f;
-	bCloudsShown = MoodRow.Clouds > 0.f;
+	bCloudsShown = MoodRow.Clouds > 0.f && FTCGraphics::Get().Budget().bCloudShadows; // Low hides the cloud shadows
 	BanksOn = Cur.Banks > 0.004f && BankAt.size() > 0;
 	if (GroundMat)
 	{
@@ -489,11 +508,12 @@ void FTCAtmosphere::UpdateSheets(double Time)
 	UProceduralMeshComponent* SheetMesh = Sheets.Get();
 	if (!SheetMesh) return;
 	SheetMesh->SetVisibility(bOn);
-	auto Place = [SheetMesh](int32 Section, const std::vector<FSheet>& At, int32 Count, bool bBank, double Tm, double Lift)
+	auto Place = [SheetMesh](int32 Section, const std::vector<FSheet>& At, int32 Count, bool bBank, double Tm, double Lift) mutable
 	{
 		if (Section >= SheetMesh->GetNumSections()) return;
 		const FProcMeshSection* S = SheetMesh->GetProcMeshSection(Section);
-		if (!S || S->ProcVertexBuffer.Num() != Count * 4) return;
+		if (!S || S->ProcVertexBuffer.Num() % 4) return;
+		Count = FMath::Min(Count, S->ProcVertexBuffer.Num() / 4); // the sheets made at the match's start (the graphics level's caps)
 		TArray<FVector> V; V.Reserve(Count * 4);
 		for (int32 K = 0; K < Count; K++)
 		{
@@ -524,7 +544,8 @@ void FTCAtmosphere::UpdateFall(const ATCTerrain* Terrain, APlayerController* PC,
 	UProceduralMeshComponent* FM = FallMesh.Get();
 	if (!FM) return;
 	const int32 Index = FallIndex(TCHAR_TO_UTF8(*FallNow));
-	const bool bShow = bOn && Index >= 0 && FallMat && PC && PC->PlayerCameraManager && FM->GetNumSections() > 0;
+	// Graphics Low keeps rain and snow, drops the dust fall (atmosphere.js: !(low && kind === 'dust'))
+	const bool bShow = bOn && Index >= 0 && FallMat && PC && PC->PlayerCameraManager && FM->GetNumSections() > 0 && !(Index == 2 && !FTCGraphics::Get().Budget().bDustFall);
 	FM->SetVisibility(bShow);
 	if (!bShow) return;
 	const FFall& F = Fall(Index);
@@ -554,7 +575,7 @@ void FTCAtmosphere::UpdateBirds(double Time, const ATCTerrain* Terrain)
 	using namespace TCAtmosImpl;
 	UProceduralMeshComponent* BM = BirdMesh.Get();
 	if (!BM) return;
-	const bool bShow = bOn && Flight.size() > 0;
+	const bool bShow = bOn && Flight.size() > 0 && FTCGraphics::Get().Budget().bBirds; // Low: no birds
 	BM->SetVisibility(bShow);
 	if (!bShow || BM->GetNumSections() < 1) return;
 	const double* BV = BirdVertices();

@@ -4,7 +4,9 @@
 //  - the authored capture points: ring, flag, progress arc, contested, cut and locked marks, the flip ring, the label
 //    and the needs link (client/objectives.js, client/markers.js capturePoint, client/main.js startGame and the
 //    minimap): CLI-78, CLI-75;
-//  - the goal line (Tutorial mode.goal, scenario objectives; client/objectives.js): CLI-125, CLI-126;
+//  - the goal line (Tutorial mode.goal, scenario objectives; client/objectives.js): CLI-125, CLI-126; since round 14
+//    the text, its box (objectives.css), the collapse banner and the damaged buildings' smoke are FTCScenarioText's
+//    (Client/TCScenarioText.h) and GoalText here returns its text;
 //  - the end of the match: the epilogue stamp, reason line, slow-down, camera glide and sounds (client/epilogue.js),
 //    the lobby's result line (client/main.js renderLobby) and the match report (client/report.js): CLI-28, CLI-20,
 //    CLI-21.
@@ -210,7 +212,7 @@ public:
 	FTCScoreStrip ScoreStrip(const FTCMatchState& S, const FTCUnitTable* Table = nullptr) const;
 	const FTCMatchNotices& Notices() const { return Notice; }
 	// The goal line (objectives.js): "Objective: ..." from mode.goal, else the scenario's active and complete objectives,
-	// one per line with a tick or a bullet. Empty: no line.
+	// one per line with a tick or a bullet. Empty: no line. FTCScenarioText::GoalText's text (one source).
 	static FString GoalText(const FTCMatchState& S);
 	// The weather line and its tooltip (weather-view.js). False before a snapshot brought the weather.
 	static bool WeatherLine(const FTCMatchState& S, FString& OutText, FString& OutTitle);
