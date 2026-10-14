@@ -1,5 +1,7 @@
 # Changelog
 
+Unreleased entries that are not yet collected live in `changelog.d/`, one file per change.
+
 ## Unreleased
 
 - Normally merge Legacy main `113ca151` into World `1fc5fae9` after independent review of the four Rust/test conflicts. Retain every World source, test, harness and fixture byte, including the existing future-birth guards and three Buy regressions; the other three divergent source files merge to their exact World blobs. Preserve both tracking histories and attribute the parity notes to their historical checkpoints, without upgrading rows. The literal incoming-delta patches remain unequal because Legacy paths already exist in World; this update cannot use the documentation-only proof-reuse exception. Record the existing post-command refusal ordering for fresh Hermes review: World checks construction before production/scenario, while Legacy checks production/scenario first. Full new-head workspace/release validation, fresh hosted gates and Hermes acknowledgment remain pending. No native job or publication runs here.

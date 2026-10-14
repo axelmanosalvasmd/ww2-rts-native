@@ -8,9 +8,10 @@ At task start, task boundaries, before interface changes and before integration-
 
 ## Always update the changelog
 
-Every change must be recorded in `CHANGELOG.md` in the same commit as the change.
+Every change must be recorded in the same commit as the change, as a new file in `changelog.d/` (see `changelog.d/README.md`). Don't edit `CHANGELOG.md` directly: one file per change keeps parallel pull requests from conflicting. `scripts/collect-changelog.sh` folds the files into `CHANGELOG.md`.
 
-- Add a bullet under **Unreleased** at the top: what changed, in plain words.
+- Write bullets as they would read under **Unreleased**: what changed, in plain words.
+- Merging main into a branch is not a change and needs no entry.
 - Include numbers when you measured something (for example "2,000 units: 9.1 ms mean, 14.3 ms p95 per tick on the Vostro").
 - Note bugs you fixed and anything you found but left for later.
 
