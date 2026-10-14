@@ -1,5 +1,9 @@
 # Three Crossroads Native: design decisions
 
+## Real-socket foreign-order invariants (2026-10-14)
+
+The existing socket denial did not directly compare foreign unit and control state. One table-driven test now checks all four admitted command families in both seat directions, forged sender keys and mixed owned/foreign selection. It preserves current owner filtering and the owned-subset rule. The new reader compares the supported default NaN pace by exact IEEE bits, after retaining its initial derived-equality failure with identical native values. The focused ci-test passes once on Vostro, with zero failures or ignored tests. Existing helpers and tests remain byte-identical; no runtime mutation defect or mixed-selection mismatch was observed. Full workspace and separate review remain required before the per-stream PR. This defines no new role, visibility policy, public start or interface.
+
 ## LOG-17 update after merged NET-17 #206 (2026-10-14, source only)
 
 Normally merge frozen main `5c1ff1049ad4379853bb0fe79c8a7856adab7ca2` into LOG-17 `5a44b68b949d6071baf5a9bdc9871bcdfe56380f`, with common ancestor `b44025a8dd90f1843918c9079192242a20d2869c`. One additive CHANGELOG hunk and one DESIGN hunk conflict; retain both histories verbatim. PARITY merges automatically. The exact non-tracking patch equals main's own incoming delta with Git 2.43.0 and the explicit format acknowledged in Axel 062. Only main's unchanged listing harness and server parity notes enter outside the three tracking files. Every LOG-17/LOG-29 recorder, fixture, test and runtime byte remains exact, including the four-second recovery and useful farther-stock assertions. The complete 60-minute workflow remains unchanged.

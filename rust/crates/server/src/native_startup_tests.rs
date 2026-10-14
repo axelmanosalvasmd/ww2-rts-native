@@ -594,3 +594,6 @@ async fn actual_socket_start_decode_mutations_resync_reconnect_and_new_match() {
 
 #[path = "native_ingress_socket_tests.rs"]
 mod ingress;
+
+#[path = "native_ownership_socket_tests.rs"]
+mod native_ownership_socket_tests;
