@@ -1,0 +1,42 @@
+{
+  "status": "SOURCE_ONLY_HANDOFF_WIP",
+  "path": "/private/tmp/ww2-native-world-ground-contact-source",
+  "branch": "codex/world-ground-contact-source",
+  "head": "fca71f0b3bf49828a87874ef2ac2a9896e3f5d3e",
+  "parents": [
+    "7f9c8861facca574cc83e201f51bcfbbd007f39e",
+    "b6cbf406b629e33ea402c4621f43b4b12ac55581"
+  ],
+  "remote": "https://github.com/axelmanosalvasmd/ww2-rts-native.git",
+  "working_tree": "clean",
+  "publication": "Root owns push; this checkpoint not pushed by author",
+  "changed_from_world_parent": [
+    "CHANGELOG.md",
+    "DESIGN.md",
+    "harness/construction-tick-fixture.mjs",
+    "harness/ground-contact-fixture.mjs",
+    "harness/ground-orders-fixture.mjs",
+    "rust/crates/core/src/lib.rs",
+    "rust/crates/core/src/match_ground_contact.rs",
+    "rust/crates/core/src/match_ground_contact_tests.rs",
+    "rust/crates/core/src/match_tick.rs",
+    "rust/crates/core/src/world.rs",
+    "rust/crates/core/tests/fixtures/ground-contact.json",
+    "rust/crates/core/tests/match_combat.rs",
+    "rust/crates/simtest/tests/construction_tick.rs",
+    "rust/crates/simtest/tests/fixtures/construction-tick.json",
+    "rust/crates/simtest/tests/fixtures/ground-orders.json.gz",
+    "rust/crates/simtest/tests/ground_orders.rs"
+  ],
+  "frozen_parents": "both exact and clean",
+  "world_recorder_and_consumer_delta": "empty",
+  "native": "no Cargo or tests run for this merge; no held cache lease or author-owned running process",
+  "remaining": [
+    "Imported contact rejects positively moved World actors under its ordinary-mode guard after restoring prior dust.",
+    "Canonical World contact admission and separate Source witnesses remain unwritten.",
+    "Crushing and hostile mine detonation remain unsupported.",
+    "Combined source review and native replay remain pending.",
+    "Ordinary Research/Scenario continuation is separate and not imported."
+  ],
+  "user_stop": "Development stopped for Linux handoff; only additive documentation conflict resolution and checkpoint committed."
+}

@@ -118,3 +118,5 @@ pub mod world_recipient_metadata;
 pub mod staged_observer;
 
 pub mod world_route_retention;
+
+pub mod startup_tables;

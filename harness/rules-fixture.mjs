@@ -2,6 +2,7 @@
 // Run with x64 Node 24.21.0, matching harness/math-fixture.mjs. --check compares without writing.
 // --reference=/path/to/ww2-rts selects an already pinned read-only checkout.
 import { readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -55,6 +56,76 @@ if (sim.UNIT_TYPES.length !== 47) throw new Error('Expected all 47 unit definiti
 const catalog = { format: 1, reference: pin, tables };
 const catalogText = text(catalog);
 
+// Capture additions from initialized modules, separately from the existing catalog.
+const [debris, structures, layers] = await Promise.all(['debris-motion', 'structures', 'world-layers'].map(load));
+const additions = {};
+for (const [module, names] of [
+  [sim, ['RAIL_DIRS', 'POINT_KINDS', 'UNIT_ROW', 'GATE_OPEN_FLAG', 'OPERATIVE_FLAG', 'AUTO_FLAG', 'RIDING_FLAG', 'CARGO_FLAG', 'CARGO_SHIFT']],
+  [debris, ['DEBRIS_LIMITS', 'SECTION_MASS']],
+  [structures, ['STRUCTURE_LIMITS']],
+  [layers, ['WORLD_VERSION', 'BASE_SURFACES', 'OBJECT_TYPES', 'BIOMES', 'MATERIALS']],
+]) for (const name of names) {
+  if (!Object.hasOwn(module, name) || Object.hasOwn(tables, name)) throw new Error(`Invalid startup addition: ${name}`);
+  additions[name] = module[name];
+}
+if (Object.keys(tables).length !== 47 || Object.keys(additions).length !== 17) throw new Error('Expected 47 catalog tables and 17 additions');
+
+// The pin keeps these literals private. Extract from the actual functions and source,
+// failing if their expression changes instead of retaining a copied fallback value.
+const formationSource = readFileSync(`${reference}/shared/formation.js`, 'utf8');
+const numberFrom = (source, pattern, label, group = 1) => {
+  const match = source.match(pattern);
+  if (!match) throw new Error(`Formation expression changed: ${label}`);
+  const value = Number(match[group]);
+  if (!Number.isFinite(value)) throw new Error(`Invalid formation number: ${label}`);
+  return value;
+};
+const slotSource = formation.slotSize.toString(), spotsSource = formation.facingSpots.toString();
+const slotPattern = /def\.infantry\s*\?\s*(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)/;
+const formationNumbers = {
+  infantrySlot: numberFrom(slotSource, slotPattern, 'infantrySlot'),
+  vehicleSlot: numberFrom(slotSource, slotPattern, 'vehicleSlot', 2),
+  slotMargin: numberFrom(slotSource, /2\s*\*\s*def\.radius\s*\+\s*(\d+(?:\.\d+)?)/, 'slotMargin'),
+  rankGap: numberFrom(spotsSource, /Math\.max\(\.\.\.rank\.map\(p => p\.u\.size\)\)\s*\+\s*(\d+(?:\.\d+)?)/, 'rankGap'),
+  lineRank: numberFrom(formationSource, /Math\.ceil\(n \/ Math\.ceil\(n \/ (\d+(?:\.\d+)?)\)\)/, 'lineRank'),
+  maxStretch: numberFrom(spotsSource, /Math\.min\((\d+(?:\.\d+)?)\s*\*\s*tight, far\)/, 'maxStretch'),
+  depthSteps: numberFrom(spotsSource, /\(b\.u\.x - a\.u\.x\) \* dx \* (\d+(?:\.\d+)?) \+ \(b\.u\.z - a\.u\.z\) \* dz \* \1/, 'depthSteps'),
+};
+const formationBytes = Buffer.concat([
+  ...formation.SHAPES.map(shape => Buffer.from(`${shape}\0`)),
+  ...Object.values(formationNumbers).map(value => { const bytes = Buffer.alloc(8); bytes.writeDoubleLE(value); return bytes; }),
+]);
+const startup = {
+  schemaVersion: 1, reference: pin,
+  formation: { hash: fnv(formationBytes), scope: 'formation-only', shapes: formation.SHAPES, numbers: formationNumbers },
+  tables: { ...tables, ...additions },
+};
+const startupText = text(startup);
+const sha256 = data => createHash('sha256').update(data).digest('hex');
+const acceptedContent = readFileSync(`${root}/docs/contracts/startup-tables/proposed-content.json`, 'utf8');
+const acceptedSha256 = '5de90a7990ec5e8a2903436ac4809302464be29b546d79591a2adc08c68a2efd';
+if (sha256(acceptedContent) !== acceptedSha256) throw new Error('Accepted candidate bytes changed');
+// Canonicalize both through this encoder: encoding differences must not hide value changes.
+function ordered(value) {
+  if (Array.isArray(value)) return value.map(ordered);
+  if (value !== null && typeof value === 'object') return Object.fromEntries(Object.keys(value).sort().map(key => [key, ordered(value[key])]));
+  return value;
+}
+if (JSON.stringify(encode(startup)) !== JSON.stringify(ordered(JSON.parse(acceptedContent)))) throw new Error('Startup values differ from accepted candidate');
+
+// Every numeric leaf comes from the raw initialized exports, before tag encoding.
+// Paths use RFC 6901; bits are big-endian IEEE754 hex, including tagged numbers.
+const numbers = [];
+function recordNumbers(value, path = '') {
+  if (typeof value === 'number') numbers.push({ path, bits: bits(value) });
+  else if (Array.isArray(value)) value.forEach((item, index) => recordNumbers(item, `${path}/${index}`));
+  else if (value !== null && typeof value === 'object') for (const key of Object.keys(value).sort()) {
+    recordNumbers(value[key], `${path}/${key.replaceAll('~', '~0').replaceAll('/', '~1')}`);
+  }
+}
+recordNumbers(startup);
+const startupValues = { format: 1, reference: pin, contentSha256: sha256(startupText), numbers };
+
 const modes = [null, '', 'classic', 'world', 'conquest', 'assault', 'annihilation', 'horde', 'tutorial', 'unknown'];
 const modeResults = modes.map(kind => {
   const g = kind === null ? {} : { mode: { kind } };
@@ -102,6 +173,9 @@ const fixture = { format: 1, reference: pin, catalogFnv: fnv(Buffer.from(catalog
 const files = [
   ['rust/crates/core/data/rules.json', catalogText],
   ['rust/crates/core/tests/fixtures/economy.json', text(fixture)],
+  ['rust/crates/core/data/startup-table-additions.json', text({ format: 1, reference: pin, tables: additions })],
+  ['rust/crates/core/tests/fixtures/startup-tables.json', startupText],
+  ['rust/crates/core/tests/fixtures/startup-table-values.json', text(startupValues)],
 ];
 for (const [path, data] of files) {
   const dest = `${root}/${path}`;
@@ -110,3 +184,5 @@ for (const [path, data] of files) {
   } else writeFileSync(dest, data);
 }
 console.log(`${process.argv.includes('--check') ? 'Checked' : 'Recorded'} ${Object.keys(tables).length} tables, 47 units, ${modeResults.length} modes, ${abilityResults.length} abilities, ${research.length} research cases, ${multiplierCases} damage multipliers`);
+
+console.log(`Startup: 64 tables, ${numbers.length} numeric leaves, formation ${startup.formation.hash}, SHA256 ${sha256(startupText)}; accepted bytes ${startupText === acceptedContent ? 'identical' : 'different'}, values equal`);

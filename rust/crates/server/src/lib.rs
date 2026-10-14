@@ -1,5 +1,6 @@
 //! Lobby transport and trusted native room attachment. Public match start remains unavailable.
 pub mod authoritative_maps;
+mod commander_ingress;
 mod lobby;
 mod maps;
 mod native_startup;
