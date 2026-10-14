@@ -552,6 +552,7 @@ impl Projection {
                     panic!("operative fixture cannot represent LastHit as a shot")
                 }
                 TickEvent::Environment(event) => event.to_json(),
+                TickEvent::Scenario(event) => event.shot_json(),
                 TickEvent::Support(_) | TickEvent::Aviation(_) => {
                     panic!("operative fixture cannot represent Support or Aviation shot events")
                 }
