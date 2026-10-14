@@ -49,6 +49,8 @@ Each section ends with the existing limitations it found, the roadmap items it e
 - **Moving the pin** updates the rows its diff touches, in the same PR as the port and the parity run (`AGENTS.md`).
 - **Limitations are decisions, not tasks.** Each section lists the known bugs and leaks at the pin. The native game may fix them; a fix players would notice follows the rule above.
 
+LOG-29 (finite-store territory restock) is `ported` by six isolated original-JavaScript component cases and 30 exact ordered-inventory checkpoints. Only caller-provided rates are covered; supply-network/World providers, whole-match proof and joint acceptance remain separate. See [the logistics evidence](docs/parity/logistics.md#finite-store-restock-evidence-log-29).
+
 ## What the inventory found
 
 1. **Live JavaScript matches cannot be replayed.** Combat rolls, artillery and strike scatter, flak, spawn layout and some AI choices draw from the global `Math.random`, which the server never seeds and every room in a process shares. The match's own seed (`g.seed`) and the weather seed come from it too. Orders apply when they arrive, between ticks. How often an AI seat gets a fresh view follows the server's measured tick time (`snapEvery` moves between 2 and 4). Only seeded headless runs repeat: `playMatch({ seed })` and `tools/bench.mjs`. See IF-20, IF-21, IF-28, IF-29 and AI-15.
