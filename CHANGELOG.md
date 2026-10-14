@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Normally combine the frozen unagreed table-transport draft `086973b` with trusted-startup main `92fb7fe` without changing runtime source. Update producer provenance to verified `b682891` (368 native tests) and published PR #197 head `8bf067d`, whose combined 404-test/platform proof remains pending. Clarify numeric negotiation and preserve optional existing proto behavior; transport approval and adoption remain separate.
+
+- Draft an expressly unagreed opt-in socket transport for the accepted startup tables: exact hello/envelope schemas, bounded UTF-8 bytes, authoritative host hash checks, linked-core compatibility, startup/refusal/reconnect rules and a complete sanitized example. No active server, ABI/header, asset or consumer behavior changes.
+
 - Verify trusted ordinary startup at `3b84f7c`: all 401 optimized workspace tests, strict Clippy, formatting and release FFI pass. An independent audit retains all 399 prior test names and passes 14 copied affected server checks. Normally incorporate schema-documentation main `4867984` without changing runtime, test, harness, header or reference source; fresh platform and Axel host review remain required.
 
 - Replace the startup privacy test's one-element rows loop with the same direct assertion. The real socket and ClientView lifecycle passes at `81cd1ef`, then strict Clippy stops on that loop; this successor retains every privacy and lifecycle assertion and needs the remaining native and platform checks.

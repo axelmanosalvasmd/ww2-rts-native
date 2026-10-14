@@ -1,5 +1,17 @@
 # Three Crossroads Native: design decisions
 
+## Startup-table transport publication candidate (2026-10-13, unagreed)
+
+This separate normal merge joins frozen transport draft `086973b78381f380a9b0b941d5a3dac0490bc7c7` and trusted-startup main `92fb7fe66eb7f788c83449ae67223984b969f177`. Only additive documentation histories conflicted. Rust, harness, workflow, reference and FFI/header bytes remain exactly current main. The inner accepted content and complete envelope example remain unchanged; this is a contract proposal, not active table delivery.
+
+The draft now records exact producer `b682891` passing 368 optimized native tests and all gates on macOS arm64, plus published PR #197 head `8bf067d`. Their expected combined 404-test and Linux/Windows/macOS proof are still pending. Opt-in negotiation treats numeric 1, 1.0 and 1e0 as the same mathematical integer, without accepting booleans, strings, null or fractions. Existing proto stays optional and follows current validation when present; absent tablesVersion retains legacy behavior. Neither content acceptance nor this publication approves transport implementation or Unreal adoption.
+
+## Startup-table transport proposal (2026-10-13, unagreed)
+
+[The isolated transport draft](docs/contracts/startup-tables/transport/README.md) proposes an opt-in `hello.tablesVersion` and one server `tables` envelope carrying the exact core-produced JSON string with out-of-band version and SHA256. A local FFI buffer alone cannot verify the authoritative host's full table identity on reconnect. The socket proposal supplies both data and identity without an ABI change, new route or packaged table asset. It remains unapproved and has no active implementation.
+
+The proposed receiver verifies release expectations and exact inner UTF-8 bytes, including the final LF, before parsing or processing lobby/start/s. It preserves one immutable cache and refuses unknown versions, mismatched hashes, schema/tag errors, missing handshakes and changed reconnect content. Canonical Rust view and formation behavior stay linked through ABI 2 guards, formation hash checks and exact release artifact pairing; this does not enable future Catalog-dependent query interfaces. The draft specifies bounds, ownership, ordered delivery, error logs and Linux-first then three-platform consumer proof. Both owners must approve the concrete wire additions before implementation.
+
 ## Trusted startup publication proof (2026-10-13)
 
 Exact `3b84f7c` passes all 401 optimized workspace tests, formatting, strict all-target Clippy and the release FFI build on macOS arm64. The full workspace takes 459.96 seconds including compilation. This is test timing, not game performance. Actual raw name comparison retains every one of the 399 room/Human baseline tests and adds the safe-identity exhaustion and real decoder/socket lifecycle regressions. All 95 test profile rows preserve optimization level 2, debug assertions and overflow checks. An independent audit verifies seven raw logs and 97 copied artifacts, then passes 14 affected server checks. Sandbox socket denials and authorized reruns of the same binary are preserved separately.
