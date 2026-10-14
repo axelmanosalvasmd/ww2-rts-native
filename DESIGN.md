@@ -1,5 +1,9 @@
 # Three Crossroads Native: design decisions
 
+## Parity status after the source union (2026-10-14)
+
+Independent preservation review of `9249f598` found two stale descriptions: the ordinary consumer still said research awaited hookup, and the event-adapter note still blanket-refused falling and Scenario state. The assembled runner connects early research, and recipient admission handles canonical falling rows and provider-validated legacy Scenario state. Update those descriptions without marking any row ported or accepted. Legacy's focused proof remains leaf-specific; combined exact-head native validation is pending, and unsupported modes, scenario/actor contexts, AIR/live-flight adapter rows and the absent skipFog toggle retain their limits. This correction changes documentation only.
+
 ## World, Legacy and current Root source assembly (2026-10-13)
 
 This second local no-fast-forward merge has explicit parents Legacy/Ground/Root union `bc94fd8964ac0f71b746afad7b01b2b03efea185` and World source `491a21f27fbbb6491fdd8e67b97303d701042da5`. Git reports three merge bases: `b6cbf406b629e33ea402c4621f43b4b12ac55581`, `dd62df37c9d5db8dacb01d9b22730745fae14044` and `32670c2cff3613c7ef031830ef1377d9f6a568a2`. The normal merge retains both histories, rather than copying an older tree or assigning parent verification to the union.
