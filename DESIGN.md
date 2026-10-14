@@ -1,5 +1,26 @@
 # Three Crossroads Native: design decisions
 
+## Ordinary research scene repair (2026-10-13, source checkpoint)
+
+The retained failure at `158fadbe` is a scene-construction defect, not a reason to remove admission guards. Both ordinary-production tests reached `aircraft admission: Environment(InvalidInput("building footprint"))`. The original live actors at IDs 1000 and above had no cells or structure identity, while the discarded constructor buildings at IDs 7 through 10 retained their footprints and sections. The second HQ at 170 metres was outside the original 48-cell, 96-metre map. A bare `unwrap_err` could therefore accept the wrong refusal before production admission.
+
+The repaired recorder uses unchanged pinned Source `placeBuilding` on an authored 96-by-96 flat map with explicit top-left cell sites. It records constructor and placed-scene terrain, footprints and sections separately, and keeps actor cells and structure identities in every tick projection. Discarded starter actors do not erase their original stamps. Native setup derives the authored footprint and centre from the catalog size, stamps it through canonical World mutations, inserts the actual owner/centre footprint rows, and calls `register_building_structure`. Section HP starts at full finished-building HP, as Source registers the building before applying the authored damaged-HP patch. Research access patches change the actor's owner or built value without rewriting its retained footprint metadata, matching Source. No expected terrain or section record is installed into native state.
+
+All four traces, 2,429 complete steps, 4,810 phase observations, research pause/access/out/away/postwinner behavior and two immediate births remain. The restored-queue regression now requires `production admission: InvalidState("nonempty Conquest training queue")`, not any error, and retains the preclock, queued-key, RNG, empty-event and recovery-after-repair assertions. The only production-source edit removes the unused Destroy `cell` local; contact identities, traversal and emissions are unchanged.
+
+The retained Source regeneration and independent unobserved replay evidence match current recorder SHA256 `cb399d10f28b1190e22b80f3f19a446199be8fecf447df064d52aeaf0372b850` and fixture SHA256 `b3b4d33a48f8e3c0c83277784918cd48660f559768e0dd8dc24dbea133c5a081`. No regeneration, Cargo build or native test was run during this source review. Raw failures and earlier attempts remain in `/tmp/legacy-repair-681f9ff0/` and `/tmp/ww2-legacy-681f9ff0/`; the retained manifest's Rust-source hash differs from the current successor, so earlier native logs are not treated as exact-checkpoint proof. Parent-stopped overlapping runs are `STOPPED_BY_PARENT_FOR_SINGLE_OWNER_RECOVERY`, neither failures nor passes, with no OOM attribution.
+
+Later serial Vostro validation must use `CARGO_BUILD_JOBS=2`, `RUST_TEST_THREADS=2` and the unchanged optimized `ci-test` profile. The focused inventory is:
+
+- `ordinary_production_tick`: `original_ordinary_research_and_immediate_buy_ticks`; `restored_ordinary_training_queue_is_refused_before_the_clock`.
+- `legacy_scenario_tick`: `original_five_maps_run_early_research_and_ordered_legacy_scenario`; `scenario_winner_gate_keeps_existing_state_and_does_not_claim_execution`; `committed_scenario_prefix_survives_later_objective_refusal_and_faults_once`; `malformed_legacy_owner_refuses_before_clock_or_input_publication`.
+- `recipient_legacy_say`: `legacy_public_rows_and_empty_objective_hud_match_original_selected_source`.
+- Core falling: `actual_bridge_damage_and_motion_match_whole_source_falling_lists`; `actual_falling_selected_delivery_keeps_order_and_skipped_memory`.
+- Core Destroy: `great_bridge_due_triggers_emit_say_and_commit_destroy_effects`; `post_damage_failure_keeps_say_effect_and_world_prefix`.
+- Server startup: `actual_socket_start_decode_mutations_resync_reconnect_and_new_match`.
+
+The scenario, Say, falling, Destroy and socket targets, full workspace, strict Clippy, workspace formatting, release FFI and C-link gates remain unrun for this checkpoint. Great Bridge's 84 failed sections and the original seats' empty visible falling lists remain distinct from the separate visible-falling tests. Reference `e4e579a`, ABI 2/header, profiles and existing privacy/role/public-start guards are unchanged. One Match, command queue and ordered event owner remain. Coordination reply Axel 048 (`6158739127`) is acknowledged here for root's publication: its exact-`c09eb98` approval is not Legacy proof. Draft #199 remains unagreed and unimplemented; draft #201 is published Unreal consumer source, not adopted here or approved for merge. Root owns integration and public replies.
+
 ## El Alamein trusted startup lifecycle (2026-10-13, source successor)
 
 The startup test now descends from the actual ordinary Research/legacy caller and selected recipient composition at `63ea2ed9`. Validated legacy Scenario state is admitted through the canonical provider preflight. The complete real WebSocket lifecycle therefore returns to authored El Alamein, keeping the exact public map, all 13 start fields, full start baselines, later Fog deltas, held checks, real terrain and unit changes, resync, paused reconnect ordering and replacement identity.

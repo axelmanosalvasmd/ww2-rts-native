@@ -156,7 +156,6 @@ fn emit_destroy(
     let mut contact_id_index = 0;
     for y in y0..=y1 {
         for x in x0..=x1 {
-            let cell = y * damage.world.game.w + x;
             hit.contact_id = Some(&contact_ids[contact_id_index]);
             contact_id_index += 1;
             let mut output = |effect| emit(LegacyScenarioEmission::Environment(effect));

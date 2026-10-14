@@ -8,7 +8,7 @@ use ww2_core::{
     catalog::Catalog,
     economy::{Faction, Mode, Technology},
     economy_state::ArmySize,
-    game::Point,
+    game::{CELL, Point},
     map::AuthoritativeMap,
     match_abilities::AbilityState,
     match_combat::CombatState,
@@ -16,7 +16,7 @@ use ww2_core::{
     match_end::{EndReason, MatchFinish, MatchSample},
     match_firing::FiringState,
     match_recovery::RecoveryState,
-    match_runtime::{Match, MatchOptions, PlayerConfig},
+    match_runtime::{BuildingCell, Match, MatchOptions, PlayerConfig},
     match_tick::{TickPathConfig, TickPhase},
     orders::OrderKey,
     production::JobStatus,
@@ -102,7 +102,7 @@ fn make(t: &Value) -> Match {
         t["bootstrap"],
         "retained constructor terrain, footprints and structural sections"
     );
-    // Both scenes discard initial actors, retaining checked map footprints.
+    // Source discards initial actors without clearing their footprints or sections.
     for id in m.world.game.units.keys().copied().collect::<Vec<_>>() {
         m.production.remove_building(id);
     }
@@ -124,17 +124,38 @@ fn make(t: &Value) -> Match {
     }
     for spec in t["specs"].as_array().unwrap() {
         let owner = spec["owner"].as_u64().unwrap() as usize;
-        let kind = m.rules.kind(spec["type"].as_str().unwrap()).unwrap();
+        let name = spec["type"].as_str().unwrap();
+        let kind = m.rules.kind(name).unwrap();
+        let definition = Catalog::compiled().unwrap().unit(name).unwrap();
+        let size = definition.get("size").unwrap().number().unwrap() as usize;
+        let max_hp = definition.get("hpPer").unwrap().number().unwrap();
+        let cell = spec["cell"].as_u64().unwrap() as usize;
+        let width = m.world.game.w;
+        let (x, y) = (cell % width, cell / width);
+        assert!(x + size <= width && y + size <= m.world.game.h);
+        let cells: Vec<_> = (y..y + size)
+            .flat_map(|row| (x..x + size).map(move |column| row * width + column))
+            .collect();
+        let top = cells
+            .iter()
+            .map(|&c| m.world.game.height.as_ref().map_or(0, |h| h[c]))
+            .max()
+            .unwrap();
+        for &c in &cells {
+            if m.world.game.height.as_ref().map_or(0, |h| h[c]) < top {
+                m.world.set_level(c, top).unwrap();
+            }
+            m.world.set_cell(c, b'K').unwrap();
+        }
+        let at = Point {
+            x: (x as f64 + size as f64 / 2.0) * CELL,
+            z: (y as f64 + size as f64 / 2.0) * CELL,
+        };
         let id = m.next_unit_id;
-        let mut u = unit_spawn::initial_unit(
-            &m.rules,
-            Catalog::compiled().unwrap(),
-            kind,
-            id,
-            owner,
-            input_point(spec),
-        )
-        .unwrap();
+        let mut u =
+            unit_spawn::initial_unit(&m.rules, Catalog::compiled().unwrap(), kind, id, owner, at)
+                .unwrap();
+        u.cells = Some(cells.iter().map(|&c| c as u32).collect());
         u.built = spec["built"].as_f64();
         u.hold_pos = true;
         if let Some(hp) = spec["hp"].as_f64() {
@@ -156,7 +177,26 @@ fn make(t: &Value) -> Match {
             id,
             (!spec["rally"].is_null()).then(|| input_point(&spec["rally"])),
         );
+        for &c in &cells {
+            m.building_cells.insert(
+                c,
+                BuildingCell {
+                    unit: id,
+                    owner,
+                    at,
+                },
+            );
+        }
+        // Source registers the finished building before applying the scene's HP patch.
+        m.world
+            .register_building_structure(id, &cells, max_hp, max_hp)
+            .unwrap();
     }
+    assert_eq!(
+        bootstrap(&m),
+        t["scene"],
+        "actual placed-scene terrain, retained footprints and structural sections"
+    );
     m.grid.rebuild(&m.world.game.units);
     ww2_core::vision::update_vision(&mut m.world.game, &m.rules, &m.grid);
     for slot in 0..m.start.players.len() {
@@ -218,7 +258,7 @@ fn projection(m: &Match) -> Value {
       "units":m.world.game.units.values().map(|u| {
         let c=&m.commands.units[&u.id];let f=m.firing.get(u.id).unwrap();let a=m.abilities.get(u.id).unwrap();
         let b=m.production.building(u.id);
-        json!({"id":u.id,"type":m.rules.kinds[u.kind].name,"owner":u.owner,"hp":bits(u.hp),"x":bits(u.x),"z":bits(u.z),"rot":bits(u.rot),"aim":bits(c.aim),"built":u.built.map(bits),
+        json!({"id":u.id,"type":m.rules.kinds[u.kind].name,"owner":u.owner,"hp":bits(u.hp),"x":bits(u.x),"z":bits(u.z),"rot":bits(u.rot),"aim":bits(c.aim),"built":u.built.map(bits),"cells":u.cells,"structureId":m.world.structures.iter().find(|s|s.entity_id==Some(u.id)).map(|s|&s.id),
           "queue":b.map(|b|b.queue().collect::<Vec<_>>()),"jobs":b.map_or_else(Vec::new,|b|b.rows().iter().map(|r|json!({"id":r.job.id,"type":r.job.kind,"status":if r.status==JobStatus::Active{"active"}else{"waiting"},"mp":bits(r.job.charge.mp),"fuel":bits(r.job.charge.fuel)})).collect::<Vec<_>>()),"prog":b.map(|b|bits(b.progress())),
           "rally":optional_point(m.building_rallies.get(&u.id).copied().flatten()),"path":u.path.iter().copied().map(point).collect::<Vec<_>>(),"goal":optional_point(u.world_goal),"routeEnd":optional_point(c.route_end),"ghost":bits(u.ghost),"auto":c.auto_cast,"autoRetreat":c.auto_retreat,"holdFire":c.hold_fire,"holdPos":u.hold_pos,"drift":u.drift,
           "timers":{"cooldown":bits(f.cooldown),"retarget":bits(f.retarget),"repath":bits(u.repath),"cd":bits(a.cooldown),"buff":bits(a.buff),"sprint":bits(u.sprint),"react":bits(c.react),"still":bits(u.still.expect("Source spawnUnit always authors still")),"stuck":bits(u.stuck),"supp":bits(u.supp),"moveSpeed":bits(u.move_speed),"vx":bits(u.vx.unwrap()),"vz":bits(u.vz.unwrap())}})
@@ -374,7 +414,7 @@ fn restored_ordinary_training_queue_is_refused_before_the_clock() {
         );
         assert_eq!(source["before"]["tick"], 0);
         assert_eq!(source["after"]["tick"], 1);
-        let scene = json!({"map":f["traces"][0]["map"],"specs":source["specs"],"bootstrap":source["bootstrap"]});
+        let scene = json!({"map":f["traces"][0]["map"],"specs":source["specs"],"bootstrap":source["bootstrap"],"scene":source["scene"]});
         let mut m = make(&scene);
         m.production.reconcile_queue(1000, &["rifle"]).unwrap();
         let key = OrderKey {
@@ -388,6 +428,10 @@ fn restored_ordinary_training_queue_is_refused_before_the_clock() {
         let queue = (m.commands.pending_commands(), m.commands.next_tick());
         assert_eq!(queue, (1, Some(key.tick)));
         let failure = m.advance_tick().unwrap_err();
+        assert_eq!(
+            failure.reason,
+            "production admission: InvalidState(\"nonempty Conquest training queue\")"
+        );
         assert_eq!(failure.tick, 0);
         assert!(failure.events.is_empty());
         assert!(m.tick_state.fault().is_none());
