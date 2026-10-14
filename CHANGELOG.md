@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Give the shared Rust CI job 60 minutes instead of 40, preserving every existing check. World run `38550473982` explicitly hit the 40-minute deadline on Windows and macOS; the cancelled jobs remain incomplete evidence. No runtime, fixture, assertion, dependency, runner or Vostro memory-limit change.
+
 - Complete the missing LOG-29 acceptance witness without changing runtime code: the maintained convoy recorder adds six isolated finite-store cases and 30 ordered-inventory checkpoints from original JavaScript `stepConvoys`. One focused test proves 40-second rate-1 fill, half-rate scaling, zero-rate/inactive/source exclusions, partial occupancy and overshoot caps. Preserve all earlier fixture values and assertions. All five convoy tests pass in debug, locked `ci-test` and release on Vostro; recorder check, formatting and strict core all-target Clippy pass under 6 GiB/no-swap caps with four build/test threads and no cap-hit or OOM events. Mark only LOG-29 `ported`, not `accepted`; caller-provided rates do not prove supply providers, World or whole matches. No runtime defect was found; existing duplicate convoy paragraphs in DESIGN remain a documentation follow-up.
 
 - Verify focused Ground `d41cbf2` on Vostro: all 30 existing construction, contact, orders, reactions, abilities, traffic, ingress and replay tests pass under locked optimized `ci-test` with 6 GiB memory caps and six build/test threads. Preserve every runtime, test, fixture and recorder byte. PR #202's World traffic and new rally-test failures remain on its separate source; the unchanged Ground traffic and Classic ability assertions pass. Independent integration review and final-head full workspace, release FFI/C replay and platform gates remain pending.

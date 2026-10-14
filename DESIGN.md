@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## Shared Rust CI job deadline (2026-10-14)
+
+Change only `jobs.check.timeout-minutes` from 40 to 60. The complete World oracle made the old deadline insufficient in run `38550473982` at `e6696418`: Windows retained 467 passes in completed result sections plus one pass within an unfinished target, while macOS completed all 469 tests before release FFI was cancelled. Both check annotations explicitly say the job exceeded 40 minutes. Ubuntu completed the full suite and release/C gate. Preserve the cancellations as incomplete platform proof, not test failures or proven OOM.
+
+This shared CI correction has its own PR against main, not World #202. The matrix, pinned tools, path filters, permissions, fail-fast setting and all format/Clippy/test/release/C commands remain byte-identical. Sixty minutes is bounded execution headroom, not a guarantee or runtime improvement. Vostro's 6 GiB focused and at-most-10 GiB heavy caps do not change. Official GitHub syntax defines this field as the whole-job maximum before automatic cancellation: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax#jobsjob_idtimeout-minutes. The standalone PR needs its own three-platform checks before merge; World then updates onto that merged main and gets fresh exact-head CI.
+
 ## LOG-29 finite-store restock witness (2026-10-14)
 
 The restock implementation already exists in `supply_convoys.rs`. Add its missing direct acceptance witness to the maintained convoy recorder/fixture and existing test target, rather than a second implementation or public API. Six empty component scenes execute original `stepConvoys` with explicit caller rates; one test compares ordered inventories at 30 intermediate, fill and overshoot checkpoints with the existing numeric-bit comparator. A genuine empty scheduling pass precedes the seeded stores; ticks 1 through 5 isolate service from the next synchronization at tick 40. These explicit time steps are component inputs, not a live match schedule. LOG-29 alone is `ported`; provider integration, World rates, whole-match proof and joint acceptance remain separate.
