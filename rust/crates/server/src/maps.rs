@@ -7,6 +7,14 @@ use axum::{
 #[path = "map-data.rs"]
 mod data;
 
+/// The committed mapForClient projection, independent of private authoring data.
+pub(crate) fn public_map(name: &str) -> Option<serde_json::Value> {
+    data::MAPS
+        .iter()
+        .find(|(key, _)| *key == name)
+        .map(|(_, text)| serde_json::from_str(text).expect("validated public map asset"))
+}
+
 /// Read-only map delivery. No request can select an authoring file or raw projection.
 pub(crate) async fn serve(
     OriginalUri(uri): OriginalUri,

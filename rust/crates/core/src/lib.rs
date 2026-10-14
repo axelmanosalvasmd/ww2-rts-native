@@ -20,6 +20,17 @@ pub mod fog;
 pub mod formation;
 pub mod game;
 pub mod grid;
+pub mod human_commander;
+pub mod human_commander_inputs;
+pub mod human_commander_policy;
+pub mod human_commander_state;
+pub mod human_commander_timing;
+
+#[cfg(test)]
+use crate as core_api;
+#[cfg(test)]
+#[path = "../tests/support/human_commander_facts.rs"]
+mod human_commander_test_facts;
 pub mod legacy_scenario;
 pub mod match_companion_effects;
 mod match_companion_tick;
@@ -41,6 +52,7 @@ mod match_destroy;
 pub mod match_end;
 pub mod match_firing;
 pub mod match_ground_support;
+pub mod match_human_observation;
 pub mod match_logistics;
 pub mod match_reactions;
 pub mod match_recovery;
