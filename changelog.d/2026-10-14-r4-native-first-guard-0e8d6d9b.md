@@ -1,0 +1,1 @@
+- Document the approved native first-guard refusal order and add one focused core regression for three independently invalid construction, production and Legacy scenario contexts, preserving admission state and publication output.
