@@ -278,9 +278,15 @@ assert.deepEqual(cases.slice(0,7).map(c=>c.legacyProjectionHash),preserved,'Orig
 assert.equal(cases.slice(0,7).reduce((n,c)=>n+c.input.until,0),114);
 assert.equal(cases.slice(0,7).reduce((n,c)=>n+c.phases.length,0),1486);
 const steps=cases.reduce((n,c)=>n+c.frames.length,0),phaseEntries=cases.reduce((n,c)=>n+c.phases.length,0);
-const output=gzipSync(Buffer.from(JSON.stringify({format:2,reference:pin,node:process.version,arch:process.arch,
+const payload=Buffer.from(JSON.stringify({format:2,reference:pin,node:process.version,arch:process.arch,
  scope:'Original complete World steps with passive chronological output and owned-state reads, compared after every step with a separately imported pristine sim.js. Source-only fixed Math.random and explicit environment seed do not claim native RNG equivalence or recipient/privacy behavior.',
  stateEncoding:'Full canonical initial raw image, followed by ordered lossless set/delete patches. Patch Number values retain explicit non-integral, non-finite and signed-zero bits; safe integer bits are exactly derivable from raw. Every serialized patch sequence is decoded and checked against the actual original state before recording.',
- preservation:{source:'6822056',cases:7,steps:114,phaseEntries:1486,projectionHashes:preserved},map,steps,phaseEntries,cases})+'\n'));
-if(process.argv.includes('--check')){if(!readFileSync(path).equals(output))throw Error('World tick fixture differs');}else writeFileSync(path,output);
-console.log(`Verified ${cases.length} original World controller traces, ${steps} ticks, ${phaseEntries} phase entries; original8 complete scenes and original7/114/1486 projections preserved; pristine replay agrees after every step; fixture SHA256 ${createHash('sha256').update(output).digest('hex')}`);
+ preservation:{source:'6822056',cases:7,steps:114,phaseEntries:1486,projectionHashes:preserved},map,steps,phaseEntries,cases})+'\n');
+let output;
+if(process.argv.includes('--check')){
+ output=readFileSync(path);
+ // Gzip's OS header byte varies by platform. Validate the complete stream, then
+ // compare every payload byte, including Number bits, state patches and RNG receipts.
+ assert.ok(gunzipSync(output).equals(payload),'World tick fixture payload differs');
+}else{output=gzipSync(payload);writeFileSync(path,output);}
+console.log(`Verified ${cases.length} original World controller traces, ${steps} ticks, ${phaseEntries} phase entries; original8 complete scenes and original7/114/1486 projections preserved; pristine replay agrees after every step; fixture SHA256 ${createHash('sha256').update(output).digest('hex')}; payload SHA256 ${createHash('sha256').update(payload).digest('hex')}`);
