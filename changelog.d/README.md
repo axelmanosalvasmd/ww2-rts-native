@@ -21,12 +21,14 @@ filename in descending order, not by creation time. Run it in its own commit
 when cutting a release or when the folder grows long. This file stays.
 
 Run one collector at a time. Before replacing `CHANGELOG.md`, the script
-saves its original and assembled contents plus each fragment's path and
-contents in a private per-worktree Git journal. If interrupted, or if Git
-cannot delete the fragments, fix the Git failure and rerun the script. It
+saves its original and assembled contents plus each fragment's path,
+contents and original Git index entry in a private per-worktree journal.
+If interrupted, or if Git cannot delete the fragments, fix the Git failure and rerun the script. It
 finishes that collection before collecting any new fragments. A retry
-refuses unrelated changelog or fragment edits, preserving the journal until
-you restore the recorded contents. It never removes Git's `index.lock`.
+refuses unrelated changelog or fragment edits and changed staged blobs or
+file modes, even when a fragment is missing from the worktree. It preserves
+the journal until you restore the recorded contents and index entries. It
+never removes Git's `index.lock`.
 Commit the resulting changelog and staged fragment deletions together.
 
 For local Rust checks after the test-binary consolidation, prefer

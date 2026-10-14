@@ -2,7 +2,8 @@
 # Move changelog fragments from changelog.d/ into CHANGELOG.md.
 #
 # Final order is newest on top, with same-date topic filenames descending.
-# A private per-worktree journal lets a retry finish interrupted collection.
+# A private per-worktree journal records contents and index identities so a
+# retry can finish interrupted collection without removing staged replacements.
 # Run one collector at a time, from anywhere inside the repository.
 set -euo pipefail
 
@@ -54,6 +55,7 @@ if [[ ! -d "$journal" ]]; then
   for ((i = 0; i < ${#fragments[@]}; i++)); do
     printf '%s\0' "${fragments[i]#"$root/"}" >> "$work/fragments"
     cp -p -- "${fragments[i]}" "$work/fragment-$i"
+    git --literal-pathspecs -C "$root" ls-files --stage -z -- "${fragments[i]}" > "$work/index-$i"
   done
   for ((i = ${#fragments[@]} - 1; i >= 0; i--)); do
     sed -e '$a\' "$work/fragment-$i" >> "$work/block"
@@ -96,6 +98,7 @@ fi
 remaining=()
 for ((i = 0; i < ${#fragments[@]}; i++)); do
   f="${fragments[i]}"
+  [[ -s "$journal/index-$i" ]] || refuse "Journal has no recorded index entry for fragment: $f"
   if [[ -e "$root/$f" || -L "$root/$f" ]]; then
     cmp -s -- "$root/$f" "$journal/fragment-$i" ||
       refuse "Fragment changed during collection; restore it before retrying: $f"
@@ -103,6 +106,10 @@ for ((i = 0; i < ${#fragments[@]}; i++)); do
     refuse "Fragment missing before collection; restore it before retrying: $f"
   fi
   if git --literal-pathspecs -C "$root" ls-files --error-unmatch -- "$f" > /dev/null 2>&1; then
+    # A missing worktree file does not make a changed staged entry ours.
+    git --literal-pathspecs -C "$root" ls-files --stage -z -- "$f" |
+      cmp -s -- "$journal/index-$i" - ||
+      refuse "Fragment index entry changed during collection; restore its recorded blob and mode before retrying: $f"
     remaining+=("$f")
   elif [[ -e "$root/$f" || -L "$root/$f" ]]; then
     refuse "Fragment is no longer tracked; restore its index entry before retrying: $f"
