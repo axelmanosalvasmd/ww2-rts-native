@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Preserve canonical startup-table documentation JSON with LF checkout attributes. PR #197 Windows failed the exact-byte comparison to accepted content while the Rust fixture comparison passed; isolated `core.autocrlf=true` checkout changed the accepted payload from 30,618 to 30,619 bytes by converting its final LF to CRLF. The scoped attribute restores the accepted bytes and hash without changing producer, fixture, schema or test source. Fresh platform proof remains pending.
+
 - Normally combine the exact verified internal table producer `b682891` with trusted-startup main `92fb7fe` in a separate publication tree. Preserve all producer, recorded data, schema, fixture and original-source harness bytes, plus all canonical main modules. The producer constituent passes 368 optimized workspace tests and all gates; main carries the checked 401-test startup baseline. Final combined 404-test and three-platform proof remain pending, with transport and Unreal adoption separate.
 
 - Flatten the startup-schema anyOf refusal condition to satisfy strict Clippy without changing short-circuit validation or output bytes. Exact predecessor `b9e9bb7` passes all 3 debug and 3 optimized startup-table tests, 7 economy tests and formatting; strict checks stop on this single style finding. Fresh successor gates remain pending.

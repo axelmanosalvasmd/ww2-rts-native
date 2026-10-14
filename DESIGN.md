@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## Canonical startup-table checkout bytes (2026-10-13)
+
+PR #197 at exact `8bf067dc8700600a648576b7f2b055cc367fc07a` failed on Windows in the second byte assertion of `complete_node_exports_keep_every_field_number_and_exact_bytes`, comparing the producer with `docs/contracts/startup-tables/proposed-content.json`. The preceding comparison with the Rust fixture passed. Existing checkout attributes force LF for Rust JSON only. An isolated Git checkout with `core.autocrlf=true` reproduces the documentation payload changing from 30,618 bytes and accepted SHA256 `5de90a7990ec5e8a2903436ac4809302464be29b546d79591a2adc08c68a2efd` to 30,619 bytes and SHA256 `a6303de3978806be1a3d94902a2d0c6351aedbe92ef6c4aa0f3abc32ade3fb0f`: its final LF becomes CRLF, while the Rust fixture retains canonical bytes.
+
+The targeted `docs/contracts/startup-tables/**/*.json text eol=lf` attribute preserves canonical documentation JSON through checkout. Repeating the same isolated checkout with this rule retains the accepted payload size/hash and all four existing startup-table documentation JSON files byte for byte. Producer runtime, maintained recorder, data, fixtures, schema, assertions, workflow and approved ABI 2 header remain unchanged. The failed Windows result is preserved; fresh exact-head platform gates remain pending. Transport and Unreal adoption stay separate.
+
 ## Startup-table producer publication candidate (2026-10-13)
 
 This separate normal merge has parents verified producer `b68289136e0572fdc0fcbc705514a509083c167b` and current main `92fb7fe66eb7f788c83449ae67223984b969f177`. Only additive CHANGELOG/DESIGN histories conflicted. The automatic module merge preserves all canonical main modules and adds exactly one `startup_tables` registration. All producer source, additions, complete payload/number fixtures, accepted schema and the maintained rules recorder remain byte-identical to the producer constituent. No server behavior, transport, FFI/header, original catalog/economy data or build profile is changed by this feature diff against main.
