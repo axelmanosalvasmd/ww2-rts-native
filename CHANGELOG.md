@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Add one focused creation-only listing check to the existing live lobby harness. Both Node and Rust preserve a listed room's initial title/visibility and keep an unlisted room absent after contrary later hellos. On Vostro, all four live cases, the original 38 checkpoints, 33 map metadata checks, existing failure paths, seven lobby tests, locked debug build, syntax, formatting and strict server/all-target Clippy pass under 6 GiB/no-swap and four-CPU limits. Mark only ordinary-lobby NET-17 ported, not accepted. Runtime and all baseline harness bytes are unchanged; full workspace, release FFI/C replay and final-head platform gates remain pending.
+
 - Verify focused Ground `d41cbf2` on Vostro: all 30 existing construction, contact, orders, reactions, abilities, traffic, ingress and replay tests pass under locked optimized `ci-test` with 6 GiB memory caps and six build/test threads. Preserve every runtime, test, fixture and recorder byte. PR #202's World traffic and new rally-test failures remain on its separate source; the unchanged Ground traffic and Classic ability assertions pass. Independent integration review and final-head full workspace, release FFI/C replay and platform gates remain pending.
 
 - Carry the exact ingress correction from `71f460ba` onto the focused Ground/main assembly, retaining its original repair notes below. Resolve one CHANGELOG and one DESIGN conflict without importing their unrelated `5185e171` context. The 17 distinct passes belong only to `71f460ba`; this candidate runs no native jobs and still needs Root's capped validation.

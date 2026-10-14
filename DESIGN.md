@@ -677,6 +677,12 @@ Three focused tests compare all 33 authored maps plus eight constructed terrain 
 
 This is component evidence, not a completed match-start pipeline. The caller still normalizes mode settings, applies the Assault defender-spawn override and Horde/Tutorial shared starts, handles World home assignments, and creates starting units, buildings and wallets. The helpers do not change the map loader, `Game`, the ABI or wire messages.
 
+## Creation-only lobby listing witness (2026-10-14)
+
+NET-17 needed a focused acceptance witness, not a runtime change. The existing live lobby harness now invokes `listing_is_creation_only` once per actual server. It directly asserts initial lobby/directory state, then awaits both joining lobby replies before checking that a listed room keeps its initial title and visibility despite a contrary hello, and that an unlisted room stays unlisted and absent despite a listing request. Node and Rust outputs are compared with the unchanged normalization. A spectate/lobby barrier removes the listed witness seats from the directory before sockets close; all prior scenarios remain byte-identical.
+
+On Vostro, pinned Node 24.21.0/ws 8.22.0 and Rust 1.99.0 pass both directions per server (four live cases), the original 38 checkpoints, 33 map metadata checks and existing failure paths. The locked debug server build, all seven existing `lobby::tests::` tests, syntax, workspace formatting and strict server/all-target Clippy pass sequentially under 6 GiB/no-swap caps and four-CPU limits. NET-17 is ported for ordinary lobbies only. Full workspace, release FFI/C replay, final-head platform gates and owner acceptance remain separate; no interface, privacy, role, public-start or game behavior changes.
+
 ## Rust lobby and session server (2026-10-12)
 
 `rust/crates/server` now provides `ww2-server`, a standalone HTTP/WebSocket process. Its first slice owns rooms, human and AI seats, observers, lobby settings, token reconnect/takeover, latency ping, a public room directory and cleanup. It does not start or simulate matches. Unsupported match commands return explicit denials, so clients cannot mistake a lobby for a running game.

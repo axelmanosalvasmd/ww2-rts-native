@@ -45,6 +45,7 @@ Each section ends with the existing limitations it found, the roadmap items it e
 ## How to use it
 
 - **Status values:** `todo`; `in progress`; `ported` (the Rust side passes the row's check); `accepted` (both owners signed off); `differs` (an approved difference, recorded in `DESIGN.md`); `dropped` (an approved removal). The tools table records a proposed decision per tool instead.
+- **NET-17 tracking:** the focused live `listing_is_creation_only` check passes both creation-only directions against pinned Node and Rust, with independent lobby/directory assertions and exact output comparison. NET-17 is `ported` for ordinary lobbies only, not `accepted`; this adds no privacy, role or public-start approval.
 - **Row IDs are stable.** A new row takes the next free number; a removed row is marked `dropped`, not renumbered, so tasks and PRs can cite IDs.
 - **Moving the pin** updates the rows its diff touches, in the same PR as the port and the parity run (`AGENTS.md`).
 - **Limitations are decisions, not tasks.** Each section lists the known bugs and leaks at the pin. The native game may fix them; a fix players would notice follows the rule above.
