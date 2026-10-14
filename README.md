@@ -8,3 +8,4 @@ Evidence images for issue #4 checkpoints. Captured offscreen from local, uncommi
 - slice-1l: lighting matched, reference map objects and scenery, animation, sprite effects, close-up soldier comparisons
 - slice-1m: Rust decoder default, polish (rings, tracers, damage smoke, tossed bodies), Spanish, packaged client frames
 - slice-1n: terrain (relief, painted ground, water, apron, railways, atmosphere); left browser reference, right Unreal
+- slice-1q: every mode played live, garrison/escort/queue/rail/recovery, F2 stats sheet, text fields, HUD fit at UI 150%, Spanish end report, lobby tone; left browser reference, right Unreal
