@@ -127,9 +127,9 @@ fn ordinary_destroy(state: &mut Match) {
         wind_angle: state.start.wind.0,
         wind_strength: state.start.wind.1,
     };
-    for x in [40, 50] {
-        let contact = format!("ordinary:{x}:{}", 25 * state.world.game.w + x);
-        hit.contact_id = Some(&contact);
+    let contacts = [40, 50].map(|x| format!("ordinary:{x}:{}", 25 * state.world.game.w + x));
+    for (x, contact) in [40, 50].into_iter().zip(&contacts) {
+        hit.contact_id = Some(contact);
         state
             .environment
             .damage_cells(

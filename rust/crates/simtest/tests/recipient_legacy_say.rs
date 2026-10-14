@@ -90,7 +90,7 @@ fn reload(state: &mut Match, frame: &Value) {
         let kind = state.rules.kind(row["type"].as_str().unwrap()).unwrap();
         let mut unit = initial_unit(
             &state.rules,
-            &catalog,
+            catalog,
             kind,
             id,
             row["owner"].as_u64().unwrap() as usize,
