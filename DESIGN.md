@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## LOG-29 finite-store restock witness (2026-10-14)
+
+The restock implementation already exists in `supply_convoys.rs`. Add its missing direct acceptance witness to the maintained convoy recorder/fixture and existing test target, rather than a second implementation or public API. Six empty component scenes execute original `stepConvoys` with explicit caller rates; one test compares ordered inventories at 30 intermediate, fill and overshoot checkpoints with the existing numeric-bit comparator. A genuine empty scheduling pass precedes the seeded stores; ticks 1 through 5 isolate service from the next synchronization at tick 40. These explicit time steps are component inputs, not a live match schedule. LOG-29 alone is `ported`; provider integration, World rates, whole-match proof and joint acceptance remain separate.
+
+Vostro passes all five convoy tests in locked debug, `ci-test` and release, recorder generation/`--check`, formatting and strict core all-target Clippy. Jobs run sequentially under 6 GiB memory/no-swap caps with four build/test threads and no recorded cap hits or OOMs. The original fixture prefix and all existing values are preserved; raw logs, tracked-file hashes, overlap exclusions and preservation evidence are in `/tmp/log29-restock-b99d9f00-evidence/`. Locally acknowledge issue #5's separate-candidate, fixed-ABI and exact-head requirements (034/036, 050, World handoff 032 and Ground merge 037). No shared runtime, reference, ABI/header, dependency, profile, workflow or pending policy changes. Independent review, Root integration and exact-head platform gates remain pending; no PR or push is made. Existing duplicated convoy paragraphs below are left for a separate documentation cleanup.
+
 ## Focused Ground validation and failure ownership (2026-10-14)
 
 Exact `d41cbf2adda68382b6854feddd35aeaac9e1e3e5` passes 30 distinct existing optimized `ci-test` checks on Vostro: six construction, three ground-contact, three ground-order, four reaction, four ability, three traffic, four server ingress and three construction/ground-order replay tests. No test fails or is ignored. Each Cargo invocation uses Rust 1.99.0, the locked dependencies, a user systemd scope with MemoryMax 6G and MemorySwapMax 0, six build jobs and six test threads. No full workspace, release, recorder or platform job runs in this phase. Raw commands, source inventory, exits and logs remain in `/tmp/ground-focused-d41cbf2-evidence/`.
@@ -676,6 +682,10 @@ Layout selection preserves the source's recursive order and pairwise score accum
 Three focused tests compare all 33 authored maps plus eight constructed terrain cases, 957 layouts and 18 VP goals against the original JavaScript helpers at `e4e579a`. Cases include every six-player team partition, every supported player/spawn count, asymmetric ford distances, missing heights, cliffs, disconnected islands, shared starts and thresholds on either side of the tolerance. Invalid dimensions, buffer shapes, cells, indices, counts, non-finite/negative distances, score overflow and invalid random fractions return errors. Tiny maps are allowed for component fixtures; the authoring-map loader enforces the game's minimum dimensions.
 
 This is component evidence, not a completed match-start pipeline. The caller still normalizes mode settings, applies the Assault defender-spawn override and Horde/Tutorial shared starts, handles World home assignments, and creates starting units, buildings and wallets. The helpers do not change the map loader, `Game`, the ABI or wire messages.
+
+## NET-17 and LOG-29 normal integration (2026-10-14)
+
+Normally merge exact main `3ca105ed` into NET-17 `d8b243b4`, retaining both parents and their tracking notes. The listing function, invocation and all prior lobby harness bytes remain exact; the LOG-29 recorder, fixture and test remain exact from `fe40b3ad` and main. Earlier 426-test NET-17 and 427-test LOG-29 proofs belong to the parents, not this mixed head. Fresh exact-head workspace, release FFI/C replay and hosted platform gates remain pending under Root ownership. No runtime, contract, header, dependency, profile, workflow or reference change is introduced by the merge.
 
 ## Creation-only lobby listing witness (2026-10-14)
 
