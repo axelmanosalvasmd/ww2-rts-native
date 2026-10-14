@@ -13,10 +13,11 @@
 #   unreal/Tools/ww2-ffi.sh remove   delete the installed files (the plugin then builds without the Rust core)
 #
 # Environment (all optional):
-#   WW2_FFI_REV      native commit to build (default below: PR #16 at 03a49ac, ABI 2 with the six ww2_view_* calls)
+#   WW2_FFI_REV      native commit to build (default below: main at 92fb7fe, ABI 2 with the six ww2_view_* calls of
+#                    PR #16, merged at d88ef6d; header and fixtures byte-identical to the PR's 03a49ac)
 #   WW2_NATIVE_SRC   an existing clone of axelmanosalvasmd/ww2-rts-native to build in. It must be clean; it is checked
 #                    out at WW2_FFI_REV (detached). Default: a clone this script makes in unreal/Saved/WW2Ffi/native
-#                    (git ignores Saved/), fetched with your own git credentials (the repository is private)
+#                    (git ignores Saved/), fetched over HTTPS (the repository is public)
 #   RUSTUP           rustup to run the pinned toolchain with (default: from PATH, else ~/.cargo/bin/rustup)
 #
 # The toolchain is the one the native commit pins in rust/rust-toolchain.toml. The script never installs it: when it
@@ -26,7 +27,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$HERE/.." && pwd)"
-REV="${WW2_FFI_REV:-03a49ac7b94301be11e820ce347c8ce97823e8e9}"
+REV="${WW2_FFI_REV:-92fb7fe66eb7f788c83449ae67223984b969f177}"
 TRIPLE="x86_64-unknown-linux-gnu"
 # What `cargo rustc -p ww2-ffi --release --target $TRIPLE -- --print native-static-libs` must list. WW2Core.Build.cs
 # links exactly these; a build that needs others stops here instead of linking short.
@@ -61,7 +62,7 @@ checkout() {
 	if [[ -z "${WW2_NATIVE_SRC:-}" && ! -d "$SRC/.git" ]]; then
 		say "cloning $REMOTE into $SRC"
 		mkdir -p "$WORK"
-		git clone --quiet "$REMOTE" "$SRC" || die "clone failed (the repository is private: set up git credentials, or point WW2_NATIVE_SRC at a clone)"
+		git clone --quiet "$REMOTE" "$SRC" || die "clone failed (check the network, or point WW2_NATIVE_SRC at a clone)"
 	fi
 	[[ -d "$SRC/.git" || -f "$SRC/.git" ]] || die "$SRC is not a git checkout"
 	[[ -z "$(git -C "$SRC" status --porcelain --untracked-files=no)" ]] || die "$SRC has local changes; use a clean clone"
@@ -175,5 +176,5 @@ case "${1:-}" in
 	verify) checkout; VERIFY=1 build; c_example; install_files ;;
 	status) status ;;
 	remove) rm -rf "$DEST"; say "removed $DEST" ;;
-	*) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+	*) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

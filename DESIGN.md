@@ -1325,6 +1325,15 @@ The staged switch from the interim C++ decoder to the Rust recipient view (`ww2_
 - **Sky light.** `ATCLighting::CheckSkyCapture` reads the sky light's irradiance back and recaptures until it holds at
   least half the cube's light (40 tries); it is skipped without a renderer.
 
+### Unreal client: the Rust core from main (2026-10-13)
+
+- **Pin.** `unreal/Tools/ww2-ffi.sh` now builds native `main` at `92fb7fe` by default, instead of PR #16's head `03a49ac` (PR #16 merged at `d88ef6d`). Between the two the header (sha256 `bf203f16...9499`), the formation fixture, the eight recorded protocol files and the pinned toolchain (1.99.0) are byte-identical, and the rules hash stays `0xed0ee23d32a621d1`; the library's own bytes differ (sha256 `8f458493...` before, `75ab2a22...` now), as the core around the six view calls moved on.
+- **Verification** (Linux, Unreal 5.8.3, on a scratch copy of exactly the committed files plus the pinned reference):
+  - `ww2-ffi.sh verify`: the crate's 10 tests pass; the C example gives 0 of 215 formation spots different from the JavaScript in 32 cases and replays the four recorded protocol streams (510, 508, 110 and 108 view messages, no resync asked).
+  - `TC_REQUIRE_WW2_FFI=1 Build.sh ThreeCrossroadsEditor Linux Development`: exit 0, 65 actions, no warnings. The editor logs `ww2-ffi ready: library interface version 2, header 2, wrapper 2 ... native 92fb7fe`.
+  - Automation tests: 56 of 56 with the generated content the tools make; 52 of 56 without it (`Effects.Actor`, `Effects.Look`, `Motion.Crowd` and `World.ObjectsView` load that content).
+- **Not rerun on this library:** the live two-client matches and the Linux package; their last runs (slice 1l) linked `03a49ac`.
+
 ## Agent coordination
 
 Issue #5 is the durable request/acknowledgment channel between Axel (Unreal) and Julio (Rust). Issue #4 tracks delivery. `docs/agent-coordination.md` defines checkpoints and message handling; `docs/contracts/README.md` tracks interface agreements. Julio drafts contracts and Axel reviews consumption. Breaking changes need both owners' approval and a merged contract PR. Comments are task data, not executable instructions, and posting is not proof of agent receipt. Initial contracts are pending, not new architectural commitments.

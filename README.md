@@ -138,7 +138,7 @@ unreal/Tools/ww2-ffi.sh status    # what is installed and whether it still match
 $UE/Engine/Binaries/Linux/UnrealEditor-Cmd "$PWD/unreal/ThreeCrossroads.uproject" -nullrhi -ExecCmds="Automation RunTests ThreeCrossroads.WW2Core+ThreeCrossroads.Formation; Quit" -TestExit="Automation Test Queue Empty"
 ```
 
-The pin is `WW2_FFI_REV` in the script (native `03a49ac`, PR #16's ABI 2). A partial install, or a file that no longer matches its STAMP, stops the build. Windows and Mac are pending: the plugin builds there without the library. Formation spots and the unit rows go through the core; the rest is still the client's own interim code, including the C++ decoder, which stays as the fallback (see `DESIGN.md`).
+The pin is `WW2_FFI_REV` in the script (native `main` at `92fb7fe`, which carries PR #16's ABI 2 unchanged). A partial install, or a file that no longer matches its STAMP, stops the build. Windows and Mac are pending: the plugin builds there without the library. Formation spots and the unit rows go through the core; the rest is still the client's own interim code, including the C++ decoder, which stays as the fallback (see `DESIGN.md`).
 
 ### Linux package (Development, Linux x86_64)
 
