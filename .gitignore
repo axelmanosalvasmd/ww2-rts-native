@@ -8,6 +8,14 @@ target/
 /unreal/DerivedDataCache/
 /unreal/Plugins/*/Binaries/
 /unreal/Plugins/*/Intermediate/
+# Unreal content generated from the pinned reference by the scripts in unreal/Tools (README, "Unreal client"):
+# build output like the editor's, so it is made locally and not committed.
+/unreal/Content/Audio/
+/unreal/Content/Effects/
+/unreal/Content/Models/
+/unreal/Content/World/
+/unreal/Content/Collections/
+/unreal/Content/Developers/
 *.sln
 *.VC.db
 *.opensdf

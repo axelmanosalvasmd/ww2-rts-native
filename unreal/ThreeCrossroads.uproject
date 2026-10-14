@@ -1,0 +1,23 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "UE_5.8",
+	"Category": "",
+	"Description": "Three Crossroads native client",
+	"Modules": [
+		{
+			"Name": "ThreeCrossroads",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "ProceduralMeshComponent",
+			"Enabled": true
+		},
+		{
+			"Name": "WW2Core",
+			"Enabled": true
+		}
+	]
+}
