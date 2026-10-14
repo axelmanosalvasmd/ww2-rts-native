@@ -6,7 +6,7 @@ Each World ground move used to prepare a private copy of the team's remembered t
 
 `move_world_unit_without_memory` now runs the same movement step first on a copy of the unit, with physical traffic terrain whose every read marks a flag and a route callback that only records that it was called. If movement read no terrain and requested no route, its result cannot depend on remembered terrain, so it equals what the prepared path would produce; the trial is kept with the same grid update, reinsertion and cached-unit update the prepared path performs when it reads nothing. Otherwise the trial is dropped (Game and the grid are untouched until a trial is kept) and the unchanged prepared path runs. The context validation the prepared path performs first runs on both paths.
 
-A temporary differential check ran the prepared path on a snapshot after every kept trial and required bit-identical `Moved`, units and grid, and that the prepared path committed no memory: 12,469 moves matched in `world_tick` and 248 in the rest of the workspace, with 1 fallback. Vostro, `ci-test`: that test went from 972 s to 51.7 s.
+A temporary differential check ran the prepared path on a snapshot after every kept trial and required bit-identical `Moved`, units and grid, and that the prepared path committed no memory: 12,469 moves matched in `world_tick` and 248 in the rest of the workspace, with 1 fallback. Vostro, `ci-test`: that test took 972 s before the change, 51.7 s in the first focused run on pre-base-update head `e59059e60b8b9427b227aeb22d08a23e559f42c9`, and 53.9 s in the workspace run on acknowledged final head `624357c23c8f7183b0738014d60d23bd314270b0`.
 
 ## Two-client final base after ownership #209 (2026-10-14, source plan)
 
