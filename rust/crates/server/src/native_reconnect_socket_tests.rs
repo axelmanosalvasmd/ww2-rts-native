@@ -25,7 +25,8 @@ async fn real_socket_drop_reconnect_resumes_owned_move_in_same_match() {
         for unit in state.world.game.units.values_mut() {
             unit.hold_pos = true;
         }
-        let expected = SetupExpected::new(&state);
+        let mut expected = SetupExpected::new(&state);
+        expected.public_map = serde_json::from_str(include_str!("maps/default.json")).unwrap();
         let owned = state
             .world
             .game
