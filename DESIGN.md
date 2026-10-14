@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## NET-17 with separately merged CI #207 (2026-10-14, source only)
+
+Normally merge exact main `b44025a8` into NET-17 `96c41d99`, with common ancestor `3ca105ed`. CI #207 merged separately at 12:26:02 UTC; its merge tree equals the checked `94194d74` tree. Retain that entire workflow byte for byte, with a 60-minute ceiling and every other command and control unchanged. Resolve only the additive CHANGELOG conflict; DESIGN merges automatically. Both original documentation histories remain verbatim. All other tracked source equals `96c41d99`, including the complete listing harness and every LOG-29 recorder, test and fixture byte.
+
+Locally acknowledge Axel's shared-CI review 058 (`6167821260`) and merge acknowledgment 059 (`6168374797`). Neither clears Legacy host/envelope review or World client-stream disclosure. Prior `96c41d99` native and hosted proof is historical, not proof for this successor. Fresh final-head Node/Rust listing checks, full locked optimized workspace, formatting, strict Clippy, release FFI, C formation/four-stream replay and Linux/Windows/macOS gates remain pending with Root. No builds, tests, recorders, replays or public actions run here. No unreceived CI inventory result is claimed. Reference `e4e579a`, approved ABI 2/header, deterministic core and pending #199/#201, terrain, privacy/role and public-start decisions remain unchanged.
+
 ## Shared Rust CI job deadline (2026-10-14)
 
 Change only `jobs.check.timeout-minutes` from 40 to 60. The complete World oracle made the old deadline insufficient in run `38550473982` at `e6696418`: Windows retained 467 passes in completed result sections plus one pass within an unfinished target, while macOS completed all 469 tests before release FFI was cancelled. Both check annotations explicitly say the job exceeded 40 minutes. Ubuntu completed the full suite and release/C gate. Preserve the cancellations as incomplete platform proof, not test failures or proven OOM.
@@ -688,6 +694,16 @@ Layout selection preserves the source's recursive order and pairwise score accum
 Three focused tests compare all 33 authored maps plus eight constructed terrain cases, 957 layouts and 18 VP goals against the original JavaScript helpers at `e4e579a`. Cases include every six-player team partition, every supported player/spawn count, asymmetric ford distances, missing heights, cliffs, disconnected islands, shared starts and thresholds on either side of the tolerance. Invalid dimensions, buffer shapes, cells, indices, counts, non-finite/negative distances, score overflow and invalid random fractions return errors. Tiny maps are allowed for component fixtures; the authoring-map loader enforces the game's minimum dimensions.
 
 This is component evidence, not a completed match-start pipeline. The caller still normalizes mode settings, applies the Assault defender-spawn override and Horde/Tutorial shared starts, handles World home assignments, and creates starting units, buildings and wallets. The helpers do not change the map loader, `Game`, the ABI or wire messages.
+
+## NET-17 and LOG-29 normal integration (2026-10-14)
+
+Normally merge exact main `3ca105ed` into NET-17 `d8b243b4`, retaining both parents and their tracking notes. The listing function, invocation and all prior lobby harness bytes remain exact; the LOG-29 recorder, fixture and test remain exact from `fe40b3ad` and main. Earlier 426-test NET-17 and 427-test LOG-29 proofs belong to the parents, not this mixed head. Fresh exact-head workspace, release FFI/C replay and hosted platform gates remain pending under Root ownership. No runtime, contract, header, dependency, profile, workflow or reference change is introduced by the merge.
+
+## Creation-only lobby listing witness (2026-10-14)
+
+NET-17 needed a focused acceptance witness, not a runtime change. The existing live lobby harness now invokes `listing_is_creation_only` once per actual server. It directly asserts initial lobby/directory state, then awaits both joining lobby replies before checking that a listed room keeps its initial title and visibility despite a contrary hello, and that an unlisted room stays unlisted and absent despite a listing request. Node and Rust outputs are compared with the unchanged normalization. A spectate/lobby barrier removes the listed witness seats from the directory before sockets close; all prior scenarios remain byte-identical.
+
+On Vostro, pinned Node 24.21.0/ws 8.22.0 and Rust 1.99.0 pass both directions per server (four live cases), the original 38 checkpoints, 33 map metadata checks and existing failure paths. The locked debug server build, all seven existing `lobby::tests::` tests, syntax, workspace formatting and strict server/all-target Clippy pass sequentially under 6 GiB/no-swap caps and four-CPU limits. NET-17 is ported for ordinary lobbies only. Full workspace, release FFI/C replay, final-head platform gates and owner acceptance remain separate; no interface, privacy, role, public-start or game behavior changes.
 
 ## Rust lobby and session server (2026-10-12)
 

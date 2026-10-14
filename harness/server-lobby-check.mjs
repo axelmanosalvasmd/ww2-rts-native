@@ -117,11 +117,66 @@ async function scenario(base) {
   for (const packet of report) assert.ok(!JSON.stringify(packet).includes('secret-'),'no token escapes in output');
   return report;
 }
+async function listing_is_creation_only(base, server) {
+  const people=[]; const report=[];
+  const cases=[
+    {code:'Listed17',listed:true,title:'Initial listed title',later:false},
+    {code:'Hidden17',listed:false,title:'Initial unlisted title',later:true},
+  ];
+  try {
+    for (const {code,listed,title,later} of cases) {
+      const creator=await connect(base,code); people.push({code,c:creator});
+      const lobby=creator.next(v=>v.t==='lobby');
+      creator.send({t:'hello',token:'secret-listing-'+code+'-creator',name:'Creator',listing:{public:listed,title}});
+      const initial=await lobby; assert.equal(initial.listed,listed,'creation sets listing');
+      report.push(normalize(initial));
+      const before=await (await fetch(base+'/api/rooms')).json();
+      const entry=before.rooms.find(r=>r.code===code);
+      if (listed) {
+        assert.ok(entry,'listed room is visible at creation');
+        assert.equal(entry.title,title,'creation sets the directory title');
+        assert.equal(entry.humans,1);
+      } else assert.equal(entry,undefined,'unlisted room is absent at creation');
+      report.push(before);
+      const joiner=await connect(base,code); people.push({code,c:joiner});
+      const updates=[creator.next(v=>v.t==='lobby'),joiner.next(v=>v.t==='lobby')];
+      joiner.send({t:'hello',token:'secret-listing-'+code+'-joiner',name:'Joiner',listing:{public:later,title:'Replacement title'}});
+      const joined=await Promise.all(updates);
+      for (const packet of joined) assert.equal(packet.listed,listed,'later hello cannot change listing');
+      report.push(joined.map(normalize));
+      const after=await (await fetch(base+'/api/rooms')).json();
+      const retained=after.rooms.find(r=>r.code===code);
+      if (listed) {
+        assert.ok(retained,'later hello cannot hide the listed room');
+        assert.equal(retained.title,title,'later hello cannot rename the listed room');
+        assert.equal(retained.humans,2,'directory read follows the joining lobby');
+      } else assert.equal(retained,undefined,'later hello cannot list the unlisted room');
+      report.push(after);
+    }
+    // Remove connected seats before closing so directory cleanup has a lobby barrier.
+    for (const {code,c} of people.filter(p=>p.code==='Listed17')) {
+      const waits=people.filter(p=>p.code===code).map(p=>p.c.next(v=>v.t==='lobby'));
+      c.send({t:'spectate'}); await Promise.all(waits);
+    }
+    const cleaned=await (await fetch(base+'/api/rooms')).json();
+    assert.ok(cleaned.rooms.every(r=>!cases.some(c=>c.code===r.code)),'witness rooms leave no directory entries');
+    for (const packet of report) assert.ok(!JSON.stringify(packet).includes('secret-'),'no token escapes in listing output');
+    console.log(`PASS: listing_is_creation_only (${server}): 2 live creation-only directions, lobby and directory assertions completed`);
+    return report;
+  } finally {
+    for (const {c} of people) {
+      if (c.socket.readyState===WebSocket.OPEN) {
+        const closed=event(c.socket,'close'); c.socket.close(); await closed;
+      }
+    }
+  }
+}
 try {
   const ref=await launch(process.execPath,[resolve(reference,'server.js')],{cwd:reference,env:{...process.env,PORT:'0',HOST:'127.0.0.1',EDIT_PASSWORD:'lobby-test-only',PUBLIC_URL:'http://example.invalid',WW2_DIAG:'0',WW2_SHARDS:'1',SAVES_DIR:resolve(root,'harness/out/nonexistent-lobby-test-saves')}},/ww2-rts on http:\/\/127\.0\.0\.1:(\d+)/);
   const rust=await launch(binary,['--bind','127.0.0.1:0'],{cwd:root},/LISTENING http:\/\/127\.0\.0\.1:(\d+)/);
   const rustHealth=await (await fetch(rust+'/health')).json(); assert.equal(rustHealth.scope,'lobby');
   const expected=await scenario(ref); const actual=await scenario(rust); assert.deepEqual(actual,expected);
+  const expectedListing=await listing_is_creation_only(ref,'Node'); const actualListing=await listing_is_creation_only(rust,'Rust'); assert.deepEqual(actualListing,expectedListing);
   const catalog=JSON.parse(await readFile(resolve(root,'rust/crates/server/src/map-catalog.json'),'utf8'));
   assert.deepEqual(await (await fetch(rust+'/maps')).json(),Object.keys(catalog).sort());
   for (const [name,counts] of Object.entries(catalog)) {

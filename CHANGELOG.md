@@ -2,7 +2,13 @@
 
 ## Unreleased
 
+- Normally merge standalone CI #207 main `b44025a8` into NET-17 `96c41d99`. Preserve both additive histories, every NET-17 harness and LOG-29 recorder/test/fixture byte, and the exact merged 60-minute workflow. Earlier 96 proof is historical; fresh final-head focused listing, full workspace, format/Clippy, release FFI/C replay and three-platform gates remain pending with Root. No native jobs or publication run here.
+
 - Give the shared Rust CI job 60 minutes instead of 40, preserving every existing check. World run `38550473982` explicitly hit the 40-minute deadline on Windows and macOS; the cancelled jobs remain incomplete evidence. No runtime, fixture, assertion, dependency, runner or Vostro memory-limit change.
+
+- Normally merge LOG-29 main `3ca105ed` into NET-17 `d8b243b4`, preserving both histories, the exact listing harness and the convoy recorder, fixture and test. Earlier 426-test NET-17 and 427-test LOG-29 results remain parent evidence only; fresh mixed-head workspace, release FFI/C replay and platform proof remain pending.
+
+- Add one focused creation-only listing check to the existing live lobby harness. Both Node and Rust preserve a listed room's initial title/visibility and keep an unlisted room absent after contrary later hellos. On Vostro, all four live cases, the original 38 checkpoints, 33 map metadata checks, existing failure paths, seven lobby tests, locked debug build, syntax, formatting and strict server/all-target Clippy pass under 6 GiB/no-swap and four-CPU limits. Mark only ordinary-lobby NET-17 ported, not accepted. Runtime and all baseline harness bytes are unchanged; full workspace, release FFI/C replay and final-head platform gates remain pending.
 
 - Complete the missing LOG-29 acceptance witness without changing runtime code: the maintained convoy recorder adds six isolated finite-store cases and 30 ordered-inventory checkpoints from original JavaScript `stepConvoys`. One focused test proves 40-second rate-1 fill, half-rate scaling, zero-rate/inactive/source exclusions, partial occupancy and overshoot caps. Preserve all earlier fixture values and assertions. All five convoy tests pass in debug, locked `ci-test` and release on Vostro; recorder check, formatting and strict core all-target Clippy pass under 6 GiB/no-swap caps with four build/test threads and no cap-hit or OOM events. Mark only LOG-29 `ported`, not `accepted`; caller-provided rates do not prove supply providers, World or whole matches. No runtime defect was found; existing duplicate convoy paragraphs in DESIGN remain a documentation follow-up.
 
