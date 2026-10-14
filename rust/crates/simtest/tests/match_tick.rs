@@ -122,10 +122,19 @@ fn connected_tick_phases_match_actual_reference_steps() {
             m.world.game.tick = boundary as i64;
         }
         if let Some(keep) = input["keep"].as_array() {
-            m.world
+            let discarded: Vec<_> = m
+                .world
                 .game
                 .units
-                .retain(|id, _| keep.iter().any(|v| v.as_u64() == Some(u64::from(*id))));
+                .keys()
+                .copied()
+                .filter(|id| !keep.iter().any(|v| v.as_u64() == Some(u64::from(*id))))
+                .collect();
+            for id in discarded {
+                m.production.remove_building(id);
+                m.building_rallies.remove(&id);
+                m.world.game.units.remove(&id);
+            }
         }
         if let Some(owners) = input["owners"].as_array() {
             for row in owners {
