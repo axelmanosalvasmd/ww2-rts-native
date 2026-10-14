@@ -172,7 +172,7 @@ fn canonical_world_contacts_match_original_commander_and_local_boundaries() {
         let wind = m.start.wind;
         let seed = m.start.environment_seed;
         let mut prior_dust = case["initial"]["dust"].as_f64();
-        for pair in case["contacts"].as_array().unwrap().chunks_exact(2) {
+        for pair in case["contacts"].as_array().unwrap().as_chunks::<2>().0 {
             let input = &pair[0];
             let expected = &pair[1];
             let before = movement_input(&mut m, id, input);

@@ -135,7 +135,11 @@ fn setup(m: &mut Match, input: &Value) {
     // Each recorder case constructs a fresh source Game and its derived caches.
     m.commands.paths = crate::pathfinding::Pathfinding::new();
     m.commands.requests = Default::default();
-    m.commands.path_tick = None;
+    assert_eq!(
+        m.commands.inspected_path_tick(),
+        None,
+        "path-service scenes must start before any path tick"
+    );
     m.building_cells.clear();
     m.world.game.tick = input["tick"].as_i64().unwrap_or(400);
     m.world.game.vision_tick = Some(0);
@@ -443,6 +447,15 @@ fn original_world_route_histories_and_full_memory_retry_version() {
         m.world.game.tick += 1;
     }
 }
+fn same_unit(actual: &crate::game::Unit, expected: &crate::game::Unit) {
+    assert_eq!(actual.pace.to_bits(), expected.pace.to_bits());
+    let mut actual = actual.clone();
+    let mut expected = expected.clone();
+    // Compare the absent NaN pace by bits before normalizing detached copies only.
+    actual.pace = 0.0;
+    expected.pace = 0.0;
+    assert_eq!(actual, expected);
+}
 #[test]
 fn lazy_world_movement_and_refusal_preserve_memory_ledger_and_history() {
     let f = fixture();
@@ -532,13 +545,13 @@ fn lazy_world_movement_and_refusal_preserve_memory_ledger_and_history() {
     foreign = unit.clone();
     foreign.kind = m.rules.kind("tank").unwrap();
     assert!(m.world_ground_home_for(&foreign).is_err());
-    assert_eq!(m.world.game.units[&7], unit);
+    same_unit(&m.world.game.units[&7], &unit);
     assert_eq!(format!("{:?}", m.commands.requests), queue);
     assert!(m.world_runtime.as_ref().unwrap().memory.teams.is_empty());
     m.options.logistics = true;
     assert!(m.begin_path_tick(4, 3).is_err());
     assert_eq!(format!("{:?}", m.commands.requests), queue);
-    assert_eq!(m.world.game.units[&7], unit);
+    same_unit(&m.world.game.units[&7], &unit);
     assert_eq!(
         m.grid
             .unordered(&m.world.game.units, (17., 17.), 50., |_, _| true),
