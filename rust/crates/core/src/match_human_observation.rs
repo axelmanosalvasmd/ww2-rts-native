@@ -78,7 +78,8 @@ impl HumanShot {
             crate::match_tick::TickEvent::Firing(event) => Self::firing(event),
             crate::match_tick::TickEvent::Support(event) => Self::support(event),
             crate::match_tick::TickEvent::Environment(event) => Self::environment(event),
-            crate::match_tick::TickEvent::Aviation(_) => Self::Other,
+            crate::match_tick::TickEvent::Aviation(_)
+            | crate::match_tick::TickEvent::Scenario(_) => Self::Other,
         }
     }
 

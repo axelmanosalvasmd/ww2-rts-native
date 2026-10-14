@@ -132,6 +132,70 @@ impl Match {
             Ok(None)
         }
     }
+    /// Admit research and live-building progression before the caller advances its clock.
+    /// Publication still validates the actual placement at each building's later turn.
+    pub fn validate_production_phases(&self, dt: f64) -> Result<(), ProductionStepError> {
+        let count = self.production_step_context()?;
+        let regions = self.production_regions()?;
+        let units = units(&self.world.game, &self.rules, count)?;
+        let context = context(
+            &self.options,
+            self.world.game.naval,
+            &units,
+            regions.as_deref(),
+        );
+        self.production
+            .validate_phases(&context, &self.start.economy, dt)?;
+        for (id, row) in self.production.buildings() {
+            let unit = self
+                .world
+                .game
+                .units
+                .get(&id)
+                .ok_or(ProductionStepError::InvalidState(
+                    "production building missing",
+                ))?;
+            if !self.rules.kinds[unit.kind].building {
+                return Err(ProductionStepError::InvalidState(
+                    "production row is not a building",
+                ));
+            }
+            if !row.jobs().is_empty() {
+                if self.options.mode != Mode::World {
+                    return Err(ProductionStepError::InvalidState(
+                        "nonempty Conquest training queue",
+                    ));
+                }
+                if self.options.logistics
+                    || unit.owner >= count
+                    || !self.building_rallies.contains_key(&id)
+                {
+                    return Err(ProductionStepError::InvalidState(
+                        "training publication context",
+                    ));
+                }
+                if self.building_rallies[&id]
+                    .into_iter()
+                    .chain(self.player_rallies[unit.owner])
+                    .any(|at| !at.x.is_finite() || !at.z.is_finite())
+                {
+                    return Err(ProductionStepError::InvalidState("training rally position"));
+                }
+                for job in row.jobs() {
+                    let kind = self
+                        .rules
+                        .kind(&job.kind)
+                        .ok_or(ProductionStepError::InvalidState("training unit kind"))?;
+                    if self.rules.kinds[kind].air {
+                        return Err(ProductionStepError::InvalidState(
+                            "aircraft training is not connected",
+                        ));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
     /// Typed source `tech` admission. Global command gates precede the research
     /// denials. Wallet, lab and canonical MP-spent story publish together.
     pub fn request_research(
@@ -270,6 +334,9 @@ impl Match {
             || self.firing.get(id).is_some()
             || self.abilities.get(id).is_some()
             || self.recovery.get(id).is_some()
+            || self.aviation.planes.contains_key(&id)
+            || self.aviation.anti_air.contains_key(&id)
+            || self.logistics.get(id).is_some()
         {
             return Err(ProductionStepError::InvalidState(
                 "training metadata identity occupied",
