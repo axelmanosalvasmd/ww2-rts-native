@@ -8,6 +8,8 @@ pub mod codec;
 pub mod load;
 pub mod map;
 pub mod replay;
+pub mod terrain_fixtures;
+pub mod terrain_scout;
 pub mod view;
 pub mod workload;
 

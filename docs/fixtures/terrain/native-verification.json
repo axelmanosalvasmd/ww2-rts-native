@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 1,
+  "producingCommit": "a81b4f2b03bfbbe0a19094bfd6e3efa00bf80f1b",
+  "referenceSha": "e4e579a838aabae3b1d9dadbc17a0a87147bc52d",
+  "platform": "macOS arm64",
+  "approvedAbi2HeaderSha256": "bf203f16eca88562cfc6e53efccc48bf260d3a44750d7300f00694723ec69499",
+  "native": {
+    "focusedDebugTests": 2,
+    "focusedOptimizedTests": 2,
+    "independentCopiedTests": 4,
+    "optimizedWorkspaceTests": 367,
+    "strictWorkspaceAllTargetClippy": true,
+    "formatting": true,
+    "releaseFfiBuild": true,
+    "releaseExporterBuild": true
+  },
+  "export": {
+    "authoredMaps": 33,
+    "centres": 661799,
+    "points": 33000,
+    "worldActors": 398,
+    "worldActions": 32,
+    "worldReceipts": 17,
+    "worldRows": 273678,
+    "numericComparison": "IEEE754 binary64 bits; full object keys and ordered arrays",
+    "bytes": 61192638,
+    "allArtifactsUnchangedAfterRefusals": true
+  },
+  "exporterBinarySha256": "a4e35948fc95d14cb0b4b87b86b75f7d5a3cbf4f207242970dc634bacf734ea1",
+  "artifactArchive": {
+    "filename": "terrain-native-a81b4f2.tar.gz",
+    "bytes": 4308253,
+    "sha256": "c1c54b5cdc4f39f49e781778abb712b4d45e810ed749a55f59322cb27ec0f6ca"
+  },
+  "artifacts": {
+    "ardennes-crossing.json": "d0c14bfaf81f0f9dd4d6c68cca048f1a7b6e92d41040893a988e4395a82793d6",
+    "bastogne.json": "8edd64ba2f45f8be8b4c7b6c6725586b8cf0808fc3db3e2aeac1815f0660004d",
+    "bocage.json": "cef6cffd80633c7f41b2421e3dcfe6d35c0b7dac81a5ebb8866dbff85b0c15cc",
+    "crater-field.json": "522c3042c68198fa79d2737d458aa0bafb134ae0c605a779fb6a9bd3bed67336",
+    "crossroads-village.json": "607946f20b6e4de67bc06f75980758eca055e467ecd2948b10b2b357795823e7",
+    "default.json": "e60cc8f6de25a1a14e5c6f256713abf09805b6b3fcd9951331dc83e14ded1b7a",
+    "el-alamein.json": "c466c65733ac2ea41d6d51927a7398f4c7a6b6f888a059eb4db1b9f2cec33f2d",
+    "helms-deep.json": "1f4fcb09918f175c483f16d9f182f1db1a7b0fefaac2800501800de1b556de6e",
+    "hill-112-xl.json": "34374a73e980ddc9e091d2984af9c3c925156a449d78334091f2036fbddf8faf",
+    "hill-112.json": "613d4bb1399a1c741c07586b685e2f87690576b1aed835f3c3c43b638a4850d9",
+    "hot-gates.json": "b2f8724310a0466f54bcae7fee5a265cf5761b7e14586adb9289544d635911e7",
+    "hurtgen-forest.json": "8c1ea3361bbd0ffca1228727012c5e044499b14e1dba97d1e0333dfe9d01742e",
+    "island-towns.json": "cba9dd9f68330d3b5322afffe6b3884b5ae799735354b4c9ea09863c104a6845",
+    "kasserine-pass.json": "2c2e968369b88c34694653411a9c22914743760f63ad5b8e3a3270d943239c79",
+    "king-of-the-hill.json": "ed808acae7df47845b632232312a276b04994b59a5068eb6d6c594d4923f4ad4",
+    "manifest.json": "ae9dc3e4af1376b29b058596822bd83b173bd2a11e0b48e10a02ab4178403c69",
+    "monte-cassino-xl.json": "2a080e3c9407dc2d51edbe9b47ccec2f556c5b77a06ad9db628ed1ecf00a0f08",
+    "monte-cassino.json": "25e678d8bdd03f653329272dc57552a2e9f945739c93be029c90ba6ae0dad3bc",
+    "no-mans-land.json": "2f9f48ce23442e80b7c25d3a35aa7589c0837a417089e612ab93c7ca3eafb610",
+    "pegasus-bridge-xl.json": "97efc9bfadb179ba6455506e0a53359b3ec4690583197f6b302d0b8c2c978bb7",
+    "pegasus-bridge.json": "891e02a4a52a58030911281e9a7e3adcb78b846f0fe40fc23e1a94cee444844c",
+    "prokhorovka.json": "3d9af324971f4b4d18f1ddbcf465302d293c34684b691fbd8247032a7bf6528b",
+    "river-towns.json": "f39d85300b73cc39144d7f0d6558fe82a3923961d489b542f019abd203a63e7f",
+    "seawall-xl.json": "8351961372f4c1ac9aae80f5696f2871eb56181103a4a0f5c78a6efc603206d0",
+    "seawall.json": "bb8c578567c72493274c16a9834d990d6368078a6b4efd4d09a0621326475c61",
+    "seelow-heights.json": "219e9870adf578c407e05792e0084e0beb21eca1dd1d2f1bb0a834dfd483720c",
+    "six-fronts.json": "d433a42fc23ff70134a6cca247890b50e25b9c52f13a686da649ba994588b226",
+    "stalingrad-factory.json": "7cb044238c37a090ec1390a7363d55a4ea85f5cd815ad54f0ae5c979ba8f2d3c",
+    "test-arena.json": "808292db9e75b1671bb9af28f44582c68a122efdc8a51454d4a2a18eecc4a3c6",
+    "the-great-bridge.json": "ec3913753945f0309178a95236e6cc6e5d734ea10ace593847eaa802338660ef",
+    "the-polder.json": "e687f42ea580606a8b801633f682265f1f56e57d8095db538b662e4aeb2e8b60",
+    "three-islands.json": "bd685d8c0625996680b9e32680d4f9b06e7ee5de903a8c551b6b2099718c53be",
+    "tutorial.json": "4c4c47ce0cc932c661d08c6fbd41236d4a86d92e0938d65839addce8d640bae2",
+    "twin-valleys.json": "e91d62d2829b6edf36a31ca457cbb8fb0ea97705ea5cbce5428172c4f4f0d528",
+    "world-scout.json": "cd0fc61ca52c332e8b100967f9c8d9544c9cbebe538618f47f3f3c42f0deedf2"
+  },
+  "refusalChecks": [
+    {
+      "name": "wrong-compiled-sha",
+      "exit": 1,
+      "message": "use an executable built from this exact clean producing commit"
+    },
+    {
+      "name": "existing-output",
+      "exit": 1,
+      "message": "output directory must be new; existing evidence is preserved"
+    }
+  ],
+  "gateLogs": [
+    {
+      "gate": "clean-default",
+      "exit": 0,
+      "sha256": "679659685ce505de45a02f9222142474ce941406373a7437bea08d984f75f3be"
+    },
+    {
+      "gate": "clean-ci-test",
+      "exit": 0,
+      "sha256": "7df47d48f89116c94c71237a1f04a92d60a2a5614ace8ebb8d7997503b1b4b3d"
+    },
+    {
+      "gate": "clean-release",
+      "exit": 0,
+      "sha256": "10210c8a2af28b4e553a8be1eb6cb4cd85116c1250838c4e1d9074a9336ae6e8"
+    },
+    {
+      "gate": "debug-heights",
+      "exit": 0,
+      "sha256": "7bae35d305a0961212f280cbb06915c967223c6d4702cdc63dda0681ddf08a58"
+    },
+    {
+      "gate": "debug-scout",
+      "exit": 0,
+      "sha256": "7b3324db0b235cbdefc4029ed504e645d06f917a658a477b00e2ec195da2a16e"
+    },
+    {
+      "gate": "optimized-heights",
+      "exit": 0,
+      "sha256": "4f136df4a4219d2652363c30db1027302b2a38fd1176598239f07accd84f3c8f"
+    },
+    {
+      "gate": "optimized-scout",
+      "exit": 0,
+      "sha256": "b9f2cb930e1ca3321c7ac8036417c5bb6d9982cfdce251df17c70dd3597a3ac8"
+    },
+    {
+      "gate": "fmt",
+      "exit": 0,
+      "sha256": "1d27acb48e7ee312bd32e4370a3bae8d71a1f66c3ac26ade3984049d7ecb617d"
+    },
+    {
+      "gate": "clippy",
+      "exit": 0,
+      "sha256": "879aa6699dd9b9b3a72b4c8bad1411f785749dd1c19daaf22ec7fb58317f4f61"
+    },
+    {
+      "gate": "workspace-optimized",
+      "exit": 0,
+      "sha256": "81d05e8f2b878e18e253841eb2d17dcf7beb90c86d289cac281328f252791648"
+    },
+    {
+      "gate": "release-ffi",
+      "exit": 0,
+      "sha256": "5d2440b45b489601a4ebdfa057e0dda92eb427c336556b2b96046c6f52556dd0"
+    },
+    {
+      "gate": "release-export",
+      "exit": 0,
+      "sha256": "e22ecb7f92f323766c56e51d141fe2d657dbe355565825e15de48940e16eaa06"
+    }
+  ],
+  "scope": "Gameplay terrain queries and recorded canonical recipient collectors. No whole World tick, rendered mesh, wire, C ABI extension or Unreal adoption.",
+  "independentCopiedExecutables": [
+    {
+      "binary_sha256": "cfe37dd51ed5752e26d5a2354604d260781b2ba68c2844aff5aa06eceb64ad5f",
+      "exit": 0,
+      "log_sha256": "f01116b3259d7e7cb95180a79d37a9d24ac99897be24e44b92a7730eb4a186b1"
+    },
+    {
+      "binary_sha256": "e082a512fb6234636afd79a3114aa4cb3be8b87569de3f521237026bfd130f1e",
+      "exit": 0,
+      "log_sha256": "582340992d265a3d402e20edddc5ac828c9225986bc64f54c806d4e43f985474"
+    },
+    {
+      "binary_sha256": "c5e52615ae65d355d28e01148c77009a7d8fd9e8530eddb529bc6119082cbd6c",
+      "exit": 0,
+      "log_sha256": "82f316e9d84a3934ddd620a9c9d6ebb3bd4ad9d277af057f8254ca18f89b3be4"
+    },
+    {
+      "binary_sha256": "00b21870f6d8f463da19be6ea229fe2f7f0a1fea3b61627b159c5346b42e67b8",
+      "exit": 0,
+      "log_sha256": "50fe95dfc0d67f91860852fe3090cc76f469b0aa300155e66084d8d5510dfa4a"
+    }
+  ],
+  "releaseFfiLibrarySha256": "79854b988db8d0ebbc55c203d8f18cd454f921b343355cbdda45802af7dfc280",
+  "independentExportAudit": {
+    "exit": 0,
+    "logSha256": "a77c2a3c9b5bd4a956af056e68d5345da7e7784b2d592d23bda33bd16e305479",
+    "fullNumericBitsKeysAndOrderEqual": true,
+    "wrongCommitRefused": true,
+    "existingOutputPreserved": true
+  }
+}
