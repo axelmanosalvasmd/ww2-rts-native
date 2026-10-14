@@ -105,7 +105,7 @@ pub(super) fn complete(
     projection.fields.insert("t".into(), json!("s"));
     // Admission inspected each actual canonical actor/list owner. Their
     // absent output is a represented source result for this bounded frame.
-    for name in ["air", "falling", "flights", "shots"] {
+    for name in ["air", "flights", "shots"] {
         projection.fields.insert(name.into(), json!([]));
     }
     projection.fields.insert(
@@ -187,17 +187,9 @@ pub(super) fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(
     if !state.aviation.events.is_empty() || !state.aviation.planes.is_empty() {
         return Err(refused(SnapshotCapability::Air));
     }
-    if state
-        .environment
-        .falling_sections()
-        .iter()
-        .any(|s| !s.body.settled)
-    {
-        return Err(refused(SnapshotCapability::TeamEffects));
-    }
-    if state.scenario.is_some() {
-        return Err(refused(SnapshotCapability::Scenario));
-    }
+    state
+        .preflight_legacy_scenario()
+        .map_err(|_| refused(SnapshotCapability::Scenario))?;
     if state.options.logistics || state.logistics.iter().next().is_some() || state.convoys.is_some()
     {
         return Err(refused(SnapshotCapability::Logistics));

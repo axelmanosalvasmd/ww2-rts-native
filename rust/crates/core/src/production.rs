@@ -293,6 +293,9 @@ impl ProductionState {
     pub fn building(&self, id: u32) -> Option<&BuildingProduction> {
         self.buildings.get(&id)
     }
+    pub(crate) fn buildings(&self) -> impl Iterator<Item = (u32, &BuildingProduction)> {
+        self.buildings.iter().map(|(&id, row)| (id, row))
+    }
     pub fn player(&self, slot: usize) -> Option<&PlayerResearch> {
         self.players.get(slot)
     }
@@ -916,6 +919,29 @@ impl ProductionState {
         Self::research_step(&mut players, c, wallets, dt, &mut out)?;
         self.players = players;
         Ok(out)
+    }
+    /// Read-only admission for the source research and live-building phases.
+    /// Only this component's prospective jobs are staged, never a Match or unit registry.
+    pub(crate) fn validate_phases(
+        &self,
+        c: &Context<'_>,
+        wallets: &EconomyState,
+        dt: f64,
+    ) -> Result<(), Error> {
+        self.validate(c, wallets)?;
+        Self::validate_dt(dt)?;
+        let mut players = self.players.clone();
+        Self::research_step(&mut players, c, wallets, dt, &mut Vec::new())?;
+        for (&id, building) in &self.buildings {
+            let unit = c
+                .units
+                .iter()
+                .find(|unit| unit.id == id)
+                .ok_or(Error::InvalidInput("production building missing"))?;
+            let mut next = building.clone();
+            Self::building_step(unit, c.sudden_death, &mut next, dt)?;
+        }
+        Ok(())
     }
     /// Stage one building at its actual source unit-loop position. Completion
     /// placement and unit publication must validate before consuming this guard.
