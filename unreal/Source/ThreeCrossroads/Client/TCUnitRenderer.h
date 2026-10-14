@@ -46,6 +46,8 @@ struct FTCUnitModelStats
 	int32 WheelHulls = 0;        // of those: tracked hulls drawn with wheel spin and track scroll (FTCWheelTracks)
 	float WheelTravelMax = 0.f;  // the most ground any of them has rolled (m, wheel-motion.js wheelTravel.x)
 	int32 Rings = 0;             // owner and selection rings
+	int32 Matched = 0;           // round 17: instances written with last frame's transform (FTCInstanceHistory)
+	int32 Moving = 0;            // of those: moved since the last frame (they carry a motion vector)
 	int32 Components = 0;        // instanced components alive (draw batches)
 	int32 Figures = 0;           // soldier figures made (near keyframe textures and far figures)
 };
@@ -128,7 +130,7 @@ private:
 
 	// ----- the model path (TCUnitModels.cpp) -----
 	// One frame's instances for one component: transforms and, flat, their custom data floats.
-	struct FFrameBatch { TArray<FTransform> Transforms; TArray<float> Data; int32 Floats = 0; };
+	struct FFrameBatch { TArray<FTransform> Transforms; TArray<float> Data; int32 Floats = 0; TArray<uint64> Keys; }; // Keys: FTCInstanceHistory
 	// The browser's squad presentation state (unit-models.js animate() for one squad, kept between frames).
 	struct FSquad
 	{
@@ -148,7 +150,7 @@ private:
 	// unit-models.js animate() for a squad or crew: false when the entry has no men
 	bool AnimateSquad(const FTCModelEntry& Entry, const FTCUnit& U, const FTCUnitDef* Def, int32 Faction, FShown& S, const FTransform& Root, const ATCTerrain* Terrain, float Dt, const FVector& Eye, FSquadMen& Out);
 	void DrawSquadMen(const FTCModelEntry& Entry, const FTCUnit& U, int32 Faction, const FShown& S, const FTransform& Root, const FSquadMen& Men, const TArray<float>& Custom);
-	void AddRing(float Radius, const FLinearColor& Color, float Opacity, int32 ColorKey, const FVector& At);
+	void AddRing(float Radius, const FLinearColor& Color, float Opacity, int32 ColorKey, const FVector& At, uint64 Key = 0);
 	// markers.js overlayMat rings are toneMapped: false; the game's post (M_TCLookPost) tone maps everything, so a
 	// ring's color is the ACES pre-image of its color at the light's exposure (ATCLighting), redone when it changes
 	void UpdateRingLooks();
@@ -161,12 +163,16 @@ private:
 	bool ApplyWheelTracks(UInstancedStaticMeshComponent* Ism, const FTCModelPart& Part, bool bFaded);
 	// One part instance's custom data: the catalog's floats, then (wheel copies only) wheel-motion.js wheelTravel.
 	void AppendPartData(FFrameBatch& B, const UInstancedStaticMeshComponent* Ism, const TArray<float>& Custom, const FTCPartMotion& Motion);
+	// round 17: every instance written with its previous transform (motion vectors for the temporal anti-aliasing)
+	FTCInstanceHistory History;
+	FTCInstanceHistory TwinHistory;
 	UStaticMesh* RingMesh(float Radius);
 	void FlushModelFrame();
 	// Every 5 s of real time, one log line: the model status and the frame time since the last line (regression
 	// awareness for the live check, not a benchmark).
 	void ReportFrame();
 	double ReportAt = 0, FrameSum = 0, FrameMax = 0;
+	FString DrawnList; // this frame's "id type owner x z near|far" for each unit drawn with its model (ReportFrame)
 	int32 FrameCount = 0;
 
 	FTCModelLibrary Library;

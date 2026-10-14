@@ -4,6 +4,8 @@
 #include "Materials/MaterialInterface.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
@@ -267,6 +269,47 @@ bool FTCModelLibrary::SetupComponent(UInstancedStaticMeshComponent* Component, c
 	return true;
 }
 
+int32 FTCInstanceHistory::PreviousFor(const TArray<FTransform>& Cur, const TArray<uint64>& Keys, const TMap<uint64, FTransform>& Last, TArray<FTransform>& OutPrev)
+{
+	OutPrev.Reset(Cur.Num());
+	int32 Found = 0;
+	for (int32 I = 0; I < Cur.Num(); I++)
+	{
+		const FTransform* Before = Keys.IsValidIndex(I) && Keys[I] != NoKey ? Last.Find(Keys[I]) : nullptr;
+		if (Before && FVector::DistSquared(Before->GetLocation(), Cur[I].GetLocation()) <= JumpCm * JumpCm) { OutPrev.Add(*Before); Found++; }
+		else OutPrev.Add(Cur[I]);
+	}
+	return Found;
+}
+
+void FTCInstanceHistory::Write(UInstancedStaticMeshComponent* Ism, const TArray<FTransform>& Cur, const TArray<uint64>& Keys)
+{
+	if (!Ism) return;
+	TMap<uint64, FTransform>& Mine = Last.FindOrAdd(Ism);
+	const int32 N = Cur.Num();
+	if (Ism->GetInstanceCount() != N)
+	{
+		// ClearInstances keeps the previous transforms' array: turned off and on again it is rebuilt to match
+		Ism->SetHasPerInstancePrevTransforms(false);
+		Ism->ClearInstances();
+		if (N) Ism->AddInstances(Cur, false, true, false);
+	}
+	Ism->SetHasPerInstancePrevTransforms(true);
+	if (N)
+	{
+		TArray<FTransform> Prev;
+		// -TCNoMotionVectors: every instance written still, as before round 17 (a verification switch for the A/B)
+		static const bool bOff = FParse::Param(FCommandLine::Get(), TEXT("TCNoMotionVectors"));
+		Matched += PreviousFor(Cur, bOff ? TArray<uint64>() : Keys, Mine, Prev);
+		for (int32 I = 0; I < N; I++) if (!Prev[I].Equals(Cur[I], 0.01)) Moving++;
+		Ism->BatchUpdateInstancesTransforms(0, Cur, Prev, true, false, false);
+	}
+	Written += N;
+	Mine.Reset();
+	for (int32 I = 0; I < N && I < Keys.Num(); I++) if (Keys[I] != NoKey) Mine.Add(Keys[I], Cur[I]);
+	for (auto It = Last.CreateIterator(); It; ++It) if (!It.Key().IsValid()) It.RemoveCurrent();
+}
+
 #if WITH_DEV_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
 
@@ -368,6 +411,56 @@ bool FTCModelLibraryTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("imported catalog has models"), Real.Num() > 0);
 	}
 	else AddInfo(TEXT("no imported catalog: ") + Error);
+	return true;
+}
+// Round 17: the motion vectors of moving instances (FTCInstanceHistory). Pure matching by key, then a component written
+// twice: each instance's previous transform is last frame's by key, a new key, no key or a jump starts still, and a
+// change of count keeps the previous transforms in step with the instances (the engine's ClearInstances does not).
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCInstanceHistoryTest, "ThreeCrossroads.Models.InstanceHistory", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+
+bool FTCInstanceHistoryTest::RunTest(const FString& Parameters)
+{
+	using H = FTCInstanceHistory;
+	TestNotEqual(TEXT("part and man keys differ"), H::PartKey(7, 0), H::ManKey(7, 0));
+	TestNotEqual(TEXT("owner and selection rings differ"), H::RingKey(7, false), H::RingKey(7, true));
+	TestNotEqual(TEXT("unit 0's first part is a key"), H::PartKey(0, 0), H::NoKey);
+	TestNotEqual(TEXT("different units differ"), H::PartKey(1, 2), H::PartKey(2, 2));
+	TMap<uint64, FTransform> Last;
+	Last.Add(H::PartKey(1, 0), FTransform(FVector(0, 0, 0)));
+	Last.Add(H::PartKey(2, 0), FTransform(FVector(0, 0, 0)));
+	const TArray<FTransform> Cur = { FTransform(FVector(50, 0, 0)), FTransform(FVector(5000, 0, 0)), FTransform(FVector(10, 10, 0)), FTransform(FVector(20, 0, 0)) };
+	const TArray<uint64> Keys = { H::PartKey(1, 0), H::PartKey(2, 0), H::PartKey(3, 0), H::NoKey };
+	TArray<FTransform> Prev;
+	TestEqual(TEXT("one match (the jump and the new ones start still)"), H::PreviousFor(Cur, Keys, Last, Prev), 1);
+	TestTrue(TEXT("matched: last frame's place"), Prev.Num() == 4 && Prev[0].GetLocation().Equals(FVector::ZeroVector));
+	TestTrue(TEXT("50 m jump: still"), Prev.Num() == 4 && Prev[1].GetLocation().Equals(Cur[1].GetLocation()));
+	TestTrue(TEXT("new key: still"), Prev.Num() == 4 && Prev[2].GetLocation().Equals(Cur[2].GetLocation()));
+	TestTrue(TEXT("no key: still"), Prev.Num() == 4 && Prev[3].GetLocation().Equals(Cur[3].GetLocation()));
+
+	UInstancedStaticMeshComponent* Ism = NewObject<UInstancedStaticMeshComponent>(GetTransientPackage());
+	H History;
+	History.Write(Ism, { FTransform(FVector(0, 0, 0)), FTransform(FVector(100, 0, 0)), FTransform(FVector(200, 0, 0)) }, { H::ManKey(1, 0), H::ManKey(1, 1), H::ManKey(1, 2) });
+	TestEqual(TEXT("first frame: three instances"), Ism->GetInstanceCount(), 3);
+	TestEqual(TEXT("first frame: nothing to match"), History.Matched, 0);
+	History.ResetCounts();
+	// the squad moves 30 cm and loses its second man: two instances, each with its own man's last place
+	History.Write(Ism, { FTransform(FVector(30, 0, 0)), FTransform(FVector(230, 0, 0)) }, { H::ManKey(1, 0), H::ManKey(1, 2) });
+	FTransform P0, P1, C1;
+	TestEqual(TEXT("second frame: two instances"), Ism->GetInstanceCount(), 2);
+	TestTrue(TEXT("previous transforms kept for both"), Ism->GetInstancePrevTransform(0, P0, true) && Ism->GetInstancePrevTransform(1, P1, true));
+	TestFalse(TEXT("no stale previous transform past the count"), Ism->GetInstancePrevTransform(2, C1, true));
+	TestTrue(TEXT("man 0 came from 0"), P0.GetLocation().Equals(FVector(0, 0, 0)));
+	TestTrue(TEXT("man 2 came from 200 (not man 1's 100)"), P1.GetLocation().Equals(FVector(200, 0, 0)));
+	TestTrue(TEXT("current place written"), Ism->GetInstanceTransform(1, C1, true) && C1.GetLocation().Equals(FVector(230, 0, 0)));
+	TestEqual(TEXT("both matched and moving"), History.Matched, 2);
+	TestEqual(TEXT("both moving"), History.Moving, 2);
+	History.ResetCounts();
+	// standing still: the previous transform is the current one (no motion vector)
+	History.Write(Ism, { FTransform(FVector(30, 0, 0)), FTransform(FVector(230, 0, 0)) }, { H::ManKey(1, 0), H::ManKey(1, 2) });
+	TestTrue(TEXT("still: previous is current"), Ism->GetInstancePrevTransform(0, P0, true) && P0.GetLocation().Equals(FVector(30, 0, 0)));
+	TestEqual(TEXT("still: none moving"), History.Moving, 0);
+	History.Write(Ism, {}, {});
+	TestEqual(TEXT("emptied"), Ism->GetInstanceCount(), 0);
 	return true;
 }
 #endif // WITH_DEV_AUTOMATION_TESTS

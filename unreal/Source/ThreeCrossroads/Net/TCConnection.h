@@ -70,6 +70,16 @@ public:
 	void SimulateDrop();
 
 	FString Status() const { return StatusText; }
+	// Round 17 (hudui): connection.js's 'retry' event for main.js's #connectionBanner: the whole seconds left of the
+	// wait before the next try (at least 1, as the countdown shows until it opens), and whether it waits for a full room
+	// ('full': "Trying this room again in {n} s") or after a loss ("Connection lost. Retrying in {n} s"); -1 when no
+	// wait is running (connected, stopped, or a try is under way)
+	int32 RetryLeft(double Now, bool* bOutFull = nullptr) const
+	{
+		if (!bRunning || RetryAt < 0.0) return -1;
+		if (bOutFull) *bOutFull = bWaitingForRoom;
+		return FMath::Max(1, (int32)FMath::CeilToDouble(RetryAt - Now));
+	}
 	int32 Opens() const { return OpenCount; }
 	static bool ValidRoom(const FString& Room);
 	static int32 Utf8Length(const FString& Text);

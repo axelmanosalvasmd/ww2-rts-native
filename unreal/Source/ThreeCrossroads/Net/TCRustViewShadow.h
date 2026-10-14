@@ -129,6 +129,9 @@ public:
 	};
 	const FCounts& Totals() const { return All; }
 	int32 ApplyErrorCount() const { return ApplyErrors; }
+	// Text messages fed to the view since Begin, and the first ww2_view_apply error ("code name: text"; empty if none).
+	int32 MessageCount() const { return Messages; }
+	const FString& FirstApplyError() const { return FirstError; }
 	const FString& DemotedWhy() const { return Demoted; }
 
 #if WITH_DEV_AUTOMATION_TESTS
@@ -151,6 +154,7 @@ private:
 	int32 RefusedRun = 0;
 	FString Demoted;
 	int32 Messages = 0, ApplyErrors = 0;
+	FString FirstError;
 	FCounts All, Segment;
 	int32 SegmentNumber = 0;
 	FString SegmentLabel;

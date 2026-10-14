@@ -47,13 +47,28 @@ namespace FTCHudFit
 	// The strip's widest: centred, its left edge right of the corner's Menu panel (CornerRight) by 4 px
 	THREECROSSROADS_API float StripMaxWidth(float ClipX, float CornerRight);
 	// Where the sandbox panel goes (UI pixels): #sandbox's own place when it is under the strip and clear of every box
-	// in Avoid (the match panel, the recruit card); else centred under the strip (StripLow).
-	THREECROSSROADS_API FBox2D SandboxPlace(float ClipX, float ClipY, FVector2D Size, float StripLow, const TArray<FBox2D>& Avoid, bool* bOutBrowserSpot = nullptr);
+	// in Avoid (the match panel, the recruit card); else centred under the strip (StripLow). Round 17: at either place
+	// a box in SlideFrom (the alert history, which hugs the right edge) does not push it away: the panel slides left
+	// until it is 4 px clear of it (never past 8 px from the left edge).
+	THREECROSSROADS_API FBox2D SandboxPlace(float ClipX, float ClipY, FVector2D Size, float StripLow, const TArray<FBox2D>& Avoid, bool* bOutBrowserSpot = nullptr, const TArray<FBox2D>& SlideFrom = TArray<FBox2D>());
 	// The match panel's levels: 0 as built; 1 the support bar shows what the browser's buttons show (the key and the
 	// cost, no name); 2 the formation summary line goes and the logistics rows stop at 2; 3 at 1, without the heading.
+	// Round 17: 4, the browser's own fit (index.html #lowerleft { max-height } over #selection .list { min-height: 0;
+	// overflow: auto }): the panel is held under the limit, its text rows cut from the end where the list would scroll
+	// (a count '... +n' in their place, no words, as the logistics rows'), the buttons kept whole, and the hover line
+	// becomes a tooltip over the panel (the browser's title) instead of a reserved row.
 	// The first level whose top (ClipY - Gap - height) is at or under TopLimit; the last when none is.
 	THREECROSSROADS_API int32 FitLevel(const TArray<float>& Heights, float ClipY, float BottomGap, float TopLimit);
-	constexpr int32 MaxLevel = 3;
+	constexpr int32 MaxLevel = 4;
+	// Level 4's text rows: how many of Lines text rows show in Room px of rows, the last of them the count of the rest
+	// (RowPx a row); 0 when not even the count fits. Lines when they all fit.
+	THREECROSSROADS_API int32 TextRowsShown(int32 Lines, float Room, float RowPx);
+	// Round 17: main.js renderLobby's Horde record sentence after #modeInfo (leading space included), from the lobby's
+	// hordeBest (FTCMatchState::LobbyHordeBest with the lead patch; empty without it)
+	THREECROSSROADS_API FString HordeRecordText(int32 Defenders, bool bBest, int32 Wave, int32 Time, const TArray<FString>& Names);
+	THREECROSSROADS_API FString HordeRecordText(const class FTCMatchState& S);
+	// Round 17: main.js's #connectionBanner text for connection.js's 'retry' (English; drawn through TC_T: es.js has both)
+	THREECROSSROADS_API FString ConnectionBannerText(bool bFullRoom, int32 SecondsLeft);
 	// The narrowest width from Start down to Floor (in Step px steps, Floor itself last) at which Fits holds, trying
 	// narrower only while the previous width fitted; Start when nothing narrower fits.
 	THREECROSSROADS_API float NarrowerPanel(float Start, float Floor, float Step, TFunctionRef<bool(float)> Fits);
@@ -179,6 +194,12 @@ private:
 	bool bSettingsInMenu = false;
 	int32 MatchPanelLevel = 0, LoggedPanelLevel = -1;
 	void DrawRecruitPanel(UFont* Font, float Left, float Bottom);
+	// Round 17: the recruit card's top limit this frame (UI pixels; 0: none) and the browser's #buy.fit card width
+	// (.uc: clamp(50px, ..., 100px)); MatchPanelCut: the text rows the match panel's last layout cut (fit level 4)
+	float RecruitTopLimit = 0.f;
+	static constexpr float RecruitFitMinW = 50.f;
+	FString RecruitFitLogged;
+	int32 MatchPanelCut = 0;
 	// A line over the ground through metre points (each leg split every 2 m so it follows the relief), Lift metres up.
 	void GroundLine(const ATCTerrain& T, const TArray<FVector2D>& Points, bool bClosed, const FLinearColor& Colour, float Thickness, float Lift = 0.3f);
 	void GroundRing(const ATCTerrain& T, FVector2D At, float Radius, const FLinearColor& Colour, float Thickness);
@@ -187,6 +208,10 @@ private:
 	void DrawMinimapOverlays();
 	// Slice 9 (see the file comment). Each returns or draws only what this recipient's messages delivered.
 	float DrawScoreStrip(UFont* Font, UFont* Big);
+	// Round 17: the strip's one card in screen pixels as last drawn (invalid without a strip)
+	FBox2D StripCard = FBox2D(ForceInit);
+	// Round 17: the alert history box as last drawn (UI pixels; DrawAlertFeed), which the sandbox panel keeps clear of
+	FBox2D AlertHistoryBox = FBox2D(ForceInit);
 	void DrawCapturePoints(UFont* Font);
 	void DrawPlans();
 	void DrawHealthBars();

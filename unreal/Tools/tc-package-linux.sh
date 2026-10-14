@@ -245,6 +245,7 @@ verify() {
 	# content found at run time by path only (slices 10 to 12): the reference's models, soldiers and far figures, the
 	# light, the overlay rings (slice 12), the map pieces' materials, the effects, the sounds and the Spanish dictionary
 	for need in ThreeCrossroads/Content/Models/ModelCatalog.json ThreeCrossroads/Content/Models/Infantry/Source/kits.json \
+		ThreeCrossroads/Content/Fonts/BarlowSemiCondensed/BarlowSemiCondensed-Medium.ttf ThreeCrossroads/Content/Fonts/BarlowSemiCondensed/BarlowSemiCondensed-Bold.ttf \
 		ThreeCrossroads/Content/Models/Motion/FarFigures.bin ThreeCrossroads/Content/Data/locale-es.json \
 		ThreeCrossroads/Content/Models/Motion/M_InfantryFar.uasset ThreeCrossroads/Content/Models/Motion/M_InfantryCrowdFaded.uasset \
 		ThreeCrossroads/Content/Models/Infantry/SM_InfantryCrowdBody.uasset ThreeCrossroads/Content/Models/Materials/Look/M_TCLookPost.uasset \

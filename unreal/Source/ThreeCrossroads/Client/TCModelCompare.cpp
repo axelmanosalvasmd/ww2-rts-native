@@ -2,6 +2,7 @@
 #include "Client/TCGraphics.h"
 #include "Client/TCUnitRenderer.h"
 #include "Client/TCUnitTable.h"
+#include "Client/TCTutorial.h"
 #include "Net/TCMatchState.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -31,6 +32,70 @@
 #endif
 
 DEFINE_LOG_CATEGORY_STATIC(LogTCModelCompare, Log, All);
+
+bool TCTour::ParseLine(const FString& Line, FTCTourPose& P)
+{
+	FString L = Line;
+	int32 Hash;
+	if (L.FindChar('#', Hash)) L.LeftInline(Hash);
+	TArray<FString> F;
+	L.ParseIntoArrayWS(F);
+	if (F.Num() < 6) return false;
+	P = FTCTourPose();
+	P.Name = F[0];
+	P.bWhenPaused = F[1].StartsWith(TEXT("p"));
+	P.At = FCString::Atod(P.bWhenPaused ? *F[1].Mid(1) : *F[1]);
+	P.bFrontier = F[2] == TEXT("frontier");
+	P.X = FCString::Atod(*F[2]); P.Z = FCString::Atod(*F[3]);
+	P.bWideShare = F[4].StartsWith(TEXT("w"));
+	P.Dist = FCString::Atod(P.bWideShare ? *F[4].Mid(1) : *F[4]);
+	P.Yaw = FCString::Atod(*F[5]);
+	if (F[2].StartsWith(TEXT("unit:")))
+	{
+		FString Type = F[2].Mid(5), Seat;
+		if (Type.Split(TEXT("@"), &Type, &Seat) && Seat.IsNumeric()) P.UnitSeat = FCString::Atoi(*Seat);
+		P.UnitType = Type;
+		P.X = P.Z = 0;
+	}
+	if (F[2].StartsWith(TEXT("step:"))) { P.Step = FMath::Max(0, FCString::Atoi(*F[2].Mid(5))); P.X = P.Z = 0; }
+	P.bHud = F.Num() > 6 && F[6] == TEXT("hud");
+	return true;
+}
+
+bool TCTour::StepFocus(int32 PoseStep, FVector2D& Out)
+{
+	const TArray<FTCTutorialStep>& Steps = TCTutorialData::Steps();
+	if (PoseStep < 1 || PoseStep > Steps.Num()) return false;
+	const FIntPoint C = Steps[PoseStep - 1].At;
+	Out = FVector2D(C.X * TCTutorialData::Cell + 1.0, C.Y * TCTutorialData::Cell + 1.0); // tour-reference.mjs: at * 2 + 1
+	return true;
+}
+
+int32 TCTour::UnitSeatFor(const FTCTourPose& P, bool bSpectator, int32 You)
+{
+	if (P.UnitSeat >= 0) return P.UnitSeat;
+	return bSpectator || You < 0 ? 0 : You;
+}
+
+int32 TCTour::PickUnit(const FTCTourPose& P, const FTCMatchState& State, int32 Seat, FVector2D& OutAt)
+{
+	int32 Best = -1;
+	if (P.UnitType == TEXT("vet"))
+	{
+		// round 17 (lead): unit:vet, the living unit with the most veterancy stars of any seat, the lowest id among equals
+		// (tour-reference.mjs picks the same from the page's v.vet); -1 while nobody has a star
+		int32 BestStars = 0;
+		for (const auto& U : State.Units)
+			if (U.Value.Hp > 0 && U.Value.Stars > 0 && (U.Value.Stars > BestStars || (U.Value.Stars == BestStars && U.Key < Best)))
+			{
+				Best = U.Key; BestStars = U.Value.Stars; OutAt = FVector2D(U.Value.X, U.Value.Z);
+			}
+		return Best;
+	}
+	for (const auto& U : State.Units)
+		if (U.Value.Type == P.UnitType && U.Value.Owner == Seat && U.Value.Hp > 0 && (Best < 0 || U.Key < Best)) { Best = U.Key; OutAt = FVector2D(U.Value.X, U.Value.Z); }
+	return Best;
+}
 
 namespace TCModelCompareImpl
 {
@@ -384,6 +449,147 @@ bool FTCUnitModelsRendererTest::RunTest(const FString& Parameters)
 	R->Draw(State, Table, nullptr, TSet<int32>(), 0.f);
 	TestEqual(TEXT("all batches: no placeholders"), R->ModelStats().PlaceholderUnits, 0);
 	R->Destroy();
+	return true;
+}
+// Round 17 (backlog 1b a): a spectator's renderer. Round 16's Conquest spectator pose showed none of the AI's moving
+// squads: they were drawn (the status line counted them) but written without previous transforms, so the temporal
+// anti-aliasing smeared them into the ground. A spectator's state (no seat, every seat's units, fog lifted) draws every
+// unit with its model and owner ring, and a unit that moved between two frames carries last frame's transform on every
+// instance (parts, men, ring), while one that stood still carries none.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCUnitModelsSpectatorTest, "ThreeCrossroads.Models.SpectatorMotion", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+
+bool FTCUnitModelsSpectatorTest::RunTest(const FString& Parameters)
+{
+	const FTCGraphicsLevelScope HighLevel(ETCGraphicsLevel::High);
+	using namespace TCModelCompareImpl;
+	FTCUnitTable Table;
+	FString Error;
+	if (!Table.Load(Error)) { AddError(TEXT("unit table: ") + Error); return false; }
+	FScratchWorld Scratch(TEXT("TCUnitModelsSpectatorTest"));
+	ATCUnitRenderer* R = Scratch.World->SpawnActor<ATCUnitRenderer>(ATCUnitRenderer::StaticClass(), FTransform::Identity);
+	if (!TestNotNull(TEXT("renderer"), R)) return false;
+	FTCMatchState State;
+	State.bHasMatch = true;
+	State.bSpectator = true;
+	State.You = -1;
+	State.bFogLifted = true;
+	State.Factions = { 0, 1 };
+	// seat 0's idle Sherman and squad, seat 1's (the AI's) squad and tank on the move across the centre
+	State.Units.Add(1, MakeUnit(1, TEXT("medium"), 0, 0.f, 0.f, Table));
+	State.Units.Add(2, MakeUnit(2, TEXT("rifle"), 0, 10.f, 0.f, Table));
+	State.Units.Add(3, MakeUnit(3, TEXT("rifle"), 1, 40.f, 40.f, Table));
+	State.Units.Add(4, MakeUnit(4, TEXT("tank"), 1, 60.f, 40.f, Table));
+	R->SetViewPoint(FVector(2500, 2000, 6000)); // 60 m up: the squads near (LOD 110 m)
+	R->Draw(State, Table, nullptr, TSet<int32>(), 1.f);
+	if (!R->ModelsLoaded())
+	{
+		AddWarning(TEXT("no imported models (") + R->ModelLoadError() + TEXT("): untested here"));
+		return true;
+	}
+	TestEqual(TEXT("a spectator draws every seat's units with models"), R->ModelStats().ModelUnits, 4);
+	TestEqual(TEXT("no placeholders"), R->ModelStats().PlaceholderUnits, 0);
+	TestEqual(TEXT("an owner ring under each"), R->ModelStats().Rings, 4);
+	TestTrue(TEXT("men drawn"), R->ModelStats().CrowdMen > 0);
+	TestEqual(TEXT("first frame: nothing moved yet"), R->ModelStats().Moving, 0);
+	// where every instance was in the first frame, by component
+	auto Snapshot = [R]()
+	{
+		TMap<UInstancedStaticMeshComponent*, TArray<FTransform>> Out;
+		for (UActorComponent* C : R->GetComponents())
+			if (UInstancedStaticMeshComponent* Ism = Cast<UInstancedStaticMeshComponent>(C))
+				if (Ism->IsVisible() && Ism->GetInstanceCount())
+					for (int32 I = 0; I < Ism->GetInstanceCount(); I++) { FTransform T; Ism->GetInstanceTransform(I, T, true); Out.FindOrAdd(Ism).Add(T); }
+		return Out;
+	};
+	const TMap<UInstancedStaticMeshComponent*, TArray<FTransform>> Before = Snapshot();
+	// the AI's two units move 3 m east (the snapshot's next rows); seat 0's stand still
+	State.Units[3].X += 3.f;
+	State.Units[4].X += 3.f;
+	R->Draw(State, Table, nullptr, TSet<int32>(), 1.f);
+	AddInfo(R->ModelStatusLine());
+	TestTrue(TEXT("the moving units' instances carry motion"), R->ModelStats().Moving > 0);
+	TestTrue(TEXT("every instance matched last frame's"), R->ModelStats().Matched >= R->ModelStats().Moving);
+	// each drawn instance: its previous transform is one of last frame's places of that component (matched by its key,
+	// never a teleport to its own place when it moved); the tank's rigid parts came from exactly 3 m west
+	int32 Moved = 0, Still = 0, Without = 0, Unseen = 0, Rigid3m = 0;
+	for (const auto& P : Snapshot())
+	{
+		const TArray<FTransform>* Old = Before.Find(P.Key);
+		for (int32 I = 0; I < P.Value.Num(); I++)
+		{
+			FTransform Prev;
+			if (!P.Key->GetInstancePrevTransform(I, Prev, true)) { Without++; continue; }
+			const FVector D = P.Value[I].GetLocation() - Prev.GetLocation();
+			if (D.Size2D() < 1.0) { Still++; continue; }
+			Moved++;
+			bool bSeen = false;
+			if (Old) for (const FTransform& O : *Old) if (O.GetLocation().Equals(Prev.GetLocation(), 1.0)) bSeen = true;
+			if (!bSeen) Unseen++;
+			if (FMath::Abs(D.X - 300.0) < 5.0 && FMath::Abs(D.Y) < 5.0) Rigid3m++;
+		}
+	}
+	AddInfo(FString::Printf(TEXT("instances moved %d (%d exactly 3 m east), still %d, without a previous transform %d, from no place of last frame %d"), Moved, Rigid3m, Still, Without, Unseen));
+	TestEqual(TEXT("every drawn instance has a previous transform"), Without, 0);
+	TestTrue(TEXT("the moving squad, tank and rings moved"), Moved > 0);
+	TestTrue(TEXT("the tank's parts and the rings moved exactly 3 m east"), Rigid3m >= 2);
+	TestTrue(TEXT("seat 0's idle units stood still"), Still > 0);
+	TestEqual(TEXT("each moved instance came from a place it had last frame"), Unseen, 0);
+	// a third frame without movement: the tank's parts carry no motion vector any more
+	R->Draw(State, Table, nullptr, TSet<int32>(), 1.f);
+	int32 Lingering = 0;
+	for (const auto& P : Snapshot())
+		for (int32 I = 0; I < P.Value.Num(); I++) { FTransform Prev; if (P.Key->GetInstancePrevTransform(I, Prev, true) && FMath::Abs((P.Value[I].GetLocation() - Prev.GetLocation()).X - 300.0) < 5.0) Lingering++; }
+	TestEqual(TEXT("standing again: nothing still carries the 3 m step"), Lingering, 0);
+	R->Reset();
+	R->Destroy();
+	return true;
+}
+// Round 17 (backlog 1b d): the tour lines both halves of a side by side read, and the Tutorial's step poses: a step:<n>
+// pose waits for the snapshot's step and centres where shared/tutorial.js STEPS[n - 1].at points (round 16's native
+// spectator tour put step:1 at the origin; the browser at (27, 45)).
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCTourPoseTest, "ThreeCrossroads.Compare.TourPoses", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+
+bool FTCTourPoseTest::RunTest(const FString& Parameters)
+{
+	FTCTourPose P;
+	TestFalse(TEXT("a comment"), TCTour::ParseLine(TEXT("# name seconds x z distance yaw"), P));
+	TestFalse(TEXT("too short"), TCTour::ParseLine(TEXT("a 1 2 3 4"), P));
+	TestTrue(TEXT("plain"), TCTour::ParseLine(TEXT("conquest-centre-60 60 80 80 90 -90 hud # the centre"), P));
+	TestTrue(TEXT("plain fields"), P.Name == TEXT("conquest-centre-60") && P.At == 60 && P.X == 80 && P.Z == 80 && P.Dist == 90 && P.Yaw == -90 && P.bHud && !P.bWideShare && P.Step == 0 && P.UnitType.IsEmpty());
+	TestTrue(TEXT("paused pose"), TCTour::ParseLine(TEXT("frozen p95 80 80 60 -90"), P) && P.bWhenPaused && P.At == 95);
+	TestTrue(TEXT("plain pose is not paused"), TCTour::ParseLine(TEXT("moving 95 80 80 60 -90"), P) && !P.bWhenPaused);
+	TestTrue(TEXT("wide share"), TCTour::ParseLine(TEXT("w 10 1 2 w0.5 0"), P) && P.bWideShare && P.Dist == 0.5 && !P.bHud);
+	TestTrue(TEXT("frontier"), TCTour::ParseLine(TEXT("f 10 frontier 0 60 -90"), P) && P.bFrontier);
+	TestTrue(TEXT("unit of the viewer's seat"), TCTour::ParseLine(TEXT("u 10 unit:medium 0 40 -90"), P) && P.UnitType == TEXT("medium") && P.UnitSeat == -1);
+	TestEqual(TEXT("a spectator follows seat 0"), TCTour::UnitSeatFor(P, true, -1), 0);
+	TestEqual(TEXT("a player its own"), TCTour::UnitSeatFor(P, false, 2), 2);
+	TestTrue(TEXT("unit of seat 1"), TCTour::ParseLine(TEXT("u 10 unit:rifle@1 0 40 -90"), P) && P.UnitType == TEXT("rifle") && P.UnitSeat == 1);
+	TestEqual(TEXT("seat 1 for anyone"), TCTour::UnitSeatFor(P, true, -1), 1);
+	TestTrue(TEXT("step"), TCTour::ParseLine(TEXT("tutorial-step1 20 step:1 0 60 -90 hud"), P) && P.Step == 1 && P.X == 0 && P.bHud);
+	FVector2D At;
+	TestTrue(TEXT("step 1 has a cell"), TCTour::StepFocus(1, At));
+	TestTrue(TEXT("step 1: STEPS[0].at [13, 22] is (27, 45) m, where the browser tour framed it"), At.Equals(FVector2D(27, 45)));
+	TestTrue(TEXT("step 9: [62, 22] is (125, 45) m"), TCTour::StepFocus(9, At) && At.Equals(FVector2D(125, 45)));
+	TestFalse(TEXT("no step 10"), TCTour::StepFocus(10, At));
+	TestFalse(TEXT("no step 0"), TCTour::StepFocus(0, At));
+	TestFalse(TEXT("before the tutorial (step -1)"), TCTour::StepReached(1, -1));
+	TestTrue(TEXT("step 1 at mode.step 0"), TCTour::StepReached(1, 0));
+	TestFalse(TEXT("step 3 at mode.step 1"), TCTour::StepReached(3, 1));
+	TestTrue(TEXT("step 3 past"), TCTour::StepReached(3, 4));
+	FTCMatchState State;
+	FTCUnit A; A.Id = 9; A.Type = TEXT("rifle"); A.Owner = 1; A.Hp = 50; A.X = 5; A.Z = 6;
+	FTCUnit B = A; B.Id = 4; B.X = 7; B.Z = 8;
+	FTCUnit C = A; C.Id = 2; C.Owner = 0;
+	FTCUnit D = A; D.Id = 1; D.Hp = 0;
+	State.Units.Add(9, A); State.Units.Add(4, B); State.Units.Add(2, C); State.Units.Add(1, D);
+	TCTour::ParseLine(TEXT("u 10 unit:rifle@1 0 40 -90"), P);
+	TestEqual(TEXT("the lowest living id of seat 1"), TCTour::PickUnit(P, State, 1, At), 4);
+	TestTrue(TEXT("its place"), At.Equals(FVector2D(7, 8)));
+	TestEqual(TEXT("seat 2 has none"), TCTour::PickUnit(P, State, 2, At), -1);
+	TCTour::ParseLine(TEXT("v 10 unit:vet 0 40 -90"), P);
+	TestEqual(TEXT("unit:vet: nobody has a star yet"), TCTour::PickUnit(P, State, 0, At), -1);
+	State.Units[9].Stars = 1; State.Units[2].Stars = 2; State.Units[4].Stars = 2; State.Units[1].Stars = 3;
+	TestEqual(TEXT("unit:vet: the most stars of any seat, the lowest id among equals, not a dead one"), TCTour::PickUnit(P, State, 1, At), 2);
 	return true;
 }
 #endif // WITH_DEV_AUTOMATION_TESTS

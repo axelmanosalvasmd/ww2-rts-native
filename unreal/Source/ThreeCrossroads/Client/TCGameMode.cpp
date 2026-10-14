@@ -352,6 +352,7 @@ void ATCGameMode::ClearMatchPresentation()
 	Powers.Clear();
 	Progress.Clear();
 	WorldRec.Clear();
+	Markers.Clear(); // round 17
 	RegionAlerts.Reset();
 	WorldObjects.Clear();
 	WorldView.Reset();
@@ -433,6 +434,7 @@ void ATCGameMode::OnMessage(const FJsonObject& M, int32 Bytes)
 		WorldObjects.ApplySnapshot(M); // this side's cell memory (houses, walls, damage stages) and the wrecks it was sent
 		GroundPaint.ApplySnapshot(M);  // the same cell rows repaint the ground round them (queued, a few tiles a frame)
 		Progress.ApplySnapshot(M); // tech, lab, wallet, mode, seats out (nothing before a start)
+		Markers.ApplySnapshot(M); // round 17: the resource nodes (client/main.js nodeMarks)
 		WorldRec.ApplySnapshot(M, State); // World: regions, stations, score, recovery offer; the region alerts against the last
 		Railways.ApplySnapshot(M); Railways.ApplyCells(M); // center(id) from this snapshot; the explored track (applyCells)
 		TakeSlice8Notices();
@@ -480,6 +482,7 @@ void ATCGameMode::OnMessage(const FJsonObject& M, int32 Bytes)
 		Field.ApplyStart(M);
 		Powers.ApplyStart(M); // home from the start's spawn, the last snapshot forgotten
 		Progress.ApplyStart(M);
+		Markers.ApplyStart(); // round 17: nodeMarks = null
 		WorldRec.ApplyStart(M); // seat, names, teams and match id: a reconnect to the same match replays no alert
 		{
 			// server.js start: weather: weatherRow(room.game), shared/weather.js: [now] or [now, next, seconds left] (what the
@@ -847,8 +850,10 @@ void ATCGameMode::Tick(float DeltaSeconds)
 	Super::Tick(DeltaSeconds);
 	const double Now = FPlatformTime::Seconds();
 	// round 15: perf.js frame once per frame: the frame start to start, the game thread's time of the last frame, the
-	// renderer's draw calls and triangles, and the units, effect particles and bodies (main.js's counts)
-	Perf.Frame(Now * 1000.0, Now * 1000.0, FPlatformTime::ToMilliseconds(GGameThreadTime), GNumDrawCallsRHI[0], GNumPrimitivesDrawnRHI[0], State.Units.Num(),
+	// renderer's draw calls and triangles, and the units, effect particles and bodies (main.js's counts). Round 17
+	// (hudui): the start is the frame's own (FApp's current time, set when the engine starts the frame, as perf.js's
+	// start is the frame's performance.now() at its beginning), so Worst is the frame stat unit times; now stays this tick
+	Perf.Frame(FApp::GetCurrentTime() * 1000.0, Now * 1000.0, FPlatformTime::ToMilliseconds(GGameThreadTime), GNumDrawCallsRHI[0], GNumPrimitivesDrawnRHI[0], State.Units.Num(),
 		Effects ? Effects->Fx.Particles().Num() : 0, Units ? Units->ModelStats().Corpses : 0);
 	if (Connection)
 	{

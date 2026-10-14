@@ -1012,8 +1012,9 @@ FString FTCOrdersCheck::Run(ATCGameMode& M, ATCPlayerController& PC, const FStep
 	}
 	if (S.Action == TEXT("press"))
 	{
-		// press:recover | press:rail: the HUD button through its hit test
-		const ETCUiAction A = Arg == TEXT("recover") ? ETCUiAction::Recover : Arg == TEXT("rail") ? ETCUiAction::Rail : ETCUiAction::None;
+		// press:recover | press:rail: the HUD button through its hit test; press:pause (round 17, poses): the host's
+		// Pause/Resume (client/main.js pauseBtn), so both clients of a side by side can shoot the same frozen scene
+		const ETCUiAction A = Arg == TEXT("recover") ? ETCUiAction::Recover : Arg == TEXT("rail") ? ETCUiAction::Rail : Arg == TEXT("pause") ? ETCUiAction::PauseMatch : ETCUiAction::None;
 		if (A == ETCUiAction::None) return TEXT("press: unknown button ") + Arg;
 		return FString::Printf(TEXT("press %s: %s"), *Arg, PC.PressButton(A) ? TEXT("done") : TEXT("did nothing"));
 	}
@@ -1021,7 +1022,8 @@ FString FTCOrdersCheck::Run(ATCGameMode& M, ATCPlayerController& PC, const FStep
 	{
 		const FString File = FPaths::Combine(ShotDir.IsEmpty() ? FPaths::ProjectSavedDir() / TEXT("Screenshots") : ShotDir, Arg + TEXT(".png"));
 		FScreenshotRequest::RequestScreenshot(File, true, false);
-		return TEXT("screenshot ") + File;
+		// round 17 (poses): the camera as drawn, so unreal/Tools/compare/scene-reference.mjs can set the browser's to it
+		return FString::Printf(TEXT("screenshot %s | camera (%.2f, %.2f) yaw %.2f distance %.2f m"), *File, PC.ViewFocus().X, PC.ViewFocus().Y, PC.ViewYaw(), PC.ViewDistance());
 	}
 	if (S.Action == TEXT("quit")) { FPlatformMisc::RequestExit(false, TEXT("TCOrdersCheck")); return TEXT("quit"); }
 	return TEXT("log");

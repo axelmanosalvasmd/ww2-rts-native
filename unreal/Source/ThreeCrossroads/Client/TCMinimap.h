@@ -3,7 +3,10 @@
 // turned with the camera so "up" on the minimap is "up" on the screen, scaled so the whole map fits at any heading.
 // Ground is coloured per terrain character and brightened 12% per level, then darkened by the fog: clear where this
 // side sees now (or a held unit stands), dimmed where it explored, dark where it never looked (opaque on World maps).
-// The held units are dots in their seat's colour (selected ones ringed white), and the camera's view is outlined.
+// The held units are dots in their seat's colour (selected ones ringed white), and the camera's view is outlined: the
+// ground under the window's four corners, the relief where the ray hits it, else the flat y = 0 plane (camera.js
+// groundAt), so the tilted camera's footprint shows as the browser's trapezoid even where the window reaches past the
+// map edge (round 17).
 // A left press or drag on it points the camera there (through the camera-target hook); a right press is an order at
 // that ground (FTCCursor, for the controller's IssueOrder).
 //
@@ -13,9 +16,9 @@
 // whole image before it is drawn again; Reset (or a state with no match) drops the image, so nothing of an earlier
 // match lingers.
 //
-// Not drawn yet, because FTCMatchState does not hold them: capture points, spawns of other seats, strikes, World
-// regions and stations, railway track, pings and alerts, the logistics overlay. A building lights only the cell under
-// its centre between vision passes (the unit table has no footprint size).
+// Capture points, spawns, strikes, World regions and stations, pings, alert pings and the logistics overlay are drawn
+// over this by ATCHUD (DrawMinimapOverlays) through WorldToPixel; the view outline goes last when the HUD sets
+// bDeferViewOutline and calls DrawViewOutline after them (the browser strokes it last).
 //
 // The first part (TCMinimapCore) is plain C++ with no engine types, so a standalone harness can check its numbers by
 // defining TC_MINIMAP_CORE_ONLY before including this header.
@@ -161,6 +164,89 @@ namespace TCMinimapCore
 		X0 = AX; Y0 = AY; X1 = BX; Y1 = BY;
 		return true;
 	}
+
+	// ---- the view outline (round 17): client/camera.js corners() as client/main.js drawMinimap strokes it ----
+	// Reference axes here: x, y up, z (metres). rig.corners maps the window's four corners, in the order top-left,
+	// top-right, bottom-right, bottom-left, through camera.js groundAt: the relief under the pixel when the ray hits it,
+	// else THREE.Ray.intersectPlane with the flat y = 0 plane (null when the ray runs level or points away from it).
+	// Misses are dropped (.filter(Boolean)) and the outline is drawn only when all four corners are left, so a camera
+	// whose window reaches past the map edge still draws its whole footprint (a trapezoid for the tilted camera), cut
+	// by the minimap's square.
+	inline constexpr double RefPitch = 0.95;          // client/main.js PITCH
+	inline constexpr double RefVerticalFov = 42.0;    // client/main.js PerspectiveCamera(42, ...)
+
+	// THREE.Ray.intersectPlane with the plane y = 0 (normal +y, constant 0): t = -o.y / d.y, null for t < 0 or a
+	// level ray off the plane; a level ray on the plane hits at its origin.
+	inline bool FlatGround(const double O[3], const double D[3], double Out[3])
+	{
+		double T;
+		if (D[1] == 0.0)
+		{
+			if (O[1] != 0.0) return false;
+			T = 0.0;
+		}
+		else
+		{
+			T = -O[1] / D[1];
+			if (!(T >= 0.0)) return false;
+		}
+		Out[0] = O[0] + D[0] * T; Out[1] = O[1] + D[1] * T; Out[2] = O[2] + D[2] * T;
+		return true;
+	}
+
+	// client/camera.js pose() and THREE.Raycaster.setFromCamera for the browser's camera: the eye at the target plus
+	// (sin yaw * cos pitch, sin pitch, cos yaw * cos pitch) * dist, looking at the target with +y up.
+	struct FRefView
+	{
+		double Eye[3] = { 0, 0, 0 }, Fwd[3] = { 0, 0, -1 }, Right[3] = { 1, 0, 0 }, Up[3] = { 0, 1, 0 };
+		double TanX = 1.0, TanY = 1.0;
+
+		static FRefView Pose(double X, double Y, double Z, double Yaw, double Dist, double Aspect, double Pitch = RefPitch, double VerticalFovDegrees = RefVerticalFov)
+		{
+			FRefView V;
+			const double Hd = Dist * std::cos(Pitch);
+			V.Eye[0] = X + std::sin(Yaw) * Hd; V.Eye[1] = Y + Dist * std::sin(Pitch); V.Eye[2] = Z + std::cos(Yaw) * Hd;
+			// Object3D.lookAt for a camera: its +z is (eye - target), x = normalize(up x z), y = z x x
+			double Zx = V.Eye[0] - X, Zy = V.Eye[1] - Y, Zz = V.Eye[2] - Z;
+			const double Zl = std::sqrt(Zx * Zx + Zy * Zy + Zz * Zz);
+			if (Zl > 0) { Zx /= Zl; Zy /= Zl; Zz /= Zl; }
+			double Xx = Zz, Xy = 0.0, Xz = -Zx; // (0, 1, 0) x z
+			const double Xl = std::sqrt(Xx * Xx + Xz * Xz);
+			if (Xl > 0) { Xx /= Xl; Xz /= Xl; }
+			V.Right[0] = Xx; V.Right[1] = Xy; V.Right[2] = Xz;
+			V.Up[0] = Zy * Xz - Zz * Xy; V.Up[1] = Zz * Xx - Zx * Xz; V.Up[2] = Zx * Xy - Zy * Xx;
+			V.Fwd[0] = -Zx; V.Fwd[1] = -Zy; V.Fwd[2] = -Zz;
+			V.TanY = std::tan(VerticalFovDegrees * 3.14159265358979323846 / 360.0);
+			V.TanX = V.TanY * Aspect;
+			return V;
+		}
+
+		// The unit ray through window pixel (Px, Py) of a W x H window (mx / w * 2 - 1, 1 - my / h * 2)
+		void Ray(double Px, double Py, double W, double H, double Out[3]) const
+		{
+			const double Nx = Px / W * 2.0 - 1.0, Ny = 1.0 - Py / H * 2.0;
+			double L = 0.0;
+			for (int I = 0; I < 3; I++) { Out[I] = Fwd[I] + Right[I] * Nx * TanX + Up[I] * Ny * TanY; L += Out[I] * Out[I]; }
+			L = std::sqrt(L);
+			if (L > 0) for (int I = 0; I < 3; I++) Out[I] /= L;
+		}
+	};
+
+	// rig.corners: Ground(O, D, Out) is the relief pick (true with Out on a hit); a miss falls back to FlatGround.
+	// Returns how many corners were found (in screen order, misses dropped); the outline is drawn only for 4.
+	template <typename FGround>
+	int ViewCorners(const FRefView& V, double W, double H, FGround&& Ground, double Out[4][3])
+	{
+		const double Px[4] = { 0.0, W, W, 0.0 }, Py[4] = { 0.0, 0.0, H, H };
+		int N = 0;
+		for (int I = 0; I < 4; I++)
+		{
+			double D[3], P[3];
+			V.Ray(Px[I], Py[I], W, H, D);
+			if (Ground(V.Eye, D, P) || FlatGround(V.Eye, D, P)) { Out[N][0] = P[0]; Out[N][1] = P[1]; Out[N][2] = P[2]; N++; }
+		}
+		return N;
+	}
 }
 
 #ifndef TC_MINIMAP_CORE_ONLY
@@ -175,8 +261,9 @@ class FTCMatchState;
 class FTCUnitTable;
 class ATCTerrain;
 
-// The camera as the minimap draws it: its heading and, when all four screen corners hit known ground, the ground
-// under them (reference metres, in screen order top-left, top-right, bottom-right, bottom-left). Fill it with
+// The camera as the minimap draws it: its heading and the ground under the window's corners (reference metres, in
+// screen order top-left, top-right, bottom-right, bottom-left; the relief, else the flat y = 0 plane; a corner whose
+// ray points above the horizon is left out, and the outline is drawn only with all four). Fill it with
 // FTCMinimap::ViewFromCanvas in the HUD, or by hand.
 struct FTCMinimapView
 {
@@ -232,6 +319,9 @@ public:
 	// The image is rebuilt from the state at most this often (client/main.js redraws the minimap every 0.15 s); a new
 	// match or map rebuilds it at once. Units and the view outline are drawn from the state every frame.
 	double RefreshSeconds = 0.15;
+	// Draw leaves the view outline out; the caller draws it with DrawViewOutline after its own overlays (the browser
+	// strokes the outline last, over points, pings and the logistics layer).
+	bool bDeferViewOutline = false;
 
 	// Called with reference metres (clamped to the map) when a left press or drag on the minimap points the camera
 	// there. Bind it to ATCPlayerController::FocusOn. Without a hook, read FTCMinimapPress::Ground and MouseMove's out
@@ -244,6 +334,9 @@ public:
 
 	// Draws the minimap on the HUD's canvas. Returns false (and draws nothing) when there is no match to draw.
 	bool Draw(UCanvas* Canvas, const FTCMatchState& State, const FTCUnitTable& Table, const TSet<int32>& Selected, const FTCMinimapView& View);
+	// The camera's view outline over the minimap as last arranged (Draw calls it unless bDeferViewOutline). False when
+	// nothing of it was drawn (no layout, fewer than four corners, or all of it outside the square).
+	bool DrawViewOutline(UCanvas* Canvas, const FTCMinimapView& View);
 
 	// Rebuilds the image from the state now (Draw does this on its timer). bForce: even when the timer has not run out.
 	// The image is always computed; the GPU texture only when this process can render (none under -nullrhi).
@@ -255,8 +348,12 @@ public:
 	bool Arrange(float ClipX, float ClipY, const FTCMatchState& State, float YawDegrees);
 
 	// The camera's heading and the ground under the screen's corners, from the canvas the HUD is drawing (its scene
-	// view) and the terrain's pick (only ground this client knows is hit). False when the canvas has no view.
+	// view): the terrain's pick (only ground this client knows is hit), else the flat plane at height 0, as camera.js
+	// groundAt falls back. Terrain may be null (the plane only). False when the canvas has no view.
 	bool ViewFromCanvas(const UCanvas* Canvas, const ATCTerrain* Terrain, FTCMinimapView& Out);
+	// camera.js groundAt for one ray (Unreal centimetres and direction): the terrain's pick, else the flat plane at
+	// height 0 (THREE.Ray.intersectPlane). False only for a ray running level or pointing away from the plane.
+	static bool GroundUnder(const ATCTerrain* Terrain, const FVector& Origin, const FVector& Dir, FVector2D& OutMetres);
 
 	// Input, in viewport pixels (the HUD canvas's coordinates). Call MouseDown for every left or right press before the
 	// world handles it; if bConsumed, the world must ignore that press (and its release). bAimArmed: the controller

@@ -140,6 +140,7 @@ bool FTCRustViewShadow::BeginMode(ETCDecoder InRequested, FTCMatchState* State, 
 	End();
 	All = FCounts(); Segment = FCounts();
 	Messages = ApplyErrors = SegmentNumber = WarnedSnapshots = WarnedNotFed = RefusedRun = 0;
+	FirstError.Reset();
 	Demoted.Reset(); LastApply = FWW2Result(); bPending = bComparedInState = false;
 	Requested_ = InRequested;
 	Effective = ETCDecoder::Cpp;
@@ -217,6 +218,7 @@ void FTCRustViewShadow::Feed(const FString& Text)
 	if (!LastApply.IsOk())
 	{
 		ApplyErrors++;
+		if (FirstError.IsEmpty()) FirstError = FString::Printf(TEXT("message %d: %d %s: %s"), Messages, LastApply.Code, FWW2Core::CodeName(LastApply.Code), *LastApply.Error);
 		// WRONG_STATE before any start is the documented answer to a snapshot with no match; log the first few of any.
 		if (ApplyErrors <= 10) UE_LOG(LogTC, Warning, TEXT("rust view shadow: ww2_view_apply %d (%s): %s [%d bytes, message %d]"), LastApply.Code, FWW2Core::CodeName(LastApply.Code), *LastApply.Error, FTCHARToUTF8(*Text, Text.Len()).Length(), Messages);
 		if (View.IsPoisoned())

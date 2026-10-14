@@ -186,6 +186,8 @@ void ATCUnitRenderer::EnsureModels()
 
 void ATCUnitRenderer::Reset()
 {
+	History.Reset();
+	TwinHistory.Reset();
 	Shown.Reset();
 	Squads.Reset();
 	UnitMotion.Reset();
@@ -204,9 +206,9 @@ FString ATCUnitRenderer::ModelStatusLine() const
 	if (!Library.IsLoaded()) return FString::Printf(TEXT("models off (%s)"), *LibraryError);
 	TArray<FString> On;
 	for (int32 B = 0; B < BatchCount; B++) if (IsBatchEnabled(B)) On.Add(BatchName(B));
-	return FString::Printf(TEXT("models [%s]: units %d model, %d placeholder (%d without a model); instances %d parts, %d near men, %d far men (%d faded), %d bodies, %d rings; %d in motion (%d with turning wheels and running tracks); %d components, %d figures"),
+	return FString::Printf(TEXT("models [%s]: units %d model, %d placeholder (%d without a model); instances %d parts, %d near men, %d far men (%d faded), %d bodies, %d rings; %d in motion (%d with turning wheels and running tracks); %d components, %d figures; motion vectors: %d instances with last frame's transform, %d of them moving"),
 		On.IsEmpty() ? TEXT("none") : *FString::Join(On, TEXT(",")), Stats.ModelUnits, Stats.PlaceholderUnits, Stats.MissingModel,
-		Stats.PartInstances, Stats.CrowdMen, Stats.FarMen, Stats.FadedMen, Stats.Corpses, Stats.Rings, Stats.MovingHulls, Stats.WheelHulls, Stats.Components, Stats.Figures);
+		Stats.PartInstances, Stats.CrowdMen, Stats.FarMen, Stats.FadedMen, Stats.Corpses, Stats.Rings, Stats.MovingHulls, Stats.WheelHulls, Stats.Components, Stats.Figures, Stats.Matched, Stats.Moving);
 }
 
 UInstancedStaticMeshComponent* ATCUnitRenderer::PartComponent(const FTCModelPart& Part, bool bFaded)
@@ -366,7 +368,7 @@ void ATCUnitRenderer::UpdateRingLooks()
 	for (auto& P : RingLooks) if (P.Value.Mid) P.Value.Mid->SetVectorParameterValue(TEXT("Color"), RingColorFor(P.Value.Display));
 }
 
-void ATCUnitRenderer::AddRing(float Radius, const FLinearColor& Color, float Opacity, int32 ColorKey, const FVector& At)
+void ATCUnitRenderer::AddRing(float Radius, const FLinearColor& Color, float Opacity, int32 ColorKey, const FVector& At, uint64 InstanceKey)
 {
 	using namespace TCUnitModelsImpl;
 	const int32 Key = FMath::RoundToInt(Radius) * 1000 + ColorKey;
@@ -437,7 +439,9 @@ void ATCUnitRenderer::AddRing(float Radius, const FLinearColor& Color, float Opa
 		RingBatches.Add(Key, Ism);
 	}
 	if (!Ism) return;
-	Frame.FindOrAdd(Ism).Transforms.Add(FTransform(At));
+	FFrameBatch& RingBatch = Frame.FindOrAdd(Ism);
+	RingBatch.Transforms.Add(FTransform(At));
+	RingBatch.Keys.Add(InstanceKey);
 	Stats.Rings++;
 }
 
@@ -494,23 +498,25 @@ bool ATCUnitRenderer::DrawModel(const FTCMatchState& State, const FTCUnit& U, co
 	const FTCPartMotion& Motion = bMoves ? UnitMotion.Update(U.Id, U.Type, Root.GetLocation(), S.Rot, true, Dt, GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0) : Still;
 	if (bMoves && (FTCUnitMotion::HasHullMotion(U.Type) || FTCUnitMotion::IsPlane(U.Type))) Stats.MovingHulls++;
 	// resolve every component first, so a unit with a missing mesh falls back whole instead of half drawn
-	TArray<TPair<UInstancedStaticMeshComponent*, FTransform>, TInlineAllocator<16>> Parts;
+	struct FPartDraw { UInstancedStaticMeshComponent* Ism; FTransform Xf; int32 Index; };
+	TArray<FPartDraw, TInlineAllocator<16>> Parts;
 	for (int32 I = 0; I < Entry->Parts.Num(); I++)
 	{
 		if (!Visible[I]) continue;
 		UInstancedStaticMeshComponent* Ism = PartComponent(Entry->Parts[I], bFaded);
 		if (!Ism) return false;
-		Parts.Add({ Ism, FTCUnitMotion::PartTransform(*Entry, I, Root, Turns, Motion) });
+		Parts.Add({ Ism, FTCUnitMotion::PartTransform(*Entry, I, Root, Turns, Motion), I });
 	}
 	// unit-models.js vehicleDamageAnchor for a ground vehicle (main.js runs vehicleDamageFrame for those): the engine
 	// deck point the damage smoke rises from, carried by the hull motion (Client/TCEffects.h VehicleDamageFrame)
 	if (bMoves && Def && !Def->bAir && !FTCUnitMotion::IsSea(U.Type))
 		UnitMotion.SetDamageAnchor(U.Id, (Motion.Body * Root).TransformPosition(DamageAnchorLocal(UnitMotion, *Entry)));
-	for (const auto& P : Parts)
+	for (const FPartDraw& P : Parts)
 	{
-		FFrameBatch& B = Frame.FindOrAdd(P.Key);
-		B.Transforms.Add(P.Value);
-		AppendPartData(B, P.Key, Custom, Motion); // the catalog's floats, then a tracked hull's wheelTravel
+		FFrameBatch& B = Frame.FindOrAdd(P.Ism);
+		B.Transforms.Add(P.Xf);
+		B.Keys.Add(FTCInstanceHistory::PartKey(U.Id, P.Index));
+		AppendPartData(B, P.Ism, Custom, Motion); // the catalog's floats, then a tracked hull's wheelTravel
 		Stats.PartInstances++;
 	}
 	if (bMen) DrawSquadMen(*Entry, U, Faction, S, FTransform(Facing, At), Men, Custom);
@@ -519,9 +525,9 @@ bool ATCUnitRenderer::DrawModel(const FTCMatchState& State, const FTCUnit& U, co
 	if (!(Def && Def->bAir))
 	{
 		const bool bRetreat = (U.Flags & 1) != 0;
-		AddRing((Radius + 0.4f) * 100.f, bRetreat ? FLinearColor(FColor(0xff, 0xff, 0xff)) : SeatColor(U.Owner), 0.9f, bRetreat ? 101 : FMath::Clamp(U.Owner, -1, 62) + 2, At + FVector(0, 0, 10.f));
+		AddRing((Radius + 0.4f) * 100.f, bRetreat ? FLinearColor(FColor(0xff, 0xff, 0xff)) : SeatColor(U.Owner), 0.9f, bRetreat ? 101 : FMath::Clamp(U.Owner, -1, 62) + 2, At + FVector(0, 0, 10.f), FTCInstanceHistory::RingKey(U.Id, false));
 	}
-	if (bSelected) AddRing((Radius + 1.f) * 100.f, FLinearColor(FColor(0xf4, 0xf2, 0xea)), 0.95f, 100, Root.GetLocation() + FVector(0, 0, 14.f));
+	if (bSelected) AddRing((Radius + 1.f) * 100.f, FLinearColor(FColor(0xf4, 0xf2, 0xea)), 0.95f, 100, Root.GetLocation() + FVector(0, 0, 14.f), FTCInstanceHistory::RingKey(U.Id, true));
 	return true;
 }
 
@@ -604,6 +610,7 @@ void ATCUnitRenderer::DrawSquadMen(const FTCModelEntry& Entry, const FTCUnit& U,
 			FFrameBatch& B = Frame.FindOrAdd(Ism);
 			B.Floats = TCModelData::Count;
 			B.Transforms.Add(D.Man);
+			B.Keys.Add(FTCInstanceHistory::ManKey(U.Id, K));
 			B.Data.Append(Custom);
 			if (S.bFar) Stats.FarMen++; else Stats.PartInstances++;
 		}
@@ -622,16 +629,10 @@ void ATCUnitRenderer::FlushModelFrame()
 		const FFrameBatch* B = Frame.Find(Ism);
 		const int32 N = B ? B->Transforms.Num() : 0;
 		LastInstances += N;
-		if (Ism->GetInstanceCount() == N)
-		{
-			if (!N) continue;
-			Ism->BatchUpdateInstancesTransforms(0, B->Transforms, true, false, true);
-		}
-		else
-		{
-			Ism->ClearInstances();
-			if (N) Ism->AddInstances(B->Transforms, false, true, false);
-		}
+		if (Ism->GetInstanceCount() == 0 && N == 0) continue;
+		// round 17: with last frame's transforms, so a moving unit carries its motion vector (FTCInstanceHistory)
+		History.Write(Ism, B ? B->Transforms : TArray<FTransform>(), B ? B->Keys : TArray<uint64>());
+		if (!N) { Ism->MarkRenderStateDirty(); continue; }
 		if (N && B->Floats > 0 && B->Data.Num() == N * B->Floats) Ism->SetCustomData(0, N - 1, B->Data, false);
 		Ism->MarkRenderStateDirty();
 	}
@@ -644,16 +645,10 @@ void ATCUnitRenderer::FlushModelFrame()
 		if (Ism->GetOwner() != this) continue;
 		const FFrameBatch* B = Frame.Find(Ism);
 		const int32 N = B ? B->Transforms.Num() : 0;
-		if (Twin->GetInstanceCount() == N)
-		{
-			if (!N) continue;
-			Twin->BatchUpdateInstancesTransforms(0, B->Transforms, true, false, true);
-		}
-		else
-		{
-			Twin->ClearInstances();
-			if (N) Twin->AddInstances(B->Transforms, false, true, false);
-		}
+		if (Twin->GetInstanceCount() == 0 && N == 0) continue;
+		// the shadow twin keeps its own history (it is drawn only into the shadow depths, where no motion vector is used,
+		// but its counts follow the part's), counted apart from the drawn instances
+		TwinHistory.Write(Twin, B ? B->Transforms : TArray<FTransform>(), B ? B->Keys : TArray<uint64>());
 		if (N && B->Floats > 0 && B->Data.Num() == N * B->Floats && Twin->NumCustomDataFloats == B->Floats) Twin->SetCustomData(0, N - 1, B->Data, false);
 		Twin->MarkRenderStateDirty();
 	}
@@ -668,5 +663,7 @@ void ATCUnitRenderer::ReportFrame()
 	if (ReportAt == 0) ReportAt = Now;
 	if (Now - ReportAt < 5.0) return;
 	UE_LOG(LogTCUnitModels, Log, TEXT("unit models: %s | frame %.2f ms mean, %.2f ms worst over %d frames"), *ModelStatusLine(), FrameSum / FMath::Max(1, FrameCount) * 1000.0, FrameMax * 1000.0, FrameCount);
+	// round 17: where each drawn unit is (reference metres), for reading a side by side against the browser's units
+	if (!DrawnList.IsEmpty()) UE_LOG(LogTCUnitModels, Log, TEXT("unit models: drawn at [%s]"), *DrawnList);
 	ReportAt = Now; FrameSum = FrameMax = 0; FrameCount = 0;
 }

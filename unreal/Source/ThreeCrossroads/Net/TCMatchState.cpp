@@ -164,6 +164,19 @@ void FTCMatchState::ApplyLobby(const FJsonObject& M)
 	}
 	M.TryGetStringField(TEXT("mapName"), LobbyMap);
 	M.TryGetBoolField(TEXT("sandbox"), bLobbySandbox);
+	// round 17: the Horde record (hordeBest: an object, or null)
+	LobbyHordeBest = FLobbyHordeBest();
+	const TSharedPtr<FJsonObject>* Best;
+	if (M.TryGetObjectField(TEXT("hordeBest"), Best) && Best->IsValid())
+	{
+		double Wave = 0, Time = 0;
+		LobbyHordeBest.bSet = (*Best)->TryGetNumberField(TEXT("wave"), Wave);
+		(*Best)->TryGetNumberField(TEXT("time"), Time);
+		LobbyHordeBest.Wave = (int32)Wave; LobbyHordeBest.Time = (int32)Time;
+		const TArray<TSharedPtr<FJsonValue>>* BestNames;
+		if ((*Best)->TryGetArrayField(TEXT("names"), BestNames))
+			for (const TSharedPtr<FJsonValue>& V : *BestNames) { FString N; if (V.IsValid() && V->TryGetString(N)) LobbyHordeBest.Names.Add(N); }
+	}
 	const TArray<TSharedPtr<FJsonValue>>* Watching;
 	if (M.TryGetArrayField(TEXT("spectators"), Watching))
 	{
@@ -281,9 +294,15 @@ void FTCMatchState::ClearMatch()
 	Snapshots = 0;
 	ConfirmedMatch = -1; ConfirmedSeat = -1;
 	DirtyCells.Reset(); FogDirtyCells.Reset();
+	ResetCells();
 	bMapReset = true;
 	ResetExtras();
 	Objectives.Reset();
+}
+
+void FTCMatchState::ResetCells()
+{
+	CellStates.Reset(); CellData.Reset(); Sections.Reset(); LastCellRows.Reset(); LastCellRowsSkipped = 0;
 }
 
 void FTCMatchState::ResetExtras()
@@ -377,6 +396,7 @@ bool FTCMatchState::ApplyStartDecode(const FJsonObject& M)
 	}
 
 	Map = MoveTemp(NewMap);
+	ResetCells(); // a new terrain: client/main.js startGame makes a new structuralSections map and state array
 	bHasMatch = true;
 	double D;
 	MatchId = M.TryGetNumberField(TEXT("matchId"), D) ? (int32)D : -1;
@@ -470,19 +490,45 @@ void FTCMatchState::ApplyStartExtras(const FJsonObject& M)
 
 void FTCMatchState::ApplyCells(const TArray<TSharedPtr<FJsonValue>>& Cells)
 {
+	using namespace TCMatchDecode;
 	// Each entry is [cell, char, level, state, data] (shared/sim.js logCell / terrainFor), from this player's memory.
+	// client/main.js applyCells: grid, level (when present), state (st ?? 0) and, from data, ground, object, material
+	// and the structural section.
+	LastCellRows.Reset();
+	LastCellRowsSkipped = 0;
 	for (const TSharedPtr<FJsonValue>& Entry : Cells)
 	{
 		const TArray<TSharedPtr<FJsonValue>>* Row;
-		if (!Entry.IsValid() || !Entry->TryGetArray(Row) || Row->Num() < 2) continue;
+		if (!Entry.IsValid() || !Entry->TryGetArray(Row) || Row->Num() < 2) { LastCellRowsSkipped++; continue; }
 		const int32 C = IntOr((*Row)[0], -1);
 		FString Ch;
-		if (!Map.IsValidCell(C) || !(*Row)[1].IsValid() || !(*Row)[1]->TryGetString(Ch) || Ch.IsEmpty()) continue;
+		if (!Map.IsValidCell(C) || !(*Row)[1].IsValid() || !(*Row)[1]->TryGetString(Ch) || Ch.IsEmpty()) { LastCellRowsSkipped++; continue; }
 		Map.Chars[C] = (uint8)FMath::Clamp((int32)Ch[0], 0, 127);
 		double Lv;
 		if (Row->Num() > 2 && Num((*Row)[2], Lv)) Map.Levels[C] = (int8)FMath::Clamp((int32)Lv, -127, 127);
 		Map.Known[C] = true;
 		DirtyCells.Add(C);
+		LastCellRows.Add(C);
+		// a Uint8Array store: ToUint8 (NaN and absent 0, truncation, modulo 256)
+		double St = 0.0;
+		double Wrapped = Row->Num() > 3 && Num((*Row)[3], St) ? FMath::Fmod(FMath::TruncToDouble(St), 256.0) : 0.0;
+		if (Wrapped < 0.0) Wrapped += 256.0;
+		const uint8 State = (uint8)Wrapped;
+		CellStates.Add(C, State);
+		const FJsonObject* Data = Row->Num() > 4 ? ObjectOf((*Row)[4]) : nullptr;
+		if (!Data) continue;
+		FTCCellData& D = CellData.FindOrAdd(C);
+		D.Ground = StrField(*Data, TEXT("ground")); D.Object = StrField(*Data, TEXT("object")); D.Material = StrField(*Data, TEXT("material"));
+		if (const FJsonObject* S = ObjectOf(Field(*Data, TEXT("section"))))
+		{
+			FTCCellSection Sec;
+			Sec.Id = StrField(*S, TEXT("id")); Sec.StructureId = StrField(*S, TEXT("structureId"));
+			Sec.State = StrField(*S, TEXT("state")); Sec.Material = StrField(*S, TEXT("material"));
+			Sec.bHasHp = HasNum(*S, TEXT("hp"), Sec.Hp);
+			Sec.bHasMaxHp = HasNum(*S, TEXT("maxHp"), Sec.MaxHp);
+			Sec.bAnchor = Truthy(Field(*S, TEXT("anchor")));
+			Sections.Add(C, MoveTemp(Sec));
+		}
 	}
 }
 
@@ -589,6 +635,7 @@ bool FTCMatchState::ApplySnapshot(const FJsonObject& M)
 	}
 
 	// Terrain this player's side learned (its own memory), and fog cells that flipped since the last fog.
+	LastCellRows.Reset(); LastCellRowsSkipped = 0;
 	if (M.TryGetArrayField(TEXT("cells"), Arr)) ApplyCells(*Arr);
 	FString FogDelta;
 	if (!bFogLifted && M.TryGetStringField(TEXT("fog"), FogDelta))

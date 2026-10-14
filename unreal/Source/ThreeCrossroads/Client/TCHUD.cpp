@@ -14,6 +14,7 @@
 #include "Client/TCFormationControls.h"
 #include "Client/TCSupportPowers.h"
 #include "Client/TCCoverPreview.h"
+#include "Client/TCMarkers.h"
 #include "Client/TCUnitRenderer.h"
 #include "Client/TCLobbySettings.h"
 #include "Client/TCPersistence.h"
@@ -187,15 +188,33 @@ float FTCHudFit::StripMaxWidth(float ClipX, float CornerRight)
 	return FMath::Max(0.f, ClipX - 2.f * FMath::Max(8.f, CornerRight + 4.f));
 }
 
-FBox2D FTCHudFit::SandboxPlace(float ClipX, float ClipY, FVector2D Size, float StripLow, const TArray<FBox2D>& Avoid, bool* bOutBrowserSpot)
+FBox2D FTCHudFit::SandboxPlace(float ClipX, float ClipY, FVector2D Size, float StripLow, const TArray<FBox2D>& Avoid, bool* bOutBrowserSpot, const TArray<FBox2D>& SlideFrom)
 {
-	const float X = FMath::Max(8.f, (ClipX - Size.X) / 2);
-	const FBox2D Spot(FVector2D(X, ClipY - SandboxBottom - Size.Y), FVector2D(X + Size.X, ClipY - SandboxBottom));
-	bool bClear = Spot.Min.Y >= StripLow + 4.f;
+	auto Hits = [](const FBox2D& A, const FBox2D& S) { return A.bIsValid && A.Min.X < S.Max.X && A.Max.X > S.Min.X && A.Min.Y < S.Max.Y + 4.f && A.Max.Y > S.Min.Y - 4.f; };
+	// round 17: centred, or slid left just clear of a SlideFrom box it would meet (the alert history at the right),
+	// staying 8 px in from the left; null when it still meets one
+	auto Across = [&](float Top, FBox2D& Out)
+	{
+		float X = FMath::Max(8.f, (ClipX - Size.X) / 2);
+		for (int32 Pass = 0; Pass < 2; Pass++)
+		{
+			const FBox2D Try(FVector2D(X, Top), FVector2D(X + Size.X, Top + Size.Y));
+			const FBox2D* Met = SlideFrom.FindByPredicate([&](const FBox2D& A) { return Hits(A, Try); });
+			if (!Met) { Out = Try; return true; }
+			X = Met->Min.X - 4.f - Size.X;
+			if (X < 8.f) break;
+		}
+		return false;
+	};
+	FBox2D Spot;
+	bool bClear = ClipY - SandboxBottom - Size.Y >= StripLow + 4.f && Across(ClipY - SandboxBottom - Size.Y, Spot);
 	for (const FBox2D& A : Avoid)
-		if (bClear && A.bIsValid && A.Min.X < Spot.Max.X && A.Max.X > Spot.Min.X && A.Min.Y < Spot.Max.Y + 4.f && A.Max.Y > Spot.Min.Y - 4.f) bClear = false;
+		if (bClear && Hits(A, Spot)) bClear = false;
 	if (bOutBrowserSpot) *bOutBrowserSpot = bClear;
 	if (bClear) return Spot;
+	FBox2D Under;
+	if (Across(StripLow + 4.f, Under)) return Under;
+	const float X = FMath::Max(8.f, (ClipX - Size.X) / 2);
 	return FBox2D(FVector2D(X, StripLow + 4.f), FVector2D(X + Size.X, StripLow + 4.f + Size.Y));
 }
 
@@ -203,6 +222,37 @@ int32 FTCHudFit::FitLevel(const TArray<float>& Heights, float ClipY, float Botto
 {
 	for (int32 L = 0; L < Heights.Num(); L++) if (ClipY - BottomGap - Heights[L] >= TopLimit) return L;
 	return FMath::Max(0, Heights.Num() - 1);
+}
+
+FString FTCHudFit::HordeRecordText(int32 Defenders, bool bBest, int32 Wave, int32 Time, const TArray<FString>& Names)
+{
+	// main.js: (best ? ` Record here with ${n} defender${n === 1 ? '' : 's'}: wave ${best.wave} in ${mins(best.time)}
+	// (${best.names.join(', ')}).` : ` No record yet here with ${n} defender${n === 1 ? '' : 's'}.`), mins: m:ss
+	const TCHAR* Plural = Defenders == 1 ? TEXT("") : TEXT("s");
+	if (!bBest) return FString::Printf(TEXT(" No record yet here with %d defender%s."), Defenders, Plural);
+	return FString::Printf(TEXT(" Record here with %d defender%s: wave %d in %d:%02d (%s)."), Defenders, Plural, Wave, Time / 60, Time % 60, *FString::Join(Names, TEXT(", ")));
+}
+
+FString FTCHudFit::ConnectionBannerText(bool bFullRoom, int32 SecondsLeft)
+{
+	// main.js: reason === 'full' ? `Trying this room again in ${left} s` : `Connection lost. Retrying in ${left} s`
+	return bFullRoom ? FString::Printf(TEXT("Trying this room again in %d s"), SecondsLeft) : FString::Printf(TEXT("Connection lost. Retrying in %d s"), SecondsLeft);
+}
+
+FString FTCHudFit::HordeRecordText(const FTCMatchState& S)
+{
+#if defined(TC_HAS_LOBBY_HORDE_BEST)
+	// main.js: n = m.players.length
+	return HordeRecordText(S.Roster.Num(), S.LobbyHordeBest.bSet, S.LobbyHordeBest.Wave, S.LobbyHordeBest.Time, S.LobbyHordeBest.Names);
+#else
+	return FString(); // without the lobby's hordeBest (lead patch round-17/hudui/lead-patch/horde-record.patch): no line
+#endif
+}
+
+int32 FTCHudFit::TextRowsShown(int32 Lines, float Room, float RowPx)
+{
+	const int32 Fit = RowPx > 0.f ? FMath::Max(0, FMath::FloorToInt((Room + 0.01f) / RowPx)) : Lines;
+	return Lines <= Fit ? Lines : Fit;
 }
 
 float FTCHudFit::NarrowerPanel(float Start, float Floor, float Step, TFunctionRef<bool(float)> Fits)
@@ -500,7 +550,10 @@ float ATCHUD::DrawLobby(UFont* Font, float Y, float LobbyW)
 	if (bLobby) AddButtons({ FItem{ TCTutorialEntry::Label(), FTCUiCommand(ETCUiAction::Tutorial), true, TCTutorialEntry::Title() } });
 	if (L.HasLobby() && bLobby)
 	{
-		const FString Info = FTCLobbySettings::ModeInfo(R.Mode);
+		FString Info = FTCLobbySettings::ModeInfo(R.Mode);
+		// round 17: main.js renderLobby appends the Horde record (server.js hordeBest) to #modeInfo; the page translates
+		// the text sentence by sentence, so es.js's 'Record here with ...' and 'No record yet here with ...' keys apply
+		if (R.Mode == TEXT("horde") && !Info.IsEmpty()) Info += FTCHudFit::HordeRecordText(S);
 		// round 16: index.html #modeInfo { max-width: 60ch } in the card's text, wrapped (white-space: normal): 60 times
 		// the width of the font's '0', within the panel
 		float ZeroW = 0.f, ZeroH = 0.f;
@@ -916,7 +969,7 @@ float ATCHUD::DrawMatchPanel(UFont* Font, float Width, float TopLimit, bool bDra
 	const float RowH = Line + Pad + 4.f;
 	// round 16: the layout at a fit level (FTCHudFit::FitLevel): the rows it keeps, the buttons in rows that wrap at the
 	// panel's width, and its height
-	struct FLayout { TArray<TPair<FString, FLinearColor>> Shown; TArray<TArray<FItem>> ButtonRows; float H = 0.f; };
+	struct FLayout { TArray<TPair<FString, FLinearColor>> Shown; TArray<TArray<FItem>> ButtonRows; float H = 0.f; bool bTooltip = false; int32 Cut = 0; };
 	auto Build = [&](int32 Level)
 	{
 		FLayout Lo;
@@ -951,6 +1004,23 @@ float ATCHUD::DrawMatchPanel(UFont* Font, float Width, float TopLimit, bool bDra
 			if (bDraw) NoteKept(R.Key, T);
 			for (const FString& Piece : WrapShown(T, W - 2 * Pad, Font)) Lo.Shown.Add({ Piece, R.Value });
 		}
+		if (Level >= 4)
+		{
+			// round 17: the browser's fit (FTCHudFit::MaxLevel): no reserved hover row, the text rows cut from the end to
+			// the room left under the limit, a count of the rest in the last row kept
+			Lo.bTooltip = true;
+			const float Room = Canvas->ClipY - Gap - TopLimit - Lo.ButtonRows.Num() * RowH - 2 * Pad;
+			const int32 Keep = FTCHudFit::TextRowsShown(Lo.Shown.Num(), Room, Line);
+			if (Keep < Lo.Shown.Num())
+			{
+				const int32 Cut = Lo.Shown.Num() - FMath::Max(0, Keep - 1);
+				Lo.Cut = Cut;
+				Lo.Shown.SetNum(FMath::Max(0, Keep - 1));
+				if (Keep >= 1) Lo.Shown.Add({ FString::Printf(TEXT("... +%d"), Cut), Dim });
+			}
+			Lo.H = Lo.Shown.Num() * Line + Lo.ButtonRows.Num() * RowH + 2 * Pad;
+			return Lo;
+		}
 		Lo.H = Lo.Shown.Num() * Line + Lo.ButtonRows.Num() * RowH + (Lo.ButtonRows.Num() ? Line : 0.f) + 2 * Pad;
 		return Lo;
 	};
@@ -964,6 +1034,7 @@ float ATCHUD::DrawMatchPanel(UFont* Font, float Width, float TopLimit, bool bDra
 	}
 	const int32 Level = FTCHudFit::FitLevel(Heights, Canvas->ClipY, Gap, TopLimit);
 	const FLayout& Lo = Levels[Level];
+	MatchPanelCut = Lo.Cut;
 	const float H = Lo.H, Y0 = Canvas->ClipY - H - Gap;
 	if (!bDraw) return Y0;
 	MatchPanelLevel = Level;
@@ -994,7 +1065,16 @@ float ATCHUD::DrawMatchPanel(UFont* Font, float Width, float TopLimit, bool bDra
 		}
 		Y += RowH;
 	}
-	if (!Hover.IsEmpty()) DrawLabel(Hover, Good, 14.f, Y, Font, 1.f);
+	if (!Hover.IsEmpty() && Lo.bTooltip)
+	{
+		// level 4: the hover text over the panel's top edge, on its own plate (the browser's title tooltip)
+		float TW = 0, TH = 0;
+		LabelSize(Hover, TW, TH, Font, 1.f);
+		const float TipW = FMath::Min(TW, Canvas->ClipX - 30.f);
+		DrawRect(FLinearColor(FColor(25, 28, 30, 245)), 8.f, Y0 - Line - 4.f, TipW + 2 * Pad + 4.f, Line + 2.f);
+		DrawLabel(Hover, Good, 14.f, Y0 - Line - 3.f, Font, 1.f);
+	}
+	else if (!Hover.IsEmpty()) DrawLabel(Hover, Good, 14.f, Y, Font, 1.f);
 	return Y0;
 }
 
@@ -1033,8 +1113,10 @@ void ATCHUD::DrawRecruitPanel(UFont* Font, float Left, float Bottom)
 	TArray<TPair<FString, FLinearColor>> Lines;
 	TArray<TArray<FItem>> Rows;
 	auto Measure = [&](const FString& L) { float TW = 0, TH = 0; LabelSize(L, TW, TH, Font, 1.f); return TW + 2 * Pad; };
+	TArray<TArray<FItem>> Lists; // round 17: each wrapped list as given, for the browser's fit below
 	auto Wrap = [&](const TArray<FItem>& Items)
 	{
+		Lists.Add(Items);
 		TArray<FItem> Row; float X = 0;
 		for (FItem I : Items)
 		{
@@ -1191,7 +1273,42 @@ void ATCHUD::DrawRecruitPanel(UFont* Font, float Left, float Bottom)
 		NoteKept(L.Key, T);
 		for (const FString& Piece : WrapShown(T, Width - 2 * Pad, Font)) ShownLines.Add({ Piece, L.Value });
 	}
-	const float H = 2 * Pad + ShownLines.Num() * Line + Rows.Num() * RowH + Line;
+	float H = 2 * Pad + ShownLines.Num() * Line + Rows.Num() * RowH + Line;
+	// round 17: index.html #buy.fit, the browser's fit for a narrow bar: the cards share the row's width (each at least
+	// .uc's 50 px, names cut), so a list takes as few rows as its count allows instead of one card per row; the hover
+	// row floats over the panel as a tooltip. Used when the card as built would rise past RecruitTopLimit (under the
+	// strip and its boss bar, the sandbox panel and the alert history box; DrawHUD), round 16's squeezed column
+	bool bFit = false;
+	if (RecruitTopLimit > 0.f && Bottom - H < RecruitTopLimit)
+	{
+		bFit = true;
+		Rows.Reset();
+		const float Room = Width - 2 * Pad;
+		for (const TArray<FItem>& L : Lists)
+		{
+			if (!L.Num()) continue;
+			const int32 Cols = FMath::Clamp(FMath::FloorToInt((Room + Pad) / (RecruitFitMinW + Pad)), 1, L.Num());
+			const int32 PerRow = FMath::Min(Cols, FMath::DivideAndRoundUp(L.Num(), FMath::DivideAndRoundUp(L.Num(), Cols)));
+			const float CardW = (Room - (PerRow - 1) * Pad) / PerRow;
+			TArray<FItem> Row;
+			for (FItem I : L)
+			{
+				I.W = CardW;
+				Row.Add(I);
+				if (Row.Num() == PerRow) { Rows.Add(Row); Row.Reset(); }
+			}
+			if (Row.Num()) Rows.Add(Row);
+		}
+		H = 2 * Pad + ShownLines.Num() * Line + Rows.Num() * RowH;
+		// logged when the fit changes (its width, rows or whether it stays under the limit), not every frame
+		const FString FitKey = FString::Printf(TEXT("%.0f/%d/%d"), Width, Rows.Num(), Bottom - H < RecruitTopLimit ? 1 : 0);
+		if (FitKey != RecruitFitLogged)
+		{
+			RecruitFitLogged = FitKey;
+			UE_LOG(LogTC, Log, TEXT("hud: recruit card fit to the browser's #buy.fit at %.0f UI px wide: %d rows, top %.0f, limit %.0f%s"), Width, Rows.Num(), Bottom - H, RecruitTopLimit,
+				Bottom - H < RecruitTopLimit ? TEXT(": still above the limit") : TEXT(""));
+		}
+	}
 	const float Top = Bottom - H;
 	AddPanel(Left, Top, Width, H, Panel);
 	float Y = Top + Pad;
@@ -1221,7 +1338,7 @@ void ATCHUD::DrawRecruitPanel(UFont* Font, float Left, float Bottom)
 	{
 		float TW = 0, TH = 0;
 		LabelSize(Hover, TW, TH, Font, 1.f);
-		if (TW <= Width - 2 * Pad) DrawLabel(Hover, Good, Left + Pad, Y, Font, 1.f);
+		if (TW <= Width - 2 * Pad && !bFit) DrawLabel(Hover, Good, Left + Pad, Y, Font, 1.f);
 		else
 		{
 			// round 15: a narrow card's hover line floats over the panel's top right, as the browser's tooltip floats
@@ -1274,40 +1391,15 @@ void ATCHUD::DrawWorldOverlays(UFont* Font)
 		FLinearColor Lc = C; Lc.A *= M->WarMap.LabelFade(); // round 14: markers.js fadeLabels while the paper war map comes
 		if (Sc.Z > 0) DrawLabel(L, Lc, Sc.X + 6.f, Sc.Y - 6.f, Font, 1.f);
 	};
-	// client/world-regions.js and markers.js, World: each region's border on the ground in its team's colour, its claim
-	// ring with the capture arc, and the label. Only regions whose claim point projects within three viewports of the
-	// screen are drawn (a cost limit of this client; the browser draws every border it holds)
-	if (M->WorldRec.IsWorld())
+	// round 17 (markers): buildHQ's reinforce zone, ring, flag and tag and the resource nodes' brackets and tags under
+	// everything else (TCMarkersHud), then World Conquest's regions as world-regions.js draws them: the border, the
+	// capture point's ring over its wash, track, arc and contested ring, its flag and its two tags. Only regions whose
+	// claim point projects within three viewports of the screen are drawn (a cost limit of this client).
 	{
-		const float VW = Canvas->ClipX, VH = Canvas->ClipY;
-		for (const FTCWorldRegionView& V : M->WorldRec.RegionViews())
-		{
-			const FVector C = Project(ATCTerrain::ToWorld(V.At.X, V.At.Y, T.HeightAt(V.At.X, V.At.Y)));
-			if (C.Z <= 0 || C.X < -VW || C.X > 2 * VW || C.Y < -VH || C.Y > 2 * VH) continue;
-			FLinearColor Border(V.TeamColour);
-			Border.A = FTCWorldRecovery::BorderOpacity;
-			for (const TPair<FVector2D, FVector2D>& Sg : V.Segments)
-			{
-				const FVector A = Project(ATCTerrain::ToWorld(Sg.Key.X, Sg.Key.Y, T.HeightAt(Sg.Key.X, Sg.Key.Y) + FTCWorldRecovery::BorderLift));
-				const FVector B = Project(ATCTerrain::ToWorld(Sg.Value.X, Sg.Value.Y, T.HeightAt(Sg.Value.X, Sg.Value.Y) + FTCWorldRecovery::BorderLift));
-				if (A.Z > 0 && B.Z > 0) DrawLine(A.X, A.Y, B.X, B.Y, Border, 1.5f);
-			}
-			if (V.Loop.Num()) GroundLine(T, V.Loop, true, Border, 1.5f, FTCWorldRecovery::BorderLift);
-			GroundRing(T, V.At, TCWorldRecoveryCore::PointRadius, FLinearColor(V.bOwner ? V.TeamColour : FTCWorldRecovery::NeutralTeamColour), V.bContested ? 3.f : 1.5f);
-			if (V.Arc.bVisible)
-			{
-				// markers.js: the capture arc, Segments of PROG_SEGS around the ring, in the owner's or the capper's colour
-				TArray<FVector2D> Arc;
-				for (int32 K = 0; K <= V.Arc.Segments; K++)
-				{
-					const double A = 2 * PI * K / TCWorldRecoveryCore::ProgressSegments;
-					Arc.Add(V.At + FVector2D(FMath::Cos(A), FMath::Sin(A)) * (TCWorldRecoveryCore::PointRadius + 0.6));
-				}
-				GroundLine(T, Arc, false, FLinearColor(V.ArcColour), 3.f);
-			}
-			const FVector L = Project(ATCTerrain::ToWorld(V.At.X, V.At.Y, T.HeightAt(V.At.X, V.At.Y) + FTCWorldRecovery::LabelHeight));
-			if (L.Z > 0) DrawLabel(V.Text, FLinearColor(V.TeamColour), L.X - 40.f, L.Y, Font, 1.f);
-		}
+		FTCMarkerPainter Marks = TCMarkersHud::Painter(Canvas, *M);
+		TCMarkersHud::DrawHqCamps(Marks, *M, Font);
+		TCMarkersHud::DrawNodes(Marks, *M, Font);
+		TCMarkersHud::DrawWorldRegions(Marks, *M, Font);
 	}
 	// client/markers.js capturePoint: the authored capture points (slice 9)
 	DrawCapturePoints(Font);
@@ -1391,23 +1483,12 @@ void ATCHUD::DrawWorldOverlays(UFont* Font)
 		for (const FTCFormationPreview::FArrow& A : F.Arrows) GroundLine(T, { A.Tip, A.Left, A.Right }, true, C, 2.f, 0.25f);
 	}
 	// client/cover-preview.js: the shields and chevrons of the cursor and the flash, each layer at its opacity (this
-	// canvas has no depth test, so the through-models layer is drawn the same way, at its own opacity); outlines only
+	// canvas has no depth test, so the through-models layer is drawn the same way, at its own opacity); round 17
+	// (markers): as overlay.js ribbons with the shields' 0.3 fill (TCMarkersHud::DrawCoverLayer)
 	{
 		const FTCCoverView& V = M->Cover.View();
-		auto Layer = [&](const TArray<FTCCoverGlyph>& Glyphs, float Opacity)
-		{
-			const TArrayView<const FVector2D> Shield = FTCCoverPreview::ShieldOutline(), Chevron = FTCCoverPreview::ChevronLine();
-			for (const FTCCoverGlyph& G : Glyphs)
-			{
-				const TArrayView<const FVector2D> Shape = G.bChevron ? Chevron : Shield;
-				TArray<FVector2D> Pts;
-				Pts.Reserve(Shape.Num());
-				for (const FVector2D& Q : Shape) Pts.Add(G.Place(Q.X, Q.Y));
-				FLinearColor C(G.Color);
-				C.A = G.Alpha * Opacity;
-				GroundLine(T, Pts, !G.bChevron, C, 1.5f, (float)FTCCoverPreview::LiftMetres);
-			}
-		};
+		FTCMarkerPainter Marks = TCMarkersHud::Painter(Canvas, *M);
+		auto Layer = [&](const TArray<FTCCoverGlyph>& Glyphs, float Opacity) { TCMarkersHud::DrawCoverLayer(Marks, Glyphs, Opacity); };
 		if (V.bVisible)
 		{
 			if (V.bCursorGround) Layer(M->Cover.CursorMarks().Ground, V.CursorGroundOpacity);
@@ -1609,6 +1690,7 @@ void ATCHUD::DrawHUD()
 		// the world's own overlays first, under every panel; then the score strip at the top centre
 		View.YawDegrees = PC->ViewYaw();
 		Minimap.ViewFromCanvas(Canvas, M->Terrain, View);
+		TCMarkersHud::Verify(*M, PC->Selected); // round 17: -TCMarkersSelect= and -TCMarkersLog (verification only)
 		DrawWorldOverlays(Font);
 		// round 14: the paper war map over the world and its markers, under every panel (client/map-view.js)
 		M->WarMap.Draw(Canvas, *M, *PC);
@@ -1648,8 +1730,10 @@ void ATCHUD::DrawHUD()
 		const float Ui = UiNow;
 		EndUi();
 		// the minimap (bottom right): the recruit card fits between it and the match panel
+		Minimap.bDeferViewOutline = true; // round 17: client/main.js drawMinimap strokes the view last
 		Minimap.Draw(Canvas, S, M->UnitTable, PC->Selected, View);
 		DrawMinimapOverlays();
+		Minimap.DrawViewOutline(Canvas, View);
 		BeginUi(Ui);
 		// round 15: the recruit card always sits beside the match panel at the bottom, between it and the minimap
 		// (#buy at every UI scale); the match panel narrows only when the window leaves the card less than RecruitMinW
@@ -1670,7 +1754,11 @@ void ATCHUD::DrawHUD()
 			TArray<FBox2D> Avoid = { FBox2D(FVector2D(8.f, PanelTop), FVector2D(8.f + MatchW, Canvas->ClipY)) };
 			if (RecruitBox.bIsValid) Avoid.Add(FBox2D(RecruitBox.Min / UiNow, RecruitBox.Max / UiNow));
 			bool bSpot = false;
-			SandboxBox = FTCHudFit::SandboxPlace(Canvas->ClipX, Canvas->ClipY, SbSize, StripLowUi, Avoid, &bSpot);
+			// round 17: and clear of the alert history box (last frame's), sliding left from it rather than under it
+			// (round 16: the history's header sat over the sandbox row's right end by about 20 px at 150%)
+			TArray<FBox2D> Slide;
+			if (AlertHistoryBox.bIsValid) Slide.Add(AlertHistoryBox);
+			SandboxBox = FTCHudFit::SandboxPlace(Canvas->ClipX, Canvas->ClipY, SbSize, StripLowUi, Avoid, &bSpot, Slide);
 			if (!bSpot && SandboxBox.Min.X < 8.f + MatchW) PanelLimit = FMath::Max(PanelLimit, SandboxBox.Max.Y + 4.f);
 		}
 		// round 16: with the settings in the menu the match panel is short; where the recruit card beside it would get
@@ -1680,10 +1768,26 @@ void ATCHUD::DrawHUD()
 		{
 			const float Floor = FMath::Max(LeftColumnMinW, RoomRight - (8.f + Gap) - RecruitWantW);
 			if (Floor < MatchW)
-				MatchW = FTCHudFit::NarrowerPanel(MatchW, Floor, 40.f, [&](float Try) { return DrawMatchPanel(Font, Try, PanelLimit, false) >= PanelLimit; });
+			{
+				// round 17: at fit level 4 a narrower panel may wrap its buttons into more rows and cut more text rows:
+				// it narrows only while it cuts no more than at its full width
+				DrawMatchPanel(Font, MatchW, PanelLimit, false);
+				const int32 CutAtStart = MatchPanelCut;
+				MatchW = FTCHudFit::NarrowerPanel(MatchW, Floor, 40.f, [&](float Try) { return DrawMatchPanel(Font, Try, PanelLimit, false) >= PanelLimit && MatchPanelCut <= CutAtStart; });
+			}
 		}
 		const float MatchTop = DrawMatchPanel(Font, MatchW, PanelLimit) * UiNow; // screen pixels
 		const int32 PanelsBeforeRecruit = Panels.Num();
+		// round 17: the recruit card's top stays under the strip and its lines (boss bar, follow chip), under the sandbox
+		// panel where it shares columns with it, and leaves the alert history box (which stands on the card when the card
+		// reaches under its span) room under the strip; past that it takes the browser's #buy.fit (DrawRecruitPanel)
+		{
+			const float CardLeft = 8.f + MatchW + Gap;
+			RecruitTopLimit = bStrip ? StripLowUi + 4.f : 0.f;
+			// the history's closed summary row (an open history's list may cover more, as the browser's does)
+			if (AlertHistoryBox.bIsValid) RecruitTopLimit += FMath::Min((float)AlertHistoryBox.GetSize().Y, 32.f) + TCAlertLook::MinimapFrame + TCAlertLook::MinimapGap;
+			if (SandboxBox.bIsValid && SandboxBox.Max.X > CardLeft) RecruitTopLimit = FMath::Max(RecruitTopLimit, (float)SandboxBox.Max.Y + 4.f);
+		}
 		DrawRecruitPanel(Font, 8.f + MatchW + Gap, Canvas->ClipY - Gap);
 		// round 14: camera.js band: from the top panels down to the recruit bar (#buy), the whole height when it is empty
 		float RecruitTop = Canvas->ClipY * UiNow; // screen pixels, as the panels are kept
@@ -1882,6 +1986,37 @@ bool FTCHudFitTest::RunTest(const FString&)
 	TestEqual(TEXT("level 2 fits"), FTCHudFit::FitLevel({ 300.f, 280.f, 250.f, 240.f }, ClipY, 8.f, 209.f), 2);
 	TestEqual(TEXT("none fits: the last"), FTCHudFit::FitLevel({ 400.f, 380.f, 350.f, 340.f }, ClipY, 8.f, 209.f), 3);
 	TestEqual(TEXT("no limit: level 0"), FTCHudFit::FitLevel({ 400.f, 380.f }, ClipY, 8.f, 0.f), 0);
+	// round 17: level 4, round 16's worst case (UI 150% in 1280 x 720, a large Spanish selection, the sandbox row
+	// under the strip and the boss bar: level 3 was 222 px tall under a top limit of 290.2 px, 182 px of room): five
+	// rows of buttons (130 px) and the 12 px of padding leave 40 px, two rows of 16: the first text row and the count
+	TestEqual(TEXT("level 4 when level 3 is still too tall"), FTCHudFit::FitLevel({ 290.f, 238.f, 222.f, 222.f, 174.f }, ClipY, 8.f, 290.2f), 4);
+	TestEqual(TEXT("level 4: two of four text rows show (one and the count)"), FTCHudFit::TextRowsShown(4, 480.f - 8.f - 290.2f - 5 * 26.f - 12.f, 16.f), 2);
+	TestEqual(TEXT("level 4: every row when they fit"), FTCHudFit::TextRowsShown(3, 64.f, 16.f), 3);
+	TestEqual(TEXT("level 4: no room, no row"), FTCHudFit::TextRowsShown(3, 10.f, 16.f), 0);
+	// round 17: the Horde record after the mode's description (main.js renderLobby), and its Spanish (es.js keys)
+	TestEqual(TEXT("no record, three defenders"), FTCHudFit::HordeRecordText(3, false, 0, 0, {}), FString(TEXT(" No record yet here with 3 defenders.")));
+	TestEqual(TEXT("no record, one defender"), FTCHudFit::HordeRecordText(1, false, 0, 0, {}), FString(TEXT(" No record yet here with 1 defender.")));
+	TestEqual(TEXT("connection banner after a loss"), FTCHudFit::ConnectionBannerText(false, 2), FString(TEXT("Connection lost. Retrying in 2 s")));
+	TestEqual(TEXT("connection banner for a full room"), FTCHudFit::ConnectionBannerText(true, 10), FString(TEXT("Trying this room again in 10 s")));
+	TestEqual(TEXT("a record"), FTCHudFit::HordeRecordText(2, true, 7, 545, { TEXT("Ann"), TEXT("Bo") }), FString(TEXT(" Record here with 2 defenders: wave 7 in 9:05 (Ann, Bo).")));
+	if (FTCLocale::IsLoaded())
+	{
+		TestEqual(TEXT("es: no record"), FTCLocale::Translate(TEXT("No record yet here with 3 defenders."), ETCLanguage::Spanish), FString(TEXT("Todavía no hay récord aquí con 3 defensores.")));
+		TestEqual(TEXT("es: connection lost"), FTCLocale::Translate(FTCHudFit::ConnectionBannerText(false, 4), ETCLanguage::Spanish), FString(TEXT("Conexión perdida. Reintentando en 4 s")));
+		TestEqual(TEXT("es: full room"), FTCLocale::Translate(FTCHudFit::ConnectionBannerText(true, 10), ETCLanguage::Spanish), FString(TEXT("Reintentando esta sala en 10 s")));
+		TestEqual(TEXT("es: a record"), FTCLocale::Translate(TEXT("Record here with 2 defenders: wave 7 in 9:05 (Ann, Bo)."), ETCLanguage::Spanish), FString(TEXT("Récord aquí con 2 defensores: oleada 7 en 9:05 (Ann, Bo).")));
+	}
+	// round 17: the sandbox panel slides left of the alert history box (round 16's Spanish guest: the history at x 528
+	// to 847 UI px, 231 to 258, stood on the recruit card; #sandbox's place 197 to 250 met it by about 20 px)
+	{
+		const FBox2D History(FVector2D(528.f, 231.f), FVector2D(847.f, 258.f));
+		const FVector2D SbEs(373.f, 53.f);
+		FBox2D C = FTCHudFit::SandboxPlace(ClipX, ClipY, SbEs, 180.f, { FBox2D(FVector2D(8, 257), FVector2D(405, 480)) }, &bSpot, { History });
+		TestTrue(TEXT("sandbox beside the history: #sandbox's height kept"), bSpot && FMath::IsNearlyEqual((float)C.Max.Y, ClipY - FTCHudFit::SandboxBottom, 0.01f));
+		TestTrue(TEXT("sandbox beside the history: 4 px left of it"), FMath::IsNearlyEqual((float)C.Max.X, 524.f, 0.01f) && C.Min.X >= 8.f);
+		C = FTCHudFit::SandboxPlace(ClipX, ClipY, SbEs, 180.f, {}, &bSpot, { FBox2D(FVector2D(600.f, 100.f), FVector2D(847.f, 120.f)) });
+		TestTrue(TEXT("a history box elsewhere: centred as before"), bSpot && FMath::IsNearlyEqual((float)(C.Min.X + C.Max.X) / 2, ClipX / 2, 0.01f));
+	}
 
 	// the panel narrows 40 px at a time while it fits, stopping at the floor or the first width that does not fit
 	TestEqual(TEXT("narrows to the floor"), FTCHudFit::NarrowerPanel(560.f, 425.f, 40.f, [](float) { return true; }), 425.f, 0.01f);

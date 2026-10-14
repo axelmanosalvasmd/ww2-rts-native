@@ -1,7 +1,417 @@
 // The stats overlay's sheet and the frame-number probe (round 16, controls scope). See Client/TCStats.h.
 #include "Client/TCStats.h"
 #include "Client/TCObjectives.h"
+#include "ThreeCrossroads.h"
 #include "UnrealClient.h"
+#include "CanvasItem.h"
+#include "CanvasTypes.h"
+#include "Engine/Canvas.h"
+#include "Engine/Font.h"
+#include "Fonts/SlateFontInfo.h"
+#include "Misc/App.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "UObject/Package.h"
+
+// ---------------------------------------------------------------------------------------------------------------------
+// FTCTypeFace: the widths of a TrueType file (round 17, hudui)
+
+namespace
+{
+	struct FTtfReader
+	{
+		const TArray<uint8>& B;
+		bool bBad = false;
+		uint32 U8(int64 O) { if (O < 0 || O >= B.Num()) { bBad = true; return 0; } return B[O]; }
+		uint32 U16(int64 O) { return (U8(O) << 8) | U8(O + 1); }
+		int32 S16(int64 O) { return (int16)U16(O); }
+		uint32 U32(int64 O) { return (U16(O) << 16) | U16(O + 2); }
+	};
+
+	// OpenType Coverage table: glyph to coverage index
+	void ReadCoverage(FTtfReader& R, int64 O, TMap<uint16, int32>& Out)
+	{
+		const uint32 Format = R.U16(O);
+		if (Format == 1)
+		{
+			const uint32 N = R.U16(O + 2);
+			for (uint32 I = 0; I < N && !R.bBad; I++) Out.Add((uint16)R.U16(O + 4 + 2 * I), (int32)I);
+		}
+		else if (Format == 2)
+		{
+			const uint32 N = R.U16(O + 2);
+			for (uint32 I = 0; I < N && !R.bBad; I++)
+			{
+				const int64 Rec = O + 4 + 6 * I;
+				const uint32 Start = R.U16(Rec), End = R.U16(Rec + 2), First = R.U16(Rec + 4);
+				for (uint32 G = Start; G <= End && G - Start < 65536; G++) Out.Add((uint16)G, (int32)(First + G - Start));
+			}
+		}
+	}
+
+	// OpenType ClassDef table
+	void ReadClassDef(FTtfReader& R, int64 O, TMap<uint16, uint16>& Out)
+	{
+		const uint32 Format = R.U16(O);
+		if (Format == 1)
+		{
+			const uint32 Start = R.U16(O + 2), N = R.U16(O + 4);
+			for (uint32 I = 0; I < N && !R.bBad; I++) if (const uint32 C = R.U16(O + 6 + 2 * I)) Out.Add((uint16)(Start + I), (uint16)C);
+		}
+		else if (Format == 2)
+		{
+			const uint32 N = R.U16(O + 2);
+			for (uint32 I = 0; I < N && !R.bBad; I++)
+			{
+				const int64 Rec = O + 4 + 6 * I;
+				const uint32 Start = R.U16(Rec), End = R.U16(Rec + 2), C = R.U16(Rec + 4);
+				if (C) for (uint32 G = Start; G <= End && G - Start < 65536; G++) Out.Add((uint16)G, (uint16)C);
+			}
+		}
+	}
+
+	// The x advance of a ValueRecord with this format (only XAdvance, bit 2, is kept; the others are skipped)
+	int32 ValueSize(uint32 Format) { return 2 * FMath::CountBits(Format & 0xFF); }
+	int32 XAdvanceOf(FTtfReader& R, int64 O, uint32 Format)
+	{
+		if (!(Format & 4)) return 0;
+		int64 At = O;
+		if (Format & 1) At += 2;
+		if (Format & 2) At += 2;
+		return R.S16(At);
+	}
+}
+
+bool FTCTypeFace::Parse(const TArray<uint8>& Bytes, FString* OutProblem)
+{
+	FTtfReader R{ Bytes };
+	auto Fail = [&](const TCHAR* Why) { if (OutProblem) *OutProblem = Why; Upm = 0; Advances.Reset(); return false; };
+	TMap<FString, uint32> Tables;
+	const uint32 NumTables = R.U16(4);
+	for (uint32 I = 0; I < NumTables && !R.bBad; I++)
+	{
+		const int64 Rec = 12 + 16 * I;
+		FString Tag;
+		for (int32 K = 0; K < 4; K++) Tag.AppendChar((TCHAR)R.U8(Rec + K));
+		Tables.Add(Tag, R.U32(Rec + 8));
+	}
+	if (R.bBad || !Tables.Contains(TEXT("head")) || !Tables.Contains(TEXT("hhea")) || !Tables.Contains(TEXT("hmtx")) || !Tables.Contains(TEXT("cmap"))) return Fail(TEXT("not a TrueType file with head, hhea, hmtx and cmap"));
+	Upm = R.U16(Tables[TEXT("head")] + 18);
+	const uint32 NumH = R.U16(Tables[TEXT("hhea")] + 34);
+	Advances.SetNum(NumH);
+	for (uint32 I = 0; I < NumH; I++) Advances[I] = (uint16)R.U16(Tables[TEXT("hmtx")] + 4 * I);
+	// cmap: the Unicode subtable, format 12 (full range) before format 4 (the basic plane)
+	const int64 Cm = Tables[TEXT("cmap")];
+	int64 Best4 = -1, Best12 = -1;
+	for (uint32 I = 0, N = R.U16(Cm + 2); I < N; I++)
+	{
+		const uint32 Pid = R.U16(Cm + 4 + 8 * I), Eid = R.U16(Cm + 6 + 8 * I);
+		const int64 Sub = Cm + R.U32(Cm + 8 + 8 * I);
+		if (!(Pid == 0 || (Pid == 3 && (Eid == 1 || Eid == 10)))) continue;
+		const uint32 Format = R.U16(Sub);
+		if (Format == 4 && Best4 < 0) Best4 = Sub;
+		if (Format == 12 && Best12 < 0) Best12 = Sub;
+	}
+	if (Best12 >= 0)
+	{
+		for (uint32 I = 0, N = R.U32(Best12 + 12); I < N && !R.bBad; I++)
+		{
+			const int64 G = Best12 + 16 + 12 * I;
+			const uint32 Start = R.U32(G), End = R.U32(G + 4), First = R.U32(G + 8);
+			for (uint32 C = Start; C <= End && C - Start < 65536; C++) Cmap.Add(C, (uint16)(First + C - Start));
+		}
+	}
+	else if (Best4 >= 0)
+	{
+		const int64 S = Best4;
+		const uint32 Segs = R.U16(S + 6) / 2;
+		const int64 Ends = S + 14, Starts = Ends + 2 * Segs + 2, Deltas = Starts + 2 * Segs, Ranges = Deltas + 2 * Segs;
+		for (uint32 K = 0; K < Segs && !R.bBad; K++)
+		{
+			const uint32 End = R.U16(Ends + 2 * K), Start = R.U16(Starts + 2 * K), Delta = R.U16(Deltas + 2 * K), Range = R.U16(Ranges + 2 * K);
+			for (uint32 C = Start; C <= End && C != 0xFFFF; C++)
+			{
+				uint32 G;
+				if (!Range) G = (C + Delta) & 0xFFFF;
+				else { G = R.U16(Ranges + 2 * K + Range + 2 * (C - Start)); if (G) G = (G + Delta) & 0xFFFF; }
+				if (G) Cmap.Add(C, (uint16)G);
+			}
+		}
+	}
+	else return Fail(TEXT("no Unicode cmap (format 4 or 12)"));
+	// GPOS: the lookups of every 'kern' feature (each lookup once, in lookup-list order), pair adjustment (type 2,
+	// or type 9 extensions of it), format 1 (glyph pairs) and 2 (class pairs); the first glyph's x advance only
+	KernLookups.Reset();
+	if (const uint32* Gp = Tables.Find(TEXT("GPOS")))
+	{
+		const int64 G = *Gp, Fl = G + R.U16(G + 6), Ll = G + R.U16(G + 8);
+		TArray<uint32> Ids;
+		for (uint32 I = 0, N = R.U16(Fl); I < N; I++)
+		{
+			const int64 Rec = Fl + 2 + 6 * I;
+			if (R.U8(Rec) != 'k' || R.U8(Rec + 1) != 'e' || R.U8(Rec + 2) != 'r' || R.U8(Rec + 3) != 'n') continue;
+			const int64 F = Fl + R.U16(Rec + 4);
+			for (uint32 K = 0, M = R.U16(F + 2); K < M; K++) Ids.AddUnique(R.U16(F + 4 + 2 * K));
+		}
+		Ids.Sort();
+		for (uint32 Id : Ids)
+		{
+			const int64 L = Ll + R.U16(Ll + 2 + 2 * Id);
+			const uint32 Type = R.U16(L);
+			TArray<FPairSub>& Subs = KernLookups.AddDefaulted_GetRef();
+			for (uint32 K = 0, M = R.U16(L + 4); K < M && !R.bBad; K++)
+			{
+				int64 St = L + R.U16(L + 6 + 2 * K);
+				uint32 SubType = Type;
+				if (Type == 9) { SubType = R.U16(St + 2); St += R.U32(St + 4); }
+				if (SubType != 2) continue;
+				FPairSub P;
+				P.Format = (uint8)R.U16(St);
+				const uint32 Vf1 = R.U16(St + 4), Vf2 = R.U16(St + 6);
+				ReadCoverage(R, St + R.U16(St + 2), P.Coverage);
+				if (P.Format == 1)
+				{
+					const uint32 Sets = R.U16(St + 8);
+					P.Pairs.SetNum(Sets);
+					const int32 RecSize = 2 + ValueSize(Vf1) + ValueSize(Vf2);
+					for (uint32 Q = 0; Q < Sets && !R.bBad; Q++)
+					{
+						const int64 Ps = St + R.U16(St + 10 + 2 * Q);
+						for (uint32 V = 0, Nv = R.U16(Ps); V < Nv; V++)
+						{
+							const int64 Pv = Ps + 2 + RecSize * V;
+							P.Pairs[Q].Add((uint16)R.U16(Pv), (int16)XAdvanceOf(R, Pv + 2, Vf1));
+						}
+					}
+				}
+				else if (P.Format == 2)
+				{
+					ReadClassDef(R, St + R.U16(St + 8), P.Class1);
+					ReadClassDef(R, St + R.U16(St + 10), P.Class2);
+					P.Class1Count = R.U16(St + 12); P.Class2Count = R.U16(St + 14);
+					const int32 RecSize = ValueSize(Vf1) + ValueSize(Vf2);
+					P.Matrix.SetNum(P.Class1Count * P.Class2Count);
+					for (int32 C1 = 0; C1 < P.Class1Count && !R.bBad; C1++)
+						for (int32 C2 = 0; C2 < P.Class2Count; C2++)
+							P.Matrix[C1 * P.Class2Count + C2] = (int16)XAdvanceOf(R, St + 16 + (int64)RecSize * (C1 * P.Class2Count + C2), Vf1);
+				}
+				else continue;
+				Subs.Add(MoveTemp(P));
+			}
+		}
+	}
+	// GSUB: body { font-variant-numeric: tabular-nums } turns on 'tnum', single substitutions (type 1, or type 7
+	// extensions of it) that give the figures one width
+	Tabular.Reset();
+	if (const uint32* Gs = Tables.Find(TEXT("GSUB")))
+	{
+		const int64 G = *Gs, Fl = G + R.U16(G + 6), Ll = G + R.U16(G + 8);
+		TArray<uint32> Ids;
+		for (uint32 I = 0, N = R.U16(Fl); I < N; I++)
+		{
+			const int64 Rec = Fl + 2 + 6 * I;
+			if (R.U8(Rec) != 't' || R.U8(Rec + 1) != 'n' || R.U8(Rec + 2) != 'u' || R.U8(Rec + 3) != 'm') continue;
+			const int64 F = Fl + R.U16(Rec + 4);
+			for (uint32 K = 0, M = R.U16(F + 2); K < M; K++) Ids.AddUnique(R.U16(F + 4 + 2 * K));
+		}
+		Ids.Sort();
+		for (uint32 Id : Ids)
+		{
+			const int64 L = Ll + R.U16(Ll + 2 + 2 * Id);
+			const uint32 Type = R.U16(L);
+			for (uint32 K = 0, M = R.U16(L + 4); K < M && !R.bBad; K++)
+			{
+				int64 St = L + R.U16(L + 6 + 2 * K);
+				uint32 SubType = Type;
+				if (Type == 7) { SubType = R.U16(St + 2); St += R.U32(St + 4); }
+				if (SubType != 1) continue;
+				TMap<uint16, int32> Cov;
+				ReadCoverage(R, St + R.U16(St + 2), Cov);
+				const uint32 Format = R.U16(St);
+				for (const TPair<uint16, int32>& C : Cov)
+				{
+					if (Tabular.Contains(C.Key)) continue;
+					if (Format == 1) Tabular.Add(C.Key, (uint16)((C.Key + R.S16(St + 4)) & 0xFFFF));
+					else if (Format == 2 && (uint32)C.Value < R.U16(St + 4)) Tabular.Add(C.Key, (uint16)R.U16(St + 6 + 2 * C.Value));
+				}
+			}
+		}
+	}
+	if (R.bBad) return Fail(TEXT("a table points outside the file"));
+	return true;
+}
+
+int32 FTCTypeFace::Kerning(int32 Left, int32 Right) const
+{
+	// as HarfBuzz applies PairPos: per lookup, the first subtable that covers the pair decides (format 1 needs the
+	// pair's record; format 2 decides as soon as the first glyph is covered and the second's class is in range)
+	int32 Sum = 0;
+	for (const TArray<FPairSub>& Subs : KernLookups)
+		for (const FPairSub& P : Subs)
+		{
+			const int32* Index = P.Coverage.Find((uint16)Left);
+			if (!Index) continue;
+			if (P.Format == 1)
+			{
+				const int16* V = P.Pairs.IsValidIndex(*Index) ? P.Pairs[*Index].Find((uint16)Right) : nullptr;
+				if (!V) continue;
+				Sum += *V;
+				break;
+			}
+			const uint16* C1 = P.Class1.Find((uint16)Left);
+			const uint16* C2 = P.Class2.Find((uint16)Right);
+			const int32 A = C1 ? *C1 : 0, B = C2 ? *C2 : 0;
+			if (A >= P.Class1Count || B >= P.Class2Count) continue;
+			Sum += P.Matrix[A * P.Class2Count + B];
+			break;
+		}
+	return Sum;
+}
+
+void FTCTypeFace::Pens(const FString& Text, float FontPx, float Tracking, TArray<float>& Out) const
+{
+	Out.Reset(Text.Len() + 1);
+	const double K = Upm > 0 ? FontPx / (double)Upm : 0.0;
+	double X = 0.0;
+	int32 Prev = -1;
+	for (int32 I = 0; I < Text.Len(); I++)
+	{
+		const int32 G = Shaped(Text[I]);
+		if (Prev >= 0) X += Kerning(Prev, G) * K;
+		Out.Add((float)X);
+		X += Advance(G) * K + Tracking;
+		Prev = G;
+	}
+	Out.Add((float)X);
+}
+
+float FTCTypeFace::Width(const FString& Text, float FontPx, float Tracking) const
+{
+	TArray<float> P;
+	Pens(Text, FontPx, Tracking, P);
+	return P.Last();
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// FTCType: client/index.html's Barlow Semi Condensed
+
+namespace
+{
+	struct FTCTypeState
+	{
+		bool bTried = false, bLoaded = false;
+		FTCTypeFace Body, Bold, Heading;
+		UFont* Font = nullptr;
+	};
+	FTCTypeState& TypeState() { static FTCTypeState S; return S; }
+	const TCHAR* TypefaceName(int32 Weight) { return Weight >= 700 ? TEXT("Bold") : Weight >= 600 ? TEXT("SemiBold") : Weight >= 500 ? TEXT("Medium") : TEXT("Regular"); }
+}
+
+FString FTCType::Folder()
+{
+	return FPaths::Combine(FPaths::ProjectContentDir(), TEXT("Fonts"), TEXT("BarlowSemiCondensed"));
+}
+
+const TArray<TPair<int32, FString>>& FTCType::Files()
+{
+	static const TArray<TPair<int32, FString>> F = {
+		{ 400, TEXT("BarlowSemiCondensed-Regular.ttf") }, { 500, TEXT("BarlowSemiCondensed-Medium.ttf") },
+		{ 600, TEXT("BarlowSemiCondensed-SemiBold.ttf") }, { 700, TEXT("BarlowSemiCondensed-Bold.ttf") } };
+	return F;
+}
+
+bool FTCType::IsLoaded()
+{
+	FTCTypeState& St = TypeState();
+	if (St.bTried) return St.bLoaded;
+	St.bTried = true;
+	FString Problem;
+	for (const TPair<int32, FString>& F : Files())
+	{
+		if (F.Key != BodyWeight && F.Key != BoldWeight && F.Key != HeadingWeight) continue;
+		TArray<uint8> Bytes;
+		const FString Path = FPaths::Combine(Folder(), F.Value);
+		if (!FFileHelper::LoadFileToArray(Bytes, *Path, FILEREAD_Silent)) { Problem = FString::Printf(TEXT("%s is missing"), *Path); break; }
+		FTCTypeFace& Face = F.Key == HeadingWeight ? St.Heading : F.Key == BoldWeight ? St.Bold : St.Body;
+		FString Why;
+		if (!Face.Parse(Bytes, &Why)) { Problem = FString::Printf(TEXT("%s: %s"), *Path, *Why); break; }
+	}
+	St.bLoaded = Problem.IsEmpty();
+	if (St.bLoaded) { UE_LOG(LogTC, Log, TEXT("type: Barlow Semi Condensed %d and %d from %s (index.html's face; widths from hmtx, GPOS kerning and tnum)"), BodyWeight, BoldWeight, *Folder()); }
+	else { UE_LOG(LogTC, Warning, TEXT("type: %s; the stats sheet and box keep the HUD font (run unreal/Tools/fonts/fetch-barlow.sh)"), *Problem); }
+	return St.bLoaded;
+}
+
+const FTCTypeFace* FTCType::Face(bool bBold)
+{
+	if (!IsLoaded()) return nullptr;
+	return bBold ? &TypeState().Bold : &TypeState().Body;
+}
+
+const FTCTypeFace* FTCType::HeadingFace()
+{
+	return IsLoaded() ? &TypeState().Heading : nullptr;
+}
+
+UFont* FTCType::Font()
+{
+	FTCTypeState& St = TypeState();
+	if (St.Font || !IsLoaded()) return St.Font;
+	// a runtime font over the files (as Slate's own default fonts are), kept for the process
+	UFont* F = NewObject<UFont>(GetTransientPackage(), NAME_None, RF_Transient);
+	F->FontCacheType = EFontCacheType::Runtime;
+	F->LegacyFontSize = 11;
+	for (const TPair<int32, FString>& File : Files())
+	{
+		FTypefaceEntry& E = F->GetMutableInternalCompositeFont().DefaultTypeface.Fonts.AddDefaulted_GetRef();
+		E.Name = TypefaceName(File.Key);
+		// the project-relative path, as Slate names its own font files (a packaged build reads it from the pak)
+		E.Font = FFontData(FPaths::Combine(Folder(), File.Value), EFontHinting::AutoLight, EFontLoadingPolicy::LazyLoad);
+	}
+	F->AddToRoot();
+	St.Font = F;
+	return St.Font;
+}
+
+FTCMeasure FTCType::Measure()
+{
+	if (!IsLoaded()) return FTCPaint::ApproxMeasure();
+	return [](const FString& T, float Px, bool bBold, float Tracking) { return T.IsEmpty() ? 0.f : Face(bBold)->Width(T, Px, Tracking); };
+}
+
+void FTCType::Draw(const FTCPaint& P, UCanvas* Canvas, UFont* Fallback, float Oversample)
+{
+	if (!Canvas) return;
+	UFont* TypeFont = Font();
+	if (!TypeFont) { P.Draw(Canvas, Fallback); return; }
+	const float K = FMath::Max(1.f, Oversample);
+	FTCPaint One;
+	One.Items.SetNum(1);
+	TArray<float> Pens;
+	for (const FTCPaintItem& I : P.Items)
+	{
+		if (I.Kind != ETCPaintKind::Text) { One.Items[0] = I; One.Draw(Canvas, Fallback); continue; }
+		if (I.Text.IsEmpty() || I.Colour.A <= 0.f) continue;
+		// an h2 (the sheet's title) is the browser's default bold, 700; other bold texts are 600
+		const bool bHeading = I.bBold && I.Role.EndsWith(TEXT(":title"));
+		const FTCTypeFace* Face = bHeading ? HeadingFace() : FTCType::Face(I.bBold);
+		Face->Pens(I.Text, I.FontPx, I.Tracking, Pens);
+		const float W = Pens.Last();
+		const float X0 = I.Pos.X - (I.Align == ETCPaintAlign::Centre ? W / 2 : I.Align == ETCPaintAlign::Right ? W : 0.f);
+		// CSS centres the content area (ascender 1000 to descender 200 per 1000 units: 1.2 em) in the line box
+		const float GlyphH = I.FontPx * 1.2f, LineH = I.Size.Y > 0 ? I.Size.Y : GlyphH;
+		const float Y = I.Pos.Y + (LineH - GlyphH) / 2;
+		// Slate sizes are points at 96 dpi (a CSS pixel is 0.75 pt); made K times larger and drawn at 1 / K
+		const FSlateFontInfo Info(TypeFont, I.FontPx * 0.75f * K, TypefaceName(bHeading ? HeadingWeight : I.bBold ? BoldWeight : BodyWeight));
+		for (int32 C = 0; C < I.Text.Len(); C++)
+		{
+			if (FChar::IsWhitespace(I.Text[C])) continue;
+			FCanvasTextItem T(FVector2D(X0 + Pens[C], Y), FText::FromString(FString::Chr(I.Text[C])), Info, I.Colour);
+			T.Scale = FVector2D(1.f / K, 1.f / K); // the runtime atlas is alpha only: the item's own blend (AlphaOnly)
+			Canvas->DrawItem(T);
+		}
+	}
+}
 
 namespace TCStatsL
 {
@@ -357,8 +767,15 @@ FString FTCStatUnitProbe::Line(const FTCPerfStats& Pf, double UnitFrame, double 
 		Count, *Num(RawMean), *Num(RawMean > 0 ? 1000.0 / RawMean : 0.0), *Num(RawWorst));
 }
 
-FString FTCStatUnitProbe::Frame(const FTCPerfStats& Pf, const FStatUnitData* Unit, bool bUnitShown)
+FString FTCStatUnitProbe::Frame(const FTCPerfStats& Pf, const FStatUnitData* Unit, bool bUnitShown, double FrameMs)
 {
+	// round 17: this frame's own start to start goes in first (perf.js counts the frame that rolls in the window it
+	// closes), then a roll logs and clears the window
+	if (Unit && bUnitShown)
+	{
+		const double Raw = FrameMs >= 0.0 ? FrameMs : (double)Unit->RawFrameTime;
+		RawSum += Raw; RawWorst = FMath::Max(RawWorst, Raw); RawCount++;
+	}
 	const bool bRolled = Pf.Fps != LastFps || Pf.Ms != LastMs || Pf.Worst != LastWorst || Pf.Cpu != LastCpu;
 	FString Out;
 	if (bRolled)
@@ -369,8 +786,6 @@ FString FTCStatUnitProbe::Frame(const FTCPerfStats& Pf, const FStatUnitData* Uni
 		RawSum = RawWorst = 0; RawCount = 0;
 		bPrimed = true;
 	}
-	// stat unit's RawFrameTime is the frame the engine just measured (FApp's delta); kept here for the next roll
-	if (Unit && bUnitShown) { RawSum += Unit->RawFrameTime; RawWorst = FMath::Max(RawWorst, (double)Unit->RawFrameTime); RawCount++; }
 	return Out;
 }
 
@@ -396,7 +811,9 @@ void ATCHUD::DrawStatsSheet(UFont* Font)
 	static const bool bProbe = FParse::Param(FCommandLine::Get(), TEXT("TCStatUnitProbe"));
 	if (bProbe && GEngine && GEngine->GameViewport)
 	{
-		const FString Line = M->StatUnitProbe.Frame(M->Perf.Stats(), GEngine->GameViewport->GetStatUnitData(), GEngine->GameViewport->IsStatEnabled(TEXT("Unit")));
+		// round 17: this frame's start to start (FApp's), the interval stat unit's RawFrameTime takes later this frame
+		const double FrameMs = (FApp::GetCurrentTime() - FApp::GetLastTime()) * 1000.0;
+		const FString Line = M->StatUnitProbe.Frame(M->Perf.Stats(), GEngine->GameViewport->GetStatUnitData(), GEngine->GameViewport->IsStatEnabled(TEXT("Unit")), FrameMs);
 		if (!Line.IsEmpty()) UE_LOG(LogTC, Log, TEXT("%s"), *Line);
 	}
 	if (!M->StatsSheet.IsOpen()) return;
@@ -404,8 +821,10 @@ void ATCHUD::DrawStatsSheet(UFont* Font)
 	FVector2D Mouse(-1, -1);
 	float MX, MY;
 	if (GetOwningPlayerController() && GetOwningPlayerController()->GetMousePosition(MX, MY)) Mouse = FVector2D(MX, MY);
-	const FTCPaint P = M->StatsSheet.Layout(M->StatsOverlay().Settings(), Canvas->ClipX, Canvas->ClipY, FTCPaint::CanvasMeasure(Font), Mouse);
-	P.Draw(Canvas, Font);
+	// round 17: in index.html's Barlow Semi Condensed with Chromium's widths when the font files are there (FTCType)
+	const bool bType = FTCType::IsLoaded();
+	const FTCPaint P = M->StatsSheet.Layout(M->StatsOverlay().Settings(), Canvas->ClipX, Canvas->ClipY, bType ? FTCType::Measure() : FTCPaint::CanvasMeasure(Font), Mouse);
+	if (bType) FTCType::Draw(P, Canvas, Font); else P.Draw(Canvas, Font);
 	M->StatsSheet.Remember(P);
 	Panels.Append(P.Panels);
 }
@@ -419,8 +838,9 @@ float ATCHUD::DrawStatsBox(UFont* Font, float CtlBottom, float CtlRight)
 	// stats.js place(): screen pixels in, HUD (UI) pixels out; under.tl is #util (here the match controls' panel),
 	// under.tc #top, under.tr #econ (none in this HUD: 52 px); clear: #scores
 	const float TopTl = CtlBottom > 0.f ? ToUi(CtlBottom) : -1.f;
-	const FTCPaint Box = O.Layout(M->Perf.Stats(), TopTl, StatsTopTc, -1.f, StatsStrip, Canvas->ClipX, CtlRight > 0.f ? ToUi(CtlRight) : 0.f, Canvas->ClipX, FTCPaint::CanvasMeasure(Font));
-	Box.Draw(Canvas, Font);
+	const bool bType = FTCType::IsLoaded();
+	const FTCPaint Box = O.Layout(M->Perf.Stats(), TopTl, StatsTopTc, -1.f, StatsStrip, Canvas->ClipX, CtlRight > 0.f ? ToUi(CtlRight) : 0.f, Canvas->ClipX, bType ? FTCType::Measure() : FTCPaint::CanvasMeasure(Font));
+	if (bType) FTCType::Draw(Box, Canvas, Font, UiNow); else Box.Draw(Canvas, Font);
 	float Bottom = 0.f;
 	for (const FTCPaintItem& I : Box.Items) Bottom = FMath::Max(Bottom, (float)(I.Pos.Y + I.Size.Y));
 	return O.Settings().Pos == TEXT("tl") && Bottom > 0.f ? Bottom * UiNow : 0.f;
@@ -623,6 +1043,111 @@ bool FTCStatsSheetTest::RunTest(const FString& Parameters)
 		FString(TEXT("stats probe: overlay FPS 59.9, Frame 16.7 ms, Worst 21.3 ms, JS 4.2 ms | stat unit Frame 16.7 ms, Game 4.3 ms, Draw 6.0 ms, RHIT 1.2 ms, GPU 9.5 ms | stat unit raw frames over the same 60 frames: mean 16.7 ms (59.9 fps), worst 21.3 ms")));
 	FTCStatUnitProbe Probe;
 	TestTrue(TEXT("probe: nothing without stat unit"), Probe.Frame(Pf, nullptr, false).IsEmpty());
+	return true;
+}
+
+// ThreeCrossroads.Stats.WorstWindow (round 17, hudui): why the overlay's Worst and stat unit's worst raw frame
+// disagreed in some windows, and that they agree now. perf.js frame(): worst = max(start - lastStart) over the frames
+// of a window, the frame whose end passes 1000 ms included, then everything is cleared. A hitch usually is that frame.
+// The probe used to read stat unit's RawFrameTime in the HUD (the previous frame's: DrawStatsHUD sets it after the HUD
+// draws) and to clear its window before adding: the hitch landed in the next window. Run:
+//   UnrealEditor-Cmd ThreeCrossroads.uproject -nullrhi -ExecCmds="Automation RunTests ThreeCrossroads.Stats; Quit"
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCStatsWorstWindowTest, "ThreeCrossroads.Stats.WorstWindow", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+
+bool FTCStatsWorstWindowTest::RunTest(const FString& Parameters)
+{
+	// frame start to start in ms: steady 20 ms frames with three hitches, each the frame that closes its window (the
+	// span passes 1000 ms on it), and one hitch in the middle of a window
+	TArray<double> Deltas;
+	auto Run = [&Deltas](int32 N, double Ms) { for (int32 I = 0; I < N; I++) Deltas.Add(Ms); };
+	Run(49, 20.0); Deltas.Add(213.2);            // window 1 closes on a 213.2 ms frame
+	Run(40, 20.5); Deltas.Add(261.6);            // window 2 closes on 261.6
+	Run(20, 21.0); Deltas.Add(96.9); Run(30, 21.0); // window 3: a 96.9 ms frame inside
+	Run(40, 19.5); Deltas.Add(242.9);            // window 4 closes on 242.9
+	Run(60, 20.0);
+	// the overlay (FTCPerf = perf.js) and two probes fed the same frames: Fixed with this frame's own interval (what
+	// ATCHUD::DrawStatsSheet passes now), Old with stat unit's RawFrameTime as the HUD saw it (the last frame's)
+	FTCPerf Perf;
+	FTCStatUnitProbe Fixed, Old;
+	FStatUnitData Unit;
+	TArray<FString> FixedLines, OldLines;
+	double T = 1000.0, Last = 0.0;
+	Perf.Frame(T, T + 3.0, 4.0, 0, 0, 0, 0, 0);
+	for (int32 I = 0; I < Deltas.Num(); I++)
+	{
+		T += Deltas[I];
+		Perf.Frame(T, T + 3.0, 4.0 + (I % 7) * 0.1, 0, 0, 0, 0, 0);
+		Unit.RawFrameTime = (float)Last; // what the HUD read: DrawStatsHUD has not run yet this frame
+		const FString A = Fixed.Frame(Perf.Stats(), &Unit, true, Deltas[I]);
+		const FString B = Old.Frame(Perf.Stats(), &Unit, true);
+		if (!A.IsEmpty()) FixedLines.Add(A);
+		if (!B.IsEmpty()) OldLines.Add(B);
+		Last = Deltas[I];
+	}
+	// the two numbers of a probe line: the overlay's 'Worst <n> ms' and the raw frames' 'worst <n> ms'
+	auto Pair = [](const FString& L)
+	{
+		auto After = [&L](const TCHAR* Key, bool bLast) { const int32 At = L.Find(Key, ESearchCase::CaseSensitive, bLast ? ESearchDir::FromEnd : ESearchDir::FromStart); return At < 0 ? -1.0 : FCString::Atod(*L.Mid(At + FCString::Strlen(Key))); };
+		return FVector2D(After(TEXT("Worst "), false), After(TEXT("worst "), true));
+	};
+	// the probe primes on its first call (before any roll), so its first line is window 1
+	for (const FString& L : FixedLines) AddInfo(L);
+	TestTrue(TEXT("four whole windows logged"), FixedLines.Num() >= 4);
+	int32 Agree = 0, OldAgree = 0;
+	for (const FString& L : FixedLines) { const FVector2D P = Pair(L); Agree += FMath::IsNearlyEqual(P.X, P.Y, 0.051); if (!FMath::IsNearlyEqual(P.X, P.Y, 0.051)) AddError(FString::Printf(TEXT("fixed probe disagrees: %s"), *L)); }
+	for (const FString& L : OldLines) { const FVector2D P = Pair(L); OldAgree += FMath::IsNearlyEqual(P.X, P.Y, 0.051); }
+	TestEqual(TEXT("every window: the overlay's Worst is stat unit's worst raw frame"), Agree, FixedLines.Num());
+	TestTrue(TEXT("the old reading split the closing hitches into the next window (round 16's disagreement)"), OldLines.Num() >= 4 && OldAgree < OldLines.Num());
+	const double Expect[] = { 213.2, 261.6, 96.9, 242.9 };
+	for (int32 I = 0; I < 4 && I < FixedLines.Num(); I++)
+		TestTrue(FString::Printf(TEXT("window %d's worst is the %.1f ms frame on both sides"), I + 1, Expect[I]), FMath::IsNearlyEqual(Pair(FixedLines[I]).X, Expect[I], 0.051) && FMath::IsNearlyEqual(Pair(FixedLines[I]).Y, Expect[I], 0.051));
+	return true;
+}
+
+// ThreeCrossroads.Stats.Type (round 17, hudui): FTCType's widths against Chromium's for index.html's face. The numbers
+// are getBoundingClientRect().width of a span in the page's font (Barlow Semi Condensed from the css2 link at the pin,
+// body's tabular-nums), headless Chromium on this desktop (round-17/hudui/chromium-widths.txt, from chromium-widths-page.html). Needs the font
+// files (unreal/Tools/fonts/fetch-barlow.sh); without them it warns and checks nothing.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCStatsTypeTest, "ThreeCrossroads.Stats.Type", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+
+bool FTCStatsTypeTest::RunTest(const FString& Parameters)
+{
+	if (!FTCType::IsLoaded()) { AddWarning(FString::Printf(TEXT("no Barlow Semi Condensed files in %s: widths not checked"), *FTCType::Folder())); return true; }
+	struct FCase { const TCHAR* Text; bool bBold; float Px; double Chromium; };
+	const FCase Cases[] = {
+		{ TEXT("Longest in the last second: hitches"), false, 13, 177.671875 }, { TEXT("Average over the last second"), false, 13, 146.5625 },
+		{ TEXT("Frame rate"), true, 14, 60.578125 }, { TEXT("Worst frame"), true, 14, 68.609375 }, { TEXT("Performance"), true, 16, 82.59375 },
+		{ TEXT("Stats overlay"), true, 21, 108.296875 }, { TEXT("Show the overlay"), true, 14, 94.0625 },
+		{ TEXT("Color warnings: amber, then red, when a number is bad"), false, 14, 300.84375 }, { TEXT("Quick pick"), false, 14, 56.546875 },
+		{ TEXT("Pings unanswered after 3 s, last minute"), false, 13, 200.203125 },
+		{ TEXT("Slowest 5% of ticks that send an update; over 40 ms it sends fewer"), false, 13, 339.875 },
+		{ TEXT("Retrasos de más de 33 ms"), false, 13, 133.328125 }, { TEXT("AVATAR Ty To Wo"), false, 14, 91.875 }, { TEXT("Esc"), true, 13, 18.65625 },
+		{ TEXT("Panel de estadísticas"), true, 21, 176.78125 }, { TEXT("Fotogramas por segundo"), true, 14, 137.75 },
+	};
+	const FTCMeasure M = FTCType::Measure();
+	double Worst = 0;
+	for (const FCase& C : Cases)
+	{
+		const double W = M(C.Text, C.Px, C.bBold, 0.f), D = FMath::Abs(W - C.Chromium);
+		Worst = FMath::Max(Worst, D);
+		TestTrue(FString::Printf(TEXT("'%s' %s %.0fpx: %.3f px, Chromium %.3f"), C.Text, C.bBold ? TEXT("600") : TEXT("500"), C.Px, W, C.Chromium), D <= 0.1);
+	}
+	AddInfo(FString::Printf(TEXT("Barlow widths: the largest difference from Chromium %.3f px over %d strings"), Worst, (int32)UE_ARRAY_COUNT(Cases)));
+	// the title is an h2 (the default bold, 700): the live sheet's h2 widths (round-17/hudui/live/b-horde-ui150-build4,
+	// reference-*/ref-steps-log.jsonl)
+	TestTrue(TEXT("h2 'Stats overlay' 700 21px as the live sheet (110.73 px)"), FMath::IsNearlyEqual(FTCType::HeadingFace()->Width(TEXT("Stats overlay"), 21.f), 110.73f, 0.1f));
+	TestTrue(TEXT("h2 'Panel de estadísticas' 700 21px as the live sheet (179.94 px)"), FMath::IsNearlyEqual(FTCType::HeadingFace()->Width(TEXT("Panel de estadísticas"), 21.f), 179.94f, 0.1f));
+	// kerning and tabular figures are in: 'AV' closes up, the figures share one width
+	const FTCTypeFace* F = FTCType::Face(false);
+	TestTrue(TEXT("GPOS kerning: AV is tighter than A plus V"), F->Width(TEXT("AV"), 100) < F->Width(TEXT("A"), 100) + F->Width(TEXT("V"), 100) - 1.f);
+	TestTrue(TEXT("tnum: 1 and 0 are as wide"), FMath::IsNearlyEqual(F->Width(TEXT("1"), 100), F->Width(TEXT("0"), 100)));
+	// the sheet laid out with these widths wraps the hints as the browser capture does at 1280 x 720
+	// (round-16/screenshots/lead16-f2-stats-sheet-*: ten hints, three of them on two lines)
+	FTCStatsOverlay O;
+	O.Load(TOptional<FString>());
+	const FTCPaint P = FTCStatsSheet().Layout(O.Settings(), 1280, 720, M, FVector2D(-1, -1), ETCLanguage::English);
+	TestEqual(TEXT("hint lines as Chromium wraps them"), FString::Join(P.TextsOf(TEXT("stats:hint")), TEXT("|")),
+		FString(TEXT("Average over the last second|Longest in the last second: hitches|Game code per frame|Chrome and Edge only|Round trip to the server|How much the ping swings|Pings unanswered after 3 s, last|minute|Game state messages received|Longest wait in the last second:|stalls|Slowest 5% of ticks that send an|update; over 40 ms it sends fewer")));
 	return true;
 }
 #endif

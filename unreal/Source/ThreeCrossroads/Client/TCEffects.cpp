@@ -422,6 +422,15 @@ namespace TCFxImpl
 
 	// shared/debris-motion.js SECTION_MASS
 	double SectionMass(const FString& M) { return M == TEXT("wood") ? 350 : M == TEXT("stone") ? 1200 : M == TEXT("concrete") ? 1600 : M == TEXT("steel") ? 1800 : 1200; }
+	// fx.js updateSections: a falling section's colour by material ({ wood, stone, concrete, steel }, stone otherwise),
+	// sRGB hex as THREE.Color.set takes it; index into SectionColour
+	int32 SectionTint(const FString& M) { return M == TEXT("wood") ? 0 : M == TEXT("concrete") ? 2 : M == TEXT("steel") ? 3 : 1; }
+	FLinearColor SectionColour(int32 Tint)
+	{
+		static const FColor C[] = { FColor(0x76, 0x5e, 0x43), FColor(0x89, 0x7d, 0x6b), FColor(0x85, 0x81, 0x79), FColor(0x42, 0x41, 0x3d) };
+		return FLinearColor(C[FMath::Clamp(Tint, 0, 3)]); // FColor is sRGB: converted to linear here
+	}
+	constexpr int32 SectionKeyBase = 200; // batch keys 200..203, one per material (the ETCFxLook keys are below 32)
 
 	// client/main.js: the shots client/aircraft.js draws (SUPPORT_PLANES and AIR_SHOTS)
 	bool IsSupportPlane(const FString& K) { return K == TEXT("strafe") || K == TEXT("recon") || K == TEXT("dive") || K == TEXT("bombing") || K == TEXT("para"); }
@@ -1619,7 +1628,7 @@ void FTCCombatEffects::UpdateEmitters(float Dt)
 	{
 		const FTCDebrisRow& R = Pair.Value;
 		const int32 O = Shape(ETCFxLook::Section, At(R.X, R.Y, R.Z), FVector::ZeroVector, 1.f, Dt * 1.5f);
-		if (O >= 0) Live[O].ShapeRot = FRotator(0.f, FMath::RadiansToDegrees(R.Dir), FMath::RadiansToDegrees(R.Tilt));
+		if (O >= 0) { Live[O].ShapeRot = FRotator(0.f, FMath::RadiansToDegrees(R.Dir), FMath::RadiansToDegrees(R.Tilt)); Live[O].Cell = TCFxImpl::SectionTint(R.Material); }
 	}
 	// rockets' smoke trails (fx.js updateRockets)
 	for (int32 I = Rockets.Num() - 1; I >= 0; I--)
@@ -2386,8 +2395,10 @@ void ATCEffects::Draw(double Clock)
 	{
 		if (P.Preset != ETCFxPreset::None) continue;
 		const TCFxImpl::FLookStyle St = TCFxImpl::ShapeStyle(P.Look);
-		const int32 Key = (int32)P.Look;
-		Batch(Key, Meshes[St.Mesh], St.Colour, true);
+		// round 17: falling sections in their material's colour (fx.js sectionColor), one batch per material
+		const bool bSection = P.Look == ETCFxLook::Section;
+		const int32 Key = bSection ? TCFxImpl::SectionKeyBase + FMath::Clamp(P.Cell, 0, 3) : (int32)P.Look;
+		Batch(Key, Meshes[St.Mesh], bSection ? TCFxImpl::SectionColour(P.Cell) : St.Colour, true);
 		const FVector Loc = P.P * 100.0;
 		FTransform T;
 		if (P.Look == ETCFxLook::Section) T = FTransform(P.ShapeRot.Quaternion(), Loc, FVector(1.8f, 0.2f, 2.8f));

@@ -33,6 +33,8 @@
 #include "Client/TCLocale.h"
 
 struct FStatUnitData;
+class UCanvas;
+class UFont;
 
 namespace TCStatsSheetRules
 {
@@ -45,6 +47,70 @@ namespace TCStatsSheetRules
 	constexpr float ButtonPadX = 10.f, ButtonPadY = 5.f, PresetPadX = 9.f, PresetPadY = 3.f, SelectPadX = 8.f, SelectPadY = 5.f;
 	constexpr float PicksGapX = 20.f, PicksGapY = 12.f, FieldGap = 5.f, LookGapX = 12.f, LookGapY = 8.f, LookLabelGap = 3.f;
 }
+
+// Round 17 (hudui): the reference's typeface. client/index.html sets every word in 'Barlow Semi Condensed' (weights
+// 400, 500, 600 and 700 from the Google Fonts css2 link at the pin; body text 500, bold 600). The native HUD drew the
+// sheet with the engine's Roboto at 1.2 em per glyph box, about 15% wider. FTCType reads the same font files the
+// browser downloads (Content/Fonts/BarlowSemiCondensed/*.ttf, fetched and checked by unreal/Tools/fonts/fetch-barlow.sh;
+// SIL Open Font License, OFL.txt beside them) and measures as Chromium lays text out: each glyph's advance (hmtx) plus
+// the font's GPOS pair kerning (the 'kern' feature, PairPos formats 1 and 2), in CSS pixels. Draw places every glyph at
+// those positions with the same files as a runtime font, so the drawn width is the measured one. Without the files
+// (IsLoaded false) the callers keep the HUD font and its measure.
+class THREECROSSROADS_API FTCTypeFace
+{
+public:
+	// The parts of a TrueType file that set widths: unitsPerEm, cmap (format 4 or 12), hmtx, GPOS pair kerning and GSUB 'tnum'
+	bool Parse(const TArray<uint8>& Bytes, FString* OutProblem = nullptr);
+	bool IsValid() const { return Upm > 0 && Advances.Num() > 0; }
+	int32 Glyph(uint32 CodePoint) const { const uint16* G = Cmap.Find(CodePoint); return G ? *G : 0; }
+	// The glyph index.html draws: Glyph with 'tnum' applied (body's font-variant-numeric: tabular-nums)
+	int32 Shaped(uint32 CodePoint) const { const int32 G = Glyph(CodePoint); const uint16* T = Tabular.Find((uint16)G); return T ? *T : G; }
+	// font units
+	int32 Advance(int32 Glyph) const { return Advances.Num() ? Advances[FMath::Clamp(Glyph, 0, Advances.Num() - 1)] : 0; }
+	int32 Kerning(int32 Left, int32 Right) const;
+	int32 UnitsPerEm() const { return Upm; }
+	// The pen position before each character and after the last (Out has Len + 1 entries), CSS pixels at FontPx with
+	// letter-spacing Tracking after every character
+	void Pens(const FString& Text, float FontPx, float Tracking, TArray<float>& Out) const;
+	float Width(const FString& Text, float FontPx, float Tracking = 0.f) const;
+
+private:
+	struct FPairSub
+	{
+		uint8 Format = 0;
+		TMap<uint16, int32> Coverage;                 // glyph to coverage index
+		TArray<TMap<uint16, int16>> Pairs;            // format 1: per coverage index, second glyph to x advance
+		TMap<uint16, uint16> Class1, Class2;          // format 2: class definitions (absent: class 0)
+		int32 Class1Count = 0, Class2Count = 0;
+		TArray<int16> Matrix;                         // format 2: Class1Count x Class2Count x advances
+	};
+	int32 Upm = 0;
+	TMap<uint32, uint16> Cmap;
+	TArray<uint16> Advances;
+	TArray<TArray<FPairSub>> KernLookups;            // the 'kern' feature's lookups in lookup-list order
+	TMap<uint16, uint16> Tabular;                    // GSUB 'tnum': glyph to its tabular form
+};
+
+class THREECROSSROADS_API FTCType
+{
+public:
+	// index.html's weights: 500 the body, 600 the bold (legends, labels, key caps); the files' typeface names
+	static constexpr int32 BodyWeight = 500, BoldWeight = 600, HeadingWeight = 700; // 700: an h2's default bold (Draw: a ':title' role)
+	// The folder the files are read from (Content/Fonts/BarlowSemiCondensed) and the four files' names
+	static FString Folder();
+	static const TArray<TPair<int32, FString>>& Files();
+	// Loads the files once (the first call); false when any is missing or unreadable (logged once)
+	static bool IsLoaded();
+	static const FTCTypeFace* Face(bool bBold);
+	static const FTCTypeFace* HeadingFace();
+	// The runtime font over the same files (typefaces 'Medium' and 'SemiBold'), or null
+	static UFont* Font();
+	// Chromium's widths: FTCTypeFace::Width with the weight bBold picks
+	static FTCMeasure Measure();
+	// Paint P on the canvas: every item as FTCPaint::Draw does, texts in this face at the measured glyph positions.
+	// Oversample: the canvas's scale (the UI scale inside BeginUi), so the glyphs are made at the size they show.
+	static void Draw(const FTCPaint& P, UCanvas* Canvas, UFont* Fallback, float Oversample = 1.f);
+};
 
 // One Look select: its settings key, the label over it and its options (value, text) in CHOICES order.
 struct FTCStatChoice
@@ -104,12 +170,22 @@ private:
 };
 
 // The frame-number probe: the overlay's numbers against the engine's 'stat unit' over the same frames.
+//
+// Round 17 (hudui): the windows now line up. perf.js's worst is the longest frame start to frame start in the roll's
+// window, the frame that rolled included (its own start minus the one before). stat unit's RawFrameTime is that same
+// interval (FApp's current minus last time) but is set in DrawStatsHUD, after the HUD drew, so the HUD read the
+// previous frame's value; and the probe cleared its window on a roll before adding the frame that rolled. So a long
+// frame that closed a window (the usual case: a hitch is what pushes the span past 1000 ms) counted in the overlay's
+// window and in the probe's next one (round 16's "Worst disagrees with stat unit in some windows"). Frame now takes
+// this frame's own interval (FApp delta, the value stat unit reads later in the same frame) and adds it before the roll.
 class FTCStatUnitProbe
 {
 public:
-	// Once per frame. Unit: the viewport's stat unit data while 'stat unit' is shown (null otherwise: nothing is kept).
-	// Returns the line to log when the overlay's numbers rolled since the last call (empty otherwise).
-	FString Frame(const FTCPerfStats& Perf, const FStatUnitData* Unit, bool bUnitShown);
+	// Once per frame, after ATCGameMode's perf.js frame. Unit: the viewport's stat unit data while 'stat unit' is shown
+	// (null otherwise: nothing is kept). FrameMs: this frame's start to start in ms (FApp::GetCurrentTime() minus
+	// FApp::GetLastTime(), what stat unit's RawFrameTime becomes this frame); negative: Unit's RawFrameTime (the last
+	// frame's, as before). Returns the line to log when the overlay's numbers rolled since the last call (else empty).
+	FString Frame(const FTCPerfStats& Perf, const FStatUnitData* Unit, bool bUnitShown, double FrameMs = -1.0);
 	// The line itself (tests): the overlay's fps, frame, worst and script time, then stat unit's smoothed Frame, Game,
 	// Draw, RHIT and GPU, and the mean and worst of its raw frame times over Count frames.
 	static FString Line(const FTCPerfStats& Perf, double UnitFrame, double UnitGame, double UnitDraw, double UnitRhit, double UnitGpu, double RawMean, double RawWorst, int32 Count);

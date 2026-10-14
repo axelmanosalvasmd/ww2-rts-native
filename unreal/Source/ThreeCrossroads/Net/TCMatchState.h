@@ -46,6 +46,24 @@ struct FTCLobbyPlayer
 	bool bAi = false, bConnected = false;
 };
 
+// One cell's structural section as a cell row's data carries it (shared/sim.js cell data: section { id, structureId,
+// state, hp, maxHp, material, anchor }). client/main.js applyCells keeps it per cell (terrain.structuralSections.set),
+// replacing it only when a later row brings a section again; a start empties the map.
+struct FTCCellSection
+{
+	FString Id, StructureId, State, Material;
+	double Hp = 0.0, MaxHp = 0.0;
+	bool bHasHp = false, bHasMaxHp = false, bAnchor = false;
+	// shared/sim.js failWorldSection sets state 'failed' and hp 0 together; either one read here counts as down
+	bool IsDown() const { return State == TEXT("failed") || (bHasHp && Hp <= 0.0); }
+};
+
+// A cell row's data besides the section (client/main.js applyCells: groundGrid, objectGrid, materials).
+struct FTCCellData
+{
+	FString Ground, Object, Material;
+};
+
 struct FTCMap
 {
 	FString Name;
@@ -287,6 +305,12 @@ public:
 	FString LastResult;                         // the lobby's result line (client/main.js renderLobby), empty when none
 	FString LobbyMap;                           // the lobby's mapName ('world' for World Conquest)
 	bool bLobbySandbox = false;                 // the room's Sandbox switch (server.js 'sandbox')
+	// Round 17 (hudui): server.js lobby() hordeBest, the room's Horde record for this map, team size and army size
+	// (recordOf: { wave, kills, time in s, names }), null outside Horde or with no record yet; main.js renderLobby
+	// writes it after the mode's description. bSet false: null.
+#define TC_HAS_LOBBY_HORDE_BEST 1
+	struct FLobbyHordeBest { bool bSet = false; int32 Wave = 0; int32 Time = 0; TArray<FString> Names; };
+	FLobbyHordeBest LobbyHordeBest;
 	TArray<FTCLobbyPlayer> Roster;              // the seats, in seat order
 	TArray<FString> Spectators;
 
@@ -316,6 +340,18 @@ public:
 	TSet<int32> DirtyCells;
 	TSet<int32> FogDirtyCells;
 	bool bMapReset = false;
+
+	// ----- cell rows beyond the character and level (client/main.js applyCells) -----
+	// terrain.state[cell] = st ?? 0 for every cell a row named (a Uint8Array: the value wraps modulo 256). Cells no row
+	// named keep the map's start state, which shared/sim.js startState derives and this decoder does not (absent here).
+	TMap<int32, uint8> CellStates;
+	// terrain.groundGrid / objectGrid / materials for cells whose row carried data
+	TMap<int32, FTCCellData> CellData;
+	// terrain.structuralSections: the last section a row brought per cell (kept when a later row has none)
+	TMap<int32, FTCCellSection> Sections;
+	// The cells the last start or snapshot applied, in row order (valid rows only), and rows it skipped as unreadable.
+	TArray<int32> LastCellRows;
+	int32 LastCellRowsSkipped = 0;
 
 	// ----- start fields beyond the map (server.js sendStart) -----
 	TArray<int32> Factions;                     // per seat
@@ -442,6 +478,7 @@ private:
 	bool HeldMismatch(const FJsonObject& M) const;
 	void NoteSeatConfirmation();
 	void ApplyCells(const TArray<TSharedPtr<FJsonValue>>& Cells);
+	void ResetCells();
 	static bool ParseUnit(const TArray<TSharedPtr<FJsonValue>>& Row, FTCUnit& Out);
 	void ResetExtras();
 	void ApplyStartExtras(const FJsonObject& M);

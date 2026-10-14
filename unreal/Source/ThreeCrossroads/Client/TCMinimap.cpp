@@ -5,12 +5,14 @@
 #include "Client/TCUnitRenderer.h"
 #include "Net/TCMatchState.h"
 #include "World/TCTerrain.h"
+#include "Client/TCCameraPawn.h"
 #include "CanvasItem.h"
 #include "Engine/Canvas.h"
 #include "Engine/Texture2D.h"
 #include "Misc/App.h"
 #include "TextureResource.h"
 #include "SceneView.h"
+#include "GlobalRenderResources.h"
 
 namespace
 {
@@ -304,31 +306,57 @@ bool FTCMinimap::Draw(UCanvas* Canvas, const FTCMatchState& State, const FTCUnit
 		}
 	}
 
-	// what the camera sees, when all four corners of the screen hit ground (client/camera.js corners)
-	bool bView = false;
-	if (View.Corners.Num() == 4)
-	{
-		const double MinX = LayoutX, MinY = LayoutY, MaxX = LayoutX + LayoutSide, MaxY = LayoutY + LayoutSide;
-		for (int32 I = 0; I < 4; I++)
-		{
-			const FVector2D& A = View.Corners[I];
-			const FVector2D& B = View.Corners[(I + 1) % 4];
-			double X0, Y0, X1, Y1;
-			Basis.ToPixel(A.X, A.Y, X0, Y0);
-			Basis.ToPixel(B.X, B.Y, X1, Y1);
-			if (!MMCore::ClipSegment(X0, Y0, X1, Y1, MinX, MinY, MaxX, MaxY)) continue;
-			FCanvasLineItem Seg(FVector2D(X0, Y0), FVector2D(X1, Y1));
-			Seg.SetColor(FLinearColor(MinimapViewOutline));
-			Seg.LineThickness = (float)(1.5 * K);
-			Seg.BlendMode = SE_BLEND_Translucent;
-			Canvas->DrawItem(Seg);
-			bView = true;
-		}
-	}
+	// what the camera sees (client/camera.js corners), unless the HUD draws it last over its own overlays as
+	// drawMinimap does (bDeferViewOutline, then DrawViewOutline)
+	LastStats.bViewDrawn = false;
+	if (!bDeferViewOutline) DrawViewOutline(Canvas, View);
 	LastStats.UnitsDrawn = Units;
 	LastStats.SelectedDrawn = Ringed;
-	LastStats.bViewDrawn = bView;
 	return true;
+}
+
+bool FTCMinimap::DrawViewOutline(UCanvas* Canvas, const FTCMinimapView& View)
+{
+	// client/main.js drawMinimap: the four corners closed into one outline, '#fff8', 1.5 canvas pixels, cut by the
+	// minimap's square (the browser's canvas edge)
+	if (!Canvas || !Canvas->Canvas || !Basis.IsValid() || LayoutSide <= 0.f || View.Corners.Num() != 4) return false;
+	const double K = Basis.CanvasScale();
+	const double MinX = LayoutX, MinY = LayoutY, MaxX = LayoutX + LayoutSide, MaxY = LayoutY + LayoutSide;
+	bool bView = false;
+	TArray<FCanvasUVTri> Strokes;
+	for (int32 I = 0; I < 4; I++)
+	{
+		const FVector2D& A = View.Corners[I];
+		const FVector2D& B = View.Corners[(I + 1) % 4];
+		double X0, Y0, X1, Y1;
+		Basis.ToPixel(A.X, A.Y, X0, Y0);
+		Basis.ToPixel(B.X, B.Y, X1, Y1);
+		if (!MMCore::ClipSegment(X0, Y0, X1, Y1, MinX, MinY, MaxX, MaxY)) continue;
+		// a see-through stroke (a line item would draw it opaque): two triangles 1.5 canvas pixels wide
+		const FVector2D A2(X0, Y0), B2(X1, Y1), D = B2 - A2;
+		const double L = D.Size();
+		if (L < 1e-6) continue;
+		const FVector2D N = FVector2D(-D.Y, D.X) / L * (0.75 * K);
+		FCanvasUVTri T0, T1;
+		T0.V0_Pos = A2 + N; T0.V1_Pos = B2 + N; T0.V2_Pos = B2 - N;
+		T1.V0_Pos = A2 + N; T1.V1_Pos = B2 - N; T1.V2_Pos = A2 - N;
+		T0.V0_Color = T0.V1_Color = T0.V2_Color = T1.V0_Color = T1.V1_Color = T1.V2_Color = FLinearColor(MinimapViewOutline);
+		for (FCanvasUVTri* T : { &T0, &T1 })
+		{
+			// the winding TCWarMap's flat triangles use
+			if ((T->V1_Pos.X - T->V0_Pos.X) * (T->V2_Pos.Y - T->V0_Pos.Y) - (T->V1_Pos.Y - T->V0_Pos.Y) * (T->V2_Pos.X - T->V0_Pos.X) < 0) Swap(T->V1_Pos, T->V2_Pos);
+			Strokes.Add(*T);
+		}
+		bView = true;
+	}
+	if (Strokes.Num())
+	{
+		FCanvasTriangleItem Item(Strokes, GWhiteTexture);
+		Item.BlendMode = SE_BLEND_Translucent;
+		Canvas->DrawItem(Item);
+	}
+	LastStats.bViewDrawn |= bView;
+	return bView;
 }
 
 bool FTCMinimap::ViewFromCanvas(const UCanvas* Canvas, const ATCTerrain* Terrain, FTCMinimapView& Out)
@@ -339,10 +367,9 @@ bool FTCMinimap::ViewFromCanvas(const UCanvas* Canvas, const ATCTerrain* Terrain
 	if (FVector2D(D.X, D.Y).SizeSquared() < 1e-8) return false; // looking straight down: no heading to read
 	Out.YawDegrees = (float)FMath::RadiansToDegrees(FMath::Atan2(D.Y, D.X));
 	Out.Corners.Reset();
-	if (!Terrain) return true;
 	const FSceneView* SV = Canvas->SceneView;
 	const FString NewKey = FString::Printf(TEXT("%s|%s|%g|%g|%d|%d|%d|%d"), *SV->ViewLocation.ToString(), *SV->ViewRotation.ToString(), Canvas->ClipX, Canvas->ClipY,
-		Terrain->MapW(), Terrain->MapH(), Terrain->ChunksMeshed(), Terrain->CellsDrawn());
+		Terrain ? Terrain->MapW() : -1, Terrain ? Terrain->MapH() : -1, Terrain ? Terrain->ChunksMeshed() : -1, Terrain ? Terrain->CellsDrawn() : -1);
 	if (NewKey != CornerKey)
 	{
 		CornerKey = NewKey;
@@ -353,10 +380,23 @@ bool FTCMinimap::ViewFromCanvas(const UCanvas* Canvas, const ATCTerrain* Terrain
 			FVector RO, RD;
 			Canvas->Deproject(P, RO, RD);
 			FVector2D G;
-			if (Terrain->RayToGround(RO, RD, G)) CornerCache.Add(G);
+			if (GroundUnder(Terrain, RO, RD, G)) CornerCache.Add(G);
 		}
 	}
 	Out.Corners = CornerCache;
+	return true;
+}
+
+bool FTCMinimap::GroundUnder(const ATCTerrain* Terrain, const FVector& Origin, const FVector& Dir, FVector2D& OutMetres)
+{
+	// camera.js groundAt: the relief this client drew under the ray, else the flat y = 0 plane (Unreal Z = 0)
+	if (Terrain && Terrain->RayToGround(Origin, Dir, OutMetres)) return true;
+	const FVector D = Dir.GetSafeNormal();
+	if (D.IsNearlyZero()) return false;
+	const double O3[3] = { Origin.X / 100.0, Origin.Z / 100.0, Origin.Y / 100.0 }, D3[3] = { D.X, D.Z, D.Y };
+	double P[3];
+	if (!MMCore::FlatGround(O3, D3, P)) return false;
+	OutMetres = FVector2D(P[0], P[2]);
 	return true;
 }
 
@@ -645,6 +685,83 @@ bool FTCMinimapModelTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("no input without a match"), Mm.MouseDown(Mid, ETCMinimapButton::Left, St, Tbl).bConsumed);
 	Mm.Reset();
 	TestEqual(TEXT("stats cleared"), Mm.Stats().Refreshes, 0);
+	return true;
+}
+
+// Round 17: the view outline as the pinned reference computes it. The cases are client/camera.js pose() and corners()
+// run under Node on the pinned files (round-17/markers/tools/view-oracle.mjs: THREE.PerspectiveCamera(42, w / h),
+// PITCH 0.95, groundAt with no relief mesh over a constant hAt inside the map, the flat y = 0 plane past it).
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCMinimapViewOutlineTest, "ThreeCrossroads.Minimap.ViewOutline", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+
+bool FTCMinimapViewOutlineTest::RunTest(const FString& Parameters)
+{
+	namespace Core = TCMinimapCore;
+	struct FCase { const TCHAR* Name; double X, Y, Z, Yaw, Dist, W, H, MapW, MapH, Ground; double C[4][3]; };
+	static const FCase Cases[] = {
+		{ TEXT("conquest-pose-north"), 80, 0, 80, 0, 90, 1280, 720, 160, 160, 0, { { -4.657106525625977, 0, 21.457198516279277 }, { 164.65710652562598, 0, 21.457198516279277 }, { 128.1898543935684, 2.842170943040401e-14, 113.32465749273048 }, { 31.810145606431576, 0, 113.32465749273047 } } },
+		{ TEXT("turned-35deg"), 60, 0, 100, 0.61, 70, 1280, 720, 160, 160, 0, { { -20.05378543042923, 0, 100.39885253297417 }, { 87.88470499664695, 7.105427357601002e-15, 24.958605607743138 }, { 105.56947930152307, 0, 99.77295886574255 }, { 44.12702809315526, 7.105427357601002e-15, 142.71624695982905 } } },
+		{ TEXT("close-wide-window"), 120, 0, 40, -1.2, 30, 1920, 1080, 240, 200, 0, { { 127.96267338790976, 0, 6.627609908936833 }, { 148.4134460686554, 0, 59.23009803345336 }, { 115.46736137230532, 0, 58.996758633215094 }, { 103.82604975456444, 0, 29.05354007196494 } } },
+		{ TEXT("raised-ground-edge"), 20, 3, 150, 2.5, 85, 1600, 900, 160, 160, 3, { { 51.024445345947676, 0, 247.86270130359156 }, { -82.64338183373803, 0, 148.0098539769229 }, { 2.373724759679348, 3, 97.54732915274366 }, { 75.29804710259545, 3, 152.02342395392117 } } },
+		{ TEXT("far-zoom-square"), 200, 0, 200, 3, 260, 1000, 1000, 400, 400, 0, { { 312.3243572249476, 2.842170943040401e-14, 386.84471201836357 }, { 39.942181431057804, 2.842170943040401e-14, 348.01757446389377 }, { 136.0609564669811, -2.842170943040401e-14, 93.64130389162716 }, { 291.1106378181585, 0, 115.74309997300577 } } },
+	};
+	for (const FCase& C : Cases)
+	{
+		// the reference's formula: its camera, its corner order, the relief (here a level ground inside the map) else
+		// the flat plane
+		const Core::FRefView V = Core::FRefView::Pose(C.X, C.Y, C.Z, C.Yaw, C.Dist, C.W / C.H);
+		auto Relief = [&C](const double O[3], const double D[3], double P[3])
+		{
+			if (D[1] == 0.0) return false;
+			const double T = (C.Ground - O[1]) / D[1];
+			if (T < 0.0) return false;
+			for (int32 I = 0; I < 3; I++) P[I] = O[I] + D[I] * T;
+			return P[0] >= 0.0 && P[2] >= 0.0 && P[0] <= C.MapW && P[2] <= C.MapH;
+		};
+		double Out[4][3];
+		const int32 N = Core::ViewCorners(V, C.W, C.H, Relief, Out);
+		TestEqual(FString::Printf(TEXT("%s: four corners"), C.Name), N, 4);
+		double Worst = 0.0;
+		for (int32 I = 0; I < N; I++) for (int32 K = 0; K < 3; K++) Worst = FMath::Max(Worst, FMath::Abs(Out[I][K] - C.C[I][K]));
+		TestTrue(FString::Printf(TEXT("%s: corners equal the reference's within 1e-6 m (worst %g)"), C.Name, Worst), Worst < 1e-6);
+		// not a rectangle: the far edge (top) is wider than the near one (bottom), a trapezoid for the tilted camera
+		const double Top = FMath::Sqrt(FMath::Square(Out[1][0] - Out[0][0]) + FMath::Square(Out[1][2] - Out[0][2]));
+		const double Bottom = FMath::Sqrt(FMath::Square(Out[2][0] - Out[3][0]) + FMath::Square(Out[2][2] - Out[3][2]));
+		if (C.Ground == 0.0) TestTrue(FString::Printf(TEXT("%s: far edge wider than the near edge (%.2f > %.2f m)"), C.Name, Top, Bottom), Top > Bottom * 1.05);
+
+		// this client's camera at the same pose (ATCCameraPawn::Place's pinhole: Unreal yaw -90 - degrees(yaw)) and
+		// FTCMinimap::GroundUnder's fallback with no terrain: on level ground at 0 they give the reference's corners
+		if (C.Ground != 0.0) continue;
+		const FTCPinhole P(FVector(C.X, C.Z, C.Y), -90.f - (float)FMath::RadiansToDegrees(C.Yaw), (float)FMath::RadiansToDegrees(Core::RefPitch), (float)C.Dist, C.W / C.H);
+		const FVector2D Px[4] = { FVector2D(0, 0), FVector2D(C.W, 0), FVector2D(C.W, C.H), FVector2D(0, C.H) };
+		double WorstPinhole = 0.0, WorstFallback = 0.0;
+		for (int32 I = 0; I < 4; I++)
+		{
+			FVector2D G;
+			if (P.Ground(Px[I], C.W, C.H, 0.0, G)) WorstPinhole = FMath::Max(WorstPinhole, FVector2D::Distance(G, FVector2D(C.C[I][0], C.C[I][2])));
+			else WorstPinhole = 1e9;
+			const FVector Dir = P.F + P.R * ((2.0 * Px[I].X / C.W - 1.0) * P.TanX) + P.U * ((1.0 - 2.0 * Px[I].Y / C.H) * P.TanY);
+			FVector2D F;
+			if (FTCMinimap::GroundUnder(nullptr, P.Pos * 100.0, Dir, F)) WorstFallback = FMath::Max(WorstFallback, FVector2D::Distance(F, FVector2D(C.C[I][0], C.C[I][2])));
+			else WorstFallback = 1e9;
+		}
+		// the pinhole is posed in float degrees: centimetres of difference over a 400 m map
+		TestTrue(FString::Printf(TEXT("%s: this client's camera sees the same footprint (worst %.4f m)"), C.Name, WorstPinhole), WorstPinhole < 0.05);
+		TestTrue(FString::Printf(TEXT("%s: GroundUnder's flat fallback (worst %.4f m)"), C.Name, WorstFallback), WorstFallback < 0.05);
+	}
+
+	// a corner ray above the horizon is dropped (THREE.Ray.intersectPlane returns null), so no outline is drawn
+	{
+		const Core::FRefView V = Core::FRefView::Pose(80, 0, 80, 0, 90, 16.0 / 9.0, 0.1);
+		double Out[4][3];
+		TestEqual(TEXT("a low pitch leaves the two top corners above the horizon"), Core::ViewCorners(V, 1280, 720, [](const double*, const double*, double*) { return false; }, Out), 2);
+		double Hit[3];
+		const double O[3] = { 0, 10, 0 }, Level[3] = { 1, 0, 0 }, Upward[3] = { 0, 1, 0 };
+		TestFalse(TEXT("a level ray off the plane misses"), Core::FlatGround(O, Level, Hit));
+		TestFalse(TEXT("a ray pointing up misses"), Core::FlatGround(O, Upward, Hit));
+		FVector2D G;
+		TestFalse(TEXT("GroundUnder: up misses"), FTCMinimap::GroundUnder(nullptr, FVector(0, 0, 1000), FVector(0, 0, 1), G));
+		TestTrue(TEXT("GroundUnder: down hits the plane"), FTCMinimap::GroundUnder(nullptr, FVector(500, 700, 1000), FVector(0, 0, -1), G) && G.Equals(FVector2D(5, 7), 1e-9));
+	}
 	return true;
 }
 #endif // WITH_DEV_AUTOMATION_TESTS

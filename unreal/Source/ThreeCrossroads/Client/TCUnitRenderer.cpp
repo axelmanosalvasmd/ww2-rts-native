@@ -80,7 +80,9 @@ void ATCUnitRenderer::Draw(const FTCMatchState& State, const FTCUnitTable& Table
 	EnsureModels();
 	UpdateRingLooks();
 	TMap<UInstancedStaticMeshComponent*, TArray<FTransform>> Frames;
+	TMap<UInstancedStaticMeshComponent*, TArray<uint64>> FrameKeys; // FTCInstanceHistory keys, by placeholder batch
 	for (const auto& Pair : Batches) Frames.Add(Pair.Value, {});
+	History.ResetCounts();
 	Frame.Reset();
 	Stats = FTCUnitModelStats();
 	const float Ease = 1.f - FMath::Exp(-DeltaSeconds * 10.f);
@@ -92,6 +94,7 @@ void ATCUnitRenderer::Draw(const FTCMatchState& State, const FTCUnitTable& Table
 			if (PC->PlayerCameraManager) Eye = PC->PlayerCameraManager->GetCameraLocation();
 	if (Crowd) Crowd->BeginFrame();
 	TSet<int32> Present;
+	DrawnList.Reset();
 	for (const auto& Pair : State.Units)
 	{
 		const FTCUnit& U = Pair.Value;
@@ -105,7 +108,12 @@ void ATCUnitRenderer::Draw(const FTCMatchState& State, const FTCUnitTable& Table
 		S.Aim += FMath::FindDeltaAngleRadians(S.Aim, U.Aim) * Ease * 0.6f;
 		if (!IsDrawn(U)) continue; // inside a building or a carrier, or a plane parked at its base (client/main.js)
 		const FTCUnitDef* Def = Table.Find(U.Type);
-		if (UsesModel(U.Type) && Library.IsLoaded() && DrawModel(State, U, Def, S, Terrain, Selected.Contains(U.Id), DeltaSeconds, Eye)) { Stats.ModelUnits++; continue; }
+		if (UsesModel(U.Type) && Library.IsLoaded() && DrawModel(State, U, Def, S, Terrain, Selected.Contains(U.Id), DeltaSeconds, Eye))
+		{
+			Stats.ModelUnits++;
+			if (Stats.ModelUnits <= 60) DrawnList += FString::Printf(TEXT("%s%d %s %d %.1f %.1f %s"), DrawnList.IsEmpty() ? TEXT("") : TEXT(", "), U.Id, *U.Type, U.Owner, S.X, S.Z, S.bFar ? TEXT("far") : TEXT("near"));
+			continue;
+		}
 		if (UsesModel(U.Type)) Stats.MissingModel++;
 		Stats.PlaceholderUnits++;
 		const float Radius = Def ? Def->Radius : 1.5f;
@@ -121,17 +129,30 @@ void ATCUnitRenderer::Draw(const FTCMatchState& State, const FTCUnitTable& Table
 				const float Across = ((I % 3) - 1) * 1.3f, Behind = (I / 3) * 1.3f;
 				const FVector Local(-Behind * 100.f, Across * 100.f, 85.f);
 				Frames.FindOrAdd(Batch(U.Owner, Man)).Add(FTransform(Facing, At + Facing.RotateVector(Local), FVector(0.45f, 0.45f, 1.7f)));
+				FrameKeys.FindOrAdd(Batch(U.Owner, Man)).Add(FTCInstanceHistory::ManKey(U.Id, I));
 			}
 		}
 		else if (Def && Def->bAir)
+		{
+			FrameKeys.FindOrAdd(Batch(U.Owner, Air)).Add(FTCInstanceHistory::PartKey(U.Id, 0));
 			// +90 degrees about +Y turns the cone's apex from +Z to +X, the heading every other unit faces along
 			Frames.FindOrAdd(Batch(U.Owner, Air)).Add(FTransform(FQuat(FVector::UpVector, S.Rot) * FQuat(FVector::RightVector, PI / 2), At + FVector(0, 0, LiftMetres(Def) * 100.f), FVector(Radius, Radius, Radius * 1.6f)));
+		}
 		else if (Def && Def->bStructure)
+		{
+			FrameKeys.FindOrAdd(Batch(U.Owner, Structure)).Add(FTCInstanceHistory::PartKey(U.Id, 0));
 			Frames.FindOrAdd(Batch(U.Owner, Structure)).Add(FTransform(Facing, At + FVector(0, 0, 200.f * FMath::Max(0.15f, U.Built)), FVector(Radius * 2.f, Radius * 2.f, 4.f * FMath::Max(0.15f, U.Built))));
+		}
 		else
+		{
+			FrameKeys.FindOrAdd(Batch(U.Owner, Vehicle)).Add(FTCInstanceHistory::PartKey(U.Id, 0));
 			Frames.FindOrAdd(Batch(U.Owner, Vehicle)).Add(FTransform(Facing, At + FVector(0, 0, 110.f), FVector(Radius * 2.f, Radius * 1.3f, 2.2f)));
+		}
 		if (Selected.Contains(U.Id))
+		{
+			FrameKeys.FindOrAdd(Batch(-1, Ring)).Add(FTCInstanceHistory::RingKey(U.Id, true));
 			Frames.FindOrAdd(Batch(-1, Ring)).Add(FTransform(FQuat::Identity, At + FVector(0, 0, 5.f), FVector(Radius * 2.f + 1.f, Radius * 2.f + 1.f, 0.05f)));
+		}
 	}
 	for (auto It = Shown.CreateIterator(); It; ++It) if (!Present.Contains(It.Key())) It.RemoveCurrent();
 	for (auto It = Squads.CreateIterator(); It; ++It)
@@ -148,8 +169,9 @@ void ATCUnitRenderer::Draw(const FTCMatchState& State, const FTCUnitTable& Table
 	{
 		UInstancedStaticMeshComponent* Ism = Pair.Key;
 		LastInstances += Pair.Value.Num();
-		if (Ism->GetInstanceCount() == Pair.Value.Num()) { if (Pair.Value.Num()) Ism->BatchUpdateInstancesTransforms(0, Pair.Value, true, true, true); }
-		else { Ism->ClearInstances(); if (Pair.Value.Num()) Ism->AddInstances(Pair.Value, false, true); }
+		const TArray<uint64>* Keys = FrameKeys.Find(Ism);
+		History.Write(Ism, Pair.Value, Keys ? *Keys : TArray<uint64>());
+		if (Pair.Value.Num()) Ism->MarkRenderStateDirty();
 	}
 	FlushModelFrame();
 	if (Crowd)
@@ -162,6 +184,8 @@ void ATCUnitRenderer::Draw(const FTCMatchState& State, const FTCUnitTable& Table
 		Stats.Components += C.Components;
 		LastInstances += C.NearMen + C.FarMen + C.Corpses;
 	}
+	Stats.Matched = History.Matched + (Crowd ? Crowd->History.Matched : 0);
+	Stats.Moving = History.Moving + (Crowd ? Crowd->History.Moving : 0);
 	ReportFrame();
 	// every 5 s of real time while tracked hulls are drawn: how many turn their wheels and how far they have rolled
 	const double Real = FPlatformTime::Seconds();

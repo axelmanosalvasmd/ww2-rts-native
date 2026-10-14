@@ -22,6 +22,7 @@
 #include "CoreMinimal.h"
 #include "Components/SceneComponent.h"
 #include "Client/TCInfantryRig.h"
+#include "Client/TCModelLibrary.h"
 #include "TCUnitMotion.generated.h"
 
 struct FTCModelEntry;
@@ -236,6 +237,8 @@ public:
 	int32 BlastTosses() const { return Tosses; }
 	int32 NumCorpses() const;
 	FTCCorpseRules Rules;
+	// round 17: the men and bodies are written with last frame's transforms (motion vectors; Client/TCModelLibrary.h)
+	FTCInstanceHistory History;
 	// Corpse yaw jitter and tosses draw from this (main.js uses Math.random); fixed for tests.
 	FRandomStream Random = FRandomStream(0x5eed);
 
@@ -263,7 +266,7 @@ private:
 		UStaticMesh* Mesh = nullptr;
 		UInstancedStaticMeshComponent* Draw[2] = {}; // solid, faded
 	};
-	struct FBatch { TArray<FTransform> Transforms; TArray<float> Data; int32 Floats = 0; };
+	struct FBatch { TArray<FTransform> Transforms; TArray<float> Data; int32 Floats = 0; TArray<uint64> Keys; };
 	struct FStood { bool bSet = false; FString FigureType; int32 Faction = 0, Slot = 0; FLinearColor Owner; FTransform Man; };
 	struct FSquadRecord { int32 Alive = -1; TArray<FStood> Men; };
 	struct FCorpse
@@ -271,15 +274,16 @@ private:
 		FString FigureType; int32 Faction = 0, Slot = 0; FLinearColor Owner; float Scale = 1.f;
 		double X = 0, Y = 0, Z = 0, Yaw = 0, Age = 0, Out = -1; // reference metres and radians; Out < 0: not fading
 		bool bFar = false, bTossed = false, bFly = false;
+		uint32 Serial = 0; // FTCInstanceHistory::BodyKey
 		double VX = 0, VY = 0, VZ = 0, RX = 0, RZ = 0, WX = 0, WZ = 0;
 	};
 
 	FNearFigure* NearFigure(const FString& FigureType, int32 Faction, int32 Slot);
 	FFarFigure* FarFigure(const FString& FigureType, int32 Faction, int32 Slot);
 	UInstancedStaticMeshComponent* MakeBatch(UStaticMesh* Mesh, int32 Floats, const TArray<UMaterialInterface*>& Materials);
-	void Add(UInstancedStaticMeshComponent* Ism, const FTransform& Xf, const float* Data, int32 Floats);
-	bool DrawNear(const FString& FigureType, int32 Faction, int32 Slot, const FTransform& Xf, const TArray<float>& Blend12, float Fade, bool bForceFaded);
-	bool DrawFar(const FString& FigureType, int32 Faction, int32 Slot, const FTransform& Xf, const TArray<float>& Blend12, float Fade, const FLinearColor& Owner, bool bForceFaded);
+	void Add(UInstancedStaticMeshComponent* Ism, const FTransform& Xf, const float* Data, int32 Floats, uint64 Key);
+	bool DrawNear(const FString& FigureType, int32 Faction, int32 Slot, const FTransform& Xf, const TArray<float>& Blend12, float Fade, bool bForceFaded, uint64 Key);
+	bool DrawFar(const FString& FigureType, int32 Faction, int32 Slot, const FTransform& Xf, const TArray<float>& Blend12, float Fade, const FLinearColor& Owner, bool bForceFaded, uint64 Key);
 	void Fall(const FStood& Man);
 	void DropCorpse(int32 Index);
 	bool LoadFarFigures(FString& OutError);
@@ -293,6 +297,7 @@ private:
 	TMap<FString, FFarFigure> FarFigures;
 	TMap<int32, FSquadRecord> Squads;
 	TArray<FCorpse> Corpses;
+	uint32 NextSerial = 1;                     // FCorpse::Serial
 	int32 Tosses = 0;                          // bodies thrown by a blast since this crowd was made
 	TWeakObjectPtr<class ATCEffects> EffectsSeen; // the game's effects (fx.js blastNear and gore) when no BlastNear is passed
 	TMap<UInstancedStaticMeshComponent*, FBatch> Frame;

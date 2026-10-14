@@ -1620,13 +1620,20 @@ void ATCHUD::DrawMatchControls(UFont* Font, float Top)
 void ATCHUD::DrawRoomBanners(UFont* Font)
 {
 	// round 16: #roomBanners (main.js positionRoomBanners: 8 px under #top's bottom in screen pixels while the HUD shows,
-	// else 16 px). Only the pause banner: this client has no #connectionBanner text yet (its status column says it).
+	// else 16 px). Round 17 (hudui): #connectionBanner first while the connection waits to try again (connection.js
+	// 'retry', main.js's two sentences, FTCHudFit::ConnectionBannerText), then the pause banner.
 	ATCGameMode* M = GetWorld()->GetAuthGameMode<ATCGameMode>();
-	if (!M || !Canvas || !Font || !M->State.bPaused || M->State.PauseText.IsEmpty()) return;
+	if (!M || !Canvas || !Font) return;
+	TArray<FTCRoomBanner> Banners;
+	bool bFull = false;
+	const int32 Left = M->ConnectionRetryLeft(&bFull);
+	if (Left > 0) Banners.Add(FTCRoomBanner{ FTCHudFit::ConnectionBannerText(bFull, Left), true });
+	if (M->State.bPaused && !M->State.PauseText.IsEmpty()) Banners.Add(FTCRoomBanner{ M->State.PauseText, false });
+	if (!Banners.Num()) return;
 	// #top holds the strip and its centred lines (rate, weather, the boss bar): StatsTopTc, its bottom in UI pixels
 	const bool bHud = M->State.bHasMatch && StatsTopTc >= 0.f;
 	const float Top = bHud ? FMath::CeilToFloat(StatsTopTc * UiNow + 8.f) : 16.f;
-	const FTCPaint P = FTCRoomBanners::Layout({ FTCRoomBanner{ M->State.PauseText, false } }, Top, Canvas->ClipX, FTCPaint::CanvasMeasure(Font));
+	const FTCPaint P = FTCRoomBanners::Layout(Banners, Top, Canvas->ClipX, FTCPaint::CanvasMeasure(Font));
 	P.Draw(Canvas, Font);
 }
 #endif

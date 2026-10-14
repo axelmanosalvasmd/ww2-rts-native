@@ -21,6 +21,9 @@ target/
 /unreal/Content/WarMap/
 /unreal/Content/Collections/
 /unreal/Content/Developers/
+# Barlow Semi Condensed, the reference's typeface (client/index.html), fetched with pinned hashes by
+# unreal/Tools/fonts/fetch-barlow.sh (SIL Open Font License, OFL.txt beside the files)
+/unreal/Content/Fonts/
 *.sln
 *.VC.db
 *.opensdf

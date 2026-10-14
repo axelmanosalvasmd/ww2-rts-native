@@ -9,9 +9,13 @@
 //   x z       the camera's target in reference metres, or "frontier" for x (z ignored): the first cell this side does
 //             not know on the line from the own army toward the map's centre, stepped back 6 m onto known ground
 //             or "unit:<type>" for x (round 14, z ignored): the living unit of that type with the lowest id owned by this
-//             seat (seat 0 for a spectator), so both halves frame the same moving vehicle or squad
+//             seat (seat 0 for a spectator), so both halves frame the same moving vehicle or squad; "unit:<type>@<seat>"
+//             (round 17) that seat's (an AI's moving squad for a spectator)
+//             or "step:<n>" for x (round 17, the Tutorial): once the snapshot's step reaches n (1-based) and 3 s more, the
+//             cell shared/tutorial.js STEPS[n - 1].at points to, as tour-reference.mjs places it (round 16: the origin)
 //   distance  metres, or wF: the fraction F of the widest view (client/camera.js wide, measured for this map and window)
 //   yaw       the native heading in degrees (-90 looks north; the browser's yaw is -(yaw + 90) degrees)
+//             or p<seconds> (round 17): that match time and the match paused (the host's Pause)
 //   [hud]     optional 7th field (round 14): keep the HUD in the shot (the goal line, the panels, the paper war map)
 // At each pose the HUD is hidden (unless "hud"), and 2.5 s later (the view settles, the paint and textures stream) <dir>/<name>.png is
 // saved; the log line has the camera as set, the frame times over those 2.5 s and the terrain status.
@@ -36,23 +40,10 @@ void ATCGameMode::RunSlice13Switches(double Now)
 		bTourRead = true;
 		TArray<FString> Lines;
 		if (!FFileHelper::LoadFileToStringArray(Lines, *TourFile)) { UE_LOG(LogTC, Error, TEXT("tour: cannot read %s"), *TourFile); TourDone = true; return; }
-		for (FString L : Lines)
+		for (const FString& L : Lines)
 		{
-			int32 Hash;
-			if (L.FindChar('#', Hash)) L.LeftInline(Hash);
-			TArray<FString> F;
-			L.ParseIntoArrayWS(F);
-			if (F.Num() < 6) continue;
 			FTourPose P;
-			P.Name = F[0]; P.At = FCString::Atod(*F[1]);
-			P.bFrontier = F[2] == TEXT("frontier");
-			P.X = FCString::Atod(*F[2]); P.Z = FCString::Atod(*F[3]);
-			P.bWideShare = F[4].StartsWith(TEXT("w"));
-			P.Dist = FCString::Atod(P.bWideShare ? *F[4].Mid(1) : *F[4]);
-			P.Yaw = FCString::Atod(*F[5]);
-			if (F[2].StartsWith(TEXT("unit:"))) P.UnitType = F[2].Mid(5);
-			P.bHud = F.Num() > 6 && F[6] == TEXT("hud");
-			Tour.Add(P);
+			if (TCTour::ParseLine(L, P)) Tour.Add(P);
 		}
 		UE_LOG(LogTC, Log, TEXT("tour: %d poses from %s into %s"), Tour.Num(), *TourFile, *TourDir);
 	}
@@ -62,8 +53,18 @@ void ATCGameMode::RunSlice13Switches(double Now)
 	if (TourShotAt < 0)
 	{
 		if (InMatch < P.At || FScreenshotRequest::IsScreenshotRequested()) return;
+		if (P.bWhenPaused && !State.bPaused) return; // round 17: p<seconds>, the host's pause freezes the scene for both halves
 		if (P.bWideShare && !PC->HasWideView()) return; // the widest view is measured once the map is drawn
 		FVector2D Focus(P.X, P.Z);
+		if (P.Step > 0)
+		{
+			// round 17: wait for the Tutorial's step (the snapshot's mode.step, FTCTutorialProgress) and 3 s more, then
+			// frame the step's goal cell (TCTour::StepFocus), as tour-reference.mjs does
+			if (!TCTour::StepReached(P.Step, Tutorial.Step())) return;
+			if (P.StepSeenAt < 0) { P.StepSeenAt = Now; UE_LOG(LogTC, Log, TEXT("tour: %s: tutorial step %d reached (snapshot step %d) at match time %.1f s"), *P.Name, P.Step, Tutorial.Step(), InMatch); }
+			if (Now < P.StepSeenAt + TCTour::StepSettleSeconds) return;
+			if (!TCTour::StepFocus(P.Step, Focus)) UE_LOG(LogTC, Warning, TEXT("tour: %s: the script has no step %d; the pose's own target"), *P.Name, P.Step);
+		}
 		if (P.bFrontier)
 		{
 			double CX, CZ;
@@ -92,13 +93,16 @@ void ATCGameMode::RunSlice13Switches(double Now)
 		}
 		if (!P.UnitType.IsEmpty())
 		{
-			// round 14: the lowest id of that type on this seat (seat 0 for a spectator, as the browser tour takes it)
-			const int32 Seat = State.bSpectator || State.You < 0 ? 0 : State.You;
-			int32 Best = MAX_int32;
-			for (const auto& U : State.Units)
-				if (U.Value.Type == P.UnitType && U.Value.Owner == Seat && U.Value.Hp > 0 && U.Key < Best) { Best = U.Key; Focus = FVector2D(U.Value.X, U.Value.Z); }
-			if (Best == MAX_int32) { UE_LOG(LogTC, Warning, TEXT("tour: %s: no living %s of seat %d; the pose's own target"), *P.Name, *P.UnitType, Seat); }
-			else P.UnitId = Best;
+			// round 14: the lowest id of that type on this seat (seat 0 for a spectator, as the browser tour takes it);
+			// round 17: or the seat the line names (unit:<type>@<seat>)
+			const int32 Seat = TCTour::UnitSeatFor(P, State.bSpectator, State.You);
+			const int32 Best = TCTour::PickUnit(P, State, Seat, Focus);
+			if (Best < 0) { UE_LOG(LogTC, Warning, TEXT("tour: %s: no living %s of seat %d; the pose's own target"), *P.Name, *P.UnitType, Seat); }
+			else
+			{
+				P.UnitId = Best;
+				if (P.UnitType == TEXT("vet")) UE_LOG(LogTC, Log, TEXT("tour: %s: unit:vet picked %s %d of seat %d with %d star(s)"), *P.Name, *State.Units[Best].Type, Best, State.Units[Best].Owner, State.Units[Best].Stars);
+			}
 		}
 		// round 15 (hudfit): a share of the widest view is a share of the widest view at the pose's heading. Turn first and
 		// read it once the controller has measured the widest view at that heading in its next tick (as the war map

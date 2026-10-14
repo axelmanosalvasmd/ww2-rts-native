@@ -927,16 +927,17 @@ UTCSoldierCrowd::FFarFigure* UTCSoldierCrowd::FarFigure(const FString& FigureTyp
 	return &Made;
 }
 
-void UTCSoldierCrowd::Add(UInstancedStaticMeshComponent* Ism, const FTransform& Xf, const float* Data, int32 Floats)
+void UTCSoldierCrowd::Add(UInstancedStaticMeshComponent* Ism, const FTransform& Xf, const float* Data, int32 Floats, uint64 Key)
 {
 	if (!Ism) return;
 	FBatch& B = Frame.FindOrAdd(Ism);
 	B.Floats = Floats;
 	B.Transforms.Add(Xf);
+	B.Keys.Add(Key);
 	B.Data.Append(Data, Floats);
 }
 
-bool UTCSoldierCrowd::DrawNear(const FString& FigureType, int32 Faction, int32 Slot, const FTransform& Xf, const TArray<float>& Blend12, float Fade, bool bForceFaded)
+bool UTCSoldierCrowd::DrawNear(const FString& FigureType, int32 Faction, int32 Slot, const FTransform& Xf, const TArray<float>& Blend12, float Fade, bool bForceFaded, uint64 Key)
 {
 	FNearFigure* F = NearFigure(FigureType, Faction, Slot);
 	if (!F) return false;
@@ -947,18 +948,18 @@ bool UTCSoldierCrowd::DrawNear(const FString& FigureType, int32 Faction, int32 S
 	D[TCCrowdData::Bone] = 0.f;
 	D[TCCrowdData::Fade] = FMath::Clamp(Fade, 0.f, 1.f);
 	const int32 BodyFloats = bFaded ? TCCrowdData::Faded : TCCrowdData::NearSolidBody;
-	Add(F->Body[L], Xf, D, BodyFloats);
-	if (F->Crown[L]) Add(F->Crown[L], Xf, D, BodyFloats);
+	Add(F->Body[L], Xf, D, BodyFloats, Key);
+	if (F->Crown[L]) Add(F->Crown[L], Xf, D, BodyFloats, Key);
 	for (const auto& K : F->Kit[L])
 	{
 		D[TCCrowdData::Bone] = K.Value;
-		Add(K.Key, Xf, D, bFaded ? TCCrowdData::Faded : TCCrowdData::NearSolidKit);
+		Add(K.Key, Xf, D, bFaded ? TCCrowdData::Faded : TCCrowdData::NearSolidKit, Key);
 	}
 	if (bFaded) Now.FadedMen++;
 	return true;
 }
 
-bool UTCSoldierCrowd::DrawFar(const FString& FigureType, int32 Faction, int32 Slot, const FTransform& Xf, const TArray<float>& Blend12, float Fade, const FLinearColor& Owner, bool bForceFaded)
+bool UTCSoldierCrowd::DrawFar(const FString& FigureType, int32 Faction, int32 Slot, const FTransform& Xf, const TArray<float>& Blend12, float Fade, const FLinearColor& Owner, bool bForceFaded, uint64 Key)
 {
 	FFarFigure* F = FarFigure(FigureType, Faction, Slot);
 	if (!F) return false;
@@ -968,7 +969,7 @@ bool UTCSoldierCrowd::DrawFar(const FString& FigureType, int32 Faction, int32 Sl
 	D[TCCrowdData::Bone] = 0.f;
 	D[TCCrowdData::Fade] = FMath::Clamp(Fade, 0.f, 1.f);
 	D[TCCrowdData::OwnerR] = Owner.R; D[TCCrowdData::OwnerG] = Owner.G; D[TCCrowdData::OwnerB] = Owner.B;
-	Add(F->Draw[bFaded ? 1 : 0], Xf, D, TCCrowdData::Far);
+	Add(F->Draw[bFaded ? 1 : 0], Xf, D, TCCrowdData::Far, Key);
 	if (bFaded) Now.FadedMen++;
 	return true;
 }
@@ -985,8 +986,9 @@ bool UTCSoldierCrowd::AddMan(const FTCSoldierDraw& Man)
 	static const bool bOff = FParse::Param(FCommandLine::Get(), TEXT("TCCrowdOff"));
 	if (bOff) { Now.Refused++; return false; }
 	const TArray<float> Blend12 = UTCInfantryRigLibrary::CrowdCustomData(Man.Blend);
-	const bool bDrawn = Man.bFar ? DrawFar(Man.FigureType, Man.Faction, Man.Slot, Man.Man, Blend12, Man.Fade, Man.Owner, false)
-		: DrawNear(Man.FigureType, Man.Faction, Man.Slot, Man.Man, Blend12, Man.Fade, false);
+	const uint64 Key = Man.ManIndex >= 0 ? FTCInstanceHistory::ManKey(Man.UnitId, Man.ManIndex) : FTCInstanceHistory::NoKey;
+	const bool bDrawn = Man.bFar ? DrawFar(Man.FigureType, Man.Faction, Man.Slot, Man.Man, Blend12, Man.Fade, Man.Owner, false, Key)
+		: DrawNear(Man.FigureType, Man.Faction, Man.Slot, Man.Man, Blend12, Man.Fade, false, Key);
 	if (bDrawn) (Man.bFar ? Now.FarMen : Now.NearMen)++;
 	else Now.Refused++;
 	if (Man.ManIndex >= 0)
@@ -1054,6 +1056,7 @@ void UTCSoldierCrowd::AddCorpse(const FString& FigureType, int32 Faction, int32 
 	C.FigureType = FigureType; C.Faction = Faction; C.Slot = Slot; C.Owner = Owner; C.Scale = Scale;
 	C.X = Where.X / 100.0; C.Z = Where.Y / 100.0; C.Y = TNumericLimits<double>::Lowest(); // the ground, at the next EndFrame
 	C.Yaw = Yaw;
+	C.Serial = NextSerial++;
 	Corpses.Add(C);
 }
 
@@ -1091,7 +1094,7 @@ bool UTCSoldierCrowd::CheckFarKeys(double& OutWorstPositionCm, double& OutWorstN
 	return OutFigures > 0;
 }
 
-void UTCSoldierCrowd::ClearCorpses() { Corpses.Reset(); Squads.Reset(); }
+void UTCSoldierCrowd::ClearCorpses() { Corpses.Reset(); Squads.Reset(); History.Reset(); }
 
 void UTCSoldierCrowd::EndFrame(float Dt, const FVector& Eye, TFunctionRef<double(double X, double Y)> GroundCm, float LodMetres,
 	TFunction<bool(double X, double Z, double& OutX, double& OutZ, double& OutSize)> BlastNear)
@@ -1164,26 +1167,20 @@ void UTCSoldierCrowd::EndFrame(float Dt, const FVector& Eye, TFunctionRef<double
 		if (const FFarShape* Shape = FarData.Find(FigureKey(C.FigureType, C.Faction, Job))) MinY = C.bFar ? Shape->FarMinY : Shape->NearMinY;
 		const FTransform Xf(Q, At + Q.RotateVector(FVector(0, 0, -MinY * C.Scale * 100.0)), FVector(C.Scale));
 		const float Fade = static_cast<float>(BodyFade(B, R));
-		const bool bDrawn = C.bFar ? DrawFar(C.FigureType, C.Faction, C.Slot, Xf, Blend12, Fade, C.Owner, true)
-			: DrawNear(C.FigureType, C.Faction, C.Slot, Xf, Blend12, Fade, true);
+		const uint64 Key = FTCInstanceHistory::BodyKey(C.Serial);
+		const bool bDrawn = C.bFar ? DrawFar(C.FigureType, C.Faction, C.Slot, Xf, Blend12, Fade, C.Owner, true, Key)
+			: DrawNear(C.FigureType, C.Faction, C.Slot, Xf, Blend12, Fade, true, Key);
 		if (bDrawn) { Now.Corpses++; (C.bFar ? Now.FarCorpses : Now.NearCorpses)++; }
 	}
-	// write every component's instances
+	// write every component's instances, with last frame's transforms (round 17: motion vectors)
+	History.ResetCounts();
 	for (UInstancedStaticMeshComponent* Ism : AllBatches)
 	{
 		if (!Ism) continue;
 		const FBatch* B = Frame.Find(Ism);
 		const int32 N = B ? B->Transforms.Num() : 0;
-		if (Ism->GetInstanceCount() == N)
-		{
-			if (!N) continue;
-			Ism->BatchUpdateInstancesTransforms(0, B->Transforms, true, false, true);
-		}
-		else
-		{
-			Ism->ClearInstances();
-			if (N) Ism->AddInstances(B->Transforms, false, true, false);
-		}
+		if (Ism->GetInstanceCount() == 0 && N == 0) continue;
+		History.Write(Ism, B ? B->Transforms : TArray<FTransform>(), B ? B->Keys : TArray<uint64>());
 		if (N && B->Floats > 0 && B->Data.Num() == N * B->Floats) Ism->SetCustomData(0, N - 1, B->Data, false);
 		Ism->MarkRenderStateDirty();
 	}

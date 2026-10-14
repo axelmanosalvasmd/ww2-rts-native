@@ -11,6 +11,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "UObject/WeakObjectPtrTemplates.h"
 
 class UInstancedStaticMeshComponent;
 class UStaticMesh;
@@ -69,6 +70,37 @@ enum class ETCModelMatch : uint8
 	Borrowed,   // the reference's own stand-in: a UK vehicle or gun without a model of its own uses the American one
 	            // in British paint (client/unit-models.js UK_MODELS), a medic squad the engineer figure
 	Substitute, // not what the reference draws: another faction's model, so something shows while assets are missing
+};
+
+// Motion vectors for moving instances (round 17). The engine's default anti-aliasing here is temporal (TSR); an
+// instance written with no previous transform has no velocity, so a moving soldier, gun or ring is blended with the
+// ground it left over the following frames and draws smeared and see-through (round 16's Conquest spectator pose:
+// the AI's squads crossing the centre were barely visible, the browser's 4x multisampled frame has no history). Each
+// component keeps per-instance previous transforms, matched frame to frame by a caller's stable key (a unit id and
+// part, a soldier, a body); an instance without last frame's key, or one that jumped further than JumpCm, starts still.
+// -TCNoMotionVectors writes every instance still (the behaviour before round 17; for an A/B on one build).
+class THREECROSSROADS_API FTCInstanceHistory
+{
+public:
+	static constexpr double JumpCm = 1000.0; // 10 m in one frame is a jump (a unit's eased glide never moves that far)
+	// The previous-frame transform for each of Cur (world space), from Last by key; Cur's own where there is none.
+	// Returns how many matched a key of the last frame.
+	static int32 PreviousFor(const TArray<FTransform>& Cur, const TArray<uint64>& Keys, const TMap<uint64, FTransform>& Last, TArray<FTransform>& OutPrev);
+	// Writes Cur into Ism (world space) with previous transforms, replacing every instance when the count changed.
+	// Keys may be empty (or short): those instances start still.
+	void Write(UInstancedStaticMeshComponent* Ism, const TArray<FTransform>& Cur, const TArray<uint64>& Keys);
+	void Reset() { Last.Reset(); }
+	// What the last Write calls did since ResetCounts (the status line and tests): instances, matched, moving.
+	int32 Written = 0, Matched = 0, Moving = 0;
+	void ResetCounts() { Written = Matched = Moving = 0; }
+	// Instance keys: a unit's part (part index) or its men (man index), a ring, a body. 0 is no key (starts still).
+	static constexpr uint64 NoKey = 0;
+	static uint64 PartKey(int32 UnitId, int32 Part) { return (1ull << 60) | (uint64(uint32(UnitId)) << 24) | (uint64(Part & 0xFFFF) << 4) | 0; }
+	static uint64 ManKey(int32 UnitId, int32 Man) { return (1ull << 60) | (uint64(uint32(UnitId)) << 24) | (uint64(Man & 0xFFFF) << 4) | 1; }
+	static uint64 RingKey(int32 UnitId, bool bSelection) { return (1ull << 60) | (uint64(uint32(UnitId)) << 24) | (bSelection ? 3 : 2); }
+	static uint64 BodyKey(uint32 Serial) { return (1ull << 62) | Serial; }
+private:
+	TMap<TWeakObjectPtr<UInstancedStaticMeshComponent>, TMap<uint64, FTransform>> Last;
 };
 
 class THREECROSSROADS_API FTCModelLibrary

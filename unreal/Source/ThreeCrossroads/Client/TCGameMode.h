@@ -213,6 +213,7 @@
 #include "Client/TCPersistence.h"
 #include "Client/TCProgression.h"
 #include "Client/TCWorldRecovery.h"
+#include "Client/TCMarkers.h"
 #include "Client/TCOrders.h"
 #include "Client/TCMatchOptions.h"
 #include "World/TCWorldObjects.h"
@@ -230,6 +231,7 @@
 #include "Client/TCWarMap.h"
 #include "Client/TCLobbyBackdrop.h"
 #include "Client/TCTutorial.h"
+#include "Client/TCModelCompare.h"
 #include "Client/TCMatchControls.h"
 #include "Client/TCRoomBrowser.h"
 // round 15 (lobby): the lobby and match controls glue below is declared (Client/TCMatchControls.cpp defines it)
@@ -281,6 +283,8 @@ public:
 	// Why the last SendCommand returned false (empty after a send that went out), for a log or the HUD.
 	const FString& LastSendProblem() const { return LastSendProblemText; }
 	FString ConnectionStatus() const;
+	// Round 17 (hudui): the connection's retry countdown for #connectionBanner (FTCConnection::RetryLeft; -1: none)
+	int32 ConnectionRetryLeft(bool* bOutFull = nullptr) const { return Connection ? Connection->RetryLeft(FPlatformTime::Seconds(), bOutFull) : -1; }
 
 	FTCMatchState State;
 	// TC_DECODER (default rust): the Rust recipient view decodes every message beside State and is compared after
@@ -344,7 +348,8 @@ public:
 	FString FrameTimesLine() const;
 	// Slice 13 verification switch (TCSlice13Checks.cpp): -TCTourFile, -TCTourDir
 	void RunSlice13Switches(double Now);
-	struct FTourPose { FString Name; double At = 0, X = 0, Z = 0, Dist = 0, Yaw = -90, Asked = 0; bool bFrontier = false, bWideShare = false; FString UnitType; int32 UnitId = -1; bool bHud = false; bool bTurned = false; };
+	// round 17 (poses): the line itself is Client/TCModelCompare.h FTCTourPose (TCTour::ParseLine), shared with the tests
+	struct FTourPose : FTCTourPose { double Asked = 0; int32 UnitId = -1; bool bTurned = false; double StepSeenAt = -1; };
 	TArray<FTourPose> Tour;
 	FString TourFile, TourDir;
 	int32 TourStep = 0, TourShots = 0;
@@ -357,6 +362,8 @@ public:
 	// region alerts' under-attack throttle is one shared FAttackQuiet (client/alerts.js). All interim, as above.
 	FTCProgression Progress;
 	FTCWorldRecovery WorldRec;
+	// round 17 (markers): what the map markers keep between snapshots (the resource nodes, the region tags' busy time)
+	FTCMarkers Markers;
 	// round 16 (orders): the -TCOrdersCheck= live script
 	FTCOrdersCheck OrdersCheck;
 	FTCMatchOptions Options;

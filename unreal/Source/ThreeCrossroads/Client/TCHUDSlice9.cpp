@@ -3,6 +3,7 @@
 // (this recipient's own messages) and FTCObjectives, which is built from it; nothing is inferred for what a snapshot
 // did not deliver. Canvas drawing only: placeholder presentation in the browser's colours, not its art.
 #include "Client/TCHUD.h"
+#include "Client/TCMarkers.h"
 #include "ThreeCrossroads.h"
 #include "Client/TCLocale.h"
 #include "Client/TCGameMode.h"
@@ -27,6 +28,9 @@ namespace TCHudSlice9
 	constexpr float LineH = 16.f, PadPx = 6.f;
 	const FLinearColor TextC(FColor(0xe2, 0xdf, 0xd3)), DimC(0.72f, 0.72f, 0.68f), Brass(FColor(0xd6, 0xb2, 0x5e)), Red(FColor(0xee, 0x8a, 0x7b));
 	const FLinearColor Plate(FColor(25, 28, 30, 235)), Hairline(FColor(176, 164, 122, 117));
+	// round 17: index.html #scores: one card on --panel-solid (rgba(25, 28, 30, 0.96)), its blocks split by a 1 px
+	// --line-soft rule (#scores > div + div { border-left })
+	const FLinearColor PanelSolid = TCCss::Rgba(25, 28, 30, 0.96f), LineSoft = TCCss::Rgba(176, 164, 122, 0.24f);
 	// client/markers.js: the neutral ring and flag, the brass flip and danger rings, the white track and arc
 	const FColor NeutralRing(0xe6, 0xe0, 0xd0), NeutralFlag(0x8f, 0x8a, 0x7c), BrassRing(0xd2, 0xa8, 0x49), White(0xf4, 0xf2, 0xea);
 	// client/markers.js PLAN_COLORS: blue move, orange attack-move, white retreat, red attack, yellow dig and build
@@ -96,6 +100,7 @@ float ATCHUD::DrawScoreStrip(UFont* Font, UFont* Big)
 	ATCGameMode* M = GetWorld()->GetAuthGameMode<ATCGameMode>();
 	const FTCMatchState& S = M->State;
 	const FTCScoreStrip Strip = S.Objectives.ScoreStrip(S, &M->UnitTable);
+	StripCard = FBox2D(ForceInit);
 	if (!Strip.bValid) return 8.f;
 	auto Width = [&](const FString& L, UFont* F) { float TW = 0, TH = 0; LabelSize(L, TW, TH, F, 1.f); return TW; };
 	// client/hud.js drawScores: a lead block (every mode but Conquest) and a block per team; the styles size the lead
@@ -118,9 +123,16 @@ float ATCHUD::DrawScoreStrip(UFont* Font, UFont* Big)
 	if (Strip.Lead.bShown) H = FMath::Max(H, 3 * LineH + 8.f + 2 * PadPx + (bNextWave ? LineH + PadPx + 4.f : 0.f));
 	const float X0 = (Canvas->ClipX - W) / 2, Y0 = 6.f;
 	float X = X0;
+	// round 17 (hudui): one card under every block, as the browser's #scores, where each block had its own plate with
+	// the world showing through the 4 px between them (round 16's stray line and ticks along the team block's edge);
+	// the gaps keep their place and hold the rule. The card is kept in screen pixels so the world's bars and labels
+	// under it are left out next frame (DrawHealthBars, DrawCapturePoints): the 0.96 card all but hides them in the
+	// browser, where this canvas showed them as faint ghosts through the 0.92 plates
+	AddPanel(X0, Y0, W, H, PanelSolid);
+	StripCard = ToScreen(FBox2D(FVector2D(X0, Y0), FVector2D(X0 + W, Y0 + H)));
+	auto Rule = [&](float At) { DrawRect(LineSoft, At, Y0 + PadPx, 1.f, H - 2 * PadPx); };
 	if (Strip.Lead.bShown)
 	{
-		AddPanel(X, Y0, LeadW, H, Plate);
 		const FTCScoreLead& L = Strip.Lead;
 		DrawLabel(L.Mode, L.bModeDanger ? Red : TextC, X + PadPx, Y0 + PadPx, Font, 1.f);
 		if (!L.Clock.IsEmpty()) DrawLabel(L.Clock, Brass, X + PadPx, Y0 + PadPx + LineH, Big, 1.f);
@@ -136,7 +148,7 @@ float ATCHUD::DrawScoreStrip(UFont* Font, UFont* Big)
 	}
 	for (const FTCScoreTeam& T : Strip.Teams)
 	{
-		AddPanel(X, Y0, Bw, H, Plate);
+		if (X > X0 + 0.5f) Rule(X - Gap / 2 - 0.5f);
 		float Y = Y0 + PadPx;
 		for (const FTCScoreSeat& Seat : T.Seats)
 		{
@@ -200,32 +212,19 @@ void ATCHUD::DrawCapturePoints(UFont* Font)
 	if (!M || !M->Terrain) return;
 	const ATCTerrain& T = *M->Terrain;
 	const FTCObjectives& O = M->State.Objectives;
-	const double R = FTCObjectives::RingRadius(), Ar = FTCObjectives::ArcRadius();
-	auto Circle = [](FVector2D C, double Rad, int32 Segs, int32 Count)
-	{
-		// clockwise from north (markers.js ring), Count of Segs segments
-		TArray<FVector2D> Pts;
-		for (int32 K = 0; K <= Count; K++) { const double A = 2 * PI * K / Segs; Pts.Add(C + FVector2D(FMath::Sin(A), -FMath::Cos(A)) * Rad); }
-		return Pts;
-	};
 	const TArray<FTCCapturePoint>& Points = O.Points();
 	for (int32 I = 0; I < Points.Num(); I++)
 	{
 		const FTCCapturePoint& P = Points[I];
 		const FVector Centre = Project(ATCTerrain::ToWorld(P.Centre.X, P.Centre.Y, T.HeightAt(P.Centre.X, P.Centre.Y)));
 		if (Centre.Z <= 0 || Centre.X < -Canvas->ClipX || Centre.X > 2 * Canvas->ClipX || Centre.Y < -Canvas->ClipY || Centre.Y > 2 * Canvas->ClipY) continue;
-		// the ring: chalk while neutral, the owner's colour once held (a point with no row yet draws neutral)
-		const FLinearColor Ring = P.RingSlot >= 0 ? WithAlpha(ATCUnitRenderer::SeatColor(P.RingSlot), 0.95f) : WithAlpha(FLinearColor(NeutralRing), 0.8f);
-		GroundLine(T, Circle(P.Centre, R, 48, 48), false, Ring, 2.5f, 0.12f);
-		// the progress arc over its dim track, in the owner's (else the capper's) colour
-		if (P.bArcVisible)
+		// round 17 (markers): markers.js capturePoint's rings as overlay.js draws them (TCMarkersHud): the ring 0.42 m
+		// wide over a faint wash (chalk while neutral, the owner's colour once held), the progress track and arc, the
+		// contested and flip brass rings
 		{
-			GroundLine(T, Circle(P.Centre, Ar, 48, 48), false, WithAlpha(FLinearColor(White), 0.22f), 2.f, 0.13f);
-			GroundLine(T, Circle(P.Centre, Ar, TCObjectiveRules::ProgressSegments, P.ArcSegments), false, WithAlpha(ATCUnitRenderer::SeatColor(P.ArcSlot), 0.9f), 4.f, 0.14f);
+			FTCMarkerPainter Marks = TCMarkersHud::Painter(Canvas, *M);
+			TCMarkersHud::DrawCapturePoint(Marks, P, O.RingFrame(I));
 		}
-		const FTCPointRingFrame F = O.RingFrame(I);
-		if (F.bDanger) GroundLine(T, Circle(P.Centre, R - 0.3, 48, 48), false, WithAlpha(FLinearColor(BrassRing), F.DangerOpacity), 3.f, 0.15f);
-		if (F.bFlip) GroundLine(T, Circle(P.Centre, (R + 0.25) * F.FlipScale, 48, 48), false, WithAlpha(FLinearColor(BrassRing), F.FlipOpacity), 3.f, 0.15f);
 		// the flag: a pole and a 2.2 x 1.4 m cloth at 7.2 m in the owner's colour (markers.js flag)
 		const float G = T.HeightAt(P.Centre.X, P.Centre.Y);
 		const FVector Foot = Project(ATCTerrain::ToWorld(P.Centre.X, P.Centre.Y, G)), Top = Project(ATCTerrain::ToWorld(P.Centre.X, P.Centre.Y, G + 7.9f));
@@ -249,6 +248,8 @@ void ATCHUD::DrawCapturePoints(UFont* Font)
 			{
 				float TW = 0, TH = 0;
 				LabelSize(Tg, TW, TH, Font, 1.f);
+				// round 17: a tag under the score strip's card is left out (see DrawScoreStrip)
+				if (StripCard.bIsValid && StripCard.Intersect(FBox2D(FVector2D(Top.X - TW / 2 - 4.f, Ly - 1.f), FVector2D(Top.X + TW / 2 + 4.f, Ly - 1.f + LineH)))) { Ly += LineH; continue; }
 				DrawRect(WithAlpha(Plate, 0.8f), Top.X - TW / 2 - 4.f, Ly - 1.f, TW + 8.f, LineH);
 				{ FLinearColor Lc = Tg == P.Label ? TextC : Red; Lc.A *= M->WarMap.LabelFade(); DrawLabel(Tg, Lc, Top.X - TW / 2, Ly, Font, 1.f); } // round 14: fadeLabels
 				Ly += LineH;
@@ -269,6 +270,11 @@ void ATCHUD::DrawPlans()
 	if (!M || !PC || !M->Terrain || !PC->PlayerCameraManager) return;
 	const FVector2D* Army = M->bArmyRally ? &M->ArmyRally : nullptr;
 	if (!PC->Selected.Num() && !Army) return;
+	// round 17 (markers): makeUnit's weapon range rings for a small selection (rangeRings), dashed, over everything
+	{
+		FTCMarkerPainter Marks = TCMarkersHud::Painter(Canvas, *M);
+		TCMarkersHud::DrawRangeRings(Marks, *M, PC->Selected);
+	}
 	const ATCTerrain& T = *M->Terrain;
 	const TArray<int32> Sel = PC->Selected.Array();
 	const TMap<int32, FTCMarkUnit> Units = TCOrders::MarkUnits(M->State, M->UnitTable, Sel,
@@ -325,7 +331,9 @@ void ATCHUD::DrawHealthBars()
 		if (!D || D->MaxHp() <= 0 || (!ATCUnitRenderer::IsDrawn(U) && !bGarr)) continue;
 		const float Frac = FMath::Max(0.f, (float)U.Hp / D->MaxHp());
 		const bool bSel = PC->Selected.Contains(U.Id);
-		if (!(bSel || PC->HoverEnemy == U.Id || 2.3f * Frac < 2.299f || U.Supp > 0 || bGarr)) continue;
+		// round 17 (markers): the veterancy stars sit in the bar group and show whether or not the bar does
+		const bool bBar = bSel || PC->HoverEnemy == U.Id || 2.3f * Frac < 2.299f || U.Supp > 0 || bGarr;
+		if (!bBar && U.Stars <= 0) continue;
 		FVector2D At(U.X, U.Z);
 		if (M->Units) M->Units->DrawnAt(U.Id, At);
 		const FVector W = ATCTerrain::ToWorld(At.X, At.Y, M->Terrain->HeightAt(At.X, At.Y) + (bGarr ? (float)TCOrders::RoofBarHeight : BarY(U.Type, D)));
@@ -333,12 +341,16 @@ void ATCHUD::DrawHealthBars()
 		if (C.Z <= 0 || E.Z <= 0 || C.X < 0 || C.Y < 0 || C.X > Canvas->ClipX || C.Y > Canvas->ClipY) continue;
 		const float PxPerM = FMath::Clamp((float)FVector2D::Distance(FVector2D(C.X, C.Y), FVector2D(E.X, E.Y)) / 1.2f, 4.f, 30.f);
 		const float BgW = 2.4f * PxPerM, BgH = FMath::Max(3.f, 0.42f * PxPerM), BarW = 2.3f * PxPerM;
+		// round 17: not under the score strip's card (last frame's, screen pixels); the stars alone neither
+		if (StripCard.bIsValid && StripCard.Intersect(FBox2D(FVector2D(C.X - BgW / 2, C.Y - BgH / 2), FVector2D(C.X + BgW / 2, C.Y + BgH / 2)))) continue;
+		if (!bBar) { TCMarkersHud::DrawStars(Canvas, FVector2D(C.X, C.Y), PxPerM, U.Stars); continue; }
 		DrawRect(FLinearColor(FColor(0x11, 0x11, 0x11)), C.X - BgW / 2, C.Y - BgH / 2, BgW, BgH);
 		const FLinearColor HpC = Frac > 0.5f ? ATCUnitRenderer::SeatColor(U.Owner) : Frac > 0.25f ? FLinearColor(FColor(0xe0, 0x8a, 0x2a)) : FLinearColor(FColor(0xd0, 0x2a, 0x1a));
 		DrawRect(HpC, C.X - BarW / 2, C.Y - 0.07f * PxPerM - FMath::Max(1.5f, 0.2f * PxPerM) / 2, BarW * FMath::Min(1.f, Frac), FMath::Max(1.5f, 0.2f * PxPerM));
 		if (U.Supp > 0)
 			DrawRect(U.Supp >= 90 ? FLinearColor(FColor(0xff, 0x3b, 0x2a)) : FLinearColor(FColor(0xff, 0xd2, 0x3a)), C.X - BarW / 2, C.Y + 0.11f * PxPerM - FMath::Max(1.f, 0.1f * PxPerM) / 2,
 				BarW * FMath::Min(1.f, U.Supp / 100.f), FMath::Max(1.f, 0.1f * PxPerM));
+		TCMarkersHud::DrawStars(Canvas, FVector2D(C.X, C.Y), PxPerM, U.Stars); // over the bar (renderOrder 4)
 	}
 }
 
@@ -362,6 +374,9 @@ void ATCHUD::DrawAlertFeed(UFont* Font)
 	M->AlertFeed.Frame(In.Now);
 	const FTCPaint P = M->AlertFeed.Layout(In, FTCPaint::CanvasMeasure(Font));
 	P.Draw(Canvas, Font);
+	// round 17: the history box (alert-history.js #alertHistory) for the sandbox panel's place next frame
+	AlertHistoryBox = FBox2D(ForceInit);
+	if (const FTCPaintItem* H = P.Find(TEXT("alert:history"))) AlertHistoryBox = FBox2D(H->Pos, H->Pos + H->Size);
 	for (const FTCPaintHit& H : P.Hits) { FTCUiCommand C(ETCUiAction::Alert); C.Unit = H.Tag; Buttons.Add({ ToScreen(H.Rect), C, H.Label, true }); }
 	for (const FBox2D& B : P.Panels) Panels.Add(ToScreen(B));
 }
