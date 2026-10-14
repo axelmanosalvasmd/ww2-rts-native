@@ -1,12 +1,17 @@
 # Changelog
 
 ## Unreleased
+
+- Update reconnect #211 onto merged movement optimization main `d2911267`, retaining both document histories, exact incoming core changes and the frozen socket test and registrations. The canonical incoming delta matches byte for byte with only CHANGELOG, DESIGN and PARITY excluded (6,428 bytes, SHA256 `828bea5142f741a6e5ada2488db29a74346c8b4a3eb8c58ffa854f7523b76cef`). Carry the focused 1-pass/0-fail/0-ignored/42-filtered result from `898968dd`; run no new native job. Separate exact-head review and fresh hosted gates remain required.
+
 - Normally merge landed World #202 main `9f0190ef` into reconnect `935dccdc`, retaining both complete tracking histories and the exact corrected socket test. All main runtime, tests, helpers, fixtures, CI, ABI/header and reference entries remain exact except the original test registration. Preserve the old interrupted evidence and keep prior test counts on their original heads. Under the owner's test-only policy, run only the named focused test; separate review, fresh hosted checks and the ordered per-worker head report remain required before publication.
 
 
 - Update the reconnect acceptance test onto main `113ca151`, preserving its complete Legacy startup helpers, assertions and guards. Correct only the new test's expected map to the unchanged committed Default JSON after independent source review found that the shared constructor now expects El-Alamein. Keep every lifecycle and owned-Move check. The earlier 429-test proof stays at `8a849544`; fresh corrected-head native, release/C and platform gates remain required. Preserve the interrupted run and original map finding.
 
 - Add one real-socket acceptance test for an owned Move after actual disconnect and same-seat reconnect. Check pause/resume ordering, stable match identity, fresh recipient decoding and the canonical runner outcome. The focused ci-test passes on Vostro (1 passed, 0 failed); the initial test-only token-type compile error is retained. Existing helpers, tests, runtime, wire and ABI are unchanged. Full workspace and independent review remain pending.
+
+- Skip the per-move World memory copy when movement reads no remembered terrain and requests no route. Each World ground move cloned and refreshed the team memory and rebuilt its route knowledge (a full 91,700-cell rebuild, about 70 ms, for a team with no memory yet), then discarded it unless movement read it; the local defender did this about 211 times per tick. The move now runs first on a copy of the unit; if it read nothing, it is kept, and otherwise the unchanged prepared path runs. A temporary differential check required bit-identical results on 12,717 moves. Vostro, `ci-test`: `world_tick::original_world_steps_use_the_actual_runner_and_explicit_whole_admission` 972 s before, 51.7 s after. Found, left for later: when the fast path is skipped, the full rebuild still repeats for every such move.
 
 - Prepare the two-client socket proof on merged World main `9f0190ef`, preserving the corrected test byte for byte, current main's complete startup helper and the three A registration lines. Retain additive tracking histories and all incoming source, fixtures, header and reference pin. The full zero-exclusion incoming patches remain disclosed as unequal. Earlier 445-pass local proof stays attributed to `0aa32a5f`; this test-only update runs its named focus, with fresh exact-head hosted checks and owner review still required. Hold publication until reconnect PR #209 lands, then qualify that next base separately.
 

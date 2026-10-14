@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## Reconnect source-only update after movement optimization #215 (2026-10-14)
+
+Normally merge main `d29112671ee2e1855f3ed3c7104e29ba85c2c4da` into published reconnect `898968dd82eb37ee07787b5e0aa472ccdd6ce984`, from common base `3c83cf799716cffc9b4aa0830f452faf07ab8c4e`. Preserve both complete document histories, the frozen reconnect test and main's complete startup file plus B's original registration. Inherit main's two movement source changes byte for byte; this test branch adds no runtime, fixture, guard, header or reference change.
+
+The full canonical incoming deltas remain disclosed with zero exclusions. For the authorized source-only qualification, exclude exactly CHANGELOG.md, DESIGN.md and PARITY.md: both complete incoming source patches must match at 6,428 bytes, SHA256 `828bea5142f741a6e5ada2488db29a74346c8b4a3eb8c58ffa854f7523b76cef`, with no normalization or fourth exclusion. Carry the one focused pass, zero failures/ignored and 42 filtered tests from `898968dd` only after exact B/source preservation is confirmed; no new native execution or duplicate full/release run is performed. Keep the original resource preflight failure and authorized taskset correction evidence unchanged. Separate exact-head review and fresh hosted checks remain pending; hosting, R1 profile/seed/lifecycle choices, wire/ABI and other owner decisions are not inferred.
+
 ## Reconnect final base after ownership #209 and two-client #210 (2026-10-14, source plan)
 
 Propose an ordinary merge of main `3c83cf799716cffc9b4aa0830f452faf07ab8c4e`, tree `582ac73870466c631779fac8aaec9555074a0f58`, into private reconnect `f9b6caef0fd24631562cfe285b6f2f59f809916c`, from common base `9f0190efb6df68eb55ad5f3b42f45a159e659342`. The actual startup conflict contains only appended child-module registrations. Resolve it by retaining the complete main startup file, including ownership #209 and two-client #210 registrations, then appending reconnect #211's original blank/path/mod suffix. Preserve every main runtime, helper, guard, old test, fixture, header and reference entry, both frozen merged socket tests, and the exact reconnect test SHA256 `d4b96e4ef216a2796c49140ab664a1209f606a62d5500e4ecc617577ad83006f`, including its independent full Default-map expectation and all three complete start checks.
@@ -22,6 +28,14 @@ The successful 429-test, 105-section workspace proof, exact inventory, formattin
 ## Real-socket command after reconnect (2026-10-14)
 
 A same-token takeover test did not prove command acceptance after an actual socket drop. The new focused socket test drops the active seat, observes the peer drop-pause, reconnects the same identity, checks start/pause/resume/lobby ordering and fresh decoding, then sends an owned Move through the replacement connection. The actual native runner and recipient view both show its result at the same match epoch. Existing lifecycle assertions and helpers remain byte-identical. The focused ci-test passes once on Vostro, with zero failures or ignored tests. The initial new assertion token-type compile error is preserved separately; only the expected token representation was corrected. Full workspace and separate review remain required before the per-stream PR. No public startup, role, privacy, interface or ABI change is made.
+
+## World movement without a memory copy when movement reads none (2026-10-14, Vostro)
+
+Each World ground move used to prepare a private copy of the team's remembered terrain before moving: it cloned `WorldMemory`, refreshed every visible cell and rebuilt route knowledge, then discarded the copy unless movement read terrain or asked for a route. For a team with no memory yet (the local defender on the first move of a tick) that is a full rebuild of all 91,700 cells of the `world_tick` map, about 70 ms. Counters over the first eight steps of `world_tick::original_world_steps_use_the_actual_runner_and_explicit_whole_admission` showed 1,720 such preparations, 211 of each step's 215 for team -1, and every one started from an empty memory.
+
+`move_world_unit_without_memory` now runs the same movement step first on a copy of the unit, with physical traffic terrain whose every read marks a flag and a route callback that only records that it was called. If movement read no terrain and requested no route, its result cannot depend on remembered terrain, so it equals what the prepared path would produce; the trial is kept with the same grid update, reinsertion and cached-unit update the prepared path performs when it reads nothing. Otherwise the trial is dropped (Game and the grid are untouched until a trial is kept) and the unchanged prepared path runs. The context validation the prepared path performs first runs on both paths.
+
+A temporary differential check ran the prepared path on a snapshot after every kept trial and required bit-identical `Moved`, units and grid, and that the prepared path committed no memory: 12,469 moves matched in `world_tick` and 248 in the rest of the workspace, with 1 fallback. Vostro, `ci-test`: that test went from 972 s to 51.7 s.
 
 ## Two-client final base after ownership #209 (2026-10-14, source plan)
 
