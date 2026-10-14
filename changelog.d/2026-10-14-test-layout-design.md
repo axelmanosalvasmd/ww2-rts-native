@@ -1,0 +1,1 @@
+- Record PR #213's two integration test binaries, shared helpers and registration guards in DESIGN, with local nextest guidance, attributed historical Vostro build measurements and separate historical/current test inventories.
