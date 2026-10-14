@@ -580,7 +580,8 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
         "idle suppression",
         "logistics",
         "convoys",
-        "mode",
+        "mode mismatch",
+        "unsupported mode",
     ] {
         let mut m = make(&fixture["cases"][0]);
         let id = *m.world.game.units.keys().next().unwrap();
@@ -604,7 +605,15 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
             "idle suppression" => unit.supp = -1.0,
             "logistics" => m.options.logistics = true,
             "convoys" => m.convoys = ww2_core::supply_convoys::ConvoyState::setup(true),
-            "mode" => m.world.game.mode = Some(ww2_core::game::ModeKind::World),
+            // World is represented only with matching canonical options and runtime.
+            "mode mismatch" => {
+                assert_eq!(m.options.mode, Mode::Conquest);
+                m.world.game.mode = Some(ww2_core::game::ModeKind::World);
+            }
+            "unsupported mode" => {
+                m.options.mode = Mode::Classic;
+                m.world.game.mode = Some(ww2_core::game::ModeKind::Classic);
+            }
             _ => unreachable!(),
         }
         let control = m.commands.units.get_mut(&id).unwrap();
@@ -654,13 +663,18 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
             error.reason.contains(match actor {
                 "garrison" => "automatic garrison retreat tick exit",
                 "logistics" | "convoys" => "reserve and convoy tick phases",
-                "mode" => "ordinary Conquest",
+                "mode mismatch" | "unsupported mode" => {
+                    "tick execution requires represented ordinary or World mode"
+                }
                 "riding" => "thrown carrier ejection tick phase",
                 "reverse riding" | "idle suppression" => "invalid canonical carrier unit",
                 _ => "rail tick actor",
             }),
             "{actor}: {error}"
         );
+        assert_eq!(error.tick, m.world.game.tick, "{actor}");
+        assert!(error.events.is_empty(), "{actor}");
+        assert_eq!(error.retirement, Default::default(), "{actor}");
         assert_eq!(snapshot(&m), before, "{actor}");
         // The absent pace sentinel is NaN, so PartialEq cannot prove equality.
         // Check its bits separately, then compare every remaining Unit field.
