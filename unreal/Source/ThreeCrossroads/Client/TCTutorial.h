@@ -172,10 +172,18 @@ class FTCTutorialDriver
 public:
 	// The commands to send after this snapshot (empty when there is nothing to do, or this is not a Tutorial in play).
 	TArray<TSharedRef<FJsonObject>> Decide(const FTCMatchState& S, const FTCUnitTable* Table);
-	void Reset() { Memo = FMemo(); }
+	void Reset() { Memo = FMemo(); Tally.Reset(); TallyRefused.Reset(); }
 	int32 Sent() const { return Memo.Count; }
+	// The step the last Decide saw (-2 before the first).
+	int32 Step() const { return Memo.Step; }
+	// Verification tally of what this seat really sent, by message type: Note() each command after the send, then
+	// TakeTally() gives "sent 3 (move 2, buy 1); not sent 1 (amove 1)" for the commands noted since the last call ("" for
+	// none). The mode driver logs it per Tutorial step, so a run shows a seated client walking the steps itself.
+	void Note(const FString& Type, bool bSent) { (bSent ? Tally : TallyRefused).FindOrAdd(Type)++; }
+	FString TakeTally();
 
 private:
+	TMap<FString, int32> Tally, TallyRefused;
 	struct FMemo
 	{
 		int32 Step = -2, Count = 0;

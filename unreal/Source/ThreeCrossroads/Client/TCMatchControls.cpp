@@ -1,7 +1,9 @@
 #include "Client/TCMatchControls.h"
+#include "Client/TCLocale.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
 #include "Math/UnrealMathUtility.h"
+#include "Containers/StringConv.h"
 #include "Misc/AutomationTest.h"
 
 namespace TCCtlL
@@ -657,11 +659,48 @@ FString& FTCTextFields::Value(ETCTextField Field)
 	}
 }
 
+TFunction<FString()> FTCTextFields::ClipboardText;
+
 void FTCTextFields::Begin(ETCTextField Field, const FString& Current)
 {
 	Active = Field;
 	Before = Current;
-	Buffer = Current.Left(MaxLen(Field));
+	Buffer = LimitLength(Current, MaxLen(Field));
+	PendingLead = 0;
+}
+
+FString FTCTextFields::LimitLength(const FString& Text, int32 N)
+{
+	int32 Len = FMath::Min(FMath::Max(N, 0), Text.Len());
+	if (Len == Text.Len()) return Text;
+	if (Len > 0 && StringConv::IsHighSurrogate(Text[Len - 1])) Len--; // U16_IS_LEAD(string[new_length - 1])
+	return Text.Left(Len);
+}
+
+bool FTCTextFields::Char(TCHAR C)
+{
+	if (Active == ETCTextField::None) return false;
+	// the window's text input sends a character outside the BMP as its two UTF-16 halves, one after the other
+	if (StringConv::IsHighSurrogate(C)) { PendingLead = C; return true; }
+	FString Typed;
+	if (StringConv::IsLowSurrogate(C)) { if (!PendingLead) return true; Typed.AppendChar(PendingLead); Typed.AppendChar(C); }
+	else if (C < 0x20 || C == 0x7F) { PendingLead = 0; return true; } // Enter, Escape, Backspace, Tab: keys, not text
+	else Typed.AppendChar(C);
+	PendingLead = 0;
+	// maxlength: typing past it inserts nothing (and a pair goes in whole or not at all)
+	if (Buffer.Len() + Typed.Len() <= MaxLen(Active)) Buffer += Typed;
+	return true;
+}
+
+int32 FTCTextFields::Paste(const FString& Text)
+{
+	if (Active == ETCTextField::None) return 0;
+	// TextFieldInputType::HandleBeforeTextInsertedEvent: "\r\n", '\r' and '\n' each become a space, then LimitLength to
+	// what maxlength leaves
+	FString T = Text.Replace(TEXT("\r\n"), TEXT(" ")).Replace(TEXT("\r"), TEXT(" ")).Replace(TEXT("\n"), TEXT(" "));
+	T = LimitLength(T, MaxLen(Active) - Buffer.Len());
+	Buffer += T;
+	return T.Len();
 }
 
 bool FTCTextFields::Key(const FName& KeyName, bool bShift, ETCTextField& OutDone, bool& OutCancelled)
@@ -672,7 +711,22 @@ bool FTCTextFields::Key(const FName& KeyName, bool bShift, ETCTextField& OutDone
 	const FString K = KeyName.ToString();
 	if (K == TEXT("Enter")) { OutDone = Active; Active = ETCTextField::None; return true; }
 	if (K == TEXT("Escape")) { OutDone = Active; OutCancelled = true; Buffer = Before; Active = ETCTextField::None; return true; }
-	if (K == TEXT("BackSpace")) { Buffer.LeftChopInline(1); return true; }
+	if (K == TEXT("BackSpace"))
+	{
+		// one character back: both halves of a surrogate pair
+		const int32 N = Buffer.Len() >= 2 && StringConv::IsLowSurrogate(Buffer[Buffer.Len() - 1]) && StringConv::IsHighSurrogate(Buffer[Buffer.Len() - 2]) ? 2 : 1;
+		Buffer.LeftChopInline(N);
+		return true;
+	}
+	// Ctrl+V (Command+V elsewhere) and Shift+Insert paste
+	if ((bCtrl && K == TEXT("V")) || (bShift && K == TEXT("Insert")))
+	{
+		const FString Clip = ClipboardText ? ClipboardText() : FString();
+		Paste(Clip);
+		return true;
+	}
+	// the window's text input types the characters (Char); a key with Ctrl held types nothing
+	if (bCharInput || bCtrl) return true;
 	TCHAR C = 0;
 	static const TCHAR* const DigitNames[] = { TEXT("Zero"), TEXT("One"), TEXT("Two"), TEXT("Three"), TEXT("Four"), TEXT("Five"), TEXT("Six"), TEXT("Seven"), TEXT("Eight"), TEXT("Nine") };
 	if (K.Len() == 1 && K[0] >= 'A' && K[0] <= 'Z') C = bShift ? K[0] : (TCHAR)(K[0] - 'A' + 'a');
@@ -693,6 +747,29 @@ FString FTCTextFields::Shown(ETCTextField Field, const FString& Current) const
 // ---------------------------------------------------------------------------------------------------------------------
 // The glue (round 15, lobby): ATCGameMode, ATCHUD and ATCPlayerController members declared by the lead patch
 // (lead-lobby-glue.patch) and defined here, so the patch stays small. Without the patch this file compiles on its own.
+FTCPaint FTCRoomBanners::Layout(const TArray<FTCRoomBanner>& Banners, float Top, float ViewW, const FTCMeasure& Measure)
+{
+	FTCPaint P;
+	const float Px = 14.f, Lh = Px * 1.35f, PadX = 12.f, PadY = 6.f, Gap = 4.f;
+	const float MaxW = FMath::Max(0.f, FMath::Min(510.f, ViewW - 40.f));
+	float Y = Top;
+	for (const FTCRoomBanner& B : Banners)
+	{
+		if (B.Text.IsEmpty()) continue;
+		const FString Shown = TC_T(B.Text);
+		const TArray<FString> Lines = FTCPaint::Wrap(Shown, FMath::Max(1.f, MaxW - 2 * PadX - 2.f), Px, false, Measure);
+		float TextW = 0.f;
+		for (const FString& L : Lines) TextW = FMath::Max(TextW, Measure(L, Px, false, 0.f));
+		const float W = FMath::Min(MaxW, TextW + 2 * PadX + 2.f), H = Lines.Num() * Lh + 2 * PadY + 2.f;
+		const float X = FMath::RoundToFloat((ViewW - W) / 2);
+		P.Rect(X, Y, W, H, TCCss::Rgba(25, 28, 30, 0.95f), B.bConnection ? TEXT("banner:connection") : TEXT("banner:pause"));
+		P.Frame(X, Y, W, H, B.bConnection ? TCCss::Rgba(200, 72, 59, 0.8f) : TCCss::Rgba(176, 164, 122, 0.46f), 1.f, TEXT("banner:frame"));
+		for (int32 K = 0; K < Lines.Num(); K++) P.Text(Lines[K], X + W / 2, Y + 1.f + PadY + K * Lh, Px, TCCss::Text, false, ETCPaintAlign::Centre, TEXT("banner:text")).Size.Y = Lh;
+		Y += H + Gap;
+	}
+	return P;
+}
+
 #include "Client/TCGameMode.h"
 #if defined(TC_HAS_LOBBY_GLUE)
 #include "Client/TCHUD.h"
@@ -710,6 +787,23 @@ FString FTCTextFields::Shown(ETCTextField Field, const FString& Current) const
 #include "Serialization/JsonWriter.h"
 #include "Policies/CondensedJsonPrintPolicy.h"
 #include "HAL/PlatformApplicationMisc.h"
+#include "Framework/Application/SlateApplication.h"
+#include "Engine/GameViewportClient.h"
+#include "Engine/Console.h"
+
+// Round 16 (controls): the window's text input for the text fields. SDL's text input (dead keys, compose and the
+// keyboard layout already applied) reaches the game viewport as InputChar; while a field is active the character goes
+// to it (ATCGameMode::Form) and nowhere else. Config/DefaultEngine.ini names this class as the game's viewport client.
+bool UTCGameViewportClient::InputChar(FViewport* InViewport, int32 ControllerId, TCHAR Character)
+{
+	ATCGameMode* M = GetWorld() ? GetWorld()->GetAuthGameMode<ATCGameMode>() : nullptr;
+	if (M && M->Form.Active != ETCTextField::None && !(ViewportConsole && ViewportConsole->ConsoleState != NAME_None))
+	{
+		M->Form.Char(Character);
+		return true;
+	}
+	return Super::InputChar(InViewport, ControllerId, Character);
+}
 
 namespace TCCtlGlue
 {
@@ -742,6 +836,10 @@ namespace TCCtlGlue
 void ATCGameMode::ControlsSwitches(const TCHAR* Cmd, FTCConnection::FSettings& Settings)
 {
 	// the Copy button's clipboard (navigator.clipboard.writeText), read back to tell Copied from Press Ctrl+C
+	// round 16: the text fields' characters from the window's text input, and their paste from the clipboard
+	FTCTextFields::ClipboardText = []() { FString T; FPlatformApplicationMisc::ClipboardPaste(T); return T; };
+	Form.bCharInput = GEngine && GEngine->GameViewport && GEngine->GameViewport->IsA<UTCGameViewportClient>();
+	UE_LOG(LogTC, Log, TEXT("lobby controls: text fields take %s; Ctrl+V and Shift+Insert paste"), Form.bCharInput ? TEXT("the window's text input (any character)") : TEXT("key names only (no text input)"));
 	FTCMatchControls::Clipboard = [](const FString& Text)
 	{
 		FPlatformApplicationMisc::ClipboardCopy(*Text);
@@ -769,6 +867,7 @@ void ATCGameMode::ControlsSwitches(const TCHAR* Cmd, FTCConnection::FSettings& S
 	}
 	// -TCBrowse: open the room directory first (public-lobby.html); no socket until a room is picked
 	bControlsDeferConnect = bRoomBrowserOpen = FParse::Param(Cmd, TEXT("TCBrowse"));
+	if (bRoomBrowserOpen) Rooms.Session.StartShown(Settings.Room); // round 16: Close opens the command line's room
 	// -TCControlsCheck="<delay>[@<cond>]:<action>[:<arg>];...": a verification script (each step waits its delay after
 	// the previous one and its condition), -TCControlsShotDir=<dir> for its shots
 	FString ScriptText;
@@ -911,6 +1010,7 @@ bool ATCGameMode::ControlsKey(const FKey& Key, bool bPressed, bool bShift)
 {
 	// Shift as its own events say (an injected Shift is not yet in the input state when the next key arrives)
 	if (Key == EKeys::LeftShift || Key == EKeys::RightShift) bControlsShift = bPressed;
+	if (Key == EKeys::LeftControl || Key == EKeys::RightControl || Key == EKeys::LeftCommand || Key == EKeys::RightCommand) Form.bCtrl = bPressed; // round 16: Ctrl+V
 	if (Form.Active == ETCTextField::None || !bPressed) return false;
 	bShift = bShift || bControlsShift;
 	if (Key.IsModifierKey()) return false;
@@ -976,8 +1076,11 @@ bool ATCGameMode::ControlsEnter(const FTCRoomEntry& E, bool bKeepSeat)
 	bControlsDeferConnect = false;
 	bQuickPlayPending = false;
 	Rooms.Cancel();
+	Rooms.Session.Entered(); // round 16: the picked room's socket opens; the directory has nothing to return to
 	BaseSettings.Room = S.Room;
 	BaseSettings.Name = S.Name;
+	BaseSettings.Listing = S.Listing; // the page's URL (?public=&title=) a Back to it would load again
+	BaseTokenRequest = R;
 	return Connect(S, R);
 }
 
@@ -1008,7 +1111,10 @@ void ATCGameMode::ControlsFrame()
 			|| (C == TEXT("watching") && Controls.Watching()) || (C == TEXT("seated") && Controls.HasLobby() && !Controls.Watching())
 			|| (C == TEXT("break") && Controls.NextWaveButton().bShown) || (C == TEXT("wave") && Controls.InPlay() && !Controls.NextWaveButton().bShown)
 			|| (C == TEXT("rooms") && Rooms.HasAnswer()) || (C == TEXT("offline") && Controls.Seats().ContainsByPredicate([](const FTCMatchControls::FSeat& P) { return !P.bAi && !P.bConnected; }))
-			|| (C == TEXT("left") && Controls.Left()) || (C == TEXT("nolobby") && !Controls.HasLobby()));
+			|| (C == TEXT("left") && Controls.Left()) || (C == TEXT("nolobby") && !Controls.HasLobby())
+			|| (C == TEXT("alert") && AlertFeed.Lines().ContainsByPredicate([](const FTCAlertLine& L) { return L.Alert.bHasAt; }))
+			// round 16: 'humans<N>': at least N connected human seats in the lobby (a host waits for its guests to start)
+			|| (C.StartsWith(TEXT("humans")) && Controls.Seats().FilterByPredicate([](const FTCMatchControls::FSeat& P) { return !P.bAi && P.bConnected; }).Num() >= FCString::Atoi(*C.Mid(6))));
 		if (bReady)
 		{
 			ControlsStep++;
@@ -1027,6 +1133,31 @@ void ATCGameMode::ControlsFrame()
 				const bool bDrawn = Hud && Hud->CommandCentre(Cmd, At);
 				PC->PressCommand(Cmd);
 				Did = FString::Printf(TEXT("press %s%s (%s)"), *Key, Slot >= 0 ? *FString::Printf(TEXT(" #%d"), Slot) : TEXT(""), bDrawn ? TEXT("through the hit test") : TEXT("not drawn: straight to the command"));
+			}
+			else if (St.Action == TEXT("type") && PC && Form.bCharInput && FSlateApplication::IsInitialized())
+			{
+				// round 16: each character through Slate's own text input path (FSlateApplication::ProcessKeyCharEvent, as
+				// the window's SDL text input sends it), so 'José' and 'ñ' go the way a typed accent does; '+' is a space
+				const FString Text = St.Arg.Replace(TEXT("+"), TEXT(" "));
+				int32 ViaSlate = 0, ViaViewport = 0;
+				for (const TCHAR Ch : Text)
+				{
+					// Slate's character event goes to the widget with the keyboard focus (the game viewport when the
+					// window has it); an offscreen window may have none, then the viewport client's InputChar, which
+					// the focused viewport would call
+					const FString Was = Form.Buffer;
+					FSlateApplication::Get().ProcessKeyCharEvent(FCharacterEvent(Ch, FModifierKeysState(), 0, false));
+					if (Form.Buffer != Was) { ViaSlate++; continue; }
+					if (GEngine && GEngine->GameViewport) GEngine->GameViewport->InputChar(GEngine->GameViewport->Viewport, 0, Ch);
+					ViaViewport++;
+				}
+				Did = FString::Printf(TEXT("typed '%s' as text input, %d character(s) through Slate's focus, %d through the viewport client (field %s: '%s')"), *Text, ViaSlate, ViaViewport, LexToString(Form.Active), *Form.Buffer);
+			}
+			else if (St.Action == TEXT("paste") && PC)
+			{
+				// round 16: Ctrl+V as keys (LeftControl down, V, LeftControl up) into the engine's input
+				PC->InjectKey(EKeys::LeftControl, true); PC->InjectKey(EKeys::V, true); PC->InjectKey(EKeys::V, false); PC->InjectKey(EKeys::LeftControl, false);
+				Did = FString::Printf(TEXT("Ctrl+V (field %s: '%s')"), LexToString(Form.Active), *Form.Buffer);
 			}
 			else if (St.Action == TEXT("type") && PC)
 			{
@@ -1100,6 +1231,95 @@ void ATCGameMode::ControlsFrame()
 				const FString File = FPaths::Combine(ControlsShotDir.IsEmpty() ? FPaths::ProjectSavedDir() / TEXT("Screenshots") : ControlsShotDir, St.Arg + TEXT(".png"));
 				FScreenshotRequest::RequestScreenshot(File, true, false);
 				Did = TEXT("screenshot ") + File;
+			}
+			else if (St.Action == TEXT("alert") && PC)
+			{
+				// round 16: a click on the alert feed through the HUD's hit test: 'line' (the newest line with a place),
+				// 'history' (its summary), 'prev' / 'next' (Previous Alert, Next Alert), 'entry' (the second newest
+				// history entry with a place, else the newest)
+				FString Tag;
+				if (St.Arg == TEXT("line"))
+				{
+					int32 Best = -1;
+					for (const FTCAlertLine& L : AlertFeed.Lines()) if (L.Alert.bHasAt && L.Serial > Best) Best = L.Serial;
+					if (Best >= 0) Tag = FString::Printf(TEXT("alert:line:%d"), Best);
+				}
+				else if (St.Arg == TEXT("history")) Tag = TEXT("alert:history");
+				else if (St.Arg == TEXT("prev")) Tag = TEXT("alert:nav:1");
+				else if (St.Arg == TEXT("next")) Tag = TEXT("alert:nav:-1");
+				else if (St.Arg == TEXT("entry"))
+				{
+					TArray<int32> Ids;
+					for (const FTCAlertHistoryEntry& E : AlertFeed.History().Entries()) if (E.bHasAt) Ids.Add(E.Id);
+					if (Ids.Num()) Tag = FString::Printf(TEXT("alert:entry:%d"), Ids.Num() > 1 ? Ids[Ids.Num() - 2] : Ids.Last());
+				}
+				if (Tag.IsEmpty()) Did = TEXT("alert click ") + St.Arg + TEXT(": nothing to click (no such line or entry)");
+				else
+				{
+					FTCUiCommand Cmd(ETCUiAction::Alert);
+					Cmd.Unit = Tag;
+					const ATCHUD* Hud = Cast<ATCHUD>(PC->GetHUD());
+					FVector2D At;
+					const bool bDrawn = Hud && Hud->CommandCentre(Cmd, At);
+					const FVector2D Before = PC->ViewFocus();
+					const bool bRan = PC->PressCommand(Cmd);
+					const FVector2D After = PC->ViewFocus();
+					Did = FString::Printf(TEXT("alert click %s (%s, %s): camera focus (%.1f, %.1f) -> (%.1f, %.1f); history %s, %d entr%s, selected %d"), *Tag, bDrawn ? *FString::Printf(TEXT("drawn at (%.0f, %.0f)"), At.X, At.Y) : TEXT("not drawn"),
+						bRan ? TEXT("ran") : TEXT("did nothing"), Before.X, Before.Y, After.X, After.Y, AlertFeed.bHistoryOpen ? TEXT("open") : TEXT("closed"), AlertFeed.History().Entries().Num(),
+						AlertFeed.History().Entries().Num() == 1 ? TEXT("y") : TEXT("ies"), AlertFeed.History().Selected());
+				}
+			}
+			else if (St.Action == TEXT("recruit") && PC)
+			{
+				// round 16: a recruit card button (hud.js [data-unit] onclick) through the HUD's hit test; its 'ready' alert
+				// has a place, so the alert feed gets a line to click
+				FTCUiCommand Cmd(ETCUiAction::Recruit);
+				Cmd.Unit = St.Arg;
+				const ATCHUD* Hud = Cast<ATCHUD>(PC->GetHUD());
+				FVector2D At;
+				const bool bDrawn = Hud && Hud->CommandCentre(Cmd, At);
+				const bool bRan = PC->PressCommand(Cmd);
+				Did = FString::Printf(TEXT("recruit %s (%s, %s)"), *St.Arg, bDrawn ? *FString::Printf(TEXT("drawn at (%.0f, %.0f)"), At.X, At.Y) : TEXT("not drawn"), bRan ? TEXT("ran") : TEXT("did nothing"));
+			}
+			else if (St.Action == TEXT("rightclick") && PC)
+			{
+				// round 16: a right press on the world at the window's centre (client/main.js mousedown button 2): with
+				// an aim armed it cancels the aim, the spawn aim included
+				int32 VX = 0, VY = 0;
+				PC->GetViewportSize(VX, VY);
+				const bool bArmedBefore = Controls.SpawnArmed();
+				const FString AimBefore = LexToString(PC->Aim);
+				PC->RightPressWorld(FVector2D(VX / 2.0, VY / 2.0), false, false);
+				Did = FString::Printf(TEXT("right press at (%d, %d): aim %s -> %s, sandbox spawn armed %s -> %s"), VX / 2, VY / 2, *AimBefore, LexToString(PC->Aim),
+					bArmedBefore ? TEXT("yes") : TEXT("no"), Controls.SpawnArmed() ? TEXT("yes") : TEXT("no"));
+			}
+			else if (St.Action == TEXT("exec") && GEngine)
+			{
+				// round 16: a console command (the stats probe's 'stat unit')
+				const FString Cmd = St.Arg.Replace(TEXT("_"), TEXT(" "));
+				GEngine->Exec(GetWorld(), *Cmd);
+				Did = TEXT("console: ") + Cmd;
+			}
+#if defined(TC_HAS_STATS_GLUE)
+			else if (St.Action == TEXT("stats") || St.Action == TEXT("statsback"))
+			{
+				// round 16: a control of the stats sheet by its tag ('show', 'pick:worst', 'preset:Everything', 'select:pos',
+				// 'warn', 'close'), pressed at its drawn centre; 'backdrop' clicks outside the sheet
+				bool bOk = false;
+				if (St.Arg == TEXT("backdrop")) bOk = StatsSheetPress(FVector2D(4, 4), false);
+				else bOk = StatsSheetTag(TEXT("stats:") + St.Arg, St.Action == TEXT("statsback"));
+				Did = FString::Printf(TEXT("stats sheet %s%s: %s; sheet %s, overlay %s, settings %s"), *St.Arg, St.Action == TEXT("statsback") ? TEXT(" (right)") : TEXT(""), bOk ? TEXT("done") : TEXT("nothing"),
+					StatsSheet.IsOpen() ? TEXT("open") : TEXT("closed"), *StatsOverlay().MenuLabel(), Stats.SaveText().IsSet() ? *Stats.SaveText().GetValue() : TEXT("(forced)"));
+			}
+#endif
+			else if (St.Action == TEXT("clip"))
+			{
+				// round 16: put a text on the system clipboard (as another program's copy would), '_' for spaces; 'save'
+				// keeps what the clipboard held and 'restore' puts it back
+				static FString Kept;
+				if (St.Arg == TEXT("save")) { FPlatformApplicationMisc::ClipboardPaste(Kept); Did = FString::Printf(TEXT("clipboard kept (%d characters)"), Kept.Len()); }
+				else if (St.Arg == TEXT("restore")) { FPlatformApplicationMisc::ClipboardCopy(*Kept); Did = TEXT("clipboard restored"); }
+				else { const FString T = St.Arg.Replace(TEXT("_"), TEXT(" ")); FPlatformApplicationMisc::ClipboardCopy(*T); Did = FString::Printf(TEXT("clipboard set to '%s'"), *T); }
 			}
 			else if (St.Action == TEXT("drop") && Connection) { Connection->SimulateDrop(); Did = TEXT("socket dropped"); }
 			else if (St.Action == TEXT("stop") && Connection) { Connection->Stop(); Did = TEXT("connection stopped (this client goes offline)"); }
@@ -1176,9 +1396,48 @@ bool ATCGameMode::RunControl(const FTCUiCommand& Command, bool bBack)
 		default: return false;
 		}
 	}
+#if defined(TC_HAS_STATS_GLUE)
+	// round 16: $('statsBtn').onclick = () => { menuOpen(false); stats.open(); }
+	if (Key == TEXT("Stats.Open"))
+	{
+		if (Controls.MenuOpen()) Controls.ToggleMenu();
+		if (ATCPlayerController* SPC = Cast<ATCPlayerController>(GetWorld()->GetFirstPlayerController())) SPC->OpenStatsSheet();
+		return true;
+	}
+#endif
 	// the room directory (client/public-lobby.js)
-	if (Key == TEXT("Browse")) { bRoomBrowserOpen = true; NoticeText.Reset(); Rooms.Request(ServerUrl, Now); UE_LOG(LogTC, Log, TEXT("room directory: open")); return true; }
-	if (Key == TEXT("Browser.Close")) { bRoomBrowserOpen = false; Rooms.Cancel(); bQuickPlayPending = false; UE_LOG(LogTC, Log, TEXT("room directory: closed")); if (bControlsDeferConnect) { bControlsDeferConnect = false; Connect(BaseSettings, BaseTokenRequest); } return true; }
+	if (Key == TEXT("Browse"))
+	{
+		// round 16: the browser leaves /play for / (index.html <a href="/">): the room's socket closes with the page,
+		// and the directory opens none (public-lobby.js); Close opens the room again
+		const FString Room = ControlsRoom();
+		if (Rooms.Session.Open(Connection.IsValid(), Room) == FTCDirectorySession::EStep::CloseSocket)
+		{
+			UE_LOG(LogTC, Log, TEXT("room directory: leaving room %s: its socket closes (%s), as the browser's page does when it goes to the directory"), *Room, *ConnectionStatus());
+			Connection->OnMessage = nullptr; Connection->OnOpened = nullptr; Connection->OnText = nullptr; Connection->Stop(); Connection.Reset();
+			RustShadow.End();
+			TokenStore.Reset();
+			State.ClearMatch();
+			State.RoomState.Reset(); State.RoomCode.Reset(); State.Roster.Reset(); State.Spectators.Reset();
+			State.bSpectator = false; State.bAmHost = false; State.LobbySeat = -1;
+			ClearMatchPresentation();
+			Controls.Reset();
+			Controls.SetFieldName(BaseSettings.Name);
+			BaseSettings.Room = Room;
+			bControlsDeferConnect = true;
+		}
+		bRoomBrowserOpen = true; NoticeText.Reset(); Rooms.Request(ServerUrl, Now);
+		UE_LOG(LogTC, Log, TEXT("room directory: open (%s)"), Connection.IsValid() ? TEXT("a socket is still open") : TEXT("no game socket"));
+		return true;
+	}
+	if (Key == TEXT("Browser.Close"))
+	{
+		const FTCDirectorySession::EStep Step = Rooms.Session.Close(Connection.IsValid());
+		bRoomBrowserOpen = false; Rooms.Cancel(); bQuickPlayPending = false;
+		UE_LOG(LogTC, Log, TEXT("room directory: closed%s"), Step == FTCDirectorySession::EStep::OpenRoom || bControlsDeferConnect ? *FString::Printf(TEXT(": back to room %s, a new socket"), *BaseSettings.Room) : TEXT(""));
+		if (Step == FTCDirectorySession::EStep::OpenRoom || bControlsDeferConnect) { bControlsDeferConnect = false; Connect(BaseSettings, BaseTokenRequest); }
+		return true;
+	}
 	if (Key == TEXT("Browser.Refresh")) { NoticeText.Reset(); return Rooms.Request(ServerUrl, Now); }
 	if (Key == TEXT("Browser.Filter")) { Rooms.StepModeFilter(bBack ? -1 : 1); return true; }
 	if (Key == TEXT("Browser.OpenOnly")) { Rooms.SetOpenOnly(!Rooms.OpenOnly()); return true; }
@@ -1270,7 +1529,13 @@ TArray<FTCControlRow> ATCGameMode::MatchControlRows() const
 	if (!MenuB.bShown) return Rows;
 	Rows.Add(Row(FString(), FTCControlRow::Plain, { Item(MenuB.Label, TEXT("Menu"), MenuB.Title, true, Controls.MenuOpen()) }));
 	if (Controls.MenuOpen())
+	{
 		for (const FTCControlButton& B : Controls.MenuButtons(Now)) if (B.bShown) Rows.Add(Row(FString(), FTCControlRow::Plain, { Button(B) }));
+#if defined(TC_HAS_STATS_GLUE)
+		// round 16: #menu's statsBtn ('Stats overlay: On' or 'Off', its title), for every reader of the menu
+		Rows.Add(Row(FString(), FTCControlRow::Plain, { Item(const_cast<ATCGameMode*>(this)->StatsOverlay().MenuLabel(), TEXT("Stats.Open"), FTCStatsSheet::MenuTitle()) }));
+#endif
+	}
 	if (Controls.SandboxShown())
 	{
 		TArray<FTCControlItem> Items;
@@ -1311,9 +1576,9 @@ float ATCHUD::DrawControlRows(UFont* Font, float X, float Y, float W, const TArr
 		if (!R.Text.IsEmpty()) { DrawLabel(R.Text, Colour, BX, RowY + 2.f + Pad / 2, Font, 1.f); BX += Measure(R.Text) - Pad; }
 		for (const FTCControlItem& It : R.Items)
 		{
-			FTCUiCommand Cmd(ETCUiAction::MatchControl);
-			Cmd.Unit = It.Key;
-			Cmd.Group = It.Slot;
+			// round 16 (hudfit): the match menu also holds the HUD's settings ('Setting.<what>' keys, ATCHUD::MenuSettingRows),
+			// whose clicks are the HUD's own actions; every other key is a match control as before
+			const FTCUiCommand Cmd = ATCHUD::ControlCommand(It.Key, It.Slot);
 			const float Left = BX;
 			BX = ATCHUD::Button(Font, BX, RowY + 2.f, It.Label, Cmd, It.bEnabled, !It.bEnabled ? CardOff : It.bOn ? TabOpen : ButtonFill);
 			if (FBox2D(FVector2D(Left, RowY + 2.f), FVector2D(BX - Pad, RowY + 2.f + Line + Pad)).IsInsideOrOn(Mouse)) Hover = It.Hover;
@@ -1350,6 +1615,21 @@ void ATCHUD::DrawMatchControls(UFont* Font, float Top)
 	if (!M) return;
 	DrawControlRows(Font, 8.f, Top, 0.f, M->MatchControlRows());
 }
+
+#if defined(TC_HAS_ROOM_BANNERS)
+void ATCHUD::DrawRoomBanners(UFont* Font)
+{
+	// round 16: #roomBanners (main.js positionRoomBanners: 8 px under #top's bottom in screen pixels while the HUD shows,
+	// else 16 px). Only the pause banner: this client has no #connectionBanner text yet (its status column says it).
+	ATCGameMode* M = GetWorld()->GetAuthGameMode<ATCGameMode>();
+	if (!M || !Canvas || !Font || !M->State.bPaused || M->State.PauseText.IsEmpty()) return;
+	// #top holds the strip and its centred lines (rate, weather, the boss bar): StatsTopTc, its bottom in UI pixels
+	const bool bHud = M->State.bHasMatch && StatsTopTc >= 0.f;
+	const float Top = bHud ? FMath::CeilToFloat(StatsTopTc * UiNow + 8.f) : 16.f;
+	const FTCPaint P = FTCRoomBanners::Layout({ FTCRoomBanner{ M->State.PauseText, false } }, Top, Canvas->ClipX, FTCPaint::CanvasMeasure(Font));
+	P.Draw(Canvas, Font);
+}
+#endif
 #endif // TC_HAS_LOBBY_GLUE
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -1760,4 +2040,138 @@ bool FTCMatchControlsReferenceTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+#endif
+
+#if WITH_DEV_AUTOMATION_TESTS
+#include "Net/TCConnection.h"
+
+// ThreeCrossroads.MatchControls.TextInput (round 16): the text fields take what the reference's inputs take. Expected
+// values from the pinned code's own rules run outside the engine (round-16/controls/logs): headless Chromium's
+// <input maxlength> for typed and inserted text (tools/paste-oracle.mjs: accents, the maxlength cut, line breaks to
+// spaces, a surrogate pair never split) and node for server.js cleanName, JSON.stringify and the UTF-8 size of the
+// rename message (logs/name-oracle.log).
+// ThreeCrossroads.MatchControls.RoomBanners (round 16): connection.css #roomBanners: centred, 8 px under the strip, each
+// box as wide as its text plus 12 px padding and a 1 px border, 4 px apart, at most min(510px, 100vw - 40px), wrapped.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCMatchControlsRoomBannersTest, "ThreeCrossroads.MatchControls.RoomBanners", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+
+bool FTCMatchControlsRoomBannersTest::RunTest(const FString& Parameters)
+{
+	const FTCMeasure M = FTCPaint::ApproxMeasure(); // 7 px a character at 14 px
+	const FTCPaint P = FTCRoomBanners::Layout({ FTCRoomBanner{ TEXT("Paused by Alder"), false } }, 100.f, 1280.f, M);
+	const FTCPaintItem* Box = P.Find(TEXT("banner:pause"));
+	if (!TestNotNull(TEXT("the pause box"), Box)) return false;
+	const float TextW = M(TEXT("Paused by Alder"), 14.f, false, 0.f);
+	TestEqual(TEXT("width: text, 2 x 12 px padding, 2 x 1 px border"), (float)Box->Size.X, TextW + 26.f);
+	TestEqual(TEXT("height: one 18.9 px line, 2 x 6 px, 2 x 1 px"), (float)Box->Size.Y, 14.f * 1.35f + 14.f, 0.01f);
+	TestEqual(TEXT("centred"), (float)(Box->Pos.X + Box->Size.X / 2), 640.f, 0.51f);
+	TestEqual(TEXT("top"), (float)Box->Pos.Y, 100.f);
+	TestEqual(TEXT("text"), P.TextsOf(TEXT("banner:text")), TArray<FString>{ TEXT("Paused by Alder") });
+	// two banners: the connection one first with its red border, 4 px between; a long text wraps inside 510 px
+	const FString Long = FString::ChrN(40, 'a') + TEXT(" ") + FString::ChrN(40, 'b') + TEXT(" ") + FString::ChrN(40, 'c');
+	const FTCPaint Q = FTCRoomBanners::Layout({ FTCRoomBanner{ TEXT("Connection lost"), true }, FTCRoomBanner{ Long, false } }, 16.f, 1280.f, M);
+	const FTCPaintItem* C = Q.Find(TEXT("banner:connection"));
+	const FTCPaintItem* W = Q.Find(TEXT("banner:pause"));
+	if (!TestNotNull(TEXT("both boxes"), C) || !TestNotNull(TEXT("both boxes"), W)) return false;
+	TestEqual(TEXT("4 px apart"), (float)W->Pos.Y, (float)(C->Pos.Y + C->Size.Y + 4.f), 0.01f);
+	TestTrue(TEXT("no wider than 510 px"), W->Size.X <= 510.f + 0.01f);
+	TestEqual(TEXT("each 280 px word on its own line (484 px inside)"), Q.TextsOf(TEXT("banner:text")).Num(), 1 + 3);
+	const FTCPaintItem* Frame = nullptr;
+	for (const FTCPaintItem& I : Q.Items) if (I.Role == TEXT("banner:frame")) { Frame = &I; break; }
+	TestTrue(TEXT("red border on the connection banner"), Frame && FMath::IsNearlyEqual(Frame->Colour.R, TCCss::Rgba(200, 72, 59, 0.8f).R));
+	// a narrow window: min(510, 100vw - 40)
+	const FTCPaint N = FTCRoomBanners::Layout({ FTCRoomBanner{ Long, false } }, 16.f, 300.f, M);
+	TestTrue(TEXT("narrow: 260 px at most"), N.Find(TEXT("banner:pause"))->Size.X <= 260.f + 0.01f);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCMatchControlsTextInputTest, "ThreeCrossroads.MatchControls.TextInput", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+
+bool FTCMatchControlsTextInputTest::RunTest(const FString& Parameters)
+{
+	auto Typed = [](ETCTextField F, const FString& Start, const FString& Chars)
+	{
+		FTCTextFields T;
+		T.bCharInput = true;
+		T.Begin(F, Start);
+		for (const TCHAR C : Chars) T.Char(C);
+		return T.Buffer;
+	};
+	auto Pasted = [](ETCTextField F, const FString& Start, const FString& Text)
+	{
+		FTCTextFields T;
+		T.Begin(F, Start);
+		T.Paste(Text);
+		return T.Buffer;
+	};
+	// paste-oracle.log, case by case (f: maxlength 16, the Name and nickname; t: 48, the match name; c: 12, a code)
+	TestEqual(TEXT("accents typed"), Typed(ETCTextField::Name, TEXT(""), TEXT("José Peña ¿Sí?")), FString(TEXT("José Peña ¿Sí?")));
+	TestEqual(TEXT("typed past maxlength"), Typed(ETCTextField::Nickname, TEXT("Soldado Ñandú"), TEXT("áéíóú")), FString(TEXT("Soldado Ñandúáéí")));
+	TestEqual(TEXT("paste with CRLF, LF and CR"), Pasted(ETCTextField::MatchTitle, TEXT("Partida"), TEXT(" uno\r\ndos\nTres\rcuatro")), FString(TEXT("Partida uno dos Tres cuatro")));
+	TestEqual(TEXT("paste cut at maxlength"), Pasted(ETCTextField::Name, TEXT("José"), TEXT("abcdefghijklmnopqrstuvwxyz")), FString(TEXT("Joséabcdefghijkl")));
+	TestEqual(TEXT("paste: a pair at the cut stays out"), Pasted(ETCTextField::JoinCode, TEXT("abcdefghijk"), TEXT("\U0001F600x")), FString(TEXT("abcdefghijk")));
+	TestEqual(TEXT("paste: a pair that fits goes in"), Pasted(ETCTextField::JoinCode, TEXT("abcdefghij"), TEXT("\U0001F600x")), FString(TEXT("abcdefghij\U0001F600")));
+	TestEqual(TEXT("paste a newline"), Pasted(ETCTextField::MatchTitle, TEXT(""), TEXT("línea 1\nlínea 2")), FString(TEXT("línea 1 línea 2")));
+	// typed control characters are keys, not text; a pair typed as its two halves; a lone second half is dropped
+	TestEqual(TEXT("control characters"), Typed(ETCTextField::Name, TEXT("a"), TEXT("\b\r\t\x1b\x7f" "b")), FString(TEXT("ab")));
+	TestEqual(TEXT("a typed pair"), Typed(ETCTextField::RoomCode, TEXT("ab"), TEXT("\U0001F600c")), FString(TEXT("ab\U0001F600c")));
+	TestEqual(TEXT("a typed pair with no room for both halves"), Typed(ETCTextField::RoomCode, TEXT("abcdefghijk"), TEXT("\U0001F600")), FString(TEXT("abcdefghijk")));
+	FString Lone; Lone.AppendChar((TCHAR)0xDE00);
+	TestEqual(TEXT("a lone second half"), Typed(ETCTextField::Name, TEXT("a"), Lone), FString(TEXT("a")));
+	TestEqual(TEXT("LimitLength"), FTCTextFields::LimitLength(TEXT("ab\U0001F600"), 3) + TEXT("|") + FTCTextFields::LimitLength(TEXT("abc"), 5) + TEXT("|") + FTCTextFields::LimitLength(TEXT("abc"), -1), FString(TEXT("ab|abc|")));
+	// keys: Backspace takes a whole pair; Ctrl+V and Shift+Insert paste the clipboard; with the text input wired a
+	// letter key types nothing (the character comes from Char); without it the key names still type
+	{
+		FTCTextFields T;
+		T.bCharInput = true;
+		T.Begin(ETCTextField::Name, TEXT("a\U0001F600"));
+		ETCTextField Done; bool bCancel = false;
+		T.Key(FName(TEXT("BackSpace")), false, Done, bCancel);
+		TestEqual(TEXT("Backspace takes the pair"), T.Buffer, FString(TEXT("a")));
+		TestTrue(TEXT("a letter key is taken"), T.Key(FName(TEXT("B")), false, Done, bCancel));
+		TestEqual(TEXT("and types nothing with the text input"), T.Buffer, FString(TEXT("a")));
+		const TFunction<FString()> Was = FTCTextFields::ClipboardText;
+		FTCTextFields::ClipboardText = []() { return FString(TEXT("María\nJosé")); };
+		T.bCtrl = true;
+		T.Key(FName(TEXT("V")), false, Done, bCancel);
+		TestEqual(TEXT("Ctrl+V"), T.Buffer, FString(TEXT("aMaría José")));
+		T.bCtrl = false;
+		T.Key(FName(TEXT("Insert")), true, Done, bCancel);
+		TestEqual(TEXT("Shift+Insert, cut at 16"), T.Buffer, FString(TEXT("aMaría JoséMaría")));
+		FTCTextFields::ClipboardText = Was;
+		T.Key(FName(TEXT("Enter")), false, Done, bCancel);
+		TestTrue(TEXT("Enter ends it"), Done == ETCTextField::Name && !bCancel);
+		FTCTextFields K;
+		K.Begin(ETCTextField::Name, TEXT(""));
+		K.Key(FName(TEXT("A")), true, Done, bCancel);
+		K.Key(FName(TEXT("One")), false, Done, bCancel);
+		TestEqual(TEXT("no text input: key names still type"), K.Buffer, FString(TEXT("A1")));
+		K.bCtrl = true;
+		K.Key(FName(TEXT("C")), false, Done, bCancel);
+		TestEqual(TEXT("no text input: Ctrl+C types nothing"), K.Buffer, FString(TEXT("A1")));
+	}
+	// the rename message (main.js { t: 'name', name }), its bytes and what server.js cleanName keeps (name-oracle.log)
+	struct FCase { const TCHAR* Typed; const TCHAR* Wire; int32 Bytes; const TCHAR* Kept; };
+	const FCase Cases[] = {
+		{ TEXT("José Peña"), TEXT("{\"t\":\"name\",\"name\":\"José Peña\"}"), 33, TEXT("José Peña") },
+		{ TEXT("  Ñandú <b>  "), TEXT("{\"t\":\"name\",\"name\":\"  Ñandú <b>  \"}"), 37, TEXT("Ñandú b") },
+		{ TEXT(" Ana　"), TEXT("{\"t\":\"name\",\"name\":\" Ana　\"}"), 30, TEXT("Ana") },
+		{ TEXT("ÁÉÍÓÚáéíóúñÑ¿¡ü"), TEXT("{\"t\":\"name\",\"name\":\"ÁÉÍÓÚáéíóúñÑ¿¡ü\"}"), 52, TEXT("ÁÉÍÓÚáéíóúñÑ¿¡ü") },
+	};
+	for (const FCase& C : Cases)
+	{
+		FTCMatchControls Ctl;
+		Ctl.SetFieldName(TEXT("Soldier"));
+		TSharedPtr<FJsonObject> Lobby;
+		FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(TCCtlFx::GuestSeated), Lobby);
+		if (Lobby.IsValid()) Ctl.ApplyLobby(*Lobby);
+		const FTCControlRequest R = Ctl.PlanRename(C.Typed);
+		if (!TestTrue(FString::Printf(TEXT("rename '%s' planned"), C.Typed), R.Message.IsValid())) continue;
+		FString Wire;
+		FJsonSerializer::Serialize(R.Message.ToSharedRef(), TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Wire));
+		TestEqual(FString::Printf(TEXT("wire of '%s' equals JSON.stringify"), C.Typed), Wire, FString(C.Wire));
+		TestEqual(FString::Printf(TEXT("UTF-8 bytes of '%s'"), C.Typed), FTCConnection::Utf8Length(Wire), C.Bytes);
+		TestEqual(FString::Printf(TEXT("cleanName of '%s'"), C.Typed), FTCMatchControls::CleanName(C.Typed), FString(C.Kept));
+	}
+	return true;
+}
 #endif

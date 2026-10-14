@@ -19,6 +19,7 @@
 #include "Client/TCPersistence.h"
 #include "Client/TCLocale.h"
 #include "Client/TCAlerts.h"
+#include "Client/TCEndReport.h"
 #include "ThreeCrossroads.h"
 #include "World/TCTerrain.h"
 #include "World/TCWorldObjects.h"
@@ -94,6 +95,8 @@ namespace
 		case ETCUiAction::Fort: case ETCUiAction::Entrench: case ETCUiAction::Formation: case ETCUiAction::Support: return A.Unit == B.Unit;
 		case ETCUiAction::LobbySetting: case ETCUiAction::MatchOption: case ETCUiAction::MatchControl: return A.Unit == B.Unit && A.Group == B.Group;
 		case ETCUiAction::LoadSave: case ETCUiAction::Research: return A.Unit == B.Unit;
+		// round 16 (controls): the alert feed's hit boxes carry their tag (a line, the summary, Previous / Next, an entry)
+		case ETCUiAction::Alert: return B.Unit.IsEmpty() || A.Unit == B.Unit;
 		default: return true;
 		}
 	}
@@ -174,6 +177,138 @@ TArray<FString> ATCHUD::WrapShown(const FString& Shown, float MaxWidth, UFont* F
 	}
 	if (!Cur.IsEmpty()) Out.Add(Cur);
 	return Out;
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// Round 16 (hudfit): the fit rules (TCHUD.h FTCHudFit) and the match controls where the browser has them
+
+float FTCHudFit::StripMaxWidth(float ClipX, float CornerRight)
+{
+	return FMath::Max(0.f, ClipX - 2.f * FMath::Max(8.f, CornerRight + 4.f));
+}
+
+FBox2D FTCHudFit::SandboxPlace(float ClipX, float ClipY, FVector2D Size, float StripLow, const TArray<FBox2D>& Avoid, bool* bOutBrowserSpot)
+{
+	const float X = FMath::Max(8.f, (ClipX - Size.X) / 2);
+	const FBox2D Spot(FVector2D(X, ClipY - SandboxBottom - Size.Y), FVector2D(X + Size.X, ClipY - SandboxBottom));
+	bool bClear = Spot.Min.Y >= StripLow + 4.f;
+	for (const FBox2D& A : Avoid)
+		if (bClear && A.bIsValid && A.Min.X < Spot.Max.X && A.Max.X > Spot.Min.X && A.Min.Y < Spot.Max.Y + 4.f && A.Max.Y > Spot.Min.Y - 4.f) bClear = false;
+	if (bOutBrowserSpot) *bOutBrowserSpot = bClear;
+	if (bClear) return Spot;
+	return FBox2D(FVector2D(X, StripLow + 4.f), FVector2D(X + Size.X, StripLow + 4.f + Size.Y));
+}
+
+int32 FTCHudFit::FitLevel(const TArray<float>& Heights, float ClipY, float BottomGap, float TopLimit)
+{
+	for (int32 L = 0; L < Heights.Num(); L++) if (ClipY - BottomGap - Heights[L] >= TopLimit) return L;
+	return FMath::Max(0, Heights.Num() - 1);
+}
+
+float FTCHudFit::NarrowerPanel(float Start, float Floor, float Step, TFunctionRef<bool(float)> Fits)
+{
+	float Best = Start;
+	for (float Try = Start - Step; Try > Floor - Step + 0.01f; Try -= Step)
+	{
+		const float W = FMath::Max(Try, Floor);
+		if (!Fits(W)) break;
+		Best = W;
+		if (W <= Floor) break;
+	}
+	return Best;
+}
+
+FTCUiCommand ATCHUD::ControlCommand(const FString& Key, int32 Slot)
+{
+	static const TPair<const TCHAR*, ETCUiAction> Settings[] = {
+		{ TEXT("Setting.Graphics"), ETCUiAction::Graphics }, { TEXT("Setting.Gore"), ETCUiAction::Gore }, { TEXT("Setting.EdgeScroll"), ETCUiAction::EdgeScroll },
+		{ TEXT("Setting.PanSpeed"), ETCUiAction::PanSpeed }, { TEXT("Setting.Cover"), ETCUiAction::CoverToggle }, { TEXT("Setting.Volume"), ETCUiAction::Volume },
+		{ TEXT("Setting.UiScale"), ETCUiAction::UiScale }, { TEXT("Setting.Language"), ETCUiAction::Language } };
+	if (Key.StartsWith(TEXT("Setting.")))
+		for (const auto& P : Settings) if (Key == P.Key) return FTCUiCommand(P.Value);
+	FTCUiCommand C(ETCUiAction::MatchControl);
+	C.Unit = Key;
+	C.Group = Slot;
+	return C;
+}
+
+TArray<FTCControlRow> ATCHUD::MenuSettingRows() const
+{
+	// client/index.html #menu after the session buttons: light.js puts Graphics and Gore before Leave (SplitMatchControls
+	// places them there); then Edge scroll, Pan speed, cover-preview.js's switch (before the first .vol), Volume and the
+	// UI scale. The browser's Capture mouse and Stats overlay buttons have no native switch here. The language picker
+	// is the page header's (#langSel), which a native match has nowhere else: it closes the list.
+	TArray<FTCControlRow> Rows;
+	const ATCGameMode* M = GetWorld() ? GetWorld()->GetAuthGameMode<ATCGameMode>() : nullptr;
+	const ATCPlayerController* PC = Cast<ATCPlayerController>(GetOwningPlayerController());
+	if (!M || !PC) return Rows;
+	auto Add = [&](const FString& Label, const TCHAR* Key, const FString& Hover, bool bOn)
+	{
+		FTCControlRow R;
+		FTCControlItem I; I.Label = Label; I.Key = Key; I.Hover = Hover; I.bOn = bOn;
+		R.Items.Add(I);
+		Rows.Add(R);
+	};
+	Add(FTCGraphics::MenuLabel(FTCGraphics::Get().Level()), TEXT("Setting.Graphics"), FTCGraphics::MenuTip(), FTCGraphics::Get().IsLow());
+	Add(FTCGraphics::GoreLabel(FTCGraphics::Get().Gore()), TEXT("Setting.Gore"), FTCGraphics::GoreTip(), false);
+	if (!M->State.bSpectator)
+	{
+		// client/camera.js preferences, the menu's Edge scroll and Pan speed (saved)
+		Add(PC->EdgeScrollLabel(), TEXT("Setting.EdgeScroll"), TEXT("Edge scroll: the view pans when the pointer is at the window's edge"), PC->EdgeScrollOn());
+		Add(PC->PanSpeedLabel(), TEXT("Setting.PanSpeed"), TEXT("Pan speed: Slow, Normal or Fast for the keys and the edges"), false);
+		Add(FTCCoverPreview::MenuLabel(M->Cover.IsEnabled()), TEXT("Setting.Cover"), FTCCoverPreview::MenuTip(), M->Cover.IsEnabled());
+	}
+	Add(PC->VolumeLabel(), TEXT("Setting.Volume"), TEXT("Effects, voices and alerts. M mutes (right click: quieter)"), false);
+	Add(PC->UiScaleLabel(), TEXT("Setting.UiScale"), FTCSettingsStore::UIScaleTip(), false);
+	Add(PC->LanguageLabel(), TEXT("Setting.Language"), TEXT("Language"), false);
+	return Rows;
+}
+
+void ATCHUD::SplitMatchControls(TArray<FTCControlRow>& Corner, TArray<FTCControlRow>& Sandbox) const
+{
+	// ATCGameMode::MatchControlRows (Client/TCMatchControls.cpp) in the browser's places: the Menu button and the open
+	// menu in the corner, with the settings in it (Graphics and Gore before Leave, the rest after it); the sandbox row
+	// apart (#sandbox); Send next wave left out (DrawScoreStrip draws it in the Horde lead block). Rows this does not
+	// know stay in the corner.
+	Corner.Reset(); Sandbox.Reset();
+	const ATCGameMode* M = GetWorld() ? GetWorld()->GetAuthGameMode<ATCGameMode>() : nullptr;
+	if (!M) return;
+	auto Has = [](const FTCControlRow& R, const TCHAR* Key) { for (const FTCControlItem& I : R.Items) if (I.Key == Key) return true; return false; };
+	TArray<FTCControlRow> Settings = bSettingsInMenu && M->Controls.MenuOpen() ? MenuSettingRows() : TArray<FTCControlRow>();
+	const int32 BeforeLeave = FMath::Min(2, Settings.Num());
+	bool bPlaced = Settings.Num() == 0;
+	for (const FTCControlRow& R : M->MatchControlRows())
+	{
+		if (Has(R, TEXT("NextWave"))) continue;
+		if (Has(R, TEXT("SandboxUnit")) || Has(R, TEXT("SandboxSide")) || Has(R, TEXT("SandboxSpawn"))) { Sandbox.Add(R); continue; }
+		if (!bPlaced && Has(R, TEXT("Leave")))
+		{
+			for (int32 K = 0; K < BeforeLeave; K++) Corner.Add(Settings[K]);
+			Corner.Add(R);
+			for (int32 K = BeforeLeave; K < Settings.Num(); K++) Corner.Add(Settings[K]);
+			bPlaced = true;
+			continue;
+		}
+		Corner.Add(R);
+	}
+	// no Leave (a spectator's menu): the settings after the session buttons
+	if (!bPlaced) Corner.Append(Settings);
+}
+
+FVector2D ATCHUD::MeasureControlRows(UFont* Font, const TArray<FTCControlRow>& Rows)
+{
+	// the size DrawControlRows gives its panel at W = 0 (as wide as the widest row), with its hover line
+	if (!Rows.Num()) return FVector2D::ZeroVector;
+	auto Measure = [&](const FString& Lb) { float TW = 0, TH = 0; LabelSize(Lb, TW, TH, Font, 1.f); return TW + 2 * Pad; };
+	float H = 2 * Pad + Line, Wide = 0.f;
+	for (const FTCControlRow& R : Rows)
+	{
+		H += R.Items.Num() ? Line + Pad + 4.f : Line;
+		float RW = (R.Text.IsEmpty() ? 0.f : Measure(R.Text)) + 2 * Pad;
+		for (const FTCControlItem& It : R.Items) RW += Measure(It.Label) + Pad;
+		Wide = FMath::Max(Wide, RW);
+	}
+	return FVector2D(Wide, H);
 }
 
 FVector2D ATCHUD::StartBand(float ScreenH, float UiScale, bool bClassic)
@@ -276,7 +411,8 @@ bool ATCHUD::ButtonAt(FVector2D Pixel, ETCUiAction& OutAction) const
 
 bool ATCHUD::CommandAt(FVector2D Pixel, FTCUiCommand& OutCommand) const
 {
-	for (const FButton& B : Buttons) if (B.Rect.IsInsideOrOn(Pixel)) { OutCommand = B.Command; return true; }
+	// round 16: the last drawn first, so a panel drawn over another (the open match menu) takes the click
+	for (int32 I = Buttons.Num() - 1; I >= 0; I--) if (Buttons[I].Rect.IsInsideOrOn(Pixel)) { OutCommand = Buttons[I].Command; return true; }
 	return false;
 }
 
@@ -305,7 +441,7 @@ FString ATCHUD::ButtonLabels() const
 	return FString::Join(L, TEXT(", "));
 }
 
-float ATCHUD::DrawLobby(UFont* Font, float Y)
+float ATCHUD::DrawLobby(UFont* Font, float Y, float LobbyW)
 {
 	// client/index.html #lobby as client/main.js renderLobby fills it: the room line, the settings (FTCLobbySettings:
 	// each select is a button that cycles its choices, left click forward, right click back, greyed when this client
@@ -316,9 +452,10 @@ float ATCHUD::DrawLobby(UFont* Font, float Y)
 	if (S.RoomState.IsEmpty()) return Y; // no lobby yet: the status line says what the connection is doing
 	const FTCLobbySettings& L = M->Lobby;
 	struct FItem { FString Label; FTCUiCommand Command; bool bEnabled; FString Hover; };
-	struct FLine { FString Text; FLinearColor Colour; TArray<FItem> Items; };
+	// MaxW (round 16): a text line's own wrap width (#modeInfo's max-width: 60ch), 0 for the panel's
+	struct FLine { FString Text; FLinearColor Colour; TArray<FItem> Items; float MaxW = 0.f; };
 	TArray<FLine> Lines;
-	const float W = 700.f;
+	const float W = LobbyW;
 	auto Measure = [&](const FString& Lb) { float TW = 0, TH = 0; LabelSize(Lb, TW, TH, Font, 1.f); return TW + 2 * Pad; };
 	// buttons in rows that wrap at the panel's width, the first row after an optional text
 	auto AddButtons = [&](const TArray<FItem>& Items, const FString& Lead = FString(), FLinearColor Colour = FLinearColor::White)
@@ -338,7 +475,11 @@ float ATCHUD::DrawLobby(UFont* Font, float Y)
 		FTCUiCommand Cmd(ETCUiAction::LobbySetting);
 		Cmd.Unit = LexToString(C.Kind);
 		Cmd.Group = C.Slot;
-		FString Label = FString::Printf(TEXT("%s: %s"), *C.Title, C.CurrentLabel.IsEmpty() ? TEXT("?") : *C.CurrentLabel);
+		// round 16: a seat's selects (team, faction, AI difficulty) show their choice alone, as client/main.js renderLobby's
+		// pick() <select>s in the roster row do ('Team 1', the faction's name, 'Normal'); the room's selects keep the
+		// 'Title: ' their page labels give them. The title stays in the hover line.
+		const bool bSeat = C.Kind == ETCLobbySetting::Team || C.Kind == ETCLobbySetting::Faction || C.Kind == ETCLobbySetting::Level;
+		FString Label = bSeat ? (C.CurrentLabel.IsEmpty() ? FString(TEXT("?")) : C.CurrentLabel) : FString::Printf(TEXT("%s: %s"), *C.Title, C.CurrentLabel.IsEmpty() ? TEXT("?") : *C.CurrentLabel);
 		if (C.bPending)
 		{
 			const FTCLobbyChoice* P = C.Find(C.PendingValue);
@@ -360,7 +501,11 @@ float ATCHUD::DrawLobby(UFont* Font, float Y)
 	if (L.HasLobby() && bLobby)
 	{
 		const FString Info = FTCLobbySettings::ModeInfo(R.Mode);
-		if (!Info.IsEmpty()) Lines.Add({ Info, Dim, {} });
+		// round 16: index.html #modeInfo { max-width: 60ch } in the card's text, wrapped (white-space: normal): 60 times
+		// the width of the font's '0', within the panel
+		float ZeroW = 0.f, ZeroH = 0.f;
+		ShownSize(TEXT("0"), ZeroW, ZeroH, Font, 1.f);
+		if (!Info.IsEmpty()) Lines.Add({ Info, Dim, {}, 60.f * ZeroW });
 		TArray<FItem> Room;
 		for (const FTCLobbyControl& C : L.RoomControls()) if (C.bShown) Room.Add(ControlItem(C));
 		// client/index.html: the Weather select and the Sandbox checkbox (FTCMatchOptions), greyed for a guest
@@ -416,7 +561,8 @@ float ATCHUD::DrawLobby(UFont* Font, float Y)
 	}
 	if (!S.LastResult.IsEmpty()) Lines.Add({ FString::Printf(TEXT("Last match: %s."), *S.LastResult), Dim, {} });
 	const bool bHost = S.bAmHost && !S.bSpectator;
-	if (S.RoomState == TEXT("play")) Lines.Add({ TEXT("A match is running: joining it..."), Dim, {} });
+	// round 16: not after a Leave (main.js on left: #lobbyMsg says only "You left the match; ...", the first row here)
+	if (S.RoomState == TEXT("play") && !M->Controls.Left()) Lines.Add({ TEXT("A match is running: joining it..."), Dim, {} });
 	else if (S.bSpectator) Lines.Add({ TEXT("You are watching this room."), Dim, {} });
 	// (a guest's "Waiting for the host to start..." is FTCLobbySettings::StartLine, the browser's #lobbyMsg text)
 	if (S.bAmHost && bLobby)
@@ -455,6 +601,23 @@ float ATCHUD::DrawLobby(UFont* Font, float Y)
 	const FTCPersistenceStatus& St = M->Persistence.Status();
 	if (St.Request != ETCPersistenceCommand::None) Lines.Add({ St.Describe(), Dim, {} });
 
+	// round 16: each text line in the language in use, wrapped at the panel's width (or its own MaxW) as the card's
+	// text wraps (white-space: normal); before, a long line (Horde's description with its record) ran past the panel
+	TArray<FLine> Wrapped;
+	TArray<bool> bShownText;
+	for (const FLine& Ln : Lines)
+	{
+		if (Ln.Items.Num()) { Wrapped.Add(Ln); bShownText.Add(false); continue; }
+		const FString T = TC_T(Ln.Text);
+		NoteKept(Ln.Text, T);
+		const float Wrap = Ln.MaxW > 0.f ? FMath::Min(Ln.MaxW, W - 2 * Pad - 6.f) : W - 2 * Pad - 6.f;
+		for (const FString& Piece : FTCPaint::Wrap(T, Wrap, 0.f, false, [&](const FString& Q, float, bool, float) { float TW = 0, TH = 0; ShownSize(Q, TW, TH, Font, 1.f); return TW; }))
+		{
+			Wrapped.Add({ Piece, Ln.Colour, {} });
+			bShownText.Add(true);
+		}
+	}
+	Lines = MoveTemp(Wrapped);
 	const float RowH = Line + Pad + 4.f;
 	float H = 2 * Pad + Line; // the hover line
 	for (const FLine& Ln : Lines) H += Ln.Items.Num() ? RowH : Line;
@@ -465,9 +628,10 @@ float ATCHUD::DrawLobby(UFont* Font, float Y)
 	if (bMouse) Mouse = FVector2D(MX, MY) / UiNow; // in the scaled panels' own pixels
 	FString Hover;
 	float RowY = Y + Pad;
-	for (const FLine& Ln : Lines)
+	for (int32 Li = 0; Li < Lines.Num(); Li++)
 	{
-		if (!Ln.Items.Num()) { DrawLabel(Ln.Text, Ln.Colour, 14.f, RowY, Font, 1.f); RowY += Line; continue; }
+		const FLine& Ln = Lines[Li];
+		if (!Ln.Items.Num()) { if (bShownText[Li]) DrawShown(Ln.Text, Ln.Colour, 14.f, RowY, Font, 1.f); else DrawLabel(Ln.Text, Ln.Colour, 14.f, RowY, Font, 1.f); RowY += Line; continue; }
 		float X = 14.f;
 		// a lead text before the buttons (a seat's name), or a trailing text after them (a save's row)
 		const bool bLead = !Ln.Text.IsEmpty() && Ln.Items[0].Command.Action != ETCUiAction::LoadSave;
@@ -485,12 +649,14 @@ float ATCHUD::DrawLobby(UFont* Font, float Y)
 	return Y + H + 4.f;
 }
 
-float ATCHUD::DrawMatchPanel(UFont* Font, float Width)
+float ATCHUD::DrawMatchPanel(UFont* Font, float Width, float TopLimit, bool bDraw)
 {
 	ATCGameMode* M = GetWorld()->GetAuthGameMode<ATCGameMode>();
 	ATCPlayerController* PC = Cast<ATCPlayerController>(GetOwningPlayerController());
 	const FTCMatchState& S = M->State;
-	TArray<TPair<FString, FLinearColor>> Rows;
+	// round 16: each text row with the fit level from which it is left out (FTCHudFit::FitLevel; 99: always shown)
+	struct FPanelRow { FString Key; FLinearColor Value; int32 DropAt = 99; bool bMore = false; };
+	TArray<FPanelRow> Rows;
 	// The selection: one unit in detail, several as counts by type with their summed health
 	if (PC->Selected.Num() == 1)
 	{
@@ -561,17 +727,19 @@ float ATCHUD::DrawMatchPanel(UFont* Font, float Width)
 	{
 		const FTCLogisticsCard Card = M->Logistics.Card(S, PC->Selected.Array());
 		// round 15: the card's heading (hud.js drawLogistics: <div class="hd">Logistics</div>)
-		if (Card.Entries.Num()) Rows.Add({ TEXT("Logistics"), Dim });
+		if (Card.Entries.Num()) Rows.Add({ TEXT("Logistics"), Dim, 3 });
 		for (int32 I = 0; I < Card.Entries.Num() && I < 4; I++)
 		{
 			const FTCLogisticsEntry& E = Card.Entries[I];
 			const FTCUnit* EU = S.Units.Find(E.Id);
-			// hud.js drawLogistics: tr(name(v.type, v.owner)) + ' #' + id
-			Rows.Add({ FString::Printf(TEXT("%s #%d: %s"), *FTCAlerts::UnitName(S, &M->UnitTable, E.Type, EU ? EU->Owner : S.You), E.Id, *FString::Join(E.Lines, TEXT("  |  "))), Good });
+			// hud.js drawLogistics: tr(name(v.type, v.owner)) + ' #' + id; round 16: rows past the first two (fit level
+			// 2) or the first (level 3) go to the count below, as the browser's list scrolls
+			Rows.Add({ FString::Printf(TEXT("%s #%d: %s"), *FTCAlerts::UnitName(S, &M->UnitTable, E.Type, EU ? EU->Owner : S.You), E.Id, *FString::Join(E.Lines, TEXT("  |  "))), Good, I >= 2 ? 2 : I >= 1 ? 3 : 99 });
 		}
 		// the rest are cut where the browser's list scrolls (logistics.css .logistics-reserves max-height and overflow:
-		// auto): a count with no words, so it reads the same in both languages (round 15; it was an English sentence)
-		if (Card.Entries.Num() > 4) Rows.Add({ FString::Printf(TEXT("... +%d"), Card.Entries.Num() - 4), Dim });
+		// auto): a count with no words, so it reads the same in both languages (round 15; it was an English sentence).
+		// Round 16: the count is made at the fit level (bMore), from the entries left out there.
+		if (Card.Entries.Num() > 1) { FPanelRow More{ FString(), Dim }; More.bMore = true; More.DropAt = Card.Entries.Num(); Rows.Add(More); }
 		if (Card.bVisible && Card.bTrucks) Rows.Add({ FTCLogisticsCard::Hint, Dim });
 	}
 	// the control groups that hold units (client/selection.js groups; the browser shows them as badges)
@@ -581,8 +749,10 @@ float ATCHUD::DrawMatchPanel(UFont* Font, float Width)
 		for (int32 G = 1; G <= FTCControlGroups::GroupCount; G++)
 			if (const int32 N = PC->Groups.Members(G).Num()) Parts.Add(FString::Printf(TEXT("%d: %d"), G, N));
 		// the browser's words: hud.js's 'Control group' label, and the Controls sheet's line for Ctrl+1-9 (index.html; the
-		// key written as es.js's 'Fullscreen: also lets Ctrl+1-9 set groups' writes it)
-		Rows.Add({ Parts.Num() ? TEXT("Control group  ") + FString::Join(Parts, TEXT("   ")) : FString(TEXT("Ctrl+1-9: Set a control group; Shift adds to it")), Dim });
+		// key written as es.js's 'Fullscreen: also lets Ctrl+1-9 set groups' writes it). Round 16: the hint only with a
+		// selection (hud.js drawOrders puts its Control group row in #abil, which is empty with nothing selected)
+		if (Parts.Num()) Rows.Add({ TEXT("Control group  ") + FString::Join(Parts, TEXT("   ")), Dim });
+		else if (PC->Selected.Num()) Rows.Add({ TEXT("Ctrl+1-9: Set a control group; Shift adds to it"), Dim });
 	}
 
 	// the Formation menu's settings while the Orders panel shows (client/hud.js drawOrders: the Form button's submenu)
@@ -591,8 +761,10 @@ float ATCHUD::DrawMatchPanel(UFont* Font, float Width)
 		const FTCFormationSettings& F = PC->Formation.Settings;
 		// the Form submenu's own words (hud.js: 'Formation: {0}', 'Formation spacing {0}x', the Together and Snap switches),
 		// each its own column so each is translated by itself
+		// round 16: this summary is the native panel's own (the browser shows the state on the Form menu's buttons), so it
+		// is the first row to go when the panel needs the room (fit level 2)
 		Rows.Add({ FString::Printf(TEXT("Formation: %s  |  Formation spacing %.2fx  |  Together: %s  |  Snap: %s"), LexToString(F.Shape), F.Spread,
-			F.bTogether ? TEXT("On") : TEXT("Off"), F.bSnap ? TEXT("On") : TEXT("Off")), Dim });
+			F.bTogether ? TEXT("On") : TEXT("Off"), F.bSnap ? TEXT("On") : TEXT("Off")), Dim, 2 });
 	}
 
 	// The buttons (client/hud.js drawOrders), in rows that wrap at the panel's width: Stop and Attack-move always; for a
@@ -600,7 +772,9 @@ float ATCHUD::DrawMatchPanel(UFont* Font, float Width)
 	// the Build menu; Resume deliveries for an all-truck selection; the logistics switches; End match for the host.
 	// Slice 1f: the support bar (client/hud.js buildSupport and drawEcon) in its own row first, the Shell area button
 	// with a salvo unit selected, the Form menu and the cover preview switch.
-	struct FItem { FString Label; FTCUiCommand Command; bool bEnabled; FLinearColor Fill; FString Hover; };
+	// Compact (round 16): the label at fit level 1 and up (the support bar: what the browser's button shows, its key and
+	// its cost; the browser draws the power's icon where this has none, and its title names it, as Hover does here)
+	struct FItem { FString Label; FTCUiCommand Command; bool bEnabled; FLinearColor Fill; FString Hover; FString Compact; };
 	TArray<FItem> Bar, Orders, Menu;
 	const float W = Width;
 	if (!S.bSpectator && S.SeatConfirmed())
@@ -612,12 +786,18 @@ float ATCHUD::DrawMatchPanel(UFont* Font, float Width)
 			const bool bAimed = PC->Aim == ETCAim::Support && PC->PowerAim.Kind == ETCSupportAimKind::Support && PC->PowerAim.SupportKind == B.Kind;
 			// the browser never disables a support button: a click on a refused one explains why (aimSupport)
 			Bar.Add({ FString::Printf(TEXT("%s [%s] %s"), D ? *D->Name : *B.Kind, *B.Key, *B.Text), C, B.Check.bOk, bAimed ? TabOpen : B.Check.bOk ? ButtonFill : CardOff,
-				B.Check.bOk ? B.Tip : FString::Printf(TEXT("%s: %s%s"), D ? *D->Name : *B.Kind, *B.Check.Reason, B.Check.bNative ? TEXT(" (this client's own check)") : TEXT("")) });
+				B.Check.bOk ? B.Tip : FString::Printf(TEXT("%s: %s%s"), D ? *D->Name : *B.Kind, *B.Check.Reason, B.Check.bNative ? TEXT(" (this client's own check)") : TEXT("")),
+				B.Key.IsEmpty() ? B.Text : FString::Printf(TEXT("[%s] %s"), *B.Key, *B.Text) });
 		}
 	if (!S.bSpectator)
 	{
-		Orders.Add({ TEXT("Stop (X)"), FTCUiCommand(ETCUiAction::Stop), true, ButtonFill, TEXT("Stop (X): halt where they are") });
-		Orders.Add({ TEXT("Attack-move (G)"), FTCUiCommand(ETCUiAction::AttackMove), true, PC->Aim == ETCAim::AttackMove ? TabOpen : ButtonFill, TEXT("Attack-move (G, or Ctrl+right-click): move and fight anything met on the way") });
+		// round 16: hud.js drawOrders fills #abil only for a selection (its key is '' with nothing selected, and the panel
+		// hides when empty), so Stop and Attack-move show with a selection, as the rest of the Orders; the keys still work
+		if (PC->Selected.Num())
+		{
+			Orders.Add({ TEXT("Stop (X)"), FTCUiCommand(ETCUiAction::Stop), true, ButtonFill, TEXT("Stop (X): halt where they are") });
+			Orders.Add({ TEXT("Attack-move (G)"), FTCUiCommand(ETCUiAction::AttackMove), true, PC->Aim == ETCAim::AttackMove ? TabOpen : ButtonFill, TEXT("Attack-move (G, or Ctrl+right-click): move and fight anything met on the way") });
+		}
 		// client/hud.js drawOrders: Shell area while a salvo unit is selected (the badge's arrow is not in the HUD's font)
 		const FTCAreaButton Area = M->Powers.AreaButton(S, M->UnitTable, PC->Selected);
 		if (Area.bShown)
@@ -722,57 +902,88 @@ float ATCHUD::DrawMatchPanel(UFont* Font, float Width)
 		if (bInfantry) Orders.Add({ FString::Printf(TEXT("Take cover (%s)"), *TCKeys::Label(TEXT("cover"))), FTCUiCommand(ETCUiAction::Cover), true, ButtonFill, TEXT("Take cover: the selected squads go to the best cover nearby (Shift queues it)") });
 		if (S.Map.bWorld && PC->Selected.Num())
 			Orders.Add({ FString::Printf(TEXT("Send by rail (%s)"), *TCKeys::Label(TEXT("rail"))), FTCUiCommand(ETCUiAction::Rail), true, PC->Aim == ETCAim::Rail ? TabOpen : ButtonFill, TEXT("Send by rail: click the destination; they ride to your station nearest it") });
-		// client/cover-preview.js: the game menu's switch (this client has no game menu: it sits with the Orders)
-		Orders.Add({ FTCCoverPreview::MenuLabel(M->Cover.IsEnabled()), FTCUiCommand(ETCUiAction::CoverToggle), true, M->Cover.IsEnabled() ? TabOpen : ButtonFill, FTCCoverPreview::MenuTip() });
-		// client/camera.js preferences, the game menu's Edge scroll and Pan speed (saved)
-		Orders.Add({ PC->EdgeScrollLabel(), FTCUiCommand(ETCUiAction::EdgeScroll), true, PC->EdgeScrollOn() ? TabOpen : ButtonFill, TEXT("Edge scroll: the view pans when the pointer is at the window's edge") });
-		Orders.Add({ PC->PanSpeedLabel(), FTCUiCommand(ETCUiAction::PanSpeed), true, ButtonFill, TEXT("Pan speed: Slow, Normal or Fast for the keys and the edges") });
 	}
-	// client/index.html's menu Volume (title "Effects, voices and alerts. M mutes") and the page's language picker: this
-	// client has no game menu, so they sit with the Orders for every match, selection or not
-	Orders.Add({ PC->VolumeLabel(), FTCUiCommand(ETCUiAction::Volume), true, ButtonFill, TEXT("Effects, voices and alerts. M mutes (right click: quieter)") });
-	Orders.Add({ PC->LanguageLabel(), FTCUiCommand(ETCUiAction::Language), true, ButtonFill, TEXT("Language") });
-	// client/light.js: the menu's Graphics and Gore buttons; client/index.html: the UI scale slider (Client/TCGraphics.h)
-	Orders.Add({ FTCGraphics::MenuLabel(FTCGraphics::Get().Level()), FTCUiCommand(ETCUiAction::Graphics), true, FTCGraphics::Get().IsLow() ? TabOpen : ButtonFill, FTCGraphics::MenuTip() });
-	Orders.Add({ FTCGraphics::GoreLabel(FTCGraphics::Get().Gore()), FTCUiCommand(ETCUiAction::Gore), true, ButtonFill, FTCGraphics::GoreTip() });
-	Orders.Add({ PC->UiScaleLabel(), FTCUiCommand(ETCUiAction::UiScale), true, ButtonFill, FTCSettingsStore::UIScaleTip() });
+	// The game menu's settings (client/index.html #menu, cover-preview.js, light.js, camera.js; Volume, the page's
+	// language picker and the UI scale slider). Round 16: they live in the match menu, as in the browser
+	// (MenuSettingRows); only a match with no menu to open (no lobby in play) keeps them here, as before.
+	if (!bSettingsInMenu)
+		for (const FTCControlRow& R : MenuSettingRows())
+			for (const FTCControlItem& It : R.Items)
+				Orders.Add({ It.Label, ControlCommand(It.Key, It.Slot), true, It.bOn ? TabOpen : ButtonFill, It.Hover });
 	// round 15: the host's Pause (Resume) match, Save match and End match moved to the match menu (client/main.js
 	// renderMatchMenu; Client/TCMatchControls.h), with Restart, Hand <name> to AI and Leave
 	auto Measure = [&](const FString& L) { float TW = 0, TH = 0; LabelSize(L, TW, TH, Font, 1.f); return TW + 2 * Pad; };
-	TArray<TArray<FItem>> ButtonRows;
-	auto Wrap = [&](const TArray<FItem>& Items)
-	{
-		TArray<FItem> Row; float X = 0;
-		for (const FItem& I : Items)
-		{
-			const float IW = Measure(I.Label);
-			if (Row.Num() && X + IW > W - 2 * Pad) { ButtonRows.Add(Row); Row.Reset(); X = 0; }
-			Row.Add(I); X += IW + Pad;
-		}
-		if (Row.Num()) ButtonRows.Add(Row);
-	};
-	Wrap(Bar);
-	Wrap(Orders);
-	Wrap(Menu);
 	const float RowH = Line + Pad + 4.f;
+	// round 16: the layout at a fit level (FTCHudFit::FitLevel): the rows it keeps, the buttons in rows that wrap at the
+	// panel's width, and its height
+	struct FLayout { TArray<TPair<FString, FLinearColor>> Shown; TArray<TArray<FItem>> ButtonRows; float H = 0.f; };
+	auto Build = [&](int32 Level)
+	{
+		FLayout Lo;
+		auto Wrap = [&](const TArray<FItem>& Items)
+		{
+			TArray<FItem> Row; float X = 0;
+			for (FItem I : Items)
+			{
+				if (Level >= 1 && !I.Compact.IsEmpty()) I.Label = I.Compact;
+				const float IW = Measure(I.Label);
+				if (Row.Num() && X + IW > W - 2 * Pad) { Lo.ButtonRows.Add(Row); Row.Reset(); X = 0; }
+				Row.Add(I); X += IW + Pad;
+			}
+			if (Row.Num()) Lo.ButtonRows.Add(Row);
+		};
+		Wrap(Bar);
+		Wrap(Orders);
+		Wrap(Menu);
+		// each text row in the language in use, wrapped at the panel's width (a narrow left column)
+		int32 Dropped = 0;
+		for (const FPanelRow& R : Rows)
+		{
+			if (R.bMore)
+			{
+				// the logistics count: the card's entries past the ones shown at this level (at most 4 are kept)
+				const int32 Kept = Level >= 3 ? 1 : Level >= 2 ? 2 : 4;
+				if (R.DropAt > Kept) Lo.Shown.Add({ FString::Printf(TEXT("... +%d"), R.DropAt - Kept), R.Value });
+				continue;
+			}
+			if (Level >= R.DropAt) { Dropped++; continue; }
+			const FString T = TC_T(R.Key);
+			if (bDraw) NoteKept(R.Key, T);
+			for (const FString& Piece : WrapShown(T, W - 2 * Pad, Font)) Lo.Shown.Add({ Piece, R.Value });
+		}
+		Lo.H = Lo.Shown.Num() * Line + Lo.ButtonRows.Num() * RowH + (Lo.ButtonRows.Num() ? Line : 0.f) + 2 * Pad;
+		return Lo;
+	};
+	TArray<FLayout> Levels;
+	TArray<float> Heights;
+	for (int32 L = 0; L <= FTCHudFit::MaxLevel; L++)
+	{
+		Levels.Add(Build(L));
+		Heights.Add(Levels.Last().H);
+		if (Canvas->ClipY - Gap - Heights.Last() >= TopLimit) break; // this level fits: no need to build the next
+	}
+	const int32 Level = FTCHudFit::FitLevel(Heights, Canvas->ClipY, Gap, TopLimit);
+	const FLayout& Lo = Levels[Level];
+	const float H = Lo.H, Y0 = Canvas->ClipY - H - Gap;
+	if (!bDraw) return Y0;
+	MatchPanelLevel = Level;
+	if (Level != LoggedPanelLevel)
+	{
+		LoggedPanelLevel = Level;
+		UE_LOG(LogTC, Log, TEXT("hud: match panel fit level %d (heights %s px, top limit %.1f px, window %.0f x %.0f UI px at %.0f%%)%s"), Level,
+			*FString::JoinBy(Heights, TEXT("/"), [](float V) { return FString::Printf(TEXT("%.0f"), V); }), TopLimit, Canvas->ClipX, Canvas->ClipY, UiNow * 100.f,
+			Y0 < TopLimit ? TEXT(": still above the limit") : TEXT(""));
+	}
 	FVector2D Mouse(-1, -1);
 	float MX, MY;
 	const bool bMouse = PC->GetMousePosition(MX, MY);
 	if (bMouse) Mouse = FVector2D(MX, MY) / UiNow; // in the scaled panels' own pixels
-	// round 15: each text row in the language in use, wrapped at the panel's width (a narrow left column)
-	TArray<TPair<FString, FLinearColor>> Shown;
-	for (const auto& R : Rows)
-	{
-		const FString T = TC_T(R.Key);
-		NoteKept(R.Key, T);
-		for (const FString& Piece : WrapShown(T, W - 2 * Pad, Font)) Shown.Add({ Piece, R.Value });
-	}
-	const float H = Shown.Num() * Line + ButtonRows.Num() * RowH + (ButtonRows.Num() ? Line : 0.f) + 2 * Pad, Y0 = Canvas->ClipY - H - Gap;
 	AddPanel(8.f, Y0, W, H, Panel);
+	MatchPanelBox = FBox2D(FVector2D(8.f, Y0), FVector2D(8.f + W, Y0 + H));
 	float Y = Y0 + Pad;
-	for (const auto& R : Shown) { DrawShown(R.Key, R.Value, 14.f, Y, Font, 1.f); Y += Line; }
+	for (const auto& R : Lo.Shown) { DrawShown(R.Key, R.Value, 14.f, Y, Font, 1.f); Y += Line; }
 	FString Hover;
-	for (const TArray<FItem>& Row : ButtonRows)
+	for (const TArray<FItem>& Row : Lo.ButtonRows)
 	{
 		float X = 14.f;
 		for (const FItem& I : Row)
@@ -1057,7 +1268,6 @@ void ATCHUD::DrawWorldOverlays(UFont* Font)
 	if (!M || !PC || !M->Terrain) return;
 	const ATCTerrain& T = *M->Terrain;
 	const FTCMatchState& S = M->State;
-	const FLinearColor RallyColour(FColor(0x9d, 0xd0, 0xff));
 	auto Label = [&](FVector2D At, const FString& L, const FLinearColor& C)
 	{
 		const FVector Sc = Project(ATCTerrain::ToWorld(At.X, At.Y, T.HeightAt(At.X, At.Y) + 1.f));
@@ -1210,15 +1420,7 @@ void ATCHUD::DrawWorldOverlays(UFont* Font)
 	if (PC->Aim == ETCAim::Ability && PC->bPointerGround && PC->AimAbilityRadius > 0)
 		GroundRing(T, PC->PointerGround, (float)PC->AimAbilityRadius, FLinearColor(FColor(0xff, 0xa0, 0x30)), 2.f);
 	// rally points: the army's (shared/sim.js snapshotFor rally) and the selected own buildings' (their queue's rally)
-	if (M->bArmyRally) { GroundRing(T, M->ArmyRally, 1.5f, RallyColour, 2.f); Label(M->ArmyRally, TEXT("Army rally"), RallyColour); }
-	for (int32 Id : PC->Selected)
-	{
-		const FTCUnit* U = S.Units.Find(Id);
-		const FTCProductionQueue* Q = U ? M->Recruit.QueueOf(Id) : nullptr;
-		if (!Q || Q->Rally.X < 0) continue;
-		GroundLine(T, { FVector2D(U->X, U->Z), Q->Rally }, false, RallyColour * FLinearColor(1, 1, 1, 0.6f), 1.5f);
-		GroundRing(T, Q->Rally, 1.2f, RallyColour, 2.f);
-	}
+	// are planLayer's flags since round 16 (DrawPlans, TCOrders::Markers)
 	// client/logistics.js overlayItems and main.js drawLogisticsRoutes: known stores, the selected trucks' known routes
 	if (M->Logistics.OverlayActive())
 	{
@@ -1385,7 +1587,7 @@ void ATCHUD::DrawHUD()
 		const bool bAsIs = I < Diagnostics || I == KeyLine;
 		const FString Shown = bAsIs ? Lines[I] : TC_T(Lines[I]);
 		if (!bAsIs) NoteKept(Lines[I], Shown);
-		Status.Add({ Shown, Text });
+		Status.Add({ Shown, Text, bAsIs });
 	}
 	if (!S.DenyReason.IsEmpty() || !S.DenyCmd.IsEmpty())
 	{
@@ -1411,6 +1613,20 @@ void ATCHUD::DrawHUD()
 		// round 14: the paper war map over the world and its markers, under every panel (client/map-view.js)
 		M->WarMap.Draw(Canvas, *M, *PC);
 		BeginUi(FTCSettingsStore::UIScaleFactor(PC->UiScalePercent));
+		// round 16: the match controls in the browser's places (SplitMatchControls). The settings live in the match menu
+		// whenever there is one to open; the corner's closed Menu panel sets how far left the strip may reach
+		bSettingsInMenu = M->Controls.MenuButton().bShown;
+		TArray<FTCControlRow> CornerRows, SandboxRows;
+		SplitMatchControls(CornerRows, SandboxRows);
+		float CornerClosedH = 0.f;
+		{
+			TArray<FTCControlRow> Closed;
+			for (const FTCControlRow& R : CornerRows) { bool bMenu = false; for (const FTCControlItem& I : R.Items) bMenu |= I.Key == TEXT("Menu"); if (bMenu) Closed.Add(R); }
+			if (!Closed.Num()) Closed = CornerRows;
+			const FVector2D C = MeasureControlRows(Font, Closed);
+			CornerRight = C.X > 0.f ? 8.f + C.X : 0.f;
+			CornerClosedH = C.Y;
+		}
 		const int32 StripFrom = Panels.Num();
 		const float StripBottom = DrawScoreStrip(Font, Big);
 		BandTop = bStrip ? StripBottom * UiNow : 0.f; // round 14: camera.js band, #top (screen pixels: the strip is drawn at the UI scale)
@@ -1438,8 +1654,35 @@ void ATCHUD::DrawHUD()
 		// round 15: the recruit card always sits beside the match panel at the bottom, between it and the minimap
 		// (#buy at every UI scale); the match panel narrows only when the window leaves the card less than RecruitMinW
 		const float RoomRight = Minimap.Rect().bIsValid ? ToUi((float)Minimap.Rect().Min.X) - 12.f : Canvas->ClipX - Gap;
-		const float MatchW = MatchPanelWidth(RoomRight);
-		const float MatchTop = DrawMatchPanel(Font, MatchW) * UiNow; // screen pixels
+		float MatchW = MatchPanelWidth(RoomRight);
+		// round 16: the match panel stays under the strip (and its notice lines, the boss bar and the follow chip) where
+		// they share columns; under the sandbox panel too when that sits under the strip over it. The sandbox panel takes
+		// #sandbox's place (230 px over the bottom, centred) when that is clear of the strip, the match panel and the
+		// recruit card (last frame's), else it goes under the strip
+		const float StripLowUi = StripLow / UiNow;
+		const bool bShareStrip = StripRight > StripLeft && StripLeft / UiNow < 8.f + MatchW;
+		float PanelLimit = bShareStrip ? StripLowUi + 4.f : 0.f;
+		const FVector2D SbSize = MeasureControlRows(Font, SandboxRows);
+		SandboxBox = FBox2D(ForceInit);
+		if (SbSize.X > 0.f)
+		{
+			const float PanelTop = DrawMatchPanel(Font, MatchW, PanelLimit, false);
+			TArray<FBox2D> Avoid = { FBox2D(FVector2D(8.f, PanelTop), FVector2D(8.f + MatchW, Canvas->ClipY)) };
+			if (RecruitBox.bIsValid) Avoid.Add(FBox2D(RecruitBox.Min / UiNow, RecruitBox.Max / UiNow));
+			bool bSpot = false;
+			SandboxBox = FTCHudFit::SandboxPlace(Canvas->ClipX, Canvas->ClipY, SbSize, StripLowUi, Avoid, &bSpot);
+			if (!bSpot && SandboxBox.Min.X < 8.f + MatchW) PanelLimit = FMath::Max(PanelLimit, SandboxBox.Max.Y + 4.f);
+		}
+		// round 16: with the settings in the menu the match panel is short; where the recruit card beside it would get
+		// less than RecruitWantW (a large UI scale in a small window: a one-card column that grew over the strip's boss
+		// bar), the panel gives the card room, 40 px at a time down to the browser's 248 px left column, for as long as
+		// it still fits under the strip (FTCHudFit::NarrowerPanel)
+		{
+			const float Floor = FMath::Max(LeftColumnMinW, RoomRight - (8.f + Gap) - RecruitWantW);
+			if (Floor < MatchW)
+				MatchW = FTCHudFit::NarrowerPanel(MatchW, Floor, 40.f, [&](float Try) { return DrawMatchPanel(Font, Try, PanelLimit, false) >= PanelLimit; });
+		}
+		const float MatchTop = DrawMatchPanel(Font, MatchW, PanelLimit) * UiNow; // screen pixels
 		const int32 PanelsBeforeRecruit = Panels.Num();
 		DrawRecruitPanel(Font, 8.f + MatchW + Gap, Canvas->ClipY - Gap);
 		// round 14: camera.js band: from the top panels down to the recruit bar (#buy), the whole height when it is empty
@@ -1462,20 +1705,38 @@ void ATCHUD::DrawHUD()
 			}
 		}
 		PC->SetClearBand(Band.X, Band.Y);
-		// round 15 (lead): the match controls (Menu and the match menu, the sandbox panel, Send next wave) in the top left
-		// corner, under the score strip when the strip reaches that corner (several seats); drawn before the status
-		// column, which then starts under them (screen pixels: the panels are recorded in screen pixels)
-		float CtlBottom = 0.f;
+		// round 16: the sandbox panel (#sandbox), then the corner: the Menu button (#util) and, open, the menu (#menu)
+		// under it. The open menu is the browser's dropdown over the HUD (z-index 20): under the strip when it fits there
+		// beside the strip's first card, else straight under the Menu button over the strip; drawn last of the panels,
+		// so its buttons take the clicks (CommandAt reads the last drawn first)
+		if (SandboxBox.bIsValid) DrawControlRows(Font, SandboxBox.Min.X, SandboxBox.Min.Y, 0.f, SandboxRows);
+		// the corner's place now (drawn after the status column and the alert feed, over them): the status column keeps
+		// to the closed Menu panel (CornerRight), the open menu covering it as the browser's dropdown covers the HUD
+		const FVector2D CtlSize = MeasureControlRows(Font, CornerRows);
+		float CtlTop = Y + 4.f;
+		if (CtlSize.X > 0.f)
 		{
-			const FVector2D CtlSize = MeasureMatchControls(Font);
-			float CtlTop = Y + 4.f;
-			// under the strip only where that leaves the match panel's buttons clear (a large UI scale in a small
-			// window, a boss bar, the sandbox row): else the corner, over the strip's first card but over no button
-			if (CtlSize.X > 0.f && StripLeft < (8.f + CtlSize.X + 4.f) * UiNow && (StripLow / UiNow + 4.f + CtlSize.Y) * UiNow <= MatchTop - 4.f) CtlTop = StripLow / UiNow + 4.f;
-			const int32 CtlFrom = Panels.Num();
-			DrawMatchControls(Font, CtlTop);
-			for (int32 K = CtlFrom; K < Panels.Num(); K++) CtlBottom = FMath::Max(CtlBottom, (float)Panels[K].Max.Y);
+			const bool bOverStrip = StripRight > StripLeft && StripLeft / UiNow < 8.f + CtlSize.X + 4.f && CtlTop < StripLowUi;
+			if (bOverStrip && StripLowUi + 4.f + CtlSize.Y <= Canvas->ClipY - Gap) CtlTop = StripLowUi + 4.f;
 		}
+		float CtlBottom = CtlSize.X > 0.f ? (CornerRight > 0.f && M->Controls.MenuOpen() ? Y + 4.f + MeasureControlRows(Font, CornerRows.Num() ? TArray<FTCControlRow>{ CornerRows[0] } : CornerRows).Y : CtlTop + CtlSize.Y) * UiNow : 0.f;
+		// round 16 (lead, controls' stats box on hudfit's corner): F2's box under the closed Menu panel (stats.js place:
+		// under #util; the open menu is a dropdown over it), the status column under both
+		{
+			const float ClosedBottom = CtlSize.X > 0.f ? (CtlTop + (CornerClosedH > 0.f ? CornerClosedH : CtlSize.Y)) * UiNow : 0.f;
+			const float ClosedRight = CtlSize.X > 0.f ? (CornerRight > 0.f ? CornerRight : 8.f + CtlSize.X) * UiNow : 0.f;
+			CtlBottom = FMath::Max(CtlBottom, DrawStatsBox(Font, ClosedBottom, ClosedRight));
+		}
+		// under the strip, the status column's last place also clears the sandbox panel (screen pixels): it starts under
+		// the strip, or under the sandbox panel when it would reach that panel (#sandbox's own place 230 px over the
+		// bottom, or the panel's place under the strip)
+		const FBox2D SandboxScreen = SandboxBox.bIsValid ? FBox2D(SandboxBox.Min * UiNow, SandboxBox.Max * UiNow) : FBox2D(ForceInit);
+		auto UnderStripTop = [&](int32 Rows)
+		{
+			const float Top = StripLow + 6.f;
+			if (SandboxScreen.bIsValid && Top < SandboxScreen.Max.Y && Top + Rows * Line > SandboxScreen.Min.Y - 4.f) return (float)SandboxScreen.Max.Y + 6.f;
+			return Top;
+		};
 		// round 15: the status column, unscaled (this client's own overlay, outside the browser's zoomed #hud), its lines
 		// wrapped at their columns. In the top left corner beside the strip (no wider than ColumnShare of the window, so
 		// the paper war map's top left stays clear) when it ends above the match panel; else in the top right corner
@@ -1484,7 +1745,7 @@ void ATCHUD::DrawHUD()
 		{
 			const float Ui2 = UiNow;
 			EndUi();
-			auto Rows = [&](float W) { TArray<FStatusLine> Out; for (const FStatusLine& L : Status) for (const FString& P : WrapShown(L.Shown, W, Font)) Out.Add({ P, L.Colour }); return Out; };
+			auto Rows = [&](float W, bool bDiag = true) { TArray<FStatusLine> Out; for (const FStatusLine& L : Status) if (bDiag || !L.bDiag) for (const FString& P : WrapShown(L.Shown, W, Font)) Out.Add({ P, L.Colour, L.bDiag }); return Out; };
 			const float LeftW = FMath::Min(StripLeft - 24.f, ColumnShare * Canvas->ClipX), RightW = FMath::Min(Canvas->ClipX - StripRight - 24.f, ColumnShare * Canvas->ClipX);
 			TArray<FStatusLine> Col;
 			const float LeftTop = CtlBottom > 0.f ? CtlBottom + 6.f : 12.f; // under the match controls
@@ -1492,13 +1753,32 @@ void ATCHUD::DrawHUD()
 			bool bPlaced = false;
 			if (LeftW >= ColumnMinW) { Col = Rows(LeftW); bPlaced = LeftTop + Col.Num() * Line <= MatchTop - 4.f; if (bPlaced) Cy = LeftTop; }
 			if (!bPlaced && RightW >= ColumnMinW) { Col = Rows(RightW); Cx = StripRight + 12.f; bPlaced = 12.f + Col.Num() * Line <= RecruitTop - 4.f; }
-			if (!bPlaced) { Col = Rows(Canvas->ClipX - 24.f); Cx = 12.f; Cy = StripLow + 6.f; }
+			if (!bPlaced)
+			{
+				Col = Rows(Canvas->ClipX - 24.f); Cx = 12.f; Cy = UnderStripTop(Col.Num());
+				// round 16: where even that runs into the match panel or the recruit card (a large UI scale in a small
+				// window), the column keeps the lines the player needs (pause, notices, refusals, the order note) and
+				// leaves out this client's own diagnostics, which the log keeps; before, they were drawn over the panel
+				if (Cy + Col.Num() * Line > FMath::Min(MatchTop, RecruitTop) - 4.f)
+				{
+					Col = Rows(Canvas->ClipX - 24.f, false);
+					Cy = UnderStripTop(Col.Num());
+					if (!bLoggedDiagDrop) { bLoggedDiagDrop = true; UE_LOG(LogTC, Log, TEXT("hud: no room for the status column's diagnostics at %.0f%% in %.0f x %.0f; they stay in the log"), Ui2 * 100.f, Canvas->ClipX, Canvas->ClipY); }
+				}
+			}
 			for (const FStatusLine& L : Col) { DrawShown(L.Shown, L.Colour, Cx, Cy, Font, 1.f); Cy += Line; }
 			BeginUi(Ui2);
 		}
 		// client/alerts.js: the alert feed over the minimap and the Alt+H history
 		DrawAlertFeed(Font);
 		DrawEpilogue(Font, Big);
+		// round 16: the corner last (#util, and #menu at z-index 20 over the HUD), on the browser's solid panel colour
+		// (--panel-solid) while the menu is open, so what it covers does not show through
+		if (CtlSize.X > 0.f)
+		{
+			if (M->Controls.MenuOpen()) DrawRect(FLinearColor(FColor(25, 28, 30, 245)), 8.f, CtlTop, CtlSize.X, CtlSize.Y);
+			DrawControlRows(Font, 8.f, CtlTop, 0.f, CornerRows);
+		}
 	}
 	else if (M->bRoomBrowserOpen)
 	{
@@ -1514,12 +1794,16 @@ void ATCHUD::DrawHUD()
 		Minimap.Reset();
 		// round 15: no band outside a match, so the next match's first frame starts camera.js's measure afresh
 		PC->SetClearBand(0.f, 0.f);
-		const float LobbyBottom = DrawLobby(Font, Y + 4.f);
+		// round 16: the lobby panel narrows (down to LobbyPanelMinW) so the report's table fits beside it
+		const float LobbyW = LobbyWidthBesideReport(Font);
+		const float LobbyBottom = DrawLobby(Font, Y + 4.f, LobbyW);
 		// client/report.js: the result card beside the lobby after a decided match (under it in a narrow window)
-		DrawMatchReport(Font, Y + 4.f, LobbyBottom);
+		DrawMatchReport(Font, Y + 4.f, LobbyBottom, 8.f + LobbyW + 8.f);
 	}
 	EndUi();
+	DrawRoomBanners(Font); // round 16: #roomBanners (z-index 25: over the HUD, under the sheets)
 	DrawControlsSheet(Font, Big);
+	DrawStatsSheet(Font); // round 16: Menu > Stats overlay
 
 	if (PC->bDragging && PC->bDragMoved)
 	{
@@ -1549,3 +1833,69 @@ void ATCHUD::DrawHUD()
 		}
 	}
 }
+
+// ---------------------------------------------------------------------------------------------------------------------
+#if WITH_DEV_AUTOMATION_TESTS
+#include "Misc/AutomationTest.h"
+
+// Round 16 (hudfit): the fit rules at UI 150% in a 1280 x 720 window (853.3 x 480 UI pixels), the case slice 1p left
+// crowded: the strip clear of the corner's Menu panel, the sandbox panel at #sandbox's place only where it is clear,
+// the match panel's level the first that stays under the strip, and the settings' clicks routed to the HUD's actions.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCHudFitTest, "ThreeCrossroads.HUD.Fit", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+bool FTCHudFitTest::RunTest(const FString&)
+{
+	const float ClipX = 1280.f / 1.5f, ClipY = 720.f / 1.5f;
+	// the Menu panel: 8 px in, about 62 px wide at the small font ('Menu' plus padding)
+	const float CornerRight = 8.f + 62.f;
+	const float MaxW = FTCHudFit::StripMaxWidth(ClipX, CornerRight);
+	TestEqual(TEXT("strip at most the window less both corners"), MaxW, ClipX - 2.f * (CornerRight + 4.f), 0.01f);
+	// Horde with two teams: the lead block (216) and two team blocks (236), 4 px apart (DrawScoreStrip)
+	const float Horde = 216.f + 4.f + 2 * 236.f + 4.f, W = FMath::Min(Horde, MaxW);
+	TestTrue(TEXT("Horde, two teams: the strip's left edge clears the Menu panel"), (ClipX - W) / 2 >= CornerRight + 4.f - 0.01f);
+	// four teams and a lead: narrowed to fit, still clear
+	const float Wide = FMath::Min(150.f + 4.f + 4 * 236.f + 3 * 4.f, MaxW);
+	TestTrue(TEXT("four teams: narrowed, clear of the corner"), Wide < 150.f + 4.f + 4 * 236.f + 3 * 4.f && (ClipX - Wide) / 2 >= CornerRight + 4.f - 0.01f);
+	TestEqual(TEXT("a window narrower than both corners: 0"), FTCHudFit::StripMaxWidth(100.f, 60.f), 0.f);
+
+	// the sandbox panel (Sandbox, the unit, the side, Spawn: about 330 x 54 UI px)
+	const FVector2D Sb(330.f, 54.f);
+	bool bSpot = true;
+	// 150%: the strip with its notice line and the boss bar ends at 205 UI px; #sandbox's place (480 - 230 - 54 = 196)
+	// is above that, so the panel goes under the strip
+	FBox2D B = FTCHudFit::SandboxPlace(ClipX, ClipY, Sb, 205.f, { FBox2D(FVector2D(8, 380), FVector2D(568, 480)) }, &bSpot);
+	TestFalse(TEXT("150%: #sandbox's place is under the strip's bottom: not used"), bSpot);
+	TestEqual(TEXT("150%: under the strip"), (float)B.Min.Y, 209.f, 0.01f);
+	TestEqual(TEXT("150%: centred"), (float)(B.Min.X + B.Max.X) / 2, ClipX / 2, 0.01f);
+	// 100% in 1280 x 720: the strip ends at 120 px, the match panel's top at 600, the recruit card at 560 (x 576 to
+	// 1080): #sandbox's place (436 to 490) is clear
+	B = FTCHudFit::SandboxPlace(1280.f, 720.f, Sb, 120.f, { FBox2D(FVector2D(8, 600), FVector2D(568, 720)), FBox2D(FVector2D(576, 560), FVector2D(1080, 712)) }, &bSpot);
+	TestTrue(TEXT("100%: #sandbox's own place"), bSpot);
+	TestEqual(TEXT("100%: 230 px over the bottom"), (float)B.Max.Y, 720.f - FTCHudFit::SandboxBottom, 0.01f);
+	// the same with a tall match panel reaching the spot: under the strip
+	B = FTCHudFit::SandboxPlace(1280.f, 720.f, Sb, 120.f, { FBox2D(FVector2D(8, 420), FVector2D(568, 720)) }, &bSpot);
+	TestFalse(TEXT("100%, a tall match panel under the spot: not used"), bSpot);
+	TestEqual(TEXT("100%, a tall match panel: under the strip"), (float)B.Min.Y, 124.f, 0.01f);
+
+	// the match panel's levels: the first whose top stays under the limit; the last when none does
+	TestEqual(TEXT("level 0 fits"), FTCHudFit::FitLevel({ 200.f, 180.f }, ClipY, 8.f, 209.f), 0);
+	TestEqual(TEXT("level 1 fits"), FTCHudFit::FitLevel({ 300.f, 260.f, 200.f, 180.f }, ClipY, 8.f, 209.f), 1);
+	TestEqual(TEXT("level 2 fits"), FTCHudFit::FitLevel({ 300.f, 280.f, 250.f, 240.f }, ClipY, 8.f, 209.f), 2);
+	TestEqual(TEXT("none fits: the last"), FTCHudFit::FitLevel({ 400.f, 380.f, 350.f, 340.f }, ClipY, 8.f, 209.f), 3);
+	TestEqual(TEXT("no limit: level 0"), FTCHudFit::FitLevel({ 400.f, 380.f }, ClipY, 8.f, 0.f), 0);
+
+	// the panel narrows 40 px at a time while it fits, stopping at the floor or the first width that does not fit
+	TestEqual(TEXT("narrows to the floor"), FTCHudFit::NarrowerPanel(560.f, 425.f, 40.f, [](float) { return true; }), 425.f, 0.01f);
+	TestEqual(TEXT("stops where it no longer fits"), FTCHudFit::NarrowerPanel(560.f, 425.f, 40.f, [](float W) { return W >= 480.f; }), 480.f, 0.01f);
+	TestEqual(TEXT("nothing narrower fits: the start"), FTCHudFit::NarrowerPanel(560.f, 425.f, 40.f, [](float) { return false; }), 560.f, 0.01f);
+	TestEqual(TEXT("a floor over the start: the start"), FTCHudFit::NarrowerPanel(560.f, 600.f, 40.f, [](float) { return true; }), 560.f, 0.01f);
+	// the settings in the match menu: their keys are the HUD's own actions; the session controls stay match controls
+	const TPair<const TCHAR*, ETCUiAction> Keys[] = { { TEXT("Setting.Graphics"), ETCUiAction::Graphics }, { TEXT("Setting.Gore"), ETCUiAction::Gore },
+		{ TEXT("Setting.EdgeScroll"), ETCUiAction::EdgeScroll }, { TEXT("Setting.PanSpeed"), ETCUiAction::PanSpeed }, { TEXT("Setting.Cover"), ETCUiAction::CoverToggle },
+		{ TEXT("Setting.Volume"), ETCUiAction::Volume }, { TEXT("Setting.UiScale"), ETCUiAction::UiScale }, { TEXT("Setting.Language"), ETCUiAction::Language } };
+	for (const auto& K : Keys) TestEqual(FString::Printf(TEXT("%s's action"), K.Key), (int32)ATCHUD::ControlCommand(K.Key, -1).Action, (int32)K.Value);
+	const FTCUiCommand Hand = ATCHUD::ControlCommand(TEXT("HandAi"), 2);
+	TestTrue(TEXT("HandAi stays a match control with its slot"), Hand.Action == ETCUiAction::MatchControl && Hand.Unit == TEXT("HandAi") && Hand.Group == 2);
+	TestTrue(TEXT("an unknown setting key stays a match control (RunControl reports it)"), ATCHUD::ControlCommand(TEXT("Setting.Nothing"), -1).Action == ETCUiAction::MatchControl);
+	return true;
+}
+#endif

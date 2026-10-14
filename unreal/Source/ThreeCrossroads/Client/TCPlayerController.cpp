@@ -510,7 +510,7 @@ void ATCPlayerController::UpdateCamera(float Dt, bool bFocused)
 	// is read after the camera moves this frame (UpdateCommandKeys), so a key starts panning or turning one frame
 	// after it goes down, never on a press that a shortcut takes. The Controls sheet takes every key while open.
 	for (auto It = ChordKeys.CreateIterator(); It; ++It) if (!IsInputKeyDown(*It)) It.RemoveCurrent();
-	auto Held = [this](const FKey& K) { return !bControlsSheetOpen && IsInputKeyDown(K) && !WasInputKeyJustPressed(K) && !ChordKeys.Contains(K); };
+	auto Held = [this](const FKey& K) { return !ModalSheetOpen() && IsInputKeyDown(K) && !WasInputKeyJustPressed(K) && !ChordKeys.Contains(K); };
 	int32 VX = 0, VY = 0;
 	GetViewportSize(VX, VY);
 	if (T.MapW() > 0) UpdateWideView(*M, VX, VY); else Wide = FWideView();
@@ -557,11 +557,12 @@ void ATCPlayerController::UpdateCamera(float Dt, bool bFocused)
 
 	// the wheel over the view (the HUD's panels keep their own wheel; a notch that ended the intro is dropped)
 	const int32 Notch = (WasInputKeyJustPressed(EKeys::MouseScrollDown) ? 1 : 0) - (WasInputKeyJustPressed(EKeys::MouseScrollUp) ? 1 : 0);
-	if (Notch && !bIntroDropWheel && !bControlsSheetOpen && (!bHasCursor || bOverView)) WheelZoom(Notch, bOverView, Mouse, VX, VY);
+	if (Notch && M->StatsSheet.IsOpen() && !bControlsSheetOpen) M->StatsSheet.Scroll(Notch * 48.f); // round 16: the stats sheet scrolls
+	if (Notch && !bIntroDropWheel && !ModalSheetOpen() && (!bHasCursor || bOverView)) WheelZoom(Notch, bOverView, Mouse, VX, VY);
 
 	// client/camera.js beginMiddle, moveMiddle, stopDrag: a middle press on the view turns it while held
-	if (bMiddleDrag && (!IsInputKeyDown(EKeys::MiddleMouseButton) || !bFocused || bControlsSheetOpen)) { bMiddleDrag = false; Anchor.bActive = false; }
-	if (!bMiddleDrag && WasInputKeyJustPressed(EKeys::MiddleMouseButton) && bOverView && !bControlsSheetOpen)
+	if (bMiddleDrag && (!IsInputKeyDown(EKeys::MiddleMouseButton) || !bFocused || ModalSheetOpen())) { bMiddleDrag = false; Anchor.bActive = false; }
+	if (!bMiddleDrag && WasInputKeyJustPressed(EKeys::MiddleMouseButton) && bOverView && !ModalSheetOpen())
 	{
 		bMiddleDrag = true;
 		MiddleX = Mouse.X;
@@ -590,7 +591,7 @@ void ATCPlayerController::UpdateCamera(float Dt, bool bFocused)
 	In.bOut = PointerEdge.Out();
 	In.bOverView = PointerEdge.Out() || OverView(PointerEdge.Pos);
 	In.bWorld = M->State.bHasMatch;
-	In.bBlocked = bControlsSheetOpen;
+	In.bBlocked = ModalSheetOpen();
 	In.bButtons = IsInputKeyDown(EKeys::LeftMouseButton) || IsInputKeyDown(EKeys::MiddleMouseButton);
 	In.bDragging = bDragging || Formation.IsGesturing();
 	In.bMiddle = bMiddleDrag;
@@ -823,6 +824,13 @@ void ATCPlayerController::UpdatePointer(bool bFocused)
 	const bool bLeftPress = WasInputKeyJustPressed(EKeys::LeftMouseButton) && bInside && !bDragging;
 	// client/camera.js introPress: a right press that ended the intro is dropped (its order was aimed at the glide)
 	const bool bRightPress = WasInputKeyJustPressed(EKeys::RightMouseButton) && bInside && !bIntroDropRight;
+	// round 16: the stats sheet is modal (showModal): a press reaches its controls or, outside it, closes it
+	if (M && M->StatsSheet.IsOpen() && !bControlsSheetOpen)
+	{
+		if (bLeftPress) M->StatsSheetPress(Mouse, false);
+		if (bRightPress) M->StatsSheetPress(Mouse, true);
+		return;
+	}
 	if (bControlsSheetOpen)
 	{
 		// round 14: the onboarding sheet closes on any press on it, and that press goes no further
@@ -1118,7 +1126,9 @@ bool ATCPlayerController::KeyChord(const FKey& Key, bool bShift, bool bCtrl, boo
 	if (Code.IsEmpty()) return false;
 	// client/main.js keydown (round 15, TCKeys::Route): F1 and F2 come before everything while the match HUD shows (a
 	// press here is never a repeat); then an open Controls sheet takes every key; then the table
-	const ETCKeyRoute Route = TCKeys::Route(Code, M->State.bHasMatch, false, bControlsSheetOpen, false);
+	const ETCKeyRoute Route = TCKeys::Route(Code, M->State.bHasMatch, false, bControlsSheetOpen, M->StatsSheet.IsOpen());
+	// round 16: Esc closes the stats sheet (the dialog's cancel), in a match or not
+	if (Route == ETCKeyRoute::Swallowed && Code == TEXT("Escape") && M->StatsSheet.IsOpen() && !bControlsSheetOpen) { M->StatsSheetTag(TEXT("stats:close"), false); return true; }
 	if (!M->State.bHasMatch)
 	{
 		// the lobby: the table too, where only M ('mute') does anything in this client
@@ -1428,8 +1438,9 @@ int32 ATCPlayerController::PickAt(FVector2D Screen, TFunctionRef<bool(const FTCU
 	{
 		const FTCUnit& U = Pair.Value;
 		const FTCUnitDef* Def = M->UnitTable.Find(U.Type);
-		// riders are never picked (client/main.js pick); garrisons and parked planes are not drawn here, so not either
-		if (!Def || !ATCUnitRenderer::IsDrawn(U) || !Test(U, *Def)) continue;
+		// riders are never picked (client/main.js pick); parked planes are not drawn here, so not either; a garrisoned
+		// squad is picked at its position in the house, as the browser's screenOf does (round 16)
+		if (!Def || (!ATCUnitRenderer::IsDrawn(U) && !(U.Flags & TCFlags::Garrisoned)) || !Test(U, *Def)) continue;
 		FVector2D P;
 		if (!ScreenPoint(*M, U, Def, P)) continue;
 		const float D = FVector2D::Distance(P, Screen);
@@ -1464,8 +1475,22 @@ bool ATCPlayerController::HouseAt(FVector2D Screen, FTCHousePick& Out) const
 bool ATCPlayerController::Pickable(const ATCGameMode& M, const FTCUnit& U, const FTCUnitDef* Def) const
 {
 	// client/selection.js own and mobileOwn: ours, alive, not a structure, and drawn (ATCUnitRenderer::IsDrawn leaves
-	// out planes parked at base, riders and, unlike the browser, garrisons, which this slice draws no roof bar for)
-	return Def && M.State.IsOwn(U) && U.Hp > 0 && !Def->bStructure && ATCUnitRenderer::IsDrawn(U);
+	// out planes parked at base and riders) or garrisoned (round 16: its roof bar is drawn and picks it)
+	return Def && M.State.IsOwn(U) && U.Hp > 0 && !Def->bStructure && (ATCUnitRenderer::IsDrawn(U) || (U.Flags & TCFlags::Garrisoned));
+}
+
+bool ATCPlayerController::RoofBounds(const ATCGameMode& M, const FTCUnit& U, const FTCUnitDef* Def, TArray<FBox2D>& Out) const
+{
+	Out.Reset();
+	if (!(U.Flags & TCFlags::Garrisoned) || !Def || !M.Terrain || !PlayerCameraManager) return false;
+	FVector2D At;
+	if (!M.Units || !M.Units->DrawnAt(U.Id, At)) At = FVector2D(U.X, U.Z);
+	const FRotationMatrix Cam(PlayerCameraManager->GetCameraRotation());
+	const FVector BarAt = ATCTerrain::ToWorld(At.X, At.Y, M.Terrain->HeightAt(At.X, At.Y) + (float)TCOrders::RoofBarHeight);
+	const double Frac = Def->MaxHp() > 0 ? (double)U.Hp / Def->MaxHp() : 1.0;
+	Out = TCOrders::RoofBarScreenBounds(BarAt, Cam.GetUnitAxis(EAxis::Y), Cam.GetUnitAxis(EAxis::Z), TCOrders::RoofBarRects(Frac, U.Supp, U.Stars),
+		[this](const FVector& W, FVector2D& Px) { return ProjectWorldLocationToScreen(W, Px); });
+	return Out.Num() > 0;
 }
 
 bool ATCPlayerController::Boxable(const ATCGameMode& M, const FTCUnit& U, const FTCUnitDef* Def) const
@@ -1491,8 +1516,18 @@ int32 ATCPlayerController::PickSelectable(FVector2D Screen) const
 			const FTCUnit& U = Pair.Value;
 			const FTCUnitDef* Def = M->UnitTable.Find(U.Type);
 			const bool bTest = bBuildings ? Def && Def->bBuilding && M->State.IsOwn(U) && U.Hp > 0 && ATCUnitRenderer::IsDrawn(U) : Pickable(*M, U, Def);
+			if (!bTest) continue;
+			// round 16: a garrisoned squad has only its roof bar's points (client/selection-view.js, radius 6 px)
+			TArray<FBox2D> Roof;
+			if (U.Flags & TCFlags::Garrisoned)
+			{
+				if (!RoofBounds(*M, U, Def, Roof)) continue;
+				const float D = (float)TCOrders::RoofPickDistance(Roof, Screen);
+				if (D < TCOrders::RoofPickRadius && D < BestD) { BestD = D; Best = U.Id; }
+				continue;
+			}
 			FVector2D P;
-			if (!bTest || !ScreenPoint(*M, U, Def, P)) continue;
+			if (!ScreenPoint(*M, U, Def, P)) continue;
 			const float D = FVector2D::Distance(P, Screen);
 			const float Radius = Def->bBuilding ? PickBuilding : Def->bInfantry ? PickInfantry : PickVehicle;
 			if (D < Radius && D < BestD) { BestD = D; Best = U.Id; }
@@ -1549,6 +1584,9 @@ TArray<FTCKeyUnit> ATCPlayerController::KeyUnits(bool bScreen) const
 			FVector2D P;
 			K.bOnScreen = ScreenPoint(*M, U, D, P) && P.X >= 0 && P.Y >= 0 && P.X <= VX && P.Y <= VY;
 		}
+		// round 16: a garrisoned squad is on the screen when its roof bar is (client/selection.js doubleClick)
+		TArray<FBox2D> Roof;
+		if (bScreen && (U.Flags & TCFlags::Garrisoned) && RoofBounds(*M, U, D, Roof)) K.bOnScreen = TCOrders::RoofBoxHits(Roof, FBox2D(FVector2D(0, 0), FVector2D(VX, VY)));
 		Out.Add(MoveTemp(K));
 	}
 	return Out;
@@ -1634,7 +1672,11 @@ void ATCPlayerController::BoxSelect(FVector2D A, FVector2D B, bool bAdd)
 		const FTCUnit& U = Pair.Value;
 		const FTCUnitDef* Def = M->UnitTable.Find(U.Type);
 		FVector2D S;
-		if (Boxable(*M, U, Def) && ScreenPoint(*M, U, Def, S) && S.X >= Lo.X && S.X <= Hi.X && S.Y >= Lo.Y && S.Y <= Hi.Y) Selected.Add(U.Id);
+		if (!Boxable(*M, U, Def)) continue;
+		// round 16: a garrisoned squad is boxed by its roof bar (client/selection.js inside, bounds against the box)
+		TArray<FBox2D> Roof;
+		if (U.Flags & TCFlags::Garrisoned) { if (RoofBounds(*M, U, Def, Roof) && TCOrders::RoofBoxHits(Roof, FBox2D(Lo, Hi))) Selected.Add(U.Id); continue; }
+		if (ScreenPoint(*M, U, Def, S) && S.X >= Lo.X && S.X <= Hi.X && S.Y >= Lo.Y && S.Y <= Hi.Y) Selected.Add(U.Id);
 	}
 }
 

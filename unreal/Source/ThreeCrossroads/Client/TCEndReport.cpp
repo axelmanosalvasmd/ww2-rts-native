@@ -320,6 +320,54 @@ void FTCEndReport::Chart(FTCPaint& P, const FTCMatchReport& R, float X0, float Y
 			P.Line(FVector2D(Xof(S.Series[K - 1].X), Yof(S.Series[K - 1].Y)), FVector2D(Xof(S.Series[K].X), Yof(S.Series[K].Y)), TCCss::PlayerColour(S.ColourSlot), S.bWon ? 3.f : 2.f, S.bWon ? TEXT("report:line-won") : TEXT("report:line"));
 }
 
+void FTCEndReport::TableColumns(const FTCMatchReport& R, const FTCMeasure& Measure, TArray<FString>& Heads, TArray<float>& Content, TArray<float>& MinC)
+{
+	using namespace TCEndReportRules;
+	Heads = { TC_T(FString(TEXT("Player"))) };
+	for (int32 K = 0; K < 7; K++) Heads.Add(TC_T(FString(FTCMatchReport::Column(K))));
+	Content.Reset();
+	MinC.Reset();
+	for (int32 C = 0; C < Heads.Num(); C++) Content.Add(Measure(Heads[C], TablePx, true, 0.f));
+	for (const FTCReportRow& Row : R.Rows)
+	{
+		const FString N = TC_T(Row.Name);
+		Content[0] = FMath::Max(Content[0], FMath::Min(NameMax, Swatch + SwatchGap + Measure(N, TablePx, Row.bMe, 0.f)));
+		for (int32 K = 0; K < 7; K++) Content[K + 1] = FMath::Max(Content[K + 1], Measure(FString::FromInt(Row.Values[K]), TablePx, Row.bMe, 0.f));
+	}
+	for (int32 C = 0; C < Content.Num(); C++)
+	{
+		float Mw = 0.f;
+		TArray<FString> Words;
+		Heads[C].ParseIntoArray(Words, TEXT(" "));
+		for (const FString& Wd : Words) Mw = FMath::Max(Mw, Measure(Wd, TablePx, true, 0.f));
+		if (C > 0) for (const FTCReportRow& Row : R.Rows) Mw = FMath::Max(Mw, Measure(FString::FromInt(Row.Values[C - 1]), TablePx, Row.bMe, 0.f));
+		else Mw = Content[0]; // a name has no space to break at: its min-content is the whole (capped) name
+		MinC.Add(FMath::Min(Mw, Content[C]));
+	}
+}
+
+float FTCEndReport::MinWidth(const FTCEndReportInput& In, const FTCMeasure& Measure)
+{
+	using namespace TCEndReportRules;
+	if (!In.Report.bShown) return 0.f;
+	TArray<FString> Heads; TArray<float> Content, MinC;
+	TableColumns(In.Report, Measure, Heads, Content, MinC);
+	float Sum = 2 * CardPadSide;
+	for (float V : MinC) Sum += V + 2 * CellPadX;
+	return Sum;
+}
+
+float FTCEndReport::NaturalWidth(const FTCEndReportInput& In, const FTCMeasure& Measure)
+{
+	using namespace TCEndReportRules;
+	if (!In.Report.bShown) return 0.f;
+	TArray<FString> Heads; TArray<float> Content, MinC;
+	TableColumns(In.Report, Measure, Heads, Content, MinC);
+	float Sum = 2 * CardPadSide;
+	for (float V : Content) Sum += V + 2 * CellPadX;
+	return Sum;
+}
+
 FTCPaint FTCEndReport::Layout(const FTCEndReportInput& In, float X0, float Y0, float Width, const FTCMeasure& Measure, float* OutHeight) const
 {
 	using namespace TCEndReportRules;
@@ -390,33 +438,15 @@ FTCPaint FTCEndReport::Layout(const FTCEndReportInput& In, float X0, float Y0, f
 			Y = FMath::Max(Y + ChartH + 1, Ly) + TopBottom;
 			// the story table: Player and the seven COLUMNS, numbers right-aligned; the reader's row marked
 			const float RowH = TablePx * TableLine + 2 * CellPadY;
-			TArray<FString> Heads = { TC_T(FString(TEXT("Player"))) };
-			for (int32 K = 0; K < 7; K++) Heads.Add(TC_T(FString(FTCMatchReport::Column(K))));
-			TArray<float> Content;
-			for (int32 C = 0; C < Heads.Num(); C++) Content.Add(Measure(Heads[C], TablePx, true, 0.f));
-			TArray<FString> Names;
-			for (const FTCReportRow& Row : R.Rows)
-			{
-				const FString N = TC_T(Row.Name);
-				Names.Add(N);
-				Content[0] = FMath::Max(Content[0], FMath::Min(NameMax, Swatch + SwatchGap + Measure(N, TablePx, Row.bMe, 0.f)));
-				for (int32 K = 0; K < 7; K++) Content[K + 1] = FMath::Max(Content[K + 1], Measure(FString::FromInt(Row.Values[K]), TablePx, Row.bMe, 0.f));
-			}
 			// table-layout: auto at width 100%: each column its widest content plus padding, the room left shared out in
 			// proportion to those widths. Round 15 (lead): narrower than that (the card beside the lobby panel in a
 			// 1280 px window), each column gives way down to its min-content width (its longest word: the header
 			// wraps), in proportion to what it can give, as CSS's auto layout does; the names ellipsize as before
-			TArray<float> MinC;
-			for (int32 C = 0; C < Content.Num(); C++)
-			{
-				float Mw = 0.f;
-				TArray<FString> Words;
-				Heads[C].ParseIntoArray(Words, TEXT(" "));
-				for (const FString& Wd : Words) Mw = FMath::Max(Mw, Measure(Wd, TablePx, true, 0.f));
-				if (C > 0) for (const FTCReportRow& Row : R.Rows) Mw = FMath::Max(Mw, Measure(FString::FromInt(Row.Values[C - 1]), TablePx, Row.bMe, 0.f));
-				else Mw = Content[0]; // a name has no space to break at: its min-content is the whole (capped) name
-				MinC.Add(FMath::Min(Mw, Content[C]));
-			}
+			TArray<FString> Heads;
+			TArray<float> Content, MinC;
+			TableColumns(R, Measure, Heads, Content, MinC);
+			TArray<FString> Names;
+			for (const FTCReportRow& Row : R.Rows) Names.Add(TC_T(Row.Name));
 			float Sum = 0.f, SumContent = 0.f, SumMin = 0.f;
 			for (int32 C = 0; C < Content.Num(); C++) { Sum += Content[C] + 2 * CellPadX; SumContent += Content[C]; SumMin += MinC[C] + 2 * CellPadX; }
 			TArray<float> ColW, ColX;
@@ -654,6 +684,26 @@ bool FTCEndReportSpanishTest::RunTest(const FString&)
 		float Right = 0.f;
 		for (const FTCPaintItem& It : NE.Items) if (It.Kind == ETCPaintKind::Text && (It.Role == TEXT("report:th") || It.Role == TEXT("report:td"))) Right = FMath::Max(Right, It.Pos.X);
 		TestTrue(TEXT("narrow, English: the right-aligned cells end inside the card"), Right <= 556.f);
+	}
+	{
+		// round 16 (hudfit): the card's min-content width (the HUD narrows the lobby panel down to 480 px so the card
+		// beside it gets at least this): at that width every Spanish cell ends inside the card, and in a 1280 px window
+		// it fits beside a 480 px lobby panel (1280 - 24 - 480 = 776 px)
+		const FTCMeasure Approx = FTCPaint::ApproxMeasure();
+		const float MinW = FTCEndReport::MinWidth(In, Approx), NatW = FTCEndReport::NaturalWidth(In, Approx);
+		AddInfo(FString::Printf(TEXT("es: card min-content %.0f px, natural %.0f px"), MinW, NatW));
+		TestTrue(TEXT("min-content under natural"), MinW > 0.f && MinW <= NatW);
+		TestTrue(TEXT("min-content fits beside a 480 px lobby panel in 1280 px"), MinW <= 1280.f - 24.f - 480.f);
+		const FTCPaint F = Card.Layout(In, 0, 0, MinW, Approx);
+		float Right = 0.f;
+		for (const FTCPaintItem& It : F.Items)
+			if (It.Kind == ETCPaintKind::Text && (It.Role == TEXT("report:th") || It.Role == TEXT("report:td")))
+				Right = FMath::Max(Right, It.Align == ETCPaintAlign::Right ? It.Pos.X : It.Pos.X + Approx(It.Text, It.FontPx, It.bBold, 0.f));
+		TestTrue(TEXT("at its min-content width every Spanish cell ends inside the card's padding"), Right <= MinW - TCEndReportRules::CardPadSide + 0.5f);
+		TestEqual(TEXT("at its min-content width: table head, joined"), Heads(F), EsHeads);
+		// no report, no table: no width asked
+		FTCEndReportInput None;
+		TestEqual(TEXT("no report: 0"), FTCEndReport::MinWidth(None, Approx), 0.f);
 	}
 	TestEqual(TEXT("canvas labels are not translated"), P.TextsOf(TEXT("report:axis")), TArray<FString>{ TEXT("0"), TEXT("1200"), TEXT("0 min"), TEXT("12 min 3 s") });
 	// each text goes through spanish() exactly once, as the observer does: the expected values are the locale's own

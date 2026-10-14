@@ -17,6 +17,7 @@
 
 #include "CoreMinimal.h"
 
+class FJsonObject;
 class FTCMatchState;
 class FTCUnitTable;
 struct FTCMatchResult;
@@ -262,4 +263,47 @@ private:
 	void UpdateNotices(const FTCMatchState& S);
 	void UpdateEpilogue(const FTCMatchState& S);
 	void UpdatePoints(const FTCMatchState& S);
+};
+
+// Mode coverage, a verification aid (native, not in the reference; round 16): what this client showed of its match's
+// mode, as LogTC "modes: ..." lines when it changed, so one live run per mode can be summed up from the log alone
+// (unreal/Tools/modes/summarize.mjs). It reads only what the HUD reads (the score strip FTCObjectives::ScoreStrip, the
+// goal box FTCScenarioText::GoalText, the 'say' lines as the alert feed words them, the winner, the end and the
+// epilogue stamp) and changes nothing.
+//   modes: start: mode <kind> on '<map>' (<w>x<h>), seat <you> of <n> (team <t>), teams [...], lobby mode <m>, <k> authored point(s)
+//   modes: strip: <lead mode> <clock> - <title> [<threat>] | team <t> <role> <u0> <num> <u> (<names>) | ... [| line: ...]
+//            when its labels change (not its clock or numbers), and every 60 s of match time
+//   modes: goal: <text>                      the goal box, when it changes ("modes: goal: (none)" when it goes)
+//   modes: say at tick <n>: <text> [| shown: <the reader's language>]
+//   modes: decided at tick <n>: winner team <w> (<outcome for this seat>), reason <r>; stamp '<word>' '<why>'
+//   modes: summary (<why>): mode <kind>, <snapshots> snapshot(s), strip lines <a>, goal lines <b>, say lines <c>, decided <...>
+class FTCModeWatch
+{
+public:
+	static constexpr int32 PeriodTicks = 1200;   // a full strip line at least every 60 s of match time (20 ticks a second)
+	void Reset();
+	void OnStart(const FTCMatchState& S);
+	// After FTCMatchState::ApplySnapshot. Raw: the same message (its 'say' shots' text and localized), or null.
+	void OnSnapshot(const FTCMatchState& S, const FTCUnitTable* Table, const FJsonObject* Raw);
+	// The match left the screen (a lobby, a leave, a new room). Logs the summary once per match.
+	void OnClear(const TCHAR* Why);
+	TArray<FString> TakeLog() { TArray<FString> Out = MoveTemp(Pending); Pending.Reset(); return Out; }
+
+	bool Started() const { return bStarted; }
+	int32 StripLines() const { return Strips; }
+	int32 GoalLines() const { return Goals; }
+	int32 SayLines() const { return Says; }
+	bool Decided() const { return bDecided; }
+	const FString& Kind() const { return ModeKind; }
+
+	// One line of the strip as drawn (English, the HUD translates when it draws): lead, teams, the notice line.
+	static FString StripText(const FTCScoreStrip& Strip, const FTCMatchState& S);
+	// The strip's labels without the numbers that move every second (clock, VP, health): a change here is a new line.
+	static FString StripShape(const FTCScoreStrip& Strip);
+
+private:
+	bool bStarted = false, bDecided = false, bSummarized = false;
+	int32 MatchId = -1, Snapshots = 0, Strips = 0, Goals = 0, Says = 0, LastStripTick = -1000000000;
+	FString ModeKind, LastShape, LastGoal, DecidedText;
+	TArray<FString> Pending;
 };

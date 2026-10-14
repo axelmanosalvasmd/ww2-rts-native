@@ -25,6 +25,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Engine/GameViewportClient.h"
+#include "Client/TCEndReport.h"
+#include "TCMatchControls.generated.h"
 
 class FJsonObject;
 
@@ -262,8 +265,16 @@ struct FTCControlRow
 };
 
 // The text inputs: the lobby's Name and Room code, the directory's nickname, match name and room code. This client
-// draws on a canvas, so a field is typed into after a click on it: letters, digits, space, '-', '_' and '.', Backspace;
-// Enter or a click elsewhere ends the typing (the browser's change event), Escape ends it and puts the old text back.
+// draws on a canvas, so a field is typed into after a click on it; Enter or a click elsewhere ends the typing (the
+// browser's change event), Escape ends it and puts the old text back.
+// Round 16 (controls): the characters an <input> takes. With the window's text input wired (bCharInput: the glue's
+// Slate input processor hands every typed character to Char, after the desktop's dead keys and compose, so 'á', 'ñ',
+// '¿' and any other text arrive as typed), the keys only end, cancel, delete and paste; without it (tests, a run with no
+// text input) the key names give letters, digits, space, '-', '_' and '.' as before. maxlength counts UTF-16 code units
+// as the browser does, and a character outside the BMP (two units) is never split. Ctrl+V and Shift+Insert paste the
+// clipboard as Chromium's text field inserts it: line breaks become spaces (TextFieldInputType's beforetextinserted),
+// the text is cut to the room maxlength leaves, never inside a surrogate pair. The caret stays at the end (no caret
+// keys, no selection).
 enum class ETCTextField : uint8 { None, Name, RoomCode, Nickname, MatchTitle, JoinCode };
 const TCHAR* LexToString(ETCTextField Field);
 struct FTCTextFields
@@ -276,13 +287,26 @@ struct FTCTextFields
 	bool bPublic = true;     // the directory's Visibility select ('public' is its first option)
 
 	static int32 MaxLen(ETCTextField Field);  // the inputs' maxlength: 16, 12, 16, 48, 12
+	bool bCharInput = false; // characters come from the window's text input (Char), not from key names
+	bool bCtrl = false;      // Ctrl is held, as its own key events say (Ctrl+V)
+	// The system clipboard's text (the glue sets FPlatformApplicationMisc::ClipboardPaste; unset: nothing to paste)
+	static TFunction<FString()> ClipboardText;
 	void Begin(ETCTextField Field, const FString& Current);
+	// A typed character while a field is active: control characters (Enter, Escape, Backspace and Tab arrive here too)
+	// are not text; a character that would pass maxlength is dropped. True when it was taken (a field is active).
+	bool Char(TCHAR C);
+	// A paste into the active field (Chromium's rule above). Returns how many UTF-16 units went in.
+	int32 Paste(const FString& Text);
+	// Chromium's LimitLength: at most N units, one less when the cut would split a surrogate pair
+	static FString LimitLength(const FString& Text, int32 N);
 	// A key while typing. True when the key was taken (every key is, while a field is active: the game's hotkeys do not
 	// fire under typing); OutDone is set to the field when Enter ends it, OutCancelled when Escape does.
 	bool Key(const FName& KeyName, bool bShift, ETCTextField& OutDone, bool& OutCancelled);
 	// The text a field shows (with the caret while typing).
 	FString Shown(ETCTextField Field, const FString& Value) const;
 	FString& Value(ETCTextField Field);
+private:
+	TCHAR PendingLead = 0;   // the first half of a surrogate pair, until its second half arrives
 };
 
 // One step of the -TCControlsCheck verification script (ATCGameMode::ControlsFrame): wait Delay seconds after the
@@ -291,4 +315,30 @@ struct FTCControlsStep
 {
 	double Delay = 0.0;
 	FString Cond, Action, Arg;
+};
+
+// Round 16 (controls): client/index.html #roomBanners as client/connection.css draws it: fixed, centred, its top 8 px
+// under #top (the score strip; 16 px with the HUD hidden: main.js positionRoomBanners), at most min(510px, 100vw - 40px)
+// wide, one box per banner (each as wide as its text, centred, 4 px apart): padding 6px 12px, a 1 px border (red for
+// #connectionBanner), rgba(25,28,30,0.95), 14px/1.35 text centred and wrapped. Screen pixels (outside #hud's zoom).
+// The pause banner's text is main.js's: "Paused by <name>" or "Waiting for <name> (<n> s)" (FTCMatchState::PauseText).
+struct FTCRoomBanner
+{
+	FString Text;            // English; drawn through TC_T
+	bool bConnection = false; // #connectionBanner (red border); else #pauseBanner
+};
+struct FTCRoomBanners
+{
+	static FTCPaint Layout(const TArray<FTCRoomBanner>& Banners, float Top, float ViewW, const FTCMeasure& Measure);
+};
+
+// Round 16 (controls): the game's viewport client, only to hand the window's typed characters (InputChar: SDL's text
+// input, after dead keys and compose) to the active text field; everything else is the engine's. Named in
+// Config/DefaultEngine.ini ([/Script/Engine.Engine] GameViewportClientClassName). Defined in Client/TCMatchControls.cpp.
+UCLASS()
+class THREECROSSROADS_API UTCGameViewportClient : public UGameViewportClient
+{
+	GENERATED_BODY()
+public:
+	virtual bool InputChar(FViewport* InViewport, int32 ControllerId, TCHAR Character) override;
 };

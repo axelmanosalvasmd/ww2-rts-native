@@ -267,6 +267,9 @@ public:
 	// Where a held unit is drawn on screen; false when it is not drawn or behind the camera.
 	bool ScreenOf(int32 Id, FVector2D& Out) const;
 	void SelectOwn(const TArray<int32>& Ids);
+	// Verification only (round 16): the left click's selection at a viewport pixel (client/selection.js pick and click),
+	// as the mouse's release without a drag runs it.
+	void ClickSelectForChecks(FVector2D Screen, bool bAdd) { ClickSelect(Screen, bAdd); }
 	// Point the camera at Metres (the minimap, a group's double tap, verification switches): ends the intro, a follow
 	// and a zoom's anchor, as client/main.js does for every shortcut that moves the camera.
 	void FocusOn(FVector2D Metres);
@@ -316,6 +319,10 @@ public:
 	FString FollowChip() const;
 	// The Controls sheet (F1) is open: the HUD draws TCKeys::ControlsSheet() while this is set.
 	bool bControlsSheetOpen = false;
+	// Round 16 (controls): Menu > Stats overlay opens the stats sheet after beforeOpen (cancelInput, pointer.release);
+	// a modal sheet (the Controls sheet or the stats sheet) is open: the camera keys, wheel and edge push stop
+	void OpenStatsSheet();
+	bool ModalSheetOpen() const;
 	// Round 14 (CLI-127, client/main.js controlsSheet pointerdown): a press on the sheet while it opened as onboarding
 	// closes it and is swallowed (with its release). True when it was taken.
 	bool OnboardingPress();
@@ -417,6 +424,9 @@ private:
 	// infantry) of Screen. Squads riding in a carrier are never picked.
 	int32 PickAt(FVector2D Screen, TFunctionRef<bool(const FTCUnit&, const FTCUnitDef&)> Test, float Radius = 0.f) const;
 	bool Pickable(const ATCGameMode& M, const FTCUnit& U, const FTCUnitDef* Def) const;
+	// round 16: a garrisoned squad's selection points (client/selection-view.js): its roof bar's meshes on screen
+	// (TCOrders::RoofBarScreenBounds). False when it is not garrisoned or nothing projects.
+	bool RoofBounds(const ATCGameMode& M, const FTCUnit& U, const FTCUnitDef* Def, TArray<FBox2D>& Out) const;
 	bool Boxable(const ATCGameMode& M, const FTCUnit& U, const FTCUnitDef* Def) const;
 	void ClickSelect(FVector2D Screen, bool bAdd);
 	void PruneSelection(const ATCGameMode& M);

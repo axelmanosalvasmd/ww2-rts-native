@@ -39,6 +39,26 @@
 class UFont;
 class ATCTerrain;
 
+// Round 16 (hudfit): the HUD's fit rules at a large UI scale in a small window, pure so tests read them.
+namespace FTCHudFit
+{
+	// client/index.html #sandbox: left 50%, translateX(-50%), bottom 230px (zoomed with #hud)
+	constexpr float SandboxBottom = 230.f;
+	// The strip's widest: centred, its left edge right of the corner's Menu panel (CornerRight) by 4 px
+	THREECROSSROADS_API float StripMaxWidth(float ClipX, float CornerRight);
+	// Where the sandbox panel goes (UI pixels): #sandbox's own place when it is under the strip and clear of every box
+	// in Avoid (the match panel, the recruit card); else centred under the strip (StripLow).
+	THREECROSSROADS_API FBox2D SandboxPlace(float ClipX, float ClipY, FVector2D Size, float StripLow, const TArray<FBox2D>& Avoid, bool* bOutBrowserSpot = nullptr);
+	// The match panel's levels: 0 as built; 1 the support bar shows what the browser's buttons show (the key and the
+	// cost, no name); 2 the formation summary line goes and the logistics rows stop at 2; 3 at 1, without the heading.
+	// The first level whose top (ClipY - Gap - height) is at or under TopLimit; the last when none is.
+	THREECROSSROADS_API int32 FitLevel(const TArray<float>& Heights, float ClipY, float BottomGap, float TopLimit);
+	constexpr int32 MaxLevel = 3;
+	// The narrowest width from Start down to Floor (in Step px steps, Floor itself last) at which Fits holds, trying
+	// narrower only while the previous width fitted; Start when nothing narrower fits.
+	THREECROSSROADS_API float NarrowerPanel(float Start, float Floor, float Step, TFunctionRef<bool(float)> Fits);
+}
+
 UCLASS()
 class THREECROSSROADS_API ATCHUD : public AHUD
 {
@@ -47,6 +67,19 @@ class THREECROSSROADS_API ATCHUD : public AHUD
 public:
 	virtual void DrawHUD() override;
 	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
+	// Round 16 (controls): client/index.html #roomBanners (the pause banner) under the score strip, in screen pixels
+	// (Client/TCMatchControls.cpp, FTCRoomBanners)
+#define TC_HAS_ROOM_BANNERS 1
+	void DrawRoomBanners(UFont* Font);
+	// Round 16 (controls): the stats sheet over everything (Client/TCStats.cpp), and the -TCStatUnitProbe log line
+	void DrawStatsSheet(UFont* Font);
+	// Round 16 (controls): F2's stats box under the panel its position belongs to (Client/TCStats.cpp): top left under
+	// the match controls (#util), top centre under the strip's lines (#top), top right 52 px (#econ: none here); clear
+	// of the score strip. CtlBottom, CtlRight: the match controls' panel in screen pixels (0: none). Returns the box's
+	// bottom in screen pixels when it sits in the top left corner (the status column starts under it), else 0.
+	float DrawStatsBox(UFont* Font, float CtlBottom, float CtlRight);
+	float StatsTopTc = -1.f;
+	FBox2D StatsStrip = FBox2D(ForceInit);
 	// The button drawn at this viewport pixel in the last frame, if any (the controller sends its click there).
 	bool ButtonAt(FVector2D Pixel, ETCUiAction& OutAction) const;
 	bool CommandAt(FVector2D Pixel, FTCUiCommand& OutCommand) const;
@@ -100,13 +133,19 @@ private:
 	// keeps its own 560 px while the recruit card beside it gets at least RecruitMin px (#buy sits between the left
 	// column and the minimap at every scale, client/index.html), and narrows toward 248 px only past that.
 	static constexpr float MatchPanelW = 560.f, LeftColumnMinW = 248.f, RecruitMinW = 120.f;
+	// the lobby panel (round 16: it gives way down to LobbyPanelMinW so the match report's table fits beside it)
+	static constexpr float LobbyPanelW = 700.f, LobbyPanelMinW = 480.f;
+	// round 16: the recruit card's room the match panel gives way to (UI pixels) at a large UI scale in a small window
+	static constexpr float RecruitWantW = 300.f;
 	static float MatchPanelWidth(float RoomRight);
 	// The native status column (the connection, room and tick diagnostics, the key reminder, the pause, graphics and
 	// refusal lines and the last order's note), drawn unscaled in screen pixels. Round 15: it stays in the top left
 	// corner beside the score strip, its lines wrapped at their ' | ' columns, so it no longer runs over the paper war
 	// map's top left; when it would reach the match panel there, in the top right corner above the recruit card; when
 	// neither has room, under the strip as before.
-	struct FStatusLine { FString Shown; FLinearColor Colour; };
+	// bDiag (round 16): one of this client's diagnostic lines (connection, room, tick, the key reminder)
+	struct FStatusLine { FString Shown; FLinearColor Colour; bool bDiag = false; };
+	bool bLoggedDiagDrop = false;
 	static constexpr float ColumnShare = 0.26f, ColumnMinW = 240.f;
 	TArray<FString> WrapShown(const FString& Shown, float MaxWidth, UFont* Font) const;
 	// A text already in the language in use, cut to MaxWidth with '...' (the browser's text-overflow: ellipsis)
@@ -131,8 +170,14 @@ private:
 	// MaxWidth (round 15): the button is no wider, its label cut with '...' (the stored label stays whole)
 	float Button(UFont* Font, float X, float Y, const FString& Label, const FTCUiCommand& Command, bool bEnabled, const FLinearColor& Fill, float MinWidth = 0.f, float MaxWidth = 0.f);
 	void AddPanel(float X, float Y, float W, float H, const FLinearColor& Colour);
-	float DrawLobby(UFont* Font, float Y);
-	float DrawMatchPanel(UFont* Font, float Width = MatchPanelW);
+	// LobbyW (round 16): the lobby panel's width (700 px, narrower so the match report fits beside it)
+	float DrawLobby(UFont* Font, float Y, float LobbyW = LobbyPanelW);
+	// Round 16 (hudfit): TopLimit is the highest the panel may reach (UI pixels); when it would reach above it the panel
+	// drops what the browser's left column does not hold (FTCHudFit::MatchPanelLevels). bDraw false only measures:
+	// the top it would have. Settings stay here only when there is no match menu to hold them (bSettingsInMenu).
+	float DrawMatchPanel(UFont* Font, float Width = MatchPanelW, float TopLimit = 0.f, bool bDraw = true);
+	bool bSettingsInMenu = false;
+	int32 MatchPanelLevel = 0, LoggedPanelLevel = -1;
 	void DrawRecruitPanel(UFont* Font, float Left, float Bottom);
 	// A line over the ground through metre points (each leg split every 2 m so it follows the relief), Lift metres up.
 	void GroundLine(const ATCTerrain& T, const TArray<FVector2D>& Points, bool bClosed, const FLinearColor& Colour, float Thickness, float Lift = 0.3f);
@@ -148,7 +193,12 @@ private:
 	void DrawAlertFeed(UFont* Font);
 	void DrawEpilogue(UFont* Font, UFont* Big);
 	void DrawControlsSheet(UFont* Font, UFont* Big);
-	void DrawMatchReport(UFont* Font, float Top, float LobbyBottom = 0.f);
+	// X0 (round 16): the card's left edge beside the lobby panel (the panel's right edge plus the gap)
+	void DrawMatchReport(UFont* Font, float Top, float LobbyBottom = 0.f, float X0 = 716.f);
+	// Round 16: the lobby panel's width so the match report beside it gets its table's width (FTCEndReport::NaturalWidth,
+	// at least its MinWidth): the panel gives way from LobbyPanelW down to LobbyPanelMinW
+	float LobbyWidthBesideReport(UFont* Font) const;
+	FVector2D ReportLogged = FVector2D(-1, -1);
 	// Round 15 (lobby; defined in Client/TCMatchControls.cpp): rows of FTCControlRow as a panel of texts and
 	// ETCUiAction::MatchControl buttons, and the match's Menu, sandbox panel and Send next wave
 	float DrawControlRows(UFont* Font, float X, float Y, float W, const TArray<FTCControlRow>& Rows);
@@ -156,6 +206,20 @@ private:
 	// round 15 (lead): the match controls panel's size at the UI scale (0 when there is nothing to draw), so the HUD can
 	// place it clear of the score strip and keep the status column clear of it
 	FVector2D MeasureMatchControls(UFont* Font);
+	// Round 16 (hudfit): the match controls where the browser has them. The Menu button in the top left corner (#util),
+	// the score strip kept clear of it; the open menu under it (#menu) with the settings the browser keeps there
+	// (MenuSettingRows); the sandbox panel at #sandbox's place (centred, 230 px over the bottom) or, when that is taken,
+	// under the strip; Send next wave in the strip's Horde lead block (hud.js .sc-next, DrawScoreStrip).
+	TArray<FTCControlRow> MenuSettingRows() const;
+	void SplitMatchControls(TArray<FTCControlRow>& Corner, TArray<FTCControlRow>& Sandbox) const;
+	FVector2D MeasureControlRows(UFont* Font, const TArray<FTCControlRow>& Rows);
+	float CornerRight = 0.f; // UI pixels: the Menu button's panel's right edge (the strip starts right of it)
+	FBox2D SandboxBox = FBox2D(ForceInit), MatchPanelBox = FBox2D(ForceInit); // UI pixels, last frame
+public:
+	// A control row item's command: 'Setting.<what>' keys are this HUD's settings (Volume, Graphics, ...); the rest are
+	// ETCUiAction::MatchControl with the key (the room and match controls, Client/TCMatchControls.h)
+	static FTCUiCommand ControlCommand(const FString& Key, int32 Slot);
+private:
 	// client/main.js drawMinimap: the capture points (owner discs, the cut cross, the locked link) and the start's spawns
 	void DrawMinimapPoints();
 	// A line over the ground drawn in dashes of Dash metres with gaps of Gap metres (client/markers.js ORDER_DASH).

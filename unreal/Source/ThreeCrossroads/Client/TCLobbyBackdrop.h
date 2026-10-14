@@ -44,7 +44,10 @@ struct THREECROSSROADS_API FTCLobbyLook
 	FVector SunDirThree = FVector::ZeroVector; // toward the sun, three's axes (x, y up, z), unit length
 	bool bShadows = false;
 	bool bHazeBeforeTone = false;            // lobby-view.js draws straight to its canvas
-	bool bNeutralToneMapping = true;          // three.NeutralToneMapping (the match draws ACES filmic)
+	// three.NeutralToneMapping (the match draws ACES filmic). Round 16 (hudfit): ATCLighting::SetLobbyLook passes it to
+	// M_TCLookPost's Neutral (lead patch lobby-neutral-tonemapping.patch); with ACES the backdrop had more contrast than
+	// the browser's (darker darks and foliage at the same pose)
+	bool bNeutralToneMapping = true;
 	// the look for a W x H metre map
 	static FTCLobbyLook For(double W, double H);
 };
@@ -116,6 +119,8 @@ private:
 	bool bShotDirRead = false;
 	int32 ShotsTaken = 0;
 
+	// seconds into the drift now (StartSeconds held under -TCBackdropStill, lobby-view.js's still mode)
+	double DriftSeconds() const;
 	void Request(const FString& Name);
 	void Build(const FString& Name, const TSharedPtr<FJsonObject>& Map);
 	void Drop();

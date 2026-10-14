@@ -318,9 +318,10 @@ namespace TCLook
 		return Base ? UMaterialInstanceDynamic::Create(Base, Outer) : nullptr;
 	}
 
-	void SetPost(UMaterialInstanceDynamic* Post, float Exposure, float FogNear, float FogFar, const FLinearColor& HazeLinear, bool bHazeBeforeTone)
+	void SetPost(UMaterialInstanceDynamic* Post, float Exposure, float FogNear, float FogFar, const FLinearColor& HazeLinear, bool bHazeBeforeTone, bool bNeutral)
 	{
 		if (!Post) return;
+		Post->SetScalarParameterValue(TEXT("Neutral"), bNeutral ? 1.f : 0.f);
 		Post->SetScalarParameterValue(TEXT("Exposure"), Exposure);
 		Post->SetScalarParameterValue(TEXT("FogNear"), FogNear);
 		Post->SetScalarParameterValue(TEXT("FogFar"), FogFar);
@@ -571,10 +572,10 @@ void ATCLighting::SetLobbyLook(const FTCLobbyLook* L)
 	SkyWantUp = TCLook::ExpectedDiffuse(FVector(0, 0, 1), M, L->Env, 0.f);
 	bSkyCheck = true; bSkyCaptured = false; SkyTries = 1;
 	SkyCheckAt = GetWorld() ? GetWorld()->GetRealTimeSeconds() + 0.25 : 0.0;
-	TCLook::SetPost(PostMaterial, M.Exposure, L->FogNear, L->FogFar, L->Fog, L->bHazeBeforeTone);
+	TCLook::SetPost(PostMaterial, M.Exposure, L->FogNear, L->FogFar, L->Fog, L->bHazeBeforeTone, L->bNeutralToneMapping);
 	LastFogNear = L->FogNear; LastFogFar = L->FogFar;
-	UE_LOG(LogTCLook, Log, TEXT("look: the lobby backdrop's light (client/lobby-view.js): sun %.1f without shadows, hemisphere %.1f, no environment, fog #%06x from %.1f to %.1f m after the tone curve"),
-		M.SunI, M.HemiI, FTCLobbyLook::FogHex, L->FogNear, L->FogFar);
+	UE_LOG(LogTCLook, Log, TEXT("look: the lobby backdrop's light (client/lobby-view.js): sun %.1f without shadows, hemisphere %.1f, no environment, fog #%06x from %.1f to %.1f m after the tone curve, %s"),
+		M.SunI, M.HemiI, FTCLobbyLook::FogHex, L->FogNear, L->FogFar, L->bNeutralToneMapping ? TEXT("NeutralToneMapping") : TEXT("ACES filmic"));
 }
 
 void ATCLighting::CheckSkyCapture()
@@ -624,7 +625,7 @@ void ATCLighting::Tick(float Dt)
 	if (bLobbyLook)
 	{
 		// round 15: the lobby backdrop's light holds; no weather easing or camera-following haze in the lobby
-		TCLook::SetPost(PostMaterial, FTCLobbyLook::Exposure, LobbyLook.FogNear, LobbyLook.FogFar, LobbyLook.Fog, LobbyLook.bHazeBeforeTone);
+		TCLook::SetPost(PostMaterial, FTCLobbyLook::Exposure, LobbyLook.FogNear, LobbyLook.FogFar, LobbyLook.Fog, LobbyLook.bHazeBeforeTone, LobbyLook.bNeutralToneMapping);
 		return;
 	}
 	// atmosphere.js update: ease toward the weather, about 8 s to settle

@@ -213,6 +213,7 @@
 #include "Client/TCPersistence.h"
 #include "Client/TCProgression.h"
 #include "Client/TCWorldRecovery.h"
+#include "Client/TCOrders.h"
 #include "Client/TCMatchOptions.h"
 #include "World/TCWorldObjects.h"
 #include "World/TCGroundPaint.h"
@@ -233,6 +234,9 @@
 #include "Client/TCRoomBrowser.h"
 // round 15 (lobby): the lobby and match controls glue below is declared (Client/TCMatchControls.cpp defines it)
 #define TC_HAS_LOBBY_GLUE 1
+// round 16 (controls): the stats sheet and its frame probe (Client/TCStats.h); the glue is defined in Client/TCStats.cpp
+#include "Client/TCStats.h"
+#define TC_HAS_STATS_GLUE 1
 #include "Client/TCScenarioText.h"
 #include "Net/TCConnection.h"
 #include "Net/TCToken.h"
@@ -353,6 +357,8 @@ public:
 	// region alerts' under-attack throttle is one shared FAttackQuiet (client/alerts.js). All interim, as above.
 	FTCProgression Progress;
 	FTCWorldRecovery WorldRec;
+	// round 16 (orders): the -TCOrdersCheck= live script
+	FTCOrdersCheck OrdersCheck;
 	FTCMatchOptions Options;
 	TCWorldRecoveryCore::FAttackQuiet AttackQuiet;
 	// World region alerts as they arrived, with the world time each was taken, newest last
@@ -411,6 +417,13 @@ public:
 		StatsOverlay().Toggle();
 		if (const TOptional<FString> Saved = Stats.SaveText()) FTCSettingsStore::Game().Set(TEXT("ww2-stats"), *Saved);
 	}
+	// Round 16 (controls): the stats sheet (Menu > Stats overlay, Client/TCStats.h), modal while open: a press goes to
+	// StatsSheetPress (a control, the sheet, or the backdrop that closes it); StatsSheetTag presses a control by its tag
+	// (verification steps). The probe logs the overlay's frame numbers beside 'stat unit' with -TCStatUnitProbe.
+	FTCStatsSheet StatsSheet;
+	FTCStatUnitProbe StatUnitProbe;
+	bool StatsSheetPress(FVector2D Pixel, bool bBack);
+	bool StatsSheetTag(const FString& Tag, bool bBack);
 	// Round 14, tutorial and scenario guidance (Client/TCTutorial.h, Client/TCScenarioText.h; the glue is defined in
 	// Client/TCTutorial.cpp): the goal box, the collapse banner and the damaged buildings' smoke (objectives.js), the
 	// Tutorial's progress as the snapshots tell it, the Controls sheet at the first match (CLI-127), and the lobby's

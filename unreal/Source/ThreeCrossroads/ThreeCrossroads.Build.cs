@@ -18,6 +18,8 @@ public class ThreeCrossroads : ModuleRules
 		PrivateDependencyModuleNames.Add("ApplicationCore");
 		// round 15 (alerts): the stats overlay's draw calls and triangles (client/perf.js renderer.info), GNumDrawCallsRHI
 		PrivateDependencyModuleNames.AddRange(new string[] { "RHI" });
+		// round 16 (controls): the verification step that types goes through Slate's text input (FSlateApplication)
+		PrivateDependencyModuleNames.Add("Slate");
 		PublicIncludePaths.Add(ModuleDirectory);
 	}
 }

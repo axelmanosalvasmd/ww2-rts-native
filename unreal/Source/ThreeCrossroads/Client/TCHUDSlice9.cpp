@@ -3,6 +3,7 @@
 // (this recipient's own messages) and FTCObjectives, which is built from it; nothing is inferred for what a snapshot
 // did not deliver. Canvas drawing only: placeholder presentation in the browser's colours, not its art.
 #include "Client/TCHUD.h"
+#include "ThreeCrossroads.h"
 #include "Client/TCLocale.h"
 #include "Client/TCGameMode.h"
 #include "Client/TCObjectives.h"
@@ -12,6 +13,8 @@
 #include "Client/TCKeys.h"
 #include "Client/TCUnitRenderer.h"
 #include "Client/TCArmyCommands.h"
+#include "Client/TCOrders.h"
+#include "Client/TCRecruitment.h"
 #include "World/TCTerrain.h"
 #include "Engine/Canvas.h"
 #include "Engine/Font.h"
@@ -100,13 +103,19 @@ float ATCHUD::DrawScoreStrip(UFont* Font, UFont* Big)
 	const float BlockW = 236.f, LeadW = Strip.Lead.bShown ? (Strip.Kind == TEXT("assault") || Strip.Kind == TEXT("horde") ? 216.f : 150.f) : 0.f, Gap = 4.f;
 	const int32 N = Strip.Teams.Num();
 	float W = LeadW + (LeadW > 0 ? Gap : 0.f) + N * BlockW + FMath::Max(0, N - 1) * Gap;
-	W = FMath::Min(W, Canvas->ClipX - 16.f);
+	// round 16: never reaching the top left corner's Menu panel (#util; the browser's #scores is narrower still: at most
+	// var(--vw) - 660px, its blocks wrapping)
+	W = FMath::Min(W, CornerRight > 0.f ? FTCHudFit::StripMaxWidth(Canvas->ClipX, CornerRight) : Canvas->ClipX - 16.f);
 	const float Bw = N ? (W - LeadW - (LeadW > 0 ? Gap : 0.f) - FMath::Max(0, N - 1) * Gap) / N : 0.f;
 	// block heights: per seat two lines, then role, bar and value
 	float H = 0.f;
 	for (const FTCScoreTeam& T : Strip.Teams)
 		H = FMath::Max(H, T.Seats.Num() * 2 * LineH + (T.Role.IsEmpty() ? 0.f : LineH) + (T.bBar ? 10.f : 0.f) + LineH + 2 * PadPx);
-	if (Strip.Lead.bShown) H = FMath::Max(H, 3 * LineH + 8.f + 2 * PadPx);
+	// round 16: hud.js .sc-next, Horde's Send next wave in the lead block under the clock (margin-top 4px), for the host
+	// between waves (FTCMatchControls::NextWaveButton; a click is the match control 'NextWave')
+	const FTCControlButton NextWave = M->Controls.NextWaveButton();
+	const bool bNextWave = Strip.Lead.bShown && NextWave.bShown;
+	if (Strip.Lead.bShown) H = FMath::Max(H, 3 * LineH + 8.f + 2 * PadPx + (bNextWave ? LineH + PadPx + 4.f : 0.f));
 	const float X0 = (Canvas->ClipX - W) / 2, Y0 = 6.f;
 	float X = X0;
 	if (Strip.Lead.bShown)
@@ -116,6 +125,13 @@ float ATCHUD::DrawScoreStrip(UFont* Font, UFont* Big)
 		DrawLabel(L.Mode, L.bModeDanger ? Red : TextC, X + PadPx, Y0 + PadPx, Font, 1.f);
 		if (!L.Clock.IsEmpty()) DrawLabel(L.Clock, Brass, X + PadPx, Y0 + PadPx + LineH, Big, 1.f);
 		if (!L.Threat.IsEmpty()) DrawLabel(L.Threat, Red, X + PadPx, Y0 + PadPx + 2 * LineH + 8.f, Font, 1.f);
+		if (bNextWave)
+		{
+			FTCUiCommand Cmd(ETCUiAction::MatchControl);
+			Cmd.Unit = LexToString(ETCMatchControl::NextWave);
+			Button(Font, X + PadPx, Y0 + PadPx + 3 * LineH + 8.f + 4.f, NextWave.Label, Cmd, NextWave.bEnabled,
+				NextWave.bEnabled ? FLinearColor(0.18f, 0.24f, 0.16f, 0.9f) : FLinearColor(0.16f, 0.16f, 0.16f, 0.85f), 0.f, LeadW - 2 * PadPx);
+		}
 		X += LeadW + Gap;
 	}
 	for (const FTCScoreTeam& T : Strip.Teams)
@@ -170,10 +186,10 @@ float ATCHUD::DrawScoreStrip(UFont* Font, UFont* Big)
 	// round 14: objectives.js's goal box and collapse banner as objectives.css draws them (FTCScenarioText), under the
 	// strip and its lines
 	const float Bottom = M->ScenarioText.Draw(Canvas, Big, Font, Y - 4.f);
-	// round 15: client/stats.js, F2's overlay (Client/TCKeys.h): under its panel (this HUD has no #util or #econ panel,
-	// so the top-left and top-right boxes take stats.js's 52 px; top centre goes under #top), clear of the strip
-	const FTCPaint StatsBox = M->StatsOverlay().Layout(M->Perf.Stats(), -1.f, FMath::Max(Y, Bottom + 4.f) - 4.f, -1.f, FBox2D(FVector2D(X0, Y0), FVector2D(X0 + W, Y0 + H)), Canvas->ClipX, 0.f, Canvas->ClipX, FTCPaint::CanvasMeasure(Font));
-	StatsBox.Draw(Canvas, Font);
+	// round 15: client/stats.js, F2's overlay (Client/TCKeys.h). Round 16: drawn by DrawStatsBox after the match
+	// controls (the top-left box goes under them, #util), from what the strip leaves here: top centre under #top
+	StatsTopTc = FMath::Max(Y, Bottom + 4.f) - 4.f;
+	StatsStrip = FBox2D(FVector2D(X0, Y0), FVector2D(X0 + W, Y0 + H));
 	return FMath::Max(Y, Bottom + 4.f);
 }
 
@@ -244,76 +260,48 @@ void ATCHUD::DrawCapturePoints(UFont* Font)
 void ATCHUD::DrawPlans()
 {
 	using namespace TCHudSlice9;
-	// client/markers.js planLayer draw: for each selected unit, its route in the plan's colour with a ring at the goal,
-	// the waiting orders as dashed legs with rings, and the line to what it is shooting at with a ring around that
+	// client/markers.js planLayer draw (round 16: TCOrders::Markers, checked against the pinned markers.js): the army
+	// rally flag, then for each selected unit its production rally (a dashed leg and a flag), its route in the plan's
+	// colour with an arrowhead and a ring at the goal, its waiting orders (Shift) as dashed legs with arrowheads and
+	// rings, and the line to what it is shooting at with a ring around that. Garrisoned units draw theirs from the house.
 	ATCGameMode* M = GetWorld()->GetAuthGameMode<ATCGameMode>();
 	ATCPlayerController* PC = Cast<ATCPlayerController>(GetOwningPlayerController());
-	if (!M || !PC || !M->Terrain || !PC->Selected.Num()) return;
+	if (!M || !PC || !M->Terrain || !PC->PlayerCameraManager) return;
+	const FVector2D* Army = M->bArmyRally ? &M->ArmyRally : nullptr;
+	if (!PC->Selected.Num() && !Army) return;
 	const ATCTerrain& T = *M->Terrain;
-	const FTCMatchState& S = M->State;
-	TMap<int32, const FTCPlan*> Plans;
-	TMap<int32, const FTCWaitingOrders*> Waiting;
-	for (const FTCPlan& P : S.Plans) if (PC->Selected.Contains(P.Id)) Plans.Add(P.Id, &P);
-	for (const FTCWaitingOrders& W : S.WaitingOrders) if (PC->Selected.Contains(W.Id)) Waiting.Add(W.Id, &W);
-	auto Where = [&](const FTCUnit& U) { FVector2D P(U.X, U.Z); if (M->Units) M->Units->DrawnAt(U.Id, P); return P; };
-	auto RadiusOf = [&](const FString& Type) { const FTCUnitDef* D = M->UnitTable.Find(Type); return D ? D->Radius : 1.5f; };
-	auto Ring = [&](FVector2D At, float Rad, const FLinearColor& C) { GroundRing(T, At, Rad, C, 2.f); };
-	auto Arrow = [&](FVector2D Tip, FVector2D Dir, const FLinearColor& C)
+	const TArray<int32> Sel = PC->Selected.Array();
+	const TMap<int32, FTCMarkUnit> Units = TCOrders::MarkUnits(M->State, M->UnitTable, Sel,
+		[M](int32 Id, FVector2D& Out) { return M->Units && M->Units->DrawnAt(Id, Out); },
+		[M](int32 Id, FVector2D& Out) { const FTCProductionQueue* Q = M->Recruit.QueueOf(Id); if (!Q || Q->Rally.X < 0) return false; Out = Q->Rally; return true; });
+	const FVector Right = FRotationMatrix(PC->PlayerCameraManager->GetCameraRotation()).GetUnitAxis(EAxis::Y);
+	auto Ground = [&T](FVector2D P) { return ATCTerrain::ToWorld(P.X, P.Y, T.HeightAt(P.X, P.Y) + 0.12f); };
+	// a ribbon's width in pixels where it lies (markers.js: w metres, never under 2 x 1.1 px)
+	auto Pixels = [&](FVector2D At, double Width)
 	{
-		const FVector2D Side(-Dir.Y, Dir.X);
-		GroundLine(T, { Tip - Dir * 1.4 + Side * 0.6, Tip, Tip - Dir * 1.4 - Side * 0.6 }, false, C, 2.5f, 0.12f);
+		const FVector C = Project(Ground(At)), E = Project(Ground(At) + Right * 100.f);
+		const float PxPerM = C.Z > 0 && E.Z > 0 ? (float)FVector2D::Distance(FVector2D(C.X, C.Y), FVector2D(E.X, E.Y)) : 0.f;
+		return FMath::Max(2.2f, (float)Width * PxPerM);
 	};
-	for (const int32 Id : PC->Selected)
+	for (const FTCMarkPrim& P : TCOrders::Markers(Sel, Units, Army))
 	{
-		const FTCUnit* U = S.Units.Find(Id);
-		if (!U || !ATCUnitRenderer::IsDrawn(*U)) continue;
-		const FVector2D From = Where(*U);
-		const float FromR = RadiusOf(U->Type) + 0.5f;
-		const FTCPlan* const* PP = Plans.Find(Id);
-		const FTCPlan* P = PP ? *PP : nullptr;
-		// the target: a held unit it fires at, else an attack order's goal
-		const FTCUnit* Tu = U->Target ? S.Units.Find(U->Target) : nullptr;
-		const bool bHasT = Tu != nullptr || (P && P->Kind == 4);
-		const FVector2D Tat = Tu ? Where(*Tu) : P ? FVector2D(P->Tx, P->Tz) : FVector2D::ZeroVector;
-		const float Tr = bHasT ? (Tu ? RadiusOf(Tu->Type) : RadiusOf(TEXT("rifle"))) + 1.2f : 0.f;
-		const bool bOnOrder = bHasT && P && P->Kind == 4 && FVector2D::Distance(Tat, FVector2D(P->Tx, P->Tz)) < 3.0;
-		if (P && P->Kind)
+		const FLinearColor C = WithAlpha(FLinearColor(FColor((P.Hex >> 16) & 255, (P.Hex >> 8) & 255, P.Hex & 255)), P.Alpha);
+		if (P.Op == FTCMarkPrim::EOp::Line && P.Points.Num() >= 2)
 		{
-			const FLinearColor C = WithAlpha(PlanColour(P->Kind), 0.9f);
-			TArray<FVector2D> Route = { From };
-			Route.Append(P->Path);
-			if (Route.Num() < 2) Route.Add(FVector2D(P->Tx, P->Tz));
-			// start at the unit's ring
-			Route[0] = From + Along(From, Route[1]) * FMath::Min((double)FromR, FVector2D::Distance(From, Route[1]));
-			if (P->Kind > 4)
-			{
-				GroundLine(T, Route, false, C, 3.f, 0.12f);
-				GroundDashes(T, Route.Last(), FVector2D(P->Tx, P->Tz), WithAlpha(C, 0.8f), 2.5f);
-			}
-			else
-			{
-				const double EndR = P->Kind == 4 ? (bOnOrder ? Tr : 2.7) + 0.3 : 1.2;
-				const FVector2D Last = Route.Last(), Prev = Route[Route.Num() - 2];
-				const FVector2D Dir = Along(Prev, Last);
-				if (FVector2D::Distance(Prev, Last) > EndR) Route.Last() = Last - Dir * EndR;
-				GroundLine(T, Route, false, C, 3.f, 0.12f);
-				Arrow(Route.Last(), Dir, C);
-			}
-			if (P->Kind != 4) Ring(FVector2D(P->Tx, P->Tz), 1.f, WithAlpha(PlanColour(P->Kind), 0.95f));
+			if (P.bDashed) GroundDashes(T, P.Points[0], P.Points.Last(), C, Pixels(P.Points.Last(), P.Width), 2.2f, 1.3f); // ORDER_DASH
+			else GroundLine(T, P.Points, false, C, Pixels(P.Points.Last(), P.Width), 0.12f);
 		}
-		FVector2D Q = P && P->Kind ? FVector2D(P->Tx, P->Tz) : From;
-		if (const FTCWaitingOrders* const* W = Waiting.Find(Id))
-			for (const FTCQueuedOrder& O : (*W)->Orders)
-			{
-				const FVector2D To(O.X, O.Z);
-				GroundDashes(T, Q, To, WithAlpha(PlanColour(O.Kind), 0.8f), 2.5f);
-				Ring(To, 1.f, WithAlpha(PlanColour(O.Kind), 0.95f));
-				Q = To;
-			}
-		if (bHasT)
+		else if (P.Op == FTCMarkPrim::EOp::Ring) GroundRing(T, P.At, (float)P.Radius, C, Pixels(P.At, P.Width));
+		else if (P.Op == FTCMarkPrim::EOp::Arrow)
 		{
-			if (!bOnOrder) GroundDashes(T, From + Along(From, Tat) * FromR, Tat - Along(From, Tat) * (Tr + 0.3f), WithAlpha(AttackColour, 0.85f), 2.5f);
-			Ring(Tat, Tr, WithAlpha(AttackColour, 0.95f));
+			// overlay.js arrow: two triangles split along the axis, tip to the base corners
+			const double L = P.Dir.Size();
+			if (L <= 0) continue;
+			const FVector2D D = P.Dir / L, N(-D.Y, D.X), Base = P.At - D * P.Len;
+			const FVector Tip = Project(Ground(P.At)), A = Project(Ground(Base + N * P.Half)), Mid = Project(Ground(Base)), B = Project(Ground(Base - N * P.Half));
+			if (Tip.Z <= 0 || A.Z <= 0 || Mid.Z <= 0 || B.Z <= 0) continue;
+			const FVector2D Q[4] = { FVector2D(Tip.X, Tip.Y), FVector2D(A.X, A.Y), FVector2D(Mid.X, Mid.Y), FVector2D(B.X, B.Y) };
+			FillQuad(Q, C);
 		}
 	}
 }
@@ -321,9 +309,10 @@ void ATCHUD::DrawPlans()
 void ATCHUD::DrawHealthBars()
 {
 	using namespace TCHudSlice9;
-	// client/main.js: a bar over a unit only when it is selected, hovered, hurt or suppressed (a garrisoned squad's roof
-	// bar is not drawn: this client draws no garrisoned squad); the health in the owner's colour, orange under half,
-	// red under a quarter; the suppression bar under it, red from 90
+	// client/main.js: a bar over a unit only when it is selected, hovered, hurt or suppressed, and always over a
+	// garrisoned squad: its roof bar, 7.5 m over the ground at the house (round 16, TCOrders::RoofBarHeight), is what
+	// selects it; the health in the owner's colour, orange under half, red under a quarter; the suppression bar under
+	// it, red from 90
 	ATCGameMode* M = GetWorld()->GetAuthGameMode<ATCGameMode>();
 	ATCPlayerController* PC = Cast<ATCPlayerController>(GetOwningPlayerController());
 	if (!M || !PC || !M->Terrain || !PC->PlayerCameraManager) return;
@@ -332,13 +321,14 @@ void ATCHUD::DrawHealthBars()
 	{
 		const FTCUnit& U = Pair.Value;
 		const FTCUnitDef* D = M->UnitTable.Find(U.Type);
-		if (!D || D->MaxHp() <= 0 || !ATCUnitRenderer::IsDrawn(U)) continue;
+		const bool bGarr = (U.Flags & TCFlags::Garrisoned) != 0;
+		if (!D || D->MaxHp() <= 0 || (!ATCUnitRenderer::IsDrawn(U) && !bGarr)) continue;
 		const float Frac = FMath::Max(0.f, (float)U.Hp / D->MaxHp());
 		const bool bSel = PC->Selected.Contains(U.Id);
-		if (!(bSel || PC->HoverEnemy == U.Id || 2.3f * Frac < 2.299f || U.Supp > 0)) continue;
+		if (!(bSel || PC->HoverEnemy == U.Id || 2.3f * Frac < 2.299f || U.Supp > 0 || bGarr)) continue;
 		FVector2D At(U.X, U.Z);
 		if (M->Units) M->Units->DrawnAt(U.Id, At);
-		const FVector W = ATCTerrain::ToWorld(At.X, At.Y, M->Terrain->HeightAt(At.X, At.Y) + BarY(U.Type, D));
+		const FVector W = ATCTerrain::ToWorld(At.X, At.Y, M->Terrain->HeightAt(At.X, At.Y) + (bGarr ? (float)TCOrders::RoofBarHeight : BarY(U.Type, D)));
 		const FVector C = Project(W), E = Project(W + Right * 120.f);
 		if (C.Z <= 0 || E.Z <= 0 || C.X < 0 || C.Y < 0 || C.X > Canvas->ClipX || C.Y > Canvas->ClipY) continue;
 		const float PxPerM = FMath::Clamp((float)FVector2D::Distance(FVector2D(C.X, C.Y), FVector2D(E.X, E.Y)) / 1.2f, 4.f, 30.f);
@@ -431,7 +421,20 @@ void ATCHUD::DrawControlsSheet(UFont* Font, UFont* Big)
 	}
 }
 
-void ATCHUD::DrawMatchReport(UFont* Font, float Top, float LobbyBottom)
+float ATCHUD::LobbyWidthBesideReport(UFont* Font) const
+{
+	const ATCGameMode* M = GetWorld() ? GetWorld()->GetAuthGameMode<ATCGameMode>() : nullptr;
+	if (!M || !Canvas || !Font) return LobbyPanelW;
+	const FTCEndReportInput In = FTCEndReport::FromState(M->State);
+	if (!In.Report.bShown) return LobbyPanelW;
+	const FTCMeasure Measure = FTCPaint::CanvasMeasure(Font);
+	// index.html #overlay .card: min(920px, 100%); the table's natural width within it, never under its min-content
+	const float Want = FMath::Max(FTCEndReport::MinWidth(In, Measure), FMath::Min(TCEndReportRules::CardWidth, FTCEndReport::NaturalWidth(In, Measure)));
+	const float Room = Canvas->ClipX - 8.f - 8.f - 8.f; // the lobby's left margin, the gap, the right margin
+	return FMath::Clamp(Room - Want, LobbyPanelMinW, LobbyPanelW);
+}
+
+void ATCHUD::DrawMatchReport(UFont* Font, float Top, float LobbyBottom, float X0)
 {
 	// round 15: client/main.js renderLobby's result line and client/report.js's card (Client/TCEndReport.h), beside the
 	// lobby panel: hidden without a result; the report hidden for a host-ended match; its summary opens and closes it
@@ -439,12 +442,22 @@ void ATCHUD::DrawMatchReport(UFont* Font, float Top, float LobbyBottom)
 	if (!M || !Canvas) return;
 	const FTCEndReportInput In = FTCEndReport::FromState(M->State);
 	M->EndReport.Sync(In);
-	float X0 = 716.f, W = FMath::Min(TCEndReportRules::CardWidth, Canvas->ClipX - X0 - 8.f);
-	// round 15 (lead): too narrow beside the 700 px lobby panel: under it, across the window (the browser's report sits
-	// in the lobby card's own column)
-	if (W < 480.f && LobbyBottom > 0.f) { X0 = 8.f; Top = LobbyBottom + 8.f; W = FMath::Min(TCEndReportRules::CardWidth, Canvas->ClipX - 16.f); }
+	const FTCMeasure Measure = FTCPaint::CanvasMeasure(Font);
+	float W = FMath::Min(TCEndReportRules::CardWidth, Canvas->ClipX - X0 - 8.f);
+	// round 15 (lead): too narrow beside the lobby panel: under it, across the window (the browser's report sits in the
+	// lobby card's own column). Round 16: too narrow means narrower than the story table's min-content (its headers
+	// broken at their words, LobbyWidthBesideReport has already narrowed the lobby panel for it), so no column is cut
+	const float Need = FMath::Max(480.f, FTCEndReport::MinWidth(In, Measure));
+	if (W < Need && LobbyBottom > 0.f) { X0 = 8.f; Top = LobbyBottom + 8.f; W = FMath::Min(TCEndReportRules::CardWidth, Canvas->ClipX - 16.f); }
 	if (W < 300.f || (!In.bResult && !In.Report.bShown)) return;
-	const FTCPaint P = M->EndReport.Layout(In, X0, Top, W, FTCPaint::CanvasMeasure(Font));
+	float Height = 0.f;
+	const FTCPaint P = M->EndReport.Layout(In, X0, Top, W, Measure, &Height);
+	if (Height > 0.f && (ReportLogged.X != X0 || ReportLogged.Y != W))
+	{
+		ReportLogged = FVector2D(X0, W);
+		UE_LOG(LogTC, Log, TEXT("hud: match report at x %.0f, %.0f px wide (table min-content %.0f, natural %.0f px), %.0f px tall, window %.0f x %.0f, %s"),
+			X0, W, FTCEndReport::MinWidth(In, Measure), FTCEndReport::NaturalWidth(In, Measure), Height, Canvas->ClipX, Canvas->ClipY, X0 > 8.f ? TEXT("beside the lobby") : TEXT("under the lobby"));
+	}
 	P.Draw(Canvas, Font);
 	for (const FTCPaintHit& H : P.Hits) { FTCUiCommand C(ETCUiAction::Alert); C.Unit = H.Tag; Buttons.Add({ ToScreen(H.Rect), C, H.Label, true }); }
 	for (const FBox2D& B : P.Panels) Panels.Add(ToScreen(B));

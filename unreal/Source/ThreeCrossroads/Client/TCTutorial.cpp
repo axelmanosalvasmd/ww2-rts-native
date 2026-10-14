@@ -318,6 +318,22 @@ void FTCControlsOnboarding::OnClosed()
 // ---------------------------------------------------------------------------------------------------------------------
 // -TCTutorialDrive (verification): Tools/tutorial/policy.mjs in C++, from this seat's snapshot only
 
+FString FTCTutorialDriver::TakeTally()
+{
+	auto Part = [](const TCHAR* Word, TMap<FString, int32>& M)
+	{
+		if (!M.Num()) return FString();
+		M.KeySort([](const FString& A, const FString& B) { return A < B; });
+		int32 N = 0;
+		TArray<FString> Kinds;
+		for (const TPair<FString, int32>& P : M) { N += P.Value; Kinds.Add(FString::Printf(TEXT("%s %d"), *P.Key, P.Value)); }
+		M.Reset();
+		return FString::Printf(TEXT("%s %d (%s)"), Word, N, *FString::Join(Kinds, TEXT(", ")));
+	};
+	const FString A = Part(TEXT("sent"), Tally), B = Part(TEXT("not sent"), TallyRefused);
+	return A.IsEmpty() ? B : B.IsEmpty() ? A : A + TEXT("; ") + B;
+}
+
 namespace TCTutorialDrive
 {
 	TSharedRef<FJsonObject> Orders(const TCHAR* T, const TArray<TTuple<int32, double, double>>& Rows)
@@ -481,6 +497,17 @@ TArray<TSharedRef<FJsonObject>> FTCTutorialDriver::Decide(const FTCMatchState& S
 #include "Camera/PlayerCameraManager.h"
 #include "UnrealClient.h"
 #include "Misc/Paths.h"
+#include "Client/TCObjectives.h"
+
+// Round 16: the mode coverage lines (FTCModeWatch, Client/TCObjectives.h) ride on the same start, snapshot and clear
+// hooks, for every mode. One watch per game mode object (TCGameMode.h has no member for it).
+namespace TCModesHook
+{
+	FTCModeWatch& Of(const void* Owner) { static TMap<const void*, FTCModeWatch> Watches; return Watches.FindOrAdd(Owner); }
+	void Flush(FTCModeWatch& W) { for (const FString& L : W.TakeLog()) UE_LOG(LogTC, Log, TEXT("%s"), *L); }
+	// the seat the Tutorial drive last played (the state's seat is gone by the time the match clears)
+	int32& DriveSeat(const void* Owner) { static TMap<const void*, int32> Seats; return Seats.FindOrAdd(Owner, -1); }
+}
 
 void ATCGameMode::TutorialSwitches(const TCHAR* Cmd)
 {
@@ -496,6 +523,9 @@ void ATCGameMode::TutorialSwitches(const TCHAR* Cmd)
 void ATCGameMode::TutorialStart()
 {
 	Tutorial.OnStart(State);
+	FTCModeWatch& Watch = TCModesHook::Of(this);
+	Watch.OnStart(State);
+	TCModesHook::Flush(Watch);
 	TutorialDriver.Reset();
 	ScenarioText.Reset();
 	TutorialShotStep = -2; TutorialShotAt = -1.0; bTutorialEndShot = false; TutorialStartAt = FPlatformTime::Seconds();
@@ -534,13 +564,28 @@ void ATCGameMode::TutorialSnapshot(const FJsonObject& M)
 	const FString BannerBefore = ScenarioText.Banner();
 	ScenarioText.OnSnapshot(State, &UnitTable, Cam);
 	if (ScenarioText.BannerShown() && ScenarioText.Banner() != BannerBefore) UE_LOG(LogTC, Log, TEXT("objective banner at tick %d: %s"), State.Tick, *ScenarioText.Banner());
+	FTCModeWatch& Watch = TCModesHook::Of(this);
+	Watch.OnSnapshot(State, &UnitTable, &M);
+	TCModesHook::Flush(Watch);
 	// -TCTutorialDrive: this seat's orders from this snapshot
+	// (round 16) what the seat sent is tallied per step: "tutorial drive totals" lines at each step change and the end
 	if (bTutorialDrive)
-		for (const TSharedRef<FJsonObject>& C : TutorialDriver.Decide(State, &UnitTable))
+	{
+		const int32 StepBefore = TutorialDriver.Step();
+		if (State.You >= 0) TCModesHook::DriveSeat(this) = State.You;
+		const TArray<TSharedRef<FJsonObject>> Commands = TutorialDriver.Decide(State, &UnitTable);
+		if (TutorialDriver.Step() != StepBefore && StepBefore >= 0)
+		{
+			const FString T = TutorialDriver.TakeTally();
+			UE_LOG(LogTC, Log, TEXT("tutorial drive totals: seat %d, step %d: %s"), State.You, StepBefore + 1, T.IsEmpty() ? TEXT("nothing sent") : *T);
+		}
+		for (const TSharedRef<FJsonObject>& C : Commands)
 		{
 			const bool bSent = SendCommand(C);
+			TutorialDriver.Note(C->GetStringField(TEXT("t")), bSent);
 			if (!bSent) UE_LOG(LogTC, Warning, TEXT("tutorial drive: %s not sent: %s"), *C->GetStringField(TEXT("t")), *LastSendProblem());
 		}
+	}
 }
 
 void ATCGameMode::TutorialFrame(float Dt)
@@ -619,6 +664,14 @@ void ATCGameMode::TutorialFrame(float Dt)
 void ATCGameMode::TutorialClear()
 {
 	if (Tutorial.IsTutorial()) UE_LOG(LogTC, Log, TEXT("tutorial: cleared (%s; %d plume bursts drawn this match)"), *Tutorial.Verdict(), TutorialPlumeBursts);
+	if (bTutorialDrive && TutorialDriver.Step() >= 0)
+	{
+		const FString T = TutorialDriver.TakeTally();
+		UE_LOG(LogTC, Log, TEXT("tutorial drive totals: seat %d, step %d (last): %s; %d command(s) this match"), TCModesHook::DriveSeat(this), TutorialDriver.Step() + 1, T.IsEmpty() ? TEXT("nothing sent") : *T, TutorialDriver.Sent());
+	}
+	FTCModeWatch& Watch = TCModesHook::Of(this);
+	Watch.OnClear(State.RoomState == TEXT("lobby") ? TEXT("back to the lobby") : TEXT("the match left the screen"));
+	TCModesHook::Flush(Watch);
 	Tutorial.Reset();
 	TutorialDriver.Reset();
 	ScenarioText.Reset();
@@ -993,6 +1046,16 @@ bool FTCTutorialDriverTest::RunTest(const FString& Parameters)
 	// nothing outside a Tutorial in play
 	St.ApplySnapshot(*Parse(TEXT(R"({"t":"s","tick":3010,"units":[],"mode":{"kind":"horde","wave":1}})")));
 	TestEqual(TEXT("not a Tutorial: nothing"), D.Decide(St, nullptr).Num(), 0);
+	// the verification tally (round 16): by type, sorted, sent then not sent, emptied by each take
+	FTCTutorialDriver Tl;
+	TestEqualSensitive(TEXT("nothing noted"), Tl.TakeTally(), FString());
+	Tl.Note(TEXT("move"), true); Tl.Note(TEXT("buy"), true); Tl.Note(TEXT("move"), true); Tl.Note(TEXT("amove"), false);
+	TestEqualSensitive(TEXT("tally"), Tl.TakeTally(), FString(TEXT("sent 3 (buy 1, move 2); not sent 1 (amove 1)")));
+	TestEqualSensitive(TEXT("taken: empty again"), Tl.TakeTally(), FString());
+	Tl.Note(TEXT("retreat"), false);
+	TestEqualSensitive(TEXT("only refused"), Tl.TakeTally(), FString(TEXT("not sent 1 (retreat 1)")));
+	TestEqual(TEXT("step before any Decide"), Tl.Step(), -2);
+	TestEqual(TEXT("step after the last Decide (horde row: unchanged)"), D.Step(), 6);
 	return true;
 }
 #endif

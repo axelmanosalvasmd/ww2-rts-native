@@ -212,7 +212,7 @@ void FTCLobbyBackdrop::Tick(float DeltaSeconds)
 	ATCTerrain& T = *Terrain;
 	T.Flush(*State);
 	Paint->Tick(*State, DeltaSeconds, false, [&T](float X, float Z) { return T.HeightAt(X, Z); });
-	Water->Flush(*State, FPlatformTime::Seconds() - Start, false);
+	Water->Flush(*State, DriftSeconds(), false);
 	Objects->Update(T, nullptr);
 	View->Draw(*Objects, *State, &T);
 	Frames++;
@@ -234,13 +234,22 @@ void FTCLobbyBackdrop::Tick(float DeltaSeconds)
 	}
 }
 
+double FTCLobbyBackdrop::DriftSeconds() const
+{
+	// round 16: lobby-view.js still mode (gl.still: reduced motion, or a software renderer such as the headless
+	// browser's SwiftShader) draws one frame where the drift would be 20 s in; -TCBackdropStill asks the same here, so a
+	// capture lines up with the browser's still frame
+	static const bool bStill = FParse::Param(FCommandLine::Get(), TEXT("TCBackdropStill"));
+	return bStill ? StartSeconds : FPlatformTime::Seconds() - Start;
+}
+
 bool FTCLobbyBackdrop::PlaceCamera(ATCCameraPawn* Cam) const
 {
 	if (!Cam || !bBuilt || !Terrain.IsValid() || !State) return false;
 	const double W = State->Map.W * FTCMatchState::CellMetres, H = State->Map.H * FTCMatchState::CellMetres;
 	FVector Eye, Aim;
 	const ATCTerrain* T = Terrain.Get();
-	DriftPose(W, H, FPlatformTime::Seconds() - Start, [T](float X, float Z) { return T->HeightAt(X, Z); }, Eye, Aim);
+	DriftPose(W, H, DriftSeconds(), [T](float X, float Z) { return T->HeightAt(X, Z); }, Eye, Aim);
 	const FVector E = ATCTerrain::ToWorld(Eye.X, Eye.Y, Eye.Z), A = ATCTerrain::ToWorld(Aim.X, Aim.Y, Aim.Z);
 	Cam->SetActorLocationAndRotation(E, (A - E).Rotation());
 	if (Cam->Camera)

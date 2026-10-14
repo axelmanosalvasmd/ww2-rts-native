@@ -115,7 +115,9 @@ namespace TCLook
 	// output space, Haze, and linear, HazeLinear) and where it mixes: bHazeBeforeTone true is Graphics High's composer
 	// (linear light, before the tone curve, the background tone-mapped too), false the direct path (after the curve)
 	UMaterialInstanceDynamic* MakePost(UObject* Outer);
-	void SetPost(UMaterialInstanceDynamic* Post, float Exposure, float FogNear, float FogFar, const FLinearColor& HazeLinear, bool bHazeBeforeTone = false);
+	// bNeutral (round 16, hudfit): three's NeutralToneMapping in place of ACES filmic (M_TCLookPost's Neutral; the lobby
+	// backdrop, client/lobby-view.js); every other caller keeps ACES filmic
+	void SetPost(UMaterialInstanceDynamic* Post, float Exposure, float FogNear, float FogFar, const FLinearColor& HazeLinear, bool bHazeBeforeTone = false, bool bNeutral = false);
 	// the haze the reference shows where the fog is full (or nothing was drawn), as display bytes 0-255
 	FLinearColor HazeOnScreen(const FLinearColor& HazeLinear, float Exposure, bool bHazeBeforeTone);
 	// MPC_TCLook: the hemisphere and environment the model materials add

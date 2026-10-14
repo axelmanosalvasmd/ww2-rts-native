@@ -84,6 +84,33 @@ struct FTCRoomRow
 	FString JoinAria;     // 'Join <title>'
 };
 
+// Round 16 (controls): the directory and the room's socket. In the browser the directory is its own page
+// (public-lobby.js: "The directory does not open a game socket or load Three.js until a player joins"): the lobby's
+// "Browse matches" link (index.html <a href="/">) leaves /play, which closes the room's socket, and a pick
+// (enter(): Join, Quick Play, Create match, Tutorial, Join room) loads /play#code, which opens a new one. This client
+// shows the directory inside itself, so it does the same: opening it closes the socket, a pick opens the picked room's
+// socket, and its Close button (the browser's Back to /play#code) opens the room it came from again.
+class FTCDirectorySession
+{
+public:
+	enum class EStep : uint8 { None, CloseSocket, OpenRoom };
+	// "Browse matches": the directory shows. CloseSocket when a room's socket was open (Room: that room, kept for Close).
+	EStep Open(bool bSocketOpen, const FString& Room);
+	// Close: OpenRoom (ReturnRoom()) when no socket is open, the way back to the room the directory left (or, with
+	// -TCBrowse at start-up, the command line's room); None when a socket is still open.
+	EStep Close(bool bSocketOpen);
+	// A pick: the directory closes and the picked room's socket opens (nothing to return to).
+	void Entered() { bShown = false; Return.Reset(); }
+	bool IsShown() const { return bShown; }
+	const FString& ReturnRoom() const { return Return; }
+	// -TCBrowse: the directory first, no socket yet, the command line's room behind Close
+	void StartShown(const FString& Room) { bShown = true; Return = Room; }
+
+private:
+	bool bShown = false;
+	FString Return;
+};
+
 class FTCRoomBrowser
 {
 public:
@@ -160,6 +187,9 @@ public:
 
 	FTCRoomBrowser();
 	~FTCRoomBrowser();
+
+	// round 16: whether the directory shows and the room behind its Close (the socket rule above)
+	FTCDirectorySession Session;
 
 private:
 	TArray<FTCRoomInfo> RoomList;

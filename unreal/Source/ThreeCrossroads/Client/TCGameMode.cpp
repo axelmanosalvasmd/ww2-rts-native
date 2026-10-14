@@ -239,6 +239,13 @@ void ATCGameMode::BeginPlay()
 	if (TCTutorialEntry::FromCommandLine(Cmd, Settings.Room, Settings.Listing)) UE_LOG(LogTC, Log, TEXT("tutorial: -TCTutorial, a new private Tutorial room %s (hello carries the listing)"), *Settings.Room);
 	TutorialSwitches(Cmd);
 	ControlsSwitches(Cmd, Settings); // round 15: the name, the hello's listing, the room's lowercase, -TCBrowse
+	{
+		// round 16 (orders): the -TCOrdersCheck= live script (Client/TCOrders.h FTCOrdersCheck)
+		FString OrdersScript, OrdersShots;
+		FParse::Value(Cmd, TEXT("TCOrdersShotDir="), OrdersShots);
+		if (FParse::Value(Cmd, TEXT("TCOrdersCheck="), OrdersScript, false) && OrdersCheck.Parse(OrdersScript, OrdersShots))
+			UE_LOG(LogTC, Log, TEXT("orders check: script of %s"), *OrdersScript);
+	}
 	TokenRequest.Server = Settings.Url;
 	TokenRequest.Room = Settings.Room;
 	TokenRequest.bSpectate = Settings.bSpectate;
@@ -317,7 +324,7 @@ bool ATCGameMode::SendCommand(const TSharedRef<FJsonObject>& Cmd)
 	if (!Connection) { LastSendProblemText = TEXT("not sent: not connected"); return false; }
 	int32 Bytes = 0;
 	const ETCSendResult Result = Connection->TrySend(Cmd, &Bytes);
-	if (Result == ETCSendResult::Sent) { LastSendProblemText.Reset(); return true; }
+	if (Result == ETCSendResult::Sent) { LastSendProblemText.Reset(); OrdersCheck.NoteSent(Cmd->GetStringField(TEXT("t"))); return true; }
 	LastSendProblemText = Result == ETCSendResult::TooLarge ? FString::Printf(TEXT("%s (%d bytes)"), LexToString(Result), Bytes) : FString(LexToString(Result));
 	return false;
 }
@@ -1026,6 +1033,7 @@ void ATCGameMode::Tick(float DeltaSeconds)
 		FramesWindow = FFrameTimes();
 	}
 	ControlsFrame(); // round 15: the room directory's refresh and the -TCControlsCheck script
+	if (ATCPlayerController* OrdersPC = Cast<ATCPlayerController>(GetWorld()->GetFirstPlayerController())) OrdersCheck.Frame(*this, *OrdersPC); // round 16
 	if (ExitAfter >= 0 && Now - BeganAt >= ExitAfter)
 	{
 		ExitAfter = -1;

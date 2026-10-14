@@ -437,6 +437,26 @@ bool FTCRoomBrowser::ParseInviteLink(const FString& Link, FString& OutSocketUrl,
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
+// ---------------------------------------------------------------------------------------------------------------------
+// FTCDirectorySession (round 16)
+
+FTCDirectorySession::EStep FTCDirectorySession::Open(bool bSocketOpen, const FString& Room)
+{
+	const bool bWasShown = bShown;
+	bShown = true;
+	if (bWasShown) return EStep::None;
+	if (!bSocketOpen) return EStep::None;
+	Return = Room; // leaving /play#room for /
+	return EStep::CloseSocket;
+}
+
+FTCDirectorySession::EStep FTCDirectorySession::Close(bool bSocketOpen)
+{
+	if (!bShown) return EStep::None;
+	bShown = false;
+	return !bSocketOpen && !Return.IsEmpty() ? EStep::OpenRoom : EStep::None;
+}
+
 #if WITH_DEV_AUTOMATION_TESTS
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCRoomBrowserReferenceTest, "ThreeCrossroads.RoomBrowser.Reference", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
@@ -612,6 +632,25 @@ bool FTCRoomBrowserReferenceTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("public url"), FTCRoomBrowser::ParseInviteLink(TEXT("https://box.tail1234.ts.net/play#main"), Url, A) && Url == TEXT("wss://box.tail1234.ts.net/ws") && A.Room == TEXT("main"));
 		TestFalse(TEXT("not a link"), FTCRoomBrowser::ParseInviteLink(TEXT("abc12"), Url, A));
 		TestFalse(TEXT("another page"), FTCRoomBrowser::ParseInviteLink(TEXT("http://h/maps/x#abc"), Url, A));
+	}
+	// round 16: the directory closes the room's socket and Close opens the room again; a pick opens the picked one
+	{
+		using E = FTCDirectorySession::EStep;
+		FTCDirectorySession D;
+		TestEqual(TEXT("session: Browse from a room closes its socket"), (int32)D.Open(true, TEXT("lbna3")), (int32)E::CloseSocket);
+		TestTrue(TEXT("session: shown"), D.IsShown());
+		TestEqual(TEXT("session: the room kept"), D.ReturnRoom(), FString(TEXT("lbna3")));
+		TestEqual(TEXT("session: Browse again does nothing"), (int32)D.Open(false, TEXT("other")), (int32)E::None);
+		TestEqual(TEXT("session: Close opens the room again"), (int32)D.Close(false), (int32)E::OpenRoom);
+		TestEqual(TEXT("session: Close again does nothing"), (int32)D.Close(false), (int32)E::None);
+		D.Open(true, TEXT("lbna3"));
+		D.Entered();
+		TestFalse(TEXT("session: a pick closes the directory"), D.IsShown());
+		TestTrue(TEXT("session: nothing to return to after a pick"), D.ReturnRoom().IsEmpty());
+		TestEqual(TEXT("session: Browse with no socket closes nothing"), (int32)D.Open(false, TEXT("x")), (int32)E::None);
+		TestEqual(TEXT("session: and Close opens nothing (no room left behind)"), (int32)D.Close(false), (int32)E::None);
+		D.StartShown(TEXT("main"));
+		TestEqual(TEXT("session: -TCBrowse, Close opens the command line's room"), (int32)D.Close(false), (int32)E::OpenRoom);
 	}
 	return true;
 }

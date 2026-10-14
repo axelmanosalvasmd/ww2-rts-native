@@ -2,6 +2,9 @@
 #include "Client/TCScenarioText.h"
 #include "ThreeCrossroads.h"
 #include "Client/TCUnitTable.h"
+#include "Client/TCLocale.h"
+#include "Dom/JsonObject.h"
+#include "Dom/JsonValue.h"
 #include "Net/TCMatchState.h"
 #include "HAL/PlatformTime.h"
 #include <cstdio>
@@ -801,6 +804,140 @@ FTCMatchReport FTCObjectives::BuildReport(const FTCMatchResult& R, int32 Me)
 //    recorded stream reaches the end of a match). That oracle script lives outside the repository; its outputs are the
 //    literals below. The per-snapshot sequences are compared through FNV-1a 64 digests of one line per snapshot.
 
+// ---------------------------------------------------------------------------------------------------------------------
+// FTCModeWatch: the mode coverage lines (verification aid, see TCObjectives.h)
+
+void FTCModeWatch::Reset()
+{
+	bStarted = bDecided = bSummarized = false;
+	MatchId = -1; Snapshots = Strips = Goals = Says = 0; LastStripTick = -1000000000;
+	ModeKind.Reset(); LastShape.Reset(); LastGoal.Reset(); DecidedText.Reset();
+	Pending.Reset();
+}
+
+void FTCModeWatch::OnStart(const FTCMatchState& S)
+{
+	// a reconnect to the same match goes on counting; a new match starts over (its summary first)
+	if (bStarted && S.MatchId == MatchId) { Pending.Add(FString::Printf(TEXT("modes: start again: match %d (a reconnect), seat %d"), S.MatchId, S.You)); return; }
+	if (bStarted) OnClear(TEXT("a new match"));
+	TArray<FString> P = MoveTemp(Pending);
+	Reset();
+	Pending = MoveTemp(P);
+	bStarted = true;
+	MatchId = S.MatchId;
+	TArray<FString> Teams;
+	for (int32 T : S.Teams) Teams.Add(FString::FromInt(T));
+	// a spectator has no seat (the server's start says seat 0, its view's); one that joins a match in play gets the start
+	// before any lobby, so the mode is not known yet
+	const FString Seat = S.bSpectator ? FString::Printf(TEXT("watching as a spectator (%d seats)"), S.Names.Num()) : FString::Printf(TEXT("seat %d of %d (team %d)"), S.You, S.Names.Num(), S.TeamOf(S.You));
+	const FString Mode = !S.StartMode.IsEmpty() ? S.StartMode : !S.Mode.IsEmpty() ? S.Mode : FString(TEXT("not known yet"));
+	Pending.Add(FString::Printf(TEXT("modes: start: match %d on '%s' (%dx%d), %s, teams [%s], lobby mode %s, %d authored point(s)"),
+		S.MatchId, *S.Map.Name, S.Map.W, S.Map.H, *Seat, *FString::Join(Teams, TEXT(",")), *Mode, S.MapPoints.Num()));
+}
+
+FString FTCModeWatch::StripText(const FTCScoreStrip& Strip, const FTCMatchState& S)
+{
+	TArray<FString> Parts;
+	const FTCScoreLead& L = Strip.Lead;
+	if (L.bShown)
+		Parts.Add(FString::Printf(TEXT("%s%s%s%s%s"), *L.Mode, L.Clock.IsEmpty() ? TEXT("") : *(TEXT(" ") + L.Clock), L.Title.IsEmpty() ? TEXT("") : *(TEXT(" - ") + L.Title),
+			L.Threat.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" [%s]"), *L.Threat), L.bNextWave ? TEXT(" [Send next wave]") : TEXT("")));
+	else Parts.Add(Strip.Kind.IsEmpty() ? FString(TEXT("conquest")) : Strip.Kind);
+	for (const FTCScoreTeam& T : Strip.Teams)
+	{
+		TArray<FString> Names;
+		for (const FTCScoreSeat& Seat : T.Seats)
+			Names.Add(FString::Printf(TEXT("%s%s%s"), *Seat.Name, Seat.bYou ? TEXT(" (you)") : TEXT(""), Seat.Held.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(": %s"), *Seat.Held)));
+		TArray<FString> V;
+		for (const FString& X : { T.Role, T.U0, T.Num, T.U }) if (!X.IsEmpty()) V.Add(X);
+		Parts.Add(FString::Printf(TEXT("team %d%s%s (%s)"), T.Team, V.Num() ? TEXT(" ") : TEXT(""), *FString::Join(V, TEXT(" ")), *FString::Join(Names, TEXT(", "))));
+	}
+	TArray<FString> Line;
+	for (const FString& X : { Strip.Rate, Strip.Bonus, Strip.Notice }) if (!X.IsEmpty()) Line.Add(X);
+	if (Line.Num()) Parts.Add(TEXT("line: ") + FString::Join(Line, TEXT(" / ")));
+	if (!Strip.OutBanner.IsEmpty()) Parts.Add(TEXT("banner: ") + Strip.OutBanner);
+	return FString::Join(Parts, TEXT(" | "));
+}
+
+FString FTCModeWatch::StripShape(const FTCScoreStrip& Strip)
+{
+	// the lead's mode word (it carries the wave and the Sudden Death switch), title and threat; each team's role and
+	// labels; an "Out" seat; the notice (an event), not the rate line that counts down
+	FString K = Strip.Kind + TEXT("|") + Strip.Lead.Mode + TEXT("|") + Strip.Lead.Title + TEXT("|") + Strip.Lead.Threat + (Strip.Lead.bNextWave ? TEXT("|next") : TEXT(""));
+	for (const FTCScoreTeam& T : Strip.Teams)
+	{
+		K += FString::Printf(TEXT("|%d:%s:%s:%s:%d"), T.Team, *T.Role, *T.U0, *T.U, T.Seats.Num());
+		for (const FTCScoreSeat& Seat : T.Seats) if (Seat.Held == TEXT("Out")) K += TEXT(":out") + FString::FromInt(Seat.Slot);
+	}
+	return K + TEXT("|") + Strip.Notice + TEXT("|") + Strip.OutBanner;
+}
+
+void FTCModeWatch::OnSnapshot(const FTCMatchState& S, const FTCUnitTable* Table, const FJsonObject* Raw)
+{
+	if (!S.bHasMatch) return;
+	if (!bStarted) OnStart(S);
+	Snapshots++;
+	if (S.ModeRow.bPresent) ModeKind = S.ModeRow.Kind; else if (ModeKind.IsEmpty()) ModeKind = TEXT("conquest");
+	// the score strip
+	const FTCScoreStrip Strip = S.Objectives.ScoreStrip(S, Table);
+	if (Strip.bValid)
+	{
+		const FString Shape = StripShape(Strip);
+		if (Shape != LastShape || S.Tick - LastStripTick >= PeriodTicks)
+		{
+			LastShape = Shape; LastStripTick = S.Tick; Strips++;
+			FString Text = StripText(Strip, S);
+			if (FTCLocale::Language() != ETCLanguage::English && Strip.Lead.bShown)
+			{
+				const FString Shown = FTCLocale::T(Strip.Lead.Mode) + (Strip.Lead.Title.IsEmpty() ? FString() : TEXT(" - ") + FTCLocale::T(Strip.Lead.Title));
+				Text += TEXT(" | shown: ") + Shown;
+			}
+			Pending.Add(FString::Printf(TEXT("modes: strip at tick %d: %s"), S.Tick, *Text));
+		}
+	}
+	// the goal box (objectives.js): its text, and the reader's language as the HUD draws it (TC_T)
+	const FTCGoalText Goal = FTCScenarioText::GoalText(S);
+	if (Goal.Text != LastGoal)
+	{
+		LastGoal = Goal.Text;
+		if (Goal.IsShown()) Goals++;
+		const FString Flat = Goal.Text.Replace(TEXT("\n"), TEXT(" / "));
+		const FString Shown = FTCLocale::T(Goal.Text).Replace(TEXT("\n"), TEXT(" / "));
+		Pending.Add(FString::Printf(TEXT("modes: goal at tick %d: %s%s"), S.Tick, Goal.IsShown() ? *Flat : TEXT("(none)"), Goal.IsShown() && Shown != Flat ? *FString::Printf(TEXT(" | shown: %s"), *Shown) : TEXT("")));
+	}
+	// the 'say' lines (client/alerts.js: localized[lang] ?? text, through TC_T)
+	const TArray<TSharedPtr<FJsonValue>>* Shots = nullptr;
+	if (Raw && Raw->TryGetArrayField(TEXT("shots"), Shots))
+		for (const TSharedPtr<FJsonValue>& V : *Shots)
+		{
+			const TSharedPtr<FJsonObject>* O = nullptr;
+			FString K, Text, Shown;
+			if (!V.IsValid() || !V->TryGetObject(O) || !(*O)->TryGetStringField(TEXT("k"), K) || K != TEXT("say")) continue;
+			(*O)->TryGetStringField(TEXT("text"), Text);
+			if (!FTCLocale::SayText(**O, Shown)) Shown = Text;
+			Shown = FTCLocale::T(Shown);
+			Says++;
+			Pending.Add(FString::Printf(TEXT("modes: say at tick %d: %s%s"), S.Tick, *Text, Shown != Text ? *FString::Printf(TEXT(" | shown: %s"), *Shown) : TEXT("")));
+		}
+	// decided: the first snapshot with a winner and an end (epilogue.js begins there)
+	if (!bDecided && S.Winner >= -1 && S.End.bPresent)
+	{
+		bDecided = true;
+		const FTCEpilogue& E = S.Objectives.Epilogue();
+		const TCHAR* Outcome = S.bSpectator ? TEXT("watching") : S.Winner == -1 ? TEXT("draw") : S.Winner == S.TeamOf(S.You) ? TEXT("won") : TEXT("lost");
+		DecidedText = FString::Printf(TEXT("at tick %d (%d min %d s): winner team %d (%s), reason %s"), S.Tick, S.Tick / 1200, (S.Tick / 20) % 60, S.Winner, Outcome, *S.End.Reason);
+		Pending.Add(FString::Printf(TEXT("modes: decided %s; stamp '%s' '%s'"), *DecidedText, *E.Word, *E.Why));
+	}
+}
+
+void FTCModeWatch::OnClear(const TCHAR* Why)
+{
+	if (!bStarted || bSummarized) return;
+	bSummarized = true;
+	Pending.Add(FString::Printf(TEXT("modes: summary (%s): mode %s, match %d, %d snapshot(s), strip lines %d, goal lines %d, say lines %d, decided %s"), Why, *ModeKind, MatchId, Snapshots, Strips, Goals, Says,
+		bDecided ? *DecidedText : TEXT("no")));
+}
+
 #if WITH_DEV_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
 #include "Misc/FileHelper.h"
@@ -1418,4 +1555,111 @@ bool FTCObjectivesDecodeBoundsTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("clear resets"), St.MapPoints.Num() == 0 && St.Objectives.Points().Num() == 0 && St.Factions.Num() == 0 && St.Spawns.Num() == 0);
 	return true;
 }
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCObjectivesModeWatchTest, "ThreeCrossroads.Objectives.ModeWatch", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+
+bool FTCObjectivesModeWatchTest::RunTest(const FString& Parameters)
+{
+	using namespace TCObjectivesTest;
+	// The round 16 mode coverage lines. The strip texts are FTCObjectives::ScoreStrip's (tested in Objectives.Modes from
+	// client/hud.js); here: when a line is written, what it carries, and that nothing else is.
+	auto Grep = [](const TArray<FString>& Lines, const TCHAR* Head) { TArray<FString> Out; for (const FString& L : Lines) if (L.StartsWith(Head)) Out.Add(L); return Out; };
+	const FTCLocale::FScopedLanguage English(ETCLanguage::English);
+	// Horde, the host's seat 0: a break, the same break a second later, the wave, a minute later, a line, the end
+	{
+		FTCMatchState St;
+		St.Objectives.Clock = []() { return 1.0; };
+		St.ApplyLobby(*Parse(TEXT("{\"t\":\"lobby\",\"state\":\"play\",\"mode\":\"horde\",\"you\":0,\"amHost\":true,\"players\":[],\"result\":null}")));
+		St.ApplyStart(*Parse(StartJson(0).Replace(TEXT("\"teams\":[0,1,2,3]"), TEXT("\"teams\":[0,0,0,1]"))));
+		FTCModeWatch W;
+		W.OnStart(St);
+		TArray<FString> Log = W.TakeLog();
+		TestTrue(TEXT("start line"), Log.Num() == 1 && Log[0].StartsWith(TEXT("modes: start: match 1 on 't' (4x4), seat 0 of 4 (team 0), teams [0,0,0,1], lobby mode horde, 2 authored point(s)")));
+		auto Snap = [&](const FString& Json) { const TSharedPtr<FJsonObject> M = Parse(Json); St.ApplySnapshot(*M); W.OnSnapshot(St, nullptr, M.Get()); return W.TakeLog(); };
+		const TCHAR* Units = TEXT("\"units\":[[5,\"bunker\",0,1,1,0,0,3000,0,0,0,0,0,0,1]],\"vp\":[0,0,0,0],\"out\":[false,false,false,false]");
+		Log = Snap(FString::Printf(TEXT("{\"t\":\"s\",\"tick\":10,\"mode\":{\"kind\":\"horde\",\"defenderTeam\":0,\"wave\":0,\"active\":false,\"timeLeft\":45,\"nextProfile\":\"infantry\",\"slot\":3},%s}"), Units));
+		TestEqual(TEXT("break: one strip line"), Grep(Log, TEXT("modes: strip")).Num(), 1);
+		TestTrue(TEXT("break line text"), Log.Num() && Log[0] == TEXT("modes: strip at tick 10: Wave 1 in 0:45 - Hold the bunker. The next wave comes 45 seconds after this one is dead [Next Wave: Infantry assault] [Send next wave] | team 0 Bunker 100% (Player 1 (you): 0 held, Player 2: 0 held, AI 1: 0 held) | team 1 Horde (AI 2)"));
+		Log = Snap(FString::Printf(TEXT("{\"t\":\"s\",\"tick\":30,\"mode\":{\"kind\":\"horde\",\"defenderTeam\":0,\"wave\":0,\"active\":false,\"timeLeft\":44,\"nextProfile\":\"infantry\",\"slot\":3},%s}"), Units));
+		TestEqual(TEXT("the clock alone writes nothing"), Log.Num(), 0);
+		Log = Snap(FString::Printf(TEXT("{\"t\":\"s\",\"tick\":50,\"mode\":{\"kind\":\"horde\",\"defenderTeam\":0,\"wave\":1,\"active\":true,\"left\":12,\"slot\":3},%s}"), Units));
+		TestTrue(TEXT("the wave writes a line"), Log.Num() == 1 && Log[0].StartsWith(TEXT("modes: strip at tick 50: Wave 1 12 left - Hold the bunker.")));
+		Log = Snap(FString::Printf(TEXT("{\"t\":\"s\",\"tick\":1250,\"mode\":{\"kind\":\"horde\",\"defenderTeam\":0,\"wave\":1,\"active\":true,\"left\":3,\"slot\":3},%s,\"shots\":[{\"k\":\"say\",\"text\":\"Hold on\",\"localized\":{\"en\":\"Hold on\",\"es\":\"Aguanta\"}}]}"), Units));
+		TestTrue(TEXT("a minute later: the periodic line and the say line"), Log.Num() == 2 && Log[0].StartsWith(TEXT("modes: strip at tick 1250: Wave 1 3 left")) && Log[1] == TEXT("modes: say at tick 1250: Hold on"));
+		Log = Snap(TEXT("{\"t\":\"s\",\"tick\":2400,\"mode\":{\"kind\":\"horde\",\"defenderTeam\":0,\"wave\":2,\"active\":true,\"left\":9,\"slot\":3},\"units\":[],\"gone\":[5],\"vp\":[0,0,0,0],\"out\":[false,false,false,false],\"winner\":1,\"end\":{\"reason\":\"structures\",\"x\":2,\"z\":2}}"));
+		const TArray<FString> Decided = Grep(Log, TEXT("modes: decided"));
+		TestTrue(TEXT("decided line"), Decided.Num() == 1 && Decided[0].StartsWith(TEXT("modes: decided at tick 2400 (2 min 0 s): winner team 1 (lost), reason structures; stamp 'Defeat' '")));
+		TestTrue(TEXT("the lost bunker is a new strip line"), Grep(Log, TEXT("modes: strip at tick 2400: Wave 2 9 left")).Num() == 1 && Log[0].Contains(TEXT("team 0 Bunker lost")));
+		Log = Snap(TEXT("{\"t\":\"s\",\"tick\":2410,\"mode\":{\"kind\":\"horde\",\"defenderTeam\":0,\"wave\":2,\"active\":true,\"left\":9,\"slot\":3},\"units\":[],\"winner\":1,\"end\":{\"reason\":\"structures\",\"x\":2,\"z\":2}}"));
+		TestEqual(TEXT("decided once"), Grep(Log, TEXT("modes: decided")).Num(), 0);
+		W.OnClear(TEXT("back to the lobby"));
+		W.OnClear(TEXT("again"));
+		Log = W.TakeLog();
+		TestTrue(TEXT("one summary"), Log.Num() == 1 && Log[0] == TEXT("modes: summary (back to the lobby): mode horde, match 1, 6 snapshot(s), strip lines 4, goal lines 0, say lines 1, decided at tick 2400 (2 min 0 s): winner team 1 (lost), reason structures"));
+		TestTrue(TEXT("counters"), W.StripLines() == 4 && W.SayLines() == 1 && W.Decided() && W.Kind() == TEXT("horde"));
+	}
+	// Conquest and a scenario: no lead block; the VP moving writes nothing, a capture owner change neither (the
+	// objectives log has those); the goal box when scenario objectives arrive, change, and go
+	{
+		FTCMatchState St;
+		St.Objectives.Clock = []() { return 1.0; };
+		St.ApplyStart(*Parse(StartJson(1)));
+		FTCModeWatch W;
+		auto Snap = [&](const FString& Json) { const TSharedPtr<FJsonObject> M = Parse(Json); St.ApplySnapshot(*M); W.OnSnapshot(St, nullptr, M.Get()); return W.TakeLog(); };
+		TArray<FString> Log = Snap(TEXT("{\"t\":\"s\",\"tick\":3,\"units\":[],\"points\":[[-1,-1,0,0,0,0],[-1,-1,0,0,0,0]],\"vp\":[0,0,0,0]}"));
+		// four one-seat teams: hud.js drops the pts from a lone player's line
+		TestTrue(TEXT("a snapshot before the start line: the start line first"), Log.Num() == 2 && Log[0].StartsWith(TEXT("modes: start: match 1")) && Log[1].StartsWith(TEXT("modes: strip at tick 3: conquest | team 0 0 / 1200 VP (Player 1: 0 held) | team 1 0 / 1200 VP (Player 2 (you): 0 held) | team 2 0 / 1200 VP (AI 1: 0 held) | team 3")));
+		Log = Snap(TEXT("{\"t\":\"s\",\"tick\":40,\"units\":[],\"points\":[[1,1,1,0,0,0],[-1,-1,0,0,0,0]],\"vp\":[0,30,0,0]}"));
+		TestEqual(TEXT("VP and owners alone write nothing"), Log.Num(), 0);
+		Log = Snap(TEXT("{\"t\":\"s\",\"tick\":41,\"units\":[],\"vp\":[0,30,0,0],\"scenario\":{\"version\":1,\"objectives\":[{\"id\":\"a\",\"state\":\"active\",\"text\":{\"en\":\"Take the town\",\"es\":\"Toma el pueblo\"}}]}}"));
+		TestTrue(TEXT("goal line"), Log.Num() == 1 && Log[0] == TEXT("modes: goal at tick 41: • Take the town"));
+		Log = Snap(TEXT("{\"t\":\"s\",\"tick\":42,\"units\":[],\"vp\":[0,30,0,0],\"scenario\":{\"version\":1,\"objectives\":[{\"id\":\"a\",\"state\":\"complete\",\"text\":\"Take the town\"}]}}"));
+		TestTrue(TEXT("goal change"), Log.Num() == 1 && Log[0] == TEXT("modes: goal at tick 42: ✓ Take the town"));
+		Log = Snap(TEXT("{\"t\":\"s\",\"tick\":43,\"units\":[],\"vp\":[0,30,0,0]}"));
+		TestTrue(TEXT("goal gone"), Log.Num() == 1 && Log[0] == TEXT("modes: goal at tick 43: (none)"));
+		TestEqual(TEXT("goal lines count the shown ones"), W.GoalLines(), 2);
+		// a reconnect to the same match keeps counting; a new match summarises the old one first
+		W.OnStart(St);
+		Log = W.TakeLog();
+		TestTrue(TEXT("reconnect"), Log.Num() == 1 && Log[0] == TEXT("modes: start again: match 1 (a reconnect), seat 1"));
+		St.ApplyStart(*Parse(StartJson(1).Replace(TEXT("\"matchId\":1"), TEXT("\"matchId\":2"))));
+		W.OnStart(St);
+		Log = W.TakeLog();
+		TestTrue(TEXT("new match: summary then start"), Log.Num() == 2 && Log[0].StartsWith(TEXT("modes: summary (a new match): mode conquest, match 1, 5 snapshot(s), strip lines 1, goal lines 2, say lines 0, decided no")) && Log[1].StartsWith(TEXT("modes: start: match 2")));
+	}
+	// a spectator that joins a match in play: the start before any lobby, no seat of its own
+	{
+		FTCMatchState St;
+		St.Objectives.Clock = []() { return 1.0; };
+		St.ApplyStart(*Parse(StartJson(0)));
+		St.bSpectator = true;
+		FTCModeWatch W;
+		W.OnStart(St);
+		const TArray<FString> Log = W.TakeLog();
+		TestTrue(TEXT("spectator start line"), Log.Num() == 1 && Log[0].StartsWith(TEXT("modes: start: match 1 on 't' (4x4), watching as a spectator (4 seats), teams [0,1,2,3], lobby mode ")));
+		TestTrue(TEXT("no seat claimed"), Log.Num() == 1 && !Log[0].Contains(TEXT("seat 0")));
+	}
+	// Spanish: the say line as the alert feed shows it (localized.es) and the strip and goal as the HUD draws them (TC_T)
+	{
+		const FTCLocale::FScopedLanguage Spanish(ETCLanguage::Spanish);
+		FTCMatchState St;
+		St.Objectives.Clock = []() { return 1.0; };
+		St.ApplyLobby(*Parse(TEXT("{\"t\":\"lobby\",\"state\":\"play\",\"mode\":\"tutorial\",\"you\":0,\"amHost\":false,\"players\":[],\"result\":null}")));
+		St.ApplyStart(*Parse(StartJson(0).Replace(TEXT("\"teams\":[0,1,2,3]"), TEXT("\"teams\":[0,0,0,1]"))));
+		FTCModeWatch W;
+		W.OnStart(St);
+		W.TakeLog();
+		const TSharedPtr<FJsonObject> M = Parse(TEXT("{\"t\":\"s\",\"tick\":5,\"mode\":{\"kind\":\"tutorial\",\"step\":0,\"steps\":9,\"goal\":\"Move your squads up to the hedgerow\"},\"units\":[],")
+			TEXT("\"shots\":[{\"k\":\"say\",\"text\":\"El Alamein\",\"localized\":{\"en\":\"El Alamein\",\"es\":\"El Alamein (es)\"}}]}"));
+		St.ApplySnapshot(*M);
+		W.OnSnapshot(St, nullptr, M.Get());
+		const TArray<FString> Log = W.TakeLog();
+		const TArray<FString> Strip = Grep(Log, TEXT("modes: strip")), Goal = Grep(Log, TEXT("modes: goal")), Say = Grep(Log, TEXT("modes: say"));
+		TestTrue(TEXT("strip keeps English, adds what is shown"), Strip.Num() == 1 && Strip[0].StartsWith(TEXT("modes: strip at tick 5: Tutorial 1 / 9 - Move your squads up to the hedgerow")) && Strip[0].Contains(TEXT(" | shown: Tutorial - ")));
+		TestTrue(TEXT("goal shown in Spanish"), Goal.Num() == 1 && Goal[0].StartsWith(TEXT("modes: goal at tick 5: Objective: Move your squads up to the hedgerow | shown: Objetivo: ")));
+		TestTrue(TEXT("say line in the reader's language"), Say.Num() == 1 && Say[0] == TEXT("modes: say at tick 5: El Alamein | shown: El Alamein (es)"));
+	}
+	return true;
+}
+
 #endif // WITH_DEV_AUTOMATION_TESTS

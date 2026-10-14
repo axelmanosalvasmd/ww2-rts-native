@@ -142,6 +142,13 @@ public:
 	// The card at (X, Y), Width wide (the lobby card's inner width plus padding, at most 920): the result line, then the
 	// report when shown. OutHeight: how tall it came out. Hits: 'report:toggle' on the summary.
 	FTCPaint Layout(const FTCEndReportInput& In, float X, float Y, float Width, const FTCMeasure& Measure, float* OutHeight = nullptr) const;
+	// Round 16 (hudfit): the card widths the story table asks for: MinWidth at its min-content (each header broken at
+	// its words, the names whole), NaturalWidth with every header on one line (CSS's auto table layout at max-content),
+	// both with the card's padding. A result line or report without a table asks for 0.
+	static float MinWidth(const FTCEndReportInput& In, const FTCMeasure& Measure);
+	static float NaturalWidth(const FTCEndReportInput& In, const FTCMeasure& Measure);
+	// the table's columns: the headers (in the language in use), each column's max-content and min-content width
+	static void TableColumns(const FTCMatchReport& R, const FTCMeasure& Measure, TArray<FString>& OutHeads, TArray<float>& OutContent, TArray<float>& OutMin);
 	// The chart alone (report.js draw) in a W by H box at (X, Y), for tests.
 	static void Chart(FTCPaint& P, const FTCMatchReport& R, float X, float Y, float W, float H, const FTCMeasure& Measure);
 
