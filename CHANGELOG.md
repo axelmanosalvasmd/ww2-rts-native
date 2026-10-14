@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Carry the exact ingress correction from `71f460ba` onto the focused Ground/main assembly, retaining its original repair notes below. Resolve one CHANGELOG and one DESIGN conflict without importing their unrelated `5185e171` context. The 17 distinct passes belong only to `71f460ba`; this candidate runs no native jobs and still needs Root's capped validation.
+
+- Repair the retained ingress refusal test after Ground integration: its bare `build` flag failed canonical construction validation, and its blanket automatic-exit expectation no longer applied to construction workers. Assign a rifle squad to a damaged constructor-created HQ through `execute_assist`, verify supported core retreat, and retain the temporary ingress AutoRetreat refusal, garrison guard, malformed-row rejection and no-publication assertions. On Vostro, the exact test and all 17 distinct affected ingress/construction/reaction/order tests pass under locked optimized `ci-test`; combined workspace and final platform gates remain pending. Production ingress, ABI, reference and profiles are unchanged.
+
 - Assemble the focused Ground stream by normally merging frozen `b6cbf406` onto main `514e15f4`. Retain construction, Attack/Retreat, moved-vehicle contact and their existing-observer/routing/Fog prerequisites, all original fixtures and current-main Human, host, input, table and terrain providers. Only one CHANGELOG and four DESIGN hunks conflict; both histories are preserved. No builds, recorders or publication run here. Ground's earlier 381-test result is parent evidence only; candidate validation and the retained ingress correction remain pending. The separate World ability guard changes Classic refusal precedence and needs a capped reproduction before correction; this assembly leaves its assertion and ordinary guard unchanged.
 
 - Record Vostro project registration and the explicit approval to retry the consolidated PR publication and separate diagnostic backup. Preserve pending validation and the original failures.
