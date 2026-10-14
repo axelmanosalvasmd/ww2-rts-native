@@ -43,7 +43,7 @@ All these branches are pushed. Keep their identities separate from test claims.
 | Work | Remote branch | Exact source head | Status at handoff |
 | --- | --- | --- | --- |
 | Landed baseline | `main` | `92fb7fe66eb7f788c83449ae67223984b969f177` | PR #196 merged; 401 tests passed on all three CI platforms |
-| Consolidated input, tables and terrain | `codex/linux-handoff-2026-10-13` | Runtime baseline `0ee71badc23df7c74c34de968540c631c0cbb0ef`; documentation successor contains this file | Independently source-reviewed; expected 410 tests, validation pending; PR #198 still has older `abcaef0` |
+| Consolidated input, tables and terrain | `codex/linux-handoff-2026-10-13` | Runtime baseline `0ee71badc23df7c74c34de968540c631c0cbb0ef`; documentation successor contains this file | Independently source-reviewed; expected 410 tests, validation pending; PR #198 is updated to this reviewed checkpoint under Julio's explicit retry approval |
 | Ground commands, construction and moved-vehicle contact | `codex/linux-handoff-ground` | `b6cbf406b629e33ea402c4621f43b4b12ac55581` | Fmt/strict Clippy passed; full suite stopped by user after 289 passing execution lines, zero failures so far; suite/FFI incomplete |
 | Ordinary research, legacy triggers, Say/falling projection and socket startup | `codex/linux-handoff-legacy` | `158fadbe568a44eda8ebc9584cf5a94a8639e7c4` | Compiles; first research target has 0 passes and 2 failures; later gates unrun |
 | World/Ground source union | `codex/linux-handoff-world` | `fca71f0b3bf49828a87874ef2ac2a9896e3f5d3e` | Source-only normal union of `7f9c886` and Ground `b6cbf406`; moved World actors still refused by contact admission |
@@ -58,11 +58,12 @@ is complete. Do not reopen or individually remerge that historical queue.
 
 ## Next work
 
-1. Validate the consolidated Linux handoff candidate, then prepare the existing
-   PR #198 for that reviewed integration scope with an accurate title/body and
-   fresh final-head Linux, Windows and macOS checks. PR #198 remains at older
-   `abcaef0`, whose Windows failure is recorded below. This checkpoint does not
-   update that PR branch. The consolidated tree preserves all providers through normal ancestry and adds
+1. Validate the consolidated Linux handoff candidate and inspect PR #198's
+   fresh final-head Linux, Windows and macOS checks. Its earlier `abcaef0`
+   Windows failure is recorded below. Julio explicitly approved retrying the
+   publication; the reviewed integration checkpoint now updates that PR
+   branch with an accurate title/body. The consolidated tree preserves all
+   providers through normal ancestry and adds
    only reviewed input, table and terrain work to main. Expected inventory is
    410, not a recorded pass. Fix actual failures, then merge under the existing
    project authorization once all gates and review conditions are satisfied.
@@ -206,10 +207,12 @@ deleted after handoff; compile native Linux artifacts from pushed source.
 
 ## Durable artifacts and local cleanup
 
-The handoff is published on its own branch. Automatic approval review refused
-adding this checkpoint commit to PR #198's existing branch because that would
-mix handoff documents into the PR. The dedicated branch preserves all source
-without that mutation. Review the integration scope before updating the PR.
+Automatic approval review initially refused updating PR #198 and publishing
+diagnostic experiments. Julio then explicitly approved a retry. The reviewed
+consolidated checkpoint is published on both the dedicated handoff branch and
+PR #198's branch; fresh platform proof remains required. The optional diagnostic
+archive is published separately from native source and test evidence. It is
+not integrated gameplay code.
 
 [Terrain dataset prerelease](https://github.com/axelmanosalvasmd/ww2-rts-native/releases/tag/terrain-fixtures-a81b4f2)
 contains 35 JSON files in a 4,308,253-byte archive. SHA256:
@@ -227,3 +230,13 @@ the user-stopped run and source correspondence. The main Mac checkout and
 this file are retained. Temporary task worktrees/caches are cleaned only
 after remote commits and these archives are verified. Never clean unrelated
 projects, shared services or another agent's uncommitted work.
+
+## Vostro destination
+
+The requested checkout is `/projects/ww2-rts-native`; `/projects` aliases the
+existing `/home/judiazm/Projects` root. T3 Code project ID is
+`8f5da126-1c26-4dae-a35e-10fceadaf6aa`, title `ww2-rts-native`. Supported CLI
+registration and the exact active project row were read back. Node 24.21.0 x64
+and pinned Rust 1.99.0 are available from a fresh minimal service PATH. The
+existing T3 service was preserved and no AI development thread was started.
+Verify the current branch, reference submodule and handoff before continuing.

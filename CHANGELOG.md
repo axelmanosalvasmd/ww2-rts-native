@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Record Vostro project registration and the explicit approval to retry the consolidated PR publication and separate diagnostic backup. Preserve pending validation and the original failures.
+
 - Save the Linux development handoff with exact pushed input/table/terrain, Ground, research/scenario and World checkpoints, known Windows/research failures, stopped-by-user validation and restart commands. Stop local Mac jobs for the transfer; preserve source and compact evidence before removing task caches and temporary copies. This checkpoint does not mark unfinished gameplay or platform checks complete.
 
 - Normally combine trusted commander ingress, the LF-stable internal startup-table producer and verified terrain fixtures in one publication candidate. Preserve all main modules and each constituent runtime, test and recorder, with only additive export/documentation convergence. The expected inventory is 410 tests (401 inherited, three table, four ingress and two terrain checks); fresh combined native/platform proof is pending. Earlier component results remain tied to their producing heads, and the changed Windows takeover witness still needs execution. No table transport is imported or enabled.
