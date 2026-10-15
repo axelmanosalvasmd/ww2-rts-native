@@ -10,6 +10,9 @@ use std::{
 #[path = "../../simtest/src/bin/r1-differential.rs"]
 mod original;
 
+#[path = "aligned_replay_comparison.rs"]
+mod canonical;
+
 #[derive(Clone, Debug)]
 pub struct Replay(Arc<Mutex<Tape>>);
 impl PartialEq for Replay {
@@ -229,11 +232,24 @@ fn original_r1_aligned_61_checkpoints() {
     report["limits"] = json!(
         "test-only 600-tick R1 prefix, exact original projection; no completed row, victory, socket or Unreal claim"
     );
+    // Read only the original runner's raw frame artifact. Engine state and input
+    // receipts are never changed by the additional comparison layer.
+    let canonical_result = if report["harnessCompleted"] == true {
+        std::env::var_os("WW2_ALIGNED_NATIVE_FRAMES")
+            .ok_or_else(|| "raw native frames path required".to_owned())
+            .and_then(|path| std::fs::read(path).map_err(|e| e.to_string()))
+            .and_then(|bytes| serde_json::from_slice(&bytes).map_err(|e| e.to_string()))
+            .and_then(|native| canonical::compare_frames(&trace, &native))
+    } else {
+        Err("raw runner did not complete".into())
+    };
+    let canonical_complete = canonical_result.is_ok();
+    report["canonicalComparison"] = canonical_result.unwrap_or_else(|error| json!({"failure":error}));
     let output = std::env::var_os("WW2_ALIGNED_REPORT").expect("private report path required");
     std::fs::write(output, serde_json::to_vec(&report).unwrap()).unwrap();
     println!(
         "{}",
-        json!({"alignedInputs":aligned,"differentialVerdict":report["differentialVerdict"],"checkpointsMatched":report["checkpointsMatched"],"checkpointsCompared":report["checkpointsCompared"],"firstMismatch":report["firstMismatch"],"alignmentFirstDrawDifference":report["alignmentFirstDrawDifference"],"sourceDraws":source["consumed"],"nativeDraws":report["nativeInputReceipt"]["consumed"]})
+        json!({"alignedInputs":aligned,"differentialVerdict":report["differentialVerdict"],"checkpointsMatched":report["checkpointsMatched"],"checkpointsCompared":report["checkpointsCompared"],"firstMismatch":report["firstMismatch"],"alignmentFirstDrawDifference":report["alignmentFirstDrawDifference"],"sourceDraws":source["consumed"],"nativeDraws":report["nativeInputReceipt"]["consumed"],"canonicalComparison":report["canonicalComparison"]})
     );
     assert_eq!(
         report["harnessCompleted"], true,
@@ -241,5 +257,7 @@ fn original_r1_aligned_61_checkpoints() {
     );
     assert_eq!(report["checkpointsCompared"], 61);
     assert!(aligned, "alignment failure retained, never a parity pass");
+    assert!(canonical_complete, "canonical comparison failure retained");
+    assert_eq!(report["canonicalComparison"]["checkpointsCompared"], 61);
     // MISMATCH is a completed diagnostic result, never an equivalence assertion.
 }

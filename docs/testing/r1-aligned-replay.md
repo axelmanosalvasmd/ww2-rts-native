@@ -83,3 +83,22 @@ Private evidence directory: `/tmp/aligned-replay-d6308bcc/`. `source-trace.json`
 Final native command selected `aligned_replay::` with `--include-ignored --nocapture --test-threads=1`, yielding three passed checks and zero failed or ignored. Both registrations selected `every_test_file_is_compiled --exact`. Strict Clippy selected only core and simtest with `--all-targets -- -D warnings`. Formatting passed `--all -- --check`. No full/release/list command or historical unaligned replay ran.
 
 One-line dependency provenance confirms `ww2_core-82f7ed540759d581.d` includes this seam and the compiler record points to this checkout's core manifest and Rust cwd. All invoked processes are terminal and S1 flock is released. Root may reclaim the slot immediately. Root retains independent review and all PR, review and publication actions; none are performed by this implementation stream.
+
+## User14:51 comparison-only successor
+
+The user expressly authorizes a narrow symmetric comparison mapping after raw integration `58a8cb8b`. All earlier no-normalization statements remain the rule for the raw path and historical results; this exception changes copied comparison projections only. The raw strict comparator, original projection, Source capture, complete input tape/receipt and all native baseline frames remain unchanged and available.
+
+| Exact mapped path | Absent input | Canonical comparison default |
+| --- | --- | --- |
+| `$.players[0].fuel` | Missing key or exact `{absent:true}` | Positive zero, bits `0000000000000000` |
+| `$.players[0].mun` | Missing key or exact `{absent:true}` | Positive zero, bits `0000000000000000` |
+| `$.players[1].fuel` | Missing key or exact `{absent:true}` | Positive zero, bits `0000000000000000` |
+| `$.players[1].mun` | Missing key or exact `{absent:true}` | Positive zero, bits `0000000000000000` |
+
+The same independent function applies to BOTH sides after validation of the original R1 identity/profile. It retains every present value. Absence versus a nondefault, present unequal values, unlisted fields, negative zero, nonfinite values and type changes remain mismatches. No null/false/empty mapping exists. Other modes, logistics-on and an explicit weather seed fail the profile gate. Both players retain their actual slot/team identity. The new single regression check covers both directions, missing keys and explicit absence markers, each whitelist field, both slots, zero-versus-one, unknown fields, signed zero, nonfinite values, malformed markers and primitive/collection type differences.
+
+The actual replay still runs once for600ticks with61 N10 checkpoints. Its unchanged raw frame artifact supplies the additional canonical comparison pass; no canonical value enters an engine or input receipt. The new report adds `canonicalComparison`, including all four paths, exact default, mapping counts and its separate verdict/count/first difference. Raw top-level fields retain their original meaning.
+
+Execution is pending at this source checkpoint. Authorized selection is `aligned_replay:: -- --include-ignored --nocapture --test-threads=1`, exactly four checks, plus formatting and fresh strict locked core/simtest all-target Clippy under S1. Reuse the original read-only authentic Source trace and write fresh native artifacts to a new private directory. Do not rerun Source, either unchanged registry guard, full/release/list commands or public actions. Root retains independent complete-input and new-comparison review.
+
+Both independent immutable-eb15 reviews now return ACCEPT: `/tmp/review-aligned-eb15-production-scope/REVIEW.md` and `/tmp/review-aligned-eb15-all-inputs/REVIEW.md`, each read in full. They independently parsed all1,321 rows and found no shipping behavior defect for that recorded prefix. Their acceptance does not cover this new comparison child, complete derived startup/internal state, executed capacity/exhaustion/label-mismatch negative controls, or any complete row check. The input seam remains unchanged; these limits are preserved, not repaired or reclassified.

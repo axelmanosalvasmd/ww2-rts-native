@@ -92,6 +92,13 @@ fn difference(source: &Value, native: &Value, field: &str) -> Option<Value> {
     }
 }
 
+// Additional comparison-only access for the private core test. The raw comparator
+// and its standalone diagnostic path retain their original behavior.
+#[cfg(test)]
+pub(crate) fn compare_projection_for_test(source: &Value, native: &Value) -> Option<Value> {
+    difference(source, native, "$")
+}
+
 fn row_metadata(tick: usize, field: &str) -> Value {
     if tick == 0
         && field.starts_with("$.units[")
