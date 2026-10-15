@@ -1,5 +1,7 @@
 # Changelog
 
+Unreleased entries that are not yet collected live in `changelog.d/`, one file per change.
+
 ## Unreleased
 - Normally merge landed World #202 main `9f0190ef` into reconnect `935dccdc`, retaining both complete tracking histories and the exact corrected socket test. All main runtime, tests, helpers, fixtures, CI, ABI/header and reference entries remain exact except the original test registration. Preserve the old interrupted evidence and keep prior test counts on their original heads. Under the owner's test-only policy, run only the named focused test; separate review, fresh hosted checks and the ordered per-worker head report remain required before publication.
 
