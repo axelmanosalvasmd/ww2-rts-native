@@ -521,6 +521,168 @@ fn queued_dig_validates_placement_and_capacity_without_reserving_manpower() {
     assert_eq!(m.story[0].mp_spent, spent);
 }
 
+// Preserve every unit field and map key, with exact floating-point representations.
+fn full_unit_bits(unit: &crate::game::Unit) -> Value {
+    use crate::game::{Clearance, LaneScan, PlaneState, Pose, Traffic, Unit};
+
+    fn point_bits(Point { x, z }: Point) -> [u64; 2] {
+        [x.to_bits(), z.to_bits()]
+    }
+    fn pose_bits(Pose { x, z, rot }: Pose) -> [u64; 3] {
+        [x.to_bits(), z.to_bits(), rot.to_bits()]
+    }
+    fn clearance_bits(clearance: &Clearance) -> Value {
+        let Clearance {
+            goal,
+            reverse,
+            path,
+            until,
+        } = clearance;
+        json!([pose_bits(*goal), reverse, path, until.to_bits()])
+    }
+    fn traffic_bits(traffic: &Traffic) -> Value {
+        let Traffic {
+            goal,
+            legs,
+            passing,
+            by,
+            until,
+        } = traffic;
+        json!([
+            point_bits(*goal),
+            legs.iter().copied().map(point_bits).collect::<Vec<_>>(),
+            passing,
+            by,
+            until.to_bits()
+        ])
+    }
+    fn lane_scan_bits(scan: &LaneScan) -> Value {
+        let LaneScan { path, until, lane } = scan;
+        json!([
+            path,
+            until.to_bits(),
+            lane.map(|(a, b)| [point_bits(a), point_bits(b)])
+        ])
+    }
+    // Exhaustive patterns make added fields require an explicit comparison choice.
+    let Unit {
+        id,
+        kind,
+        owner,
+        x,
+        z,
+        rot,
+        garrison,
+        riding,
+        air,
+        still,
+        shot_at,
+        dust,
+        built,
+        cells,
+        heavy,
+        hp,
+        path,
+        path_gen,
+        reverse,
+        pace,
+        attack,
+        retreating,
+        sprint,
+        supp,
+        hit_from,
+        stuck,
+        repath,
+        world_goal,
+        amove,
+        move_speed,
+        travel_dir,
+        vx,
+        vz,
+        drift,
+        motion_before,
+        clearance,
+        traffic,
+        traffic_wait,
+        traffic_trail,
+        traffic_entered,
+        queued_behind,
+        lane_scan,
+        ghost,
+        hold_pos,
+        build,
+        dig,
+        entrench,
+        board,
+        rail,
+    } = unit;
+    json!({
+        "id": id,
+        "kind": kind,
+        "owner": owner,
+        "x": x.to_bits(),
+        "z": z.to_bits(),
+        "rot": rot.to_bits(),
+        "garrison": garrison,
+        "riding": riding,
+        "air": air.map(|state| match state {
+            PlaneState::Base => "Base",
+            PlaneState::Rearm => "Rearm",
+            PlaneState::Out => "Out",
+            PlaneState::Station => "Station",
+            PlaneState::Home => "Home",
+        }),
+        "still": still.map(f64::to_bits),
+        "shot_at": shot_at.map(f64::to_bits),
+        "dust": dust.map(f64::to_bits),
+        "built": built.map(f64::to_bits),
+        "cells": cells,
+        "heavy": heavy,
+        "hp": hp.to_bits(),
+        "path": path.iter().copied().map(point_bits).collect::<Vec<_>>(),
+        "path_gen": path_gen,
+        "reverse": reverse.map(point_bits),
+        "pace": pace.to_bits(),
+        "attack": attack,
+        "retreating": retreating,
+        "sprint": sprint.to_bits(),
+        "supp": supp.to_bits(),
+        "hit_from": hit_from.map(point_bits),
+        "stuck": stuck.to_bits(),
+        "repath": repath.to_bits(),
+        "world_goal": world_goal.map(point_bits),
+        "amove": amove.map(point_bits),
+        "move_speed": move_speed.to_bits(),
+        "travel_dir": travel_dir.map(f64::to_bits),
+        "vx": vx.map(f64::to_bits),
+        "vz": vz.map(f64::to_bits),
+        "drift": drift,
+        "motion_before": motion_before.map(pose_bits),
+        "clearance": clearance.as_ref().map(clearance_bits),
+        "traffic": traffic.as_ref().map(traffic_bits),
+        "traffic_wait": traffic_wait.to_bits(),
+        "traffic_trail": traffic_trail.iter().copied().map(pose_bits).collect::<Vec<_>>(),
+        "traffic_entered": traffic_entered,
+        "queued_behind": queued_behind,
+        "lane_scan": lane_scan.as_ref().map(lane_scan_bits),
+        "ghost": ghost.to_bits(),
+        "hold_pos": hold_pos,
+        "build": build,
+        "dig": dig,
+        "entrench": entrench,
+        "board": board,
+        "rail": rail,
+    })
+}
+fn full_units_bits(
+    units: &std::collections::BTreeMap<u32, crate::game::Unit>,
+) -> std::collections::BTreeMap<u32, Value> {
+    units
+        .iter()
+        .map(|(&key, unit)| (key, full_unit_bits(unit)))
+        .collect()
+}
+
 #[test]
 fn queued_dig_errors_preserve_queue_drift_wallet_story_and_views() {
     let fixture: Value =
@@ -542,7 +704,10 @@ fn queued_dig_errors_preserve_queue_drift_wallet_story_and_views() {
         invalid_mp_bits
     );
     assert_eq!(invalid_wallet.commands.units, controls);
-    assert_eq!(invalid_wallet.world.game.units, units);
+    assert_eq!(
+        full_units_bits(&invalid_wallet.world.game.units),
+        full_units_bits(&units)
+    );
     assert!(invalid_wallet.field_works.jobs().is_empty());
     for fault in ["story", "path", "metadata", "selection", "capacity"] {
         let mut m = make(&fixture["traces"][1]);
@@ -624,7 +789,11 @@ fn queued_dig_errors_preserve_queue_drift_wallet_story_and_views() {
         }
         assert_eq!(snapshot(&m), before, "{fault}");
         assert_eq!(m.commands.units, controls, "{fault}");
-        assert_eq!(m.world.game.units, units, "{fault}");
+        assert_eq!(
+            full_units_bits(&m.world.game.units),
+            full_units_bits(&units),
+            "{fault}"
+        );
         assert_eq!(m.firing.get(1), firing.as_ref(), "{fault}");
         assert_eq!(m.abilities.get(1), ability.as_ref(), "{fault}");
         assert_eq!(m.world.game.units[&1].path_gen, path_gen, "{fault}");

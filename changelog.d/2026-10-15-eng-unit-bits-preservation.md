@@ -1,0 +1,1 @@
+- Fix the queued-Dig error-preservation test to compare both complete unit maps by exact floating-point bits, retaining every field and key, NaN payloads and signed zero. Keep the original 0604 failure unchanged; this source-only repair has no new execution result.
