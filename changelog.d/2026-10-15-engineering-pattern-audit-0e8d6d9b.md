@@ -1,0 +1,1 @@
+- Mark ENG-18 through ENG-22 ported after the shared exact Source pattern replay and named geometry checks pass. Preserve all 168 existing plan comparisons and supported price assertions, require eight trench variants per selected pattern, and record the full 52-row engineering audit with 47 remaining gaps. Runtime, fixtures, guards and all other statuses stay unchanged.
