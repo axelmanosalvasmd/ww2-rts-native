@@ -97,8 +97,16 @@ mod mode14_spawn_layout;
 mod mode_predicates;
 #[path = "../mode_startup_checks.rs"]
 mod mode_startup_checks;
+#[path = "../mov_border_rays.rs"]
+mod mov_border_rays;
+#[path = "../mov_corner.rs"]
+mod mov_corner;
+#[path = "../mov_terrain_companion.rs"]
+mod mov_terrain_companion;
 #[path = "../mov_vehicle_predicates.rs"]
 mod mov_vehicle_predicates;
+#[path = "../mov_world_distance.rs"]
+mod mov_world_distance;
 #[path = "../movement.rs"]
 mod movement;
 #[path = "../movement_existing_checks.rs"]

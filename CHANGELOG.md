@@ -4,6 +4,28 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Mark MOV-05/06/07/10/12/13 ported from their complete literal road/mud, half-road, timed-slope, together-march, obstructed-corner and border-ray checks. Actual `8d7d892b` passes all six behavior tests plus both real registration guards (8 passed, 0 failed, 363 skipped), final fmt and strict locked core/simtest all-target Clippy. Preserve every Acceptance cell, all other rows, all prior failures and the MOV-04 fuel gap.
+
+- Format only the two new MOV corner and border-ray consumers after retaining their initial fmt-check diagnostics. Preserve all assertions, literals, original inputs and authentic fixtures. The eight selected native checks remain pending.
+
+- Freeze authentic MOV-12 and MOV-13 fixtures after all four Source commands pass at `9102d794`: the unchanged corner callback and canonical companion each complete 61 ticks, and the complete border-ray callback records 244 queries. Both regeneration checks match exact compressed bytes. Native checks and row promotions remain pending; older captures and failures stay unchanged.
+
+- Compare only the MOV companion weather rain assertion as a present finite Number with exact binary64 bits. Preserve the recorded Source value1, all thirteen physical scenes and the prior failed integer-storage-kind comparison. No runtime, fixture, default or parity-status change; new native validation is pending.
+
+- Bind the unrun MOV-12/13 consumers to complete original constructor/action records, exact source-body hashes, explicit return/failure shapes and all 61 corner steps or 244 ray inputs. Record a separate MOV-04 internal fuel-cap ownership proposal with BASE_AUDIT, keeping its reserve consumer and the logistics guard untouched. Freeze pending consumer commands without claiming execution or ported rows.
+
+- Record the actual MOV weather Number storage-kind mismatch and an unapplied, weather-only finite IEEE-bit comparison patch. Keep the Rust assertion, all thirteen captured scenes and every prior failure unchanged; no execution or status promotion occurs.
+
+- Preserve the first MOV native weather-assertion failure at `ec3ccfe3` without repair or retry. Prepare separate MOV-12 and MOV-13 complete original callback recorders and native consumers: a retained-constructor 61-tick obstructed-corner journey and all 244 border-ray queries. Register both tests; Source capture and native execution remain ungranted, and no fixture or status is fabricated.
+
+- Apply the two mechanical rustfmt line wraps in the new MOV together-march assertions after preserving the failed format-check log. No assertion, input, fixture or behavior changes; native validation remains pending.
+
+- Freeze the authentic thirteen-scene MOV terrain/together fixture after Source generation and exact compressed-byte regeneration both pass at `51730145`. Preserve the original map-admission failure and older fixtures in their producing commits. Native validation remains pending; no row status changes.
+
+- Correct the private MOV companion input with one open neutral capture point worth zero MP and VP, preserving native map admission. Add a real Motor Pool tank/AT together march with the original slowest-speed, twenty-tick level-travel and plain-order reset predicates. Source recapture and native checks remain pending; retained failure packets and parity statuses are unchanged.
+
+- Recover MOV companion checkpoint `389ac81141` onto frozen main `379ba4e0` with a normal merge that retains both histories. Preserve both captured fixtures and the actual native map-admission failure. This source-only checkpoint changes no runtime or parity status.
+
 - Mark MAP-04/05/07/117 ported after six exact native checks pass at `7cbfcddd`: three strict original validation-message readers, the full map corpus, complete XL/Hill Assault check and affected BASE replay. Formatting recheck and strict core/simtest all-target Clippy also pass. Retain MAP-97's separate historical debug/release proof, all 140 Acceptance cells and the tested Rust tree; MAP-06/19/100 remain held.
 
 - Apply the single mechanical BASE assertion wrap reported by the first authorized MAP formatting check at `f1928e13`. Preserve every assertion/literal and the failed log; native checks have not started.
@@ -109,6 +131,21 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 - Record the 16 CMB-61 flame firing scenes from pinned original Source, with 202 checkpoints. Generation and the serial byte check pass with x64 Node 24.21.0 under S3 caps. Preserve the old firing fixture and all row statuses; native comparison remains pending.
 
 - Prepare two CMB-61 flame comparisons through the existing Match firing provider: paired trench/open/garrison launch accuracy and the x1.5 target preference with negative controls. Keep the ordinary 131 firing traces and 668 checkpoints unchanged. Add only an unapplied Rust/Status proposal for CMB-69. Authentic recording and native execution remain pending; no row status or runtime changes.
+- Apply rustfmt layout to the two new MOV companion consumers after retaining the first format-check failure. Preserve assertion/literal order and all behavior, inputs and authentic fixtures; native compilation remains pending.
+
+- Record authentic MOV terrain and World companion fixtures from `0e2334be`: four remaining Source generation/check commands passed with exact compressed-byte equality, covering twelve terrain scenes and two World branches (581 World ticks). Reuse the original five-callback capture/check from `3a97ed37`; native verification and row eligibility remain pending. Preserve the earlier failed mud-arena packet.
+
+- Correct the private MOV companion's authored mud arena in both Source and native inputs: extend mud and matching depth through row69 while keeping the producer yard dry and half-churn's grass band at20 rows. Preserve the first shallow-mud aggregate failure and the successful original five-callback capture/check. All distance assertions, public commands and canonical actors remain unchanged; corrected results and native proof are pending.
+
+- Reject streamed MOV captures missing successful path or snapshot results: require an own array result for findPath and an own object result for snapshotFor. Keep genuine undefined omissions limited to step/commands, preserve present values and leave thrown evidence unchanged. Source-only repair, with no executed mutation or test result.
+
+- Reject incomplete streamed MOV evidence before companion generation: require constructor/action inputs, complete witness and error shapes, and matching case-local game/call identities. Preserve null step inputs and genuine undefined returns. This source-only repair changes no capture output or Source behavior and has no executed mutation or test result.
+
+- Prepare bounded-memory original MOV evidence capture with synchronous gzip JSONL records and streaming companion readers. Retain every before/after field, constructor input/state and original callback, assertion and RNG operation. Preserve both parent 9e424 heap failures; the source-only successor has no execution, fixture or parity-status claim.
+
+- Resume the private MOV speed companion with real constructor-rifle build admission, retained HQ rifle purchases and two authentic World physical movement branches (581 planned ticks). Preserve all 41 original Source assertion sites and nine selected terrain distance inequalities, and add recorder generate/check modes with first-failure output. Five native functions are source-written and registered; fixtures and all execution remain pending. Keep MOV03's outcome agreement and MOV04's missing fuel cap held, with no parity, runtime, guard or published PR256 change.
+
+- Preserve the private MOV05/06/07 canonical-companion consumer draft before the priority PR256 rebase. Add twelve authored scenes, three registered native test sources and a separate original-callback recorder. Nothing ran and no fixture was generated. Static inspection found that the draft incorrectly expects a constructor engineer in Conquest, whose original startForce is rifle/rifle/MG. The setup remains unfinished; no actor, producer, admission or parity status was changed to bypass it.
 
 - Rebase the combat vision checks onto main `66592ae8`, retaining all incoming content and relocating the three owned vision notes beside the existing core vision section. Preserve all seven focused checks, three Source oracles and historical failures. CMB-124, CMB-125, CMB-131 and CMB-132 remain ported; CMB-128 remains held for its complete border-ray regression. Earlier test results stay attributed to their original heads.
 

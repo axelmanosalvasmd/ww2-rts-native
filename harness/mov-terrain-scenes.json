@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "reference": "e4e579a838aabae3b1d9dadbc17a0a87147bc52d",
+  "scope": "Disclosed canonical companion; not literal admission of the cleared original fixtures",
+  "map": {"w": 80, "h": 96, "mudRows": 70, "spawns": [{"x": 10, "y": 82}, {"x": 70, "y": 82}], "points": [{"x": 40, "y": 90, "mp": 0, "vp": 0}]},
+  "startup": {"seed": 7301, "environmentSeed": 123, "wind": [0, 0.5], "weather": "clear", "weatherSeed": 1, "livingWeather": true, "tech": false, "supply": false, "logistics": false, "army": "standard", "names": ["A", "B"], "teams": [0, 1], "factions": [0, 1]},
+  "producer": {"kind": "motorpool", "builderKind": "rifle", "rifleMaker": "hq", "at": [45, 145], "limitTicks": 2400, "wallet": 5000},
+  "scenes": [
+    {"name": "grass", "surface": "grass", "warmup": 40, "measure": 40, "actors": [{"alias": "subject", "kind": "tank", "at": [5, 29], "rot": 0, "goal": [151, 29]}]},
+    {"name": "road", "surface": "road", "warmup": 40, "measure": 40, "actors": [{"alias": "subject", "kind": "tank", "at": [5, 5], "rot": 0, "goal": [151, 5]}]},
+    {"name": "road-edge", "surface": "road", "warmup": 40, "measure": 40, "actors": [{"alias": "subject", "kind": "tank", "at": [5, 8.2], "rot": 0, "goal": [151, 8.2], "straight": true}]},
+    {"name": "shallow-mud", "surface": "mud", "wear": 0, "warmup": 40, "measure": 40, "actors": [{"alias": "subject", "kind": "tank", "at": [5, 29], "rot": 0, "goal": [151, 29]}]},
+    {"name": "deep-mud", "surface": "mud", "wear": 1, "warmup": 40, "measure": 40, "actors": [{"alias": "subject", "kind": "tank", "at": [5, 29], "rot": 0, "goal": [151, 29]}]},
+    {"name": "rifle-mud", "surface": "mud", "wear": 0, "warmup": 40, "measure": 40, "actors": [{"alias": "subject", "kind": "rifle", "at": [5, 13], "rot": 0, "goal": [151, 13]}]},
+    {"name": "rifle-grass", "surface": "grass", "warmup": 40, "measure": 40, "actors": [{"alias": "subject", "kind": "rifle", "at": [5, 13], "rot": 0, "goal": [151, 13]}]},
+    {"name": "churn-reference", "surface": "grass", "warmup": 40, "measure": 20, "actors": [{"alias": "idle", "kind": "tank", "at": [3, 21], "rot": 0}, {"alias": "subject", "kind": "tank", "at": [3, 29], "rot": 0, "goal": [37, 29]}]},
+    {"name": "half-churn", "surface": "grass", "wear": 0.5, "warmup": 40, "measure": 20, "actors": [{"alias": "subject", "kind": "tank", "at": [3, 29], "rot": 0, "goal": [37, 29]}]},
+    {"name": "slope-hill", "surface": "hill", "warmup": 0, "measure": 40, "actors": [{"alias": "up", "kind": "tank", "at": [15, 21], "rot": 0, "goal": [37, 21]}, {"alias": "down", "kind": "tank", "at": [25, 29], "rot": 3.141592653589793, "goal": [3, 29]}]},
+    {"name": "slope-flat", "surface": "grass", "warmup": 0, "measure": 40, "actors": [{"alias": "up", "kind": "tank", "at": [15, 21], "rot": 0, "goal": [37, 21]}, {"alias": "down", "kind": "tank", "at": [25, 29], "rot": 3.141592653589793, "goal": [3, 29]}]},
+    {"name": "wet-ground", "surface": "grass", "warmup": 40, "measure": 20, "rainTicks": 800, "actors": [{"alias": "subject", "kind": "tank", "at": [3, 21], "rot": 0, "goal": [37, 21]}]},
+    {"name": "together", "surface": "grass", "together": true, "warmup": 0, "measure": 20, "actors": [{"alias": "tank", "kind": "tank", "at": [10, 20], "rot": 0, "goal": [90, 20]}, {"alias": "gun", "kind": "at", "at": [10, 30], "rot": 0, "goal": [90, 30]}]}
+  ]
+}

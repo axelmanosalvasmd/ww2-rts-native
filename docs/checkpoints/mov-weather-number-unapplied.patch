@@ -1,0 +1,41 @@
+--- a/rust/crates/simtest/tests/mov_terrain_companion.rs
++++ b/rust/crates/simtest/tests/mov_terrain_companion.rs
+@@ -581,7 +581,15 @@
+             .expect("real weather snapshot")
+             .recipient(0)
+             .unwrap();
+-        assert_eq!(delivered.fields["wx"][0], 1, "clients are told the weather");
++        let delivered_rain = delivered.fields["wx"][0]
++            .as_f64()
++            .filter(|rain| rain.is_finite())
++            .expect("delivered wx[0] must be a present finite Number");
++        assert_eq!(
++            delivered_rain.to_bits(),
++            1.0_f64.to_bits(),
++            "clients are told the weather"
++        );
+         scene.m.world.game.wet = Some(1.0);
+         scene.m.start.living.as_mut().unwrap().next = 1e9;
+         let id = scene.aliases["subject"];
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -3,6 +3,8 @@
+ Unreleased entries that are not yet collected live in `changelog.d/`, one file per change.
+ 
+ ## Unreleased
++
++- Compare only the MOV companion weather rain assertion as a present finite Number with exact binary64 bits, preserving the recorded Source value1 and every physical movement assertion. Keep the prior native JSON storage-kind failure; no runtime, fixture, default or parity-status change. Native validation of this assertion repair is pending.
+ 
+ - Preserve the first MOV native weather-assertion failure at `ec3ccfe3` without repair or retry. Prepare separate MOV-12 and MOV-13 complete original callback recorders and native consumers: a retained-constructor 61-tick obstructed-corner journey and all 244 border-ray queries. Register both tests; Source capture and native execution remain ungranted, and no fixture or status is fabricated.
+ 
+--- a/DESIGN.md
++++ b/DESIGN.md
+@@ -1,4 +1,8 @@
+ # Three Crossroads Native: design decisions
++
++## Weather-only Number assertion repair (2026-10-15)
++
++The original Source weather assertion compares Number1, while the native snapshot emits finite f64 Number1.0. The retained raw Source snapshot case3/call964 encodes1 and the ec3 failure prints Number(1.0); both denote binary64 `3ff0000000000000`, inferred from those values and the pinned serde implementation rather than a new native bit dump. Replace only the weather assertion with typed `as_f64`, an explicit finite check and exact `to_bits` equality to1.0. Missing, null, wrong-type, nonfinite, signed-zero or unequal finite values still fail. Keep every other field comparison, fixture, Source observer, physical frame and distance predicate unchanged. No generic comparator, absent-field rule or default is introduced. Preserve the old failure and require a new grant before native validation.
+ 
+ ## MOV first native weather assertion and separate corner/ray source batch (2026-10-15)
+ 
