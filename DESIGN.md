@@ -1937,6 +1937,18 @@ A single authorized diagnostic proved the supplemental no-SIGHT-anywhere asserti
 - **The last error stays until the next failure,** like `errno`: a successful call does not clear it, and reading it does not change it.
 - **The header is checked by a test, not written by the build.** cbindgen is a dev-dependency, so building the static library needs only the core. `tests/header.rs` compares the committed header with cbindgen's output and fails when they differ.
 
+## MOV-72 purchase setup blocker (2026-10-15)
+
+Source-only inspection of `f7d9ada0` found that the original cleared transport fixture buys through a temporary negative-ID producer. Native `recorded_buy` and `recruit` require a producer in the canonical roster; absence reaches production `Denial::Needs`, and a cleared roster cannot construct a replacement without a builder. Existing carrier tests directly initialize actors and therefore do not prove this purchase scene. No guard was changed and no direct-spawn replacement was added. [The blocker and proposed canonical companion](docs/parity/mov72-purchase-blocker.md) preserve all original assertions and the 100/40-tick timing for Root review. The four prepared checks remain unchanged and unrun. Cargo execution instructions now use the recovery guard, shared target and explicit three-job cap inside a Root-granted scope.
+
+
+## Movement stream two: existing-check preparation (2026-10-15)
+
+At baseline `34edf52a7eaa6cb6edba3e802c2190226228276f`, IMPL_MOV_2 prepares MOV-43/62/72/79/83 without changing runtime rules. The recorder preserves the complete original editor, Massive crowd, later-pair and tank-rider callbacks and helper bodies. Four native tests are prepared for both editor routes, all crowd coordinates, full five-seed rail arrays and all three aircraft definitions plus CFG.air. The tank-rider recording has no complete native purchase/recipient consumer yet and remains held. Existing tests and fixtures stay intact.
+
+No Source recorder, Cargo, rustc or native run is performed: Root's three slots are assigned elsewhere. The new fixture remains absent and the new tests fail on its absence; this source-only checkpoint is not integration-ready. No row becomes ported. [The handoff](docs/parity/movement-stream-two-preparation.md) records complete predicates, missing consumers, exact pending commands and resource requirements. No terrain provider, ABI, gameplay/privacy decision or whole-match criterion changes.
+
+
 ## Movement and crowd separation in the core (2026-10-12)
 
 The movement block of `step()`'s unit loop and `separateCrowds` are ported to `rust/crates/core/src/movement.rs`, `traffic.rs`, `vehicle.rs`, `terrain.rs` and `separation.rs`, and give the reference's answers call by call (Measurements).

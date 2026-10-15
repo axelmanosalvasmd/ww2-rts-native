@@ -1,0 +1,1 @@
+- Use fixed-size pairs in the MOV2 fixture decoder to satisfy strict Clippy, preserving pair order, repeat counts and discarded incomplete tails.
