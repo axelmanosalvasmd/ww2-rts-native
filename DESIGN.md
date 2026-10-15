@@ -3440,3 +3440,7 @@ The native trusted scene reader validates declared Source cells against the cata
 ## Ground contact module formatting
 
 The frozen `b45ed53` native run passed all six focused contact, construction and ground-order tests. Its formatting gate exited 1 because `match_ground_contact` appeared after `match_construction`; rustfmt requires it after `match_firing`. Move only that declaration. Every module body, fixture, test and interface remains unchanged. This is a mechanical formatting correction, not additional native acceptance; final successor gates remain pending.
+
+## Ordinary target-selection source replay
+
+The ordinary Match firing owner already holds target ID, retarget timer and team volley claims. Extend its existing pinned-source recorder with nine targeted ordinary firing scenes instead of adding a second combat model or an external interface. These scenes expose the Source-selected target for role weighting, shootability visibility, threat, hysteresis, delayed and immediate retargeting, shared claims, and trench or visible-crowd salvo value. They keep the original per-unit firing block and ordered claim rebuild. The native test compares the full recorded firing snapshot and Combat random bits in both ordinary mode aliases, Default and Conquest. This is component evidence for CMB-42, CMB-44 and CMB-86 through CMB-89; the wider row acceptance checks and whole-match outcomes remain open.
