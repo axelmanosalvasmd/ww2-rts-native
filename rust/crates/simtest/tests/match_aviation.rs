@@ -694,10 +694,8 @@ fn cmb65_mg_flak_and_fighter_hold_then_resume_permitted_anti_air() {
             assert!(m.aviation.planes[&shooter].fuel > 0.0);
             assert!(m.world.game.players[0].sees(target));
             let at = m.world.game.units[&target].at();
-            let patrol = Command::from_json(
-                &json!({"t":"move","orders":[[shooter,at.x,at.z]]}),
-            )
-            .unwrap();
+            let patrol =
+                Command::from_json(&json!({"t":"move","orders":[[shooter,at.x,at.z]]})).unwrap();
             assert_eq!(m.execute_command(0, &patrol, false).unwrap(), None);
             let sent = m.aviation.planes[&shooter].mission.unwrap();
             assert_eq!(sent.kind, MissionKind::Patrol);
@@ -729,10 +727,8 @@ fn cmb65_mg_flak_and_fighter_hold_then_resume_permitted_anti_air() {
         }
         if kind == "fighter" {
             let ammo = m.aviation.planes[&shooter].ammo;
-            let attack = Command::from_json(
-                &json!({"t":"attack","ids":[shooter],"target":target}),
-            )
-            .unwrap();
+            let attack =
+                Command::from_json(&json!({"t":"attack","ids":[shooter],"target":target})).unwrap();
             assert_eq!(m.execute_command(0, &attack, false).unwrap(), None);
             let admitted = m.aviation.planes[&shooter].mission.unwrap();
             assert_eq!(admitted.kind, MissionKind::Attack);

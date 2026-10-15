@@ -1,5 +1,14 @@
 # Three Crossroads Native: design decisions
 
+## CMB-65 S3 mechanical format child (2026-10-15)
+
+The exact 3ca67777 S3 format check requests two expression wraps in the new
+Patrol/Attack test commands. Apply only those mechanical changes and freeze a
+child before the renewed format check and five selected native instances.
+Preserve all inputs, assertions, captured fixtures and runtime code. The format
+diagnostic remains in `/tmp/audit-combat-3ca-S3-3fa592e8/fmt-3ca.log` and supplies
+no native result or parity eligibility by itself.
+
 ## CMB-65 ready-fighter source correction (2026-10-15)
 
 The separate private child starts at ccad825a and preserves daaa4743's real

@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Apply the two mechanical command-expression wraps from CMB-65's granted S3 format check. Preserve every test input, assertion, fixture and runtime byte; freeze the child before the five selected native checks.
+
 - Prepare a source-only CMB-65 correction using the complete existing ready-fighter capture, ordinary Patrol/Attack command admission and one actual aircraft step before the six held AA calls. Preserve all positive damage/XP/event checks and the zero-ammo failure history. No ammo, HP, type, pose, guard, fixture or status edit; the composed sequence has no new Source capture or native result.
 
 - Record restored combat S2's first native failure at daaa4743: CMB-64 passes, then CMB-65's new explicit fighter mission is refused because its reused continuous-AA fixture starts with zero aircraft ammo. Stop without repair or retry; CMB-39/CMB-69/connected tick/CMB-41 and conditional strict Clippy remain unrun. Renewed fmt passes, all parity cells stay unchanged and the initial fmt diagnostic is retained.
