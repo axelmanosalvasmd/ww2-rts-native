@@ -261,6 +261,266 @@ fn classic_price_boundary_three_paid_rifles_then_atomic_mp_refusal() {
     assert_eq!(state.next_job_id(), 3);
 }
 
+// External authentic captures remain absent until a new exact Root Source grant.
+// Card sentences are original client observations. Native queries below compare
+// admission and count only; they do not implement a native card-text provider.
+fn base13_control_input(makers: &[&str], fuel: u32) -> Value {
+    let units: Vec<_> = makers
+        .iter()
+        .enumerate()
+        .map(|(index, kind)| {
+            json!({"id": index + 1, "owner": 0, "type": kind, "hp": 1000, "built": 1,
+                "x": 0, "z": 0, "cd": 0, "flags": 0, "queue": [], "productionJobs": [], "prog": 0})
+        })
+        .collect();
+    json!({"mode": {"kind": "classic", "suddenDeath": false}, "army": "standard",
+        "tech": false, "naval": false,
+        "players": [{"slot": 0, "team": 0, "faction": 0, "tier": 1,
+            "armory": {"inf": 0, "guns": 0, "armor": 0}, "lab": [],
+            "mp": 10000, "mun": 0, "fuel": fuel}],
+        "units": units, "strikes": [], "regions": [], "nextProductionJob": 0})
+}
+
+fn base13_action(kind: &str, from: Option<u32>) -> Value {
+    let mut action = json!({"t": "buy", "unit": kind, "slot": 0});
+    if let Some(id) = from {
+        action["from"] = json!(id);
+    }
+    action
+}
+
+fn base13_buy(kind: &str, from: Option<u32>, denial: Option<&str>) -> Value {
+    json!({"op": "buy", "action": base13_action(kind, from), "result": denial})
+}
+
+fn base13_observe(kind: &str, from: Option<u32>, count: usize, sentence: &str) -> Value {
+    json!({"op": "observe", "action": base13_action(kind, from), "count": count,
+        "card": {"ok": sentence.is_empty(), "reason": sentence}})
+}
+
+fn base13_controls_projection(
+    state: &ProductionState,
+    wallets: &EconomyState,
+    makers: &[&str],
+) -> Value {
+    let payer = &wallets.players[0];
+    let buildings: Vec<_> = makers
+        .iter()
+        .enumerate()
+        .map(|(index, _)| {
+            let id = (index + 1) as u32;
+            let maker = state.building(id).unwrap();
+            let jobs: Vec<_> = maker
+                .rows()
+                .into_iter()
+                .map(|row| {
+                    json!([row.job.id, row.job.kind, bits(row.job.charge.mp),
+                        bits(row.job.charge.fuel),
+                        if row.status == JobStatus::Active { "active" } else { "waiting" }])
+                })
+                .collect();
+            json!({"id": id, "progress": bits(maker.progress()),
+                "queue": maker.queue().collect::<Vec<_>>(), "jobs": jobs})
+        })
+        .collect();
+    json!({"next": state.next_job_id(),
+        "money": [bits(payer.mp), bits(payer.mun), bits(payer.fuel)], "buildings": buildings})
+}
+
+fn base13_control(
+    name: &str,
+    makers: &[&str],
+    fuel: u32,
+    steps: &[Value],
+    calls: usize,
+    probes: usize,
+) {
+    let path = std::env::var_os("BASE13_CONTROLS_INPUT")
+        .expect("ABSENT: new exact Root Source grant must produce external BASE13 controls");
+    let path = std::fs::canonicalize(path).expect("authentic external BASE13 controls must exist");
+    let repository = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../..")
+        .canonicalize()
+        .unwrap();
+    assert!(!path.starts_with(repository));
+    let fixture: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    assert_eq!(
+        fixture["reference"],
+        "e4e579a838aabae3b1d9dadbc17a0a87147bc52d"
+    );
+    assert_eq!(fixture["schema"], "base13-paid-controls-v1");
+    assert_eq!(
+        fixture["inputPolicy"],
+        "independent authored inputs; no live rewrites; strict present values; no comparison mappings"
+    );
+    let scenarios = a(&fixture["scenarios"]);
+    let names: Vec<_> = scenarios
+        .iter()
+        .map(|row| row["name"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        names,
+        [
+            "queue-room",
+            "no-barracks",
+            "selected-full",
+            "tank-fuel-low",
+            "tank-fuel-paid"
+        ]
+    );
+    let scenario = scenarios.iter().find(|row| row["name"] == name).unwrap();
+    // Validate every declared input against authored literals before setup.
+    // Missing, null, false and zero remain distinct. No recorded state is loaded.
+    let input = base13_control_input(makers, fuel);
+    assert_eq!(scenario["input"], input);
+    let mut state = ProductionState::new(vec![TechState::new(1, 0, 0, 0).unwrap()]).unwrap();
+    for index in 0..makers.len() {
+        state.initialize_building((index + 1) as u32).unwrap();
+    }
+    let mut wallets = EconomyState {
+        players: vec![PlayerEconomy {
+            team: 0,
+            mp: 10000.0,
+            mun: 0.0,
+            fuel: f64::from(fuel),
+            ..Default::default()
+        }],
+    };
+    assert_eq!(
+        base13_controls_projection(&state, &wallets, makers),
+        scenario["initial"]
+    );
+    assert_eq!(a(&scenario["trace"]).len(), steps.len());
+    let mut actual_calls = 0;
+    let mut actual_probes = 0;
+    for (row, step) in a(&scenario["trace"]).iter().zip(steps) {
+        assert_eq!(row["op"], step["op"]);
+        assert_eq!(row["action"], step["action"]);
+        let action = &step["action"];
+        let kind = action["unit"].as_str().unwrap();
+        // Only an absent from means automatic selection. Present null is invalid.
+        let from = action
+            .get("from")
+            .map(|id| u32::try_from(id.as_u64().unwrap()).unwrap());
+        let before = state.clone();
+        let money_before = wallets.clone();
+        if step["op"] == "buy" {
+            actual_calls += 1;
+            context(&input, |c| {
+                let result = state.queue_unit(c, &mut wallets, 0, Faction::Usa, kind, from);
+                let actual = result.map_or_else(reason, |_| Value::Null);
+                assert_eq!(actual, step["result"]);
+                assert_eq!(
+                    &actual,
+                    row.get("result")
+                        .expect("Source Buy result must be present, including null")
+                );
+                if !actual.is_null() {
+                    assert_eq!(
+                        state, before,
+                        "refusal preserves the entire production component"
+                    );
+                    assert_eq!(wallets, money_before, "refusal preserves every wallet field");
+                }
+            });
+        } else {
+            assert_eq!(step["op"], "observe");
+            assert_eq!(row["card"], step["card"]);
+            assert_eq!(row["count"], step["count"]);
+            let mut probe = state.clone();
+            let mut money = wallets.clone();
+            let mut count = 0;
+            context(&input, |c| {
+                for _ in 0..5 {
+                    actual_probes += 1;
+                    let prior = probe.clone();
+                    let prior_money = money.clone();
+                    match probe.queue_unit(c, &mut money, 0, Faction::Usa, kind, from) {
+                        Ok(_) => count += 1,
+                        Err(Error::Denied(_)) => {
+                            assert_eq!(probe, prior);
+                            assert_eq!(money, prior_money);
+                            break;
+                        }
+                        other => panic!("unexpected paid-control admission: {other:?}"),
+                    }
+                }
+            });
+            assert_eq!(json!(count), row["count"]);
+            assert_eq!(json!(count > 0), row["card"]["ok"]);
+            assert_eq!(state, before);
+            assert_eq!(wallets, money_before);
+        }
+        assert_eq!(
+            base13_controls_projection(&state, &wallets, makers),
+            row["expected"]
+        );
+    }
+    assert_eq!(actual_calls, calls);
+    assert_eq!(actual_probes, probes);
+}
+
+#[test]
+#[ignore = "held until new exact Root Source and native grants for external BASE13 controls"]
+fn classic_queue_room_after_three_paid_rifles() {
+    let mut steps = vec![base13_observe("rifle", Some(1), 5, "")];
+    steps.extend((0..3).map(|_| base13_buy("rifle", Some(1), None)));
+    steps.push(base13_observe("rifle", Some(1), 2, ""));
+    steps.extend((0..2).map(|_| base13_buy("rifle", Some(1), None)));
+    steps.push(base13_observe(
+        "rifle",
+        Some(1),
+        0,
+        "The training queue is full",
+    ));
+    steps.push(base13_buy("rifle", Some(1), Some("queueFull")));
+    base13_control("queue-room", &["hq"], 0, &steps, 6, 9);
+}
+
+#[test]
+#[ignore = "held until new exact Root Source and native grants for external BASE13 controls"]
+fn classic_no_barracks_mg_card_refusal() {
+    let steps = [
+        base13_observe("mg", None, 0, "Needs a Barracks"),
+        base13_buy("mg", None, Some("needs")),
+    ];
+    base13_control("no-barracks", &["hq"], 0, &steps, 1, 1);
+}
+
+#[test]
+#[ignore = "held until new exact Root Source and native grants for external BASE13 controls"]
+fn classic_full_selected_maker_does_not_fall_back() {
+    let mut steps: Vec<_> = (0..5)
+        .map(|_| base13_buy("rifle", Some(1), None))
+        .collect();
+    steps.extend([
+        base13_observe("rifle", None, 5, ""),
+        base13_observe("rifle", Some(2), 5, ""),
+        base13_observe("rifle", Some(1), 0, "The training queue is full"),
+        base13_buy("rifle", Some(1), Some("queueFull")),
+        base13_buy("rifle", None, None),
+        base13_buy("rifle", Some(2), None),
+    ]);
+    base13_control("selected-full", &["hq", "hq"], 0, &steps, 8, 11);
+}
+
+#[test]
+#[ignore = "held until new exact Root Source and native grants for external BASE13 controls"]
+fn classic_tank_fuel_denial_and_paid_debit() {
+    let low = [
+        base13_observe("tank", Some(1), 0, "Needs 60 fuel"),
+        base13_buy("tank", Some(1), Some("fuel")),
+    ];
+    base13_control("tank-fuel-low", &["motorpool"], 10, &low, 1, 1);
+    let paid = [
+        base13_observe("tank", Some(1), 1, ""),
+        base13_buy("tank", Some(1), None),
+        base13_observe("tank", Some(1), 0, "Needs 60 fuel"),
+        base13_buy("tank", Some(1), Some("fuel")),
+    ];
+    base13_control("tank-fuel-paid", &["motorpool"], 100, &paid, 2, 3);
+}
+
 fn replay_production_fixture(fixture: &Value, dynamic_makers: bool) {
     for split in [false, true] {
         for scenario in a(&fixture["scenarios"]) {
