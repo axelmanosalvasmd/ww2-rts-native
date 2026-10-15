@@ -38,7 +38,54 @@ fn fixture() -> Value {
             "base48_pillbox_needs_company_hq",
         ])
     );
+    for case in fixture["cases"].as_array().unwrap() {
+        check_preparation(case);
+    }
     fixture
+}
+
+fn check_preparation(case: &Value) {
+    let proof = &case["preparation"];
+    assert_eq!(proof["kind"], "root-approved-name-and-one-zero-value-neutral-point");
+    assert_eq!(proof["nativeAdmissionOfRaw"], false);
+    assert_eq!(proof["originalValidation"], "name must be a string up to 40 chars");
+    assert_eq!(proof["nameOnlyValidation"], "needs 1-9 capture points");
+    assert!(proof["amendedValidation"].is_null());
+    let original = &proof["originalMap"];
+    assert!(original.get("name").is_none());
+    assert_eq!(original["points"], json!([]));
+    let error = AuthoritativeMap::from_json(&serde_json::to_vec(original).unwrap())
+        .err().expect("raw component map must not gain native admission");
+    assert_eq!(error.to_string(), "name: expected text up to 40 UTF-16 code units");
+    let mut named = original.clone();
+    named["name"] = json!("Base selected");
+    let error = AuthoritativeMap::from_json(&serde_json::to_vec(&named).unwrap())
+        .err().expect("name-only component map still has no capture points");
+    assert_eq!(error.to_string(), "points: needs 1-9 capture points");
+    let width = original["w"].as_u64().unwrap();
+    assert!(width == 80 || width == 64);
+    named["points"] = json!([{"x":if width == 80 {40} else {32},"y":4,"vp":0,"mp":0}]);
+    assert_eq!(named, case["setup"]["map"]);
+    assert_eq!(named, proof["amendedMap"]);
+    AuthoritativeMap::from_json(&serde_json::to_vec(&named).unwrap()).unwrap();
+    let control = &proof["control"];
+    assert_eq!(control["setup"]["map"], *original);
+    let mut control_setup = control["setup"].clone();
+    control_setup["map"] = named;
+    assert_eq!(control_setup, case["setup"]);
+    for (key, value) in control.as_object().unwrap() {
+        if key != "setup" {
+            assert_eq!(*value, case[key], "complete original/amended recorded result: {key}");
+        }
+    }
+    assert_eq!(proof["comparedFrames"], case["snapshots"]);
+    assert_eq!(proof["rawSteps"], proof["amendedSteps"]);
+    assert_eq!(proof["rawFramesSha256"], proof["amendedFramesSha256"]);
+    assert_eq!(proof["rawFramesSha256"].as_str().unwrap().len(), 64);
+    for key in ["rawPointFrames", "amendedPointFrames"] {
+        assert_eq!(proof[key].as_array().unwrap().len(), case["snapshots"].as_u64().unwrap() as usize);
+    }
+    assert!(proof["rawPointFrames"].as_array().unwrap().iter().all(|frame| *frame == json!([])));
 }
 
 fn population(m: &Match) -> Vec<Value> {
@@ -84,7 +131,28 @@ fn population(m: &Match) -> Vec<Value> {
         .collect()
 }
 
-fn extra_compare(m: &Match, expected: &Value) {
+fn extra_compare(m: &Match, expected: &Value, points: &Value) {
+    assert_eq!(m.start.points.len(), 1);
+    assert_eq!(points.as_array().unwrap().len(), 1);
+    let actual = &m.start.points[0];
+    let point = &points[0];
+    assert_eq!(actual.owner, None, "approved neutral point must never become owned");
+    assert_eq!(actual.capper, None, "approved neutral point must never become captured");
+    assert_eq!(actual.progress.to_bits(), 0.0f64.to_bits());
+    assert_eq!(actual.mp.to_bits(), 0.0f64.to_bits());
+    assert_eq!(actual.vp.to_bits(), 0.0f64.to_bits());
+    assert!(!actual.cut);
+    assert_eq!(point["owner"], -1);
+    assert_eq!(point["capper"], -1);
+    assert_eq!(bits(actual.at.x), point["x"]);
+    assert_eq!(bits(actual.at.z), point["z"]);
+    assert_eq!(bits(actual.progress), point["progress"]);
+    assert_eq!(bits(actual.mp), point["mp"]);
+    assert_eq!(bits(actual.vp), point["vp"]);
+    assert_eq!(json!(actual.cut), point["cut"]);
+    assert_eq!(actual.id, point["scenarioId"]);
+    assert_eq!(json!(actual.kind), point["kind"]);
+    assert_eq!(json!(actual.needs.map_or(-1, |n| n as i64)), point["needs"]);
     assert_eq!(json!(population(m)), expected["population"]);
     for row in expected["units"].as_array().unwrap() {
         let id = row["id"].as_u64().unwrap() as u32;
@@ -211,7 +279,7 @@ fn replay(name: &str, predicate: &str) -> Replay {
     let mut cursors = Cursors::default();
     let mut effects = json!([]);
     compare(&m, &expected, &rng, &mut cursors, &effects, name);
-    extra_compare(&m, &expected);
+    extra_compare(&m, &expected, &case["preparation"]["amendedPointFrames"][0]);
     let mut frames = BTreeMap::from([("initial".into(), witness(&m))]);
     let mut results = BTreeMap::new();
     let mut steps = BTreeMap::new();
@@ -356,7 +424,7 @@ fn replay(name: &str, predicate: &str) -> Replay {
                 &effects,
                 &format!("{name} {label} snapshot{next}"),
             );
-            extra_compare(&m, &expected);
+            extra_compare(&m, &expected, &case["preparation"]["amendedPointFrames"][next]);
             assert!(constructor.iter().all(|id| m.world.game.units.contains_key(id)));
         }
         if op == "until" {

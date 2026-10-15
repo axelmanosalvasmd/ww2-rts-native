@@ -168,3 +168,17 @@ c72e951d7ac3e06ceb157ee1e2048543f6d6ed0fb02a19c781c59a85515a5d76  Source/test-sk
 05d4c359046b49313aff3fb7ab6d8afe4340c9b0ea99493200dc8fff10a49ff9  Source/test-tech.js
 6c666543534964cb2488ba90c13e0d7ff93218c5cf4b47431fb8279d4bf4b20d  Source/test-fixtures.js
 ```
+
+## Root-approved component-map preparation after a1678
+
+Source generation at `a1678fdee932c92c003e7bcdd2a8e559ffdf2dce` exited 1 before creation because the original component maps have no name. The original packet remains immutable at `/tmp/impl-bases-a1678-S1-h7ttp1tq/`; it includes exact caps, log hashes and completed cleanup. Root also verified that the zero-point maps fail both playable-map parsers. No Source case, tick, fixture or native instance completed at that head.
+
+Root specifically authorizes retaining the raw original maps and errors while preparing the map consumed by both Source and native with only `name: "Base selected"` and one neutral zero-MP/zero-VP point: cell (40,4) for 80-cell maps and (32,4) for B05. This supersedes only the map-input statement in the earlier setup list. Actors, constructor footprints, producer identity, commands, authored poses, options and original predicates remain frozen.
+
+The raw Source path calls the original unchecked constructor with the original map before the amended path runs. It is component evidence without native admission. The amended path still asserts normal Source validation. Every existing projected field in every initial/action/full-step frame is compared by its complete JSON byte string. All original predicate assertions execute in both paths. Complete action records, aliases, checkpoints and every non-map setup/result field are also compared without normalization. A single mismatch or further substantive failure stops the recorder; it tries no alternative point or setup.
+
+The fixture, if recording succeeds, retains both complete control and amended records plus original maps, name-only validation errors, point-state traces and equal full-frame digest receipts. The native checker requires both original parser refusals and consumes only the amended map through the existing helper. The point must remain neutral and uncaptured with zero MP/VP at each frame. No whole-match outcome, native admission of raw controls or standing preparation exception is claimed.
+
+This recorder/checker source child must be committed before Source execution. After successful raw/amended invariance, authentic generation and byte-check, the fixture must be frozen before Cargo. S1 is assigned CPU 0-3 with MemoryMax=6G, swap=0, quota=400%, jobs=4 and test threads=4. The current per-slot guard, `WW2_CARGO_SLOT=S1`, exclusive target and compiler wrapper apply; record `df -h /` immediately before each Cargo command and stop on the 20 GiB floor. Only fmt, the six named child tests and `every_test_file_is_compiled` are authorized. No old construction replay, full/release/list command, publication or status promotion is added to this grant.
+
+Earlier source hashes above identify the uncorrected a1678 inputs. New hashes and actual run counts belong to the new immutable execution packet. No equality or pass is claimed until those runs finish.

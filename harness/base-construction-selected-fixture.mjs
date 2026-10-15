@@ -1,6 +1,7 @@
 // Six selected predicates. Every simulation call uses the unchanged pinned Source.
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
 import {readFileSync, writeFileSync} from 'node:fs';
 import {join, resolve} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
@@ -65,11 +66,26 @@ const constructorDraw = bootstrap / 2 ** 32;
 const originalRandom = Math.random;
 const cases = [];
 let totalSteps = 0, totalSnapshots = 0;
+let active = null;
+const preparationKind = 'root-approved-name-and-one-zero-value-neutral-point';
 
-function record(name, map, tech, actions) {
+// Raw Source component maps are deliberately not admitted as native playable maps.
+// This path calls the original unchecked Source constructor before the amended run.
+function recordScene(name, map, tech, actions, path) {
+  let totalSteps = 0, totalSnapshots = 0;
+  active = {name, path, steps: 0, snapshots: 0};
+  console.error(JSON.stringify({starting: active}));
   const draws = [];
   Math.random = () => { draws.push(constructorDraw); return constructorDraw; };
-  assert.equal(sim.validateMap(map), null);
+  if (path === 'raw-control') {
+    assert.equal(sim.validateMap(map), 'name must be a string up to 40 chars');
+    assert.equal(sim.validateMap({...map, name: 'Base selected'}), 'needs 1-9 capture points');
+    assert.deepEqual(map.points, []);
+    assert.equal(Object.hasOwn(map, 'name'), false);
+  } else {
+    assert.equal(path, 'amended');
+    assert.equal(sim.validateMap(map), null);
+  }
   const opts = {weather: false, tech, supply: false, logistics: false};
   const g = sim.createGame(map, ['Crew', 'Opposition'], false, [0, 1], [0, 1], opts);
   assert.equal(g.mode, undefined);
@@ -91,7 +107,7 @@ function record(name, map, tech, actions) {
     prime: {allUnits: {holdFire: true, holdPos: true, auto: false, autoRetreat: false},
       player0: {mp: 5000}, pathRetryLimit: 1, cellJournal: []}, creationRandomDraws: 1, setupRandomDraws: 0};
   let previous = null, newAt = 0, journalAt = 0, index = 0;
-  const patches = [], records = [], checkpoints = new Map();
+  const patches = [], records = [], checkpoints = new Map(), frames = [], pointFrames = [];
   const sites=new Map();
   const snapshot=()=>{
    const units=[...g.units.values()].map(u=>({id:u.id,type:u.type,owner:u.owner,hp:bits(u.hp),...point(u),rot:bits(u.rot),aim:bits(u.aim),built:u.built===undefined?null:bits(u.built),cells:u.cells??null,structureId:u.structureId??null,build:u.build??null,dig:paid(u.dig),entrench:u.entrench?.id??null,path:u.path.map(point),orders:encode(u.orders),follow:u.follow??null,garrison:u.garrison,riding:u.riding??null,holdFire:u.holdFire??null,holdPos:u.holdPos??null,auto:u.auto??null,autoRetreat:u.autoRetreat??null,retreating:u.retreating,repath:bits(u.repath),still:u.still===undefined?null:bits(u.still),moveSpeed:bits(u.moveSpeed),moveOutcome:u.moveOutcome??null,moveOutcomeTick:u.moveOutcomeTick??null,moveResult:encode(u.moveResult),queue:encode(u.queue),productionJobs:encode(u.productionJobs),prog:u.prog===undefined?null:bits(u.prog),cooldown:bits(u.cooldown)}));
@@ -103,11 +119,28 @@ function record(name, map, tech, actions) {
   };
   function save() {
     const state = snapshot();
+    const pointState = g.points.map(p => ({scenarioId: p.scenarioId, x: bits(p.x), z: bits(p.z),
+      vp: bits(p.vp), mp: bits(p.mp), owner: p.owner, capper: p.capper,
+      progress: bits(p.progress), cut: p.cut, kind: p.kind ?? null, needs: p.needs}));
+    if (path === 'raw-control') assert.deepEqual(pointState, []);
+    else {
+      assert.equal(pointState.length, 1);
+      const p = pointState[0];
+      assert.equal(p.owner, -1, 'approved point never becomes owned');
+      assert.equal(p.capper, -1, 'approved point never becomes captured');
+      assert.equal(p.progress, bits(0));
+      assert.equal(p.mp, bits(0), 'approved point carries no income');
+      assert.equal(p.vp, bits(0), 'approved point carries no VP');
+      assert.equal(p.cut, false);
+    }
+    frames.push(JSON.stringify(state));
+    pointFrames.push(pointState);
     if (previous === null) checkpoints.set('initial', state);
     else patches.push(changes(previous, state));
     previous = state;
     index++;
     totalSnapshots++;
+    active.snapshots = totalSnapshots;
   }
   save();
   const initial = previous;
@@ -167,6 +200,7 @@ function record(name, map, tech, actions) {
         sim.step(g);
         count++;
         totalSteps++;
+        active.steps = totalSteps;
         save();
       }
       if (action.op === 'until') assert.ok(done(), `${name}: construction completes within original bound`);
@@ -235,9 +269,53 @@ function record(name, map, tech, actions) {
     }
     predicateNames.push('base48_mortar_needs_company_hq');
   } else throw Error(name);
-  cases.push({name, setup, initial, records, patches, snapshots: index,
+  const result = {name, setup, initial, records, patches, snapshots: index,
     finalAliases: structuredClone(aliases), predicates: predicateNames,
-    checkpoints: Object.fromEntries([...checkpoints].map(([label, state]) => [label, state.tick]))});
+    checkpoints: Object.fromEntries([...checkpoints].map(([label, state]) => [label, state.tick]))};
+  console.error(JSON.stringify({completed: active, predicates: predicateNames.length}));
+  return {result, frames, pointFrames, steps: totalSteps};
+}
+
+function digestFrames(frames) {
+  const hash = createHash('sha256');
+  for (const frame of frames) hash.update(frame + '\n', 'utf8');
+  return hash.digest('hex');
+}
+
+function record(name, originalMap, tech, actions) {
+  const baseline = structuredClone(originalMap);
+  const raw = recordScene(name, structuredClone(baseline), tech, actions, 'raw-control');
+  const amendedMap = {...structuredClone(baseline), name: 'Base selected',
+    points: [{x: baseline.w === 80 ? 40 : 32, y: 4, vp: 0, mp: 0}]};
+  assert.ok(baseline.w === 80 || baseline.w === 64);
+  const amended = recordScene(name, amendedMap, tech, actions, 'amended');
+  assert.equal(raw.frames.length, amended.frames.length, `${name}: complete snapshot count`);
+  for (let i = 0; i < raw.frames.length; i++) {
+    assert.equal(amended.frames[i], raw.frames[i], `${name}: byte-exact complete recorded frame ${i}`);
+  }
+  const {map: rawMap, ...rawSetup} = raw.result.setup;
+  const {map: admittedMap, ...amendedSetup} = amended.result.setup;
+  assert.equal(JSON.stringify(amendedSetup), JSON.stringify(rawSetup), `${name}: unchanged actor and option setup`);
+  for (const key of Object.keys(raw.result).filter(key => key !== 'setup')) {
+    assert.equal(JSON.stringify(amended.result[key]), JSON.stringify(raw.result[key]), `${name}: unchanged ${key}`);
+  }
+  assert.equal(amended.steps, raw.steps);
+  const rawSha256 = digestFrames(raw.frames), amendedSha256 = digestFrames(amended.frames);
+  assert.equal(rawSha256, amendedSha256);
+  amended.result.preparation = {kind: preparationKind, nativeAdmissionOfRaw: false,
+    originalMap: rawMap, amendedMap: admittedMap,
+    originalValidation: sim.validateMap(rawMap),
+    nameOnlyValidation: sim.validateMap({...rawMap, name: 'Base selected'}),
+    amendedValidation: sim.validateMap(admittedMap),
+    control: raw.result, rawPointFrames: raw.pointFrames, amendedPointFrames: amended.pointFrames,
+    comparedFrames: raw.frames.length, rawSteps: raw.steps, amendedSteps: amended.steps,
+    rawFramesSha256: rawSha256, amendedFramesSha256: amendedSha256,
+    comparison: 'every full recorded frame JSON byte string, all original predicates and all non-map setup/result fields; no normalization'};
+  cases.push(amended.result);
+  totalSteps += amended.steps;
+  totalSnapshots += amended.result.snapshots;
+  console.error(JSON.stringify({invariance: name, frames: raw.frames.length, rawSteps: raw.steps,
+    amendedSteps: amended.steps, rawSha256, amendedSha256}));
 }
 
 const prime = (label, units = {}, players = {}) => ({op: 'prime', label, units, players});
@@ -286,11 +364,17 @@ try {
   const content = JSON.stringify({reference: pin, node: process.version, arch: process.arch,
     boundary: 'unmodified createGame + command + full step; selected ordinary Conquest predicates only',
     random: {nativeMatchSeed: 701, bootstrap, constructorDraw: bits(constructorDraw), runtimeMathRandomDraws: 0},
+    preparation: {kind: preparationKind, rawControlHasNativeAdmission: false,
+      rawSteps: totalSteps, amendedSteps: totalSteps, actualSourceSteps: totalSteps * 2,
+      comparedFramePairs: totalSnapshots},
     cases, steps: totalSteps, snapshots: totalSnapshots}) + '\n';
   const target = join(root, 'rust/crates/simtest/tests/fixtures/base-construction-selected.json.gz');
   if (process.argv.includes('--check')) assert.equal(gunzipSync(readFileSync(target)).toString('utf8'), content);
   else writeFileSync(target, gzipSync(content, {level: 9}));
-  console.error(`${process.argv.includes('--check') ? 'Verified' : 'Recorded'} 4 cases, 6 predicates, ${totalSteps} full steps, ${totalSnapshots} snapshots`);
+  console.error(`${process.argv.includes('--check') ? 'Verified' : 'Recorded'} 4 paired cases, 6 predicates in each path, ${totalSteps} raw + ${totalSteps} amended full steps, ${totalSnapshots} byte-exact frame pairs`);
+} catch (error) {
+  console.error(JSON.stringify({stopped: active}));
+  throw error;
 } finally {
   Math.random = originalRandom;
   clean();
