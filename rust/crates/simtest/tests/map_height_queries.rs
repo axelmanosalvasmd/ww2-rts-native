@@ -14,7 +14,8 @@ fn decode(bits: &Value) -> f64 {
 fn one_thousand_source_samples_match_existing_native_height_queries() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../..");
     let fixture: Value = serde_json::from_slice(
-        &fs::read(root.join("rust/crates/simtest/tests/fixtures/map-height-selected.json")).unwrap(),
+        &fs::read(root.join("rust/crates/simtest/tests/fixtures/map-height-selected.json"))
+            .unwrap(),
     )
     .unwrap();
     assert_eq!(fixture["schemaVersion"], 1);
@@ -35,7 +36,9 @@ fn one_thousand_source_samples_match_existing_native_height_queries() {
     for (map_index, source) in maps.iter().enumerate() {
         let key = source["mapKey"].as_str().unwrap();
         if map_index > 0 {
-            let previous = maps[map_index - 1]["sourceCapture"]["path"].as_str().unwrap();
+            let previous = maps[map_index - 1]["sourceCapture"]["path"]
+                .as_str()
+                .unwrap();
             let current = source["sourceCapture"]["path"].as_str().unwrap();
             assert!(previous < current);
         }
