@@ -320,7 +320,184 @@
       "source": "sim.js:198, 245, 251, 256, 260, 266, 286, 313, 321",
       "acceptance_check": "Port test-transport.mjs 'a light tank carries two squads as riders and a Tiger three' (21-34)",
       "selected": true,
-      "batch_state": "prepared, unrun; see movement-stream-two-preparation.md"
+      "batch_state": "blocked at exact original purchase setup; source-only inspection; no runtime execution",
+      "blocker_report": "mov72-purchase-blocker.md",
+      "native_purchase_boundary": {
+        "entry": "Match::execute_command -> recorded_buy -> RecruitParts::stage -> ProductionState::prepare_recruit",
+        "source_guard": "rust/crates/core/src/production.rs:620-627",
+        "denial": "production::Error::Denied(Denial::Needs), mapped to command Denial::Needs",
+        "proof": "source inspection only; not a native observed result",
+        "missing_adapter": "Original fixtureCommand temporary producer (-100 for owner 0), after clearFixtureUnits, has no canonical native fixture-purchase equivalent",
+        "additional_required_state": "actual roster producer, building_rallies entry, production state; IDs are u32",
+        "proposal": "Keep original scene, add separately named canonical companion with real retained constructor producers, only after Root review"
+      },
+      "original_predicates": [
+        {
+          "source_line": 21,
+          "original_assertion": "assert.deepEqual(['tank', 'medium', 'tiger', 'churchill', 'halftrack', 'lorry'].map(t => UNITS[t].carries), [2, 2, 3, 3, 1, 3]);",
+          "meaning": "capacity table",
+          "intended_native_consumer": "Catalog::compiled().unit(kind).carries",
+          "when": "before scene",
+          "state": "held before first purchase; unrun"
+        },
+        {
+          "source_line": 23,
+          "original_assertion": "assert.equal(command(g, 0, { t: 'board', ids: [a.id, b.id, c.id], target: tank.id }), undefined);",
+          "meaning": "first Board admitted",
+          "intended_native_consumer": "Match::execute_command(Board)",
+          "when": "tick 0",
+          "state": "held before first purchase; unrun"
+        },
+        {
+          "source_line": 24,
+          "original_assertion": "assert.equal([a, b, c].filter(u => u.board === tank.id).length, 2, 'only two squads walk to a light tank');",
+          "meaning": "exactly two squads reserve seats",
+          "intended_native_consumer": "Unit.board equals tank id",
+          "when": "before ticks",
+          "state": "held before first purchase; unrun"
+        },
+        {
+          "source_line": 26,
+          "original_assertion": "assert.deepEqual(tank.cargo.sort(), [a.id, b.id].sort(), 'the two nearest squads ride');",
+          "meaning": "two nearest squads ride",
+          "intended_native_consumer": "Match.combat[tank].cargo sorted against purchased rifle IDs",
+          "when": "after 100 advance_tick calls",
+          "state": "held before first purchase; unrun"
+        },
+        {
+          "source_line": 27,
+          "original_assertion": "assert.equal(row(g, tank)[12] & CARGO_FLAG, CARGO_FLAG);",
+          "meaning": "owner cargo flag",
+          "intended_native_consumer": "SnapshotCache::new(&m).recipient(0).fields.units[tank][12] & 524288",
+          "when": "after 100 ticks",
+          "state": "held before first purchase; unrun"
+        },
+        {
+          "source_line": 28,
+          "original_assertion": "assert.equal(row(g, tank)[12] >> CARGO_SHIFT & 3, 2, 'the snapshot tells how many ride');",
+          "meaning": "owner cargo count two",
+          "intended_native_consumer": "(owner row[12] >> 23) & 3 == 2",
+          "when": "after 100 ticks",
+          "state": "held before first purchase; unrun"
+        },
+        {
+          "source_line": 29,
+          "original_assertion": "assert.equal(command(g, 0, { t: 'board', ids: [c.id], target: tank.id }), 'max');",
+          "meaning": "third squad refused with max",
+          "intended_native_consumer": "Match::execute_command(Board) == Some(Denial::Max)",
+          "when": "before Move",
+          "state": "held before first purchase; unrun"
+        },
+        {
+          "source_line": 32,
+          "original_assertion": "assert.ok(a.x > 41 && a.x === tank.x, 'riders go where the tank goes');",
+          "meaning": "rider moves with tank and x > 41",
+          "intended_native_consumer": "purchased rifle x == purchased tank x, x > 41",
+          "when": "after 40 additional advance_tick calls",
+          "state": "held before first purchase; unrun"
+        },
+        {
+          "source_line": 33,
+          "original_assertion": "assert.equal(command(g, 0, { t: 'unload', ids: [tank.id] }), undefined);",
+          "meaning": "Unload admitted",
+          "intended_native_consumer": "Match::execute_command(Unload)",
+          "when": "tick 140, no extra tick",
+          "state": "held before first purchase; unrun"
+        },
+        {
+          "source_line": 34,
+          "original_assertion": "assert.ok(!a.riding && !b.riding && !tank.cargo.length, 'unload puts every rider down');",
+          "meaning": "both riders and cargo cleared",
+          "intended_native_consumer": "!a.riding && !b.riding && cargo empty; canonical carrier links cleared",
+          "when": "immediately after Unload",
+          "state": "held before first purchase; unrun"
+        }
+      ],
+      "setup_purchase_assertions": {
+        "original_source_line": 12,
+        "original_assertion": "g.players[owner].mp = 1e6;",
+        "repeat_for": [
+          "tank",
+          "rifle",
+          "rifle",
+          "mg"
+        ],
+        "mp_before_each": 1000000,
+        "poses": [
+          [
+            40,
+            40
+          ],
+          [
+            44,
+            40
+          ],
+          [
+            40,
+            44
+          ],
+          [
+            36,
+            40
+          ]
+        ],
+        "state": "exact cleared-scene canonical adapter missing"
+      },
+      "timing_and_commands": [
+        {
+          "source_line": 22,
+          "op": "scene purchases and original authored inputs"
+        },
+        {
+          "source_line": 23,
+          "op": "board",
+          "ids": [
+            "a",
+            "b",
+            "c"
+          ],
+          "target": "tank"
+        },
+        {
+          "source_line": 25,
+          "op": "step",
+          "count": 100
+        },
+        {
+          "source_line": 29,
+          "op": "board",
+          "ids": [
+            "c"
+          ],
+          "target": "tank",
+          "expected_denial": "max"
+        },
+        {
+          "source_line": 30,
+          "op": "move",
+          "orders": [
+            [
+              "tank",
+              60,
+              40
+            ]
+          ]
+        },
+        {
+          "source_line": 31,
+          "op": "step",
+          "count": 40
+        },
+        {
+          "source_line": 33,
+          "op": "unload",
+          "ids": [
+            "tank"
+          ]
+        }
+      ],
+      "source_file_sha256": "1bf26b20bfa1e70001a13e287a46449f01e3c6568b2c81c52474318228cd0db5",
+      "completed": false
     },
     {
       "row": "MOV-73",

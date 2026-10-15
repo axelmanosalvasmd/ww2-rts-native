@@ -47,28 +47,43 @@ These are scope findings, not new gameplay or admission decisions.
 
 ## Pending commands and slot requirements
 
-Root must explicitly grant a slot before any command below. At this checkpoint,
-the shared ledger grants all three native slots to CMB, MAP and ENG. The worker
-did not change the ledger or infer a grant from an idle process.
+Root must explicitly grant a slot before any command below. All three slots are
+occupied by recovery work at this source-only checkpoint. The worker did not
+change the ledger or infer a grant from an idle process. The original four tests
+and recorder remain unchanged; MOV-72's exact purchase blocker is documented in
+[mov72-purchase-blocker.md](mov72-purchase-blocker.md).
 
-Run from this branch's isolated worktree. Use Root's granted CPU affinity,
-memory/swap limits, process scope and job limits. Recording and native testing
-must run serially in that slot.
+The recovery policy supersedes the original direct Cargo commands. Run every
+Cargo command through the coordinator guard inside Root's granted systemd scope,
+with 6 GiB memory, zero swap, four test threads, 400% CPU quota and the assigned
+CPU set. Keep the nominal four-job scope limit, with the stricter recovery cap of
+three Cargo jobs explicitly applied. Never use a task-local target or
+`--target-dir`. Capture `df -h /` immediately before each Cargo invocation.
 
 ```sh
 WW2_REFERENCE=/home/judiazm/Projects/ww2-rts-native/reference/ww2-rts node harness/movement-existing-checks-fixture.mjs
 WW2_REFERENCE=/home/judiazm/Projects/ww2-rts-native/reference/ww2-rts node harness/movement-existing-checks-fixture.mjs --check
 cd rust
-cargo fmt --all -- --check
-cargo test --locked --profile ci-test -p ww2-simtest --test it movement_existing_checks:: -- --test-threads=1
+df -h /
+CARGO_BUILD_JOBS=3 python3 /home/judiazm/.t3/handoffs/ww2-native-cargo-guard.py +1.99.0 fmt --all -- --check
+df -h /
+CARGO_BUILD_JOBS=3 python3 /home/judiazm/.t3/handoffs/ww2-native-cargo-guard.py +1.99.0 test --locked --profile ci-test -j3 -p ww2-simtest --test it movement_existing_checks:: -- --test-threads=4
 ```
 
-The four new native tests include World generation, so Root should grant a heavy
-slot for this combined command or split the three smaller tests from the
-five-seed generation test under separate grants. The existing ledger's heavy
-limits are 8 GiB, zero swap and six Cargo build jobs. Focused limits are 6 GiB,
-zero swap and four build jobs. Root must supply the actual CPU set; no set is
-reserved here. No full workspace/release/FFI run is requested in this checkpoint.
+These are pending commands, not a slot grant or executed checks. Recording and
+native tests must run serially. The guard forces
+`CARGO_TARGET_DIR=/tmp/ww2-native-target-0e8d6d9b` and checks the 20 GiB disk floor
+before exec. Its inspected source does not itself set a Cargo job limit, so the
+commands above explicitly enforce three. A disk-floor refusal stops this stream;
+never clean another stream to make it pass. World generation stays part of the
+unchanged four-test group and needs Root's explicit scheduling within that scope.
+No full workspace/release/FFI run is requested.
+
+Completed old build outputs were deliberately removed during recovery. Historical
+hashes/logs remain historical evidence; their binaries are not assumed available.
+Their removal alone does not justify repeating completed gates. The archived
+coordinator evidence is at
+`/home/judiazm/.t3/handoffs/ww2-disk-recovery-20261015-0651/coordinator-tmp-evidence.tgz`.
 
 First failure remains evidence. Do not remove Source assertions, narrow scenes,
 inject native expected outputs or relax admission to obtain a pass. Formatting
