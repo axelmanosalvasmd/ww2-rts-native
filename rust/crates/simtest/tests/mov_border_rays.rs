@@ -25,9 +25,16 @@ fn complete_original_border_rays_both_directions_and_wall_controls() {
     assert_eq!(f["arch"], "x64");
     assert_eq!(f["completed"], true);
     assert!(f["failure"].is_null() && f["readbackFailure"].is_null());
+    assert_eq!(f["name"], "Sight rays ending on a cell border must stop at the destination, including mixed-sign diagonals");
+    assert_eq!(f["bodySha256"], "fb60b3952780fada97f99ec4c6df6ba26a1dd3fdc328c750b0d01524dc689610");
     let constructors = f["constructors"].as_array().unwrap();
     assert_eq!(constructors.len(), 1);
     let original = &constructors[0];
+    assert_eq!(original["completed"], true);
+    assert_eq!(original["w"], 64);
+    assert_eq!(original["h"], 64);
+    assert!(original["state"].is_object());
+    assert!(original.get("failure").is_none());
     let source_map = json!({"w":64,"h":64,"rows":vec![".".repeat(64);64],
         "spawns":[{"x":1,"y":1},{"x":60,"y":60}],"points":[]});
     assert_eq!(original["input"], json!([source_map, ["a", "b"], false]));
@@ -70,6 +77,10 @@ fn complete_original_border_rays_both_directions_and_wall_controls() {
             m.world.game.flags[40 * 64 + 37] &= !SIGHT;
             m.world.game.flags[45 * 64 + 30] |= SIGHT;
         }
+        assert_eq!(query["completed"], true);
+        assert!(query.get("failure").is_none());
+        assert_eq!(query["w"], 64);
+        assert_eq!(query["h"], 64);
         assert_eq!(point(&query["a"]), a);
         assert_eq!(point(&query["b"]), b);
         assert_eq!(json!(m.world.game.flags), query["flags"]);

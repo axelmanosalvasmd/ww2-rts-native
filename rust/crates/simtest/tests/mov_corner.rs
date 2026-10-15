@@ -40,8 +40,44 @@ fn original_obstructed_corner_is_kept_then_arrives_after_sixty_more_ticks() {
     assert_eq!(f["reference"],"e4e579a838aabae3b1d9dadbc17a0a87147bc52d");
     assert_eq!(f["node"],"v24.21.0"); assert_eq!(f["arch"],"x64");
     assert_eq!(f["completed"],true); assert!(f["failure"].is_null()&&f["readbackFailure"].is_null());
-    assert_eq!(f["original"]["completed"],true);
-    assert_eq!(f["original"]["calls"].as_array().unwrap().len(),61);
+    let original = &f["original"];
+    assert_eq!(original["completed"], true);
+    assert_eq!(original["name"], "Jam recovery keeps terrain corners when the next waypoint is obstructed");
+    assert_eq!(original["sha256"], "53571d81b0266ac7c31812eda9800d37b758f3c013abfed93b63bf6503db92ea");
+    let constructors = original["constructors"].as_array().unwrap();
+    assert_eq!(constructors.len(), 1);
+    let original_rows: Vec<_> = (0..20).map(|y| if y == 6 {
+        ".".repeat(6) + "B" + &".".repeat(13)
+    } else { ".".repeat(20) }).collect();
+    assert_eq!(constructors[0]["input"], json!([{
+        "w":20,"h":20,"rows":original_rows,
+        "spawns":[{"x":1,"y":1},{"x":18,"y":1},{"x":1,"y":18}],
+        "points":[{"x":10,"y":10}]}, ["a","b"], false]));
+    assert_eq!(constructors[0]["sequence"], 0);
+    assert_eq!(constructors[0]["completed"], true);
+    assert!(constructors[0]["initial"].is_object());
+    assert!(constructors[0].get("failure").is_none());
+    let original_commands = original["commands"].as_array().unwrap();
+    assert_eq!(original_commands.len(), 1);
+    let command = &original_commands[0];
+    assert_eq!(command["sequence"], 1);
+    assert_eq!(command["op"], "fixtureCommand");
+    assert_eq!(command["input"], json!({"owner":0,"cmd":{"t":"buy","unit":"rifle"}}));
+    assert_eq!(command["completed"], true);
+    assert_eq!(command["returnedUndefined"], true);
+    assert!(command.get("result").is_none() && command.get("failure").is_none());
+    assert!(command["before"].is_object() && command["after"].is_object());
+    let original_calls = original["calls"].as_array().unwrap();
+    assert_eq!(original_calls.len(), 61);
+    for (index, call) in original_calls.iter().enumerate() {
+        assert_eq!(call["sequence"], index + 2);
+        assert_eq!(call["op"], "step");
+        assert_eq!(call.get("input"), Some(&Value::Null));
+        assert_eq!(call["completed"], true);
+        assert_eq!(call["returnedUndefined"], true);
+        assert!(call.get("result").is_none() && call.get("failure").is_none());
+        assert!(call["before"].is_object() && call["after"].is_object());
+    }
     let c=&f["companion"];
     assert_eq!(c["completed"],true);
     let rows:Vec<_>=(0..96).map(|y|if y==6 {".".repeat(6)+"B"+&".".repeat(73)}else{".".repeat(80)}).collect();

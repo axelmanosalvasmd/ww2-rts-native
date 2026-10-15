@@ -27,7 +27,7 @@ const helpers = section('const blank = ', '\nawait check(');
 const body = section(`await check(${JSON.stringify(name)},`, '\n});') + '\n});';
 const hash = value => createHash('sha256').update(value).digest('hex');
 const packet = {reference: pin, node: process.version, arch: process.arch, original: {
-  name, helpers, body, sha256: hash(helpers + '\n' + body), calls: [], completed: false}, companion: null, completed: false};
+  name, helpers, body, sha256: hash(helpers + '\n' + body), constructors: [], commands: [], calls: [], completed: false}, companion: null, completed: false};
 const data = new DataView(new ArrayBuffer(8));
 const bits = n => { data.setFloat64(0, n); return data.getBigUint64(0).toString(16).padStart(16, '0'); };
 const motion = u => ({id:u.id,x:bits(u.x),z:bits(u.z),rot:bits(u.rot),speed:bits(u.moveSpeed),
@@ -37,14 +37,49 @@ const priorRandom = Math.random; let failure;
 try {
   Math.random = () => 0.5;
   const sim = {...raw};
-  sim.step = g => { const before = encode(g,{runs:true}); raw.step(g); packet.original.calls.push({before,after:encode(g,{runs:true})}); };
-  const command = (g, owner, cmd) => fixtures.fixtureCommand(g, owner, cmd);
+  let originalSequence = 0;
+  sim.createGame = (...args) => {
+    const row = {sequence: originalSequence++, input: encode(args), completed: false};
+    packet.original.constructors.push(row);
+    try {
+      const g = raw.createGame(...args);
+      row.initial = encode(g, {runs: true}); row.completed = true;
+      return g;
+    } catch (error) {
+      row.failure = {name:error.name,message:error.message,stack:error.stack};
+      throw error;
+    }
+  };
+  const observed = (rows, op, g, input, call) => {
+    const row = {sequence: originalSequence++, op, input: encode(input),
+      before: encode(g, {runs: true}), completed: false};
+    rows.push(row);
+    try {
+      const result = call();
+      row.returnedUndefined = result === undefined;
+      if (result !== undefined) row.result = encode(result);
+      row.after = encode(g, {runs: true}); row.completed = true;
+      return result;
+    } catch (error) {
+      row.after = encode(g, {runs: true});
+      row.failure = {name:error.name,message:error.message,stack:error.stack};
+      throw error;
+    }
+  };
+  sim.step = g => observed(packet.original.calls, 'step', g, null, () => raw.step(g));
+  const command = (g, owner, cmd) => observed(packet.original.commands,
+    'fixtureCommand', g, {owner,cmd}, () => fixtures.fixtureCommand(g, owner, cmd));
   let invoked = 0;
   const check = async (actual, fn) => { assert.equal(actual,name); invoked++; await fn(); };
   const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
   await new AsyncFunction('bindings',`with (bindings) {\n${helpers}\n${body}\n}`)
     ({...sim,sim,assert,check,command,clearFixtureUnits:fixtures.clearFixtureUnits});
-  assert.equal(invoked,1); assert.equal(packet.original.calls.length,61); packet.original.completed=true;
+  assert.equal(invoked,1);
+  assert.equal(packet.original.constructors.length,1);
+  assert.equal(packet.original.commands.length,1);
+  assert.equal(packet.original.calls.length,61);
+  assert.equal(originalSequence,63);
+  packet.original.completed=true;
   const map = {name:'MOV-12 canonical corner companion',w:80,h:96,
     rows:Array.from({length:96},(_,y)=>y===6?'.'.repeat(6)+'B'+'.'.repeat(73):'.'.repeat(80)),
     spawns:[{x:10,y:82},{x:70,y:82}],points:[{x:40,y:90,mp:0,vp:0}]};

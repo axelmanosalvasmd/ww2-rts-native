@@ -5,6 +5,7 @@ import {createHash} from 'node:crypto';
 import {readFileSync, writeFileSync} from 'node:fs';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {gzipSync} from 'node:zlib';
+import {encode} from './state-codec.mjs';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const ref = process.env.WW2_REFERENCE ?? `${root}/reference/ww2-rts`;
 const pin = 'e4e579a838aabae3b1d9dadbc17a0a87147bc52d';
@@ -35,18 +36,31 @@ const packet = {reference: pin, node: process.version, arch: process.arch,
   name, body, bodySha256: hash(body), sourceSha256: hash(source), constructors: [], queries: [], completed: false};
 const sim = {...raw};
 sim.createGame = (...args) => {
-  const g = raw.createGame(...args);
-  packet.constructors.push({input: structuredClone(args),
-    flags: [...g.flags], height: g.height ? [...g.height] : null, smokes: structuredClone(g.smokes)});
-  return g;
+  const row = {input: structuredClone(args), completed:false};
+  packet.constructors.push(row);
+  try {
+    const g = raw.createGame(...args);
+    Object.assign(row, {state: encode(g, {runs: true}), w:g.w, h:g.h,
+      flags:[...g.flags], height:g.height ? [...g.height] : null,
+      smokes:structuredClone(g.smokes), completed:true});
+    return g;
+  } catch (error) {
+    row.failure = {name:error.name,message:error.message,stack:error.stack};
+    throw error;
+  }
 };
 const los = (g, a, b) => {
   // All query inputs are captured; expected booleans are never setup data.
-  const row = {a: structuredClone(a), b: structuredClone(b), flags: [...g.flags],
+  const row = {a: structuredClone(a), b: structuredClone(b), w:g.w, h:g.h, completed:false, flags: [...g.flags],
     height: g.height ? [...g.height] : null, smokes: structuredClone(g.smokes)};
   packet.queries.push(row);
-  row.expected = raw.los(g, a, b);
-  return row.expected;
+  try {
+    row.expected = raw.los(g, a, b); row.completed = true;
+    return row.expected;
+  } catch (error) {
+    row.failure = {name:error.name,message:error.message,stack:error.stack};
+    throw error;
+  }
 };
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
 const previous = Math.random;
