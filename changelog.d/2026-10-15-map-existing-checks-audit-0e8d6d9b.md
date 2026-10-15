@@ -1,0 +1,1 @@
+- Audited all 69 in-progress MAP rows against their complete stated Rust checks and marked 48 additional rows ported using existing Source-backed checks. Kept 18 rows in progress and left the three rows reserved to PR #222 unchanged. Recorded constructor, component and remaining runtime limits, with the existing 483-pass result on each of three platforms; no new native jobs.
