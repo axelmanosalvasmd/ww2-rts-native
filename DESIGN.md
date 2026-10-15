@@ -1,5 +1,23 @@
 # Three Crossroads Native: design decisions
 
+## Recovered MAP97 eligibility on frozen main (2026-10-15)
+
+Recover only the owned MAP97 Rust/Status cells from reviewed private child
+`2687e2b8e7e1b8795c9f46d8f97ef6cf7dead3d6`. All 140 Acceptance cells,
+all other MAP cells and frozen main's complete files remain intact.
+The World memory provider, recorder, native consumer and both retained
+fixtures are byte-identical between producing `0b62374461` and frozen main.
+The raw debug and release logs each show the registered native test passing
+once, 1 passed/0 failed/217 filtered. Each instance consumes 120 actions.
+The full recovered review ACCEPTs that literal component check. These are
+historical producing-head results, not execution of this successor.
+
+[The current eight-row delivery note](docs/runtime/map-audit-delivery.md)
+records the other seven gaps and exact pending consumers. Native World
+recipient serialization and MAP100's delivery/reconnect history remain
+separate. No owner acceptance or client adoption is inferred. Root alone
+controls publication after fresh independent actual-head review.
+
 ## MAP validation-message successor (2026-10-15, source only)
 
 Start from frozen main `379ba4e06c794708623c005ab6052bebd03d8809`

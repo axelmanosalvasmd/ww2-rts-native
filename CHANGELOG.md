@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Recover the reviewed MAP-97 ported status on frozen main, retaining its original two 120-action native passes at `0b62374461` and unchanged memory source/fixtures. Keep the seven other assigned statuses held pending their complete checks; no execution ran in this successor.
+
 - Prepare exact original validation-message consumers for MAP-04/05/07/117 using the retained map and Assault fixtures. Preserve all existing constructor, raw-route and rejection coverage. Native validation and the bounded validator-message repair remain pending; MAP-06/19/100 remain held.
 
 - Recover the complete ENG-04/13/14/48/66 checks onto frozen main `379ba4e0`, preserving both histories, every incoming row and the authentic four-fixture extensions. The private five-row proposal raises this baseline from 235 to 240 ported rows. Prior six native passes remain attributed to `df9a0cff`; this source-only integration awaits Root's slot and independent actual-head review.
