@@ -1,1 +1,2 @@
 - Extend the existing 57-start Assault replay with the original Hill 112 raw path query on all ten canonical owner-zero rifles. Compose existing observed-terrain and pathfinding components, require nonempty routes and compare every waypoint bit with the unchanged Source fixture. Preserve elevation/invalid-map checks and the separate live recipient-routing refusal. Native checks and MODE-15 status qualification are pending.
+- Format the added raw-route consumer without changing its assertions, literals or behavior before native execution.
