@@ -339,13 +339,9 @@ fn original_cut_reconnection_check_and_human_inputs_match() {
             .map(|v| v.as_f64().unwrap())
             .collect::<Vec<_>>();
         let mut memory = SourceState::default();
-        let plan = commander_ai::plan_with_fractions(
-            &observation,
-            &mut memory,
-            level(name),
-            &fractions,
-        )
-        .unwrap();
+        let plan =
+            commander_ai::plan_with_fractions(&observation, &mut memory, level(name), &fractions)
+                .unwrap();
         assert_eq!(plan.draws, fractions.len());
         let raw = plan
             .commands
@@ -385,8 +381,7 @@ fn original_cut_reconnection_check_and_human_inputs_match() {
                 .map(|u| Unit {
                     id: u["id"].as_u64().unwrap() as u32,
                     at: facts::point(u),
-                    world_goal: (!u["worldGoal"].is_null())
-                        .then(|| facts::point(&u["worldGoal"])),
+                    world_goal: (!u["worldGoal"].is_null()).then(|| facts::point(&u["worldGoal"])),
                     amove: (!u["amove"].is_null()).then(|| facts::point(&u["amove"])),
                     target_id: u["targetId"].as_u64().unwrap() as u32,
                     retreating: facts::truthy(&u["retreating"]),
@@ -398,8 +393,7 @@ fn original_cut_reconnection_check_and_human_inputs_match() {
             .map(|c| inputs::news(c, &view).unwrap())
             .collect::<Vec<_>>();
         assert!(facts::exact(&json!(news), &case["human"]["news"]));
-        let merged = inputs::formation_moves(news.into_iter().flatten().collect(), &view)
-            .unwrap();
+        let merged = inputs::formation_moves(news.into_iter().flatten().collect(), &view).unwrap();
         assert!(facts::exact(&json!(merged), &case["human"]["formation"]));
         let expected_inputs = case["human"]["inputs"].as_array().unwrap();
         assert_eq!(merged.len(), expected_inputs.len());
