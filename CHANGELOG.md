@@ -4,11 +4,15 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Normally merge accepted combat `7c017b2c` with fixed main `9e618217`, preserving both histories, all nine accepted combat rows, four incoming vision rows, six incoming NET rows and all source, tests and fixtures. This private source-only union runs zero checks; the earlier five native passes remain evidence for `df39366e`. Final-head review and authorized execution remain pending.
+
 - Mark only CMB-34/35/36/37/81/105/118/119/120 ported after independent exact-`ee03a77a` acceptance and fresh `df39366e` fmt, five unique selected native passes and strict locked workspace/all-target Clippy. Fixed-main count rises from 211 to 220 of 939; all other rows stay unchanged, including held CMB-128. No Source regeneration, runtime, guard, terrain or ABI change. Root final-head review and hosted gates remain pending.
 
 - Wrap one existing combat phase-count assertion to satisfy the integration format check, preserving all tokens, literals and assertions. The failed fmt log belongs to `34ccd823`; the repaired `df39366e` passes fmt and the five selected tests.
 
 - Integrate the nine combat component checks from frozen `ee03a77a` with fixed main `396f6d8a`, preserving both histories, every older fixture case and all incoming tests and rows. Attribute the four Source command successes and five native passes to `ee03a77a`; independent review accepts its nine literal row predicates. The successor `df39366e` passes fmt, the original five selected tests and fresh strict Clippy; the docs child adds only the nine approved ported rows.
+
+- Rebase NET2 snapshot and cadence checks onto current main, retain the six ported NET rows and held gaps, and move the two original NET2 design notes beside snapshot delivery history without changing their text.
 
 - Rebase the combat vision checks onto main `66592ae8`, retaining all incoming content and relocating the three owned vision notes beside the existing core vision section. Preserve all seven focused checks, three Source oracles and historical failures. CMB-124, CMB-125, CMB-131 and CMB-132 remain ported; CMB-128 remains held for its complete border-ray regression. Earlier test results stay attributed to their original heads.
 

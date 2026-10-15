@@ -364,3 +364,6 @@ fn ordinary_binary_genuine_mine_contact_latches_fault_and_refuses_restart() {
             .contains("faulted match restart awaits a recovery policy")
     );
 }
+
+#[path = "trusted_room_process/net2.rs"]
+mod net2;
