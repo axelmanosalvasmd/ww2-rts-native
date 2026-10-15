@@ -1,5 +1,33 @@
 # Three Crossroads Native: design decisions
 
+## MODE-05/28 existing-check eligibility (2026-10-15)
+
+The private docs successor starts with the complete 103-row modes table at
+prospective BASE stack head `a69771de`, not current main. Only MODE-05/28 Rust
+and Status cells change. Both Acceptance strings and all incoming Tutorial,
+MODE-14/15/19/20 and other cells remain exact. The old
+`c8e5d3de` candidate is retained, not restored over current main.
+
+MODE-05 is covered by all six actual TCP joins, complete roster team/faction
+comparisons and freed-team reuse. Native constructors still take explicit
+faction configuration. MODE-28's complete selected XL check covers four
+named authored maps, validation, six spawns, defend [0,1,2], explicit six-seat
+teams/factions, clock and three actual constructor bunkers. The original
+43-case/702-actor corpus remains within the authentic 57-start fixture.
+No full Assault runner or additional client gate is required by that check.
+
+Both named tests PASS in fixed-main push run `38740304188`, on Ubuntu
+job `116439969938`, Windows `116439970061` and macOS `116439970306`.
+These are main's existing executions, not executions of this docs child.
+The selected recorder/test/fixture/provider blobs were identical from
+producing `da002e2b` to that main. The current Assault test adds MODE-15
+raw-route proof; its complete XL constructor assertion body stays exact.
+No runtime, provider, guard, interface, terrain,
+ABI, reference or fixture change. This proposal adds two ported rows to the
+233/939 prospective baseline (235/939), with no joint acceptance. No new
+execution is claimed. Delivery follows the CMB #262 and BASE #263 stack,
+with Root's current-main and modes-file overlap check before publication.
+
 ## Ten accepted combat rows on prospective aligned main (2026-10-15, source only)
 
 Preserve `a788b9d6` and whole CMB-61 child `89de3410`, normally merge them at `f2bf7663`, then merge fixed prospective #261 integration `5a8ce0e2` without changing provider, input, oracle or assertion bodies. Retain all incoming test-only aligned hooks, default mappings and consumed-draw handling, MODE-15, PARITY's exact owner quotation, both documentation histories and the mechanical simtest registry union. Only the ten accepted CMB-34/35/36/37/61/81/105/118/119/120 Rust/Status pairs differ from incoming; all 160 combat acceptance cells remain exact. Prospective 222/939 plus ten gives private 232/939. This is not main or a MODE-21 promotion.
