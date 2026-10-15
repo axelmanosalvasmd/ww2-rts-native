@@ -30,8 +30,11 @@ const vector=p=>[bits(p.x),bits(p.y),bits(p.z)];
 const sparse=a=>Array.from(a,(v,i)=>v?[i,bits(v)]:null).filter(Boolean);
 function snapshot(g){const retained=new Map();for(const p of g.flights.values())if(!g.units.has(p.shooter))retained.set(p.shooter,bits(p.source.xp));return {ammo:[...g.units.values()].filter(u=>u.logistics).map(u=>[u.id,bits(u.logistics.ammo)]),retained:[...retained],environment:[g.seed>>>0,g.nextId],terrain:{chars:g.chars.join(''),hp:sparse(g.cellHp),wear:sparse(g.wear),scar:sparse(g.scar),burnt:Array.from(g.burnt,(v,i)=>v?[i,v]:null).filter(Boolean),versions:[g.terrainVersion??0,g.obstructionVersion??0,g.infantryRegionVersion??0,g.vehicleRegionVersion??0,g.navalRegionVersion??0]},units:[...g.units.values()].map(u=>[u.id,u.targetId,bits(u.cooldown),bits(u.retarget),bits(u.aim),bits(u.rot),u.shotAt??null,bits(u.hp),bits(u.supp),bits(u.xp),u.hitBy??null,bits(u.hitAt),u.lastHit??null,u.hitFrom??null,u.deathImpulse??null]),claims:[...g.claims].sort((a,b)=>a[0]-b[0]).map(([k,v])=>[k,bits(v)]),flights:[...g.flights.values()].map(p=>({id:p.id,shooter:p.shooter,owner:p.owner,kind:p.kind,origin:vector(p),velocity:[bits(p.vx),bits(p.vy),bits(p.vz)],gravity:bits(p.gravity),stamp:bits(p.stamp),launched:bits(p.launched),last:bits(p.last),expires:bits(p.expires),energy:bits(p.energy),sequence:p.sequence,maxContacts:p.maxContacts,near:bits(p.near),startCell:p.startCell,intended:p.intended??null,damageScale:bits(p.damageScale??1),suppression:bits(p.suppression??0),suppressionScale:bits(p.suppressionScale??1),ap:!!p.ap,apMultiplier:bits(p.apMultiplier??1.5),apNaval:!!p.apNaval,explosive:!!p.explosive,terrain:bits(p.terrain??0),scar:bits(p.scar??0),blastRadius:p.blastRadius===undefined?null:bits(p.blastRadius),blastSource:!!p.blastSource,effect:p.effect??null,sent:!!p.sent})),shots:g.shots,salvos:g.salvos.map(s=>({owner:s.owner,at:[bits(s.x),bits(s.z)],left:s.left,next:bits(s.next),every:bits(s.w.every),spread:bits(s.spread)}))};}
 const cases=[];
-for(const shooter of ['rifle','mg','sniper','at','tank','flamer','mortar','howitzer','rocket','gunboat','destroyer'])for(const variation of ['plain','cover','moving','hold','unseen','hurt','flight','flight-cover','flight-wall','flight-bounce','flight-expiry','flight-motion','flight-dead-shooter','ammo-low','ammo-empty','attack','flight-attack']){
+for(const shooter of ['rifle','mg','sniper','at','tank','flamer','mortar','howitzer','rocket','gunboat','destroyer'])for(const variation of ['plain','cover','moving','hold','unseen','hurt','flight','flight-cover','flight-wall','flight-bounce','flight-expiry','flight-motion','flight-dead-shooter','ammo-low','ammo-empty','attack','flight-attack','choice-role','choice-threat','choice-hysteresis','choice-visibility','choice-invalid','choice-timer','choice-claims','choice-dug','choice-crowd']){
  if(!sim.UNITS[shooter])continue;
+ if(variation==='choice-role'&&shooter!=='at')continue;
+ if(['choice-threat','choice-hysteresis','choice-visibility','choice-invalid','choice-timer','choice-claims'].includes(variation)&&shooter!=='rifle')continue;
+ if(['choice-dug','choice-crowd'].includes(variation)&&shooter!=='mortar')continue;
  if(variation==='flight-attack'&&!['rocket','destroyer'].includes(shooter))continue;
  if(variation.startsWith('ammo')&&!['rifle','rocket'].includes(shooter))continue;
  if(variation==='flight-wall'&&!['rifle','tank','howitzer'].includes(shooter))continue;
@@ -43,15 +46,40 @@ for(const shooter of ['rifle','mg','sniper','at','tank','flamer','mortar','howit
  if(naval){map.rows=map.rows.map((_,i)=>i<8?'.'.repeat(80):'W'.repeat(80));map.spawns=[{x:0,y:0},{x:79,y:0}];}
  const original=Math.random;Math.random=()=>.5;let g;try{g=sim.createGame(map,['A','B'],false,[0,1],[0,1],{weather:false,logistics:false,tech:false});}finally{Math.random=original;}
  g.units.clear();g.nextId=1;g.seed=123;g.wind={a:0,v:.5};g.wx={rain:0,wet:0};
- const u=sim.internals.spawnUnit(g,0,shooter),t=sim.internals.spawnUnit(g,1,naval?'gunboat':'rifle'),other=sim.internals.spawnUnit(g,1,naval?'gunboat':'tank');
+ const otherKind=variation==='choice-role'?'tank':variation.startsWith('choice-')?'rifle':naval?'gunboat':'tank';
+ const u=sim.internals.spawnUnit(g,0,shooter),t=sim.internals.spawnUnit(g,1,naval?'gunboat':'rifle'),other=sim.internals.spawnUnit(g,1,otherKind);
  const range=sim.UNITS[shooter].w.range,minimum=sim.UNITS[shooter].w.minRange??0,distance=Math.max(minimum+(naval?16:2),Math.min(range-2,30));
  Object.assign(u,{x:25,z:naval?30:15,rot:0,aim:0,still:20,cooldown:0,retarget:0,targetId:0,auto:false,buff:0,ap:false,holdFire:variation==='hold'});
  Object.assign(t,{x:25+distance,z:u.z,still:20,rot:Math.PI});Object.assign(other,{x:t.x+2,z:t.z+3,still:20,rot:0});
+ if(variation.startsWith('choice-')){
+  Object.assign(u,{cooldown:1e9,retarget:0});
+  Object.assign(t,{x:42,z:u.z});Object.assign(other,{x:53,z:u.z});
+  if(variation==='choice-role'){Object.assign(t,{x:37,z:u.z});other.x=53;}
+  if(variation==='choice-threat'){t.x=42;other.x=45;Object.assign(other,{targetId:1,shotAt:1});}
+  if(variation==='choice-hysteresis'){t.x=45;other.x=42;u.targetId=2;}
+  if(variation==='choice-visibility'){t.x=37;other.x=45;}
+  if(variation==='choice-invalid'){u.targetId=2;u.retarget=1;t.hp=0;other.x=45;}
+  if(variation==='choice-timer'){u.retarget=.1;}
+  if(variation==='choice-claims'){
+   u.targetId=2;u.retarget=1;t.hp=1;other.x=44;
+   const second=sim.internals.spawnUnit(g,0,'rifle');Object.assign(second,{x:25,z:u.z+1,retarget:0,cooldown:1e9});
+  }
+  if(variation==='choice-dug'){
+   t.x=42;other.x=53;
+   const c=Math.floor(other.z/2)*g.w+Math.floor(other.x/2);sim.setCell(g,c,'T');
+  }
+  if(variation==='choice-crowd'){
+   t.x=42;other.x=53;
+   for(const [x,z] of [[54,u.z+2],[55,u.z-2],[56,u.z+3]]){
+    const neighbour=sim.internals.spawnUnit(g,1,'rifle');Object.assign(neighbour,{x,z,retarget:1e9,cooldown:1e9});
+   }
+  }
+ }
  if(variation==='attack'||variation==='flight-attack'||variation.startsWith('ammo')){u.attackId=2;u.targetId=2;}
  if(variation.startsWith('ammo'))u.logistics={ammo:variation==='ammo-low'?2:0,ammoMax:20,ammoPrice:1,ammoCredit:0,provisions:120,forced:false,stranded:false,exhausted:false};
  if(variation.endsWith('cover')){const c=Math.floor(t.z/2)*g.w+Math.floor(t.x/2);sim.setCell(g,c,'#');}
  if(variation==='hurt'){Object.assign(u,{supp:55,xp:sim.UNITS[shooter].cost*5,hitBy:3,hitAt:1,hitFrom:{x:other.x,z:other.z}});Object.assign(other,{targetId:1,shotAt:1});}
- g.players[0].visible=new Set(variation==='unseen'?[]:[2,3]);g.players[1].visible=new Set([1]);grid.rebuildGrid(g);
+ g.players[0].visible=new Set(variation==='unseen'?[]:variation==='choice-visibility'?[3]:[...g.units.values()].filter(v=>v.owner===1).map(v=>v.id));g.players[1].visible=new Set([1]);grid.rebuildGrid(g);
  const input=[...g.units.values()].map(u=>({id:u.id,kind:u.type,owner:u.owner,x:u.x,z:u.z,rot:u.rot,hp:u.hp,still:u.still,supp:u.supp,xp:u.xp,hitBy:u.hitBy??null,hitAt:u.hitAt,hitFrom:u.hitFrom??null,target:u.targetId,shotAt:u.shotAt??null,logistics:u.logistics?structuredClone(u.logistics):null,hold:u.holdFire,attack:u.attackId,aim:u.aim,cooldown:u.cooldown,retarget:u.retarget}));
  g.nextId=1000;
  const random=combatRandom(701);const steps=[];
@@ -68,12 +96,19 @@ for(const shooter of ['rifle','mg','sniper','at','tank','flamer','mortar','howit
   if(!run||tick===1)g.shots=[];
   g.claims=new Map();for(const v of g.units.values())if(v.targetId&&v.hp>0)sim.claim(g,v,v.targetId,1);u.cooldown-=.05;u.retarget-=.05;
   const old=Math.random;Math.random=()=>random.next();try{
-   if(!run||tick===1)sim.__firing(g,1,variation==='moving',.05);
+   if(!run||tick===1){sim.__firing(g,1,variation==='moving',.05);if(variation==='choice-claims')sim.__firing(g,4,false,.05);}
    if(run){sim.stepFlights(g,prior);sim.__salvos(g,.05);}
   }finally{Math.random=old;}
-  if(checkpoints.includes(tick)){steps.push({tick,expected:snapshot(g),random:random.state()});g.shots=[];}
+  if(checkpoints.includes(tick)){
+   if(variation.startsWith('choice-')){
+    const expected={ 'choice-role':3,'choice-threat':3,'choice-hysteresis':2,'choice-visibility':3,'choice-invalid':3,'choice-timer':tick===1?0:2,'choice-claims':2,'choice-dug':3,'choice-crowd':3 }[variation];
+    assert.equal(u.targetId,expected,`${variation} tick ${tick}: Source selected target`);
+    if(variation==='choice-claims')assert.equal(g.units.get(4).targetId,3,'second shooter spreads its claim');
+   }
+   steps.push({tick,expected:snapshot(g),random:random.state()});g.shots=[];
+  }
  }
- cases.push({map,shooter,variation,lateWall:variation==='flight-wall'?Math.floor(u.z/2)*g.w+Math.floor((u.x+5)/2):null,cells:variation.endsWith('cover')?[[Math.floor(t.z/2)*g.w+Math.floor(t.x/2),'#']]:[],input,visible:[...g.players[0].visible],steps});
+ cases.push({map,shooter,variation,lateWall:variation==='flight-wall'?Math.floor(u.z/2)*g.w+Math.floor((u.x+5)/2):null,cells:variation.endsWith('cover')?[[Math.floor(t.z/2)*g.w+Math.floor(t.x/2),'#']]:variation==='choice-dug'?[[Math.floor(other.z/2)*g.w+Math.floor(other.x/2),'T']]:[],input,visible:[...g.players[0].visible],steps});
 }
 clean();const output=JSON.stringify({reference:pin,node:process.version,arch:process.arch,seed:701,cases})+'\n';
 const path=`${root}/rust/crates/simtest/tests/fixtures/match-firing.json.gz`;
