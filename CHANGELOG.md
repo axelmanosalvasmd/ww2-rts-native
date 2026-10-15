@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Add a source-only CMB-41 witness that buys four real Soviet Conscripts through the existing recorded purchase caller, retains the full native starting roster, and checks actual field/queue population after each paid birth. The original four-squads-count-three check is authored but unrun; no status is changed.
+
 - Prepare the first five restored combat checks: add focused native tower 12/60 vision, enemy/friendly bounty, and MG/flak/fighter Hold Fire witnesses using existing fixture actors and callers. Recover exact main hosted component passes and record every held batch gap. Execution, whole-check review and the private five-row status proposal remain pending; all actual parity cells stay unchanged.
 
 - Add an 800-tick CMB-69 death-trace witness over the existing authentic retirement scene, with eight controls for wrong timing, identity, attribution, missing deaths and duplicates. Reuse the complete connected-tick replay and preserve all original assertions and fixtures. Native execution and parity promotion remain pending.

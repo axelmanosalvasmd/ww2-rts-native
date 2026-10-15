@@ -12,6 +12,9 @@ fn bits(n: f64) -> Value {
     json!(format!("{:016x}", n.to_bits()))
 }
 fn make(c: &Value) -> Match {
+    make_with_faction(c, Faction::Usa)
+}
+fn make_with_faction(c: &Value, faction: Faction) -> Match {
     let map = AuthoritativeMap::from_json(&serde_json::to_vec(&c["map"]).unwrap()).unwrap();
     Match::new(
         &map,
@@ -22,7 +25,7 @@ fn make(c: &Value) -> Match {
                 PlayerConfig {
                     name: "A".into(),
                     team: 0,
-                    faction: Faction::Usa,
+                    faction,
                 },
                 PlayerConfig {
                     name: "B".into(),
@@ -1018,4 +1021,79 @@ fn late_terrain_change_does_not_recompute_the_earlier_supply_beat() {
         );
     }
     assert!(m.start.points[0].cut);
+}
+
+#[test]
+fn cmb41_four_actual_conscript_recruits_add_three_population() {
+    use std::collections::BTreeSet;
+    use ww2_core::economy_state::{Context, ModeContext, Unit};
+    let fixture: Value = serde_json::from_str(include_str!("fixtures/match-tick.json")).unwrap();
+    let mut m = make_with_faction(&fixture["cases"][0], Faction::Ussr);
+    let original = m.world.game.units.keys().copied().collect::<BTreeSet<_>>();
+    assert!(m.world.game.strikes.is_empty());
+    m.start.economy.players[0].mp = 1000.0;
+    let population = |m: &Match| {
+        let queues = m
+            .world
+            .game
+            .units
+            .values()
+            .map(|unit| {
+                m.production
+                    .building(unit.id)
+                    .map_or_else(Vec::new, |building| building.queue().collect::<Vec<_>>())
+            })
+            .collect::<Vec<_>>();
+        let units = m
+            .world
+            .game
+            .units
+            .values()
+            .zip(&queues)
+            .map(|(unit, queue)| Unit {
+                id: u64::from(unit.id),
+                owner: Some(unit.owner),
+                kind: &m.rules.kinds[unit.kind].name,
+                hp: unit.hp,
+                built: unit.built.unwrap_or(1.0),
+                queue,
+            })
+            .collect::<Vec<_>>();
+        m.start
+            .economy
+            .population(
+                &Context {
+                    mode: ModeContext {
+                        kind: m.options.mode,
+                        ..Default::default()
+                    },
+                    army: m.options.army,
+                    units: &units,
+                    drops: &[],
+                    points: &[],
+                    nodes: &[],
+                    world: None,
+                },
+                0,
+            )
+            .unwrap()
+    };
+    let before = population(&m);
+    let wallet = m.start.economy.players[0].mp;
+    let price = ww2_core::economy::price_of(Mode::Conquest, "conscript").unwrap();
+    let mut bought = BTreeSet::new();
+    for count in 1..=4 {
+        let born = m.recorded_buy(0, "conscript", None).unwrap();
+        assert!(bought.insert(born.unit));
+        assert!(!original.contains(&born.unit));
+        let actor = &m.world.game.units[&born.unit];
+        assert_eq!(m.rules.kinds[actor.kind].name, "conscript");
+        assert_eq!(actor.owner, 0);
+        assert!(m.recruit_metadata.contains_key(&born.unit));
+        assert_eq!(population(&m) - before, f64::from(count) * 0.75);
+    }
+    assert_eq!(bought.len(), 4);
+    assert_eq!(population(&m) - before, 3.0);
+    assert_eq!(m.start.economy.players[0].mp, wallet - 4.0 * price.mp);
+    assert!(original.iter().all(|id| m.world.game.units.contains_key(id)));
 }

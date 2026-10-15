@@ -63,3 +63,12 @@ unique instance is requested once. Existing unchanged hosted component checks
 remain attributed to producing `7a7348cb`; they do not need a new whole-match
 gate. Formatting and strict core/simtest all-target Clippy remain conditional
 on Root's explicit slot scope. No execution is claimed in this plan.
+
+## Continued batch: CMB-41 source witness
+
+A later child adds `ww2-simtest::it` instance
+`match_tick::cmb41_four_actual_conscript_recruits_add_three_population`.
+It is the sixth affected instance only if Root explicitly adds it to the new
+head's scope. The first-five status patch stays unchanged. No request for the
+old frozen head implicitly authorizes this new test. All execution remains
+pending; do not run both old and superseding command sets.

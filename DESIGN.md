@@ -1,5 +1,23 @@
 # Three Crossroads Native: design decisions
 
+## CMB-41 genuine recruitment witness (2026-10-15, source only)
+
+Continue the restored batch after the first-five source freeze. The new
+`match_tick::cmb41_four_actual_conscript_recruits_add_three_population` uses
+the existing arena and canonical Match constructor with an explicit Soviet
+seat, retains every starting actor, funds the wallet as the original named
+check does, and calls recorded_buy four times. It reads actual paid queue and
+field descriptors into the existing EconomyState population component after
+every birth, requiring increments .75, 1.5, 2.25 and 3, four distinct native
+birth IDs, recruitment metadata and exact payment. No synthetic actors, type
+mutation, health write, expected-state import or runtime change is introduced.
+The original Source test changes four placed rifles to Conscripts; real paid
+Conscript births exercise the same named population check through the native
+caller. This test has no execution proof and CMB-41 stays held. It is additional
+to the first-five status proposal, not a silent expansion of that patch or a
+previous slot request. Root must explicitly grant this sixth affected instance
+at its new frozen head before it runs.
+
 ## Restored combat first-five candidate (2026-10-15, source only)
 
 The first proposed batch is CMB-39/40/64/65/69. CMB-39 supplements the existing
