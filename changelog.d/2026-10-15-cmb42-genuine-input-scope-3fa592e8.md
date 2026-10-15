@@ -1,0 +1,1 @@
+- Preserve the old combat component inputs and add a separate unrun two-case CMB42 recorder/native reader using constructor wallets, real income, research, construction, purchases and movement. Retain all combat guards, original target-choice checks, raw observations and random receipts.

@@ -11,6 +11,12 @@ const git=a=>execFileSync('git',['-C',reference,...a],{encoding:'utf8'}).trim();
 const clean=()=>{if(git(['rev-parse','HEAD'])!==pin||git(['status','--porcelain','--untracked-files=no']))throw Error('Pinned clean reference required');};
 if(process.arch!=='x64'||process.version!=='v24.21.0')throw Error('Use x64 Node v24.21.0');
 clean();
+// The genuine-input successor leaves the old component packet intact.
+if(process.argv.includes('--cmb42-genuine-only')){
+ const {recordCmb42Genuine}=await import('./cmb42-genuine-scenes.mjs');
+ await recordCmb42Genuine({reference,pin,clean});
+ process.exit(0);
+}
 // This scope returns before the historical corpus and its loader are loaded.
 if(process.argv.includes('--cmb42-ordinary-only')){
  const {recordCmb42Ordinary}=await import('./cmb42-ordinary-scenes.mjs');

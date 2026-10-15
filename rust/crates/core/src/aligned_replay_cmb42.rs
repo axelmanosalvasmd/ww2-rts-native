@@ -2,6 +2,9 @@
 #[path = "aligned_replay_combat_effects.rs"]
 mod combat_effects;
 
+#[path = "aligned_replay_cmb42_genuine.rs"]
+mod genuine;
+
 use super::observe;
 use super::super::{Replay, Tape};
 use crate::{
@@ -134,7 +137,8 @@ impl Replay {
 }
 pub(crate) fn is_ordinary(replay: &Replay) -> bool {
     let tape = replay.0.lock().unwrap();
-    tape.values.len() == 1 && tape.input.get(MODE).is_some()
+    tape.input.get(MODE).is_some() && (tape.values.len() == 1
+        || (tape.values.len() != 16384 && tape.input[MODE]["genuineInputV2"] == true))
 }
 pub(crate) fn environment_observation(replay: &Replay, before: u32, after: u32, value: f64, consumer: Value) {
     let mut tape = replay.0.lock().unwrap();

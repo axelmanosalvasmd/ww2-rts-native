@@ -1,5 +1,34 @@
 # Three Crossroads Native: design decisions
 
+## CMB42 genuine-input successor on PR271 main (2026-10-15, unrun)
+
+Integrate only the retained combat-audit packet and protected consumers onto
+fetched main f7c51b1a in the assigned persistent checkout. Preserve every
+incoming typed entry and parity cell. The old MP5000 and shooter cooldown1e9
+are actual assignments in both the Source helper and native consumer, declared
+as component inputs. They are not ordinary constructor or income history.
+
+Keep that candidate intact and add a separate two-case genuine-input recorder
+and ignored native reader. Constructor wallets, positive tick income, funded
+research, real builder-completed motor pools, actual Buy and Move commands now
+produce the complete input history. No wallet, pose, HP, cooldown, ammo,
+visibility, target or running RNG state is installed. Preserve literal sniper
+12/30 and AT7/28, all selection/survival checks, distance and hidden-recipient
+controls, and the actual owner target field. Normal firing is permitted.
+
+Retain all global consumer/index/value/seed and original environment receipts.
+Lossless observation pooling avoids repeating large map arrays at every income
+tick. The native reader expands expected data only for strict comparison; its
+engine inputs are constructor options, commands, steps and captured global
+random inputs. Default Replay capacity/schema and existing bodies remain exact;
+the optional successor returns observed original environment values. Raw
+representation differences remain failures, with no defaults or suppression.
+
+CMB38/63 and funded B09 consumers remain unrun. All held FireAt, aircraft,
+carrier and enabled-logistics guards remain exact. No Source packet, compile,
+run or completed row is claimed. [The exact two-case scope](docs/testing/cmb42-genuine-two-case-scope.md)
+records provenance, selection, pending grants and preserved PR269 boundaries.
+
 ## AUDIT_COMBAT protected-actuator consumers (2026-10-15, unrun)
 
 Start a new branch from fetched main f7b0e588 in the designated persistent
