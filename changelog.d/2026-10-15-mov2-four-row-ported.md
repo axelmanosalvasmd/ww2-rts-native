@@ -1,0 +1,1 @@
+- Mark MOV-43, MOV-62, MOV-79 and MOV-83 ported after independent eligibility review of their complete Rust checks; MOV-72 remains held.
