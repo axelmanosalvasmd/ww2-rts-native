@@ -83,6 +83,8 @@ mod match_tick_companions;
 mod match_tick_events;
 #[path = "../mode_predicates.rs"]
 mod mode_predicates;
+#[path = "../mov_vehicle_predicates.rs"]
+mod mov_vehicle_predicates;
 #[path = "../movement.rs"]
 mod movement;
 #[path = "../movement_existing_checks.rs"]
