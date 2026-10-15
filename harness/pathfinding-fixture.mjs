@@ -215,6 +215,18 @@ for(const type of ['tank','lorry']) {
   wide(type,pt(11,19),pt(161,121),null,null,{flags:cells.map(c=>[c,0]),from:wideVersion,version:++wideVersion,changed:cells});
 }
 
+// ENG-04: the same complete Y wall must refuse a tank and admit infantry.
+{
+  const rows=Array(20).fill('.'.repeat(20));rows[10]='Y'.repeat(20);
+  const map={name:'Trap wall',w:20,h:20,rows,spawns:[{x:1,y:1},{x:18,y:18}],points:[{x:4,y:4}]};
+  if(sim.validateMap(map)!==null)throw Error('Invalid trap-wall scene');
+  const g=sim.createGame(map,[],false,[],[],{weather:false});
+  const query=makeScenario('fortifications-full-trap-wall',20,20,[...g.flags],null);
+  query('tank',pt(20,8),pt(20,35));query('rifle',pt(20,5),pt(20,35));
+  const [tank,rifle]=scenarios.at(-1).queries;
+  if(tank.expected.points.length!==0||rifle.expected.points.length===0)throw Error('Original full trap-wall check failed');
+}
+
 const output = JSON.stringify({ reference: pin, node: process.version, arch: process.arch, seed: '0xface17',
   rules: { wallHug: sim.CFG.wallHug, bunkerRadius: sim.UNITS.bunker.radius, roadSpeed:sim.CFG.roadSpeed, fordSpeed:sim.CFG.fordSpeed,
     mudSpeed:sim.CFG.mudSpeed, woodSpeed:sim.CFG.wood.speed, churn:sim.CFG.churn, wetFord:sim.CFG.weather.wetFord, wetGround:sim.CFG.weather.wetGround },
