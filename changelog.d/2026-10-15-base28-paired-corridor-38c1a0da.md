@@ -1,0 +1,1 @@
+- Add an unrun paired Classic/Conquest corridor experiment for BASE-28, retaining natural actors and testing paid placement, destruction and settled rubble against the original three route predicates. Preserve all old fixtures, assertions and row statuses; equivalence and native success remain unproved until execution and independent review.
