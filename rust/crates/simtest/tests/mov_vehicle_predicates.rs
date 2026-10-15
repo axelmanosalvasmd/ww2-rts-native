@@ -286,6 +286,28 @@ fn delivered(m: &Match, ids: &[u32]) -> Value {
     )
 }
 
+fn delivered_bits(rows: &Value) -> Value {
+    // Source has one Number type; JSON prints integral doubles without `.0`.
+    // Preserve row shape, integer identity and every represented value's bits.
+    Value::Array(
+        rows.as_array()
+            .unwrap()
+            .iter()
+            .map(|row| {
+                let row = row.as_array().unwrap();
+                assert_eq!(row.len(), 5);
+                json!([
+                    row[0].as_u64().unwrap(),
+                    bits(number(&row[1])),
+                    bits(number(&row[2])),
+                    bits(number(&row[3])),
+                    bits(number(&row[4]))
+                ])
+            })
+            .collect(),
+    )
+}
+
 fn replay(case: &Value) {
     let label = format!(
         "{}/{}",
@@ -448,7 +470,8 @@ fn replay(case: &Value) {
                     );
                     let rows = delivered(&m, &engine_ids);
                     assert_eq!(
-                        rows, milestone["rows"],
+                        delivered_bits(&rows),
+                        delivered_bits(&milestone["rows"]),
                         "{label}: actual recipient row at tick {tick}"
                     );
                     let recipient = SnapshotCache::new(&m).unwrap().recipient(0).unwrap();
