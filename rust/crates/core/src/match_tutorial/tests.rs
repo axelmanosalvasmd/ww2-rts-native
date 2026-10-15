@@ -65,7 +65,79 @@ fn go(m: &mut Match, at: Point, attack: bool) {
         },
     );
 }
+fn timeout_operands(m: &Match) -> String {
+    let game = &m.world.game;
+    let roster = game
+        .units
+        .values()
+        .map(|unit| {
+            (
+                unit,
+                m.rules.kinds[unit.kind].name.as_str(),
+                crate::vision::in_trench(game, &m.rules, unit),
+                m.field_works.membership(unit.id),
+                game.cell_of(unit.x, unit.z),
+            )
+        })
+        .collect::<Vec<_>>();
+    let mut cells = BTreeSet::new();
+    for at in game.units.values().map(|unit| unit.at()).chain(
+        m.tutorial_state()
+            .into_iter()
+            .flat_map(|state| state.step().entry().spawns)
+            .map(|spawn| spawn.at),
+    ) {
+        if let Some(cell) = game.cell_of(at.x, at.z) {
+            let (x, z) = (cell % game.w, cell / game.w);
+            for row in z.saturating_sub(1)..=(z + 1).min(game.h - 1) {
+                for col in x.saturating_sub(1)..=(x + 1).min(game.w - 1) {
+                    cells.insert(row * game.w + col);
+                }
+            }
+        }
+    }
+    let terrain = cells
+        .into_iter()
+        .map(|cell| {
+            (
+                cell,
+                game.chars.get(cell).copied().map(char::from),
+                game.flags.get(cell),
+                game.cell_hp.get(cell),
+                game.trench_front.as_ref().and_then(|v| v.get(cell)),
+                game.ground.as_ref().and_then(|v| v.get(cell)),
+                game.objects.as_ref().and_then(|v| v.get(cell)),
+                game.house.get(cell),
+                game.height.as_ref().and_then(|v| v.get(cell)),
+            )
+        })
+        .collect::<Vec<_>>();
+    format!(
+        "tick={} mode={:?}/{:?} finish={:?} terrain_version={}\n\
+         roster(unit, kind, in_trench, project, cell)={roster:#?}\n\
+         players={:#?}\neconomy={:#?}\ncontrols={:#?}\npaid_jobs_and_projects={:#?}\n\
+         combat={:#?}\nfiring={:#?}\nabilities={:#?}\nrecovery={:#?}\n\
+         terrain(cell, char, flags, hp, trench_front, ground, objects, house, height)={terrain:#?}\n\
+         command_queue={:#?}",
+        game.tick,
+        m.options.mode,
+        game.mode,
+        m.finish,
+        game.terrain_version,
+        game.players,
+        m.start.economy.players,
+        m.commands.units,
+        m.field_works,
+        m.combat,
+        m.firing,
+        m.abilities,
+        m.recovery,
+        m.commands.queue.snapshot(),
+    )
+}
 fn until(m: &mut Match, done: impl Fn(&Match) -> bool, budget: usize, said: &mut usize) {
+    let mut command_results = Vec::new();
+    let mut last_report = None;
     for _ in 0..budget {
         if done(m) {
             return;
@@ -74,12 +146,18 @@ fn until(m: &mut Match, done: impl Fn(&Match) -> bool, budget: usize, said: &mut
             .advance_tick()
             .unwrap_or_else(|e| panic!("Tutorial tick {}: {}", e.tick, e.reason));
         *said += report.tutorial_lines.len();
+        if !report.commands.is_empty() {
+            command_results.push((report.tick, report.commands.clone()));
+        }
+        last_report = Some(report);
         assert!(!ours(m).is_empty(), "Tutorial lost its human army");
     }
     assert!(
         done(m),
-        "Tutorial did not reach its next actual goal: {:?}",
-        m.tutorial_state()
+        "Tutorial did not reach its next actual goal: {:?}\n{}\n\
+         observed_tick_command_results={command_results:#?}\nlast_tick_report={last_report:#?}",
+        m.tutorial_state(),
+        timeout_operands(m)
     );
 }
 fn next(m: &mut Match, step: TutorialStep, said: &mut usize) {

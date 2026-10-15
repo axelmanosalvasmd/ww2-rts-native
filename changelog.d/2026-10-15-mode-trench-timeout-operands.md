@@ -1,0 +1,1 @@
+- Add read-only operands to the original Tutorial goal-timeout failure: actual tick, actors, trench and terrain state, controls, paid projects and observed tick reports. Preserve the full progression, commands, assertions and time budgets. The step5 timeout cause remains unproven; this child has not been formatted, compiled or run.

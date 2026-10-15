@@ -1,5 +1,40 @@
 # Three Crossroads Native: design decisions
 
+## Tutorial Trench timeout operands (2026-10-15, execution pending)
+
+The original full Tutorial test at `01f895e60f695bc3c12de28549e6e80c1a4cdd26`
+compiled and failed once: 0 passed, 1 failed, 151 filtered. Its unchanged
+next-goal assertion reports step5 (Trench), spawned IDs9/10 and empty
+pending dialogue. Tick, actor HP/poses and project state were not logged.
+That receipt demonstrates a timeout, not its cause. Original42's separate
+tick1048 crushing failure and every previous receipt remain intact.
+
+Pinned Source `shared/tutorial.js:43-53,70-78,108-117` advances from Trench
+only when every spawned defender is absent or no longer alive. Native
+TutorialStep::complete and the late Match consumer use the same condition.
+The live tick calls movement, contact, attack/firing, abilities, field work,
+recovery, reinforcement and retirement before that consumer. Reading those
+providers does not establish which state caused the observed timeout.
+No runtime or witness repair is justified by these missing operands.
+
+Add read-only test diagnostics at the existing final timeout assertion.
+Report actual tick/mode/finish, complete actor roster and kind, computed
+trench occupancy, project membership, controls, paid jobs/projects, combat,
+firing, abilities, recovery and terrain around actors and authored spawns.
+The terrain records include cell flags/HP, trench fronts and all local
+layers. Retain the last actual TickReport and nonempty boundary command
+results observed within that wait. Direct command acceptance remains the
+existing helper assertion; no boundary-result history is invented for it.
+The assertion evaluates current-state diagnostics only on failure.
+
+Keep the real constructor, complete original progression body, commands,
+assertions, guards and every original budget unchanged. No actor HP/pose,
+wallet, clock, RNG, Tutorial step or mode is written by the diagnostics.
+No fixture, parity cell, BASE consumer, interface or Source predicate changes.
+All16 proposed native selections, formatting and Clippy are UNRUN at this
+child until Root grants its exact head and slot. Root retains the ledger,
+independent review, runtime owner readback and publication.
+
 ## Five complete selected MAP checks (2026-10-15)
 
 At producing runtime head `7cbfcdddf913625c48fd109d8d216151881cba20`,
