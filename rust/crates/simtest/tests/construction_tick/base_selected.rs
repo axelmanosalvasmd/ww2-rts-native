@@ -10,9 +10,10 @@ const PIN: &str = "e4e579a838aabae3b1d9dadbc17a0a87147bc52d";
 fn fixture() -> Value {
     // Runtime loading keeps this source checkpoint compilable before recording.
     // Never skip or synthesize an expected result when the recording is absent.
-    let path =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/base-construction-selected.json.gz");
-    let file = File::open(path).expect("Root must grant Source recording before selected base replay");
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/base-construction-selected.json.gz");
+    let file =
+        File::open(path).expect("Root must grant Source recording before selected base replay");
     let mut text = String::new();
     GzDecoder::new(file).read_to_string(&mut text).unwrap();
     let fixture: Value = serde_json::from_str(&text).unwrap();
@@ -46,21 +47,32 @@ fn fixture() -> Value {
 
 fn check_preparation(case: &Value) {
     let proof = &case["preparation"];
-    assert_eq!(proof["kind"], "root-approved-name-and-one-zero-value-neutral-point");
+    assert_eq!(
+        proof["kind"],
+        "root-approved-name-and-one-zero-value-neutral-point"
+    );
     assert_eq!(proof["nativeAdmissionOfRaw"], false);
-    assert_eq!(proof["originalValidation"], "name must be a string up to 40 chars");
+    assert_eq!(
+        proof["originalValidation"],
+        "name must be a string up to 40 chars"
+    );
     assert_eq!(proof["nameOnlyValidation"], "needs 1-9 capture points");
     assert!(proof["amendedValidation"].is_null());
     let original = &proof["originalMap"];
     assert!(original.get("name").is_none());
     assert_eq!(original["points"], json!([]));
     let error = AuthoritativeMap::from_json(&serde_json::to_vec(original).unwrap())
-        .err().expect("raw component map must not gain native admission");
-    assert_eq!(error.to_string(), "name: expected text up to 40 UTF-16 code units");
+        .err()
+        .expect("raw component map must not gain native admission");
+    assert_eq!(
+        error.to_string(),
+        "name: expected text up to 40 UTF-16 code units"
+    );
     let mut named = original.clone();
     named["name"] = json!("Base selected");
     let error = AuthoritativeMap::from_json(&serde_json::to_vec(&named).unwrap())
-        .err().expect("name-only component map still has no capture points");
+        .err()
+        .expect("name-only component map still has no capture points");
     assert_eq!(error.to_string(), "points: needs 1-9 capture points");
     let width = original["w"].as_u64().unwrap();
     assert!(width == 80 || width == 64);
@@ -75,7 +87,10 @@ fn check_preparation(case: &Value) {
     assert_eq!(control_setup, case["setup"]);
     for (key, value) in control.as_object().unwrap() {
         if key != "setup" {
-            assert_eq!(*value, case[key], "complete original/amended recorded result: {key}");
+            assert_eq!(
+                *value, case[key],
+                "complete original/amended recorded result: {key}"
+            );
         }
     }
     assert_eq!(proof["comparedFrames"], case["snapshots"]);
@@ -83,9 +98,18 @@ fn check_preparation(case: &Value) {
     assert_eq!(proof["rawFramesSha256"], proof["amendedFramesSha256"]);
     assert_eq!(proof["rawFramesSha256"].as_str().unwrap().len(), 64);
     for key in ["rawPointFrames", "amendedPointFrames"] {
-        assert_eq!(proof[key].as_array().unwrap().len(), case["snapshots"].as_u64().unwrap() as usize);
+        assert_eq!(
+            proof[key].as_array().unwrap().len(),
+            case["snapshots"].as_u64().unwrap() as usize
+        );
     }
-    assert!(proof["rawPointFrames"].as_array().unwrap().iter().all(|frame| *frame == json!([])));
+    assert!(
+        proof["rawPointFrames"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|frame| *frame == json!([]))
+    );
 }
 
 fn population(m: &Match) -> Vec<Value> {
@@ -136,8 +160,14 @@ fn extra_compare(m: &Match, expected: &Value, points: &Value) {
     assert_eq!(points.as_array().unwrap().len(), 1);
     let actual = &m.start.points[0];
     let point = &points[0];
-    assert_eq!(actual.owner, None, "approved neutral point must never become owned");
-    assert_eq!(actual.capper, None, "approved neutral point must never become captured");
+    assert_eq!(
+        actual.owner, None,
+        "approved neutral point must never become owned"
+    );
+    assert_eq!(
+        actual.capper, None,
+        "approved neutral point must never become captured"
+    );
     assert_eq!(actual.progress.to_bits(), 0.0f64.to_bits());
     assert_eq!(actual.mp.to_bits(), 0.0f64.to_bits());
     assert_eq!(actual.vp.to_bits(), 0.0f64.to_bits());
@@ -175,7 +205,9 @@ fn selected_prime(m: &mut Match, aliases: &BTreeMap<String, u32>, action: &Value
                         "holdFire" => m.commands.units.get_mut(&id).unwrap().hold_fire = value,
                         "holdPos" => m.world.game.units.get_mut(&id).unwrap().hold_pos = value,
                         "auto" => m.commands.units.get_mut(&id).unwrap().auto_cast = value,
-                        "autoRetreat" => m.commands.units.get_mut(&id).unwrap().auto_retreat = value,
+                        "autoRetreat" => {
+                            m.commands.units.get_mut(&id).unwrap().auto_retreat = value
+                        }
                         _ => unreachable!(),
                     }
                 }
@@ -385,7 +417,10 @@ fn replay(name: &str, predicate: &str) -> Replay {
                     assert!(m.world.game.units[&id].built.unwrap() < 1.0);
                 }
                 let report = m.advance_tick().unwrap_or_else(|error| {
-                    panic!("{name} {label} step{index} tick{}: {error}", m.world.game.tick)
+                    panic!(
+                        "{name} {label} step{index} tick{}: {error}",
+                        m.world.game.tick
+                    )
                 });
                 assert!(report.commands.is_empty());
                 assert_eq!(
@@ -406,12 +441,13 @@ fn replay(name: &str, predicate: &str) -> Replay {
                 };
                 assert!(position(TickPhase::Firing) < position(TickPhase::Construction));
                 assert!(position(TickPhase::Construction) < position(TickPhase::Separation));
-                effects.as_array_mut().unwrap().extend(report.events.iter().map(
-                    |event| match event {
+                effects
+                    .as_array_mut()
+                    .unwrap()
+                    .extend(report.events.iter().map(|event| match event {
                         TickEvent::Environment(effect) => effect.to_json(),
                         other => panic!("{name}: unexpected event in quiet scene {other:?}"),
-                    },
-                ));
+                    }));
             }
             patch(&mut expected, &case["patches"][next]);
             next += 1;
@@ -424,8 +460,16 @@ fn replay(name: &str, predicate: &str) -> Replay {
                 &effects,
                 &format!("{name} {label} snapshot{next}"),
             );
-            extra_compare(&m, &expected, &case["preparation"]["amendedPointFrames"][next]);
-            assert!(constructor.iter().all(|id| m.world.game.units.contains_key(id)));
+            extra_compare(
+                &m,
+                &expected,
+                &case["preparation"]["amendedPointFrames"][next],
+            );
+            assert!(
+                constructor
+                    .iter()
+                    .all(|id| m.world.game.units.contains_key(id))
+            );
         }
         if op == "until" {
             let id = aliases[action["target"].as_str().unwrap()];
@@ -494,7 +538,10 @@ fn base28_b05_occupied_adjacent_complete_and_escape() {
     let cell = (number(&builder["z"]) / 2.0).floor() as usize * 64
         + (number(&builder["x"]) / 2.0).floor() as usize;
     assert_eq!(
-        trace.frame("occupied")["chars"].as_str().unwrap().as_bytes()[cell],
+        trace.frame("occupied")["chars"]
+            .as_str()
+            .unwrap()
+            .as_bytes()[cell],
         b'.'
     );
     assert!(trace.mp("occupied") >= trace.mp("posed"));
@@ -564,7 +611,10 @@ fn base30_conquest_builders_repair_after_real_tank_birth() {
 
 #[test]
 fn base48_mortar_needs_company_hq() {
-    let trace = replay("mortar-and-motorpool-tier", "base48_mortar_needs_company_hq");
+    let trace = replay(
+        "mortar-and-motorpool-tier",
+        "base48_mortar_needs_company_hq",
+    );
     assert_eq!(trace.frame("funded")["tier"], 1);
     assert_eq!(
         trace.results["mortar-refusal"], "tier",
@@ -573,7 +623,10 @@ fn base48_mortar_needs_company_hq() {
     assert_eq!(trace.results["motorpool-refusal"], "tier");
     for label in ["mortar-refusal", "motorpool-refusal"] {
         assert_eq!(trace.mp(label), trace.mp("funded"));
-        assert_eq!(trace.frame(label)["nextId"], trace.frame("funded")["nextId"]);
+        assert_eq!(
+            trace.frame(label)["nextId"],
+            trace.frame("funded")["nextId"]
+        );
         assert_eq!(
             trace.frame(label)["population"],
             trace.frame("funded")["population"]
