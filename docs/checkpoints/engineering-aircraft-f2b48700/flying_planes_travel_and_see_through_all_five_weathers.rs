@@ -1,3 +1,13 @@
+fn plane_frame(m: &Match, id: u32, probe: Point) -> Value {
+    use crate::shared::aviation::state_name;
+    let u = &m.world.game.units[&id];
+    let a = &m.aviation.planes[&id];
+    json!({"environment":environment(m),"id":id,"x":u.x,"z":u.z,"rot":u.rot,
+        "air":{"state":state_name(u.air.unwrap()),"fuel":a.fuel,"ammo":a.ammo,"timer":a.timer,"ang":a.orbit,
+            "mission":a.mission.map(|mission| json!({"kind":mission.kind.name(),"x":mission.at.x,"z":mission.at.z,"id":mission.target.unwrap_or(0)}))},
+        "sees":ww2_core::vision::team_sees(&m.world.game,&m.rules,&m.grid,0,probe)})
+}
+
 #[test]
 fn flying_planes_travel_and_see_through_all_five_weathers() {
     let f = fixture();

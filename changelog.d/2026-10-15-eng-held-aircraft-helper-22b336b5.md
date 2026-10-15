@@ -1,0 +1,1 @@
+- Move the unused aircraft-only frame helper verbatim beside the FAILED / HELD aircraft checkpoint, keeping all 20 supported checks unchanged. The aircraft provider refusal remains unresolved.
