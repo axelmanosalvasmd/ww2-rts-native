@@ -258,6 +258,17 @@ fn research_prices_include_maxed_levels_and_mode_currency() {
 
 #[test]
 fn damage_multipliers_match_javascript_for_every_unit_pair_and_level() {
+    // Exact selected Source literals, test-tech.js:38-44 (BASE-51).
+    let attacker = Some(TechState::new(1, 2, 1, 0).unwrap());
+    let defender = Some(TechState::new(1, 0, 0, 2).unwrap());
+    let infantry = economy::tech_mul(attacker, Some("rifle"), defender, "rifle").unwrap();
+    assert!((infantry - 1.2).abs() < 1e-9);
+    let vehicle = economy::tech_mul(attacker, Some("tank"), defender, "tank").unwrap();
+    assert!((vehicle - 1.1 * 0.81).abs() < 1e-9);
+    assert_eq!(
+        economy::tech_mul(None, Some("rifle"), None, "tank").unwrap(),
+        1.0
+    );
     let f = fixture();
     let players: Vec<_> = f["players"]
         .as_array()
