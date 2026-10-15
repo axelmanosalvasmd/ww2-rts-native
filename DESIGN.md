@@ -2,6 +2,8 @@
 
 ## First five NET network components on current main (2026-10-15)
 
+At `7cca098d`, each of the three appended NET22/23/30 WebSocket checks passed once (1 passed, 0 failed, 57 filtered per command). Strict core/server all-targets Clippy then exited 101 because `Client::closed` is unused in the six selected tests. Remove only that unused helper, without suppression or changes to test bodies. Preserve those producing-head results and the raw lint failure; a separate exact-head lint grant is required before execution resumes or row statuses change.
+
 The authorized S1 formatter check on `0210274f` reported layout differences only. Apply its formatter output in a mechanical child; removing whitespace from the before/after test module produces identical bytes. The focused tests run only after that child is committed.
 
 This publication branch starts at current main7c9df2d5 and preserves its complete test-observer265 tree. It selects six real WebSocket functions for candidate rowsNET19/22/23/24/30. The test transport/clock helpers are exactde30e9a1 bytes; production builds exclude the optional clock seam and existing test constructors selectNone. Ordinary HTTP upgrade, socket pump, Hub consumers, close handling and maintenance owners are unchanged. No Source fixture, expected game state, RNG, runtime policy, public schema or ABI changes.

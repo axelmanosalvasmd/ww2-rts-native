@@ -103,12 +103,6 @@ impl Client {
         }
         panic!("missing processing barrier");
     }
-    fn closed(&mut self) {
-        let (opcode, bytes) = self.frame();
-        assert_eq!(opcode, 8);
-        assert!(bytes.len() >= 2);
-        assert_eq!(u16::from_be_bytes([bytes[0], bytes[1]]), 1000);
-    }
 }
 
 struct Rig {
