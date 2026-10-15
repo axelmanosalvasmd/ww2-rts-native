@@ -35,8 +35,7 @@ fn query(m: &Match, paths: &mut Pathfinding) -> Vec<Point> {
         }
         let x = c % g.w;
         for dy in [-1_i64, 0, 1] {
-            for dx in (if x > 0 { -1_i64 } else { 0 })..=(if x < g.w - 1 { 1 } else { 0 })
-            {
+            for dx in (if x > 0 { -1_i64 } else { 0 })..=(if x < g.w - 1 { 1 } else { 0 }) {
                 let n = i64::try_from(c).unwrap() + dy * i64::try_from(g.w).unwrap() + dx;
                 if let Ok(n) = usize::try_from(n)
                     && n < near.len()
@@ -194,8 +193,8 @@ fn base28_paid_stamp_and_settled_collapse_reopen_warmed_corridor() {
     assert_eq!(f["projection"]["settlementSteps"], 52);
     assert_eq!(f["projection"]["expectedCells"], json!(CELLS));
     assert_eq!(f["projection"]["localCells"], json!(local_cells()));
-    let map = AuthoritativeMap::from_json(&serde_json::to_vec(&f["amended"]["map"]).unwrap())
-        .unwrap();
+    let map =
+        AuthoritativeMap::from_json(&serde_json::to_vec(&f["amended"]["map"]).unwrap()).unwrap();
     let mut m = Match::new(
         &map,
         MatchOptions {
@@ -250,7 +249,8 @@ fn base28_paid_stamp_and_settled_collapse_reopen_warmed_corridor() {
     let crew = m.world.game.units.get_mut(&builder).unwrap();
     crew.x = 37.0;
     crew.z = 19.0;
-    m.initialize_tick_scene(0, TickPathConfig::default()).unwrap();
+    m.initialize_tick_scene(0, TickPathConfig::default())
+        .unwrap();
     let expected = f["amended"]["measured"].as_array().unwrap();
     let witnesses = f["amended"]["witness"].as_array().unwrap();
     assert_eq!(expected.len(), 61);
@@ -334,7 +334,11 @@ fn base28_paid_stamp_and_settled_collapse_reopen_warmed_corridor() {
             *frame,
             "complete measured corridor projection: {label}"
         );
-        assert_eq!(witness(&m, label), witnesses[index], "{label}: native caller witness");
+        assert_eq!(
+            witness(&m, label),
+            witnesses[index],
+            "{label}: native caller witness"
+        );
     }
     let site = site.unwrap();
     assert!(!m.world.game.units.contains_key(&site.id));
