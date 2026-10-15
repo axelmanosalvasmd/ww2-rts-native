@@ -1,5 +1,5 @@
 // Writes rust/crates/core/tests/fixtures/formation.txt: what the pinned shared/formation.js returns, so
-// `cargo test -p ww2-core --test formation` can check the Rust port bit for bit, and
+// `cargo test -p ww2-core --test it formation` can check the Rust port bit for bit, and
 // rust/crates/ffi/examples/link_check.c can check the C interface. Run it from the repo root with an
 // x86-64 build of Node 24.21.0, like harness/math-fixture.mjs (facingSpots calls Math.cos and Math.sin,
 // whose last bits differ on arm64 Node):

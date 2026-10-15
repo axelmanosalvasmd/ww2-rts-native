@@ -1,3 +1,5 @@
+use crate::shared::firing as common;
+use common::{compare, make, make_with_mode, snapshot};
 use serde_json::Value;
 use std::io::Read;
 use ww2_core::{
@@ -6,9 +8,6 @@ use ww2_core::{
     match_firing::{AbilityBlast, LaunchEvent},
     random::StreamId,
 };
-#[path = "common/firing.rs"]
-mod common;
-use common::{compare, make, make_with_mode, snapshot};
 fn fixture() -> Value {
     let mut text = String::new();
     flate2::read::GzDecoder::new(&include_bytes!("fixtures/match-firing.json.gz")[..])
