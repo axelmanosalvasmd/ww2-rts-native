@@ -658,3 +658,6 @@ mod native_two_client_socket_tests;
 
 #[path = "native_reconnect_socket_tests.rs"]
 mod native_reconnect_socket_tests;
+
+#[path = "native_net2_socket_tests.rs"]
+mod native_net2_socket_tests;
