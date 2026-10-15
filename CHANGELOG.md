@@ -17,9 +17,72 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 - Unreal (slice 1s, approved FFI follow-up): pin the ABI 2 library to full main revision 9e618217de2ac1d0a806c6804eda50c1c9da497f after the slice commit; the header hash is unchanged. FFI verification passes 10 tests and four C protocol streams; the rebuilt editor passes 117/117 and four 4,200-snapshot Great Bridge streams. Native and packaged two-human Rust Conquest runs verify move/amove/Stop/stance, one foreign-unit Stop refusal each, same-token reconnect and healthy Restart with a fresh identity. Native pair: 617/623 adopted; packaged host/editor guest: 625/630, all agreeing and zero decoder refusals. Seven separate executable tests cover ownership and absent-seat/faulted lifecycle. All final live/package counters: 51 logs, 141,786 adopted/agreeing, tries excluded. Rebuilt the Linux Development package with 1,559 cooked packages, no cook errors/warnings and verified SHA256SUMS. Add a bounded supplied-id ownership probe and refresh obsolete packaged server/ABI wording; omit debug compilation/staging unless requested. Native faulted Restart, all-map Rust play, visual gaps and human acceptance remain open. No row accepted.
 
 - Unreal (slice 1s): enforce the approved private Rust-host lobby matrix and fixed temporary logistics-off line. Ground markers test scene depth; role badges and HQ camps reuse the reference builders. Barlow text, score/status wrapping, loss/boss geometry, minimap scale, camera band and queued dashes follow the browser. Bridge sections persist per held row with the correct tumble axis and generated surface; FarFigures v2 preserves material tags and linear tint. Three editor builds pass 117/117 tests each; Great Bridge decoder replay passes four 4,200-snapshot streams. Sixteen live mode rows explicitly record High or the separate Low lane: 51 final-counter client logs, 141,786 adopted/agreeing snapshots, zero refused/disagreeing (tries excluded). Linux Development package: 1,559 cooked packages, zero cook errors/warnings, verified hashes and a working packaged host plus editor guest. Fixed the Development compile of an editor-only camp test. The approved current Rust executable runs a two-native Conquest match with move, Stop and same-token reconnect (1,459 adopted/agreeing); seven separate executable process tests pass, with the current-pin native ownership/stance/reconnect/healthy-Restart follow-up now passing; soldier/section lighting, flag/HQ labels, HUD icons, bottom-panel fit at UI150 and missing upstream Spanish keys remain open. Browser tooling supports a selecting seat, language, UI scale, history and an explicitly logged presentation-clock hold after a real loss. No parity row accepted.
+- Mark MODE-05 and MODE-28 ported from their complete existing six-join and four-map XL constructor checks. Both named tests pass on Linux, Windows and macOS in main `396f6d8a` run `38740304188`. Preserve every Acceptance cell, all other MODE rows and generic Assault runner guards. This documentation proposal has no new native execution.
+
+- Mark BASE-15 ported after complete-row ACCEPT: actual HQ purchases, whole-stick reservation/refusal, denied recruitment, delayed delivery, Fighter Cover interception and full reservation release. Source generation/check at `162e7bd7` records 3 scenes, 26 commands and 289 ticks; integrated native `ce3d5026` passes 3 tests (0 failed, 313 skipped), fmt check and strict workspace/all-target Clippy. Preserve the setup-specific population/global-count inequality and all runtime, fixture, test and acceptance bytes.
+
+- Format the new BASE-15 pending-paratrooper replay after its first fmt-check diagnostic. Preserve every literal/assertion token and the authentic fixture; native lifecycle qualification remains pending.
+
+- Record the authentic BASE-15 pending-drop fixture from pinned Source at recorder head `162e7bd7`: 3 retained-constructor scenes, 26 actual commands and 289 complete ticks. Generation and exact regeneration check pass, with no post-constructor random draws. Native replay and complete row eligibility remain pending.
+
+- Draft the complete BASE-15 pending-paratrooper recorder and native replay over retained canonical constructors, real HQ purchases, actual delayed delivery/Fighter Cover interception and released-slot recruitment. Register one test module. The three scenes predict 26 commands and 289 full ticks; no fixture or execution exists yet. Preserve the original cleared-scene population/global-count difference for whole-predicate review. All parity statuses, runtime, guards, old tests and fixtures remain unchanged.
+
+
+- Normally merge accepted combat `7c017b2c` with fixed main `9e618217`, preserving both histories, all nine accepted combat rows, four incoming vision rows, six incoming NET rows and all source, tests and fixtures. This private source-only union runs zero checks; the earlier five native passes remain evidence for `df39366e`. Final-head review and authorized execution remain pending.
+
+- Mark only CMB-34/35/36/37/81/105/118/119/120 ported after independent exact-`ee03a77a` acceptance and fresh `df39366e` fmt, five unique selected native passes and strict locked workspace/all-target Clippy. Fixed-main count rises from 211 to 220 of 939; all other rows stay unchanged, including held CMB-128. No Source regeneration, runtime, guard, terrain or ABI change. Root final-head review and hosted gates remain pending.
+
+- Wrap one existing combat phase-count assertion to satisfy the integration format check, preserving all tokens, literals and assertions. The failed fmt log belongs to `34ccd823`; the repaired `df39366e` passes fmt and the five selected tests.
+
+- Integrate the nine combat component checks from frozen `ee03a77a` with fixed main `396f6d8a`, preserving both histories, every older fixture case and all incoming tests and rows. Attribute the four Source command successes and five native passes to `ee03a77a`; independent review accepts its nine literal row predicates. The successor `df39366e` passes fmt, the original five selected tests and fresh strict Clippy; the docs child adds only the nine approved ported rows.
+
+- Record Axel's exact aligned whole-match evidence decision in PARITY.md. Preserve the existing component, outcome and owner rules. Both owners record readback of the final documentation head on #5 before merge; no parity row is promoted.
+
+- Complete MODE-15's raw observed Hill 112 path check on 10 canonical Assault starts, comparing all 30 full waypoints with the unchanged Source fixture; the three selected tests pass at 0b60e793.
+
+- Finish the comparison-only R1 handoff: four checks at `db854ef7` report canonical 61/61 with no divergence while retaining raw 0/61. Fresh strict Clippy and formatting pass at `24433da4`; preserve the earlier lint failure, both eb15 review limits and exact input/frame provenance. No row promotion or Source rerun.
+
+- Record the authorized R1 comparison result at `db854ef7`: canonical 61/61 checkpoints and all 600 stepped ticks match, while raw comparison remains 0/61 with the tick-0 Fuel presence difference. Preserve the first strict-Clippy unused-helper failure and make only the test-build delegate visibility public before retrying lint.
+
+- Format the frozen comparison-only R1 currency rule and its regression vectors before the authorized four-check native run. No comparison rule, input or engine behavior changes.
+
+- Add the explicitly authorized R1 comparison-only currency rule: absent Fuel/Munitions keys or exact absence markers use positive-zero defaults on both projected snapshots. Preserve every present value, the raw 0/61 result and all source/native traces. Add focused positive and negative vectors; canonical 61-checkpoint results and fresh review are pending.
+
+- Merge the frozen aligned R1 test seam onto exact post-256 main d412aad6, preserving both complete histories and every incoming row, registry and fixture. Keep the measured 0/61 MISMATCH and tick-0 Fuel absence versus zero; earlier execution stays on its producing heads, with successor review pending and no reruns or row moves.
+
 - Rebase the four existing MOV43/62/79/83 checks from accepted local `4873cd90` onto exact post-255 main `9e618217`. Preserve every incoming row, module, fixture and old predicate body; relocate the two owned DESIGN notes verbatim beside movement. MOV72 remains held. Prior passes retain their original producing heads; new focused validation is pending.
 
+- Complete the aligned-replay handoff: final Source check at `23ad8570` reproduces the frozen trace and input receipt, with native evidence kept on `87dfae5c`. Retain 0/61 MISMATCH and the Fuel presence difference, document private artifacts and commands, and release S1 for Root.
+
+- Extend the aligned Source recorder's unseeded-random refusal to module initialization. At `87dfae5c`, three focused harness checks, both registration guards, formatting and fresh strict core/simtest Clippy pass; aligned R1 remains MISMATCH at 0/61.
+
+- Record the first aligned R1 native diagnostic at `cae6e358`: both engines complete 600 ticks and all 1,321 consumed random values agree, but 0/61 checkpoints match. The first difference is tick 0, player 0 fuel: Source absence versus native zero. Preserve full traces and correct a test-only visibility warning before strict Clippy. No runtime or row status changes.
+
+- Format the aligned-replay test seam after the authentic Source freeze; no input, projection, command or runtime behavior changed.
+
+- Freeze the first authentic aligned-input Source capture before Cargo: 600 ticks, 61 checkpoints, 1,321 consumed values and 15,063 unused, reproduced by a fresh capture at `864d6485`. Native alignment is pending.
+
+- Add a test-only R1 constructor layout input and finite consumed-random tape at the actual Rust and pinned JavaScript consumers. Reuse #220's original projection, ten orders and 61 checkpoints without moving rows. Source capture, native alignment and comparison are pending at this implementation checkpoint; historical #220 remains 0/61.
+
 - Rebase NET2 snapshot and cadence checks onto current main, retain the six ported NET rows and held gaps, and move the two original NET2 design notes beside snapshot delivery history without changing their text.
+
+- Mark CMB-61 ported privately after independent whole-row ACCEPT of `cfc8263e`. Change only its Rust evidence and Status cells; preserve all 160 acceptance cells and every other row/cell. Keep new passes at `25c76d6c`, Source capture at `7a762f65`/`a5411f79` and old main 396f component proof separate. No new execution, runtime change or publication.
+
+- Verify the CMB-61 metadata comparator and existing firing consumers at `25c76d6c`: launch accuracy, x1.5 target preference and the simtest registration guard each pass, with formatting and strict locked workspace/all-target Clippy. Keep the authentic fixture and both earlier failures intact; CMB-61 awaits Root whole-row review and no status is changed.
+
+- Compare CMB-61 input metadata recursively with exact f64 bits for JSON numbers, exact object key sets, ordered arrays and strict nonnumeric values. Replace the field-specific representation exception without mutating metadata or changing any replay comparison, input or fixture. Preserve both earlier failed test logs.
+
+- Retain the renewed CMB-61 failure at `d01d213a`: exact `hitAt` comparison succeeds, then strict metadata equality rejects a choice actor's integer versus float `cooldown`. The accuracy test reports 0 passed and 1 failed; stop without widening normalization. Target-choice, registry and Clippy remain unrun.
+
+- Compare CMB-61 metadata actor `hitAt` values by exact f64 bits before canonicalizing only those verified cells for strict whole-JSON equality. Keep every other metadata type, key and value strict. Preserve authored inputs, Source, authentic fixtures and all replay assertions; retain the earlier failure.
+
+- Retain the first CMB-61 native test failure at `556a2ad5`: exact authored-input metadata equality rejects Source integer `hitAt` against the input JSON float before firing replay. Stop after 0 passed and 1 failed; target-choice, registry and Clippy checks remain unrun. Source generation/check and the formatting recheck passed. No predicate, input, fixture, runtime or row-status repair is applied.
+
+- Apply the two whitespace-only changes requested by the CMB-61 formatting check. Preserve all test tokens, assertions, literals and the authentic Source fixture. The initial formatting failure is retained; native tests remain pending.
+
+- Record the 16 CMB-61 flame firing scenes from pinned original Source, with 202 checkpoints. Generation and the serial byte check pass with x64 Node 24.21.0 under S3 caps. Preserve the old firing fixture and all row statuses; native comparison remains pending.
+
+- Prepare two CMB-61 flame comparisons through the existing Match firing provider: paired trench/open/garrison launch accuracy and the x1.5 target preference with negative controls. Keep the ordinary 131 firing traces and 668 checkpoints unchanged. Add only an unapplied Rust/Status proposal for CMB-69. Authentic recording and native execution remain pending; no row status or runtime changes.
 
 - Rebase the combat vision checks onto main `66592ae8`, retaining all incoming content and relocating the three owned vision notes beside the existing core vision section. Preserve all seven focused checks, three Source oracles and historical failures. CMB-124, CMB-125, CMB-131 and CMB-132 remain ported; CMB-128 remains held for its complete border-ray regression. Earlier test results stay attributed to their original heads.
 

@@ -82,6 +82,9 @@ try {
  record('medic-near-seek-and-hurt-boundaries',[U(1,'medic'),U(2,'rifle',25,15,{hp:40}),U(3,'rifle',45,15,{hp:89})],[medic(1),prime(2,{hp:100}),medic(1),prime(1,{path:[]}),prime(3,{x:45.001,z:15}),medic(1),prime(3,{x:45,z:15,hp:90}),medic(1)]);
  record('vehicle-half-recovery-rate',[U(1,'hq'),U(2,'tank',20,15,{hp:300,logistics:reserve(29)})],[prepareAction,reinforce(1)],{logistics:true});
  {const map=blank();map.rows[7]=map.rows[7].slice(0,10)+'NN'+map.rows[7].slice(12);record('mine-exact-distance-and-builder-exclusions',[U(1,'engineer',15,15),U(2,'rifle',21,15,{owner:1,still:1.999}),U(3,'mg',21,15,{owner:2,still:5}),U(4,'engineer',21,15,{owner:1,hp:0})],[{op:'sweep',ids:[1,2,3,4]},prime(2,{still:2}),{op:'sweep',ids:[2]}],{map});}
+ // test.js:7807-7811, scoped to recovery beside an already halted carrier, without full-tick income.
+ const paidHalftrack='dismounted-squad-beside-halted-halftrack-paid-ten-second-window';
+ record(paidHalftrack,[U(1,'rifle',17,17,{hp:20,riding:0}),U(2,'halftrack',15,15,{still:2})],[player(0,{mp:500}),...Array.from({length:200},(_,i)=>[{op:'prepare',tick:11+i},reinforce(sim.TICK)]).flat()]);
  const find=name=>cases.find(c=>c.name===name),last=name=>find(name).snapshots.at(-1),unit=(snapshot,id)=>snapshot.units.find(u=>u.id===id);
  assert.equal(last('repair-fractional-f32-full-and-history').units[0].hp,3000);
  assert.equal(last('repair-fractional-f32-full-and-history').structures[0].sections[0].failedAt,.5);
@@ -97,6 +100,24 @@ try {
  assert.equal(unit(last('home-exact-radius-and-outside'),3).hp,40);
  assert.equal(unit(last('vehicle-half-recovery-rate'),2).hp,309);
  assert.equal(last('vehicle-half-recovery-rate').wallets[0].mp,95.5);
+ {
+  const trace=find(paidHalftrack),cost=sim.UNITS.rifle.cost/sim.UNITS.rifle.models*.5,interval=sim.CFG.reinforceEvery*sim.CFG.aid.slow;
+  assert.equal(trace.units[0].riding,0);assert.equal(trace.units[1].still,2);assert.equal(trace.actions.length,401);assert.equal(sim.TICK,.05);assert.equal(interval,4);
+  for(let beat=0;beat<200;beat++){
+   const before=trace.snapshots[2+beat*2],after=trace.snapshots[3+beat*2],patient=unit(after,1),previous=unit(before,1);
+   assert.equal(before.tick,11+beat);assert.equal(after.tick,before.tick);assert.deepEqual(before.frame.bases,[]);assert.deepEqual(before.frame.depots,[]);assert.deepEqual(before.frame.tents,[]);assert.deepEqual(before.frame.tracks,[2]);
+   if(patient.hp>previous.hp){
+    assert.ok(previous.reinf+sim.TICK>=interval);assert.equal(patient.reinf,0);assert.equal(patient.hp,Math.min(100,(Math.ceil(previous.hp/sim.UNITS.rifle.hpPer)+1)*sim.UNITS.rifle.hpPer));
+    assert.equal(after.wallets[0].mp,before.wallets[0].mp-cost);assert.equal(after.story[0].mpSpent,before.story[0].mpSpent+cost);
+   }else{
+    assert.equal(patient.hp,previous.hp);assert.equal(patient.reinf,previous.reinf+sim.TICK);assert.equal(after.wallets[0].mp,before.wallets[0].mp);assert.equal(after.story[0].mpSpent,before.story[0].mpSpent);
+   }
+   if((beat+1)*sim.TICK<interval){assert.equal(patient.hp,20);assert.equal(after.wallets[0].mp,500);}
+  }
+  const final=last(paidHalftrack),patient=unit(final,1);
+  assert.ok(patient.hp>20&&patient.hp<100&&final.wallets[0].mp<500+200*sim.CFG.mpBase/20,'squad reinforced beside the halftrack, and paid for');assert.ok(unit(final,2).hp>0);
+  assert.ok(final.wallets[0].mp<500);assert.equal(500-final.wallets[0].mp,final.story[0].mpSpent);assert.equal(final.story[0].mpSpent,(patient.hp-20)/sim.UNITS.rifle.hpPer*cost);
+ }
  clean();const content=JSON.stringify({reference:pin,node:process.version,arch:process.arch,scope:'Original repair, medic and mine helpers; captured late preparation, cadence and reinforcement. No construction scheduler, World recovery or full tick.',cases})+'\n';
  const path=join(root,'rust/crates/core/tests/fixtures/match-recovery.json');if(process.argv.includes('--check'))assert.equal(readFileSync(path,'utf8'),content);else writeFileSync(path,content);
  console.error(`${process.argv.includes('--check')?'Verified':'Recorded'} ${cases.length} match recovery traces, ${cases.reduce((n,c)=>n+c.actions.length,0)} actions, ${cases.reduce((n,c)=>n+c.snapshots.length,0)} snapshots`);

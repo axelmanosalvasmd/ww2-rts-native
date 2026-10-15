@@ -1,0 +1,1 @@
+- Prepare appended automatic-ability and dismounted halftrack reinforcement witnesses for the named combat checks, preserving older coverage. Source fixture recording, native replay and parity status changes remain pending.

@@ -1,5 +1,123 @@
 # Three Crossroads Native: design decisions
 
+## MODE-05/28 existing-check eligibility (2026-10-15)
+
+The private docs successor starts with the complete 103-row modes table at
+prospective BASE stack head `a69771de`, not current main. Only MODE-05/28 Rust
+and Status cells change. Both Acceptance strings and all incoming Tutorial,
+MODE-14/15/19/20 and other cells remain exact. The old
+`c8e5d3de` candidate is retained, not restored over current main.
+
+MODE-05 is covered by all six actual TCP joins, complete roster team/faction
+comparisons and freed-team reuse. Native constructors still take explicit
+faction configuration. MODE-28's complete selected XL check covers four
+named authored maps, validation, six spawns, defend [0,1,2], explicit six-seat
+teams/factions, clock and three actual constructor bunkers. The original
+43-case/702-actor corpus remains within the authentic 57-start fixture.
+No full Assault runner or additional client gate is required by that check.
+
+Both named tests PASS in fixed-main push run `38740304188`, on Ubuntu
+job `116439969938`, Windows `116439970061` and macOS `116439970306`.
+These are main's existing executions, not executions of this docs child.
+The selected recorder/test/fixture/provider blobs were identical from
+producing `da002e2b` to that main. The current Assault test adds MODE-15
+raw-route proof; its complete XL constructor assertion body stays exact.
+No runtime, provider, guard, interface, terrain,
+ABI, reference or fixture change. This proposal adds two ported rows to the
+233/939 prospective baseline (235/939), with no joint acceptance. No new
+execution is claimed. Delivery follows the CMB #262 and BASE #263 stack,
+with Root's current-main and modes-file overlap check before publication.
+
+## Ten accepted combat rows on prospective aligned main (2026-10-15, source only)
+
+Preserve `a788b9d6` and whole CMB-61 child `89de3410`, normally merge them at `f2bf7663`, then merge fixed prospective #261 integration `5a8ce0e2` without changing provider, input, oracle or assertion bodies. Retain all incoming test-only aligned hooks, default mappings and consumed-draw handling, MODE-15, PARITY's exact owner quotation, both documentation histories and the mechanical simtest registry union. Only the ten accepted CMB-34/35/36/37/61/81/105/118/119/120 Rust/Status pairs differ from incoming; all 160 combat acceptance cells remain exact. Prospective 222/939 plus ten gives private 232/939. This is not main or a MODE-21 promotion.
+
+[The source-derived gate plan](docs/testing/cmb-ten-integration-gates.md) names exactly 12 future instances across core libtest and both consolidated `it` targets, including the ignored private replay. No Source, Cargo, native, formatter, Clippy or discovery command runs here. Future evidence must retain raw 0/61 separately from canonical 61/61, all 600 ticks and complete 1,321-draw agreement without changing original artifacts. Historical passes remain on their producing heads. Root must grant the current slot and review the frozen actual head before execution; fresh independent integration review and hosted CI precede publication. The five-row and CMB-128 source drafts remain separate.
+
+## Accepted combat and NET main union (2026-10-15, source only)
+
+Normally merge accepted `7c017b2cb5bc1a6aea09c3483d16019dfea59c09` as first parent with fixed main `9e618217de2ac1d0a806c6804eda50c1c9da497f` as second parent. Retain both documentation histories, the complete incoming NET tests and instrumentation, four vision rows, all 160 combat acceptance cells and the nine accepted combat Rust/Status cells. The accepted recorders, assertions and 45 ability/24 recovery cases stay unchanged, including their exact older 36/23 case prefixes. No provider, runtime, guard, terrain, ABI, reference or predicate change is introduced by this integration. The six NET promotions are inherited from main; this union adds no row promotion beyond the nine already accepted combat cells.
+
+The five-row source checkpoint remains separately frozen at `492e8afdf6abee5589f81d9e6524bbfe609009e9`; its five tests and recorder have no execution proof or authentic new fixture. The unexecuted CMB-128 draft remains separately frozen at `b5db5a0aa7b24df4489f35d637d90d37a2675078`. Neither draft enters this union. CMB-49 and CMB-69 remain unchanged for a later private documentation batch. Reviewer2's final ACCEPT for exact `7c017b2c` remains at `/tmp/roster16-reviewer2-cmb7c017-final/REVIEW.md`; it does not review this new head.
+
+No Source, Cargo, native, formatter or discovery command runs for this union. The historical five passes, fmt and strict Clippy remain attributed to `df39366e`, with unchanged combat source on accepted `7c017b2c`; they are not new-head results. Before any future execution, freeze the clean integration and obtain Root's slot grant. The proposed original five unique instances are `economy::compiled_catalog_keeps_complete_post_initialization_tables`, `startup_tables::complete_node_exports_keep_every_field_number_and_exact_bytes`, `match_recovery::tests::represented_recovery_phases_match_original_source`, `match_abilities::tests::conquest_abilities_match_original_source_phases` and `every_test_file_is_compiled`. Source confirms package `ww2-core`, libtest `ww2_core` for the private recovery/ability phases and consolidated test target `it` for the other three. A future authorized nextest command retains `--lib --test it` and exact-name filters; fmt and fresh strict locked workspace/all-target Clippy also remain pending. Root retains final-head review, hosted gates and publication in queue #256 then #259.
+
+## CMB named component witnesses (2026-10-15, recorded at ee03a77a)
+
+The first integration fmt check on `34ccd823` found one assertion-wrapping difference at `match_abilities/tests.rs:839`. Its child changes only Rust whitespace and retains every token, string literal and assertion. No compile or behavior test ran before that repair; the failed fmt log remains at `/tmp/cmb-s2-34ccd823-508272ac/fmt.log`.
+
+Append nine automatic ability traces and one dismounted halftrack recovery trace to the maintained recorders. All older cases and assertions remain intact; the authorized recording at `ee03a77a` preserves both exact serialized fixture prefixes. The ability inputs enable ready automatic actors and run the named Source windows: approaching/away MG (2/3 s), vehicle/infantry AP (2 s), recent-hit/healthy/no-history smoke (1 s), and moving/idle Ura (1/1.5 s). Ordinary move commands establish the MG enemy routes and moving conscript route; the bounded ability phase leaves movement positions unchanged. New observations retain the complete existing snapshot comparison and add activation, cooldown, chronology and negative-state assertions. The idle actor receives suppression 70 between phases, following the named Source acceptance.
+
+The recovery append keeps a dismounted rifle squad beside a living allied halftrack halted for two seconds, prepares the existing recovery frame on each tick, and checks 200 reinforcement beats, four-second cadence and per-model manpower/story payment without full-tick income. Existing providers suffice; no runtime, admission, guard, ABI or interface changes are made. CMB-34 through CMB-37 retain their existing complete static checks and 67 numeric leaves. The four authorized Source generation/check commands exited 0, and five selected native tests passed at exact `ee03a77a`. Reviewer1 independently ACCEPTs the nine literal row checks in `/tmp/roster16-reviewer1-cmbee03/REVIEW.md`; the missing original full-plan and distinct earlier compile-history search remains disclosed, not treated as inspected failure evidence. This normal ordered integration retains fixed main `396f6d8a` and both histories. On actual integration child `df39366e4521a9c531b58f3feeb3f0bd632a6db4`, fmt passed, the five original unique selected instances passed across libtest and `it` (271 skipped), and fresh strict locked workspace/all-target Clippy passed with all four workspace crates checked from this checkout. No Source regeneration ran. The first nextest invocation stopped at argument parsing because `-j4` duplicated `--test-threads`; it compiled nothing and ran zero tests, and the corrected `--build-jobs 4 --test-threads 1` invocation ran the five once. The docs child changes only CMB-34/35/36/37/81/105/118/119/120 Rust and Status cells to ported, adding nine to fixed main's 211 (220/939). All other rows, including held CMB-128, remain unchanged. Raw logs are `/tmp/cmb-s2-34ccd823-508272ac/`; the own-checkout libtest/it dep-info bind to Rust tree `135a736d31a20f677cbacb66a21004680feb3aa2`. Root final-head review, fresh hosted gates and publication remain pending. Historical success stays attributed to `ee03a77a`; these new native gates belong to `df39366e`.
+
+## CMB-61 private Rust completion after whole-row review (2026-10-15)
+
+Root read the complete independent ACCEPT in `/tmp/review-cmb61-cfc826-whole-final/REVIEW.md`, checked the row, metadata helper, both behavior tests and tested-parent documentation delta, and authorized a private documentation/status child of `cfc8263e827e9aa4030fd3775b923a5434fbca43`. CMB-61 changes only its Rust evidence and Status to ported. The whole literal acceptance is covered: flame accuracy through cover/walls/trenches/houses, cover-independent suppression, x1.5 trench/garrison damage and matching target preference. No CMB-61 clause remains held. This is Rust completion under the existing component acceptance, not both-owner client acceptance or a new whole-match decision.
+
+Keep evidence on its producing heads: three unique exact native test passes, fmt and strict locked workspace/all-target Clippy at `25c76d6c`; original Source generation/check at `7a762f65`, 16 scenes/202 checkpoints, authentic fixture frozen at `a5411f79`; separate existing damage/suppression/ordinary-firing proof at main `396f6d8a` hosted run 38740304188. Retain both earlier metadata 0-pass/1-fail logs as history. This private child executes no Source, Cargo, native, fmt, discovery or release command and preserves the complete `cfc8263e` Rust tree, all inputs/fixtures/recorders and every replay assertion. All 160 acceptance cells and every cell outside CMB-61 Rust/Status remain exact; CMB-49 and CMB-69 are unchanged. [Current proof and preparation history](docs/runtime/combat-flame-preparation.md) replace the earlier current-state HOLD wording without erasing historical failures.
+
+Local ACK of Hermes 156 on current #5 preserves the agreed pin/contracts and queue. Do not merge current main here or publish. Root must later compose the ordered union with CMB_IMPL's private a7889 row candidate, preserving both owners' changes, before one combat PR after #256 then #259. The ALIGNED S1 stream continues independently; this action grants no slot or shared-replay authority. Earlier CMB-61 sections below describe their named historical checkpoints. This decision supersedes their pending or held status wording; both earlier 0-pass/1-fail results remain failures.
+
+## CMB-61 renewed exact checks pass (2026-10-15)
+
+At clean producing head `25c76d6c0bb5be6384d95ee2db3c63847baed07f`, the granted sequence passes: workspace fmt, `match_firing_flame::cmb61_flame_launch_accuracy_ignores_trench_and_garrison`, `match_firing_flame::cmb61_flame_target_value_has_decisive_one_point_five_preference`, `every_test_file_is_compiled`, then strict locked workspace/all-target Clippy. There are three unique exact test instances, each 1 passed and 0 failed, with 219 filtered out. The two behavior tests exercise all 16 recorded scenes in both modes: 384 launch checkpoints and 20 choice checkpoints, including final paired-velocity and target-choice assertions.
+
+The authentic Source fixture remains the earlier 16-scene/202-checkpoint capture at `a5411f79`; no Source or old component case is rerun. The metadata helper alone adopts exact JSON Number semantics; every replay assertion, authored/recorded byte and ordinary firing fixture/test remains unchanged. Preserve both earlier 0-pass/1-fail logs on their original heads. Existing flame damage and suppression proof remains attributed to main 396f. CMB-61 remains in progress for Root whole-row review and CMB-69 remains an unapplied proposal. Logs are under `/tmp/cmb61-flame-s3-25c76d6c/`; tests and Clippy use S3, CPUs 8-11, 6 GiB/swap 0, quota 400%, jobs 4/threads 1, the current guard and its 20 GiB disk floor. No status or publication change.
+
+## CMB-61 exact JSON Number semantics for metadata (2026-10-15)
+
+Root authorizes replacing the field-specific `hitAt` normalization in the new consumer with a recursive comparator used only for recorded `output.input` versus authored input. JavaScript metadata numbers use one Number type; require their `as_f64().to_bits()` values to match exactly, with no epsilon. Objects require equal key counts and every authored key, so missing or extra keys fail. Arrays require equal lengths and recursively compare each position. All nonnumeric types and values remain strictly equal. The comparator reads metadata without mutation and never initializes the replay match.
+
+The consumer outside the metadata helper/call is byte-identical to `281f4b36`; every replay assertion and integer identity check elsewhere remains unchanged. Preserve authored inputs, Source, both fixtures, ordinary firing tests, runtime, registry and all parity rows. Both prior 0-pass/1-fail logs remain attributed to their producing heads; earlier partial launch traversal is not a test pass. Freeze this child before S3 fmt, the two named behavior tests, simtest registry guard and conditional fresh strict Clippy. No Source or old case is rerun.
+
+## CMB-61 renewed S3 stop after hitAt repair (2026-10-15)
+
+At frozen `d01d213a999c2d1cacbc3e50be79e8e7b009e857`, fmt passes and the exact accuracy test compiles, then fails at the retained strict whole-metadata equality, now line 56. Its first failing case is `choice-flamer-open-below`: Source represents the actor's `cooldown` as integer `1000000000`, while authored input retains float `1000000000.0`. The authorized exact-bit `hitAt` check succeeds. Do not extend that exception to cooldown or change any input, fixture or replay assertion. The raw failure remains `/tmp/cmb61-flame-s3-d01d213a/accuracy.log`.
+
+Control flow reaches this first choice case after replaying all six launch scenes in both modes, but the test never returns from its replay helper and never reaches its final paired-velocity assertions. Report the actual result as 0 passed, 1 failed, 219 filtered out, exit 101. Target-choice, registry and fresh strict Clippy remain unrun under the first-further-failure STOP rule. No Source, old component or full/release gate is rerun. CMB-61 stays held and CMB-69 remains an unapplied proposal.
+
+## CMB-61 exact hitAt metadata representation check (2026-10-15)
+
+Root authorizes a minimal new-consumer repair after reading the first failure at `556a2ad5`. Clone only the recorded and authored metadata for comparison. Require equal actor counts, convert each actor's `hitAt` through `as_f64`, and compare its complete `to_bits` value. Only after that equality succeeds, put the same f64 representation into both metadata clones at those `hitAt` cells and retain strict whole-JSON equality. This uses no epsilon or general number normalization. All other keys, types and values remain strict, and neither clone initializes the replay match.
+
+The original consumer outside that one comparison block is byte-identical to `0563eb91`, including every replay outcome assertion. Authored inputs, Source recorder and authentic fixture, ordinary firing recorder/fixture/body, runtime, registry and parity statuses remain exact. Preserve the first failure log. Freeze this child before the renewed S3 fmt, three exact test instances and conditional fresh strict Clippy. No Source or old component gate is rerun.
+
+## CMB-61 first native failure retained (2026-10-15)
+
+At frozen `556a2ad5e24e22b9e5c4736813b0dbf8da978d49`, formatting passes and the exact accuracy test compiles but fails before constructing a replay match. `match_firing_flame.rs:44` compares complete authored metadata with ordinary `serde_json::Value` equality. Authentic Source serializes `hitAt` as integer `-1000000000`; the authored input retains float `-1000000000.0`. This is the observed metadata representation mismatch, not evidence of a firing-provider defect. Preserve both unchanged and stop under the explicit first-failure rule.
+
+Actual new native count is 0 passed, 1 failed, 219 filtered out. Target-choice, simtest registration execution and fresh strict Clippy were not started. Source generation and serial byte check each passed at preparation `7a762f65`, yielding the frozen 16-scene/202-checkpoint fixture at `a5411f79`. The two allowed formatting wraps are the only consumer changes after that capture. Raw logs remain under `/tmp/cmb61-flame-s3-7a762f65/`; CMB-61 stays held, CMB-69 stays an unapplied proposal, and no old component gate is rerun.
+
+## CMB-61 formatter-only follow-up (2026-10-15)
+
+The first guarded formatting check at `a5411f79` reports two line-wrap differences in the new flame consumer. Apply only those whitespace changes and verify the complete non-whitespace byte sequence remains exact. Preserve the initial log at `/tmp/cmb61-flame-s3-7a762f65/fmt-check-a5411f79.log`. The authentic Source fixture and all assertions/literals remain unchanged. Freeze this follow-up before the granted formatting recheck and native checks.
+
+## CMB-61 authentic firing capture (2026-10-15)
+
+Frozen preparation `7a762f6573891a2564cbd7aa4e0ee8566c0ad300` records 16 original-Source scenes and 202 firing checkpoints. Generation and serial `--check` both exit 0 using `/usr/bin/node` v24.21.0 x64 and clean pinned Source `e4e579a`, under the exclusive S3 lock, CPUs 8-11, 6 GiB memory, zero swap and 400% CPU quota. Freeze this authentic supplemental fixture before Cargo. No recorder, authored input, expected predicate, ordinary firing fixture or runtime changes. Native comparisons remain pending, CMB-61 stays held and the CMB-69 proposal remains unapplied.
+
+## CMB-61 firing extension and private CMB-69 proposal (2026-10-15, source only)
+
+At fixed main `396f6d8a7014bd4a5ebe64f0a12ccd66865bf452`, prepare only the two flame components missing from the independent CMB-61 review. A separate original-Source recorder and authored-input file add 16 scenes without changing the ordinary firing recorder, fixture or tests. Six 32-volley launch scenes compare flame and rifle fire into open ground, a settled trench and a garrison. Ten one-phase choice scenes bracket the x1.5 preference with equal rifle targets at distances bracketing the 1.5 ratio, including centered house occupants, including rifle, unseen and dead-target controls. The two new consumers call existing public Match firing methods and compare every recorded state, launch and Combat stream state in Default and Conquest. These are bounded firing-component observations, not full-step histories or whole-match statistics.
+
+The supplemental authentic fixture is absent until a future Root Source grant. No Source, Cargo, native, fmt or discovery job runs in this checkpoint. Existing damage (9 open, 13.5 trench/garrison) and suppression evidence remains valid; CMB-61 stays held until the launch and choice comparisons actually pass. Preserve `e490fb9a` and `11a28e94` unchanged. CMB-69 has only an [unapplied Rust/Status patch](docs/proposals/cmb69-rust-status-only.patch), based on the existing actual seeded runner and independently reviewed exact-main hosted evidence. The real parity table and all acceptance cells stay unchanged. [Predicates, Source schedule, registration and pending commands](docs/runtime/combat-flame-preparation.md) define the remaining work. Direct Unreleased documentation follows the explicit stream instruction.
+
+## Aligned whole-match documentation proposal (2026-10-15)
+
+This amendment quotes item 1 of Axel's owner answer `6194079987` exactly in
+PARITY.md, following narrowed proposal `6182315380`. The existing component
+comparison, natural whole-match outcome judgment and owner rules remain
+byte-for-byte intact. Both owners record readback of the final documentation
+head on #5 before merge. [Axel-side readback 156](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6194582243)
+covered only old head `24520743`; [Hermes 157](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6194837091)
+requires new-head readback after rebase. This amendment grants no block
+approval or row promotion and makes no new global equal-seed rule.
+#220's unaligned diagnostic stays diagnostic.
+
+No test seam is implemented or assigned here. ALIGNED_REPLAY owns that
+separate stream. This change touches no runtime, RNG, provider, guard,
+interface, terrain, ABI, reference, test, fixture or parity-row status.
+
 ## Engineering supported scope and held aircraft consumer (2026-10-15)
 
 The supported engineering gate contains 20 original checks. Preserve the full `f2b48700` candidate under `refs/heads/held/eng-five-row-aircraft-f2b48700` and move its aircraft test function verbatim to the [unregistered checkpoint](docs/checkpoints/engineering-aircraft-f2b48700/README.md). That function remains FAILED / HELD: the first firing-enabled Clear patrol is refused before tick 1 because the automatic aircraft ground-fire actuator is unavailable. Its Source input and complete five-weather capture remain intact. The checkpoint records the precise provider boundary and pending consumer work.
@@ -1596,6 +1714,18 @@ The income phase preserves the reference's order: the leading VP total is captur
 Three focused tests compare 37 original-JavaScript traces comprising 217 income steps and 865 player states, including all four army sizes, the seven game modes, absent and unknown modes, cutoff points, mixed teams, queues, drops, depot changes and World territory changes. Three additional World cap cases cover the clamp, eliminated teammates and fewer owned regions than seats; recipient previews and invalid-context errors are checked too. An independent review found that grouping a city's base and bonus changed the last bit: with two ordinary regions followed by a city, the source returns `5.550000000000001` MP/s. The regression now records that original-source result, and the implementation adds each base and bonus separately in source order.
 
 Invalid slots or region indices, duplicate unit IDs, unknown catalog names, non-finite input and negative dt return errors before a wallet changes. This is a deliberate typed-input boundary in place of unchecked JavaScript objects. The fixture calls the unchanged source income block and `worldIncome` at `e4e579a`; it is component evidence, not a running match or end-to-end mode proof. Full economy and mode rows stay in progress. The server, wire snapshots, ABI and formation-only rules hash are unchanged.
+
+## BASE-15 complete pending-drop predicate (2026-10-15)
+
+The [pending-drop checkpoint](docs/runtime/base15-pending-drop-checkpoint.md) records complete whole-stick refusal, reservation, recruitment denial without debit, delayed delivery, actual Fighter Cover interception and released-slot recruitment. The recorder and replay retain all ten canonical constructor actors, footprints and linked structures, use real HQ purchases and Support commands, and advance complete normal ticks. Existing population checks also cover default and fractional Conscripts, ownership, structures, queues and pending/live drops. No runtime, guard, admission, terrain, interface or client rule changes.
+
+Source generation and exact regeneration check passed at recorder head `162e7bd7bf9506b0fd54f0544592fd201dbca6c8`: 3 scenes, 26 commands and 289 full ticks, with no post-constructor random draws. The authentic fixture was committed at `dd93d575658daf848cc28f1e133f8c918010fbce`. Integrated native head `ce3d50260d464a6bbad5dc461c8c522549e55f95` passed fmt check, the lifecycle and both actual registration guards (3 PASS, 0 failed, 313 skipped), and fresh strict locked workspace/all-target Clippy. The docs/status successor carries those results without claiming a new native execution.
+
+Independent complete-row review at ce3d5026 returned ACCEPT and PORT eligible, and Root verified the actual final-head gates. BASE-15 is ported for its complete selected population predicate. The original cleared Source fixture's `popOf(g,0) === g.units.size` witnesses absence of pending reservation in that setup. The retained two-player scene instead checks actual owned field population plus queues and non-live drops while preserving the complete global roster. Its raw owned-population/global-count pairs remain unequal: 12/19 after delivery, 9/16 after interception and 10/17 after the released-slot purchase. Five foreign constructor actors and two owned structures explain the difference; neither implementation counts them as owner0 population. This is selected-predicate proof on the declared admitted arena, not literal cleared-fixture equality, zero-point-map admission or whole-match/client proof.
+
+### Historical preparation
+
+The source-only plan at `130f31446de14df8499e73067b9fa52b106cd329` and implementation at `162e7bd7` originally preceded fixture generation and native qualification. The first fmt-check failure at dd93d575 remains historical; formatter-only child `842ebb1d85982b233f7cfdd8c888612cf472871c` preserved every literal/assertion and fixture byte before its initial 3-pass run. The later ce3d5026 integration results and complete-row review supersede those preparation-stage pending claims. Source createGame/command/step and native Match::new/execute_command/advance_tick remain unchanged. The constructor/Combat/OffMap adapter records draw purposes without resetting native randomness, logistics remains disabled on both sides, and drop births use their actual publication metadata rather than synthetic producer records.
 
 ## Production and research ownership (2026-10-13)
 
@@ -4497,3 +4627,78 @@ All sixteen integrated mode rows complete on the Rust decoder with a second seat
 | conquest-low | Low | no: time cap 120 s, ended by the host at tick 2402 | 1,201 / 1,201 |
 
 Final live and package counters total 57 native logs, 147,644 adopted and agreeing snapshots: 53 editor live logs / 145,634 snapshots and four package logs / 2,010 snapshots. Decoder refusals, disagreements, apply errors, view resyncs, not-fed snapshots, OOM, ensures and client error entries are zero. Every -try path and console duplicate is excluded; three rendered recorded detail replays are separate (12,600 adopted/agreeing). Initial failed driver, Vulkan allocation and package-path attempts remain retained. No row is accepted, and cap rows do not prove natural wins.
+
+## Test-only aligned R1 replay seam (2026-10-15, source checkpoint)
+
+Owner decision [6194079987](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6194079987) accepts exactly the narrowed condition in [6182315380](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6182315380). This implementation adds no parity status change. Historical #220 at `2e7f827f` remains an unaligned 0/61 diagnostic, first difference tick 0, unit 1 x: Source 27 metres, Rust 85 metres.
+
+Fixed native base is `9e618217de2ac1d0a806c6804eda50c1c9da497f`; Source remains `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. A private core unit-test constructor accepts explicit authored spawn slots before player positions, initial placement, base stamping or actor allocation. The normal constructor and public options stay unchanged. Test-only per-match storage has no global state. Ordinary compilation removes its fields, constructor, random branches and arguments; environment-draw macros expand to the original generator calls. MatchRandom's shipping purpose streams, rejection sampling and snapshot remain unchanged.
+
+The input is a finite 16,384-fraction tape generated independently of either engine's state, plus authored spawn slots [0,1]. Every actual consumption records global index, semantic consumer, context and exact value bits. Constructor environment-seed input is explicitly floor(fraction times 2^32). Original Mulberry32 executes and advances before each environment return is injected. Direct-fire context is tick, shooter, target and round, with separate accuracy, miss magnitude and sign roles. Unknown consumers are reported as UNMAPPED, never skipped; absent values cannot fall back to an unseeded or native stream. Full alignment additionally requires equal draw count and unconsumed suffix, matching layout input and matching startup observations. A consumer-order or count difference is an alignment failure even if the states happen to match.
+
+The Node wrapper reads pinned files without writing them. It instruments only random-expression boundaries and wraps the original spawnSlots return with the declared layout before createGame allocates players or units. Original createGame, spawnSlots, rng, command, step and downstream functions execute; no engine formula or expected state is copied. Reversing every call-boundary edit must reproduce the exact original source. Math.random throws at any uninstrumented consumer. Clear weather with weatherSeed None does not run the independent random-plan generator.
+
+The diagnostic reuses #220's comparator, projection, command queue and complete tick loop. It records all 601 frames even after a state difference, unless an actual runner fault stops execution. All 61 N10 checkpoints remain. MISMATCH is a deliverable; alignment failure remains a failed harness assertion. Full traces and seed stay private. [The implementation brief](docs/testing/r1-aligned-replay.md) records receipt fields, pending commands and row limits. No Source, Cargo, native, formatter or Clippy job has run at this source checkpoint. Root retains review and publication.
+
+
+### First aligned R1 native result
+
+The authentic Source capture was frozen at `864d6485` and reproduced before Cargo. On Vostro at native head `cae6e358f40429bddb5882ab7e6381b694dcc57c`, the finite-tape regression passes and the actual replay completes 600 native ticks with all 61 checkpoints compared. Startup observations, the explicit layout and all 1,321 consumer/index/value rows agree exactly; both sides leave 15,063 tape entries unused. This establishes aligned inputs for this prefix.
+
+The unchanged projection reports MISMATCH: 0/61 checkpoints match, with first divergence tick 0, `$.players[0].fuel`: Source `{absent:true}`, Rust zero (`0000000000000000`). No value is normalized or added to Source, and no native wallet or other state is patched. The failing field has no assigned owning row; constructor resource representation needs separate source investigation. Both sides move during 352 ticks, accept all ten orders and retain all actors and the original event stream. Historical #220 remains distinct.
+
+The first compiler invocation emits a private-interfaces warning because the test-only weather argument names a crate-private type. Make the type public inside its private cfg(test) module; this changes no shipping interface. Native receipts, state traces, raw stage logs and producing heads remain under the private task directory, including immutable `-cae6e358` first-result copies. Registration and fresh strict Clippy remain pending.
+
+
+### Qualified aligned-replay source and remaining representation difference
+
+At `87dfae5c1801ad7d41046e637fd870a8fea1bbb6`, three focused harness checks, both crate registration guards, formatting and fresh strict core/simtest all-target Clippy pass on Vostro under S1. The actual 61-checkpoint run repeats aligned inputs and the same MISMATCH, 0/61. Both engines complete 600 ticks and 352 moving ticks, accept ten orders and consume exactly 1,321 values; native emits 128 events. Six unavailable phases remain explicitly reported. This is not a completed Conquest victory or proof of those phases.
+
+The first field is now source-investigated as BASE-01's resource-presence question. Ordinary pinned player construction omits Fuel and Munitions; the Rust wallet has mandatory f64 fields and StartPlan retains Default zeros. Keep the raw first result and original comparator metadata, with this later investigation separately documented. No absent-to-zero conversion, projection exclusion or runtime change is adopted. All candidate row probes remain partial.
+
+The final harness-only correction starts the unseeded-random refusal before Source module evaluation, covering initialization and captured callbacks as well as construction and ticks. Its check must preserve the original frozen input and output exactly. All Rust input bytes and the original fixture remain unchanged; native results stay attributed to `87dfae5c`. Root owns independent review and any test-only PR.
+
+
+The final initialization-guard Source check passes at `23ad8570`, reproducing the entire original frozen trace and receipt. Native source remains byte-identical to tested `87dfae5c`; no native result is reassigned to a later head. S1 processes are terminal and its flock is released. The [handoff](docs/testing/r1-aligned-replay.md#final-handoff) records actual commands, private artifact paths and the original failure copies. No external action or row promotion occurred.
+
+
+## Aligned R1 source-only integration onto post-256 main (2026-10-15)
+
+Normally merge frozen seam `eb15ffcdf89cc860aab04bb475a03921c6c96efa` first and exact current main `d412aad648936b5123068938d624209f6d5d2df9` second, from common base `9e618217de2ac1d0a806c6804eda50c1c9da497f`. The original head remains preserved at `evidence/aligned-replay-eb15-d6308bcc`. Retain every incoming MOV-43/62/79/83, NET, CMB, BASE and MODE cell, registration and fixture. Only CHANGELOG.md conflicts; preserve both full parent document histories, including the automatically merged DESIGN additions. No new routine fragment is introduced.
+
+All 13 owned paths are retained: the 11 non-composite mode/type/blob entries stay exact, while both tracking documents retain their entire parent bodies. Main changes no core source from the fixed base; the complete integrated core tree remains the frozen seam tree. The private integration report records the full expected Git entry union and the literal canonical 11-flag zero-exclusion and exact-three-tracking-document patch pairs. Preserve any unequal raw pair without normalization; equality of a narrower pair does not make the zero-exclusion pair equal.
+
+The measured result remains MISMATCH, 0/61 checkpoints over 600 ticks, first difference tick 0 at `$.players[0].fuel`: Source absence, Rust zero. The existing harness reports 1,321 equal consumed records and 15,063 unused values. These are historical observations, not a new all-input acceptance claim. The independent scope/projection and complete-input reviews of immutable eb15 remain pending; no ACCEPT is inferred. Root has independently verified the four preflight risks against 9e: startup before bases, 1,203 local environment draws, cloned Combat transactions and the unchanged Fuel/Munitions absence difference. No risk-driven seam edit is made here.
+
+Three focused native checks, both registration guards, formatting and strict Clippy remain attributed to `87dfae5c`; the final Source check remains attributed to `23ad8570`, with the authentic fixture produced at `864d6485`. Preserve all execution inputs, raw traces, first-result copies and source bodies byte for byte. This integration performs zero Source, Node, Cargo, native, formatter, gate or CI executions, and no publication. It promotes no row. Root owns actual-successor review, the baseline-push gate and publication; merge order keeps #259 first, with #260 readback separate.
+
+
+## Authorized R1 currency comparison defaults (2026-10-15, source checkpoint)
+
+User14:51 explicitly permits this comparison-layer exception to the prior no-normalization instruction. On the clean ordered integration `58a8cb8b6f3fdc347cc87965386c938d3f5b4812`, add only a test comparison module, a test-only delegate to the unchanged raw comparator, and additional reporting in the existing private replay test. No Source loader, input tape, hook, engine state, constructor, runtime RNG, admission, terrain, ABI, policy or row changes. Native and Source raw frames remain separate immutable observations.
+
+The complete whitelist is `$.players[0].fuel`, `$.players[0].mun`, `$.players[1].fuel`, and `$.players[1].mun`. Each uses the exact positive-zero wrapper `{bits:"0000000000000000",value:0.0}` as its comparison default. A missing key or exact `{absent:true}` marker maps to that default independently and symmetrically on both copied projections. Every present value stays intact. This is limited to the original validated R1 Conquest, Standard, clear, shuffle/tech/supply/living-weather-on, logistics/sandbox-off, weatherSeed-None profile and the actual two opposing slot/team0/1 rows. The original runner still validates the map and constructor options.
+
+Outside construction modes, Source omits these two fields while Rust's existing wallet stores mandatory f64 defaults. The mapping compares that known representation difference; it changes no wallet, price, income or engine operand. Present zero versus one, absence versus a nondefault, unlisted absence, negative zero, nonfinite values, null, false, empty collections and type changes remain different. Both complete original projections and the original strict comparator remain available. No other field or default is inferred.
+
+The existing 600-tick native replay produces raw frames once. Raw comparison retains the original result; an additional pass applies the same canonical function separately to each side and compares all601 projected frames and61 N10 checkpoints with that unchanged raw comparator. The private report keeps separate raw and canonical verdicts, counts and first differences, plus the original consumed-input receipt and per-field mapping counts. Every mapped path and default is explicitly reported. A state mismatch remains a deliverable, not a reason to alter inputs or expectations.
+
+The prior raw MISMATCH0/61, tick0 Fuel absence versus zero,1321 consumed/15063unused, and all original traces remain frozen. The new canonical result is not yet measured. Four selected checks (the new comparison vectors and three existing aligned checks), formatting and fresh strict locked core/simtest all-target Clippy require the granted S1 scope after the clean child is frozen. No unchanged registration guard, Source, full/release/list run is added. Independent input-alignment review of eb15 and fresh comparison review of this successor remain separate pending gates; no row eligibility follows.
+
+Both independent immutable-eb15 reviews now return ACCEPT: `/tmp/review-aligned-eb15-production-scope/REVIEW.md` and `/tmp/review-aligned-eb15-all-inputs/REVIEW.md`, each read in full. They independently parsed all1,321 rows and found no shipping behavior defect for that recorded prefix. Their acceptance does not cover this new comparison child, complete derived startup/internal state, executed capacity/exhaustion/label-mismatch negative controls, or any complete row check. The input seam remains unchanged; these limits are preserved, not repaired or reclassified.
+
+
+### First canonical R1 execution and retained lint failure
+
+At clean `db854ef7f6568f33bd1179851e0c417b3664a8dd`, all four selected checks pass, zero failed/ignored. The canonical comparison matches61/61 checkpoints and all600 stepped ticks, with no first divergence. The unchanged raw path remains MISMATCH0/61, first tick0 `$.players[0].fuel`, Source absence versus Rust positive zero. Both runs still supply1321 equal consumed records and15063 unused values. Each of the four declared Source fields maps601 times; zero native fields map because their present positive-zero values are retained. The new raw native frame bytes and all original raw report fields exactly equal the preserved baseline.
+
+Fresh strict locked core/simtest all-target Clippy then exits101 on the new test-only delegate's unused private visibility in the standalone simtest binary test target. Retain its raw log and producing head before repair. Change only that cfg(test) delegate from pub(crate) to pub; the private core import can call the same function, and no shipping interface exists. Comparator bodies, negative vectors, input hooks, engine state and fixtures do not change. Focused evidence stays on db854ef7 unless explicitly rerun; fresh strict lint on the visibility child remains pending.
+
+
+### Canonical R1 qualification handoff
+
+Fresh strict locked core/simtest all-target Clippy and formatting check pass at `24433da4a2c9a6b0dc4b16984d587149ba9bacfe`. Its only Rust change from four-check head `db854ef7` is the new cfg(test) delegate's visibility; its body, the entire comparison module, all regression vectors and every input/engine operation remain exact. No native run is reassigned to that lint child. The final documentation child keeps its whole Rust tree unchanged.
+
+The measured canonical result remains MATCH61/61 with no first divergence; raw result remains MISMATCH0/61 at tick0 Fuel absence versus positive zero. All601 raw native frames are byte-identical to the baseline, every original raw report field remains equal, and the complete input receipt is unchanged. Each declared Source currency field maps601 times, with zero native mappings. This is a600-tick projected prefix under the explicit comparison exception, not a completed row or match outcome.
+
+Private actual-result artifacts, the first lint failure, exact stage commands and compiler/dependency provenance live under `/tmp/aligned-replay-canonical-d6308bcc/`. The immutable ordered-merge proof and both unequal/equal raw pairs remain under `/tmp/aligned-replay-d412-d6308bcc/`, scoped only to `58a8cb8b`. Original artifacts and eb15 are preserved. S1 processes are terminal and its lock is free. No Source run, repeated registration guard, full/release/list command or publication occurred during the comparison stage. Independent eb15 input/scope acceptance and fresh comparison-head review are separate; Root retains actual-successor review, baseline qualification, PR creation and the259-first merge queue.

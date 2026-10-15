@@ -1,0 +1,1 @@
+- Document the 12 exact pending checks for the private ten-row combat integration, including both registry guards and the ignored aligned replay. Preserve accepted component evidence and incoming R1, MODE-15 and parity text; run no new Source or native checks. Private row count is 232/939, with execution, independent final-head review and hosted gates pending.

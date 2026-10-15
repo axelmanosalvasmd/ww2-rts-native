@@ -31,6 +31,8 @@ mod assault_finish;
 mod assault_start;
 #[path = "../base_ordinary_checks.rs"]
 mod base_ordinary_checks;
+#[path = "../base_pending_paratroopers.rs"]
+mod base_pending_paratroopers;
 #[path = "../compiled_rules.rs"]
 mod compiled_rules;
 #[path = "../conquest_finish.rs"]
@@ -69,6 +71,8 @@ mod match_carrier_tick;
 mod match_economy;
 #[path = "../match_firing.rs"]
 mod match_firing;
+#[path = "../match_firing_flame.rs"]
+mod match_firing_flame;
 #[path = "../match_production.rs"]
 mod match_production;
 #[path = "../match_recruitment.rs"]

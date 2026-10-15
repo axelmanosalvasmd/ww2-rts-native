@@ -1194,6 +1194,10 @@ impl Match {
         let mut flights = Vec::with_capacity(count as usize);
         let first_id = self.firing.next_flight;
         for i in 0..count {
+            #[cfg(test)]
+            if let Some(replay) = &random.replay {
+                replay.shot(g.tick, id, t.id, i);
+            }
             let (x, z, height) = {
                 let accurate = random.next_fraction(crate::random::StreamId::Combat) < accuracy;
                 let off = if accurate {
