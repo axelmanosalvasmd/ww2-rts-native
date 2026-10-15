@@ -1,0 +1,1 @@
+- Prepare five existing movement-row checks: full original editor and crowd scenes, the complete tank-rider Source scene, five-seed ordered rail arrays, and aircraft tables. Source recording and four native tests await Root's slot grant; no row is marked ported. The tank-rider scene still needs its complete native purchase and recipient consumer.
