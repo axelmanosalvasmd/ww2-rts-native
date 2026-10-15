@@ -71,6 +71,8 @@ mod match_carrier_tick;
 mod match_economy;
 #[path = "../match_firing.rs"]
 mod match_firing;
+#[path = "../match_firing_flame.rs"]
+mod match_firing_flame;
 #[path = "../match_production.rs"]
 mod match_production;
 #[path = "../match_recruitment.rs"]

@@ -384,10 +384,30 @@ fn represented_recovery_phases_match_original_source() {
     assert_eq!(fixture["node"], "v24.21.0");
     let mut count = 0;
     let mut cases = 0;
+    let mut paid_halftrack_cases = 0;
     for case in fixture["cases"].as_array().unwrap() {
         let name = case["name"].as_str().unwrap();
+        let paid_halftrack =
+            name == "dismounted-squad-beside-halted-halftrack-paid-ten-second-window";
         cases += 1;
         let (mut m, mut order) = make(case);
+        if paid_halftrack {
+            paid_halftrack_cases += 1;
+            assert_eq!(case["actions"].as_array().unwrap().len(), 401);
+            assert_eq!(case["snapshots"].as_array().unwrap().len(), 402);
+            assert_eq!(order, [1, 2]);
+            let patient = &m.world.game.units[&1];
+            let carrier = &m.world.game.units[&2];
+            assert_eq!(m.rules.kinds[patient.kind].name, "rifle");
+            assert_eq!(m.rules.kinds[carrier.kind].name, "halftrack");
+            assert_eq!(patient.hp, 20.);
+            assert!(!patient.riding);
+            assert_eq!(m.combat.get(1).unwrap().carrier, None);
+            assert_eq!(patient.owner, carrier.owner);
+            assert_eq!(carrier.still, Some(2.));
+            assert_eq!(patient.at(), Point { x: 17., z: 17. });
+            assert_eq!(carrier.at(), Point { x: 15., z: 15. });
+        }
         let mut frame = None;
         let initial = snapshot(&m, &order, None, &[]);
         let expected = normalize(case["snapshots"][0].clone());
@@ -398,6 +418,25 @@ fn represented_recovery_phases_match_original_source() {
         );
         for (index, a) in case["actions"].as_array().unwrap().iter().enumerate() {
             count += 1;
+            let paid_halftrack_before = if paid_halftrack {
+                if index == 0 {
+                    assert_eq!(a, &json!({"op":"player","slot":0,"changes":{"mp":500}}));
+                    None
+                } else if index % 2 == 1 {
+                    assert_eq!(a, &json!({"op":"prepare","tick":11 + index / 2}));
+                    None
+                } else {
+                    assert_eq!(a, &json!({"op":"reinforce","dt":0.05}));
+                    Some((
+                        m.world.game.units[&1].hp,
+                        m.recovery.get(1).unwrap().reinforcement,
+                        m.start.economy.players[0].mp,
+                        m.story[0].mp_spent,
+                    ))
+                }
+            } else {
+                None
+            };
             let mut result = Value::Null;
             let mut shots = Vec::new();
             if let Some(tick) = a["tick"].as_i64() {
@@ -650,10 +689,48 @@ fn represented_recovery_phases_match_original_source() {
                 "{name} action{index} {}",
                 diff(&actual, &expected, "")
             );
+            if let Some((hp, timer, wallet, spent)) = paid_halftrack_before {
+                let frame = frame.as_ref().unwrap();
+                assert!(frame.bases.is_empty());
+                assert!(frame.depots.is_empty());
+                assert!(frame.tents.is_empty());
+                assert_eq!(frame.tracks, [2]);
+                let patient = &m.world.game.units[&1];
+                let reinforcement = m.recovery.get(1).unwrap().reinforcement;
+                if patient.hp > hp {
+                    assert!(timer + 0.05 >= 4.);
+                    assert_eq!(reinforcement, 0.);
+                    assert_eq!(patient.hp, ((hp / 20.).ceil() + 1.) * 20.);
+                    assert_eq!(m.start.economy.players[0].mp, wallet - 10.);
+                    assert_eq!(m.story[0].mp_spent, spent + 10.);
+                } else {
+                    assert_eq!(patient.hp, hp);
+                    assert_eq!(reinforcement, timer + 0.05);
+                    assert_eq!(m.start.economy.players[0].mp, wallet);
+                    assert_eq!(m.story[0].mp_spent, spent);
+                }
+                if index / 2 < 80 {
+                    assert_eq!(patient.hp, 20.);
+                    assert_eq!(m.start.economy.players[0].mp, 500.);
+                }
+            }
+        }
+        if paid_halftrack {
+            let hp = m.world.game.units[&1].hp;
+            let wallet = m.start.economy.players[0].mp;
+            assert!(hp > 20. && hp < 100. && wallet < 500. + 200. * 4. / 20.);
+            assert!(m.world.game.units[&2].hp > 0.);
+            assert!(wallet < 500.);
+            assert_eq!(500. - wallet, m.story[0].mp_spent);
+            assert_eq!(m.story[0].mp_spent, (hp - 20.) / 20. * 10.);
+            // Keep the historical inventory assertions independent of this appended witness.
+            cases -= 1;
+            count -= case["actions"].as_array().unwrap().len();
         }
     }
     assert_eq!(cases, 23);
     assert_eq!(count, 133);
+    assert_eq!(paid_halftrack_cases, 1);
 }
 
 #[test]
