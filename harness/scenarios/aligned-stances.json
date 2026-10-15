@@ -281,6 +281,23 @@
         },
         {
           "tick": 2,
+          "issuer": 0,
+          "sequence": 35,
+          "command": {
+            "t": "move",
+            "orders": [
+              [
+                1,
+                23,
+                27
+              ]
+            ]
+          },
+          "label": "ordinary-actor-open-lane-stage",
+          "expectedDenial": null
+        },
+        {
+          "tick": 2,
           "issuer": 1,
           "sequence": 9,
           "command": {

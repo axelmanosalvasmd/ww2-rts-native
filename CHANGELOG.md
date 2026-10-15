@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Retain the read-only gate probe: every old frame/input matches, while the old branch failure still exits 2. Original actor LOS is blocked despite ammo, visibility and 22 m reach within 28 m range; the foe cannot see actor 1 and targets barracks 8. Author one added ordinary actor Move to the observed open lane (23,27) for the single bounded corrected trial. Keep all 34 prior commands, terrain, actors and positive branch assertions. Results pending.
+
 - Add one read-only stance shootability probe using actual pinned Source gate functions and structural cells. Keep the failed scene, tape, branch assertions and raw frames exact; the expected old branch failure remains a failure. No native execution or row change.
 
 - Preserve the first stance Source failure at 25b9ed68: generation captures all 1,200 ticks but exits 2 because the planned Hold Fire/Hold Position window has no shootable foe or incoming damage. Actual 34 command dispositions and recipient-bit checks complete; Source consumes 2,533 values with 13,851 unused. Stop before Source check, formatting or Cargo. No paired comparison, native alignment or row eligibility is claimed.
