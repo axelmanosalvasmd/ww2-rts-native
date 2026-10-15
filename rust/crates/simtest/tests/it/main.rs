@@ -29,6 +29,8 @@ mod air_retirement;
 mod assault_finish;
 #[path = "../assault_start.rs"]
 mod assault_start;
+#[path = "../base_ordinary_checks.rs"]
+mod base_ordinary_checks;
 #[path = "../compiled_rules.rs"]
 mod compiled_rules;
 #[path = "../conquest_finish.rs"]
