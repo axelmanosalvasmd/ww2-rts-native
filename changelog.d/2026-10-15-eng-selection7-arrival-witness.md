@@ -1,0 +1,1 @@
+- Include canonical Move completion in selection 7's queued-Dig witness clock with one call replacement. Preserve every assertion, input, wait bound, all fourteen names and all runtime providers. No checks ran; ef81's five PASS, one FAIL and eight UNRUN and the a52 Source capture remain historical.

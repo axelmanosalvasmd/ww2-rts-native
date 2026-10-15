@@ -1,5 +1,13 @@
 # Three Crossroads Native: design decisions
 
+## Queued-Dig selection 7 arrival phase repair (2026-10-15, source only)
+
+The source-only child of frozen `39712e0c8b416d093967fde7c1487596b7cf9455` completes the same witness-clock repair in selection 7. Its independent 160-step Move loop still called `start_queued_orders` directly. That omits the canonical Move completion/retry phase before queue service, even though the shared selection-6 clock already calls `prepare_unit_commands`. The independent ef81 review records this second omission at `/tmp/roster16-2222-reviewer2-engef81/REVIEW.md`. Selection 7 remains unrun; no Wire activation failure or runtime provider defect is claimed as observed.
+
+Replace only the loop call with `prepare_unit_commands(1, false)`, matching production `match_tick.rs:533` and pinned Source `shared/sim.js:5349-5351`. Preserve every assertion, authored input, wait bound and phase order, all fourteen names, every other test byte and all runtime providers. The optional authentic queued Source consumer remains at the same call site after the physical-arrival and Wire activation assertions. No pose, currency, RNG, queue or expected-state assignment is added.
+
+Preserve 397 and ef81, including ef81's actual five PASS, one FAIL and eight UNRUN, its raw selection-6 failure and unrun Clippy. The a52 Source producer, immutable ada3b28c fixture, original twelve-trace baseline and ca56 failure remain exact. All parity cells, BASES and the recipient kind-7 guard stay unchanged; owner-view and MOV28 proposals remain unapplied. ENG-15/16/17/23/24 remain in progress, and IMPL_ENGINEERING retains first publication priority. Current issue #5 owner/Hermes replies are acknowledged as receipt, not consent to this child. Root retains the sole ledger, a new exact-head grant, qualification, review and publication. This child runs zero Source, Cargo/native, formatting, lint or reruns.
+
 ## Queued-Dig component arrival phase repair (2026-10-15, source only)
 
 The exact `ef81d708359013bdf31224a993f35dbcb7cf3f54` qualification passed five native checks, then selection 6 failed at `match_projects_original_checks.rs:423`: `the dig activates after the leading move`. Eight checks, including the authentic optional fixture consumer, and Clippy remained unrun. Preserve the actual report, results and raw failure in `/tmp/eng-five-native-2152-e92ceac8/`; this child does not rerun or relabel them.

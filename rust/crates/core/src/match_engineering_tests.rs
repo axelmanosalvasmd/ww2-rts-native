@@ -434,7 +434,7 @@ fn queued_dig_preserves_paid_work_and_tallies_only_actual_activation() {
     for _ in 0..160 {
         m.world.game.tick += 1;
         m.begin_path_tick(4096, 20).unwrap();
-        m.start_queued_orders(1, false).unwrap();
+        m.prepare_unit_commands(1, false).unwrap();
         if m.field_works.is_active(1) {
             break;
         }
