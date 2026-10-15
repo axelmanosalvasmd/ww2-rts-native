@@ -2161,6 +2161,12 @@ The recorder runs the original `observedTerrainFor`, `seenWorldCell` and `observ
 
 Generated World Conquest memory, real fog wiring, client receive-order reconstruction, snapshots and full Match integration remain separate. The collector does not change the public wire format, C ABI or draft privacy contracts. MOV-29 and MAP-100 remain in progress.
 
+## Streaming original MOV capture preparation (2026-10-15, unexecuted)
+
+Replace the private original-check recorder's retained full-state history with synchronous gzip-compressed JSONL records, one gzip member per record. Preserve the complete before/after witnesses, encoded constructor inputs/state, original helper/callback extraction, all 41 static assertion sites and RNG operations. Explicit case/call identities retain action order and nesting. Both companion readers scan and validate the complete stream while retaining only metadata and its compressed-byte digest. Their construction, measurements, predicates and native schemas stay unchanged.
+
+The two parent 9e424 executions remain failed, exit 134: default V8 heap near 2045MiB and the sole 4096MiB retry near 4076MiB. Neither produced a packet; callback counts are unknown. No new execution or peak-memory claim is made. The [capture design, compatibility limits and future commands](docs/checkpoints/mov-original-stream-capture-design.md) preserve both raw logs, explain the retained-history cause and require Root's new grant after separate capture-semantics review. Partial members are retained on fatal interruption and cannot qualify a completed capture. No parity, provider, guard, terrain, ABI or runtime change.
+
 ## Routing inside movement (2026-10-13)
 
 The movement block now has `move_unit_with_routes` and `move_units_with_routes` entry points. They invoke the caller's route handler at the reference's actual recovery point, after traffic has selected its steering goal. Infantry stalls request budgeted recovery; vehicle stalls and traffic replans request an immediate search. The handler owns terrain selection, scheduling, errors and path replacement. A replaced path advances `path_gen`, preserving the identity checks used by lane and clearance caches. Existing entry points retain the disabled-search behavior needed by the frozen benchmark.

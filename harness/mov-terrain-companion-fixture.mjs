@@ -1,10 +1,10 @@
 // Disclosed canonical companion. Do not execute without Root's recorder grant.
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
-import {createHash} from 'node:crypto';
 import {readFileSync, writeFileSync} from 'node:fs';
 import {fileURLToPath, pathToFileURL} from 'node:url';
-import {gzipSync, gunzipSync} from 'node:zlib';
+import {gzipSync} from 'node:zlib';
+import {readOriginalCapture} from './mov-original-capture-stream.mjs';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const ref = process.env.WW2_REFERENCE ?? `${root}/reference/ww2-rts`;
@@ -16,8 +16,7 @@ const args = process.argv.slice(2), checking = args.includes('--check');
 const paths = args.filter(a => a !== '--check');
 assert.equal(paths.length, 2, 'separate original capture and /tmp output paths required');
 assert.equal(args.length, 2 + Number(checking));
-const originalBytes = readFileSync(paths[0]);
-const original = JSON.parse(gunzipSync(originalBytes));
+const original = await readOriginalCapture(paths[0]);
 assert.equal(original.reference, pin);
 assert.equal(original.failure, undefined, 'retain and report the first original failure before companion recording');
 const originalChecks = ['Roads and mud', 'Ground that wears', 'Slope', 'Wind, weather, dust and fire'].map(name => {
@@ -61,7 +60,7 @@ function frame(g, aliases) {
   }))};
 }
 const packet = {reference: pin, node: process.version, arch: process.arch, manifest,
-  originalCapture: {sha256: createHash('sha256').update(originalBytes).digest('hex'), checks: originalChecks},
+  originalCapture: {sha256: original.sha256Compressed, checks: originalChecks},
   scope: 'Canonical public construction/Buy/Move companion. Original cleared fixtures are captured separately, unchanged.',
   random: 'Global Math.random fixed0.5; native MatchRandom must never be replaced', cases: [], completed: false};
 let active;

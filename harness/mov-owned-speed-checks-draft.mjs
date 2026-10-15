@@ -3,10 +3,10 @@
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {readFileSync, writeFileSync} from 'node:fs';
+import {readFileSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
-import {gzipSync} from 'node:zlib';
+import {captureWriter, finishCapture, format} from './mov-original-capture-stream.mjs';
 import {encode} from './state-codec.mjs';
 
 const pin = 'e4e579a838aabae3b1d9dadbc17a0a87147bc52d';
@@ -63,17 +63,19 @@ function witness(g) {
 let active;
 const ids = new WeakMap();
 let nextGame;
+let nextCall;
 function observe(op, g, input, call) {
-  const event = {op, game: ids.get(g), input: encode(input), before: witness(g)};
-  active.calls.push(event);
+  const id = nextCall++;
+  capture.write({type: 'action-start', case: caseIndex, call: id,
+    event: {op, game: ids.get(g), input: encode(input), before: witness(g)}});
   try {
     const result = call();
-    event.result = encode(result);
-    event.after = witness(g);
+    capture.write({type: 'action-end', case: caseIndex, call: id, op, game: ids.get(g), outcome: 'return',
+      event: {result: encode(result), after: witness(g)}});
     return result;
   } catch (error) {
-    event.failure = {name: error.name, message: error.message, stack: error.stack};
-    event.after = witness(g);
+    capture.write({type: 'action-end', case: caseIndex, call: id, op, game: ids.get(g), outcome: 'throw',
+      event: {failure: {name: error.name, message: error.message, stack: error.stack}, after: witness(g)}});
     throw error;
   }
 }
@@ -81,8 +83,8 @@ const sim = {...raw};
 sim.createGame = (...args) => {
   const g = raw.createGame(...args);
   ids.set(g, nextGame++);
-  active.calls.push({op: 'createGame', game: ids.get(g), input: encode(args),
-    initial: encode(g, {runs: true})});
+  capture.write({type: 'create', case: caseIndex, call: nextCall++,
+    event: {op: 'createGame', game: ids.get(g), input: encode(args), initial: encode(g, {runs: true})}});
   return g;
 };
 sim.step = g => observe('step', g, null, () => raw.step(g));
@@ -97,15 +99,20 @@ const packet = {reference: pin, node: process.version, arch: process.arch,
   scope: 'Original Source checks only; no native replay or parity promotion.',
   globalRandom: 'constant 0.5, restored after capture',
   sourceHashes: {'test.js': hash(source), 'test-world-rules.mjs': hash(worldSource),
-    'test-fixtures.js': hash(readFileSync(`${reference}/test-fixtures.js`))}, cases: []};
+    'test-fixtures.js': hash(readFileSync(`${reference}/test-fixtures.js`))}};
+const partial = `${output}.partial.gz`;
+const capture = captureWriter(partial);
+capture.write({type: 'header', format, caseCount: selected.length, packet});
+let caseIndex = -1, completedCases = 0;
 const previousRandom = Math.random;
 let failure;
 try {
   Math.random = () => 0.5;
   for (const spec of selected) {
     nextGame = 1;
-    active = {...spec, sha256: hash(spec.helpers + '\n' + spec.body), calls: [], completed: false};
-    packet.cases.push(active);
+    caseIndex++; nextCall = 0;
+    active = {...spec, sha256: hash(spec.helpers + '\n' + spec.body), completed: false};
+    capture.write({type: 'case-start', case: caseIndex, spec: active});
     let invoked = 0;
     const check = async (name, fn) => { assert.equal(name, spec.name); invoked++; await fn(); };
     const test = (name, fn) => { assert.equal(name, spec.name); invoked++; fn(); };
@@ -115,24 +122,25 @@ try {
         command: spec.file === 'test.js' ? command : publicCommand});
     assert.equal(invoked, 1);
     active.completed = true;
+    capture.write({type: 'case-end', case: caseIndex, calls: nextCall, completed: true});
+    completedCases++;
   }
 } catch (error) {
   failure = error;
   packet.failure = {name: error.name, message: error.message, stack: error.stack};
+  if (active && !active.completed) capture.write({type: 'case-end', case: caseIndex, calls: nextCall, completed: false});
 } finally {
   Math.random = previousRandom;
   try { clean(); } catch (error) {
     packet.sourceReadbackFailure = {name: error.name, message: error.message, stack: error.stack};
     failure ??= error;
   }
-  // A failed original callback retains all preceding observations and its raw error.
-  const compressed = gzipSync(JSON.stringify(packet) + '\n', {level: 9});
-  if (failure) writeFileSync(checking ? `${output}.failed.gz` : output, compressed);
-  else if (checking) {
-    if (!readFileSync(output).equals(compressed)) writeFileSync(`${output}.different.gz`, compressed);
-    assert.deepEqual(readFileSync(output), compressed, 'original full callback recording is reproducible');
-  }
-  else writeFileSync(output, compressed);
+  // Completed records are already on disk, including before/after failure evidence.
+  capture.write({type: 'footer', cases: caseIndex + 1,
+    ...(packet.failure ? {failure: packet.failure} : {}),
+    ...(packet.sourceReadbackFailure ? {sourceReadbackFailure: packet.sourceReadbackFailure} : {})});
+  capture.close();
+  finishCapture(partial, output, checking, Boolean(failure));
 }
 if (failure) throw failure;
-console.log(`${packet.cases.length} original Source checks completed; native consumers remain pending`);
+console.log(`${completedCases} original Source checks completed; native consumers remain pending`);

@@ -1,5 +1,10 @@
 # MOV03-08 consumer readiness, source only
 
+The preparation text below records parent9e424, before its two later failed
+original recorder runs. Neither produced a packet. Its whole-packet capture
+format and command block are superseded by the [source-only streaming
+successor](mov-original-stream-capture-design.md), which has no new execution.
+
 Private branch starts at fixed main396f and preserves d1e426dd/40229feb.
 Published PR256 at6fb63193 is read-only; queue256 then259 remains with Root.
 No parity file or status cell is edited. Source, Node syntax checks, Cargo,
@@ -31,7 +36,9 @@ Total41 static assertion sites. This number describes Source text, not an
 executed assertion count or41 native tests. The two companion packets require
 the separately generated original capture, bind its bytes and callback IDs,
 and refuse an original failure. They do not replace original cleared-map
-admission. Any first Source error retains the partial packet before throwing;
+admission. A caught Source error retains partial evidence before throwing; fatal V8 aborts
+did not reach the old final packet write. The streaming successor retains
+completed records as it runs. A
 check mismatch keeps the differing packet beside the original output.
 
 ## MOV05/06/07: canonical public construction and purchase
@@ -152,16 +159,16 @@ unexecuted seeded bench reaches them. No guard or order is weakened.
 
 ## Exact pending commands and counts
 
-No slot is granted by this plan. Use /usr/bin/node24.21.0 in Root's explicit
+No slot is granted by this plan. Use /usr/bin/node --max-old-space-size=4096 in Root's explicit
 recorder scope. Preserve the first raw failure and stop before another stage.
 
 ```sh
-WW2_REFERENCE=/home/judiazm/Projects/ww2-rts-native/reference/ww2-rts /usr/bin/node24.21.0 harness/mov-owned-speed-checks-draft.mjs /tmp/mov-original-speed.json.gz
-WW2_REFERENCE=/home/judiazm/Projects/ww2-rts-native/reference/ww2-rts /usr/bin/node24.21.0 harness/mov-owned-speed-checks-draft.mjs /tmp/mov-original-speed.json.gz --check
-WW2_REFERENCE=/home/judiazm/Projects/ww2-rts-native/reference/ww2-rts /usr/bin/node24.21.0 harness/mov-terrain-companion-fixture.mjs /tmp/mov-original-speed.json.gz /tmp/mov-terrain-companion.json.gz
-WW2_REFERENCE=/home/judiazm/Projects/ww2-rts-native/reference/ww2-rts /usr/bin/node24.21.0 harness/mov-terrain-companion-fixture.mjs /tmp/mov-original-speed.json.gz /tmp/mov-terrain-companion.json.gz --check
-WW2_REFERENCE=/home/judiazm/Projects/ww2-rts-native/reference/ww2-rts /usr/bin/node24.21.0 harness/mov-world-distance-fixture.mjs /tmp/mov-original-speed.json.gz /tmp/mov-world-distance.json.gz
-WW2_REFERENCE=/home/judiazm/Projects/ww2-rts-native/reference/ww2-rts /usr/bin/node24.21.0 harness/mov-world-distance-fixture.mjs /tmp/mov-original-speed.json.gz /tmp/mov-world-distance.json.gz --check
+WW2_REFERENCE=/home/judiazm/Projects/ww2-rts-native/reference/ww2-rts /usr/bin/node --max-old-space-size=4096 harness/mov-owned-speed-checks-draft.mjs /tmp/mov-original-speed-stream.jsonl.gz
+WW2_REFERENCE=/home/judiazm/Projects/ww2-rts-native/reference/ww2-rts /usr/bin/node --max-old-space-size=4096 harness/mov-owned-speed-checks-draft.mjs /tmp/mov-original-speed-stream.jsonl.gz --check
+WW2_REFERENCE=/home/judiazm/Projects/ww2-rts-native/reference/ww2-rts /usr/bin/node --max-old-space-size=4096 harness/mov-terrain-companion-fixture.mjs /tmp/mov-original-speed-stream.jsonl.gz /tmp/mov-terrain-companion.json.gz
+WW2_REFERENCE=/home/judiazm/Projects/ww2-rts-native/reference/ww2-rts /usr/bin/node --max-old-space-size=4096 harness/mov-terrain-companion-fixture.mjs /tmp/mov-original-speed-stream.jsonl.gz /tmp/mov-terrain-companion.json.gz --check
+WW2_REFERENCE=/home/judiazm/Projects/ww2-rts-native/reference/ww2-rts /usr/bin/node --max-old-space-size=4096 harness/mov-world-distance-fixture.mjs /tmp/mov-original-speed-stream.jsonl.gz /tmp/mov-world-distance.json.gz
+WW2_REFERENCE=/home/judiazm/Projects/ww2-rts-native/reference/ww2-rts /usr/bin/node --max-old-space-size=4096 harness/mov-world-distance-fixture.mjs /tmp/mov-original-speed-stream.jsonl.gz /tmp/mov-world-distance.json.gz --check
 ```
 
 After successful recording and explicit Root fixture freeze, install the two
