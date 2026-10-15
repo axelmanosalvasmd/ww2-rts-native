@@ -3,6 +3,7 @@
 Unreleased entries that are not yet collected live in `changelog.d/`, one file per change.
 
 ## Unreleased
+- Rebase the selected BASE checks onto main `cd5760c4`, preserving the Tutorial provider and its three ported rows. BASE-28 alone is a ported candidate, supported by complete B05, the paid-placement/collapse/rubble corridor and 61 exact Source component frame pairs at `0d2df9f8`; BASE-26/29/30/48 retain their provider gaps. Keep the owned DESIGN notes beside the wallet section and historical results on their producing heads, including nine selected passes, fmt and strict Clippy at `3c07bb9f`. The final rebased head requires fresh nine-check validation and independent whole-row review before publication.
 - Normally merge landed World #202 main `9f0190ef` into reconnect `935dccdc`, retaining both complete tracking histories and the exact corrected socket test. All main runtime, tests, helpers, fixtures, CI, ABI/header and reference entries remain exact except the original test registration. Preserve the old interrupted evidence and keep prior test counts on their original heads. Under the owner's test-only policy, run only the named focused test; separate review, fresh hosted checks and the ordered per-worker head report remain required before publication.
 
 
