@@ -146,6 +146,79 @@ mapping and #259/#260 delivery queue remain separate. This capture-only
 successor addresses Root's retention request without a contract, outcome or
 publication decision. No public acknowledgment is sent.
 
+## Mandatory-field repair after review of 5669
+
+Parent `5669c6b5d1e18668e1e9066ad61f82aaf90bbcc8` is preserved at
+`held/mov-speed-stream-5669-20261015`. Full review read from
+`/tmp/review-mov5669-stream-capture/REVIEW.md`: REVISE for P2, missing
+mandatory input validation. Its preservation findings otherwise accept the
+Source bodies, 41 assertions, witness, codec and RNG handling. The review's
+remove-input mutation is source-derived. Neither reviewer nor this repair
+executed that mutation, and no passing mutation-test result is claimed.
+
+The repair changes only this design, the streaming reader, direct CHANGELOG
+and the owned DESIGN note. Writer/finishCapture, all three recorders, codec,
+callbacks, helpers, inputs, raw before/after production, companions, Rust,
+registrations, fixtures, rows and reference remain byte-identical to 5669.
+There is no format-version change or new capture normalization. Existing
+valid v1 data remains the intended input, with stronger structural rejection.
+
+Validation follows actual producer shapes: state-codec.mjs:9-23;
+sim.js createGame:709-824, setupWorld:1167-1171, spawnUnit:1776-1807 and
+setupStructures:2465-2466; world-layers.js:53-66; and the recorder's own
+witness and action adapters. The temporary fixture maker in test-fixtures.js
+is inserted/removed within the wrapped fixtureCommand call, so its abbreviated
+actor is not a before/after witness. The reader never fabricates that actor
+or changes the original fixture helper.
+
+Static lexical readback confirmed the reader's complete 98-key actor field
+set equals the pinned spawnUnit declaration, and all 46 createGame literal
+keys are mandatory alongside subsequent terrain/setup fields. The writer,
+comparison/finalization code, gzip/UTF-8 pipeline and digest return are
+byte-identical to 5669. Exactly four owned paths change. No JavaScript was
+imported, parsed by Node or executed to obtain these source comparisons.
+
+Every record is recursively checked as encoded JSON before discarded evidence
+can be admitted: exact codec wrapper structure, ordered map pairs/sets, typed
+arrays or value/count runs, positive run counts and encoded numeric forms.
+Runs are counted without expansion. Each fixed constructor/actor field from
+the pinned declarations must be an own field. All supplied conditional fields
+and nested values are validated too; no input or state field is stripped or
+replaced. Witnesses require every named top-level field, complete selected
+player rows, declared actor fields, motion-bit row identity/shape, matching
+terrain lengths, nullable height/weather and explicit non-World undefined
+regions. Initial constructor arrays require map/name argument shapes, the
+full fixed game envelope, typed terrain, players, maps/sets, initialTerrain,
+and the conditional World envelope. Schema checks read values only.
+
+| Source-derived counterexample | Rejection in the repair |
+| --- | --- |
+| Delete create event.input, or replace its argument array with null/object | own(op/game/input/initial), array and constructor-argument shape checks fail. |
+| Delete action-start event.input | own(op/game/input/before) fails before the record can be discarded. |
+| Keep step input null | Legal. Input is present and the step adapter's exact null shape passes; no undefined default is inserted. |
+| Missing/malformed operation or game ID, reuse a constructor ID, or reference an uncreated game | Required own fields, integer identities, exact createGame operation, action operation switch and case-local consecutive created-game map reject. |
+| Missing/mismatched/repeated call ID or end operation/game | Consecutive start IDs and the open-call map require a matching begun pair, consumed once in the same case. |
+| Delete a required initial/before/after witness field, nested selected player field or declared actor field | Own-field schemas reject rather than supplying an empty/default value. |
+| Replace a terrain codec tag, remove its payload, corrupt RLE pairs/counts or mismatch cell lengths | Recursive codec, typed container and length checks reject without expanding the evidence. |
+| Remove or mistype thrown failure.name/message/stack | errorShape requires all three own string fields; throw also forbids result. |
+| Omit success result because Source returned undefined | Still legal only in the existing return envelope. Required input/after are independently checked; missing input cannot use this exception. |
+| Remove footer, leave an open action, or mark a case failed | Existing completion/failure checks still reject. |
+
+The reader retains at most current-record validation temporaries, five case
+metadata objects, unresolved call identities and case-local created-game
+metadata (cell count, player count and World flag). It never stores witnesses
+in those maps. The writer, fatal partial-file behavior, short-write loop,
+compression and exact check comparison are unchanged. A single record can
+still exhaust memory; neither bounded-run resource success nor I/O-error
+recovery is proved here. Both old exit134 logs remain untouched.
+
+MOV11/49 have transferred to ALIGNED_REPLAY by Root's 15:51 instruction.
+This capture repair edits no parity file or targeted aligned scenario. Other
+owned and held scopes stay intact. Issue5 was read through Axel readback162,
+source comment6196151342; no public acknowledgment or
+contract change is made. Future commands/counts below remain preparation,
+not a grant. A fresh independent reader review must precede Source execution.
+
 ## Commands prepared for a future grant only
 
 Read back the actual successor SHA and clean state before any execution.
