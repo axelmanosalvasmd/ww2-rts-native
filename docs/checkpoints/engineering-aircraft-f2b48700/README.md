@@ -1,0 +1,11 @@
+# Aircraft weather consumer: FAILED / HELD
+
+The complete original candidate is preserved at `refs/heads/held/eng-five-row-aircraft-f2b48700`, commit `f2b48700c6e91ebf8dfc80e63d1b0155795bb02c`. Its aircraft test failed with `aircraft admission: aircraft automatic ground-fire actuator is unavailable` before the first Clear-weather patrol tick. It has no passing aircraft timeline result.
+
+The adjacent `.rs` file contains the original test function verbatim, including its test attribute, body and assertions. It is an unregistered checkpoint outside the Rust test trees. Its helpers remain unchanged in `rust/crates/simtest/tests/engineering_consumers.rs`; this checkpoint is not a standalone test target. The supported candidate's registered gate selects the other 20 original checks. This is an explicit scope split authorized by Root, with no row promotion or runtime fix.
+
+The actual boundary is `match_tick.rs:335-337` through `match_aircraft_ticks.rs:7-10` and `:101`, reaching `match_aviation.rs:545-548`. That provider rejects an active plane with firing enabled because automatic ground fire is unavailable. Mission admission also refuses that condition at `match_aviation.rs:398-401`. The Source actor retains its original firing condition, patrol and complete five-weather capture. Inputs, recorded aircraft frames, expected bit values and provider guards remain intact.
+
+Pending consumer work requires a separately scoped provider decision and implementation for the Source aircraft turn's automatic target selection and firing (`shared/sim.js:2198-2236`). This checkpoint makes no such change. The separate native AI weather/sight/caution gap and public aircraft-row refusal also remain held. Restore and execute the preserved function only after the relevant provider is supported and Root grants validation. No ignored test or substituted passing assertion represents this missing consumer.
+
+Historical receipts remain tied to their exact heads: the two travel tests passed only at `4b0471d5`; `f2b48700` passed the other 18 supported checks and retained this one aircraft refusal. Fresh supported-candidate checks after the ordered main merge do not turn that aircraft result into a pass. The original Source captures and raw failure logs remain preserved.

@@ -1,5 +1,12 @@
 # Three Crossroads Native: design decisions
 
+## Engineering supported scope and held aircraft consumer (2026-10-15)
+
+The supported engineering gate contains 20 original checks. Preserve the full `f2b48700` candidate under `refs/heads/held/eng-five-row-aircraft-f2b48700` and move its aircraft test function verbatim to the [unregistered checkpoint](docs/checkpoints/engineering-aircraft-f2b48700/README.md). That function remains FAILED / HELD: the first firing-enabled Clear patrol is refused before tick 1 because the automatic aircraft ground-fire actuator is unavailable. Its Source input and complete five-weather capture remain intact. The checkpoint records the precise provider boundary and pending consumer work.
+
+This explicit scope split changes no runtime, guard, setup, expected value, policy, ABI or row status. The two historical travel passes belong only to `4b0471d5`; the other 18 supported passes and aircraft refusal belong to `f2b48700`. A fresh supported-head gate after the ordered main merge selects all 20 supported checks, with separate actual-head review and hosted checks still required. The missing AI weather/sight/caution consumer and public aircraft-row refusal remain held.
+
+
 ## Five engineering rows: actual-consumer preparation (2026-10-15, source only)
 
 Extend the frozen `64d750e9` preparation on fixed main `446671b9` for the exclusively assigned ENG-59/73/74/75/76 rows. Preserve every prior test, fixture, assertion and status. New authored inputs and an unexecuted Source recorder prepare 22 travel scenes, four routes, four live-weather scenes, 620 warning ticks, four rifle sight scenes, five flying-plane scenes and 313 constructor plan cases. Eight new tests call actual Match movement/weather, pathfinding, vision, aircraft, constructor and recipient snapshot consumers. No target output is fabricated; authentic captures, compilation and results remain pending.
