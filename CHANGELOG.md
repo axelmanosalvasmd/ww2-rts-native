@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Apply the two mechanical rustfmt line wraps in the new MOV together-march assertions after preserving the failed format-check log. No assertion, input, fixture or behavior changes; native validation remains pending.
+
 - Freeze the authentic thirteen-scene MOV terrain/together fixture after Source generation and exact compressed-byte regeneration both pass at `51730145`. Preserve the original map-admission failure and older fixtures in their producing commits. Native validation remains pending; no row status changes.
 
 - Correct the private MOV companion input with one open neutral capture point worth zero MP and VP, preserving native map admission. Add a real Motor Pool tank/AT together march with the original slowest-speed, twenty-tick level-travel and plain-order reset predicates. Source recapture and native checks remain pending; retained failure packets and parity statuses are unchanged.

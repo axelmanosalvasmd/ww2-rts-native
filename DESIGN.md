@@ -1,5 +1,9 @@
 # Three Crossroads Native: design decisions
 
+## MOV together-test mechanical formatting (2026-10-15)
+
+The first guarded fmt check on fixture child `c46fa019` exits1 for two assertion line wraps in the new together test. The authorized formatter exits0 and changes only those wraps. Literal/assertion order and all Source inputs, fixtures and runtime stay unchanged. Freeze this mechanical child before the exact six native instances. The diagnostic remains `/tmp/mov-55cfa430-neutral-together/04-fmt-check.log`.
+
 ## Authentic thirteen-scene MOV capture (2026-10-15)
 
 At clean `51730145d43dc480525a8c4c86421b32b53b101c`, the sole authorized Source generation and regeneration check both exit0. The check requires exact compressed-byte equality. All thirteen scenes complete with 15203 physical frames and 58 ordinary commands, including the new tank/AT twenty-tick march and pace reset. Reuse the unchanged original five-callback packet from `3a97ed37`; no original or World recorder repeats. The actual output is `/tmp/mov-55cfa430-neutral-together/terrain.json.gz`.

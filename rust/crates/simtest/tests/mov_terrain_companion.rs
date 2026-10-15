@@ -716,8 +716,7 @@ fn original_together_twenty_ticks_and_plain_order_reset() {
     let gun = scene.aliases["gun"];
     let slowest = scene.m.rules.kinds[scene.m.world.game.units[&gun].kind].speed;
     assert_eq!(
-        scene.m.world.game.units[&tank].pace,
-        slowest,
+        scene.m.world.game.units[&tank].pace, slowest,
         "the group marches at its slowest unit"
     );
     assert_eq!(scene.m.world.game.units[&gun].pace, slowest);
@@ -749,8 +748,7 @@ fn original_together_twenty_ticks_and_plain_order_reset() {
         face: None,
     });
     assert_eq!(
-        scene.m.world.game.units[&tank].pace,
-        0.0,
+        scene.m.world.game.units[&tank].pace, 0.0,
         "a plain order drops the march pace"
     );
     assert_eq!(
