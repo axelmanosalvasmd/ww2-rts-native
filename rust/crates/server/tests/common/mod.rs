@@ -15,6 +15,84 @@ use ww2_core::client_view::ClientView;
 
 static NEXT: AtomicU64 = AtomicU64::new(1);
 
+// The child may expose only part of a JSON record, including a UTF-8 tail.
+fn complete_records<'a>(
+    bytes: &'a [u8],
+    prefix: &'a [u8],
+) -> impl Iterator<Item = serde_json::Result<Value>> + 'a {
+    bytes
+        .split_inclusive(|&byte| byte == b'\n')
+        .filter(|line| line.ends_with(b"\n"))
+        .filter_map(move |line| line.strip_prefix(prefix))
+        .map(serde_json::from_slice)
+}
+
+#[test]
+fn private_receipt_records_wait_for_complete_lines() {
+    for prefix in [b"NATIVE_MATCH ".as_slice(), b"NATIVE_FAULT ".as_slice()] {
+        let first = json!({"name":"é", "record":0});
+        let next = json!({"name":"雪", "record":1});
+        let line = |value: &Value| {
+            let mut bytes = prefix.to_vec();
+            bytes.extend(serde_json::to_vec(value).unwrap());
+            bytes.push(b'\n');
+            bytes
+        };
+        let prior = line(&first);
+        let pending = line(&next);
+        let mut split_utf8 = false;
+        for split in 0..=pending.len() {
+            split_utf8 |= std::str::from_utf8(&pending[..split]).is_err();
+            let mut bytes = prior.clone();
+            bytes.extend_from_slice(&pending[..split]);
+            let expected = if split == pending.len() {
+                vec![first.clone(), next.clone()]
+            } else {
+                vec![first.clone()]
+            };
+            assert_eq!(
+                complete_records(&bytes, prefix)
+                    .collect::<Result<Vec<_>, _>>()
+                    .unwrap(),
+                expected,
+                "split {split}"
+            );
+            assert_eq!(
+                complete_records(&pending[..split], prefix)
+                    .collect::<Result<Vec<_>, _>>()
+                    .unwrap(),
+                if split == pending.len() {
+                    vec![next.clone()]
+                } else {
+                    vec![]
+                },
+                "standalone split {split}"
+            );
+            bytes.extend_from_slice(&pending[split..]);
+            assert_eq!(
+                complete_records(&bytes, prefix)
+                    .collect::<Result<Vec<_>, _>>()
+                    .unwrap(),
+                vec![first.clone(), next.clone()]
+            );
+        }
+        assert!(
+            split_utf8,
+            "the split points must include a partial UTF-8 character"
+        );
+        for invalid in [b"{bad}\n".as_slice(), b"{\"name\":\"\xff\"}\n".as_slice()] {
+            let mut malformed = prefix.to_vec();
+            malformed.extend_from_slice(invalid);
+            assert!(
+                complete_records(&malformed, prefix)
+                    .next()
+                    .unwrap()
+                    .is_err()
+            );
+        }
+    }
+}
+
 pub struct BinaryServer {
     child: Child,
     pub address: SocketAddr,
@@ -66,21 +144,16 @@ impl BinaryServer {
         fs::read_to_string(&self.log).unwrap()
     }
     pub fn receipts(&self) -> Vec<Value> {
-        self.log()
-            .lines()
-            .filter_map(|line| line.strip_prefix("NATIVE_MATCH "))
-            .map(|line| serde_json::from_str(line).unwrap())
-            .collect()
+        complete_records(&fs::read(&self.log).unwrap(), b"NATIVE_MATCH ")
+            .collect::<Result<_, _>>()
+            .unwrap()
     }
     pub fn wait_fault(&self) -> Value {
         let began = std::time::Instant::now();
         loop {
-            if let Some(line) = self
-                .log()
-                .lines()
-                .find_map(|line| line.strip_prefix("NATIVE_FAULT "))
-            {
-                return serde_json::from_str(line).unwrap();
+            let bytes = fs::read(&self.log).unwrap();
+            if let Some(record) = complete_records(&bytes, b"NATIVE_FAULT ").next() {
+                return record.unwrap();
             }
             assert!(
                 began.elapsed() < Duration::from_secs(90),
