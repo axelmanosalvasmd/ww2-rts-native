@@ -81,6 +81,8 @@ mod match_tick_companions;
 mod match_tick_events;
 #[path = "../movement.rs"]
 mod movement;
+#[path = "../movement_existing_checks.rs"]
+mod movement_existing_checks;
 #[path = "../movement_routing.rs"]
 mod movement_routing;
 #[path = "../navigation.rs"]
