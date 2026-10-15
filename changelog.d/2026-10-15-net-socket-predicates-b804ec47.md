@@ -1,0 +1,2 @@
+- Prepare Source-backed recorder and ordinary binary socket predicates for malformed JSON, complete numeric-slot/authority guards and start/reconnect decoder resets. Source recording, formatting and native execution remain pending a central-ledger grant; no parity status changes.
+- Keep the original NET title/name/capacity runtime gaps and literal seat/reconnect acceptance gaps held. The additional-row search found one strong complete candidate, NET-34, rather than padding the batch with narrower or repeated evidence.
