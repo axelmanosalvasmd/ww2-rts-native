@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## Authentic thirteen-scene MOV capture (2026-10-15)
+
+At clean `51730145d43dc480525a8c4c86421b32b53b101c`, the sole authorized Source generation and regeneration check both exit0. The check requires exact compressed-byte equality. All thirteen scenes complete with 15203 physical frames and 58 ordinary commands, including the new tank/AT twenty-tick march and pace reset. Reuse the unchanged original five-callback packet from `3a97ed37`; no original or World recorder repeats. The actual output is `/tmp/mov-55cfa430-neutral-together/terrain.json.gz`.
+
+Both jobs verify CPU8-11, memory6442450944, swap0 and quota400%, with Node24.21.0 x64 heap4096 and an inherited exclusive S3 lock. An initial scratch preflight exits before Node or lock acquisition because an optional cpuset controller file is absent; the corrected scratch check retains the required actual kernel affinity and memory/swap/quota checks. This is no Source retry. Freeze only the authentic terrain fixture before the exact granted six-instance native selection. No native success or row eligibility is inferred from Source results.
+
 ## MOV neutral-point input and together-march consumer (2026-10-15)
 
 The recovered terrain manifest has `points: []`, which the actual native attempt rejected before Match construction. Give both independent map builders the same authored open point at cell (40,90), with MP and VP both zero. This point is below the measurement band and away from the retained producer yard. Keep every actor, footprint, original distance window, native guard and old failure. This is a disclosed successor input requiring fresh Source generation/check; do not patch the old expected fixture or treat its frames as new results.

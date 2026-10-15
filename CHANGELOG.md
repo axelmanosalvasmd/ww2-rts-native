@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Freeze the authentic thirteen-scene MOV terrain/together fixture after Source generation and exact compressed-byte regeneration both pass at `51730145`. Preserve the original map-admission failure and older fixtures in their producing commits. Native validation remains pending; no row status changes.
+
 - Correct the private MOV companion input with one open neutral capture point worth zero MP and VP, preserving native map admission. Add a real Motor Pool tank/AT together march with the original slowest-speed, twenty-tick level-travel and plain-order reset predicates. Source recapture and native checks remain pending; retained failure packets and parity statuses are unchanged.
 
 - Recover MOV companion checkpoint `389ac81141` onto frozen main `379ba4e0` with a normal merge that retains both histories. Preserve both captured fixtures and the actual native map-admission failure. This source-only checkpoint changes no runtime or parity status.
