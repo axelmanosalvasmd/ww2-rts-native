@@ -1,5 +1,23 @@
 # CMB-61 missing flame components, source-only preparation
 
+## Current result: three exact tests and strict lint pass
+
+Producing head: `25c76d6c0bb5be6384d95ee2db3c63847baed07f`, a clean direct child of `281f4b36`. Rust tree: `ec3b8ac10b09a8090071bd07534c8516ec6206e2`. The authorized metadata-only recursive comparator uses exact f64 bits for numbers, exact object key sets, ordered equal-length arrays and strict nonnumeric values, without mutation. Replay comparisons, every outcome assertion and integer identity checks elsewhere remain byte-identical. Authored inputs, Source, both fixtures and the old firing suite remain exact.
+
+| Granted check | Actual result at producing head | Predicate scope |
+| --- | --- | --- |
+| Workspace fmt check | PASS, exit 0 | Formatting only |
+| `match_firing_flame::cmb61_flame_launch_accuracy_ignores_trench_and_garrison` | 1 passed, 0 failed, 219 filtered | Six launch scenes in Default/Conquest; all 384 state/RNG checkpoints plus the final flame-equal/rifle-different paired velocity assertions |
+| `match_firing_flame::cmb61_flame_target_value_has_decisive_one_point_five_preference` | 1 passed, 0 failed, 219 filtered | Ten choice scenes in both modes; all 20 state/RNG checkpoints and final selected-target/no-launch assertions. Covered target at 12 m wins versus 8.1 m open target and loses versus 7.9 m, with open/rifle/unseen/dead controls |
+| `every_test_file_is_compiled` | 1 passed, 0 failed, 219 filtered | Actual simtest integration registration guard |
+| `cargo clippy --locked --workspace --all-targets -j4 -- -D warnings` | PASS, exit 0 | Fresh granted strict workspace/all-target invocation |
+
+Exactly three unique native test instances ran in this renewal. Source reruns 0; old damage/suppression or firing test repeats 0; full/release/discovery 0. Authentic Source generation/check remains the earlier two successful executions at preparation 7a762f65, frozen in a5411f79 with 16 scenes and 202 checkpoints. Both older metadata test failures remain 0 passed/1 failed on 556a2ad5 and d01d213a. Earlier partial traversal is not reclassified as a test pass.
+
+Raw logs: `/tmp/cmb61-flame-s3-25c76d6c/{fmt,accuracy,choice,registry,clippy}.log`. All commands run serially under S3, CPUs 8-11, 6 GiB memory, swap 0, quota 400%, jobs 4, threads 1 and the current guard's exclusive S3 target/lock with 20 GiB floor. Native dep-info `it-6576708762656383.d` and Clippy dep-info `it-884b87c31258606f.d` include the new consumer. Workspace provenance under key `cde5f99448f48ff551b5cdd7` binds the compiler to this absolute checkout and producing Rust tree.
+
+CMB-61 launch accuracy and target preference now have these focused passes for Root review. Damage 9/13.5 and flame suppression retain their existing producing main 396f component proof, without reruns. Actual CMB-61 status remains in progress; Root still owns whole-row review, any status change and publication. CMB-69 remains only an unapplied Rust/Status proposal. All 160 combat rows and their literal acceptance remain unchanged. Local ack of Hermes 155 preserves the pin, contracts and Root queue 256 then 259; this stream makes no whole-match, runtime or interface decision. The sections below are historical checkpoints.
+
 ## Renewed S3 result after the authorized hitAt repair
 
 Tested head: `d01d213a999c2d1cacbc3e50be79e8e7b009e857`, a clean direct child of `0563eb91`. Its Rust tree is `f98be6df380f133240d36cd8acacc9fd539ca29d`. Only the new consumer's metadata comparison changes: every actor's `hitAt` must have equal `as_f64().to_bits()` on both sides, then only those verified cells are canonicalized in local metadata clones for strict whole-JSON equality. Every other field/type remains strict. The entire consumer outside that block, all replay assertions, authored inputs, both Source recorders/fixtures, old tests, registry, parity table and CMB-69 proposal remain exact. No metadata clone initializes native state.

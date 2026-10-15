@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Verify the CMB-61 metadata comparator and existing firing consumers at `25c76d6c`: launch accuracy, x1.5 target preference and the simtest registration guard each pass, with formatting and strict locked workspace/all-target Clippy. Keep the authentic fixture and both earlier failures intact; CMB-61 awaits Root whole-row review and no status is changed.
+
 - Compare CMB-61 input metadata recursively with exact f64 bits for JSON numbers, exact object key sets, ordered arrays and strict nonnumeric values. Replace the field-specific representation exception without mutating metadata or changing any replay comparison, input or fixture. Preserve both earlier failed test logs.
 
 - Retain the renewed CMB-61 failure at `d01d213a`: exact `hitAt` comparison succeeds, then strict metadata equality rejects a choice actor's integer versus float `cooldown`. The accuracy test reports 0 passed and 1 failed; stop without widening normalization. Target-choice, registry and Clippy remain unrun.

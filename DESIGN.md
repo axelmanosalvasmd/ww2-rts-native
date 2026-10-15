@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## CMB-61 renewed exact checks pass (2026-10-15)
+
+At clean producing head `25c76d6c0bb5be6384d95ee2db3c63847baed07f`, the granted sequence passes: workspace fmt, `match_firing_flame::cmb61_flame_launch_accuracy_ignores_trench_and_garrison`, `match_firing_flame::cmb61_flame_target_value_has_decisive_one_point_five_preference`, `every_test_file_is_compiled`, then strict locked workspace/all-target Clippy. There are three unique exact test instances, each 1 passed and 0 failed, with 219 filtered out. The two behavior tests exercise all 16 recorded scenes in both modes: 384 launch checkpoints and 20 choice checkpoints, including final paired-velocity and target-choice assertions.
+
+The authentic Source fixture remains the earlier 16-scene/202-checkpoint capture at `a5411f79`; no Source or old component case is rerun. The metadata helper alone adopts exact JSON Number semantics; every replay assertion, authored/recorded byte and ordinary firing fixture/test remains unchanged. Preserve both earlier 0-pass/1-fail logs on their original heads. Existing flame damage and suppression proof remains attributed to main 396f. CMB-61 remains in progress for Root whole-row review and CMB-69 remains an unapplied proposal. Logs are under `/tmp/cmb61-flame-s3-25c76d6c/`; tests and Clippy use S3, CPUs 8-11, 6 GiB/swap 0, quota 400%, jobs 4/threads 1, the current guard and its 20 GiB disk floor. No status or publication change.
+
 ## CMB-61 exact JSON Number semantics for metadata (2026-10-15)
 
 Root authorizes replacing the field-specific `hitAt` normalization in the new consumer with a recursive comparator used only for recorded `output.input` versus authored input. JavaScript metadata numbers use one Number type; require their `as_f64().to_bits()` values to match exactly, with no epsilon. Objects require equal key counts and every authored key, so missing or extra keys fail. Arrays require equal lengths and recursively compare each position. All nonnumeric types and values remain strictly equal. The comparator reads metadata without mutation and never initializes the replay match.
