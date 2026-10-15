@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Record the corrected stance diagnostic at 6244c439: all 1,200 ticks and 121/121 checkpoints match with 2,533 equal consumed draws, 13,851 unused and every stance/disposition/recipient branch complete. Raw strict and approved currency-only remain 0/121 at tick-0 holdFire absence versus false. Source generation/check at 6d646c6e, formatting and fresh strict core/simtest Clippy pass. Keep the first failure/probe exact and owner approval pending; private proposal drafts only, no row change.
+
 - Apply mechanical formatting to the stance consumer after preserving the first format-check diff. Authentic corrected Source generation/check pass at 6d646c6e, with all required branches and 35 actual command dispositions; freeze its read-only capture before native. No predicate, registry, scene or input change in this formatting child.
 
 - Retain the read-only gate probe: every old frame/input matches, while the old branch failure still exits 2. Original actor LOS is blocked despite ammo, visibility and 22 m reach within 28 m range; the foe cannot see actor 1 and targets barracks 8. Author one added ordinary actor Move to the observed open lane (23,27) for the single bounded corrected trial. Keep all 34 prior commands, terrain, actors and positive branch assertions. Results pending.
