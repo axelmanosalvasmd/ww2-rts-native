@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## CMB named component witnesses (2026-10-15, draft execution pending)
+
+Append nine automatic ability traces and one dismounted halftrack recovery trace to the maintained recorders. Preserve every older case, assertion and generated fixture byte until an authorized recording. The ability inputs enable ready automatic actors and run the named Source windows: approaching/away MG (2/3 s), vehicle/infantry AP (2 s), recent-hit/healthy/no-history smoke (1 s), and moving/idle Ura (1/1.5 s). Ordinary move commands establish the MG enemy routes and moving conscript route; the bounded ability phase leaves movement positions unchanged. New observations retain the complete existing snapshot comparison and add activation, cooldown, chronology and negative-state assertions. The idle actor receives suppression 70 between phases, following the named Source acceptance.
+
+The recovery append keeps a dismounted rifle squad beside a living allied halftrack halted for two seconds, prepares the existing recovery frame on each tick, and checks 200 reinforcement beats, four-second cadence and per-model manpower/story payment without full-tick income. Existing providers suffice; no runtime, admission, guard, ABI or interface changes are made. CMB-34 through CMB-37 retain their existing complete static checks and 67 numeric leaves. No parity status changes: actual Source regeneration, native replay and independent acceptance review remain pending. Historical successful execution belongs only to its recorded older commit.
+
 ## Parallel Rust verification and dependency caching (2026-10-14)
 
 PR #214 at `ee7bdc3c899b912f229dade7e5d58855052d87b7` separates lint, tests and release into three jobs on each of Ubuntu 24.04, Windows 2025 and macOS 15, for nine jobs total. Strict locked workspace/all-target Clippy remains on all three platforms. Locked workspace tests use cargo-nextest 0.9.148 with Cargo's existing `ci-test` profile and nextest's `ci` profile; explicit locked `cargo test --doc` retains doctests on all three. Locked release FFI builds remain on all three, with strict C11 linking and formation replay on Linux. Test jobs retain the 60-minute limit; lint and release jobs have 30-minute limits.

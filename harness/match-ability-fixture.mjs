@@ -94,6 +94,19 @@ try {
  record('manual-ap-qualifies-against-concrete',[U(1,'at',15,15,{still:20,targetId:2,attackId:2,retarget:100}),U(2,'bunker',30,15,{owner:1})],[command([1]),{op:'weapon',id:1}]);
  record('empty-ammo-preserves-loaded-ap',[U(1,'at',15,15,{still:20,targetId:2,attackId:2,retarget:100,ap:true,logistics:{ammo:0,forced:false,stranded:false}}),U(2,'tank',30,15,{owner:1})],[{op:'weapon',id:1}]);
  record('manual-aimed-unrepresented-project-boundary',[U(1,'rifle',15,15,dirty)],[command([1],25,15)]);
+ // CMB named acceptance windows use ready automatic actors and actual phase calls.
+ // Routes come from the ordinary move command; this component does not advance movement.
+ const window=(ticks,ids=[1])=>Array.from({length:ticks},(_,i)=>phase(ids,.05,11+i));
+ const move=(slot,id,x,z)=>({op:'command',slot,cmd:{t:'move',orders:[[id,x,z]]}});
+ record('cmb-105-approaching-phase-window',[U(1,'mg',20,21,{auto:true,still:5}),U(2,'rifle',45,21,{owner:1,rot:Math.PI})],[move(1,2,22,21),...window(40)]);
+ record('cmb-105-away-phase-window',[U(1,'mg',20,21,{auto:true,still:5}),U(2,'rifle',40,21,{owner:1,rot:0})],[move(1,2,58,21),...window(60)]);
+ record('cmb-118-vehicle-phase-window',[U(1,'at',20,21,{auto:true,still:5,targetId:2}),U(2,'tank',50,21,{owner:1})],window(40));
+ record('cmb-118-infantry-phase-window',[U(1,'at',20,21,{auto:true,still:5,targetId:2}),U(2,'rifle',40,21,{owner:1})],window(40));
+ record('cmb-119-recent-hit-phase-window',[U(1,'tank',20,21,{auto:true,hp:100,atHit:10})],window(20));
+ record('cmb-119-healthy-phase-window',[U(1,'tank',20,21,{auto:true,hp:300,atHit:10})],window(20));
+ record('cmb-119-no-hit-history-phase-window',[U(1,'tank',20,21,{auto:true,hp:100})],window(20));
+ record('cmb-120-moving-phase-window',[U(1,'conscript',20,21,{auto:true,supp:70})],[move(0,1,50,21),...window(20)]);
+ record('cmb-120-idle-phase-window',[U(1,'conscript',20,21,{auto:true,supp:70})],window(30).flatMap(a=>[a,prime(1,{supp:70})]));
  const byName=name=>cases.find(c=>c.name===name),last=name=>byName(name).snapshots.at(-1);
  assert.deepEqual(byName('refusal-precedence-and-selection-success').results,['retreating','cooldown','ammo','cooldown','retreating','needs',null]);
  assert.equal(last('command-ownership-carrier-operative-structure-and-dead').units.find(u=>u.id===5).cd,40);
@@ -107,6 +120,21 @@ try {
  assert.equal(last('autocast-satchel-walks-with-attack-order').units[0].nade.walked,true);
  assert.equal(last('throw-exact-range-and-just-outside').flights.length,1);
  assert.equal(last('barrage-exact-range-and-just-outside').flights.length,4);
+ // Keep the older cases and assertions intact, including their narrower query coverage.
+ const phaseSnapshots=name=>byName(name).actions.flatMap((a,i)=>a.op==='phase'?[byName(name).snapshots[i+1]]:[]);
+ const actor=s=>s.units.find(u=>u.id===1);
+ const phases=[['cmb-105-approaching-phase-window',40],['cmb-105-away-phase-window',60],['cmb-118-vehicle-phase-window',40],['cmb-118-infantry-phase-window',40],['cmb-119-recent-hit-phase-window',20],['cmb-119-healthy-phase-window',20],['cmb-119-no-hit-history-phase-window',20],['cmb-120-moving-phase-window',20],['cmb-120-idle-phase-window',30]];
+ for(const [name,count] of phases){const c=byName(name),states=phaseSnapshots(name);assert.equal(states.length,count);assert.equal(c.snapshots[0].tick,10);for(let i=0;i<count;i++){assert.equal(states[i].tick,11+i);assert.equal(actor(states[i]).control.auto,true);}}
+ for(const name of ['cmb-105-away-phase-window','cmb-118-infantry-phase-window','cmb-119-healthy-phase-window','cmb-119-no-hit-history-phase-window','cmb-120-idle-phase-window'])for(const s of phaseSnapshots(name)){assert.ok(actor(s).cd<=0);assert.equal(actor(s).buff,0);assert.equal(actor(s).ap,false);assert.ok(actor(s).sprint<=0);assert.equal(s.smokes.length,0);}
+ for(const [name,to] of [['cmb-105-approaching-phase-window',22],['cmb-105-away-phase-window',58]]){const c=byName(name);assert.equal(c.results[0],null);const e=c.snapshots[1].units.find(u=>u.id===2);assert.ok(e.path.length);assert.equal(e.path.at(-1).x,to);assert.equal(e.control.worldGoal.x,to);}
+ assert.ok(phaseSnapshots('cmb-105-approaching-phase-window').some(s=>actor(s).cd>0&&actor(s).buff>0));
+ assert.ok(phaseSnapshots('cmb-118-vehicle-phase-window').some(s=>actor(s).cd>0&&actor(s).ap));
+ for(const s of phaseSnapshots('cmb-118-infantry-phase-window'))assert.equal(actor(s).control.targetId,2);
+ const smoke=phaseSnapshots('cmb-119-recent-hit-phase-window').find(s=>s.smokes.length>0&&actor(s).cd>0);assert.ok(smoke);assert.ok(smoke.tick>=10);assert.ok(smoke.tick-10<=60);assert.equal(smoke.smokes.length,1);assert.equal(smoke.smokes[0].r,9);assert.equal(smoke.smokes[0].t,14);
+ for(const [name,cooldown] of [['cmb-105-approaching-phase-window',40],['cmb-118-vehicle-phase-window',45],['cmb-119-recent-hit-phase-window',45],['cmb-120-moving-phase-window',35]]){const s=phaseSnapshots(name).find(s=>actor(s).cd>0);assert.ok(s);assert.equal(s.tick,19);assert.equal(actor(s).cd,cooldown);if(name.startsWith('cmb-105'))assert.equal(actor(s).buff,10);if(name.startsWith('cmb-120'))assert.equal(actor(s).sprint,6);}
+ assert.equal(Object.hasOwn(byName('cmb-119-no-hit-history-phase-window').units[0],'atHit'),false);
+ assert.ok(phaseSnapshots('cmb-120-moving-phase-window').some(s=>actor(s).cd>0&&actor(s).sprint>0&&actor(s).supp===0));
+ for(const s of phaseSnapshots('cmb-120-idle-phase-window')){assert.equal(actor(s).path.length,0);assert.ok(actor(s).supp>=50);}
  clean();const content=JSON.stringify({reference:pin,node:process.version,arch:process.arch,scope:'Original command and autocastTarget; extracted timer, autocast and aimed execution phases. No full tick or public wire claim.',cases})+'\n';
  const path=join(root,'rust/crates/core/tests/fixtures/match-ability.json');if(process.argv.includes('--check'))assert.equal(readFileSync(path,'utf8'),content);else writeFileSync(path,content);
  console.error(`${process.argv.includes('--check')?'Verified':'Recorded'} ${cases.length} match ability traces, ${cases.reduce((n,c)=>n+c.actions.length,0)} actions, ${cases.reduce((n,c)=>n+c.snapshots.length,0)} snapshots`);

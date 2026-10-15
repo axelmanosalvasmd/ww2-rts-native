@@ -63,6 +63,28 @@ fn order(v: &Value, id: u32) -> Command {
     }
 }
 fn command(v: &Value, automatic: bool) -> Command {
+    if v["t"] == "move" {
+        assert!(!automatic);
+        return Command::Move {
+            orders: v["orders"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|o| MoveOrder {
+                    unit: o[0].as_i64().unwrap(),
+                    at: Point {
+                        x: o[1].as_f64().unwrap(),
+                        z: o[2].as_f64().unwrap(),
+                    },
+                })
+                .collect(),
+            control_ids: None,
+            attack_move: false,
+            queue: false,
+            together: false,
+            face: None,
+        };
+    }
     assert_eq!(v["t"], "ability");
     Command::Ability {
         ids: v["ids"]
@@ -489,8 +511,19 @@ fn conquest_abilities_match_original_source_phases() {
     );
     assert_eq!(fixture["node"], "v24.21.0");
     let (mut cases, mut actions, mut unsupported, mut unsupported_work) = (0, 0, 0, 0);
+    let mut appended_cases = std::collections::BTreeSet::new();
+    let mut appended_actions = 0;
     for case in fixture["cases"].as_array().unwrap() {
         let name = case["name"].as_str().unwrap();
+        let appended = name.starts_with("cmb-");
+        let mut activated = false;
+        let mut phase_count = 0;
+        let mut prior_tick = 10;
+        if appended {
+            assert!(appended_cases.insert(name));
+            assert_eq!(case["units"][0]["auto"], true);
+            assert_eq!(case["units"][0].get("cd"), None);
+        }
         let (mut m, order) = make(case);
         if case["mode"] == "classic" {
             m.options.mode = Mode::Classic;
@@ -568,7 +601,9 @@ fn conquest_abilities_match_original_source_phases() {
             unsupported_work += 1;
             continue;
         }
-        cases += 1;
+        if !appended {
+            cases += 1;
+        }
         let mut initial = snapshot(&m, &order, &[]);
         normalize_zero(&mut initial);
         let expected = normalize(case["snapshots"][0].clone());
@@ -578,7 +613,11 @@ fn conquest_abilities_match_original_source_phases() {
             diff(&initial, &expected, "")
         );
         for (index, a) in case["actions"].as_array().unwrap().iter().enumerate() {
-            actions += 1;
+            if appended {
+                appended_actions += 1;
+            } else {
+                actions += 1;
+            }
             m.firing.take_events();
             let mut result = Value::Null;
             if let Some(tick) = a["tick"].as_i64() {
@@ -586,6 +625,9 @@ fn conquest_abilities_match_original_source_phases() {
             }
             match a["op"].as_str().unwrap() {
                 "command" => {
+                    if a["cmd"]["t"] == "move" {
+                        m.begin_path_tick(4096, 1).unwrap();
+                    }
                     result = m
                         .execute_command(
                             a["slot"].as_u64().unwrap() as usize,
@@ -685,6 +727,98 @@ fn conquest_abilities_match_original_source_phases() {
                 "{name} action{index} result {}",
                 diff(&result, &case["results"][index], "")
             );
+            if appended && a["op"] == "phase" {
+                phase_count += 1;
+                assert_eq!(
+                    m.world.game.tick,
+                    prior_tick + 1,
+                    "{name} chronological phase"
+                );
+                prior_tick = m.world.game.tick;
+                let u = &m.world.game.units[&1];
+                let ability = m.abilities.get(1).unwrap();
+                assert!(
+                    m.commands.units[&1].auto_cast,
+                    "{name} enabled automatic actor"
+                );
+                let negative = matches!(
+                    name,
+                    "cmb-105-away-phase-window"
+                        | "cmb-118-infantry-phase-window"
+                        | "cmb-119-healthy-phase-window"
+                        | "cmb-119-no-hit-history-phase-window"
+                        | "cmb-120-idle-phase-window"
+                );
+                if negative {
+                    assert!(
+                        ability.cooldown <= 0.,
+                        "{name} stays ready without activating"
+                    );
+                    assert_eq!(ability.buff, 0.);
+                    assert!(!ability.ap);
+                    assert!(u.sprint <= 0.);
+                    assert!(m.world.game.smokes.is_empty());
+                }
+                if !activated && !negative && ability.cooldown > 0. {
+                    assert_eq!(m.world.game.tick, 19, "{name} first scheduled opportunity");
+                    let cooldown = match name {
+                        "cmb-105-approaching-phase-window" => 40.,
+                        "cmb-118-vehicle-phase-window" | "cmb-119-recent-hit-phase-window" => 45.,
+                        "cmb-120-moving-phase-window" => 35.,
+                        _ => panic!("unexpected positive CMB case {name}"),
+                    };
+                    assert_eq!(ability.cooldown, cooldown);
+                    if name == "cmb-105-approaching-phase-window" {
+                        assert_eq!(ability.buff, 10.);
+                    }
+                    if name == "cmb-120-moving-phase-window" {
+                        assert_eq!(u.sprint, 6.);
+                    }
+                }
+                match name {
+                    "cmb-105-approaching-phase-window" | "cmb-105-away-phase-window" => {
+                        let enemy = &m.world.game.units[&2];
+                        let goal = enemy.path.last().expect("commanded enemy movement path");
+                        if name == "cmb-105-away-phase-window" {
+                            assert!(goal.x > enemy.x && enemy.x > u.x);
+                            assert_eq!(enemy.rot, 0.);
+                        } else {
+                            assert!(goal.x < enemy.x);
+                            activated |= ability.cooldown > 0. && ability.buff > 0.;
+                        }
+                    }
+                    "cmb-118-infantry-phase-window" => {
+                        assert_eq!(m.firing.get(1).unwrap().target_id, 2);
+                        assert!(m.rules.kinds[m.world.game.units[&2].kind].infantry);
+                    }
+                    "cmb-118-vehicle-phase-window" => {
+                        activated |= ability.cooldown > 0. && ability.ap;
+                    }
+                    "cmb-119-recent-hit-phase-window" => {
+                        let hit = m.combat.get(1).unwrap().at_hit.unwrap();
+                        assert!(hit <= m.world.game.tick as f64);
+                        if !m.world.game.smokes.is_empty() {
+                            assert!(m.world.game.tick as f64 - hit <= 60.);
+                            assert_eq!(m.world.game.smokes.len(), 1);
+                            assert_eq!(m.world.game.smokes[0].r, 9.);
+                            assert_eq!(m.world.game.smokes[0].remaining, Some(14.));
+                            activated |= ability.cooldown > 0.;
+                        }
+                    }
+                    "cmb-119-no-hit-history-phase-window" => {
+                        assert_eq!(m.combat.get(1).unwrap().at_hit, None);
+                    }
+                    "cmb-119-healthy-phase-window" => assert_eq!(u.hp, 300.),
+                    "cmb-120-moving-phase-window" => {
+                        activated |= ability.cooldown > 0. && u.sprint > 0. && u.supp == 0.;
+                    }
+                    "cmb-120-idle-phase-window" => {
+                        assert!(u.path.is_empty());
+                        assert!(u.supp >= 50.);
+                    }
+                    _ => panic!("unexpected appended CMB case {name}"),
+                }
+            }
             let expected = normalize(case["snapshots"][index + 1].clone());
             assert!(
                 equal(&actual, &expected),
@@ -692,7 +826,36 @@ fn conquest_abilities_match_original_source_phases() {
                 diff(&actual, &expected, "")
             );
         }
+        if appended {
+            let expected_phases = match name {
+                "cmb-105-approaching-phase-window"
+                | "cmb-118-vehicle-phase-window"
+                | "cmb-118-infantry-phase-window" => 40,
+                "cmb-105-away-phase-window" => 60,
+                "cmb-119-recent-hit-phase-window"
+                | "cmb-119-healthy-phase-window"
+                | "cmb-119-no-hit-history-phase-window"
+                | "cmb-120-moving-phase-window" => 20,
+                "cmb-120-idle-phase-window" => 30,
+                _ => panic!("unexpected appended CMB case {name}"),
+            };
+            assert_eq!(phase_count, expected_phases, "{name} full acceptance window");
+            if matches!(
+                name,
+                "cmb-105-approaching-phase-window"
+                    | "cmb-118-vehicle-phase-window"
+                    | "cmb-119-recent-hit-phase-window"
+                    | "cmb-120-moving-phase-window"
+            ) {
+                assert!(
+                    activated,
+                    "{name} activates inside its named acceptance window"
+                );
+            }
+        }
     }
+    assert_eq!(appended_cases.len(), 9);
+    assert_eq!(appended_actions, 323);
     assert_eq!(cases, 33);
     assert_eq!(unsupported, 2);
     assert_eq!(unsupported_work, 1);
