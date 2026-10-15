@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Rebase NET2 snapshot and cadence checks onto current main, retain the six ported NET rows and held gaps, and move the two original NET2 design notes beside snapshot delivery history without changing their text.
+
 - Rebase the combat vision checks onto main `66592ae8`, retaining all incoming content and relocating the three owned vision notes beside the existing core vision section. Preserve all seven focused checks, three Source oracles and historical failures. CMB-124, CMB-125, CMB-131 and CMB-132 remain ported; CMB-128 remains held for its complete border-ray regression. Earlier test results stay attributed to their original heads.
 
 - Rebase the selected BASE checks onto main `cd5760c4`, preserving the Tutorial provider and its three ported rows. BASE-28 alone is a ported candidate, supported by complete B05, the paid-placement/collapse/rubble corridor and 61 exact Source component frame pairs at `0d2df9f8`; BASE-26/29/30/48 retain their provider gaps. Keep the owned DESIGN notes beside the wallet section and historical results on their producing heads, including nine selected passes, fmt and strict Clippy at `3c07bb9f`. The final rebased head requires fresh nine-check validation and independent whole-row review before publication.

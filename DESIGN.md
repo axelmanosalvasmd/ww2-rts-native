@@ -1,17 +1,5 @@
 # Three Crossroads Native: design decisions
 
-## NET2 socket witnesses (2026-10-15, execution pending)
-
-The successor to source plan `6bd3336d` adds four explicit-clock Hub tests over real WebSocket receivers and one ordinary-executable R1 witness. They check recipient eligibility, skipped producer entry, tick/stall boundaries, selected meter thresholds feeding socket cadence, controlled outstanding-write accounting, stale completion authority, human metadata and drop/reconnect delivery. [The freeze](docs/testing/net-2-socket-freeze.md) records exact tests, Source predicates, held branches and guarded commands. All rows keep their existing status.
-
-The controlled harness reuses the actual upgrade, socket pump, R1 admission and canonical start. It invokes existing Hub polling explicitly instead of running a maintenance timer. Twelve `cfg(test)` lines count nonempty snapshot-producer entries; non-test runtime bytes remain unchanged after removing those insertions. Duration inputs use the existing runtime API, and controlled reservations model outstanding writes without claiming OS saturation. The ordinary executable witness uses the existing process helpers separately. No Source, Cargo, formatter, server or test has executed at this source checkpoint. Root's disk guard, assigned systemd scope, separate review and publication ownership remain required.
-
-## Second server-stream source freeze (2026-10-15)
-
-At baseline `34edf52a7eaa6cb6edba3e802c2190226228276f`, IMPL_NET_2 selects NET-64/65/66/67/69/70/72/74/80/81 for a source-inspected acceptance plan, not a completion claim. [The plan](docs/testing/net-2-row-plan.md) and [full 47-row predicate map](docs/testing/net-2-row-plan.json) preserve the original acceptance requirements and distinguish component fixtures from actual socket consumers. NET-98 is absent from the inventory and ownership map; NET-68 remains another owner's row. All parity statuses stay unchanged.
-
-Keep R1's approved two-human Conquest profile and existing wire/ABI. AI, spectator and client branches prevent full completion claims for several selected rows; missing controlled socket witnesses prevent the others. The native metadata builder has no AI-specific online/ping values, and the current dispatcher leaves host pause/resume unavailable. No runtime change or policy expansion is adopted. Cargo, server execution and Source recorders await an explicit Root slot grant; this documentation freeze has no new runtime proof. Root retains separate review and publication ownership.
-
 ## Engineering supported scope and held aircraft consumer (2026-10-15)
 
 The supported engineering gate contains 20 original checks. Preserve the full `f2b48700` candidate under `refs/heads/held/eng-five-row-aircraft-f2b48700` and move its aircraft test function verbatim to the [unregistered checkpoint](docs/checkpoints/engineering-aircraft-f2b48700/README.md). That function remains FAILED / HELD: the first firing-enabled Clear patrol is refused before tick 1 because the automatic aircraft ground-fire actuator is unavailable. Its Source input and complete five-weather capture remain intact. The checkpoint records the precise provider boundary and pending consumer work.
@@ -2103,6 +2091,18 @@ Ordinary rooms capture raw wreck/node list versions once per immutable send-cach
 The prototype compares JSON strings for lists. Native equality compares JSON content with JavaScript binary64 number equality, preserving negative-zero and integer/float equivalence while ignoring object key insertion order. Reordering otherwise identical object properties no longer causes a redundant resend. This is an internal cache choice; list payloads, array order and role filtering are unchanged. Shared versions remain authoritative outside World, including when one recipient's remembered list changes while the raw cache stays unchanged.
 
 List shape/depth/size validation precedes recipient mutation, and both shared version increments are checked before either is committed. Existing core unit/cell limits bound list sizes and value traversal, with a depth guard of 128 levels. The original-source recorder matches seven traces and 75 steps, including shared cache identity, per-recipient World lists, late/full/reset streams, missing lists, wreck motion and overwriting stale delta flags. This slice does not start rooms, implement backpressure or alter the JSON/C contracts. Native verification remains pending.
+
+## NET2 socket witnesses (2026-10-15, execution pending)
+
+The successor to source plan `6bd3336d` adds four explicit-clock Hub tests over real WebSocket receivers and one ordinary-executable R1 witness. They check recipient eligibility, skipped producer entry, tick/stall boundaries, selected meter thresholds feeding socket cadence, controlled outstanding-write accounting, stale completion authority, human metadata and drop/reconnect delivery. [The freeze](docs/testing/net-2-socket-freeze.md) records exact tests, Source predicates, held branches and guarded commands. All rows keep their existing status.
+
+The controlled harness reuses the actual upgrade, socket pump, R1 admission and canonical start. It invokes existing Hub polling explicitly instead of running a maintenance timer. Twelve `cfg(test)` lines count nonempty snapshot-producer entries; non-test runtime bytes remain unchanged after removing those insertions. Duration inputs use the existing runtime API, and controlled reservations model outstanding writes without claiming OS saturation. The ordinary executable witness uses the existing process helpers separately. No Source, Cargo, formatter, server or test has executed at this source checkpoint. Root's disk guard, assigned systemd scope, separate review and publication ownership remain required.
+
+## Second server-stream source freeze (2026-10-15)
+
+At baseline `34edf52a7eaa6cb6edba3e802c2190226228276f`, IMPL_NET_2 selects NET-64/65/66/67/69/70/72/74/80/81 for a source-inspected acceptance plan, not a completion claim. [The plan](docs/testing/net-2-row-plan.md) and [full 47-row predicate map](docs/testing/net-2-row-plan.json) preserve the original acceptance requirements and distinguish component fixtures from actual socket consumers. NET-98 is absent from the inventory and ownership map; NET-68 remains another owner's row. All parity statuses stay unchanged.
+
+Keep R1's approved two-human Conquest profile and existing wire/ABI. AI, spectator and client branches prevent full completion claims for several selected rows; missing controlled socket witnesses prevent the others. The native metadata builder has no AI-specific online/ping values, and the current dispatcher leaves host pause/resume unavailable. No runtime change or policy expansion is adopted. Cargo, server execution and Source recorders await an explicit Root slot grant; this documentation freeze has no new runtime proof. Root retains separate review and publication ownership.
 
 ## Snapshot write backpressure (2026-10-13)
 
