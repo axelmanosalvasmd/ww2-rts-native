@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## CMB-61 first native failure retained (2026-10-15)
+
+At frozen `556a2ad5e24e22b9e5c4736813b0dbf8da978d49`, formatting passes and the exact accuracy test compiles but fails before constructing a replay match. `match_firing_flame.rs:44` compares complete authored metadata with ordinary `serde_json::Value` equality. Authentic Source serializes `hitAt` as integer `-1000000000`; the authored input retains float `-1000000000.0`. This is the observed metadata representation mismatch, not evidence of a firing-provider defect. Preserve both unchanged and stop under the explicit first-failure rule.
+
+Actual new native count is 0 passed, 1 failed, 219 filtered out. Target-choice, simtest registration execution and fresh strict Clippy were not started. Source generation and serial byte check each passed at preparation `7a762f65`, yielding the frozen 16-scene/202-checkpoint fixture at `a5411f79`. The two allowed formatting wraps are the only consumer changes after that capture. Raw logs remain under `/tmp/cmb61-flame-s3-7a762f65/`; CMB-61 stays held, CMB-69 stays an unapplied proposal, and no old component gate is rerun.
+
 ## CMB-61 formatter-only follow-up (2026-10-15)
 
 The first guarded formatting check at `a5411f79` reports two line-wrap differences in the new flame consumer. Apply only those whitespace changes and verify the complete non-whitespace byte sequence remains exact. Preserve the initial log at `/tmp/cmb61-flame-s3-7a762f65/fmt-check-a5411f79.log`. The authentic Source fixture and all assertions/literals remain unchanged. Freeze this follow-up before the granted formatting recheck and native checks.

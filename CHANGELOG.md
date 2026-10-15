@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Retain the first CMB-61 native test failure at `556a2ad5`: exact authored-input metadata equality rejects Source integer `hitAt` against the input JSON float before firing replay. Stop after 0 passed and 1 failed; target-choice, registry and Clippy checks remain unrun. Source generation/check and the formatting recheck passed. No predicate, input, fixture, runtime or row-status repair is applied.
+
 - Apply the two whitespace-only changes requested by the CMB-61 formatting check. Preserve all test tokens, assertions, literals and the authentic Source fixture. The initial formatting failure is retained; native tests remain pending.
 
 - Record the 16 CMB-61 flame firing scenes from pinned original Source, with 202 checkpoints. Generation and the serial byte check pass with x64 Node 24.21.0 under S3 caps. Preserve the old firing fixture and all row statuses; native comparison remains pending.

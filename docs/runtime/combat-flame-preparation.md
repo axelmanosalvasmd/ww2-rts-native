@@ -1,5 +1,15 @@
 # CMB-61 missing flame components, source-only preparation
 
+## Terminal result under the S3 grant
+
+Producing native head: `556a2ad5e24e22b9e5c4736813b0dbf8da978d49`, Rust tree `c30a8070c28d257273acb10f2c54d74b85e35b82`. Authentic fixture checkpoint: `a5411f799a8887cd83bce2b8bba192f5a69d8a95`. Source generation and serial `--check` each passed at preparation `7a762f65`: 16 actual scenes and 202 actual checkpoints. The first fmt check found two whitespace-only wraps; they were corrected with complete non-whitespace token preservation. The fmt recheck passed at `556a2ad5`.
+
+The first exact native test, `match_firing_flame::cmb61_flame_launch_accuracy_ignores_trench_and_garrison`, compiled and failed: 0 passed, 1 failed, 219 filtered out, exit 101. At `simtest/tests/match_firing_flame.rs:44`, `assert_eq!(output["input"], *input)` sees Source integer `hitAt=-1000000000` and authored JSON float `hitAt=-1000000000.0`. This occurs before `common::make_with_mode` or any firing replay. No firing behavior comparison has passed or failed yet. Preserve the inputs, predicate and authentic fixture exactly; no repair or rerun is authorized by this grant.
+
+STOP applies. Target-choice, the simtest registry guard and fresh strict locked workspace/all-target Clippy remain unrun. CMB-61 remains held for the new launch/choice proof; its old damage/suppression evidence remains attributed to main 396f. CMB-69 remains an unapplied proposal. The raw terminal log is `/tmp/cmb61-flame-s3-7a762f65/accuracy-556a2ad5.log`. Source and fmt logs are beside it. No old Source recorder, damage/suppression test, full/release run or discovery was executed.
+
+Dep-info `it-8f64e9b318a856f5.d` names the new flame consumer and authored inputs. Compiler provenance in `/home/judiazm/.t3/handoffs/ww2-native-cargo-wrappers/1fbc157023959f0c051d20e6/compiler-invocations.jsonl` binds the compiled simtest target to this absolute checkout and the frozen Rust tree above. S3 used CPUs 8-11, 6 GiB memory, swap 0, CPU quota 400%, four Cargo jobs and one test thread. The guard enforced the S3 target, exclusive lock and 20 GiB disk floor.
+
 ## Granted formatting follow-up
 
 The first S3 formatting check at `a5411f79` failed only on two new-consumer line wraps. Apply those exact whitespace changes under the explicit formatter-only allowance. Static comparison confirms every non-whitespace byte, assertion and literal remains unchanged. Keep the raw failure in `/tmp/cmb61-flame-s3-7a762f65/fmt-check-a5411f79.log`. No compile or behavior test has run at this point.
