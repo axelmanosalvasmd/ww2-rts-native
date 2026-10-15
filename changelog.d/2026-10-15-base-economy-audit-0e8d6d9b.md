@@ -1,0 +1,1 @@
+- Audit seven BASE economy/population rows with the unchanged Source-backed checks, mark the fully checked upkeep operation BASE-07 ported, and retain the six broader rows in progress with their exact gaps. All three existing economy-state tests pass.
