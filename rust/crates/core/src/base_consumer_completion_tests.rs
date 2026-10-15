@@ -255,7 +255,7 @@ fn replay(name: &str) -> Match {
                             let c = &m.commands.units[&(ids[0] as u32)];
                             assert_eq!(c.build_target, None);
                             assert!(
-                                matches!(c.orders.first(),Some(Command::Assist { target:t,.. }) if *t==target)
+                                matches!(c.orders.front(),Some(Command::Assist { target:t,.. }) if *t==target)
                             );
                         }
                         _ => {}

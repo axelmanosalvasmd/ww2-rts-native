@@ -1,0 +1,1 @@
+- Correct the BASE consumer test to inspect its VecDeque queue head with `front()`, retaining the exact Assist target assertion. The previous native compile failure is preserved; this repair has not been compiled or run.

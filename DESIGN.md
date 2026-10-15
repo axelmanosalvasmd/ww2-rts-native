@@ -4530,3 +4530,40 @@ selected native tests, strict Clippy, old 33 test results and all broader row
 clauses remain unqualified here. No Source rerun, semantic repair, public action,
 full-mode admission or interface change follows. Root owns independent review,
 hosted checks, Hermes readback and runtime integration.
+
+
+## BASE consumer queue-head compile repair (2026-10-15, unrun)
+
+The retained native5 report and full raw log bind the child fmt exit 0 and
+subsequent compile exit 101 to `b939cc9833c025a65f5898ae57b071b52e108591`.
+No test body ran. At `base_consumer_completion_tests.rs:258`, rustc reports
+E0599 for `VecDeque<Command>::first()` and E0614 on the same guard's `*t`.
+Root authorizes only a minimal test-consumer source repair at this checkpoint.
+
+Change the single accessor token from `first` to `front`. The actual
+`UnitControl::orders` field is `VecDeque<Command>`;
+[`front()`](https://doc.rust-lang.org/std/collections/struct.VecDeque.html#method.front)
+returns `Option<&Command>`. Rust's
+[binding rules](https://doc.rust-lang.org/reference/patterns.html#binding-modes)
+therefore bind `t` as `&i64` in the unchanged Assist pattern. Retain `*t == target`
+with its existing spelling. The assertion still requires the head queued command
+to be Assist for the exact requested target. It still rejects an empty queue,
+another command or a different target. No clone, queue removal or state write
+is introduced. No assertion, input, predicate or expected observation changes.
+
+Declare overlap before editing: only this test-consumer file, this appended
+design record and one changelog fragment change. Every other Rust file and all
+other test bodies remain byte-exact against the frozen parent. The recorder,
+Source/runtime/providers, seventh fixture and six absent older fixtures retain
+their prior state. Source success stays attributed to `aaf0cf6f`, the genuine
+fixture freeze to `8b6837f2`, and the native compile failure to `b939cc98`.
+The fixture remains 486,928 bytes with SHA256
+`0a6bf3a9dbf01f1efa578a2b3b882dd1854ca96dd3533cb01063f079e31702ca`.
+
+This repair has no formatter, Cargo, rustc, native, Source, lint or discovery
+execution. Compilation and all five exact native names remain unverified until
+Root issues a new exact-head grant. Old 33 native bodies, raw failures, source
+findings and row holds remain retained. No parity or Acceptance cell moves;
+Shipyard/enemy claims, total retirement and full-mode admission stay held.
+Root owns the sole ledger, independent review, Hermes readback and integration.
+No slot is requested or held and no public action follows.
