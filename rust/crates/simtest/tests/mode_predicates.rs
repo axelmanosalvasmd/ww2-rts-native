@@ -227,7 +227,7 @@ fn alliance_predicate_and_existing_consumers_match_source() {
             .map(|b| game.allied(source_slot(a), source_slot(b))).collect::<Vec<_>>()).collect::<Vec<_>>();
         assert_eq!(json!(actual), c["expected"], "alliance {}", c["mode"]);
     }
-    let mut m = ordinary(&f);
+    let mut m = make(&f, &f["allianceConsumers"]["map"], &teams(&f["roster"]), Mode::Conquest, 5);
     let before = anchors(&m);
     vision::update_vision(&mut m.world.game, &m.rules, &m.grid);
     let c = &f["allianceConsumers"];

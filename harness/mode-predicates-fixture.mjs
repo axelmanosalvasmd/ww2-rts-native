@@ -72,7 +72,8 @@ for (const teams of [[0, 1], roster]) for (const mode of ['conquest', 'world']) 
   const slots = [-2, -1, ...teams.map((_, i) => i), teams.length, 99];
   alliance.push({ teams, mode, slots, expected: slots.map(a => slots.map(b => sim.allied(g, a, b))) });
 }
-const consumers = make();
+const consumerMap = { ...structuredClone(map), name: 'Canonical alliance vision', spawns: [{ x: 16, y: 16 }, { x: 28, y: 16 }, { x: 16, y: 28 }, { x: 28, y: 28 }] };
+const consumers = make(consumerMap);
 const consumerAnchors = anchors(consumers);
 sim.__modeGrid(consumers);
 sim.__modeVision(consumers);
@@ -81,13 +82,13 @@ const ally = [...consumers.units.values()].find(u => u.owner === 2 && u.type ===
 assert(own && ally);
 const shared = [...consumers.players[0].visible].filter(id => !sim.allied(consumers, consumers.units.get(id).owner, 0));
 assert(shared.length > 0, 'A genuine enemy is seen at the first allied spawn');
-assert(shared.every(id => consumers.players[2].visible.has(id)), 'Distant teammate shares enemy vision');
+assert(shared.every(id => consumers.players[2].visible.has(id)), 'Teammate shares enemy vision');
 assert(!consumers.players[0].visible.has(ally.id));
 assert(sim.snapshotFor(consumers, 0, []).units.some(u => u[0] === ally.id));
 sim.command(consumers, 0, { t: 'attack', ids: [own.id], target: ally.id });
 assert.equal(own.attackId, 0);
 assert.deepEqual(anchors(consumers), consumerAnchors);
-const allianceConsumers = { shooter: own.id, ally: ally.id, expected: encode({ visible: consumers.players.map(p => [...p.visible].sort((a, b) => a - b)), recipients: recipients(consumers), attackId: own.attackId }) };
+const allianceConsumers = { map: consumerMap, allocatedSpawns: consumers.players.map(p => ({ slot: p.slot, team: p.team, spawn: p.spawn })), canonicalAnchors: consumerAnchors, shooter: own.id, ally: ally.id, expected: encode({ visible: consumers.players.map(p => [...p.visible].sort((a, b) => a - b)), recipients: recipients(consumers), attackId: own.attackId }) };
 // A declared finished producer uses original canonical placement, not the test.js
 // helper's temporary factory. Purchase and research still use real command admission.
 const factionInput = { factions: [0, 1, 1, 2], slot: 2, cell: 42 * map.w + 40, mp: 5000, researchSeconds: [60, 90] };
