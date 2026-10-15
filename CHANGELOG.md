@@ -29,6 +29,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 - Compare MODE-21 building footprints by complete cell-key membership in the test-only startup observer. Retain all 49 original raw differences, add strict negative controls and leave the separate house-wrapper difference unresolved.
 
+- Record the authentic LOG-24 causal fixture from pinned Source at `d50860e2`: 10 retained constructor actors, nine commands and 740 full ticks. Generation and exact byte check each pass once. Real enemy arrival closes the network at tick 500; the owner view shows grace 8 and no cut 40 ticks later, then zero supply and cut 240 ticks later. Native qualification and row promotion remain pending under a new grant.
+
 - Add LOG-24 authored-input readiness checks for the actual open Move endpoint and retained building footprints, plus an exclusive partial-failure artifact for the first future Source attempt. Preserve the exact scene, commands, bounds, rate/grace/cut assertions and runtime bytes from `91f9bc12`. Source and native checks remain unrun.
 
 - Draft a LOG-24 network-to-grace/cut witness using retained constructor units, actual stance and Move commands, the real network/convoy methods and owner-recipient rows. Keep its fixture absent until authorized Source recording, preserve the BASE-09 failures and all held BASE callers, and make no LOG-24 status or runtime change. Source, native and format checks are unrun.
