@@ -154,7 +154,7 @@ fn run_scene(f: &Value, name: &str, count: usize) -> Vec<Vec<Point>> {
     // This Game supplies physical terrain only to the public hull query. Native
     // pathfinding receives the complete recorded Source routing view separately.
     let map = AuthoritativeMap::from_json(&serde_json::to_vec(&json!({
-        "w":w,"h":h,"rows":vec![".".repeat(w);h],"spawns":[{"x":1,"y":1},{"x":w-2,"y":h-2}],"points":[]
+        "name":"Selected route hull query","w":w,"h":h,"rows":vec![".".repeat(w);h],"spawns":[{"x":1,"y":1},{"x":w-2,"y":h-2}],"points":[{"x":w/2,"y":h/2}]
     })).unwrap()).unwrap();
     let mut physical = map.initialize_terrain().unwrap().query_game();
     let rules = Rules::compiled().unwrap();
