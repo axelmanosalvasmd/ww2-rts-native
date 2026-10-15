@@ -493,11 +493,9 @@ fn replay_connected_tick_cases(cases: &[Value], mut after_tick: impl FnMut(i64, 
 // The full final Source trace specifies the prefix due on every native tick.
 // Neither this comparison nor its controls can initialize or mutate Match.
 fn death_trace_matches_tick(actual: &[Value], expected: &[Value], tick: i64) -> bool {
-    actual.iter().eq(
-        expected
-            .iter()
-            .filter(|death| death[0].as_i64().unwrap() <= tick),
-    )
+    actual.iter().eq(expected
+        .iter()
+        .filter(|death| death[0].as_i64().unwrap() <= tick))
 }
 
 #[test]
@@ -1095,5 +1093,9 @@ fn cmb41_four_actual_conscript_recruits_add_three_population() {
     assert_eq!(bought.len(), 4);
     assert_eq!(population(&m) - before, 3.0);
     assert_eq!(m.start.economy.players[0].mp, wallet - 4.0 * price.mp);
-    assert!(original.iter().all(|id| m.world.game.units.contains_key(id)));
+    assert!(
+        original
+            .iter()
+            .all(|id| m.world.game.units.contains_key(id))
+    );
 }

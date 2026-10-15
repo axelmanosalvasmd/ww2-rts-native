@@ -675,10 +675,9 @@ fn cmb65_mg_flak_and_fighter_hold_then_resume_permitted_anti_air() {
         let mut m = scene(trace);
         let shooter = 1000;
         let target = 1001;
-        let hold = Command::from_json(
-            &json!({"t":"stance","ids":[shooter],"key":"holdFire","on":true}),
-        )
-        .unwrap();
+        let hold =
+            Command::from_json(&json!({"t":"stance","ids":[shooter],"key":"holdFire","on":true}))
+                .unwrap();
         assert_eq!(m.execute_command(0, &hold, false).unwrap(), None);
         let hp = m.world.game.units[&target].hp;
         let xp = m.combat.get(shooter).unwrap().xp;

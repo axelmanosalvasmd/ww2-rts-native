@@ -1,5 +1,17 @@
 # Three Crossroads Native: design decisions
 
+## Restored combat S2 formatting child (2026-10-15)
+
+Root grants exact e80d qualification on S2, CPUs 4-7, 6 GiB memory, zero swap,
+400% quota, jobs 4 and threads 1. The initial cargo fmt check exits 1 with four
+mechanical differences in the new bounty, AA, death-prefix and Conscript code.
+The authorized formatter application exits 0. Preserve the initial log at
+`/tmp/audit-combat-e80-S2-3fa592e8/fmt-e80.log`; no native behavior check has run.
+This child changes only formatting in the three affected Rust test files plus
+direct CHANGELOG/DESIGN notes. Inputs, assertions and fixture/runtime behavior
+stay exact. Freeze before the renewed fmt check and exactly six granted native
+instances. The separate eb4e sniper worktree remains unrun and excluded.
+
 ## CMB-41 genuine recruitment witness (2026-10-15, source only)
 
 Continue the restored batch after the first-five source freeze. The new

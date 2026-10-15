@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Apply the four formatting-only changes requested by the granted e80d S2 format check. Preserve all test inputs, assertions, fixtures and runtime behavior. Keep the initial formatting diagnostic; the six exact native checks remain pending on the frozen child.
+
 - Add a source-only CMB-41 witness that buys four real Soviet Conscripts through the existing recorded purchase caller, retains the full native starting roster, and checks actual field/queue population after each paid birth. The original four-squads-count-three check is authored but unrun; no status is changed.
 
 - Prepare the first five restored combat checks: add focused native tower 12/60 vision, enemy/friendly bounty, and MG/flak/fighter Hold Fire witnesses using existing fixture actors and callers. Recover exact main hosted component passes and record every held batch gap. Execution, whole-check review and the private five-row status proposal remain pending; all actual parity cells stay unchanged.

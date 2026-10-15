@@ -732,7 +732,10 @@ fn cmb64_actual_retirement_pays_enemy_cost_bounty_and_excludes_friendly_death() 
     assert_eq!(m.start.economy.players[0].mp.to_bits(), before[0].to_bits());
     assert_eq!(
         m.start.economy.players[1].mp.to_bits(),
-        case["snapshots"][1]["wallets"][1].as_f64().unwrap().to_bits()
+        case["snapshots"][1]["wallets"][1]
+            .as_f64()
+            .unwrap()
+            .to_bits()
     );
     let catalog = Catalog::compiled().unwrap();
     let cost = |kind| {
