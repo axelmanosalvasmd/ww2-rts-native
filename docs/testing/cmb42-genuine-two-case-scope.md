@@ -133,3 +133,28 @@ This task executes no Source/Node, Cargo/native, formatter, discovery, CI or
 release job, and holds no slot or lock. It creates no worktree and makes no
 public change. Text inspection and preservation checks are recorded separately
 under `/tmp/audit-combat-2152-3fa592e8/`. No row completion is claimed.
+
+## Consumer and queue binding successor (user22:22, unrun)
+
+The next child labels the actual constructor seed and both constructor/tick
+wind consumers at their exact pinned expressions. Every global/environment
+receipt retains its real value, continuous index and seed transition. Any
+unexpected consumer remains in the failure artifact and prevents success.
+The original environment generator still executes once and returns its value.
+
+Every Source selection tick now checks the literal distances as well as
+visibility, canShoot, survival, target choice and owner recipient. The native
+reader independently checks queued command contents, owner, sequence, boundary
+clock and actual dispatch identity before comparing its saved snapshot. Each
+queued snapshot must bind once, including its global/environment prefix. Signed
+Source seeds must match their retained u32 bits; environment consumer labels
+must equal the native labels. The hidden control checks the actual owner
+shooter target0 as well as hidden-MG omission.
+
+No Source/Node or native execution accompanies this child. The private grant
+request and single-job wrapper are in `/tmp/audit-combat-2222-3fa592e8/`.
+Generation, check and native qualification are three separately granted jobs.
+The wrapper requires a fresh Root-authored exact-head grant and matching live
+ledger slot before executing. It never grants a slot or writes Root's ledger.
+All runtime guards, default Replay bodies and original component history remain
+unchanged. This is literal consumer work; it supplies no completed CMB42 proof.

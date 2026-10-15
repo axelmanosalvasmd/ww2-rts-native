@@ -1,0 +1,1 @@
+- Bind the genuine CMB42 recorder to actual seed and wind consumers, check literal distances on every target-selection tick, and bind native queued snapshots to their command, owner, sequence, clock and random prefix. Keep the hidden-recipient target check explicit. Source and native qualification remain unrun.

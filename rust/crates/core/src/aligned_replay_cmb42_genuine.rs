@@ -140,6 +140,21 @@ impl Replay {
         }))))
     }
 }
+fn prefix_counts(record: &Value, case: &Value) -> Result<(usize,usize),String> {
+    let count = record["random"]["count"].as_u64().ok_or("global count missing")? as usize;
+    let environment_count = record["random"]["environmentCount"].as_u64().ok_or("environment count missing")? as usize;
+    let draws = case["random"]["draws"].as_array().ok_or("missing global draws")?;
+    let environment = case["random"]["environment"].as_array().ok_or("missing environment draws")?;
+    if count > draws.len() || environment_count > environment.len() {
+        return Err("observation consumed prefix exceeds captured input".into());
+    }
+    let state = if count == 0 { format!("{:016x}",case["sharedInput"]["seed"].as_u64().ok_or("global seed")?) }
+        else { draws[count-1]["after"].as_str().ok_or("global prefix state missing")?.into() };
+    if record["random"]["state"] != state {
+        return Err("observation global state is not its consumed prefix".into());
+    }
+    Ok((count,environment_count))
+}
 fn genuine_random_receipt(observation: Value, case: &Value, count: usize, environment_count: usize) -> Value {
     let native = &observation["global"];
     let environment = &observation["environment"];
@@ -167,7 +182,11 @@ fn genuine_random_receipt(observation: Value, case: &Value, count: usize, enviro
                 && source["phase"].as_str().is_some_and(|v|v.starts_with("step:"))
                 && source["tick"] == row["consumer"][1]
         };
-        if first.is_none() && (!context_matches || ["index","beforeU32","afterU32","value"].iter().any(|key| source[*key] != row[*key])) {
+        let source_seeds_match = ["before","after"].into_iter().all(|key| {
+            source[key].as_i64().is_some_and(|v| source[format!("{key}U32")].as_u64() == Some(u64::from(v as u32)))
+        });
+        if first.is_none() && (!context_matches || !source_seeds_match
+            || ["consumer","index","beforeU32","afterU32","value"].iter().any(|key| source[*key] != row[*key])) {
             first = Some(json!({"kind":"actual-environment-transition","source":source,"native":row}));
         }
     }
@@ -198,6 +217,7 @@ impl GenuineDriver {
         let mut births = Vec::new();
         let mut choice_counts = BTreeMap::<String, usize>::new();
         let mut recipient_controls = 0;
+        let mut verified_queued = BTreeSet::new();
         for (index, packed) in records.iter().enumerate() {
             let expanded = expand(packed,pool,0)?;
             let record = &expanded;
@@ -209,6 +229,7 @@ impl GenuineDriver {
                 return Err("unknown packet observation event".into());
             }
             let mut queued_frames = Vec::new();
+            let mut consumed_commands = Vec::new();
             if inputs.get(cursor).is_some_and(|v| v["record"].as_u64() == Some(index as u64)) {
                 let action = &inputs[cursor];
                 if action["index"].as_u64() != Some(cursor as u64) { return Err("input index gap".into()); }
@@ -257,7 +278,7 @@ impl GenuineDriver {
                         let mut tape = replay.0.lock().unwrap();
                         queued_frames = std::mem::take(tape.input[MODE]["commands"].as_array_mut().unwrap());
                         if queued_frames.len() != pending.len() { return Err("missing actual command-boundary snapshots".into()); }
-                        pending.clear();
+                        consumed_commands = std::mem::take(&mut pending);
                     }
                     _ => return Err("unknown declared input".into()),
                 }
@@ -268,14 +289,26 @@ impl GenuineDriver {
                 for (offset, saved) in queued_frames.iter().enumerate() {
                     let source = expand(records.get(index+offset).ok_or("missing queued source receipt")?,pool,0)?;
                     if source["event"] != "command-consumed" { return Err("expected actual queued dispatch receipt".into()); }
-                    let count = source["random"]["count"].as_u64().ok_or("global count missing")? as usize;
-                    let environment_count = source["random"]["environmentCount"].as_u64().ok_or("environment count missing")? as usize;
+                    let command = &consumed_commands[offset];
+                    let detail = &source["detail"];
+                    let expected_command = command_json(&command["command"])?;
+                    let parsed = Command::from_json(&expected_command).map_err(|e|format!("queued identity: {e:?}"))?;
+                    if Some(numeric(&detail["owner"])?) != command["owner"].as_f64()
+                        || Some(numeric(&detail["sequence"])?) != command["sequence"].as_f64()
+                        || command_json(&detail["command"])? != expected_command
+                        || source["tick"].as_i64() != command["tick"].as_i64().map(|v|v-1)
+                        || saved["command"] != format!("{parsed:?}")
+                        || !verified_queued.insert(index+offset) {
+                        return Err("actual queued snapshot command/key/clock identity differs".into());
+                    }
+                    let (count,environment_count) = prefix_counts(&source,case)?;
                     let random = genuine_random_receipt(saved["random"].clone(),case,count,environment_count);
                     self.compare(&source,saved["frame"].clone(),random)?;
                 }
             }
             if record["event"] == "command-consumed" && !record["detail"]["sequence"].is_null() {
                 // Queued records were observed in advance_tick, never re-executed.
+                if !verified_queued.remove(&index) { return Err("unbound queued command snapshot".into()); }
                 continue;
             }
             if record["event"] == "purchase-provider" {
@@ -306,20 +339,21 @@ impl GenuineDriver {
                 }
                 let view = SnapshotCache::new(&m).map_err(|e| format!("cache: {e:?}"))?
                     .recipient(0).map_err(|e| format!("recipient: {e:?}"))?;
-                if view.fields["units"].as_array().ok_or("recipient units")?.iter()
-                    .any(|row| row[0].as_u64() == Some(u64::from(mg))) {
+                let rows = view.fields["units"].as_array().ok_or("recipient units")?;
+                let shooter_row = rows.iter().find(|row|row[0].as_u64() == Some(u64::from(shooter)))
+                    .ok_or("hidden control missing actual owner shooter row")?;
+                if shooter_row[9].as_u64() != Some(0) {
+                    return Err("hidden control actual owner target is not zero".into());
+                }
+                if rows.iter().any(|row| row[0].as_u64() == Some(u64::from(mg))) {
                     return Err("actual owner recipient leaks hidden MG".into());
                 }
                 recipient_controls += 1;
             }
-            let count = record["random"]["count"].as_u64().ok_or("global count missing")? as usize;
-            let environment_count = record["random"]["environmentCount"].as_u64().ok_or("environment count missing")? as usize;
-            let state = if count == 0 { format!("{:016x}",input["seed"].as_u64().unwrap()) }
-                else { case["random"]["draws"][count-1]["after"].as_str().ok_or("global prefix exceeds captured input")?.into() };
-            if record["random"]["state"] != state { return Err("observation global state is not its consumed prefix".into()); }
+            let (count,environment_count) = prefix_counts(record,case)?;
             self.compare(record,native_frame(&m,&bindings)?,genuine_random_receipt(random_observation(&replay),case,count,environment_count))?;
         }
-        if cursor != inputs.len() || !pending.is_empty() || m.commands.pending_commands() != 0
+        if cursor != inputs.len() || !pending.is_empty() || !verified_queued.is_empty() || m.commands.pending_commands() != 0
             || records.last().is_none_or(|r|r["event"]!="scene-complete") {
             return Err("incomplete scene input or command consumption".into());
         }

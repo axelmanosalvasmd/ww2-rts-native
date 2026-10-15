@@ -35,7 +35,7 @@ function randomProvider(seed){
   draws,
   consumer(value){assert.equal(consumer,undefined);consumer=value;},
   environment,
-  observeEnvironment(g,before,value){environment.push({...context,index:environment.length,tick:g.tick,before,after:g.seed,beforeU32:before>>>0,afterU32:g.seed>>>0,value:bits(value)});},
+  observeEnvironment(g,before,value,consumer){environment.push({...context,consumer,index:environment.length,tick:g.tick,before,after:g.seed,beforeU32:before>>>0,afterU32:g.seed>>>0,value:bits(value)});},
   context(next){context=next;},
   state:()=>state.toString(16).padStart(16,'0'),
   next(){
@@ -46,7 +46,7 @@ function randomProvider(seed){
    value=((value^(value>>27n))*0x94d049bb133111ebn)&mask;
    value^=value>>31n;
    const result=Number(value>>11n)/9007199254740992;
-   draws.push({...context,consumer:consumer??(context.phase==='constructor'?['startup.environment.seed32']:['UNMAPPED.global',new Error().stack]),index:draws.length,before:before.toString(16).padStart(16,'0'),after:state.toString(16).padStart(16,'0'),value:bits(result)});
+   draws.push({...context,consumer:consumer??['UNMAPPED.global',new Error().stack],index:draws.length,before:before.toString(16).padStart(16,'0'),after:state.toString(16).padStart(16,'0'),value:bits(result)});
    consumer=undefined;
    return result;
   }
@@ -73,12 +73,19 @@ export async function recordCmb42Genuine({reference,pin,clean}){
   const rngLine=source.split('\n').filter(line=>line.startsWith('const rng = (g) => '));
   assert.equal(rngLine.length,1,'actual environment RNG anchor');
   const observed=rngLine[0].replace('const rng =','const __cmb42OriginalRng =')+
-   '\nlet __cmb42EnvironmentObserver;\nconst rng=g=>{const before=g.seed;const value=__cmb42OriginalRng(g);__cmb42EnvironmentObserver?.(g,before,value);return value;};\n';
+   "\nlet __cmb42EnvironmentObserver;\nconst rng=(g,consumer=['UNMAPPED.environment',new Error().stack])=>{const before=g.seed;const value=__cmb42OriginalRng(g);__cmb42EnvironmentObserver?.(g,before,value,consumer);return value;};\n";
   const accuracy='const accurate = Math.random() < acc';
   const dispersion='const off = accurate ? 0 : ((def.radius ?? 1.5) * 0.95 + 0.2 + Math.random() * 0.7) * (Math.random() < 0.5 ? -1 : 1);';
   assert.equal(source.split(accuracy).length,2,'single actual ordinary accuracy consumer');
   assert.equal(source.split(dispersion).length,2,'single actual ordinary dispersion consumers');
-  const firingObserved=source.replace(accuracy,"const accurate = __cmb42Global(['combat.accuracy',g.tick,u.id,t.id,i]) < acc")
+  const seedLine='  g.seed = Math.floor(Math.random() * 2 ** 32);';
+  const startupWind='  g.wind = { a: rng(g) * Math.PI * 2, v: 0.3 + rng(g) * 0.5 };';
+  const tickWind='  g.wind.a += (rng(g) - 0.5) * 0.6 * dt; g.wind.v = Math.min(1, Math.max(0.15, g.wind.v + (rng(g) - 0.5) * 0.3 * dt));';
+  for(const anchor of [seedLine,startupWind,tickWind])assert.equal(source.split(anchor).length,2,'single actual seed/wind consumer anchor');
+  const inputObserved=source.replace(seedLine,"  g.seed = Math.floor(__cmb42Global(['startup.environment.seed32']) * 2 ** 32);")
+   .replace(startupWind,"  g.wind = { a: rng(g,['startup.wind.angle']) * Math.PI * 2, v: 0.3 + rng(g,['startup.wind.strength']) * 0.5 };")
+   .replace(tickWind,"  g.wind.a += (rng(g,['weather.wind.angle',g.tick]) - 0.5) * 0.6 * dt; g.wind.v = Math.min(1, Math.max(0.15, g.wind.v + (rng(g,['weather.wind.strength',g.tick]) - 0.5) * 0.3 * dt));");
+  const firingObserved=inputObserved.replace(accuracy,"const accurate = __cmb42Global(['combat.accuracy',g.tick,u.id,t.id,i]) < acc")
    .replace(dispersion,"const off = accurate ? 0 : ((def.radius ?? 1.5) * 0.95 + 0.2 + __cmb42Global(['combat.offset.magnitude',g.tick,u.id,t.id,i]) * 0.7) * (__cmb42Global(['combat.offset.sign',g.tick,u.id,t.id,i]) < 0.5 ? -1 : 1);");
   const layoutLine=source.split('\n').filter(line=>line.startsWith('  const usable = spawnsFor(map, opts.mode), spawnIdx = '));
   assert.equal(layoutLine.length,1,'actual constructor layout observer anchor');
@@ -111,7 +118,7 @@ export async function recordCmb42Genuine({reference,pin,clean}){
   let observedLayout;
   Math.random=()=>random.next();
   sim.__cmb42SetGlobalObserver(consumer=>random.consumer(consumer));
-  sim.__cmb42SetEnvironmentObserver((g,before,value)=>random.observeEnvironment(g,before,value));
+  sim.__cmb42SetEnvironmentObserver((g,before,value,consumer)=>random.observeEnvironment(g,before,value,consumer));
   sim.__cmb42SetLayoutObserver(layout=>{assert.equal(observedLayout,undefined);observedLayout=layout;});
   try{
    const g=sim.createGame(structuredClone(arena),['A','B'],false,[0,1],[0,1],options);
@@ -231,6 +238,7 @@ export async function recordCmb42Genuine({reference,pin,clean}){
    function choices(shooter,candidates,expected,count=20){
     for(let turn=0;turn<count;turn++){
      const views=step();
+     geometry(shooter,candidates.map((target,index)=>[target,phase==='at-select-tank'?[7,28][index]:[12,phase==='sniper-select-mg'?30:40][index]]));
      assert.equal(shooter.attackId,0,'no explicit attack order');
      for(const target of candidates){
       assert(g.players[0].visible.has(target.id),'natural candidate visibility');
@@ -324,6 +332,8 @@ export async function recordCmb42Genuine({reference,pin,clean}){
     phase='at-select-tank';queue(0,{t:'stance',ids:[at.id],key:'holdFire',on:false});choices(at,[rifle,tank],tank);
    }
    assert.equal(pending.length,0,'consume every authored command');
+   assert(random.draws.every(row=>!row.consumer[0].startsWith('UNMAPPED.')),'every actual global consumer must be identified');
+   assert(random.environment.every(row=>!row.consumer[0].startsWith('UNMAPPED.')),'every actual environment consumer must be identified');
    retained(stable,true);receipt('scene-complete',{bindings,totalTicks:g.tick});
    cases.push({name,sharedInput:{map:arena,names:['A','B'],teams:[0,1],factions:[0,1],layout:[0,1],shuffle:false,options,seed:701,inputs},observedLayout,bindings,records,random:{algorithm:'splitmix64-global-source-input',seed:701,draws:random.draws,environment:random.environment,finalState:random.state()}});
   }catch(error){

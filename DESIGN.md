@@ -1,5 +1,24 @@
 # Three Crossroads Native: design decisions
 
+## CMB42 actual consumer and queued snapshot binding (2026-10-15, unrun)
+
+The genuine-input successor now labels the pinned constructor seed and wind
+expressions and the actual tick wind expressions. It retains all original
+values and seed transitions. Unknown consumers fail with their raw receipts.
+Each selection tick checks the literal sniper12/30, sniper12/40 or AT7/28
+geometry. Native queued snapshots bind the actual command contents, owner,
+sequence and pre-tick clock once each, including consumed random prefixes.
+Environment labels and signed/u32 seed representations are checked together.
+The hidden-MG control also requires target0 in the actual owner shooter row.
+
+No expected observation initializes runtime state. No runtime guard, default
+Replay16384 body, old component setup or PR269 reconstruction changes. The
+private single-job wrapper requires Root's exact grant and live slot entry,
+actual four CPUs/6GiB/swap0/400%, jobs4/threads1, inherited slot flock,
+external target, fresh free-g and20GiB disk checks. Its Source branch mirrors
+the current Cargo guard's gates because that guard executes Cargo only.
+This child has no Source, compile, native or parity result.
+
 ## CMB42 genuine-input successor on PR271 main (2026-10-15, unrun)
 
 Integrate only the retained combat-audit packet and protected consumers onto
