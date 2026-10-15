@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## CMB-61 exact hitAt metadata representation check (2026-10-15)
+
+Root authorizes a minimal new-consumer repair after reading the first failure at `556a2ad5`. Clone only the recorded and authored metadata for comparison. Require equal actor counts, convert each actor's `hitAt` through `as_f64`, and compare its complete `to_bits` value. Only after that equality succeeds, put the same f64 representation into both metadata clones at those `hitAt` cells and retain strict whole-JSON equality. This uses no epsilon or general number normalization. All other keys, types and values remain strict, and neither clone initializes the replay match.
+
+The original consumer outside that one comparison block is byte-identical to `0563eb91`, including every replay outcome assertion. Authored inputs, Source recorder and authentic fixture, ordinary firing recorder/fixture/body, runtime, registry and parity statuses remain exact. Preserve the first failure log. Freeze this child before the renewed S3 fmt, three exact test instances and conditional fresh strict Clippy. No Source or old component gate is rerun.
+
 ## CMB-61 first native failure retained (2026-10-15)
 
 At frozen `556a2ad5e24e22b9e5c4736813b0dbf8da978d49`, formatting passes and the exact accuracy test compiles but fails before constructing a replay match. `match_firing_flame.rs:44` compares complete authored metadata with ordinary `serde_json::Value` equality. Authentic Source serializes `hitAt` as integer `-1000000000`; the authored input retains float `-1000000000.0`. This is the observed metadata representation mismatch, not evidence of a firing-provider defect. Preserve both unchanged and stop under the explicit first-failure rule.

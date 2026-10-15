@@ -41,7 +41,19 @@ fn replay(group: &str) -> Vec<(String, Value)> {
     assert_eq!(recorded.len(), authored.len());
     let mut observations = Vec::new();
     for (input, output) in authored.iter().zip(recorded) {
-        assert_eq!(output["input"], *input);
+        let mut actual_metadata = output["input"].clone();
+        let mut authored_metadata = input.clone();
+        let actual_actors = actual_metadata["input"].as_array_mut().unwrap();
+        let authored_actors = authored_metadata["input"].as_array_mut().unwrap();
+        assert_eq!(actual_actors.len(), authored_actors.len());
+        for (actual, authored) in actual_actors.iter_mut().zip(authored_actors) {
+            let actual_hit_at = actual["hitAt"].as_f64().unwrap();
+            let authored_hit_at = authored["hitAt"].as_f64().unwrap();
+            assert_eq!(actual_hit_at.to_bits(), authored_hit_at.to_bits());
+            actual["hitAt"] = json!(authored_hit_at);
+            authored["hitAt"] = json!(authored_hit_at);
+        }
+        assert_eq!(actual_metadata, authored_metadata);
         assert_eq!(output["name"], input["name"]);
         if input["group"] != group {
             continue;

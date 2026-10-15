@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Compare CMB-61 metadata actor `hitAt` values by exact f64 bits before canonicalizing only those verified cells for strict whole-JSON equality. Keep every other metadata type, key and value strict. Preserve authored inputs, Source, authentic fixtures and all replay assertions; retain the earlier failure.
+
 - Retain the first CMB-61 native test failure at `556a2ad5`: exact authored-input metadata equality rejects Source integer `hitAt` against the input JSON float before firing replay. Stop after 0 passed and 1 failed; target-choice, registry and Clippy checks remain unrun. Source generation/check and the formatting recheck passed. No predicate, input, fixture, runtime or row-status repair is applied.
 
 - Apply the two whitespace-only changes requested by the CMB-61 formatting check. Preserve all test tokens, assertions, literals and the authentic Source fixture. The initial formatting failure is retained; native tests remain pending.
