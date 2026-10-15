@@ -12,6 +12,26 @@ At baseline `34edf52a7eaa6cb6edba3e802c2190226228276f`, IMPL_NET_2 selects NET-6
 
 Keep R1's approved two-human Conquest profile and existing wire/ABI. AI, spectator and client branches prevent full completion claims for several selected rows; missing controlled socket witnesses prevent the others. The native metadata builder has no AI-specific online/ping values, and the current dispatcher leaves host pause/resume unavailable. No runtime change or policy expansion is adopted. Cargo, server execution and Source recorders await an explicit Root slot grant; this documentation freeze has no new runtime proof. Root retains separate review and publication ownership.
 
+## Engineering supported scope and held aircraft consumer (2026-10-15)
+
+The supported engineering gate contains 20 original checks. Preserve the full `f2b48700` candidate under `refs/heads/held/eng-five-row-aircraft-f2b48700` and move its aircraft test function verbatim to the [unregistered checkpoint](docs/checkpoints/engineering-aircraft-f2b48700/README.md). That function remains FAILED / HELD: the first firing-enabled Clear patrol is refused before tick 1 because the automatic aircraft ground-fire actuator is unavailable. Its Source input and complete five-weather capture remain intact. The checkpoint records the precise provider boundary and pending consumer work.
+
+This explicit scope split changes no runtime, guard, setup, expected value, policy, ABI or row status. The two historical travel passes belong only to `4b0471d5`; the other 18 supported passes and aircraft refusal belong to `f2b48700`. A fresh supported-head gate after the ordered main merge selects all 20 supported checks, with separate actual-head review and hosted checks still required. The missing AI weather/sight/caution consumer and public aircraft-row refusal remain held.
+
+
+## Five engineering rows: actual-consumer preparation (2026-10-15, source only)
+
+Extend the frozen `64d750e9` preparation on fixed main `446671b9` for the exclusively assigned ENG-59/73/74/75/76 rows. Preserve every prior test, fixture, assertion and status. New authored inputs and an unexecuted Source recorder prepare 22 travel scenes, four routes, four live-weather scenes, 620 warning ticks, four rifle sight scenes, five flying-plane scenes and 313 constructor plan cases. Eight new tests call actual Match movement/weather, pathfinding, vision, aircraft, constructor and recipient snapshot consumers. No target output is fabricated; authentic captures, compilation and results remain pending.
+
+[The full predicate map and limits](docs/runtime/engineering-five-row-preparation.md) identify the missing native AI weather/sight/caution packet and the existing aircraft snapshot refusal. The prior five weather helper proofs remain bounded. No runtime, provider, terrain, guard, ABI, policy, parity status or whole-match decision changes. No Source, Cargo, native or fmt job runs without a future Root grant.
+
+
+## Original ENG-59 travel preparation (2026-10-15, source only)
+
+At base `446671b977abfa6bf689fcb8853833d36519faab`, a new shared-input recorder and native test prepare the original Roads and mud travel checks: shallow tank, deep tank and infantry at full speed. Five isolated scenes retain the original 40 acceleration ticks and 40 measurement ticks, default living weather and actual accumulated wear. The consumer uses `Match::advance_tick`, including routed movement, ground contact, separation and late weather. It does not substitute helper multipliers for displacement or feed recorded travel state back into the runner.
+
+Starting-base cells are restored in place so the existing routing owner retains its initial-terrain binding. Native map authoring receives an empty textual name for Source's unnamed blank map; both retain Clear default weather. No runtime, provider, guard, interface or policy changes. No Source or native job ran, and no authentic output fixture is committed yet. The [predicate/input map and pending commands](docs/runtime/engineering-travel-preparation.md) record the setup, observations and remaining limits. All parity statuses and the earlier weather fixtures/tests stay unchanged.
+
 ## Engineering weather predicate checkpoint (2026-10-15, unexecuted)
 
 At base `34edf52a7eaa6cb6edba3e802c2190226228276f`, the `IMPL_ENGINEERING` batch adds five focused tests for existing ENG-59 and ENG-73 through ENG-76. They exercise the current mud-speed, weather-speed, sight, catalog, plan and warning providers. The five-state application matrix covers all 47 unit kinds, including completed buildings and explicitly constructed aircraft. Existing weather fixtures and all old assertions remain unchanged.

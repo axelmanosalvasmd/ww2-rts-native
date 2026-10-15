@@ -1,0 +1,1 @@
+- Mark MODE-14/19/20 ported from #248's verified walking/layout, three-player startup and Assault objective checks. Record the 6 local passes at df9abad6 and 9 successful hosted jobs in run 38717639417; preserve all acceptance checks and MODE-15/16/17 statuses. Reconcile the earlier blanket-HOLD preparation notes.
