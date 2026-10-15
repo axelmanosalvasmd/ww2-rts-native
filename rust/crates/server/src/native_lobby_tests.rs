@@ -479,3 +479,6 @@ fn original_result_roster_rows_follow_people_across_removal_and_refill() {
         }
     }
 }
+
+#[path = "native_mode_predicates.rs"]
+mod mode_predicates;
