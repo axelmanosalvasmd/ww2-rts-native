@@ -136,7 +136,13 @@ impl TutorialStep {
                 "Knock out the tank with your AT gun",
                 cell(44, 22),
                 None,
-                vec![spawn("tank", 53, 21, None, SpawnOrder::AttackMove(cell(41, 22)))],
+                vec![spawn(
+                    "tank",
+                    53,
+                    21,
+                    None,
+                    SpawnOrder::AttackMove(cell(41, 22)),
+                )],
             ),
             Self::Trench => (
                 "Clear the farm trench. Rifles: F throws a grenade",
@@ -181,7 +187,10 @@ impl TutorialStep {
     /// Reject malformed internal facts before using an owner as an index.
     pub fn complete(self, view: &CompletionView<'_>) -> Result<bool, &'static str> {
         let mut ids = std::collections::BTreeSet::new();
-        if view.players.iter().any(|p| !p.artillery_cooldown.is_finite())
+        if view
+            .players
+            .iter()
+            .any(|p| !p.artillery_cooldown.is_finite())
             || view.units.iter().any(|u| {
                 u.owner >= view.players.len()
                     || !u.hp.is_finite()

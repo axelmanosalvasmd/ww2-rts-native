@@ -1,6 +1,8 @@
 //! Original Tutorial callbacks on declared facts, not Tutorial match execution.
 use serde_json::{Value, json};
-use ww2_core::tutorial_steps::{CompletionView, SpawnOrder, TutorialPlayer, TutorialStep, TutorialUnit};
+use ww2_core::tutorial_steps::{
+    CompletionView, SpawnOrder, TutorialPlayer, TutorialStep, TutorialUnit,
+};
 
 fn fixture() -> Value {
     let path =
@@ -211,8 +213,26 @@ fn malformed_completion_facts_are_refused() {
     };
     assert_eq!(check(&[unit], &[]), Ok(true));
     assert!(check(&[TutorialUnit { owner: 1, ..unit }], &[]).is_err());
-    assert!(check(&[TutorialUnit { hp: f64::NAN, ..unit }], &[]).is_err());
-    assert!(check(&[TutorialUnit { x: f64::INFINITY, ..unit }], &[]).is_err());
+    assert!(
+        check(
+            &[TutorialUnit {
+                hp: f64::NAN,
+                ..unit
+            }],
+            &[]
+        )
+        .is_err()
+    );
+    assert!(
+        check(
+            &[TutorialUnit {
+                x: f64::INFINITY,
+                ..unit
+            }],
+            &[]
+        )
+        .is_err()
+    );
     assert!(check(&[unit, unit], &[]).is_err());
     assert!(check(&[unit], &[Some(1)]).is_err());
     let view = CompletionView {
