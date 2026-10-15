@@ -1,5 +1,41 @@
 # Three Crossroads Native: design decisions
 
+## Five complete selected MAP checks (2026-10-15)
+
+At producing runtime head `7cbfcdddf913625c48fd109d8d216151881cba20`,
+all six authorized unique native instances pass once: three exact validation
+message readers, the full authoritative corpus, complete original Assault
+check and affected BASE Pillbox replay. Each selects1/passes1/fails0; core
+instances filter140 and simtest instances filter224. Formatting recheck and
+strict locked core/simtest ci-test all-target Clippy exit0. The initial
+f192 formatting-only failure remains preserved; no native failure or rerun
+occurred. Raw logs and the report are `/tmp/map-7cbfcddd-S1-52b4776c/`.
+
+The complete original checks cover ten core-field and two height errors,
+three Assault-authoring errors, all138 map cases, all57 Assault constructors
+including four named XL maps and ten full raw Hill routes, both retained
+Assault validation messages and the affected BASE diagnostic/replay. No
+whole-match or recipient-delivery requirement is added to those components.
+MAP97 retains its separate producing0b default-debug/release120-action
+proof. These establish five selected Rust checks: MAP04/05/07/97/117.
+
+Root explicitly authorizes this docs-only child after the actual gates.
+Change only four new MAP Rust/Status pairs, retain MAP97, and preserve all
+140 Acceptance cells and all other table cells. The entire tested Rust
+tree remains `c707f7ebda7b519edb0071f42c7de0a875706949`. This child claims
+zero additional executions. The private maps table becomes93 ported,
+6 in progress and41 todo; MAP06/19/100 remain held. The separate unfinished
+MAP06/editor worktree is not imported.
+
+S1 scopes actually report CPU0-3,6GiB/swap0/quota400%, with jobs4/threads1,
+the current guard, exclusive target and disk floor checked before every job.
+Own-checkout core/simtest dep-info bind to producing7cbfcddd. Clippy's final
+process exits0 and the exact S1 lock is immediately free; Root is notified
+before any status edit. No Source, discovery, full, release, cleanup scan
+or sealing operation is added. Actual final-child independent review,
+normal preservation of newer main's test observer, Hermes acknowledgment
+of the exact runtime head and hosted gates remain Root-owned before merge.
+
 ## MAP qualification formatting child (2026-10-15)
 
 The authorized S1 formatting check at frozen `f1928e13` exits1 with one
