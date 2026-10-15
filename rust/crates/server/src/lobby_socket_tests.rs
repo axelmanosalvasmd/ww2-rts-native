@@ -187,13 +187,30 @@ async fn net19_websocket_close_at_zero_expires_only_after_sixty_seconds() {
         drop(ana);
         rig.wait(|hub| hub.rooms["Expiry"].players[0].connection.is_none());
         rig.read(|hub| assert_eq!(hub.rooms["Expiry"].empty_since, Some(0)));
+        rig.poll(1);
+        let (ben, _) = rig.join("ExpiryNext", "ben", "Ben", false);
+        drop(ben);
+        rig.wait(|hub| hub.rooms["ExpiryNext"].players[0].connection.is_none());
+        rig.read(|hub| assert_eq!(hub.rooms["ExpiryNext"].empty_since, Some(1)));
         rig.poll(59_951);
         rig.poll(60_000);
         rig.read(|hub| assert!(hub.rooms.contains_key("Expiry")));
+        rig.read(|hub| assert_eq!(hub.clock.due_ns(), 60_001_000_000));
         rig.poll(60_001);
         rig.read(|hub| {
             assert!(!hub.rooms.contains_key("Expiry"));
             assert!(!hub.room_order.iter().any(|code| code == "Expiry"));
+            assert_eq!(hub.clock.due_ns(), 60_051_000_000);
+            let younger = &hub.rooms["ExpiryNext"];
+            assert_eq!(younger.empty_since, Some(1));
+            assert_eq!(60_001 - younger.empty_since.unwrap(), 60_000);
+            assert!(hub.room_order.iter().any(|code| code == "ExpiryNext"));
+        });
+        rig.poll(60_051);
+        rig.read(|hub| {
+            assert_eq!(hub.clock.due_ns(), 60_101_000_000);
+            assert!(!hub.rooms.contains_key("ExpiryNext"));
+            assert!(!hub.room_order.iter().any(|code| code == "ExpiryNext"));
         });
     })
     .await;
