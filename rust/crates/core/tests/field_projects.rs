@@ -71,7 +71,11 @@ fn original_shared_pattern_order_front_and_segment_prices() {
         line.iter()
             .all(|job| job.front.to_bits() == (-std::f64::consts::FRAC_PI_2).to_bits())
     );
-    assert_eq!(plan(Pattern::Line, a).len(), 1, "a plain click is one segment");
+    assert_eq!(
+        plan(Pattern::Line, a).len(),
+        1,
+        "a plain click is one segment"
+    );
 
     let double = plan(Pattern::Double, b);
     assert_eq!(double.len(), 10, "a double line is two rows");
