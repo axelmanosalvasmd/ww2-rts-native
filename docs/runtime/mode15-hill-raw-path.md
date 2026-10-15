@@ -1,0 +1,11 @@
+# MODE-15 Hill 112 raw route check
+
+This test-only continuation starts at main `a20cac1b8c367625e93dcfe39932471ec2705b7f`. Pinned Source `test.js:1664-1674` validates Hill 112, constructs ten shuffled three-player Assault games, checks spawn levels `[0,0,4]`, requires a nonempty raw `findPath` from the actual owner-zero rifle to player two's spawn, and rejects an all-spawn defend list. It does not call native recipient command routing.
+
+The existing `assault-start.json` remains unchanged: 57 starts, all ten selected Hill route arrays, four XL checks and both selected invalid maps. Each Hill oracle has three complete waypoints. The original 43-case/702-unit guards and every existing constructor assertion remain. The expanded behavior also validates both retained invalid-map inputs.
+
+Source `shared/sim.js:3068-3090` derives the asking owner's observed view before searching. The test composes existing public `ObservedMemory`, `RouteKnowledge::observed`, `RouteQuery::path_terrain` and `Pathfinding::find_path` APIs from the canonical `Match::new_assault`. Authored baseline arrays come from `World::initial`; pending rows and building identities come from the actual constructor. Current point sight uses existing `vision::team_sees`; footprint facts use actual teams, visibility and linked units. Mine/fire absence is asserted against the actual Hill state before supplying their empty hazard views. Live bunker costs include only allied or visible canonical bunkers. No terrain, actor, target, RNG or expected route is supplied from the oracle.
+
+The query acknowledges observed pending rows through the existing memory API, as Source does. It changes no terrain or actor. Every complete native waypoint is compared by f64 bits with the retained Source path. The existing `refresh_recipient_routing(0)` refusal remains a separate assertion: raw component availability does not admit Assault commands, live routing, ticks or hosting. MODE-16/17 still lack their startup providers.
+
+Native fmt, the expanded Assault behavior plus both registration guards (three expected tests), and fresh strict workspace/all-target Clippy are pending at the preparation commit. MODE-15 remains unchanged until the complete checks actually pass. No Source recorder rerun is needed because recorder and fixture inputs are identical.
