@@ -2,7 +2,18 @@
 
 ## Proposed-default diagnostic mode and bounded report memory (2026-10-15)
 
-Frozen diagnostic implementation8ad038ee retains its first format diff; the repair is mechanical only. Source/private baseline byte binding remains exact. Execution results for the diagnostic child remain pending.
+### Actual diagnostic execution and retained strict results
+
+At `10feb6aaa5acf1ce064c9a02c3891652de88ce73`, the registry regression and actual attack-move/plain-Move scenario each pass as diagnostic harness checks. Formatting and fresh strict locked core/simtest all-target ci-test Clippy also pass. Each case advances all 4,800 ticks, compares 4,801 raw frame pairs and matches 481/481 N10 checkpoints under the proposed two-boolean defaults. There is no proposed-diagnostic first difference, including after tick 0. Both cases retain ownerApproval=PENDING and parityEligible=false. This proves this authored diagnostic scenario only, without owner-approved row eligibility or complete startup-state parity.
+
+All actual consumed consumer/index/value rows agree: attack-move 9,686 with 6,698 unused, plain Move 9,694 with 6,690 unused, from 16,384 values per case, neither exhausted. Both engines satisfy the unchanged branch predicates. Attack-move halts at 490, retires the naturally killed full-health foe at 780, requests resume at 781, progresses at 782 and reaches the cleared/empty-path arrival predicate at 1102. Plain Move passes a living shootable foe at 617 and arrives at 811 without an attack-move halt.
+
+Raw strict and approved currency-only each remain 0/481 per case, first tick 0 `$.units[0].holdFire`, Source `{absent:true}` versus native false. Each case records 38,420 Source boolean mappings and zero native mappings, with every exact actor/path/count in the private report; each of four approved Source currency paths maps 4,801 times. Present native false and all other present values are retained. Original 13e Source capture/binding and 9819 first-result files remain byte-exact, and the initial raw native frame is literal-byte-identical to 9819. There are zero Source reruns. Earlier OOM and first failures remain preserved separately.
+
+Full frames, final receipts, separate verdicts, stage logs and exact commands are under `/tmp/aligned-amove-diagnostic-d6308bcc/`. Executions belong only to 10feb6aa. This documentation successor keeps its entire Rust tree equal to that head and claims no new execution. S1 processes are terminal and its flock is released. Root owns the pending general-default decision, fresh independent final-head review and any later publication; no row proposal or status change occurs.
+
+
+Source-freeze history: diagnostic implementation `8ad038ee` retained its first format diff; the repair was mechanical only. Source/private baseline byte binding stayed exact. Execution was pending at that initial freeze.
 
 
 USER16:21 supersedes any earlier implication that holdFire/holdPos defaults had owner approval. Hermes164/6196736715 withheld approval; Root sends one general-rule request. The new mode is DIAGNOSTIC_PROPOSED_DEFAULTS with parityEligible=false and ownerApproval=PENDING unconditionally. Raw strict, approved four-currency and proposed diagnostic results remain separate. [The explicit registry](docs/testing/aligned-proposed-defaults.json) identifies only the two actual stance reads/defaults at the pin; present values/types/zero bits/nonfinite/array order remain unchanged. No generic falsey folding or empty-container default exists.

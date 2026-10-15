@@ -156,3 +156,23 @@ cargo +1.99.0 test --manifest-path rust/Cargo.toml --locked --profile ci-test \
 ```
 
 These are payloads for the current S1 guard, not bare-shell authorization. Formatting repair is mechanical only. Conditional fresh core/simtest all-target ci-test strict Clippy runs only if both new diagnostic checks pass. No Source, old vectors/R1 tests, guards/list/full/release, worker, MODE-21 or public action. New private output directory: `/tmp/aligned-amove-diagnostic-d6308bcc/`.
+
+
+## Completed proposed-default diagnostic, owner decision pending
+
+Actual producing head: `10feb6aaa5acf1ce064c9a02c3891652de88ce73`. The registry regression and scenario check each pass (1 passed, 0 failed, 143 filtered). Final formatting and fresh strict locked core/simtest all-target ci-test Clippy pass at the same head. Earlier format diffs and the 6dca OOM remain preserved; no result is inferred from that killed attempt.
+
+| Case | Actual ticks / frame pairs | Proposed diagnostic N10 matches | Raw strict / approved currency-only N10 matches | Consumed / unused per side |
+| --- | --- | --- | --- | --- |
+| Attack-move | 4,800 / 4,801 | 481/481 | 0/481 / 0/481 | 9,686 / 6,698 |
+| Plain Move control | 4,800 / 4,801 | 481/481 | 0/481 / 0/481 | 9,694 / 6,690 |
+
+The proposed diagnostic first difference is null in each case. Raw strict and approved currency-only both first differ at tick 0 `$.units[0].holdFire`: Source `{absent:true}`, native false. Full alignment covers all actual consumed rows and equal unconsumed suffixes from 16,384 supplied values per case; neither side exhausts its tape. This extent does not replace the historical five-draw-only first attempt.
+
+Both engines complete all unchanged nonvacuity/branch predicates. Attack-move uses full-health natural actors, halts at 490, stays stationary, kills/retires the foe at 780, requests resume at 781 and progresses at 782. The actual arrival branch occurs at 1092, with empty-path/cleared-amove/within2.5m predicate at 1102. The plain-Move control passes the living shootable foe at 617 while moving with a nonempty path and no amove, then arrives at 811 with no attack-move halt. Source and native branch summaries agree exactly.
+
+Each case has 38,420 Source boolean mappings and zero native mappings. Troop actors 1 through 6 map both fields only at tick 0. In the control, headquarters actors 7 through 10 map both fields 4,801 times each. In attack-move those same headquarters map 780 times at their original array indexes, then 4,021 times at indexes shifted by the genuine foe retirement. The private report enumerates every path/actor/default/count separately. Each approved currency path maps 4,801 times on Source and zero times on native. The only proposed fields remain holdFire and holdPos; no additional defaults were needed.
+
+Private evidence: `/tmp/aligned-amove-diagnostic-d6308bcc/native-report.json` retains all raw frames, raw/approved/proposed verdicts, full receipts and the registry. `comparison-summary.json` contains exact per-path/actor counts and branch summaries. `raw-preservation.json` confirms unchanged original Source/binding/first-result bytes and literal initial native-frame bytes equal9819. All commands and producing heads are in the stage-result JSON files. Authentic Source still belongs to 13eae85e; zero Source reruns occurred. The final documentation commit keeps10feb6aa's Rust tree exact and claims no execution at its own head.
+
+The result is **DIAGNOSTIC_PROPOSED_DEFAULTS**, ownerApproval=PENDING, parityEligible=false. Test completion is separate from owner-approved parity. CMB-91 and MOV-49 remain held, with no row proposal, eligibility claim or publication. Root receives the final actual head for independent review and handles the one general-rule owner request. S1 is terminal and its flock is released.
