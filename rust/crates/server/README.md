@@ -1,6 +1,6 @@
 # Rust lobby server
 
-This is the first standalone `ww2-server` slice. It hosts lobbies and sessions over HTTP and WebSocket. It does not start or simulate rooms. Its Rust library can construct native authored matches from a separate private map catalogue. The reference is `ww2-rts` commit `e4e579a`, with the existing JSON `t` messages and optional `hello.proto: 0` from the protocol draft.
+This is the first standalone `ww2-server` slice. It hosts lobbies and sessions over HTTP and WebSocket. Its default mode remains lobby-only; the owner-approved trusted R1 opt-in starts canonical matches and admits the four existing commander control families. Its Rust library can construct native authored matches from a separate private map catalogue. The reference is `ww2-rts` commit `e4e579a`, with the existing JSON `t` messages and optional `hello.proto: 0` from the protocol draft.
 
 From `rust/`:
 
@@ -63,7 +63,7 @@ Dependency APIs were checked against the official [Axum 0.8.9 WebSocket document
 
 ## Native authored-match construction
 
-`authoritative_maps::load(name)` returns a validated immutable original map, and `create_match(name, options)` constructs independent canonical core state. The binary embeds all 33 original maps, including hidden mines and authoring triggers. Neither function reads files or invokes Node at runtime. Room start remains explicitly refused until the real simulation and snapshot pipeline are integrated.
+`authoritative_maps::load(name)` returns a validated immutable original map, and `create_match(name, options)` constructs independent canonical core state. The binary embeds all 33 original maps, including hidden mines and authoring triggers. Neither function reads files or invokes Node at runtime. Ordinary lobby mode refuses room start; the trusted R1 opt-in below uses canonical construction, runtime admission and recipient delivery before publication.
 
 The private assets are generated separately:
 
@@ -73,3 +73,21 @@ WW2_REFERENCE=/path/to/pinned/ww2-rts node harness/server-authored-maps.mjs --ch
 ```
 
 HTTP `/maps` routes keep using `mapForClient` projections from their own index. Editor headers still receive 403; they cannot unlock the private native match catalogue.
+
+## Trusted private R1 hosting
+
+Owner decision [097](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6181065743) approves this explicit opt-in. After building the ordinary binary, run from repository root:
+
+```sh
+rust/target/ci-test/ww2-server --bind 127.0.0.1:3000 --trusted-room ABC --seed 3936341
+```
+
+The shown path uses `cargo build --locked --profile ci-test -p ww2-server` from `rust/`. Release builds use their ordinary release path. The code is case-sensitive, 3-12 ASCII alphanumeric characters. Both flags are required together; the seed accepts the full u64 range. The host serves exactly that private room code, rejects public/tutorial listing, and keeps `/api/rooms` empty. This is a controlled-host mode, not a production deployment or account authentication.
+
+Exactly two human commander tokens on distinct teams may start. The current connected host seat starts or restarts. The room must select Conquest, Standard army and sandbox off, a committed bound map and an existing weather choice. Shuffle, tech, point supply and living weather are on. Physical logistics is temporarily off, an explicit deviation from Source network Conquest; reserve/convoy and other capability guards stay. Unsupported settings or canonical map/weather admission return existing scenario denial before a runtime, identity, account or start is published. Exact admission failures are written only to the host log. At the recorded seed, No Man's Land currently refuses each weather choice with `native startup authoring map binding changed`; its assets and binding guard are preserved.
+
+An absent or unready retained seat does not block start or healthy restart: the new match auto-pauses using the existing drop lifecycle and resumes when that same token returns. New tokens cannot join a running room. Restart builds a fully independent canonical match, then publishes it atomically with a fresh matchId; failed preparation preserves the old runtime and authority. A latched fault stops advancement and refuses manual restart pending a separate recovery policy. No failed tick is retried and no automatic restart occurs.
+
+Every successful publication retains a complete private option/derived-seed receipt in its runtime and logs `NATIVE_MATCH` JSON to stderr. The explicit seed is reused for each fresh identity; weather seed None uses the existing constructor derivation, whose actual result is recorded. `NATIVE_REFUSED` and `NATIVE_FAULT` are host diagnostics. Tokens and private authoring data are excluded. No seed, receipt, capability, terminal-fault field or new envelope is sent to clients. Start keeps its existing 13 fields, and ingress remains move/amove/stop/stance. These host logs are private operator output.
+
+`tests/trusted_room_process.rs` launches the ordinary executable and uses real TCP/WebSocket clients with ClientView decoding. Its assertions cover the chosen profile, private admission, both seat controls, absent-seat start/reconnect, healthy restart and genuine authored mine-contact fault refusal. Internal tests separately compare failed preparation and old-write authority. Verification results are recorded in DESIGN; test source alone does not establish a pass or actual Unreal consumer adoption.
