@@ -1,5 +1,9 @@
 # Three Crossroads Native: design decisions
 
+## Selected ordinary base checks, source plan (2026-10-15)
+
+The [IMPL_BASES plan](docs/testing/impl-bases-selected-plan-38c1a0da.md) selects six original predicates across BASE-26, BASE-28, BASE-29, BASE-30 and BASE-48 from native baseline `34edf52a7eaa6cb6edba3e802c2190226228276f`. It uses actual purchases and canonical building placement, retaining existing actors, footprints and structure identities. The B05 test's temporary producer is replaced by a disclosed purchase from the real constructor HQ; its complete occupancy, completion and escape assertions remain required. Construction and repair select the Conquest iteration only. Other modes, cancellation, interfaces and every parity status remain unchanged. This checkpoint contains a plan, with no recorder or native execution and no implementation or acceptance claim. Root owns execution slots and separate review.
+
 ## Parallel Rust verification and dependency caching (2026-10-14)
 
 PR #214 at `ee7bdc3c899b912f229dade7e5d58855052d87b7` separates lint, tests and release into three jobs on each of Ubuntu 24.04, Windows 2025 and macOS 15, for nine jobs total. Strict locked workspace/all-target Clippy remains on all three platforms. Locked workspace tests use cargo-nextest 0.9.148 with Cargo's existing `ci-test` profile and nextest's `ci` profile; explicit locked `cargo test --doc` retains doctests on all three. Locked release FFI builds remain on all three, with strict C11 linking and formation replay on Linux. Test jobs retain the 60-minute limit; lint and release jobs have 30-minute limits.
