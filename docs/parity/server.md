@@ -12,6 +12,16 @@ Native timing progress: `tick_timing.rs` supplies host catch-up and per-room sna
 
 Current Rust slice: `rust/crates/server` handles lobby/session behavior; `harness/server-lobby-check.mjs` checks 38 live checkpoints against Node. `harness/map-delivery-check.mjs` adds 96 HTTP comparisons for the 33 embedded client-safe maps and route failures. NET-11 remains in progress because raw editor reads are unavailable; POST editing is not implemented. Rows marked in progress are not claims of full match, static-hosting or persistence parity. See the server README for exact supported commands and limitations.
 
+## Native multiple-fault admission order (owner R4)
+
+[Axel approved R4 on issue #5](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6179562683): the first guard actually reached by native `Match::advance_tick` determines its refusal. This is an intentional native definition. Pinned `shared/sim.js` runs research at 5321, building training at 5352, worker collection at 5374-5379, aggregate construction at 5585-5603 and Legacy scenario at 5638. These live phases supply no equivalent global construction/production/scenario preflight order.
+
+Current admission checks Legacy scenario before ordinary production and construction, before recorded inputs execute or the runner starts. Thus three independently invalid contexts already present at admission return the Legacy scenario refusal. The later post-command ordinary checks run construction, production, then Legacy scenario. The historical Legacy endpoint checked production, scenario, then construction there; neither later sequence overrides the earlier admission check.
+
+The focused core regression uses genuine El Alamein startup and distinct waiting-Build, missing-production-building and invalid-scenario-owner defects. It checks each defect independently, all three together and all six direct read-only guard permutations, preserving the canonical queue, RNG, World and owner state. Failed admission returns empty events and default retirement without starting or faulting the runner. This core-only publication witness covers queued input, producer output and World publication state; it supplies no socket, frame or Unreal delivery proof. Runtime faults after successful admission retain their existing phase prefix and fault latch, rather than rolling the entire tick back. This note adds no parity row or completion claim.
+
+## Server parity inventory
+
 Test key used in the Evidence and Acceptance columns:
 
 - **RL@n**: `test.js:5647` "Room lifecycle checks use one fake clock for captured timers and the socket retry module", sub-scenario starting at line n.
