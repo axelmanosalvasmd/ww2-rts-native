@@ -92,6 +92,13 @@ fn difference(source: &Value, native: &Value, field: &str) -> Option<Value> {
     }
 }
 
+// Additional comparison-only access for the private core test. The raw comparator
+// and its standalone diagnostic path retain their original behavior.
+#[cfg(test)]
+pub fn compare_projection_for_test(source: &Value, native: &Value) -> Option<Value> {
+    difference(source, native, "$")
+}
+
 fn row_metadata(tick: usize, field: &str) -> Value {
     if tick == 0
         && field.starts_with("$.units[")
@@ -104,6 +111,13 @@ fn row_metadata(tick: usize, field: &str) -> Value {
 }
 
 fn run(trace: &Value) -> Result<Value, String> {
+    run_with_match(trace, Match::new)
+}
+
+pub(crate) fn run_with_match(
+    trace: &Value,
+    constructor: impl FnOnce(&AuthoritativeMap, MatchOptions) -> Result<Match, String>,
+) -> Result<Value, String> {
     if trace["format"] != "r1-whole-match-differential-v1"
         || trace["reference"] != PIN
         || trace["requestedTicks"] != 600
@@ -130,7 +144,7 @@ fn run(trace: &Value) -> Result<Value, String> {
         .map_err(|_| "invalid private seed")?;
     let map = AuthoritativeMap::from_json(&serde_json::to_vec(&committed).unwrap())
         .map_err(|e| e.to_string())?;
-    let mut m = Match::new(
+    let mut m = constructor(
         &map,
         MatchOptions {
             seed,
@@ -274,6 +288,11 @@ fn run(trace: &Value) -> Result<Value, String> {
         && trace["movedTicks"].as_u64().is_some_and(|v| v > 0)
         && moved_ticks > 0
         && !orders.is_empty();
+    #[cfg(test)]
+    if let Some(path) = std::env::var_os("WW2_ALIGNED_NATIVE_FRAMES") {
+        std::fs::write(path, serde_json::to_vec(&native_frames).unwrap())
+            .map_err(|e| e.to_string())?;
+    }
     Ok(json!({
         "harnessCompleted":complete,"differentialVerdict":if !complete {"INCOMPLETE"} else if first.is_some() {"MISMATCH"} else {"MATCH"},
         "sourceTicks":completed_source,"nativeTicks":native_ticks,"actualTicksMatched":ticks_matched,"matchedTickPrefix":prefix,
