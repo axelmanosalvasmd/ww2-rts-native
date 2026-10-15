@@ -1,0 +1,1 @@
+- Record the parallel Rust CI jobs, nextest process isolation, dependency-cache boundaries and Axel decision 085 in DESIGN. Attribute the older Vostro and hosted timings to their original baselines; current per-job and warm-cache measurements remain pending.
