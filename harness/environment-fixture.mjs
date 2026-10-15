@@ -5,7 +5,8 @@ import { readFileSync,writeFileSync,readdirSync,mkdtempSync,rmSync } from 'node:
 import { join,resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath,pathToFileURL } from 'node:url';
-assert.equal(process.arch,'x64');assert.equal(process.version,'v24.21.0');assert.ok(process.argv.slice(2).every(a=>a==='--check'));
+assert.equal(process.arch,'x64');assert.equal(process.version,'v24.21.0');assert.ok(process.argv.slice(2).every(a=>a==='--check'||a==='--engineering-acceptance'));
+const acceptance=process.argv.includes('--engineering-acceptance');
 const root=fileURLToPath(new URL('../',import.meta.url)),reference=resolve(process.env.WW2_REFERENCE??join(root,'reference/ww2-rts'));
 const pin='e4e579a838aabae3b1d9dadbc17a0a87147bc52d';
 const git=args=>execFileSync('git',['-C',reference,...args],{encoding:'utf8'}).trim();
@@ -62,10 +63,11 @@ try {
     if(a.wear)g.wear[a.wear[0]]=a.wear[1];if(a.scar)g.scar[a.scar[0]]=a.scar[1];if(a.hp)g.cellHp[a.hp[0]]=a.hp[1];
    } else throw Error(a.op);
    results.push({value:result,shots:structuredClone(g.shots)});snapshots.push(structuredClone(snapshot(g)));
-  }cases.push({name,map,units,actions,results,snapshots});
+  }cases.push({name,map,units,actions,results,snapshots});return {game:g,snapshots,results};
  }
  const blank=()=>({name:'Environment',w:20,h:20,rows:Array(20).fill('.'.repeat(20)),spawns:[{x:0,y:0},{x:19,y:19}],points:[{x:10,y:10}]});
  const cell=(m,c,ch)=>{const y=Math.floor(c/m.w),x=c%m.w;m.rows[y]=m.rows[y].slice(0,x)+ch+m.rows[y].slice(x+1);};
+ if(!acceptance){
  for(const filename of readdirSync(join(reference,'maps')).filter(n=>n.endsWith('.json')).sort()){
   const m=JSON.parse(readFileSync(join(reference,'maps',filename),'utf8'));const c=m.rows.join('').search(/[BHOT#XYN]/);const target=c>=0?c:Math.floor(m.w*m.h/2);const at={x:(target%m.w+.5)*2,z:(Math.floor(target/m.w)+.5)*2};
   record(`authored:${filename}`,m,[{op:'blast',at,radius:3,damage:95,scar:.4},{op:'burn',dt:.5},{op:'blast',at,radius:1,damage:1000,scar:1},{op:'debris',dt:.5},{op:'debris',dt:2},{op:'flood'}]);
@@ -91,6 +93,7 @@ try {
   ['dent-low-neighbour-int8',[[42,4],[22,4],[62,4],[41,4],[43,-128]]],
   ['dent-valid-upper-level',[[42,4],[22,4],[62,4],[41,4],[43,4]]],
  ]){const m=blank();record(name,m,[{op:'prime',height},{op:'blast',at:{x:5,z:5},radius:0,damage:1000,scar:1}]);}
+ }
  // Compact expected states as path replacements. Every Rust comparison reconstructs the full state.
  function changes(a,b,path=[],out=[]){
   if(Object.is(a,b))return out;
@@ -100,9 +103,53 @@ try {
   }
   out.push([path,b]);return out;
  }
+ if(!acceptance){
  {const m=blank();for(const c of [42,43])cell(m,c,'B');m.structures=[{id:'old',kind:'house',sections:[{id:'a',c:42,hp:100,material:'wood',anchor:true,supports:['b']},{id:'b',c:43,hp:100,material:'wood',anchor:false,supports:[]}]}];record('detached-section-support-failure',m,[{op:'mutate',c:43,change:{object:'K'}},{op:'building',id:7,cells:[43],hp:200},{op:'section',c:42,damage:500},{op:'debris',dt:2.5}],[{id:7,type:'hq',x:7,z:5}]);}
  {const m=blank();cell(m,42,'B');m.structures=[{id:'durable',kind:'house',sections:[{id:'a',c:42,hp:100000,material:'concrete',anchor:true,supports:[]}]}];record('contact-fifo-limit',m,[{op:'contact_loop',c:42,count:2050,damage:0.000001},{op:'section',c:42,damage:0.000001,contact:'fifo:0'},{op:'section',c:42,damage:0.000001,contact:'fifo:2049'}]);}
+ }
+ const checks=[],hulls=[];
+ if(acceptance){
+  // These add selected-check scenes; the default fixture cases remain unchanged.
+  const accepted=(row,label,condition)=>{assert.ok(condition,`${row}: ${label}`);checks.push({row,label});};
+  const failed=(scene,c)=>scene.game.structuralCells.get(c).state==='failed';
+  {const m=blank(),cells=[42,43,63,62];for(const c of cells)cell(m,c,'B');
+   m.structures=[{id:'cycle',kind:'house',sections:cells.map((c,i)=>({id:`s${i}`,c,hp:100,material:'stone',anchor:i===0,supports:[`s${(i+1)%4}`]}))}];
+   const r=record('acceptance:support-cycle',m,[{op:'section',c:42,damage:100,contact:'anchor',direction:{x:1,z:0}}]);
+   accepted('ENG-39','a disconnected support cycle cannot support itself',cells.every(c=>failed(r,c)));}
+  {const m=blank(),cells=[204,205,206,207,208];for(let y=0;y<20;y++)for(let x=4;x<=8;x++)cell(m,y*20+x,'W');for(const c of cells)cell(m,c,'=');
+   m.structures=[{id:'span',kind:'bridge',sections:cells.map((c,i)=>({id:`s${i}`,c,hp:200,material:'stone',anchor:i===0||i===4,supports:[i-1,i+1].filter(j=>j>=0&&j<cells.length).map(j=>`s${j}`)}))}];
+   const r=record('acceptance:far-anchor',m,[{op:'section',c:206,damage:500,contact:'bridge-hit',direction:{x:1,z:0}}]);
+   accepted('ENG-39','the far anchored deck survives',failed(r,206)&&r.game.chars[205]==='='&&r.game.chars[207]==='=');}
+  {const m=blank();for(const c of [42,43,44])cell(m,c,'B');
+   m.structures=[{id:'independent',kind:'house',sections:[{id:'a',c:42,hp:100,material:'wood',anchor:true,supports:['b']},{id:'b',c:43,hp:100,material:'wood',anchor:false,supports:['a']},{id:'c',c:44,hp:100,material:'wood',anchor:true,supports:[]}]}];
+   const r=record('acceptance:independent-and-duplicate-collapse',m,[{op:'section',c:42,damage:100,contact:'breach'},{op:'section',c:42,damage:100,contact:'breach'},{op:'section',c:43,damage:100,contact:'breach'}]);
+   accepted('ENG-39','the breach and its unsupported dependent fail',failed(r,42)&&failed(r,43));
+   accepted('ENG-39','the independent supported section survives',!failed(r,44)&&r.game.chars[44]==='B');
+   accepted('ENG-40','duplicate contact cannot repeat collapse',r.results[0].shots.filter(x=>x.k==='collapse').length===2&&r.results[1].shots.length===0&&r.results[2].shots.length===0);}
+  {const m=blank();cell(m,210,'#');const r=record('acceptance:sandbag-damage-stage',m,[{op:'blast',at:{x:21,z:21},radius:0,damage:80},{op:'blast',at:{x:21,z:21},radius:0,damage:200}]);
+   accepted('ENG-43','the wall passes through a damaged stage before it falls',r.snapshots[1].chars[210]==='#'&&r.snapshots[1].log.some(x=>x[0]===210&&(x[3]>>3)>=1)&&r.game.chars[210]!=='#');}
+  {const m=blank();const r=record('acceptance:subcrater-client-state',m,[{op:'blast',at:{x:21,z:21},radius:1,damage:40,scar:1}]);
+   accepted('ENG-43','clients are told',r.game.scar[210]>.02&&r.game.scar[210]<1&&r.game.chars[210]==='.'&&!!((r.game.cellState[210]>>5)&3)&&r.game.cellLog.some(x=>x[0]===210&&((x[3]>>5)&3)));}
+  {const m=blank();m.rows[5]='.....W++.+..........';m.rows[8]='.....W+.............';m.heights=Array.from({length:20},(_,y)=>'0'.repeat(6)+(y===8?'1':'0')+'0'.repeat(13));
+   const r=record('acceptance:flood-bank-depth-and-high-crater',m,[{op:'flood'},{op:'flood'}]);
+   accepted('ENG-53','the crater on the bank fills first',r.snapshots[1].chars[106]+r.snapshots[1].chars[107]==='F+');
+   accepted('ENG-53','as deep as the crater was',r.game.chars[107]==='F'&&JSON.stringify(r.snapshots[0].wear)===JSON.stringify(r.snapshots[2].wear));
+   accepted('ENG-53','a crater above the water stays dry',r.game.chars[166]==='+');}
+  {const m=blank();m.points=[{x:4,y:4}];cell(m,210,'B');m.structures=[{id:'contact',kind:'house',sections:[{id:'a',c:210,hp:40,material:'stone',anchor:true,supports:[]}]}];
+   const steps=Array.from({length:60},(_,i)=>({op:'debris',dt:.05,tick:11+i}));const r=record('acceptance:falling-section-live-contact',m,[{op:'section',c:210,damage:2000,contact:'fall',direction:{x:1,z:0}},...steps],[{id:7,type:'tank',x:24,z:21,rot:0}]);
+   const initial=r.snapshots[0].units[0],last=r.snapshots.at(-1).units[0];
+   accepted('ENG-68','falling section contacts do not crush living units',r.snapshots.some(s=>s.falling.some(b=>b.contacts>0))&&last[1]===initial[1]&&r.game.units.get(7).x===24&&r.game.units.get(7).z===21&&r.game.fallingSections.length===0);}
+  {const m=blank(),sections=[];for(let i=0;i<97;i++){const c=(2+Math.floor(i/12))*20+2+i%12;cell(m,c,'B');sections.push({id:`s${i}`,c,hp:40,material:'stone',anchor:true,supports:[]});}m.structures=[{id:'cap',kind:'house',sections}];
+   const actions=sections.map((s,i)=>({op:'section',c:s.c,damage:1000,contact:`cap:${i}`}));actions.push(...Array.from({length:60},(_,i)=>({op:'debris',dt:.05,tick:11+i})));
+   const r=record('acceptance:active-body-cap',m,actions);
+   accepted('ENG-68','a large collapse obeys the authoritative active body cap',r.snapshots[97].falling.length===96&&r.game.fallingSections.length===0&&sections.every(s=>failed(r,s.c)));}
+  const {debrisBody,stepDebris,wreckMass}=await import(pathToFileURL(join(reference,'shared/debris-motion.js')));
+  const numberBits=n=>{const b=new DataView(new ArrayBuffer(8));b.setFloat64(0,n,false);return b.getBigUint64(0,false).toString(16).padStart(16,'0');};
+  for(const kind of ['tank','tiger']){const input={id:kind,kind:'wreck',x:0,y:.08,z:0,impulse:2,mass:wreckMass(kind,sim.UNITS[kind])};const body=debrisBody(input),states=[];
+   for(let i=0;i<60;i++){stepDebris(body,.05,{ground:()=>0,material:()=>({rebound:.15,absorption:.7})});states.push({values:[body.x,body.y,body.z,body.vx,body.vy,body.vz].map(numberBits),settled:body.settled});}
+   accepted('ENG-68',`both hulls become static in bounded time:${kind}`,body.settled&&body.vx===0&&body.vy===0&&body.vz===0);hulls.push({input,states});}
+ }
  for(const c of cases){c.snapshots=c.snapshots.map(s=>JSON.parse(JSON.stringify(s)));c.initial=c.snapshots[0];c.patches=c.snapshots.slice(1).map((s,i)=>changes(c.snapshots[i],s));delete c.snapshots;}
- Math.random=random;clean();const content=JSON.stringify({reference:pin,node:process.version,arch:process.arch,cases})+'\n';const path=join(root,'rust/crates/core/tests/fixtures/environment.json');if(process.argv.includes('--check'))assert.equal(readFileSync(path,'utf8'),content);else writeFileSync(path,content);
+ Math.random=random;clean();const content=JSON.stringify({reference:pin,node:process.version,arch:process.arch,cases,...(acceptance?{checks,hulls}:{})})+'\n';const path=join(root,acceptance?'rust/crates/core/tests/fixtures/engineering-environment-acceptance.json':'rust/crates/core/tests/fixtures/environment.json');if(process.argv.includes('--check'))assert.equal(readFileSync(path,'utf8'),content);else writeFileSync(path,content);
  console.error(`${process.argv.includes('--check')?'Verified':'Recorded'} ${cases.length} environment traces, ${cases.reduce((n,c)=>n+c.actions.length,0)} actions`);
 }finally{rmSync(temp,{recursive:true,force:true});}
