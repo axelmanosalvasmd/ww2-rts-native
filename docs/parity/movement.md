@@ -55,6 +55,8 @@ Live-routing evidence: four focused recordings now run real fine searches inside
 
 ## Pathfinding
 
+The named branch recorder `harness/pathfinding-branches-fixture.mjs` adds a shared component witness for MOV-31 through MOV-35, MOV-38 and MOV-39: 603 original searches in 24 scenarios across 20 profiles. It records exact paths, endpoints, expansion counts, local goals and leg limits on explicit selected routing views. The existing 1,529-query recorder remains unchanged. Scoped Source regeneration matches, and Vostro `ci-test` passes all three pathfinding checks, including 2,132 recorded searches across the old and new fixtures. Full workspace/release checks and review remain pending. These views do not prove recipient selection or whole-match outcomes, and the bounded legs do not reach the default 16,384-expansion cap. All affected rows retain their existing status.
+
 The standalone `path_requests.rs` scheduler matches 606 original-source action checkpoints, including 207 searches and 22 order drops. Its adapters supply eligibility, searches and unit updates; complete live-order eligibility and movement integration remain pending, so MOV-40 and MOV-41 stay in progress.
 
 | ID | Behavior / content | Evidence | Rust (Julio) | Unreal (Axel) | Depends on | Acceptance check | Status |
