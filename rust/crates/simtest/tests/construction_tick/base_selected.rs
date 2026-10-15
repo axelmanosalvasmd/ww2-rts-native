@@ -62,8 +62,7 @@ fn check_preparation(case: &Value) {
     assert!(original.get("name").is_none());
     assert_eq!(original["points"], json!([]));
     let error = AuthoritativeMap::from_json(&serde_json::to_vec(original).unwrap())
-        .err()
-        .expect("raw component map must not gain native admission");
+        .expect_err("raw component map must not gain native admission");
     assert_eq!(
         error.to_string(),
         "name: expected text up to 40 UTF-16 code units"
@@ -71,8 +70,7 @@ fn check_preparation(case: &Value) {
     let mut named = original.clone();
     named["name"] = json!("Base selected");
     let error = AuthoritativeMap::from_json(&serde_json::to_vec(&named).unwrap())
-        .err()
-        .expect("name-only component map still has no capture points");
+        .expect_err("name-only component map still has no capture points");
     assert_eq!(error.to_string(), "points: needs 1-9 capture points");
     let width = original["w"].as_u64().unwrap();
     assert!(width == 80 || width == 64);
