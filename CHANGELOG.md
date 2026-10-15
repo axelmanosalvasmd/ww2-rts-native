@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Add a private aligned attack-move scenario and same-start plain-Move control from exact 5a8. Genuine full-health constructor actors receive only scripted orders; compare path/facing/motion/targets/stances, ordinary retirement and actual halt/death/resume/arrival branches. Retain the four currency mappings and stop at the first divergence. Source/native results pending; no row or public branch changes.
+
 - Record Axel's exact aligned whole-match evidence decision in PARITY.md. Preserve the existing component, outcome and owner rules. Both owners record readback of the final documentation head on #5 before merge; no parity row is promoted.
 
 - Complete MODE-15's raw observed Hill 112 path check on 10 canonical Assault starts, comparing all 30 full waypoints with the unchanged Source fixture; the three selected tests pass at 0b60e793.

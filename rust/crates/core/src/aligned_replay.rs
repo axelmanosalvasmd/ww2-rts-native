@@ -13,6 +13,9 @@ mod original;
 #[path = "aligned_replay_comparison.rs"]
 mod canonical;
 
+#[path = "aligned_attack_move.rs"]
+mod attack_move;
+
 #[derive(Clone, Debug)]
 pub struct Replay(Arc<Mutex<Tape>>);
 impl PartialEq for Replay {
@@ -29,6 +32,8 @@ struct Tape {
     layout: Option<Value>,
     startup: Option<Value>,
     shot: Option<(i64, u32, u32, u32)>,
+    scenario_branches: Vec<Value>,
+    scenario_motion: Vec<Value>,
 }
 impl Replay {
     fn new(input: &Value) -> Result<Self, String> {
@@ -59,6 +64,8 @@ impl Replay {
             layout: None,
             startup: None,
             shot: None,
+            scenario_branches: Vec::new(),
+            scenario_motion: Vec::new(),
         }))))
     }
     pub(crate) fn draw(&self, consumer: Value) -> f64 {

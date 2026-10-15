@@ -1,5 +1,13 @@
 # Three Crossroads Native: design decisions
 
+## First targeted aligned attack-move scenario (2026-10-15)
+
+A private child of exact `5a8ce0e22c5771f3619f7f52fb0705c9afe2fe8a` prepares CMB-91/MOV-49 before further MODE-21 work. [The exact scene, fields, predicates and gates](docs/testing/aligned-attack-move.md) preserve the full-health ordinary constructor and four base buildings. Both cases use the same authored open map, shared layout/tape, staging orders and goal; only the final Move versus attack-move differs. No state/health/actor patching or copied engine formula supplies an expected result.
+
+Test-only observers record executed halt/resume/arrival, actual movement flags and ordinary retirement. Shipping predicates and operations are unchanged and all new native observation/storage compiles out. All paired frames compare actual unit paths, facing, movement/backing intent, retries, queues, targets, attack-move and stances, health, actor births/removals and retirement, alongside the existing economy/score projection. Only the four existing fuel/mun absence defaults are mapped symmetrically; all other differences remain visible. Nonempty waiting-order serialization is an explicit provider boundary, not an invented empty queue.
+
+PASS requires every checkpoint/tick and input consumer to match, natural enemy death after an actual halt, post-kill resumed progress, cleared arrival within 2.5 m and the separate plain-Move pass-by control on both engines. First divergence is a valid diagnostic and the test fails, with full private frames/receipts retained and rows held. Current execution is pending the announced frozen head; user15:51 now grants direct Source then focused native execution under S1 without another approval pause. Old R1 evidence/public #261 and MODE-21 checkpoint34317 remain untouched. No row or shipping/interface/RNG/pin changes.
+
 ## Aligned whole-match documentation proposal (2026-10-15)
 
 This amendment quotes item 1 of Axel's owner answer `6194079987` exactly in

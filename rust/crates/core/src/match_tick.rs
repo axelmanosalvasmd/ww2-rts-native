@@ -615,6 +615,10 @@ impl crate::match_runtime::Match {
             let unit = &self.world.game.units[&id];
             let moving = !unit.path.is_empty()
                 || crate::math::hypot(unit.x - before.x, unit.z - before.z) > 0.001;
+            #[cfg(test)]
+            if let Some(replay) = &self.start.random.replay {
+                replay.observe_moving(id, moving);
+            }
             let result = self.apply_unit_firing(id, moving, dt);
             self.take_firing_tick_events(events);
             result?;
