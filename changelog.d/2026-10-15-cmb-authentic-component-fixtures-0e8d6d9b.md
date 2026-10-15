@@ -1,0 +1,1 @@
+- Record nine additional automatic-ability cases and one dismounted halftrack reinforcement case from pinned Source, preserving every existing fixture case. Native validation remains pending.
