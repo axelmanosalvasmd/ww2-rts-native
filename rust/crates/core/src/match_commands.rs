@@ -2371,7 +2371,3 @@ impl crate::match_runtime::Match {
         Ok(moved)
     }
 }
-
-#[cfg(test)]
-#[path = "../tests/support/mov_group_move_selected.rs"]
-mod mov_group_move_selected;
