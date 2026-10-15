@@ -219,6 +219,39 @@ source comment6196151342; no public acknowledgment or
 contract change is made. Future commands/counts below remain preparation,
 not a grant. A fresh independent reader review must precede Source execution.
 
+## Successful return evidence repair after review of 700b
+
+Read the full `/tmp/review-mov700-required-fields-repair/REVIEW.md`: REVISE
+for one P2, with the prior missing-input finding fixed. Preserve parent
+`700b6989a6a169c8ffb279a5a93ac8e634f7863e` at
+`held/mov-speed-required-fields-700b-20261015`, alongside 5669/9e424 and both
+original exit134 logs. The review's result-deletion counterexamples are
+source-derived, not executed mutations or Source failures.
+
+Pinned sim.js:3068-3181 returns a path array from every successful findPath
+branch. Its actual value is consumed by selected test.js:7527-7528.
+Pinned sim.js:6011-6089 returns a snapshot object, consumed through flags at test.js:7657-7658 and directly at7662. The reader now requires
+an own event.result on either successful operation and validates only that
+outer array/object shape. Delete either result and own(result) rejects;
+replace a path result with an object/null, or a snapshot result with an
+array/null, and the existing array/object shape assertion rejects.
+
+Only successful step/fixtureCommand/command records may still omit result
+for an actual undefined return. Their present nonundefined encoded results
+continue through the existing full encoded-value validation without changes.
+Missing input remains independently rejected. The throw branch and its
+failure/result/after validation are byte-identical to 700b. No snapshot ABI
+validator or expansion of the 203-line required-field schema is added.
+
+Exactly four paths change: streaming reader, this design, direct CHANGELOG
+and the small owned DESIGN note. Writer, codec, original Source bodies,
+helpers, all 41 assertions, RNG, inputs, witnesses, companions, Rust, fixture
+bytes and every parity row remain unchanged. MOV11/49 remain ALIGNED-owned.
+No Node, Source, Cargo, native, formatting, mutation, test or publication
+execution occurs. Existing single-record OOM and I/O recovery limits remain;
+a fresh independent review and Root grant are still required. The following
+future commands and expected counts are unchanged, with no new execution.
+
 ## Commands prepared for a future grant only
 
 Read back the actual successor SHA and clean state before any execution.

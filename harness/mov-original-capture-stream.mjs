@@ -340,8 +340,14 @@ export async function readOriginalCapture(path) {
         if (row.outcome === 'throw') {
           own(row.event, 'failure'); errorShape(row.event.failure);
           assert.equal(Object.hasOwn(row.event, 'result'), false);
+        } else if (row.op === 'findPath') {
+          own(row.event, 'result'); array(row.event.result);
+        } else if (row.op === 'snapshotFor') {
+          own(row.event, 'result'); object(row.event.result);
+        } else {
+          // Only these operations may genuinely omit an undefined return result.
+          assert.ok(['step', 'fixtureCommand', 'command'].includes(row.op));
         }
-        // An undefined return was omitted by JSON.stringify in the old packet too.
         open.delete(row.call);
         break;
       case 'case-end':
