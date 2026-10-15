@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## MOV implementation recovery on frozen main (2026-10-15)
+
+The MOV_IMPL replacement normally merges `389ac811412213fb3f6e212db75ea1f6ba1bcf65` into frozen main `379ba4e06c794708623c005ab6052bebd03d8809` in its own checkout. Keep both additive changelog histories, the incoming registry union and every prior fixture and assertion. The earlier source generation/check successes belong to `0e2334be`; formatting and the native map-admission failure belong to `389ac811`. No earlier result qualifies the assembled head.
+
+Read the actual `/tmp/mov-mud70-S2-20261015-run1/08-focus7.log`: two registration guards passed, then the first terrain behavior failed because the non-World map has zero capture points. The other four behavior tests did not run. Preserve the failure and the native map guard. MOV-04 still lacks a connected fuel-cap consumer: `movement.rs` omits the reserve scalar and `match_tick.rs` refuses logistics. This runtime ownership gap prevents five complete assigned rows without a Root scope decision; independent terrain and together-march proof continues. No slot, runtime change, row promotion or public action is implied.
+
 ## Five complete selected MAP checks (2026-10-15)
 
 At producing runtime head `7cbfcdddf913625c48fd109d8d216151881cba20`,
