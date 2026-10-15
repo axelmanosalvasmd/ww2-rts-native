@@ -1,0 +1,1 @@
+- Prepare MAP-56's finite height-query matrix: 1,000 selected original-Source samples across 33 complete maps, exact input/output bits, an independent Source reproducer and a focused native replay with the existing non-finite-input guard. Source reproduction and native execution remain pending; no terrain provider, coordinate contract or parity status changes.
