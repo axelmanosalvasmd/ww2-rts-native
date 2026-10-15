@@ -1,5 +1,13 @@
 # Three Crossroads Native: design decisions
 
+## CMB-140 genuine three-actor Stop diagnostic (2026-10-15, source freeze)
+
+From preserved diagnostic docs head `68bd3ba2`, add one owned child module and recorder for CMB-140. Original constructors, shared finite tape/layout, ordinary commands and 450 actual ticks prepare actor A with attack-move, actor B with a visible Attack target and actor C with queued Move/Attack work. One actual Stop selects all three; Source Attack and attack-move clear each other, so no single actor is primed with impossible simultaneous intent. Observe every selected actor before/after, all typed waiting-order fields, full existing movement/firing projection and additional work/target/traffic fields. Foreign-only, no-own, empty and mixed Stop controls retain actual denials and unchanged foreign state. No actor birth, HP, pose, queue or expected state is authored into either engine.
+
+The old amove snapshot keeps its nonempty-queue refusal unchanged. The new projection serializes actual typed queued commands with Source-semantic fields and refuses unrepresented active field work. Its scoped registry adds exact missing-key/absence-marker defaults for worldGoal/entrench/traffic (null), build/follow/trafficWait (positive zero), tied to explicit pinned reads. Parent holdFire/holdPos proposals and all six additions remain DIAGNOSTIC_PROPOSED_DEFAULTS, ownerApproval=PENDING and parityEligible=false; the approved four currencies are a separate comparison. Every present value/type/bit, unknown field, array and container remains intact. Source instrumentation must erase exactly to the pin and observers have zero engine effects.
+
+[The scenario and pending gates](docs/testing/aligned-stop.md) preserve raw strict, approved-currency-only and proposed diagnostic results, complete consumed-input prefixes and genuine per-actor preconditions. User16:51 grants bounded S3 execution after this source freeze and authentic recording/binding; first genuine Source, compile, admission or post-zero behavior difference stops the batch. No Source or native command has run for this new scenario yet. No table/status change, aircraft closure or network-route claim. Main 55193075 already contains the earlier ten component rows; this private helper base is older and is not current main.
+
 ## Proposed-default diagnostic mode and bounded report memory (2026-10-15)
 
 ### Actual diagnostic execution and retained strict results

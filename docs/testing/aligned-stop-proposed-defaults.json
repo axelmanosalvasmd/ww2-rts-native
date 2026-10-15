@@ -1,0 +1,105 @@
+{
+  "mode": "DIAGNOSTIC_PROPOSED_DEFAULTS",
+  "ownerApproval": "PENDING",
+  "parityEligible": false,
+  "reference": "e4e579a838aabae3b1d9dadbc17a0a87147bc52d",
+  "parentRegistry": "docs/testing/aligned-proposed-defaults.json",
+  "fields": [
+    {
+      "path": "$.units[*].worldGoal",
+      "field": "worldGoal",
+      "default": null,
+      "numberBits": null,
+      "sourceFile": "shared/sim.js",
+      "consumerLine": 2406,
+      "consumingExpression": "!!u.worldGoal",
+      "uniqueSourceLine": "const busy = (u) => u.path.length > 0 || !!u.worldGoal || !!u.attackId || !!u.dig || !!u.nade || !!u.amove || !!u.build || u.enter >= 0 || !!u.board || !!u.riding || u.fireAt >= 0 || u.retreating;",
+      "nativeProvider": "Match.world.game.units[id].world_goal",
+      "absentForms": [
+        "missing key",
+        "exact {absent:true}"
+      ],
+      "scope": "comparison copies only; diagnostic pending general owner decision"
+    },
+    {
+      "path": "$.units[*].build",
+      "field": "build",
+      "default": 0,
+      "numberBits": "0000000000000000",
+      "sourceFile": "shared/sim.js",
+      "consumerLine": 2406,
+      "consumingExpression": "!!u.build",
+      "uniqueSourceLine": "const busy = (u) => u.path.length > 0 || !!u.worldGoal || !!u.attackId || !!u.dig || !!u.nade || !!u.amove || !!u.build || u.enter >= 0 || !!u.board || !!u.riding || u.fireAt >= 0 || u.retreating;",
+      "nativeProvider": "Match.commands.units[id].build_target (zero means none)",
+      "absentForms": [
+        "missing key",
+        "exact {absent:true}"
+      ],
+      "scope": "comparison copies only; diagnostic pending general owner decision"
+    },
+    {
+      "path": "$.units[*].entrench",
+      "field": "entrench",
+      "default": null,
+      "numberBits": null,
+      "sourceFile": "shared/sim.js",
+      "consumerLine": 5331,
+      "consumingExpression": "if (u.entrench)",
+      "uniqueSourceLine": "      if (u.entrench) crews.set(u.entrench, (crews.get(u.entrench) ?? 0) + 1);",
+      "nativeProvider": "Match.world.game.units[id].entrench plus field-work provider; active work refuses this ground-only projection",
+      "absentForms": [
+        "missing key",
+        "exact {absent:true}"
+      ],
+      "scope": "comparison copies only; diagnostic pending general owner decision"
+    },
+    {
+      "path": "$.units[*].follow",
+      "field": "follow",
+      "default": 0,
+      "numberBits": "0000000000000000",
+      "sourceFile": "shared/sim.js",
+      "consumerLine": 2157,
+      "consumingExpression": "!s.follow",
+      "uniqueSourceLine": "    if (d < bd && s.owner === u.owner && s.hp > 0 && UNITS[s.type].infantry && !s.operative && !s.riding && !s.follow) { best = s; bd = d; }",
+      "nativeProvider": "Match.commands.units[id].follow",
+      "absentForms": [
+        "missing key",
+        "exact {absent:true}"
+      ],
+      "scope": "comparison copies only; diagnostic pending general owner decision"
+    },
+    {
+      "path": "$.units[*].traffic",
+      "field": "traffic",
+      "default": null,
+      "numberBits": null,
+      "sourceFile": "shared/local-traffic.js",
+      "consumerLine": 160,
+      "consumingExpression": "!u.traffic",
+      "uniqueSourceLine": "    if (!u.traffic) return { goal: u.path[0], blocked: false, replan: true };",
+      "nativeProvider": "Match.world.game.units[id].traffic",
+      "absentForms": [
+        "missing key",
+        "exact {absent:true}"
+      ],
+      "scope": "comparison copies only; diagnostic pending general owner decision"
+    },
+    {
+      "path": "$.units[*].trafficWait",
+      "field": "trafficWait",
+      "default": 0,
+      "numberBits": "0000000000000000",
+      "sourceFile": "shared/local-traffic.js",
+      "consumerLine": 11,
+      "consumingExpression": "u.trafficWait ?? 0",
+      "uniqueSourceLine": "const priority = (g, u) => (u.retreating ? 30 : u.drift ? 0 : u.path?.length ? 10 : 20) + Math.min(25, Math.floor((u.trafficWait ?? 0) / TRAFFIC.age) * 5);",
+      "nativeProvider": "Match.world.game.units[id].traffic_wait",
+      "absentForms": [
+        "missing key",
+        "exact {absent:true}"
+      ],
+      "scope": "comparison copies only; diagnostic pending general owner decision"
+    }
+  ]
+}
