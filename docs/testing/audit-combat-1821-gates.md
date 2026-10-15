@@ -39,3 +39,27 @@ CMB-41, CMB-42, CMB-64 and CMB-69; eligibility is pending whole-predicate readba
 not established by this list. Preserve every held row and prior failure.
 CMB_IMPL owns the next combat publication lease. Root alone requests independent
 actual-head review and publishes. No public action is authorized here.
+
+## First-five successor
+
+The successor adds three focused witnesses. Its exact requested affected scope
+is five unique instances, with no Source generation or registration changes:
+
+- `ww2-core::it`: `match_combat::cmb64_actual_retirement_pays_enemy_cost_bounty_and_excludes_friendly_death`
+- `ww2-simtest::it`: `vision::cmb39_existing_tower_actor_sees_twelve_then_sixty_when_complete`
+- `ww2-simtest::it`: `match_aviation::cmb65_mg_flak_and_fighter_hold_then_resume_permitted_anti_air`
+- `ww2-simtest::it`: the new CMB-69 control named above
+- `ww2-simtest::it`: the extracted existing connected-tick replay named above
+
+Proposed commands after Root grants the successor head:
+
+```sh
+cargo nextest run --locked -p ww2-core --test it --build-jobs 4 --test-threads 1 -E 'test(=match_combat::cmb64_actual_retirement_pays_enemy_cost_bounty_and_excludes_friendly_death)'
+cargo nextest run --locked -p ww2-simtest --test it --build-jobs 4 --test-threads 1 -E 'test(=vision::cmb39_existing_tower_actor_sees_twelve_then_sixty_when_complete) | test(=match_aviation::cmb65_mg_flak_and_fighter_hold_then_resume_permitted_anti_air) | test(=match_tick::cmb69_seeded_retirement_rejects_wrong_tick_identity_and_missing_or_extra_deaths) | test(=match_tick::connected_tick_phases_match_actual_reference_steps)'
+```
+
+Do not run the earlier two-name command as well as this successor set. Each
+unique instance is requested once. Existing unchanged hosted component checks
+remain attributed to producing `7a7348cb`; they do not need a new whole-match
+gate. Formatting and strict core/simtest all-target Clippy remain conditional
+on Root's explicit slot scope. No execution is claimed in this plan.

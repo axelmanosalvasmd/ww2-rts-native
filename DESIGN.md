@@ -1,5 +1,36 @@
 # Three Crossroads Native: design decisions
 
+## Restored combat first-five candidate (2026-10-15, source only)
+
+The first proposed batch is CMB-39/40/64/65/69. CMB-39 supplements the existing
+complete catalog and original tower range fixtures with a paired native
+12/60 check on the recorded tower actor with weather disabled. CMB-40 already
+has the exact named second-Tiger refusal in the actual production fixture and
+native replay. CMB-64 adds an explicit bounty assertion over the existing
+recorded enemy/friendly retirement scene; the connected 800-tick fixture
+separately supplies a real projectile casualty and complete wallet comparison.
+CMB-65 supplements the existing 42-trace AA fixture with ordinary Hold Fire
+commands and a fighter's existing explicit-air-target mission caller: six
+held calls must preserve HP/XP/events, followed by six permitted AA calls
+with damage, XP and an actual AA event. Actors come from the maintained
+scene factory; there are no new synthetic actors or health writes.
+
+Main push run `38776054627` was opened directly and its raw log read locally.
+It produced successful executions at `7a7348cbac35924b5876531e318140d13b7a42c1`,
+not this child: the existing catalog, production, combat, aviation, firing and
+connected-tick tests each pass on all three hosted platforms. Those named
+bodies, providers and inputs are retained, apart from the documented extraction
+of the connected replay. Current `379ba4e` has the same Rust tree as that
+producing head. The [row assessment](docs/testing/audit-combat-1821-eligibility.md)
+keeps each complete selected check separate from broader runtime claims.
+
+Four new tests remain unexecuted. Source-only evidence is not compiled proof.
+The private status-cell patch is a review proposal and has not been applied.
+Root must grant and qualify the five named affected instances, obtain independent
+actual-head review, and compose the combat publication lease before applying
+any proposed status cells. CMB-41/42/62/63/66/67/68 and CMB-38 remain held for
+the exact missing checks, rather than being promoted to reach a quota.
+
 ## AUDIT_COMBAT restored batch and seeded death controls (2026-10-15)
 
 The private branch starts directly at frozen main `379ba4e06c794708623c005ab6052bebd03d8809`.

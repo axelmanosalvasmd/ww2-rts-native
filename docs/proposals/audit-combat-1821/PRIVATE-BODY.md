@@ -1,0 +1,7 @@
+Private draft. Not ready for publication: four new native witnesses and the extracted original runner have no execution results yet. Root owns the combat publication lease, independent review and public actions.
+
+This candidate closes the selected CMB-39/40/64/65/69 checks through existing catalog/production/aviation/combat callers and an actual seeded 800-tick retirement runner. Add explicit 12/60 tower vision, friendly/enemy bounty, MG/flak/fighter Hold Fire transitions and eight per-tick death-trace negative controls. Preserve all existing Source captures and assertions.
+
+The unapplied STATUS-CELLS.patch proposes only those five Rust/Status pairs. Every Acceptance cell and all other rows remain exact. Eight other assigned rows remain held with specific missing checks in docs/testing/audit-combat-1821-eligibility.md. CMB-61 and prior #262 promotions are excluded.
+
+Validation available: existing exact main run 38776054627 at producing 7a7348cb passes on all three platforms; its logs were read directly. This candidate has Source 0, Cargo 0, native 0, fmt 0, lint 0 and CI 0. The five affected instances, package/target mapping and proposed commands are in docs/testing/audit-combat-1821-gates.md. Root must replace this pending paragraph with actual producing-head results after the granted run and independent review before applying the patch or publishing. No current-head PASS or complete-five-row delivery is claimed yet.

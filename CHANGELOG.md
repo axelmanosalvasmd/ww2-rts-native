@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Prepare the first five restored combat checks: add focused native tower 12/60 vision, enemy/friendly bounty, and MG/flak/fighter Hold Fire witnesses using existing fixture actors and callers. Recover exact main hosted component passes and record every held batch gap. Execution, whole-check review and the private five-row status proposal remain pending; all actual parity cells stay unchanged.
+
 - Add an 800-tick CMB-69 death-trace witness over the existing authentic retirement scene, with eight controls for wrong timing, identity, attribution, missing deaths and duplicates. Reuse the complete connected-tick replay and preserve all original assertions and fixtures. Native execution and parity promotion remain pending.
 
 - Mark MOV-05/06/07/10/12/13 ported from their complete literal road/mud, half-road, timed-slope, together-march, obstructed-corner and border-ray checks. Actual `8d7d892b` passes all six behavior tests plus both real registration guards (8 passed, 0 failed, 363 skipped), final fmt and strict locked core/simtest all-target Clippy. Preserve every Acceptance cell, all other rows, all prior failures and the MOV-04 fuel gap.

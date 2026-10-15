@@ -512,7 +512,7 @@ fn cmb69_seeded_retirement_rejects_wrong_tick_identity_and_missing_or_extra_deat
     let checkpoints = case["checkpoints"].as_array().unwrap();
     assert_eq!(checkpoints.len(), 15);
     let expected = checkpoints.last().unwrap()["deaths"].as_array().unwrap();
-    assert_eq!(expected, &vec![json!([483, 2, 1, "rifle", 0])]);
+    assert_eq!(expected.as_slice(), &[json!([483, 2, 1, "rifle", 0])]);
 
     let mut early = expected.clone();
     early[0][0] = json!(482);

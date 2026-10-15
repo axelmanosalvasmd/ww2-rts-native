@@ -659,3 +659,64 @@ fn aircraft_tick_preflight_rejects_unrepresented_phases_before_mutation() {
     m.aviation.planes.remove(&1000);
     assert!(m.validate_aircraft_turns(0.05).is_err());
 }
+
+#[test]
+fn cmb65_mg_flak_and_fighter_hold_then_resume_permitted_anti_air() {
+    use ww2_core::match_commands::Command;
+    let fixture = fixture();
+    for kind in ["mg", "flak", "fighter"] {
+        let name = format!("{kind}-continuous-aa");
+        let trace = fixture["traces"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|trace| trace["name"] == name)
+            .unwrap();
+        let mut m = scene(trace);
+        let shooter = 1000;
+        let target = 1001;
+        let hold = Command::from_json(
+            &json!({"t":"stance","ids":[shooter],"key":"holdFire","on":true}),
+        )
+        .unwrap();
+        assert_eq!(m.execute_command(0, &hold, false).unwrap(), None);
+        let hp = m.world.game.units[&target].hp;
+        let xp = m.combat.get(shooter).unwrap().xp;
+        for _ in 0..6 {
+            m.step_aircraft_anti_air(&[shooter], 0.05).unwrap();
+            assert_eq!(m.world.game.units[&target].hp.to_bits(), hp.to_bits());
+            assert_eq!(m.combat.get(shooter).unwrap().xp.to_bits(), xp.to_bits());
+            assert!(m.aviation.take_events().is_empty());
+        }
+        if kind == "fighter" {
+            let at = m.world.game.units[&target].at();
+            assert!(
+                m.send_aircraft_mission(
+                    0,
+                    shooter,
+                    mission(&json!({"kind":"attack","id":target,"x":at.x,"z":at.z})),
+                )
+                .unwrap()
+            );
+            assert!(m.commands.units[&shooter].hold_fire);
+        } else {
+            let fire = Command::from_json(
+                &json!({"t":"stance","ids":[shooter],"key":"holdFire","on":false}),
+            )
+            .unwrap();
+            assert_eq!(m.execute_command(0, &fire, false).unwrap(), None);
+        }
+        for _ in 0..6 {
+            m.step_aircraft_anti_air(&[shooter], 0.05).unwrap();
+        }
+        assert!(m.world.game.units[&target].hp < hp, "{kind} resumes AA");
+        assert!(m.combat.get(shooter).unwrap().xp > xp, "{kind} earns XP");
+        assert!(
+            m.aviation.take_events().iter().any(|event| matches!(
+                event,
+                ww2_core::match_aviation::AviationEvent::AntiAir { .. }
+            )),
+            "{kind} emits the actual AA event"
+        );
+    }
+}
