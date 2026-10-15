@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Format only the new MODE-21 observer after its retained fmt diagnostic. Preserve every literal, assertion, operator and identifier; authentic Source generate/check passed at 5139d218 with identical full startup graphs and the old 601 frames/1,321 draws. Native zero-tick semantics remain unmeasured.
+
 - Prepare an exhaustive MODE-21 semantic startup diagnostic using existing readers, preserving full raw observations and the original R1 capture. Keep proposed defaults pending Axel, check actual empty target reservations, and distinguish zero native ticks/five constructor draws from the preserved 600-tick Source trace.
 
 - Record diagnostic-only attack-move and plain-Move results at 10feb6aa: each matches all 4,800 ticks and 481/481 checkpoints with equal consumed-input receipts and complete actual branches. Raw strict and approved currency-only remain 0/481 at tick-0 holdFire absence versus false. Two focused checks, formatting and fresh strict core/simtest Clippy pass. Boolean-default owner approval remains pending; no row eligibility or Source rerun.

@@ -2,6 +2,8 @@
 
 ## MODE-21 complete semantic startup diagnostic (2026-10-15)
 
+Pinned Source generate/check at 5139d218 both pass, preserving the old trace and reproducing the complete startup graph, five constructor draws and 16,379 unused values. Both private artifacts are read-only before Cargo. The first fmt check requests only new observer layout/import ordering and expression braces/commas. Its mechanical child preserves every literal, assertion, operator and identifier and changes no old source or predicate. Native semantics remain pending.
+
 Carry only the private 34317 observer onto tested attack-move documentation head 68bd3ba2. Replace raw-object-layout qualification with exhaustive field-specific exact comparisons, documented no-intent sentinels, checked inactive/internal storage and explicitly proposed defaults. Use the existing target_claims reader and retain its complete raw entries. Keep both raw graphs, aliases, strict/four-currency diagnostics, every default mapping and all semantic differences. Unknown fields fail. No shipping provider, constructor policy, random consumer or expected state changes.
 
 The Source preservation capture/check keeps the old R1 input and all 601 frames/1,321 draws. Native runs only the actual constructor: zero ticks, five startup draws and 16,379 unused entries. Proposed defaults remain DIAGNOSTIC_PROPOSED_DEFAULTS pending Axel decision 6196930542 item 8; technical ACK is not consent, and no row/status promotion follows. The original four currency mapping remains unchanged. See [the complete semantic dispositions and pending commands](docs/testing/r1-mode21-startup.md). No new execution is claimed at this preparation checkpoint. Root owns actual-head review and later delivery.
