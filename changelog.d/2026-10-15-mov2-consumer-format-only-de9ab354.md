@@ -1,0 +1,1 @@
+- Format the new movement-check consumer after retaining its first formatting failure. Import order, layout, trailing commas and an expression-only closure brace wrapper change; statements, values, assertions, the authentic fixture and all other checks stay unchanged. Native verification remains pending.

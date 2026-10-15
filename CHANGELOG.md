@@ -4,6 +4,10 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Merge the frozen aligned R1 test seam onto exact post-256 main d412aad6, preserving both complete histories and every incoming row, registry and fixture. Keep the measured 0/61 MISMATCH and tick-0 Fuel absence versus zero; earlier execution stays on its producing heads, with successor review pending and no reruns or row moves.
+
+- Rebase the four existing MOV43/62/79/83 checks from accepted local `4873cd90` onto exact post-255 main `9e618217`. Preserve every incoming row, module, fixture and old predicate body; relocate the two owned DESIGN notes verbatim beside movement. MOV72 remains held. Prior passes retain their original producing heads; new focused validation is pending.
+
 - Complete the aligned-replay handoff: final Source check at `23ad8570` reproduces the frozen trace and input receipt, with native evidence kept on `87dfae5c`. Retain 0/61 MISMATCH and the Fuel presence difference, document private artifacts and commands, and release S1 for Root.
 
 - Extend the aligned Source recorder's unseeded-random refusal to module initialization. At `87dfae5c`, three focused harness checks, both registration guards, formatting and fresh strict core/simtest Clippy pass; aligned R1 remains MISMATCH at 0/61.

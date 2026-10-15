@@ -1937,6 +1937,18 @@ A single authorized diagnostic proved the supplemental no-SIGHT-anywhere asserti
 - **The last error stays until the next failure,** like `errno`: a successful call does not clear it, and reading it does not change it.
 - **The header is checked by a test, not written by the build.** cbindgen is a dev-dependency, so building the static library needs only the core. `tests/header.rs` compares the committed header with cbindgen's output and fails when they differ.
 
+## MOV-72 purchase setup blocker (2026-10-15)
+
+Source-only inspection of `f7d9ada0` found that the original cleared transport fixture buys through a temporary negative-ID producer. Native `recorded_buy` and `recruit` require a producer in the canonical roster; absence reaches production `Denial::Needs`, and a cleared roster cannot construct a replacement without a builder. Existing carrier tests directly initialize actors and therefore do not prove this purchase scene. No guard was changed and no direct-spawn replacement was added. [The blocker and proposed canonical companion](docs/parity/mov72-purchase-blocker.md) preserve all original assertions and the 100/40-tick timing for Root review. The four prepared checks remain unchanged and unrun. Cargo execution instructions now use the recovery guard, shared target and explicit three-job cap inside a Root-granted scope.
+
+
+## Movement stream two: existing-check preparation (2026-10-15)
+
+At baseline `34edf52a7eaa6cb6edba3e802c2190226228276f`, IMPL_MOV_2 prepares MOV-43/62/72/79/83 without changing runtime rules. The recorder preserves the complete original editor, Massive crowd, later-pair and tank-rider callbacks and helper bodies. Four native tests are prepared for both editor routes, all crowd coordinates, full five-seed rail arrays and all three aircraft definitions plus CFG.air. The tank-rider recording has no complete native purchase/recipient consumer yet and remains held. Existing tests and fixtures stay intact.
+
+No Source recorder, Cargo, rustc or native run is performed: Root's three slots are assigned elsewhere. The new fixture remains absent and the new tests fail on its absence; this source-only checkpoint is not integration-ready. No row becomes ported. [The handoff](docs/parity/movement-stream-two-preparation.md) records complete predicates, missing consumers, exact pending commands and resource requirements. No terrain provider, ABI, gameplay/privacy decision or whole-match criterion changes.
+
+
 ## Movement and crowd separation in the core (2026-10-12)
 
 The movement block of `step()`'s unit loop and `separateCrowds` are ported to `rust/crates/core/src/movement.rs`, `traffic.rs`, `vehicle.rs`, `terrain.rs` and `separation.rs`, and give the reference's answers call by call (Measurements).
@@ -3761,3 +3773,14 @@ The final harness-only correction starts the unseeded-random refusal before Sour
 
 
 The final initialization-guard Source check passes at `23ad8570`, reproducing the entire original frozen trace and receipt. Native source remains byte-identical to tested `87dfae5c`; no native result is reassigned to a later head. S1 processes are terminal and its flock is released. The [handoff](docs/testing/r1-aligned-replay.md#final-handoff) records actual commands, private artifact paths and the original failure copies. No external action or row promotion occurred.
+
+
+## Aligned R1 source-only integration onto post-256 main (2026-10-15)
+
+Normally merge frozen seam `eb15ffcdf89cc860aab04bb475a03921c6c96efa` first and exact current main `d412aad648936b5123068938d624209f6d5d2df9` second, from common base `9e618217de2ac1d0a806c6804eda50c1c9da497f`. The original head remains preserved at `evidence/aligned-replay-eb15-d6308bcc`. Retain every incoming MOV-43/62/79/83, NET, CMB, BASE and MODE cell, registration and fixture. Only CHANGELOG.md conflicts; preserve both full parent document histories, including the automatically merged DESIGN additions. No new routine fragment is introduced.
+
+All 13 owned paths are retained: the 11 non-composite mode/type/blob entries stay exact, while both tracking documents retain their entire parent bodies. Main changes no core source from the fixed base; the complete integrated core tree remains the frozen seam tree. The private integration report records the full expected Git entry union and the literal canonical 11-flag zero-exclusion and exact-three-tracking-document patch pairs. Preserve any unequal raw pair without normalization; equality of a narrower pair does not make the zero-exclusion pair equal.
+
+The measured result remains MISMATCH, 0/61 checkpoints over 600 ticks, first difference tick 0 at `$.players[0].fuel`: Source absence, Rust zero. The existing harness reports 1,321 equal consumed records and 15,063 unused values. These are historical observations, not a new all-input acceptance claim. The independent scope/projection and complete-input reviews of immutable eb15 remain pending; no ACCEPT is inferred. Root has independently verified the four preflight risks against 9e: startup before bases, 1,203 local environment draws, cloned Combat transactions and the unchanged Fuel/Munitions absence difference. No risk-driven seam edit is made here.
+
+Three focused native checks, both registration guards, formatting and strict Clippy remain attributed to `87dfae5c`; the final Source check remains attributed to `23ad8570`, with the authentic fixture produced at `864d6485`. Preserve all execution inputs, raw traces, first-result copies and source bodies byte for byte. This integration performs zero Source, Node, Cargo, native, formatter, gate or CI executions, and no publication. It promotes no row. Root owns actual-successor review, the baseline-push gate and publication; merge order keeps #259 first, with #260 readback separate.
