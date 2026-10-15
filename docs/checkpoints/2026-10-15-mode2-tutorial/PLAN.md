@@ -145,3 +145,10 @@ side's shared parity or DESIGN additions. Recheck ownership, all ported
 rows, original tests/assertions/fixtures and exact Source bytes. Re-freeze
 and have Root commission separate review. Report actual counts and gaps;
 do not promote these nine rows on component proof alone.
+
+
+## Authorized S2 Source result
+
+Root granted S2 at exact clean `bf62462d35309559f2f0da6c3596a28644ee3c88`. Use `/usr/bin/node`, verified v24.21.0 x64, instead of the historical nonexistent `/usr/bin/node24.21.0` path above. Source generation and check pass serially, preserving nine definitions and all 50 original callbacks. The authentic fixture is 24,788 bytes with SHA256 `35cc4ae1ab3ba12681f58360f066ac2152951f5d7bdabb27ae31cdaab625db3c`. The first receipt preflight failed on an absent cpuset file before starting Node; it is retained, with no Source failure. The corrected receipt verifies actual CPU affinity 4-7 and effective memory, swap and quota controls. Evidence lives outside the repository at `/home/judiazm/.t3/handoffs/mode2-s2-bf62462d-20261015`.
+
+Freeze the authentic fixture before Cargo. Current guard is `/home/judiazm/.t3/handoffs/ww2-native-cargo-guard.py` with `WW2_CARGO_SLOT=S2`; target is only `/tmp/ww2-native-target-S2-0e8d6d9b`. Run df immediately before each Cargo command with a 20 GiB floor. Formatting can change only layout in owned new files/additive declarations, with literal token preservation, a unique fragment and a new freeze. First semantic/compiler/behavior failure stops before a repair or rerun. The original `tutorial_steps::` filter must select ten tests exactly once; strict Clippy follows only if all ten pass. No full/release/list command, Tutorial activation, status promotion, nested delegation or external publication is authorized.

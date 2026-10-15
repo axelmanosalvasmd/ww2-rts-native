@@ -1,0 +1,1 @@
+- Record all nine Tutorial step definitions and 50 completion cases from pinned Source on Vostro; deterministic generation/check pass. Native checks and Tutorial match consumers remain pending, and MODE-61 through MODE-69 stay in progress.
