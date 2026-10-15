@@ -1,0 +1,1 @@
+- Prepare Source observations and two native MODE-14 spawn-layout tests for the complete original checklist and every shipped map with 2-6 players. Generation and native execution are pending. Preserve native RNG purposes and keep MODE-14 in progress because Source global draws do not establish same-seed native Match equality.

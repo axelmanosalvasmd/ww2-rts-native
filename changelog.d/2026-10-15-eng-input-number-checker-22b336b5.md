@@ -1,0 +1,1 @@
+- Compare captured engineering input numbers by their exact binary64 bits, accepting equivalent JSON integer and decimal notation while preserving signed zero. Keep complete object keys, array lengths and order, and all nonnumeric values and types strict. Source inputs, captures and output predicates remain unchanged.

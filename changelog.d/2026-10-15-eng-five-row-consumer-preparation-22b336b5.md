@@ -1,0 +1,1 @@
+- Prepare Source recorders and eight native consumer tests for the complete Roads and mud check, live weather, travel, sight, planes, constructor plans and public warning ticks. Capture and execution remain pending; document the missing native AI weather consumer and retained aircraft snapshot refusal. Preserve the earlier engineering checkpoint and all row statuses.
