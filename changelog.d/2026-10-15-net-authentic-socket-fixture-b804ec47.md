@@ -1,0 +1,1 @@
+- Record authentic pinned Source NET-05/34/68 socket predicates and reproduce the fixture byte for byte in a second run. Preserve all thirteen malformed-play inputs, twenty original slot actions and forty-one additional guard actions; focused native validation remains pending.

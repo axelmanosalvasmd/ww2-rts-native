@@ -1,0 +1,1 @@
+- Apply the retained fmt diagnostic's line wrapping to the checked footprint lookup assertion. Keep all tokens, values, ordered cells, predicates and fixture bytes exact. Native verification remains pending on the frozen formatting child.

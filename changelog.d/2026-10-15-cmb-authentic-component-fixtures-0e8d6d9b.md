@@ -1,1 +1,1 @@
-- Record nine additional automatic-ability cases and one dismounted halftrack reinforcement case from pinned Source, preserving every existing fixture case. Native validation remains pending.
+- Record nine additional automatic-ability cases and one dismounted halftrack reinforcement case from pinned Source, preserving every existing fixture case. Four Source generation/check commands and five selected native tests passed at exact `ee03a77a`; independent nine-row review accepts that frozen head. Fresh validation of the main integration remains pending.

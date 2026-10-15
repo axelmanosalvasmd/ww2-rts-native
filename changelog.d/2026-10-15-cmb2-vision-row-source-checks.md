@@ -1,0 +1,1 @@
+- Prepare original-Source vision and fog checks for CMB-124, CMB-125, CMB-128, CMB-131 and CMB-132, using compiled Rust vision rules and the existing recipient delivery consumer. Preserve all old fixtures and assertions. The five new tests remain unrun and their fixtures await a Root recorder slot; no row is newly ported.

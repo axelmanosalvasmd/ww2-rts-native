@@ -50,7 +50,8 @@ function scenario(name, rows, w, h, flags, heights, options = {}) {
       if (n >= 0 && n < near.length) near[n] = 1;
     }
   }
-  const { mines = [], fires = [], bunkers = [], wear = null, wetness = 0, roads = false, worldKnown = false } = options;
+  const { mines = [], fires = [], bunkers = [], wear = null, wetness = 0, roads = false, worldKnown = false,
+    recordStats = false, carryStats = false } = options;
   const g = { w, h, flags: Uint16Array.from(flags), height: heights && Int8Array.from(heights), navigationObserved: true,
     worldKnown, worldNearWalls: near, wear: wear && Float32Array.from(wear), wx: { wet: wetness }, roads,
     players: [{ team: 0 }], mineSeen: new Map(mines.map(c => [c, 1])), fires: new Map(fires.map(c => [c, 20])),
@@ -59,8 +60,11 @@ function scenario(name, rows, w, h, flags, heights, options = {}) {
   const record = { name, rows, w, h, flags: runs(flags), height: heights && runs(heights), near: runs(near),
     worldKnown, mines, fires, bunkers, wear: wear && runs(Float32Array.from(wear)), wetness, roads, queries: [] };
   scenarios.push(record);
+  const freshStats = () => ({ calls: 0, deferred: 0, failed: 0, dropped: 0, expansions: 0, regionRejected: 0 });
+  if (carryStats) g.pathStats = freshStats();
   return (type, from, to, limit = null) => {
-    g.pathStats = { calls: 0, deferred: 0, failed: 0, dropped: 0, expansions: 0, regionRejected: 0 };
+    if (!carryStats) g.pathStats = freshStats();
+    const before = { ...g.pathStats };
     g.finePathLimit = limit ?? undefined;
     const unit = { id: 999, owner: 0, type, ...from };
     const def = sim.UNITS[type];
@@ -72,17 +76,19 @@ function scenario(name, rows, w, h, flags, heights, options = {}) {
     const start = view.flags[stand] & block ? sim.__nearestFree(view, from.x, from.z, block) : stand;
     const leg = navigationLeg(view, start, fullGoal, block);
     const path = sim.findPath(view, unit, to);
-    const expected = { points: path.map(pointBits), routeEnd: pointBits(unit.routeEnd), expansions: g.pathStats.expansions,
-      status: g.pathStats.deferred ? 'ExpansionLimit' : g.pathStats.failed ? 'Unreachable' : 'Found',
+    const expected = { points: path.map(pointBits), routeEnd: pointBits(unit.routeEnd), expansions: g.pathStats.expansions - before.expansions,
+      status: g.pathStats.deferred > before.deferred ? 'ExpansionLimit' : g.pathStats.failed > before.failed ? 'Unreachable' : 'Found',
       localGoal: leg.goal, limited: leg.limited };
-    record.queries.push({ type, from, to, limit, expected });
+    const query = { type, from, to, limit, expected };
+    if (recordStats) query.diagnostics = { before, after: { ...g.pathStats }, start, fullGoal, legConnected: leg.connected };
+    record.queries.push(query);
     return expected;
   };
 }
 
 // Directional cliffs and both blocked corners, with and without known mines.
 for (const mines of [[], [1], [1, 2]]) {
-  const q = scenario(`diagonal-corners-mines-${mines.length}`, ['MOV-31'], 2, 2, [0, 0, 0, 0], [0, 2, 2, 1], { mines });
+  const q = scenario(`diagonal-corners-mines-${mines.length}`, ['MOV-31'], 2, 2, [0, 0, 0, 0], [0, 2, 2, 1], { mines, recordStats: mines.length === 0 });
   for (const type of infantry) { q(type, pt(3, 3), pt(1, 1)); q(type, pt(1, 1), pt(3, 3)); }
 }
 
@@ -124,6 +130,18 @@ for (const blocked of [false, true]) {
     q(type, pt(7, 19), pt(43.7, 19.2)); q(type, pt(7, 19), pt(-3, 80));
   }
 }
+
+// Keep a prior failed search while observing blocked-start and same-cell results.
+const sealed = Array(w * h).fill(0);
+for (let y = 0; y < h; y++) sealed[y * w + 12] = sim.MOVE | sim.SIGHT;
+const selected = scenario('goal-start-selected', ['MOV-34'], w, h, sealed, null, { recordStats: true, carryStats: true });
+selected('rifle', pt(7, 19), pt(43, 19));
+selected('rifle', pt(25, 19), pt(43, 19));
+selected('rifle', pt(7, 19), pt(7, 19));
+const [rejected, escaped, sameCell] = scenarios.at(-1).queries;
+if (rejected.expected.status !== 'Unreachable' || rejected.expected.expansions !== 0 || rejected.diagnostics.after.regionRejected <= rejected.diagnostics.before.regionRejected) throw Error('Selected region rejection not observed');
+if (!escaped.expected.points.length) throw Error('Selected blocked start did not escape');
+if (sameCell.expected.points.length || sameCell.diagnostics.before.failed === 0 || sameCell.diagnostics.after.failed !== sameCell.diagnostics.before.failed) throw Error('Selected same-cell failure counter changed');
 
 // Naval pull masks and 2 m clearance, with a land peninsula or shoal strip.
 for (const obstruction of [sim.LAND, sim.SHOAL]) {

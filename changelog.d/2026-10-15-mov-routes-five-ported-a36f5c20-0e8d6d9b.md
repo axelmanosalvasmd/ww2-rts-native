@@ -1,0 +1,1 @@
+- Mark MOV-31, MOV-32, MOV-34, MOV-39 and MOV-98 ported after their complete routing and smoke checks passed at a36f5c20 (20 selected tests, fmt and strict workspace/all-target Clippy). Keep MOV-35 held on its original GroupMove map-admission failure.

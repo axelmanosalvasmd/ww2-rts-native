@@ -1,0 +1,1 @@
+- Mark ENG-59, ENG-73, ENG-75 and ENG-76 ported after the complete predicate review. ENG-74 stays held for its missing AI weather/query consumer; the failed aircraft checkpoint remains preserved.

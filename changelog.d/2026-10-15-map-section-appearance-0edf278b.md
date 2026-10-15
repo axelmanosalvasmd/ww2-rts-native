@@ -1,0 +1,1 @@
+- Compare the native authored section appearance with the recorded Source state after bridge damage. Preserve the non-failed, health, identity and support checks; remove the test's incorrect assumption that every surviving section remains intact. The first failed run and unchanged Source fixtures remain available in the audit receipt.

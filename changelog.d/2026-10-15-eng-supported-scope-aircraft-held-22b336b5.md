@@ -1,0 +1,1 @@
+- Split the supported engineering gate into 20 registered checks. Preserve the failing aircraft test verbatim in an unregistered checkpoint and keep the full failed candidate under an explicit held ref. Automatic aircraft ground fire, AI weather consumers and aircraft snapshot rows remain held; Source captures, other predicates and row statuses are unchanged.

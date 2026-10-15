@@ -65,7 +65,7 @@ fn infantry_naval_and_vehicle_paths_match_original_find_path() {
 fn named_fine_search_branches_match_original_find_path() {
     let fixture: Value =
         serde_json::from_str(include_str!("fixtures/pathfinding-branches.json")).unwrap();
-    assert_eq!(fixture["scenarios"].as_array().unwrap().len(), 24);
+    assert_eq!(fixture["scenarios"].as_array().unwrap().len(), 25);
     let covered: std::collections::BTreeSet<_> = fixture["scenarios"]
         .as_array()
         .unwrap()
@@ -81,7 +81,7 @@ fn named_fine_search_branches_match_original_find_path() {
         .into_iter()
         .collect()
     );
-    replay_paths(&fixture, (603, 487, 36, 80, 0));
+    replay_paths(&fixture, (606, 489, 37, 80, 0));
 }
 
 fn replay_paths(fixture: &Value, expected_counts: (usize, usize, usize, usize, usize)) {
@@ -410,3 +410,355 @@ fn invalid_inputs_and_unsupported_profiles_return_errors() {
         PathError::InvalidShape
     );
 }
+
+#[test]
+fn authored_spawn_reachability_matches_original_selected_check() {
+    use ww2_core::{game::CELL, map::AuthoritativeMap, world::World};
+
+    let fixture_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/map-reachability.json");
+    let fixture_bytes = std::fs::read(&fixture_path).unwrap_or_else(|error| {
+        panic!(
+            "MAP-105 requires the authorized original-Source capture at {}: {error}; no fixture was fabricated",
+            fixture_path.display()
+        )
+    });
+    let fixture: Value = serde_json::from_slice(&fixture_bytes).unwrap();
+    assert_eq!(fixture["schemaVersion"], 1);
+    assert_eq!(
+        fixture["reference"],
+        "e4e579a838aabae3b1d9dadbc17a0a87147bc52d"
+    );
+    assert_eq!(fixture["node"], "v24.21.0");
+    assert_eq!(fixture["arch"], "x64");
+    assert_eq!(
+        fixture["producer"],
+        "original-createGame-clearFixtureUnits-findPath"
+    );
+    assert_eq!(fixture["selectedCheck"], "test.js:3881-3891");
+    assert_eq!(fixture["expansionLimit"], "Source default min(cells,16384)");
+    assert_eq!(
+        fixture["profile"],
+        serde_json::json!({
+            "inputFields": ["x", "z"], "definitionAbsent": true,
+            "block": ww2_core::game::MOVE, "naval": false, "vehicle": false,
+            "pull": ww2_core::game::MOVE | ww2_core::game::WIRE
+        })
+    );
+
+    // This catalog fixture independently fixes all shipped map names and inputs.
+    let authored: Value = serde_json::from_str(include_str!(
+        "../../core/tests/fixtures/authoritative-maps.json"
+    ))
+    .unwrap();
+    assert_eq!(authored["reference"], fixture["reference"]);
+    let maps: Vec<_> = authored["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|case| case["name"].as_str().unwrap().starts_with("authored:"))
+        .collect();
+    assert_eq!(maps.len(), 33);
+    assert_eq!(
+        fixture["maps"],
+        serde_json::json!(
+            maps.iter()
+                .map(|case| {
+                    case["name"]
+                        .as_str()
+                        .unwrap()
+                        .strip_prefix("authored:")
+                        .unwrap()
+                })
+                .collect::<Vec<_>>()
+        )
+    );
+    let cases = fixture["cases"].as_array().unwrap();
+    assert_eq!(cases.len(), maps.len());
+
+    // Source passes plain {x,z}, so UNITS[from.type] is absent. This synthetic
+    // profile selects MOVE, non-naval, non-vehicle and MOVE|WIRE string pulling.
+    // It is not an owned rifle query and never selects a recipient terrain view.
+    let kind = profile(
+        "untyped-source-query",
+        &serde_json::json!({
+            "infantry": true, "speed": 0.0, "radius": 0.0, "naval": false, "deep": false
+        }),
+    );
+    assert_eq!(kind.block(), ww2_core::game::MOVE);
+    assert!(!kind.ground_vehicle());
+    let rules = PathRules::compiled().unwrap();
+    let center = |x: usize, y: usize| Point {
+        x: (x as f64 + 0.5) * CELL,
+        z: (y as f64 + 0.5) * CELL,
+    };
+    let mut query_count = 0;
+    for (case, authored) in cases.iter().zip(maps) {
+        let filename = case["filename"].as_str().unwrap();
+        assert_eq!(
+            format!("authored:{filename}"),
+            authored["name"].as_str().unwrap()
+        );
+        assert_eq!(
+            case["map"], authored["map"],
+            "{filename}: original authored input"
+        );
+        assert_eq!(case["initializationRandom"]["constant"], 0.5);
+        assert!(case["initializationRandom"]["draws"].as_u64().unwrap() > 0);
+        let map = AuthoritativeMap::from_json(&serde_json::to_vec(&case["map"]).unwrap())
+            .unwrap_or_else(|error| panic!("{filename}: map validation: {error}"));
+        let world = World::from_map(&map).unwrap();
+        let game = &world.game;
+        let n = game.w * game.h;
+        let expected_terrain = &case["terrain"];
+        for (key, native) in [
+            ("chars", game.chars.as_slice()),
+            ("ground", game.ground.as_deref().unwrap()),
+            ("objects", game.objects.as_deref().unwrap()),
+        ] {
+            assert_eq!(
+                native,
+                expected_terrain[key].as_str().unwrap().as_bytes(),
+                "{filename}: restored Source {key} differs from native authored World"
+            );
+        }
+        for (key, native) in [
+            (
+                "flags",
+                game.flags.iter().map(|v| i64::from(*v)).collect::<Vec<_>>(),
+            ),
+            ("house", game.house.iter().map(|v| i64::from(*v)).collect()),
+            (
+                "hp32",
+                game.cell_hp
+                    .iter()
+                    .map(|v| i64::from(v.to_bits()))
+                    .collect(),
+            ),
+            (
+                "mines",
+                world.mine_layer.iter().map(|v| i64::from(*v)).collect(),
+            ),
+            (
+                "wear32",
+                game.wear
+                    .as_ref()
+                    .unwrap()
+                    .iter()
+                    .map(|v| i64::from(v.to_bits()))
+                    .collect(),
+            ),
+        ] {
+            assert_eq!(
+                native,
+                runs(&expected_terrain[key]),
+                "{filename}: restored Source {key} differs from native authored World"
+            );
+        }
+        if let Some(native) = &game.height {
+            assert_eq!(
+                native.iter().map(|v| i64::from(*v)).collect::<Vec<_>>(),
+                runs(&expected_terrain["height"]),
+                "{filename}: authored heights"
+            );
+        } else {
+            // clearFixtureUnits restores each real building cell with height 0
+            // on flat maps, allocating Source heights. Native keeps None; both
+            // navigation::TerrainView::level and pathfinding::level read 0.
+            assert!(
+                case["map"]["heights"].is_null(),
+                "{filename}: absent authored heights"
+            );
+            assert!(
+                case["removed"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .any(|unit| { !unit["cells"].as_array().unwrap().is_empty() }),
+                "{filename}: actual Source footprint restoration"
+            );
+            assert_eq!(
+                runs(&expected_terrain["height"]),
+                vec![0; n],
+                "{filename}: Source allocated flat heights must be entirely zero"
+            );
+        }
+        assert_eq!(world.roads, expected_terrain["roads"].as_bool().unwrap());
+        assert!(game.units.is_empty());
+        assert!(
+            world
+                .structures
+                .iter()
+                .all(|structure| structure.kind != "building")
+        );
+        for key in ["units", "buildingCells", "buildingStructures"] {
+            assert_eq!(expected_terrain[key], 0, "{filename}: Source {key}");
+        }
+        let near = authored_reachability_near_walls(game.w, &game.flags);
+        assert_eq!(
+            near.iter().map(|v| i64::from(*v)).collect::<Vec<_>>(),
+            runs(&expected_terrain["near"]),
+            "{filename}: near-wall inputs"
+        );
+        let fires: Vec<_> = (0..n).map(|cell| world.fires.contains_key(&cell)).collect();
+        assert_eq!(
+            world
+                .fires
+                .iter()
+                .map(|(cell, _)| *cell)
+                .collect::<Vec<_>>(),
+            expected_terrain["fires"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|cell| cell.as_u64().unwrap() as usize)
+                .collect::<Vec<_>>()
+        );
+        // No owner was supplied to Source: authored mines are never known mines.
+        let known_mines = vec![false; n];
+        // Share the observed Source weather scalar as a component input. This
+        // does not compare Match weather or infer World::from_map weather.
+        // Both searches use wetness only behind their vehicle-cost guards.
+        let wetness = expected_terrain["wetness"].as_f64().unwrap();
+        assert!(wetness.is_finite() && (0.0..=1.0).contains(&wetness));
+        let terrain = PathTerrain {
+            navigation: TerrainView {
+                width: game.w,
+                height: game.h,
+                flags: &game.flags,
+                heights: game.height.as_deref(),
+                world_known: false,
+                knowledge_id: 0,
+                versions: Versions::default(),
+                changed: None,
+                changes: &[],
+            },
+            near_walls: &near,
+            known_mines: &known_mines,
+            fires: &fires,
+            bunkers: &[],
+            wear: game.wear.as_deref(),
+            wetness,
+            roads: world.roads,
+        };
+        // Enumerate actual parsed map starts and points, independently of the
+        // recorded query list. Naval starts require an existential per spawn.
+        let naval = case["map"]["naval"].as_bool().unwrap_or(false);
+        let mut required = Vec::new();
+        for (spawn, from) in map.spawns().iter().enumerate() {
+            for (target, to) in map.points().iter().enumerate() {
+                required.push((
+                    spawn,
+                    "point",
+                    target,
+                    center(from.x, from.y),
+                    center(to.x, to.y),
+                ));
+            }
+            if !naval {
+                for (target, to) in map.spawns().iter().enumerate() {
+                    if target != spawn {
+                        required.push((
+                            spawn,
+                            "spawn",
+                            target,
+                            center(from.x, from.y),
+                            center(to.x, to.y),
+                        ));
+                    }
+                }
+            }
+        }
+        let recorded = case["queries"].as_array().unwrap();
+        assert_eq!(
+            recorded.len(),
+            required.len(),
+            "{filename}: exhaustive query coverage"
+        );
+        let mut reached = vec![false; map.spawns().len()];
+        let mut source_reached = vec![false; map.spawns().len()];
+        let mut finder = Pathfinding::new();
+        for (query, (spawn, target_kind, target, from, to)) in recorded.iter().zip(required) {
+            assert_eq!(
+                usize_field(query, "spawn"),
+                spawn,
+                "{filename}: spawn coverage"
+            );
+            assert_eq!(query["targetKind"], target_kind);
+            assert_eq!(usize_field(query, "target"), target);
+            assert_eq!(bits(point(&query["from"])), bits(from));
+            assert_eq!(bits(point(&query["to"])), bits(to));
+            for key in ["from", "to"] {
+                assert_eq!(
+                    query[key]
+                        .as_object()
+                        .unwrap()
+                        .keys()
+                        .map(String::as_str)
+                        .collect::<Vec<_>>(),
+                    ["x", "z"],
+                    "{filename}: plain Source point"
+                );
+            }
+            let result = finder
+                .find_path(terrain, rules, &kind, from, to, None)
+                .unwrap();
+            let status = match result.status {
+                PathStatus::Found => "Found",
+                PathStatus::Unreachable => "Unreachable",
+                PathStatus::ExpansionLimit => "ExpansionLimit",
+            };
+            assert_eq!(
+                serde_json::json!({
+                    "points": result.waypoints.iter().copied().map(bits).collect::<Vec<_>>(),
+                    "status": status,
+                }),
+                query["expected"],
+                "{filename}: spawn {spawn} to {target_kind} {target}"
+            );
+            let native_found = !result.waypoints.is_empty();
+            let source_found = !query["expected"]["points"].as_array().unwrap().is_empty();
+            if naval {
+                reached[spawn] |= native_found;
+                source_reached[spawn] |= source_found;
+            } else {
+                assert!(
+                    native_found && source_found,
+                    "{filename}: spawn {spawn} must reach {target_kind} {target}"
+                );
+            }
+            query_count += 1;
+        }
+        if naval {
+            for spawn in 0..map.spawns().len() {
+                assert!(
+                    reached[spawn] && source_reached[spawn],
+                    "{filename}: naval spawn {spawn} must reach some capture point"
+                );
+            }
+        }
+    }
+    assert_eq!(query_count, usize_field(&fixture, "queryCount"));
+}
+
+fn authored_reachability_near_walls(width: usize, flags: &[u16]) -> Vec<u8> {
+    let mut near = vec![0; flags.len()];
+    for (cell, flag) in flags.iter().enumerate() {
+        if flag & 3 != 3 {
+            continue;
+        }
+        let x = cell % width;
+        for dy in [-1, 0, 1] {
+            for dx in (if x > 0 { -1 } else { 0 })..=(if x + 1 < width { 1 } else { 0 }) {
+                let neighbor = cell as isize + dy * width as isize + dx;
+                if neighbor >= 0 && neighbor < near.len() as isize {
+                    near[neighbor as usize] = 1;
+                }
+            }
+        }
+    }
+    near
+}
+
+#[path = "common/pathfinding_selected.rs"]
+mod selected_original_checks;

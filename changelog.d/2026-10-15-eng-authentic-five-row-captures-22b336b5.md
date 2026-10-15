@@ -1,0 +1,1 @@
+- Record and byte-check the authentic Source travel and weather-consumer fixtures: 5,240 full steps and 5,281 timeline boundaries. Preserve the existing weather fixture exactly. Native checks remain pending, and the AI weather probes remain Source-only evidence.

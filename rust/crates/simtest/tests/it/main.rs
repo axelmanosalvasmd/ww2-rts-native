@@ -29,14 +29,22 @@ mod air_retirement;
 mod assault_finish;
 #[path = "../assault_start.rs"]
 mod assault_start;
+#[path = "../base_ordinary_checks.rs"]
+mod base_ordinary_checks;
 #[path = "../compiled_rules.rs"]
 mod compiled_rules;
 #[path = "../conquest_finish.rs"]
 mod conquest_finish;
 #[path = "../conquest_mode_batch.rs"]
 mod conquest_mode_batch;
+#[path = "../conquest_team_result.rs"]
+mod conquest_team_result;
 #[path = "../construction_tick.rs"]
 mod construction_tick;
+#[path = "../engineering_consumers.rs"]
+mod engineering_consumers;
+#[path = "../engineering_travel.rs"]
+mod engineering_travel;
 #[path = "../fps_effects.rs"]
 mod fps_effects;
 #[path = "../fps_runtime.rs"]
@@ -47,6 +55,8 @@ mod ground_orders;
 mod ground_support_tick;
 #[path = "../legacy_scenario_tick.rs"]
 mod legacy_scenario_tick;
+#[path = "../map_height_queries.rs"]
+mod map_height_queries;
 #[path = "../mass_project_tick.rs"]
 mod mass_project_tick;
 #[path = "../match_aircraft_runner.rs"]
@@ -77,6 +87,14 @@ mod match_tick;
 mod match_tick_companions;
 #[path = "../match_tick_events.rs"]
 mod match_tick_events;
+#[path = "../mode14_spawn_layout.rs"]
+mod mode14_spawn_layout;
+#[path = "../mode_predicates.rs"]
+mod mode_predicates;
+#[path = "../mode_startup_checks.rs"]
+mod mode_startup_checks;
+#[path = "../mov_vehicle_predicates.rs"]
+mod mov_vehicle_predicates;
 #[path = "../movement.rs"]
 mod movement;
 #[path = "../movement_routing.rs"]
@@ -105,6 +123,8 @@ mod support_coherence;
 mod terrain_contract;
 #[path = "../terrain_scout.rs"]
 mod terrain_scout;
+#[path = "../tutorial_steps.rs"]
+mod tutorial_steps;
 #[path = "../unit_publication.rs"]
 mod unit_publication;
 #[path = "../unit_spawn.rs"]
