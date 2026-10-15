@@ -107,6 +107,8 @@ mod support_coherence;
 mod terrain_contract;
 #[path = "../terrain_scout.rs"]
 mod terrain_scout;
+#[path = "../tutorial_steps.rs"]
+mod tutorial_steps;
 #[path = "../unit_publication.rs"]
 mod unit_publication;
 #[path = "../unit_spawn.rs"]

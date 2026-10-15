@@ -102,6 +102,7 @@ pub mod supply_routes;
 pub mod terrain;
 pub mod traffic;
 pub mod traffic_knowledge;
+pub mod tutorial_steps;
 pub mod unit_publication;
 pub mod unit_spawn;
 pub mod vehicle;
