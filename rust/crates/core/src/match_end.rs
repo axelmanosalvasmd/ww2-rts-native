@@ -55,6 +55,45 @@ pub enum MatchSample {
         structures: Vec<f64>,
     },
 }
+/// Shared Source finish metadata after the caller has selected the winning team
+/// and decisive location. A missing location uses the map center for every reason.
+pub fn finish_metadata(
+    winner: i32,
+    reason: EndReason,
+    at: Option<Point>,
+    dimensions: (usize, usize),
+    tick: i64,
+) -> Result<MatchFinish, String> {
+    if dimensions.0 == 0
+        || dimensions.1 == 0
+        || !(0..=9_007_199_254_740_991).contains(&tick)
+        || !(-1..6).contains(&winner)
+    {
+        return Err("invalid finish metadata".into());
+    }
+    let at = at.unwrap_or(Point {
+        x: dimensions.0 as f64 * CELL / 2.0,
+        z: dimensions.1 as f64 * CELL / 2.0,
+    });
+    let end_at = Point {
+        x: math::round(at.x * 10.0) / 10.0,
+        z: math::round(at.z * 10.0) / 10.0,
+    };
+    if !end_at.x.is_finite() || !end_at.z.is_finite() {
+        return Err("invalid Match end position".into());
+    }
+    Ok(MatchFinish {
+        winner,
+        reason: if winner == -1 {
+            EndReason::Draw
+        } else {
+            reason
+        },
+        end_at,
+        end_tick: tick,
+    })
+}
+
 impl Match {
     /// Early source sample at tick 1 and every 200 ticks. Caller owns exactly one invocation
     /// at that phase; no clock advance or duplicate suppression is invented here.
@@ -72,12 +111,21 @@ impl Match {
             Ok(false)
         }
     }
+    pub(crate) fn validate_ordinary_finish_state(&self) -> Result<(), String> {
+        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
+            return Err("ordinary finish requires Conquest or Tutorial".into());
+        }
+        self.validate_match_finish_state()
+    }
     pub(crate) fn validate_story_mode(&self) -> Result<(), String> {
         match (self.options.mode, self.world.game.mode) {
             (Mode::Default | Mode::Conquest, None)
             | (Mode::Assault, Some(ModeKind::Assault))
             | (Mode::World, Some(ModeKind::World)) => Ok(()),
-            _ => Err("finish/story supports represented Conquest, Assault and World only".into()),
+            (Mode::Tutorial, Some(ModeKind::Tutorial)) => self.validate_tutorial_state(),
+            _ => {
+                Err("finish/story requires represented Conquest, Assault, World or Tutorial".into())
+            }
         }
     }
     pub(crate) fn validate_match_finish_state(&self) -> Result<(), String> {
@@ -252,57 +300,39 @@ impl Match {
         &self,
         units: impl IntoIterator<Item = (usize, usize, f64)>,
     ) -> Result<MatchSample, String> {
-        let players = &self.start.economy.players;
-        let n = players
+        let players = self
+            .start
+            .economy
+            .players
             .iter()
-            .map(|p| p.team)
-            .max()
-            .ok_or("sample needs players")? as usize
-            + 1;
-        let t = math::round(self.world.game.tick as f64 / 20.0);
-        if self.world.game.mode.is_none() {
-            let mut vp = vec![0.0; n];
-            for p in players {
-                vp[p.team as usize] += p.vp;
-                if !vp[p.team as usize].is_finite() {
-                    return Err("nonfinite Conquest sample score".into());
-                }
-            }
-            for value in &mut vp {
-                *value = value.floor();
-            }
-            Ok(MatchSample::Conquest { t, vp })
-        } else {
-            let mut points = vec![0.0; n];
-            let mut structures = vec![0.0; n];
-            for p in &self.start.points {
-                if let Some(owner) = p.owner {
-                    points[players[owner].team as usize] += 1.0;
-                }
-            }
-            for (owner, kind, hp) in units {
-                if kind >= self.rules.kinds.len()
-                    || !hp.is_finite()
-                    || (owner >= players.len()
-                        && !(self.options.mode == Mode::World && owner == LOCAL_DEFENDER_OWNER))
-                {
-                    return Err("invalid Match sample unit".into());
-                }
-                if hp > 0.0
-                    && self.rules.kinds[kind].structure
-                    && (self.options.mode == Mode::World || self.rules.kinds[kind].name == "bunker")
-                    && let Some(owner) = players.get(owner)
-                {
-                    structures[owner.team as usize] += 1.0;
-                }
-            }
-            Ok(MatchSample::Territories {
-                t,
-                points,
-                structures,
+            .map(|p| crate::match_timeline::TimelinePlayer {
+                team: p.team,
+                vp: p.vp,
             })
-        }
+            .collect::<Vec<_>>();
+        let points = self
+            .start
+            .points
+            .iter()
+            .map(|p| p.owner)
+            .collect::<Vec<_>>();
+        let mode = if self.world.game.mode.is_none() {
+            Mode::Default
+        } else {
+            self.options.mode
+        };
+        crate::match_timeline::sample(
+            mode,
+            self.world.game.tick,
+            &players,
+            &points,
+            units
+                .into_iter()
+                .map(|(owner, kind, hp)| crate::match_timeline::TimelineUnit { owner, kind, hp }),
+            &self.rules,
+        )
     }
+
     /// Prepare all fallible finish work before an actuator changes its timer or other state.
     /// The caller publishes this pair immediately under exclusive Match ownership.
     pub(crate) fn prepare_match_finish(
@@ -323,31 +353,16 @@ impl Match {
         if winner != -1 && !self.start.economy.players.iter().any(|p| p.team == winner) {
             return Err("unknown winning team".into());
         }
-        let at = at.unwrap_or(Point {
-            x: self.world.game.w as f64 * CELL / 2.0,
-            z: self.world.game.h as f64 * CELL / 2.0,
-        });
-        let end_at = Point {
-            x: math::round(at.x * 10.0) / 10.0,
-            z: math::round(at.z * 10.0) / 10.0,
-        };
-        if !end_at.x.is_finite() || !end_at.z.is_finite() {
-            return Err("invalid Match end position".into());
-        }
-        Ok((
-            MatchFinish {
-                winner,
-                reason: if winner == -1 {
-                    EndReason::Draw
-                } else {
-                    reason
-                },
-                end_at,
-                end_tick: self.world.game.tick,
-            },
-            sample()?,
-        ))
+        let finish = finish_metadata(
+            winner,
+            reason,
+            at,
+            (self.world.game.w, self.world.game.h),
+            self.world.game.tick,
+        )?;
+        Ok((finish, sample()?))
     }
+
     pub(crate) fn publish_match_finish(
         &mut self,
         prepared: (MatchFinish, MatchSample),

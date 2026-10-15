@@ -125,7 +125,8 @@ impl Match {
             Some((
                 state.attacker_team,
                 crate::match_end::EndReason::Structures,
-                self.fallen.bunker,
+                self.fallen
+                    .end_position(crate::match_story::StructureEnding::LastBunker),
             ))
         } else if time_left <= 0.0 {
             Some((

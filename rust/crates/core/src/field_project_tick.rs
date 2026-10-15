@@ -1,7 +1,11 @@
 //! Read-only admission for the shared-project phases in the caller's real tick.
 use super::{FieldWorksRuntime, FortKind, ProjectOrder, definitions, line_fort, position};
 use crate::{
-    economy::Mode, game::Game, grid::UnitId, match_commands::Command, match_runtime::Match,
+    economy::Mode,
+    game::{Game, ModeKind},
+    grid::UnitId,
+    match_commands::Command,
+    match_runtime::Match,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -122,15 +126,60 @@ impl FieldWorksRuntime {
 }
 
 impl Match {
+    /// Tutorial owns ordinary paid projects, but only its explicit constructor
+    /// supplies the runtime, roster and terrain required by these actuators.
+    pub(super) fn validate_field_project_context(&self) -> Result<(), String> {
+        match (self.options.mode, self.world.game.mode) {
+            (Mode::Default | Mode::Conquest, None) => return Ok(()),
+            (Mode::Tutorial, Some(ModeKind::Tutorial)) => {
+                self.validate_tutorial_state()?;
+                self.validate_match_finish_state()?;
+            }
+            _ => {
+                return Err(
+                    "field-project context requires represented Conquest or Tutorial".into(),
+                );
+            }
+        }
+        let game = &self.world.game;
+        let cells = game
+            .w
+            .checked_mul(game.h)
+            .ok_or("invalid Tutorial project terrain dimensions")?;
+        if cells == 0
+            || game.flags.len() != cells
+            || game.chars.len() != cells
+            || game.house.len() != cells
+            || game.cell_hp.len() != cells
+            || game
+                .ground
+                .as_ref()
+                .is_none_or(|layer| layer.len() != cells)
+            || game
+                .objects
+                .as_ref()
+                .is_none_or(|layer| layer.len() != cells)
+            || game
+                .height
+                .as_ref()
+                .is_some_and(|layer| layer.len() != cells)
+        {
+            return Err("Tutorial field projects require canonical terrain layers".into());
+        }
+        for (&id, unit) in &game.units {
+            if unit.kind >= self.rules.kinds.len() || !position(unit.at()) {
+                return Err("invalid Tutorial field-project actor".into());
+            }
+            self.validate_project_unit(id)?;
+        }
+        Ok(())
+    }
+
     /// Call before advancing the clock, using the complete current unit order.
     /// This reads only project-owned facts. It does not refresh sight, spend, recount or sort turns.
     /// Common terrain, combat and runner admission remain the caller's responsibility.
     pub fn validate_field_project_tick(&self, current_order: &[UnitId]) -> Result<(), String> {
-        if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
-            || self.world.game.mode.is_some()
-        {
-            return Err("field-project tick supports ordinary Conquest only".into());
-        }
+        self.validate_field_project_context()?;
         let game = &self.world.game;
         if !(0..SAFE_INTEGER).contains(&game.tick) {
             return Err("field-project tick clock exhausted or invalid".into());

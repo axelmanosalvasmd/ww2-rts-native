@@ -83,7 +83,7 @@ impl PlayerStory {
             Err("nonfinite match story counter".into())
         }
     }
-    fn rounded(self) -> Self {
+    pub fn rounded(self) -> Self {
         let mut row = self;
         for key in StoryKey::ALL {
             *row.field(key) = math::round(self.value(key));
@@ -152,6 +152,51 @@ pub struct FallenLocations {
     pub bunker: Option<Point>,
     pub hq: Option<Point>,
 }
+/// Select the retained location at the structural ending call site. This does not
+/// decide which team survived, remove an army or admit a runtime mode.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StructureEnding {
+    LastStructure,
+    LastBunker,
+    LastProductionBuilding,
+}
+impl FallenLocations {
+    pub fn end_position(self, ending: StructureEnding) -> Option<Point> {
+        match ending {
+            StructureEnding::LastStructure => self.structure,
+            StructureEnding::LastBunker => self.bunker,
+            StructureEnding::LastProductionBuilding => self.hq,
+        }
+    }
+    /// Mode endings consume their actual retained death location, including the
+    /// map-center fallback. Source retains structure but no ending selects it.
+    pub fn finish(
+        self,
+        mode: crate::economy::Mode,
+        winner: i32,
+        dimensions: (usize, usize),
+        tick: i64,
+    ) -> Result<crate::match_end::MatchFinish, String> {
+        use crate::{economy::Mode, match_end::EndReason};
+        let (ending, reason) = match mode {
+            Mode::Classic => (
+                StructureEnding::LastProductionBuilding,
+                EndReason::Headquarters,
+            ),
+            Mode::Annihilation => (StructureEnding::LastBunker, EndReason::Bunkers),
+            Mode::Assault | Mode::Horde => (StructureEnding::LastBunker, EndReason::Structures),
+            _ => return Err("mode has no retained-structure ending".into()),
+        };
+        crate::match_end::finish_metadata(
+            winner,
+            reason,
+            self.end_position(ending),
+            dimensions,
+            tick,
+        )
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct DeathRecord<'a> {
     pub owner: Option<usize>,
@@ -346,6 +391,7 @@ impl Match {
             mode: match self.options.mode {
                 crate::economy::Mode::World => "world",
                 crate::economy::Mode::Assault => "assault",
+                crate::economy::Mode::Tutorial => "tutorial",
                 _ => "conquest",
             },
         }))

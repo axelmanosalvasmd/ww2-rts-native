@@ -1,0 +1,1 @@
+- Apply the five printed Rust formatting diagnostics before the original ten Tutorial and history checks. Preserve all literals, inputs and assertions; native qualification remains pending.

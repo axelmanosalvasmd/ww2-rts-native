@@ -1,0 +1,1 @@
+- Give the private Tutorial runtime a validated home purchase and spawn-based recovery path, preserving ordinary producer guards, real placement/rally/payment and the unattended enemy exclusion. Extend the existing capability witness; native qualification remains pending.

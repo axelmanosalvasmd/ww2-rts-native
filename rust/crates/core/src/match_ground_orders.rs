@@ -15,10 +15,11 @@ use std::collections::BTreeMap;
 
 impl Match {
     fn ground_orders_open(&self) -> Result<(), String> {
-        if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
-            || self.world.game.mode.is_some()
-        {
-            return Err("ground orders require ordinary Default or Conquest".into());
+        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
+            return Err("ground orders require represented Conquest or Tutorial".into());
+        }
+        if self.options.mode == Mode::Tutorial {
+            self.validate_tutorial_state()?;
         }
         Ok(())
     }

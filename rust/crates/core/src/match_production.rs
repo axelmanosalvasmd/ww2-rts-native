@@ -92,6 +92,9 @@ impl Match {
         let count = self.start.players.len();
         let supported = match self.options.mode {
             Mode::Default | Mode::Conquest => self.world.game.mode.is_none(),
+            Mode::Tutorial => {
+                self.world.game.mode == Some(ModeKind::Tutorial) && self.tutorial.is_some()
+            }
             Mode::World => {
                 self.world.game.mode == Some(ModeKind::World) && self.world_runtime.is_some()
             }

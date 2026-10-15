@@ -140,7 +140,7 @@ struct AntiAirStep {
 impl Match {
     pub(crate) fn validate_aviation(&self) -> Result<(), AviationError> {
         let g = &self.world.game;
-        if !matches!(self.options.mode, Mode::Default | Mode::Conquest) || g.mode.is_some() {
+        if !crate::match_actor::ordinary_ground_mode(g, self.options.mode) {
             return Err(AviationError::Unsupported(
                 "aviation currently requires ordinary Conquest",
             ));

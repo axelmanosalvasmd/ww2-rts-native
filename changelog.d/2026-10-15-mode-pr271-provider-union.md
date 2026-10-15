@@ -1,0 +1,1 @@
+- Integrate the owned Tutorial contact and history repair on PR271 main while preserving incoming LOG causal tests, fixtures, parity cells and both documentation histories. All 16 proposed native instances await a new exact-head grant; retain the original tick-1048 failure and nine unrun checks.

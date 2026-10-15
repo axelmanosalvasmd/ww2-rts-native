@@ -1,0 +1,6 @@
+- Share the canonical timeline sampler across mode policies and consume retained bunker and Production Building death positions when composing finish metadata. Keep the last structure location recorded without inventing a new ending rule.
+- Add typed internal completed reports, personal last-match history and ordered Horde record composition. Preserve human name overrides, enemy rows, raw human kill totals, hold-completion duration and the previous best record. Server transport and admission stay pending their separate review.
+- Project complete internal result fields and recipient outcomes through the production provider, including the host-ended branch, instead of constructing result payloads in test helpers.
+- Compare each complete recipient result with the original Source expression across seated, moved, observer, newcomer and host-ended cases.
+- Connect Tutorial's explicit Attack and Retreat consumers to its validated runtime and canonical routing, while retaining refusal for other unsupported modes.
+- Add focused source fixtures and tests for complete Tutorial starting forces, finish locations, all timeline policies and result branches. These new checks are authored but have not run; no parity status changes are claimed.

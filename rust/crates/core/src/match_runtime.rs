@@ -93,6 +93,7 @@ fn number(v: &Value, name: &str) -> Result<f64, String> {
 
 enum StartupProfile {
     Conquest,
+    Tutorial,
     World(MatchRandom),
     Assault { defender_team: i32 },
 }
@@ -108,6 +109,21 @@ impl StartPlan {
             options,
             rules,
             StartupProfile::Conquest,
+            #[cfg(test)]
+            None,
+        )
+    }
+
+    pub(crate) fn prepare_tutorial(
+        map: &crate::map::AuthoritativeMap,
+        options: &MatchOptions,
+        rules: &Rules,
+    ) -> Result<Self, String> {
+        Self::prepare_mode(
+            map,
+            options,
+            rules,
+            StartupProfile::Tutorial,
             #[cfg(test)]
             None,
         )
@@ -153,6 +169,7 @@ impl StartPlan {
         #[cfg(test)] replay: Option<crate::aligned_replay::Replay>,
     ) -> Result<Self, String> {
         let world_mode = matches!(&profile, StartupProfile::World(_));
+        let tutorial = matches!(&profile, StartupProfile::Tutorial);
         let defender_team = match &profile {
             StartupProfile::Assault { defender_team } => Some(*defender_team),
             _ => None,
@@ -163,7 +180,11 @@ impl StartPlan {
         if defender_team.is_some() && options.mode != Mode::Assault {
             return Err("Assault startup requires explicit Assault mode".into());
         }
+        if tutorial && options.mode != Mode::Tutorial {
+            return Err("Tutorial startup needs the explicit Tutorial constructor".into());
+        }
         if !world_mode
+            && !tutorial
             && defender_team.is_none()
             && !matches!(options.mode, Mode::Default | Mode::Conquest)
         {
@@ -244,7 +265,10 @@ impl StartPlan {
         } else {
             LayoutSelection::First
         };
-        let slots = if world_mode {
+        let slots = if tutorial {
+            // Source explicitly overrides every Tutorial spawn by team after allocation.
+            teams.iter().map(|team| *team as usize).collect()
+        } else if world_mode {
             if spawns.len() < teams.len() {
                 return Err("World startup needs one authored spawn per commander".into());
             }
@@ -356,7 +380,7 @@ impl StartPlan {
             .points()
             .iter()
             .enumerate()
-            .filter_map(|(i, p)| (defender_team.is_none() || p.mp > 0.0).then_some(i))
+            .filter_map(|(i, p)| (defender_team.is_none() && !tutorial || p.mp > 0.0).then_some(i))
             .collect();
         let points = map
             .points()
@@ -504,6 +528,9 @@ impl StartPlan {
         let mut units = BTreeMap::new();
         let mut next_id = 1;
         for (owner, player) in self.players.iter().enumerate() {
+            if player.config.team != 0 && game.mode == Some(crate::game::ModeKind::Tutorial) {
+                continue;
+            }
             for (index, &kind) in self.starting_kinds.iter().enumerate() {
                 let view = TerrainView {
                     width: game.w,
@@ -517,7 +544,16 @@ impl StartPlan {
                     changes: &[],
                 };
                 let at = placer
-                    .scatter_position(view, &rules.kinds[kind], player.spawn, index as u32)
+                    .scatter_position(
+                        view,
+                        &rules.kinds[kind],
+                        player.spawn,
+                        if game.mode == Some(crate::game::ModeKind::Tutorial) {
+                            (owner * 3 + index) as u32
+                        } else {
+                            index as u32
+                        },
+                    )
                     .map_err(|e| format!("starting placement: {e:?}"))?
                     .point;
                 let unit = unit_spawn::initial_unit(rules, catalog, kind, next_id, owner, at)
@@ -593,6 +629,7 @@ pub struct Match {
     pub story: Vec<crate::match_story::PlayerStory>,
     pub fallen: crate::match_story::FallenLocations,
     pub finish: Option<crate::match_end::MatchFinish>,
+    pub(crate) tutorial: Option<crate::match_tutorial::TutorialRuntime>,
     pub timeline: Vec<crate::match_end::MatchSample>,
     pub next_unit_id: u32,
     pub rules: Rules,
@@ -698,6 +735,9 @@ impl Match {
         start: StartPlan,
     ) -> Result<Self, String> {
         let mut world = World::from_map(map).map_err(|e| e.to_string())?;
+        if options.mode == Mode::Tutorial {
+            world.game.mode = Some(crate::game::ModeKind::Tutorial);
+        }
         let next_unit_id = start.spawn_initial_force(&mut world.game, &rules)?;
         for slot in 0..start.players.len() {
             world.register_recipient(crate::world::Recipient::Player(slot));
@@ -762,6 +802,7 @@ impl Match {
             story: vec![crate::match_story::PlayerStory::default(); player_count],
             fallen: crate::match_story::FallenLocations::default(),
             finish: None,
+            tutorial: None,
             timeline: Vec::new(),
             next_unit_id,
             rules,
@@ -770,7 +811,9 @@ impl Match {
     }
 
     pub(crate) fn complete_skirmish_start(&mut self) -> Result<(), String> {
-        self.setup_bases()?;
+        if self.options.mode != Mode::Tutorial {
+            self.setup_bases()?;
+        }
         for unit in self.world.game.units.values() {
             self.combat.initialize(unit.id);
             self.firing.initialize(unit.id);
@@ -782,7 +825,7 @@ impl Match {
             }
         }
         self.grid.rebuild(&self.world.game.units);
-        if self.world.game.mode.is_none() {
+        if crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
             self.initialize_recipient_routing()?;
             self.initialize_logistics()?;
         }
@@ -824,7 +867,11 @@ impl Match {
         capture_income: bool,
     ) -> Result<Vec<crate::objectives::Captured>, String> {
         use crate::{economy_state as economy, objectives};
-        self.validate_conquest_finish_state()?;
+        if self.options.mode == Mode::Tutorial {
+            self.validate_match_finish_state()?;
+        } else {
+            self.validate_conquest_finish_state()?;
+        }
         let winner_decided = winner_decided || self.finish.is_some();
         let dt = self.rules.movement.tick;
         let game = &self.world.game;
@@ -920,7 +967,14 @@ impl Match {
             wallets
                 .advance_income(
                     &economy::Context {
-                        mode: economy::ModeContext::default(),
+                        mode: economy::ModeContext {
+                            kind: if self.options.mode == Mode::Tutorial {
+                                Mode::Tutorial
+                            } else {
+                                Mode::Default
+                            },
+                            ..Default::default()
+                        },
                         army: self.options.army,
                         units: &income_units,
                         drops: &[],

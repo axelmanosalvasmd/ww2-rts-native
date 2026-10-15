@@ -360,6 +360,9 @@ fn config() -> Result<&'static Value, String> {
 impl Match {
     fn validate_recovery_ids(&self, ids: &[UnitId]) -> Result<(), String> {
         self.validate_actor_mode()?;
+        if self.options.mode == crate::economy::Mode::Tutorial {
+            self.validate_tutorial_state()?;
+        }
         if !(0..9_007_199_254_740_351).contains(&self.world.game.tick) {
             return Err("invalid recovery clock".into());
         }
@@ -656,14 +659,18 @@ impl Match {
             && !flag(d, "air")
             && u.hp > 0.
             && u.hp < full
-            && (frame.bases.iter().any(|base| {
-                let b = &self.world.game.units[base];
-                (if self.world.game.mode == Some(crate::game::ModeKind::World) {
-                    self.world.game.allied(b.owner, u.owner)
-                } else {
-                    b.owner == u.owner
-                }) && dist(u.at(), b.at()) <= home_radius
-            }) || frame.depots.iter().any(|(owner, at)| {
+            && (if self.options.mode == crate::economy::Mode::Tutorial {
+                dist(u.at(), self.start.players[u.owner].spawn) <= home_radius
+            } else {
+                frame.bases.iter().any(|base| {
+                    let b = &self.world.game.units[base];
+                    (if self.world.game.mode == Some(crate::game::ModeKind::World) {
+                        self.world.game.allied(b.owner, u.owner)
+                    } else {
+                        b.owner == u.owner
+                    }) && dist(u.at(), b.at()) <= home_radius
+                })
+            } || frame.depots.iter().any(|(owner, at)| {
                 self.world.game.allied(*owner, u.owner) && dist(u.at(), *at) <= home_radius
             }));
         Ok(home)
@@ -715,6 +722,10 @@ impl Match {
         for &id in &frame.units {
             let u = &self.world.game.units[&id];
             if self.commands.units[&id].operative {
+                continue;
+            }
+            if self.tutorial_state().is_some_and(|t| t.enemy() == u.owner) {
+                self.recovery.get_mut(id).unwrap().reinforcement = 0.0;
                 continue;
             }
             let d = def(self, id)?;

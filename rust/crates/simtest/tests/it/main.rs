@@ -93,6 +93,8 @@ mod match_tick_companions;
 mod match_tick_events;
 #[path = "../mode14_spawn_layout.rs"]
 mod mode14_spawn_layout;
+#[path = "../mode_history_components.rs"]
+mod mode_history_components;
 #[path = "../mode_predicates.rs"]
 mod mode_predicates;
 #[path = "../mode_startup_checks.rs"]

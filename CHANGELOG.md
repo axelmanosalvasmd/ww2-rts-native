@@ -4,6 +4,16 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Connect Tutorial field projects to their canonical runtime, roster and terrain context while retaining all paid-work validation and ordinary mode refusals. Add an unrun real paid-project and malformed-context witness to the existing Tutorial capability check; preserve the first failed run.
+
+- Restore the construction tests' explicit Mode import and initialize Tutorial state to absent in the World constructor after the retained first compile failure. Preserve the mode-history oracle and all test bodies.
+
+- Apply Rust formatting to the new Tutorial and mode-history components after retaining the first format-check diagnostic. Preserve their fixtures and behavior.
+
+- Record and check the authentic mode-history fixture: 21 sampler cases, 12 retained-death finishes, four Tutorial constructors, 24 result projections and seven Horde record updates. Native qualification remains pending.
+
+- Add an explicit native Tutorial constructor and connected tick consumer using canonical actors, step spawns, movement, garrison entry, objective capture and the shared finish/report state. Keep server admission unchanged. Add unrun live Tutorial and timeline checks; Horde results and Classic/history coverage remain incomplete, and no MODE status changes are claimed.
+
 - Mark MAP-04/05/07/117 ported after six exact native checks pass at `7cbfcddd`: three strict original validation-message readers, the full map corpus, complete XL/Hill Assault check and affected BASE replay. Formatting recheck and strict core/simtest all-target Clippy also pass. Retain MAP-97's separate historical debug/release proof, all 140 Acceptance cells and the tested Rust tree; MAP-06/19/100 remain held.
 
 - Apply the single mechanical BASE assertion wrap reported by the first authorized MAP formatting check at `f1928e13`. Preserve every assertion/literal and the failed log; native checks have not started.

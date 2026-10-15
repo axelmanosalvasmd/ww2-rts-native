@@ -323,6 +323,7 @@ impl Match {
             story: vec![crate::match_story::PlayerStory::default(); count],
             fallen: crate::match_story::FallenLocations::default(),
             finish: None,
+            tutorial: None,
             timeline: Vec::new(),
             next_unit_id: 1,
             rules,

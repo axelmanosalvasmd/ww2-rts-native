@@ -4149,3 +4149,185 @@ Prepare the five local Rust/Status pairs LOG-03/04/10/15/24 as a reviewable port
 ## Owned-only logistics rebase after MAP267 (2026-10-15)
 
 Rebase PR271 from preserved4cbc3922 onto exact incoming main f7b0e5889e3b707beb6d18c4ea8d20a7d9f7b578 by replaying only its seven owned non-merge commits. Main262 and all incoming G1/engineering history are already ancestors of f7 and are not replayed. Preserve the three owned base-correction annotations from mergec350 as an explicit owned documentation step; the other two old merges introduce no unique owned annotation lines. Retain complete incoming MAP five-row validation/runtime/tests and every incoming path. Reconstruct the aggregate typed union independently from common base262, old4cbc and incomingf7 before replay, then compare every path, mode, type and blob. Exactly five logistics Rust/Status pairs and all55 Acceptance/other cells remain as reviewed; causal fixture, reader and recorder stay byte-identical to producing9efa. The successor is a new integration head: prior4cbc ACCEPT and9efa execution do not transfer. No Source, Cargo, formatter, lint, native, discovery or hosted job is run during reconstruction; Root must record a new exact scope before reservedS1 is used.
+## MODE69 and history batch: canonical Tutorial consumer (2026-10-15, source checkpoint)
+
+The MODE implementation stream owns MODE69/90/91/92/93 on frozen main379ba4e0. The first code checkpoint implements the missing Tutorial Match consumer instead of treating the existing entry/completion provider as gameplay proof. `Match::new_tutorial` is explicit, like the separate World and Assault constructors. It normalizes human teams to zero, adds the unattended enemy in the first unused Germany/USSR/USA faction, shares the first authored spawn, and gives the enemy the second. Canonical initial-force creation skips the enemy. Tutorial disables tech, point supply and logistics, creates no skirmish bases, and keeps normal unit, control, grid, combat, firing, ability, recovery, wallet and routing owners.
+
+Tutorial runtime owns only its step index, current-step spawn IDs and pending dialogue. Entry effects use canonical unit staging/publication, ceil-scaled health, no automatic retreat, accepted attack-move orders and source-ordered house-edge selection. House occupants walk on the existing route service and enter only when physically within the Source reach. The late tick consumer runs after actual death and objective capture/income, reads current canonical facts and invokes the existing finish actuator at point1 after the final step completes. Dialogue leaves the tick through a separate internal Tutorial output field; no wire or ABI schema changes. A corresponding real Tutorial phase is recorded only when that consumer executes.
+
+The ordinary actor, route, purchase, field-work, firing, carrier and support adapters now explicitly accept the matching Tutorial mode tag. Tick admission additionally requires canonical Tutorial state and exact actor teams. These are production capability changes, not a test guard bypass. Conquest still uses the original no-mode economy context; Tutorial uses its actual named-mode context with no VP income. Classic, Horde and Annihilation remain rejected by the ordinary constructor/tick gate. The server's two-human Conquest admission, recipient transport and interface approvals remain unchanged. Root must obtain Hermes exact-head runtime acknowledgment before merge; the test-only waiver does not apply.
+
+Three new core tests are authored without execution. The Tutorial test starts from the committed map and constructor, uses accepted movement, recruitment, retreat and support commands, and waits for actual battles, garrison arrival and captures. It installs no step index, expected frame, point owner, pose, HP result or RNG state. It checks final team0 victory, reason tutorial, point1 end position, all18 dialogue lines and the post-decision story/timeline freeze. A second test protects explicit construction and malformed admission. A third advances real clocks through201 ticks and checks tick1/200 samples, fractional Conquest VP floors with sparse team IDs, and Tutorial point/bunker counts. These are proposed witnesses, not passing results.
+
+The intended delivery remains one five-row MODE PR after complete row checks, independent review and the publication lease. No row is promoted at this source checkpoint. MODE90 still needs Horde result/record handling and the corresponding admitted runtime/server consumer. MODE92 needs the full last-bunker and Classic Production Building ending consumers; MODE93 additionally needs Classic/World building and other-mode finish samples. MODE91's existing original-callback fixture and canonical death/spending/support/field-work call sites must be assessed against every seven-counter event before claiming completion. Existing complete component checks count under PARITY; no whole-match gate is added. No prior component or hosted result is transferred to this new Rust tree.
+
+Locally acknowledge Hermes173/6199107614 and the restored18:21 ownership: house group269b929 and footprint group1fd942 stay frozen and separate, general defaults6196930542 remain pending Axel, and MODE21 does not move. This checkpoint performs zero Source, Node, Cargo, rustc, native, fmt, lint, test-discovery or CI executions. Root owns the slot grant, first-failure handling, actual-head review, future five-row status child and all publication.
+
+### Shared finish, timeline and typed result consumers (source checkpoint)
+
+The runtime branch now includes actual main `7c9df2d581a79de48fbec0cb4d7ab8e98b488d43` through a normal merge. The separate house observer delivery remains outside this branch. Its equivalent delivery on main has the complete original `69b929` tree and retains only that head's measured results.
+
+`match_timeline::sample` consumes borrowed canonical player, point-owner and living-unit facts. Both periodic and final Match samples use this implementation. Conquest retains player-order team sums and floor VP; Classic and World count all catalog structures, and other named modes count bunkers. Team-indexed gaps and World's neutral defenders retain their existing meaning. This exposes the missing Classic policy as a component without falsely admitting a playable Classic Match. `FallenLocations::finish` selects the retained Production Building location for Classic and the bunker for Annihilation, Assault and Horde, with their actual source reasons. It calls the same rounded metadata provider used by canonical finish. A missing spot uses the map center, and a draw retains the selected spot while changing its reason. The existing Assault actuator selects its retained bunker through the same selector. Source also records the last structure location, but no pinned finish call selects it; this change adds no such rule. Team survival and army elimination remain separate policies.
+
+`match_result` owns typed completed-report composition and personal history. `Match::completed_report` calls the actual canonical Match result producer; the live Tutorial finish witness also consumes this report and stores its human outcome. Human names override the stable human prefix, while the unattended enemy retains its canonical name. Results require matching team/name/story lengths, a real winning team or draw, compatible timeline variants and the Conquest-only VP goal. Personal outcomes stay with people when seats move. Host-ended reports have a separate enum variant, so their projection cannot expose story or a prior personal outcome.
+
+The ordered in-memory Horde record owner uses the Source map/human-count/army key. Runs sum raw human kills before the enemy slot and round the current hold-completion tick to seconds, separately from the decision tick. Higher wave wins, then longer time; an exact tie does not replace the record. A report carries the previous best even when the new run replaces it. Core code owns no record file, shard transport or socket. A server storage owner must retain the accepted cached record if persistence fails, matching the prototype. This is an implemented result component, not a claim that the Horde wave runtime or its server admission is complete.
+
+The new recorder is authored for 21 original sampler cases, 12 retained-death finish cases, four actual Tutorial constructors, 24 original server result-composition cases and seven Horde record updates. Constructor expectations come only from actual Source `createGame`, and native constructors receive only authored map/options. Other cases explicitly supply component input facts and run original Source callbacks or composition expressions. They do not fake a server hold, restore a Match from expected state or claim a playable Classic/Horde match. Source generation/check and every new native test remain unexecuted pending Root's grant; the fixture is intentionally absent until authentic recording. MODE91's existing seven traces and 42 actions remain unchanged and are selected for qualification, with no tally defect asserted.
+
+Before any external adoption, the precise proposed mapping remains JSON WebSocket v0 with the Source's existing result fields: winner, teams, names, reason, at, endTick, seven-counter story, timeline, Conquest-only winVp and mode; non-sandbox Horde adds wave, raw human kills, hold-completion time, human names, record and previous best. Host end gives only ended true before the lobby adds you null. A completed seated person's you comes from their stored lastMatch; observers and newcomers have none. The present server admits only its existing ordinary Conquest contract and its serializer still refuses other modes. No wire/ABI, public-start policy, runtime RNG or owner approval changes in this checkpoint. Root must obtain the separate Hermes runtime/consumer readback before merge or admission changes. No five-row status proposal is qualified yet.
+
+
+### Complete internal result projection
+
+The result component now owns the complete internal field projection, rather than relying on a test serializer. Completed reports project canonical winner, teams, name overrides, reason, location, decision tick, seven rounded counters, typed timeline, VP goal and mode. The Horde branch projects the run and previous record through the same provider. `RoomReport::recipient_fields` projects stored personal outcomes, and its host-ended variant contains no story and always yields you null. The actual Tutorial finish test consumes this production projection. Exact component fixtures select these production methods directly.
+
+This is the pure result-composition scope of MODE90. Full Horde wave execution, file persistence, room startup and public admission are separate behaviors and are not added as gates for these pure components. The current external server path remains its existing ordinary contract. No server or ABI file changes, external wire adoption, new visibility policy or runtime RNG changes are included. The same displayed-zero handling already used by the ordinary server result serializer applies only in the explicit result representation; raw canonical state and raw fixture bit comparisons remain unchanged.
+
+The new checks remain unexecuted until Root grants an exclusive slot. The five-row publication lease permits opening a proved row PR after the complete selected checks pass. Hermes exact-head runtime readback remains a merge gate, and neither this source checkpoint nor the pending defaults proposal promotes a row.
+
+Tutorial's ground Attack/Retreat consumer now uses the same explicit Conquest/Tutorial capability boundary as its tick and routing owners. Before accepting Tutorial orders it validates the canonical Tutorial runtime, roster and matching mode tag. This completes actual scripted attack and human retreat routing through the existing actuator; it does not drop actor, route or path-capacity checks. Constructor admission tests also issue a real Retreat, and the full Tutorial witness still executes its retreat lesson. Other modes remain refused. No public startup or transport contract changes.
+
+Result-composition fixtures compare the complete recipient payload for every seated person, a retained person at a different seat, an observer, a newcomer and a host-ended match. They compare all common report and Horde fields alongside the stored outcome, so a correct you field cannot hide missing or changed report contents. The recorder still evaluates the unchanged original Source composition/projection expressions; no existing fixture or Source capture changes.
+
+
+### Authentic mode-history oracle (2026-10-15)
+
+At clean source head `810bc2b9ec049838a4e503ce10938166feb72a46`, pinned x64 Node24.21.0 generation and byte-exact check both exit0. The authentic fixture contains21 sampler cases,12 retained-death finishes,four actual Tutorial constructors,24 complete original result projections and seven Horde record updates. It is frozen in the next child before any Cargo execution. Source callbacks and result expressions produced these expectations; no native or expected startup state generated them. The original MODE21 captures and prior fixtures remain unchanged. S2 used actual CPUs4-7,6GiB memory,swap0 and400percent CPU, with the exclusive slot lock and20GiB disk floor. Both Source processes terminated and released the lock. Native,fmt and Clippy qualification remain pending.
+
+
+The first guarded format check at authentic-fixture child `acd6f2a06a8516c758e9dde477fd498eb165aa5d` exits1 on formatting only. Its original log is retained. Guarded `cargo +1.99.0 fmt --all` exits0 and mechanically formats19 owned Rust paths, including moving the new simtest module declaration into formatter order. No fixture, assertion, runtime policy or Source code is edited during formatting. Freeze this child before native qualification; no native pass is yet claimed.
+
+The first native compile at `607fd9b7d8d69a82f0dd8c3b95023e954b00c60a` exits101 before any selected test executes. Three construction-test references lost their parent module's Mode import, and the World Match initializer lacks the newly added optional Tutorial field. The bounded correction imports Mode explicitly in that test module and initializes World's Tutorial state to None. No test body, oracle, input, clock or other runtime behavior changes. Retain the original four compiler errors and all Source receipts at their producing heads. The new S3 grant qualifies the same ten previously unexecuted tests; it permits no Source repeat.
+
+### Tutorial field-project capability adapter (source-only recovery)
+
+The first native run at `1cea75bb6315bcd6a186e146b8618d116d2be710` compiles, then fails the original Tutorial witness at tick0: field-project preflight still admits only ordinary Conquest. Its actual0PASS/1FAIL/149filtered result and terminal slot receipt remain preserved. No retry or passing result is assigned to this new source child.
+
+Pinned Source `shared/sim.js:5322-5334` recounts paid project references and performs the twentieth-tick crew sweep before starting path work in every mode. Its unit loop allocates project segments and advances actual Dig work at `:5383-5412`. Tutorial reaches these shared phases before its late step/finish consumer. The native adapter therefore validates a real Tutorial context and uses these existing phases. It neither skips field work nor relabels Tutorial as Conquest.
+
+The context keeps the original Default/Conquest plus absent Game mode branch. Tutorial additionally requires its matching mode tag, private TutorialRuntime, complete canonical finish/roster identity, real terrain-layer lengths and live project/control/firing/ability identities. The existing project-record, paid-job, membership, waiting-order, safe-clock, wallet and crew-capacity checks remain. Tutorial command admission, recount and per-unit allocation share the same context check. Actual terrain mutation, payment, movement, work progress, spending and built counters remain with their current canonical owners. Other mode/tag combinations remain refused; no public startup, server, ABI, RNG, input or clock change is made.
+
+The existing Tutorial capability test now includes a constructor-created rifle receiving a real recorded Entrench command on open authored ground. It advances ordinary ticks and requires a paid job, MP spending, completed Dig story and new trench terrain. Additional read-only controls reject absent Tutorial state, inconsistent teams, incomplete terrain and missing control metadata. These are unrun witnesses, not expected startup imports or phase manipulation. The original full Tutorial progression witness is unchanged. The remaining qualification is the same ten named tests on a future frozen head, then strict locked core/simtest all-target ci-test Clippy only if all pass. No Cargo, Source, formatter or discovery execution occurs in this recovery; authentic68case Source results stay at810bc2b9.
+
+
+### Tutorial home purchase and recovery callers (source-only recovery)
+
+Reading the complete pinned `test-tutorial.js` and the actual Tutorial tick callers after `21d44f31` found two remaining internal capability gaps. Recorded Buy reaches `ProductionState::prepare_recruit`, which deliberately admits only Default/Conquest and selects an actual producer. Tutorial has no such building. Source `shared/sim.js:3794-3805` instead validates the same purchase limits, scatters the unit once, steps out from the owner's real spawn with radius4 and home-region restriction, then sends it to the player's rally. Source ignores `from` in this branch. Native now has a separate crate-private Tutorial preparation and placement path. The ordinary public component keeps its mode and producer guards. Both paths retain common faction, classic/naval, tier, price, population, maximum, wallet and transaction checks; Tutorial remains Tutorial throughout.
+
+The Tutorial path validates its actual private runtime, matching mode tags, complete canonical finish/player identity and existing recruitment facts before staging. Placement uses the actual home, terrain, occupant table, allocator and scatter index. Canonical recipient routing, unit/control/combat/firing/ability/recovery publication and MP-spent updates remain in the existing transaction. Internal completed-purchase metadata uses building0 to mean the home origin; all actual unit/building IDs remain nonzero. No synthetic HQ or producer row is created. This internal meaning is not adopted by a server, public startup, ABI or wire consumer. Tutorial aircraft purchases remain explicitly unsupported by the ground placer, as before; the complete Tutorial lesson requires a ground AT gun.
+
+Source `shared/sim.js:5646-5668` uses the owner's spawn as Tutorial's reinforcement home and excludes the unattended mode slot from both home and forward recovery. Native now selects that actual spawn only in a validated Tutorial context and excludes its canonical enemy. Existing ordinary HQ and World production-base policies, allied depots, aid, health/clock/record validation, provision spending, MP payment, story updates and fixed tick ordering remain. This is an internal capability repair, not a new income or defeat policy. The original complete Tutorial progression test remains byte-identical, including its real fights, AT purchase, retreat, artillery, capture and point1 finish.
+
+The existing capability test additionally exercises an affordable real home purchase, ignored `from`, real recipient rally routing, no producer, insufficient-MP refusal without publication, and malformed-runtime refusal without payment. A real canonical damage component supplies a human injury; ordinary ticks must restore health near home and pay MP. Actual scripted understrength sentries walk to their own home and must retain their health and zero reinforcement credit. No expected frame, phase, pose, HP result, wallet or clock is installed by these witnesses. The original ten qualification names remain unchanged. These additions are authored source only: no Source, Node, Cargo, native, formatter, lint, discovery or CI was run. Preserve `1cea75bb`'s 0PASS/1FAIL/149filtered result and every earlier producing-head receipt. The next execution needs a grant naming its exact frozen head; no five-row status change or new passing proof is claimed.
+
+
+## MODE original ten on fresh main (2026-10-15, source only)
+
+The MODE69/90/91/92/93 integration starts from main `f7b0e5889e3b707beb6d18c4ea8d20a7d9f7b578`. It retains the owned Tutorial, typed result, timeline, retained-death and callback components from `6e09523c`, including `21d44f31` field-project context and actual Tutorial home purchase/recovery. Incoming MAP/ENG code, fixtures, parity cells and test registrations remain intact. Original direct changelog entries are retained as historical text; this integration adds its new entry as a fragment. The separate `5b59978e` next-five tests and `a2e4ae13` defaults docs are not imported. Horde runtime implementation remains zero. No snapshot, AI, aircraft-base, building-repair, public-start, wire, ABI or privacy gate is widened.
+
+The existing constructor/capability test lacked direct controls for zero humans, enabled skirmish options and a valid map missing the lesson's second objective. It now calls the real constructor for those inputs, requires normalization of team/shuffle/tech/supply/logistics, validates the produced Tutorial context and rejects the invalid inputs. These controls do not write runtime phases, expected startup state, health or clocks. The original complete nine-step Tutorial progression and authentic `acd6f2a0` fixture remain byte-identical. The same original ten test names remain selected, in their original order.
+
+All executable qualification remains frozen: Source, Node, Cargo, native, fmt, lint, discovery and CI counts are zero for this integration. Source generation/check exits zero and the 68 cases belong to `810bc2b9`; `1cea75bb` retains its first ordinary-field-project refusal at tick zero, 0 PASS, 1 FAIL, 149 filtered and exit 101. `6e09523c` has ten UNRUN tests, and no historical result transfers to this integration. A new exact-head/selection/slot grant is required before execution. Root owns independent review, hosted checks and Hermes runtime-head readback. No parity cell changes or public actions occur here.
+
+
+## MODE original-ten formatting child (2026-10-15, native pending)
+
+The first authorized S3 format check at `29d136faa02d1253c6aab078c690171814b35f35` exits 1 with layout diagnostics in five owned Rust files. Its process is terminal and the inherited slot flock is released. The raw log and actual scope receipt remain in `/tmp/mode-impl-S3-29d136fa-20261015/`. The scope reports CPUs 8-11, 6 GiB memory, zero swap and CPU quota 400 percent, with jobs four and test threads one. The guard enforces the external S3 target and 20 GiB disk floor. No native test executes at that head.
+
+Root authorizes only the exact printed formatter replacements. Static comparison enumerates 15 inserted trailing commas and one pair of closure-body braces in the original diagnostic. No original non-whitespace token is removed or reordered; every string literal is exact. The complete original live Tutorial progression body, all authored inputs and assertions, the authentic 68-case fixture, all 21 parity files and 1,017 protected incoming entries remain intact. The preservation receipt lists each punctuation insertion rather than claiming literal non-whitespace equality. No semantic repair or additional test is introduced.
+
+Freeze this mechanical child before execution and send its full commit and Rust tree to Root for the sole S3 ledger binding. The same original ten exact names and order remain selected, once each with fail-fast execution. Strict locked core/simtest all-target ci-test Clippy is conditional on all ten passing. The earlier Source generation/check and native failure receipts retain their original producing heads. No row, Acceptance cell, interface, wire, ABI, privacy, defaults mapping or public admission changes. Formatting qualification after application and native results are not claimed by this source commit.
+
+
+## Tutorial moved crushing capability union (2026-10-15, source only)
+
+The original full Tutorial test at `42e53f0116ad9a48b510c1bdf0847a395be0fc90`
+fails once at tick1048 with `moved vehicle crushing is not connected`:
+0 passed,1 failed,149 filtered,exit101. Its Rust tree is
+`0fc991dd164b2acf4e1e9f9b976a22375b9a0a29`. The raw report and first-test
+log remain at `/tmp/mode-impl-S3-29d136fa-20261015/`. The log names no actor
+or cell. The remaining nine selected tests and Clippy remain UNRUN; the
+formatting pass belongs only to42. Preserve29,42,1cea and all earlier raw
+failures at their producing heads.
+
+On freshly fetched main `f7b0e588`, retain the complete MODE42 integration
+and import only the moved-contact capability from frozen IMPL_ENGINEERING
+`0ea364323157337003865abdedac65d5dbdb9696`. The actual actor's compiled
+`crushes` flag and CFG.crush replacement select the existing canonical
+`EnvironmentRuntime::wreck_cell_emitting` owner. Its Context borrows every
+current unit ID in canonical order, the maintained grid, shared environment
+seed, allocator, tick and weather. After that owner mutates the cell,
+contact rereads its actual terrain before wear and dust. Hostile mines,
+World roster and actor-policy refusals remain. No generic guard is removed.
+Pinned Source `shared/sim.js:5513-5528` orders crushing before terrain wear
+and dust; the existing contact owner retains its hostile-mine refusal.
+
+The actual call chain is wreck_cell_emitting -> check -> check_terrain.
+It validates shape, clock, weather, complete current-unit membership and
+capacity, without excluding Tutorial. Existing actor_policy already admits
+the matching Tutorial tag. No Tutorial Environment adapter or mode relabel
+is necessary. The sole tick edit sends each committed contact effect into
+the current chronological TickEvent sequence before firing. Existing
+TickFailure retains that prefix if this or a later phase fails; it still
+poisons the runner and refuses a second advance.
+
+Replace only the old crush-refusal cases in the two existing contact suites.
+Keep hostile mines and all other refusals. The frozen World fixture's actual
+crush case now checks its full existing rows and cumulative effect sequence.
+A focused contact test covers all four compiled replacements and an unmoved
+no-op. No ENG first-five parity row or fixture is imported.
+
+The existing Tutorial capability test adds a separate real Large-army
+constructor and paid tank purchase, followed by accepted movement onto an
+authored hedge. This deliberately chosen contact cell is not attributed to
+the historical tick1048 failure. The positive case checks the real tick's
+collapse, cleared ground, wear and dust. A negative finite terrain-wear input
+checks that the collapse remains in the failed tick and the faulted runner
+keeps its state. Complete and incomplete Environment order controls use
+actual Tutorial owners. A direct weather refusal uses the tank's actual
+current and prior movement poses. No pose, HP, clock, wallet, phase or RNG
+result is installed or reset. The original complete progression, every
+existing assertion, authentic68case fixture and registered module stay exact.
+
+This union is authored source only. Source,Node,Cargo,native,fmt,lint,
+discovery,release and CI execution counts are zero. All original ten names
+and their order are retained, followed by the explicitly listed affected
+contact selections in the private handoff manifest. Every selection is UNRUN
+at the new head. All Acceptance cells and parity-table bytes stay unchanged;
+MODE69/90/91/92/93 remain in progress. A fresh Root grant must name the frozen
+head, Rust tree and exclusive slot before execution, with four CPUs,6GiB,
+zero swap,400percent CPU,jobs4,threads1,external targets,current guard,
+inherited lock and20GiB free. No lock or ledger is acquired or modified here.
+No public API,wire,privacy,publication or owner-approval claim is added.
+
+
+## MODE provider union after PR271 (2026-10-15, native pending)
+
+Start a fresh private branch from exact main
+`f7c51b1a0ebf850c5c22b560a595e4095ce39fdc`, retaining the owned repair
+`ea2869a904e36ca1ca513b8bbc431476102cc3d4` and its Rust tree
+`4362e4c522a943534939a39e46298b7ba0ac77e0` on their original ref.
+Import only that owned delta against its f7b0 baseline. Preserve both
+document histories and the incoming LOG causal-test module registration.
+No Source predicate, Tutorial phase, runtime guard or input changes are
+introduced by this integration. All incoming LOG/G1/MAP/ENG statuses,
+Acceptance cells, fixtures, observers and other typed tree entries are
+retained. The original full Tutorial progression body stays exact.
+
+Independently freeze the expected typed path/mode/type/blob union before
+writing source, then compare the complete committed tree. Receipts live at
+`/tmp/mode-main-union-20261015/`. That packet hashes every file in both
+prior MODE repair and S3 evidence directories before integration. The
+original42 failure remains 0 passed,1 failed,149 filtered at tick1048,
+missing moved crushing; its nine remaining selections stay UNRUN.
+The earlier compile, format and tick0 failures retain their original
+producer attribution. No historical PASS transfers to this union.
+
+The proposed qualification retains the original ten exact selections in
+order, followed by six affected contact instances. All16 are UNRUN here.
+Source generation is not repeated. A new Root exact-head/Rust-tree/slot
+grant must precede focused native qualification. Strict locked core/simtest
+all-target ci-test Clippy is conditional on all16 passing and that grant.
+No parity row is promoted or quota PR prepared. Root retains independent
+review, hosted checks, Hermes runtime readback and publication.

@@ -88,6 +88,9 @@ impl Match {
 
     /// Early source recount, before waiting orders and per-unit paid-segment allocation.
     pub fn recount_field_projects(&mut self) -> Result<(), String> {
+        if self.options.mode == crate::economy::Mode::Tutorial {
+            self.validate_field_project_context()?;
+        }
         let mut waiting = Vec::new();
         for (&id, c) in &self.commands.units {
             for order in &c.orders {
@@ -221,11 +224,7 @@ impl Match {
         if winner || player.out || player.away {
             return Ok(Some(Denial::Blocked));
         }
-        if !matches!(
-            self.options.mode,
-            crate::economy::Mode::Default | crate::economy::Mode::Conquest
-        ) || self.world.game.mode.is_some()
-        {
+        if self.validate_field_project_context().is_err() {
             return Ok(Some(Denial::Unsupported));
         }
         let defs = definitions().map_err(|e| e.to_string())?;
@@ -437,6 +436,9 @@ impl Match {
 
     /// Mass-work allocation immediately before the existing timed Dig phase of this source unit turn.
     pub fn apply_project_unit(&mut self, id: UnitId) -> Result<(), String> {
+        if self.options.mode == crate::economy::Mode::Tutorial {
+            self.validate_field_project_context()?;
+        }
         self.validate_project_unit(id)?;
         let u = &self.world.game.units[&id];
         if u.hp <= 0. || u.riding || self.commands.units[&id].operative || !u.entrench || u.dig {
