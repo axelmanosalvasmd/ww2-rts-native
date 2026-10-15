@@ -14,6 +14,24 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 - Rebase NET2 snapshot and cadence checks onto current main, retain the six ported NET rows and held gaps, and move the two original NET2 design notes beside snapshot delivery history without changing their text.
 
+- Mark CMB-61 ported privately after independent whole-row ACCEPT of `cfc8263e`. Change only its Rust evidence and Status cells; preserve all 160 acceptance cells and every other row/cell. Keep new passes at `25c76d6c`, Source capture at `7a762f65`/`a5411f79` and old main 396f component proof separate. No new execution, runtime change or publication.
+
+- Verify the CMB-61 metadata comparator and existing firing consumers at `25c76d6c`: launch accuracy, x1.5 target preference and the simtest registration guard each pass, with formatting and strict locked workspace/all-target Clippy. Keep the authentic fixture and both earlier failures intact; CMB-61 awaits Root whole-row review and no status is changed.
+
+- Compare CMB-61 input metadata recursively with exact f64 bits for JSON numbers, exact object key sets, ordered arrays and strict nonnumeric values. Replace the field-specific representation exception without mutating metadata or changing any replay comparison, input or fixture. Preserve both earlier failed test logs.
+
+- Retain the renewed CMB-61 failure at `d01d213a`: exact `hitAt` comparison succeeds, then strict metadata equality rejects a choice actor's integer versus float `cooldown`. The accuracy test reports 0 passed and 1 failed; stop without widening normalization. Target-choice, registry and Clippy remain unrun.
+
+- Compare CMB-61 metadata actor `hitAt` values by exact f64 bits before canonicalizing only those verified cells for strict whole-JSON equality. Keep every other metadata type, key and value strict. Preserve authored inputs, Source, authentic fixtures and all replay assertions; retain the earlier failure.
+
+- Retain the first CMB-61 native test failure at `556a2ad5`: exact authored-input metadata equality rejects Source integer `hitAt` against the input JSON float before firing replay. Stop after 0 passed and 1 failed; target-choice, registry and Clippy checks remain unrun. Source generation/check and the formatting recheck passed. No predicate, input, fixture, runtime or row-status repair is applied.
+
+- Apply the two whitespace-only changes requested by the CMB-61 formatting check. Preserve all test tokens, assertions, literals and the authentic Source fixture. The initial formatting failure is retained; native tests remain pending.
+
+- Record the 16 CMB-61 flame firing scenes from pinned original Source, with 202 checkpoints. Generation and the serial byte check pass with x64 Node 24.21.0 under S3 caps. Preserve the old firing fixture and all row statuses; native comparison remains pending.
+
+- Prepare two CMB-61 flame comparisons through the existing Match firing provider: paired trench/open/garrison launch accuracy and the x1.5 target preference with negative controls. Keep the ordinary 131 firing traces and 668 checkpoints unchanged. Add only an unapplied Rust/Status proposal for CMB-69. Authentic recording and native execution remain pending; no row status or runtime changes.
+
 - Rebase the combat vision checks onto main `66592ae8`, retaining all incoming content and relocating the three owned vision notes beside the existing core vision section. Preserve all seven focused checks, three Source oracles and historical failures. CMB-124, CMB-125, CMB-131 and CMB-132 remain ported; CMB-128 remains held for its complete border-ray regression. Earlier test results stay attributed to their original heads.
 
 - Rebase the selected BASE checks onto main `cd5760c4`, preserving the Tutorial provider and its three ported rows. BASE-28 alone is a ported candidate, supported by complete B05, the paid-placement/collapse/rubble corridor and 61 exact Source component frame pairs at `0d2df9f8`; BASE-26/29/30/48 retain their provider gaps. Keep the owned DESIGN notes beside the wallet section and historical results on their producing heads, including nine selected passes, fmt and strict Clippy at `3c07bb9f`. The final rebased head requires fresh nine-check validation and independent whole-row review before publication.
