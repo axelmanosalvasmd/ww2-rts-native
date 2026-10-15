@@ -62,6 +62,8 @@ pub struct RoomRuntime {
     pause_sent_at: u64,
     auto_paused: BTreeSet<usize>,
     held: u16,
+    #[cfg(test)]
+    snapshot_production_calls: u64,
 }
 impl RoomRuntime {
     /// Establish full start baselines on the existing receipt owner without shot previews.
@@ -121,10 +123,16 @@ impl RoomRuntime {
             pause_sent_at: now_ms,
             auto_paused: BTreeSet::new(),
             held: 0,
+            #[cfg(test)]
+            snapshot_production_calls: 0,
         })
     }
     pub fn state(&self) -> &Match {
         &self.state
+    }
+    #[cfg(test)]
+    pub(crate) fn snapshot_production_calls(&self) -> u64 {
+        self.snapshot_production_calls
     }
     /// Only a trusted host may admit recorded commands or author setup through this borrow.
     pub fn state_mut(&mut self) -> &mut Match {
@@ -207,6 +215,10 @@ impl RoomRuntime {
             .batch
             .checked_add(1)
             .ok_or("native snapshot batch exhausted")?;
+        #[cfg(test)]
+        {
+            self.snapshot_production_calls += 1;
+        }
         let raw = self.state.ordinary_snapshot_raw_lists()?;
         let mut lists = self.lists.clone();
         let versions = lists

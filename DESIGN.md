@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## NET2 socket witnesses (2026-10-15, execution pending)
+
+The successor to source plan `6bd3336d` adds four explicit-clock Hub tests over real WebSocket receivers and one ordinary-executable R1 witness. They check recipient eligibility, skipped producer entry, tick/stall boundaries, selected meter thresholds feeding socket cadence, controlled outstanding-write accounting, stale completion authority, human metadata and drop/reconnect delivery. [The freeze](docs/testing/net-2-socket-freeze.md) records exact tests, Source predicates, held branches and guarded commands. All rows keep their existing status.
+
+The controlled harness reuses the actual upgrade, socket pump, R1 admission and canonical start. It invokes existing Hub polling explicitly instead of running a maintenance timer. Twelve `cfg(test)` lines count nonempty snapshot-producer entries; non-test runtime bytes remain unchanged after removing those insertions. Duration inputs use the existing runtime API, and controlled reservations model outstanding writes without claiming OS saturation. The ordinary executable witness uses the existing process helpers separately. No Source, Cargo, formatter, server or test has executed at this source checkpoint. Root's disk guard, assigned systemd scope, separate review and publication ownership remain required.
+
 ## Second server-stream source freeze (2026-10-15)
 
 At baseline `34edf52a7eaa6cb6edba3e802c2190226228276f`, IMPL_NET_2 selects NET-64/65/66/67/69/70/72/74/80/81 for a source-inspected acceptance plan, not a completion claim. [The plan](docs/testing/net-2-row-plan.md) and [full 47-row predicate map](docs/testing/net-2-row-plan.json) preserve the original acceptance requirements and distinguish component fixtures from actual socket consumers. NET-98 is absent from the inventory and ownership map; NET-68 remains another owner's row. All parity statuses stay unchanged.

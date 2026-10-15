@@ -5,10 +5,11 @@ Owner `IMPL_NET_2` works from native baseline
 `e4e579a838aabae3b1d9dadbc17a0a87147bc52d` at
 `/home/judiazm/Projects/ww2-rts-native/reference/ww2-rts`.
 
-This is a source-inspected plan with precise gaps, not an implementation or
-runtime acceptance report. Ten candidate rows are selected below. None is newly
-complete, no test has been added, and no parity status has changed. Cargo,
-rustc, server execution and Source recorders have not run in this worktree.
+This records the initial source-inspected plan at `6bd3336d`. Its ten selected
+rows and complete acceptance requirements remain held. The later
+[socket test freeze](net-2-socket-freeze.md) adds unrun two-human witnesses and
+supersedes this plan's execution instructions. No parity status has changed;
+Cargo, rustc, server execution and Source recorders have not run in this worktree.
 
 ## Ownership and coordination
 
@@ -85,53 +86,19 @@ completion claims. No request for an expansion is made by this plan.
 
 ## Pending commands and resource slots
 
-At intake, S1/S2/S3 were assigned by Root to CMB/MAP/ENG. This worker has no
-runtime slot. Root must grant a named focused slot before any command below,
-with the exact frozen SHA, kernel CPU affinity, 6 GiB memory limit, no swap,
-at most four build jobs and one test thread. Run serially, preserve failures,
-and return exit status, logs and verified process/scope cleanup to Root.
-The ledger is Root-owned and was not modified.
-
-These existing checks are runnable after that grant, from this worktree. They
-are prerequisite evidence only and do not implement the missing witnesses:
-
-```sh
-# In rust/, one command at a time inside the Root-granted scope:
-cargo +1.99.0 test --locked --profile ci-test -p ww2-server --lib -j4 snapshot_delta::tests::original_source_traces_preserve_recipient_delta_history -- --exact --test-threads=1 --nocapture
-cargo +1.99.0 test --locked --profile ci-test -p ww2-server --lib -j4 snapshot_lists::tests::original_trimmed_traces_preserve_source_stream_history -- --exact --test-threads=1 --nocapture
-cargo +1.99.0 test --locked --profile ci-test -p ww2-server --lib -j4 tick_timing::tests::original_meter_windows_and_server_polling_loop -- --exact --test-threads=1 --nocapture
-cargo +1.99.0 test --locked --profile ci-test -p ww2-server --lib -j4 snapshot_backpressure::tests::original_socket_callbacks_and_watcher_boundaries -- --exact --test-threads=1 --nocapture
-cargo +1.99.0 test --locked --profile ci-test -p ww2-server --lib -j4 lobby::native_startup_tests::native_two_client_socket_tests::both_seated_sockets_move_and_stop_owned_units_in_one_match -- --exact --test-threads=1 --nocapture
-cargo +1.99.0 test --locked --profile ci-test -p ww2-server --test trusted_room_process -j4 -- --test-threads=1 --nocapture
-```
-
-The last command launches the ordinary executable. It therefore requires the
-same explicit server/native slot grant as compilation. No workspace, release,
-test-list, standalone server or native format command is authorized by this
-document. Root should choose only checks needed for a subsequent change.
-
-Source regeneration/checking also requires a grant. The existing timing and
-backpressure recorders require x64 Node `v24.21.0`. `/usr/bin/node24.21.0` is
-absent on this host; Root must identify the permitted matching executable
-before running these from the worktree root:
-
-```sh
-WW2_REFERENCE=/home/judiazm/Projects/ww2-rts-native/reference/ww2-rts "$NET_SOURCE_NODE" harness/tick-timing-fixture.mjs --check
-WW2_REFERENCE=/home/judiazm/Projects/ww2-rts-native/reference/ww2-rts "$NET_SOURCE_NODE" harness/snapshot-backpressure-fixture.mjs --check
-```
-
-`NET_SOURCE_NODE` is an unassigned placeholder, not a verified command path.
-No fixture regeneration is needed for this documentation-only freeze. A
-future maintained socket recorder and native consumer need their own source
-freeze and review before a slot run; their commands do not exist yet.
+The [socket test freeze](net-2-socket-freeze.md#pending-commands) contains the
+current guarded commands and resource requirements. The initial plan's plain
+Cargo commands and task-local binary assumptions are superseded by Root's disk
+recovery instructions. No runtime slot has been granted to this worker.
 
 ## Handoff boundary
 
 Root must obtain a separate reviewer before publication. This branch is not
 pushed and has no PR. If a later implementation shares `docs/parity/server.md`,
 integrate the then-current main before PR creation, preserve both owners' cells
-and rerun the owned-row diff check. This freeze changes no parity file, runtime,
-test, fixture, reference file, contract, header, terrain or client source.
+and rerun the owned-row diff check. The initial plan changed no parity file, runtime, test, fixture, reference
+file, contract, header, terrain or client source. Its successor's test-only
+additions are disclosed in the socket freeze.
 
 Validation here is static: exact baseline, clean initial worktree, Source pin
 and clean Source status, 47 unique owned rows, ten selected rows, unchanged
