@@ -1,7 +1,5 @@
 //! Original complete Source steps establish one chronological actual-runner output sequence.
-#[path = "common/aviation.rs"]
-#[allow(dead_code)]
-mod common;
+use crate::shared::aviation as common;
 
 use common::{assert_json, bits};
 use serde_json::{Value, json};

@@ -10,9 +10,7 @@ use ww2_core::{
     match_runtime::Match,
 };
 // This file uses only the shared real constructor, not restored phase scenes.
-#[allow(dead_code)]
-#[path = "common/world_scene.rs"]
-mod world_scene;
+use crate::shared::world_scene;
 
 fn scene() -> Match {
     let fixture: Value = serde_json::from_str(include_str!("fixtures/world-phases.json")).unwrap();

@@ -1,6 +1,5 @@
 //! Unchanged original full steps compared with the sole production Match runner.
-#[path = "common/aviation.rs"]
-mod common;
+use crate::shared::aviation as common;
 
 use common::{aircraft_phase_snapshot_with_events, assert_json, bits, scene};
 use serde_json::{Value, json};

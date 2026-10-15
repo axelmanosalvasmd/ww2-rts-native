@@ -1,5 +1,4 @@
-#[path = "common/staged_observer.rs"]
-mod common;
+use crate::shared::staged_observer as common;
 use common::*;
 use serde_json::{Value, json};
 use ww2_core::{
