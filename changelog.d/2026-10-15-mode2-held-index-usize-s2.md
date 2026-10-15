@@ -1,0 +1,1 @@
+- Give the Tutorial held-point closure an explicit usize index after the retained E0282 compiler failure. Point lookup, team checks, all 50 Source cases and the authentic fixture remain unchanged; native validation is pending.
