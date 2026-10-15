@@ -80,7 +80,7 @@ fn infantry_naval_and_vehicle_paths_match_original_find_path() {
             .unwrap()
             .is_empty()
     );
-    replay_paths(&fixture, (1531, 1109, 300, 122, 34));
+    replay_paths(&fixture, (1531, 1109, 300, 122, 33));
 }
 
 #[test]

@@ -1,1 +1,2 @@
 - Prepare existing Source recorders and native readers for ENG-04, ENG-13, ENG-14, ENG-48 and ENG-66. Record 186 World actions, 396 field-work actions, 1,531 path queries and 5,943 support checkpoints, preserving all prior recorded entries byte for byte. Native verification and parity promotion remain pending.
+- Correct the expected authored-map count from 34 to 33: the added trap-wall scenario contributes two queries but is not a `map:` scenario. Preserve the original failed focused run and all Source recordings.
