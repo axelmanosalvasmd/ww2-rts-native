@@ -75,9 +75,11 @@ fn named_fine_search_branches_match_original_find_path() {
         .collect();
     assert_eq!(
         covered,
-        ["MOV-31", "MOV-32", "MOV-33", "MOV-34", "MOV-35", "MOV-38", "MOV-39"]
-            .into_iter()
-            .collect()
+        [
+            "MOV-31", "MOV-32", "MOV-33", "MOV-34", "MOV-35", "MOV-38", "MOV-39"
+        ]
+        .into_iter()
+        .collect()
     );
     replay_paths(&fixture, (603, 487, 36, 80, 0));
 }
