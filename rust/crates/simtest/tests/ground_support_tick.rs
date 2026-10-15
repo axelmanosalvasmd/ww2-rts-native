@@ -126,7 +126,10 @@ fn actual_ground_support_ticks_match_source_effects_and_lifetimes() {
                     } else {
                         assert_eq!(clouds.len(), 5, "{name}:{tick}: delivered cloud count");
                         assert!(clouds.iter().all(|s| s.r.to_bits() == 7f64.to_bits()));
-                        assert_eq!(sight["withSmoke"], false, "{name}:{tick}: actual barrage LOS");
+                        assert_eq!(
+                            sight["withSmoke"], false,
+                            "{name}:{tick}: actual barrage LOS"
+                        );
                         arrival_x = Some(first.x);
                     }
                 } else {
@@ -168,9 +171,15 @@ fn actual_ground_support_ticks_match_source_effects_and_lifetimes() {
         if is_smoke {
             assert!(arrival_x.is_some(), "{name}: no actual smoke delivery");
             if trace["spec"]["rain"].is_null() {
-                assert!(drifted, "{name}: actual delivered cloud did not drift downwind");
+                assert!(
+                    drifted,
+                    "{name}: actual delivered cloud did not drift downwind"
+                );
             }
-            assert!(m.world.game.smokes.is_empty(), "{name}: smoke did not retire");
+            assert!(
+                m.world.game.smokes.is_empty(),
+                "{name}: smoke did not retire"
+            );
             assert_eq!(common::smoke_los(&m, smoke_query)["withSmoke"], true);
             smoke_traces += 1;
         }

@@ -111,7 +111,13 @@ fn selected_goal_start_failure_signals_match_source() {
             assert_eq!(full_goal as u64, diagnostic["fullGoal"].as_u64().unwrap());
             let connected = paths
                 .navigation
-                .leg(terrain.navigation, start, full_goal, block, Options::default())
+                .leg(
+                    terrain.navigation,
+                    start,
+                    full_goal,
+                    block,
+                    Options::default(),
+                )
                 .unwrap()
                 .connected;
             assert_eq!(connected, diagnostic["legConnected"].as_bool().unwrap());
