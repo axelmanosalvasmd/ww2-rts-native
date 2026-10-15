@@ -31,6 +31,8 @@ mod assault_finish;
 mod assault_start;
 #[path = "../base_ordinary_checks.rs"]
 mod base_ordinary_checks;
+#[path = "../base_pending_paratroopers.rs"]
+mod base_pending_paratroopers;
 #[path = "../compiled_rules.rs"]
 mod compiled_rules;
 #[path = "../conquest_finish.rs"]

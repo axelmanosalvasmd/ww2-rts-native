@@ -1,5 +1,5 @@
 {
-  "status": "source-only unimplemented scene plan, no generated expectation or pass",
+  "status": "source-only implemented recorder/replay draft, no generated fixture or pass",
   "base": "446671b977abfa6bf689fcb8853833d36519faab",
   "row": "BASE-15",
   "source_pin": "e4e579a838aabae3b1d9dadbc17a0a87147bc52d",
@@ -17,5 +17,5 @@
   "count_plan": {"scenes": 3, "support_and_Buy_commands": 26, "complete_ticks": 289, "future_native_tests_after_registration": 3, "future_guards": 2, "executed": 0},
   "evidence_limit": "canonical scene correspondence requires independent review; original cleared-fixture popOf==global size is not literal in this retained two-player actor scene",
   "runtime_provider_gap_found": false,
-  "missing_work": "implement one new original-Source recorder and actual full-tick native composition; register module only when authorized; record/compile only after Root grant"
+  "missing_work": "Source generation/check, generated-fixture freeze, compilation/execution and independent whole-predicate review remain pending; record/compile only after Root grant"
 }

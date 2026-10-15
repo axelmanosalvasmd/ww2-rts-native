@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## BASE-15 composed pending-drop draft (2026-10-15, unexecuted)
+
+The [pending-drop checkpoint](docs/runtime/base15-pending-drop-checkpoint.md) now has one Source recorder and one registered native replay draft. They retain the canonical ordinary constructor roster, footprints and linked structures, fill capacity through real HQ purchases, request actual para/Cover support and advance complete normal ticks. The three schedules predict 26 commands and 289 ticks. No fixture has been generated and no Source, native, formatting or Cargo check has run on this draft.
+
+Population is queried from actual field units, real producer queues and actual non-live strikes, then compared separately with the entire global ID set. The original selected Source fixture clears actors and injects Cover, so its literal population-equals-global-count assertion remains unequal in this retained two-player scene. Both the full predicate correspondence and actual execution remain unproved; BASE-15 stays held. No runtime, guard, admission, terrain, interface or other parity decision changes. The constructor/Combat/OffMap Source input adapter records draw purposes without resetting native randomness; unclassified draw sites stop recording. Logistics remains disabled on both sides, and drop births retain their actual publication metadata rather than receiving synthetic producer records.
+
 ## BASE-15 pending-drop composition plan (2026-10-15, unexecuted)
 
 The source-only [BASE-15 checkpoint](docs/runtime/base15-pending-drop-checkpoint.md) maps the complete selected pending-paratrooper history to existing ordinary support/recruitment/tick consumers. Its proposed three scenes preserve canonical constructors, fill capacity through real purchases and obtain interception through an actual opposing Cover request. The original Source fixture clears actors and inserts temporary makers/cover, so the retained-scene population/global-count correspondence must be reviewed explicitly. This checkpoint adds no recorder, test, runtime rule or eligibility claim; recording, registration and native execution remain future granted work. BASE-15 and every other parity cell stay exact.

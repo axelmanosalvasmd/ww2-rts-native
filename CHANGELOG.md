@@ -3,6 +3,9 @@
 Unreleased entries that are not yet collected live in `changelog.d/`, one file per change.
 
 ## Unreleased
+
+- Draft the complete BASE-15 pending-paratrooper recorder and native replay over retained canonical constructors, real HQ purchases, actual delayed delivery/Fighter Cover interception and released-slot recruitment. Register one test module. The three scenes predict 26 commands and 289 full ticks; no fixture or execution exists yet. Preserve the original cleared-scene population/global-count difference for whole-predicate review. All parity statuses, runtime, guards, old tests and fixtures remain unchanged.
+
 - Normally merge landed World #202 main `9f0190ef` into reconnect `935dccdc`, retaining both complete tracking histories and the exact corrected socket test. All main runtime, tests, helpers, fixtures, CI, ABI/header and reference entries remain exact except the original test registration. Preserve the old interrupted evidence and keep prior test counts on their original heads. Under the owner's test-only policy, run only the named focused test; separate review, fresh hosted checks and the ordered per-worker head report remain required before publication.
 
 

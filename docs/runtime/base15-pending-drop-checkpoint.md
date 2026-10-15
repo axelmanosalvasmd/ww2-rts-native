@@ -1,6 +1,14 @@
 # BASE-15 pending-drop composition, source-only checkpoint
 
-This checkpoint starts from fixed main `446671b977abfa6bf689fcb8853833d36519faab`. It is an unexecuted plan for the complete selected check, not a population-helper pass or row completion. BASE-15 stays in progress with its full acceptance cell unchanged. No runtime, admission, paratrooper rule, old test/fixture or other row changes.
+The plan began at source checkpoint `130f31446de14df8499e73067b9fa52b106cd329`, from fixed main `446671b977abfa6bf689fcb8853833d36519faab`. It is an unexecuted plan for the complete selected check, not a population-helper pass or row completion. BASE-15 stays in progress with its full acceptance cell unchanged. No runtime, admission, paratrooper rule, old test/fixture or other row changes.
+
+## Current implementation draft, unexecuted
+
+The source-only child adds `harness/base-pending-paratroopers-fixture.mjs`, `rust/crates/simtest/tests/base_pending_paratroopers.rs` and exactly one additive path/module pair. The fixture `tests/fixtures/base-pending-paratroopers.json` is absent until a future generation grant. The registered replay reads that runtime input explicitly and fails if it is missing; it never skips or imports expected native state. Source createGame/command/step and native Match::new/execute_command/advance_tick remain unchanged.
+
+Both implementations fix the entire three-scene input schedule and check after every command and tick. Actual population providers expose field, queue and pending contributions independently of global roster count. Original IDs and owners survive; foreign poses/health and all structure identities, cells and links stay exact. Native publication checks actual controls, combat/firing/ability/recovery sidecars, producer records for real purchases and the absence of synthetic producer records for drops. The declared disabled logistics context has no physical reserve records on either side. A genuine opposing Cover request replaces the original test's injected Cover only for this composed-scene correspondence, not in the original Source file.
+
+No behavior, compile, formatting or generation result is available. The known unresolved questions are canonical purchase/drop admission and exact pose/float/clock equivalence, the actual random-draw inventory, complete normal-tick composition and independent judgment of the cleared-fixture/global-count inequality. Stop on the first actual recording/compiler/behavior failure under a future grant. These source assertions are prospective and cannot promote BASE-15.
 
 ## Complete original check and fixture context
 
@@ -44,19 +52,19 @@ Every tick must require the remote point neutral/uncaptured, progress0, no point
 
 ## Review and future command plan
 
-This commit contains only the source-backed composition plan and a machine-readable scene draft. No recorder or replay test has been implemented or registered yet. The exact proposed files are `harness/base-pending-paratroopers-fixture.mjs`, `rust/crates/simtest/tests/base_pending_paratroopers.rs` and a new generated fixture. A later authorized registration adds only that path/module pair, preserving existing registry bytes. Do not run a filter now and accidentally count only the two existing guards. Review this plan's entire original-assertion mapping and canonical scene before implementing or recording it.
+The recorder/replay and single registry pair are now drafted. The generated fixture remains absent, so running this replay now would fail at its explicit fixture read. Both registry guards already exist. The future three-test inventory must include the composed replay once and both actual guards once; no guard-only filter proves the behavior. Review the full original-assertion mapping and canonical scene before granting generation or execution.
 
-After a later implementation and Root slot grant, planned Source generation/check are exactly:
+After Root grants generation/execution, planned Source generation/check are exactly:
 
 ```sh
 WW2_REFERENCE=/home/judiazm/.t3/worktrees/ww2-rts-native/t3-29229094/reference/ww2-rts /usr/bin/node harness/base-pending-paratroopers-fixture.mjs
 WW2_REFERENCE=/home/judiazm/.t3/worktrees/ww2-rts-native/t3-29229094/reference/ww2-rts /usr/bin/node harness/base-pending-paratroopers-fixture.mjs --check
 ```
 
-Freeze any generated fixture before Cargo. Under the actual future slot's CPU/memory/swap/quota grant, each Cargo command must be preceded by `df -h /` and use the current guard with WW2_CARGO_SLOT set. Proposed single focused command after actual module registration:
+Freeze any generated fixture before Cargo. Under the actual future slot's CPU/memory/swap/quota grant, each Cargo command must be preceded by `df -h /` and use the current guard with WW2_CARGO_SLOT set. Proposed single focused command after generated-fixture freeze:
 
 ```sh
-WW2_CARGO_SLOT=<granted-slot> python3 /home/judiazm/.t3/handoffs/ww2-native-cargo-guard.py +1.99.0 nextest run --locked --cargo-profile ci-test --build-jobs 4 --test-threads 4 -p ww2-core -p ww2-simtest --test it -E '(package(ww2-simtest) & test(=base_pending_paratroopers::original_pending_paratrooper_population_lifecycle)) | ((package(ww2-core) | package(ww2-simtest)) & test(=every_test_file_is_compiled))'
+WW2_CARGO_SLOT="${WW2_FUTURE_SLOT:?Set the Root-granted slot}" python3 /home/judiazm/.t3/handoffs/ww2-native-cargo-guard.py +1.99.0 nextest run --locked --cargo-profile ci-test --build-jobs 4 --test-threads 4 -p ww2-core -p ww2-simtest --test it -E '(package(ww2-simtest) & test(=base_pending_paratroopers::original_pending_paratrooper_population_lifecycle)) | ((package(ww2-core) | package(ww2-simtest)) & test(=every_test_file_is_compiled))'
 ```
 
 Expected future inventory is3 unique tests: one replay covering all three scenes and both actual registration guards once. There is no current three-pass claim. No Cargo, Source, native or performance execution is authorized now; no row status, acceptance cell, old fixture, predicate, client behavior or public admission policy is changed. A future first failure stops before any repair or rerun. Separate source review and future granted execution are required before eligibility.
