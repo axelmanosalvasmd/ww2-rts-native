@@ -73,6 +73,8 @@ pub enum RandomError {
 pub struct MatchRandom {
     seed: u64,
     streams: BTreeMap<StreamId, SplitMix64>,
+    #[cfg(test)]
+    pub(crate) replay: Option<crate::aligned_replay::Replay>,
 }
 
 impl MatchRandom {
@@ -80,10 +82,17 @@ impl MatchRandom {
         Self {
             seed,
             streams: BTreeMap::new(),
+            #[cfg(test)]
+            replay: None,
         }
     }
 
+    #[cfg_attr(test, track_caller)]
     pub fn next_u64(&mut self, purpose: StreamId) -> u64 {
+        #[cfg(test)]
+        if let Some(replay) = &self.replay {
+            return replay.integer(purpose, std::panic::Location::caller());
+        }
         let seed = self.seed;
         self.streams
             .entry(purpose)
@@ -92,7 +101,12 @@ impl MatchRandom {
     }
 
     /// Uniform 53-bit fraction in [0, 1), using exactly one draw.
+    #[cfg_attr(test, track_caller)]
     pub fn next_fraction(&mut self, purpose: StreamId) -> f64 {
+        #[cfg(test)]
+        if let Some(replay) = &self.replay {
+            return replay.fraction(purpose, std::panic::Location::caller());
+        }
         (self.next_u64(purpose) >> 11) as f64 * (1.0 / 9_007_199_254_740_992.0)
     }
 
@@ -134,6 +148,8 @@ impl MatchRandom {
             return Err(RandomError::UnorderedStreams);
         }
         Ok(Self {
+            #[cfg(test)]
+            replay: None,
             seed: snapshot.seed,
             streams: snapshot
                 .streams

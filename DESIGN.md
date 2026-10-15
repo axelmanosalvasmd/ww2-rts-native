@@ -1,5 +1,21 @@
 # Three Crossroads Native: design decisions
 
+## Aligned whole-match documentation proposal (2026-10-15)
+
+This amendment quotes item 1 of Axel's owner answer `6194079987` exactly in
+PARITY.md, following narrowed proposal `6182315380`. The existing component
+comparison, natural whole-match outcome judgment and owner rules remain
+byte-for-byte intact. Both owners record readback of the final documentation
+head on #5 before merge. [Axel-side readback 156](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6194582243)
+covered only old head `24520743`; [Hermes 157](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6194837091)
+requires new-head readback after rebase. This amendment grants no block
+approval or row promotion and makes no new global equal-seed rule.
+#220's unaligned diagnostic stays diagnostic.
+
+No test seam is implemented or assigned here. ALIGNED_REPLAY owns that
+separate stream. This change touches no runtime, RNG, provider, guard,
+interface, terrain, ABI, reference, test, fixture or parity-row status.
+
 ## Engineering supported scope and held aircraft consumer (2026-10-15)
 
 The supported engineering gate contains 20 original checks. Preserve the full `f2b48700` candidate under `refs/heads/held/eng-five-row-aircraft-f2b48700` and move its aircraft test function verbatim to the [unregistered checkpoint](docs/checkpoints/engineering-aircraft-f2b48700/README.md). That function remains FAILED / HELD: the first firing-enabled Clear patrol is refused before tick 1 because the automatic aircraft ground-fire actuator is unavailable. Its Source input and complete five-weather capture remain intact. The checkpoint records the precise provider boundary and pending consumer work.
@@ -1915,6 +1931,30 @@ The core carries its own math (`rust/crates/core/src/math.rs`) instead of Rust's
 - **Ported as the reference has it, for now:** the fog's sight walk ignores the woods depth rule that `los` applies (`docs/parity/combat.md`, limitations), and the vision pass still runs one team after another.
 - **Not ported yet** (Conquest does not use them): Horde stragglers and the Kaiju shown through the fog, the remembered enemy buildings of Classic and World Conquest, World Conquest's guards and its visible-cell list.
 
+## Vision row source checks (2026-10-15, unrun candidate)
+
+The second combat stream prepares five existing row checks, CMB-124/125/128/131/132, against native baseline `34edf52a7eaa6cb6edba3e802c2190226228276f`. The new recorder reads original Source at `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. It adds exports for `visionOf` and `visionRange` only, calls the existing vision/LOS/fog functions, and records exact inputs and outputs. Canonical `placeBuilding` supplies the target footprint and structural cells in aim-point cases. Component scenes isolate observer inputs; recipient delivery retains original constructor actors.
+
+The native side uses compiled rules and existing `vision`/`Fog` consumers, plus the actual recipient `DeliveryState` and run encoder. Full masks, ordered visibility, packet presence, cursor/base state and floating-point bits are compared. Source and native cold recomputations independently check cache reuse. No runtime algorithm, gameplay rule, consumer interface, acceptance criterion or old fixture changes.
+
+The prepared inventory is 18 range cases, 30 visibility cases, 18 LOS cases, 20 fog frames, eight three-recipient delivery frames and 64 run-encoding cases. These are source counts, not execution results. Root has not granted this stream a native/recorder slot. Fixtures are not generated, tests have not run, and all five rows retain their previous statuses. The exact predicate map and consumer names are in `docs/parity/combat.md`. A generated and verified successor and independent review remain required before integration.
+
+
+
+## Supplemental fog witness preparation (2026-10-15, source only)
+
+Independent review of combat head `9aa20852e6c055fd94b9d56b26178a48553903cf` found two non-decisive CMB-131 witnesses. An allied source already covered the old dusty target cell, and a pre-existing sight blocker hid the old height edit. Root independently verified both against the frozen JSON. No runtime bug is established and no runtime algorithm changes.
+
+Preserve the complete historical recorder, its 18 range/30 visibility/18 LOS cases, 20 fog frames, eight delivery frames, 64 packing cases and both authentic fixtures. Add only separate supplemental recording/test data: a three-frame dusty-target sequence with every allied source excluded and an explicit visibility-fact counterfactual; and an independent four-frame height-only transition from warmed stable cells to a changed mask, version and nonempty delta. Both Source and native tests compare complete outputs and cold recomputation. Native tests retain persistent Fog for each actual/control sequence in both serial and threaded paths. The single-source masks and removed-visible-fact inputs are declared component counterfactuals, never room or whole-match admissions.
+
+The new fixture remains absent and the new two tests remain unrun. The five original checks retain only their exact `9aa20852` results; those results are not promoted to this child. No Source, Cargo, native test or formatter is authorized in this preparation turn. CMB-131 status/acceptance, terrain policy, privacy, ABI/header/contracts and runtime guards stay unchanged. The exact supplemental inputs and predicates are recorded in `docs/parity/combat.md`; a later reviewer must receive both verified findings and these responses.
+
+
+
+## Canonical bases outside the supplemental sight domain (2026-10-15)
+
+A single authorized diagnostic proved the supplemental no-SIGHT-anywhere assertion rejected all 54 retained constructor footprint cells, K/1027, belonging to six HQ/barracks structures. Their nearest centre is 40.496913463 m from the observer, beyond its clear-ground 36 m sight. Preserve those flags, ground/objects and full structural links. Replace only that impossible global precondition with a conservative cell-rectangle exclusion against the actual observer sight provider and exact canonical exception checks. The entire possible sight domain, edit cell and probe remain free of sight/woods blockers. The recorder additionally captures existing canonical metadata for native assertions; it changes no physical input, expected mask or runtime provider. Full-map canonical bases remain present. The two original review objections, failed Source attempt and diagnostic stay in the evidence packet; fresh execution is still required for this corrected child.
+
 ## Formation spots and the first C calls (2026-10-12)
 
 `shared/formation.js` is ported to `rust/crates/core/src/formation.rs` and gives the reference's spots bit for bit; `rust/crates/ffi` (`ww2-ffi`) exposes it to Unreal (`docs/contracts/rust-unreal-abi.md`, First calls).
@@ -1924,6 +1964,18 @@ The core carries its own math (`rust/crates/core/src/math.rs`) instead of Rust's
 - **`ww2_formation_spots` reports a count.** The draft had none, but the JavaScript returns no spots at all for a line or block whose average slot times spread is NaN, or 0 with no drag, so the call writes `*out_len`.
 - **The last error stays until the next failure,** like `errno`: a successful call does not clear it, and reading it does not change it.
 - **The header is checked by a test, not written by the build.** cbindgen is a dev-dependency, so building the static library needs only the core. `tests/header.rs` compares the committed header with cbindgen's output and fails when they differ.
+
+## MOV-72 purchase setup blocker (2026-10-15)
+
+Source-only inspection of `f7d9ada0` found that the original cleared transport fixture buys through a temporary negative-ID producer. Native `recorded_buy` and `recruit` require a producer in the canonical roster; absence reaches production `Denial::Needs`, and a cleared roster cannot construct a replacement without a builder. Existing carrier tests directly initialize actors and therefore do not prove this purchase scene. No guard was changed and no direct-spawn replacement was added. [The blocker and proposed canonical companion](docs/parity/mov72-purchase-blocker.md) preserve all original assertions and the 100/40-tick timing for Root review. The four prepared checks remain unchanged and unrun. Cargo execution instructions now use the recovery guard, shared target and explicit three-job cap inside a Root-granted scope.
+
+
+## Movement stream two: existing-check preparation (2026-10-15)
+
+At baseline `34edf52a7eaa6cb6edba3e802c2190226228276f`, IMPL_MOV_2 prepares MOV-43/62/72/79/83 without changing runtime rules. The recorder preserves the complete original editor, Massive crowd, later-pair and tank-rider callbacks and helper bodies. Four native tests are prepared for both editor routes, all crowd coordinates, full five-seed rail arrays and all three aircraft definitions plus CFG.air. The tank-rider recording has no complete native purchase/recipient consumer yet and remains held. Existing tests and fixtures stay intact.
+
+No Source recorder, Cargo, rustc or native run is performed: Root's three slots are assigned elsewhere. The new fixture remains absent and the new tests fail on its absence; this source-only checkpoint is not integration-ready. No row becomes ported. [The handoff](docs/parity/movement-stream-two-preparation.md) records complete predicates, missing consumers, exact pending commands and resource requirements. No terrain provider, ABI, gameplay/privacy decision or whole-match criterion changes.
+
 
 ## Movement and crowd separation in the core (2026-10-12)
 
@@ -2079,6 +2131,18 @@ Ordinary rooms capture raw wreck/node list versions once per immutable send-cach
 The prototype compares JSON strings for lists. Native equality compares JSON content with JavaScript binary64 number equality, preserving negative-zero and integer/float equivalence while ignoring object key insertion order. Reordering otherwise identical object properties no longer causes a redundant resend. This is an internal cache choice; list payloads, array order and role filtering are unchanged. Shared versions remain authoritative outside World, including when one recipient's remembered list changes while the raw cache stays unchanged.
 
 List shape/depth/size validation precedes recipient mutation, and both shared version increments are checked before either is committed. Existing core unit/cell limits bound list sizes and value traversal, with a depth guard of 128 levels. The original-source recorder matches seven traces and 75 steps, including shared cache identity, per-recipient World lists, late/full/reset streams, missing lists, wreck motion and overwriting stale delta flags. This slice does not start rooms, implement backpressure or alter the JSON/C contracts. Native verification remains pending.
+
+## NET2 socket witnesses (2026-10-15, execution pending)
+
+The successor to source plan `6bd3336d` adds four explicit-clock Hub tests over real WebSocket receivers and one ordinary-executable R1 witness. They check recipient eligibility, skipped producer entry, tick/stall boundaries, selected meter thresholds feeding socket cadence, controlled outstanding-write accounting, stale completion authority, human metadata and drop/reconnect delivery. [The freeze](docs/testing/net-2-socket-freeze.md) records exact tests, Source predicates, held branches and guarded commands. All rows keep their existing status.
+
+The controlled harness reuses the actual upgrade, socket pump, R1 admission and canonical start. It invokes existing Hub polling explicitly instead of running a maintenance timer. Twelve `cfg(test)` lines count nonempty snapshot-producer entries; non-test runtime bytes remain unchanged after removing those insertions. Duration inputs use the existing runtime API, and controlled reservations model outstanding writes without claiming OS saturation. The ordinary executable witness uses the existing process helpers separately. No Source, Cargo, formatter, server or test has executed at this source checkpoint. Root's disk guard, assigned systemd scope, separate review and publication ownership remain required.
+
+## Second server-stream source freeze (2026-10-15)
+
+At baseline `34edf52a7eaa6cb6edba3e802c2190226228276f`, IMPL_NET_2 selects NET-64/65/66/67/69/70/72/74/80/81 for a source-inspected acceptance plan, not a completion claim. [The plan](docs/testing/net-2-row-plan.md) and [full 47-row predicate map](docs/testing/net-2-row-plan.json) preserve the original acceptance requirements and distinguish component fixtures from actual socket consumers. NET-98 is absent from the inventory and ownership map; NET-68 remains another owner's row. All parity statuses stay unchanged.
+
+Keep R1's approved two-human Conquest profile and existing wire/ABI. AI, spectator and client branches prevent full completion claims for several selected rows; missing controlled socket witnesses prevent the others. The native metadata builder has no AI-specific online/ping values, and the current dispatcher leaves host pause/resume unavailable. No runtime change or policy expansion is adopted. Cargo, server execution and Source recorders await an explicit Root slot grant; this documentation freeze has no new runtime proof. Root retains separate review and publication ownership.
 
 ## Snapshot write backpressure (2026-10-13)
 
@@ -3703,3 +3767,79 @@ This provider is not connected to a Tutorial constructor, tick runner, canonical
 Root grants S2 at `bf62462d35309559f2f0da6c3596a28644ee3c88`. Pinned Source generation and deterministic check both pass serially with `/usr/bin/node` v24.21.0 x64: nine original entry definitions and 50 original completion callbacks. The generated fixture is 24,788 bytes, SHA256 `35cc4ae1ab3ba12681f58360f066ac2152951f5d7bdabb27ae31cdaab625db3c`. Original begin uses declared spawn/command hooks; no actual unit creation, accepted command or native admission follows from that evidence. The earlier missing-cpuset receipt preflight stopped before Node; its failure is retained separately. Effective kernel affinity is CPUs 4-7, memory.max 6 GiB, swap.max zero and cpu.max 400000/100000. Source scope memory peak is 21,094,400 bytes, with zero memory-limit or OOM events.
 
 The authentic runtime-read fixture is frozen before any Cargo invocation. Formatting, ten selected native tests and strict core/simtest all-target Clippy are still pending at this freeze. All nine rows remain in progress and all missing Tutorial Match consumers remain as listed in the candidate plan. Runtime provider review and an exact-head Hermes ack after hosted green remain required before a future merge; the test-only waiver is not inferred.
+
+
+## Test-only aligned R1 replay seam (2026-10-15, source checkpoint)
+
+Owner decision [6194079987](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6194079987) accepts exactly the narrowed condition in [6182315380](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6182315380). This implementation adds no parity status change. Historical #220 at `2e7f827f` remains an unaligned 0/61 diagnostic, first difference tick 0, unit 1 x: Source 27 metres, Rust 85 metres.
+
+Fixed native base is `9e618217de2ac1d0a806c6804eda50c1c9da497f`; Source remains `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. A private core unit-test constructor accepts explicit authored spawn slots before player positions, initial placement, base stamping or actor allocation. The normal constructor and public options stay unchanged. Test-only per-match storage has no global state. Ordinary compilation removes its fields, constructor, random branches and arguments; environment-draw macros expand to the original generator calls. MatchRandom's shipping purpose streams, rejection sampling and snapshot remain unchanged.
+
+The input is a finite 16,384-fraction tape generated independently of either engine's state, plus authored spawn slots [0,1]. Every actual consumption records global index, semantic consumer, context and exact value bits. Constructor environment-seed input is explicitly floor(fraction times 2^32). Original Mulberry32 executes and advances before each environment return is injected. Direct-fire context is tick, shooter, target and round, with separate accuracy, miss magnitude and sign roles. Unknown consumers are reported as UNMAPPED, never skipped; absent values cannot fall back to an unseeded or native stream. Full alignment additionally requires equal draw count and unconsumed suffix, matching layout input and matching startup observations. A consumer-order or count difference is an alignment failure even if the states happen to match.
+
+The Node wrapper reads pinned files without writing them. It instruments only random-expression boundaries and wraps the original spawnSlots return with the declared layout before createGame allocates players or units. Original createGame, spawnSlots, rng, command, step and downstream functions execute; no engine formula or expected state is copied. Reversing every call-boundary edit must reproduce the exact original source. Math.random throws at any uninstrumented consumer. Clear weather with weatherSeed None does not run the independent random-plan generator.
+
+The diagnostic reuses #220's comparator, projection, command queue and complete tick loop. It records all 601 frames even after a state difference, unless an actual runner fault stops execution. All 61 N10 checkpoints remain. MISMATCH is a deliverable; alignment failure remains a failed harness assertion. Full traces and seed stay private. [The implementation brief](docs/testing/r1-aligned-replay.md) records receipt fields, pending commands and row limits. No Source, Cargo, native, formatter or Clippy job has run at this source checkpoint. Root retains review and publication.
+
+
+### First aligned R1 native result
+
+The authentic Source capture was frozen at `864d6485` and reproduced before Cargo. On Vostro at native head `cae6e358f40429bddb5882ab7e6381b694dcc57c`, the finite-tape regression passes and the actual replay completes 600 native ticks with all 61 checkpoints compared. Startup observations, the explicit layout and all 1,321 consumer/index/value rows agree exactly; both sides leave 15,063 tape entries unused. This establishes aligned inputs for this prefix.
+
+The unchanged projection reports MISMATCH: 0/61 checkpoints match, with first divergence tick 0, `$.players[0].fuel`: Source `{absent:true}`, Rust zero (`0000000000000000`). No value is normalized or added to Source, and no native wallet or other state is patched. The failing field has no assigned owning row; constructor resource representation needs separate source investigation. Both sides move during 352 ticks, accept all ten orders and retain all actors and the original event stream. Historical #220 remains distinct.
+
+The first compiler invocation emits a private-interfaces warning because the test-only weather argument names a crate-private type. Make the type public inside its private cfg(test) module; this changes no shipping interface. Native receipts, state traces, raw stage logs and producing heads remain under the private task directory, including immutable `-cae6e358` first-result copies. Registration and fresh strict Clippy remain pending.
+
+
+### Qualified aligned-replay source and remaining representation difference
+
+At `87dfae5c1801ad7d41046e637fd870a8fea1bbb6`, three focused harness checks, both crate registration guards, formatting and fresh strict core/simtest all-target Clippy pass on Vostro under S1. The actual 61-checkpoint run repeats aligned inputs and the same MISMATCH, 0/61. Both engines complete 600 ticks and 352 moving ticks, accept ten orders and consume exactly 1,321 values; native emits 128 events. Six unavailable phases remain explicitly reported. This is not a completed Conquest victory or proof of those phases.
+
+The first field is now source-investigated as BASE-01's resource-presence question. Ordinary pinned player construction omits Fuel and Munitions; the Rust wallet has mandatory f64 fields and StartPlan retains Default zeros. Keep the raw first result and original comparator metadata, with this later investigation separately documented. No absent-to-zero conversion, projection exclusion or runtime change is adopted. All candidate row probes remain partial.
+
+The final harness-only correction starts the unseeded-random refusal before Source module evaluation, covering initialization and captured callbacks as well as construction and ticks. Its check must preserve the original frozen input and output exactly. All Rust input bytes and the original fixture remain unchanged; native results stay attributed to `87dfae5c`. Root owns independent review and any test-only PR.
+
+
+The final initialization-guard Source check passes at `23ad8570`, reproducing the entire original frozen trace and receipt. Native source remains byte-identical to tested `87dfae5c`; no native result is reassigned to a later head. S1 processes are terminal and its flock is released. The [handoff](docs/testing/r1-aligned-replay.md#final-handoff) records actual commands, private artifact paths and the original failure copies. No external action or row promotion occurred.
+
+
+## Aligned R1 source-only integration onto post-256 main (2026-10-15)
+
+Normally merge frozen seam `eb15ffcdf89cc860aab04bb475a03921c6c96efa` first and exact current main `d412aad648936b5123068938d624209f6d5d2df9` second, from common base `9e618217de2ac1d0a806c6804eda50c1c9da497f`. The original head remains preserved at `evidence/aligned-replay-eb15-d6308bcc`. Retain every incoming MOV-43/62/79/83, NET, CMB, BASE and MODE cell, registration and fixture. Only CHANGELOG.md conflicts; preserve both full parent document histories, including the automatically merged DESIGN additions. No new routine fragment is introduced.
+
+All 13 owned paths are retained: the 11 non-composite mode/type/blob entries stay exact, while both tracking documents retain their entire parent bodies. Main changes no core source from the fixed base; the complete integrated core tree remains the frozen seam tree. The private integration report records the full expected Git entry union and the literal canonical 11-flag zero-exclusion and exact-three-tracking-document patch pairs. Preserve any unequal raw pair without normalization; equality of a narrower pair does not make the zero-exclusion pair equal.
+
+The measured result remains MISMATCH, 0/61 checkpoints over 600 ticks, first difference tick 0 at `$.players[0].fuel`: Source absence, Rust zero. The existing harness reports 1,321 equal consumed records and 15,063 unused values. These are historical observations, not a new all-input acceptance claim. The independent scope/projection and complete-input reviews of immutable eb15 remain pending; no ACCEPT is inferred. Root has independently verified the four preflight risks against 9e: startup before bases, 1,203 local environment draws, cloned Combat transactions and the unchanged Fuel/Munitions absence difference. No risk-driven seam edit is made here.
+
+Three focused native checks, both registration guards, formatting and strict Clippy remain attributed to `87dfae5c`; the final Source check remains attributed to `23ad8570`, with the authentic fixture produced at `864d6485`. Preserve all execution inputs, raw traces, first-result copies and source bodies byte for byte. This integration performs zero Source, Node, Cargo, native, formatter, gate or CI executions, and no publication. It promotes no row. Root owns actual-successor review, the baseline-push gate and publication; merge order keeps #259 first, with #260 readback separate.
+
+
+## Authorized R1 currency comparison defaults (2026-10-15, source checkpoint)
+
+User14:51 explicitly permits this comparison-layer exception to the prior no-normalization instruction. On the clean ordered integration `58a8cb8b6f3fdc347cc87965386c938d3f5b4812`, add only a test comparison module, a test-only delegate to the unchanged raw comparator, and additional reporting in the existing private replay test. No Source loader, input tape, hook, engine state, constructor, runtime RNG, admission, terrain, ABI, policy or row changes. Native and Source raw frames remain separate immutable observations.
+
+The complete whitelist is `$.players[0].fuel`, `$.players[0].mun`, `$.players[1].fuel`, and `$.players[1].mun`. Each uses the exact positive-zero wrapper `{bits:"0000000000000000",value:0.0}` as its comparison default. A missing key or exact `{absent:true}` marker maps to that default independently and symmetrically on both copied projections. Every present value stays intact. This is limited to the original validated R1 Conquest, Standard, clear, shuffle/tech/supply/living-weather-on, logistics/sandbox-off, weatherSeed-None profile and the actual two opposing slot/team0/1 rows. The original runner still validates the map and constructor options.
+
+Outside construction modes, Source omits these two fields while Rust's existing wallet stores mandatory f64 defaults. The mapping compares that known representation difference; it changes no wallet, price, income or engine operand. Present zero versus one, absence versus a nondefault, unlisted absence, negative zero, nonfinite values, null, false, empty collections and type changes remain different. Both complete original projections and the original strict comparator remain available. No other field or default is inferred.
+
+The existing 600-tick native replay produces raw frames once. Raw comparison retains the original result; an additional pass applies the same canonical function separately to each side and compares all601 projected frames and61 N10 checkpoints with that unchanged raw comparator. The private report keeps separate raw and canonical verdicts, counts and first differences, plus the original consumed-input receipt and per-field mapping counts. Every mapped path and default is explicitly reported. A state mismatch remains a deliverable, not a reason to alter inputs or expectations.
+
+The prior raw MISMATCH0/61, tick0 Fuel absence versus zero,1321 consumed/15063unused, and all original traces remain frozen. The new canonical result is not yet measured. Four selected checks (the new comparison vectors and three existing aligned checks), formatting and fresh strict locked core/simtest all-target Clippy require the granted S1 scope after the clean child is frozen. No unchanged registration guard, Source, full/release/list run is added. Independent input-alignment review of eb15 and fresh comparison review of this successor remain separate pending gates; no row eligibility follows.
+
+Both independent immutable-eb15 reviews now return ACCEPT: `/tmp/review-aligned-eb15-production-scope/REVIEW.md` and `/tmp/review-aligned-eb15-all-inputs/REVIEW.md`, each read in full. They independently parsed all1,321 rows and found no shipping behavior defect for that recorded prefix. Their acceptance does not cover this new comparison child, complete derived startup/internal state, executed capacity/exhaustion/label-mismatch negative controls, or any complete row check. The input seam remains unchanged; these limits are preserved, not repaired or reclassified.
+
+
+### First canonical R1 execution and retained lint failure
+
+At clean `db854ef7f6568f33bd1179851e0c417b3664a8dd`, all four selected checks pass, zero failed/ignored. The canonical comparison matches61/61 checkpoints and all600 stepped ticks, with no first divergence. The unchanged raw path remains MISMATCH0/61, first tick0 `$.players[0].fuel`, Source absence versus Rust positive zero. Both runs still supply1321 equal consumed records and15063 unused values. Each of the four declared Source fields maps601 times; zero native fields map because their present positive-zero values are retained. The new raw native frame bytes and all original raw report fields exactly equal the preserved baseline.
+
+Fresh strict locked core/simtest all-target Clippy then exits101 on the new test-only delegate's unused private visibility in the standalone simtest binary test target. Retain its raw log and producing head before repair. Change only that cfg(test) delegate from pub(crate) to pub; the private core import can call the same function, and no shipping interface exists. Comparator bodies, negative vectors, input hooks, engine state and fixtures do not change. Focused evidence stays on db854ef7 unless explicitly rerun; fresh strict lint on the visibility child remains pending.
+
+
+### Canonical R1 qualification handoff
+
+Fresh strict locked core/simtest all-target Clippy and formatting check pass at `24433da4a2c9a6b0dc4b16984d587149ba9bacfe`. Its only Rust change from four-check head `db854ef7` is the new cfg(test) delegate's visibility; its body, the entire comparison module, all regression vectors and every input/engine operation remain exact. No native run is reassigned to that lint child. The final documentation child keeps its whole Rust tree unchanged.
+
+The measured canonical result remains MATCH61/61 with no first divergence; raw result remains MISMATCH0/61 at tick0 Fuel absence versus positive zero. All601 raw native frames are byte-identical to the baseline, every original raw report field remains equal, and the complete input receipt is unchanged. Each declared Source currency field maps601 times, with zero native mappings. This is a600-tick projected prefix under the explicit comparison exception, not a completed row or match outcome.
+
+Private actual-result artifacts, the first lint failure, exact stage commands and compiler/dependency provenance live under `/tmp/aligned-replay-canonical-d6308bcc/`. The immutable ordered-merge proof and both unequal/equal raw pairs remain under `/tmp/aligned-replay-d412-d6308bcc/`, scoped only to `58a8cb8b`. Original artifacts and eb15 are preserved. S1 processes are terminal and its lock is free. No Source run, repeated registration guard, full/release/list command or publication occurred during the comparison stage. Independent eb15 input/scope acceptance and fresh comparison-head review are separate; Root retains actual-successor review, baseline qualification, PR creation and the259-first merge queue.

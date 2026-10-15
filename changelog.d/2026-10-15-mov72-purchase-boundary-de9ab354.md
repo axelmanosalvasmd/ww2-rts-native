@@ -1,0 +1,1 @@
+- Record MOV-72's blocked cleared-fixture purchase: Source inserts a temporary negative producer, while native recruitment requires a canonical roster producer. Preserve the four prepared checks and every original transport predicate; propose a separately recorded canonical setup for Root review. No Source or native execution, runtime change or row promotion.

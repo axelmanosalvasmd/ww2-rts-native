@@ -1,0 +1,853 @@
+{
+  "baseline": "34edf52a7eaa6cb6edba3e802c2190226228276f",
+  "reference": "e4e579a838aabae3b1d9dadbc17a0a87147bc52d",
+  "rows": [
+    {
+      "row": "MOV-41",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "in progress",
+      "behavior": "Retry cap: 20 failed searches for the same goal and knowledge version drop the order, `moveOutcome` 'unreachable'",
+      "source": "sim.js:3217-3228",
+      "acceptance_check": "Port test.js \"Repeated failures drop the same unreachable order, and a new command gets a fresh retry count\" (6878-6887); test-engine-movement.js:169-170",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-42",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Long moves: `worldGoal` re-requests the next leg when the path empties; done within 0.25 m of `routeEnd` and under 0.1 m/s (World retreats: within 15 m); owner gets `movement` outcomes and `plans` with every waypoint",
+      "source": "sim.js:5349-5350, 3190-3194, 6017, 6025",
+      "acceptance_check": "test-world-movement.js:102-126",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-43",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Pathing with no players (the editor) skips mine avoidance and knowledge views",
+      "source": "sim.js:3069, 3098",
+      "acceptance_check": "Port test.js \"Editor reachability uses terrain without a match's player or mine state\" (86-88)",
+      "selected": true,
+      "batch_state": "prepared, unrun; see movement-stream-two-preparation.md"
+    },
+    {
+      "row": "MOV-44",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "in progress",
+      "behavior": "`nearestFree`: breadth-first 4-neighbour search from the clamped cell for a cell free of the block mask; with an origin, only cells in the origin's region",
+      "source": "sim.js:2884-2905",
+      "acceptance_check": "test-horde-navigation.mjs:28-31; native origin-restricted placement matches 513 original nearest-free queries",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-45",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "in progress",
+      "behavior": "Move and attack-move: coordinates clamped to the map, Shift queues (8 max), a replacement clears traffic state, leaves a house, sets `worldGoal` (move) or `amove`, searches at once, applies `reverseIfShort`; planes get a patrol",
+      "source": "sim.js:3258, 3421-3461, 3364-3380",
+      "acceptance_check": "Port test.js \"Massive move orders reach the whole army...\" (1145); \"Shift orders finish one task before starting the next...\" (5984)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-46",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "in progress",
+      "behavior": "Move-end spots: same click (rounded) groups into rows of ceil(sqrt n) columns, 5 m apart, behind the click or centred on a capture point and kept 1.5 m inside it; unreachable spots fall back to the click; infantry settle into cover within 4 m; spacing 3 m infantry, 5 m vehicles; Hold position goes exactly; World skips this if any spot is unseen",
+      "source": "sim.js:4019-4068, 3950-3986; CFG sim.js:135",
+      "acceptance_check": "Port test.js \"Spreading\" (2761-2765), \"Squads sent to a capture point's center all end inside its circle\" (2773), \"A formation spot across water or a cliff from the click falls back to the near side\" (2777)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-47",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "in progress",
+      "behavior": "Idle spacing: an idle squad closer than 2.75 m to an older idle own squad walks to equal or better cover within 4 m",
+      "source": "sim.js:4112-4122",
+      "acceptance_check": "test.js \"Spreading\": 'idle squads spread out' (2765)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-48",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "in progress",
+      "behavior": "Retreat: leaves a house, goes to `homeOf` (skirmish modes: nearest HQ; Classic and World: nearest finished production building; else the spawn) at 1.5x speed; planes fly home",
+      "source": "sim.js:3335-3344, 1725-1734, 5536",
+      "acceptance_check": "test.js \"Retreat\" (383); test-world-movement.js:126",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-49",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Attack-move halts while its target is shootable, resumes after, ends within 2.5 m",
+      "source": "sim.js:5449-5455",
+      "acceptance_check": "Port test.js \"Attack-move\" (730-733)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-50",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "World local guards farther than 16 m from their post snap back to it and drop their route",
+      "source": "sim.js:5348",
+      "acceptance_check": "World fixture: guard dragged 20 m returns the next tick",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-51",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "in progress",
+      "behavior": "Rally walk: a new unit gets a route to the building's or player's rally point (`drift` 'rally', no rally in Classic); it stops to answer fire it can return; planes and paratroopers do not walk",
+      "source": "sim.js:1076-1077, 3389-3393, 4096, 5256-5263",
+      "acceptance_check": "Port test.js \"Recruit rallies leave purchased planes at base and deliberate drops at their landing point\" (6149-6171)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-52",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "in progress",
+      "behavior": "Constants: horizon 0.7 s, wait 0.35 s, replan 3 s, age 2 s, maxYield 5 s, ghost 3 s, ghostTime 2 s. Priority: retreating 30, drifting 0, routed 10, idle 20, + 5 per 2 s waited (max + 25); ties: unit already in the stretch, then lower id",
+      "source": "local-traffic.js:3, 11-17",
+      "acceptance_check": "Lab 'opposing', 'bridge'",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-53",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "in progress",
+      "behavior": "Who steers: not boats, structures or protected units (holding position idle, garrisoned, riding, building, digging); infantry steer only around heavy units; only visible, alive, ground, non-riding, non-garrisoned, non-ghost-paired units count",
+      "source": "local-traffic.js:18, 95-102; sim.js:5490-5495",
+      "acceptance_check": "test-engine-movement.js:96-97, 107-109, 147",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-54",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "in progress",
+      "behavior": "Conflict: closest approach within 0.7 s under the pair radius + 0.15 (infantry pairs 0.45 x summed radius, else summed body radii); a unit already moving away is ignored; earliest conflict wins, ties by id",
+      "source": "local-traffic.js:19-22, 103-123",
+      "acceptance_check": "Lab 'opposing'",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-55",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "in progress",
+      "behavior": "Queueing: friends whose routes run the same way over 8 m and that are within 60\u00b0 ahead are waited for (`queuedBehind`), not dodged; waiting chains (up to 16) prevent rings; queue waits do not age priority or trigger ghosts",
+      "source": "local-traffic.js:23-39, 116-122, 168-169",
+      "acceptance_check": "Port test.js \"A tank group files through a narrow gap\" (7223)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-56",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "in progress",
+      "behavior": "One-lane turns (vehicles): look 32 m along the route for ground narrower than 0.96 r + 2 body radii + 1.5 m (scanned every 10 ticks); hold 16 m short while an oncoming friend is in it or nearer its middle 2 m cell and not waiting",
+      "source": "local-traffic.js:40-93, 100, 125-128",
+      "acceptance_check": "Port test.js \"Tanks crossing a narrow gap both ways take turns\" (7229)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-57",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "in progress",
+      "behavior": "Yield: after 0.35 s, step aside to the first clear candidate (1, 1.5, 2 x (pair radius + 0.7 m) to each side, 0.8 m back; then trail points within 24 m) whose cover rank is no worse; held up to 5 s; trail keeps 20 points 1.5 m apart",
+      "source": "local-traffic.js:172-200, 203-208",
+      "acceptance_check": "test-engine-movement.js:81-89",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-58",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "in progress",
+      "behavior": "Passing a stopped unit: four checked legs around it; afterwards resume the furthest kept waypoint with a clear segment, else replan",
+      "source": "local-traffic.js:134-160, 184-196",
+      "acceptance_check": "test-engine-movement.js:96 'a tank passes a stationary protected unit and resumes its retained destination'; lab 'parked', 'passing-redirect'",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-59",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "in progress",
+      "behavior": "No candidate: blocked, `replan` after 3 s waiting; a stuck, non-waiting unit in front makes this one give way; gridlock with a friend for 3 s starts a 2 s ghost",
+      "source": "local-traffic.js:126-133, 171, 201",
+      "acceptance_check": "test-engine-movement.js:143-146",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-60",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "in progress",
+      "behavior": "Ghost rule: `startGhost` sets ghost until tick + round(seconds / dt); `ghostPair` lets own or allied pairs pass when either is a ghost. Set by stepOut (4 s), traffic gridlock (2 s) and `driveVehicle` when a friend blocks a unit stuck over 3 s (2 s); used by traffic, separation and the swept unit check",
+      "source": "local-traffic.js:4-9; movement.js:11-12, 53; sim.js:1096, 1099, 5212; CFG sim.js:52",
+      "acceptance_check": "test-horde-navigation.mjs:46-74",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-61",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "in progress",
+      "behavior": "Traffic privacy: traffic sees only units the side can see and only remembered terrain (open width, clear legs, cover rank)",
+      "source": "sim.js:5487-5495",
+      "acceptance_check": "test-engine-traffic-privacy.js:204 'unobserved terrain cannot change the initial voluntary trajectory', 219",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-62",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "in progress",
+      "behavior": "`separateCrowds`: fresh 4 m grid; for each unit i in list order, later units j within (r_i + max r) x 0.8, pairs under 0.8 x summed radius are each pushed (gap / 2) x factor: vehicle contact 1 (2 against a structure), any other pair 0.5 (1 against a structure); push skipped into a blocked cell, through a swept hull, or across a level step; solid vehicle contact zeroes both speeds; candidate list re-queried from j when the query box moves; garrisoned, air, riding and rail units skipped",
+      "source": "sim.js:5185-5241",
+      "acceptance_check": "Port test.js \"Twenty ticks of a seeded crowded infantry army preserve the old separation coordinates\" (3529) and \"Live infantry separation must discover later pairs brought into range by an earlier push\" (6689)",
+      "selected": true,
+      "batch_state": "prepared, unrun; see movement-stream-two-preparation.md"
+    },
+    {
+      "row": "MOV-63",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "in progress",
+      "behavior": "Same-way allied infantry near a bridge or ford keep lateral spacing without undoing forward steps",
+      "source": "sim.js:5191-5197, 5215-5225",
+      "acceptance_check": "test-bridge-groups.mjs:44",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-64",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "in progress",
+      "behavior": "Units holding position, building, digging or entrenching, or that would leave cover, are not pushed and do not push friends with a route",
+      "source": "sim.js:5226-5229, 2407-2408",
+      "acceptance_check": "test-bridge-groups.mjs:73; test-horde-navigation.mjs:46",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-65",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "ported",
+      "behavior": "`SpatialGrid` (16 m cells, one per game; key z x 65536 + x): records keep a first-seen `order`; `rebuild` drops changed records, re-adds moved units at bucket ends, then sorts touched buckets by order; `updateGrid` between rebuilds appends to the new bucket; heavy units (not infantry) also sit in heavy buckets; owner sets",
+      "source": "grid.js:1-50, 130-140; sim.js:202",
+      "acceptance_check": "Port test.js \"Spatial queries keep the brute-force order, including borders, duplicate positions and exact ties\" (6655-6668)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-66",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "ported",
+      "behavior": "Queries scan cells z then x over the square: `inOrder` (Map order, merged or sorted), `unordered` and `heavy` (raw bucket order), `has` and `hasHeavy` (stop at the first), `radius` (inOrder + hypot <= r), `nearest` (first strict minimum), `ownedBy` (sorted by order)",
+      "source": "grid.js:51-129",
+      "acceptance_check": "Same check (6655-6673); unordered results equal to JS as sequences, not only as sets",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-67",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "`placeUnit` sets fields and updates the grid; used by step-outs, garrison entry and exit, rail stops, paradrops, buildings, bunkers, riders, planes at base, sandbox and scenario spawns, setup relocation",
+      "source": "sim.js:1769-1772, 986, 1027, 1074, 1096, 1191, 1295, 1598, 2174, 2202, 2420, 2428, 3558, 4354, 4908, 5261, 5359, 5437",
+      "acceptance_check": "Grid contents after each placement equal a fresh rebuild",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-68",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "in progress",
+      "behavior": "`spawnUnit`: spot 4 m from the spawn at angle n x 2.4 (n = unit count), nearest free cell in the spawn's region; boats search nearby water instead; ids from `g.nextId`",
+      "source": "sim.js:1773-1808",
+      "acceptance_check": "test.js naval checks 'the destroyer launches into deep water' (7880), 'launched in deep water' (7914); native placement/current-Unit projection matches 769 original spawns across 44 non-air types and 33 maps; full spawn pipeline remains pending",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-69",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "`stepOut`: up to 30 tries in rings of six spots (0, \u00b10.6, \u00b11.2 rad off the facing), each ring 2 x radius further, on the vehicle navigation view, same region as the origin, clear of others by 0.8 x summed radii; fallback nearest free; 4 s spawn ghost",
+      "source": "sim.js:1080-1097, 937, 961, 1075, 3801",
+      "acceptance_check": "test-horde-navigation.mjs:19-31 (eight scatter directions per gate)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-70",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Garrison door: a squad steps into a house within 3.2 m of its entry cell centre and leaves to the nearest free cell; trapped setup units move to the nearest free cell",
+      "source": "sim.js:5433-5439, 2416-2421, 1596-1599",
+      "acceptance_check": "test.js \"Queued house entry completes before a move exits...\" (6263)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-71",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "in progress",
+      "behavior": "A moving unit changes the ground: crushers flatten H to '.', '#' to '+', X to '.', T to '+'; vehicles wear '.' and M by moved x 0.05 (light vehicles half, mud half, x (1 + 3 x wet)), '.' turns to M at wear 1; dust flag on dry ground (wet < 0.3, not mud or ford); first non-allied unit on a mine sets it off",
+      "source": "sim.js:5513-5533; CFG sim.js:78, 85, 91",
+      "acceptance_check": "Port test.js \"Ground that wears\" (7596-7604), \"Mines\" (7572-7578), \"Wind, weather, dust and fire\" (7658)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-72",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Carriers (seats): halftrack 1 (reinforces), lorry 3, tank 2, medium 2, tankdestroyer 2, tiger 3, churchill 3 (tanks carry riders on deck), lcvp 1, train 8",
+      "source": "sim.js:198, 245, 251, 256, 260, 266, 286, 313, 321",
+      "acceptance_check": "Port test-transport.mjs 'a light tank carries two squads as riders and a Tiger three' (21-34)",
+      "selected": true,
+      "batch_state": "blocked at exact original purchase setup; source-only inspection; no runtime execution",
+      "blocker_report": "mov72-purchase-blocker.md",
+      "native_purchase_boundary": {
+        "entry": "Match::execute_command -> recorded_buy -> RecruitParts::stage -> ProductionState::prepare_recruit",
+        "source_guard": "rust/crates/core/src/production.rs:620-627",
+        "denial": "production::Error::Denied(Denial::Needs), mapped to command Denial::Needs",
+        "proof": "source inspection only; not a native observed result",
+        "missing_adapter": "Original fixtureCommand temporary producer (-100 for owner 0), after clearFixtureUnits, has no canonical native fixture-purchase equivalent",
+        "additional_required_state": "actual roster producer, building_rallies entry, production state; IDs are u32",
+        "proposal": "Keep original scene, add separately named canonical companion with real retained constructor producers, only after Root review"
+      },
+      "original_predicates": [
+        {
+          "source_line": 21,
+          "original_assertion": "assert.deepEqual(['tank', 'medium', 'tiger', 'churchill', 'halftrack', 'lorry'].map(t => UNITS[t].carries), [2, 2, 3, 3, 1, 3]);",
+          "meaning": "capacity table",
+          "intended_native_consumer": "Catalog::compiled().unit(kind).carries",
+          "when": "before scene",
+          "state": "held before first purchase; unrun"
+        },
+        {
+          "source_line": 23,
+          "original_assertion": "assert.equal(command(g, 0, { t: 'board', ids: [a.id, b.id, c.id], target: tank.id }), undefined);",
+          "meaning": "first Board admitted",
+          "intended_native_consumer": "Match::execute_command(Board)",
+          "when": "tick 0",
+          "state": "held before first purchase; unrun"
+        },
+        {
+          "source_line": 24,
+          "original_assertion": "assert.equal([a, b, c].filter(u => u.board === tank.id).length, 2, 'only two squads walk to a light tank');",
+          "meaning": "exactly two squads reserve seats",
+          "intended_native_consumer": "Unit.board equals tank id",
+          "when": "before ticks",
+          "state": "held before first purchase; unrun"
+        },
+        {
+          "source_line": 26,
+          "original_assertion": "assert.deepEqual(tank.cargo.sort(), [a.id, b.id].sort(), 'the two nearest squads ride');",
+          "meaning": "two nearest squads ride",
+          "intended_native_consumer": "Match.combat[tank].cargo sorted against purchased rifle IDs",
+          "when": "after 100 advance_tick calls",
+          "state": "held before first purchase; unrun"
+        },
+        {
+          "source_line": 27,
+          "original_assertion": "assert.equal(row(g, tank)[12] & CARGO_FLAG, CARGO_FLAG);",
+          "meaning": "owner cargo flag",
+          "intended_native_consumer": "SnapshotCache::new(&m).recipient(0).fields.units[tank][12] & 524288",
+          "when": "after 100 ticks",
+          "state": "held before first purchase; unrun"
+        },
+        {
+          "source_line": 28,
+          "original_assertion": "assert.equal(row(g, tank)[12] >> CARGO_SHIFT & 3, 2, 'the snapshot tells how many ride');",
+          "meaning": "owner cargo count two",
+          "intended_native_consumer": "(owner row[12] >> 23) & 3 == 2",
+          "when": "after 100 ticks",
+          "state": "held before first purchase; unrun"
+        },
+        {
+          "source_line": 29,
+          "original_assertion": "assert.equal(command(g, 0, { t: 'board', ids: [c.id], target: tank.id }), 'max');",
+          "meaning": "third squad refused with max",
+          "intended_native_consumer": "Match::execute_command(Board) == Some(Denial::Max)",
+          "when": "before Move",
+          "state": "held before first purchase; unrun"
+        },
+        {
+          "source_line": 32,
+          "original_assertion": "assert.ok(a.x > 41 && a.x === tank.x, 'riders go where the tank goes');",
+          "meaning": "rider moves with tank and x > 41",
+          "intended_native_consumer": "purchased rifle x == purchased tank x, x > 41",
+          "when": "after 40 additional advance_tick calls",
+          "state": "held before first purchase; unrun"
+        },
+        {
+          "source_line": 33,
+          "original_assertion": "assert.equal(command(g, 0, { t: 'unload', ids: [tank.id] }), undefined);",
+          "meaning": "Unload admitted",
+          "intended_native_consumer": "Match::execute_command(Unload)",
+          "when": "tick 140, no extra tick",
+          "state": "held before first purchase; unrun"
+        },
+        {
+          "source_line": 34,
+          "original_assertion": "assert.ok(!a.riding && !b.riding && !tank.cargo.length, 'unload puts every rider down');",
+          "meaning": "both riders and cargo cleared",
+          "intended_native_consumer": "!a.riding && !b.riding && cargo empty; canonical carrier links cleared",
+          "when": "immediately after Unload",
+          "state": "held before first purchase; unrun"
+        }
+      ],
+      "setup_purchase_assertions": {
+        "original_source_line": 12,
+        "original_assertion": "g.players[owner].mp = 1e6;",
+        "repeat_for": [
+          "tank",
+          "rifle",
+          "rifle",
+          "mg"
+        ],
+        "mp_before_each": 1000000,
+        "poses": [
+          [
+            40,
+            40
+          ],
+          [
+            44,
+            40
+          ],
+          [
+            40,
+            44
+          ],
+          [
+            36,
+            40
+          ]
+        ],
+        "state": "exact cleared-scene canonical adapter missing"
+      },
+      "timing_and_commands": [
+        {
+          "source_line": 22,
+          "op": "scene purchases and original authored inputs"
+        },
+        {
+          "source_line": 23,
+          "op": "board",
+          "ids": [
+            "a",
+            "b",
+            "c"
+          ],
+          "target": "tank"
+        },
+        {
+          "source_line": 25,
+          "op": "step",
+          "count": 100
+        },
+        {
+          "source_line": 29,
+          "op": "board",
+          "ids": [
+            "c"
+          ],
+          "target": "tank",
+          "expected_denial": "max"
+        },
+        {
+          "source_line": 30,
+          "op": "move",
+          "orders": [
+            [
+              "tank",
+              60,
+              40
+            ]
+          ]
+        },
+        {
+          "source_line": 31,
+          "op": "step",
+          "count": 40
+        },
+        {
+          "source_line": 33,
+          "op": "unload",
+          "ids": [
+            "tank"
+          ]
+        }
+      ],
+      "source_file_sha256": "1bf26b20bfa1e70001a13e287a46449f01e3c6568b2c81c52474318228cd0db5",
+      "completed": false
+    },
+    {
+      "row": "MOV-73",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Board: infantry only, not retreating; seats = carries - cargo - squads already walking there; nearest squad-carrier pairs first; without a target, boats are excluded; climbs in within 4.5 m with a walkable line (boats: from the bank, no cliff or building between)",
+      "source": "sim.js:3520-3539, 5441-5447, 2441-2446; CFG sim.js:109",
+      "acceptance_check": "test-transport.mjs 'mount up: squads spread over the selected carriers' (53-54); test.js halftrack checks (7789-7790)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-74",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Riding: each tick the rider is placed on its carrier (same rot, suppression 0, no target) and does nothing else; takes no orders; owner and allies get RIDING_FLAG, owner gets CARGO_FLAG and count",
+      "source": "sim.js:5355-5361, 3419, 5881-5883",
+      "acceptance_check": "test.js halftrack checks (7793-7797); test-transport.mjs:27-32",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-75",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Unload: every rider to the nearest free cell around it; a boat needs dry or wadeable ground within 5 m of it, else 'shore'",
+      "source": "sim.js:3564-3570, 2422-2433; CFG sim.js:111",
+      "acceptance_check": "test.js 'no landing in the middle of the strait' (7843), 'the squad lands on the far side' (7848)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-76",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "A wrecked carrier throws its riders out: each loses 30% of full strength; a rider landing more than 5 m from free ground drowns",
+      "source": "sim.js:5356-5358, 2427-2433; CFG sim.js:109, 111",
+      "acceptance_check": "test.js 'thrown out of the wreck', 'and hurt' (7805-7806); 'a squad thrown out in deep water drowns' (7859)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-77",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Tank riders: blasts reach them on deck; when the tank or a rider is hit by an enemy, all jump down with suppression >= 60",
+      "source": "sim.js:2434-2440, 4727, 4733; CFG sim.js:119",
+      "acceptance_check": "Port test-transport.mjs 'riders jump down, shaken, when the tank comes under fire' (45-46)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-78",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "A halftrack standing still 2 s reinforces allied infantry within 10 m at half the HQ pace, same price",
+      "source": "sim.js:5651-5653, 5658-5669; CFG sim.js:109",
+      "acceptance_check": "test.js 'squad reinforced beside the halftrack, and paid for' (7810)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-79",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Network generation: stations 9-16 cells from home, city and industrial objectives (16-23 in homes) on a clear flat 5x5 spot facing the map centre; lines by a nearest-neighbour spanning tree plus each station's two nearest within 110 cells; coarse A* on a 2-cell grid (grade x 12, height x 2, woods + 1.5, bridges - 0.5, home ground + 50; water, fords, houses blocked; laid track 0.6)",
+      "source": "shared/world-rails.js:1-96",
+      "acceptance_check": "Generated `stations` and `lines` equal JS for 5 seeds",
+      "selected": true,
+      "batch_state": "prepared, unrun; see movement-stream-two-preparation.md"
+    },
+    {
+      "row": "MOV-80",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "ported",
+      "behavior": "Setup: station and line records, per-cell direction bits (`RAIL_DIRS`) sent with explored terrain, rail yard (track plus 5 cells around stations) closed to building",
+      "source": "sim.js:1226-1250, 2513-2514",
+      "acceptance_check": "railAt and stationAt maps equal JS",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-81",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Rail order: ground units (not air, naval or forced logistics) within 30 m of an own station; destination = own station nearest the click; open line only (every region owned, bridges standing); one train per station per team every 20 s; up to 8 nearest units board",
+      "source": "sim.js:3540-3563, 1251-1270; CFG sim.js:114",
+      "acceptance_check": "Port test-world-rules.mjs 'railways: a train carries units...' (78-83)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-82",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Train run: loads 8 s, runs 16 m/s along track cell centres, stops and unloads where the next cell's bridge is gone or the region changed hands, unloads 2 s at the end; riders land on a 5 m ring then the nearest free cell; the train leaves the map (900 hp, can be shot)",
+      "source": "sim.js:1271-1299, 260; CFG sim.js:114",
+      "acceptance_check": "test-world-rules.mjs:84-96",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-83",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Planes (speed m/s, hp, ammo): fighter 20, 200, 60 (aa 30 dps, 30 m); ground-attack 15, 280, 8; bomber 12, 420, 2 sticks of 4. CFG.air: seen 60 m, 50 s on station, rearm 30 s, orbit 18 m (10 m for attack-role attack or area runs), seek 60 m, turn home below 35% hp, off-map base 40 m",
+      "source": "sim.js:218-226, 300-305; CFG sim.js:61-67",
+      "acceptance_check": "Plane tables equal",
+      "selected": true,
+      "batch_state": "prepared, unrun; see movement-stream-two-preparation.md"
+    },
+    {
+      "row": "MOV-84",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Base: nearest finished Airfield the player can produce from, else 40 m out past the player's spawn away from the map centre; new planes start there",
+      "source": "sim.js:2182-2190, 1074, 1804",
+      "acceptance_check": "Port test.js \"test.js:2263\" checks (2306, 2317)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-85",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Sortie: base, out (to mission or target), station within R + 6 m (circle at speed / R rad/s, fuel drains), home on no fuel, no ammo, hp < 35% or no mission, rearm within 6 m of base (hp back over 30 s, then fuel and ammo full); at base or rearming: invisible, untouchable",
+      "source": "sim.js:2181, 2193-2226",
+      "acceptance_check": "Port test.js \"test.js:2224\" checks (2255-2270); \"A returning plane disappears from enemy snapshots immediately on reaching base\" (2351-2352)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-86",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Plane orders: move = patrol, attack (only planes may attack planes), fireat = area (bombers), escort an ally, stop = patrol where it is, retreat = home; refused while rearming or empty; Hold fire limits guns and anti-air to an explicit attack target",
+      "source": "sim.js:3442, 3473, 3498-3506, 3513-3519, 3337, 2193-2196, 2212, 2231, 2242",
+      "acceptance_check": "Port test.js \"Hold fire applies to aircraft, anti-air guns and support interception...\" (1258-1286)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-87",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Fighters steer to the nearest visible enemy airborne plane within 60 m of their mission point",
+      "source": "sim.js:2211-2215",
+      "acceptance_check": "Two-fighter fixture: positions equal JS",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-88",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Plane attacks: area run drops a salvo stick each interval on station (ammo - 1); otherwise picks a ground target every 0.5 s and fires on cooldown (ammo - 1)",
+      "source": "sim.js:2227-2234, 4141-4154",
+      "acceptance_check": "test.js 'the ground-attack plane hit the tank' (2279)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-89",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Anti-air: every tick each set-up, finished, alive unit with aa dps (flak gun 25 / 45 m, mobile flak 25 / 45, emplacement 40 / 55, fighter 30 / 30, destroyer 30 / 45, MG 5 / 30) damages the nearest visible enemy airborne plane in range by dps x dt; uses ammo for logistics units; 'planedown' when hp reaches 0",
+      "source": "sim.js:2236-2253, 214-216, 222, 228-230, 279, 330, 356",
+      "acceptance_check": "test.js 'two flak guns shot the plane down' (2285); \"Shoot-down events do not expose commandable planes...\" (2393-2395)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-90",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Planes ignore terrain, collisions, separation, blasts, strafes and bridge collapses, leave no wreck, and count toward pop",
+      "source": "sim.js:2198-2226, 4733, 5200, 5295, 5682, 535",
+      "acceptance_check": "Port test.js \"Bridge demolition affects the ground units on it, while planes fly above it\" (2379-2381)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-91",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "in progress",
+      "behavior": "Call: kind must be an own SUPPORT key; cost MP, or Munitions in Classic and World; refused on cooldown or short funds; direction = given angle or spawn toward the spot. Price MP / Mun, cooldown s, delay s: recon 60/25, 45, 3; artillery 150/60, 60, 5; strafe 200/80, 90, 5; smoke 50/20, 40, 3; bombing 250/100, 120, 6; dive 180/70, 75, 5; para 260/90, 90, 6; cover 120/40, 90, 2",
+      "source": "sim.js:398-418, 513-517, 549, 3680-3688",
+      "acceptance_check": "Port test.js \"Support\" (445-450), \"Support names are strings and inherited table keys are rejected\" (339), \"Every support call leaves only its intended short-lived effects...\" (2199-2202)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-92",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Announcement: incoming strikes [kind, x, z, dir, seconds, owner] go to every player (World: allies and teams that see the spot); planes announce a shot of their kind on arrival",
+      "source": "sim.js:5935, 6052, 5249",
+      "acceptance_check": "test.js 'enemy sees the incoming barrage' (450)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-93",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "ported",
+      "behavior": "Cooldowns count down 1 per second, 1.5 per second while the team holds an uncut radio point",
+      "source": "sim.js:5634-5637; CFG sim.js:151",
+      "acceptance_check": "Radio fixture: cooldown after 20 s equals JS",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-94",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Interception on arrival of a plane support (recon, strafe, bombing, dive, para): an enemy Fighter Cover zone over the spot always downs it (not recon) and is used up; else each enemy flak in range that is set up, finished, not holding fire and has ammo rolls its chance (0.35, 0.35, 0.45) until one hits. Downed: bombing keeps floor(random x 6) bombs, recon keeps random x its time, others deliver nothing",
+      "source": "sim.js:412-413, 4692-4712",
+      "acceptance_check": "Port test.js \"Aviation\" (2231-2247), \"Fighter Cover stops one strike even when two planes arrive on the same tick\" (2338-2339), \"Public support effects preserve the announcement without revealing hidden flak IDs\" (2409-2413)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-95",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Recon Flight: for 15 s reveals enemy units inside an 80 x 30 m strip along `dir`",
+      "source": "sim.js:400, 5269, 4433, 4600-4602",
+      "acceptance_check": "Port test.js \"Recon\" (503-508)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-96",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "ported",
+      "behavior": "Artillery Barrage: 10 shells (UK doctrine 15), first on arrival then every 0.4 s, each uniform in a 24 x 10 m strip; blast 4 m, inf 30, veh 35, supp 60, terrain 90, scar 1; each shell dents its cell",
+      "source": "sim.js:401, 415-418, 5286-5291, 2776-2785",
+      "acceptance_check": "Port test.js \"Artillery\" (459-466)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-97",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Strafing Run: on arrival, every non-air, non-rider unit in a 36 x 8 m strip, any side, takes inf 25, veh 10, supp 80 once",
+      "source": "sim.js:402, 5292-5298",
+      "acceptance_check": "Port test.js \"Strafe\" (475), \"Direction\" (484-485)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-99",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Bombing Run: 6 bombs, first on arrival then every 0.2 s, evenly along 40 m with \u00b11.5 m random sideways; blast 7 m, inf 60, veh 150, supp 90, terrain 400, crater radius 4.2",
+      "source": "sim.js:404-405, 5279-5285",
+      "acceptance_check": "Port test.js \"Bombing\" (871-878)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-100",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Dive Bomber: one bomb on the spot; blast 5 m, inf 80, veh 400, supp 90, terrain 500, crater radius 3.2",
+      "source": "sim.js:408, 5251-5255",
+      "acceptance_check": "test.js \"Aviation\": 'a dive bomber kills a tank it lands on' (2214)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-101",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Paratroopers: two rifle squads and an MG team; the spot must be seen and the army must have room for all three (reserved while the plane flies); World needs a finished own Airfield within 300 m; on landing each squad (if its owner is still in and has room) lands on the nearest free cell to a 6 m ring point (dir + i x 120\u00b0)",
+      "source": "sim.js:409, 534-536, 548, 3683-3684, 5256-5263; CFG sim.js:115",
+      "acceptance_check": "Port test.js \"Pending paratroopers reserve population...\" (2151-2171), \"Aviation\" (2220-2225), \"An incoming paratrooper drop cannot recreate an eliminated player's army\" (2441); test-world-rules.mjs 'World paratroopers need a finished Airfield nearby' (65-67)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-102",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "ported",
+      "behavior": "Fighter Cover: on arrival a zone of 40 m for 60 s for the caller's team; shown to that team only",
+      "source": "sim.js:410, 5264-5267, 5633, 5929",
+      "acceptance_check": "Port test.js \"Fighter Cover hands off its lifetime to the cover zone when it arrives\" (2180-2186)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-103",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Masks: LAND on every terrain char except W and F; boats are blocked by LAND, the destroyer (deep) by LAND+SHOAL; SHOAL = water within 10 cells (4-neighbour) of any non-W cell, set once per match on `naval: true` maps and kept through cell changes",
+      "source": "sim.js:171-180, 740-741, 2665-2678, 2710, 2727",
+      "acceptance_check": "test.js 'and stops short of the shoals instead of running aground' (7883)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-104",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Boats: lcvp 7 m/s, r 2.5, 1 seat; gunboat 10 m/s, r 3, hull 11; destroyer 6 m/s, r 6, hull 52, max 2; bought only on naval maps; launched on the water nearest the spawn or out of a Shipyard",
+      "source": "sim.js:263-280, 3784, 1775, 1071-1075",
+      "acceptance_check": "Port test.js naval checks (7834, 7880, 7912-7917)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-105",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Boat motion: `walkRoute` legs, no local traffic, terrain speed 1, no road march, weather vehicle factor; soft separation with boats, solid with vehicles",
+      "source": "sim.js:5490, 2385, 2378, 5212-5213; movement.js:72-88",
+      "acceptance_check": "test.js 'the boat keeps to the water', 'the boat crosses to the far beach' (7842, 7846); test-engine-movement.js:193-199",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-106",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "in progress",
+      "behavior": "A knocked-out vehicle off MOVE-blocked ground becomes a debris body (last blast's direction and impulse, mass by type), stepped in 0.05 s pieces (gravity 9.81, drag 3.2, at most 2 m travel, 2.5 s, 8 contacts) against cells and vehicles; settled on open, crater, road or mud with no vehicle there it becomes a Q cell (blocks vehicles); over 96 moving bodies settle at once; oldest of 40 wrecks is cleared",
+      "source": "shared/debris-motion.js:1-58; sim.js:5125-5183, 5679-5692, 4739",
+      "acceptance_check": "Port test.js \"Wrecks settle near the knocked-out tank and cover infantry behind their final hull\" (914-932), \"A wreck plugs a causeway for vehicles, not for infantry, until it is blown apart\" (940-944)",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-107",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Vehicle rows carry [moveSpeed, vx, vz, travelDir] (0.1 precision); the client poses hulls on the ground from them",
+      "source": "sim.js:5884-5885; client/engine-presentation.js:1-25",
+      "acceptance_check": "Side-by-side recording of a tank route: hull pose follows the same arc",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    },
+    {
+      "row": "MOV-108",
+      "owner": "IMPL_MOV_2",
+      "status_at_baseline": "todo",
+      "behavior": "Squad men are visual followers of the server's squad centre (stride phases, own turning, within the footprint plus 0.65 m)",
+      "source": "client/squad-motion.js:1-3; DESIGN.md:2556-2563",
+      "acceptance_check": "Visual check: selection and fire use the centre, men stay within 0.65 m of their slots",
+      "selected": false,
+      "batch_state": "unchanged; not audited in this batch"
+    }
+  ]
+}
