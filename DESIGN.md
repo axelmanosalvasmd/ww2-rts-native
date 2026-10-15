@@ -2,6 +2,9 @@
 
 ## Proposed-default diagnostic mode and bounded report memory (2026-10-15)
 
+Frozen diagnostic implementation8ad038ee retains its first format diff; the repair is mechanical only. Source/private baseline byte binding remains exact. Execution results for the diagnostic child remain pending.
+
+
 USER16:21 supersedes any earlier implication that holdFire/holdPos defaults had owner approval. Hermes164/6196736715 withheld approval; Root sends one general-rule request. The new mode is DIAGNOSTIC_PROPOSED_DEFAULTS with parityEligible=false and ownerApproval=PENDING unconditionally. Raw strict, approved four-currency and proposed diagnostic results remain separate. [The explicit registry](docs/testing/aligned-proposed-defaults.json) identifies only the two actual stance reads/defaults at the pin; present values/types/zero bits/nonfinite/array order remain unchanged. No generic falsey folding or empty-container default exists.
 
 Preserve actual6dca6095 vectors1PASS and formatting0, plus the native OOM at memory.max6442450944/swap0. The scope journal reports oom-kill after1min16.259s CPU; no native report/stage result exists, so no scenario counts, new first difference or alignment extent are claimed. Original Source/first-result bytes remain exact. The bounded successor streams full raw frames per case and releases each native array before the control. It borrows the actual immutable draw ledger to check each new row exactly once, retaining the checked-prefix count and complete final receipt. This is test-only memory/report work, without Source/input, scene/script, projection/hook, engine, provider/getter, rule, runtime RNG or ABI changes. No Source rerun. Two exact new diagnostic checks and conditional strict Clippy follow the announced clean freeze under S1. No row/status/publication or MODE-21 action.

@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Format the frozen diagnostic registry/report changes after preserving the first formatting diff. No comparison predicate, registry evidence, input, projection or engine behavior changes; diagnostic results remain pending.
+
 - Preserve the 6dca two-field attempt's OOM with no scenario counts, and reclassify proposed defaults as diagnostic pending Axel's decision. Keep raw strict and approved currency-only results separate. Add the two-field Source-read registry, stream full raw reports by case and compare each actual consumed draw once without changing inputs, projection or engine behavior. No Source rerun or row eligibility.
 
 - Apply mechanical formatting to the frozen two-boolean comparison follow-up after retaining its first format-check diff. No predicate, mapping, input, raw projection or Source change; focused native results remain pending.

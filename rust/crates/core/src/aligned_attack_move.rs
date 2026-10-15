@@ -11,7 +11,10 @@ use crate::{
     weather::WeatherChoice,
 };
 use serde_json::{Value, json};
-use std::{collections::{BTreeMap, BTreeSet}, io::{BufWriter, Write}};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    io::{BufWriter, Write},
+};
 
 fn number(value: f64) -> Value {
     json!({"bits":format!("{:016x}",value.to_bits()),"value":if value.is_finite(){json!(value)}else{json!(if value.is_nan(){"NaN"}else if value.is_sign_positive(){"Infinity"}else{"-Infinity"})}})
@@ -84,7 +87,10 @@ fn snapshot(
     )
 }
 fn proposed_registry() -> Value {
-    serde_json::from_str(include_str!("../../../../docs/testing/aligned-proposed-defaults.json")).unwrap()
+    serde_json::from_str(include_str!(
+        "../../../../docs/testing/aligned-proposed-defaults.json"
+    ))
+    .unwrap()
 }
 // The owner-approved four-currency exception remains a separate result.
 fn approved_currency_only(snapshot: &Value) -> (Value, Vec<String>) {
@@ -173,10 +179,19 @@ fn proposed_default_registry_preserves_every_present_value() {
     assert_eq!(registry["mode"], "DIAGNOSTIC_PROPOSED_DEFAULTS");
     assert_eq!(registry["ownerApproval"], "PENDING");
     assert_eq!(registry["parityEligible"], false);
-    assert_eq!(registry["reference"], "e4e579a838aabae3b1d9dadbc17a0a87147bc52d");
+    assert_eq!(
+        registry["reference"],
+        "e4e579a838aabae3b1d9dadbc17a0a87147bc52d"
+    );
     assert_eq!(registry["fields"].as_array().unwrap().len(), 2);
-    for (index, field, expression) in [(0, "holdFire", "u.holdFire ? 2048 : 0"), (1, "holdPos", "u.holdPos ? 4096 : 0")] {
-        assert_eq!(registry["fields"][index]["path"], format!("$.units[*].{field}"));
+    for (index, field, expression) in [
+        (0, "holdFire", "u.holdFire ? 2048 : 0"),
+        (1, "holdPos", "u.holdPos ? 4096 : 0"),
+    ] {
+        assert_eq!(
+            registry["fields"][index]["path"],
+            format!("$.units[*].{field}")
+        );
         assert_eq!(registry["fields"][index]["field"], field);
         assert_eq!(registry["fields"][index]["default"], false);
         assert_eq!(registry["fields"][index]["consumingExpression"], expression);
@@ -245,8 +260,14 @@ fn proposed_default_registry_preserves_every_present_value() {
     let unlisted_false = frame("autoRetreat", Some(json!(false)));
     assert!(!equal(&unlisted_missing, &unlisted_false));
     assert!(!equal(&unlisted_false, &unlisted_missing));
-    assert!(!equal(&frame("holdFire", Some(number(0.0))), &frame("holdFire", Some(number(-0.0)))));
-    assert!(!equal(&frame("holdPos", Some(json!([1, 2]))), &frame("holdPos", Some(json!([2, 1])))));
+    assert!(!equal(
+        &frame("holdFire", Some(number(0.0))),
+        &frame("holdFire", Some(number(-0.0)))
+    ));
+    assert!(!equal(
+        &frame("holdPos", Some(json!([1, 2]))),
+        &frame("holdPos", Some(json!([2, 1])))
+    ));
     let absence = frame("holdFire", None);
     let present = frame("holdFire", Some(json!(false)));
     let (a, _) = approved_currency_only(&absence);
@@ -419,39 +440,65 @@ fn branch_predicates(frames: &[Value], scene: &Value, name: &str) -> Value {
 }
 // Compare each newly consumed row exactly once and retain the checked-prefix count.
 // The original per-consumer ledger is unchanged; no draw is skipped or discarded.
-fn prefix_alignment(source: &Value, frame: &Value, replay: &Replay, checked: &mut usize) -> Result<(), Value> {
+fn prefix_alignment(
+    source: &Value,
+    frame: &Value,
+    replay: &Replay,
+    checked: &mut usize,
+) -> Result<(), Value> {
     let tape = replay.0.lock().unwrap();
     let draws = &tape.used;
     let expected = source["inputReceipt"]["draws"].as_array().unwrap();
     let count = frame["drawCount"].as_u64().unwrap() as usize;
     if draws.len() != count || count < *checked {
-        return Err(json!({"kind":"drawCount","source":count,"native":draws.len(),"checked":checked}));
+        return Err(
+            json!({"kind":"drawCount","source":count,"native":draws.len(),"checked":checked}),
+        );
     }
     if count > expected.len() {
         return Err(json!({"kind":"sourceDrawsTruncated","source":expected.len(),"native":count}));
     }
     for i in *checked..count {
         let (a, b) = (&expected[i], &draws[i]);
-        if a != b {return Err(json!({"kind":"draw","index":i,"source":a,"native":b}));}
-        if a["consumer"][0].as_str().is_none_or(|v|v.starts_with("UNMAPPED")) {
+        if a != b {
+            return Err(json!({"kind":"draw","index":i,"source":a,"native":b}));
+        }
+        if a["consumer"][0]
+            .as_str()
+            .is_none_or(|v| v.starts_with("UNMAPPED"))
+        {
             return Err(json!({"kind":"unmapped","index":i,"source":a,"native":b}));
         }
         *checked = i + 1;
     }
     Ok(())
 }
-fn stream_case(writer: &mut impl Write, metadata: &Value, native: &[Value], source: &Value) -> Result<(), String> {
+fn stream_case(
+    writer: &mut impl Write,
+    metadata: &Value,
+    native: &[Value],
+    source: &Value,
+) -> Result<(), String> {
     // Borrow complete raw frames into the output stream, with no full-frame clones.
-    let mut header = serde_json::to_vec(metadata).map_err(|e|e.to_string())?;
+    let mut header = serde_json::to_vec(metadata).map_err(|e| e.to_string())?;
     assert_eq!(header.pop(), Some(b'}'));
-    writer.write_all(&header).map_err(|e|e.to_string())?;
-    writer.write_all(b",\"nativeFrames\":").map_err(|e|e.to_string())?;
-    serde_json::to_writer(&mut *writer, native).map_err(|e|e.to_string())?;
-    writer.write_all(b",\"sourceRawFrames\":").map_err(|e|e.to_string())?;
-    serde_json::to_writer(&mut *writer, &source["frames"]).map_err(|e|e.to_string())?;
-    writer.write_all(b"}").map_err(|e|e.to_string())
+    writer.write_all(&header).map_err(|e| e.to_string())?;
+    writer
+        .write_all(b",\"nativeFrames\":")
+        .map_err(|e| e.to_string())?;
+    serde_json::to_writer(&mut *writer, native).map_err(|e| e.to_string())?;
+    writer
+        .write_all(b",\"sourceRawFrames\":")
+        .map_err(|e| e.to_string())?;
+    serde_json::to_writer(&mut *writer, &source["frames"]).map_err(|e| e.to_string())?;
+    writer.write_all(b"}").map_err(|e| e.to_string())
 }
-fn run_case(trace: &Value, authored: &Value, source: &Value, writer: &mut impl Write) -> Result<Value, String> {
+fn run_case(
+    trace: &Value,
+    authored: &Value,
+    source: &Value,
+    writer: &mut impl Write,
+) -> Result<Value, String> {
     let scene = &trace["scene"];
     let ticks = scene["ticks"].as_u64().unwrap() as usize;
     if source["completed"] != ticks
@@ -567,7 +614,11 @@ fn run_case(trace: &Value, authored: &Value, source: &Value, writer: &mut impl W
         native.push(frame);
         let observed = &native[tick];
         let expected = &source_frames[tick];
-        let receipt = if tick == 0 {replay.receipt()} else {Value::Null};
+        let receipt = if tick == 0 {
+            replay.receipt()
+        } else {
+            Value::Null
+        };
         if tick == 0
             && (source["startup"] != receipt["startup"]
                 || source["inputReceipt"]["layout"]["input"] != receipt["layout"]["input"])
@@ -590,8 +641,12 @@ fn run_case(trace: &Value, authored: &Value, source: &Value, writer: &mut impl W
         }
         let (approved_source, _) = approved_currency_only(expected);
         let (approved_native, _) = approved_currency_only(observed);
-        if let Some(delta) = original::compare_projection_for_test(&approved_source, &approved_native) {
-            if first_approved.is_none() {first_approved = Some(json!({"tick":tick,"difference":delta}));}
+        if let Some(delta) =
+            original::compare_projection_for_test(&approved_source, &approved_native)
+        {
+            if first_approved.is_none() {
+                first_approved = Some(json!({"tick":tick,"difference":delta}));
+            }
         } else if tick % 10 == 0 {
             approved_checkpoints_matched += 1;
         }
@@ -690,34 +745,55 @@ fn attack_move_and_plain_move_match_with_complete_branches() {
     writer.write_all(b",\"cases\":[").unwrap();
     let mut results = Vec::new();
     let mut failure = None;
-    for (authored, source) in scene["cases"].as_array().unwrap().iter().zip(trace["cases"].as_array().unwrap()) {
+    for (authored, source) in scene["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .zip(trace["cases"].as_array().unwrap())
+    {
         assert_eq!(authored["name"], source["name"]);
-        if !results.is_empty() {writer.write_all(b",").unwrap();}
+        if !results.is_empty() {
+            writer.write_all(b",").unwrap();
+        }
         match run_case(&trace, authored, source, &mut writer) {
             Ok(result) => {
                 let matched = result["diagnosticMatched"] == true;
-                println!("{}", json!({"mode":"DIAGNOSTIC_PROPOSED_DEFAULTS","name":result["name"],"diagnosticVerdict":result["diagnosticVerdict"],
+                println!(
+                    "{}",
+                    json!({"mode":"DIAGNOSTIC_PROPOSED_DEFAULTS","name":result["name"],"diagnosticVerdict":result["diagnosticVerdict"],
                     "firstProposedDifference":result["firstProposedDifference"],"rawStrict":result["rawStrict"],"approvedCurrencyOnly":result["approvedCurrencyOnly"],
                     "framesCompared":result["framesCompared"],"checkpointsCompared":result["checkpointsCompared"],"checkpointsMatched":result["checkpointsMatched"],
                     "actualTicksMatched":result["actualTicksMatched"],"prefixDrawsCompared":result["prefixDrawsCompared"],"fullInputAlignment":result["fullInputAlignment"],
-                    "sourceBranch":result["sourceBranch"],"nativeBranch":result["nativeBranch"],"booleanMappings":result["booleanMappings"]}));
+                    "sourceBranch":result["sourceBranch"],"nativeBranch":result["nativeBranch"],"booleanMappings":result["booleanMappings"]})
+                );
                 results.push(result);
                 writer.flush().unwrap();
-                if !matched {break;}
+                if !matched {
+                    break;
+                }
             }
             Err(error) => {
                 serde_json::to_writer(&mut writer, &json!({"name":authored["name"],"mode":"DIAGNOSTIC_PROPOSED_DEFAULTS","admissionFailure":error,"parityEligible":false})).unwrap();
-                failure = Some(error);break;
+                failure = Some(error);
+                break;
             }
         }
     }
-    let matched = results.len() == 2 && results.iter().all(|r|r["diagnosticMatched"]==true) && failure.is_none();
+    let matched = results.len() == 2
+        && results.iter().all(|r| r["diagnosticMatched"] == true)
+        && failure.is_none();
     writer.write_all(b"],\"diagnosticMatched\":").unwrap();
     serde_json::to_writer(&mut writer, &matched).unwrap();
     writer.write_all(b",\"failure\":").unwrap();
     serde_json::to_writer(&mut writer, &failure).unwrap();
     writer.write_all(b"}").unwrap();
     writer.flush().unwrap();
-    println!("{}",json!({"mode":"DIAGNOSTIC_PROPOSED_DEFAULTS","diagnosticMatched":matched,"ownerApproval":"PENDING","parityEligible":false,"failure":failure}));
-    assert!(matched,"diagnostic comparison or complete branch failed; raw report retained, no parity eligibility");
+    println!(
+        "{}",
+        json!({"mode":"DIAGNOSTIC_PROPOSED_DEFAULTS","diagnosticMatched":matched,"ownerApproval":"PENDING","parityEligible":false,"failure":failure})
+    );
+    assert!(
+        matched,
+        "diagnostic comparison or complete branch failed; raw report retained, no parity eligibility"
+    );
 }
