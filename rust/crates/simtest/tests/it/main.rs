@@ -29,6 +29,8 @@ mod air_retirement;
 mod assault_finish;
 #[path = "../assault_start.rs"]
 mod assault_start;
+#[path = "../base05_supply_caller.rs"]
+mod base05_supply_caller;
 #[path = "../base_ordinary_checks.rs"]
 mod base_ordinary_checks;
 #[path = "../base_pending_paratroopers.rs"]

@@ -1,0 +1,2 @@
+- Recover only owned BASE05 capture/bridge/rubble/Fill and BASE13 paid-price source onto f7 main. BASE13 now compares all five Source count observations through actual admission probes on state copies; every new execution remains unrun.
+- Add maintained BASE12 canonical node/coastal preview and BASE19 no-maker Tutorial purchase recorders, plus explicit dependent native consumer proposals. Classic/Shipyard/enemy-memory and Tutorial providers remain read-only and absent from this candidate. Keep all five rows held, preserve both BASE09 failures and leave PR271 unchanged.

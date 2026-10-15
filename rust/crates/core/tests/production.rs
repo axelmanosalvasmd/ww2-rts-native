@@ -135,6 +135,103 @@ fn production_research_and_refunds_match_original_source_traces() {
     replay_production_fixture(&fixture, false);
 }
 
+#[test]
+fn classic_price_boundary_three_paid_rifles_then_atomic_mp_refusal() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/base13-paid-price.json");
+    let fixture: Value = serde_json::from_str(
+        &std::fs::read_to_string(path)
+            .expect("Root must grant authentic BASE13 Source generation before this test"),
+    )
+    .unwrap();
+    assert_eq!(fixture["reference"], "e4e579a838aabae3b1d9dadbc17a0a87147bc52d");
+    assert_eq!(fixture["price"], json!({"mp": 100, "fuel": 0}));
+    assert_eq!(fixture["initialCount"], 3);
+    let input = &fixture["input"];
+    assert_eq!(input["mode"], json!({"kind": "classic"}));
+    assert_eq!(input["army"], "standard");
+    assert_eq!(input["tech"], false);
+    assert_eq!(a(&input["players"]).len(), 1);
+    assert_eq!(a(&input["units"]).len(), 1);
+    assert_eq!(input["units"][0]["id"], 1);
+    assert_eq!(input["units"][0]["type"], "hq");
+    assert_eq!(input["players"][0]["mp"], 301);
+    assert!(a(&input["units"][0]["queue"]).is_empty());
+    let mut state = ProductionState::new(vec![TechState::new(1, 0, 0, 0).unwrap()]).unwrap();
+    state.initialize_building(1).unwrap();
+    let mut wallets = EconomyState {
+        players: vec![PlayerEconomy {
+            team: 0,
+            mp: 301.0,
+            ..Default::default()
+        }],
+    };
+    let projection = |state: &ProductionState, wallets: &EconomyState| {
+        let payer = &wallets.players[0];
+        let maker = state.building(1).unwrap();
+        let jobs: Vec<_> = maker.rows().into_iter().map(|row| {
+            json!([row.job.id, row.job.kind, bits(row.job.charge.mp), bits(row.job.charge.fuel),
+                if row.status == JobStatus::Active { "active" } else { "waiting" }])
+        }).collect();
+        json!({"next": state.next_job_id(),
+            "money": [bits(payer.mp), bits(payer.mun), bits(payer.fuel)],
+            "progress": bits(maker.progress()), "jobs": jobs})
+    };
+    // Compare all five original client buyCount observations with real admission
+    // attempts on copies of the current canonical component, without wallet edits.
+    let affordable = |state: &ProductionState, wallets: &EconomyState| {
+        let mut probe = state.clone();
+        let mut money = wallets.clone();
+        let mut count = 0;
+        context(input, |c| {
+            for _ in 0..5 {
+                match probe.queue_unit(c, &mut money, 0, Faction::Usa, "rifle", Some(1)) {
+                    Ok(_) => count += 1,
+                    Err(Error::Denied(Denial::Mp)) => break,
+                    other => panic!("unexpected paid-count admission: {other:?}"),
+                }
+            }
+        });
+        count
+    };
+    assert_eq!(projection(&state, &wallets), fixture["initial"]);
+    assert_eq!(affordable(&state, &wallets), 3);
+    assert_eq!(a(&fixture["trace"]).len(), 4);
+    let mut accepted = 0;
+    for (index, row) in a(&fixture["trace"]).iter().enumerate() {
+        assert_eq!(row["action"], json!({"slot": 0, "kind": "rifle", "from": 1}));
+        let before = projection(&state, &wallets);
+        context(input, |c| {
+            let actual = state.queue_unit(c, &mut wallets, 0, Faction::Usa, "rifle", Some(1));
+            let result = match actual {
+                Ok(job) => {
+                    accepted += 1;
+                    assert_eq!(job, (index + 1) as u64);
+                    Value::Null
+                }
+                Err(error) => reason(error),
+            };
+            assert_eq!(result, row["result"]);
+            assert_eq!(result, if index < 3 { Value::Null } else { json!("mp") });
+        });
+        let actual = projection(&state, &wallets);
+        assert_eq!(actual, row["expected"], "paid buy {index}");
+        let remaining = affordable(&state, &wallets);
+        assert_eq!(json!(remaining), row["remainingCount"]);
+        assert_eq!(remaining, [2, 1, 0, 0][index]);
+        assert_eq!(wallets.players[0].mp, if index < 3 { 301.0 - 100.0 * (index + 1) as f64 } else { 1.0 });
+        assert_eq!(wallets.players[0].mun, 0.0);
+        assert_eq!(wallets.players[0].fuel, 0.0);
+        assert_eq!(state.building(1).unwrap().rows().len(), (index + 1).min(3));
+        if index == 3 {
+            assert_eq!(actual, before, "refused buy cannot change wallet, jobs, progress or next ID");
+        }
+    }
+    assert_eq!(accepted, 3);
+    assert_eq!(json!(accepted), fixture["initialCount"]);
+    assert_eq!(state.next_job_id(), 3);
+}
+
 fn replay_production_fixture(fixture: &Value, dynamic_makers: bool) {
     for split in [false, true] {
         for scenario in a(&fixture["scenarios"]) {

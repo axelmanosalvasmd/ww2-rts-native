@@ -1,5 +1,13 @@
 # Three Crossroads Native: design decisions
 
+## BASE05/09/12/13/19 owned source on f7 (2026-10-15, unrun)
+
+Recover only BASE05's a26 recorder/1045 consumer and BASE13's fa18 recorder/paid component onto fresh f7 main. Keep every incoming parity cell, fixture and proof blob. The BASE13 native consumer now compares all five original client count observations using real production admission on copies of current canonical state; no price formula, replacement wallet or expected job state supplies the answer. Four canonical buys and eleven copy-probe attempts are declared, not executed. Existing price/production fixture and helper bodies remain exact.
+
+New BASE12/19 recorders exercise actual constructors and commands without actor, wallet, HP, pose, clock, node/ghost or live RNG installation. BASE12's Shipyard control distinguishes node reservation from generic coast/terrain refusal before any Depot stamp; actual scout movement drives observed occupancy. BASE19 uses the actual no-maker branch, facing, personal Rally, walking and atomic MP refusal. Both depend on private owner providers absent from main. Keep those providers read-only; the checkpoint records explicit minimal behavior unions and unregistered crate-local consumer proposals instead of importing whole unqualified branches. Full BASE12 destruction/Shipyard/observed occupancy remains missing. Native ClientView buy-count adoption is not claimed.
+
+The [checkpoint and Source-first gate proposal](docs/checkpoints/2026-10-15-base-five/README.md) preserve both BASE09 failures, the original a26/fa18 gates and PR271/c84 qualification separately. Source, Node, Cargo, rustc, native, fmt, lint, discovery and CI all remain UNRUN. No row changes or five-row completion claim. Root owns exact slot grants, reviewed provider unions, independent review and publication. PR271 is untouched and its watch/merge remains Root-owned. ABI2, pinned e4e579a, table authority, wire and privacy scopes remain unchanged.
+
 ## Five complete selected MAP checks (2026-10-15)
 
 At producing runtime head `7cbfcdddf913625c48fd109d8d216151881cba20`,
