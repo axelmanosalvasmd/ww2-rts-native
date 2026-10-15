@@ -259,9 +259,22 @@ pub fn smoke_los(m: &Match, query: &Value) -> Value {
 }
 
 pub fn compare_smoke_los(m: &Match, encoded: &Value, context: &str) {
+    let actual = smoke_los(m, &encoded["raw"]["smokeLos"]);
+    let expected = &encoded["raw"]["smokeLos"];
+    for (a, e) in [
+        (&actual, expected),
+        (&actual["from"], &expected["from"]),
+        (&actual["to"], &expected["to"]),
+    ] {
+        assert_eq!(
+            a.as_object().unwrap().keys().collect::<Vec<_>>(),
+            e.as_object().unwrap().keys().collect::<Vec<_>>(),
+            "{context}: smoke observation fields"
+        );
+    }
     assert_source(
-        &smoke_los(m, &encoded["raw"]["smokeLos"]),
-        &encoded["raw"]["smokeLos"],
+        &actual,
+        expected,
         &encoded["floatBits"],
         "smokeLos",
         context,
