@@ -11,7 +11,7 @@ use crate::{
     weather::WeatherChoice,
 };
 use serde_json::{Value, json};
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 fn number(value: f64) -> Value {
     json!({"bits":format!("{:016x}",value.to_bits()),"value":if value.is_finite(){json!(value)}else{json!(if value.is_nan(){"NaN"}else if value.is_sign_positive(){"Infinity"}else{"-Infinity"})}})
@@ -83,8 +83,9 @@ fn snapshot(
         "drawCount":replay.receipt()["consumed"]}),
     )
 }
-// Identical four-path rule, on independent copies. No other absence/default map.
-fn canonical(snapshot: &Value) -> (Value, Vec<String>) {
+// Comparison copies only: the four currency defaults and the separately
+// authorized holdFire/holdPos absence-to-false fields. Every present value survives.
+fn canonical(snapshot: &Value) -> (Value, Vec<String>, Vec<Value>) {
     let mut result = snapshot.clone();
     let mut mapped = Vec::new();
     if let Some(players) = result
@@ -111,7 +112,102 @@ fn canonical(snapshot: &Value) -> (Value, Vec<String>) {
             }
         }
     }
-    (result, mapped)
+    let mut booleans = Vec::new();
+    if let Some(units) = result.get_mut("units").and_then(Value::as_array_mut) {
+        for (index, unit) in units.iter_mut().enumerate() {
+            if let Some(object) = unit.as_object_mut() {
+                for field in ["holdFire", "holdPos"] {
+                    if object
+                        .get(field)
+                        .is_none_or(|value| *value == json!({"absent":true}))
+                    {
+                        booleans.push(json!({"path":format!("$.units[{index}].{field}"),"actor":object.get("id"),"field":field}));
+                        object.insert(field.into(), json!(false));
+                    }
+                }
+            }
+        }
+    }
+    (result, mapped, booleans)
+}
+
+type BooleanCounts = BTreeMap<(String, String, String), usize>;
+fn count_mappings(
+    currencies: Vec<String>,
+    booleans: Vec<Value>,
+    currency_counts: &mut BTreeMap<String, usize>,
+    boolean_counts: &mut BooleanCounts,
+) {
+    for path in currencies {
+        *currency_counts.entry(path).or_default() += 1;
+    }
+    for row in booleans {
+        let key = (
+            row["path"].as_str().unwrap().to_owned(),
+            row["actor"].to_string(),
+            row["field"].as_str().unwrap().to_owned(),
+        );
+        *boolean_counts.entry(key).or_default() += 1;
+    }
+}
+fn boolean_counts(counts: &BooleanCounts) -> Vec<Value> {
+    counts.iter().map(|((path, actor, field), count)| {
+        let actor: Value = serde_json::from_str(actor).unwrap();
+        json!({"path":path,"actor":actor,"field":field,"count":count,"default":false})
+    }).collect()
+}
+
+#[test]
+fn boolean_defaults_are_symmetric_and_preserve_every_present_value() {
+    let frame = |field: &str, value: Option<Value>| {
+        let mut frame = json!({"units":[{"id":7,"holdFire":false,"holdPos":false}]});
+        let object = frame["units"][0].as_object_mut().unwrap();
+        if let Some(value) = value {
+            object.insert(field.into(), value);
+        } else {
+            object.remove(field);
+        }
+        frame
+    };
+    let equal = |a: &Value, b: &Value| {
+        let originals = (a.clone(), b.clone());
+        let (a_copy, _, _) = canonical(a);
+        let (b_copy, _, _) = canonical(b);
+        assert_eq!((a, b), (&originals.0, &originals.1));
+        original::compare_projection_for_test(&a_copy, &b_copy).is_none()
+    };
+    for field in ["holdFire", "holdPos"] {
+        let missing = frame(field, None);
+        let marker = frame(field, Some(json!({"absent":true})));
+        let false_value = frame(field, Some(json!(false)));
+        for a in [&missing, &marker, &false_value] {
+            for b in [&missing, &marker, &false_value] {
+                assert!(equal(a, b));
+            }
+        }
+        let (_, currencies, mappings) = canonical(&missing);
+        assert!(currencies.is_empty());
+        assert_eq!(mappings, vec![json!({"path":format!("$.units[0].{field}"),"actor":7,"field":field})]);
+        for present in [json!(true), json!(false), json!(0), number(0.0), Value::Null,
+            json!("false"), json!({"absent":true,"extra":0})] {
+            let original = frame(field, Some(present.clone()));
+            let (copy, _, mapped) = canonical(&original);
+            assert_eq!(copy["units"][0][field], present);
+            assert!(mapped.is_empty());
+            if present != json!(false) {
+                assert!(!equal(&original, &false_value));
+                assert!(!equal(&false_value, &original));
+                assert!(!equal(&original, &missing));
+                assert!(!equal(&missing, &original));
+            }
+        }
+        assert!(!equal(&frame(field, Some(json!(true))), &false_value));
+        assert!(!equal(&false_value, &frame(field, Some(json!(true)))));
+    }
+    let unlisted_missing = frame("autoRetreat", None);
+    let unlisted_false = frame("autoRetreat", Some(json!(false)));
+    assert!(!equal(&unlisted_missing, &unlisted_false));
+    assert!(!equal(&unlisted_false, &unlisted_missing));
 }
 fn actor(frame: &Value, id: u32) -> Option<&Value> {
     frame["units"].as_array()?.iter().find(|u| u["id"] == id)
@@ -368,6 +464,10 @@ fn run_case(trace: &Value, authored: &Value, source: &Value) -> Result<Value, St
     let mut checkpoints = 0;
     let mut matched = 0;
     let mut ticks_matched = 0;
+    let mut source_currency_counts = BTreeMap::new();
+    let mut native_currency_counts = BTreeMap::new();
+    let mut source_boolean_counts = BooleanCounts::new();
+    let mut native_boolean_counts = BooleanCounts::new();
     let mut denials = Vec::new();
     let mut unavailable = BTreeSet::new();
     let source_frames = source["frames"].as_array().unwrap();
@@ -427,8 +527,10 @@ fn run_case(trace: &Value, authored: &Value, source: &Value) -> Result<Value, St
                 first_raw = Some(json!({"tick":tick,"difference":delta}));
             }
         }
-        let (a, _) = canonical(expected);
-        let (b, _) = canonical(observed);
+        let (a, source_currency, source_boolean) = canonical(expected);
+        let (b, native_currency, native_boolean) = canonical(observed);
+        count_mappings(source_currency, source_boolean, &mut source_currency_counts, &mut source_boolean_counts);
+        count_mappings(native_currency, native_boolean, &mut native_currency_counts, &mut native_boolean_counts);
         if tick % 10 == 0 {
             checkpoints += 1;
         }
@@ -463,7 +565,9 @@ fn run_case(trace: &Value, authored: &Value, source: &Value) -> Result<Value, St
     Ok(
         json!({"name":authored["name"],"semanticVerdict":if passed{"PASS"}else if first.is_some(){"MISMATCH"}else if failure.is_some(){"HARNESS_FAILURE"}else{"BRANCH_INCOMPLETE"},
         "harnessCompleted":failure.is_none(),"failure":failure,"firstRawDifference":first_raw,"firstCanonicalDifference":first,"framesCompared":native.len(),"actualTicksMatched":ticks_matched,
-        "checkpointsCompared":checkpoints,"checkpointsMatched":matched,"requestedCheckpoints":ticks/10+1,"nativeFrames":native,
+        "checkpointsCompared":checkpoints,"checkpointsMatched":matched,"requestedCheckpoints":ticks/10+1,"nativeFrames":native,"sourceRawFrames":source["frames"],
+        "currencyMappings":{"source":source_currency_counts,"native":native_currency_counts},
+        "booleanMappings":{"fields":["holdFire","holdPos"],"default":false,"source":boolean_counts(&source_boolean_counts),"native":boolean_counts(&native_boolean_counts)},
         "nativeInputReceipt":receipt,"sourceInputReceipt":source["inputReceipt"],"fullInputAlignment":full_alignment,
         "sourceBranch":source_branch,"nativeBranch":native_branch,"denials":denials,"unavailable":unavailable,"pass":passed,"rowStatusChanged":false}),
     )
@@ -518,7 +622,10 @@ fn attack_move_and_plain_move_match_with_complete_branches() {
         results.len() == 2 && results.iter().all(|r| r["pass"] == true) && failure.is_none();
     let report = json!({"format":"aligned-amove-report-v1","sourceHead":trace["sourceHead"],"nativeHead":std::env::var("WW2_AMOVE_NATIVE_HEAD").expect("frozen head required"),
         "pass":passed,"cases":results,"failure":failure,"sourceFixtureSha256":std::env::var("WW2_AMOVE_TRACE_SHA256").expect("private fixture binding required"),
-        "currencyWhitelist":["$.players[0].fuel","$.players[0].mun","$.players[1].fuel","$.players[1].mun"],"rowStatusChanged":false});
+        "currencyWhitelist":["$.players[0].fuel","$.players[0].mun","$.players[1].fuel","$.players[1].mun"],
+        "booleanWhitelist":["$.units[*].holdFire","$.units[*].holdPos"],"booleanDefault":false,
+        "booleanAuthority":"User follow-up after diagnostic6196700421: missing key or exact absence marker only; every present value retained; comparison copies only",
+        "rowStatusChanged":false});
     std::fs::write(
         std::env::var_os("WW2_AMOVE_REPORT").expect("private report path required"),
         serde_json::to_vec(&report).unwrap(),

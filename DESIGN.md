@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## Two explicit attack-move boolean format defaults (2026-10-15)
+
+The user's follow-up to Root's diagnostic6196700421 explicitly permits comparison-only absence-to-false for holdFire and holdPos. Actual pinned Source declares both undefined at `sim.js:1797`, and its `stanceBits` at3334 uses their truthiness. Native constructor fields are false (`match_commands.rs:252`, `unit_spawn.rs:347`), so both formats leave the corresponding player stance bit clear. [The exact paths, source authority, vectors and selected commands](docs/testing/aligned-attack-move.md#authorized-two-boolean-comparison-follow-up) distinguish these two fields from the unchanged four currency defaults.
+
+Only missing keys or exact absence markers become false, independently on comparison copies. Every present value survives, including true, false, numeric0, null, strings and extra-key markers. No state/input, Source recorder, scene, raw projection, hook, provider, runtime RNG, shipping interface or old global canonical module changes. Reports retain all raw frames, first raw divergence and per-side/case mapping counts by exact path plus actor ID. The focused regression checks symmetry, preserved values and rejected unlisted/type/marker differences. Existing a985/9819/13e and first failure remain immutable historical evidence. The authentic Source capture/binding is reused byte-exact, with zero Source reruns. Native/formatting results for this bounded child are pending its announced source freeze. Both rows remain held.
+
 ## First targeted aligned attack-move result (2026-10-15)
 
 The actual native/formatting producing head is `9819b5c3062e9018727bef9bfb2af1a9389b3a78`. Compilation and the final format check pass. The one selected scenario test fails: raw and four-currency-canonical comparison first differ at tick0, `$.units[0].holdFire`, Source `{absent:true}` versus native `false`. This is an unlisted field-presence/default representation difference, not an established gameplay-rule defect. No new normalization or semantic repair is made. Only one frame/checkpoint was compared, with0/1 matching; the planned denominator remains481 per case and is not reported as completed. Native advances zero ticks and does not execute the plain-Move control.

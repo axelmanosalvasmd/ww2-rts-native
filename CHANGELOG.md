@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Add the user's two explicit attack-move comparison defaults: absent holdFire/holdPos become false independently on copied unit projections, with all present values retained. Keep currency defaults separate, report exact actor/path/count mappings, retain all raw frames and add one focused positive/negative regression. Reuse frozen Source with no rerun; the first tick-0 failure remains historical. New results pending.
+
 - Retain the first targeted attack-move result at 9819b5c3: the selected test fails at tick 0 on Source holdFire absence versus native false, with 0/1 observed checkpoints matching and all five consumed startup draws equal. Stop before native ticks/control, keep both rows held and preserve raw evidence. Formatting passes; conditional Clippy is not run.
 
 - Format the new aligned attack-move consumer after preserving its first formatting failure. Authentic Source at 13eae85e completes both 4,800-tick cases, including natural foe death/resume/arrival and the living-foe plain-Move pass. Native comparison remains pending; no predicate, input, mapping or engine change.
