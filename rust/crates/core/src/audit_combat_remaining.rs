@@ -497,7 +497,13 @@ fn cmb67_automatic_patrol_weapon_and_bomber_area_salvos_use_actual_consumers() {
         });
         s.m.grid.rebuild(&s.m.world.game.units);
         ww2_core::vision::update_vision(&mut s.m.world.game,&s.m.rules,&s.m.grid);
-        assert!(s.m.can_shoot_target(plane,target).unwrap());
+        assert!(s.m.world.game.players[0].sees(target));
+        assert!(ww2_core::math::hypot(
+            s.m.world.game.units[&plane].x-s.m.world.game.units[&target].x,
+            s.m.world.game.units[&plane].z-s.m.world.game.units[&target].z,
+        )<20.0);
+        // Ground can_shoot_target itself rejects airborne shooters. Reach the
+        // actual aircraft mission/stance consumer without calling that helper.
         let ammo=s.m.aviation.planes[&plane].ammo;
         if area {
             // Preserve the native Area refusal until its owner implements it.

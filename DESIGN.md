@@ -23,6 +23,9 @@ first B09 research tick. Native FireAt parsing/terrain firing, aircraft ground
 and area weapons, and dead-carrier ejection remain unavailable. Offshore
 drowning also needs the separate naval/shore caller. Original component
 inputs remain explicit; Source attackPick is not guessed into native fields.
+The extra aircraft control checks visible nearby geometry before its real
+stance/mission admission; it does not call the ground targeting helper, which
+itself rejects an airborne shooter. That provider boundary remains unchanged.
 No row completes or moves. All Source/Node, native, format/lint, discovery,
 CI and release counts are zero. Root retains runtime scope, exact grants and
 publication. The [bounded readback](docs/testing/audit-combat-seven-protected-consumers.md)

@@ -134,7 +134,10 @@ Hold Fire predicate.
 `match_aviation.rs:394-418,545-565` still reject the required automatic,
 ground-attack or Area paths. Quiet patrol, aircraft AA and helper launching
 cannot qualify these positive consumers. The aircraft provider owner must
-supply the missing weapon actuators.
+supply the missing weapon actuators. The ground targeting helper also rejects
+an airborne shooter at `match_firing.rs:2041-2042`; the additional aircraft
+consumer checks actual visibility and nearby geometry before calling its real
+stance/mission admission, so that helper does not mask the intended boundary.
 
 ## CMB68: selected wreck and separate rider components
 
