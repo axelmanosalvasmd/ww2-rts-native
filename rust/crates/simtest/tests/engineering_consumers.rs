@@ -868,7 +868,6 @@ fn plane_frame(m: &Match, id: u32, probe: Point) -> Value {
         "sees":ww2_core::vision::team_sees(&m.world.game,&m.rules,&m.grid,0,probe)})
 }
 
-
 #[test]
 fn actual_match_constructors_consume_all_authored_weather_plans() {
     let f = fixture();

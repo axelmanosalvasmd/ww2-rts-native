@@ -1,0 +1,1 @@
+- Remove the extra blank line left when the held aircraft test moved to its checkpoint. Test bodies, literals and assertions remain unchanged.
