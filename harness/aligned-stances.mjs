@@ -75,6 +75,17 @@ if(restored!==originalSource)throw Error('instrumentation does not erase to the 
 // Any other actual consumer refuses rather than silently using an unseeded draw.
 const prefix="import { hooks as __aligned } from 'aligned:test';\n";
 const suffix="\nconst __alignedOriginalSpawnSlots = spawnSlots; spawnSlots = (...args) => __aligned.layout(__alignedOriginalSpawnSlots(...args));\nexport const __alignedCanShoot = (g,u,t) => canShoot(g,u,t);\n";
+const probeSuffix=args.includes('--gate-probe')?`
+export const __alignedStanceGate=(g,u,t)=>({
+  canShoot:canShoot(g,u,t),canFire:canFire(u),reachDist:reachDist(u,t),rangeOf:rangeOf(g,u,UNITS[u.type].w),
+  visible:g.players[u.owner].visible.has(t.id),los:los(g,u,aimPoint(g,u,t)),aimPoint:aimPoint(g,u,t),allied:allied(g,t.owner,u.owner),
+  actor:{id:u.id,type:u.type,x:u.x,z:u.z,hp:u.hp,targetId:u.targetId,attackId:u.attackId,logistics:u.logistics},
+  target:{id:t.id,type:t.type,x:t.x,z:t.z,hp:t.hp,air:t.air,riding:t.riding,owner:t.owner},
+  structureCells:[...g.structuralCells].map(([c,section])=>({c,at:cellCenter(g,c),char:g.chars[c],flags:g.flags[c],section})),
+  buildings:[...g.units.values()].filter(q=>q.cells).map(q=>({id:q.id,type:q.type,owner:q.owner,x:q.x,z:q.z,cells:q.cells})),
+  candidates:[{x:21,z:27},{x:21,z:29},{x:21,z:31},{x:23,z:27},{x:23,z:29},{x:23,z:31},{x:25,z:27},{x:25,z:29}].map(at=>({at,c:cellOf(g,at.x,at.z),char:g.chars[cellOf(g,at.x,at.z)],flags:g.flags[cellOf(g,at.x,at.z)],los:los(g,at,aimPoint(g,at,t)),reachDist:reachDist(at,t)}))
+});
+`:'';
 // Cover module initialization too, including any captured default RNG callback.
 const originalRandom=Math.random;
 Math.random=()=>{throw Error('unmapped Math.random consumer; no fallback');};
@@ -83,7 +94,7 @@ const hookModule=new SyntheticModule(['hooks'],function(){this.setExport('hooks'
 const load=path=>{
   if(modules.has(path))return modules.get(path);
   const raw=readFileSync(path,'utf8');
-  const source=path===resolve(reference,'shared/sim.js')?prefix+transformed+suffix:raw;
+  const source=path===resolve(reference,'shared/sim.js')?prefix+transformed+suffix+probeSuffix:raw;
   const module=new SourceTextModule(source,{identifier:path});modules.set(path,module);return module;
 };
 const module=load(resolve(reference,'shared/sim.js'));
@@ -140,6 +151,7 @@ const stanceBranches=frames=>{
   result.complete=allDispositions&&result.malformedBlocked&&result.foreignNeeds&&holdFirePreventsDamage&&holdPositionUnderFire&&explicitAttackOverridesHoldFire&&holdFireOffResumesDamage&&releasedMoveTick>820&&actualBooleanToggles&&ownerOnlyRecipientBits;
   return result;
 };
+const gateObservations=[];
 const cases=[];
 let failure=null;
 try {
@@ -166,6 +178,11 @@ try {
       const beforeIds=new Set(g.units.keys());
       sim.step(g);row.completed++;
       frames.push(stanceSnapshot(g,[...g.units.keys()].filter(id=>!beforeIds.has(id)),[...beforeIds].filter(id=>!g.units.has(id)),commands));
+      if(args.includes('--gate-probe')&&[499,500,520,540,580,599,600,620,700,821].includes(tick)) {
+        const count=consumed.length;
+        gateObservations.push({tick,actorToFoe:encode(sim.__alignedStanceGate(g,g.units.get(scene.actor),g.units.get(scene.foe))),foeToActor:encode(sim.__alignedStanceGate(g,g.units.get(scene.foe),g.units.get(scene.actor)))});
+        if(consumed.length!==count)throw Error('gate observer consumed randomness');
+      }
     }
     row.branches=stanceBranches(frames);
     if(!row.branches.complete)throw Error(`Source stance branch incomplete: ${JSON.stringify(row.branches)}`);
@@ -177,6 +194,12 @@ try {
 clean();
 const trace={format:'aligned-stances-trace-v1',reference:pin,sourceHead,node:process.version,scene,sharedInput,cases,failure,
   instrumentation:{erasesExactly:true,anchors:edits.map(([before,after])=>({before,after})),originalFunctions:'createGame, spawnSlots, rng, command, step, movement, attack-move, firing and retirement execute; only observers and accepted input hooks added'}};
+if(args.includes('--gate-probe')) {
+  const baseline=JSON.parse(readFileSync(option('--baseline')));
+  const unchanged=isDeepStrictEqual(trace.scene,baseline.scene)&&isDeepStrictEqual(trace.sharedInput,baseline.sharedInput)&&isDeepStrictEqual(trace.cases[0].frames,baseline.cases[0].frames)&&isDeepStrictEqual(trace.cases[0].inputReceipt,baseline.cases[0].inputReceipt);
+  trace.gateProbe={mode:'READ_ONLY_SOURCE_GATE_OBSERVATION',baselineHead:baseline.sourceHead,unchangedFramesAndInputs:unchanged,observations:gateObservations};
+  if(!unchanged)throw Error('probe changed original raw frames or inputs');
+}
 if(args.includes('--check')) {
   const prior=JSON.parse(readFileSync(output));
   if(!isDeepStrictEqual(prior,trace)) {writeFileSync(output+'.check-failure.json',JSON.stringify(trace)+'\n',{mode:0o400,flag:'wx'});throw Error('authentic stance check differs from frozen capture');}

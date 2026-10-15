@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Add one read-only stance shootability probe using actual pinned Source gate functions and structural cells. Keep the failed scene, tape, branch assertions and raw frames exact; the expected old branch failure remains a failure. No native execution or row change.
+
 - Preserve the first stance Source failure at 25b9ed68: generation captures all 1,200 ticks but exits 2 because the planned Hold Fire/Hold Position window has no shootable foe or incoming damage. Actual 34 command dispositions and recipient-bit checks complete; Source consumes 2,533 values with 13,851 unused. Stop before Source check, formatting or Cargo. No paired comparison, native alignment or row eligibility is claimed.
 
 - Add a separate test-only CMB-83 stance diagnostic using genuine constructor actors, ordinary JSON commands, malformed/foreign dispositions and actual recipient flags. Author nearby cover and staged natural fire to check Hold Position, Hold Fire on/off and explicit-attack override; toggle all three boolean keys and autocast through commands. Keep proposed defaults pending, old evidence intact and rows held. Execution pending.
