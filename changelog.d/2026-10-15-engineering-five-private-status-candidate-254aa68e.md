@@ -1,0 +1,1 @@
+- Prepare private ENG-37/45/47/50/51 Rust/Status updates from actual ec1d formatting, twenty exact native passes and strict core/simtest Clippy. Preserve all Acceptance cells and the tested Rust tree; document remaining Fill, broader weapon and whole-World limits, with final review, Hermes readback and hosted gates pending.
