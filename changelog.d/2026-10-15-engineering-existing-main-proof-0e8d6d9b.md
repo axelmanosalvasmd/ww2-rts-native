@@ -1,0 +1,2 @@
+- Mark 15 additional ENG rows ported using their unchanged Source-backed acceptance checks and existing three-platform test results. Audit all 52 original in-progress ENG rows with exact test, fixture and coverage bindings; no new native or recorder jobs ran.
+- Reserve ENG-18..22 to pending PR #224 and retain 32 selected-check gaps. Keep broader crushing, queued-Dig, hostile-mine-contact, lifecycle and recipient limits explicit; this documentation audit grants no joint acceptance or whole-match criterion.
