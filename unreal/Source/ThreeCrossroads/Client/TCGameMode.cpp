@@ -143,6 +143,8 @@ void ATCGameMode::BeginPlay()
 	bAutoAttack = FParse::Param(Cmd, TEXT("TCAutoAttack"));
 	bHostSandbox = FParse::Param(Cmd, TEXT("TCHostSandbox"));
 	bProbeDeny = FParse::Param(Cmd, TEXT("TCProbeDeny"));
+	int32 ForeignStopId = INDEX_NONE;
+	bProbeDeny |= FParse::Value(Cmd, TEXT("TCProbeForeignStop="), ForeignStopId) && ForeignStopId >= 0;
 	bAttackWithTrucks = FParse::Param(Cmd, TEXT("TCAttackWithTrucks"));
 	FParse::Value(Cmd, TEXT("TCAutoStopAfter="), AutoStopAfter);
 	FParse::Value(Cmd, TEXT("TCSpawnEnemy="), SpawnEnemy, false); // a list: do not stop at the comma
@@ -805,12 +807,22 @@ void ATCGameMode::RunVerificationSwitches(double Now)
 		if (Ids.Num())
 		{
 			bProbeSent = true; DeniesAtProbe = State.Denies;
-			// not something the right-click builds (it attacks only foes): a raw message, to see the server's validation
+			// Raw verification probes bypass selection filtering to exercise the server's validation.
 			TSharedRef<FJsonObject> A = MakeShared<FJsonObject>();
-			A->SetStringField(TEXT("t"), TEXT("attack"));
-			A->SetArrayField(TEXT("ids"), { MakeShared<FJsonValueNumber>(Ids[0]) });
-			A->SetNumberField(TEXT("target"), Ids[0]);
-			UE_LOG(LogTC, Log, TEXT("deny probe: attack on own unit %d: %s; the server should refuse it ('unseen')"), Ids[0], SendCommand(A) ? TEXT("sent") : *LastSendProblemText);
+			int32 ForeignId = INDEX_NONE;
+			if (FParse::Value(FCommandLine::Get(), TEXT("TCProbeForeignStop="), ForeignId) && ForeignId >= 0)
+			{
+				A->SetStringField(TEXT("t"), TEXT("stop"));
+				A->SetArrayField(TEXT("ids"), { MakeShared<FJsonValueNumber>(ForeignId) });
+				UE_LOG(LogTC, Log, TEXT("deny probe: Stop of supplied foreign unit %d: %s; ownership must be checked by the server"), ForeignId, SendCommand(A) ? TEXT("sent") : *LastSendProblemText);
+			}
+			else
+			{
+				A->SetStringField(TEXT("t"), TEXT("attack"));
+				A->SetArrayField(TEXT("ids"), { MakeShared<FJsonValueNumber>(Ids[0]) });
+				A->SetNumberField(TEXT("target"), Ids[0]);
+				UE_LOG(LogTC, Log, TEXT("deny probe: attack on own unit %d: %s; the server should refuse it ('unseen')"), Ids[0], SendCommand(A) ? TEXT("sent") : *LastSendProblemText);
+			}
 		}
 	}
 	if (bAutoMoved && AutoReports < 12 && Now - AutoMovedAt >= AutoReports * 1.0)

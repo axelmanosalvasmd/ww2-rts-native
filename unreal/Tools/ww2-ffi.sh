@@ -13,8 +13,8 @@
 #   unreal/Tools/ww2-ffi.sh remove   delete the installed files (the plugin then builds without the Rust core)
 #
 # Environment (all optional):
-#   WW2_FFI_REV      native commit to build (default below: main at 92fb7fe, ABI 2 with the six ww2_view_* calls of
-#                    PR #16, merged at d88ef6d; header and fixtures byte-identical to the PR's 03a49ac)
+#   WW2_FFI_REV      native commit to build (default below: main at 9e618217, approved after slice 1s; ABI 2 and the
+#                    six ww2_view_* calls stay unchanged)
 #   WW2_NATIVE_SRC   an existing clone of axelmanosalvasmd/ww2-rts-native to build in. It must be clean; it is checked
 #                    out at WW2_FFI_REV (detached). Default: a clone this script makes in unreal/Saved/WW2Ffi/native
 #                    (git ignores Saved/), fetched over HTTPS (the repository is public)
@@ -27,7 +27,7 @@ set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(cd "$HERE/.." && pwd)"
-REV="${WW2_FFI_REV:-92fb7fe66eb7f788c83449ae67223984b969f177}"
+REV="${WW2_FFI_REV:-9e618217de2ac1d0a806c6804eda50c1c9da497f}"
 TRIPLE="x86_64-unknown-linux-gnu"
 # What `cargo rustc -p ww2-ffi --release --target $TRIPLE -- --print native-static-libs` must list. WW2Core.Build.cs
 # links exactly these; a build that needs others stops here instead of linking short.

@@ -9,8 +9,8 @@
 #   unreal/Tools/tc-package-linux.sh stage-fixtures [DIR]   copy the Rust view's self-check stream into an existing
 #                                             package (default $TC_PACKAGE_OUT; build does this itself), then verify
 #
-# The package needs a running game server: today the pinned JavaScript reference server (tc-local.sh serve), which is
-# not part of it. Start it with the package's tc-client.sh (see the README there and unreal/README).
+# The package needs a separate server: the pinned JavaScript reference server or the approved trusted private
+# Rust R1 executable. Start the client with tc-client.sh; server profiles are described in the packaged README.
 #
 # Environment (all optional):
 #   UE                       engine folder (default ~/Applications/UnrealEngine-5.8.3)
@@ -21,7 +21,7 @@
 #   TC_PACKAGE_CLEAN=1       empty the work folder's project copy first (a build from nothing)
 #   TC_PACKAGE_JOBS          compile processes at once (default: half the logical cores, at most 8)
 #   TC_PACKAGE_MIN_FREE_GB   free space needed in the work and output folders (default 30)
-#   TC_PACKAGE_DEBUGINFO=1   keep the separate debug files (.debug, .sym; large) in the package
+#   TC_PACKAGE_DEBUGINFO=1   compile and keep the separate debug files (.debug, .sym; large)
 #   TC_PACKAGE_SKIP_TABLE_CHECK=1   skip the generated-table comparison with the reference (it needs node)
 #
 # The project is copied (not built in place) so the editor build in unreal/Binaries and unreal/Intermediate is never
@@ -155,10 +155,12 @@ uat() {
 	export TC_REQUIRE_WW2_FFI=1    # WW2Core.Build.cs: a missing Rust core is a build error, not the interim port
 	export uebp_LogFolder="$logs/uat"
 	local debug=(-nodebuginfo); [[ "${TC_PACKAGE_DEBUGINFO:-0}" == 1 ]] && debug=()
+	local ubt="-MaxParallelActions=$JOBS"
+	[[ "${TC_PACKAGE_DEBUGINFO:-0}" == 1 ]] || ubt+=" -NoDebugInfo"
 	local cmd=("$RUNUAT" BuildCookRun -project="$MIRROR/$PROJECT_NAME.uproject" -target="$PROJECT_NAME" -platform=Linux
 		-clientconfig=Development -build -cook -stage -pak -iostore -compressed -package -archive
 		-stagingdirectory="$WORK/staged" -archivedirectory="$archive" "${debug[@]}"
-		-unattended -utf8output -nop4 -ubtargs="-MaxParallelActions=$JOBS")
+		-unattended -utf8output -nop4 -ubtargs="$ubt")
 	printf '%q ' "${cmd[@]}" >"$logs/uat-command.txt"; echo >>"$logs/uat-command.txt"
 	say "RunUAT BuildCookRun (log $logs/uat.log, $JOBS compile processes; shader compiling keeps the engine's default of half the cores free)"
 	set +e
@@ -323,7 +325,7 @@ build() {
 		echo "reference=$(git -C "$REF" rev-parse HEAD 2>/dev/null || echo unknown)"
 		echo "units_json_reference=$(sed -n 's/^ *"reference": *"\([0-9a-f]*\)".*/\1/p' "$PROJECT_DIR/Content/Data/units.json" | head -n 1)"
 		echo "ww2_ffi_stamp:"; sed 's/^/  /' "$FFI_DIR/STAMP"
-		echo "server=not included: the temporary pinned JavaScript reference server (reference/ww2-rts, Node.js), started from a ww2-rts-native checkout with unreal/Tools/tc-local.sh serve. The Rust ww2-server does not exist yet."
+		echo "server=not included: pinned JavaScript reference via unreal/Tools/tc-local.sh serve, or approved private Rust R1 via rust/crates/server/README.md. Rust supports the bounded two-human Conquest profile only."
 		echo "uat_command=$(cat "$logs/uat-command.txt")"
 	} >"$next/BUILD-INFO.txt"
 	(cd "$next" && find . -type f -not -name SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 sha256sum >SHA256SUMS)

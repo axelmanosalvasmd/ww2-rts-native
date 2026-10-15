@@ -1,7 +1,7 @@
 Three Crossroads native client: Linux x86_64 Development package
 ================================================================
 
-This is the first packaged milestone of the native Unreal client. It is not a public release: it is a Development
+This is a packaged milestone of the native Unreal client. It is not a public release: it is a Development
 build, and it has no game server inside.
 
 What it needs
@@ -9,18 +9,21 @@ What it needs
 - Linux x86_64 with a Vulkan driver for the GPU, for a window or offscreen rendering. The system Vulkan loader
   (libvulkan.so.1) is used when present, else the one in Linux/Engine/Binaries/ThirdParty/Vulkan. With -nullrhi
   (after --) it draws nothing and needs neither.
-- A running game server. The Rust ww2-server does not exist yet, so today this is the TEMPORARY reference backend:
-  the pinned JavaScript game server (reference/ww2-rts at the commit named in BUILD-INFO.txt), on Node.js. It is not
-  part of this package and must not be mistaken for the final server. In a ww2-rts-native checkout:
+- A separate running game server. The pinned JavaScript reference backend (reference/ww2-rts at the commit in
+  BUILD-INFO.txt) supports the reference modes. In a ww2-rts-native checkout:
 
       unreal/Tools/tc-local.sh serve     # an isolated copy of the pinned server on a free 127.0.0.1 port
       unreal/Tools/tc-local.sh status    # prints its ws:// URL
+
+  The Rust executable also supports the approved trusted private R1 profile. Use its committed launch command
+  in rust/crates/server/README.md. That profile allows exactly two human commanders on teams 0/1, Conquest/Default,
+  Standard army, Sandbox off and temporary logistics off. AI, spectators and other modes remain refused there.
 
 Start
 -----
       ./tc-client.sh --server ws://127.0.0.1:PORT/ws --room native1 --seat host -- -windowed -ResX=1600 -ResY=900
       ./tc-client.sh --server ws://127.0.0.1:PORT/ws --room native1 --seat guest     # a second player
-      ./tc-client.sh --server ws://127.0.0.1:PORT/ws --room native1 --spectate       # a spectator
+      ./tc-client.sh --server ws://127.0.0.1:PORT/ws --room native1 --spectate       # reference server only
       ./tc-client.sh --server ws://127.0.0.1:PORT/ws --check                         # check only, start nothing
 
 tc-client.sh checks the machine (architecture, shared libraries, Vulkan loader, display) and that the server answers,
@@ -38,6 +41,6 @@ What is inside
 - SHA256SUMS                   every file's hash
 - Manifest_*Files_Linux.txt    Unreal's staging lists: every file in the paks (UFS) and beside them (NonUFS)
 
-The Rust core (ww2-ffi, C ABI v1) is linked into the executable; formation spots come from it. Everything else the
-client computes is still its interim C++ port (see DESIGN.md in the repository). Windows and Mac packages are not
-built yet.
+The Rust core (ww2-ffi, C ABI 2) supplies formation spots and the default recipient-unit decoder. C++ still reads
+row tails, HUD, cells and fog and supplies interim rules queries (see DESIGN.md). The exact FFI revision and file
+hashes are in BUILD-INFO.txt. Windows and Mac packages are not built yet.
