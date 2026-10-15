@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Retain the first targeted attack-move result at 9819b5c3: the selected test fails at tick 0 on Source holdFire absence versus native false, with 0/1 observed checkpoints matching and all five consumed startup draws equal. Stop before native ticks/control, keep both rows held and preserve raw evidence. Formatting passes; conditional Clippy is not run.
+
 - Format the new aligned attack-move consumer after preserving its first formatting failure. Authentic Source at 13eae85e completes both 4,800-tick cases, including natural foe death/resume/arrival and the living-foe plain-Move pass. Native comparison remains pending; no predicate, input, mapping or engine change.
 
 - Add a private aligned attack-move scenario and same-start plain-Move control from exact 5a8. Genuine full-health constructor actors receive only scripted orders; compare path/facing/motion/targets/stances, ordinary retirement and actual halt/death/resume/arrival branches. Retain the four currency mappings and stop at the first divergence. Source/native results pending; no row or public branch changes.

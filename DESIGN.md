@@ -1,5 +1,13 @@
 # Three Crossroads Native: design decisions
 
+## First targeted aligned attack-move result (2026-10-15)
+
+The actual native/formatting producing head is `9819b5c3062e9018727bef9bfb2af1a9389b3a78`. Compilation and the final format check pass. The one selected scenario test fails: raw and four-currency-canonical comparison first differ at tick0, `$.units[0].holdFire`, Source `{absent:true}` versus native `false`. This is an unlisted field-presence/default representation difference, not an established gameplay-rule defect. No new normalization or semantic repair is made. Only one frame/checkpoint was compared, with0/1 matching; the planned denominator remains481 per case and is not reported as completed. Native advances zero ticks and does not execute the plain-Move control.
+
+The five actually consumed startup draws, their full labels/index/bits, layout and startup receipt agree. Native has16,379 unused values; Source attack-move has6,698 unused after9,686 draws. Full-run input alignment is therefore unproved after the deliberate early native stop. Both rows remain held. Source independently completed both4,800-tick scripts at13eae85e with the natural-death/resume/arrival and living-foe pass observations recorded below. That Source evidence does not substitute for native execution.
+
+Private artifacts under `/tmp/aligned-amove-d6308bcc/` preserve the read-only authentic Source capture and fixture binding, complete native frame/first-failure report, first/final formatting logs, exact stage commands/results, source branch observations and one-line own-checkout dependency provenance. The diagnostic report completes; its semantic verdict is MISMATCH and the Rust test exits101 with0passed/1failed/142filtered. Conditional strict Clippy, old tests/guards and public actions remain unrun. S1 is terminal with its flock released. This final documentation child claims no fresh execution; all results retain their producing heads.
+
 ## First targeted aligned attack-move scenario (2026-10-15)
 
 Authentic Source generation at `13eae85e75681f51d0fca1cca056bac3c7ba2d64` completes both 4,800-tick cases with zero harness faults. Attack-move stages both actors at 100 HP, halts at tick490, naturally retires foe4 at780, requests resume at781 and executes arrival at1092. Plain Move passes the living shootable foe at617; both reach the exact goal with empty path and null amove. Draw counts are9,686/9,694 with6,698/6,690 unused of16,384. The new read-only private Source artifact and single SHA256 binding freeze before Cargo. The first formatting check fails on the new module; preserve its raw log and apply only mechanical formatting before the native stage. No new native result is claimed here.

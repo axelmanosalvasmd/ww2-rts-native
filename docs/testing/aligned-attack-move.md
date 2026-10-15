@@ -76,3 +76,12 @@ python3 /home/judiazm/.t3/handoffs/ww2-native-cargo-guard.py \
 ```
 
 No old four-test replay, registration guard, full/release/list command or extra format gate is selected. At terminal exit and lock release, transfer S1 immediately. Root reviews the final actual head before any later PR or complete-row proposal for Axel. No row is proposed until both cases PASS; a first divergence is a completed diagnostic deliverable with both rows held.
+
+
+## Retained first result
+
+Native/formatting head `9819b5c3062e9018727bef9bfb2af1a9389b3a78`: final formatting passes; actual selected test exits101,0passed/1failed/142filtered. First raw and canonical difference is tick0 `$.units[0].holdFire`, Source `{absent:true}` versus native `false`. No engine tick advances. This presence/default representation difference is retained without labeling it a proved gameplay defect or adding a new mapping. Native control remains unexecuted. Comparison count is0/1 observed N10 checkpoints, not0/481 completed checkpoints.
+
+All five consumed constructor draws and startup observations agree, with16,379 native values unused. Full-run alignment is not claimed against Source's9,686/9,694 consumed draws. Source attack-move has actual halt490, natural retirement780, resume781, progress782, arrival branch1092 and empty-path/cleared-goal arrival1102; Source plain Move passes the living shootable foe617 and ends exactly at goal. These are authentic Source observations at13eae85e, separate from the native early-stop result.
+
+Full first failure, both raw frame values, receipts, immutable Source fixture and binding, logs/commands and dependency provenance are private at `/tmp/aligned-amove-d6308bcc/`. Preserve the first formatting failure too. Conditional Clippy is not run after scenario failure. No old test, guard, full/release/list command or public action runs. Both rows remain held; no complete-row proposal is posted. S1 is terminal and its lock released. Final documentation changes do not claim a new execution or alter any predicate, projection, hook, input, map, tape or comparison.
