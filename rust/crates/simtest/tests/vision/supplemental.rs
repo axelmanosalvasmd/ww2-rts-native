@@ -43,7 +43,10 @@ fn advance(frame: &Value, rules: &Rules, threaded: bool) -> Game {
     for (slot, p) in g.players.iter().enumerate() {
         post["players"][slot]["visible"] = json!({"$set":p.visible});
     }
-    assert_eq!(post, frame["postVisionInput"], "only actual vision outputs change");
+    assert_eq!(
+        post, frame["postVisionInput"],
+        "only actual vision outputs change"
+    );
     g
 }
 
@@ -80,19 +83,30 @@ fn assert_height_sight_domain(g: &Game, rules: &Rules, case: &Value) {
     assert_eq!(reach, 36.0);
     let domain = &case["sightDomain"];
     assert_eq!(domain["reach"].as_f64().unwrap(), reach);
-    let bases = [(10, 0, 5, 5, 97), (11, 0, 17, 5, 103),
-        (12, 1, 5, 123, 5761), (13, 1, 17, 123, 5767),
-        (14, 2, 187, 123, 5852), (15, 2, 175, 123, 5846)];
-    let expected_bases: Vec<_> = bases.iter().map(|&(id, owner, x, z, c)| {
-        json!({"id":id,"owner":owner,"x":x,"z":z,"c":c})
-    }).collect();
+    let bases = [
+        (10, 0, 5, 5, 97),
+        (11, 0, 17, 5, 103),
+        (12, 1, 5, 123, 5761),
+        (13, 1, 17, 123, 5767),
+        (14, 2, 187, 123, 5852),
+        (15, 2, 175, 123, 5846),
+    ];
+    let expected_bases: Vec<_> = bases
+        .iter()
+        .map(|&(id, owner, x, z, c)| json!({"id":id,"owner":owner,"x":x,"z":z,"c":c}))
+        .collect();
     assert_eq!(json!(expected_bases), domain["bases"]);
-    let mut canonical: Vec<usize> = bases.iter().flat_map(|&(_, _, _, _, c)| {
-        (0..9).map(move |i| c + i % 3 + i / 3 * g.w)
-    }).collect();
+    let mut canonical: Vec<usize> = bases
+        .iter()
+        .flat_map(|&(_, _, _, _, c)| (0..9).map(move |i| c + i % 3 + i / 3 * g.w))
+        .collect();
     canonical.sort_unstable();
-    let flagged: Vec<_> = g.flags.iter().enumerate()
-        .filter_map(|(cell, flags)| (flags & (SIGHT | WOOD) != 0).then_some(cell)).collect();
+    let flagged: Vec<_> = g
+        .flags
+        .iter()
+        .enumerate()
+        .filter_map(|(cell, flags)| (flags & (SIGHT | WOOD) != 0).then_some(cell))
+        .collect();
     assert_eq!(flagged, canonical);
     assert_eq!(flagged.len(), 54);
     assert_eq!(g.sections.len(), 54);
@@ -104,11 +118,23 @@ fn assert_height_sight_domain(g: &Game, rules: &Rules, case: &Value) {
     for (cell, declared) in flagged.into_iter().zip(exceptions) {
         assert_eq!(declared["cell"].as_u64().unwrap() as usize, cell);
         let (x, y) = (cell % g.w, cell / g.w);
-        let dx = math::max(math::max(x as f64 * CELL - observer.x, 0.0), observer.x - (x + 1) as f64 * CELL);
-        let dz = math::max(math::max(y as f64 * CELL - observer.z, 0.0), observer.z - (y + 1) as f64 * CELL);
+        let dx = math::max(
+            math::max(x as f64 * CELL - observer.x, 0.0),
+            observer.x - (x + 1) as f64 * CELL,
+        );
+        let dz = math::max(
+            math::max(y as f64 * CELL - observer.z, 0.0),
+            observer.z - (y + 1) as f64 * CELL,
+        );
         let distance = math::hypot(dx, dz);
-        assert!(distance > reach, "entire flagged cell outside possible sight domain");
-        assert_eq!(distance.to_bits(), declared["distance"].as_f64().unwrap().to_bits());
+        assert!(
+            distance > reach,
+            "entire flagged cell outside possible sight domain"
+        );
+        assert_eq!(
+            distance.to_bits(),
+            declared["distance"].as_f64().unwrap().to_bits()
+        );
         minimum = math::min(minimum, distance);
         assert_eq!(g.flags[cell], 1027);
         assert_eq!(g.flags[cell] & WOOD, 0);
@@ -116,10 +142,14 @@ fn assert_height_sight_domain(g: &Game, rules: &Rules, case: &Value) {
         assert_eq!(declared["chars"], "K");
         assert_eq!(declared["ground"], ".");
         assert_eq!(declared["object"], "K");
-        let &(id, owner, bx, bz, _) = bases.iter().find(|&&(_, _, _, _, c)| {
-            (0..9).any(|i| c + i % 3 + i / 3 * g.w == cell)
-        }).unwrap();
-        assert_eq!(declared["building"], json!({"id":id,"owner":owner,"x":bx,"z":bz}));
+        let &(id, owner, bx, bz, _) = bases
+            .iter()
+            .find(|&&(_, _, _, _, c)| (0..9).any(|i| c + i % 3 + i / 3 * g.w == cell))
+            .unwrap();
+        assert_eq!(
+            declared["building"],
+            json!({"id":id,"owner":owner,"x":bx,"z":bz})
+        );
         let section = &declared["section"];
         assert_eq!(section["id"], json!(format!("building:{id}:{cell}")));
         assert_eq!(section["structureId"], json!(format!("building:{id}")));
@@ -128,7 +158,10 @@ fn assert_height_sight_domain(g: &Game, rules: &Rules, case: &Value) {
         assert_eq!(section["state"], "intact");
         let actual = &g.sections[&(cell as u32)];
         assert!(!actual.failed && actual.hp > 0.0);
-        assert_eq!(actual.hp.to_bits(), section["hp"].as_f64().unwrap().to_bits());
+        assert_eq!(
+            actual.hp.to_bits(),
+            section["hp"].as_f64().unwrap().to_bits()
+        );
         let structure = structures.iter().find(|s| s["entityId"] == id).unwrap();
         assert_eq!(structure["id"], section["structureId"]);
         assert_eq!(structure["kind"], "building");
@@ -137,9 +170,18 @@ fn assert_height_sight_domain(g: &Game, rules: &Rules, case: &Value) {
         assert!(sections.contains(section));
         assert!(!g.units.contains_key(&(id as u32)));
     }
-    assert_eq!(minimum.to_bits(), domain["minimumRectangleDistance"].as_f64().unwrap().to_bits());
+    assert_eq!(
+        minimum.to_bits(),
+        domain["minimumRectangleDistance"]
+            .as_f64()
+            .unwrap()
+            .to_bits()
+    );
     for key in ["editCell", "probeCell"] {
-        assert_eq!(g.flags[case[key].as_u64().unwrap() as usize] & (SIGHT | WOOD), 0);
+        assert_eq!(
+            g.flags[case[key].as_u64().unwrap() as usize] & (SIGHT | WOOD),
+            0
+        );
     }
 }
 
@@ -178,7 +220,9 @@ fn cmb131_seen_enemy_cell_requires_actual_visible_fact() {
                     p.visible.clear();
                 }
                 let mut declared_input = frame["postVisionInput"].clone();
-                declared_input["units"]["$map"].as_array_mut().unwrap()
+                declared_input["units"]["$map"]
+                    .as_array_mut()
+                    .unwrap()
                     .retain(|entry| entry[0] == json!(source.id));
                 for p in declared_input["players"].as_array_mut().unwrap() {
                     p["visible"] = json!({"$set":[]});
@@ -186,11 +230,17 @@ fn cmb131_seen_enemy_cell_requires_actual_visible_fact() {
                 assert_eq!(declared_input, recorded["game"]);
                 let ordinary = observe(&only, &rules, &mut Fog::default(), threaded);
                 assert_eq!(ordinary, recorded["expected"]);
-                assert_eq!(ordinary[0]["vis"][target_cell], 0, "every source excludes target cell");
+                assert_eq!(
+                    ordinary[0]["vis"][target_cell], 0,
+                    "every source excludes target cell"
+                );
             }
 
             let control_record = &frame["control"];
-            assert_eq!(control_record["kind"], "counterfactual-remove-only-target-visible-fact");
+            assert_eq!(
+                control_record["kind"],
+                "counterfactual-remove-only-target-visible-fact"
+            );
             assert_eq!(control_record["admittedMatch"], false);
             let mut control = g.clone();
             let mut declared_input = frame["postVisionInput"].clone();
@@ -200,10 +250,19 @@ fn cmb131_seen_enemy_cell_requires_actual_visible_fact() {
                     declared_input["players"][slot]["visible"] = json!({"$set":p.visible});
                 }
             }
-            assert_eq!(declared_input, control_record["game"], "only target's visible fact removed");
+            assert_eq!(
+                declared_input, control_record["game"],
+                "only target's visible fact removed"
+            );
             let absent = observe(&control, &rules, &mut control_fog, threaded);
             assert_eq!(absent, control_record["expected"]);
-            assert_cold(&control, &rules, &absent, &control_record["coldExpected"], threaded);
+            assert_cold(
+                &control,
+                &rules,
+                &absent,
+                &control_record["coldExpected"],
+                threaded,
+            );
             assert_eq!(absent[0]["vis"][target_cell], 0);
             assert_eq!(actual[0]["vis"][target_cell], 1);
             let changed = changed_cells(&absent[0]["vis"], &actual[0]["vis"]);
@@ -241,7 +300,10 @@ fn cmb131_height_only_edit_invalidates_warmed_cells() {
             assert_eq!(actual, frame["expected"]);
             assert_cold(&g, &rules, &actual, &frame["coldExpected"], threaded);
             if index == 1 || index == 2 {
-                assert_eq!(actual, before, "stable scene retains masks, versions and deltas");
+                assert_eq!(
+                    actual, before,
+                    "stable scene retains masks, versions and deltas"
+                );
                 assert!(fog.kept[&observer].seen.as_ref().unwrap().cells.len() > 0);
             }
             if index == 3 {
@@ -251,11 +313,18 @@ fn cmb131_height_only_edit_invalidates_warmed_cells() {
                 for key in ["height", "tick", "visionTick", "terrainVersion"] {
                     restored[key] = prior_input[key].clone();
                 }
-                assert_eq!(restored, *prior_input, "only declared height and clocks/version change");
+                assert_eq!(
+                    restored, *prior_input,
+                    "only declared height and clocks/version change"
+                );
                 let old_height = previous.height.as_ref().unwrap();
                 let new_height = g.height.as_ref().unwrap();
-                let edits: Vec<_> = old_height.iter().zip(new_height).enumerate()
-                    .filter_map(|(cell, (a, b))| (a != b).then_some(cell)).collect();
+                let edits: Vec<_> = old_height
+                    .iter()
+                    .zip(new_height)
+                    .enumerate()
+                    .filter_map(|(cell, (a, b))| (a != b).then_some(cell))
+                    .collect();
                 assert_eq!(edits, vec![edit_cell]);
                 assert_eq!(json!(old_height[edit_cell]), case["oldHeight"]);
                 assert_eq!(json!(new_height[edit_cell]), case["newHeight"]);
