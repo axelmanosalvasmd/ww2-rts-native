@@ -13,8 +13,10 @@ const pin = 'e4e579a838aabae3b1d9dadbc17a0a87147bc52d';
 assert.equal(process.version, 'v24.21.0');
 assert.equal(process.arch, 'x64');
 const args = process.argv.slice(2);
-assert.equal(args.length, 1, 'one explicit /tmp output path is required');
-const output = resolve(args[0]);
+const checking = args.includes('--check'), paths = args.filter(a => a !== '--check');
+assert.equal(paths.length, 1, 'one explicit /tmp output path is required');
+assert.equal(args.length, 1 + Number(checking));
+const output = resolve(paths[0]);
 assert.ok(output.startsWith('/tmp/'), 'draft evidence stays outside the candidate tree');
 const root = fileURLToPath(new URL('../', import.meta.url));
 const reference = resolve(process.env.WW2_REFERENCE ?? `${root}/reference/ww2-rts`);
@@ -124,7 +126,13 @@ try {
     failure ??= error;
   }
   // A failed original callback retains all preceding observations and its raw error.
-  writeFileSync(output, gzipSync(JSON.stringify(packet) + '\n', {level: 9}));
+  const compressed = gzipSync(JSON.stringify(packet) + '\n', {level: 9});
+  if (failure) writeFileSync(checking ? `${output}.failed.gz` : output, compressed);
+  else if (checking) {
+    if (!readFileSync(output).equals(compressed)) writeFileSync(`${output}.different.gz`, compressed);
+    assert.deepEqual(readFileSync(output), compressed, 'original full callback recording is reproducible');
+  }
+  else writeFileSync(output, compressed);
 }
 if (failure) throw failure;
 console.log(`${packet.cases.length} original Source checks completed; native consumers remain pending`);

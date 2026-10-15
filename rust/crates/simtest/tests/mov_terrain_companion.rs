@@ -139,8 +139,10 @@ impl<'a> Scene<'a> {
             retained_structures, step: 0, command: 0};
         scene.dry();
         scene.m.validate_tick_state().expect("first real tick admission, no bypass");
-        let builder = scene.m.world.game.units.values().find(|u|u.owner == 0 && scene.m.rules.kinds[u.kind].name == "engineer")
-            .expect("actual constructor engineer").id;
+        let builder_kind = manifest["producer"]["builderKind"].as_str().unwrap();
+        assert!(ww2_core::economy::builder_types(Mode::Conquest).unwrap().contains(&builder_kind));
+        let builder = scene.m.world.game.units.values().find(|u|u.owner == 0 && scene.m.rules.kinds[u.kind].name == builder_kind)
+            .expect("actual constructor actor admitted by native builder policy").id;
         assert_eq!(json!(builder), oracle["builder"]);
         scene.m.start.economy.players[0].mp = n(&manifest["producer"]["wallet"]);
         let births = scene.issue(Command::Build {ids: vec![i64::from(builder)], kind: "motorpool".into(),
@@ -178,8 +180,8 @@ impl<'a> Scene<'a> {
         for actor in spec["actors"].as_array().unwrap() {
             let kind = actor["kind"].as_str().unwrap();
             let producer = if kind == "tank" { maker } else {
-                scene.m.world.game.units.values().find(|u|u.owner == 0 && scene.m.rules.kinds[u.kind].name == "barracks")
-                    .expect("retained constructor barracks").id
+                scene.m.world.game.units.values().find(|u|u.owner == 0 && scene.m.rules.kinds[u.kind].name == manifest["producer"]["rifleMaker"].as_str().unwrap())
+                    .expect("retained constructor HQ").id
             };
             scene.m.start.economy.players[0].mp = n(&manifest["producer"]["wallet"]);
             let births = scene.issue(Command::Buy {kind: kind.into(), from: Some(producer)});

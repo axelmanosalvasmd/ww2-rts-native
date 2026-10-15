@@ -101,6 +101,8 @@ mod mode_startup_checks;
 mod mov_terrain_companion;
 #[path = "../mov_vehicle_predicates.rs"]
 mod mov_vehicle_predicates;
+#[path = "../mov_world_distance.rs"]
+mod mov_world_distance;
 #[path = "../movement.rs"]
 mod movement;
 #[path = "../movement_existing_checks.rs"]

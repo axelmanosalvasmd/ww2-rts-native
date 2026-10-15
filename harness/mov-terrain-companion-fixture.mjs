@@ -12,8 +12,11 @@ const manifest = JSON.parse(readFileSync(`${root}/harness/mov-terrain-scenes.jso
 const pin = manifest.reference;
 assert.equal(process.version, 'v24.21.0');
 assert.equal(process.arch, 'x64');
-assert.equal(process.argv.length, 4, 'separate original capture and /tmp output paths required');
-const originalBytes = readFileSync(process.argv[2]);
+const args = process.argv.slice(2), checking = args.includes('--check');
+const paths = args.filter(a => a !== '--check');
+assert.equal(paths.length, 2, 'separate original capture and /tmp output paths required');
+assert.equal(args.length, 2 + Number(checking));
+const originalBytes = readFileSync(paths[0]);
 const original = JSON.parse(gunzipSync(originalBytes));
 assert.equal(original.reference, pin);
 assert.equal(original.failure, undefined, 'retain and report the first original failure before companion recording');
@@ -22,7 +25,7 @@ const originalChecks = ['Roads and mud', 'Ground that wears', 'Slope', 'Wind, we
   assert.equal(check?.completed, true, `complete original callback: ${name}`);
   return {name, sha256: check.sha256, completed: check.completed};
 });
-const target = process.argv[3];
+const target = paths[1];
 assert.ok(target.startsWith('/tmp/'));
 const clean = () => {
   assert.equal(execFileSync('git', ['-C', ref, 'rev-parse', 'HEAD'], {encoding: 'utf8'}).trim(), pin);
@@ -63,6 +66,7 @@ const packet = {reference: pin, node: process.version, arch: process.arch, manif
   random: 'Global Math.random fixed0.5; native MatchRandom must never be replaced', cases: [], completed: false};
 let active;
 function trace(spec) {
+  active = {name: spec.name, boundary: 'canonical constructor', completed: false};
   const map = sceneMap(spec), s = manifest.startup;
   const g = sim.createGame(map, s.names, false, s.teams, s.factions,
     {mode: 'conquest', army: s.army, weather: s.weather, weatherSeed: s.weatherSeed,
@@ -97,8 +101,9 @@ function trace(spec) {
   g.seed = s.environmentSeed; g.wind = {a: s.wind[0], v: s.wind[1]};
   Object.assign(g.wx, {rain: 0, raining: false, wet: 0, next: 1e9});
   g.players[0].mp = manifest.producer.wallet;
-  const builder = [...g.units.values()].find(u => u.owner === 0 && u.type === 'engineer');
-  assert.ok(builder, 'real constructor engineer');
+  assert.ok(sim.builderTypes(sim.isConstructionMode(g)).includes(manifest.producer.builderKind));
+  const builder = [...g.units.values()].find(u => u.owner === 0 && u.type === manifest.producer.builderKind);
+  assert.ok(builder, 'real constructor builder admitted by Source builder policy');
   active.builder = builder.id;
   const built = command({t: 'build', ids: [builder.id], kind: manifest.producer.kind,
     x: manifest.producer.at[0], z: manifest.producer.at[1]});
@@ -109,7 +114,7 @@ function trace(spec) {
   while (maker.built < 1 && constructionTicks < manifest.producer.limitTicks) {
     ticks('construction', 1); constructionTicks++;
   }
-  assert.ok(maker.built >= 1, 'actual engineer completes the Motor Pool before the cap');
+  assert.ok(maker.built >= 1, 'actual builder completes the Motor Pool before the cap');
   active.constructionTicks = constructionTicks;
   command({t: 'stop', ids: [builder.id]});
   active.producer = roster(g).find(row => row.id === maker.id);
@@ -124,7 +129,7 @@ function trace(spec) {
   }
   for (const actor of spec.actors) {
     g.players[0].mp = manifest.producer.wallet;
-    const from = actor.kind === 'tank' ? maker : [...g.units.values()].find(u => u.owner === 0 && u.type === 'barracks');
+    const from = actor.kind === 'tank' ? maker : [...g.units.values()].find(u => u.owner === 0 && u.type === manifest.producer.rifleMaker);
     assert.ok(from, 'retained real producer');
     const buy = command({t: 'buy', unit: actor.kind, from: from.id});
     assert.equal(buy.births.length, 1, 'public Buy publishes one actor');
@@ -185,7 +190,13 @@ try {
 } finally {
   Math.random = previousRandom;
   try { clean(); } catch (error) { packet.readbackFailure = {message: error.message, stack: error.stack}; failure ??= error; }
-  writeFileSync(target, gzipSync(JSON.stringify(packet) + '\n', {level: 9}));
+  const compressed = gzipSync(JSON.stringify(packet) + '\n', {level: 9});
+  if (failure) writeFileSync(checking ? `${target}.failed.gz` : target, compressed);
+  else if (checking) {
+    if (!readFileSync(target).equals(compressed)) writeFileSync(`${target}.different.gz`, compressed);
+    assert.deepEqual(readFileSync(target), compressed, 'canonical companion recording is reproducible');
+  }
+  else writeFileSync(target, compressed);
 }
 if (failure) throw failure;
 console.log(`${packet.cases.length} canonical companion scenes; original cleared captures and native proof remain separate`);

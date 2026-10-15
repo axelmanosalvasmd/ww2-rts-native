@@ -4,7 +4,7 @@
   "scope": "Disclosed canonical companion; not literal admission of the cleared original fixtures",
   "map": {"w": 80, "h": 96, "spawns": [{"x": 10, "y": 82}, {"x": 70, "y": 82}], "points": []},
   "startup": {"seed": 7301, "environmentSeed": 123, "wind": [0, 0.5], "weather": "clear", "weatherSeed": 1, "livingWeather": true, "tech": false, "supply": false, "logistics": false, "army": "standard", "names": ["A", "B"], "teams": [0, 1], "factions": [0, 1]},
-  "producer": {"kind": "motorpool", "at": [45, 145], "limitTicks": 2400, "wallet": 5000},
+  "producer": {"kind": "motorpool", "builderKind": "rifle", "rifleMaker": "hq", "at": [45, 145], "limitTicks": 2400, "wallet": 5000},
   "scenes": [
     {"name": "grass", "surface": "grass", "warmup": 40, "measure": 40, "actors": [{"alias": "subject", "kind": "tank", "at": [5, 29], "rot": 0, "goal": [151, 29]}]},
     {"name": "road", "surface": "road", "warmup": 40, "measure": 40, "actors": [{"alias": "subject", "kind": "tank", "at": [5, 5], "rot": 0, "goal": [151, 5]}]},

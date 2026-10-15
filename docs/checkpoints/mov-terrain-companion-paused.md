@@ -1,5 +1,9 @@
 # Private MOV terrain companion, paused before execution
 
+Historical paused checkpoint40229feb. The resumed source and current gaps are in
+[the consumer readiness plan](mov-speed-consumer-readiness.md). The original
+failure finding below remains as history; no execution is implied.
+
 Based on exact fixed main396f. Root's priority PR256 rebase interrupts this draft.
 No Source/Node/Cargo/rustc/native/fmt/discovery ran. No fixture exists yet.
 
