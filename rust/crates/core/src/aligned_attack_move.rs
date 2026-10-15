@@ -151,10 +151,13 @@ fn count_mappings(
     }
 }
 fn boolean_counts(counts: &BooleanCounts) -> Vec<Value> {
-    counts.iter().map(|((path, actor, field), count)| {
-        let actor: Value = serde_json::from_str(actor).unwrap();
-        json!({"path":path,"actor":actor,"field":field,"count":count,"default":false})
-    }).collect()
+    counts
+        .iter()
+        .map(|((path, actor, field), count)| {
+            let actor: Value = serde_json::from_str(actor).unwrap();
+            json!({"path":path,"actor":actor,"field":field,"count":count,"default":false})
+        })
+        .collect()
 }
 
 #[test]
@@ -187,9 +190,19 @@ fn boolean_defaults_are_symmetric_and_preserve_every_present_value() {
         }
         let (_, currencies, mappings) = canonical(&missing);
         assert!(currencies.is_empty());
-        assert_eq!(mappings, vec![json!({"path":format!("$.units[0].{field}"),"actor":7,"field":field})]);
-        for present in [json!(true), json!(false), json!(0), number(0.0), Value::Null,
-            json!("false"), json!({"absent":true,"extra":0})] {
+        assert_eq!(
+            mappings,
+            vec![json!({"path":format!("$.units[0].{field}"),"actor":7,"field":field})]
+        );
+        for present in [
+            json!(true),
+            json!(false),
+            json!(0),
+            number(0.0),
+            Value::Null,
+            json!("false"),
+            json!({"absent":true,"extra":0}),
+        ] {
             let original = frame(field, Some(present.clone()));
             let (copy, _, mapped) = canonical(&original);
             assert_eq!(copy["units"][0][field], present);
@@ -529,8 +542,18 @@ fn run_case(trace: &Value, authored: &Value, source: &Value) -> Result<Value, St
         }
         let (a, source_currency, source_boolean) = canonical(expected);
         let (b, native_currency, native_boolean) = canonical(observed);
-        count_mappings(source_currency, source_boolean, &mut source_currency_counts, &mut source_boolean_counts);
-        count_mappings(native_currency, native_boolean, &mut native_currency_counts, &mut native_boolean_counts);
+        count_mappings(
+            source_currency,
+            source_boolean,
+            &mut source_currency_counts,
+            &mut source_boolean_counts,
+        );
+        count_mappings(
+            native_currency,
+            native_boolean,
+            &mut native_currency_counts,
+            &mut native_boolean_counts,
+        );
         if tick % 10 == 0 {
             checkpoints += 1;
         }

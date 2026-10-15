@@ -2,6 +2,9 @@
 
 ## Two explicit attack-move boolean format defaults (2026-10-15)
 
+Initial frozen implementation `e6061b8446f56ee5b689e7bcbe6c297ebcfc2599` retains its first formatting diff; apply only mechanical formatting before the two selected tests. The original read-only13eSource bytes match their existing binding, and all first-report/stage artifacts remain unchanged. No Source rerun or new native result is claimed by the format repair.
+
+
 The user's follow-up to Root's diagnostic6196700421 explicitly permits comparison-only absence-to-false for holdFire and holdPos. Actual pinned Source declares both undefined at `sim.js:1797`, and its `stanceBits` at3334 uses their truthiness. Native constructor fields are false (`match_commands.rs:252`, `unit_spawn.rs:347`), so both formats leave the corresponding player stance bit clear. [The exact paths, source authority, vectors and selected commands](docs/testing/aligned-attack-move.md#authorized-two-boolean-comparison-follow-up) distinguish these two fields from the unchanged four currency defaults.
 
 Only missing keys or exact absence markers become false, independently on comparison copies. Every present value survives, including true, false, numeric0, null, strings and extra-key markers. No state/input, Source recorder, scene, raw projection, hook, provider, runtime RNG, shipping interface or old global canonical module changes. Reports retain all raw frames, first raw divergence and per-side/case mapping counts by exact path plus actor ID. The focused regression checks symmetry, preserved values and rejected unlisted/type/marker differences. Existing a985/9819/13e and first failure remain immutable historical evidence. The authentic Source capture/binding is reused byte-exact, with zero Source reruns. Native/formatting results for this bounded child are pending its announced source freeze. Both rows remain held.

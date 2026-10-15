@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Apply mechanical formatting to the frozen two-boolean comparison follow-up after retaining its first format-check diff. No predicate, mapping, input, raw projection or Source change; focused native results remain pending.
+
 - Add the user's two explicit attack-move comparison defaults: absent holdFire/holdPos become false independently on copied unit projections, with all present values retained. Keep currency defaults separate, report exact actor/path/count mappings, retain all raw frames and add one focused positive/negative regression. Reuse frozen Source with no rerun; the first tick-0 failure remains historical. New results pending.
 
 - Retain the first targeted attack-move result at 9819b5c3: the selected test fails at tick 0 on Source holdFire absence versus native false, with 0/1 observed checkpoints matching and all five consumed startup draws equal. Stop before native ticks/control, keep both rows held and preserve raw evidence. Formatting passes; conditional Clippy is not run.
