@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Preserve the 6dca two-field attempt's OOM with no scenario counts, and reclassify proposed defaults as diagnostic pending Axel's decision. Keep raw strict and approved currency-only results separate. Add the two-field Source-read registry, stream full raw reports by case and compare each actual consumed draw once without changing inputs, projection or engine behavior. No Source rerun or row eligibility.
+
 - Apply mechanical formatting to the frozen two-boolean comparison follow-up after retaining its first format-check diff. No predicate, mapping, input, raw projection or Source change; focused native results remain pending.
 
 - Add the user's two explicit attack-move comparison defaults: absent holdFire/holdPos become false independently on copied unit projections, with all present values retained. Keep currency defaults separate, report exact actor/path/count mappings, retain all raw frames and add one focused positive/negative regression. Reuse frozen Source with no rerun; the first tick-0 failure remains historical. New results pending.

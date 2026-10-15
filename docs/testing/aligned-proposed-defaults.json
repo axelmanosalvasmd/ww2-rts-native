@@ -1,0 +1,40 @@
+{
+  "mode": "DIAGNOSTIC_PROPOSED_DEFAULTS",
+  "ownerApproval": "PENDING",
+  "parityEligible": false,
+  "reference": "e4e579a838aabae3b1d9dadbc17a0a87147bc52d",
+  "fields": [
+    {
+      "path": "$.units[*].holdFire",
+      "field": "holdFire",
+      "default": false,
+      "sourceFile": "shared/sim.js",
+      "declarationLine": 1797,
+      "consumerLine": 3334,
+      "consumingExpression": "u.holdFire ? 2048 : 0",
+      "reason": "Absent/undefined and false both leave this specific stance bit clear; present values are never rewritten.",
+      "nativeProvider": "Match.commands.units[id].hold_fire",
+      "absentForms": [
+        "missing key",
+        "exact {absent:true}"
+      ],
+      "scope": "comparison copies only, diagnostic while owner approval is pending"
+    },
+    {
+      "path": "$.units[*].holdPos",
+      "field": "holdPos",
+      "default": false,
+      "sourceFile": "shared/sim.js",
+      "declarationLine": 1797,
+      "consumerLine": 3334,
+      "consumingExpression": "u.holdPos ? 4096 : 0",
+      "reason": "Absent/undefined and false both leave this specific stance bit clear; present values are never rewritten.",
+      "nativeProvider": "Match.world.game.units[id].hold_pos",
+      "absentForms": [
+        "missing key",
+        "exact {absent:true}"
+      ],
+      "scope": "comparison copies only, diagnostic while owner approval is pending"
+    }
+  ]
+}

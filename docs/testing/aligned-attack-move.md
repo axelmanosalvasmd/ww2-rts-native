@@ -129,3 +129,30 @@ python3 /home/judiazm/.t3/handoffs/ww2-native-cargo-guard.py \
 ```
 
 Execution for this child is pending at its first source freeze. On an early stop, report only the aligned consumed prefix, with actual Source/native counts and checkpoint/tick counts. Root retains fresh final-head review and any later passing-row proposal/publication. Process exit plus flock release immediately returns S1.
+
+## USER16:21: proposed defaults are diagnostic only
+
+This instruction supersedes the earlier implication that the two boolean mappings were owner-approved. Root reports Hermes164/6196736715 explicitly withheld that approval. Root alone sends the one general-rule question to Axel. Until the answer, every proposed-default run is **DIAGNOSTIC_PROPOSED_DEFAULTS**, with ownerApproval=PENDING and parityEligible=false even if all4,800 ticks and both branches match. No row proposal/status/public PR follows from a diagnostic match.
+
+[The explicit per-field registry](aligned-proposed-defaults.json) currently contains only holdFire and holdPos, their exact pinned consuming expressions at sim.js3334, false defaults, declaration evidence, actual native providers and the reason each default leaves its own stance bit clear. It lists every proposed field rather than applying a generic falsey conversion. A new field needs its own actual Source read/default evidence. Present values, types, signed-zero bits, nonfinite values and array order always survive unchanged; no []/{}/empty-string defaults exist. The approved four-currency rule remains a separate unchanged comparison.
+
+The previous two-field attempt remains preserved at6dca6095: vectors1PASS, final formatting0, but the native scope ended OOM-killed at6GiB/swap0 before writing a report or stage-result file. Its tick/checkpoint/first-path/draw-prefix counts are unavailable. No outcome is inferred from that killed attempt. The original13e fixture/binding, a985/9819 first report and all old execution records remain byte-exact. Zero Source reruns.
+
+A bounded test-only successor streams each case's complete raw Source and native frame arrays directly to the final private JSON report, then drops that case's native array before starting the control. It does not clone all frame arrays into nested report Values. Per-tick alignment borrows the unchanged actual draw ledger, checks each newly consumed row exactly once, and retains an explicit checked-prefix count. The original consumers/tape are unchanged. This removes repeated full-receipt clones without omitting a row or altering engine input/state. Full receipts remain in the final report.
+
+The new report separates raw strict, approved currency-only and proposed-diagnostic differences and counts. The test's success means complete diagnostic comparison and branch execution only. First proposed real difference or alignment/admission failure stops execution; it does not cause another mapping/rule/input fix. The corresponding first raw/approved difference remains available even when diagnostic execution proceeds beyond tick0.
+
+Exact new selections, using the same S1 limits/current guard after the announced clean freeze:
+
+```sh
+cargo +1.99.0 test --manifest-path rust/Cargo.toml --locked --profile ci-test \
+  -p ww2-core --lib -j4 \
+  aligned_replay::attack_move::proposed_default_registry_preserves_every_present_value \
+  -- --exact --nocapture --test-threads=1
+cargo +1.99.0 test --manifest-path rust/Cargo.toml --locked --profile ci-test \
+  -p ww2-core --lib -j4 \
+  aligned_replay::attack_move::attack_move_and_plain_move_match_with_complete_branches \
+  -- --exact --ignored --nocapture --test-threads=1
+```
+
+These are payloads for the current S1 guard, not bare-shell authorization. Formatting repair is mechanical only. Conditional fresh core/simtest all-target ci-test strict Clippy runs only if both new diagnostic checks pass. No Source, old vectors/R1 tests, guards/list/full/release, worker, MODE-21 or public action. New private output directory: `/tmp/aligned-amove-diagnostic-d6308bcc/`.
