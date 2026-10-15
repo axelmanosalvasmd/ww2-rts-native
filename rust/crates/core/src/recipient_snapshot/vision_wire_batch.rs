@@ -6,7 +6,8 @@ use crate::grid::SpatialGrid;
 fn fixture() -> Value {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/vision-wire-batch.json");
-    let bytes = std::fs::read(path).expect("generate vision-wire-batch.json with a Root recorder slot");
+    let bytes =
+        std::fs::read(path).expect("generate vision-wire-batch.json with a Root recorder slot");
     let value: Value = serde_json::from_slice(&bytes).expect("vision wire fixture JSON");
     assert_eq!(value["pin"], "e4e579a838aabae3b1d9dadbc17a0a87147bc52d");
     value
