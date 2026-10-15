@@ -1,5 +1,13 @@
 # Three Crossroads Native: design decisions
 
+## Queued hospital recorder denial repair (2026-10-15, source only)
+
+The single Source generation at `ca56e75d1d2ba780b914d0eb880d9aa4965f174f` failed at the final `hospital[6].result` assertion: actual `blocked`, expected `max`. The complete original twelve-trace, 47-action byte guard passed before that failure. The private output was absent with ENOENT; its byte check and all fourteen native checks, formatting and Clippy remained unrun. The raw failure and receipt stay in `/tmp/eng-five-proof-ca56-e92ceac8/`.
+
+Pinned `shared/sim.js:3642-3645` checks placement before the single-hospital limit. The final action requests the completed hospital's original site, so its placement denial is `blocked`. Change only that final recorder expectation from `max` to `blocked`; keep the earlier pending-hospital `max` assertion, every input, all four private traces and 28 actions, all other assertions, the old twelve-trace byte guard and every native body unchanged. This repairs the recorder witness and proves no native provider defect. The optional native consumer already converts actual typed denials with `denial.name()` and compares them with the captured result; no consumer field or conversion changes.
+
+ENG-15/16/17/23/24 remain in progress, with every Acceptance cell preserved. A fresh exact-head Root grant is required before Source generation and, only if it passes, the byte check. Native proof needs a separate grant. The kind-7 owner-view and MOV28 bridge proposals remain unapplied; IMPL_ENGINEERING keeps first publication priority. No interface or privacy adoption follows from this repair.
+
 ## Owned queued-Dig current-main union and optional capture (2026-10-15, source only)
 
 Start a fresh branch at fixed main `f7b0e5889e3b707beb6d18c4ea8d20a7d9f7b578` and restore only ENG-15/16/17/23/24 source from frozen `5445d4ac`. Reconstruct the complete expected tree before writes: overlapping owned source is unchanged between old `7c9df2d5` and incoming main, so the owned candidate files fit without dropping any incoming field or command case. Keep every other incoming blob, fixture, parity cell, consolidated registry and direct CHANGELOG history. New entries use fragments. All fourteen focused names remain unchanged and unrun.

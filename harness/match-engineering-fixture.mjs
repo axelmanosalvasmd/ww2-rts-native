@@ -81,7 +81,7 @@ try {
   assert.equal(poor[3].snapshot.paid.mp[0],encode(0));assert.equal(poor[3].snapshot.paid.story[0].mpSpent,encode(0));assert.equal(poor[3].snapshot.paid.units[0].dig,null);assert.equal(poor[3].snapshot.orders[0].orders.length,0);assert.ok(poor[3].snapshot.paid.units[0].path.length);
   assert.ok(full.slice(1,9).every(r=>r.result===null&&r.snapshot.paid.mp[0]===encode(0)));
   assert.equal(full[9].result,'queueFull');assert.equal(full[10].result,'notVisible');assert.equal(full[10].snapshot.orders[0].orders.length,8);assert.equal(full[11].snapshot.orders[0].orders.length,0);
-  assert.equal(hospital[1].snapshot.paid.mp[0],encode(500));assert.equal(hospital[2].snapshot.paid.mp[0],encode(400));assert.equal(hospital[3].result,'max');assert.equal(hospital[4].snapshot.aid.length,1);assert.equal(hospital[5].snapshot.orders[0].orders.length,0);assert.equal(hospital[5].snapshot.paid.mp[0],encode(400));assert.equal(hospital[6].result,'max');
+  assert.equal(hospital[1].snapshot.paid.mp[0],encode(500));assert.equal(hospital[2].snapshot.paid.mp[0],encode(400));assert.equal(hospital[3].result,'max');assert.equal(hospital[4].snapshot.aid.length,1);assert.equal(hospital[5].snapshot.orders[0].orders.length,0);assert.equal(hospital[5].snapshot.paid.mp[0],encode(400));assert.equal(hospital[6].result,'blocked');
   content=JSON.stringify({reference:pin,node:process.version,arch:process.arch,baselineBytes:baseline,traces:extra})+'\n';path=resolve(queuedOutput);
  }
  clean();

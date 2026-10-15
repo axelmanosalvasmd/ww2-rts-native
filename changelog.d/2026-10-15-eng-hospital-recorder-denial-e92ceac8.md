@@ -1,0 +1,1 @@
+- Correct only the final private queued-hospital recorder expectation from `max` to `blocked`, matching pinned Source placement before its hospital-limit check. Preserve the failed ca56e75d attempt, all inputs and native bodies, four private traces with 28 actions, and the twelve-trace baseline; fresh Source and native proof remain pending.
