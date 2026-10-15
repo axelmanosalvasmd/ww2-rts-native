@@ -21,6 +21,8 @@ mod deployment;
 mod economy;
 #[path = "../economy_state.rs"]
 mod economy_state;
+#[path = "../engineering_weather.rs"]
+mod engineering_weather;
 #[path = "../environment.rs"]
 mod environment;
 #[path = "../environment_debris.rs"]
