@@ -19,6 +19,8 @@ mod lifecycle;
 mod income;
 #[path = "classic_construction_queue_tests.rs"]
 mod queue;
+#[path = "base_consumer_completion_tests.rs"]
+mod consumers;
 
 fn bits(n: f64) -> String { format!("{:016x}", n.to_bits()) }
 fn point(p: Option<Point>) -> Json { p.map_or(Json::Null, |p| json!([bits(p.x), bits(p.z)])) }

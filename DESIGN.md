@@ -4352,3 +4352,112 @@ Stop and release the granted slot on the first actual executed failure, keeping
 its head and raw log. No retry, historical PASS transfer or broader whole-match
 gate is implied. Root owns independent review, hosted checks and exact-head
 Hermes readback before any runtime merge.
+
+## BASE command and Classic crew completion draft (2026-10-15, unrun)
+
+This fresh bounded worker preserves `cd9a776114145717974d250e266b99808272ac2f`
+under `impl/bases-cycle2-cd9-preserved-d699fc97`, fetches main, and starts a new
+branch at `f7b0e5889e3b707beb6d18c4ea8d20a7d9f7b578`. The clean owned checkpoint
+is carried onto that branch without changing its tree. Existing recovery refs,
+historical failures, all six earlier recipes, the frozen 30 older test bodies
+and the three cd9 queue bodies remain preserved. No granted tree is resumed or
+modified. The sole shared slot ledger remains Root-owned.
+
+Read the complete original named scenarios at reference `e4e579a`: test.js's
+explicit-maker, Classic mode/production/endgame, personal Rally, queued Classic
+work and full Engineer queue scenarios; the construction/repair loops and Horde
+shared-producer scenario in test-skirmish-bases.js; the complete Classic section
+breach/Assist block in test-engine-world.js; and the waiting-recruitment identity,
+refund, progress, ownership and reconnect check in test-engine-acceptance.js.
+Those complete checks include branches beyond this selected component scope.
+An authored component witness is neither execution evidence nor a whole-row
+promotion. No additional whole-match gate is added to a complete component check.
+
+One runtime defect follows directly from pinned shared/sim.js:3737-3741.
+`cancelProduction` tests construction mode, then Sudden Death, then building/job
+identity. The native Match consumer previously returned `unseen` for an absent
+or malformed ID before reaching the deadline denial in ProductionState. Check
+the actual canonical Classic deadline after validating its represented context
+and before unpacking either optional ID. Ordinary modes still return `needs`;
+World and the existing prepared cancellation/refund transaction keep their scope.
+This adds no public Rust shape, entry, command or external adoption.
+
+The seventh independent recipe, base-consumer-completion-fixture.mjs, records
+five authored scenes using original constructors, commands, section contacts and
+fixed Source steps. Each scene calls the actual shared/story.js storyResult observer
+once before capture, so Source initializes its own lazy story rows through its
+existing report-card read. No absent-story value is mapped to a native default. Native creates independent real Match state from declared
+map/settings, never from expected snapshots. Default and Conquest scenes test
+the ordinary cancellation mode refusal, strict personal destination refusals,
+selected-building ownership, explicit null scalar precedence and a real paid
+rifle whose building Rally takes precedence over its personal Rally. Ordinary
+purchases use constructor funds and require no income or wallet assignment.
+
+The genuine Classic owner scene earns funds, queues three identical owner jobs
+and a real allied purchase, advances the head for 40 ticks, refuses allied and
+rival cancellation, refunds the third waiting identity once, and retains head
+progress and the untouched waiter. Real training promotes that waiter and
+refuses its cancellation as active. Source cached and uncached job/queue rows
+must agree for every actual player and exclude other owners, including allies.
+The native private reader is compared with both Source paths; it is not a new
+native cache, wire, spectator, reconnect or full Classic snapshot provider.
+
+The construction scene pays for two Barracks immediately and queues real Assist
+to the second behind work on the first. It refuses MG training at an unfinished
+maker, then requires both sites to complete naturally. An actual Move brings the
+Engineer back into repair reach. A paid MG job survives the first real section
+breach and the repeated contact's zero debit. Assist restores the supported
+section after two fixed ticks without MP spending. A later Move plus queued
+Assist keeps work waiting until the route completes, finishes the repair and
+retains the real trained MG's building-rally endpoint. No pose, HP, tier, wallet,
+clock, RNG, income or training timer is assigned to make that scene pass.
+Native calls the existing environment section component and consumes its combat
+metadata effects, matching the Source damageWorldSection component. Classic
+DamageWorld combat admission remains closed; no actor-mode guard is relaxed.
+Full destruction/retirement and settled debris are still outside this caller.
+
+The deadline scene advances from canonical startup to the actual 1500-second
+boundary, pays for three jobs one second before it, and observes the real late
+clear with no refund. Three later cancellations, including absent and malformed
+IDs, must all return `suddenDeath`. Ten further seconds retain the original
+one-percent-per-second HQ decay predicate. No synthetic near-deadline state is
+installed. The separate native fault control earns and pays for real jobs,
+removes only story bookkeeping to exercise atomic waiting cancellation, restores
+that bookkeeping for a successful positive control, then removes only a later
+owned maker's rally metadata and proves no earlier selected Rally is published.
+Typed preservation includes the inherited canonical actor/control/wallet/jobs,
+node/section/structure/grid/log/pending sets plus clock, allocator and RNG state.
+
+Authored counts, not measurements: five scenes, five story observer reads, 50 commands, two section-contact
+calls, 38,986 Source steps, 63 action frames and five initial frames per recipe
+invocation. The new native child contains five tests, all unrun. The earlier
+33 pending tests retain their producing-head attribution; this makes 38 pending
+tests, without expanding any older grant or prefix. Raw Source observations
+retain their exact values and no comparison-default mapping is added.
+
+BASE-12 node claims remain BASE_AUDIT's read-only provider and MODE's home Buy
+remains read-only. The new worker sends Root this coordination boundary before
+editing; no overlapping owner code is edited and silence grants nothing.
+Locally acknowledge issue #5 through 6202580526 and PR195 reply 6156740603:
+receipt preserves the serial 271,268,269,270 integration queue, fresh readback
+per changed head, ABI 2 and the pinned reference. Defaults approval 6201127263
+is conditional comparison-only authority and is unused here. No public message
+is authorized. Root owns independent review, nine exact-head hosted checks and
+Hermes readback before any runtime merge.
+
+All Source, Node, Cargo, rustc, native, formatting, lint, discovery, release and
+CI executions remain zero. No slot was granted or held and no parity cell moved.
+The authentic seventh fixture is absent until Root grants generation and a
+serial byte check on this exact source head with a named clean pinned Source
+checkout. Root then freezes its genuine producing child and separately grants
+the five exact native names, current guard and an exclusive external target.
+Every granted job must use four actual CPUs, 6 GiB, zero swap, a 400-second limit,
+jobs4, one test thread, exclusive slot flock and an immediate 20 GiB disk floor.
+On the first executed failure, retain the exact head and raw log, terminate the
+job, release inherited and terminal slot locks, notify Root and stop.
+
+The ten owned BASE rows retain their current status and full Acceptance cells.
+Horde/Assault/Annihilation producer and Rally admission, full recipient/reconnect
+history, aircraft/naval birth, logistics repair, Classic total-failure retirement,
+concrete Wall/Gate and the broader mode matrix remain explicit gaps. This draft
+does not qualify a five-row PR or transfer any historical pass to a new head.

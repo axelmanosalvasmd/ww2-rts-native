@@ -1,0 +1,2 @@
+- Check Classic Sudden Death before malformed production-cancellation IDs, matching the original command's refusal order.
+- Add an unrun Source recipe and five native test drafts for ordinary Rally and cancellation, private paid-job identities and refunds, sequential Classic construction and queued section repair, and the real deadline. Preserve all 33 older unrun drafts and every parity row. Compilation, formatting, recording and behavior remain unverified.

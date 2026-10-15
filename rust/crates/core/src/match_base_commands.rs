@@ -23,6 +23,10 @@ impl Match {
             return Ok(Some(Denial::Unsupported));
         }
         let count = self.production_step_context().map_err(|e| format!("production cancel context: {e:?}"))?;
+        // Source checks the deadline before looking up the building or job.
+        if self.classic_sudden_death() {
+            return Ok(Some(Denial::SuddenDeath));
+        }
         let (Some(building), Some(job)) = (building, job) else {
             return Ok(Some(Denial::Unseen));
         };
