@@ -144,7 +144,10 @@ fn classic_price_boundary_three_paid_rifles_then_atomic_mp_refusal() {
             .expect("Root must grant authentic BASE13 Source generation before this test"),
     )
     .unwrap();
-    assert_eq!(fixture["reference"], "e4e579a838aabae3b1d9dadbc17a0a87147bc52d");
+    assert_eq!(
+        fixture["reference"],
+        "e4e579a838aabae3b1d9dadbc17a0a87147bc52d"
+    );
     assert_eq!(fixture["price"], json!({"mp": 100, "fuel": 0}));
     assert_eq!(fixture["initialCount"], 3);
     let input = &fixture["input"];
@@ -169,10 +172,23 @@ fn classic_price_boundary_three_paid_rifles_then_atomic_mp_refusal() {
     let projection = |state: &ProductionState, wallets: &EconomyState| {
         let payer = &wallets.players[0];
         let maker = state.building(1).unwrap();
-        let jobs: Vec<_> = maker.rows().into_iter().map(|row| {
-            json!([row.job.id, row.job.kind, bits(row.job.charge.mp), bits(row.job.charge.fuel),
-                if row.status == JobStatus::Active { "active" } else { "waiting" }])
-        }).collect();
+        let jobs: Vec<_> = maker
+            .rows()
+            .into_iter()
+            .map(|row| {
+                json!([
+                    row.job.id,
+                    row.job.kind,
+                    bits(row.job.charge.mp),
+                    bits(row.job.charge.fuel),
+                    if row.status == JobStatus::Active {
+                        "active"
+                    } else {
+                        "waiting"
+                    }
+                ])
+            })
+            .collect();
         json!({"next": state.next_job_id(),
             "money": [bits(payer.mp), bits(payer.mun), bits(payer.fuel)],
             "progress": bits(maker.progress()), "jobs": jobs})
@@ -199,7 +215,10 @@ fn classic_price_boundary_three_paid_rifles_then_atomic_mp_refusal() {
     assert_eq!(a(&fixture["trace"]).len(), 4);
     let mut accepted = 0;
     for (index, row) in a(&fixture["trace"]).iter().enumerate() {
-        assert_eq!(row["action"], json!({"slot": 0, "kind": "rifle", "from": 1}));
+        assert_eq!(
+            row["action"],
+            json!({"slot": 0, "kind": "rifle", "from": 1})
+        );
         let before = projection(&state, &wallets);
         context(input, |c| {
             let actual = state.queue_unit(c, &mut wallets, 0, Faction::Usa, "rifle", Some(1));
@@ -219,12 +238,22 @@ fn classic_price_boundary_three_paid_rifles_then_atomic_mp_refusal() {
         let remaining = affordable(&state, &wallets);
         assert_eq!(json!(remaining), row["remainingCount"]);
         assert_eq!(remaining, [2, 1, 0, 0][index]);
-        assert_eq!(wallets.players[0].mp, if index < 3 { 301.0 - 100.0 * (index + 1) as f64 } else { 1.0 });
+        assert_eq!(
+            wallets.players[0].mp,
+            if index < 3 {
+                301.0 - 100.0 * (index + 1) as f64
+            } else {
+                1.0
+            }
+        );
         assert_eq!(wallets.players[0].mun, 0.0);
         assert_eq!(wallets.players[0].fuel, 0.0);
         assert_eq!(state.building(1).unwrap().rows().len(), (index + 1).min(3));
         if index == 3 {
-            assert_eq!(actual, before, "refused buy cannot change wallet, jobs, progress or next ID");
+            assert_eq!(
+                actual, before,
+                "refused buy cannot change wallet, jobs, progress or next ID"
+            );
         }
     }
     assert_eq!(accepted, 3);

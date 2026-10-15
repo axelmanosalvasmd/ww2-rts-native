@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## BASE13 paid component formatting child (2026-10-15)
+
+At frozen `889fa902`, Root's new exact S2 grant ran the core formatting check once. It exited 1 with five layout diagnostics confined to the paid-boundary consumer in tests/production.rs. The actual scope used CPUs 4-7, 6 GiB memory, zero swap, a 400% CPU quota, jobs 4 and threads 1, the current guard and inherited exclusive S2 lock, external target and per-job free-g/20 GiB disk checks. The process ended and the lock was reacquired and released before reporting. Native and Clippy did not run.
+
+Apply exactly those five recorded replacements. Every non-whitespace Rust byte and quoted literal is preserved. The authentic Source fixture, recorder, production provider, five count observations, four canonical buys, eleven copy-probe calls and atomic refusal assertions remain unchanged. Raw diagnostics and reconstruction are in `/tmp/logistics271-rebase-f7-9add/base13-native-889-20261015/`. Freeze this mechanical child for a new exact Root binding before the one native test and conditional strict core Clippy. The original formatting failure remains retained. No Source repeat, other BASE13 clause, row promotion or Classic shipping admission is claimed.
+
 ## BASE13 authentic paid boundary capture (2026-10-15)
 
 At exact producer `970ab0dbc5d5b3da7fbaa1576b29090421519b98`, Root's new S2 Source-only grant ran the unchanged maintained recorder once and its byte check once. Both exited 0 with x64 Node 24.21.0 against clean pinned `e4e579a`. Each run exercised one declared production component, four original Source Buy calls, three paid rifle jobs and five original client `buyCount` observations `[3, 2, 1, 0, 0]`, with zero ticks and zero draws. The fourth Buy returned `mp` with 1 MP left and unchanged paid jobs, next ID and progress.

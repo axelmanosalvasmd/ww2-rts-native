@@ -1,0 +1,1 @@
+- Apply the five recorded formatter replacements in the BASE13 paid rifle consumer. Preserve every assertion, input, Source fixture and runtime byte; retain the initial formatting failure. Native proof awaits a new exact-child Root binding, and the remaining BASE13 clauses stay held.
