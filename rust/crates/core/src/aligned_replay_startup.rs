@@ -78,9 +78,16 @@ fn building_cells_equal(source: &Value, native: &Value) -> bool {
         if object.len() != 2 {
             return None;
         }
-        let value = object.get("value")?.as_f64()?;
-        let bits = object.get("bits")?.as_str()?;
-        (value.is_finite() && format!("{:016x}", value.to_bits()) == bits).then_some(value)
+        let text = object.get("bits")?.as_str()?;
+        if text.len() != 16 || !text.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return None;
+        }
+        let bits = u64::from_str_radix(text, 16).ok()?;
+        let number = f64::from_bits(bits);
+        let display = object.get("value")?.as_f64()?;
+        // JSON.stringify(-0) displays 0. Recorded bits still distinguish the two zeros.
+        let consistent = display.to_bits() == bits || display == 0.0 && number == 0.0;
+        (number.is_finite() && consistent).then_some(number)
     }
     fn entries(value: &Value) -> Option<std::collections::BTreeMap<String, &Value>> {
         let object = value.as_object()?;
@@ -936,6 +943,16 @@ fn building_cells_membership_preserves_complete_entries() {
     reordered["$map"].as_array_mut().unwrap().reverse();
     assert!(building_cells_equal(&source, &reordered));
     assert!(!exact(&source, &reordered)); // Raw order still differs.
+    let mut negative_zero = source.clone();
+    negative_zero["$map"][0][1]["x"] = json!({"bits":"8000000000000000","value":0});
+    assert!(building_cells_equal(&negative_zero, &negative_zero));
+    let mut native_negative_zero = negative_zero.clone();
+    native_negative_zero["$map"][0][1]["x"] = n(-0.0);
+    assert!(building_cells_equal(&negative_zero, &native_negative_zero));
+    let mut positive_zero = negative_zero.clone();
+    positive_zero["$map"][0][1]["x"] = n(0.0);
+    assert!(!building_cells_equal(&positive_zero, &negative_zero));
+    assert!(!building_cells_equal(&negative_zero, &positive_zero));
     for source_side in [false, true] {
         let rejected = |changed: Value| {
             if source_side {
@@ -990,15 +1007,21 @@ fn building_cells_membership_preserves_complete_entries() {
         let mut wrong_type = source.clone();
         wrong_type["$map"][0][1]["owner"] = json!(false);
         rejected(wrong_type);
+        let mut wrong_association = source.clone();
+        let first = wrong_association["$map"][0][1].clone();
+        wrong_association["$map"][0][1] = wrong_association["$map"][1][1].clone();
+        wrong_association["$map"][1][1] = first;
+        rejected(wrong_association);
+        let mut inconsistent_bits = source.clone();
+        inconsistent_bits["$map"][0][1]["x"]["bits"] = json!("4000000000000000");
+        rejected(inconsistent_bits);
+        let mut malformed_bits = source.clone();
+        malformed_bits["$map"][0][1]["x"]["bits"] = json!("not sixteen hex");
+        rejected(malformed_bits);
         let mut nonfinite = source.clone();
         nonfinite["$map"][0][1]["x"] = n(f64::NAN);
         rejected(nonfinite);
     }
-    let mut wrong_association = source.clone();
-    let first = wrong_association["$map"][0][1].clone();
-    wrong_association["$map"][0][1] = wrong_association["$map"][1][1].clone();
-    wrong_association["$map"][1][1] = first;
-    assert!(!building_cells_equal(&source, &wrong_association));
     assert!(!building_cells_equal(&source, &source["$map"]));
 }
 
