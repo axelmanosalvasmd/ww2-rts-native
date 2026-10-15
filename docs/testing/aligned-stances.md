@@ -2,7 +2,7 @@
 
 Status at this source freeze: execution pending; DIAGNOSTIC_PROPOSED_DEFAULTS, ownerApproval=PENDING, parityEligible=false. Root owns the one general-rule request6196930542. Hermes1656196947312 is a technical acknowledgment, not owner approval. No row status or public action occurs.
 
-Literal CMB-83: stance accepts holdFire/holdPos/autoRetreat with boolean on, otherwise blocked; own units only, otherwise needs; private bits2048/4096/8192/16384 reach only the owner. Source Stances check is test.js1227-1246. Actual Source anchors: declarations1786-1797; stance reads3331-3334; selection3419; dispatch3574-3579; explicit attack3460 onward; reactive Hold Position4090; fire gate5569; owner projection5903 and snapshotFor6011 onward. Native anchors: Command::from_json stance decoder, Match::execute_command own-unit dispatch, existing recipient_snapshot::SnapshotCache/recipient. No new shipping interface is needed.
+Literal CMB-83: stance accepts holdFire/holdPos/autoRetreat with boolean on, otherwise blocked; own units only, otherwise needs; private bits2048/4096/8192/16384 reach only the owner. Source Stances check is test.js1227-1246. Actual Source anchors: declarations1786-1797; stance reads3331-3334; selection3419; dispatch3574-3579; explicit attack3495 onward; reactive Hold Position4090; fire gate5569; owner projection5903 and snapshotFor6011 onward. Native anchors: Command::from_json stance decoder, Match::execute_command own-unit dispatch, existing recipient_snapshot::SnapshotCache/recipient. No new shipping interface is needed.
 
 The complete authored script is [aligned-stances.json](../../harness/scenarios/aligned-stances.json), with a single1,200-tick case and121 N10 checkpoints. It keeps the accepted profile, explicit layout[0,1], finite16,384-draw shared tape and the same genuine constructor. The authored flat map adds one sandbag cell(10,11), next to ordinary actor1 at(21,21). Ordinary Move stages foe4 at(43,21); ordinary Stop ends staging. Neither actors, health, pose, flags, queues nor ownership are primed or overwritten.
 
@@ -32,3 +32,15 @@ cargo +1.99.0 clippy --manifest-path rust/Cargo.toml --locked --profile ci-test 
 ```
 
 Only one new selected test because the registry and its vector are unchanged. No old attack-move/R1/four-test/guard/list/full/release run, worker or public action. Formatting correction may be mechanical only and requires another clean freeze. Slot transfers immediately on process exit plus flock release. Root handles private final-head review and any owner decision/publication; no eligibility pass is inferred.
+
+## Actual first Source result and stop
+
+Producer: `25b9ed6880f3751f244e97ed261b69b61fba1f8b`. Generation exits 2 after 1,200 ticks and 1,201 captured raw frames. First qualification failure is detected at tick 1,200, `$.cases[0].branches.complete`, required true versus observed false. This is a Source branch failure, with no JS/Rust comparison yet.
+
+Original canShootFoe is false at every frame from tick 500 through 600. Both ordinary actors are stationary at the authored positions, actor 1 (21,21), foe 4 (43,21), and both retain 100 HP through tick 600. Thus inRange, holdFirePreventsDamage, naturalIncoming and holdPositionUnderFire are false. No claim about the exact LOS/visibility cause is made because those subpredicates were not observed. The script is retained without a repair or weaker predicate.
+
+Source completes 34 actual command dispositions: 27 accepted, five malformed blocked and two foreign needs. Legal boolean toggles, explicit Attack damage despite Hold Fire, resumed damage after switching off, released movement at tick 840 and owner-only recipient-bit checks complete. The owner observes all four private bits, with 4,416 actual visible-foreign checks and no private-bit leak, using both Source snapshot paths. These facts do not establish a native result or complete CMB-83 proof.
+
+The Source ledger contains 2,533 consumed values, 13,851 unused, capacity 16,384, not exhausted. No native consumed prefix or input alignment is proved. Paired checkpoint count is zero; raw strict, approved currency-only and proposed-diagnostic comparison verdicts are NOT_RUN, not 0/121 mismatches. Source check, formatting, compile, native test, registry vector and Clippy are all unrun after the first genuine Source failure. The registry remains unchanged.
+
+Private evidence is `/tmp/aligned-stances-d6308bcc/`: read-only source-trace.json, source-generate.log and source-generate-result.json, first-source-failure.json, command-summary.json and REPORT.md. The Source fixture includes every raw frame, per-command before/after recipient flags and the complete actual draw ledger. This final documentation child keeps the script, scene and whole Rust tree identical to the Source-producing head and claims no new execution. Old evidence remains intact. S1 is terminal and flock released; no row/status/publication action occurs.

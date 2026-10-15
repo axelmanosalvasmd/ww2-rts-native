@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Preserve the first stance Source failure at 25b9ed68: generation captures all 1,200 ticks but exits 2 because the planned Hold Fire/Hold Position window has no shootable foe or incoming damage. Actual 34 command dispositions and recipient-bit checks complete; Source consumes 2,533 values with 13,851 unused. Stop before Source check, formatting or Cargo. No paired comparison, native alignment or row eligibility is claimed.
+
 - Add a separate test-only CMB-83 stance diagnostic using genuine constructor actors, ordinary JSON commands, malformed/foreign dispositions and actual recipient flags. Author nearby cover and staged natural fire to check Hold Position, Hold Fire on/off and explicit-attack override; toggle all three boolean keys and autocast through commands. Keep proposed defaults pending, old evidence intact and rows held. Execution pending.
 
 - Record diagnostic-only attack-move and plain-Move results at 10feb6aa: each matches all 4,800 ticks and 481/481 checkpoints with equal consumed-input receipts and complete actual branches. Raw strict and approved currency-only remain 0/481 at tick-0 holdFire absence versus false. Two focused checks, formatting and fresh strict core/simtest Clippy pass. Boolean-default owner approval remains pending; no row eligibility or Source rerun.
