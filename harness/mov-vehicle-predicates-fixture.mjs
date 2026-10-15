@@ -208,4 +208,4 @@ const output = JSON.stringify({ reference: pin, node: process.version, arch: pro
 const target = resolve(root, 'rust/crates/simtest/tests/fixtures/mov-vehicle-predicates.json');
 if (process.argv.includes('--check')) assert.equal(readFileSync(target, 'utf8'), output);
 else writeFileSync(target, output);
-console.log(`Verified ${cases.length} original lab journeys, ${cases.reduce((sum, c) => sum + c.ticks, 0)} full steps and ${cliffs.length} diagonal checks`);
+console.log(`Verified ${cases.length - 1} original lab journeys and one engine sequence, ${cases.reduce((sum, c) => sum + c.ticks, 0)} full steps and ${cliffs.length} diagonal checks`);

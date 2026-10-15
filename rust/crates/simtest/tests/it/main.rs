@@ -87,6 +87,8 @@ mod mode_predicates;
 mod movement;
 #[path = "../movement_routing.rs"]
 mod movement_routing;
+#[path = "../mov_vehicle_predicates.rs"]
+mod mov_vehicle_predicates;
 #[path = "../navigation.rs"]
 mod navigation;
 #[path = "../ordinary_production_tick.rs"]

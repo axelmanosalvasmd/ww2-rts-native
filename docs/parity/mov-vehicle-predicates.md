@@ -1,12 +1,12 @@
-# Selected vehicle predicates: source-only checkpoint
+# Selected vehicle predicates: S1 recording and focused validation
 
 Base: `91c1d4453b8ba74b511bb950b5c651f36398f78b`, branch `test/mov-vehicle-predicates-0e8d6d9b`. Source: `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. The recovered checkout had no tracked or untracked dirty draft. Its reference submodule was initially absent and is now initialized at the unchanged pin.
 
-This draft targets five existing selected row checks. It has not run a Source recorder, compiled Rust or executed a native test. The expected fixture `rust/crates/simtest/tests/fixtures/mov-vehicle-predicates.json` does not exist yet. No row is promoted. The native test reads that file at runtime and fails explicitly if it is missing.
+This batch targets five existing selected row checks. The original source-only checkpoint was `66f65c03bc6fb546c0cd933de1b52426f8bb18d8`. Its ordinary merge of exact main `90ce32f59508a1c991397aa6d0bb7b562b19c695` is `3f4f46461ca00d89f6cc5666018f3c0b96db2d4e`, with those two ordered parents. The incoming consolidated test layout is retained, with the same consumer registered in `rust/crates/simtest/tests/it/main.rs`. No helper import adaptation was needed. Source generation and a byte-equal regeneration check now pass inside Root's S1 scope. No row is promoted. Rust compilation and native execution remain pending at the pre-Cargo freeze.
 
 ## Selected batch
 
-The recorder imports the original `runMovementCase` and `createMovementCase` through the original runner. It selects seven complete journeys across the original eleven lab types: tank, medium, tankdestroyer, tiger, churchill, armoredcar, halftrack, flaktrack, rocket, rifle and AT gun. This means 77 complete journeys, one engine acceleration/Stop sequence and six diagonal component checks. These are planned inputs and assertions, not measured passing counts.
+The recorder imports the original `runMovementCase` and `createMovementCase` through the original runner. It selects seven complete journeys across the original eleven lab types: tank, medium, tankdestroyer, tiger, churchill, armoredcar, halftrack, flaktrack, rocket, rifle and AT gun. Source generation and regeneration pass 77 complete journeys, one engine acceleration/Stop sequence, 74,970 actual Source steps and six diagonal component checks. These are Source results; complete native row checks remain pending.
 
 All Source paths below are relative to `reference/ww2-rts` at the pin. The acceptance cells in `movement.md` are unchanged.
 
@@ -46,9 +46,13 @@ PR #234 is background evidence only: 26 scenes, 134 actions, zero promotions, cu
 
 MOV-09 and new rows remain paused. MOV-31 through MOV-39 and MOV-91/MOV-98 files belong to the other audit and are untouched. No runtime, reference, terrain provider, guard, header, ABI, interface, DESIGN or shared CHANGELOG file is changed.
 
-## Validation queued for Root
+## S1 validation
 
 Static checks performed: JavaScript syntax only, direct Rust formatting/parser check and `git diff --check`. These do not establish Rust compilation, Source verdicts, native admission or row completion. `/usr/bin/node` is the verified x64 Node v24.21.0 binary; the shell's default Node is v26.11.1. Rust 1.99.0 with rustfmt is installed.
+
+Root grants standing S1 for this stream: 6 GiB, no swap, four build jobs, four test threads, CPUs 0-3 and 400% CPU quota. Each job asserts kernel `memory.max=6442450944`, `memory.swap.max=0`, `cpu.max=400000 100000`, affinity `[0,1,2,3]` and both thread/job environment values before execution. Source generation and check run through `/usr/bin/node` inside separate transient scopes. Generation peaks at 295,964,672 bytes and check at 286,859,264 bytes; both exit zero with all memory event counters zero. Both scopes are inactive after completion. Logs and the scope runner are retained under `harness/out/mov-s1/`.
+
+The generated fixture has 4,867,857 bytes and SHA256 `035b57ca31a5d151f7a3378653f9d4d0a20236d9a2b6cca08d751ca4f431e9e9`. Recorder SHA256 is `e2141c1c64c33236a85f6b83392e9e58c525b7ef0a55cd021bfa96d126bb35a4`; the unchanged complete native consumer is `17552ea35997b6633b6bb638196b032d50ede849214e7b05a133b95dd72aecb5`. The recorder's final console label now distinguishes 77 lab journeys from the engine sequence. No serialized input, Source body or predicate was changed for that wording correction.
 
 Read-only source review found and corrected an initial false assumption that Conquest startup had no base footprints. `Match::new` actually stamps bases (`match_runtime.rs:627-632,713-715,901-955`) and retained production rows require their actors (`match_production.rs:137-157`). The draft now retains those complete constructor bindings on both sides. This correction was made before any Source or native job; no failed execution is represented as a pass.
 
@@ -64,9 +68,9 @@ Run these only inside Root's granted central resource scope, from this checkout:
 Then, from `rust/`, run the sole new focused test:
 
 ```sh
-cargo test --locked --profile ci-test -p ww2-simtest --test mov_vehicle_predicates original_vehicle_selected_journeys_through_real_admission_and_ground_orders -- --exact --nocapture
+cargo nextest run --locked --cargo-profile ci-test -p ww2-simtest --test it --test-threads 4 -E 'test(=mov_vehicle_predicates::original_vehicle_selected_journeys_through_real_admission_and_ground_orders)'
 ```
 
-This command targets the recovered branch's existing test layout. If Root later carries it onto the consolidated test layout, register the same test in that layout and select its exact name through nextest. Do not add a second version of the test. Preserve any initial failure and diagnose it before changing setup or assertions. A successful focused run still needs separate source review and Root's integration gates before row status changes.
+This command selects only the registered vehicle consumer in the incoming consolidated layout. Preserve any initial failure and diagnose it before changing setup or assertions. A successful focused run still needs separate source review and Root's integration gates before row status changes. Full, release and list jobs are not authorized here; the new fixture enters Root's heavy queue after focus and review.
 
-Local coordination readback acknowledges issue #5's requirement for exact Source citations, complete selected checks and explicit unsupported scope. Missing owner agreement remains pending. This source-only checkpoint makes no external acknowledgment post, push, PR or merge.
+Local coordination readback acknowledges issue #5's requirement for exact Source citations, complete selected checks and explicit unsupported scope, including readback 125 at exact main 90ce32f5. Missing owner agreement remains pending. This stream makes no external acknowledgment post, push, PR or external merge.
