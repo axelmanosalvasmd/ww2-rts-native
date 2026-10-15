@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Record the authorized R1 comparison result at `db854ef7`: canonical 61/61 checkpoints and all 600 stepped ticks match, while raw comparison remains 0/61 with the tick-0 Fuel presence difference. Preserve the first strict-Clippy unused-helper failure and make only the test-build delegate visibility public before retrying lint.
+
 - Format the frozen comparison-only R1 currency rule and its regression vectors before the authorized four-check native run. No comparison rule, input or engine behavior changes.
 
 - Add the explicitly authorized R1 comparison-only currency rule: absent Fuel/Munitions keys or exact absence markers use positive-zero defaults on both projected snapshots. Preserve every present value, the raw 0/61 result and all source/native traces. Add focused positive and negative vectors; canonical 61-checkpoint results and fresh review are pending.
