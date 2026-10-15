@@ -8,14 +8,14 @@ linter, discovery, release or CI command has run in this successor.
 
 | Owned row | Current delivery |
 | --- | --- |
-| MAP-04 | Held. Three core-field classes have ten authentic retained bad-map inputs. The new strict text consumer is committed; current native messages differ. |
-| MAP-05 | Held. Two retained height errors now have a strict text consumer; current native messages differ. |
+| MAP-04 | Held. Three core-field classes have ten authentic retained bad-map inputs. The strict consumer and authorized native message repair are committed; execution remains pending. |
+| MAP-05 | Held. Two retained height errors have a strict consumer and authorized message repair; execution remains pending. |
 | MAP-06 | Held. Existing deployment filtering is covered, but the original twenty modified-map shuffled Conquest starts, Assault defender start and exact insufficient-normal-spawn message still need their complete native witness. |
-| MAP-07 | Held. Frozen main has four named XL constructors and ten Hill constructors with full raw path comparisons. The improved consumer compares both retained invalid-map messages; current native text differs. |
+| MAP-07 | Held. Frozen main has four named XL constructors and ten Hill constructors with full raw path comparisons. The improved consumer compares both retained invalid-map messages; the authorized text repair awaits execution. |
 | MAP-19 | Held. Static structure graphs/material/health are covered. Original editor movement, save round trip, invalid-move atomicity, deletion/pruning and anchor rejection history is not a native editor consumer. |
 | MAP-97 | Ported. Recover the reviewed whole selected component from the historical producing head below. |
 | MAP-100 | Held. Internal memory/read/query components do not prove the selected full World delivery, reconnect and hidden-perturbation histories. World snapshot/server admission remains refused. |
-| MAP-117 | Held. Complete Hill constructor/raw-path proof is already present; its exact invalid-defend message remains the missing clause. |
+| MAP-117 | Held. Complete Hill constructor/raw-path proof is already present; its exact invalid-defend text is repaired but remains unproved until execution. |
 
 ## Recovered native MAP97 proof
 
@@ -47,14 +47,16 @@ or serialization claim follows from this component.
 
 ## Exact pending gate set
 
-Source/test checkpoint: `28c13fb5`, direct child of frozen main.
-Root's runtime scope decision precedes the bounded validator-message fix.
-The public MapError variants, validation predicates, fixture inputs and
-all guards must remain unchanged. One dependent BASE diagnostic currently
-expects the old name message at
-`rust/crates/simtest/tests/construction_tick/base_selected.rs:68`; Root must
-coordinate its expectation update before the name-message fix is delivered.
-No public or ABI/protocol contract change is proposed.
+Initial source/test checkpoint: `28c13fb5`, direct child of frozen main.
+Root explicitly authorized the runtime-message repair on primary
+`13064504`, plus the single dependent BASE name-error expectation update.
+The public MapError variants, all validation predicates, fixture inputs,
+accepted maps and unsupported guards remain unchanged. Other layer-helper
+errors retain their previous strings. The BASE raw invalid input still
+fails; its name-only empty-point refusal and all replay expectations stay
+intact. Root owns IMPL_BASES notification. No public, ABI or protocol
+contract change is proposed. Root retains Hermes exact-runtime-head
+acknowledgment before merge. No slot is granted yet.
 
 Proposed native instances, only after freezing the repair and obtaining
 an exact execution grant:
@@ -65,7 +67,11 @@ an exact execution grant:
 - `ww2-core::it authoritative_maps::authoritative_maps_match_pinned_validation_and_static_terrain`
 - `ww2-simtest::it assault_start::explicit_assault_start_matches_original_create_game`
 
-These are five unique instances. No new original capture is needed for
+These are five unique MAP instances. The affected BASE gate is the existing
+`ww2-simtest::it construction_tick::base_selected::base26_pillbox_slit_faces_out_from_home`.
+Its shared fixture loader calls the changed preparation diagnostic for all
+four cases before the selected real Pillbox replay. This makes six proposed
+unique native instances in total, with no new BASE test or row edit. No new original capture is needed for
 their fifteen strict map cases or the two Assault errors, all already in
 the retained authentic fixtures. Workspace formatting and strict locked
 core/simtest all-target Clippy are conditional on Root's grant and passing
@@ -83,7 +89,8 @@ original Hill validation inputs and errors.
 
 Issue5 was read through comment6199190039. Receipt of Hermes173 and the
 unchanged reference/ABI/contracts is acknowledged locally and to Root;
-it is not consent for proposed defaults, new runtime scope or private
-view changes. No public acknowledgment, push, PR or merge was made.
+it is not consent for proposed defaults or private view changes. The
+subsequent Root message explicitly authorizes only the bounded validator
+repair and single BASE expectation described above. No public acknowledgment, push, PR or merge was made.
 Root owns the ledger, slots, maps publication lease, actual-head review,
 Hermes readback and final hosted gates.

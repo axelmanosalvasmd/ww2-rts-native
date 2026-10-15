@@ -28,6 +28,21 @@ pub enum MapError {
 impl fmt::Display for MapError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Invalid { field, .. } if field == "name" => {
+                f.write_str("name must be a string up to 40 chars")
+            }
+            Self::Invalid { field, .. } if field == "w" || field == "h" => {
+                f.write_str("size must be 20-1024 cells")
+            }
+            Self::Invalid { field, .. } if field == "defend" => {
+                f.write_str("defend must list some (not all) spawn numbers")
+            }
+            Self::Invalid { field, .. } if field == "assaultTime" => {
+                f.write_str("assaultTime must be 300-3600 seconds")
+            }
+            Self::Invalid { field, reason } if field == "rows" || field == "heights" => {
+                f.write_str(reason)
+            }
             Self::Invalid { field, reason } => write!(f, "{field}: {reason}"),
             Self::Unsupported { feature } => {
                 write!(f, "unsupported authoritative map feature: {feature}")
@@ -69,20 +84,37 @@ fn optional_bool(v: &Value, key: &str) -> Result<bool> {
     }
 }
 fn rows(v: &Value, w: usize, h: usize, allowed: &[u8], field: &str) -> Result<Vec<u8>> {
-    let list = array(v, field)?;
+    let error = |shape: bool| {
+        let reason = match field {
+            "rows" if shape => "row count must equal height".to_owned(),
+            "rows" => format!("rows must be {w} valid terrain chars"),
+            "heights" => format!("heights must be {h} rows of 0-4 (a/b for depths -1/-2)"),
+            _ if shape => "row count must equal height".to_owned(),
+            _ => "rows must have the declared width and valid cells".to_owned(),
+        };
+        invalid(field, &reason)
+    };
+    let list = array(v, field).map_err(|original| {
+        if field == "rows" || field == "heights" {
+            error(true)
+        } else {
+            original
+        }
+    })?;
     if list.len() != h {
-        return Err(invalid(field, "row count must equal height"));
+        return Err(error(true));
     }
     let mut out = Vec::with_capacity(w * h);
     for row in list {
-        let row = row
-            .as_str()
-            .ok_or_else(|| invalid(field, "expected text rows"))?;
+        let row = row.as_str().ok_or_else(|| {
+            if field == "rows" || field == "heights" {
+                error(false)
+            } else {
+                invalid(field, "expected text rows")
+            }
+        })?;
         if row.len() != w || !row.bytes().all(|c| allowed.contains(&c)) {
-            return Err(invalid(
-                field,
-                "rows must have the declared width and valid cells",
-            ));
+            return Err(error(false));
         }
         out.extend_from_slice(row.as_bytes());
     }

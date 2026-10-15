@@ -1,5 +1,41 @@
 # Three Crossroads Native: design decisions
 
+## Authorized map validation text repair (2026-10-15, execution pending)
+
+Root reviewed the concrete validator proposal and pinned Source validation
+at shared/sim.js:575-595, then authorized its bounded application directly
+on primary `13064504`, not the earlier status child. MapError keeps its
+existing variants and fields; its Display now returns the original text
+for name, width/height, rows/heights, defend and assaultTime errors. The
+existing rows helper supplies declared dimensions in row/height messages.
+Every validation condition, allowed character, accepted map and unsupported
+feature guard remains unchanged. Calls for other layer fields retain their
+original array-type, row-type, shape and content errors. This preserves the
+bounded scope where the shared helper serves unrelated layered inputs.
+
+Root also authorized the one dependent BASE diagnostic expectation at
+construction_tick/base_selected.rs:68. It now expects the original Source
+name-error text. The raw nameless/empty-points input, rejection, name-only
+point rejection, amended map and every replay assertion remain intact.
+Root is notifying IMPL_BASES; this is explicit authorization for that single
+expectation, not inferred consent to edit any other BASE consumer or row.
+The existing exact test
+`construction_tick::base_selected::base26_pillbox_slit_faces_out_from_home`
+loads the shared fixture and checks all four raw-map preparation receipts
+before its own replay. It is the proposed affected-consumer gate in addition
+to the five MAP native instances. No new duplicate diagnostic test is added.
+
+Measured execution status here is zero jobs and zero native results.
+No Source, Node, Cargo, rustc, native, fmt, lint, discovery, release or CI
+command runs without a new exact Root slot grant. The five-row status child
+for MAP04/05/07/97/117 remains conditional on actual gates and independent
+actual-head review. Only the already reviewed MAP97 status is applied now;
+all140 Acceptance cells and all other MAP cells remain exact. MAP06's
+unfinished constructor child stays separate, with no Source capture grant.
+Root retains Hermes exact-runtime-head acknowledgment before merge, the
+publication lease and hosted9/9. No ABI, protocol, interface or terrain
+policy change is introduced.
+
 ## Recovered MAP97 eligibility on frozen main (2026-10-15)
 
 Recover only the owned MAP97 Rust/Status cells from reviewed private child
