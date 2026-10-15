@@ -660,9 +660,8 @@ fn original_vehicle_selected_journeys_through_real_admission_and_ground_orders()
             x: number(&v["x"]),
             z: number(&v["z"]),
         };
-        assert_eq!(
-            terrain::segment_cliff_clear(&world.game, at(&case["from"]), at(&case["to"])),
-            false,
+        assert!(
+            !terrain::segment_cliff_clear(&world.game, at(&case["from"]), at(&case["to"])),
             "diagonal {index}"
         );
         assert_eq!(case["clear"], false);
