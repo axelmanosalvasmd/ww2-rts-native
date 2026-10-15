@@ -11,6 +11,9 @@ use crate::{
     world::{Recipient, World},
 };
 use serde_json::{Value, json};
+
+#[path = "mov_wrapper_batch.rs"]
+mod mov_wrapper_batch;
 fn bits(n: f64) -> Value {
     json!(format!("{:016x}", n.to_bits()))
 }
