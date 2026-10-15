@@ -1,0 +1,1 @@
+- Fix the ordinary-binary test harness reading a private match or fault receipt before its final newline reaches the log. Parse complete byte records so a partial JSON or UTF-8 tail waits for the next poll; malformed complete JSON still fails. Add one deterministic regression over every split point, retaining the existing mine-contact, timeout and restart assertions.
