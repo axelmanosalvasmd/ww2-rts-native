@@ -1,5 +1,7 @@
 # Three Crossroads Native: design decisions
 
+CMB-140 formatting checkpoint: Source generation and serial check both exit 0 at `4d60cfc4`, with all genuine Stop branches qualified over 450 ticks/451 frames and 905 draws. The first fmtcheck reports only new aligned_stop.rs layout. The mechanical new-file rustfmt retains every original lexical token and every string literal, inserting only optional trailing commas. Source inputs, authentic read-only capture, observers, registry, predicates and all old files remain unchanged. Freeze this child before renewed fmt and the two new native checks; no native pass is claimed here. Raw evidence is `/tmp/cmb140-stop-s3-508272ac/`.
+
 ## CMB-140 genuine three-actor Stop diagnostic (2026-10-15, source freeze)
 
 From preserved diagnostic docs head `68bd3ba2`, add one owned child module and recorder for CMB-140. Original constructors, shared finite tape/layout, ordinary commands and 450 actual ticks prepare actor A with attack-move, actor B with a visible Attack target and actor C with queued Move/Attack work. One actual Stop selects all three; Source Attack and attack-move clear each other, so no single actor is primed with impossible simultaneous intent. Observe every selected actor before/after, all typed waiting-order fields, full existing movement/firing projection and additional work/target/traffic fields. Foreign-only, no-own, empty and mixed Stop controls retain actual denials and unchanged foreign state. No actor birth, HP, pose, queue or expected state is authored into either engine.

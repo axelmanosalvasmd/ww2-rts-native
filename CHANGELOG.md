@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Format only the new CMB-140 diagnostic module after Source generation/check passed at `4d60cfc4` (450 ticks, 451 frames, 905 draws). Preserve all original tokens and literals, allowing only formatter-added trailing commas. Native tests remain pending; retain the initial fmt diff.
+
 - Prepare CMB-140 as a private aligned Stop diagnostic: three genuine actors carry attack-move, an attack target and typed queued Move/Attack orders before one Stop. Preserve foreign/empty/mixed controls, raw observations and separate comparison modes; add six source-backed pending defaults only for newly observed work/traffic fields. No row promotion or new execution is claimed at this source freeze.
 
 - Record diagnostic-only attack-move and plain-Move results at 10feb6aa: each matches all 4,800 ticks and 481/481 checkpoints with equal consumed-input receipts and complete actual branches. Raw strict and approved currency-only remain 0/481 at tick-0 holdFire absence versus false. Two focused checks, formatting and fresh strict core/simtest Clippy pass. Boolean-default owner approval remains pending; no row eligibility or Source rerun.
