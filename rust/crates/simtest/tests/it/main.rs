@@ -33,6 +33,10 @@ mod assault_start;
 mod compiled_rules;
 #[path = "../conquest_finish.rs"]
 mod conquest_finish;
+#[path = "../conquest_mode_batch.rs"]
+mod conquest_mode_batch;
+#[path = "../conquest_team_result.rs"]
+mod conquest_team_result;
 #[path = "../construction_tick.rs"]
 mod construction_tick;
 #[path = "../fps_effects.rs"]
