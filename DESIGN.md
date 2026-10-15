@@ -1,5 +1,9 @@
 # Three Crossroads Native: design decisions
 
+## Selected BASE checked footprint indices (2026-10-15, source child)
+
+The first selected native compilation at `8ade5c103f0a6a6127151234893591de48a46bfc` exited 101 before any test instance ran. The new test used `u32` actor footprint cells directly against `usize` canonical lookup/structure cells. Root authorizes only a local full-vector checked conversion through `usize::try_from(*cell).expect`, preserving order, every value and the original actor footprint. Both the lookup assertion and exact ordered structure equality remain. The immutable compiler diagnostic and Source/fmt proof stay in `/tmp/impl-bases-26276-S1-75l4dlp_/`. No Source recording is repeated and the authentic gzip fixture SHA256 remains `0eebee9ebd0020adb973a8e6f8fe099bf424baf1ca8b856d34a209e10b6757e6`. Freeze this child before fmt and the original six-test plus registry gate. No native success is claimed here; runtime/parser guards, old assertions, BASE-51 and parity statuses are unchanged.
+
 ## Selected BASE native formatting child (2026-10-15)
 
 The granted formatting check at fixture head `a1a6a73ce51f0d4d709356e14f4785c1103ad712` exited 1 with layout diagnostics confined to `construction_tick/base_selected.rs`. Retain the diagnostic and apply only its authorized formatting changes. A token/literal comparison confirms identical strings, predicates, values and statements; differences are whitespace, trailing commas and the equivalent block around the unchanged Auto Retreat assignment match arm. The Source recorder and authentic paired fixture remain byte-identical. Freeze this child before the new formatting check and native tests. Evidence is separate under `/tmp/impl-bases-26276-S1-75l4dlp_/`; no native result is claimed yet.

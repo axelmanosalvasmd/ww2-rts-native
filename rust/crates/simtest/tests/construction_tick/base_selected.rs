@@ -381,12 +381,16 @@ fn replay(name: &str, predicate: &str) -> Replay {
                         );
                         let cells = site.cells.as_ref().unwrap();
                         assert_eq!(cells.len(), size * size);
-                        assert!(cells.iter().all(|cell| m.building_cells[cell].unit == id));
+                        let indexed_cells = cells
+                            .iter()
+                            .map(|cell| usize::try_from(*cell).expect("actor cell fits usize"))
+                            .collect::<Vec<_>>();
+                        assert!(indexed_cells.iter().all(|cell| m.building_cells[cell].unit == id));
                         assert!(
                             m.world
                                 .structures
                                 .iter()
-                                .any(|row| row.entity_id == Some(id) && row.cells == *cells)
+                                .any(|row| row.entity_id == Some(id) && row.cells == indexed_cells)
                         );
                     }
                 }
