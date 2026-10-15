@@ -1,5 +1,9 @@
 # Three Crossroads Native: design decisions
 
+## Unapplied MOV weather Number assertion proposal (2026-10-15)
+
+The [read-only review](docs/checkpoints/mov-weather-number-review.md) binds the retained Source weather Number1 to case3/call964 of3a97 and native Number(1.0) to the actual ec3 failure. Both finite logged values denote IEEE bits `3ff0000000000000`, as a source-derived conclusion without a fresh native bit dump. Keep the Rust assertion unchanged and commit only an unapplied patch for Root review: typed Number access, explicit finiteness and exact bits at wx[0]. It includes future direct CHANGELOG/DESIGN text, rejects wrong types, zero/nonfinite/unequal values, and introduces no generic comparator or default. No old fixture, motion predicate, failed head, runtime, guard or status changes; new execution remains ungranted.
+
 ## MOV first native weather assertion and separate corner/ray source batch (2026-10-15)
 
 The exact granted selection at `ec3ccfe390dc6a3422705db5e711d5e64c6e10dd` compiles and selects six instances across two binaries, with363 tests skipped. Both real registration guards pass. The first behavior test, `original_half_churn_and_wet_ground_distances`, fails at line584 on `clients are told the weather`: the delivered serde JSON number is1.0 while the assertion expects integer1. Three remaining behavior instances do not run; strict Clippy does not start. Preserve the failure and the producing branch, with no predicate repair, input/provider change or retry. Root receives terminal process/lock release before the concise report and one-line dep-info at `/tmp/mov-55cfa430-neutral-together/`. Source13 generation/check stays attributed to `51730145`, authentic fixture freeze to `c46fa019`, and final passing format check to `ec3ccfe3`. No complete behavior or row pass is claimed.

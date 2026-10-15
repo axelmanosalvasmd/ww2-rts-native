@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Record the actual MOV weather Number storage-kind mismatch and an unapplied, weather-only finite IEEE-bit comparison patch. Keep the Rust assertion, all thirteen captured scenes and every prior failure unchanged; no execution or status promotion occurs.
+
 - Preserve the first MOV native weather-assertion failure at `ec3ccfe3` without repair or retry. Prepare separate MOV-12 and MOV-13 complete original callback recorders and native consumers: a retained-constructor 61-tick obstructed-corner journey and all 244 border-ray queries. Register both tests; Source capture and native execution remain ungranted, and no fixture or status is fabricated.
 
 - Apply the two mechanical rustfmt line wraps in the new MOV together-march assertions after preserving the failed format-check log. No assertion, input, fixture or behavior changes; native validation remains pending.
