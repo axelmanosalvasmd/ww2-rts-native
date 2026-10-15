@@ -1,9 +1,8 @@
+use crate::shared::firing as common;
+use common::{bits, compare, make, make_with_mode, snapshot};
 use serde_json::{Value, json};
 use std::io::Read;
 use ww2_core::{economy::Mode, game::Point, match_firing::AbilityBlast, random::StreamId};
-#[path = "common/firing.rs"]
-mod common;
-use common::{bits, compare, make, make_with_mode, snapshot};
 fn fixture() -> Value {
     let mut text = String::new();
     flate2::read::GzDecoder::new(&include_bytes!("fixtures/ability-flights.json.gz")[..])

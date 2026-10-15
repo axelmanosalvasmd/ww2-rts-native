@@ -1,0 +1,1 @@
+- Audit all 60 eligible in-progress MOV rows against their complete selected checks. Mark only MOV-80, MOV-93, MOV-96 and MOV-102 ported using unchanged tests from a three-platform run with 483 passes per OS; record the remaining check gaps. MOV-09 stays paused. No simulation, test, fixture, interface or acceptance check changes.

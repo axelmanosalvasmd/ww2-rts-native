@@ -1,11 +1,9 @@
-#![recursion_limit = "256"]
 //! Pure ordinary RTS projection from original Source boundary inputs and events.
 //! This test does not replay gameplay, restore MatchRandom, or adopt transport policy.
 //! Only complete `shots` rows are compared. Other snapshot fields, dormant ordinary
 //! state, and source-only falling bodies are retained in the fixture but not claimed.
 #[allow(dead_code)]
-#[path = "common/companion_tick.rs"]
-mod common;
+use crate::shared::companion_tick as common;
 
 use flate2::read::GzDecoder;
 use serde_json::{Value, json};

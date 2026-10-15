@@ -4,6 +4,8 @@ version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 publish.workspace = true
+# One test binary per crate: see tests/it/main.rs.
+autotests = false
 description = "The ww2-rts rules core: no engine, networking or file-system code."
 
 [lib]
@@ -12,3 +14,7 @@ name = "ww2_core"
 [dependencies]
 # Match the harness parser and preserve every finite IEEE 754 number.
 serde_json = { version = "1.0.154", features = ["float_roundtrip"] }
+
+[[test]]
+name = "it"
+path = "tests/it/main.rs"

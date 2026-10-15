@@ -1,6 +1,7 @@
 //! Replay the frozen full-step source oracle through the single Match runner.
 //! Constructor randomness remains native. Quiet runtime streams must not draw;
 //! environment seed advancement compares deltas from each constructor's state.
+use crate::shared::startup;
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
 use ww2_core::{
@@ -18,8 +19,6 @@ use ww2_core::{
     unit_spawn,
     weather::WeatherChoice,
 };
-#[path = "common/startup.rs"]
-mod startup;
 
 fn bits(n: f64) -> Value {
     json!(format!("{:016x}", n.to_bits()))

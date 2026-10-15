@@ -1,10 +1,9 @@
+use crate::shared::world_scene;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use ww2_core::{
     game::LOCAL_DEFENDER_OWNER, match_runtime::Match, match_world_phases::WorldIncomeUnit,
 };
-#[path = "common/world_scene.rs"]
-mod world_scene;
 
 fn fixture() -> Value {
     serde_json::from_str(include_str!("fixtures/world-phases.json")).unwrap()
