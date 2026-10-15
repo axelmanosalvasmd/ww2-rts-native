@@ -2,6 +2,9 @@
 
 ## First targeted aligned attack-move scenario (2026-10-15)
 
+Authentic Source generation at `13eae85e75681f51d0fca1cca056bac3c7ba2d64` completes both 4,800-tick cases with zero harness faults. Attack-move stages both actors at 100 HP, halts at tick490, naturally retires foe4 at780, requests resume at781 and executes arrival at1092. Plain Move passes the living shootable foe at617; both reach the exact goal with empty path and null amove. Draw counts are9,686/9,694 with6,698/6,690 unused of16,384. The new read-only private Source artifact and single SHA256 binding freeze before Cargo. The first formatting check fails on the new module; preserve its raw log and apply only mechanical formatting before the native stage. No new native result is claimed here.
+
+
 A private child of exact `5a8ce0e22c5771f3619f7f52fb0705c9afe2fe8a` prepares CMB-91/MOV-49 before further MODE-21 work. [The exact scene, fields, predicates and gates](docs/testing/aligned-attack-move.md) preserve the full-health ordinary constructor and four base buildings. Both cases use the same authored open map, shared layout/tape, staging orders and goal; only the final Move versus attack-move differs. No state/health/actor patching or copied engine formula supplies an expected result.
 
 Test-only observers record executed halt/resume/arrival, actual movement flags and ordinary retirement. Shipping predicates and operations are unchanged and all new native observation/storage compiles out. All paired frames compare actual unit paths, facing, movement/backing intent, retries, queues, targets, attack-move and stances, health, actor births/removals and retirement, alongside the existing economy/score projection. Only the four existing fuel/mun absence defaults are mapped symmetrically; all other differences remain visible. Nonempty waiting-order serialization is an explicit provider boundary, not an invented empty queue.

@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Format the new aligned attack-move consumer after preserving its first formatting failure. Authentic Source at 13eae85e completes both 4,800-tick cases, including natural foe death/resume/arrival and the living-foe plain-Move pass. Native comparison remains pending; no predicate, input, mapping or engine change.
+
 - Add a private aligned attack-move scenario and same-start plain-Move control from exact 5a8. Genuine full-health constructor actors receive only scripted orders; compare path/facing/motion/targets/stances, ordinary retirement and actual halt/death/resume/arrival branches. Retain the four currency mappings and stop at the first divergence. Source/native results pending; no row or public branch changes.
 
 - Record Axel's exact aligned whole-match evidence decision in PARITY.md. Preserve the existing component, outcome and owner rules. Both owners record readback of the final documentation head on #5 before merge; no parity row is promoted.
