@@ -5,6 +5,15 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 ## Unreleased
 
 - Recover the complete ENG-04/13/14/48/66 checks onto frozen main `379ba4e0`, preserving both histories, every incoming row and the authentic four-fixture extensions. The private five-row proposal raises this baseline from 235 to 240 ported rows. Prior six native passes remain attributed to `df9a0cff`; this source-only integration awaits Root's slot and independent actual-head review.
+- Compare MODE-21 footprint keys by validated numeric bits, accepting hexadecimal letter-case variants and rejecting duplicate bit-identical keys. Preserve exact value-bit checks and signed-zero distinctions; no player-visible behavior changes.
+
+- Validate finite MODE-21 footprint bits using the existing JSON zero-display rule, while preserving signed-zero mismatches. Check swapped footprint associations on both sides and retain all other negative controls.
+
+- Pair Source and native values in the test-only MODE-21 field dispatcher after the retained strict Clippy argument-count diagnostic, preserving comparison order and every predicate.
+
+- Apply the retained formatter diagnostic to line wrapping in the new MODE-21 footprint comparator and controls, preserving every non-whitespace byte.
+
+- Compare MODE-21 building footprints by complete cell-key membership in the test-only startup observer. Retain all 49 original raw differences, add strict negative controls and leave the separate house-wrapper difference unresolved.
 
 - Mark MODE-05 and MODE-28 ported from their complete existing six-join and four-map XL constructor checks. Both named tests pass on Linux, Windows and macOS in main `396f6d8a` run `38740304188`. Preserve every Acceptance cell, all other MODE rows and generic Assault runner guards. This documentation proposal has no new native execution.
 
