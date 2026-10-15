@@ -265,7 +265,10 @@ fn damage_multipliers_match_javascript_for_every_unit_pair_and_level() {
     assert!((infantry - 1.2).abs() < 1e-9);
     let vehicle = economy::tech_mul(attacker, Some("tank"), defender, "tank").unwrap();
     assert!((vehicle - 1.1 * 0.81).abs() < 1e-9);
-    assert_eq!(economy::tech_mul(None, Some("rifle"), None, "tank").unwrap(), 1.0);
+    assert_eq!(
+        economy::tech_mul(None, Some("rifle"), None, "tank").unwrap(),
+        1.0
+    );
     let f = fixture();
     let players: Vec<_> = f["players"]
         .as_array()
