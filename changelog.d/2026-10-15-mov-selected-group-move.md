@@ -1,0 +1,1 @@
+- Add the original two-starting-rifle group-move route oracle to selected MOV checks, comparing acceptance and both paths through native Match command dispatch after canonical startup and building-fixture cleanup. Source generation and byte-for-byte check passed (one accepted command, two paths and the original hash); focused native verification is pending.

@@ -410,3 +410,6 @@ fn invalid_inputs_and_unsupported_profiles_return_errors() {
         PathError::InvalidShape
     );
 }
+
+#[path = "common/pathfinding_selected.rs"]
+mod selected_original_checks;
