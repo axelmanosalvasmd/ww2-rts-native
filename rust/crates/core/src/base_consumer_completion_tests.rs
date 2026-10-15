@@ -150,6 +150,84 @@ fn step(m: &mut Match, count: u64, construction: bool) {
         }
     }
 }
+// Capture before dispatch so a refusal's follow reset cannot obscure its inputs.
+fn build_failure_operands(m: &Match, owner: usize, command: &Command) -> Json {
+    use crate::{
+        game::CELL,
+        grid::SpatialGrid,
+        match_runtime::{foot_center, footprint},
+        vision::{team_sees, unit_sees, vision_of},
+    };
+    let Command::Build { ids, kind, at, .. } = command else {
+        return json!({"command":format!("{command:?}")});
+    };
+    let g = &m.world.game;
+    let catalog = Catalog::compiled().unwrap();
+    let definition = catalog.unit(kind).unwrap();
+    let size = definition.get("size").and_then(Value::number).unwrap() as usize;
+    let requested = at.unwrap();
+    let clamped = Point {
+        x: math::min(g.w as f64 * CELL, math::max(0., requested.x)),
+        z: math::min(g.h as f64 * CELL, math::max(0., requested.z)),
+    };
+    let x = math::round(clamped.x / CELL - size as f64 / 2.);
+    let z = math::round(clamped.z / CELL - size as f64 / 2.);
+    let cell = (x >= 0. && z >= 0. && x < g.w as f64 && z < g.h as f64)
+        .then_some(z as usize * g.w + x as usize);
+    let cells = cell.and_then(|c| footprint(g, c, size));
+    let center = cell.map(|c| foot_center(g, c, size));
+    let observation = SpatialGrid::new(&g.units, 16.);
+    let team = g.players[owner].team;
+    let query = center.unwrap_or(clamped);
+    let radius = math::max(g.w as f64, g.h as f64) * CELL;
+    json!({
+        "command":format!("{command:?}"), "owner":owner, "tick":g.tick,
+        "dimensions":[g.w,g.h], "next":m.next_unit_id,
+        "requested":[bits(requested.x),bits(requested.z)],
+        "clamped":[bits(clamped.x),bits(clamped.z)],
+        "size":size, "topLeft":[x,z], "cell":cell, "cells":cells,
+        "center":point(center), "cost":definition.get("cost").and_then(Value::number),
+        "needs":definition.get("needs").and_then(Value::string),
+        "selection":format!("{:?}",m.construction_selected_rows(owner,ids,command)),
+        "players":m.start.players.iter().enumerate().map(|(slot,p)| {
+            let wallet=&m.start.economy.players[slot];
+            json!({"slot":slot,"team":g.players[slot].team,"spawn":point(Some(p.spawn)),
+                "wallet":[bits(wallet.mp),bits(wallet.mun),bits(wallet.fuel)],
+                "visible":g.players[slot].visible})
+        }).collect::<Vec<_>>(),
+        "worldCells":cells.as_ref().map(|cs| cs.iter().map(|&c| json!({
+            "cell":c,"char":char::from(g.chars[c]).to_string(),"flags":g.flags[c],
+            "height":g.height.as_ref().map_or(0,|h| h[c]),
+            "worldRow":format!("{:?}",m.world.cell_row(c)),
+            "footprint":format!("{:?}",m.building_cells.get(&c)),
+            "section":format!("{:?}",g.sections.get(&(c as u32)))
+        })).collect::<Vec<_>>()),
+        "nodes":m.classic_runtime.as_ref().map(|state| state.nodes.iter().map(|n| {
+            let reserved=footprint(g,n.cell,2);
+            json!({"cell":n.cell,"at":point(Some(n.at)),"depot":n.depot,
+                "rate":bits(n.rate),"fuel":n.fuel,"reserved":reserved,
+                "overlap":reserved.as_ref().map(|rs| rs.iter().copied().filter(|c|
+                    cells.as_ref().is_some_and(|cs| cs.contains(c))).collect::<Vec<_>>())})
+        }).collect::<Vec<_>>()),
+        "units":g.units.values().map(|u| {
+            let k=&m.rules.kinds[u.kind];
+            let cell=g.cell_of(u.x,u.z);
+            json!({"id":u.id,"owner":u.owner,"kind":k.name,"at":point(Some(u.at())),
+                "hp":bits(u.hp),"built":u.built.map(bits),"cell":cell,
+                "air":k.air,"riding":u.riding,"structure":k.structure,
+                "occupiesSite":u.hp>0. && !k.air && !u.riding && !k.structure
+                    && cell.is_some_and(|c| cells.as_ref().is_some_and(|cs| cs.contains(&c))),
+                "control":format!("{:?}",m.commands.units.get(&u.id)),
+                "vision":bits(vision_of(g,&m.rules,u)),"team":g.team_of(u),
+                "seesCenter":center.map(|p| unit_sees(g,&m.rules,u,p))})
+        }).collect::<Vec<_>>(),
+        "grid":m.grid.in_order(&g.units,(query.x,query.z),radius,|_,_| true),
+        "observationGrid":observation.in_order(&g.units,(query.x,query.z),radius,|_,_| true),
+        "siteGrid":m.grid.in_order(&g.units,(query.x,query.z),size as f64 * CELL,|_,_| true),
+        "siteObservationGrid":observation.in_order(&g.units,(query.x,query.z),size as f64 * CELL,|_,_| true),
+        "teamSeesCenter":center.map(|p| team_sees(g,&m.rules,&observation,team,p))
+    })
+}
 fn contact(m: &mut Match, cell: usize, amount: f64, name: &str) -> f64 {
     // Same existing section component used by DamageWorld, without admitting
     // the unsupported Classic combat runner or changing actor-mode guards.
@@ -441,7 +519,12 @@ fn base22_23_classic_paid_waiter_and_rally_preflight_errors_preserve_canonical_s
         &json!({"t":"build","kind":"barracks","ids":[engineer],"x":at.x+20.,"z":at.z}),
     )
     .unwrap();
-    assert_eq!(m.execute_command(0, &build, false).unwrap(), None);
+    let placement = build_failure_operands(&m, 0, &build);
+    assert_eq!(
+        m.execute_command(0, &build, false).unwrap(),
+        None,
+        "pre-command placement operands: {placement:#}"
+    );
     m.building_rallies.remove(&site);
     let before = Preserved::capture(&m);
     let rally = Command::from_json(&json!({"t":"rally","ids":[hq,site],"x":45,"z":45})).unwrap();

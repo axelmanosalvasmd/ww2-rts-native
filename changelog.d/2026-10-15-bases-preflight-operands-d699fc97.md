@@ -1,0 +1,1 @@
+- Add read-only placement operands to the failing BASE canonical preflight test's assertion, preserving its actual Build command, paid cancellation/refund controls and rally atomicity assertions. The prior 602b80f8 native result remains one pass, one failure and three unrun; this diagnostic child has no execution grant or claimed fix.

@@ -4567,3 +4567,82 @@ findings and row holds remain retained. No parity or Acceptance cell moves;
 Shipyard/enemy claims, total retirement and full-mode admission stay held.
 Root owns the sole ledger, independent review, Hermes readback and integration.
 No slot is requested or held and no public action follows.
+
+
+## BASE canonical preflight failure operands (2026-10-15, unrun)
+
+The exact `602b80f8030c37a241b4aeb283ff63e4c7ada37d` qualification
+passes fmt and compilation. Its selected five native tests stop at one pass,
+one failure and three unrun, with 165 skipped. The failure is the success
+assertion for the real Engineer's Barracks command at HQ x + 20, z in
+`base22_23_classic_paid_waiter_and_rally_preflight_errors_preserve_canonical_state`.
+Actual is `Some(Blocked)`, expected is `None`. The later rally bookkeeping
+removal and its canonical-preservation assertions were never reached. The
+complete raw log remains at
+`/tmp/impl-bases-consumer-cycle2-d699fc97/qualify-602b80f8/native5.log`.
+Those observations belong to 602b80f8, not this child.
+
+Before switching branches, preserve the clean worktree/index state, all refs
+and hashes of 144 existing evidence files. Fetch origin/main at `f7c51b1a`
+and create `impl/bases-preflight-inputs-602-d699fc97` directly from the immutable
+failing head. This is a diagnostic child of that failure, without a rebase.
+Declare overlap to Root before editing: only the consumer test file, this
+appended record and a new changelog fragment. The shared slot ledger remains
+Root-owned. No slot is requested or held.
+
+Read original pinned `shared/sim.js` placementCheck, footprint, footCenter,
+canStamp, stampOccupied, setupClassic, spawnUnit and teamSees, alongside the
+native canonical constructor, authored shared map, actual selected-row/wallet
+providers, site admission, World cell rows, grid queries and point visibility.
+The canonical constructor publishes real HQs, generated resource nodes and
+natural starting actors. The retained failure log records no actual placement
+operands. A specific failing operand is therefore still unestablished; no
+position, map, history, wallet or admission rule is changed to make it pass.
+
+Add one private test-only read-only operand capture immediately before the
+unchanged Build dispatch. Include it in that success assertion's failure text.
+The capture borrows `&Match`, uses the catalog's actual size/cost/needs and the
+existing footprint/center helpers, and reports requested/clamped coordinates,
+snapped site cells, physical World rows/flags/heights/sections, historical
+building footprints, all actor identities/positions/controls, canonical nodes
+and their reserved-cell intersections, selected rows, commander spawns/wallets
+and visible lists. It queries the live grid and a separately built observation
+grid. Center visibility uses the existing read-only team_sees and unit_sees
+providers with the local observation grid, as recipient_sees does for its
+current-position check. It does not refresh recipient memory, rebuild the live
+grid or dispatch any extra command. This is diagnostic observation, not a new
+placement checker, admission decision or proof of the refusal's cause.
+
+The original paid-job cancellation error/refund controls, real allied purchase,
+first maker's preexisting Rally, owned unfinished Barracks request, later-maker
+bookkeeping removal and full Preserved comparisons remain intact. The command
+and its expected success remain unchanged. All four sibling consumer bodies,
+all 33 older native bodies, every Source body and recorded fixture remain exact.
+The seventh fixture remains 486,928 bytes with SHA256
+`0a6bf3a9dbf01f1efa578a2b3b882dd1854ca96dd3533cb01063f079e31702ca`;
+its Source results remain attributed to `aaf0cf6f` and fixture freeze `8b6837f2`.
+The six older pending fixtures remain absent. Prior format/compile/native
+failures and Source findings stay retained with their original producing heads.
+
+Locally ACK issue #5 through 6204098871, PR16 replies 6137154230/6137379059
+and PR195 reply 6156740603. The new PR268 replies 6204082388/6204098871 keep
+both held World probes strict and unchanged, with only their registration
+eligible for a separately reviewed repair. They grant no World runtime scope
+to this worker. Receipt preserves ABI 2's six-call scope, agreed content/schema
+limits, serial integration and fresh exact-head readbacks; transport/privacy
+drafts remain unadopted. No interface is changed or used beyond the existing
+internal providers, and no public acknowledgment is posted.
+
+Source, Node, Cargo, rustc, native, formatting, lint, discovery, release and
+CI execution are zero in this continuation. Formatting, compilation and native
+behavior remain unverified for this source-only child. Root must select a new exact-head slot and
+job list before any execution, with the current guard, inherited exclusive
+flock, external target, four actual CPUs, 6 GiB, zero swap, CPU quota 400
+percent, jobs4/thread1, 400-second bound, immediate free -g and 20 GiB disk
+floor before each job. Low available memory permits only the focused 6 GiB
+jobs. The shared maximum remains three Cargo jobs. Stop, release and notify
+Root on the first genuine failure. No old grant extends to this child.
+
+No owned BASE row or Acceptance cell changes. Whole-mode and Shipyard/enemy
+claims, total retirement and recipient/reconnect composition remain held.
+Root owns independent review, Hermes readback and runtime integration.
