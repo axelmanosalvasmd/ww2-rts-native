@@ -79,7 +79,7 @@ const observedThink = (g, slot, opts) => {
     commands, human: clone({ news, formation, initialCursor, inputs, finalCursor: cursor }) });
 };
 // These function bodies are copied verbatim from the pinned check and helpers.
-const aiCommands = new Function('createHash', 'snapshotFor', 'think', helperSource + '\nreturn aiCommands;')(createHash, sim.snapshotFor, observedThink);
+const aiCommands = new Function('createHash', 'snapshotFor', 'think', 'assert', helperSource + '\nreturn aiCommands;')(createHash, sim.snapshotFor, observedThink, assert);
 const aiMap = new Function(mapSource + '\nreturn aiMap;')();
 const createGame = (...args) => { constructors.push(clone(args)); return sim.createGame(...args); };
 const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
