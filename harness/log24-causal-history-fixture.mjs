@@ -55,20 +55,35 @@ const opts = {
 assert.equal(sim.validateMap(map), null);
 const prior = Math.random;
 let constructorDraws = 0;
+let active = null, liveGame = null;
 try {
   Math.random = () => { constructorDraws++; return constructorDraw; };
   const g = sim.createGame(map, ['a', 'b'], false, [0, 1], [0, 1], opts);
+  liveGame = g;
   assert.equal(constructorDraws, 1);
   // Continue the initialized match without replacing any engine RNG state.
   Math.random = () => { throw Error('Unexpected post-constructor random consumer in peaceful LOG24 scene'); };
   const actors = () => [...g.units.values()].map(u => [u.id, u.owner, u.type, bits(u.hp), bits(u.x), bits(u.z)]);
   const troop = [...g.units.values()].find(u => u.owner === 0 && u.type === 'rifle');
   const enemy = [...g.units.values()].find(u => u.owner === 1 && u.type === 'rifle');
+  assert.ok(troop && enemy, 'select two actual constructor rifles');
   const initialEnemy = {x: enemy.x, z: enemy.z};
   const terrain = [...g.chars];
   assert.equal(g.units.size, 10);
   const result = {reference: pin, map, aliases: [troop.id, enemy.id], initialActors: actors()};
+  active = result;
+  const target = {x: troop.x, z: troop.z - 6};
+  const targetCell = Math.floor(target.z / 2) * g.w + Math.floor(target.x / 2);
+  assert.ok(targetCell >= 0 && targetCell < g.w * g.h);
+  assert.equal(g.flags[targetCell] & sim.MOVE, 0, 'declared Move endpoint is actual open ground');
+  assert.equal(g.buildingCells.has(targetCell), false, 'retain actual blocking HQ footprints');
+  result.inputReady = {
+    movement: {owner: 1, unit: enemy.id, target: [bits(target.x), bits(target.z)]},
+    targetCell: {cell: targetCell, ch: g.chars[targetCell], flags: g.flags[targetCell], footprint: false},
+    buildingFootprints: [...g.units.values()].filter(u => sim.UNITS[u.type].building).map(u => [u.id, [...u.cells]]),
+  };
   const commands = [];
+  result.commands = commands;
   const command = (owner, raw) => {
     assert.equal(sim.command(g, owner, raw), undefined);
     commands.push({owner, raw});
@@ -92,7 +107,7 @@ try {
   result.initial = projection();
   assert.ok(sim.supplyHooks(g).supplyRate(0, troop) > 0);
   assert.equal(troop.logistics.cutFor, 0);
-  command(1, {t: 'move', orders: [[enemy.id, troop.x, troop.z - 6]]});
+  command(1, {t: 'move', orders: [[enemy.id, target.x, target.z]]});
   let firstZero = null;
   result.causalTrace = [];
   for (let n = 0; n < 1140; n++) {
@@ -141,6 +156,17 @@ try {
   if (process.argv.includes('--check')) assert.equal(readFileSync(path, 'utf8'), data);
   else writeFileSync(path, data);
   console.log(`${process.argv.includes('--check') ? 'Checked' : 'Recorded'} LOG24 causal history: ${g.tick} ticks, ${commands.length} commands`);
+} catch (error) {
+  if (process.env.LOG24_FAILURE_PATH) writeFileSync(process.env.LOG24_FAILURE_PATH,
+    JSON.stringify({
+      error: String(error), constructorDraws, active,
+      lastObserved: liveGame ? {
+        tick: liveGame.tick,
+        actors: [...liveGame.units.values()].map(u => [u.id, u.owner, u.type, bits(u.hp), bits(u.x), bits(u.z)]),
+        reserves: [...liveGame.units.values()].filter(u => u.logistics).map(u => [u.id, u.logistics]),
+      } : null,
+    }) + '\n', {flag: 'wx'});
+  throw error;
 } finally {
   Math.random = prior;
 }

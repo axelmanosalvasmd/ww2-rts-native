@@ -107,6 +107,24 @@ fn real_enemy_move_drives_network_grace_and_owner_cut() {
         u.owner == 1 && m.rules.kinds[u.kind].name == "rifle"
     }).unwrap().id;
     assert_eq!(json!([troop, enemy]), f["aliases"]);
+    let target = Point {
+        x: m.world.game.units[&troop].x,
+        z: m.world.game.units[&troop].z - 6.0,
+    };
+    let target_cell = (target.z / CELL).floor() as usize * m.world.game.w
+        + (target.x / CELL).floor() as usize;
+    assert!(target_cell < m.world.game.chars.len());
+    assert_eq!(m.world.game.flags[target_cell] & MOVE, 0);
+    assert!(!m.building_cells.contains_key(&target_cell));
+    let footprints = m.world.game.units.values()
+        .filter(|u| m.rules.kinds[u.kind].building)
+        .map(|u| json!([u.id, u.cells.as_ref().unwrap()])).collect::<Vec<_>>();
+    assert_eq!(json!({
+        "movement": {"owner": 1, "unit": enemy, "target": [bits(target.x), bits(target.z)]},
+        "targetCell": {"cell": target_cell, "ch": char::from(m.world.game.chars[target_cell]).to_string(),
+            "flags": m.world.game.flags[target_cell], "footprint": false},
+        "buildingFootprints": footprints,
+    }), f["inputReady"]);
     let mut raw_commands = Vec::new();
     for owner in 0..2 {
         let ids = m.world.game.units.values().filter(|u| u.owner == owner)
@@ -124,8 +142,7 @@ fn real_enemy_move_drives_network_grace_and_owner_cut() {
     assert_eq!(selected(&mut m, troop), f["initial"]);
     assert!(m.supply_net.rate_at(Some(0), m.world.game.units[&troop].at()).unwrap() > 0.0);
     assert_eq!(m.logistics.get(troop).unwrap().cut_for, Some(0.0));
-    let at = m.world.game.units[&troop].at();
-    raw_commands.push(json!({"owner": 1, "raw": {"t": "move", "orders": [[enemy, at.x, at.z - 6.0]]}}));
+    raw_commands.push(json!({"owner": 1, "raw": {"t": "move", "orders": [[enemy, target.x, target.z]]}}));
     let source_commands = f["commands"].as_array().unwrap();
     assert_eq!(raw_commands.len(), source_commands.len());
     for (native, source) in raw_commands.iter().zip(source_commands) {
@@ -134,7 +151,7 @@ fn real_enemy_move_drives_network_grace_and_owner_cut() {
     }
     command(&mut m, 1, Command::Move {
         control_ids: None,
-        orders: vec![MoveOrder { unit: i64::from(enemy), at: Point { x: at.x, z: at.z - 6.0 } }],
+        orders: vec![MoveOrder { unit: i64::from(enemy), at: target }],
         attack_move: false, queue: false, together: false, face: None,
     });
     let mut first_zero = None;

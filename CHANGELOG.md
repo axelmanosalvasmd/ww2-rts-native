@@ -27,6 +27,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 - Compare MODE-21 building footprints by complete cell-key membership in the test-only startup observer. Retain all 49 original raw differences, add strict negative controls and leave the separate house-wrapper difference unresolved.
 
+- Add LOG-24 authored-input readiness checks for the actual open Move endpoint and retained building footprints, plus an exclusive partial-failure artifact for the first future Source attempt. Preserve the exact scene, commands, bounds, rate/grace/cut assertions and runtime bytes from `91f9bc12`. Source and native checks remain unrun.
+
 - Draft a LOG-24 network-to-grace/cut witness using retained constructor units, actual stance and Move commands, the real network/convoy methods and owner-recipient rows. Keep its fixture absent until authorized Source recording, preserve the BASE-09 failures and all held BASE callers, and make no LOG-24 status or runtime change. Source, native and format checks are unrun.
 
 - Propose LOG-04, LOG-10 and LOG-15 as ported from their complete existing price, recovery and transfer component checks. Preserve the original Acceptance cells and LOG-24 causal grace/cut hold. Historical three-platform named passes stay attributed to main `396f6d8a`; this private documentation head has no new execution.
