@@ -85,6 +85,8 @@ mod match_tick_events;
 mod mode14_spawn_layout;
 #[path = "../mode_predicates.rs"]
 mod mode_predicates;
+#[path = "../mode_startup_checks.rs"]
+mod mode_startup_checks;
 #[path = "../movement.rs"]
 mod movement;
 #[path = "../movement_routing.rs"]
