@@ -6,6 +6,7 @@ use crate::tick_timing::{CatchUpClock, TickSample};
 use serde_json::{Value, json};
 use std::{
     collections::BTreeMap,
+    io::Write,
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -14,10 +15,13 @@ use std::{
 };
 use tokio::sync::{mpsc, watch};
 use ww2_core::{
+    economy::{Faction, Mode},
+    economy_state::ArmySize,
     match_end::MatchSample,
-    match_runtime::Match,
+    match_runtime::{Match, MatchOptions, PlayerConfig},
     match_story::{MatchResult, StoryKey},
     recipient_snapshot::SelectedSeat,
+    weather::WeatherChoice,
 };
 
 const MAX_PLAYERS: usize = 6;
@@ -142,6 +146,15 @@ struct AttachedRuntime {
     ingress: CommanderIngress,
     runtime: RoomRuntime,
     startup: crate::native_startup::NativeStartup,
+    // Complete R1 options/seeds are a host receipt, never a client envelope.
+    receipt: Option<Value>,
+}
+
+struct PreparedNative {
+    attached: AttachedRuntime,
+    starts: Vec<(usize, Value)>,
+    resume: Value,
+    pause: Option<Value>,
 }
 
 struct RoomResult {
@@ -703,6 +716,7 @@ pub(crate) struct Hub {
     next_epoch: u64,
     clock: CatchUpClock,
     stopped: Arc<AtomicBool>,
+    trusted: Option<crate::TrustedRoomConfig>,
 }
 impl Hub {
     pub fn new(max_rooms: usize, public_url: String) -> Self {
@@ -716,14 +730,30 @@ impl Hub {
             next_epoch: 0,
             clock: CatchUpClock::new(0),
             stopped: Arc::new(AtomicBool::new(false)),
+            trusted: None,
         }
     }
     pub fn attach_native(&mut self, code: &str, state: Match, now: u64) -> Result<u64, String> {
+        let prepared = self.prepare_native(code, state, now, false)?;
+        Ok(self.publish_native(code, prepared))
+    }
+
+    pub(crate) fn configure_trusted_room(&mut self, trusted: Option<crate::TrustedRoomConfig>) {
+        self.trusted = trusted;
+    }
+
+    fn prepare_native(
+        &self,
+        code: &str,
+        state: Match,
+        now: u64,
+        replace: bool,
+    ) -> Result<PreparedNative, String> {
         if self.is_stopped() {
             return Err("server stopped".into());
         }
         let room = self.rooms.get(code).ok_or("room does not exist")?;
-        if room.native.is_some() {
+        if room.native.is_some() && !replace {
             return Err("room already has a native runtime".into());
         }
         if !room.spectators.is_empty()
@@ -784,13 +814,30 @@ impl Hub {
             .collect::<Vec<_>>();
         let starts = runtime.collect_starts(&slots, &startup, &names, epoch)?;
         let pause = runtime.paused().then(|| runtime.pause_message(now));
+        Ok(PreparedNative {
+            attached: AttachedRuntime {
+                epoch,
+                ingress: CommanderIngress::default(),
+                runtime,
+                startup,
+                receipt: None,
+            },
+            starts,
+            resume,
+            pause,
+        })
+    }
+
+    fn publish_native(&mut self, code: &str, prepared: PreparedNative) -> u64 {
+        let PreparedNative {
+            attached,
+            starts,
+            resume,
+            pause,
+        } = prepared;
+        let epoch = attached.epoch;
         let room = self.rooms.get_mut(code).unwrap();
-        room.native = Some(AttachedRuntime {
-            epoch,
-            ingress: CommanderIngress::default(),
-            runtime,
-            startup,
-        });
+        room.native = Some(attached);
         room.result = None;
         self.next_epoch = epoch;
         for (slot, person) in room.players.iter().enumerate() {
@@ -813,7 +860,11 @@ impl Hub {
                 self.accounts.get_mut(&connection.id).unwrap().full_terrain = false;
             }
         }
-        Ok(epoch)
+        if let Some(receipt) = &room.native.as_ref().unwrap().receipt {
+            // The installed runtime retains the receipt even if the log sink fails.
+            let _ = writeln!(std::io::stderr().lock(), "NATIVE_MATCH {receipt}");
+        }
+        epoch
     }
     pub fn native_status(&self, code: &str) -> Result<crate::NativeRoomStatus, String> {
         if self.is_stopped() {
@@ -1243,6 +1294,16 @@ impl Hub {
                     Ok(report) => report,
                     Err(error) => {
                         native.ingress.discard_feedback();
+                        if native.receipt.is_some() {
+                            let _ = writeln!(
+                                std::io::stderr().lock(),
+                                "NATIVE_FAULT {}",
+                                json!({
+                                    "room": room.code, "matchId": native.epoch,
+                                    "tick": native.runtime.state().world.game.tick, "error": error
+                                })
+                            );
+                        }
                         native.runtime.fault_stop(error);
                         continue;
                     }
@@ -1303,6 +1364,166 @@ impl Hub {
         json!({"rooms":self.room_order.iter().filter_map(|code| self.rooms.get(code)).filter(|r| r.listed && r.players.iter().any(|p| !p.ai && p.connection.is_some()))
             .map(|r| r.directory(&self.maps)).collect::<Vec<_>>()})
     }
+
+    fn start_trusted(
+        &mut self,
+        code: &str,
+        connection_id: u64,
+        restart: bool,
+        now: u64,
+    ) -> Result<u64, String> {
+        let trusted = self.trusted.as_ref().ok_or("trusted hosting is disabled")?;
+        if trusted.code != code || self.is_stopped() {
+            return Err("trusted room unavailable".into());
+        }
+        let room = self.rooms.get(code).ok_or("trusted room absent")?;
+        if !room.is_host(connection_id)
+            || !room.players.iter().any(|p| {
+                p.connection
+                    .as_ref()
+                    .is_some_and(|c| c.id == connection_id && c.ready())
+            })
+        {
+            return Err("only the current commander host may start or restart".into());
+        }
+        if restart {
+            let native = room
+                .native
+                .as_ref()
+                .ok_or("restart requires an attached match")?;
+            if let Some(fault) = native.runtime.fault() {
+                return Err(format!(
+                    "faulted match restart awaits a recovery policy: {fault}"
+                ));
+            }
+        } else if room.native.is_some() {
+            return Err("start requires lobby state".into());
+        }
+        if room.listed || room.mode != "conquest" || room.army != "standard" || room.sandbox {
+            return Err("R1 requires private Conquest, standard army and sandbox off".into());
+        }
+        if room.players.len() != 2
+            || !room.spectators.is_empty()
+            || room.players.iter().any(|p| p.ai || p.token.is_empty())
+            || room.players[0].team == room.players[1].team
+            || room.players[0].token == room.players[1].token
+        {
+            return Err("R1 requires exactly two human commander tokens on opposing teams".into());
+        }
+        if !matches!(
+            room.weather.as_str(),
+            "map" | "clear" | "fog" | "rain" | "mud" | "snow" | "random"
+        ) {
+            return Err("R1 weather choice is unsupported".into());
+        }
+        let players = room
+            .players
+            .iter()
+            .map(|p| {
+                Ok(PlayerConfig {
+                    name: p.name.clone(),
+                    team: i32::try_from(p.team).map_err(|_| "invalid R1 team")?,
+                    faction: Faction::try_from(
+                        u8::try_from(p.faction).map_err(|_| "invalid R1 faction")?,
+                    )
+                    .map_err(|e| e.to_string())?,
+                })
+            })
+            .collect::<Result<Vec<_>, String>>()?;
+        let state = crate::authoritative_maps::create_match(
+            &room.map,
+            MatchOptions {
+                seed: trusted.seed,
+                mode: Mode::Conquest,
+                players,
+                shuffle: true,
+                army: ArmySize::Standard,
+                weather: WeatherChoice::from_reference(Some(&room.weather)),
+                weather_seed: None,
+                living_weather: true,
+                map_key: Some(room.map.clone()),
+                tech: true,
+                supply: true,
+                logistics: false,
+                sandbox: false,
+            },
+        )
+        .map_err(|e| e.to_string())?;
+        let mut prepared = self.prepare_native(code, state, now, restart)?;
+        prepared.attached.receipt =
+            Some(trusted.receipt(prepared.attached.runtime.state(), prepared.attached.epoch));
+        Ok(self.publish_native(code, prepared))
+    }
+
+    fn trusted_command(&mut self, code: &str, connection_id: u64, msg: &Value, now: u64) -> bool {
+        if self.trusted.as_ref().is_none_or(|p| p.code != code) {
+            return false;
+        }
+        let Some(command) = msg["t"].as_str() else {
+            return false;
+        };
+        let result = match command {
+            "start" | "restart" => self
+                .start_trusted(code, connection_id, command == "restart", now)
+                .map(|_| ()),
+            "addAi" | "level" | "spectate" | "sit" => Err("R1 admits human commanders only".into()),
+            _ => return false,
+        };
+        if let Err(error) = result {
+            if let Some(person) = self.rooms.get_mut(code).and_then(|room| {
+                room.players
+                    .iter_mut()
+                    .find(|p| p.connection.as_ref().is_some_and(|c| c.id == connection_id))
+            }) {
+                person.deny(
+                    command,
+                    if matches!(command, "start" | "restart") {
+                        "scenario"
+                    } else {
+                        "blocked"
+                    },
+                    now,
+                );
+            }
+            let _ = writeln!(
+                std::io::stderr().lock(),
+                "NATIVE_REFUSED {}",
+                json!({"room":code,"command":command,"error":error})
+            );
+        }
+        true
+    }
+
+    fn admit_trusted_hello(&self, code: &str, msg: &Value) -> Result<(), &'static str> {
+        let Some(trusted) = &self.trusted else {
+            return Ok(());
+        };
+        if code != trusted.code
+            || msg["listing"]["public"] == true
+            || msg["listing"]["tutorial"] == true
+        {
+            return Err("trusted room is private and code-bound");
+        }
+        let token = msg["token"]
+            .as_str()
+            .unwrap()
+            .encode_utf16()
+            .take(40)
+            .collect::<Vec<_>>();
+        if token.is_empty()
+            || msg["spectate"] == true
+            || msg.get("role").is_some_and(|role| role != "commander")
+        {
+            return Err("trusted room requires a commander seat token");
+        }
+        if let Some(room) = self.rooms.get(code)
+            && !room.players.iter().any(|p| p.token == token)
+            && (room.native.is_some() || room.players.len() >= 2)
+        {
+            return Err("trusted commander roster is fixed");
+        }
+        Ok(())
+    }
     pub fn message(
         &mut self,
         code: &str,
@@ -1315,6 +1536,9 @@ impl Hub {
             return;
         }
         if *joined {
+            if self.trusted_command(code, connection.id, &msg, now) {
+                return;
+            }
             if msg["t"] == "resync"
                 && let Some(room) = self.rooms.get(code)
                 && let Some(native) = &room.native
@@ -1348,6 +1572,11 @@ impl Hub {
         if msg["role"] == "operative" {
             connection.send(json!({"t":"deny","cmd":"join","reason":"commander"}));
             connection.close(1008, "operative unavailable");
+            return;
+        }
+        if let Err(reason) = self.admit_trusted_hello(code, &msg) {
+            connection.send(json!({"t":"deny","cmd":"join","reason":"blocked"}));
+            connection.close(1008, reason);
             return;
         }
         if !self.rooms.contains_key(code) && self.rooms.len() >= self.max_rooms {
@@ -1800,3 +2029,7 @@ mod native_startup_tests;
 #[cfg(test)]
 #[path = "native_ingress_lobby_tests.rs"]
 mod native_ingress_tests;
+
+#[cfg(test)]
+#[path = "trusted_room_lobby_tests.rs"]
+mod trusted_room_tests;
