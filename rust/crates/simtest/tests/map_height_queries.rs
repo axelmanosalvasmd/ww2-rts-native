@@ -125,7 +125,7 @@ fn one_thousand_source_samples_match_existing_native_height_queries() {
         "negative-level",
         "interpolated-distinct-from-step",
         "height-layer-present",
-        "interior-bilinear-slope",
+        "fractional-interior-distinct-from-step",
     ];
     assert_eq!(coverage, [66, 296, 132, 67, 453, 40, 97, 940, 13]);
     for (name, count) in names.iter().zip(coverage) {

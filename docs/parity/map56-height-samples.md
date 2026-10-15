@@ -1,6 +1,6 @@
 # MAP56 height query draft
 
-This source-only draft selects exactly 1,000 query rows from the maintained original-JavaScript terrain captures at reference `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. The branch starts at fixed native main `446671b977abfa6bf689fcb8853833d36519faab`. MAP-56 retains its incoming status; all acceptance text and status cells remain unchanged. No Source, Cargo or native execution has qualified this draft.
+This source-only draft selects exactly 1,000 query rows from the maintained original-JavaScript terrain captures at reference `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. The branch starts at fixed native main `446671b977abfa6bf689fcb8853833d36519faab`. MAP-56 retains its incoming status; all acceptance text and status cells remain unchanged. The initial preparation preceded execution; historical results and this coverage correction are attributed below.
 
 The finite sample matrix contains 33 complete original map inputs and 5,000 expected binary64 columns: x, z, integer level, step height in metres and interpolated height in metres. Coordinates and expected values are 16-digit hexadecimal IEEE754 bits. Each map retains its complete pinned original JSON text and its SHA256, plus the exact existing Source-capture path, hash and producer identity. Expected outputs do not initialize native terrain.
 
@@ -16,7 +16,9 @@ Selection is fixed: Source capture filenames in ascending order, all first 16 ex
 | Negative integer level | 40 |
 | Interpolated height differs from step height | 97 |
 | Explicit height layer | 940 |
-| Interior fractional samples with distinct bilinear height on both axes | 13 |
+| Fractional interior samples whose recorded height differs from step height | 13 |
+
+The category `fractional-interior-distinct-from-step` describes the existing predicate: fractional coordinates inside the outer cell centres and a recorded height different from the step height. It does not test geometric slope. Of these 13 samples, authored corner heights vary along both axes in 2, along one axis in 7, and along neither axis in 4. The two-axis samples are crater-field:19 and three-islands:19. The four flat patches retain valid weighted-arithmetic differences, including hill-112:18, whose four levels are [4,4,4,4] and whose interpolated result is one ulp below its step height. No expected value or sample changes.
 
 The remaining 60 queries use the two original maps without a height layer. Their interpolated-height result follows the existing guarded gameplay caller branch, zero. This does not invoke the private Source `heightAt` helper without its required height array.
 
@@ -26,4 +28,6 @@ Native `Game::level_at` in `rust/crates/core/src/game.rs:418` and `terrain::heig
 
 All selected finite negative and outside coordinates are accepted by the existing producer. The step query returns level zero outside the map; interpolation clamps to its existing edge centres. These are original query behaviors, not new admission rules. The producer separately refuses non-finite x or z before calling either query. Six NaN/infinity placements assert its existing exact error, `terrain fixture point must be finite`. They are native harness refusal witnesses, not a cross-language equality claim for non-finite coordinates. Empty or malformed maps, direct raw queries on invalid dimensions, unbounded numeric magnitudes, generated World startup, dynamic terrain, rendered meshes, transport and Unreal consumption are outside this finite selected check.
 
-The initial fixture was selected from existing Source evidence without running Source. A future authorized x64 Node v24.21.0 recorder run must independently recompute these bits from pinned Source and check the complete fixture bytes. The new test and existing terrain-contract test then need a focused run on the actual frozen head, with the registration guard. A separate actual-head review precedes any PR or status proposal. No previous pass is attributed to this draft, and no slot or publication is authorized here.
+The initial fixture was selected from existing Source evidence without running Source. Source `--check` later ran once at `8187a261ffd17582a086dd3f7e27a82d6ecdd02b`, exit 0, byte-matching all 1,000 query records. The formatting child `da1d151ad7ea1c3e021a0eb68ac47cf959730d09` passed fmt and the exact three native instances, 3 passed, 0 failed, 170 skipped, in run `76f6c07c-2b02-4800-84ee-ac0aa6d6f1a7`.
+
+The independent review of da1d151a returned REVISE for the overstated two-axis coverage label while accepting the literal 1,000-point comparison. This correction renames only that metadata category and corrects the prose; all predicates, numeric counts, selections, coordinates, maps, input metadata, provenance and 5,000 expected bits are unchanged. The sealed earlier reports, including their original coverage claim, remain historical evidence. No Source, Cargo, formatter or native command ran for this correction, and no execution is attributed to its child head. MAP56 remains unpromoted; separate review and Root publication authorization remain required.

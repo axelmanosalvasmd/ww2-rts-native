@@ -1,2 +1,3 @@
 - Prepare MAP-56's finite height-query matrix: 1,000 selected original-Source samples across 33 complete maps, exact input/output bits, an independent Source reproducer and a focused native replay with the existing non-finite-input guard. Source reproduction and native execution remain pending; no terrain provider, coordinate contract or parity status changes.
 - Apply the formatter's two line wraps in the new MAP-56 test, preserving all assertion tokens, literals and recorded query bits.
+- Correct MAP-56's coverage label: the 13 fractional interior height differences comprise 2 two-axis patches, 7 one-axis patches and 4 flat patches. Preserve all 1,000 queries and 5,000 expected bits; earlier execution remains attributed to its original heads.

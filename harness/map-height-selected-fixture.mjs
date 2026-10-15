@@ -52,7 +52,7 @@ for (let j = 16; j < 1000 && selected.length < 1000; j++) {
 }
 assert.equal(selected.length, 1000);
 const coverage = Object.fromEntries(['negative-coordinate', 'outside-half-open', 'exact-map-boundary',
-  'cell-centre', 'cell-edge', 'negative-level', 'interpolated-distinct-from-step', 'height-layer-present', 'interior-bilinear-slope'].map(key => [key, 0]));
+  'cell-centre', 'cell-edge', 'negative-level', 'interpolated-distinct-from-step', 'height-layer-present', 'fractional-interior-distinct-from-step'].map(key => [key, 0]));
 const oldRandom = Math.random;
 try {
   const maps = names.map((name, i) => {
