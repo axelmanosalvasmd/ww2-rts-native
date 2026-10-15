@@ -1,1 +1,2 @@
 - Cover a World infantry move that reads remembered terrain: the trial is discarded without changing the unit, grid, memory or random state, and the resulting move matches the prepared path in outcome, unit, grid and remembered state.
+- Remove an unnecessary explicit test-only drop so the fallback regression passes strict Clippy on all hosted platforms.

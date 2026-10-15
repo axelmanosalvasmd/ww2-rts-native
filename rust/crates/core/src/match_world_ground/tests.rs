@@ -580,7 +580,6 @@ fn remembered_terrain_read_discards_world_trial_and_matches_prepared_move() {
     .unwrap()
     .unwrap();
     assert!(read.get());
-    drop(knowledge);
     drop(query);
     commit.sync_moved_object(&game.units[&id], &prepared.rules, true);
     commit.commit();
