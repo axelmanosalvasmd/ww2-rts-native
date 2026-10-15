@@ -1,23 +1,34 @@
 use std::{env, net::IpAddr};
 use tokio::net::TcpListener;
-use ww2_server::{Config, serve};
+use ww2_server::{Config, TrustedRoomConfig, serve, serve_trusted_room};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut explicit_bind = None;
+    let mut trusted_room = None;
+    let mut seed = None;
     let mut args = env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--bind" => explicit_bind = Some(args.next().ok_or("--bind requires HOST:PORT")?),
+            "--trusted-room" if trusted_room.is_none() => {
+                trusted_room = Some(args.next().ok_or("--trusted-room requires CODE")?);
+            }
+            "--seed" if seed.is_none() => seed = Some(args.next().ok_or("--seed requires U64")?),
             "--help" | "-h" => {
                 println!(
-                    "ww2-server [--bind HOST:PORT]\nAddress priority: --bind, WW2_BIND, HOST/PORT, 127.0.0.1:3000. Port 0 selects a free port."
+                    "ww2-server [--bind HOST:PORT] [--trusted-room CODE --seed U64]\nAddress priority: --bind, WW2_BIND, HOST/PORT, 127.0.0.1:3000. Port 0 selects a free port.\nTrusted mode: one private two-human Conquest room, standard army, sandbox off, logistics off (temporary). Seeds/receipts stay host-private."
                 );
                 return Ok(());
             }
             _ => return Err(format!("unknown argument: {arg}").into()),
         }
     }
+    let trusted = match (trusted_room, seed) {
+        (None, None) => None,
+        (Some(code), Some(seed)) => Some(TrustedRoomConfig::new(code, seed.parse::<u64>()?)?),
+        _ => return Err("--trusted-room and --seed must be supplied together".into()),
+    };
     let address = bind_address(
         env::var("HOST").ok().as_deref(),
         env::var("PORT").ok().as_deref(),
@@ -30,10 +41,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         public_url: env::var("PUBLIC_URL").unwrap_or_default(),
         ..Config::default()
     };
-    serve(listener, config, async {
+    let shutdown = async {
         let _ = tokio::signal::ctrl_c().await;
-    })
-    .await?;
+    };
+    if let Some(trusted) = trusted {
+        serve_trusted_room(listener, config, shutdown, trusted).await?;
+    } else {
+        serve(listener, config, shutdown).await?;
+    }
     Ok(())
 }
 
