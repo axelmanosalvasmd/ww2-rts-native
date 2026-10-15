@@ -1,0 +1,1 @@
+- Add Source recorder and native test drafts for the complete named house-type, church and stone-bridge checks and every required authored spawn reachability pair. Keep the existing MAP-26/36 providers and all parity statuses. Fixture recording, native execution and independent review remain pending.
