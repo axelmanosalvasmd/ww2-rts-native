@@ -1,5 +1,9 @@
 # Three Crossroads Native: design decisions
 
+## CMB-61 authentic firing capture (2026-10-15)
+
+Frozen preparation `7a762f6573891a2564cbd7aa4e0ee8566c0ad300` records 16 original-Source scenes and 202 firing checkpoints. Generation and serial `--check` both exit 0 using `/usr/bin/node` v24.21.0 x64 and clean pinned Source `e4e579a`, under the exclusive S3 lock, CPUs 8-11, 6 GiB memory, zero swap and 400% CPU quota. Freeze this authentic supplemental fixture before Cargo. No recorder, authored input, expected predicate, ordinary firing fixture or runtime changes. Native comparisons remain pending, CMB-61 stays held and the CMB-69 proposal remains unapplied.
+
 ## CMB-61 firing extension and private CMB-69 proposal (2026-10-15, source only)
 
 At fixed main `396f6d8a7014bd4a5ebe64f0a12ccd66865bf452`, prepare only the two flame components missing from the independent CMB-61 review. A separate original-Source recorder and authored-input file add 16 scenes without changing the ordinary firing recorder, fixture or tests. Six 32-volley launch scenes compare flame and rifle fire into open ground, a settled trench and a garrison. Ten one-phase choice scenes bracket the x1.5 preference with equal rifle targets at distances bracketing the 1.5 ratio, including centered house occupants, including rifle, unseen and dead-target controls. The two new consumers call existing public Match firing methods and compare every recorded state, launch and Combat stream state in Default and Conquest. These are bounded firing-component observations, not full-step histories or whole-match statistics.

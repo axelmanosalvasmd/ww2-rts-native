@@ -1,5 +1,9 @@
 # CMB-61 missing flame components, source-only preparation
 
+## Authentic Source capture after preparation
+
+S3 granted generation and a serial byte check at frozen `7a762f6573891a2564cbd7aa4e0ee8566c0ad300`. Both commands exited 0. The authentic new fixture contains 16 scenes and 202 checkpoints, with x64 Node v24.21.0 and Source `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. The recorder and inputs remain exact. Raw logs: `/tmp/cmb61-flame-s3-7a762f65/source-generate.log` and `source-check.log`. Both invocations held the exclusive S3 flock and ran with CPUs 8-11, 6 GiB memory, zero swap and 400% CPU quota. This fixture is frozen before Cargo; native results remain pending. The source-only statements below describe the original preparation checkpoint, not this later capture. CMB-61 stays held and the CMB-69 patch stays unapplied.
+
 Base: `396f6d8a7014bd4a5ebe64f0a12ccd66865bf452`. Original Source: `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. Owner: AUDIT_COMBAT, CMB-61 and the private CMB-69 proposal only. Frozen `e490fb9a37ad307d76f94d5e499809bde85a0b3b` and `11a28e94f126a7bcbcb3d82b00ab649d8cbb8d54` remain on their original branches.
 
 Root's independent review at `/tmp/roster16-reviewer1-cmb61-69/REVIEW.md` holds CMB-61 for launch accuracy and target value. Its earlier damage/suppression proofs remain valid. This checkpoint adds recorder and consumer source, with no generated `rust/crates/simtest/tests/fixtures/match-firing-flame.json.gz`. The consumer fails explicitly when that authentic fixture is absent. No expected observation initializes or repairs the native match. There is no runtime, terrain-rule, guard, interface or randomness-policy change.
