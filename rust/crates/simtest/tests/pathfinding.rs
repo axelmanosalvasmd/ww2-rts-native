@@ -58,6 +58,33 @@ fn profile(name: &str, v: &Value) -> UnitKind {
 #[test]
 fn infantry_naval_and_vehicle_paths_match_original_find_path() {
     let fixture: Value = serde_json::from_str(include_str!("fixtures/pathfinding.json")).unwrap();
+    replay_paths(&fixture, (1529, 1108, 299, 122, 33));
+}
+
+#[test]
+fn named_fine_search_branches_match_original_find_path() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("fixtures/pathfinding-branches.json")).unwrap();
+    assert_eq!(fixture["scenarios"].as_array().unwrap().len(), 24);
+    let covered: std::collections::BTreeSet<_> = fixture["scenarios"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|case| case["rows"].as_array().unwrap().iter())
+        .map(|row| row.as_str().unwrap())
+        .collect();
+    assert_eq!(
+        covered,
+        [
+            "MOV-31", "MOV-32", "MOV-33", "MOV-34", "MOV-35", "MOV-38", "MOV-39"
+        ]
+        .into_iter()
+        .collect()
+    );
+    replay_paths(&fixture, (603, 487, 36, 80, 0));
+}
+
+fn replay_paths(fixture: &Value, expected_counts: (usize, usize, usize, usize, usize)) {
     assert_eq!(
         fixture["reference"],
         "e4e579a838aabae3b1d9dadbc17a0a87147bc52d"
@@ -257,8 +284,12 @@ fn infantry_naval_and_vehicle_paths_match_original_find_path() {
                     "ExpansionLimit"
                 }
             };
-            let actual = serde_json::json!({ "points": result.waypoints.iter().copied().map(bits).collect::<Vec<_>>(),
+            let mut actual = serde_json::json!({ "points": result.waypoints.iter().copied().map(bits).collect::<Vec<_>>(),
                 "routeEnd": bits(result.route_end), "expansions": result.expansions, "status": status });
+            if query["expected"].get("localGoal").is_some() {
+                actual["localGoal"] = serde_json::json!(result.local_goal);
+                actual["limited"] = serde_json::json!(result.limited);
+            }
             assert_eq!(
                 actual, query["expected"],
                 "{name}, query {i}: {name_type}, total {queries}"
@@ -268,7 +299,7 @@ fn infantry_naval_and_vehicle_paths_match_original_find_path() {
     }
     assert_eq!(
         (queries, found, unreachable, deferred, maps),
-        (1529, 1108, 299, 122, 33),
+        expected_counts,
         "reference coverage changed"
     );
 }
