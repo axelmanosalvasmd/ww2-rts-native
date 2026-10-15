@@ -3749,3 +3749,12 @@ The authentic Source capture was frozen at `864d6485` and reproduced before Carg
 The unchanged projection reports MISMATCH: 0/61 checkpoints match, with first divergence tick 0, `$.players[0].fuel`: Source `{absent:true}`, Rust zero (`0000000000000000`). No value is normalized or added to Source, and no native wallet or other state is patched. The failing field has no assigned owning row; constructor resource representation needs separate source investigation. Both sides move during 352 ticks, accept all ten orders and retain all actors and the original event stream. Historical #220 remains distinct.
 
 The first compiler invocation emits a private-interfaces warning because the test-only weather argument names a crate-private type. Make the type public inside its private cfg(test) module; this changes no shipping interface. Native receipts, state traces, raw stage logs and producing heads remain under the private task directory, including immutable `-cae6e358` first-result copies. Registration and fresh strict Clippy remain pending.
+
+
+### Qualified aligned-replay source and remaining representation difference
+
+At `87dfae5c1801ad7d41046e637fd870a8fea1bbb6`, three focused harness checks, both crate registration guards, formatting and fresh strict core/simtest all-target Clippy pass on Vostro under S1. The actual 61-checkpoint run repeats aligned inputs and the same MISMATCH, 0/61. Both engines complete 600 ticks and 352 moving ticks, accept ten orders and consume exactly 1,321 values; native emits 128 events. Six unavailable phases remain explicitly reported. This is not a completed Conquest victory or proof of those phases.
+
+The first field is now source-investigated as BASE-01's resource-presence question. Ordinary pinned player construction omits Fuel and Munitions; the Rust wallet has mandatory f64 fields and StartPlan retains Default zeros. Keep the raw first result and original comparator metadata, with this later investigation separately documented. No absent-to-zero conversion, projection exclusion or runtime change is adopted. All candidate row probes remain partial.
+
+The final harness-only correction starts the unseeded-random refusal before Source module evaluation, covering initialization and captured callbacks as well as construction and ticks. Its check must preserve the original frozen input and output exactly. All Rust input bytes and the original fixture remain unchanged; native results stay attributed to `87dfae5c`. Root owns independent review and any test-only PR.

@@ -66,6 +66,9 @@ if(restored!==originalSource)throw Error('instrumentation does not erase to the 
 // Any other actual consumer refuses rather than silently using an unseeded draw.
 const prefix="import { hooks as __aligned } from 'aligned:test';\n";
 const suffix="\nconst __alignedOriginalSpawnSlots = spawnSlots; spawnSlots = (...args) => __aligned.layout(__alignedOriginalSpawnSlots(...args));\n";
+// Cover module initialization too, including any captured default RNG callback.
+const originalRandom=Math.random;
+Math.random=()=>{throw Error('unmapped Math.random consumer; no fallback');};
 const modules=new Map();
 const hookModule=new SyntheticModule(['hooks'],function(){this.setExport('hooks',hooks);},{identifier:'aligned:test'});
 const load=path=>{
@@ -99,9 +102,7 @@ const snapshot = g => ({
 
 let completed=0,failure=null,movedTicks=0,startup=null;
 const frames=[],denials=[];
-const originalRandom=Math.random;
 try{
-  Math.random=()=>{throw Error('unmapped Math.random consumer; no fallback');};
   const g=sim.createGame(map,['A','B'],true,[0,1],[0,1],{mode:'conquest',army:'standard',sandbox:false,logistics:false,tech:true,supply:true,weather:'clear',mapKey:'default'});
   if(![1,2,3].every(id=>g.units.get(id)?.owner===0)||![4,5,6].every(id=>g.units.get(id)?.owner===1))throw Error('canonical IDs no longer bind original orders');
   startup={spawns:g.players.map(p=>[bits(p.spawn.x),bits(p.spawn.z)]),environmentSeed32:g.seed>>>0,weatherSeed:1,

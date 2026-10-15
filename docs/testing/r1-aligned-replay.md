@@ -42,6 +42,7 @@ WW2_ALIGNED_TRACE, WW2_ALIGNED_REPORT and WW2_ALIGNED_NATIVE_FRAMES name private
 
 | Row | Actual candidate probe | Remaining full-check limits |
 | --- | --- | --- |
+| BASE-01 | Failing Conquest currency-presence projection at tick 0 and all checkpoints | Complete Classic starting-currency and owner snapshot check absent; no promotion |
 | MODE-22 | Constructor IDs, kinds, owners and positions at tick 0 | Only this two-player Conquest startup; no other modes or complete constructor-order proof |
 | CMB-83 | Both accepted holdPos=true commands at tick 1 | Invalid keys/types, foreign selections, other stances and owner-only wire-bit privacy absent |
 | CMB-91 | Attack-move at tick 140, Stop at 400, all position/health frames through 600 | Halt/resume, 2.5 m arrival and target eligibility branches need independent witnesses |
@@ -60,3 +61,15 @@ The private source trace, shared input and complete source input receipt are fro
 At `cae6e358f40429bddb5882ab7e6381b694dcc57c`, the finite-tape check and actual 61-checkpoint replay each pass as harness checks. Both engines complete 600 ticks, move during 352 ticks, accept all ten orders, and consume exactly the same 1,321 draw rows with 15,063 unused values. Startup observations match. The differential verdict is MISMATCH, 0/61; first divergence is tick 0, `$.players[0].fuel`, Source absence versus Rust zero bits `0000000000000000`. A successful harness check does not turn that result into parity. No owning row is assigned without separate source investigation.
 
 Immutable first-result copies are `native-report-cae6e358.json` and `native-frames-cae6e358.json` in the private directory. The raw first compiler log retains its test-only private-interface warning. The cleanup makes Replay public only within its private cfg(test) module, and adds the differential verdict to the sanitized stdout summary. Registration, fresh strict Clippy and the final focused-head qualification follow.
+
+## Qualified native head and source investigation
+
+At clean native head `87dfae5c1801ad7d41046e637fd870a8fea1bbb6`, all three focused checks pass: finite tape validation/counting, the original exact-bits comparator regression, and the actual private R1 replay. Both core and simtest registration guards pass. Formatting check and fresh strict locked core/simtest all-target Clippy pass. No failures or ignored tests occur in the explicitly selected focused invocation. All processes use S1 with four jobs, one test thread and the recorded caps.
+
+The actual comparison again completes 600 ticks per engine, 352 moving ticks per engine and all 61 N10 checkpoints. Native emits 128 events. Both accept ten orders. The complete 1,321 draw rows and startup receipt agree; both have 15,063 unconsumed values. Result: MISMATCH, 0/61. Six unchanged unavailable native phases are Convoys, GroundEffects, Production, Rail, SupplyNetwork and UnitReserves. These are listed, not claimed as executed.
+
+Source investigation identifies BASE-01 as the row describing the first field's semantics. At pinned `shared/sim.js:723`, ordinary player construction omits Fuel and Munitions; World construction assigns both at `:1177`. Native `economy_state.rs:59-65` has mandatory f64 fields, and StartPlan uses their Default zeros at `match_runtime.rs:334-350`. The raw diagnostic retains its original unassigned metadata, while this later investigation assigns the resource-representation question to BASE-01. It is a failing partial currency probe, not the complete Classic/snapshot check. No runtime representation or projection is changed.
+
+Local ACK of Hermes 156, comment 6194582243: test-only bounds, no row moves and separate Root review/publication are observed. No external acknowledgment or PR action is performed here.
+
+A final source-review correction moves the unseeded Math.random refusal ahead of module evaluation, covering import-time code and any captured callback. The Rust tree and already frozen shared inputs are unchanged. Check this frozen harness child against the original authentic fixture before final handoff; do not regenerate or replace the first fixture.
