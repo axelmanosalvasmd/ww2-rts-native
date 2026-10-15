@@ -7,7 +7,10 @@ use crate::{
 };
 
 fn scene(size: usize, units: &[(u32, f64, f64)]) -> Match {
-    let units = units.iter().map(|&(id, x, z)| (id, "rifle", x, z)).collect::<Vec<_>>();
+    let units = units
+        .iter()
+        .map(|&(id, x, z)| (id, "rifle", x, z))
+        .collect::<Vec<_>>();
     scene_with_units(size, &units)
 }
 
@@ -23,7 +26,9 @@ fn scene_with_units(size: usize, units: &[(u32, &str, f64, f64)]) -> Match {
         .iter()
         .map(|&(id, kind, x, z)| json!({"id":id,"owner":0,"type":kind,"x":bits(x),"z":bits(z)}))
         .collect::<Vec<_>>();
-    make(&json!({"map":map,"units":units,"mp":[bits(10000.),bits(10000.),bits(10000.)],"tech":false}))
+    make(
+        &json!({"map":map,"units":units,"mp":[bits(10000.),bits(10000.),bits(10000.)],"tech":false}),
+    )
 }
 
 fn command(m: &mut Match, input: Value) -> Option<Denial> {
@@ -101,7 +106,10 @@ fn hidden_placement_and_queued_sight_loss_do_not_reveal_or_pay() {
     let mp = positive.start.economy.players[0].mp;
     assert_eq!(command(&mut positive, order.clone()), None);
     step(&mut positive);
-    assert!(positive.world.game.units[&1].dig, "the intact scout permits actual activation");
+    assert!(
+        positive.world.game.units[&1].dig,
+        "the intact scout permits actual activation"
+    );
     assert_eq!(positive.field_works.jobs().len(), 1);
     assert_eq!(mp - positive.start.economy.players[0].mp, 30.);
     assert_eq!(works(&positive).as_array().unwrap().len(), 1);
@@ -132,42 +140,69 @@ fn hidden_placement_and_queued_sight_loss_do_not_reveal_or_pay() {
 
 #[test]
 fn five_segment_line_pays_once_per_segment_and_completes_twenty_cells() {
-    let mut m = scene_with_units(40, &[
-        (1, "rifle", 36., 50.),
-        (2, "rifle", 40., 50.),
-        (3, "rifle", 44., 50.),
-        (4, "tank", 10., 10.),
-    ]);
+    let mut m = scene_with_units(
+        40,
+        &[
+            (1, "rifle", 36., 50.),
+            (2, "rifle", 40., 50.),
+            (3, "rifle", 44., 50.),
+            (4, "tank", 10., 10.),
+        ],
+    );
     assert_eq!(
-        command(&mut m, json!({"t":"entrench","pattern":"line","ids":[4],"x":20,"z":40,"x2":60,"z2":40})),
+        command(
+            &mut m,
+            json!({"t":"entrench","pattern":"line","ids":[4],"x":20,"z":40,"x2":60,"z2":40})
+        ),
         Some(Denial::NoBuilders)
     );
     assert_eq!(
-        command(&mut m, json!({"t":"entrench","pattern":"toString","ids":[1,2,3],"x":20,"z":40,"x2":60,"z2":40})),
+        command(
+            &mut m,
+            json!({"t":"entrench","pattern":"toString","ids":[1,2,3],"x":20,"z":40,"x2":60,"z2":40})
+        ),
         Some(Denial::Blocked)
     );
     let mp = m.start.economy.players[0].mp;
     assert_eq!(
-        command(&mut m, json!({"t":"entrench","pattern":"line","ids":[1,2,3,4],"x":20,"z":40,"x2":60,"z2":40})),
+        command(
+            &mut m,
+            json!({"t":"entrench","pattern":"line","ids":[1,2,3,4],"x":20,"z":40,"x2":60,"z2":40})
+        ),
         None
     );
     assert_eq!(m.start.economy.players[0].mp, mp, "nothing paid up front");
     step(&mut m);
     assert_eq!(m.field_works.jobs().len(), 3);
-    let assigned = m.field_works.jobs().values().map(|job| {
-        (job.at.x.to_bits(), job.at.z.to_bits())
-    }).collect::<BTreeSet<_>>();
+    let assigned = m
+        .field_works
+        .jobs()
+        .values()
+        .map(|job| (job.at.x.to_bits(), job.at.z.to_bits()))
+        .collect::<BTreeSet<_>>();
     assert_eq!(assigned.len(), 3, "each worker takes a different segment");
     assert!(assigned.contains(&(40_f64.to_bits(), 40_f64.to_bits())));
     assert!((1..=3).all(|id| m.world.game.units[&id].dig));
     assert!(!m.world.game.units[&4].entrench && !m.world.game.units[&4].dig);
     let projection = SnapshotCache::new(&m).unwrap().recipient(0).unwrap();
-    let first = projection.fields["units"].as_array().unwrap().iter().find(|row| row[0] == 1).unwrap();
+    let first = projection.fields["units"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|row| row[0] == 1)
+        .unwrap();
     assert_ne!(first[12].as_u64().unwrap() & 1024, 0);
     assert_eq!(mp - m.start.economy.players[0].mp, 90.);
     run(&mut m, 1199);
-    assert_eq!(m.world.game.chars.iter().filter(|&&ch| ch == b'T').count(), 20);
-    assert_eq!(mp - m.start.economy.players[0].mp, 150., "five paid segments without component income");
+    assert_eq!(
+        m.world.game.chars.iter().filter(|&&ch| ch == b'T').count(),
+        20
+    );
+    assert_eq!(
+        mp - m.start.economy.players[0].mp,
+        150.,
+        "five paid segments without component income"
+    );
     assert!(m.world.game.units.values().all(|u| !u.entrench && !u.dig));
     assert_eq!(works(&m), json!([]));
 }
@@ -176,15 +211,20 @@ fn five_segment_line_pays_once_per_segment_and_completes_twenty_cells() {
 fn strongpoint_completes_twelve_trench_and_ten_forward_wire_cells() {
     let mut m = scene(40, &[(1, 38., 54.), (2, 42., 54.)]);
     assert_eq!(
-        command(&mut m, json!({"t":"entrench","pattern":"strongpoint","ids":[1,2],"x":40,"z":40,"x2":40,"z2":20})),
+        command(
+            &mut m,
+            json!({"t":"entrench","pattern":"strongpoint","ids":[1,2],"x":40,"z":40,"x2":40,"z2":20})
+        ),
         None
     );
     run(&mut m, 1800);
     let chars = &m.world.game.chars;
     assert_eq!(chars.iter().filter(|&&ch| ch == b'T').count(), 12);
     assert_eq!(chars.iter().filter(|&&ch| ch == b'X').count(), 10);
-    assert!(chars.iter().position(|&ch| ch == b'X').unwrap()
-        < chars.iter().position(|&ch| ch == b'T').unwrap());
+    assert!(
+        chars.iter().position(|&ch| ch == b'X').unwrap()
+            < chars.iter().position(|&ch| ch == b'T').unwrap()
+    );
     assert!(m.world.game.units.values().all(|u| !u.entrench && !u.dig));
 }
 
@@ -193,38 +233,81 @@ fn mass_line_waits_for_manpower_and_replacement_move_leaves_it_unfinished() {
     let mut poor = scene(40, &[(1, 38., 50.), (2, 42., 50.)]);
     poor.start.economy.players[0].mp = 45.;
     assert_eq!(
-        command(&mut poor, json!({"t":"entrench","pattern":"line","ids":[1,2],"x":20,"z":40,"x2":60,"z2":40})),
+        command(
+            &mut poor,
+            json!({"t":"entrench","pattern":"line","ids":[1,2],"x":20,"z":40,"x2":60,"z2":40})
+        ),
         None
     );
     run(&mut poor, 600);
-    assert_eq!(poor.world.game.chars.iter().filter(|&&ch| ch == b'T').count(), 4);
+    assert_eq!(
+        poor.world
+            .game
+            .chars
+            .iter()
+            .filter(|&&ch| ch == b'T')
+            .count(),
+        4
+    );
     assert!(poor.world.game.units.values().all(|u| u.entrench && !u.dig));
     assert_eq!(poor.start.economy.players[0].mp, 15.);
     assert_eq!(poor.story[0].mp_spent, 30.);
     // The original check explicitly refills the purse after proving the wait.
     poor.start.economy.players[0].mp = 10000.;
     run(&mut poor, 1200);
-    assert_eq!(poor.world.game.chars.iter().filter(|&&ch| ch == b'T').count(), 20);
+    assert_eq!(
+        poor.world
+            .game
+            .chars
+            .iter()
+            .filter(|&&ch| ch == b'T')
+            .count(),
+        20
+    );
     assert_eq!(poor.start.economy.players[0].mp, 9880.);
     assert_eq!(poor.story[0].mp_spent, 150.);
-    assert!(poor.world.game.units.values().all(|u| !u.entrench && !u.dig));
+    assert!(
+        poor.world
+            .game
+            .units
+            .values()
+            .all(|u| !u.entrench && !u.dig)
+    );
 
     let mut moved = scene(40, &[(1, 40., 50.)]);
     assert_eq!(
-        command(&mut moved, json!({"t":"entrench","pattern":"line","ids":[1],"x":20,"z":40,"x2":60,"z2":40})),
+        command(
+            &mut moved,
+            json!({"t":"entrench","pattern":"line","ids":[1],"x":20,"z":40,"x2":60,"z2":40})
+        ),
         None
     );
     step(&mut moved);
     assert!(moved.world.game.units[&1].dig);
     let mp = moved.start.economy.players[0].mp;
-    assert_eq!(command(&mut moved, json!({"t":"move","orders":[[1,40,70]]})), None);
+    assert_eq!(
+        command(&mut moved, json!({"t":"move","orders":[[1,40,70]]})),
+        None
+    );
     assert!(!moved.field_works.is_active(1));
     assert_eq!(moved.field_works.membership(1), None);
-    assert_eq!(moved.start.economy.players[0].mp, mp, "replacement does not refund payment");
+    assert_eq!(
+        moved.start.economy.players[0].mp, mp,
+        "replacement does not refund payment"
+    );
     run(&mut moved, 800);
     let worker = &moved.world.game.units[&1];
     assert!(!worker.entrench && !worker.dig && worker.z > 60.);
-    assert!(moved.world.game.chars.iter().filter(|&&ch| ch == b'T').count() < 20);
+    assert!(
+        moved
+            .world
+            .game
+            .chars
+            .iter()
+            .filter(|&&ch| ch == b'T')
+            .count()
+            < 20
+    );
     assert_eq!(moved.start.economy.players[0].mp, mp);
     assert_eq!(works(&moved), json!([]));
 }
@@ -233,24 +316,47 @@ fn mass_line_waits_for_manpower_and_replacement_move_leaves_it_unfinished() {
 fn trap_line_executes_and_non_line_materials_are_refused() {
     let mut m = scene(40, &[(1, 40., 50.), (2, 44., 50.)]);
     assert_eq!(
-        command(&mut m, json!({"t":"entrench","pattern":"line","fort":"wire","ids":[1,2],"x":25,"z":30,"x2":55,"z2":30})),
+        command(
+            &mut m,
+            json!({"t":"entrench","pattern":"line","fort":"wire","ids":[1,2],"x":25,"z":30,"x2":55,"z2":30})
+        ),
         None
     );
     assert_eq!(works(&m).as_array().unwrap().len(), 3);
     run(&mut m, 800);
-    assert_eq!(m.world.game.chars.iter().filter(|&&ch| ch == b'X').count(), 15);
     assert_eq!(
-        command(&mut m, json!({"t":"entrench","pattern":"line","fort":"traps","ids":[1],"x":25,"z":26,"x2":33,"z2":26})),
+        m.world.game.chars.iter().filter(|&&ch| ch == b'X').count(),
+        15
+    );
+    assert_eq!(
+        command(
+            &mut m,
+            json!({"t":"entrench","pattern":"line","fort":"traps","ids":[1],"x":25,"z":26,"x2":33,"z2":26})
+        ),
         None
     );
     run(&mut m, 400);
-    assert_eq!(m.world.game.chars.iter().filter(|&&ch| ch == b'Y').count(), 4);
-    assert_eq!(m.world.game.chars.iter().filter(|&&ch| ch == b'X').count(), 15);
-    for (fort, pattern) in [("bridge", "line"), ("nest", "line"), ("toString", "line"), ("wire", "ring")] {
+    assert_eq!(
+        m.world.game.chars.iter().filter(|&&ch| ch == b'Y').count(),
+        4
+    );
+    assert_eq!(
+        m.world.game.chars.iter().filter(|&&ch| ch == b'X').count(),
+        15
+    );
+    for (fort, pattern) in [
+        ("bridge", "line"),
+        ("nest", "line"),
+        ("toString", "line"),
+        ("wire", "ring"),
+    ] {
         let mp = m.start.economy.players[0].mp;
         let terrain = m.world.game.chars.clone();
         assert_eq!(
-            command(&mut m, json!({"t":"entrench","pattern":pattern,"fort":fort,"ids":[1],"x":25,"z":20,"x2":40,"z2":20})),
+            command(
+                &mut m,
+                json!({"t":"entrench","pattern":pattern,"fort":fort,"ids":[1],"x":25,"z":20,"x2":40,"z2":20})
+            ),
             Some(Denial::Blocked),
             "{fort}/{pattern}"
         );
@@ -263,7 +369,12 @@ fn trap_line_executes_and_non_line_materials_are_refused() {
 fn malformed_dig_names_do_not_start_work_or_spend_manpower() {
     let m = scene(40, &[(1, 10., 10.)]);
     let before = snapshot(&m);
-    for kind in [json!({"toString":null,"valueOf":null}), json!(["trench"]), json!("toString"), json!("__proto__")] {
+    for kind in [
+        json!({"toString":null,"valueOf":null}),
+        json!(["trench"]),
+        json!("toString"),
+        json!("__proto__"),
+    ] {
         assert_eq!(
             Command::from_json(&json!({"t":"dig","ids":[1],"kind":kind,"x":10,"z":10})),
             Err(Denial::Blocked)
@@ -277,13 +388,25 @@ fn malformed_dig_names_do_not_start_work_or_spend_manpower() {
 fn queued_dig_defers_payment_and_skips_unaffordable_work() {
     let mut m = scene(40, &[(1, 5., 5.)]);
     let mp = m.start.economy.players[0].mp;
-    assert_eq!(command(&mut m, json!({"t":"move","orders":[[1,27,5]]})), None);
-    // Admission stays unpaid; the stored immediate command pays on activation.
     assert_eq!(
-        command(&mut m, json!({"t":"dig","ids":[1],"kind":"trench","x":27,"z":5,"dir":0,"queue":true})),
+        command(&mut m, json!({"t":"move","orders":[[1,27,5]]})),
         None
     );
-    assert_eq!(command(&mut m, json!({"t":"move","orders":[[1,27,27]],"queue":true})), None);
+    // Admission stays unpaid; the stored immediate command pays on activation.
+    assert_eq!(
+        command(
+            &mut m,
+            json!({"t":"dig","ids":[1],"kind":"trench","x":27,"z":5,"dir":0,"queue":true})
+        ),
+        None
+    );
+    assert_eq!(
+        command(
+            &mut m,
+            json!({"t":"move","orders":[[1,27,27]],"queue":true})
+        ),
+        None
+    );
     assert_eq!(m.start.economy.players[0].mp, mp);
     assert!(!m.world.game.units[&1].dig);
     let mut started = false;
@@ -300,18 +423,34 @@ fn queued_dig_defers_payment_and_skips_unaffordable_work() {
     assert!(started, "the dig activates after the leading move");
     let planned = m.field_works.jobs()[&1].cells.clone();
     run(&mut m, 400); // Source: digCells * digTime + 8 seconds.
-    assert!(planned.iter().all(|cell| m.world.game.chars[cell.cell] == b'T'));
+    assert!(
+        planned
+            .iter()
+            .all(|cell| m.world.game.chars[cell.cell] == b'T')
+    );
     let unit = &m.world.game.units[&1];
     assert!(crate::math::hypot(unit.x - 27., unit.z - 27.) < 1.);
     assert_eq!(mp - m.start.economy.players[0].mp, 30.);
 
     let mut poor = scene(40, &[(1, 5., 5.)]);
-    assert_eq!(command(&mut poor, json!({"t":"move","orders":[[1,7,5]]})), None);
     assert_eq!(
-        command(&mut poor, json!({"t":"dig","ids":[1],"kind":"trench","x":7,"z":5,"dir":0,"queue":true})),
+        command(&mut poor, json!({"t":"move","orders":[[1,7,5]]})),
         None
     );
-    assert_eq!(command(&mut poor, json!({"t":"move","orders":[[1,17,5]],"queue":true})), None);
+    assert_eq!(
+        command(
+            &mut poor,
+            json!({"t":"dig","ids":[1],"kind":"trench","x":7,"z":5,"dir":0,"queue":true})
+        ),
+        None
+    );
+    assert_eq!(
+        command(
+            &mut poor,
+            json!({"t":"move","orders":[[1,17,5]],"queue":true})
+        ),
+        None
+    );
     poor.start.economy.players[0].mp = 0.;
     run(&mut poor, 80);
     let unit = &poor.world.game.units[&1];
@@ -330,16 +469,24 @@ fn queued_dig_losing_sight_or_ground_skips_without_payment_and_continues_move() 
         let target = Point { x: 120., z: 120. };
         assert!(m.recipient_sees(0, target).unwrap());
         assert_eq!(
-            command(&mut m, json!({"t":"dig","kind":"trench","ids":[1],"x":120,"z":120,"dir":0,"queue":true})),
+            command(
+                &mut m,
+                json!({"t":"dig","kind":"trench","ids":[1],"x":120,"z":120,"dir":0,"queue":true})
+            ),
             None
         );
-        assert_eq!(command(&mut m, json!({"t":"move","orders":[[1,17,5]],"queue":true})), None);
+        assert_eq!(
+            command(&mut m, json!({"t":"move","orders":[[1,17,5]],"queue":true})),
+            None
+        );
         assert_eq!(m.commands.units[&1].orders.len(), 2);
         if loss == "sight" {
             remove_scene_unit(&mut m, 2);
             assert!(!m.recipient_sees(0, target).unwrap());
         } else {
-            let cells = field_works::placement(&m.world, FortKind::Trench, target, 0., Some(0), |_| true).unwrap();
+            let cells =
+                field_works::placement(&m.world, FortKind::Trench, target, 0., Some(0), |_| true)
+                    .unwrap();
             assert_eq!(cells.len(), 4);
             for cell in cells {
                 m.world.set_cell(cell.cell, b'W').unwrap();
@@ -356,7 +503,10 @@ fn queued_dig_losing_sight_or_ground_skips_without_payment_and_continues_move() 
         assert_eq!(m.start.economy.players[0].mp, mp, "{loss}");
         assert_eq!(m.story[0].mp_spent, spent, "{loss}");
         assert!(!m.world.game.chars.contains(&b'T'), "{loss}");
-        assert!(crate::math::hypot(worker.x - 17., worker.z - 5.) < 1., "{loss}: the following move executes");
+        assert!(
+            crate::math::hypot(worker.x - 17., worker.z - 5.) < 1.,
+            "{loss}: the following move executes"
+        );
         assert_eq!(works(&m), json!([]));
     }
 }

@@ -35,7 +35,10 @@ fn original_shared_pattern_order_front_and_segment_prices() {
             fort,
         )
         .unwrap();
-        assert!(jobs.len() <= 24, "patterns stay small enough to order at once: {input}");
+        assert!(
+            jobs.len() <= 24,
+            "patterns stay small enough to order at once: {input}"
+        );
         let actual:Vec<_>=jobs.iter().map(|j|json!({"kind":j.kind.as_str(),"x":bits(j.at.x),"z":bits(j.at.z),"dir":bits(j.direction),"front":bits(j.front)})).collect();
         assert_eq!(json!(actual), case["jobs"], "{input}");
         if fort == FortKind::Trench {

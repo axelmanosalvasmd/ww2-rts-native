@@ -94,7 +94,12 @@ impl Match {
         self.execute_dig_intent(
             owner,
             ids,
-            DigIntent { kind, at, direction, queued: false },
+            DigIntent {
+                kind,
+                at,
+                direction,
+                queued: false,
+            },
             winner_decided,
         )
     }
@@ -105,13 +110,25 @@ impl Match {
         command: &Command,
         winner_decided: bool,
     ) -> Result<Option<Denial>, String> {
-        let Command::Dig { ids, kind, at, direction, queue } = command else {
+        let Command::Dig {
+            ids,
+            kind,
+            at,
+            direction,
+            queue,
+        } = command
+        else {
             return Err("expected a Dig command".into());
         };
         self.execute_dig_intent(
             owner,
             ids,
-            DigIntent { kind: *kind, at: *at, direction: *direction, queued: *queue },
+            DigIntent {
+                kind: *kind,
+                at: *at,
+                direction: *direction,
+                queued: *queue,
+            },
             winner_decided,
         )
     }
@@ -123,7 +140,12 @@ impl Match {
         intent: DigIntent,
         winner_decided: bool,
     ) -> Result<Option<Denial>, String> {
-        let DigIntent { kind, at, direction, queued } = intent;
+        let DigIntent {
+            kind,
+            at,
+            direction,
+            queued,
+        } = intent;
         let Some(player) = self.start.economy.players.get(owner) else {
             return Ok(Some(Denial::Blocked));
         };
@@ -207,7 +229,9 @@ impl Match {
                         return Ok(Some(Denial::QueueFull));
                     }
                     let mut orders = self.commands.units[&id].orders.clone();
-                    orders.try_reserve(1).map_err(|_| "dig queue reservation failed")?;
+                    orders
+                        .try_reserve(1)
+                        .map_err(|_| "dig queue reservation failed")?;
                     orders.push_back(Command::Dig {
                         ids: vec![i64::from(id)],
                         kind,

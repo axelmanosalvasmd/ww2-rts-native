@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## Queued-Dig qualification formatting child (2026-10-15)
+
+The first S1 formatting check at `a52a77764d56c593fbf4731c5471a4d5780a94ae` exits1 on five owned Rust files. Keep its full diagnostic at `/tmp/eng-five-native-2152-e92ceac8/fmt.log`. Apply exactly the formatter output to those five files. The token receipt records only comma and closure-brace changes beyond whitespace. Every literal, assertion and authored input remains intact. No native check has run at this checkpoint.
+
+The existing fourteen-check selection and order remain fixed. Root binds the frozen formatting child before native execution, including the optional consumer of the authentic external queued-Dig fixture. The Source producer remains `a52a7776`; its four private traces and 28 actions, the twelve-trace baseline and historical ca56 failure stay unchanged. ENG-15/16/17/23/24 remain in progress, all Acceptance cells and other rows remain exact, and the owner-view/MOV28 proposals remain unapplied. IMPL_ENGINEERING retains first publication priority.
+
 ## Queued hospital recorder denial repair (2026-10-15, source only)
 
 The single Source generation at `ca56e75d1d2ba780b914d0eb880d9aa4965f174f` failed at the final `hospital[6].result` assertion: actual `blocked`, expected `max`. The complete original twelve-trace, 47-action byte guard passed before that failure. The private output was absent with ENOENT; its byte check and all fourteen native checks, formatting and Clippy remained unrun. The raw failure and receipt stay in `/tmp/eng-five-proof-ca56-e92ceac8/`.

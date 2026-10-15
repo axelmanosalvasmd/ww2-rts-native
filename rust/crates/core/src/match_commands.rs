@@ -1988,7 +1988,10 @@ impl crate::match_runtime::Match {
             return Err("invalid queued Dig capacity".into());
         }
         let order = c.orders.front().ok_or("missing queued Dig")?;
-        let Command::Dig { ids, queue: false, .. } = order else {
+        let Command::Dig {
+            ids, queue: false, ..
+        } = order
+        else {
             return Err("invalid queued Dig intent".into());
         };
         if ids.as_slice() != [i64::from(id)] {
@@ -2007,7 +2010,8 @@ impl crate::match_runtime::Match {
             || c.nade.is_some()
             || u.dig
             || self.project_goal(id)?.is_some()
-            || c.build_target.is_some_and(|site| self.world.game.units.contains_key(&site))
+            || c.build_target
+                .is_some_and(|site| self.world.game.units.contains_key(&site))
             || c.enter.is_some()
             || u.board != 0
             || u.amove.is_some()
@@ -2017,7 +2021,9 @@ impl crate::match_runtime::Match {
         if !busy {
             let order = order.clone();
             let mut remaining = VecDeque::new();
-            remaining.try_reserve(c.orders.len() - 1).map_err(|_| "dig queue reservation failed")?;
+            remaining
+                .try_reserve(c.orders.len() - 1)
+                .map_err(|_| "dig queue reservation failed")?;
             remaining.extend(c.orders.iter().skip(1).cloned());
             // The existing immediate Dig provider stages wallet, story, exit
             // and control changes. Err leaves both work and this queue intact.

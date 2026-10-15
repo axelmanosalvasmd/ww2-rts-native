@@ -240,10 +240,9 @@ fn admission_guards_reject_before_payment_or_cancellation() {
     )
     .unwrap();
     let before = snapshot(&m);
-    let queued = Command::from_json(
-        &json!({"t":"dig","ids":[1],"kind":"wire","x":20,"z":20,"queue":true}),
-    )
-    .unwrap();
+    let queued =
+        Command::from_json(&json!({"t":"dig","ids":[1],"kind":"wire","x":20,"z":20,"queue":true}))
+            .unwrap();
     assert_eq!(m.execute_command(0, &queued, false).unwrap(), None);
     assert_eq!(snapshot(&m), before, "queueing preserves real paid work");
     let waiting = m.commands.units[&1].orders.clone();
@@ -377,7 +376,15 @@ fn queued_dig_preserves_paid_work_and_tallies_only_actual_activation() {
         serde_json::from_str(include_str!("../tests/fixtures/match-engineering.json")).unwrap();
     let mut m = make(&fixture["traces"][1]);
     assert_eq!(
-        m.execute_dig(0, &[1], FortKind::Trench, Point { x: 20., z: 20. }, Some(0.), false).unwrap(),
+        m.execute_dig(
+            0,
+            &[1],
+            FortKind::Trench,
+            Point { x: 20., z: 20. },
+            Some(0.),
+            false
+        )
+        .unwrap(),
         None
     );
     let paid = m.field_works.clone();
@@ -385,7 +392,11 @@ fn queued_dig_preserves_paid_work_and_tallies_only_actual_activation() {
     let spent = m.story[0].mp_spent;
     let walk = Command::from_json(&json!({"t":"move","orders":[[1,24,23]],"queue":true})).unwrap();
     assert_eq!(m.execute_command(0, &walk, false).unwrap(), None);
-    assert_eq!(m.execute_command(0, &queued_dig("wire", 20., 25.), false).unwrap(), None);
+    assert_eq!(
+        m.execute_command(0, &queued_dig("wire", 20., 25.), false)
+            .unwrap(),
+        None
+    );
     assert_eq!(m.field_works, paid);
     assert_eq!(m.start.economy.players[0].mp, mp);
     assert_eq!(m.story[0].mp_spent, spent);
@@ -393,7 +404,13 @@ fn queued_dig_preserves_paid_work_and_tallies_only_actual_activation() {
     assert_eq!(waiting.len(), 2);
     let stored = waiting.back().unwrap().clone();
     let direction = match stored {
-        Command::Dig { ref ids, kind: FortKind::Wire, at, direction: Some(direction), queue: false } => {
+        Command::Dig {
+            ref ids,
+            kind: FortKind::Wire,
+            at,
+            direction: Some(direction),
+            queue: false,
+        } => {
             assert_eq!(ids.as_slice(), &[1]);
             assert_eq!(at, Point { x: 20., z: 25. });
             assert_eq!(direction.to_bits(), std::f64::consts::PI.to_bits());
@@ -424,10 +441,16 @@ fn queued_dig_preserves_paid_work_and_tallies_only_actual_activation() {
         m.world.game.units.get_mut(&1).unwrap().repath -= 0.05;
         m.move_unit_with_command_routes(1, 1.).unwrap();
     }
-    assert!(m.world.game.units[&1].x > 22., "the actor actually moved before activation");
+    assert!(
+        m.world.game.units[&1].x > 22.,
+        "the actor actually moved before activation"
+    );
     assert_eq!(m.field_works.jobs()[&1].kind, FortKind::Wire);
     assert_eq!(m.field_works.jobs()[&1].at, Point { x: 20., z: 25. });
-    assert_eq!(m.field_works.jobs()[&1].direction.to_bits(), direction.to_bits());
+    assert_eq!(
+        m.field_works.jobs()[&1].direction.to_bits(),
+        direction.to_bits()
+    );
     assert_eq!(mp - m.start.economy.players[0].mp, 25.);
     assert_eq!(m.story[0].mp_spent - spent, 25.);
     assert!(m.commands.units[&1].orders.is_empty());
@@ -448,29 +471,51 @@ fn queued_dig_validates_placement_and_capacity_without_reserving_manpower() {
     let spent = m.story[0].mp_spent;
     let unseen = Point { x: 70., z: 70. };
     assert!(!m.recipient_sees(0, unseen).unwrap());
-    assert_eq!(m.execute_command(0, &queued_dig("trench", unseen.x, unseen.z), false).unwrap(), Some(Denial::NotVisible));
+    assert_eq!(
+        m.execute_command(0, &queued_dig("trench", unseen.x, unseen.z), false)
+            .unwrap(),
+        Some(Denial::NotVisible)
+    );
     assert!(m.commands.units[&1].orders.is_empty());
     for count in 1..=8 {
-        assert_eq!(m.execute_command(0, &queued_dig("trench", 20., 20.), false).unwrap(), None);
+        assert_eq!(
+            m.execute_command(0, &queued_dig("trench", 20., 20.), false)
+                .unwrap(),
+            None
+        );
         assert_eq!(m.commands.units[&1].orders.len(), count);
         assert_eq!(m.start.economy.players[0].mp, 0.);
         assert_eq!(m.story[0].mp_spent, spent);
         assert!(m.field_works.jobs().is_empty());
     }
     let waiting = m.commands.units[&1].orders.clone();
-    assert_eq!(m.execute_command(0, &queued_dig("trench", 20., 20.), false).unwrap(), Some(Denial::QueueFull));
+    assert_eq!(
+        m.execute_command(0, &queued_dig("trench", 20., 20.), false)
+            .unwrap(),
+        Some(Denial::QueueFull)
+    );
     assert_eq!(m.commands.units[&1].orders, waiting);
     // Visibility refusal precedes capacity refusal, even with eight orders.
-    assert_eq!(m.execute_command(0, &queued_dig("trench", unseen.x, unseen.z), false).unwrap(), Some(Denial::NotVisible));
+    assert_eq!(
+        m.execute_command(0, &queued_dig("trench", unseen.x, unseen.z), false)
+            .unwrap(),
+        Some(Denial::NotVisible)
+    );
     assert_eq!(m.commands.units[&1].orders, waiting);
     let mut wrong_first = queued_dig("trench", 20., 20.);
     if let Command::Dig { ids, .. } = &mut wrong_first {
         *ids = vec![999, 1];
     }
-    assert_eq!(m.execute_command(0, &wrong_first, false).unwrap(), Some(Denial::NoBuilders));
+    assert_eq!(
+        m.execute_command(0, &wrong_first, false).unwrap(),
+        Some(Denial::NoBuilders)
+    );
     assert_eq!(m.commands.units[&1].orders, waiting);
     m.start_queued_orders(1, false).unwrap();
-    assert!(m.commands.units[&1].orders.is_empty(), "unaffordable orders are skipped");
+    assert!(
+        m.commands.units[&1].orders.is_empty(),
+        "unaffordable orders are skipped"
+    );
     assert!(m.field_works.jobs().is_empty());
     assert_eq!(m.start.economy.players[0].mp, 0.);
     assert_eq!(m.story[0].mp_spent, spent);
@@ -486,16 +531,28 @@ fn queued_dig_errors_preserve_queue_drift_wallet_story_and_views() {
     let controls = invalid_wallet.commands.units.clone();
     let units = invalid_wallet.world.game.units.clone();
     let invalid_mp_bits = invalid_wallet.start.economy.players[0].mp.to_bits();
-    assert!(invalid_wallet.execute_command(0, &queued_dig("trench", 20., 20.), false).is_err());
+    assert!(
+        invalid_wallet
+            .execute_command(0, &queued_dig("trench", 20., 20.), false)
+            .is_err()
+    );
     assert_eq!(snapshot(&invalid_wallet), before);
-    assert_eq!(invalid_wallet.start.economy.players[0].mp.to_bits(), invalid_mp_bits);
+    assert_eq!(
+        invalid_wallet.start.economy.players[0].mp.to_bits(),
+        invalid_mp_bits
+    );
     assert_eq!(invalid_wallet.commands.units, controls);
     assert_eq!(invalid_wallet.world.game.units, units);
     assert!(invalid_wallet.field_works.jobs().is_empty());
     for fault in ["story", "path", "metadata", "selection", "capacity"] {
         let mut m = make(&fixture["traces"][1]);
-        assert_eq!(m.execute_command(0, &queued_dig("trench", 20., 20.), false).unwrap(), None);
-        let tail = Command::from_json(&json!({"t":"move","orders":[[1,30,23]],"queue":true})).unwrap();
+        assert_eq!(
+            m.execute_command(0, &queued_dig("trench", 20., 20.), false)
+                .unwrap(),
+            None
+        );
+        let tail =
+            Command::from_json(&json!({"t":"move","orders":[[1,30,23]],"queue":true})).unwrap();
         assert_eq!(m.execute_command(0, &tail, false).unwrap(), None);
         assert_eq!(m.commands.units[&1].orders.len(), 2);
         let unit = m.world.game.units.get_mut(&1).unwrap();
@@ -505,9 +562,21 @@ fn queued_dig_errors_preserve_queue_drift_wallet_story_and_views() {
         match fault {
             "story" => m.story[0].mp_spent = f64::NAN,
             "path" => m.world.game.units.get_mut(&1).unwrap().path_gen = u64::MAX,
-            "metadata" => { m.firing.remove(1); }
+            "metadata" => {
+                m.firing.remove(1);
+            }
             "selection" => {
-                let Command::Dig { ids, .. } = m.commands.units.get_mut(&1).unwrap().orders.front_mut().unwrap() else { unreachable!() };
+                let Command::Dig { ids, .. } = m
+                    .commands
+                    .units
+                    .get_mut(&1)
+                    .unwrap()
+                    .orders
+                    .front_mut()
+                    .unwrap()
+                else {
+                    unreachable!()
+                };
                 *ids = vec![2];
             }
             "capacity" => {
@@ -524,13 +593,29 @@ fn queued_dig_errors_preserve_queue_drift_wallet_story_and_views() {
         let ability = m.abilities.get(1).copied();
         let path_gen = m.world.game.units[&1].path_gen;
         let work = m.field_works.clone();
-        let story_bits = m.story.iter().map(|story| {
-            StoryKey::ALL.map(|key| story.value(key).to_bits())
-        }).collect::<Vec<_>>();
-        let currency_bits = m.start.economy.players.iter().map(|player| {
-            [player.mp.to_bits(), player.mun.to_bits(), player.fuel.to_bits()]
-        }).collect::<Vec<_>>();
-        let memory = m.recipients.iter().map(|r| r.remembered().to_vec()).collect::<Vec<_>>();
+        let story_bits = m
+            .story
+            .iter()
+            .map(|story| StoryKey::ALL.map(|key| story.value(key).to_bits()))
+            .collect::<Vec<_>>();
+        let currency_bits = m
+            .start
+            .economy
+            .players
+            .iter()
+            .map(|player| {
+                [
+                    player.mp.to_bits(),
+                    player.mun.to_bits(),
+                    player.fuel.to_bits(),
+                ]
+            })
+            .collect::<Vec<_>>();
+        let memory = m
+            .recipients
+            .iter()
+            .map(|r| r.remembered().to_vec())
+            .collect::<Vec<_>>();
         let fog = m.routing_fog.clone();
         let pending = m.world.pending(crate::world::Recipient::Player(0)).cloned();
         let error = m.start_queued_orders(1, false).unwrap_err();
@@ -544,15 +629,44 @@ fn queued_dig_errors_preserve_queue_drift_wallet_story_and_views() {
         assert_eq!(m.abilities.get(1), ability.as_ref(), "{fault}");
         assert_eq!(m.world.game.units[&1].path_gen, path_gen, "{fault}");
         assert_eq!(m.field_works, work, "{fault}");
-        assert_eq!(m.story.iter().map(|story| {
-            StoryKey::ALL.map(|key| story.value(key).to_bits())
-        }).collect::<Vec<_>>(), story_bits, "{fault}");
-        assert_eq!(m.start.economy.players.iter().map(|player| {
-            [player.mp.to_bits(), player.mun.to_bits(), player.fuel.to_bits()]
-        }).collect::<Vec<_>>(), currency_bits, "{fault}");
-        assert_eq!(m.recipients.iter().map(|r| r.remembered().to_vec()).collect::<Vec<_>>(), memory, "{fault}");
+        assert_eq!(
+            m.story
+                .iter()
+                .map(|story| { StoryKey::ALL.map(|key| story.value(key).to_bits()) })
+                .collect::<Vec<_>>(),
+            story_bits,
+            "{fault}"
+        );
+        assert_eq!(
+            m.start
+                .economy
+                .players
+                .iter()
+                .map(|player| {
+                    [
+                        player.mp.to_bits(),
+                        player.mun.to_bits(),
+                        player.fuel.to_bits(),
+                    ]
+                })
+                .collect::<Vec<_>>(),
+            currency_bits,
+            "{fault}"
+        );
+        assert_eq!(
+            m.recipients
+                .iter()
+                .map(|r| r.remembered().to_vec())
+                .collect::<Vec<_>>(),
+            memory,
+            "{fault}"
+        );
         assert_eq!(m.routing_fog, fog, "{fault}");
-        assert_eq!(m.world.pending(crate::world::Recipient::Player(0)), pending.as_ref(), "{fault}");
+        assert_eq!(
+            m.world.pending(crate::world::Recipient::Player(0)),
+            pending.as_ref(),
+            "{fault}"
+        );
     }
 }
 
@@ -576,7 +690,11 @@ fn queued_dig_uses_real_single_fort_reservations_and_rechecks_at_activation() {
     assert_eq!(m.field_works.jobs()[&1].kind, FortKind::Aid);
     assert_eq!(m.commands.units[&1].orders.len(), 1);
     let paid = m.field_works.clone();
-    assert_eq!(m.execute_command(0, &queued_dig("aid", 20., 25.), false).unwrap(), Some(Denial::Maximum));
+    assert_eq!(
+        m.execute_command(0, &queued_dig("aid", 20., 25.), false)
+            .unwrap(),
+        Some(Denial::Maximum)
+    );
     assert_eq!(m.field_works, paid);
     assert_eq!(m.commands.units[&1].orders.len(), 1);
     for _ in 0..260 {
@@ -603,7 +721,10 @@ fn optional_queued_source_fixture() {
     let baseline: Value = serde_json::from_str(baseline_bytes).unwrap();
     assert_eq!(baseline["traces"].as_array().unwrap().len(), 12);
     for key in ["reference", "node", "arch"] {
-        assert_eq!(fixture[key], baseline[key], "private queued provenance {key}");
+        assert_eq!(
+            fixture[key], baseline[key],
+            "private queued provenance {key}"
+        );
     }
     let cases = fixture["traces"].as_array().unwrap();
     let expected = [
@@ -619,7 +740,11 @@ fn optional_queued_source_fixture() {
         assert_eq!(case["units"], baseline["traces"][1]["units"]);
         assert_eq!(case["rows"].as_array().unwrap().len(), rows);
         let mut m = make(case);
-        assert_eq!(queued_source_snapshot(&m), case["initial"], "{name} initial");
+        assert_eq!(
+            queued_source_snapshot(&m),
+            case["initial"],
+            "{name} initial"
+        );
         for (index, row) in case["rows"].as_array().unwrap().iter().enumerate() {
             let action = &row["action"];
             let mut result = Value::Null;
@@ -647,7 +772,11 @@ fn optional_queued_source_fixture() {
                 op => panic!("unrepresented private queued action {op}"),
             }
             assert_eq!(encode(result), row["result"], "{name} {index} result");
-            assert_eq!(queued_source_snapshot(&m), row["snapshot"], "{name} {index} state");
+            assert_eq!(
+                queued_source_snapshot(&m),
+                row["snapshot"],
+                "{name} {index} state"
+            );
         }
     }
 }

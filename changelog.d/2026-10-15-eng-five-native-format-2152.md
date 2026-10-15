@@ -1,0 +1,1 @@
+- Apply the first queued-Dig qualification formatter output in five owned Rust files, retaining every literal, assertion and input. Preserve the a52a7776 formatting diagnostic and historical Source failure; all fourteen native checks remain pending Root binding of this child.
