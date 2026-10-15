@@ -247,7 +247,7 @@ fogFrame('smoke-leave', () => { fogGame.smokes.length = 0; });
 fogFrame('recon-strip', () => { fogGame.strikes.push({ kind: 'recon', owner: 0, live: true, x: 120, z: 70, dir: 0.5 }); });
 fogFrame('recon-ended', () => { fogGame.strikes[0].live = false; });
 fogFrame('visible-ground-cell', () => { fogEnemy.x = 77; fogEnemy.z = 55; fogEnemy.dust = fogGame.tick + 4; });
-fogFrame('visible-building-footprint', () => { visibleBuilding = sim.internals.placeBuilding(fogGame, 2, 'barracks', cell(69, 47), true); });
+fogFrame('visible-building-footprint', () => { visibleBuilding = sim.internals.placeBuilding(fogGame, 2, 'barracks', cell(71, 47), true); });
 fogFrame('building-circle', () => { spawn(fogGame, 0, 'hq', 115, 41); });
 fogFrame('airborne-circle', () => { spawn(fogGame, 0, 'fighter', 145, 75, { air: { state: 'out' } }); });
 fogFrame('parked-plane', () => { [...fogGame.units.values()].find(u => u.type === 'fighter').air.state = 'base'; });
