@@ -22,6 +22,7 @@ fn actual_ground_support_ticks_match_source_effects_and_lifetimes() {
     let mut traces = 0;
     let mut ticks = 0;
     let mut checkpoints = 0;
+    let mut smoke_traces = 0;
     for trace in fixture["traces"].as_array().unwrap() {
         let name = trace["name"].as_str().unwrap();
         let mut m = common::make(trace);
@@ -32,6 +33,15 @@ fn actual_ground_support_ticks_match_source_effects_and_lifetimes() {
         };
         assert_eq!(m.options.mode, expected_mode);
         assert!(m.world.game.mode.is_none());
+        let smoke_query = &trace["initial"]["raw"]["smokeLos"];
+        let is_smoke = trace["spec"]["kind"] == "smoke" && trace["denial"].is_null();
+        let mut arrival_x = None;
+        let mut drifted = false;
+        if is_smoke {
+            assert!(m.world.game.smokes.is_empty());
+            assert_eq!(common::smoke_los(&m, smoke_query), *smoke_query);
+            assert_eq!(smoke_query["withSmoke"], true);
+        }
         let initial_rng = m.start.random.snapshot();
         let frames: BTreeMap<_, _> = trace["frames"]
             .as_array()
@@ -107,6 +117,23 @@ fn actual_ground_support_ticks_match_source_effects_and_lifetimes() {
             }
             let events = common::events(&report.events);
             assert!(m.support.events.is_empty() && m.aviation.events.is_empty());
+            if is_smoke {
+                let sight = common::smoke_los(&m, smoke_query);
+                assert_eq!(sight["withoutSmoke"], true, "{name}:{tick}: clear control");
+                let clouds = &m.world.game.smokes;
+                if let Some(first) = clouds.first() {
+                    if let Some(x) = arrival_x {
+                        drifted |= first.x > x;
+                    } else {
+                        assert_eq!(clouds.len(), 5, "{name}:{tick}: delivered cloud count");
+                        assert!(clouds.iter().all(|s| s.r.to_bits() == 7f64.to_bits()));
+                        assert_eq!(sight["withSmoke"], false, "{name}:{tick}: actual barrage LOS");
+                        arrival_x = Some(first.x);
+                    }
+                } else {
+                    assert_eq!(sight["withSmoke"], true, "{name}:{tick}: no-smoke LOS");
+                }
+            }
             let next_signature = common::signature(&m);
             let next_quiet = quiet_state(&m);
             if let Some(expected) = frames.get(&tick) {
@@ -139,7 +166,17 @@ fn actual_ground_support_ticks_match_source_effects_and_lifetimes() {
         }
         assert_eq!(m.commands.pending_commands(), 0);
         assert!(m.tick_state.fault().is_none());
+        if is_smoke {
+            assert!(arrival_x.is_some(), "{name}: no actual smoke delivery");
+            if trace["spec"]["rain"].is_null() {
+                assert!(drifted, "{name}: actual delivered cloud did not drift downwind");
+            }
+            assert!(m.world.game.smokes.is_empty(), "{name}: smoke did not retire");
+            assert_eq!(common::smoke_los(&m, smoke_query)["withSmoke"], true);
+            smoke_traces += 1;
+        }
         traces += 1;
     }
     assert_eq!((traces, ticks, checkpoints), (13, 2705, 153));
+    assert_eq!(smoke_traces, 2);
 }

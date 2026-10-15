@@ -39,10 +39,15 @@ function exact(v) {
   visit(raw);return {raw,floatBits};
 }
 const runs=a=>{const out=[];for(const x of a){if(out.length&&Object.is(out.at(-1)[0],x))out.at(-1)[1]++;else out.push([x,1]);}return out;};
+function smokeLos(g) {
+  const from={x:17,z:41},to={x:65,z:41};
+  return {from,to,withSmoke:sim.los(g,from,to),withoutSmoke:sim.los({...g,smokes:[]},from,to)};
+}
 function snapshot(g,rng) {
   return exact({tick:g.tick,visionTick:g.visionTick,nextId:g.nextId,seed:g.seed,wind:g.wind,wx:g.wx,winner:g.winner,
     players:g.players.map(p=>({...p,visible:[...p.visible]})),points:g.points,
     units:[...g.units.values()],unitOrder:[...g.units.keys()],strikes:g.strikes,covers:g.covers??[],smokes:g.smokes,
+    smokeLos:smokeLos(g),
     shots:g.shots,story:g.story??null,timeline:g.timeline??null,fallen:g.fallen??null,
     flights:[...g.flights.values()],nades:g.nades,salvos:g.salvos,
     environment:{fires:[...g.fires],soak:[...g.soak],mines:[...g.mines],aid:[...g.aid],claims:[...(g.claims??[])],wrecks:g.wrecks,newCells:g.newCells,cellLog:g.cellLog},
@@ -115,7 +120,16 @@ const traces=cases.map(spec=>{
   }
   if(spec.kind==='smoke'&&observed.denial===null) {
     assert.equal(events.filter(e=>e.k==='smokeshells').length,1);
+    assert.equal(observed.initial.raw.smokes.length,0);
+    assert.equal(observed.initial.raw.smokeLos.withSmoke,true);
+    const arrival=observed.frames.find(frame=>frame.expected.raw.smokes.length===5);
+    assert.ok(arrival,'the actual barrage must deliver five clouds');
+    assert.ok(arrival.expected.raw.smokes.every(cloud=>cloud.r===7));
+    assert.equal(arrival.expected.raw.smokeLos.withSmoke,false,'delivered smoke must block LOS');
+    assert.ok(observed.frames.every(frame=>frame.expected.raw.smokeLos.withoutSmoke),'the smoke-empty control must stay clear');
+    if(!spec.rain)assert.ok(observed.frames.some(frame=>frame.expected.raw.smokes[0]?.x>arrival.expected.raw.smokes[0].x),'delivered smoke must drift downwind');
     assert.equal(observed.final.raw.smokes.length,0,'full-step weather must retire smoke');
+    assert.equal(observed.final.raw.smokeLos.withSmoke,true,'LOS must clear after smoke retirement');
   }
   if(spec.name==='cover-activation-and-expiry')assert.equal(observed.final.raw.covers.length,0);
   assert.equal(observed.drawSites.reduce((n,row)=>n+row.count,0),observed.final.raw.random.count);
