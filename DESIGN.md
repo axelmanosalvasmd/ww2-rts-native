@@ -1,6 +1,5 @@
 # Three Crossroads Native: design decisions
 
-<<<<<<< HEAD
 ## Conquest capture, score and terminal component batch (2026-10-15)
 
 One Source-backed recorder/fixture and one Rust test cover MODE-23/25/26/27/88 without a runtime change. The recorder executes unchanged e4e579a capture, point/income, periodic-sample and victory statements. Sixteen capture cases compare 500 checkpoints, six goal vectors check the compiled formula, and five canonical phase traces compare nine score/victory checkpoints. Actual `sim.step` and native `advance_tick` also run 420 ticks through capture, 200 away ticks and resume, then a separate 220-tick postwinner trace with real rifle retirement and frozen first result/story/timeline. The native replay matches every declared component field exactly. These are isolated component checks under current PARITY.md, not the pending whole-match replay proposal.
@@ -10,7 +9,7 @@ The canonical setup uses two opposing human seats, Conquest/Standard, sandbox fa
 The full stated Rust checks now support MODE-23, MODE-25 and MODE-88 as ported. The corrected MODE-23 sentence says qualifying non-allied infantry contest, matching both Source and native filtering. MODE-26/27 remain in progress: a pure 2v2 goal is not a canonical 2v2 constructor witness, and opposing seats do not prove allied-player team-sum victory. Other modes, generic finish/result/callback rows, server-away propagation, client presentation, contracts/wire/ABI/header and whole-match outcomes remain outside this batch.
 
 The final Source generate/check and focused native test pass once: one passed, zero failed/ignored/filtered. Its 6 GiB/no-swap, CPU400%, four-core scope peaks at 152,035,328 bytes with zero memory events and no owned processes after cleanup. The first new recorder attempt failed before Cargo when a copied trailing Source comment swallowed its wrapper brace; the raw failure/source is retained, and Root inspected it before the newline correction. The earlier successful test source lacked the final 420-tick trace and remains separately attributed. Full workspace/release validation, separate actual-head review and fresh hosted/owner gates are pending; no whole-match or Unreal acceptance is claimed.
-=======
+
 ## Approved R1 private executable host (owner 097)
 
 Owner [axel-decision-r1-profile-lifecycle-097](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6181065743), authored by Axel account ID 283409233, selects the concrete trusted Conquest profile. A separate opt-in serving entry point preserves the lobby-only default and existing Rust callers. The ordinary binary accepts `--trusted-room CODE --seed U64`; policy is installed before requests. A current commander host resolves through the existing connected-human authority, not client-supplied slot/issuer fields. A private fixed two-human opposing roster, committed bound map/current weather, Standard army and sandbox off remain mandatory.
@@ -23,7 +22,6 @@ The explicit full-range u64 seed is reused on every fresh start/restart. Existin
 
 The successful focused source cycle passes three internal and five ordinary-binary TCP/WebSocket tests. All 231 committed map/weather combinations were checked: 224 admit, while No Man's Land refuses all seven weather choices with `native startup authoring map binding changed`, leaving no runtime/accounts/identity publication. Its authored setup is unchanged; the gap stays refused. The process tests use actual ClientView and a genuine El Alamein owned rifle, holdPos, clear staging cell (46,39), then authored mine (47,39). The actual contact guard latches a fault; subsequent host/guest restart attempts are refused with no postfault frame or new identity. Internal exact-state tests protect preparation rollback and old outstanding writes; their explicit fault latch setup is not described as binary proof. The first new-test run retained two incorrect assumptions as failures (every map admits and a hard-coded next tick); source-verified corrections pin the exact existing refusal and authoritative next clock. A strict-lint cycle found only a complex new test tuple, now named with aliases. These earlier results do not qualify the final head. Root owns separate actual-head review and full runtime/release validation before the readiness report; fresh hosted checks and explicit final-head owner acknowledgment remain merge gates.
 
->>>>>>> e1285e65ffa00bdec94a5673be231daa3fcb315c
 
 ## Reconnect source-only update after movement optimization #215 (2026-10-14)
 
