@@ -48,3 +48,9 @@ WW2_ALIGNED_TRACE, WW2_ALIGNED_REPORT and WW2_ALIGNED_NATIVE_FRAMES name private
 | MOV-11 | Move 2, Stop 120, attack-move 140, Stop 400 and positions through 600 | Backing, route budgets, blocked/yielding retries and bridge-group variants absent |
 
 These are partial probes, not complete row checks. No row is eligible for promotion from this prefix alone, even if all 61 checkpoints match. Victory, logistics on, other modes/weather/maps/rosters, vehicles, planes, network delivery and Unreal remain separate.
+
+## Authentic Source freeze
+
+At clean seam head `864d6485f2129d48c2a70635c1505ba16c8c4487`, generation and exact fresh capture check both exited 0 on Vostro Node v24.21.0/x64. Each completed 600 ticks, 352 moving ticks and 61 checkpoints, consuming 1,321 tape values with 15,063 unused. Observed roles include all five startup roles, both tick wind roles and all three direct-fire roles. No Source fault occurred.
+
+The private source trace, shared input and complete source input receipt are frozen read-only under `/tmp/aligned-replay-d6308bcc/`, before the first Cargo invocation. Both Source processes held S1 flock with kernel affinity 0-3, memory.max 6,442,450,944, memory.swap.max 0 and cpu.max 400000/100000. No native alignment or match count is claimed yet. Full logs and stage results retain the producing head.
