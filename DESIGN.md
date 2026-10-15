@@ -1,5 +1,13 @@
 # Three Crossroads Native: design decisions
 
+## Six complete MOV checks and first row delivery (2026-10-15)
+
+At frozen `8d7d892bd61eb8fe447df30c73b6453fea1915fa`, exactly six named behavior tests and two real registration guards pass once across two integration binaries:8 passed,0 failed,363 skipped. Final fmt and strict locked core/simtest all-target ci-test Clippy both exit0 on that same head. The six complete predicates cover road/mud/infantry and churn/wet travel, half-road travel, uphill/downhill tank travel, tank/AT together pace and twenty-tick travel plus plain reset, the61-tick obstructed-corner journey, and244 border-ray queries including both wall controls. The [movement evidence](docs/parity/movement.md#six-complete-speed-slope-together-corner-and-ray-checks-2026-10-15) records the precise native/Source scopes.
+
+The four new corner/border Source commands each pass once at9102d794 with exact compressed-byte checks; their authentic fixtures freeze at19d728ce before Cargo. The thirteen-scene terrain/together capture remains51730145, original five callbacks3a97ed37 and historical World capture0e2334be. No old Source recording repeats. Source and native results retain their producing heads. The approved finite typed Number bit assertion repair addresses only the recorded wx[0] storage-kind mismatch. It changes no physical check, provider or default rule. All earlier failures remain preserved.
+
+Promote only MOV05/06/07/10/12/13 Rust and Status cells, preserving all Acceptance cells and every other row. This documentation-only child keeps the tested Rust tree unchanged. Root's19:21 instruction grants this implementation stream the first MOV publication lease and authorizes opening the reviewable six-row PR now. It does not authorize merge, infer independent ACCEPT or replace fresh hosted checks and Hermes' exact runtime-head readback before merge. MOV04 fuel integration and native World companions remain held. No runtime, ABI, protocol or terrain-policy change.
+
 ## Mechanical MOV-12/13 consumer formatting (2026-10-15)
 
 The first guarded fmt check on authentic fixture child `19d728ce` reports formatting only in mov_corner.rs and mov_border_rays.rs. The explicitly allowed formatter exits0 and changes only those two files: layout, import ordering, closure grouping and trailing commas. Inspection preserves every assertion, literal, Source input, fixture and runtime path. Freeze this mechanical child before the exact eight native instances; old failures and all row statuses remain unchanged.

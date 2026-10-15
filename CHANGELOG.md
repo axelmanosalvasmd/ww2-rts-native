@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Mark MOV-05/06/07/10/12/13 ported from their complete literal road/mud, half-road, timed-slope, together-march, obstructed-corner and border-ray checks. Actual `8d7d892b` passes all six behavior tests plus both real registration guards (8 passed, 0 failed, 363 skipped), final fmt and strict locked core/simtest all-target Clippy. Preserve every Acceptance cell, all other rows, all prior failures and the MOV-04 fuel gap.
+
 - Format only the two new MOV corner and border-ray consumers after retaining their initial fmt-check diagnostics. Preserve all assertions, literals, original inputs and authentic fixtures. The eight selected native checks remain pending.
 
 - Freeze authentic MOV-12 and MOV-13 fixtures after all four Source commands pass at `9102d794`: the unchanged corner callback and canonical companion each complete 61 ticks, and the complete border-ray callback records 244 queries. Both regeneration checks match exact compressed bytes. Native checks and row promotions remain pending; older captures and failures stay unchanged.
