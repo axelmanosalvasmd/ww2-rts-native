@@ -174,3 +174,12 @@ unreal/Tools/tc-local.sh serve                # the temporary reference server; 
 - ww2-rts stays the playable game until the native game replaces it, and gameplay changes keep landing there.
 - `reference/ww2-rts` pins the ww2-rts commit the native game is measured against. That game is a prototype: `PARITY.md` lists what it does and how the native game carries it over, improves it or drops it. Moving the pin is its own commit, together with the port of whatever rules changed.
 - The plan started as axelmanosalvasmd/ww2-rts#65.
+
+
+## Slice 1s generated presentation assets
+
+The Rust-host lobby applies owner decisions 090 R1 and 097. The approved current-main trusted Rust executable now runs a bounded two-native Conquest match with move/Stop and same-token reconnect. Native ownership/stance/Restart checks and the approved current-main FFI rebuild follow the slice commit. Reference server admission is unchanged.
+
+Before building or cooking, regenerate the reference HQ camp surface slots with `unreal/Tools/world/make-world-materials.py`, the marker materials and symbol-badge atlas with `unreal/Tools/markers`, and the bridge section material with `unreal/Tools/bridge-replay/make-section-material.py` through the Unreal Python commandlet. The badge exporter reads the actual clean pinned browser builder from an isolated local reference server. `TCCampModels.Export.mjs` emits the exact reference bag and node geometry. Barlow Semi Condensed is fetched with `unreal/Tools/fonts/fetch-barlow.sh`. FarFigures v2 requires its matching `export-far-figures.mjs` payload and `make-crowd-look.py` materials. Generated assets remain ignored build outputs; no replacement art is authored.
+
+The mode driver sets Graphics High explicitly before every client and records the observed level in its table; set `TC_MODES_GRAPHICS=low` for a Low lane. The browser tour can reconnect a real guest with `--token-file`, use `--lang es --ui 150`, and open actual alert history with `--alert-history`. Tokens stay in local owner-only files and are never logged. For slow capture of a real loss, `--freeze-on-loss` holds only the browser presentation clock at loss age 2.5 seconds and records the delivered tick/removed IDs; it is not evidence of later simulation state.

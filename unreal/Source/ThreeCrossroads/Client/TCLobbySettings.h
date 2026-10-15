@@ -21,10 +21,11 @@
 // browser fetches /maps/<name>.json over HTTP for its preview; this client does not), weather (lobby 'weather', the
 // browser's own weather view), sandbox (FTCMatchState::bLobbySandbox), saves, operatives and the public listing.
 // ApplyLobby logs nothing: the caller decides what a refused message is worth saying.
-// Interim until the Rust server and its contract carry the lobby.
+// Rust hosts additionally follow owner decisions 090 R1 and 097. The reference path stays unchanged.
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Net/TCConnection.h"
 
 class FJsonObject;
 
@@ -50,12 +51,18 @@ struct FTCLobbySeat
 	int32 Faction = -1;       // -1: the lobby's value was not an integer from 0 to 3
 	bool bAi = false;
 	bool bConnected = false;  // an AI counts as connected (server.js: connected(q) || !!q.ai)
+	FString Role = TEXT("commander"); // optional seat role; reference players are commanders
 	FString Level;            // an AI's difficulty (the server sends 'normal' when unset); empty for a human
 };
 
 // The room as the last lobby message described it.
 struct FTCLobbyRoom
 {
+	ETCHostKind HostKind = ETCHostKind::Unknown;
+	int32 Protocol = -1;
+	bool bSandbox = false;
+	int32 Spectators = -1, Operatives = -1; // -1 when absent or malformed
+	FString Weather;
 	FString Code;
 	FString State;              // 'lobby' or 'play' (server.js room.state)
 	FString Role;               // 'commander' or 'operative'
@@ -137,6 +144,7 @@ public:
 
 	bool HasLobby() const { return bHasLobby; }
 	const FTCLobbyRoom& Room() const { return Current; }
+	bool IsRustHost() const { return bHasLobby && Current.HostKind == ETCHostKind::Rust; }
 	bool InLobby() const { return bHasLobby && Current.State == TEXT("lobby"); }
 	// Requests the lobby has shown since this object was made, for logs.
 	int32 Confirmed() const { return ConfirmedCount; }
@@ -166,6 +174,12 @@ public:
 	FString StartLabel() const;
 	bool StartAllowed() const;
 	FString StartLine() const;
+	// Owner decisions 090 R1 and 097. Empty only for the admitted trusted matrix. No readiness requirement.
+	FString RustStartRefusal() const;
+	// Shared guard for button and unattended send paths. Reference returns empty for every message.
+	FString RustCommandRefusal(const FJsonObject& Message) const;
+	static bool RustMapAllowed(const FString& Name);
+	static FString RustChoiceRefusal(ETCLobbySetting Kind, const FString& Value);
 	// "solo test", "co-op", "3-way FFA" or the team sizes ("2v1"), from the seats' teams.
 	FString Matchup() const;
 

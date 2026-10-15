@@ -19,6 +19,16 @@ enum class ETCSendResult : uint8
 };
 const TCHAR* LexToString(ETCSendResult Result);
 
+// Which server the lobby says this client reached (docs/contracts/protocol.md v0, "Additions in v0" 1): a Rust server
+// adds proto to every lobby; the pinned reference server (e4e579a, server.js lobby()) sends no proto at all.
+enum class ETCHostKind : uint8
+{
+	Unknown,    // no lobby yet on this connection
+	Reference,  // a lobby without proto: the Node reference server (or the browser-era protocol)
+	Rust,       // a lobby with proto: the Rust server (ww2-server); HostProto() says which version it speaks
+};
+const TCHAR* LexToString(ETCHostKind Kind);
+
 class FTCConnection : public TSharedFromThis<FTCConnection>
 {
 public:
@@ -81,6 +91,20 @@ public:
 		return FMath::Max(1, (int32)FMath::CeilToDouble(RetryAt - Now));
 	}
 	int32 Opens() const { return OpenCount; }
+	// Round 18 (rusthost): which server the last lobby came from, the proto it carried (-1 when it carried none, or a
+	// value that is not an integer) and its rules hash (protocol.md addition 2; empty when absent). Unknown until the
+	// first lobby; kept across a reconnect until the next lobby says otherwise, forgotten by Start.
+	ETCHostKind HostKind() const { return Host; }
+	bool IsRustHost() const { return Host == ETCHostKind::Rust; }
+	int32 HostProto() const { return HostProtoValue; }
+	const FString& HostRules() const { return HostRulesValue; }
+	// What a lobby message says about its server. OutProto: the integer proto, -1 when absent or not an integer.
+	// Anything but a lobby is Unknown. A proto that is present but not an integer still marks a non-reference host
+	// (the reference never sends the field), with OutProto -1.
+	static ETCHostKind HostKindOf(const FJsonObject& Message, int32* OutProto = nullptr, FString* OutRules = nullptr);
+	// deny {cmd:'join', reason:'version'} (protocol.md addition 1; only a Rust server sends it): the connection stops
+	// for good instead of retrying with the same hello.
+	static bool IsVersionDeny(const FJsonObject& Message);
 	static bool ValidRoom(const FString& Room);
 	static int32 Utf8Length(const FString& Text);
 
@@ -91,6 +115,8 @@ private:
 	// Drops the current socket. bClose: ask it to close (a socket still connecting closes as soon as it connects);
 	// false when it already reported closed or failed.
 	void Retire(bool bClose = true);
+	// Round 18: reads a lobby's host kind (HostKindOf) into Host, HostProtoValue and HostRulesValue.
+	void NoteLobby(const FJsonObject& Message);
 
 	FSettings Settings;
 	TSharedPtr<IWebSocket> Socket;
@@ -100,4 +126,7 @@ private:
 	int32 Attempts = 0, OpenCount = 0;
 	double RetryAt = -1.0, LastNow = 0.0;
 	FString StatusText = TEXT("idle");
+	ETCHostKind Host = ETCHostKind::Unknown;
+	int32 HostProtoValue = -1;
+	FString HostRulesValue;
 };

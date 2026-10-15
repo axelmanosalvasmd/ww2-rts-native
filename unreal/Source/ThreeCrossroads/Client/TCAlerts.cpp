@@ -351,13 +351,15 @@ namespace
 	}
 }
 
-FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measure) const
+FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measure, const FTCMeasure& HeavyMeasure) const
 {
 	using namespace TCAlertLook;
 	FTCPaint P;
 	const double Now = In.Now;
 	const float BoxW = FMath::Min(BoxMax, In.ViewW - BoxSide), Right = In.Right;
-	const float LineBox = FontPx * LineHeight;
+	const float Scale = FMath::Max(0.01f, In.UiScale), Border = FMath::Max(1.f, FMath::FloorToFloat(Scale)) / Scale;
+	auto Line = [Scale](float Px) { return FMath::FloorToFloat(Px * Scale * 64.f) / (64.f * Scale); };
+	const float LineBox = Line(FontPx * LineHeight), HeadingH = Line(HeadingPx * LineHeight), DetailH = Line(DetailPx * DetailLine), HintH = Line(HintPx * LineHeight);
 	auto Hover = [&In](float X, float Y, float W, float H) { return In.bMouse && In.Mouse.X >= X && In.Mouse.X < X + W && In.Mouse.Y >= Y && In.Mouse.Y < Y + H; };
 
 	// the children, top to bottom: the loss column, the routine lines (newest first), the history box
@@ -372,7 +374,7 @@ FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measur
 	// #lossAlerts: 380 px, 6 px between losses, 8 px under the column
 	if (Losses.Num())
 	{
-		const float W = FMath::Min(LossW, In.ViewW - LossSide), Inner = W - 1 - LossEdge - 2 * LossPadX - 1;
+		const float W = FMath::Min(LossW, In.ViewW - LossSide), Inner = W - LossEdge - 2 * LossPadX - Border;
 		struct FLoss { const FTCAlertLine* L; FString Heading, Hint; TArray<FString> Detail, HintLines; float H; };
 		TArray<FLoss> Items;
 		float H = 0;
@@ -381,15 +383,15 @@ FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measur
 			FLoss F;
 			F.L = L;
 			F.Heading = TC_T(FString(TEXT("Unit lost"))).ToUpper(); // tr('Unit lost'), then text-transform: uppercase
-			F.Detail = FTCPaint::Wrap(TC_T(L->Alert.Text), Inner, DetailPx, true, Measure);
+			F.Detail = FTCPaint::Wrap(TC_T(L->Alert.Text), Inner, DetailPx, true, HeavyMeasure ? HeavyMeasure : Measure);
 			F.HintLines = FTCPaint::Wrap(TC_T(FString(TEXT("Space or click: look there"))), Inner, HintPx, false, Measure);
-			F.H = 1 + LossPadY + HeadingPx * LineHeight + LossInner + F.Detail.Num() * DetailPx * DetailLine + LossInner + HintTop + F.HintLines.Num() * HintPx * LineHeight + LossPadY + 1;
+			F.H = 2 * Border + 2 * LossPadY + HeadingH + 2 * LossInner + F.Detail.Num() * DetailH + HintTop + F.HintLines.Num() * HintH;
 			H += (Items.Num() ? LossGap : 0.f) + F.H;
 			Items.Add(MoveTemp(F));
 		}
 		FBlock B;
 		B.W = W; B.H = H + LossBottom;
-		B.Paint = [this, Items, W, Now, Hover](FTCPaint& Out, float X, float Y)
+		B.Paint = [this, Items, W, Now, Hover, Border, HeadingH, DetailH, HintH](FTCPaint& Out, float X, float Y)
 		{
 			for (const FLoss& F : Items)
 			{
@@ -401,24 +403,24 @@ FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measur
 				for (int32 K = 3; K >= 1; K--) Out.Rect(X - 3.f * K, Y + 3 - 3.f * K, W + 6.f * K, F.H + 6.f * K, TCCss::Rgba(0, 0, 0, 0.4f / (K + 2)), TEXT("alert:loss-shadow"));
 				const FLinearColor Edge = bHover ? TCCss::Rgba(214, 178, 94, 0.8f) : TCCss::Hex(0xc66a57);
 				Out.Rect(X, Y, W, F.H, bHover ? TCCss::Rgba(46, 51, 55, 0.94f) : TCCss::Rgba(73, 24, 21, 0.97f), TEXT("alert:loss"));
-				Out.Frame(X, Y, W, F.H, Edge, 1.f, TEXT("alert:loss-frame"));
+				Out.Frame(X, Y, W, F.H, Edge, Border, TEXT("alert:loss-frame"));
 				Out.Rect(X, Y, LossEdge, F.H, bHover ? Edge : TCCss::Hex(0xff9a76), TEXT("alert:loss-edge"));
 				const float Tx = X + LossEdge + LossPadX;
-				float Ty = Y + 1 + LossPadY;
+				float Ty = Y + Border + LossPadY;
 				FTCPaintItem& Hd = Out.Text(F.Heading, Tx, Ty, HeadingPx, TCCss::Hex(0xffb293), true, ETCPaintAlign::Left, TEXT("alert:loss-heading"));
-				Hd.Tracking = HeadingTrack * HeadingPx; Hd.Size.Y = HeadingPx * LineHeight;
+				Hd.Tracking = HeadingTrack * HeadingPx; Hd.Size.Y = HeadingH;
 				Ty += Hd.Size.Y + LossInner;
 				for (const FString& D : F.Detail)
 				{
 					FTCPaintItem& Dt = Out.Text(D, Tx, Ty, DetailPx, TCCss::Hex(0xfff1e8), true, ETCPaintAlign::Left, TEXT("alert:loss-detail"));
-					Dt.Size.Y = DetailPx * DetailLine;
+					Dt.Size.Y = DetailH;
 					Ty += Dt.Size.Y;
 				}
 				Ty += LossInner + HintTop;
 				for (const FString& Hn : F.HintLines)
 				{
 					FTCPaintItem& Hi = Out.Text(Hn, Tx, Ty, HintPx, TCCss::Hex(0xdec4bb), false, ETCPaintAlign::Left, TEXT("alert:loss-hint"));
-					Hi.Size.Y = HintPx * LineHeight;
+					Hi.Size.Y = HintH;
 					Ty += Hi.Size.Y;
 				}
 				Out.Hit(FBox2D(FVector2D(X, Y), FVector2D(X + W, Y + F.H)), FString::Printf(TEXT("alert:line:%d"), F.L->Serial), F.L->Alert.Text);
@@ -435,13 +437,13 @@ FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measur
 	{
 		const FTCAlertLine* L = Routine[I];
 		const bool bBase = L->Alert.Kind == TEXT("base"), bNewest = I == 0, bBold = bBase || bNewest;
-		const float MaxW = FMath::Min(LineMax, BoxW) - 2 * PadX - 2;
+		const float MaxW = FMath::Min(LineMax, BoxW) - 2 * PadX - 2 * Border;
 		const FString Text = FTCPaint::Ellipsis(TC_T(L->Alert.Text), MaxW, FontPx, bBold, Measure);
 		FBlock B;
 		B.W = FMath::Min(FMath::Min(LineMax, BoxW), Measure(Text, FontPx, bBold, 0.f) + 2 * PadX + 2);
-		B.H = LineBox + 2 * PadY + 2;
+		B.H = LineBox + 2 * PadY + 2 * Border;
 		const float W = B.W, H = B.H;
-		B.Paint = [L, Text, W, H, Now, bBase, bNewest, bBold, LineBox, Hover](FTCPaint& Out, float X, float Y)
+		B.Paint = [L, Text, W, H, Now, bBase, bNewest, bBold, LineBox, Hover, Border](FTCPaint& Out, float X, float Y)
 		{
 			float Slide = 0.f;
 			const float A = ShownAlpha(*L, Now, &Slide);
@@ -462,8 +464,8 @@ FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measur
 			if (Hover(X, Y, W, H) && !(bBase && Now - L->Born < SlideIn + 4 * BasePulse)) { Back = TCCss::Rgba(46, 51, 55, 0.94f); Edge = TCCss::Rgba(214, 178, 94, 0.8f); }
 			else if (Hover(X, Y, W, H)) Edge = TCCss::Rgba(214, 178, 94, 0.8f);
 			Out.Rect(X, Y, W, H, Back, TEXT("alert:line"));
-			Out.Frame(X, Y, W, H, Edge, 1.f, TEXT("alert:line-frame"));
-			FTCPaintItem& T = Out.Text(Text, X + 1 + PadX, Y + 1 + PadY, FontPx, bBase ? FLinearColor::White : LineColour(L->Alert.Kind), bBold, ETCPaintAlign::Left, bNewest ? TEXT("alert:text-newest") : TEXT("alert:text"));
+			Out.Frame(X, Y, W, H, Edge, Border, TEXT("alert:line-frame"));
+			FTCPaintItem& T = Out.Text(Text, X + Border + PadX, Y + Border + PadY, FontPx, bBase ? FLinearColor::White : LineColour(L->Alert.Kind), bBold, ETCPaintAlign::Left, bNewest ? TEXT("alert:text-newest") : TEXT("alert:text"));
 			T.Size.Y = LineBox;
 			Out.Hit(FBox2D(FVector2D(X, Y), FVector2D(X + W, Y + H)), FString::Printf(TEXT("alert:line:%d"), L->Serial), L->Alert.Text);
 			Out.Panels.Add(FBox2D(FVector2D(X, Y), FVector2D(X + W, Y + H)));
@@ -475,8 +477,8 @@ FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measur
 	// the Alert history box: the summary always, the nav buttons and the list when open
 	{
 		const float W = FMath::Min(HistoryW, In.ViewW - BoxSide);
-		const float SumH = 1 + HistoryPadY + LineBox + HistoryPadY;
-		const float ButtonH = LineBox + 2 * ButtonPadY + 2, NavH = 2 * NavPad + ButtonH;
+		const float SumH = Border + HistoryPadY + LineBox + HistoryPadY;
+		const float ButtonH = LineBox + 2 * ButtonPadY + 2 * Border, NavH = 2 * NavPad + ButtonH;
 		const TArray<FTCAlertHistoryEntry>& Entries = Hist.Entries();
 		const float ListMaxH = FMath::Min(ListMax, ListVh * In.ViewH);
 		struct FEntry { const FTCAlertHistoryEntry* E; TArray<FString> Lines; float H; };
@@ -485,13 +487,13 @@ FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measur
 		int32 First = 0;
 		if (bHistoryOpen)
 		{
-			const float TextW = W - 2 - 2 * ListPad - 2 - 2 * EntryPad;
+			const float TextW = W - 4 * Border - 2 * ListPad - 2 * EntryPad;
 			for (const FTCAlertHistoryEntry& E : Entries)
 			{
 				FEntry R;
 				R.E = &E;
 				R.Lines = FTCPaint::Wrap(TC_T(FString::Printf(TEXT("%s · %s"), *MatchClock(E.Time), *E.Text)), TextW, FontPx, false, Measure);
-				R.H = 2 + 2 * EntryPad + R.Lines.Num() * LineBox;
+				R.H = 2 * Border + 2 * EntryPad + R.Lines.Num() * LineBox;
 				Rows.Add(MoveTemp(R));
 			}
 			// the list scrolls (max-height min(30vh, 250px)): this shows a window of whole entries, the selected one in it
@@ -508,39 +510,44 @@ FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measur
 		}
 		FBlock B;
 		B.W = W;
-		B.H = SumH + (bHistoryOpen ? NavH + ListH : 0.f) + 1;
+		B.H = SumH + (bHistoryOpen ? NavH + ListH : 0.f) + Border;
 		const float H = B.H;
 		const bool bOpen = bHistoryOpen;
 		const int32 Selected = Hist.Selected();
-		B.Paint = [W, H, SumH, ButtonH, NavH, ListH, ListMaxH, Content, Rows, First, bOpen, Selected, LineBox, &Measure, this](FTCPaint& Out, float X, float Y)
+		B.Paint = [W, H, SumH, ButtonH, NavH, ListH, ListMaxH, Content, Rows, First, bOpen, Selected, LineBox, &Measure, this, Border](FTCPaint& Out, float X, float Y)
 		{
 			Out.Rect(X, Y, W, H, TCCss::Rgba(25, 28, 30, 0.96f), TEXT("alert:history"));
-			Out.Frame(X, Y, W, H, TCCss::Rgba(176, 164, 122, 0.46f), 1.f, TEXT("alert:history-frame"));
+			Out.Frame(X, Y, W, H, TCCss::Rgba(176, 164, 122, 0.46f), Border, TEXT("alert:history-frame"));
 			Out.Panels.Add(FBox2D(FVector2D(X, Y), FVector2D(X + W, Y + H)));
 			// <summary>Alert history</summary> with the details marker
-			const float Sx = X + 1 + HistoryPadX, Sy = Y + 1 + HistoryPadY;
-			FTCPaintItem& Mk = Out.Text(bOpen ? TEXT("▼") : TEXT("▶"), Sx, Sy, FontPx * 0.7f, TCCss::Text, false, ETCPaintAlign::Left, TEXT("alert:history-marker"));
-			Mk.Size.Y = LineBox;
+			const float Sx = X + Border + HistoryPadX, Sy = Y + Border + HistoryPadY;
+			// The browser's <summary> marker is geometry, not a glyph in the Barlow font.
+			const float MidY = Sy + LineBox / 2;
+			for (int32 K = 0; K < 7; K++)
+			{
+				if (bOpen) Out.Line(FVector2D(Sx + K / 2.f, MidY - 3 + K), FVector2D(Sx + 7 - K / 2.f, MidY - 3 + K), TCCss::Text, 1.f, TEXT("alert:history-marker"));
+				else Out.Line(FVector2D(Sx + K, MidY - 4 + K / 2.f), FVector2D(Sx + K, MidY + 4 - K / 2.f), TCCss::Text, 1.f, TEXT("alert:history-marker"));
+			}
 			FTCPaintItem& Su = Out.Text(TC_T(FString(TEXT("Alert history"))), Sx + FontPx * 0.95f, Sy, FontPx, TCCss::Text, false, ETCPaintAlign::Left, TEXT("alert:history-summary"));
 			Su.Size.Y = LineBox;
 			Out.Hit(FBox2D(FVector2D(X, Y), FVector2D(X + W, Y + SumH)), TEXT("alert:history"), TEXT("Alert history"));
 			if (!bOpen) return;
 			// the nav: Previous Alert (navigate(1)), Next Alert (navigate(-1))
-			float Bx = X + 1 + NavPad;
+			float Bx = X + Border + NavPad;
 			const float By = Y + SumH + NavPad;
 			for (int32 K = 0; K < 2; K++)
 			{
 				const FString Label = TC_T(FString(K == 0 ? TEXT("Previous Alert") : TEXT("Next Alert")));
-				const float Bw = Measure(Label, FontPx, false, 0.f) + 2 * ButtonPadX + 2;
+				const float Bw = Measure(Label, FontPx, false, 0.f) + 2 * ButtonPadX + 2 * Border;
 				Out.Rect(Bx, By, Bw, ButtonH, TCCss::Rgba(46, 51, 55, 0.94f), TEXT("alert:nav"));
-				Out.Frame(Bx, By, Bw, ButtonH, TCCss::Rgba(176, 164, 122, 0.24f), 1.f, TEXT("alert:nav-frame"));
-				FTCPaintItem& Bt = Out.Text(Label, Bx + 1 + ButtonPadX, By + 1 + ButtonPadY, FontPx, TCCss::Text, false, ETCPaintAlign::Left, TEXT("alert:nav-label"));
+				Out.Frame(Bx, By, Bw, ButtonH, TCCss::Rgba(176, 164, 122, 0.24f), Border, TEXT("alert:nav-frame"));
+				FTCPaintItem& Bt = Out.Text(Label, Bx + Border + ButtonPadX, By + Border + ButtonPadY, FontPx, TCCss::Text, false, ETCPaintAlign::Left, TEXT("alert:nav-label"));
 				Bt.Size.Y = LineBox;
 				Out.Hit(FBox2D(FVector2D(Bx, By), FVector2D(Bx + Bw, By + ButtonH)), K == 0 ? TEXT("alert:nav:1") : TEXT("alert:nav:-1"), K == 0 ? TEXT("Previous Alert") : TEXT("Next Alert"));
 				Bx += Bw + NavGap;
 			}
 			// the list
-			const float Lx = X + 1 + ListPad, Lw = W - 2 - 2 * ListPad, Top = Y + SumH + NavH + ListPad, Bottom = Top + ListH - 2 * ListPad;
+			const float Lx = X + Border + ListPad, Lw = W - 2 * Border - 2 * ListPad, Top = Y + SumH + NavH + ListPad, Bottom = Top + ListH - 2 * ListPad;
 			if (!Rows.Num())
 			{
 				FTCPaintItem& E = Out.Text(TC_T(FString(TEXT("No Alerts yet"))), Lx, Top, FontPx, TCCss::Text, false, ETCPaintAlign::Left, TEXT("alert:history-empty"));
@@ -553,12 +560,12 @@ FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measur
 				const FEntry& R = Rows[K];
 				if (Ey + R.H > Bottom + 0.5f) break;
 				Out.Rect(Lx, Ey, Lw, R.H, TCCss::Rgba(46, 51, 55, 0.94f), TEXT("alert:entry"));
-				Out.Frame(Lx, Ey, Lw, R.H, TCCss::Rgba(176, 164, 122, 0.24f), 1.f, TEXT("alert:entry-frame"));
+				Out.Frame(Lx, Ey, Lw, R.H, TCCss::Rgba(176, 164, 122, 0.24f), Border, TEXT("alert:entry-frame"));
 				if (R.E->Id == Selected) Out.Frame(Lx, Ey, Lw, R.H, TCCss::Brass, 2.f, TEXT("alert:entry-current")); // aria-current: the 2 px brass outline inside
-				float Ty = Ey + 1 + EntryPad;
+				float Ty = Ey + Border + EntryPad;
 				for (const FString& Ln : R.Lines)
 				{
-					FTCPaintItem& T = Out.Text(Ln, Lx + 1 + EntryPad, Ty, FontPx, LineColour(R.E->Kind), false, ETCPaintAlign::Left, TEXT("alert:entry-text"));
+					FTCPaintItem& T = Out.Text(Ln, Lx + Border + EntryPad, Ty, FontPx, LineColour(R.E->Kind), false, ETCPaintAlign::Left, TEXT("alert:entry-text"));
 					T.Size.Y = LineBox;
 					Ty += LineBox;
 				}

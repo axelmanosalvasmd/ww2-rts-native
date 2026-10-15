@@ -13,9 +13,8 @@
 //
 // The first part (TCMarkersCore) is plain C++ with no engine types: the geometry in metres (ring and line vertices,
 // dashes, clipping at the map edge) and the reference's constants, so a standalone harness can check it by defining
-// TC_MARKERS_CORE_ONLY. The second part draws on the HUD's canvas through a projection the HUD gives (FTCMarkerPainter)
-// and keeps the snapshot's resource nodes (FTCMarkers). The canvas has no depth test: markers the browser depth tests
-// (capture rings, HQ ring) are drawn over models here; the range rings are drawn over everything on both sides.
+// TC_MARKERS_CORE_ONLY. FTCMarkerPainter builds terrain-following world triangles, with separate depth-tested and
+// through-model layers. Text tags, veterancy and role badges stay on the HUD, matching the reference billboards.
 #pragma once
 
 #include <cmath>
@@ -347,6 +346,7 @@ class UCanvas;
 class UFont;
 class FJsonObject;
 class ATCGameMode;
+class FTCMarkerScene;
 struct FCanvasUVTri;
 struct FTCCapturePoint;
 struct FTCPointRingFrame;
@@ -367,7 +367,8 @@ class THREECROSSROADS_API FTCMarkers
 public:
 	void ApplyStart();
 	void ApplySnapshot(const FJsonObject& M);
-	void Clear() { Nodes.Reset(); RegionBusy.Reset(); }
+	void Clear();
+	TSharedPtr<FTCMarkerScene> WorldScene(const ATCGameMode& Match) const;
 	const TArray<FTCResourceNode>& ResourceNodes() const { return Nodes; }
 	// The node tag's English text ('+<rate> MP/s' or '+<rate> Fuel/s') before translation.
 	static FString NodeTag(const FTCResourceNode& N);
@@ -375,12 +376,13 @@ public:
 	bool RegionTagVisible(double Id, double Progress, double NowSeconds);
 
 private:
+	mutable TSharedPtr<FTCMarkerScene> Scene;
 	TArray<FTCResourceNode> Nodes;
 	struct FBusy { double Last = -1, Until = 0; };
 	TMap<int64, FBusy> RegionBusy;
 };
 
-// Draws ribbons, fills, diamonds and tags on a UCanvas. Project maps Unreal world centimetres to canvas pixels (Z > 0
+// Draws ribbons and fills in FTCMarkerScene, and billboard tags and diamonds on a UCanvas. Project maps world cm to pixels (Z > 0
 // in front of the camera, as UCanvas::Project); Height gives the ground in metres at (x, z). CameraRight and
 // CameraForward are the view's unit axes (Unreal), CameraLocation its origin (cm): for the minimum widths and the tags'
 // depth fade. Triangles are batched in call order and drawn by Flush (the destructor flushes too).
@@ -400,10 +402,10 @@ public:
 	// A polyline (x, z pairs, metres) as overlay.js line. Hub (x, z): a closed line's inside is filled from there to its
 	// inner edge at L.Fill (cover-preview.js's shield template).
 	void Line(const double* Pts, int32 N, const TCMarkersCore::FRibbon& O, const TCMarkersCore::FLook& L, const double* Hub = nullptr);
-	// A flat disc (CircleGeometry) at Lift metres over the ground, cut at Clip when given.
+	// A flat disc (CircleGeometry) at Lift metres over its centre's ground height, cut at Clip when given.
 	void Disc(double Cx, double Cz, double R, int32 Segs, const FLinearColor& Colour, double Lift, const double* Clip = nullptr);
-	// A world quad (four points: x, z, height over the ground), e.g. a flag cloth.
-	void Quad(const FVector (&Points)[4], const FLinearColor& Colour);
+	// A world quad (four points: x, z, height over the anchor's ground), e.g. a flag cloth on a fixed pole.
+	void Quad(const FVector (&Points)[4], const FLinearColor& Colour, const FVector2D& GroundAnchor);
 	// A line between two world points (cm), Width pixels wide, as two triangles in the batch (WebGL lines are 1 px).
 	void ScreenLine(const FVector& A, const FVector& B, const FLinearColor& Colour, double Width = 1.0);
 	FVector ProjectWorld(const FVector& World) const;
@@ -415,6 +417,8 @@ public:
 	// colour. Fade multiplies the depth fade (map-view.js fadeLabels). Returns false when it was not drawn.
 	bool Tag(UFont* Font, const FString& Text, double X, double Z, double Lift, const TCMarkersCore::FTagStyle& Style, float Fade = 1.f, const FLinearColor* Swatch = nullptr);
 	void Flush();
+	void SetWorldScene(TSharedPtr<FTCMarkerScene> InScene) { Scene = MoveTemp(InScene); }
+	void SetDepthTest(bool bEnabled) { Flush(); bDepthTest = bEnabled; }
 
 	// Pixels per metre at a world point (cm), measured across the view; 0 behind the camera.
 	double PixelsPerMetre(const FVector& World) const;
@@ -425,6 +429,9 @@ public:
 	static FLinearColor Colour(uint32 Hex, double Alpha);
 
 private:
+	TSharedPtr<FTCMarkerScene> Scene;
+	bool bDepthTest = true;
+	void WorldTri(const FVector& A, const FVector& B, const FVector& C, const FLinearColor& Colour);
 	UCanvas* Canvas = nullptr;
 	TFunction<FVector(const FVector&)> Project;
 	TFunction<double(double, double)> Height;
@@ -446,10 +453,10 @@ namespace TCMarkersHud
 	bool Ranges(const FString& Type, double& OutRange, double& OutMinRange);
 	// buildHQ for every spawn of the start: the reinforce zone tinted toward chalk and the HQ ring, cut at the map
 	// edge, the tall flag's cloth and the "<name> HQ" tag. The camp's models (sandbags, tent, crates, flagpole) are not
-	// drawn here.
+	// drawn by FTCMarkerScene from the existing reference model imports.
 	void DrawHqCamps(FTCMarkerPainter& P, const ATCGameMode& M, UFont* Font);
 	// nodeMark for every node the snapshots listed: the four brackets and the "+<rate> MP/s" (or Fuel/s) tag. The
-	// small wooden box on it is not drawn.
+	// small wooden box is drawn by FTCMarkerScene from reference-derived geometry.
 	void DrawNodes(FTCMarkerPainter& P, const ATCGameMode& M, UFont* Font);
 	// makeUnit's weapon range rings for the selection while rangeRings() allows them (dashed, white 0.7, over all).
 	int32 DrawRangeRings(FTCMarkerPainter& P, const ATCGameMode& M, const TSet<int32>& Selected);
@@ -460,10 +467,10 @@ namespace TCMarkersHud
 	void DrawWorldRegions(FTCMarkerPainter& P, ATCGameMode& M, UFont* Font);
 	// client/cover-preview.js glyph for each mark of one layer at the layer's opacity: the shield's closed ribbon (0.18 m,
 	// at least 1.15 px each side, 0.14 m over the ground) over its 0.3 fill, or the chevron's open ribbon, in the mark's
-	// colour and alpha. This canvas has no depth test: the ground layer is not hidden behind trees and units as the
-	// browser's is; the through-models layer has none on either side.
-	void DrawCoverLayer(FTCMarkerPainter& P, const TArray<FTCCoverGlyph>& Glyphs, float Opacity);
+	// colour and alpha. bDepthTest distinguishes the reference ground and through-model layers.
+	void DrawCoverLayer(FTCMarkerPainter& P, const TArray<FTCCoverGlyph>& Glyphs, float Opacity, bool bDepthTest = true);
 	// makeUnit's veterancy stars over a bar centred at BarCentre (canvas pixels), PxPerMetre the bar group's scale.
+	void DrawBadge(UCanvas* Canvas, const FString& Type, int32 Owner, FVector2D BarCentre, float PxPerMetre);
 	void DrawStars(UCanvas* Canvas, FVector2D BarCentre, float PxPerMetre, int32 Stars);
 
 	// Verification switches (round 17), read once from the command line; call once per HUD frame:

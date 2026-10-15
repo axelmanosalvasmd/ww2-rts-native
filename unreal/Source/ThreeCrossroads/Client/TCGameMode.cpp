@@ -322,6 +322,8 @@ FString ATCGameMode::ConnectionStatus() const
 bool ATCGameMode::SendCommand(const TSharedRef<FJsonObject>& Cmd)
 {
 	if (!Connection) { LastSendProblemText = TEXT("not sent: not connected"); return false; }
+	const FString RustRefusal = Lobby.RustCommandRefusal(*Cmd);
+	if (!RustRefusal.IsEmpty()) { LastSendProblemText = RustRefusal; return false; }
 	int32 Bytes = 0;
 	const ETCSendResult Result = Connection->TrySend(Cmd, &Bytes);
 	if (Result == ETCSendResult::Sent) { LastSendProblemText.Reset(); OrdersCheck.NoteSent(Cmd->GetStringField(TEXT("t"))); return true; }
@@ -572,6 +574,7 @@ void ATCGameMode::OnMessage(const FJsonObject& M, int32 Bytes)
 		const int32 OptionsBefore = Options.Confirmed();
 		if (!Options.ApplyLobby(M)) { UE_LOG(LogTC, Warning, TEXT("match options: this lobby message could not be read; the options shown are the last good ones")); }
 		else if (Options.Confirmed() != OptionsBefore) { UE_LOG(LogTC, Log, TEXT("match options: %d request(s) shown by this lobby, %d still pending (weather %s, sandbox %s, %d seats)"), Options.Confirmed() - OptionsBefore, Options.PendingCount(), *Options.WeatherChoice(), Options.SandboxOn() ? TEXT("on") : TEXT("off"), Options.Seats().Num()); }
+		if (Lobby.IsRustHost()) UE_LOG(LogTC, Log, TEXT("Rust lobby: start %s; %s; %s"), Lobby.StartAllowed() ? TEXT("allowed") : TEXT("refused"), *Lobby.StartLine(), *Options.LogisticsLine());
 		if (!Persistence.LastMalformed().IsEmpty()) { UE_LOG(LogTC, Warning, TEXT("saves: the lobby's list could not be read (%s); the rows shown are the last good ones"), *Persistence.LastMalformed()); }
 		else if (Persistence.Rows().Num() != RowsBefore || Persistence.Rows().Num())
 		{

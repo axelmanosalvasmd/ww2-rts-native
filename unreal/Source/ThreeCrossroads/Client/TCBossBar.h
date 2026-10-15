@@ -41,7 +41,7 @@ public:
 	double WidthAt(double Now) const;
 	// The bar centred on CentreX with its top at Top (the score strip's bottom plus #top's 4 px gap), for a HUD
 	// ViewW pixels wide. Empty when hidden.
-	FTCPaint Layout(float CentreX, float Top, float ViewW, double Now, const FTCMeasure& Measure, float* OutBottom = nullptr) const;
+	FTCPaint Layout(float CentreX, float Top, float ViewW, double Now, const FTCMeasure& Measure, float* OutBottom = nullptr, float Scale = 1.f) const;
 
 private:
 	bool bShown = false, bEverSet = false;

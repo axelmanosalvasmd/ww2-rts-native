@@ -205,6 +205,9 @@ public:
 	bool AmHost() const { return bHasLobby && bAmHost; }
 	// The lobby's weather choice as the browser shows it ('map' when the lobby's value is not one of the choices).
 	FString WeatherChoice() const;
+	bool IsRustHost() const { return bRustHost; }
+	// Owner decision 097: fixed presentation only, never sent as a room option.
+	FString LogisticsLine() const { return bRustHost ? FString(TEXT("Logistics: off (temporary)")) : FString(); }
 	bool SandboxOn() const { return bHasLobby && bSandbox; }
 	const TArray<FTCOptionSeat>& Seats() const { return SeatList; }
 	// Requests the lobby has shown since this object was made, for logs.
@@ -291,6 +294,7 @@ private:
 	FString State, Role, Mode, MapName, WorldSize;
 	FString Weather;              // the lobby's 'weather' as sent
 	bool bSandbox = false;
+	bool bRustHost = false;
 	bool bAmHost = false, bSpectator = false;
 	int32 You = -1;
 	TArray<FTCOptionSeat> SeatList;

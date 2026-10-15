@@ -1,6 +1,7 @@
 #include "Client/TCCameraPawn.h"
 #include "Camera/CameraComponent.h"
 #include "Misc/AutomationTest.h"
+#include "SceneView.h"
 
 ATCCameraPawn::ATCCameraPawn()
 {
@@ -216,6 +217,27 @@ bool FTCCameraIntro::Skip(FTCCameraPose& Out)
 }
 
 #if WITH_DEV_AUTOMATION_TESTS
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCCameraProjectionTest, "ThreeCrossroads.Camera.Projection", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+bool FTCCameraProjectionTest::RunTest(const FString&)
+{
+	// Exercise the engine's real camera-component view, not just the analytic fit camera. A wrong axis or FOV here
+	// makes equal zoom distances appear closer even when the camera.js wheel and fit calculations agree.
+	const UCameraComponent* Camera = GetDefault<ATCCameraPawn>()->Camera;
+	for (const FIntPoint Size : { FIntPoint(1280,720), FIntPoint(720,1280), FIntPoint(1920,1080) })
+	{
+		FMinimalViewInfo View;
+		const_cast<UCameraComponent*>(Camera)->GetCameraView(0, View);
+		FSceneViewProjectionData Data;
+		const FIntRect Rect(0, 0, Size.X, Size.Y);
+		Data.SetViewRectangle(Rect);
+		FMinimalViewInfo::CalculateProjectionMatrixGivenViewRectangle(View, AspectRatio_MaintainXFOV, Rect, Data);
+		const double Y = 1.0 / FMath::Tan(FMath::DegreesToRadians(42.0 / 2));
+		TestEqual(TEXT("actual engine projection keeps the browser's vertical FOV"), Data.ProjectionMatrix.M[1][1], Y, 1e-5);
+		TestEqual(TEXT("horizontal projection follows viewport aspect"), Data.ProjectionMatrix.M[0][0], Y * Size.Y / Size.X, 1e-5);
+	}
+	return true;
+}
 
 // ThreeCrossroads.Camera.Feel: client/camera.js's numbers and rules, ported. Run:
 //   UnrealEditor-Cmd ThreeCrossroads.uproject -nullrhi -ExecCmds="Automation RunTests ThreeCrossroads.Camera; Quit"

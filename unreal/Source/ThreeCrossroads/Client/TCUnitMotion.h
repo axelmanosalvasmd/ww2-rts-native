@@ -257,6 +257,7 @@ private:
 		float NearMinY = 0.f, FarMinY = 0.f;
 		TArray<float> Positions, Normals; // NumKeys * Vertices * 3, three space metres
 		TArray<float> Base, Tint;         // Vertices * 3, linear
+		TArray<float> Materials;          // Vertices, reference matId including baked grime
 		TArray<uint16> Indices;
 	};
 	struct FFarFigure

@@ -604,8 +604,8 @@ namespace TCUnitMotionImpl
 	// FarFigures.bin (unreal/Tools/motion/export-far-figures.mjs): "TCFARFG1", u32 version, u32 figures, u32 keys,
 	// u32 compressed and uncompressed sizes, then the zlib payload: per figure a u16-length key, u32 vertices,
 	// u32 indices, f32 near and far fallen lowest y, f32 positions and normals [keys][vertices][3], f32 base and tint
-	// colors [vertices][3], u16 indices.
-	constexpr uint32 FarVersion = 1;
+	// colors [vertices][3], f32 material tags [vertices] (v2), u16 indices.
+	constexpr uint32 FarVersion = 2;
 	struct FReader
 	{
 		const uint8* P; const uint8* End; bool bOk = true;
@@ -671,8 +671,14 @@ bool UTCSoldierCrowd::Load(FString& OutError)
 	bModelLook = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Models/Motion/MI_InfantryCrowdLook_DE.MI_InfantryCrowdLook_DE")) != nullptr && CrowdLookFaded && CrowdKitLookFaded
 		&& !FParse::Param(FCommandLine::Get(), TEXT("TCCrowdAtlasLook"));
 	if (!bModelLook) Problems.Add(TEXT("no crowd model look (unreal/Tools/motion/make-crowd-look.py): near men take the atlas-only materials"));
-	FarSolid = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Models/Motion/M_InfantryFar.M_InfantryFar"));
-	FarFaded = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Models/Motion/M_InfantryFarFaded.M_InfantryFarFaded"));
+	FarSolid = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Models/Motion/MI_InfantryFarLook.MI_InfantryFarLook"));
+	FarFaded = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Models/Motion/MI_InfantryFarLookFaded.MI_InfantryFarLookFaded"));
+	if (!FarSolid || !FarFaded)
+	{
+		Problems.Add(TEXT("no far model look (unreal/Tools/motion/make-crowd-look.py): far men keep the vertex-only fallback"));
+		FarSolid = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Models/Motion/M_InfantryFar.M_InfantryFar"));
+		FarFaded = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Models/Motion/M_InfantryFarFaded.M_InfantryFarFaded"));
+	}
 	if (!CrowdFaded || !CrowdKitFaded) Problems.Add(TEXT("no faded crowd materials (camouflaged near men draw solid, near bodies do not fade)"));
 	if (!FarSolid || !FarFaded) Problems.Add(TEXT("no far figure materials"));
 	FString FarError;
@@ -717,6 +723,7 @@ bool UTCSoldierCrowd::LoadFarFigures(FString& OutError)
 		R.Floats(Shape.Normals, static_cast<int64>(Keys) * Shape.Vertices * 3);
 		R.Floats(Shape.Base, Shape.Vertices * 3);
 		R.Floats(Shape.Tint, Shape.Vertices * 3);
+		R.Floats(Shape.Materials, Shape.Vertices);
 		if (R.P + NumIndices * 2 > R.End) { R.bOk = false; break; }
 		Shape.Indices.SetNumUninitialized(NumIndices);
 		FMemory::Memcpy(Shape.Indices.GetData(), R.P, NumIndices * 2);
@@ -859,7 +866,7 @@ UTCSoldierCrowd::FFarFigure* UTCSoldierCrowd::FarFigure(const FString& FigureTyp
 		Colors[Inst] = FVector4f(1, 1, 1, 1);
 		const float* B = &Shape->Base[I * 3]; const float* T = &Shape->Tint[I * 3];
 		UVs.Set(Inst, 0, FVector2f(B[0], B[1]));
-		UVs.Set(Inst, 1, FVector2f(static_cast<float>(I), 0.f)); // joints: the vertex's own keyframe column
+		UVs.Set(Inst, 1, FVector2f(static_cast<float>(I), Shape->Materials[I])); // keyframe column; unused joint carries the material tag (its weight is zero)
 		UVs.Set(Inst, 2, FVector2f(0.f, 0.f));
 		UVs.Set(Inst, 3, FVector2f(1.f, 0.f));                    // weights: all on it
 		UVs.Set(Inst, 4, FVector2f(0.f, 0.f));

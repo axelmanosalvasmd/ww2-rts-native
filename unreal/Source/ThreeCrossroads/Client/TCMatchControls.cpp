@@ -1630,9 +1630,9 @@ void ATCHUD::DrawRoomBanners(UFont* Font)
 	if (Left > 0) Banners.Add(FTCRoomBanner{ FTCHudFit::ConnectionBannerText(bFull, Left), true });
 	if (M->State.bPaused && !M->State.PauseText.IsEmpty()) Banners.Add(FTCRoomBanner{ M->State.PauseText, false });
 	if (!Banners.Num()) return;
-	// #top holds the strip and its centred lines (rate, weather, the boss bar): StatsTopTc, its bottom in UI pixels
-	const bool bHud = M->State.bHasMatch && StatsTopTc >= 0.f;
-	const float Top = bHud ? FMath::CeilToFloat(StatsTopTc * UiNow + 8.f) : 16.f;
+	// #top holds the strip and its centred lines. EndUi has reset UiNow, so use the saved physical bottom.
+	const bool bHud = bShowHUD && M->State.bHasMatch && TopStackBottomPx >= 0.f;
+	const float Top = bHud ? FMath::CeilToFloat(TopStackBottomPx + 8.f) : 16.f;
 	const FTCPaint P = FTCRoomBanners::Layout(Banners, Top, Canvas->ClipX, FTCPaint::CanvasMeasure(Font));
 	P.Draw(Canvas, Font);
 }

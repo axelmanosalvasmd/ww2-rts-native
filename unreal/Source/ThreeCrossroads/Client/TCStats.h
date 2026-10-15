@@ -71,8 +71,8 @@ public:
 	int32 UnitsPerEm() const { return Upm; }
 	// The pen position before each character and after the last (Out has Len + 1 entries), CSS pixels at FontPx with
 	// letter-spacing Tracking after every character
-	void Pens(const FString& Text, float FontPx, float Tracking, TArray<float>& Out) const;
-	float Width(const FString& Text, float FontPx, float Tracking = 0.f) const;
+	void Pens(const FString& Text, float FontPx, float Tracking, TArray<float>& Out, bool bTabular = true) const;
+	float Width(const FString& Text, float FontPx, float Tracking = 0.f, bool bTabular = true) const;
 
 private:
 	struct FPairSub
@@ -107,9 +107,11 @@ public:
 	static UFont* Font();
 	// Chromium's widths: FTCTypeFace::Width with the weight bBold picks
 	static FTCMeasure Measure();
+	// CSS font-weight 700 (loss heading/detail and the boss name).
+	static FTCMeasure HeavyMeasure();
 	// Paint P on the canvas: every item as FTCPaint::Draw does, texts in this face at the measured glyph positions.
 	// Oversample: the canvas's scale (the UI scale inside BeginUi), so the glyphs are made at the size they show.
-	static void Draw(const FTCPaint& P, UCanvas* Canvas, UFont* Fallback, float Oversample = 1.f);
+	static void Draw(const FTCPaint& P, UCanvas* Canvas, UFont* Fallback, float Oversample = 1.f, bool bTabular = true);
 };
 
 // One Look select: its settings key, the label over it and its options (value, text) in CHOICES order.

@@ -23,6 +23,8 @@ export function client(log) {
   const raw = log.split(/\r?\n/), L = tc(log);
   const c = { present: log.length > 0 };
   if (!c.present) return c;
+  c.graphics = raw.map(strip).find((l) => /^LogTCGraphics: graphics (high|low):/.test(l))?.match(/graphics (high|low):/)?.[1];
+  c.graphicsSwitches = raw.map(strip).filter((l) => /^LogTCGraphics: graphics: .*switch to /.test(l));
   const st = first(L, /^start #(\d+): match (\d+), map '([^']*)' (\d+x\d+)[^,]*, seat (-?\d+)/);
   c.started = !!st; if (st) Object.assign(c, { start: +st[1], match: +st[2], mapTitle: st[3], size: st[4], seat: +st[5] });
   const play = first(L, /^lobby: room \S+ play, mode (\w+), map ([^,\s]+)/);
@@ -84,7 +86,7 @@ export function row(dir, id, cap) {
   cap ??= cmd.match(/-TCEndAfter=(\d+)/)?.[1];
   const host = client(read(join(dir, 'host.log'))), guest = client(read(join(dir, 'guest.log'))), ex = exits(dir);
   const spectator = client(read(join(dir, 'spectator.log')));
-  const r = { id, dir, cap: cap ? +cap : undefined, host, guest, ...(spectator.present && { spectator }), exits: ex, shots: shots(dir) };
+  const r = { id, dir, cap: cap ? +cap : undefined, graphics: host.graphics ?? 'unrecorded', requestedGraphics: cmd.match(/^graphics: (high|low)$/m)?.[1], host, guest, ...(spectator.present && { spectator }), exits: ex, shots: shots(dir) };
   r.started = !!host.started && (!guest.present || !!guest.started);
   const shownOf = (c) => {
     const parts = [];
@@ -117,9 +119,9 @@ export function row(dir, id, cap) {
 
 const esc = (s) => String(s ?? '').replace(/\|/g, '\\|');
 export function mdRow(r) {
-  return `| ${r.id} | ${r.started ? `yes (${r.host.mode ?? '?'} on ${r.host.map ?? '?'})` : 'no'} | ${esc(r.objectives.host || 'nothing logged')} | ${esc(r.endReached)} | ${esc(r.endReport)} | ${r.adoptedRefused} | ${r.shadowAgree} | ${esc(r.crashes)} | ${basename(r.dir)} |`;
+  return `| ${r.id} | ${r.graphics ?? 'unrecorded'} | ${r.started ? `yes (${r.host.mode ?? '?'} on ${r.host.map ?? '?'})` : 'no'} | ${esc(r.objectives.host || 'nothing logged')} | ${esc(r.endReached)} | ${esc(r.endReport)} | ${r.adoptedRefused} | ${r.shadowAgree} | ${esc(r.crashes)} | ${basename(r.dir)} |`;
 }
-export const HEADER = '| Mode | Started | Objectives shown (host) | End condition reached | End report shown | Adopted/refused | Shadow agree | Crashes | Run |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- |';
+export const HEADER = '| Mode | Graphics | Started | Objectives shown (host) | End condition reached | End report shown | Adopted/refused | Shadow agree | Crashes | Run |\n| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |';
 
 const main = process.argv[1] && import.meta.url.endsWith(basename(process.argv[1]));
 if (main && table) {

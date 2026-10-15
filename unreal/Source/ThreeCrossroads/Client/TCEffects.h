@@ -266,6 +266,12 @@ struct FTCDebrisRow
 	double X = 0.0, Y = 0.0, Z = 0.0, Tilt = 0.0, Dir = 0.0;
 };
 
+// fx.js updateSections: exact box pose after the Three.js to Unreal axis swap.
+namespace TCFxSections
+{
+	FTransform Transform(const FTCDebrisRow& Row);
+}
+
 // The debris view (client/debris.js) on its own.
 class FTCDebrisView
 {
@@ -598,6 +604,7 @@ private:
 	void SyncRubble();
 	void Draw(double Clock);
 	void ApplyShake(double Clock);
+	void CaptureBridge(double Clock);
 	// main.js frame loop: vehicleDamageFrame for every held ground vehicle (engine-presentation.js)
 	void DamageFrame(float Dt);
 
@@ -615,6 +622,7 @@ private:
 	UPROPERTY() TObjectPtr<UStaticMesh> CylinderMesh;
 	UPROPERTY() TObjectPtr<UStaticMesh> ConeMesh;
 	UPROPERTY() TObjectPtr<UMaterialInterface> BaseMaterial;
+	UPROPERTY() TObjectPtr<UMaterialInterface> SectionMaterial;
 	UPROPERTY() TObjectPtr<UMaterialInterface> SpriteMaterial;
 	UPROPERTY() TObjectPtr<UMaterialInterface> CraterMaterial;
 	UPROPERTY() TObjectPtr<UMaterialInterface> RubbleMaterial;
@@ -626,6 +634,10 @@ private:
 	int32 LastInstances = 0, LastSprites = 0;
 	double LastSoundLog = 0.0;
 	bool bWarnedLook = false;
+	FString BridgeShotPrefix;
+	double BridgeSeen = -1.0, BridgeCollapse = -1.0;
+	int32 BridgeShot = 0;
+	bool bBridgeCaptureRead = false;
 };
 
 // fx.js update: the camera jitters by the effects' shake (metres; nothing below 0.004, as the browser).

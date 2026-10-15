@@ -1,5 +1,5 @@
 // The reference half of the slice 13 terrain side by sides: the pinned browser client, served by the isolated reference
-// server the native clients play on, joins the same room as a spectator (the server gives it no seat) in headless
+// server the native clients play on, joins the same room as a spectator or reconnects a seated token in headless
 // Chromium with its own profile, and saves a frame at every pose of the same tour file the native -TCTourFile switch
 // reads (Client/TCSlice13Checks.cpp). Only window.__game's camera state is set (cam.x, cam.z, cam.dist, cam.yaw: what the
 // keyboard and wheel move); nothing in reference/ is changed. Only the renderer's canvas is kept in the bare frame. Graphics stay on High: gfx.js's automatic drop to Low is
@@ -7,6 +7,11 @@
 //
 //   node unreal/Tools/compare/tour-reference.mjs --origin http://127.0.0.1:<port> --room <room> --tour <file> --out <dir>
 //        [--chromium /usr/bin/chromium] [--profile <dir>] [--timeout 600] [--name RefWatch] [--block-maps] [--query ao=0]
+//        [--token-file <file>] [--lang en|es] [--ui 100|150] [--alert-history]
+// A token file reconnects the browser to that genuine seat. The token is never logged. Language, UI scale and the
+// history switch use the reference's own preferences and alert module.
+// --freeze-on-loss holds the browser presentation clock 2.5 s after a genuine own-unit removal, so a slow software
+// renderer can capture that alert. It changes no wire payload or match state; the held tick and unit ids are logged.
 // --block-maps (round 14): the page's requests for /maps/* fail. Only the lobby's map preview asks for them during play
 // (client/main.js previewMap); without them client/lobby-view.js never rebuilds its backdrop in the middle of the match,
 // which otherwise (always, for a spectator that joins a running match) calls setFogMap(null) and empties the match's map
@@ -32,6 +37,12 @@ const arg = (name, d) => { const i = process.argv.indexOf(`--${name}`); return i
 const origin = arg('origin'), room = arg('room'), out = arg('out'), tourFile = arg('tour');
 const chromium = arg('chromium', '/usr/bin/chromium'), timeout = +arg('timeout', 600), who = arg('name', 'RefWatch');
 const blockMaps = process.argv.includes('--block-maps'), query = arg('query', '');
+const tokenFile = arg('token-file', ''), lang = arg('lang', 'en'), ui = +arg('ui', '100');
+const showHistory = process.argv.includes('--alert-history');
+const freezeOnLoss = process.argv.includes('--freeze-on-loss');
+if (!['en', 'es'].includes(lang) || !Number.isInteger(ui) || ui < 75 || ui > 150) throw new Error('invalid language or UI scale');
+const token = tokenFile ? fs.readFileSync(tokenFile, 'utf8').trim() : '';
+if (tokenFile && !/^[0-9a-zA-Z_-]{8,40}$/.test(token)) throw new Error('invalid seat token file');
 const seatArg = arg('seat', ''), gfxLevel = arg('gfx', 'high'), selectType = arg('select', ''), minFrames = +arg('min-frames', '6'); // round 17 (markers): --select <type> keeps the page's selection on that seat's lowest-id living unit of the type (drawing only, as the native -TCMarkersSelect); the settle waits for at least --min-frames frames (SwiftShader on a loaded machine), at most 90 s // round 14: --gfx low draws the browser on Graphics Low
 if (!origin || !room || !out || !tourFile) { console.error('usage: tour-reference.mjs --origin <url> --room <room> --tour <file> --out <dir>'); process.exit(2); }
 const profile = arg('profile', path.join(out, '.chromium-profile'));
@@ -52,7 +63,7 @@ const port = 9300 + Math.floor(Math.random() * 500);
 const browser = spawn(chromium, ['--headless=new', `--user-data-dir=${profile}`, `--remote-debugging-port=${port}`, '--no-first-run', '--no-default-browser-check',
   '--disable-extensions', '--disable-background-networking', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist',
   '--window-size=1280,720', '--mute-audio', '--autoplay-policy=no-user-gesture-required', 'about:blank'], { stdio: ['ignore', 'ignore', 'pipe'] });
-browser.stderr.on('data', () => {});
+browser.stderr.on('data', (data) => fs.appendFileSync(path.join(out, 'chromium.log'), data));
 const kill = () => { try { browser.kill('SIGTERM'); } catch {} };
 setTimeout(() => { log({ error: 'timeout' }); kill(); process.exit(3); }, timeout * 1000);
 
@@ -74,9 +85,33 @@ ws.addEventListener('message', (e) => {
   if (m.method === 'Runtime.consoleAPICalled' && ['error', 'warning', 'assert'].includes(m.params.type) && consoleLines++ < 200) log({ console: m.params.type, text: m.params.args.map((a) => a.value ?? a.description ?? '').join(' ').slice(0, 2000) });
 });
 await send('Page.enable'); await send('Runtime.enable');
+if (freezeOnLoss) await send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
+  const Base = window.WebSocket, realNow = performance.now.bind(performance), rows = new Map(); let me = -1;
+  window.WebSocket = class extends Base {
+    constructor(...args) {
+      super(...args);
+      this.addEventListener('message', ({ data }) => {
+        let m; try { m = JSON.parse(data); } catch { return; }
+        if (m.t === 'lobby' || m.t === 'start') me = m.you ?? me;
+        if (m.t !== 's') return;
+        const lost = (m.gone ?? []).filter(id => rows.get(id)?.[2] === me);
+        if (lost.length && !window.__tcLossClock) {
+          let held = realNow();
+          Object.defineProperty(performance, 'now', { configurable: true, value: () => held });
+          window.__tcLossClock = { tick: m.tick, ids: lost, ageSeconds: 2.5 };
+          setTimeout(() => { held += 2500; }, 0);
+        }
+        if (m.all || !m.held) rows.clear();
+        for (const id of m.gone ?? []) rows.delete(id);
+        for (const row of m.units ?? []) rows.set(row[0], row);
+      });
+    }
+  };
+})()` });
 await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
 await send('Page.navigate', { url: origin + '/' }); await sleep(1500);
-await evaluate(`localStorage.setItem('ww2-gfx-auto', '1'); localStorage.setItem('ww2-gfx', ${JSON.stringify(gfxLevel)}); localStorage.setItem('ww2-controls-seen', '1'); localStorage.setItem('ww2-name', ${JSON.stringify(who)}); true`);
+await evaluate(`localStorage.setItem('ww2-gfx-auto', '1'); localStorage.setItem('ww2-gfx', ${JSON.stringify(gfxLevel)}); localStorage.setItem('ww2-controls-seen', '1'); localStorage.setItem('ww2-name', ${JSON.stringify(who)}); localStorage.setItem('ww2rts-lang', ${JSON.stringify(lang)}); localStorage.setItem('ww2-ui-scale', ${JSON.stringify(String(ui))}); true`);
+if (tokenFile) await evaluate(`(() => { const k = ${JSON.stringify('ww2-token:' + room.toLowerCase())}; localStorage.setItem(k, ${JSON.stringify(token)}); sessionStorage.setItem(k, ${JSON.stringify(token)}); return true; })()`);
 if (blockMaps) await send('Fetch.enable', { patterns: [{ urlPattern: '*/maps/*', requestStage: 'Request' }] });
 await send('Page.navigate', { url: `${origin}/play?name=${encodeURIComponent(who)}${query ? '&' + query : ''}#${room}` });
 let t0 = 0;
@@ -88,7 +123,10 @@ if (!t0) { log({ error: 'no snapshot' }); kill(); process.exit(5); }
 // the camera's opening sweep (camera.js intro) runs first: the tour starts once it has settled
 for (let i = 0; i < 240; i++) { if (await evaluate(`!window.__game.rig.intro`)) break; await sleep(250); }
 await evaluate(`(() => { window.__game.renderer.domElement.setAttribute('data-tc-main', '1'); return true; })()`);
-log({ watching: true, room, gfx: await evaluate(`localStorage.getItem('ww2-gfx')`), mood: await evaluate(`window.__game.atmos.mood`), weather: await evaluate(`window.__game.atmos.weather`), wide: await evaluate(`window.__game.rig.wide`) });
+const identity = await evaluate(`({ me: window.__game.me, selected: [...window.__game.selected] })`);
+if (tokenFile && !(Number.isInteger(identity.me) && identity.me >= 0)) { log({ error: 'requested seat was not admitted', identity }); kill(); process.exit(7); }
+if (showHistory) await evaluate(`import('/client/alerts.js').then(({ alerts }) => { alerts.toggleHistory(); return alerts.history.length; })`);
+log({ watching: identity.me < 0, identity, room, lang, ui, gfx: await evaluate(`localStorage.getItem('ww2-gfx')`), mood: await evaluate(`window.__game.atmos.mood`), weather: await evaluate(`window.__game.atmos.weather`), wide: await evaluate(`window.__game.rig.wide`) });
 for (const s of tour) {
   // match time: the snapshot's tick / 20 (shared/sim.js TICK), as the native switch reads it
   for (;;) { const tick = await evaluate(`window.__game.snapshot ? window.__game.snapshot.tick : 0`); if (tick / 20 >= s.t) break; await sleep(200); }
@@ -144,7 +182,7 @@ for (const s of tour) {
   const full = await send('Page.captureScreenshot', { format: 'png' });
   fs.writeFileSync(path.join(out, `${s.name}-hud.png`), Buffer.from(full.data, 'base64'));
   const ms = frames.slice(1);
-  log({ shot: s.name, pose: s, seconds: (Date.now() - t0) / 1000, matchTime: await evaluate(`window.__game.snapshot.tick / 20`), state, sideEffects, mapsBlocked: blocked, frames: ms.length, frameMeanMs: ms.reduce((a, b) => a + b, 0) / Math.max(1, ms.length), frameWorstMs: Math.max(0, ...ms), settledFrom: fps0 });
+  log({ shot: s.name, pose: s, seconds: (Date.now() - t0) / 1000, matchTime: await evaluate(`window.__game.snapshot.tick / 20`), lossClock: await evaluate(`window.__tcLossClock ?? null`), state, sideEffects, mapsBlocked: blocked, frames: ms.length, frameMeanMs: ms.reduce((a, b) => a + b, 0) / Math.max(1, ms.length), frameWorstMs: Math.max(0, ...ms), settledFrom: fps0 });
 }
 kill();
 process.exit(0);

@@ -9,6 +9,7 @@ import { client, row, mdRow } from './summarize.mjs';
 const at = (n, s) => `[2026.10.14-12.00.${String(n).padStart(2, '0')}:000][${n}]${s}`;
 const hostLines = [
   'LogInit: Command Line: -game',
+  'LogTCGraphics: graphics high: render scale 100%',
   'LogTC: lobby: room m1 play, mode conquest, map default, host, seat 0 of 3 [Alder, Fern, AI 1 (AI)]',
   "LogTC: start #1: match 1, map 'Three Crossroads' 80x80, seat 0 (confirmed), spawn (5, 5)",
   "LogTC: modes: start: match 1 on 'Three Crossroads' (80x80), seat 0 of 3 (team 0), teams [0,0,1], lobby mode conquest, 7 authored point(s)",
@@ -30,6 +31,8 @@ test('CRLF logs: the coverage lines, the end, the decoder and the shadow are rea
   const c = client(log(hostLines));
   assert.equal(c.started, true);
   assert.equal(c.mode, 'conquest');
+  assert.equal(c.graphics, 'high');
+  assert.equal(client(log(hostLines.filter((l) => !l.includes('graphics high:')))).graphics, undefined);
   assert.match(c.modesStart, /^match 1 on 'Three Crossroads'/);
   assert.deepEqual(c.strips, ['conquest | team 0 0 / 1800 VP | line: Scores tied']);
   assert.deepEqual(c.goals, ['Objective: Hold | shown: Objetivo: Mantener']);
@@ -62,7 +65,7 @@ test('row: cap from the host command line, crash lines, markdown', () => {
   const d = mkdtempSync(join(process.cwd(), '.summarize-test-'));
   try {
     writeFileSync(join(d, 'cmdlines.txt'), 'mode id: horde; room m1\nmodule: 2026-10-14, 1 bytes, md5 abc\nhost: x -TCEndAfter=900 y\n');
-    writeFileSync(join(d, 'host.log'), log([...hostLines.slice(0, 5), 'LogCore: Error: appError called: Fatal error: [File:x]']));
+    writeFileSync(join(d, 'host.log'), log([...hostLines.slice(0, 6), 'LogCore: Error: appError called: Fatal error: [File:x]']));
     writeFileSync(join(d, 'exit.txt'), 'host exit 139\n');
     const r = row(d);
     assert.equal(r.id, 'horde');
@@ -70,7 +73,8 @@ test('row: cap from the host command line, crash lines, markdown', () => {
     assert.equal(r.module, '2026-10-14, 1 bytes, md5 abc');
     assert.equal(r.endReached, 'no: time cap 900 s');
     assert.match(r.crashes, /^host exit 139 host: .*appError called/);
-    assert.match(mdRow(r), /^\| horde \| yes \(conquest on default\) \| 1 strip line\(s\), first "conquest \\\| team 0/);
+    assert.equal(r.graphics, 'high');
+    assert.match(mdRow(r), /^\| horde \| high \| yes \(conquest on default\) \| 1 strip line\(s\), first "conquest \\\| team 0/);
     // a spectator (tour runs): its counts and exit join the row
     writeFileSync(join(d, 'host.log'), log(hostLines));
     writeFileSync(join(d, 'spectator.log'), log(hostLines));

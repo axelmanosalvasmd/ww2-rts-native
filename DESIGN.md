@@ -3086,3 +3086,83 @@ This separate candidate normally merges ingress successor `22eae725da1d029b4c99c
 Component native proof stays separate: ingress `17179f2` passed 405 tests, table producer `b682891` passed 368, and terrain producer `a81b4f2` passed 367, with their recorded strict/format/release gates and independent audits. Those counts belong to different constituent baselines. The current main has 401 tests; adding three table, four ingress and two terrain tests gives an expected combined inventory of 410. No combined run has occurred. The table LF successor corrects the actual Windows checkout-byte failure, and the ingress socket successor changes the takeover witness after its actual Windows abort; neither repair inherits a platform pass from the earlier component proof. Fresh Linux, Windows and macOS gates are required on this exact union.
 
 Axel review 044's stable-seat, terminal-hold and temporary whole-command refusal answers are retained above, as are the real socket notification and stale-authority assertions. Startup tables remain an internal producer with accepted content/schema but no delivered transport or cache adoption. Terrain remains an independently identified Source/native comparison corpus with its own producing commit, not a whole World runner or rendered Unreal result. Transport proposal #199 is not imported. Root owns final publication, the exact-head Axel reply and merge after the required checks.
+
+## Unreal Rust-host lobby matrix (owner decisions 090 R1 and 097)
+
+A lobby carrying `proto` identifies the Rust host. An absent field identifies the pinned Node reference. A present invalid or unsupported version keeps the Rust restrictions and refuses start. FTCConnection exposes host kind, version and optional rules string; no seed, weather seed or option receipt fields are added.
+
+FTCLobbySettings admits only a private Conquest/Default room on one of the 33 committed public catalogue maps bound by native d2911267 (including the bounded El Alamein path), Standard army, existing weather choices, Sandbox off, exactly two human commanders on teams 0 and 1, and no spectators or operatives. Only the seated host starts. A play-state lobby refuses new starts and seat requests; same-token reconnect is the server's identity contract. Per decision 097 a disconnected/unready seat does not block start: the server auto-pauses. FTCMatchOptions supplies one fixed read-only line, `Logistics: off (temporary)`, with no control or wire field.
+
+The Node reference path returns its previous settings, StartAllowed predicate, reason text and outgoing messages unchanged. The Rust-only SendCommand guard also covers unattended lobby requests. Manual restart fault refusal remains server-side: no terminal fault notice exists in the current client protocol. Ingress remains move/amove/stop/stance; widening it is outside R1.
+
+Verification and remaining live limitations are recorded in the round 18 rusthost evidence report. The d2911267 standalone CLI serves lobbies and refuses start; a successful lobby connection cannot be counted as gameplay verification. The subsequent exact-main 9e618217 ordinary executable now provides the approved trusted R1 launch. The integrated result below distinguishes actual native movement/reconnect from separate server ownership/lifecycle tests.
+
+## Unreal client: world marker depth and reference HQ camps (round 18, 2026-10-14)
+
+`Client/TCMarkers` submits reference ribbon triangles to `TCCampModels` world batches. Ground HQ/capture/node
+markers and cover shields use translucent depth testing, no depth writes; weapon ranges and the faint cover layer
+use a separate depth-disabled material. Tags, veterancy and role badges retain the reference billboard behavior.
+The materials consume linear vertex colors and blend before tone mapping. HQ zone circles stay flat at spawn
+height, while overlay ribbons follow terrain, as the pinned builders do.
+
+HQ camps reuse the existing reproducible imported `hq-camp`/`hq-camp-flagpole` meshes for all four factions.
+`TCCampModels.Export.mjs` calls the pinned `sandbagRing(15.8)` for 472 bag transforms and its rounded geometry;
+each center is clipped at the reference 0.75 m map margin. Resource nodes use the exact 0.8 x 0.6 x 0.8 m box,
+centered 0.3 m above terrain. Tent selection uses the lobby mode known at start. Tutorial shares spawn positions:
+Three's LessEqualDepth displays the later camp paint, so native drawing omits earlier coincident camp surfaces
+rather than relying on Unreal's opaque depth ties. All other camp positions and sandbags remain unchanged.
+The browser's real `symbolBadge` Canvas2D builder produces a deterministic atlas of 47 unit types in seven owner
+colors including fallback. Its exporter checks the full clean reference pin and isolated HTTP source hashes.
+
+Scratch editor build and four `ThreeCrossroads.Markers` tests passed. Classic comparison at paused tick 246,
+1280 x 720, High, Rust decoder, used identical tours for browser and Unreal. An A/B with identical geometry and
+depth disabled reveals 1,364 ring pixels over the foreground house roof that normal depth hides, matching the
+browser's occlusion. HQ and neutral wash regions have median absolute RGB differences (1,1,1) and (0,1,1)/255;
+these descriptive regions include underlying terrain and lighting. Range bright pixels measure median RGB
+(199,197,191) native versus (206,205,200) browser, leaving 7 to 9 levels of difference. No acceptance threshold,
+benchmark, package verification, Low verification or cross-platform verification is claimed. Lobby-first Tutorial
+at tick 240 verifies the tent variant and role badges at two matched distances; browser and native exit 0. A native
+cover smoke draws 47 cursor glyphs and 42 move-flash glyphs and exercises off/on; no nonempty heavy/light or
+through-model glyph set, or matched browser cover lane, was captured. Evidence and
+regeneration instructions: `round-18/markers/REPORT.md` and `round-18/markers/lead/README.md` in the verification
+workspace. Flat flags still omit the reference cloth texture; the HQ tag still omits its HQ silhouette.
+
+## Unreal client, round 18: HUD look (2026-10-14)
+
+The pinned browser remains the presentation source. Barlow Semi Condensed uses weights 500/600 for normal/bold DOM text and 700 for loss details and h2 headings. Missing font payloads retain Roboto and log the existing warning. Canvas marker labels use proportional digits; the DOM uses tabular digits. Font metrics differ from Chromium by at most 0.015 px over 16 recorded strings.
+
+At 1280 x 720, Graphics High, the paused Horde reference score card is 620 x 175.234375 px at UI 100%, and 290 x 335.65625 px at UI 150%. Its flex blocks wrap as whole blocks. The match and spectator status notices wrap at the reference max-width; routine alerts retain their reference nowrap/ellipsis. The Kaiju card starts at y=246.328125 and y=492.90625, with border-box heights 58.25 and 86.375 px. The loss column starts at (892,297.640625) and (698,89.4375). At 150%, losses cover part of the score card, as in the browser. No collision-avoidance rule is introduced.
+
+The camera retains the reference 42 degree vertical field of view. Its band measures the physical bottom of the top stack, excluding the following 4 CSS px gap, and spectators reserve no recruit bar. A 30% clear-height threshold falls back to the whole viewport. In the recorded Bastogne snow scene, wheel refresh fits 521.053349 m at UI 100% and 293.065987 m at 150%. These are camera fit calculations, not performance measurements.
+
+Queued plans use overlay.js ORDER_DASH [2.2,1.3] as period and lit length, with a 0.9 m gap, counted back from the goal. The ribbon retains the reference dark rim, soft edge and world/pixel minimum widths. The plan layer draws through models as markers.js specifies. Dash ends use the two reference smoothsteps; fwidth comes from the projected along/across Jacobian, including perspective skew.
+
+FarFigures v2 carries the procedural source matId (including baked grime) and full linear base/owner tint, instead of quantizing them to vertex colours. It contains 161 figures; export tint reconstruction error is 4.04e-8. The reader requires the matching v2 payload; absent materials keep the existing vertex-only fallback and absent payloads draw catalog rest figures. The look generator reuses the master model and hemisphere/environment nodes and duplicates their full parameter expressions, including collection GUIDs. Generated materials, payload and reader must integrate together. The matched close soldier shading remains too grey; no palette adjustment or artistic substitute is approved by this work. Colour, normals and live lighting parameters are verified, but a matching lit result is still open.
+
+The pinned es.js has no key for the five "decided when ..." reasons, "(won)", "Last match:", "You are watching this room." or "A match is running: joining it...". The existing Horde key is used for both its role and observed seat-name text (Horda). Those nine absent strings remain English. No translation is invented. Evidence and capture manifests are in round-18/hudlook/REPORT.md. No parity row is accepted by these automated comparisons.
+
+Isolated build 19 passes 24 focused automation tests, zero failures or warnings. Forty PNG captures at 1280 x 720 cover English and Spanish, UI 100% and 150%, Graphics High. These checks do not accept a parity row or close the remaining soldier lighting difference.
+
+## Great Bridge collapse presentation (round 18)
+
+`client/fx.js:updateSections` at reference e4e579a draws a 1.8 x 2.8 x 0.2 m box at each delivered position. Euler (0,-dir,-tilt), YXZ, becomes Unreal pitch -tilt then yaw dir after the (x,y,z) to (x,z,y) conversion. No random pose spread is added. `client/debris.js` interpolates x/y/z/tilt, holds the last pose without extrapolation, and removes a section only when the next snapshot omits it. The simulation's min(pi/2, age*2.6) tumble is supplied by the server. The client must not invent it between snapshots.
+
+`TCEffects` draws one persistent instance per row. `Tools/bridge-replay/make-section-material.py` generates its standard surface (roughness 1, metallic 0, dielectric specular, the existing Three.js hemisphere/PMREM indirect shader). It casts and receives shadows on the scenery channel. Regenerate this asset before packaging, or apply the supplied generated asset patch.
+
+The bridge replay archive ends at tick 8400 with 84 sections at tilt 0. Captures at 1 and 3 seconds after receipt still show tick 8400 and its grid while local dust ages. This is a fixture limitation, not a reason to create unrecorded simulation state. `Effects.SectionPose` checks 20 poses/160 transformed corners generated by pinned Three.js and shared debris motion, plus delivered-pose interpolation and the material's connected sky bindings.
+
+Matched round 18 replay captures still show darker native section faces and lighter dust than the browser. The generated surface and its sky bindings pass focused checks, but rendered lighting parity is not accepted. The controlled browser capture runs normal terrain frames with particle age held at zero before taking exact local-presentation ages 0, 1 and 3 seconds.
+
+## Unreal slice 1s integrated verification (2026-10-15)
+
+Two real ThreeCrossroadsEditor Build.sh builds require the Rust FFI and succeed with zero compiler warnings. Each full integrated suite passes 117/117, including RustHostDetection, RustHostMatrix and ReferenceMatrixUnchanged. Eight Node harness tests pass. The optional prior Tutorial recording is absent; its deterministic trimmed fixture runs. Integrated Great Bridge decoder replay passes four streams of 4,200 adopted and agreeing snapshots, with no refusals, apply errors or resyncs. Native/source final state retains only the known wx difference (16/17 parts equal).
+
+Sixteen completed live mode rows run the Rust decoder: Conquest, Assault, Annihilation, Classic, Horde, two-seat Tutorial, World Conquest, all five authored scenarios, Annihilation/Horde sandbox losses, a separate AI Great Bridge victory and a separate Graphics Low Conquest lane. High is explicitly set before every High client; the table records observed Graphics, fixing the prior stale-Low Conquest/Tutorial/World coverage. Cap rows are host-ended checks, not natural wins. The idle two-team Great Bridge row holds long enough for the authored collapse; a separate AI row reaches a normal Conquest result. There are 47 final-counter client logs including the package pair: 139,291 adopted/agreeing snapshots, no refused/disagreeing snapshots, apply errors, resyncs, OOM or ensures. All -try logs and console duplicates are excluded. The rendered recorded replay is separate (one client, 4,200 adopted/agreeing).
+
+The d2911267 Rust CLI lobby rerun first confirmed one-seat refusal, two-seat Start and server scenario denial, all three client exits 0. After refetching current main 9e618217, its approved ordinary --trusted-room/--seed executable starts a real two-native Conquest/Default match on High with logistics off. Both clients exit 0: host 724 and guest 735 adopted/agreeing snapshots, no refusals/disagreements. Native move and Stop send, and the host reconnects with its same token and match identity while retaining its selection. Seven separate real-executable TCP tests pass ownership rejection and healthy/absent-seat/faulted restart cases. Native ownership rejection, amove/stance and Restart are not yet verified; the first stance step used an invalid verification-script key spelling and sent nothing. The launch-command blocker is resolved; 0b b remains incomplete. The approved FFI pin/rebuild follows the slice commit.
+
+Integrated browser/Unreal pairs cover a real selecting Spanish guest at UI150, team card, actual own-unit loss and history above the boss, matched camera distances, near/far soldier colour, queue dashes, tree/house depth, HQ camp and the tick-8400 collapse. For the guest pair, an evidence-only mirror carries one actual native guest's unchanged recipient stream to the browser with one upstream command authority. The browser has me=1, watching=false and the same selected rifle. Its presentation clock is held 2.5 seconds after an actual own MG removal to keep the notice during slow software capture; no synthetic alert or match state is introduced. The first queue pair differs by one tick during pause delivery; the second pair is the same tick. Native bottom panels still overlap at UI150, active routes/circles are wider, faction icons and flag/HQ labels are incomplete, soldiers remain grey and section faces/dust differ. The replay archive ends at 8400, so later images hold section poses and age local particles only. No row is accepted.
+
+The Linux Development slice18 package cooks 1,559 packages with zero errors/warnings, passes static asset checks and SHA256SUMS, and runs a High packaged host with a seated headless editor guest. Both exit 0, each 848 adopted/agreeing, zero refused. The first package attempt caught GetMeshDescription in a Development automation assertion; WITH_EDITOR now guards that editor-only assertion. Runtime camp code is unchanged. Generated art, material and font payloads remain build outputs; their reproducible text generators are committed.
+
+An informal shared-machine Seelow Heights run on loiko-linux, 1280x720/UI100, records High 14.91 ms mean / 35.3 ms worst over 3,930 frames, and Low 13.75 / 41.5 ms over 9,472 frames. Complete five-second status windows are frame-weighted, with startup and switch-straddling windows excluded; other rendered lanes were active and no seed was controlled. These are descriptive frame times, not a benchmark, improvement claim or measured gate. Windows/macOS and human playtesting remain pending.

@@ -1,4 +1,5 @@
 #include "Client/TCEndReport.h"
+#include "Client/TCStats.h"
 #include "Client/TCLocale.h"
 #include "Net/TCMatchState.h"
 #include "Engine/Canvas.h"
@@ -129,6 +130,7 @@ namespace
 
 FTCMeasure FTCPaint::CanvasMeasure(UFont* Font)
 {
+	if (FTCType::IsLoaded()) return FTCType::Measure();
 	return [Font](const FString& T, float Px, bool bBold, float Tracking)
 	{
 		if (!Font || T.IsEmpty()) return 0.f;
@@ -177,6 +179,9 @@ TArray<FString> FTCPaint::Wrap(const FString& Text, float MaxW, float FontPx, bo
 void FTCPaint::Draw(UCanvas* Canvas, UFont* Font) const
 {
 	if (!Canvas) return;
+	// FTCType sends non-text items back here. Only redirect a draw list that actually contains text.
+	if (FTCType::IsLoaded() && Items.ContainsByPredicate([](const FTCPaintItem& I) { return I.Kind == ETCPaintKind::Text; }))
+	{ FTCType::Draw(*this, Canvas, Font); return; }
 	for (const FTCPaintItem& I : Items)
 	{
 		if (I.Colour.A <= 0.f && (I.Kind != ETCPaintKind::Gradient || I.Colour2.A <= 0.f)) continue;

@@ -244,7 +244,7 @@ def catalog_slots(project_content):
     cat = json.load(open(os.path.join(project_content, 'Models', 'ModelCatalog.json')))
     slots = {}
     for m in cat['models']:
-        if m.get('category') not in ('piece', 'prop', 'foliage'):
+        if m.get('category') not in ('piece', 'prop', 'foliage') and not m['key'].startswith('hq-'):
             continue
         for part in m['parts']:
             for path in part['materials']:

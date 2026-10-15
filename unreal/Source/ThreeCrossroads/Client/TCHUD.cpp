@@ -1,4 +1,5 @@
 #include "Client/TCHUD.h"
+#include "Client/TCStats.h"
 #include "Client/TCGraphics.h"
 #include "Client/TCPersistence.h"
 #include "Client/TCTutorial.h"
@@ -113,7 +114,32 @@ void ATCHUD::DrawLabel(const FString& Str, const FLinearColor& Colour, float X, 
 {
 	const FString Shown = TC_T(Str);
 	NoteKept(Str, Shown);
-	AHUD::DrawText(Shown, Colour, X, Y, Font, Scale);
+	DrawShown(Shown, Colour, X, Y, Font, Scale);
+}
+
+// index.html's body is 500 14px Barlow Semi Condensed; larger native headings keep their relative size.
+namespace
+{
+	float HudFontPx(UFont* Font, float Scale)
+	{
+		return (GEngine && Font == GEngine->GetMediumFont() ? 18.f : 14.f) * Scale;
+	}
+}
+
+void ATCHUD::DrawShown(const FString& Str, const FLinearColor& Colour, float X, float Y, UFont* Font, float Scale)
+{
+	if (!FTCType::IsLoaded()) { AHUD::DrawText(Str, Colour, X, Y, Font, Scale); return; }
+	FTCPaint P;
+	P.Text(Str, X, Y, HudFontPx(Font, Scale), Colour);
+	FTCType::Draw(P, Canvas, Font, UiNow);
+}
+
+void ATCHUD::ShownSize(const FString& Str, float& OutWidth, float& OutHeight, UFont* Font, float Scale) const
+{
+	if (!FTCType::IsLoaded()) { AHUD::GetTextSize(Str, OutWidth, OutHeight, Font, Scale); return; }
+	const float Px = HudFontPx(Font, Scale);
+	OutWidth = FTCType::Face(false)->Width(Str, Px);
+	OutHeight = 1.2f * Px;
 }
 
 void ATCHUD::NoteKept(const FString& Str, const FString& Shown)
@@ -361,9 +387,11 @@ FVector2D ATCHUD::MeasureControlRows(UFont* Font, const TArray<FTCControlRow>& R
 	return FVector2D(Wide, H);
 }
 
-FVector2D ATCHUD::StartBand(float ScreenH, float UiScale, bool bClassic)
+FVector2D FTCHudFit::InitialCameraBand(float ScreenH, float UiScale, bool bBuyShown)
 {
-	return FVector2D((CssGap + CssEmptyScores) * UiScale, bClassic ? ScreenH : ScreenH - (CssGap + CssBuyTabs) * UiScale);
+	const float Border = FMath::Max(1.f, FMath::FloorToFloat(UiScale));
+	// Empty #scores: 8px top gap, 17px padding, two snapped borders. #buy's tabs: 46px plus four borders.
+	return FVector2D(25.f * UiScale + 2 * Border, bBuyShown ? ScreenH - (54.f * UiScale + 4 * Border) : ScreenH);
 }
 
 float ATCHUD::MatchPanelWidth(float RoomRight)
@@ -374,7 +402,7 @@ float ATCHUD::MatchPanelWidth(float RoomRight)
 
 void ATCHUD::LabelSize(const FString& Str, float& OutWidth, float& OutHeight, UFont* Font, float Scale) const
 {
-	AHUD::GetTextSize(TC_T(Str), OutWidth, OutHeight, Font, Scale);
+	ShownSize(TC_T(Str), OutWidth, OutHeight, Font, Scale);
 }
 
 void ATCHUD::DrawMinimapPings()
@@ -547,7 +575,7 @@ float ATCHUD::DrawLobby(UFont* Font, float Y, float LobbyW)
 		AddButtons({ FItem{ LPC->LanguageLabel(), FTCUiCommand(ETCUiAction::Language), true, TEXT("Language") } });
 	// round 14: client/public-lobby.html's Tutorial button (this client has no room directory, CLI-01: it sits in the
 	// room's lobby), for anyone outside a match
-	if (bLobby) AddButtons({ FItem{ TCTutorialEntry::Label(), FTCUiCommand(ETCUiAction::Tutorial), true, TCTutorialEntry::Title() } });
+	if (bLobby && !L.IsRustHost()) AddButtons({ FItem{ TCTutorialEntry::Label(), FTCUiCommand(ETCUiAction::Tutorial), true, TCTutorialEntry::Title() } });
 	if (L.HasLobby() && bLobby)
 	{
 		FString Info = FTCLobbySettings::ModeInfo(R.Mode);
@@ -578,6 +606,7 @@ float ATCHUD::DrawLobby(UFont* Font, float Y, float LobbyW)
 			Room.Add({ Label, Cmd, C.bEditable, Hover });
 		}
 		AddButtons(Room);
+		if (!M->Options.LogisticsLine().IsEmpty()) Lines.Add({ M->Options.LogisticsLine(), Dim, {} });
 	}
 	for (int32 I = 0; I < S.Roster.Num(); I++)
 	{
@@ -608,7 +637,7 @@ float ATCHUD::DrawLobby(UFont* Font, float Y, float LobbyW)
 	for (const FTCControlRow& Row : M->LobbyControlRows())
 	{
 		TArray<FItem> Items;
-		for (const FTCControlItem& It : Row.Items) { FTCUiCommand C(ETCUiAction::MatchControl); C.Unit = It.Key; C.Group = It.Slot; Items.Add({ It.Label, C, It.bEnabled, It.Hover }); }
+		for (const FTCControlItem& It : Row.Items) { FTCUiCommand C(ETCUiAction::MatchControl); C.Unit = It.Key; C.Group = It.Slot; const bool bRustWatch = L.IsRustHost() && It.Key == TEXT("Watch"); Items.Add({ It.Label, C, It.bEnabled && !bRustWatch, bRustWatch ? FString(TEXT("Rust host: no spectators.")) : It.Hover }); }
 		const FLinearColor Colour = Row.Tone == FTCControlRow::Dim ? Dim : Row.Tone == FTCControlRow::Warn ? Warn : Row.Tone == FTCControlRow::Good ? Good : Text;
 		if (Items.Num()) AddButtons(Items, Row.Text, Colour); else Lines.Add({ Row.Text, Colour, {} });
 	}
@@ -622,7 +651,7 @@ float ATCHUD::DrawLobby(UFont* Font, float Y, float LobbyW)
 	{
 		// the Start button's text and enabled state are the browser's (renderLobby); Add AI as before
 		TArray<FItem> Host;
-		if (bHost) Host.Add({ TEXT("+ Add AI player"), FTCUiCommand(ETCUiAction::AddAi), true, TEXT("+ Add AI player") }); // lobby-view.js
+		if (bHost && !L.IsRustHost()) Host.Add({ TEXT("+ Add AI player"), FTCUiCommand(ETCUiAction::AddAi), true, TEXT("+ Add AI player") }); // lobby-view.js
 		const bool bStart = !L.HasLobby() || L.StartAllowed();
 		Host.Add({ L.HasLobby() ? L.StartLabel() : FString(TEXT("Start match")), FTCUiCommand(ETCUiAction::Start), bStart, bStart ? FString(TEXT("Start the match")) : L.StartLine() });
 		AddButtons(Host);
@@ -1488,13 +1517,13 @@ void ATCHUD::DrawWorldOverlays(UFont* Font)
 	{
 		const FTCCoverView& V = M->Cover.View();
 		FTCMarkerPainter Marks = TCMarkersHud::Painter(Canvas, *M);
-		auto Layer = [&](const TArray<FTCCoverGlyph>& Glyphs, float Opacity) { TCMarkersHud::DrawCoverLayer(Marks, Glyphs, Opacity); };
+		auto Layer = [&](const TArray<FTCCoverGlyph>& Glyphs, float Opacity, bool bDepth) { TCMarkersHud::DrawCoverLayer(Marks, Glyphs, Opacity, bDepth); };
 		if (V.bVisible)
 		{
-			if (V.bCursorGround) Layer(M->Cover.CursorMarks().Ground, V.CursorGroundOpacity);
-			if (V.bCursorThrough) Layer(M->Cover.CursorMarks().Through, V.CursorThroughOpacity);
-			if (V.bFlashGround) Layer(M->Cover.FlashMarks().Ground, V.FlashGroundOpacity);
-			if (V.bFlashThrough) Layer(M->Cover.FlashMarks().Through, V.FlashThroughOpacity);
+			if (V.bCursorGround) Layer(M->Cover.CursorMarks().Ground, V.CursorGroundOpacity, true);
+			if (V.bCursorThrough) Layer(M->Cover.CursorMarks().Through, V.CursorThroughOpacity, false);
+			if (V.bFlashGround) Layer(M->Cover.FlashMarks().Ground, V.FlashGroundOpacity, true);
+			if (V.bFlashThrough) Layer(M->Cover.FlashMarks().Through, V.FlashThroughOpacity, false);
 		}
 	}
 	// client/main.js aimShape for an aimed ability: a ring of its radius under the pointer
@@ -1711,7 +1740,8 @@ void ATCHUD::DrawHUD()
 		}
 		const int32 StripFrom = Panels.Num();
 		const float StripBottom = DrawScoreStrip(Font, Big);
-		BandTop = bStrip ? StripBottom * UiNow : 0.f; // round 14: camera.js band, #top (screen pixels: the strip is drawn at the UI scale)
+		// camera.js measures #top's border box. DrawScoreStrip also returns the gap for the next card.
+		BandTop = bStrip ? TopStackBottomPx : 0.f;
 		// round 15: the strip's left edge in screen pixels (its panels are recorded in screen pixels)
 		float StripLeft = Canvas->ClipX * UiNow, StripRight = 0.f, StripLow = StripBottom * UiNow;
 		for (int32 K = StripFrom; K < Panels.Num(); K++) { StripLeft = FMath::Min(StripLeft, (float)Panels[K].Min.X); StripRight = FMath::Max(StripRight, (float)Panels[K].Max.X); }
@@ -1730,6 +1760,7 @@ void ATCHUD::DrawHUD()
 		const float Ui = UiNow;
 		EndUi();
 		// the minimap (bottom right): the recruit card fits between it and the match panel
+		Minimap.UiScale = Ui;
 		Minimap.bDeferViewOutline = true; // round 17: client/main.js drawMinimap strokes the view last
 		Minimap.Draw(Canvas, S, M->UnitTable, PC->Selected, View);
 		DrawMinimapOverlays();
@@ -1797,7 +1828,8 @@ void ATCHUD::DrawHUD()
 		if (bStartBand)
 		{
 			// round 15: the band camera.js measured at receiveStart, until the controller has taken it (StartBand)
-			Band = StartBand(Canvas->ClipY * UiNow, UiNow, TCArmyCommands::ClassicLobby(S));
+			const bool bBuyShown = !S.bSpectator && !TCArmyCommands::ClassicLobby(S);
+			Band = FTCHudFit::InitialCameraBand(Canvas->ClipY * UiNow, UiNow, bBuyShown);
 			const FVector2D Taken = PC->ClearBand();
 			// kept until the strip is up too: the controller measures again when the reported top first turns positive
 			// (round 14's glue for a strip that arrives with the first snapshot), which must not happen after this
@@ -1805,7 +1837,7 @@ void ATCHUD::DrawHUD()
 			{
 				bStartBand = false;
 				UE_LOG(LogTC, Log, TEXT("hud: camera band at the match start %.1f to %.1f px (client/main.js receiveStart: empty #scores, %s), taken after %d frames; this HUD's own band now %.1f to %.1f px"),
-					Band.X, Band.Y, TCArmyCommands::ClassicLobby(S) ? TEXT("no #buy in Classic and World") : TEXT("#buy with its group tabs"), StartBandFrames, BandTop, RecruitTop);
+					Band.X, Band.Y, bBuyShown ? TEXT("#buy with its group tabs") : TEXT("no #buy for spectators, Classic or World"), StartBandFrames, BandTop, RecruitTop);
 			}
 		}
 		PC->SetClearBand(Band.X, Band.Y);

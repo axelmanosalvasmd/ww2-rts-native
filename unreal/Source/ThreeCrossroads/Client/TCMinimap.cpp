@@ -207,12 +207,13 @@ void FTCMinimap::UploadRows(int32 Y0, int32 Y1)
 void FTCMinimap::LayoutIn(float ClipX, float ClipY)
 {
 	// client/index.html: --mm 184 px, 228 px at 1600 x 860 and up; --gap 8 px; bottom right
-	float Side = SideOverride > 0.f ? SideOverride : (ClipX >= 1600.f && ClipY >= 860.f ? 228.f : 184.f);
-	Side = FMath::Min(Side, FMath::Min(ClipX, ClipY) - 2.f * Gap);
+	const float Scale = FMath::Max(0.01f, UiScale), Margin = Gap * Scale;
+	float Side = (SideOverride > 0.f ? SideOverride : (ClipX >= 1600.f && ClipY >= 860.f ? 228.f : 184.f)) * Scale;
+	Side = FMath::Min(Side, FMath::Min(ClipX, ClipY) - 2.f * Margin);
 	if (Side < 16.f) { LayoutSide = 0.f; return; }
 	LayoutSide = Side;
-	LayoutX = ClipX - Gap - Side;
-	LayoutY = ClipY - Gap - Side;
+	LayoutX = ClipX - Margin - Side;
+	LayoutY = ClipY - Margin - Side;
 }
 
 bool FTCMinimap::Arrange(float ClipX, float ClipY, const FTCMatchState& State, float YawDegrees)
@@ -236,10 +237,10 @@ bool FTCMinimap::Draw(UCanvas* Canvas, const FTCMatchState& State, const FTCUnit
 
 	// frame and background
 	{
-		FCanvasTileItem FrameItem(Origin - FVector2D(5, 5), Size + FVector2D(10, 10), FLinearColor(MinimapFrameLine));
+		FCanvasTileItem FrameItem(Origin - FVector2D(5, 5) * UiScale, Size + FVector2D(10, 10) * UiScale, FLinearColor(MinimapFrameLine));
 		FrameItem.BlendMode = SE_BLEND_Translucent;
 		Canvas->DrawItem(FrameItem);
-		FCanvasTileItem PanelItem(Origin - FVector2D(4, 4), Size + FVector2D(8, 8), FLinearColor(MinimapPanelSolid));
+		FCanvasTileItem PanelItem(Origin - FVector2D(4, 4) * UiScale, Size + FVector2D(8, 8) * UiScale, FLinearColor(MinimapPanelSolid));
 		PanelItem.BlendMode = SE_BLEND_Translucent;
 		Canvas->DrawItem(PanelItem);
 		FCanvasTileItem BackItem(Origin, Size, MinimapSrgb(MMCore::Background[0], MMCore::Background[1], MMCore::Background[2]));

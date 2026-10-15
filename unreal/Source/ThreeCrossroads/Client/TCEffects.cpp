@@ -4,6 +4,9 @@
 #include "Client/TCUnitRenderer.h"
 #include "Client/TCLighting.h"
 #include "Client/TCGraphics.h"
+#include "Client/TCPlayerController.h"
+#include "GameFramework/HUD.h"
+#include "UnrealClient.h"
 #include "Net/TCMatchState.h"
 #include "World/TCTerrain.h"
 #include "ThreeCrossroads.h"
@@ -11,6 +14,8 @@
 #include "Dom/JsonValue.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialParameterCollection.h"
+#include "Materials/MaterialParameterCollectionInstance.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "GameFramework/PlayerController.h"
@@ -47,6 +52,11 @@
 #include "Misc/Parse.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
+#if WITH_EDITOR
+#include "Materials/Material.h"
+#include "Materials/MaterialExpressionCollectionParameter.h"
+#include "Materials/MaterialExpressionCustom.h"
+#endif
 #include "Client/TCUnitTable.h"
 #if WITH_EDITOR
 #include "AssetCompilingManager.h"
@@ -242,6 +252,14 @@ void FTCProjectileView::Reset()
 	for (const int32 Id : TArray<int32>(FlightOrder)) if (On.Remove) On.Remove(Id);
 	Flights.Reset(); FlightOrder.Reset(); Events.Reset(); EventOrder.Reset();
 	ServerTime = 0.0; Arrival = 0.0; LastTick = -1;
+}
+
+FTransform TCFxSections::Transform(const FTCDebrisRow& Row)
+{
+	// Three.js Ry(-dir) * Rz(-tilt), conjugated by (x,y,z) -> (x,z,y).
+	// The tilt becomes Unreal pitch, then yaw. Roll tumbles about the wrong edge.
+	return FTransform(FRotator(-FMath::RadiansToDegrees(Row.Tilt), FMath::RadiansToDegrees(Row.Dir), 0).Quaternion(),
+		FVector(Row.X, Row.Z, Row.Y) * 100.0, FVector(1.8, 0.2, 2.8));
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -1623,13 +1641,7 @@ void FTCCombatEffects::UpdateEmitters(float Dt)
 		const int32 O = Shape(ETCFxLook::Plane, FVector(X, Z, Y), FVector(Dx, Dz, 0) * 0.001, 3.f, Dt * 1.5f);
 		if (O >= 0) Live[O].Stretch = 5.f;
 	}
-	// falling sections (debris.js poses, interpolated in Frame; fx.js updateSections draws them as boxes)
-	for (const auto& Pair : SectionPoses)
-	{
-		const FTCDebrisRow& R = Pair.Value;
-		const int32 O = Shape(ETCFxLook::Section, At(R.X, R.Y, R.Z), FVector::ZeroVector, 1.f, Dt * 1.5f);
-		if (O >= 0) { Live[O].ShapeRot = FRotator(0.f, FMath::RadiansToDegrees(R.Dir), FMath::RadiansToDegrees(R.Tilt)); Live[O].Cell = TCFxImpl::SectionTint(R.Material); }
-	}
+	// Sections are persistent meshes, like fx.js sectionMesh, not expiring particles.
 	// rockets' smoke trails (fx.js updateRockets)
 	for (int32 I = Rockets.Num() - 1; I >= 0; I--)
 	{
@@ -2162,15 +2174,31 @@ UInstancedStaticMeshComponent* ATCEffects::Batch(int32 Key, UStaticMesh* Mesh, c
 	UInstancedStaticMeshComponent* Ism = NewObject<UInstancedStaticMeshComponent>(this);
 	Ism->SetStaticMesh(Mesh);
 	Ism->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	Ism->SetCastShadow(false);
+	Ism->SetCastShadow(Key >= TCFxImpl::SectionKeyBase && Key < TCFxImpl::SectionKeyBase + 4);
 	Ism->SetMobility(EComponentMobility::Movable);
 	Ism->SetupAttachment(RootComponent);
 	Ism->RegisterComponent();
-	if (BaseMaterial)
+	const bool bSection = Key >= TCFxImpl::SectionKeyBase && Key < TCFxImpl::SectionKeyBase + 4;
+	if (bSection && !SectionMaterial) SectionMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Effects/Materials/M_TCFxSection.M_TCFxSection"), nullptr, LOAD_NoWarn);
+	UMaterialInterface* Material = bSection && SectionMaterial ? SectionMaterial : BaseMaterial;
+	if (Material)
 	{
-		UMaterialInstanceDynamic* Mid = UMaterialInstanceDynamic::Create(BaseMaterial, this);
+		UMaterialInstanceDynamic* Mid = UMaterialInstanceDynamic::Create(Material, this);
 		Mid->SetVectorParameterValue(TEXT("Color"), Colour);
 		Ism->SetMaterial(0, Mid);
+	}
+	if (bSection)
+	{
+		FLinearColor Env = FLinearColor::Black, Top = FLinearColor::Black, Bottom = FLinearColor::Black;
+		UMaterialParameterCollection* Collection = LoadObject<UMaterialParameterCollection>(nullptr, TEXT("/Game/Models/Materials/Look/MPC_TCLook.MPC_TCLook"));
+		if (Collection) if (UMaterialParameterCollectionInstance* I = GetWorld()->GetParameterCollectionInstance(Collection))
+		{
+			I->GetVectorParameterValue(TEXT("Env"), Env);
+			I->GetVectorParameterValue(TEXT("HemiTop"), Top);
+			I->GetVectorParameterValue(TEXT("HemiBottom"), Bottom);
+		}
+		UE_LOG(LogTC, Log, TEXT("falling section surface: %s, linear colour %s; indirect %s, top %s, bottom %s"),
+			*GetPathNameSafe(Material), *Colour.ToString(), *Env.ToString(), *Top.ToString(), *Bottom.ToString());
 	}
 	Batches.Add(Key, Ism);
 	return Ism;
@@ -2308,6 +2336,7 @@ void ATCEffects::Tick(float DeltaSeconds)
 	}
 	Draw(Clock);
 	ApplyShake(Clock);
+	CaptureBridge(Clock);
 }
 
 void ATCEffects::DamageFrame(float Dt)
@@ -2395,16 +2424,21 @@ void ATCEffects::Draw(double Clock)
 	{
 		if (P.Preset != ETCFxPreset::None) continue;
 		const TCFxImpl::FLookStyle St = TCFxImpl::ShapeStyle(P.Look);
-		// round 17: falling sections in their material's colour (fx.js sectionColor), one batch per material
-		const bool bSection = P.Look == ETCFxLook::Section;
-		const int32 Key = bSection ? TCFxImpl::SectionKeyBase + FMath::Clamp(P.Cell, 0, 3) : (int32)P.Look;
-		Batch(Key, Meshes[St.Mesh], bSection ? TCFxImpl::SectionColour(P.Cell) : St.Colour, true);
+		const int32 Key = (int32)P.Look;
+		Batch(Key, Meshes[St.Mesh], St.Colour, true);
 		const FVector Loc = P.P * 100.0;
 		FTransform T;
-		if (P.Look == ETCFxLook::Section) T = FTransform(P.ShapeRot.Quaternion(), Loc, FVector(1.8f, 0.2f, 2.8f));
-		else if (P.Look == ETCFxLook::Plane) T = FTransform(FRotationMatrix::MakeFromX(P.V.GetSafeNormal().IsNearlyZero() ? FVector::ForwardVector : P.V.GetSafeNormal()).ToQuat(), Loc, FVector(P.Stretch, 4.f, 0.6f));
+		if (P.Look == ETCFxLook::Plane) T = FTransform(FRotationMatrix::MakeFromX(P.V.GetSafeNormal().IsNearlyZero() ? FVector::ForwardVector : P.V.GetSafeNormal()).ToQuat(), Loc, FVector(P.Stretch, 4.f, 0.6f));
 		else T = FTransform(FQuat::Identity, Loc, FVector(FMath::Max(P.Size, 0.05f)));
 		Frames.FindOrAdd(Key).Add(T);
+	}
+	// One instance per delivered section, with the browser's geometry, colour and lit/shadowed surface.
+	for (const auto& Pair : Fx.Sections())
+	{
+		const FTCDebrisRow& Row = Pair.Value;
+		const int32 Tint = TCFxImpl::SectionTint(Row.Material), Key = TCFxImpl::SectionKeyBase + Tint;
+		Batch(Key, CubeMesh, TCFxImpl::SectionColour(Tint), false);
+		Frames.FindOrAdd(Key).Add(TCFxSections::Transform(Row));
 	}
 	// map pings (client/pings.js): a chalk ring at the spot, spreading and fading every 1.2 s for 4 s
 	if (Alerts)
@@ -2437,6 +2471,38 @@ void ATCEffects::Draw(double Clock)
 		else { Ism->ClearInstances(); if (Pair.Value.Num()) Ism->AddInstances(Pair.Value, false, true); }
 	}
 	LastInstances = LastSprites + Decals + RubbleList.Num() + Shapes;
+}
+
+// Replay-only capture switch: before, first collapse frame, then 1 and 3 real seconds later.
+// The archive ends at tick 8400, so the latter frames keep the delivered poses and age only the local FX.
+void ATCEffects::CaptureBridge(double Clock)
+{
+	if (!bBridgeCaptureRead)
+	{
+		bBridgeCaptureRead = true;
+		FParse::Value(FCommandLine::Get(), TEXT("TCBridgeCapture="), BridgeShotPrefix);
+	}
+	if (BridgeShotPrefix.IsEmpty() || !State || State->Tick < 8398) return;
+	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	if (!PC) return;
+	if (BridgeSeen < 0)
+	{
+		BridgeSeen = Clock;
+		if (ATCPlayerController* TPC = Cast<ATCPlayerController>(PC)) { TPC->SetViewYawForChecks(-90.f); TPC->EpilogueCamera(FVector2D(119, 98), 70.f); }
+		if (PC->GetHUD()) PC->GetHUD()->bShowHUD = false;
+	}
+	if (State->Tick >= 8400 && BridgeCollapse < 0) BridgeCollapse = Clock;
+	const TCHAR* Names[] = { TEXT("before"), TEXT("at"), TEXT("after1s"), TEXT("after3s") };
+	const double Times[] = { 0, 0, 1, 3 };
+	if (BridgeShot >= 4) return;
+	if (BridgeShot == 0 ? (State->Tick != 8398 || Clock - BridgeSeen < 4) : (BridgeCollapse < 0 || Clock - BridgeCollapse < Times[BridgeShot])) return;
+	const FString File = BridgeShotPrefix + TEXT("-") + Names[BridgeShot] + TEXT(".png");
+	FScreenshotRequest::RequestScreenshot(File, false, false);
+	const FMinimalViewInfo& View = PC->PlayerCameraManager->GetCameraCacheView();
+	UE_LOG(LogTC, Log, TEXT("bridgefx capture: %s tick %d collapse age %.4f, sections %d, sprites %d, camera %s rotation %s fov %.5f"),
+		*File, State->Tick, BridgeCollapse < 0 ? -1.0 : Clock - BridgeCollapse, Fx.Sections().Num(), LastSprites,
+		*View.Location.ToString(), *View.Rotation.ToString(), View.FOV);
+	BridgeShot++;
 }
 
 void ATCEffects::ApplyShake(double Clock)
@@ -3277,6 +3343,78 @@ bool FTCEffectsActorTest::RunTest(const FString& Parameters)
 	GEngine->DestroyWorldContext(World);
 	World->DestroyWorld(false);
 	return bOk;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCEffectsSectionPoseTest, "ThreeCrossroads.Effects.SectionPose", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+bool FTCEffectsSectionPoseTest::RunTest(const FString&)
+{
+	FString Text;
+	const FString Path = FPaths::Combine(FPaths::ProjectDir(), TEXT("Tools/bridge-replay/section-oracle.json"));
+	TSharedPtr<FJsonObject> Oracle;
+	if (!FFileHelper::LoadFileToString(Text, *Path) || !FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Oracle))
+	{
+		AddError(TEXT("Cannot read Three.js section pose oracle: ") + Path); return false;
+	}
+	int32 Corners = 0;
+	for (const auto& V : Oracle->GetArrayField(TEXT("poses")))
+	{
+		const auto& O = V->AsObject(); const auto& R = O->GetObjectField(TEXT("row"));
+		FTCDebrisRow Row;
+		Row.X = R->GetNumberField(TEXT("x")); Row.Y = R->GetNumberField(TEXT("y")); Row.Z = R->GetNumberField(TEXT("z"));
+		Row.Dir = R->GetNumberField(TEXT("dir")); Row.Tilt = R->GetNumberField(TEXT("tilt"));
+		const FTransform T = TCFxSections::Transform(Row);
+		int32 I = 0;
+		for (double X : {-50.,50.}) for (double Y : {-50.,50.}) for (double Z : {-50.,50.})
+		{
+			// Oracle loop is Three.js x/y/z. Unreal's local y/z are interchanged.
+			const auto& C = O->GetArrayField(TEXT("corners"))[I++]->AsArray();
+			const FVector Expected(C[0]->AsNumber(), C[1]->AsNumber(), C[2]->AsNumber());
+			TestTrue(TEXT("box corner equals Ry(-dir)*Rz(-tilt), including delivered spread"), T.TransformPosition(FVector(X,Z,Y)).Equals(Expected, 1e-7));
+			Corners++;
+		}
+	}
+	// Delivered positions and tilt interpolate; direction and material come from the current row.
+	FTCMatchState State; State.Tick = 2;
+	FTCFalling A; A.Id = TEXT("section"); A.Kind = TEXT("section"); A.X = 10; A.Y = 5; A.Z = 20; A.Tilt = .1;
+	State.Falling.Add(A);
+	FTCDebrisView View; FTCDebrisRow Seen;
+	View.On.Pose = [&Seen](const FString&, const FTCDebrisRow& R) { Seen = R; };
+	View.Snapshot(State, {}, {}, 0);
+	State.Tick = 4; State.Falling[0].X = 14; State.Falling[0].Y = 3; State.Falling[0].Z = 22; State.Falling[0].Tilt = .5; State.Falling[0].Dir = .7;
+	View.Snapshot(State, {}, {}, .1); View.Frame(.15);
+	TestTrue(TEXT("halfway pose without invented scatter"), FMath::IsNearlyEqual(Seen.X,12.) && FMath::IsNearlyEqual(Seen.Y,4.) && FMath::IsNearlyEqual(Seen.Z,21.) && FMath::IsNearlyEqual(Seen.Tilt,.3) && Seen.Dir == .7);
+	View.Frame(3.1);
+	TestEqual(TEXT("hold final delivered tilt; never extrapolate server physics"), Seen.Tilt, .5);
+	// A missing sky input makes the shadowed faces black even with the correct material colour.
+#if WITH_EDITOR
+	UMaterial* Surface = LoadObject<UMaterial>(nullptr, TEXT("/Game/Effects/Materials/M_TCFxSection.M_TCFxSection"));
+	if (TestNotNull(TEXT("generated section surface loads"), Surface))
+	{
+		FExpressionInput* Emissive = Surface->GetExpressionInputForProperty(MP_EmissiveColor);
+		UMaterialExpressionCustom* Indirect = Emissive ? Cast<UMaterialExpressionCustom>(Emissive->Expression) : nullptr;
+		if (TestNotNull(TEXT("section emissive comes from the Three.js indirect shader"), Indirect))
+		{
+			int32 SkyInputs = 0;
+			for (const FCustomInput& Input : Indirect->Inputs)
+			if (Input.InputName == TEXT("HemiTop") || Input.InputName == TEXT("HemiBottom") || Input.InputName == TEXT("Look"))
+			{
+				UMaterialExpressionCollectionParameter* P = Cast<UMaterialExpressionCollectionParameter>(Input.Input.Expression);
+				if (!TestNotNull(TEXT("indirect input comes from the sky collection"), P)) continue;
+				if (TestNotNull(TEXT("indirect collection exists"), P->Collection.Get()))
+				{
+					AddInfo(FString::Printf(TEXT("section surface input %s: saved %s, expected %s"), *P->ParameterName.ToString(), *P->ParameterId.ToString(), *P->Collection->GetParameterId(P->ParameterName).ToString()));
+					const FName Name = Input.InputName == TEXT("Look") ? FName(TEXT("Env")) : Input.InputName;
+					TestEqual(TEXT("indirect input is bound to the intended vector"), P->ParameterName, Name);
+					TestTrue(TEXT("indirect input refers to its named vector"), P->ParameterId == P->Collection->GetParameterId(P->ParameterName));
+					SkyInputs++;
+				}
+			}
+			TestEqual(TEXT("all three sky vectors feed the shader"), SkyInputs, 3);
+		}
+	}
+#endif
+	AddInfo(FString::Printf(TEXT("%d transformed corners checked against pinned Three.js r186"), Corners));
+	return true;
 }
 
 #endif // WITH_DEV_AUTOMATION_TESTS

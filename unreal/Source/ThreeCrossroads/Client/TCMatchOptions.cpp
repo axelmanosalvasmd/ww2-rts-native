@@ -292,7 +292,7 @@ void FTCMatchOptions::Reset()
 {
 	bHasLobby = false;
 	State.Reset(); Role.Reset(); Mode.Reset(); MapName.Reset(); WorldSize.Reset(); Weather.Reset();
-	bSandbox = bAmHost = bSpectator = false;
+	bSandbox = bAmHost = bSpectator = bRustHost = false;
 	You = -1;
 	SeatList.Reset();
 	Pending.Reset();
@@ -317,6 +317,7 @@ bool FTCMatchOptions::ApplyLobby(const FJsonObject& M)
 	}
 
 	bHasLobby = true;
+	bRustHost = FTCConnection::HostKindOf(M) == ETCHostKind::Rust;
 	State = NewState;
 	SeatList = MoveTemp(NewSeats);
 	if (!TCMOptL::Str(M, TEXT("role"), Role)) Role = TEXT("commander");
@@ -434,6 +435,8 @@ FTCOptionControl FTCMatchOptions::Control(ETCMatchOption Kind, int32 Slot) const
 		if (const FPending* P = FindPending(Kind)) { C.bPending = true; C.PendingValue = P->Value; C.PendingSentAt = P->SentAt; }
 		C.bEditable = Lock.IsEmpty() && bAmHost;
 		C.Why = !Lock.IsEmpty() ? Lock : bAmHost ? FString() : FString(TEXT("only the host switches Sandbox"));
+		// Permit correcting a mismatched host lobby to off, but never offer enabling Sandbox under R1.
+		if (bRustHost && !bSandbox) { C.bEditable = false; C.Why = TEXT("Rust host: Sandbox must be off."); }
 		return C;
 	}
 	case ETCMatchOption::Kick:
@@ -506,6 +509,7 @@ FTCOptionRequest FTCMatchOptions::PlanSandbox(bool bOn) const
 	FTCOptionRequest R;
 	R.Kind = ETCMatchOption::Sandbox;
 	R.Value = bOn ? TEXT("true") : TEXT("false");
+	if (bRustHost && bOn) { R.Note = TEXT("Rust host: Sandbox must be off."); return R; }
 	const FTCOptionControl C = Control(ETCMatchOption::Sandbox);
 	const TCHAR* Label = bOn ? TEXT("on") : TEXT("off");
 	if (!C.bShown || !C.bEditable) { R.Note = FString::Printf(TEXT("Sandbox: %s"), *C.Why); return R; }

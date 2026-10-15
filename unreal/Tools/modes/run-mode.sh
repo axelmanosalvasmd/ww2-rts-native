@@ -11,6 +11,7 @@
 #   TC_MODES_PROJECT  the .uproject to run (default: this checkout's unreal/ThreeCrossroads.uproject)
 #   TC_RUN_DIR        the tc-local.sh server folder (its port file), or TC_MODES_URL=ws://127.0.0.1:<port>/ws
 #   TC_MODES_TOKENS   folder for the seat token files (required: tokens never go into the out dir)
+#   TC_MODES_GRAPHICS high (default) or low, explicitly applied before every client; auto-drop disabled for the lane
 #   UE                engine folder (default ~/Applications/UnrealEngine-5.8.3)
 #   TC_MODES_CAP      seconds, overrides the mode's cap; TC_MODES_GUEST_RENDER=1 renders the guest too (captures in es;
 #                     a mode's "guestRender": true in modes.json does the same)
@@ -22,6 +23,22 @@ ID="$1"; OUT="$2"; ROOM="${3:-m$(date +%H%M%S)$((RANDOM % 100))}"
 UE="${UE:-$HOME/Applications/UnrealEngine-5.8.3}"
 P="${TC_MODES_PROJECT:-$(cd "$HERE/../.." && pwd)/ThreeCrossroads.uproject}"
 T="${TC_MODES_TOKENS:?set TC_MODES_TOKENS to a folder outside the evidence}"
+GRAPHICS="${TC_MODES_GRAPHICS:-high}"
+[[ "$GRAPHICS" == high || "$GRAPHICS" == low ]] || { echo 'TC_MODES_GRAPHICS must be high or low' >&2; exit 2; }
+# A previous lane can persist Low. Set the saved choice before launch, including on a fresh project, and use the
+# command-line ini override for every client so a concurrent lane cannot change the choice it loads.
+python3 - "$P" "$GRAPHICS" <<'PY'
+import configparser, pathlib, sys
+ini = pathlib.Path(sys.argv[1]).parent / 'Saved/Config/LinuxEditor/GameUserSettings.ini'
+ini.parent.mkdir(parents=True, exist_ok=True)
+c = configparser.RawConfigParser(strict=False); c.optionxform = str
+if ini.exists(): c.read(ini)
+if not c.has_section('ThreeCrossroads'): c.add_section('ThreeCrossroads')
+c.set('ThreeCrossroads', 'Graphics', sys.argv[2]); c.set('ThreeCrossroads', 'GraphicsAutoDropped', '1')
+c.set('ThreeCrossroads', 'UIScale', '100')
+with ini.open('w') as f: c.write(f)
+PY
+PREFERENCES=(-ini:GameUserSettings:ThreeCrossroads:Graphics="$GRAPHICS" -ini:GameUserSettings:ThreeCrossroads:GraphicsAutoDropped=1 -ini:GameUserSettings:ThreeCrossroads:UIScale=100 -TCGraphicsAt="$GRAPHICS@0")
 if [ -n "${TC_MODES_URL:-}" ]; then URL="$TC_MODES_URL"; else URL="ws://127.0.0.1:$(cat "${TC_RUN_DIR:?set TC_RUN_DIR or TC_MODES_URL}/port")/ws"; fi
 mkdir -p "$OUT/host" "$OUT/guest" "$T"
 CFG=$(python3 - "$HERE/modes.json" "$ID" "${TC_MODES_CAP:-}" <<'PY'
@@ -48,6 +65,7 @@ SEATS=1; [ "$GUEST" = 1 ] && SEATS=2
 # -TCHostStart=N adds AI seats until the lobby holds 1 + N seats: the guest counts among them
 HOSTSTART=$((AI + SEATS - 1))
 HOST=(env TC_DECODER=rust SDL_AUDIODRIVER=dummy SDL_AUDIO_DRIVER=dummy "$UE/Engine/Binaries/Linux/UnrealEditor" "$P" -game -RenderOffscreen -ResX=1280 -ResY=720 -unattended -nosplash
+  "${PREFERENCES[@]}"
   -TCServer="$URL" -TCRoom="$ROOM" -TCName=Alder -TCTokenFile="$T/host-$ROOM.txt" -TCLang=en -TCObjectivesLog
   -TCHostStart="$HOSTSTART" -TCHostMode="$MODE" -TCHostSeats="$SEATS"
   -TCControlsCheck="$SCRIPT" -TCControlsShotDir="$OUT/host"
@@ -65,6 +83,7 @@ HOST+=(-TCEndAfter="$CAP")
 # "spectator": true a third native (rendered, English) watches as a spectator and flies the tour instead: a spectator sees
 # every cell (server.js watchGame), where a seat only learns of a change its units see (shared/sim.js observedTerrainFor)
 SPECCMD=(env TC_DECODER=rust SDL_AUDIODRIVER=dummy SDL_AUDIO_DRIVER=dummy "$UE/Engine/Binaries/Linux/UnrealEditor" "$P" -game -RenderOffscreen -ResX=1280 -ResY=720 -unattended -nosplash
+  "${PREFERENCES[@]}"
   -TCServer="$URL" -TCRoom="$ROOM" -TCName=Wren -TCSpectate -TCTokenFile="$T/spectator-$ROOM.txt" -TCLang=en -TCObjectivesLog -TCExitAfterResult=6
   -TCExitAfter=$((CAP + 300)) -abslog="$OUT/spectator.log")
 if [ -n "$TOUR" ] && [ "$SPECTATOR" = 1 ]; then mkdir -p "$OUT/spectator"; SPECCMD+=(-TCTourFile="$HERE/tours/$TOUR" -TCTourDir="$OUT/spectator")
@@ -72,11 +91,12 @@ elif [ -n "$TOUR" ]; then HOST+=(-TCTourFile="$HERE/tours/$TOUR" -TCTourDir="$OU
 [ "$GUESTRENDER" = 1 ] && TC_MODES_GUEST_RENDER=1
 if [ "${TC_MODES_GUEST_RENDER:-0}" = 1 ]; then GR=(-RenderOffscreen -ResX=1280 -ResY=720 -TCEpilogueShotFile="$OUT/guest/modes-$ID-epilogue-es.png" -TCResultShotFile="$OUT/guest/modes-$ID-end-report-es.png"); else GR=(-nullrhi -nosound); fi
 GUESTCMD=(env TC_DECODER=rust SDL_AUDIODRIVER=dummy SDL_AUDIO_DRIVER=dummy "$UE/Engine/Binaries/Linux/UnrealEditor" "$P" -game "${GR[@]}" -unattended -nosplash
+  "${PREFERENCES[@]}"
   -TCServer="$URL" -TCRoom="$ROOM" -TCName=Fern -TCTokenFile="$T/guest-$ROOM.txt" -TCLang=es -TCObjectivesLog -TCExitAfterResult=6
   -TCExitAfter=$((CAP + 300)) -abslog="$OUT/guest.log")
 [ "$CAPTURE" = 1 ] && GUESTCMD+=(-TCCapturePlay)
 [ "$DRIVE" = 1 ] && { GUESTCMD+=(-TCTutorialDrive); [ "${TC_MODES_GUEST_RENDER:-0}" = 1 ] && GUESTCMD+=(-TCTutorialShots="$OUT/guest" -TCTutorialShotTag=es); }
-{ echo "mode id: $ID; room $ROOM; server $URL; decoder TC_DECODER=rust"; echo "config: $(python3 -c "import json,sys; print(json.dumps(json.load(open('$HERE/modes.json'))['$ID']))")";
+{ echo "mode id: $ID; room $ROOM; server $URL; decoder TC_DECODER=rust"; echo "graphics: $GRAPHICS"; echo "config: $(python3 -c "import json,sys; print(json.dumps(json.load(open('$HERE/modes.json'))['$ID']))")";
   so="$(dirname "$P")/Binaries/Linux/libUnrealEditor-ThreeCrossroads.so"; [ -f "$so" ] && echo "module: $(stat -c '%y, %s bytes' "$so"), md5 $(md5sum "$so" | cut -c1-12)"
   echo "host: ${HOST[*]}"; [ "$GUEST" = 1 ] && echo "guest: ${GUESTCMD[*]}"; [ "$SPECTATOR" = 1 ] && echo "spectator: ${SPECCMD[*]}"; } > "$OUT/cmdlines.txt"
 echo "begin $(date -u +%FT%TZ)" > "$OUT/timing.txt"

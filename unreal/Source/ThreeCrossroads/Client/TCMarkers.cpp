@@ -1,4 +1,5 @@
 #include "Client/TCMarkers.h"
+#include "Client/TCCampModels.h"
 #include "Client/TCWorldRecovery.h"
 #include "ThreeCrossroads.h"
 #include "CanvasItem.h"
@@ -13,6 +14,7 @@
 #include "SceneView.h"
 #include "Client/TCGameMode.h"
 #include "Client/TCLocale.h"
+#include "Client/TCStats.h"
 #include "Client/TCLobbySettings.h"
 #include "Client/TCObjectives.h"
 #include "Client/TCCoverPreview.h"
@@ -20,6 +22,8 @@
 #include "Net/TCMatchState.h"
 #include "World/TCTerrain.h"
 #include "Client/TCMarkers.Ranges.inl"
+#include "Client/TCMarkers.Badges.inl"
+#include "Engine/Texture2D.h"
 
 namespace
 {
@@ -100,6 +104,18 @@ bool FTCMarkers::RegionTagVisible(double Id, double Progress, double NowSeconds)
 	return NowSeconds >= B.Until;
 }
 
+void FTCMarkers::Clear()
+{
+	Nodes.Reset(); RegionBusy.Reset(); Scene.Reset();
+}
+
+TSharedPtr<FTCMarkerScene> FTCMarkers::WorldScene(const ATCGameMode& Match) const
+{
+	if (!Scene) Scene = MakeShared<FTCMarkerScene>();
+	Scene->Begin(Match);
+	return Scene;
+}
+
 // ------------------------------------------------------------------------------------------------ FTCMarkerPainter
 
 FTCMarkerPainter::FTCMarkerPainter(UCanvas* InCanvas, TFunction<FVector(const FVector&)> InProject, TFunction<double(double, double)> InHeight,
@@ -144,8 +160,15 @@ void FTCMarkerPainter::Tri(const FVector& A, const FVector& B, const FVector& C,
 	Tris.Add(T);
 }
 
+void FTCMarkerPainter::WorldTri(const FVector& A, const FVector& B, const FVector& C, const FLinearColor& Col)
+{
+	if (Scene) Scene->Triangle(A, B, C, Col, bDepthTest);
+	else Tri(ProjectWorld(A), ProjectWorld(B), ProjectWorld(C), Col);
+}
+
 void FTCMarkerPainter::Flush()
 {
+	if (Scene) Scene->Flush();
 	if (!Tris.Num()) return;
 	if (Canvas && Canvas->Canvas)
 	{
@@ -187,8 +210,8 @@ void FTCMarkerPainter::Ribbon(const std::vector<MC::FVertex>& V, const MC::FRibb
 		const int32 K = (int32)P.size() / 2;
 		if (K < 3) return;
 		TArray<FVector, TInlineAllocator<12>> S;
-		for (int32 I = 0; I < K; I++) S.Add(Project(Ground(P[I * 2], P[I * 2 + 1], Lift)));
-		for (int32 I = 1; I + 1 < K; I++) Tri(S[0], S[I], S[I + 1], Col);
+		for (int32 I = 0; I < K; I++) S.Add(Ground(P[I * 2], P[I * 2 + 1], Lift));
+		for (int32 I = 1; I + 1 < K; I++) WorldTri(S[0], S[I], S[I + 1], Col);
 	};
 	constexpr int32 Strips = MC::ProfileStrips;
 	for (int32 I = 1; I < N; I++)
@@ -253,7 +276,8 @@ void FTCMarkerPainter::Line(const double* Pts, int32 N, const MC::FRibbon& O, co
 
 void FTCMarkerPainter::Disc(double Cx, double Cz, double R, int32 Segs, const FLinearColor& Col, double Lift, const double* Clip)
 {
-	// CircleGeometry: a fan of Segs triangles from the centre
+	// buildHQ's unpatched CircleGeometry stays flat at the spawn height. Its ribbon alone drapes over terrain.
+	const double WorldZ = Ground(Cx, Cz, Lift).Z;
 	for (int32 I = 0; I < Segs; I++)
 	{
 		const double A0 = 2 * MC::Pi * I / Segs, A1 = 2 * MC::Pi * (I + 1) / Segs;
@@ -262,17 +286,18 @@ void FTCMarkerPainter::Disc(double Cx, double Cz, double R, int32 Segs, const FL
 		const int32 K = (int32)P.size() / 2;
 		if (K < 3) continue;
 		TArray<FVector, TInlineAllocator<8>> S;
-		for (int32 J = 0; J < K; J++) S.Add(Project(Ground(P[J * 2], P[J * 2 + 1], Lift)));
-		for (int32 J = 1; J + 1 < K; J++) Tri(S[0], S[J], S[J + 1], Col);
+		for (int32 J = 0; J < K; J++) S.Add(FVector(P[J * 2] * 100, P[J * 2 + 1] * 100, WorldZ));
+		for (int32 J = 1; J + 1 < K; J++) WorldTri(S[0], S[J], S[J + 1], Col);
 	}
 }
 
-void FTCMarkerPainter::Quad(const FVector (&Points)[4], const FLinearColor& Col)
+void FTCMarkerPainter::Quad(const FVector (&Points)[4], const FLinearColor& Col, const FVector2D& GroundAnchor)
 {
 	FVector S[4];
-	for (int32 I = 0; I < 4; I++) S[I] = Project(Ground(Points[I].X, Points[I].Y, Points[I].Z));
-	Tri(S[0], S[1], S[2], Col);
-	Tri(S[0], S[2], S[3], Col);
+	const double Base = Ground(GroundAnchor.X, GroundAnchor.Y, 0).Z;
+	for (int32 I = 0; I < 4; I++) S[I] = FVector(Points[I].X * 100, Points[I].Y * 100, Base + Points[I].Z * 100);
+	WorldTri(S[0], S[1], S[2], Col);
+	WorldTri(S[0], S[2], S[3], Col);
 }
 
 FVector FTCMarkerPainter::ProjectWorld(const FVector& World) const
@@ -296,8 +321,20 @@ void FTCMarkerPainter::ScreenLine(const FVector& WA, const FVector& WB, const FL
 	if (L < 1e-6) return;
 	const FVector2D N = FVector2D(-D.Y, D.X) / L * (Width / 2);
 	const FVector A0(A.X + N.X, A.Y + N.Y, 1), A1(A.X - N.X, A.Y - N.Y, 1), B0(B.X + N.X, B.Y + N.Y, 1), B1(B.X - N.X, B.Y - N.Y, 1);
-	Tri(A0, B0, B1, Col);
-	Tri(A0, B1, A1, Col);
+	if (Scene)
+	{
+		const FVector Up = FVector::CrossProduct(CamFwd, CamRight).GetSafeNormal();
+		const FVector OffsetDir = CamRight * N.X - Up * N.Y;
+		const double Pa = PixelsPerMetre(WA), Pb = PixelsPerMetre(WB);
+		if (Pa <= 0 || Pb <= 0) return;
+		const FVector Oa = OffsetDir * (100.0 / Pa), Ob = OffsetDir * (100.0 / Pb);
+		WorldTri(WA + Oa, WB + Ob, WB - Ob, Col);
+		WorldTri(WA + Oa, WB - Ob, WA - Oa, Col);
+	}
+	else
+	{
+		Tri(A0, B0, B1, Col); Tri(A0, B1, A1, Col);
+	}
 }
 
 void FTCMarkerPainter::Diamond(FVector2D C, double H, const FLinearColor& Col)
@@ -320,13 +357,18 @@ bool FTCMarkerPainter::Tag(UFont* Font, const FString& Text, double X, double Z,
 	Flush(); // the tag goes over every ribbon drawn so far
 	// the canvas is laid out in its own pixels (W x H, widened for a long text) and shown at Sx / W of that
 	const double K = St.Sx / St.W;
+	const bool bBarlow = FTCType::IsLoaded();
+	const float Tracking = St.bSwatch ? 1.f : 0.f;
+	float Px = St.Px;
 	float TW1 = 0, TH1 = 0;
 	Canvas->TextSize(Font, Text, TW1, TH1, 1.f, 1.f);
 	if (TH1 <= 0) return false;
 	const float TextScale = (float)(St.Px * K * 1.2 / TH1); // the font's line height to the tag's text size
-	const double TextW = TW1 * TextScale / K;              // in canvas pixels
+	double TextW = bBarlow ? FTCType::Face(true)->Width(Text, Px, Tracking, false) : TW1 * TextScale / K;              // in canvas pixels
 	const double Lead = St.bSwatch && Swatch ? St.H - 20 : 0;
 	const double Cw = FMath::Max(St.W, FMath::CeilToDouble((TextW * 1.1 + 40 + Lead) / 32) * 32);
+	if (bBarlow) while (TextW > Cw - 32 - (St.bSwatch && Swatch ? St.H - 20 : 0) - 8 && Px > 12)
+	{ Px -= 2; TextW = FTCType::Face(true)->Width(Text, Px, Tracking, false); }
 	const double Bh = St.H - 12, Y0 = 6, Pad = 16, Sw = St.bSwatch && Swatch ? Bh - 22 : 0, LeadIn = Sw > 0 ? Sw + 14 : 0;
 	const double Bw = FMath::Min(Cw - 4, TextW + 2 * Pad + LeadIn), X0 = (Cw - Bw) / 2;
 	const FVector2D Origin(At.X - Cw * K / 2, At.Y - St.H * K / 2);
@@ -347,10 +389,20 @@ bool FTCMarkerPainter::Tag(UFont* Font, const FString& Text, double X, double Z,
 	FLinearColor TC = TagText;
 	TC.A *= Alpha;
 	const double TextCx = X0 + LeadIn + (Bw - LeadIn) / 2, TextCy = St.H / 2 + 2;
-	FCanvasTextItem Item(Origin + FVector2D(TextCx * K - TW1 * TextScale / 2, TextCy * K - TH1 * TextScale / 2), FText::FromString(Text), Font, TC);
-	Item.Scale = FVector2D(TextScale, TextScale);
-	Item.BlendMode = SE_BLEND_Translucent;
-	Canvas->DrawItem(Item);
+	if (bBarlow)
+	{
+		FTCPaint P;
+		FTCPaintItem& Label = P.Text(Text, Origin.X + TextCx * K, Origin.Y + (TextCy - Px * 0.6) * K, Px * K, TC, true, ETCPaintAlign::Centre);
+		Label.Tracking = Tracking * K;
+		FTCType::Draw(P, Canvas, Font, 1.f, false); // canvas labels use proportional figures, unlike the DOM HUD
+	}
+	else
+	{
+		FCanvasTextItem Item(Origin + FVector2D(TextCx * K - TW1 * TextScale / 2, TextCy * K - TH1 * TextScale / 2), FText::FromString(Text), Font, TC);
+		Item.Scale = FVector2D(TextScale, TextScale);
+		Item.BlendMode = SE_BLEND_Translucent;
+		Canvas->DrawItem(Item);
+	}
 	Tags++;
 	return true;
 }
@@ -373,10 +425,12 @@ FTCMarkerPainter TCMarkersHud::Painter(UCanvas* Canvas, const ATCGameMode& M)
 		const FRotationMatrix RM(Canvas->SceneView->ViewRotation);
 		Fwd = RM.GetUnitAxis(EAxis::X); Right = RM.GetUnitAxis(EAxis::Y);
 	}
-	return FTCMarkerPainter(Canvas,
+	FTCMarkerPainter P(Canvas,
 		[Canvas](const FVector& W) { return Canvas ? Canvas->Project(W) : FVector(0, 0, -1); },
 		[T](double X, double Z) { return T ? (double)T->HeightAt((float)X, (float)Z) : 0.0; },
 		Loc, Right, Fwd);
+	P.SetWorldScene(M.Markers.WorldScene(M));
+	return P;
 }
 
 bool TCMarkersHud::Ranges(const FString& Type, double& OutRange, double& OutMinRange)
@@ -405,7 +459,7 @@ void TCMarkersHud::DrawHqCamps(FTCMarkerPainter& P, const ATCGameMode& M, UFont*
 		P.Ring(Sp.X, Sp.Y, MC::HqRingRadius(), MC::HqRingRibbon(), Ring, -1, Clip);
 		// the tall flag: a 4.5 x 2.8 m cloth centred 2.3 m east of the spawn, 13 m up
 		const FVector Cloth[4] = { FVector(Sp.X + 0.05, Sp.Y, 11.6), FVector(Sp.X + 4.55, Sp.Y, 11.6), FVector(Sp.X + 4.55, Sp.Y, 14.4), FVector(Sp.X + 0.05, Sp.Y, 14.4) };
-		P.Quad(Cloth, Seat);
+		P.Quad(Cloth, Seat, Sp);
 		Stats().HqCamps++;
 	}
 	// the tags last, over the rings
@@ -441,6 +495,7 @@ void TCMarkersHud::DrawNodes(FTCMarkerPainter& P, const ATCGameMode& M, UFont* F
 
 int32 TCMarkersHud::DrawRangeRings(FTCMarkerPainter& P, const ATCGameMode& M, const TSet<int32>& Selected)
 {
+	P.SetDepthTest(false); // markers.js selectionRing: range rings draw through models
 	const FTCMatchState& S = M.State;
 	if (!S.bHasMatch || !Selected.Num()) return 0;
 	// rangeRings(): the types of the selection in its order (a missing unit has none)
@@ -508,7 +563,7 @@ void TCMarkersHud::DrawWorldRegions(FTCMarkerPainter& P, ATCGameMode& M, UFont* 
 		// the flag: a 2.2 x 1.4 m cloth at 7.2 m in the owner's colour (else the neutral flag)
 		const FLinearColor Flag = V.bOwner ? FLinearColor(V.TeamColour) : FLinearColor(FColor(0x8f, 0x8a, 0x7c));
 		const FVector Cloth[4] = { FVector(V.At.X, V.At.Y, 6.5), FVector(V.At.X + 2.2, V.At.Y, 6.5), FVector(V.At.X + 2.2, V.At.Y, 7.9), FVector(V.At.X, V.At.Y, 7.9) };
-		P.Quad(Cloth, Flag);
+		P.Quad(Cloth, Flag, V.At);
 		const FTCWorldRegion& R = M.WorldRec.Snapshot().Regions[V.Index];
 		Tags.Add({ V.At, FTCLocale::T(V.Text), FTCLocale::T(V.Name), M.Markers.RegionTagVisible(R.Id, V.Progress, Now) });
 		Stats().Regions++;
@@ -521,8 +576,9 @@ void TCMarkersHud::DrawWorldRegions(FTCMarkerPainter& P, ATCGameMode& M, UFont* 
 	}
 }
 
-void TCMarkersHud::DrawCoverLayer(FTCMarkerPainter& P, const TArray<FTCCoverGlyph>& Glyphs, float Opacity)
+void TCMarkersHud::DrawCoverLayer(FTCMarkerPainter& P, const TArray<FTCCoverGlyph>& Glyphs, float Opacity, bool bDepthTest)
 {
+	P.SetDepthTest(bDepthTest);
 	// cover-preview.js templates: b.line(pts, n, { w: 0.18, min: 1.15, y: LIFT, closed: !cue }), the shield filled from
 	// its centre (makeOverlay fill 0.3)
 	MC::FRibbon Shield; Shield.W = 0.18; Shield.Min = 1.15; Shield.Y = FTCCoverPreview::LiftMetres; Shield.bClosed = true;
@@ -599,6 +655,25 @@ void TCMarkersHud::Verify(ATCGameMode& M, TSet<int32>& Selected)
 			S.Tick, *Spawns, M.Markers.ResourceNodes().Num(), *Nodes, Selected.Num(), F.HqCamps, F.Nodes, F.CapturePoints, F.Regions, F.RangeRings, F.Stars, F.Tags, VetCount, *Vets);
 	}
 	Stats() = FFrameStats();
+}
+
+void TCMarkersHud::DrawBadge(UCanvas* Canvas, const FString& Type, int32 Owner, FVector2D Centre, float Scale)
+{
+	if (!Canvas) return;
+	int32 TypeIndex = INDEX_NONE;
+	for (int32 I = 0; I < UE_ARRAY_COUNT(BadgeTypes); I++) if (Type == BadgeTypes[I]) { TypeIndex = I; break; }
+	if (TypeIndex == INDEX_NONE) return;
+	static TWeakObjectPtr<UTexture2D> Atlas;
+	if (!Atlas.IsValid()) Atlas = LoadObject<UTexture2D>(nullptr, TEXT("/Game/Markers/T_TCUnitBadges.T_TCUnitBadges"));
+	if (!Atlas.IsValid()) return;
+	const int32 Index = TypeIndex * BadgeColours + (Owner >= 0 && Owner < BadgeColours - 1 ? Owner : BadgeColours - 1);
+	const FVector2D Uv0(double(Index % BadgeColumns) * 128 / BadgeWidth, double(Index / BadgeColumns) * 128 / BadgeHeight);
+	const FVector2D Uv1 = Uv0 + FVector2D(128.0 / BadgeWidth, 128.0 / BadgeHeight);
+	const double Size = 1.45 * Scale;
+	// markers.js symbolBadge: local centre (-1.98, +0.08), 1.45 m square, billboarded without depth testing.
+	FCanvasTileItem Tile(Centre + FVector2D(-1.98 * Scale - Size / 2, -0.08 * Scale - Size / 2), Atlas->GetResource(), FVector2D(Size, Size), Uv0, Uv1, FLinearColor::White);
+	Tile.BlendMode = SE_BLEND_Translucent;
+	Canvas->DrawItem(Tile);
 }
 
 void TCMarkersHud::DrawStars(UCanvas* Canvas, FVector2D BarCentre, float PxPerMetre, int32 Stars)

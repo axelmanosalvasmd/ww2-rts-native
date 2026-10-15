@@ -3,6 +3,7 @@
 #include "WebSocketsModule.h"
 #include "IWebSocket.h"
 #include "Dom/JsonObject.h"
+#include "Dom/JsonValue.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 #include "Serialization/JsonWriter.h"
@@ -20,6 +21,32 @@ const TCHAR* LexToString(ETCSendResult Result)
 	case ETCSendResult::TooLarge: return TEXT("not sent: over the server's 16 KB message limit");
 	}
 	return TEXT("not sent");
+}
+
+const TCHAR* LexToString(ETCHostKind Kind)
+{
+	switch (Kind)
+	{
+	case ETCHostKind::Unknown: return TEXT("unknown");
+	case ETCHostKind::Reference: return TEXT("reference");
+	case ETCHostKind::Rust: return TEXT("rust");
+	}
+	return TEXT("unknown");
+}
+
+ETCHostKind FTCConnection::HostKindOf(const FJsonObject& Message, int32* OutProto, FString* OutRules)
+{
+	if (OutProto) *OutProto = -1;
+	if (OutRules) OutRules->Reset();
+	FString Type;
+	if (!Message.TryGetStringField(TEXT("t"), Type) || Type != TEXT("lobby")) return ETCHostKind::Unknown;
+	if (OutRules) Message.TryGetStringField(TEXT("rules"), *OutRules);
+	const TSharedPtr<FJsonValue> Proto = Message.TryGetField(TEXT("proto"));
+	// Only an absent field means reference. A malformed or future proto must keep the Rust restrictions.
+	if (!Proto.IsValid()) return ETCHostKind::Reference;
+	double Number = 0.0;
+	if (OutProto && Proto->Type == EJson::Number && Proto->TryGetNumber(Number) && FMath::IsFinite(Number) && Number == FMath::FloorToDouble(Number) && FMath::Abs(Number) < 1e9) *OutProto = (int32)Number;
+	return ETCHostKind::Rust;
 }
 
 FTCConnection::FTCConnection(const FSettings& InSettings) : Settings(InSettings) {}
@@ -45,6 +72,7 @@ void FTCConnection::Start()
 	RetryAt = -1.0; Retire();
 	LastNow = FPlatformTime::Seconds(); // the clock Tick is given: a failure before the first Tick still waits
 	Attempts = 0; bWaitingForRoom = false; bRunning = true;
+	Host = ETCHostKind::Unknown; HostProtoValue = -1; HostRulesValue.Reset();
 	Open();
 }
 
@@ -150,6 +178,14 @@ void FTCConnection::Open()
 			Self->bRunning = false; Self->RetryAt = -1.0; Self->Retire();
 			Self->StatusText = TEXT("left the match: an AI took over this army");
 		}
+		else if (Type == TEXT("deny") && Self->IsVersionDeny(*Message))
+		{
+			// protocol.md addition 1: a Rust server that does not speak this proto answers deny {cmd:'join',
+			// reason:'version'} and closes with 1008; retrying cannot help. The reference never sends 'version'.
+			Self->bRunning = false; Self->RetryAt = -1.0; Self->Retire();
+			Self->StatusText = TEXT("the server does not speak this client's protocol version");
+			UE_LOG(LogTC, Warning, TEXT("%s (hello proto %d): stopped"), *Self->StatusText, FTCConnection::ProtocolVersion);
+		}
 		else if (Type == TEXT("full"))
 		{
 			Self->bWaitingForRoom = true; Self->Attempts = 0;
@@ -159,10 +195,30 @@ void FTCConnection::Open()
 		{
 			Self->Attempts = 0; Self->bWaitingForRoom = false;
 			if (!Self->bAnswered) { Self->bAnswered = true; Self->StatusText = TEXT("in room"); }
+			if (Type == TEXT("lobby")) Self->NoteLobby(*Message);
 		}
 		if (Self->OnMessage) Self->OnMessage(*Message, Utf8Length(Text));
 	});
 	Current->Connect();
+}
+
+bool FTCConnection::IsVersionDeny(const FJsonObject& Message)
+{
+	FString Type, Cmd, Reason;
+	return Message.TryGetStringField(TEXT("t"), Type) && Type == TEXT("deny") && Message.TryGetStringField(TEXT("cmd"), Cmd) && Cmd == TEXT("join") && Message.TryGetStringField(TEXT("reason"), Reason) && Reason == TEXT("version");
+}
+
+void FTCConnection::NoteLobby(const FJsonObject& Message)
+{
+	int32 Proto = -1;
+	FString Rules;
+	const ETCHostKind Kind = HostKindOf(Message, &Proto, &Rules);
+	if (Kind == ETCHostKind::Unknown) return;
+	const bool bChanged = Kind != Host || Proto != HostProtoValue || Rules != HostRulesValue;
+	const bool bWasRust = Host == ETCHostKind::Rust;
+	Host = Kind; HostProtoValue = Proto; HostRulesValue = MoveTemp(Rules);
+	// Logged only for a Rust host (or when a Rust host turns into the reference): a reference session logs as before.
+	if (bChanged && (Kind == ETCHostKind::Rust || bWasRust)) UE_LOG(LogTC, Log, TEXT("host: %s server (lobby proto %s%s)"), LexToString(Kind), Proto >= 0 ? *FString::FromInt(Proto) : Kind == ETCHostKind::Rust ? TEXT("present, not an integer") : TEXT("absent"), HostRulesValue.IsEmpty() ? TEXT(", no rules hash") : *FString::Printf(TEXT(", rules %s"), *HostRulesValue.Left(24)));
 }
 
 void FTCConnection::Lost()

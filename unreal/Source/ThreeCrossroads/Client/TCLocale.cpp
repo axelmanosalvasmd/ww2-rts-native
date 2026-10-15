@@ -915,4 +915,15 @@ bool FTCLocaleOrderNoteTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+
+// These are native/report strings for which the pinned es.js has no key. Keep the English source faithfully.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCLocaleHudMissingTest, "ThreeCrossroads.Locale.HudMissingKeys", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+bool FTCLocaleHudMissingTest::RunTest(const FString& Parameters)
+{
+	FTCLocale::FScopedLanguage Es(ETCLanguage::Spanish);
+	for (const TCHAR* Text : {TEXT("decided when the clock ran out"), TEXT("decided when the last bunker fell"), TEXT("decided when the last Production Building fell"), TEXT("decided when the last defending structure fell"), TEXT("decided when the bridge was taken"), TEXT("(won)"), TEXT("Last match:"), TEXT("You are watching this room."), TEXT("A match is running: joining it...")})
+		TestEqual(Text, TC_T(FString(Text)), FString(Text));
+	return true;
+}
+
 #endif

@@ -294,3 +294,73 @@ void ATCUnitRenderer::AppendPartData(FFrameBatch& B, const UInstancedStaticMeshC
 	}
 	else for (int32 K = Custom.Num(); K < Floats; K++) B.Data.Add(0.f);
 }
+
+#if WITH_EDITOR && WITH_DEV_AUTOMATION_TESTS
+#include "Misc/AutomationTest.h"
+#include "Materials/Material.h"
+#include "Materials/MaterialExpressionCustom.h"
+#include "Materials/MaterialExpressionCollectionParameter.h"
+#include "Materials/MaterialParameterCollection.h"
+
+// Generated soldier materials must retain the model's lighting and all named custom outputs. A disconnected
+// output or collection GUID can compile successfully while silently dropping the reference hemisphere light.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCInfantryMaterialLookTest, "ThreeCrossroads.Infantry.MaterialLook",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
+bool FTCInfantryMaterialLookTest::RunTest(const FString&)
+{
+	auto Node = [](UMaterial* M, const TCHAR* Name) -> UMaterialExpressionCustom*
+	{
+		if (M) for (UMaterialExpression* E : M->GetExpressions())
+			if (auto* C = Cast<UMaterialExpressionCustom>(E); C && C->Description == Name) return C;
+		return nullptr;
+	};
+	UMaterial* Master = LoadObject<UMaterial>(nullptr, TEXT("/Game/Models/Materials/M_TCModel"));
+	if (!TestNotNull(TEXT("reference model material"), Master)) return false;
+	UMaterialExpressionCustom* MasterModel = Node(Master, TEXT("TCModel"));
+	UMaterialExpressionCustom* MasterLook = Node(Master, TEXT("TCLookIndirect"));
+	if (!TestNotNull(TEXT("model shader"), MasterModel) || !TestNotNull(TEXT("indirect shader"), MasterLook)) return false;
+	for (const TCHAR* Name : {TEXT("M_InfantryCrowdLook"), TEXT("M_InfantryCrowdKitLook"),
+		TEXT("M_InfantryCrowdLookFaded"), TEXT("M_InfantryCrowdKitLookFaded")})
+	{
+		UMaterial* M = LoadObject<UMaterial>(nullptr, *FString::Printf(TEXT("/Game/Models/Motion/%s"), Name));
+		if (!TestNotNull(Name, M)) continue;
+		auto* Model = Node(M, TEXT("TCModel"));
+		auto* Look = Node(M, TEXT("TCLookIndirect"));
+		if (!TestNotNull(TEXT("soldier model shader"), Model) || !TestNotNull(TEXT("soldier indirect shader"), Look)) continue;
+		TestEqual(TEXT("model code comes from the master"), Model->Code, MasterModel->Code);
+		TestEqual(TEXT("indirect code comes from the master"), Look->Code, MasterLook->Code);
+		TestFalse(TEXT("normal is in world space"), M->bTangentSpaceNormal != 0);
+		for (const FCustomInput& I : Look->Inputs)
+		{
+			const FString Label = FString::Printf(TEXT("%s.%s"), Name, *I.InputName.ToString());
+			if (I.InputName == TEXT("Color") || I.InputName == TEXT("Roughness") || I.InputName == TEXT("Metallic") ||
+				I.InputName == TEXT("Specular") || I.InputName == TEXT("NormalWS") || I.InputName == TEXT("Emissive"))
+			{
+				int32 Index = 0;
+				if (I.InputName != TEXT("Color"))
+				{
+					Index = INDEX_NONE;
+					for (int32 K = 0; K < Model->AdditionalOutputs.Num(); K++)
+						if (Model->AdditionalOutputs[K].OutputName == I.InputName) Index = K + 1;
+				}
+				TestTrue(*Label, Index != INDEX_NONE && I.Input.Expression == Model && I.Input.OutputIndex == Index);
+			}
+		}
+		for (UMaterialExpression* E : M->GetExpressions())
+		{
+			if (auto* C = Cast<UMaterialExpressionCollectionParameter>(E))
+				TestTrue(*FString::Printf(TEXT("%s collection %s is bound"), Name, *C->ParameterName.ToString()),
+					C->Collection && C->ParameterId.IsValid() && C->ParameterId == C->Collection->GetParameterId(C->ParameterName));
+		}
+		for (auto P : {MP_BaseColor, MP_Roughness, MP_Metallic, MP_Specular, MP_Normal, MP_EmissiveColor})
+		{
+			const FExpressionInput* I = M->GetExpressionInputForProperty(P);
+			const int32 Index = P == MP_BaseColor || P == MP_EmissiveColor ? 0 :
+				P == MP_Roughness ? 1 : P == MP_Metallic ? 2 : P == MP_Specular ? 3 : 4;
+			TestTrue(*FString::Printf(TEXT("%s property %d"), Name, int32(P)),
+				I && I->Expression == (P == MP_EmissiveColor ? Look : Model) && I->OutputIndex == Index);
+		}
+	}
+	return true;
+}
+#endif

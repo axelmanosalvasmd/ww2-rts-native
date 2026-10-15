@@ -268,7 +268,7 @@ int32 FTCTypeFace::Kerning(int32 Left, int32 Right) const
 	return Sum;
 }
 
-void FTCTypeFace::Pens(const FString& Text, float FontPx, float Tracking, TArray<float>& Out) const
+void FTCTypeFace::Pens(const FString& Text, float FontPx, float Tracking, TArray<float>& Out, bool bTabular) const
 {
 	Out.Reset(Text.Len() + 1);
 	const double K = Upm > 0 ? FontPx / (double)Upm : 0.0;
@@ -276,7 +276,7 @@ void FTCTypeFace::Pens(const FString& Text, float FontPx, float Tracking, TArray
 	int32 Prev = -1;
 	for (int32 I = 0; I < Text.Len(); I++)
 	{
-		const int32 G = Shaped(Text[I]);
+		const int32 G = bTabular ? Shaped(Text[I]) : Glyph(Text[I]);
 		if (Prev >= 0) X += Kerning(Prev, G) * K;
 		Out.Add((float)X);
 		X += Advance(G) * K + Tracking;
@@ -285,10 +285,10 @@ void FTCTypeFace::Pens(const FString& Text, float FontPx, float Tracking, TArray
 	Out.Add((float)X);
 }
 
-float FTCTypeFace::Width(const FString& Text, float FontPx, float Tracking) const
+float FTCTypeFace::Width(const FString& Text, float FontPx, float Tracking, bool bTabular) const
 {
 	TArray<float> P;
-	Pens(Text, FontPx, Tracking, P);
+	Pens(Text, FontPx, Tracking, P, bTabular);
 	return P.Last();
 }
 
@@ -338,7 +338,7 @@ bool FTCType::IsLoaded()
 	}
 	St.bLoaded = Problem.IsEmpty();
 	if (St.bLoaded) { UE_LOG(LogTC, Log, TEXT("type: Barlow Semi Condensed %d and %d from %s (index.html's face; widths from hmtx, GPOS kerning and tnum)"), BodyWeight, BoldWeight, *Folder()); }
-	else { UE_LOG(LogTC, Warning, TEXT("type: %s; the stats sheet and box keep the HUD font (run unreal/Tools/fonts/fetch-barlow.sh)"), *Problem); }
+	else { UE_LOG(LogTC, Warning, TEXT("type: %s; the HUD keeps Roboto (run unreal/Tools/fonts/fetch-barlow.sh)"), *Problem); }
 	return St.bLoaded;
 }
 
@@ -379,7 +379,13 @@ FTCMeasure FTCType::Measure()
 	return [](const FString& T, float Px, bool bBold, float Tracking) { return T.IsEmpty() ? 0.f : Face(bBold)->Width(T, Px, Tracking); };
 }
 
-void FTCType::Draw(const FTCPaint& P, UCanvas* Canvas, UFont* Fallback, float Oversample)
+FTCMeasure FTCType::HeavyMeasure()
+{
+	if (!IsLoaded()) return FTCPaint::ApproxMeasure();
+	return [](const FString& T, float Px, bool bBold, float Tracking) { return T.IsEmpty() ? 0.f : (bBold ? HeadingFace() : Face(false))->Width(T, Px, Tracking); };
+}
+
+void FTCType::Draw(const FTCPaint& P, UCanvas* Canvas, UFont* Fallback, float Oversample, bool bTabular)
 {
 	if (!Canvas) return;
 	UFont* TypeFont = Font();
@@ -393,9 +399,9 @@ void FTCType::Draw(const FTCPaint& P, UCanvas* Canvas, UFont* Fallback, float Ov
 		if (I.Kind != ETCPaintKind::Text) { One.Items[0] = I; One.Draw(Canvas, Fallback); continue; }
 		if (I.Text.IsEmpty() || I.Colour.A <= 0.f) continue;
 		// an h2 (the sheet's title) is the browser's default bold, 700; other bold texts are 600
-		const bool bHeading = I.bBold && I.Role.EndsWith(TEXT(":title"));
+		const bool bHeading = I.bBold && (I.Role.EndsWith(TEXT(":title")) || I.Role == TEXT("boss:name") || I.Role == TEXT("alert:loss-heading") || I.Role == TEXT("alert:loss-detail"));
 		const FTCTypeFace* Face = bHeading ? HeadingFace() : FTCType::Face(I.bBold);
-		Face->Pens(I.Text, I.FontPx, I.Tracking, Pens);
+		Face->Pens(I.Text, I.FontPx, I.Tracking, Pens, bTabular);
 		const float W = Pens.Last();
 		const float X0 = I.Pos.X - (I.Align == ETCPaintAlign::Centre ? W / 2 : I.Align == ETCPaintAlign::Right ? W : 0.f);
 		// CSS centres the content area (ascender 1000 to descender 200 per 1000 units: 1.2 em) in the line box
@@ -1141,6 +1147,9 @@ bool FTCStatsTypeTest::RunTest(const FString& Parameters)
 	const FTCTypeFace* F = FTCType::Face(false);
 	TestTrue(TEXT("GPOS kerning: AV is tighter than A plus V"), F->Width(TEXT("AV"), 100) < F->Width(TEXT("A"), 100) + F->Width(TEXT("V"), 100) - 1.f);
 	TestTrue(TEXT("tnum: 1 and 0 are as wide"), FMath::IsNearlyEqual(F->Width(TEXT("1"), 100), F->Width(TEXT("0"), 100)));
+	// markers.js uses a canvas font, without the DOM body's tabular-nums. Browser canvas measurements, round 18.
+	TestEqual(TEXT("600 30px canvas node label"), FTCType::Face(true)->Width(TEXT("+1.5 MP/s"), 30, 0, false), 109.52989f, .02f);
+	TestEqual(TEXT("600 54px HQ label, 1px letter spacing"), FTCType::Face(true)->Width(TEXT("HudLookHost HQ"), 54, 1, false), 370.02133f, .02f);
 	// the sheet laid out with these widths wraps the hints as the browser capture does at 1280 x 720
 	// (round-16/screenshots/lead16-f2-stats-sheet-*: ten hints, three of them on two lines)
 	FTCStatsOverlay O;

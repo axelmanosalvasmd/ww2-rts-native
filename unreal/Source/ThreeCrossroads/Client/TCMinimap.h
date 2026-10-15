@@ -315,6 +315,7 @@ public:
 	// Layout, as client/index.html: a square in the bottom-right corner, Gap pixels in, 184 px across, 228 px once
 	// the window is at least 1600 x 860. A positive SideOverride replaces that size (clamped to fit the window).
 	float Gap = 8.f;
+	float UiScale = 1.f; // CSS zoom; the input basis remains in physical viewport pixels
 	float SideOverride = 0.f;
 	// The image is rebuilt from the state at most this often (client/main.js redraws the minimap every 0.15 s); a new
 	// match or map rebuilds it at once. Units and the view outline are drawn from the state every frame.

@@ -17,6 +17,7 @@
 #   TC_PACKAGE_OUT           where the finished package goes (default unreal/Saved/Packages/ww2-rts-native-linux)
 #   TC_PACKAGE_WORK          work folder: the project copy, its build output, the cook and the logs
 #                            (default unreal/Saved/PackageWork). Kept between runs, so a second build is incremental.
+#   TC_PACKAGE_ARCHIVE       UAT archive folder (default <work>/archive); a build-output folder keeps scratch smaller
 #   TC_PACKAGE_CLEAN=1       empty the work folder's project copy first (a build from nothing)
 #   TC_PACKAGE_JOBS          compile processes at once (default: half the logical cores, at most 8)
 #   TC_PACKAGE_MIN_FREE_GB   free space needed in the work and output folders (default 30)
@@ -246,6 +247,7 @@ verify() {
 	# light, the overlay rings (slice 12), the map pieces' materials, the effects, the sounds and the Spanish dictionary
 	for need in ThreeCrossroads/Content/Models/ModelCatalog.json ThreeCrossroads/Content/Models/Infantry/Source/kits.json \
 		ThreeCrossroads/Content/Fonts/BarlowSemiCondensed/BarlowSemiCondensed-Medium.ttf ThreeCrossroads/Content/Fonts/BarlowSemiCondensed/BarlowSemiCondensed-Bold.ttf \
+		ThreeCrossroads/Content/Fonts/BarlowSemiCondensed/BarlowSemiCondensed-SemiBold.ttf \
 		ThreeCrossroads/Content/Models/Motion/FarFigures.bin ThreeCrossroads/Content/Data/locale-es.json \
 		ThreeCrossroads/Content/Models/Motion/M_InfantryFar.uasset ThreeCrossroads/Content/Models/Motion/M_InfantryCrowdFaded.uasset \
 		ThreeCrossroads/Content/Models/Infantry/SM_InfantryCrowdBody.uasset ThreeCrossroads/Content/Models/Materials/Look/M_TCLookPost.uasset \
@@ -263,6 +265,10 @@ verify() {
 		ThreeCrossroads/Content/Models/Motion/Tracks/SM_medium_0_hull_Tracks.uasset ThreeCrossroads/Content/Models/Motion/M_InfantryCrowdLookFaded.uasset \
 		ThreeCrossroads/Content/Models/Motion/MI_InfantryCrowdLook_DE.uasset ThreeCrossroads/Content/Models/Motion/M_InfantryCrowdKitLookFaded.uasset \
 		ThreeCrossroads/Content/WarMap/WarMapData.json ThreeCrossroads/Content/WarMap/T_TCWarMapSymbols.uasset \
+		ThreeCrossroads/Content/Markers/M_TCMarkerGround.uasset ThreeCrossroads/Content/Markers/M_TCMarkerThrough.uasset ThreeCrossroads/Content/Markers/T_TCUnitBadges.uasset \
+		ThreeCrossroads/Content/World/Materials/Instances/MI_TCWorld_Surface_canvas_Painted.uasset ThreeCrossroads/Content/World/Materials/Instances/MI_TCWorld_Surface_darkwood_Painted.uasset \
+		ThreeCrossroads/Content/Effects/Materials/M_TCFxSection.uasset \
+		ThreeCrossroads/Content/Models/Motion/MI_InfantryFarLook.uasset ThreeCrossroads/Content/Models/Motion/MI_InfantryFarLookFaded.uasset \
 		ThreeCrossroads/Content/WarMap/Fonts/F_TCWarMapMono.uasset; do
 		grep -q "^$need"$'\t' "$manifest" || die "verify: $need is not in the package (see the cook settings in Config/DefaultGame.ini)"
 	done
@@ -285,7 +291,7 @@ build() {
 	preflight
 	mirror
 	local stamp; stamp="$(date -u +%Y%m%dT%H%M%SZ)"
-	local logs="$WORK/logs/$stamp" archive="$WORK/archive"
+	local logs="$WORK/logs/$stamp" archive="${TC_PACKAGE_ARCHIVE:-$WORK/archive}"
 	mkdir -p "$logs"
 	rm -rf "$archive" "$WORK/staged"
 	local digest; digest="$(source_digest)"

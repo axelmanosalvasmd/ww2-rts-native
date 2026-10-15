@@ -31,29 +31,30 @@ void FTCBossBar::Snapshot(const FTCMatchState& S, double Now)
 	bEverSet = true;
 }
 
-FTCPaint FTCBossBar::Layout(float CentreX, float Top, float ViewW, double Now, const FTCMeasure& Measure, float* OutBottom) const
+FTCPaint FTCBossBar::Layout(float CentreX, float Top, float ViewW, double Now, const FTCMeasure& Measure, float* OutBottom, float Scale) const
 {
 	using namespace TCBossRules;
 	FTCPaint P;
 	if (!bShown) { if (OutBottom) *OutBottom = Top; return P; }
 	const float W = FMath::Min(MaxWidth, ViewW - SideRoom), X = CentreX - W / 2;
-	const float NameH = NamePx * NameLine, H = 1 + PadTop + NameH + BarGap + BarH + 2 + PadBottom + 1;
+	const float Border = FMath::Max(1.f, FMath::FloorToFloat(Scale)) / Scale;
+	const float NameH = FMath::FloorToFloat(NamePx * NameLine * Scale * 64.f) / (Scale * 64.f), H = Border + PadTop + NameH + BarGap + BarH + PadBottom + Border;
 	P.Rect(X, Top, W, H, TCCss::PanelSolid, TEXT("boss:panel"));
-	P.Frame(X, Top, W, H, TCCss::Line, 1.f, TEXT("boss:frame"));
+	P.Frame(X, Top, W, H, TCCss::Line, Border, TEXT("boss:frame"));
 	// the name line: translated as a text node, its whitespace collapsed as HTML draws it, letter-spaced 0.2 em
 	FString Shown = TC_T(Name);
 	while (Shown.ReplaceInline(TEXT("  "), TEXT(" ")) > 0) {}
 	const float Track = Tracking * NamePx;
-	FTCPaintItem& T = P.Text(Shown, CentreX, Top + 1 + PadTop, NamePx, TCCss::Hex(0xe8c060), true, ETCPaintAlign::Centre, TEXT("boss:name"));
+	FTCPaintItem& T = P.Text(Shown, CentreX, Top + Border + PadTop, NamePx, TCCss::Hex(0xe8c060), true, ETCPaintAlign::Centre, TEXT("boss:name"));
 	T.Tracking = Track;
 	T.Size.Y = NameH;
 	// text-align: center places the line box, letter-spacing included after the last letter: half a spacing to the left
 	T.Pos.X -= Track / 2;
-	const float BarX = X + 1 + PadSide, BarW = W - 2 - 2 * PadSide, BarY = Top + 1 + PadTop + NameH + BarGap;
-	P.Rect(BarX, BarY, BarW, BarH + 2, TCCss::Hex(0x000000), TEXT("boss:bar-border"));
-	P.Rect(BarX + 1, BarY + 1, BarW - 2, BarH, TCCss::Hex(0x2a1010), TEXT("boss:bar"));
-	const float Fill = (float)FMath::Clamp(WidthAt(Now), 0.0, 100.0) / 100.f * (BarW - 2);
-	if (Fill > 0) P.Gradient(BarX + 1, BarY + 1, Fill, BarH, TCCss::Hex(0xe04a3a), TCCss::Hex(0x8e1c14), TEXT("boss:fill"));
+	const float BarX = X + Border + PadSide, BarW = W - 2 * Border - 2 * PadSide, BarY = Top + Border + PadTop + NameH + BarGap;
+	P.Rect(BarX, BarY, BarW, BarH, TCCss::Hex(0x000000), TEXT("boss:bar-border"));
+	P.Rect(BarX + Border, BarY + Border, BarW - 2 * Border, BarH - 2 * Border, TCCss::Hex(0x2a1010), TEXT("boss:bar"));
+	const float Fill = (float)FMath::Clamp(WidthAt(Now), 0.0, 100.0) / 100.f * (BarW - 2 * Border);
+	if (Fill > 0) P.Gradient(BarX + Border, BarY + Border, Fill, BarH - 2 * Border, TCCss::Hex(0xe04a3a), TCCss::Hex(0x8e1c14), TEXT("boss:fill"));
 	P.Panels.Add(FBox2D(FVector2D(X, Top), FVector2D(X + W, Top + H)));
 	if (OutBottom) *OutBottom = Top + H;
 	return P;
@@ -123,7 +124,9 @@ bool FTCBossBarTest::RunTest(const FString&)
 	TestEqual(TEXT("name as drawn"), P.TextsOf(TEXT("boss:name")), TArray<FString>{ TEXT("KAIJU 1%") });
 	const FTCPaintItem* Fill = P.Find(TEXT("boss:fill"));
 	TestTrue(TEXT("fill width"), Fill && FMath::IsNearlyEqual(Fill->Size.X, (640.f - 2 - 24 - 2) * (float)(1.0 / 12000.0), 0.01f));
-	TestTrue(TEXT("height: 1 + 6 + 20.25 + 4 + 20 + 8 + 1"), FMath::IsNearlyEqual(Bottom - 60.f, 60.25f, 0.01f));
+	TestTrue(TEXT("border-box track: 1 + 6 + 20.25 + 4 + 18 + 8 + 1"), FMath::IsNearlyEqual(Bottom - 60.f, 58.25f, 0.01f));
+	const FTCPaint Zoom = B.Layout(640.f / 1.5f, 0, 1280.f / 1.5f, 5.5, M, nullptr, 1.5f);
+	TestEqual(TEXT("CSS zoom snaps the border: browser 150% height"), static_cast<float>(Zoom.Find(TEXT("boss:panel"))->Size.Y * 1.5f), 86.375f, .01f);
 	const FTCPaint Narrow = B.Layout(300, 60, 600, 5.5, M);
 	TestTrue(TEXT("narrow window: vw - 32"), Narrow.Find(TEXT("boss:panel")) && Narrow.Find(TEXT("boss:panel"))->Size.X == 568.f);
 	// the last Kaiju dies: mode.boss null, hidden; it comes back with its width set at once

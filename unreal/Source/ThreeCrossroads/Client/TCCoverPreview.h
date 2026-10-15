@@ -42,8 +42,8 @@
 //   the last bit, which only matters for a point exactly on a threshold.
 // - The browser's DOM: the menu button and localStorage ('ww2-cover', on unless '0') are the caller's. MenuLabel and
 //   MenuTip give the texts; SetEnabled is the switch.
-// Not ported: the overlay mesh and shader (client/overlay.js). Each glyph carries everything the browser draws with:
-// place, angle, size, colour, alpha, ground or through-models layer, and the template outline it is drawn from.
+// Each glyph carries place, angle, size, colour, alpha and its outline. TCMarkers draws the ground layer with scene
+// depth testing and the faint through-models layer without it, using the same overlay.js ribbon profile.
 #pragma once
 
 #include "CoreMinimal.h"

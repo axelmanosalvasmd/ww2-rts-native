@@ -76,6 +76,9 @@ for (const type of Object.keys(SLOTS)) {
       }
       checked++;
       const k = keys(lo);
+      if (!lo.attributes.matId || lo.attributes.modelUV) throw new Error(`${key}: expected procedural far material tags without an atlas`);
+      const materials = Float32Array.from(lo.attributes.matId.array);
+      if (!materials.every(Number.isFinite)) throw new Error(`${key}: non-finite material tag`);
       const rec = { key, type, figure, fac, slot: i, kit, vertices: n, indices: lo.index.count, digger: k.digger, nearMinY: minY(hi.userData.fallen.position), farMinY: minY(lo.userData.fallen.position) };
       if (figures.has(key)) {
         // the same shape from another squad slot or type: it must be the same geometry
@@ -84,7 +87,7 @@ for (const type of Object.keys(SLOTS)) {
           throw new Error(`${key}: two different far figures`);
         return;
       }
-      figures.set(key, { rec, k, base, tint, index: lo.index.array });
+      figures.set(key, { rec, k, base, tint, materials, index: lo.index.array });
     });
   }
 }
@@ -97,16 +100,16 @@ const u32 = (x) => { const b = Buffer.alloc(4); b.writeUInt32LE(x); chunks.push(
 const f32 = (x) => { const b = Buffer.alloc(4); b.writeFloatLE(x); chunks.push(b); };
 const arr = (a) => chunks.push(Buffer.from(a.buffer, a.byteOffset, a.byteLength));
 const list = [...figures.values()].sort((a, b) => (a.rec.key < b.rec.key ? -1 : a.rec.key > b.rec.key ? 1 : 0));
-for (const { rec, k, base, tint, index } of list) {
+for (const { rec, k, base, tint, materials, index } of list) {
   const name = Buffer.from(rec.key, 'utf8');
   u16(name.length); chunks.push(name);
   u32(rec.vertices); u32(rec.indices); f32(rec.nearMinY); f32(rec.farMinY);
-  arr(k.P); arr(k.N); arr(base); arr(tint); arr(Uint16Array.from(index));
+  arr(k.P); arr(k.N); arr(base); arr(tint); arr(materials); arr(Uint16Array.from(index));
 }
 const payload = Buffer.concat(chunks), packed = deflateSync(payload, { level: 9 });
 const head = Buffer.alloc(8 + 5 * 4);
 head.write('TCFARFG1', 0, 'ascii');
-head.writeUInt32LE(1, 8); head.writeUInt32LE(list.length, 12); head.writeUInt32LE(KEYS, 16); head.writeUInt32LE(packed.length, 20); head.writeUInt32LE(payload.length, 24);
+head.writeUInt32LE(2, 8); head.writeUInt32LE(list.length, 12); head.writeUInt32LE(KEYS, 16); head.writeUInt32LE(packed.length, 20); head.writeUInt32LE(payload.length, 24);
 const bin = Buffer.concat([head, packed]);
 writeFileSync(join(out, 'FarFigures.bin'), bin);
 
@@ -114,7 +117,7 @@ const sha = (buf) => createHash('sha256').update(buf).digest('hex');
 const git = (args) => { try { return execFileSync('git', ['-C', REF, ...args], { encoding: 'utf8' }).trim(); } catch { return null; } };
 const sources = ['client/unit-models.js', 'client/models/infantry.js', 'client/models/infantry-authored.js', 'client/models/infantry-authored-data.js', 'shared/squad-men.js', 'shared/sim.js'];
 const manifest = {
-  format: 'tc-far-figures-v1', reference: { commit: git(['rev-parse', 'HEAD']), clean: git(['status', '--porcelain']) === '' },
+  format: 'tc-far-figures-v2', reference: { commit: git(['rev-parse', 'HEAD']), clean: git(['status', '--porcelain']) === '' },
   three: JSON.parse(readFileSync(join(process.env.INFANTRY_DEPS, 'node_modules/three/package.json'), 'utf8')).version, node: process.version,
   tool: { file: relative(join(HERE, '../../..'), fileURLToPath(import.meta.url)), sha256: sha(readFileSync(fileURLToPath(import.meta.url))) },
   sources: Object.fromEntries(sources.map((s) => [s, sha(readFileSync(join(REF, s)))])),

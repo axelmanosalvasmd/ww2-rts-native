@@ -33,6 +33,7 @@
 #include "GameFramework/HUD.h"
 #include "Client/TCPlayerController.h"
 #include "Client/TCMinimap.h"
+#include "Client/TCEndReport.h"
 #include "Client/TCMatchControls.h"
 #include "TCHUD.generated.h"
 
@@ -42,6 +43,18 @@ class ATCTerrain;
 // Round 16 (hudfit): the HUD's fit rules at a large UI scale in a small window, pure so tests read them.
 namespace FTCHudFit
 {
+	THREECROSSROADS_API FTCPaint NoticeCard(const FString& Shown, float ViewW, float Top, FLinearColor Colour, const FTCMeasure& Measure, float Scale = 1.f, bool bEliminated = false);
+	THREECROSSROADS_API FTCPaint MatchNoticeCard(const FString& Rate, const FString& Bonus, const FString& Notice, float ViewW, float Top, const FTCMeasure& Measure, float Scale = 1.f);
+	// index.html scores flex layout, in CSS pixels, shared by drawing and geometry tests.
+	THREECROSSROADS_API FTCPaint ScoreCard(const FTCScoreStrip& Strip, float ViewW, const FTCMeasure& Measure, bool bNextWave, float Scale = 1.f);
+	// receiveStart: the still-empty score card and group tabs, absent for spectators and Classic/World.
+	THREECROSSROADS_API FVector2D InitialCameraBand(float ScreenH, float UiScale, bool bBuyShown);
+	// overlay.js dash is [period, lit length], measured backwards from a queued leg's goal, in metres.
+	THREECROSSROADS_API TArray<FVector2D> QueueDashSpans(double Length, double Period = 2.2, double Lit = 1.3);
+	// overlay.js FRAG_BODY: the two smoothstep ends, with fwidth(distance) in metres per screen pixel.
+	THREECROSSROADS_API double QueueDashAlpha(double FromGoal, double PixelWidth, double Period = 2.2, double Lit = 1.3);
+	// Screen projections of one metre along and across the ribbon, including perspective and terrain slope.
+	THREECROSSROADS_API double QueueDashPixelWidth(FVector2D Along, FVector2D Across);
 	// client/index.html #sandbox: left 50%, translateX(-50%), bottom 230px (zoomed with #hud)
 	constexpr float SandboxBottom = 230.f;
 	// The strip's widest: centred, its left edge right of the corner's Menu panel (CornerRight) by 4 px
@@ -95,6 +108,7 @@ public:
 	float DrawStatsBox(UFont* Font, float CtlBottom, float CtlRight);
 	float StatsTopTc = -1.f;
 	FBox2D StatsStrip = FBox2D(ForceInit);
+	float TopStackBottomPx = -1.f; // #top's physical bottom, also valid after EndUi resets UiNow
 	// The button drawn at this viewport pixel in the last frame, if any (the controller sends its click there).
 	bool ButtonAt(FVector2D Pixel, ETCUiAction& OutAction) const;
 	bool CommandAt(FVector2D Pixel, FTCUiCommand& OutCommand) const;
@@ -142,8 +156,6 @@ private:
 	// #buy at bottom: var(--gap) 8 px holding the group tabs buildCard makes with no group open (padding 7 px, a 1 px
 	// border, one .hd row of 5 + 16 + 5 px with its 1 px border and #hud .hd's 6 px margin: 50 px), absent in Classic
 	// and World (buildCard hides it). Zoomed by the UI scale like the rest of #hud.
-	static constexpr float CssGap = 8.f, CssEmptyScores = 19.f, CssBuyTabs = 50.f;
-	static FVector2D StartBand(float ScreenH, float UiScale, bool bClassic);
 	// Round 15: the reference CSS's left column (--left-w 248 px) is this HUD's narrowest match panel; the match panel
 	// keeps its own 560 px while the recruit card beside it gets at least RecruitMin px (#buy sits between the left
 	// column and the minimap at every scale, client/index.html), and narrows toward 248 px only past that.
@@ -174,8 +186,8 @@ private:
 	void LabelSize(const FString& Text, float& OutWidth, float& OutHeight, UFont* Font, float Scale = 1.f) const;
 	// A text already in the language in use (put together from parts that were each passed through TC_T): drawn and
 	// measured as it is
-	void DrawShown(const FString& Text, const FLinearColor& Colour, float X, float Y, UFont* Font, float Scale = 1.f) { AHUD::DrawText(Text, Colour, X, Y, Font, Scale); }
-	void ShownSize(const FString& Text, float& OutWidth, float& OutHeight, UFont* Font, float Scale = 1.f) const { AHUD::GetTextSize(Text, OutWidth, OutHeight, Font, Scale); }
+	void DrawShown(const FString& Text, const FLinearColor& Colour, float X, float Y, UFont* Font, float Scale = 1.f);
+	void ShownSize(const FString& Text, float& OutWidth, float& OutHeight, UFont* Font, float Scale = 1.f) const;
 	// In Spanish, the distinct texts drawn that came back unchanged (no entry or pattern in client/es.js, or a name kept
 	// as it is), logged once each as "locale: kept in English" (CLI-120's capture review reads them)
 	TSet<FString> KeptEnglish;
@@ -247,8 +259,8 @@ public:
 private:
 	// client/main.js drawMinimap: the capture points (owner discs, the cut cross, the locked link) and the start's spawns
 	void DrawMinimapPoints();
-	// A line over the ground drawn in dashes of Dash metres with gaps of Gap metres (client/markers.js ORDER_DASH).
-	void GroundDashes(const ATCTerrain& T, FVector2D A, FVector2D B, const FLinearColor& Colour, float Thickness, float Dash = 1.2f, float GapM = 0.8f);
+	// ORDER_DASH: 2.2 m period, 1.3 m lit, anchored at the goal (overlay.js uEnd).
+	void GroundDashes(const ATCTerrain& T, FVector2D A, FVector2D B, const FLinearColor& Colour, float Thickness, float Period = 2.2f, float Lit = 1.3f);
 	// A filled screen-space quad (two canvas triangles).
 	void FillQuad(const FVector2D (&P)[4], const FLinearColor& Colour);
 	// client/main.js frame: the preview keeps its last colour when the browser's placement check throws

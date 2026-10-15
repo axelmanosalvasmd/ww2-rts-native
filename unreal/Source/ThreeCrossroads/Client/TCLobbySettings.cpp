@@ -181,6 +181,15 @@ bool FTCLobbySettings::ApplyLobby(const FJsonObject& M)
 
 	// Read into a new room, so a malformed message changes nothing.
 	FTCLobbyRoom R;
+	R.HostKind = FTCConnection::HostKindOf(M, &R.Protocol);
+	R.bSandbox = Flag(M, TEXT("sandbox"));
+	Str(M, TEXT("weather"), R.Weather);
+	for (const TCHAR* Field : { TEXT("spectators"), TEXT("operatives") })
+	{
+		const TSharedPtr<FJsonValue> V = M.TryGetField(Field);
+		const int32 Count = V.IsValid() && V->Type == EJson::Array ? V->AsArray().Num() : -1;
+		if (FCString::Strcmp(Field, TEXT("spectators")) == 0) R.Spectators = Count; else R.Operatives = Count;
+	}
 	const TSharedPtr<FJsonValue> PlayersValue = M.TryGetField(TEXT("players"));
 	if (!Str(M, TEXT("state"), R.State) || !Str(M, TEXT("mode"), R.Mode) || !PlayersValue.IsValid() || PlayersValue->Type != EJson::Array) return false;
 	for (const TSharedPtr<FJsonValue>& V : PlayersValue->AsArray())
@@ -189,6 +198,7 @@ bool FTCLobbySettings::ApplyLobby(const FJsonObject& M)
 		const FJsonObject& P = *V->AsObject();
 		FTCLobbySeat Seat;
 		Str(P, TEXT("name"), Seat.Name);
+		Str(P, TEXT("role"), Seat.Role);
 		if (!Int(P, TEXT("team"), 0, MaxPlayers - 1, Seat.Team)) Seat.Team = -1;
 		if (!Int(P, TEXT("faction"), 0, FactionCount - 1, Seat.Faction)) Seat.Faction = -1;
 		Seat.bAi = Flag(P, TEXT("ai"));
@@ -353,6 +363,11 @@ FTCLobbyControl FTCLobbySettings::Control(ETCLobbySetting Kind, int32 Slot) cons
 		if (!C.bShown) C.Why = TEXT("only an AI seat has a difficulty");
 		for (int32 I = 0; I < UE_ARRAY_COUNT(Levels); I++) C.Choices.Add({ Levels[I], -1, LevelNames[I] });
 		break;
+	}
+	if (IsRustHost()) for (FTCLobbyChoice& Choice : C.Choices)
+	{
+		const FString Why = RustChoiceRefusal(Kind, Choice.Value);
+		if (!Why.IsEmpty()) { Choice.bEnabled = false; Choice.Why = Why; }
 	}
 	for (FTCLobbyChoice& Choice : C.Choices) Choice.bCurrent = !C.CurrentValue.IsEmpty() && Choice.Value == C.CurrentValue;
 	if (const FTCLobbyChoice* Shown = C.Find(C.CurrentValue)) C.CurrentLabel = Shown->Label;
@@ -531,8 +546,86 @@ namespace TCLobbySettingsLocal
 	}
 }
 
+// R1 binds the committed public catalogue at native d2911267, including the bounded El Alamein path.
+// A custom name advertised by a host cannot widen this list. Update only with a reviewed host matrix.
+bool FTCLobbySettings::RustMapAllowed(const FString& Name)
+{
+	static const TCHAR* const Maps[] = { TEXT("ardennes-crossing"), TEXT("bastogne"), TEXT("bocage"), TEXT("crater-field"), TEXT("crossroads-village"), TEXT("default"), TEXT("el-alamein"), TEXT("helms-deep"), TEXT("hill-112"), TEXT("hill-112-xl"), TEXT("hot-gates"), TEXT("hurtgen-forest"), TEXT("island-towns"), TEXT("kasserine-pass"), TEXT("king-of-the-hill"), TEXT("monte-cassino"), TEXT("monte-cassino-xl"), TEXT("no-mans-land"), TEXT("pegasus-bridge"), TEXT("pegasus-bridge-xl"), TEXT("prokhorovka"), TEXT("river-towns"), TEXT("seawall"), TEXT("seawall-xl"), TEXT("seelow-heights"), TEXT("six-fronts"), TEXT("stalingrad-factory"), TEXT("test-arena"), TEXT("the-great-bridge"), TEXT("the-polder"), TEXT("three-islands"), TEXT("tutorial"), TEXT("twin-valleys") };
+	return TCLobbySettingsLocal::IndexOf(Maps, Name) != INDEX_NONE;
+}
+
+FString FTCLobbySettings::RustChoiceRefusal(ETCLobbySetting Kind, const FString& Value)
+{
+	switch (Kind)
+	{
+	case ETCLobbySetting::Mode: if (Value != TEXT("conquest")) return TEXT("Rust host: Conquest/Default only."); break;
+	case ETCLobbySetting::Map: if (!RustMapAllowed(Value)) return TEXT("Rust host: choose a committed public map."); break;
+	case ETCLobbySetting::Army: if (Value != TEXT("standard")) return TEXT("Rust host: Standard army only."); break;
+	case ETCLobbySetting::Team: if (Value != TEXT("0") && Value != TEXT("1")) return TEXT("Rust host: one commander on Team 1 and one on Team 2."); break;
+	case ETCLobbySetting::Level: return TEXT("Rust host: no AI commanders.");
+	case ETCLobbySetting::WorldSize:
+	case ETCLobbySetting::Defender: return TEXT("Rust host: Conquest/Default only.");
+	default: break;
+	}
+	return FString();
+}
+
+FString FTCLobbySettings::RustCommandRefusal(const FJsonObject& Message) const
+{
+	if (!IsRustHost()) return FString();
+	FString Type, Value;
+	if (!TCLobbySettingsLocal::Str(Message, TEXT("t"), Type)) return FString();
+	if (Type == TEXT("start")) return RustStartRefusal();
+	if (Type == TEXT("addAi")) return TEXT("Rust host: no AI commanders.");
+	if (Type == TEXT("spectate")) return TEXT("Rust host: no spectators.");
+	if (Type == TEXT("sit") && Current.State != TEXT("lobby")) return TEXT("Rust host: no late join or start during a match. Reconnect with the same seat token.");
+	if (Type == TEXT("fps")) return TEXT("Rust host: no operatives.");
+	if (Type == TEXT("sandbox"))
+	{
+		const TSharedPtr<FJsonValue> V = Message.TryGetField(TEXT("v"));
+		if (!V.IsValid() || V->Type != EJson::Boolean || V->AsBool()) return TEXT("Rust host: Sandbox must be off.");
+	}
+	for (ETCLobbySetting Kind : { ETCLobbySetting::Mode, ETCLobbySetting::Map, ETCLobbySetting::Army, ETCLobbySetting::WorldSize, ETCLobbySetting::Defender, ETCLobbySetting::Level, ETCLobbySetting::Team })
+	{
+		if (Type != MessageType(Kind)) continue;
+		if (Kind == ETCLobbySetting::Team)
+		{
+			int32 Team = -1;
+			if (TCLobbySettingsLocal::Int(Message, TEXT("v"), 0, 1, Team)) return FString();
+			return TEXT("Rust host: one commander on Team 1 and one on Team 2.");
+		}
+		TCLobbySettingsLocal::Str(Message, Kind == ETCLobbySetting::Map ? TEXT("name") : TEXT("v"), Value);
+		return RustChoiceRefusal(Kind, Value);
+	}
+	return FString();
+}
+
+FString FTCLobbySettings::RustStartRefusal() const
+{
+	if (!IsRustHost()) return FString();
+	if (Current.Protocol != FTCConnection::ProtocolVersion) return TEXT("Rust host: unsupported lobby protocol version.");
+	if (Current.State != TEXT("lobby")) return TEXT("Rust host: no late join or start during a match. Reconnect with the same seat token.");
+	if (Current.bListed) return TEXT("Rust host: trusted private rooms only.");
+	if (Current.Role != TEXT("commander") || Current.Operatives != 0) return TEXT("Rust host: no operatives.");
+	for (const FTCLobbySeat& S : Current.Seats) if (S.Role != TEXT("commander")) return TEXT("Rust host: no operatives.");
+	if (Current.bSpectator || Current.Spectators != 0) return TEXT("Rust host: no spectators.");
+	if (const FString Why = RustChoiceRefusal(ETCLobbySetting::Mode, Current.Mode); !Why.IsEmpty()) return Why;
+	if (!RustMapAllowed(Current.MapName) || !Current.Maps.Contains(Current.MapName) || Current.Spawns < 2) return TEXT("Rust host: choose a committed public map with at least 2 spawns.");
+	if (const FString Why = RustChoiceRefusal(ETCLobbySetting::Army, Current.Army); !Why.IsEmpty()) return Why;
+	if (Current.bSandbox) return TEXT("Rust host: Sandbox must be off.");
+	static const TCHAR* const Weather[] = { TEXT("map"), TEXT("clear"), TEXT("fog"), TEXT("rain"), TEXT("mud"), TEXT("snow"), TEXT("random") };
+	if (TCLobbySettingsLocal::IndexOf(Weather, Current.Weather) == INDEX_NONE) return TEXT("Rust host: choose an existing weather option.");
+	for (const FTCLobbySeat& S : Current.Seats) if (S.bAi) return TEXT("Rust host: no AI commanders.");
+	if (Current.Seats.Num() != 2) return TEXT("Rust host: exactly 2 human commanders required.");
+	const int32 A = Current.Seats[0].Team, B = Current.Seats[1].Team;
+	if (!((A == 0 && B == 1) || (A == 1 && B == 0))) return TEXT("Rust host: one commander on Team 1 and one on Team 2.");
+	if (!Current.bAmHost || Current.You != Current.Host || !Current.Seats.IsValidIndex(Current.You)) return TEXT("Waiting for the host to start...");
+	return FString();
+}
+
 bool FTCLobbySettings::StartAllowed() const
 {
+	if (IsRustHost()) return RustStartRefusal().IsEmpty();
 	const int32 N = Current.Seats.Num();
 	return bHasLobby && N > 0 && N <= TCLobbySettingsLocal::SeatLimit(Current) && TCLobbySettingsLocal::AssaultReady(Current);
 }
@@ -540,6 +633,7 @@ bool FTCLobbySettings::StartAllowed() const
 FString FTCLobbySettings::StartLine() const
 {
 	if (!bHasLobby) return FString();
+	if (IsRustHost()) return RustStartRefusal();
 	const int32 N = Current.Seats.Num(), Limit = TCLobbySettingsLocal::SeatLimit(Current);
 	const bool bHorde = Current.Mode == TEXT("horde");
 	if (N > Limit) return bHorde ? FString::Printf(TEXT("Horde seats %d defenders: remove a player."), Limit) : FString::Printf(TEXT("This map has %d spawns: pick a bigger map or remove players."), Limit);

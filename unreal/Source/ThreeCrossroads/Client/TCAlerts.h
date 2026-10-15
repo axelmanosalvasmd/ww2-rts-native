@@ -23,7 +23,7 @@
 //     click: look there", 380 px wide in deep red with a light left edge), then the routine lines newest first (the
 //     newest semi-bold with the stronger border; while a loss shows only two of them), then the Alert history box;
 //   - each kind's colour (light red for attack, unit lost, point lost and air; brass for a point won; the base alert
-//     white and bold on red, pulsing four half-cycles), the line's ellipsis at 320 px, the 0.18 s (0.22 s for a loss)
+//     white and bold on red, pulsing four half-cycles), the routine line's ellipsis at 320 px (loss details wrap), the 0.18 s (0.22 s for a loss)
 //     slide-in, each kind's life (event 15 s, base 10 s, unit lost 12 s, the rest 6 s) and the 0.6 s fade;
 //   - a click on a line looks at its spot (hooks.jump), on the history's summary opens or closes it, on Previous
 //     Alert or Next Alert navigates (navigate(1), navigate(-1)), on an entry selects and visits it;
@@ -170,6 +170,7 @@ struct FTCAlertViewInput
 	float Right = 0.f;        // the minimap's right edge
 	float MinimapTop = 0.f;   // the minimap's top edge (the box sits 13 px above it)
 	float ViewW = 1280.f, ViewH = 720.f;
+	float UiScale = 1.f;      // CSS zoom, for device-pixel borders and 1/64 px line boxes
 	bool bMouse = false;
 	FVector2D Mouse = FVector2D::ZeroVector; // :hover
 	FString Focus;            // the hit tag the keyboard (Alt+Left/Right) is on, drawn with the brass outline
@@ -226,7 +227,7 @@ public:
 	// 'alert:entry:<id>'. True when the tag was this feed's; bOutJump with OutAt when the camera should go there.
 	bool Click(const FString& Tag, FVector2D& OutAt, bool& bOutJump);
 	// The feed as alerts.css draws it, in UI pixels; hits carry the tags Click takes.
-	FTCPaint Layout(const FTCAlertViewInput& In, const FTCMeasure& Measure) const;
+	FTCPaint Layout(const FTCAlertViewInput& In, const FTCMeasure& Measure, const FTCMeasure& HeavyMeasure = FTCMeasure()) const;
 	// drawPings: the minimap marks of the lines with a place (not pings), newest first, at Now.
 	TArray<FTCAlertRing> MinimapRings(double Now) const;
 	// alerts.js frame's opacity and the slide-in (alert-in or loss-in) at Now: opacity and the x offset in pixels.

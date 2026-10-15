@@ -12,6 +12,7 @@ target/
 # build output like the editor's, so it is made locally and not committed.
 /unreal/Content/Audio/
 /unreal/Content/Effects/
+/unreal/Content/Markers/
 /unreal/Content/Models/
 /unreal/Content/World/
 /unreal/Content/Relief/
