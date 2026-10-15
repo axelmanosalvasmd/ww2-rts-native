@@ -85,7 +85,14 @@ fn check_cells(m: &Match, expected: &Value) {
         assert_eq!(json!(metadata.anchor), s[3]);
         assert_eq!(json!(metadata.supports), s[4]);
         assert!(!state.failed);
-        assert_eq!(s[5], "intact");
+        assert_eq!(
+            match metadata.appearance {
+                crate::world::Appearance::Intact => "intact",
+                crate::world::Appearance::Damaged => "damaged",
+                crate::world::Appearance::Burning => "burning",
+            },
+            s[5]
+        );
         assert_eq!(json!(metadata.rubble), s[6]);
         assert_eq!(bits(state.hp), s[7]);
         assert_eq!(bits(state.max_hp.unwrap()), s[8]);
