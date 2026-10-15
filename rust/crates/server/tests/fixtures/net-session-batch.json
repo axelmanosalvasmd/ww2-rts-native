@@ -1,0 +1,847 @@
+{
+  "reference": "e4e579a838aabae3b1d9dadbc17a0a87147bc52d",
+  "rows": [
+    "NET-02",
+    "NET-03",
+    "NET-05",
+    "NET-10",
+    "NET-22"
+  ],
+  "scope": "Real TCP, existing lobby commanders only. Exact selected transport outcomes and roster fields; no match, spectator, private seed or whole-match claim.",
+  "queries": [
+    {
+      "id": "missing",
+      "path": "/ws",
+      "valid": false,
+      "close": {
+        "code": 1008,
+        "reason": "bad room"
+      }
+    },
+    {
+      "id": "empty",
+      "path": "/ws?room=",
+      "valid": false,
+      "close": {
+        "code": 1008,
+        "reason": "bad room"
+      }
+    },
+    {
+      "id": "short",
+      "path": "/ws?room=ab",
+      "valid": false,
+      "close": {
+        "code": 1008,
+        "reason": "bad room"
+      }
+    },
+    {
+      "id": "punctuation",
+      "path": "/ws?room=x!y",
+      "valid": false,
+      "close": {
+        "code": 1008,
+        "reason": "bad room"
+      }
+    },
+    {
+      "id": "long",
+      "path": "/ws?room=abcdefghijklm",
+      "valid": false,
+      "close": {
+        "code": 1008,
+        "reason": "bad room"
+      }
+    },
+    {
+      "id": "minimum",
+      "path": "/ws?room=abc",
+      "valid": true,
+      "lobby": {
+        "code": "abc",
+        "state": "lobby",
+        "mode": "conquest",
+        "you": 0,
+        "players": [
+          {
+            "name": "minimum",
+            "connected": true,
+            "ai": false,
+            "team": 0,
+            "faction": 0,
+            "level": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "case",
+      "path": "/ws?room=ABC",
+      "valid": true,
+      "lobby": {
+        "code": "ABC",
+        "state": "lobby",
+        "mode": "conquest",
+        "you": 0,
+        "players": [
+          {
+            "name": "case",
+            "connected": true,
+            "ai": false,
+            "team": 0,
+            "faction": 0,
+            "level": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "maximum",
+      "path": "/ws?room=Abcdef123456",
+      "valid": true,
+      "lobby": {
+        "code": "Abcdef123456",
+        "state": "lobby",
+        "mode": "conquest",
+        "you": 0,
+        "players": [
+          {
+            "name": "maximum",
+            "connected": true,
+            "ai": false,
+            "team": 0,
+            "faction": 0,
+            "level": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "encoded-value",
+      "path": "/ws?room=%50ercent",
+      "valid": true,
+      "lobby": {
+        "code": "Percent",
+        "state": "lobby",
+        "mode": "conquest",
+        "you": 0,
+        "players": [
+          {
+            "name": "encoded-value",
+            "connected": true,
+            "ai": false,
+            "team": 0,
+            "faction": 0,
+            "level": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "encoded-key",
+      "path": "/ws?%72oom=KeyRoom",
+      "valid": true,
+      "lobby": {
+        "code": "KeyRoom",
+        "state": "lobby",
+        "mode": "conquest",
+        "you": 0,
+        "players": [
+          {
+            "name": "encoded-key",
+            "connected": true,
+            "ai": false,
+            "team": 0,
+            "faction": 0,
+            "level": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "first-value",
+      "path": "/ws?room=FirstRoom&room=SecondRoom",
+      "valid": true,
+      "lobby": {
+        "code": "FirstRoom",
+        "state": "lobby",
+        "mode": "conquest",
+        "you": 0,
+        "players": [
+          {
+            "name": "first-value",
+            "connected": true,
+            "ai": false,
+            "team": 0,
+            "faction": 0,
+            "level": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "unrelated-bad-key",
+      "path": "/ws?%=x&room=BadPrefix",
+      "valid": true,
+      "lobby": {
+        "code": "BadPrefix",
+        "state": "lobby",
+        "mode": "conquest",
+        "you": 0,
+        "players": [
+          {
+            "name": "unrelated-bad-ke",
+            "connected": true,
+            "ai": false,
+            "team": 0,
+            "faction": 0,
+            "level": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "unrelated-bad-utf8-key",
+      "path": "/ws?%FF=x&room=UtfPrefix",
+      "valid": true,
+      "lobby": {
+        "code": "UtfPrefix",
+        "state": "lobby",
+        "mode": "conquest",
+        "you": 0,
+        "players": [
+          {
+            "name": "unrelated-bad-ut",
+            "connected": true,
+            "ai": false,
+            "team": 0,
+            "faction": 0,
+            "level": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "unrelated-bad-value",
+      "path": "/ws?x=%zz&room=ValueRoom",
+      "valid": true,
+      "lobby": {
+        "code": "ValueRoom",
+        "state": "lobby",
+        "mode": "conquest",
+        "you": 0,
+        "players": [
+          {
+            "name": "unrelated-bad-va",
+            "connected": true,
+            "ai": false,
+            "team": 0,
+            "faction": 0,
+            "level": null
+          }
+        ]
+      }
+    },
+    {
+      "id": "space",
+      "path": "/ws?room=a+b",
+      "valid": false,
+      "close": {
+        "code": 1008,
+        "reason": "bad room"
+      }
+    },
+    {
+      "id": "bad-room-escape",
+      "path": "/ws?room=%zz",
+      "valid": false,
+      "close": {
+        "code": 1008,
+        "reason": "bad room"
+      }
+    }
+  ],
+  "payloads": [
+    {
+      "id": "limit",
+      "bytes": 16384,
+      "parts": [
+        16384
+      ],
+      "pong": {
+        "t": "pong",
+        "c": "limit"
+      }
+    },
+    {
+      "id": "over-limit",
+      "bytes": 16385,
+      "parts": [
+        16385
+      ],
+      "close": {
+        "code": 1009,
+        "reason": ""
+      },
+      "sourceExit": {
+        "code": 1,
+        "signal": null
+      }
+    },
+    {
+      "id": "17-kib",
+      "bytes": 17408,
+      "parts": [
+        17408
+      ],
+      "close": {
+        "code": 1009,
+        "reason": ""
+      },
+      "sourceExit": {
+        "code": 1,
+        "signal": null
+      }
+    },
+    {
+      "id": "fragment-limit",
+      "bytes": 16384,
+      "parts": [
+        8192,
+        8192
+      ],
+      "pong": {
+        "t": "pong",
+        "c": "fragment-limit"
+      }
+    },
+    {
+      "id": "fragment-over-limit",
+      "bytes": 16385,
+      "parts": [
+        8192,
+        8193
+      ],
+      "close": {
+        "code": 1009,
+        "reason": ""
+      },
+      "sourceExit": {
+        "code": 1,
+        "signal": null
+      }
+    }
+  ],
+  "malformed": {
+    "invalid": [
+      "{bad json",
+      "null",
+      "false",
+      "7",
+      "\"text\"",
+      "[]",
+      "[1]",
+      "{}",
+      "{\"t\":null}",
+      "{\"t\":7}",
+      "{\"t\":[]}",
+      "{\"t\":{}}"
+    ],
+    "lobby": {
+      "code": "Malformed",
+      "state": "lobby",
+      "mode": "conquest",
+      "you": 0,
+      "players": [
+        {
+          "name": "malformed",
+          "connected": true,
+          "ai": false,
+          "team": 0,
+          "faction": 0,
+          "level": null
+        }
+      ]
+    },
+    "pong": {
+      "t": "pong",
+      "c": "after-invalid"
+    },
+    "barrier": {
+      "t": "pong",
+      "c": "still-alive"
+    }
+  },
+  "maps": [
+    "ardennes-crossing",
+    "bastogne",
+    "bocage",
+    "crater-field",
+    "crossroads-village",
+    "default",
+    "el-alamein",
+    "helms-deep",
+    "hill-112",
+    "hill-112-xl",
+    "hot-gates",
+    "hurtgen-forest",
+    "island-towns",
+    "kasserine-pass",
+    "king-of-the-hill",
+    "monte-cassino",
+    "monte-cassino-xl",
+    "no-mans-land",
+    "pegasus-bridge",
+    "pegasus-bridge-xl",
+    "prokhorovka",
+    "river-towns",
+    "seawall",
+    "seawall-xl",
+    "seelow-heights",
+    "six-fronts",
+    "stalingrad-factory",
+    "test-arena",
+    "the-great-bridge",
+    "the-polder",
+    "three-islands",
+    "tutorial",
+    "twin-valleys"
+  ],
+  "seats": {
+    "joins": [
+      {
+        "code": "SeatDefaults",
+        "state": "lobby",
+        "mode": "conquest",
+        "you": 0,
+        "players": [
+          {
+            "name": "seat-0",
+            "connected": true,
+            "ai": false,
+            "team": 0,
+            "faction": 0,
+            "level": null
+          }
+        ]
+      },
+      {
+        "code": "SeatDefaults",
+        "state": "lobby",
+        "mode": "conquest",
+        "you": 0,
+        "players": [
+          {
+            "name": "seat-0",
+            "connected": true,
+            "ai": false,
+            "team": 0,
+            "faction": 0,
+            "level": null
+          },
+          {
+            "name": "seat-1",
+            "connected": true,
+            "ai": false,
+            "team": 1,
+            "faction": 1,
+            "level": null
+          }
+        ]
+      },
+      {
+        "code": "SeatDefaults",
+        "state": "lobby",
+        "mode": "conquest",
+        "you": 0,
+        "players": [
+          {
+            "name": "seat-0",
+            "connected": true,
+            "ai": false,
+            "team": 0,
+            "faction": 0,
+            "level": null
+          },
+          {
+            "name": "seat-1",
+            "connected": true,
+            "ai": false,
+            "team": 1,
+            "faction": 1,
+            "level": null
+          },
+          {
+            "name": "seat-2",
+            "connected": true,
+            "ai": false,
+            "team": 2,
+            "faction": 2,
+            "level": null
+          }
+        ]
+      },
+      {
+        "code": "SeatDefaults",
+        "state": "lobby",
+        "mode": "conquest",
+        "you": 0,
+        "players": [
+          {
+            "name": "seat-0",
+            "connected": true,
+            "ai": false,
+            "team": 0,
+            "faction": 0,
+            "level": null
+          },
+          {
+            "name": "seat-1",
+            "connected": true,
+            "ai": false,
+            "team": 1,
+            "faction": 1,
+            "level": null
+          },
+          {
+            "name": "seat-2",
+            "connected": true,
+            "ai": false,
+            "team": 2,
+            "faction": 2,
+            "level": null
+          },
+          {
+            "name": "seat-3",
+            "connected": true,
+            "ai": false,
+            "team": 3,
+            "faction": 0,
+            "level": null
+          }
+        ]
+      },
+      {
+        "code": "SeatDefaults",
+        "state": "lobby",
+        "mode": "conquest",
+        "you": 0,
+        "players": [
+          {
+            "name": "seat-0",
+            "connected": true,
+            "ai": false,
+            "team": 0,
+            "faction": 0,
+            "level": null
+          },
+          {
+            "name": "seat-1",
+            "connected": true,
+            "ai": false,
+            "team": 1,
+            "faction": 1,
+            "level": null
+          },
+          {
+            "name": "seat-2",
+            "connected": true,
+            "ai": false,
+            "team": 2,
+            "faction": 2,
+            "level": null
+          },
+          {
+            "name": "seat-3",
+            "connected": true,
+            "ai": false,
+            "team": 3,
+            "faction": 0,
+            "level": null
+          },
+          {
+            "name": "seat-4",
+            "connected": true,
+            "ai": false,
+            "team": 4,
+            "faction": 1,
+            "level": null
+          }
+        ]
+      },
+      {
+        "code": "SeatDefaults",
+        "state": "lobby",
+        "mode": "conquest",
+        "you": 0,
+        "players": [
+          {
+            "name": "seat-0",
+            "connected": true,
+            "ai": false,
+            "team": 0,
+            "faction": 0,
+            "level": null
+          },
+          {
+            "name": "seat-1",
+            "connected": true,
+            "ai": false,
+            "team": 1,
+            "faction": 1,
+            "level": null
+          },
+          {
+            "name": "seat-2",
+            "connected": true,
+            "ai": false,
+            "team": 2,
+            "faction": 2,
+            "level": null
+          },
+          {
+            "name": "seat-3",
+            "connected": true,
+            "ai": false,
+            "team": 3,
+            "faction": 0,
+            "level": null
+          },
+          {
+            "name": "seat-4",
+            "connected": true,
+            "ai": false,
+            "team": 4,
+            "faction": 1,
+            "level": null
+          },
+          {
+            "name": "seat-5",
+            "connected": true,
+            "ai": false,
+            "team": 5,
+            "faction": 2,
+            "level": null
+          }
+        ]
+      }
+    ],
+    "disconnected": {
+      "code": "SeatDefaults",
+      "state": "lobby",
+      "mode": "conquest",
+      "you": 0,
+      "players": [
+        {
+          "name": "seat-0",
+          "connected": true,
+          "ai": false,
+          "team": 0,
+          "faction": 0,
+          "level": null
+        },
+        {
+          "name": "seat-1",
+          "connected": true,
+          "ai": false,
+          "team": 1,
+          "faction": 1,
+          "level": null
+        },
+        {
+          "name": "seat-2",
+          "connected": false,
+          "ai": false,
+          "team": 2,
+          "faction": 2,
+          "level": null
+        },
+        {
+          "name": "seat-3",
+          "connected": true,
+          "ai": false,
+          "team": 3,
+          "faction": 0,
+          "level": null
+        },
+        {
+          "name": "seat-4",
+          "connected": true,
+          "ai": false,
+          "team": 4,
+          "faction": 1,
+          "level": null
+        },
+        {
+          "name": "seat-5",
+          "connected": true,
+          "ai": false,
+          "team": 5,
+          "faction": 2,
+          "level": null
+        }
+      ]
+    },
+    "afterKick": {
+      "code": "SeatDefaults",
+      "state": "lobby",
+      "mode": "conquest",
+      "you": 0,
+      "players": [
+        {
+          "name": "seat-0",
+          "connected": true,
+          "ai": false,
+          "team": 0,
+          "faction": 0,
+          "level": null
+        },
+        {
+          "name": "seat-1",
+          "connected": true,
+          "ai": false,
+          "team": 1,
+          "faction": 1,
+          "level": null
+        },
+        {
+          "name": "seat-3",
+          "connected": true,
+          "ai": false,
+          "team": 3,
+          "faction": 0,
+          "level": null
+        },
+        {
+          "name": "seat-4",
+          "connected": true,
+          "ai": false,
+          "team": 4,
+          "faction": 1,
+          "level": null
+        },
+        {
+          "name": "seat-5",
+          "connected": true,
+          "ai": false,
+          "team": 5,
+          "faction": 2,
+          "level": null
+        }
+      ]
+    },
+    "replacement": {
+      "code": "SeatDefaults",
+      "state": "lobby",
+      "mode": "conquest",
+      "you": 5,
+      "players": [
+        {
+          "name": "seat-0",
+          "connected": true,
+          "ai": false,
+          "team": 0,
+          "faction": 0,
+          "level": null
+        },
+        {
+          "name": "seat-1",
+          "connected": true,
+          "ai": false,
+          "team": 1,
+          "faction": 1,
+          "level": null
+        },
+        {
+          "name": "seat-3",
+          "connected": true,
+          "ai": false,
+          "team": 3,
+          "faction": 0,
+          "level": null
+        },
+        {
+          "name": "seat-4",
+          "connected": true,
+          "ai": false,
+          "team": 4,
+          "faction": 1,
+          "level": null
+        },
+        {
+          "name": "seat-5",
+          "connected": true,
+          "ai": false,
+          "team": 5,
+          "faction": 2,
+          "level": null
+        },
+        {
+          "name": "replacement",
+          "connected": true,
+          "ai": false,
+          "team": 2,
+          "faction": 2,
+          "level": null
+        }
+      ]
+    },
+    "afterReplacement": {
+      "code": "SeatDefaults",
+      "state": "lobby",
+      "mode": "conquest",
+      "you": 0,
+      "players": [
+        {
+          "name": "seat-0",
+          "connected": true,
+          "ai": false,
+          "team": 0,
+          "faction": 0,
+          "level": null
+        },
+        {
+          "name": "seat-1",
+          "connected": true,
+          "ai": false,
+          "team": 1,
+          "faction": 1,
+          "level": null
+        },
+        {
+          "name": "seat-3",
+          "connected": true,
+          "ai": false,
+          "team": 3,
+          "faction": 0,
+          "level": null
+        },
+        {
+          "name": "seat-4",
+          "connected": true,
+          "ai": false,
+          "team": 4,
+          "faction": 1,
+          "level": null
+        },
+        {
+          "name": "seat-5",
+          "connected": true,
+          "ai": false,
+          "team": 5,
+          "faction": 2,
+          "level": null
+        },
+        {
+          "name": "replacement",
+          "connected": true,
+          "ai": false,
+          "team": 2,
+          "faction": 2,
+          "level": null
+        }
+      ]
+    }
+  }
+}

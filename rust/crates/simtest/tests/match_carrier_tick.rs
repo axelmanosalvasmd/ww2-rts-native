@@ -22,6 +22,7 @@ use ww2_core::{
     game::Point,
     map::AuthoritativeMap,
     match_commands::{Command, MoveOutcome, UnitControl},
+    match_end::MatchSample,
     match_runtime::{Match, MatchOptions, PlayerConfig},
     match_tick::{TickPathConfig, TickPhase},
     orders::OrderKey,
@@ -576,10 +577,9 @@ fn compare(
                 m.timeline
                     .iter()
                     .map(|s| match s {
-                        ww2_core::match_end::MatchSample::Conquest { t, vp } =>
-                            json!({"t":t,"vp":vp}),
-                        ww2_core::match_end::MatchSample::Territories { .. } =>
-                            panic!("carrier-tick fixture cannot represent a Territories timeline"),
+                        MatchSample::Conquest { t, vp } => json!({"t":t,"vp":vp}),
+                        MatchSample::Territories { .. } =>
+                            panic!("carrier fixture cannot represent a Territories timeline"),
                     })
                     .collect::<Vec<_>>()
             )),

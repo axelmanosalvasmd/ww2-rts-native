@@ -537,6 +537,321 @@ fn startup_and_delivery_scheduler_match_original_functions() {
     }
 }
 #[test]
+fn finite_store_territory_restock_matches_original_javascript() {
+    let f = fixture();
+    let cases = f["finiteStores"].as_array().unwrap();
+    assert_eq!(
+        cases
+            .iter()
+            .map(|c| c["kind"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        [
+            "full-rate",
+            "half-rate",
+            "zero-rate",
+            "inactive",
+            "source",
+            "partially-occupied"
+        ]
+    );
+    let stock = |v: &Value| Stock {
+        ammo: v["ammo"].as_f64().unwrap(),
+        provisions: v["provisions"].as_f64().unwrap(),
+        fuel: v["fuel"].as_f64().unwrap(),
+    };
+    let players = [0, 1].map(|slot| Player {
+        slot,
+        team: 0,
+        spawn: Point { x: 1.0, z: 1.0 },
+        out: false,
+        away: true,
+    });
+    let chars = *b"....";
+    let mut ctx = Context {
+        enabled: true,
+        construction: false,
+        tick: 0,
+        winner: false,
+        army_pop: 1.0,
+        players: &players,
+        width: 2,
+        chars: &chars,
+        aid: &[],
+        points: &[],
+    };
+    for case in cases {
+        let kind = case["kind"].as_str().unwrap();
+        let mut world = TestWorld {
+            units: vec![],
+            next: 20,
+            rate: case["rate"].as_f64().unwrap(),
+            route_mode: "good".into(),
+            handoff: true,
+        };
+        let mut r = LogisticsState::default();
+        let mut state = ConvoyState::setup(true).unwrap();
+        ctx.tick = 0;
+        state.step(ctx, &mut r, &mut world, 0.0).unwrap();
+        assert_eq!(state.next_schedule, 40);
+        let initial = &case["initial"][0];
+        state.stores.push(Store {
+            id: StoreId::Cache(4),
+            owner: 0,
+            at: point(initial),
+            source: initial["source"].as_bool().unwrap(),
+            entity: None,
+            capacity: stock(&initial["capacity"]),
+            buckets: initial["buckets"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|b| (b[0].as_u64().unwrap() as usize, stock(&b[1])))
+                .collect(),
+            donations: vec![],
+            active: initial["active"].as_bool().unwrap(),
+            support: false,
+            point: None,
+        });
+        let before = state.stores.clone();
+        compare(
+            &projection(&state, &r, &world)["stores"],
+            &case["initial"],
+            kind,
+        );
+        let steps = case["steps"].as_array().unwrap();
+        assert_eq!(steps.len(), 5);
+        for (i, row) in steps.iter().enumerate() {
+            ctx.tick = row["tick"].as_u64().unwrap();
+            assert_eq!(ctx.tick, i as u64 + 1);
+            assert_eq!(
+                row["dt"].as_f64().unwrap(),
+                [10.0, 10.0, 20.0, 40.0, 60.0][i]
+            );
+            assert_eq!(row["elapsed"].as_u64().unwrap(), [10, 20, 40, 80, 140][i]);
+            state
+                .step(ctx, &mut r, &mut world, row["dt"].as_f64().unwrap())
+                .unwrap();
+            compare(
+                &projection(&state, &r, &world)["stores"],
+                &row["stores"],
+                &format!("{kind}.step{i}"),
+            );
+            assert!(world.units.is_empty());
+            assert!(state.trucks.is_empty() && state.jobs.is_empty() && state.events.is_empty());
+            assert_eq!(state.next_schedule, 40);
+            if matches!(kind, "zero-rate" | "inactive" | "source") {
+                assert_eq!(state.stores, before);
+            }
+            let store = &state.stores[0];
+            if kind == "full-rate" && i >= 2 || kind == "half-rate" && i >= 3 {
+                compare(
+                    &sj(store.total()),
+                    &json!({"ammo":96,"provisions":3840,"fuel":5760}),
+                    "full capacity",
+                );
+            }
+            if kind == "half-rate" && i == 2 {
+                compare(
+                    &sj(store.total()),
+                    &json!({"ammo":48,"provisions":1920,"fuel":2880}),
+                    "half capacity at 40 seconds",
+                );
+            }
+            if kind == "partially-occupied" {
+                assert_eq!(store.buckets[0], before[0].buckets[0]);
+                if i >= 2 {
+                    compare(
+                        &sj(store.total()),
+                        &json!({"ammo":96,"provisions":3840,"fuel":5760}),
+                        "occupied capacity",
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn local_service_matches_original_javascript() {
+    let f = fixture();
+    let cases = f["localService"].as_array().unwrap();
+    assert_eq!(
+        cases
+            .iter()
+            .map(|c| c["kind"].as_str().unwrap())
+            .collect::<Vec<_>>(),
+        [
+            "source-rate",
+            "finite-continuation",
+            "nearest-recovery",
+            "store-filter",
+            "radius-inclusive",
+            "radius-outside",
+            "rejected-handoff",
+            "rider-carrier",
+            "recipient-exclusions"
+        ]
+    );
+    let players = [0, 1, 2].map(|slot| Player {
+        slot,
+        team: if slot == 2 { 1 } else { 0 },
+        spawn: Point { x: 1.0, z: 1.0 },
+        out: false,
+        away: true,
+    });
+    let chars = *b"....";
+    let mut ctx = Context {
+        enabled: true,
+        construction: false,
+        tick: 0,
+        winner: false,
+        army_pop: 1.0,
+        players: &players,
+        width: 2,
+        chars: &chars,
+        aid: &[],
+        points: &[],
+    };
+    let stock = |v: &Value| Stock {
+        ammo: v["ammo"].as_f64().unwrap(),
+        provisions: v["provisions"].as_f64().unwrap(),
+        fuel: v["fuel"].as_f64().unwrap(),
+    };
+    let mut checkpoints = 0;
+    for case in cases {
+        let kind = case["kind"].as_str().unwrap();
+        let mut world = TestWorld {
+            units: vec![],
+            next: 20,
+            rate: 0.0,
+            route_mode: "good".into(),
+            handoff: case["handoff"].as_bool().unwrap(),
+        };
+        let mut r = LogisticsState::default();
+        let mut state = ConvoyState::setup(true).unwrap();
+        ctx.tick = 0;
+        state.step(ctx, &mut r, &mut world, 0.0).unwrap();
+        assert_eq!(state.next_schedule, 40);
+        world.units = case["initial"]["units"].as_array().unwrap().clone();
+        for u in &world.units {
+            if !u["logistics"].is_null() {
+                r.insert(u["id"].as_u64().unwrap() as u32, reserves(&u["logistics"]));
+            }
+        }
+        for s in case["initial"]["stores"].as_array().unwrap() {
+            state.stores.push(Store {
+                id: StoreId::Cache(
+                    s["id"]
+                        .as_str()
+                        .unwrap()
+                        .strip_prefix("cache:")
+                        .unwrap()
+                        .parse()
+                        .unwrap(),
+                ),
+                owner: s["owner"].as_u64().unwrap() as usize,
+                at: point(s),
+                source: s["source"].as_bool().unwrap(),
+                entity: None,
+                capacity: stock(&s["capacity"]),
+                buckets: s["buckets"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|b| (b[0].as_u64().unwrap() as usize, stock(&b[1])))
+                    .collect(),
+                donations: vec![],
+                active: s["active"].as_bool().unwrap(),
+                support: false,
+                point: None,
+            });
+        }
+        let before = state.stores.clone();
+        let initial = projection(&state, &r, &world);
+        compare(&initial["stores"], &case["initial"]["stores"], kind);
+        compare(&initial["units"], &case["initial"]["units"], kind);
+        let steps = case["steps"].as_array().unwrap();
+        assert_eq!(steps.len(), if kind == "source-rate" { 3 } else { 1 });
+        for (i, row) in steps.iter().enumerate() {
+            ctx.tick = row["tick"].as_u64().unwrap();
+            assert_eq!(ctx.tick, i as u64 + 1);
+            assert!(ctx.tick < 40);
+            let dt = row["dt"].as_f64().unwrap();
+            assert_eq!(
+                dt,
+                if kind == "source-rate" {
+                    [2.0, 6.0, 1.0][i]
+                } else if kind == "nearest-recovery" {
+                    4.0
+                } else {
+                    8.0
+                }
+            );
+            state.step(ctx, &mut r, &mut world, dt).unwrap();
+            let actual = projection(&state, &r, &world);
+            compare(
+                &actual["stores"],
+                &row["stores"],
+                &format!("{kind}.step{i}.stores"),
+            );
+            compare(
+                &actual["units"],
+                &row["units"],
+                &format!("{kind}.step{i}.units"),
+            );
+            assert!(state.trucks.is_empty() && state.jobs.is_empty() && state.events.is_empty());
+            assert_eq!(state.next_schedule, 40);
+            assert_eq!(
+                world.units.len(),
+                case["initial"]["units"].as_array().unwrap().len()
+            );
+            let recipient = r.get(1).unwrap();
+            if matches!(
+                kind,
+                "radius-outside" | "rejected-handoff" | "recipient-exclusions"
+            ) {
+                assert_eq!(state.stores, before);
+                assert_eq!(recipient.provisions, 0.0);
+            } else if kind == "source-rate" && i == 0 {
+                assert_eq!(recipient.provisions, 30.0);
+                assert_eq!(recipient.fuel, Some(60.0));
+                assert!(recipient.forced && recipient.stranded && recipient.exhausted);
+            } else if kind == "nearest-recovery" {
+                assert!(r.recovered(1));
+                assert!(recipient.ammo < recipient.ammo_max);
+                assert!(recipient.provisions < 120.0);
+                assert!(recipient.fuel.unwrap() < 180.0);
+                assert!(recipient.emergency.unwrap() < 60.0);
+                assert!(!recipient.forced && !recipient.stranded && !recipient.exhausted);
+            } else {
+                assert_eq!(recipient.provisions, 120.0);
+                assert_eq!(recipient.ammo, recipient.ammo_max);
+                assert_eq!(recipient.fuel, Some(180.0));
+                assert_eq!(recipient.emergency, Some(60.0));
+                assert!(!recipient.forced && !recipient.stranded && !recipient.exhausted);
+            }
+            if kind == "nearest-recovery" {
+                let farther = state.stores[0].available(0, false);
+                assert!(farther.ammo >= recipient.ammo_price);
+                assert!(farther.provisions > 0.0 && farther.fuel > 0.0);
+                assert_eq!(state.stores[0], before[0]);
+                assert!(state.stores[1].total().provisions < before[1].total().provisions);
+            }
+            if kind == "finite-continuation" {
+                assert_eq!(state.stores[1].total(), Stock::default());
+                assert!(state.stores[0].total().provisions < before[0].total().provisions);
+            }
+            if kind == "store-filter" {
+                assert_eq!(&state.stores[..2], &before[..2]);
+                assert!(state.stores[2].total().provisions < before[2].total().provisions);
+            }
+            checkpoints += 1;
+        }
+    }
+    assert_eq!(checkpoints, 11);
+}
+
+#[test]
 fn payer_grants_conserve_private_and_relief_stock() {
     let f = fixture();
     for row in f["pools"].as_array().unwrap() {

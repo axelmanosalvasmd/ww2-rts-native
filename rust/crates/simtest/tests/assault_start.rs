@@ -1,7 +1,4 @@
-#[path = "common/startup_projection.rs"]
-mod projection;
-#[path = "common/startup.rs"]
-mod startup;
+use crate::shared::startup_projection as projection;
 use projection::{bits, equivalent, terrain};
 use serde_json::{Value, json};
 use ww2_core::{
@@ -39,7 +36,7 @@ fn options(c: &Value) -> MatchOptions {
         living_weather: c["living"].as_bool().unwrap(),
         map_key: None,
         tech: c["tech"].as_bool().unwrap(),
-        supply: false,
+        supply: c["supply"].as_bool().unwrap_or(false),
         logistics: false,
         sandbox: false,
     }
@@ -71,6 +68,8 @@ fn explicit_assault_start_matches_original_create_game() {
         "e4e579a838aabae3b1d9dadbc17a0a87147bc52d"
     );
     let mut units = 0;
+    let mut named_xl = std::collections::BTreeSet::new();
+    let mut named_hill = std::collections::BTreeSet::new();
     for (index, c) in fixture["cases"].as_array().unwrap().iter().enumerate() {
         let source = &fixture["maps"][c["map"].as_u64().unwrap() as usize]["map"];
         let map = AuthoritativeMap::from_json(&serde_json::to_vec(source).unwrap()).unwrap();
@@ -143,7 +142,9 @@ fn explicit_assault_start_matches_original_create_game() {
             assert!(
                 combat.cargo.is_empty() && combat.carrier.is_none() && combat.last_hit.is_none()
             );
-            units += 1;
+            if index < 43 {
+                units += 1;
+            }
             assert!(
                 m.grid
                     .in_order(&m.world.game.units, (unit.x, unit.z), 0.0, |_, _| true)
@@ -235,13 +236,95 @@ fn explicit_assault_start_matches_original_create_game() {
         assert!(m.timeline.is_empty());
         assert_eq!(m.capture_ticks.len(), m.start.points.len());
         assert!(m.story.iter().all(|r| *r == Default::default()));
+        if let Some(selected) = c.get("selectedCheck") {
+            assert!(index >= 43, "named cases must follow the original corpus");
+            assert!(m.options.supply && m.options.living_weather);
+            let map_name = fixture["maps"][c["map"].as_u64().unwrap() as usize]["name"]
+                .as_str()
+                .unwrap();
+            assert_eq!(
+                map_name,
+                format!("{}.json", selected["map"].as_str().unwrap())
+            );
+            match selected["kind"].as_str().unwrap() {
+                "xl" => {
+                    assert!(named_xl.insert(map_name.to_owned()));
+                    assert_eq!(m.start.players.len(), 6);
+                    assert!(!m.options.shuffle);
+                    assert_eq!(map.spawns().len(), 6);
+                    assert_eq!(map.defend(), Some([0usize, 1, 2].as_slice()));
+                    assert_eq!(bits(state.time_left), selected["clock"]);
+                    let bunkers: Vec<_> = m
+                        .world
+                        .game
+                        .units
+                        .values()
+                        .filter(|unit| m.rules.kinds[unit.kind].name == "bunker")
+                        .map(|unit| unit.id)
+                        .collect();
+                    assert_eq!(bunkers.len(), 3);
+                    assert_eq!(json!(bunkers), selected["bunkers"]);
+                    assert_eq!(state.total, 3);
+                }
+                "hill" => {
+                    assert!(m.options.shuffle);
+                    assert_eq!(m.start.players.len(), 3);
+                    assert!(named_hill.insert(selected["shuffleCase"].as_u64().unwrap()));
+                    let game = &m.world.game;
+                    let levels: Vec<_> = m
+                        .start
+                        .players
+                        .iter()
+                        .map(|player| {
+                            game.height.as_ref().unwrap()
+                                [game.cell_of(player.spawn.x, player.spawn.z).unwrap()]
+                        })
+                        .collect();
+                    assert_eq!(levels, [0i8, 0, 4]);
+                    assert_eq!(json!(levels), selected["levels"]);
+                    let route = &selected["route"];
+                    let actor = &game.units[&(route["actor"].as_u64().unwrap() as u32)];
+                    assert_eq!(actor.owner, 0);
+                    assert_eq!(m.rules.kinds[actor.kind].name, "rifle");
+                    assert_eq!(json!([bits(actor.x), bits(actor.z)]), route["from"]);
+                    let target = m.start.players[2].spawn;
+                    assert_eq!(json!([bits(target.x), bits(target.z)]), route["target"]);
+                    assert!(!route["path"].as_array().unwrap().is_empty());
+                    // This is a retained native admission limit, not a successful route comparison.
+                    assert_eq!(
+                        m.refresh_recipient_routing(0).unwrap_err(),
+                        "owned routing currently supports ordinary Conquest"
+                    );
+                }
+                kind => panic!("unknown selected Assault check {kind}"),
+            }
+        } else {
+            assert!(index < 43, "new cases need their named-check scope");
+        }
         // Constructor availability must not quietly admit the incomplete mode to a Conquest phase.
         assert!(m.apply_conquest_victory().is_err());
         assert!(m.sample_conquest_tick().is_err());
         assert!(m.apply_point_economy(&[], false).is_err());
     }
-    assert_eq!(fixture["cases"].as_array().unwrap().len(), 43);
+    assert_eq!(fixture["cases"].as_array().unwrap().len(), 57);
+    // Retain the exact actor-count guard for all original 43 cases.
     assert_eq!(units, 702);
+    assert_eq!(
+        named_xl,
+        [
+            "hill-112-xl.json",
+            "monte-cassino-xl.json",
+            "pegasus-bridge-xl.json",
+            "seawall-xl.json",
+        ]
+        .map(str::to_owned)
+        .into_iter()
+        .collect::<std::collections::BTreeSet<_>>()
+    );
+    assert_eq!(
+        named_hill,
+        (0u64..10).collect::<std::collections::BTreeSet<_>>()
+    );
 }
 #[test]
 fn explicit_mode_admission_rejects_invalid_or_unimplemented_setup() {

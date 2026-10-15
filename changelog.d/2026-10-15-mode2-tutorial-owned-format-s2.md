@@ -1,0 +1,1 @@
+- Format only the two new Tutorial provider/test files after retaining the first formatting failure. Literal token comparison preserves every comment, string and other token, allowing only two optional trailing commas; all runtime behavior, predicates, fixtures and row statuses are unchanged.

@@ -117,8 +117,66 @@ fn supported(m: &Match, structure: &WorldStructure) -> Result<BTreeSet<String>, 
 }
 
 impl Match {
+    /// Read-only whole-operation admission for callers that stage several crew repairs.
+    /// Returns a conservative mutation reservation; no health or terrain is published.
+    pub(crate) fn preflight_building_repair(&self, id: UnitId, amount: f64) -> Result<u64, String> {
+        if !matches!(
+            self.options.mode,
+            crate::economy::Mode::Default | crate::economy::Mode::Conquest
+        ) || self.world.game.mode.is_some()
+            || !amount.is_finite()
+            || amount < 0.0
+        {
+            return Err("invalid Conquest repair request".into());
+        }
+        let unit = self
+            .world
+            .game
+            .units
+            .get(&id)
+            .ok_or("missing repair unit")?;
+        let definition = def(self, id)?;
+        if !flag(definition, "building") || !unit.hp.is_finite() {
+            return Err("invalid repair building".into());
+        }
+        number(definition, "hpPer")?;
+        if unit.hp <= 0.0 {
+            return Ok(0);
+        }
+        let Some(structure) = self
+            .world
+            .structures
+            .iter()
+            .find(|s| s.entity_id == Some(id))
+        else {
+            return Ok(0);
+        };
+        if structure.cells.len() != structure.section_ids.len()
+            || self.world.game.units.values().any(|u| {
+                u.kind >= self.rules.kinds.len() || ![u.x, u.z, u.hp].iter().all(|v| v.is_finite())
+            })
+        {
+            return Err("invalid repair footprint/occupancy".into());
+        }
+        self.world
+            .preflight_cell_rows(&structure.cells)
+            .map_err(|e| e.to_string())?;
+        supported(self, structure)?;
+        let count = structure.cells.len() as u64 * 4 + 1;
+        self.world
+            .mutation_capacity(count)
+            .map_err(|e| e.to_string())?;
+        self.world
+            .journal_end()
+            .map_err(|e| e.to_string())?
+            .checked_add(count)
+            .ok_or("repair journal capacity exhausted")?;
+        Ok(count)
+    }
+
     /// Repair existing sections in source order. Dead buildings cannot be restored.
     pub fn repair_building_sections(&mut self, id: UnitId, amount: f64) -> Result<f64, String> {
+        self.preflight_building_repair(id, amount)?;
         if !matches!(
             self.options.mode,
             crate::economy::Mode::Default | crate::economy::Mode::Conquest
@@ -301,13 +359,9 @@ fn config() -> Result<&'static Value, String> {
 }
 impl Match {
     fn validate_recovery_ids(&self, ids: &[UnitId]) -> Result<(), String> {
-        if !matches!(
-            self.options.mode,
-            crate::economy::Mode::Default | crate::economy::Mode::Conquest
-        ) || self.world.game.mode.is_some()
-            || !(0..9_007_199_254_740_351).contains(&self.world.game.tick)
-        {
-            return Err("recovery currently requires represented Conquest state".into());
+        self.validate_actor_mode()?;
+        if !(0..9_007_199_254_740_351).contains(&self.world.game.tick) {
+            return Err("invalid recovery clock".into());
         }
         let mut seen = BTreeSet::new();
         for &id in ids {
@@ -322,7 +376,6 @@ impl Match {
                 .ok_or("missing captured recovery unit")?;
             if unit.id != id
                 || unit.kind >= self.rules.kinds.len()
-                || unit.owner >= self.world.game.players.len()
                 || ![
                     unit.x,
                     unit.z,
@@ -335,6 +388,7 @@ impl Match {
             {
                 return Err("invalid captured recovery unit".into());
             }
+            self.actor_policy(unit.owner)?;
             let row = self.recovery.get(id).ok_or("missing recovery metadata")?;
             if !row.reinforcement.is_finite() || row.hp_was.is_some_and(|hp| !hp.is_finite()) {
                 return Err("invalid recovery metadata".into());
@@ -396,7 +450,12 @@ impl Match {
         };
         for &id in ids {
             let u = &self.world.game.units[&id];
-            if self.rules.kinds[u.kind].name == "hq" && u.built.unwrap_or(0.) >= 1. && u.hp > 0. {
+            let base = if self.world.game.mode == Some(crate::game::ModeKind::World) {
+                flag(def(self, id)?, "produces")
+            } else {
+                self.rules.kinds[u.kind].name == "hq"
+            };
+            if base && u.built.unwrap_or(0.) >= 1. && u.hp > 0. {
                 frame.bases.push(id);
             }
             if flag(def(self, id)?, "reinforces") && u.hp > 0. && u.still.unwrap_or(0.) >= 2. {
@@ -418,9 +477,10 @@ impl Match {
             }
         }
         for (&cell, &owner) in &self.world.aid {
-            if owner >= self.world.game.players.len() || cell >= self.world.game.chars.len() {
+            if cell >= self.world.game.chars.len() {
                 return Err("invalid recovery aid".into());
             }
+            self.actor_policy(owner)?;
             frame.tents.push((
                 owner,
                 Point {
@@ -587,10 +647,31 @@ impl Match {
         self.check_recovery_frame(&frame, 0.)?;
         self.sweep_prepared_mines(&frame)
     }
+    fn recovery_home(&self, frame: &RecoveryFrame, id: UnitId) -> Result<bool, String> {
+        let u = &self.world.game.units[&id];
+        let d = def(self, id)?;
+        let full = number(d, "models")? * number(d, "hpPer")?;
+        let home_radius = number(config()?, "reinforceRadius")?;
+        let home = !flag(d, "structure")
+            && !flag(d, "air")
+            && u.hp > 0.
+            && u.hp < full
+            && (frame.bases.iter().any(|base| {
+                let b = &self.world.game.units[base];
+                (if self.world.game.mode == Some(crate::game::ModeKind::World) {
+                    self.world.game.allied(b.owner, u.owner)
+                } else {
+                    b.owner == u.owner
+                }) && dist(u.at(), b.at()) <= home_radius
+            }) || frame.depots.iter().any(|(owner, at)| {
+                self.world.game.allied(*owner, u.owner) && dist(u.at(), *at) <= home_radius
+            }));
+        Ok(home)
+    }
     /// Run after point supply and network refresh, using the earlier captured base/aid membership.
     pub fn reinforce(&mut self, frame: &RecoveryFrame, dt: f64) -> Result<(), String> {
         self.check_recovery_frame(frame, dt)?;
-        self.validate_conquest_finish_state()?;
+        self.validate_match_finish_state()?;
         self.validate_support_provisions()?;
         if self.start.economy.players.iter().any(|p| !p.mp.is_finite()) {
             return Err("invalid recovery wallet".into());
@@ -599,7 +680,6 @@ impl Match {
         let every = number(cfg, "reinforceEvery")?;
         let aid = cfg.get("aid").ok_or("missing recovery aid rules")?;
         let slow = number(aid, "slow")?;
-        let home_radius = number(cfg, "reinforceRadius")?;
         let aid_radius = number(aid, "radius")?;
         let carrier_radius = number(aid, "carrier")?;
         // Provision hooks can decline a charge. Simulate the positive upper bounds on only
@@ -625,7 +705,7 @@ impl Match {
                 return Err("invalid recovery result".into());
             }
             changes.push(StoryChange {
-                slot: Some(u.owner),
+                slot: self.actor_policy(u.owner)?.economy_slot,
                 key: StoryKey::MpSpent,
                 amount: cost,
             });
@@ -642,16 +722,7 @@ impl Match {
             let hp_per = number(d, "hpPer")?;
             let full = models * hp_per;
             let infantry = self.rules.kinds[u.kind].infantry;
-            let home = !flag(d, "structure")
-                && !flag(d, "air")
-                && u.hp > 0.
-                && u.hp < full
-                && (frame.bases.iter().any(|base| {
-                    let b = &self.world.game.units[base];
-                    b.owner == u.owner && dist(u.at(), b.at()) <= home_radius
-                }) || frame.depots.iter().any(|(owner, at)| {
-                    self.world.game.allied(*owner, u.owner) && dist(u.at(), *at) <= home_radius
-                }));
+            let home = self.recovery_home(frame, id)?;
             let forward = infantry
                 && (frame.tents.iter().any(|(owner, at)| {
                     self.world.game.allied(*owner, u.owner) && dist(u.at(), *at) <= aid_radius
@@ -665,6 +736,7 @@ impl Match {
                 continue;
             }
             let owner = u.owner;
+            let economy_slot = self.actor_policy(owner)?.economy_slot;
             let hp = u.hp;
             let rate = self.logistics.recovery_rate(id);
             if infantry {
@@ -672,12 +744,13 @@ impl Match {
                 let timer = &mut self.recovery.get_mut(id).unwrap().reinforcement;
                 *timer += dt * rate;
                 if *timer >= every * if home { 1. } else { slow }
-                    && self.start.economy.players[owner].mp >= cost
-                    && self.spend_support_provisions(id, owner, 5.)?
+                    && economy_slot.is_some_and(|slot| self.start.economy.players[slot].mp >= cost)
+                    && self.spend_support_provisions(id, economy_slot.unwrap(), 5.)?
                 {
                     self.recovery.get_mut(id).unwrap().reinforcement = 0.;
-                    self.start.economy.players[owner].mp -= cost;
-                    self.record_spending(owner, cost)?;
+                    let slot = economy_slot.unwrap();
+                    self.start.economy.players[slot].mp -= cost;
+                    self.record_spending(slot, cost)?;
                     self.world.game.units.get_mut(&id).unwrap().hp =
                         math::min(full, ((hp / hp_per).ceil() + 1.) * hp_per);
                 }
@@ -685,13 +758,14 @@ impl Match {
                 let add = math::min(full - hp, 18. * dt * rate);
                 let cost = add * 0.5;
                 if add > 0.
-                    && self.start.economy.players[owner].mp >= cost
-                    && self.spend_support_provisions(id, owner, add / 5.)?
+                    && economy_slot.is_some_and(|slot| self.start.economy.players[slot].mp >= cost)
+                    && self.spend_support_provisions(id, economy_slot.unwrap(), add / 5.)?
                 {
                     self.world.game.units.get_mut(&id).unwrap().hp += add;
-                    self.start.economy.players[owner].mp -= cost;
+                    let slot = economy_slot.unwrap();
+                    self.start.economy.players[slot].mp -= cost;
                     self.recovery.get_mut(id).unwrap().reinforcement = 1.;
-                    self.record_spending(owner, cost)?;
+                    self.record_spending(slot, cost)?;
                 }
             }
         }
@@ -723,11 +797,12 @@ impl Match {
             {
                 continue;
             }
-            let team = self.world.game.players[unit.owner].team;
-            if !(0..=5).contains(&team) {
+            let team = self.actor_policy(unit.owner)?.team;
+            if !(0..=5).contains(&team) && team != -1 {
                 return Err("invalid mine discovery team".into());
             }
-            let bit = 1u32 << team;
+            // Source JavaScript masks the signed team shift to five bits.
+            let bit = 1u32 << ((team as u32) & 31);
             let at = unit.at();
             let cx = (at.x / CELL).floor() as i64;
             let cz = (at.z / CELL).floor() as i64;

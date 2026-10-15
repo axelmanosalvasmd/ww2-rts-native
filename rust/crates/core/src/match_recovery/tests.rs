@@ -674,3 +674,295 @@ fn medic_path_identity_capacity_rejects_before_health_or_wound_writes() {
     assert_eq!(snapshot(&m, &order, None, &[]), before);
     assert_eq!(m.world.game.units[&1].path_gen, u64::MAX);
 }
+
+fn world_recovery_bits(n: f64) -> Value {
+    json!(format!("{:016x}", n.to_bits()))
+}
+fn world_recovery_scene(fixture: &Value) -> Match {
+    let map = AuthoritativeMap::from_json(&serde_json::to_vec(&fixture["map"]).unwrap()).unwrap();
+    Match::new_world(
+        &map,
+        MatchOptions {
+            seed: 701,
+            mode: Mode::World,
+            players: vec![
+                PlayerConfig {
+                    name: "Recovery".into(),
+                    team: 0,
+                    faction: Faction::Usa,
+                },
+                PlayerConfig {
+                    name: "Ally".into(),
+                    team: 0,
+                    faction: Faction::Germany,
+                },
+            ],
+            shuffle: false,
+            army: ArmySize::Standard,
+            weather: WeatherChoice::Map,
+            weather_seed: Some(1),
+            living_weather: false,
+            map_key: None,
+            tech: false,
+            supply: false,
+            logistics: false,
+            sandbox: false,
+        },
+        crate::random::MatchRandom::new(701),
+    )
+    .unwrap()
+}
+fn compare_world_recovery(
+    m: &Match,
+    expected: &Value,
+    frame: Option<&RecoveryFrame>,
+    context: &str,
+) {
+    let rows=m.world.game.units.iter().map(|(&id,u)|{let actor=m.actor_policy(u.owner).unwrap();let r=m.recovery.get(id).unwrap();json!({"id":id,"type":m.rules.kinds[u.kind].name,"owner":actor.source_owner,"team":actor.team,"x":world_recovery_bits(u.x),"z":world_recovery_bits(u.z),"hp":world_recovery_bits(u.hp),"reinf":world_recovery_bits(r.reinforcement),"hpWas":r.hp_was.map(world_recovery_bits),"woundAt":r.wound_at,"healAt":r.heal_at,"path":u.path.iter().map(|p|json!({"x":world_recovery_bits(p.x),"z":world_recovery_bits(p.z)})).collect::<Vec<_>>()})}).collect::<Vec<_>>();
+    assert_eq!(
+        json!(rows),
+        expected["actors"],
+        "{context}: all authoritative actors"
+    );
+    assert_eq!(
+        json!(m.world.game.units.keys().copied().collect::<Vec<_>>()),
+        expected["actorOrder"],
+        "{context}: source actor order"
+    );
+    assert_eq!(json!(m.world.game.tick), expected["tick"]);
+    assert_eq!(json!(m.start.environment_seed), expected["seed"]);
+    assert_eq!(
+        json!(
+            m.start
+                .economy
+                .players
+                .iter()
+                .map(|p| world_recovery_bits(p.mp))
+                .collect::<Vec<_>>()
+        ),
+        expected["wallets"],
+        "{context}: commander wallets"
+    );
+    assert_eq!(m.start.economy.players.len(), 2);
+    assert_eq!(m.world.game.players.len(), 2);
+    assert_eq!(expected["localWallet"], world_recovery_bits(0.));
+    if expected["story"].is_null() {
+        assert!(m.story.iter().all(|s| s.mp_spent == 0.));
+    } else {
+        assert_eq!(
+            json!(
+                m.story
+                    .iter()
+                    .map(|s| json!({"mpSpent":world_recovery_bits(s.mp_spent)}))
+                    .collect::<Vec<_>>()
+            ),
+            expected["story"],
+            "{context}: spending"
+        );
+    }
+    assert_eq!(
+        json!(
+            m.world
+                .mine_seen
+                .iter()
+                .map(|(c, b)| json!([c, *b as i32]))
+                .collect::<Vec<_>>()
+        ),
+        expected["mineSeen"],
+        "{context}: signed Source mask, identical bit31"
+    );
+    assert_eq!(
+        json!(
+            m.world
+                .mines
+                .iter()
+                .map(|(c, b)| json!([c, b]))
+                .collect::<Vec<_>>()
+        ),
+        expected["mines"]
+    );
+    if let Some(frame) = frame {
+        assert_eq!(json!(frame.units), expected["frame"]["list"]);
+        assert_eq!(
+            json!(frame.bases),
+            expected["frame"]["bases"],
+            "{context}: captured production bases"
+        );
+        assert_eq!(json!(frame.tracks), expected["frame"]["tracks"]);
+        let home = frame
+            .units
+            .iter()
+            .copied()
+            .filter(|id| m.recovery_home(frame, *id).unwrap())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            json!(home),
+            expected["frame"]["home"],
+            "{context}: live Source home predicate"
+        );
+    } else {
+        assert!(expected["frame"].is_null());
+    }
+}
+#[test]
+fn captured_world_recovery_matches_original_source_without_local_seat() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/world-recovery.json")).unwrap();
+    let mut actions = 0;
+    for case in fixture["cases"].as_array().unwrap() {
+        let name = case["name"].as_str().unwrap();
+        let mut m = world_recovery_scene(&fixture);
+        let random = m.start.random.snapshot();
+        let aliases = &case["aliases"];
+        let mut frame = None;
+        compare_world_recovery(&m, &case["initial"], None, name);
+        for (index, a) in case["actions"].as_array().unwrap().iter().enumerate() {
+            actions += 1;
+            match a["op"].as_str().unwrap() {
+                "clock" => m.world.game.tick = a["tick"].as_i64().unwrap(),
+                "prime" => {
+                    let id = aliases[a["unit"].as_str().unwrap()].as_u64().unwrap() as u32;
+                    for (k, v) in a["fields"].as_object().unwrap() {
+                        match k.as_str() {
+                            "hp" => {
+                                m.world.game.units.get_mut(&id).unwrap().hp = v.as_f64().unwrap()
+                            }
+                            "reinf" => {
+                                m.recovery.get_mut(id).unwrap().reinforcement = v.as_f64().unwrap()
+                            }
+                            "still" => {
+                                m.world.game.units.get_mut(&id).unwrap().still =
+                                    Some(v.as_f64().unwrap())
+                            }
+                            k => panic!("unrepresented recovery scene field{k}"),
+                        }
+                    }
+                }
+                "nearBase" => {
+                    let id = aliases[a["unit"].as_str().unwrap()].as_u64().unwrap() as u32;
+                    let base = aliases[a["base"].as_str().unwrap()].as_u64().unwrap() as u32;
+                    let at = m.world.game.units[&base].at();
+                    let u = m.world.game.units.get_mut(&id).unwrap();
+                    u.x = at.x;
+                    u.z = at.z;
+                }
+                "prepare" => {
+                    frame = Some(
+                        m.prepare_recovery(&m.world.game.units.keys().copied().collect::<Vec<_>>())
+                            .unwrap(),
+                    )
+                }
+                "reinforce" => m
+                    .reinforce(frame.as_ref().unwrap(), a["dt"].as_f64().unwrap())
+                    .unwrap(),
+                "heal" => {
+                    m.heal_wounded(frame.as_ref().unwrap().units(), a["dt"].as_f64().unwrap())
+                        .unwrap();
+                }
+                "sweep" => m.sweep_mines(frame.as_ref().unwrap().units()).unwrap(),
+                "mine" => {
+                    let c = aliases["mine"].as_u64().unwrap() as usize;
+                    m.world
+                        .mutate_cell(
+                            c,
+                            CellChange {
+                                mine: Some(true),
+                                ..CellChange::default()
+                            },
+                        )
+                        .unwrap();
+                }
+                "medic" => {
+                    let row = &case["factory"][0];
+                    let id = row["id"].as_u64().unwrap() as u32;
+                    assert_eq!(m.next_unit_id, id);
+                    assert!(!m.world.game.units.contains_key(&id));
+                    let kind = m.rules.kind("medic").unwrap();
+                    let owner = crate::game::LOCAL_DEFENDER_OWNER;
+                    let u = initial_unit(
+                        &m.rules,
+                        Catalog::compiled().unwrap(),
+                        kind,
+                        id,
+                        owner,
+                        Point {
+                            x: row["x"].as_f64().unwrap(),
+                            z: row["z"].as_f64().unwrap(),
+                        },
+                    )
+                    .unwrap();
+                    m.commands.insert(
+                        id,
+                        UnitControl::new_for_mode(&u, &m.rules, Mode::World).unwrap(),
+                    );
+                    m.combat.initialize(id);
+                    m.firing.initialize(id);
+                    m.abilities.initialize(id);
+                    m.recovery.initialize(id);
+                    m.world.game.units.insert(id, u);
+                    m.next_unit_id = id.checked_add(1).unwrap();
+                }
+                op => panic!("unrepresented World recovery action{op}"),
+            }
+            m.grid.rebuild(&m.world.game.units);
+            compare_world_recovery(
+                &m,
+                &case["snapshots"][index],
+                frame.as_ref(),
+                &format!("{name} action{index}"),
+            );
+            assert_eq!(
+                m.start.random.snapshot(),
+                random,
+                "recovery must preserve recorded streams"
+            );
+        }
+    }
+    assert_eq!(actions, 30);
+}
+#[test]
+fn invalid_world_recovery_actor_rejects_before_health_wallet_or_metadata() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/world-recovery.json")).unwrap();
+    let mut m = world_recovery_scene(&fixture);
+    let id = *m.world.game.units.keys().next().unwrap();
+    m.world.game.units.get_mut(&id).unwrap().owner = m.world.game.players.len() + 1;
+    let health = m
+        .world
+        .game
+        .units
+        .iter()
+        .map(|(id, u)| (*id, u.hp.to_bits()))
+        .collect::<Vec<_>>();
+    let wallets = m
+        .start
+        .economy
+        .players
+        .iter()
+        .map(|p| p.mp.to_bits())
+        .collect::<Vec<_>>();
+    let metadata = m.recovery.clone();
+    assert!(
+        m.prepare_recovery(&m.world.game.units.keys().copied().collect::<Vec<_>>())
+            .is_err()
+    );
+    assert_eq!(
+        m.world
+            .game
+            .units
+            .iter()
+            .map(|(id, u)| (*id, u.hp.to_bits()))
+            .collect::<Vec<_>>(),
+        health
+    );
+    assert_eq!(
+        m.start
+            .economy
+            .players
+            .iter()
+            .map(|p| p.mp.to_bits())
+            .collect::<Vec<_>>(),
+        wallets
+    );
+    assert_eq!(m.recovery, metadata);
+}

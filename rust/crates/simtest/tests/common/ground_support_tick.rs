@@ -242,6 +242,45 @@ pub fn signature(m: &Match) -> Value {
     ])
 }
 
+pub fn smoke_los(m: &Match, query: &Value) -> Value {
+    let from = Point {
+        x: n(&query["from"]["x"]),
+        z: n(&query["from"]["z"]),
+    };
+    let to = Point {
+        x: n(&query["to"]["x"]),
+        z: n(&query["to"]["z"]),
+    };
+    let g = &m.world.game;
+    let mut control = g.clone();
+    control.smokes.clear();
+    let visible = |g| ww2_core::vision::los(g, &m.rules, (from.x, from.z), (to.x, to.z));
+    json!({"from":point_json(from),"to":point_json(to),"withSmoke":visible(g),"withoutSmoke":visible(&control)})
+}
+
+pub fn compare_smoke_los(m: &Match, encoded: &Value, context: &str) {
+    let actual = smoke_los(m, &encoded["raw"]["smokeLos"]);
+    let expected = &encoded["raw"]["smokeLos"];
+    for (a, e) in [
+        (&actual, expected),
+        (&actual["from"], &expected["from"]),
+        (&actual["to"], &expected["to"]),
+    ] {
+        assert_eq!(
+            a.as_object().unwrap().keys().collect::<Vec<_>>(),
+            e.as_object().unwrap().keys().collect::<Vec<_>>(),
+            "{context}: smoke observation fields"
+        );
+    }
+    assert_source(
+        &actual,
+        expected,
+        &encoded["floatBits"],
+        "smokeLos",
+        context,
+    );
+}
+
 pub fn compare(
     m: &Match,
     encoded: &Value,
@@ -269,6 +308,7 @@ pub fn compare(
         "strikes":m.world.game.strikes.iter().map(|s| { let timing=s.runtime.as_ref().unwrap();json!({"kind":timing.kind.name(),"owner":s.owner,"x":s.x,"z":s.z,"dir":s.dir,"t":timing.delay,"left":timing.left,"next":timing.next,"live":s.live})}).collect::<Vec<_>>(),
         "covers":m.support.covers.iter().map(|c|json!({"team":c.team,"owner":c.owner,"x":c.at.x,"z":c.at.z,"r":c.radius,"t":c.remaining})).collect::<Vec<_>>(),
         "smokes":g.smokes.iter().map(|s|json!({"id":s.id,"x":s.x,"z":s.z,"r":s.r,"t":s.remaining})).collect::<Vec<_>>(),"shots":shots,
+        "smokeLos":smoke_los(m, &encoded["raw"]["smokeLos"]),
         "timeline":m.timeline.iter().map(|s|match s { MatchSample::Conquest {t,vp}=>json!({"t":t,"vp":vp}), MatchSample::Territories {..}=>panic!("ground-support fixture cannot represent a Territories timeline") }).collect::<Vec<_>>(),"flights":[],"nades":[],"salvos":[],
         "environment":{"fires":m.world.fires.iter().map(|(c,t)|json!([c,t])).collect::<Vec<_>>(),"soak":m.world.soak(),"mines":m.world.mines.iter().map(|(c,o)|json!([c,o])).collect::<Vec<_>>(),"aid":m.world.aid.iter().map(|(c,o)|json!([c,o])).collect::<Vec<_>>(),"claims":m.firing.target_claims().map(|((target,team),v)|json!([u64::from(target)*8+team as u64,v])).collect::<Vec<_>>(),"wrecks":[],"newCells":m.world.new_cells().iter().map(cell_row).collect::<Vec<_>>(),"cellLog":m.world.cell_log().iter().map(cell_row).collect::<Vec<_>>()},
         "terrain":{"chars":runs(g.chars.iter().map(|c|json!(char::from(*c).to_string()))),"flags":runs(g.flags.iter().map(|c|json!(c))),"height":g.height.as_ref().map(|h|runs(h.iter().map(|n|json!(n)))),"cellHp":runs(g.cell_hp.iter().map(|n|json!(f64::from(*n)))),"wear":runs(g.wear.as_ref().unwrap().iter().map(|n|json!(f64::from(*n)))),"scar":runs(m.world.scar.iter().map(|n|json!(f64::from(*n)))),"burnt":runs(m.world.burnt.iter().map(|n|json!(n))),"cellState":runs(m.world.cell_state.iter().map(|n|json!(n))),"versions":[g.terrain_version,m.world.versions.obstruction,m.world.versions.infantry,m.world.versions.vehicle,m.world.versions.naval]}});

@@ -19,11 +19,15 @@ concurrency:
   group: rust-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+# Lint, tests and the release library run as separate jobs so the slowest
+# platform waits only on its test job. Each job restores a dependency cache
+# saved by main; pull requests restore it but never save, so the cache stays
+# within the repository limit.
 jobs:
-  check:
-    name: Rust (${{ matrix.os }})
+  lint:
+    name: Lint (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 40
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -44,12 +48,85 @@ jobs:
           rustup toolchain install --profile minimal --component rustfmt --component clippy --no-self-update
           rustc --version
           cargo --version
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: rust
+          shared-key: lint
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Check formatting
+        # Formatting does not depend on the platform, so one runner checks it.
+        if: runner.os == 'Linux'
         run: cargo fmt --all --check
       - name: Check Clippy
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
+
+  test:
+    name: Rust (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-15]
+    defaults:
+      run:
+        shell: bash
+        working-directory: rust
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned Rust toolchain
+        run: |
+          rustup toolchain install --profile minimal --no-self-update
+          rustc --version
+          cargo --version
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: rust
+          shared-key: test
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - uses: taiki-e/install-action@1168f6810a3cb30a3514bf5756a3b7f0422c6df8 # v2.87.28
+        with:
+          tool: cargo-nextest@0.9.148
       - name: Test the workspace
-        run: cargo test --locked --workspace --profile ci-test
+        # nextest runs tests from every test binary at once; cargo test runs
+        # the binaries one after another. Same tests, same ci-test profile.
+        run: cargo nextest run --locked --workspace --cargo-profile ci-test --profile ci
+      - name: Run documentation tests
+        # nextest does not run doctests.
+        run: cargo test --locked --workspace --profile ci-test --doc
+
+  release:
+    name: Release library (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025, macos-15]
+    defaults:
+      run:
+        shell: bash
+        working-directory: rust
+    env:
+      CARGO_TERM_COLOR: always
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install the pinned Rust toolchain
+        run: |
+          rustup toolchain install --profile minimal --no-self-update
+          rustc --version
+          cargo --version
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: rust
+          shared-key: release
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: Build the release C library
         run: cargo build --locked -p ww2-ffi --release
       - name: Link and replay the C formation fixture on Linux

@@ -279,7 +279,7 @@ mod tests {
             .game
             .units
             .values()
-            .find(|u| u.owner == 0 && state.rules.kinds[u.kind].infantry)
+            .find(|u| u.owner == 0 && state.rules.kinds[u.kind].name == "rifle")
             .unwrap()
             .id;
         state.commands.units.get_mut(&actor).unwrap().auto_retreat = false;
@@ -311,14 +311,39 @@ mod tests {
         for building in [false, true] {
             let unit = state.world.game.units.get_mut(&actor).unwrap();
             unit.hp = 1.;
-            unit.build = building;
             unit.garrison = (!building).then_some(house);
+            if building {
+                // Repair a constructor-created HQ through the canonical assignment API.
+                let site = state
+                    .world
+                    .game
+                    .units
+                    .values()
+                    .find(|u| u.owner == 0 && state.rules.kinds[u.kind].name == "hq")
+                    .unwrap()
+                    .id;
+                state.world.game.units.get_mut(&site).unwrap().hp = 1.;
+                assert_eq!(
+                    state
+                        .execute_assist(0, &[i64::from(actor)], i64::from(site), false)
+                        .unwrap(),
+                    None
+                );
+                assert!(state.world.game.units[&actor].build);
+                assert_eq!(state.commands.units[&actor].build_target, Some(site));
+            }
             state.validate_tick_state().unwrap();
             state.commands.units.get_mut(&actor).unwrap().auto_retreat = true;
-            assert!(
-                state.validate_tick_state().is_err(),
-                "the prospective stance cannot reach an unrepresented automatic exit"
-            );
+            assert!(state.automatic_retreat_candidate(actor).unwrap());
+            if building {
+                // Core construction retreat is supported; this host slice still refuses it.
+                state.validate_tick_state().unwrap();
+            } else {
+                assert!(
+                    state.validate_tick_state().is_err(),
+                    "the prospective stance cannot reach an unrepresented garrison exit"
+                );
+            }
             state.commands.units.get_mut(&actor).unwrap().auto_retreat = false;
             let before = format!(
                 "{:?}",
@@ -341,10 +366,15 @@ mod tests {
             );
             assert_eq!(state.commands.pending_commands(), 0);
         }
-        let unit = state.world.game.units.get_mut(&actor).unwrap();
-        unit.build = false;
-        unit.garrison = None;
-        let before = format!("{:?}", ingress);
+        state.commands.units.get_mut(&actor).unwrap().auto_retreat = true;
+        assert!(state.automatic_retreat_unit(actor).unwrap());
+        assert!(state.world.game.units[&actor].retreating);
+        assert!(!state.world.game.units[&actor].build);
+        assert_eq!(state.commands.units[&actor].build_target, None);
+        let before = format!(
+            "{:?}",
+            (&state.world.game.units, &state.commands.units, &ingress)
+        );
         assert_eq!(
             ingress.enqueue(
                 &mut state,
@@ -353,7 +383,13 @@ mod tests {
             ),
             Err(Denial::Blocked)
         );
-        assert_eq!(format!("{:?}", ingress), before);
+        assert_eq!(
+            format!(
+                "{:?}",
+                (&state.world.game.units, &state.commands.units, &ingress)
+            ),
+            before
+        );
         assert_eq!(state.commands.pending_commands(), 0);
     }
 }

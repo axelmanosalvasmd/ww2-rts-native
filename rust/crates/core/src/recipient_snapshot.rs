@@ -16,6 +16,8 @@ mod composition;
 mod delivery;
 #[path = "recipient_snapshot/engineering.rs"]
 mod engineering;
+#[path = "recipient_snapshot/falling.rs"]
+mod falling;
 #[path = "recipient_snapshot/owners.rs"]
 mod owners;
 #[path = "recipient_snapshot/public_state.rs"]
@@ -178,6 +180,7 @@ impl<'a> SnapshotCache<'a> {
         fields.insert("units".into(), json!(units));
         fields.extend(self.owners[slot].clone());
         fields.extend(self.public[slot].clone());
+        fields.insert("falling".into(), falling::project(self.state, slot)?);
         Ok(RecipientProjection {
             fields,
             missing: vec![
@@ -186,7 +189,6 @@ impl<'a> SnapshotCache<'a> {
                 SnapshotCapability::Fog,
                 SnapshotCapability::ShotsAndFlights,
                 SnapshotCapability::TeamEffects,
-                SnapshotCapability::Scenario,
                 SnapshotCapability::Logistics,
             ],
         })
@@ -1062,3 +1064,7 @@ pub(crate) mod tests {
         ));
     }
 }
+
+#[cfg(test)]
+#[path = "map_house_selected_tests.rs"]
+mod map_house_selected_tests;

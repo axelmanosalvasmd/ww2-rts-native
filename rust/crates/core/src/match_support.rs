@@ -1078,6 +1078,66 @@ impl Match {
         if !dt.is_finite() || dt < 0.0 {
             return Err(SupportError::Invalid("invalid support timer step"));
         }
+        self.advance_support_timer_values(dt)
+    }
+
+    /// Admit only the inert World support timer path. Active support remains unavailable.
+    pub fn validate_world_support_timers(&self, dt: f64) -> Result<(), SupportError> {
+        if self.options.mode != Mode::World
+            || self.world.game.mode != Some(crate::game::ModeKind::World)
+            || self.world_runtime.is_none()
+        {
+            return Err(SupportError::Unsupported(
+                "support timers require canonical World mode",
+            ));
+        }
+        self.validate_world_phase_context(dt)
+            .map_err(SupportError::Actuation)?;
+        if !self.start.points.is_empty() {
+            return Err(SupportError::Invalid(
+                "World support timers require empty legacy points",
+            ));
+        }
+        if !self.world.game.strikes.is_empty() || !self.support.covers.is_empty() {
+            return Err(SupportError::Unsupported(
+                "active World support effects are not connected",
+            ));
+        }
+        let kinds = catalog()?
+            .table("SUPPORT")
+            .map_err(|e| SupportError::Actuation(e.to_string()))?
+            .object()
+            .ok_or(SupportError::Invalid("invalid compiled support table"))?;
+        for (slot, player) in self.start.players.iter().enumerate() {
+            if self.world.game.players[slot].slot != slot
+                || player.config.team != self.world.game.players[slot].team
+                || player.config.team != self.options.players[slot].team
+                || player.support.len() != kinds.len()
+                || kinds.keys().any(|kind| !player.support.contains_key(kind))
+                || player.support.values().any(|value| !value.is_finite())
+            {
+                return Err(SupportError::Invalid(
+                    "World support player metadata mismatch",
+                ));
+            }
+        }
+        self.prepare_support_timer_values(dt)?;
+        Ok(())
+    }
+
+    /// Every World commander cooldown decays, including negative, out and away rows.
+    pub fn advance_world_support_timers(&mut self, dt: f64) -> Result<(), SupportError> {
+        self.validate_world_support_timers(dt)?;
+        self.advance_support_timer_values(dt)
+    }
+
+    fn prepare_support_timer_values(
+        &self,
+        dt: f64,
+    ) -> Result<Vec<(usize, String, f64)>, SupportError> {
+        if !dt.is_finite() || dt < 0.0 {
+            return Err(SupportError::Invalid("invalid support timer step"));
+        }
         let radio = number(cfg()?, "radioCd")?;
         let mut values = Vec::new();
         for (slot, p) in self.start.players.iter().enumerate() {
@@ -1096,6 +1156,11 @@ impl Match {
                 values.push((slot, kind.clone(), next));
             }
         }
+        Ok(values)
+    }
+
+    fn advance_support_timer_values(&mut self, dt: f64) -> Result<(), SupportError> {
+        let values = self.prepare_support_timer_values(dt)?;
         for c in &mut self.support.covers {
             c.remaining -= dt;
         }

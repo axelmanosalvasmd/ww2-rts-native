@@ -47,6 +47,13 @@ impl Match {
             .units
             .get(&id)
             .ok_or("missing retreat unit")?;
+        self.reaction_home_for(unit)
+    }
+
+    pub(crate) fn reaction_home_for(&self, unit: &Unit) -> Result<Point, String> {
+        if self.uses_world_routes() {
+            return self.world_ground_home_for(unit);
+        }
         let mut home = self
             .start
             .players
@@ -80,7 +87,7 @@ impl Match {
 
     /// Source retreat reset. Air, carrier and building exit need their own actuator.
     pub fn retreat_unit(&mut self, id: UnitId) -> Result<(), String> {
-        let mut u = self
+        let u = self
             .world
             .game
             .units
@@ -90,25 +97,41 @@ impl Match {
         if u.air.is_some() || u.riding || u.garrison.is_some() {
             return Err("air, carrier or garrison retreat is unsupported".into());
         }
-        if u.build {
-            return Err("construction retreat is unsupported".into());
-        }
         if u.id != id
             || u.dig != self.field_works.is_active(id)
             || u.entrench != self.field_works.membership(id).is_some()
         {
             return Err("unrepresented or inconsistent retreat field work".into());
         }
-        if !self.commands.units.contains_key(&id) {
-            return Err("missing retreat control".into());
-        }
+        let control = self
+            .commands
+            .units
+            .get(&id)
+            .ok_or("missing retreat control")?;
+        crate::match_construction::validate_build_activity(&u, control)?;
         u.path_gen
             .checked_add(1)
             .ok_or("reaction path identity exhausted")?;
         let home = self.reaction_home(id)?;
         let route = self.command_route(u.owner, &u, home)?;
-        crate::match_runtime::cancel_field_work_state(&mut self.field_works, &mut u)?;
-        self.commands.requests.clear_failures(id);
+        self.apply_retreat_route(u, home, route)?;
+        Ok(())
+    }
+
+    /// Commit a preflighted route through the sole retreat reset authority.
+    /// A manual command may supply an already prepared physical building exit.
+    pub(crate) fn apply_retreat_route(
+        &mut self,
+        mut u: Unit,
+        home: Point,
+        route: crate::pathfinding::PathResult,
+    ) -> Result<(), String> {
+        let id = u.id;
+        crate::match_runtime::cancel_owned_work_state(
+            &mut self.field_works,
+            &mut u,
+            self.commands.units.get_mut(&id).unwrap(),
+        )?;
         // The source retreat reset assigns targetId directly; its existing claim
         // remains until the next tick's claim rebuild.
         self.firing.initialize(id).target_id = 0;
@@ -141,10 +164,10 @@ impl Match {
         c.nade = None;
         c.enter = None;
         c.fire_at = None;
-        c.route_end = Some(route.route_end);
         c.outcome = Some(MoveOutcome::Interrupted);
         c.outcome_tick = Some(self.world.game.tick);
         self.world.game.units.insert(id, u);
+        self.commands.requests.clear_failures(id);
         Ok(())
     }
 
@@ -211,12 +234,16 @@ impl Match {
         if ![u.x, u.z, u.hp, u.rot, c.react]
             .iter()
             .all(|v| v.is_finite())
-            || u.owner >= self.world.game.players.len()
+            || (self.options.mode != crate::economy::Mode::World
+                && u.owner >= self.world.game.players.len())
             || u.hit_from
                 .is_some_and(|p| !p.x.is_finite() || !p.z.is_finite())
             || self.combat.get(id).is_some_and(|h| !h.hit_at.is_finite())
         {
             return Err("invalid canonical reaction state".into());
+        }
+        if self.options.mode == crate::economy::Mode::World {
+            self.actor_policy(u.owner)?;
         }
         if kind.structure || self.logistics.get(id).is_some_and(|r| r.forced) {
             return Ok(());
@@ -263,7 +290,7 @@ impl Match {
             && shooter.is_some_and(|s| self.world.game.units.contains_key(&s))
             && self.can_shoot_target(id, shooter.unwrap_or(0))?;
         if !u.path.is_empty() {
-            if c.rally_drift && answer {
+            if u.drift && c.rally_drift && answer {
                 self.set_firing_target(id, shooter.expect("answer has shooter"))?;
                 let live = self.world.game.units.get_mut(&id).expect("reaction unit");
                 live.amove = u.path.last().copied();
@@ -437,8 +464,13 @@ impl Match {
             points: &points,
             hit_at: &hit_at,
         };
-        let from = command_destinations::threat_for(&context, id, u.at())
-            .map_err(|e| format!("spacing threat: {e:?}"))?;
+        let from = if self.options.mode == crate::economy::Mode::World {
+            let actor = self.actor_policy(u.owner)?;
+            command_destinations::threat_for_with_visibility(&context, id, u.at(), actor.visible)
+        } else {
+            command_destinations::threat_for(&context, id, u.at())
+        }
+        .map_err(|e| format!("spacing threat: {e:?}"))?;
         let rank = terrain::cover_rank(&self.world.game, &self.rules, u.at(), from);
         let radius = number(behavior, "coverSeek")?;
         if let Some(spot) = self.reaction_spot(&u, radius, from, (rank + 1).min(3), rank >= 3)? {
@@ -453,7 +485,11 @@ impl Match {
     }
 
     fn assign_reaction_route(&mut self, mut u: Unit, to: Point, back: bool) -> Result<(), String> {
+        if !self.commands.units.contains_key(&u.id) {
+            return Err("missing reaction route control".into());
+        }
         let route = self.command_route(u.owner, &u, to)?;
+        let route_end = route.route_end;
         u.path = route.waypoints;
         u.path_gen = u
             .path_gen
@@ -478,6 +514,13 @@ impl Match {
                 }
             }
         }
+        let control = self
+            .commands
+            .units
+            .get_mut(&u.id)
+            .expect("admitted reaction control");
+        control.route_end = Some(route_end);
+        control.rally_drift = false;
         self.world.game.units.insert(u.id, u);
         Ok(())
     }

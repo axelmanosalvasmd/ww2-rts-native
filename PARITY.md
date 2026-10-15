@@ -13,7 +13,7 @@ The JavaScript game is a prototype: it was built to try the game's ideas out, an
 
 Some rows were written before this rule and propose copying a JavaScript accident exactly (for example IF-20: one shared random stream, discarded draws included). Where a row and the decisions below disagree, the decisions win.
 
-**Status: draft from the Rust side, 2026-10-12.** Julio's agents wrote the rows by reading the code at the pin; `DESIGN.md` and `CHANGELOG.md` served only to find things, and the code decided. The "Unreal (Axel)" column is a first guess written from the Rust side; Axel owns it and may rewrite it. Client presentation (camera, HUD, menus, effects, audio, languages, assets) has no section yet; Axel's inventory belongs in `docs/parity/client.md`.
+**Status: draft from the Rust side, 2026-10-12.** Julio's agents wrote the rows by reading the code at the pin; `DESIGN.md` and `CHANGELOG.md` served only to find things, and the code decided. The "Unreal (Axel)" column is a first guess written from the Rust side; Axel owns it and may rewrite it. Axel's 140-row client presentation/input inventory is published as [`docs/parity/client.md` at `9551d3976e9145c81030cf5a81ec7f0764b04d12`](https://github.com/axelmanosalvasmd/ww2-rts-native/blob/9551d3976e9145c81030cf5a81ec7f0764b04d12/docs/parity/client.md) in draft [PR #201](https://github.com/axelmanosalvasmd/ww2-rts-native/pull/201), explicitly not for merge. That file is not on main, and no client row is accepted. Its Axel-reported Linux build/automation on Rust `92fb7fe` is separate from live/package evidence on `03a49ac`. Fresh live adoption, Windows/macOS client and input checks, physical mouse/keyboard tests, complete decoder adoption and broader rules-query integration remain pending.
 
 ## Reference pin
 
@@ -46,9 +46,14 @@ Each section ends with the existing limitations it found, the roadmap items it e
 ## How to use it
 
 - **Status values:** `todo`; `in progress`; `ported` (the Rust side passes the row's check); `accepted` (both owners signed off); `differs` (an approved difference, recorded in `DESIGN.md`); `dropped` (an approved removal). The tools table records a proposed decision per tool instead.
+- **NET-17 tracking:** the focused live `listing_is_creation_only` check passes both creation-only directions against pinned Node and Rust, with independent lobby/directory assertions and exact output comparison. NET-17 is `ported` for ordinary lobbies only, not `accepted`; this adds no privacy, role or public-start approval.
 - **Row IDs are stable.** A new row takes the next free number; a removed row is marked `dropped`, not renumbered, so tasks and PRs can cite IDs.
 - **Moving the pin** updates the rows its diff touches, in the same PR as the port and the parity run (`AGENTS.md`).
 - **Limitations are decisions, not tasks.** Each section lists the known bugs and leaks at the pin. The native game may fix them; a fix players would notice follows the rule above.
+
+LOG-17 (local store service) is `ported` by nine isolated original-JavaScript cases and 11 complete-reserve/ordered-inventory checkpoints. Caller-provided handoff results do not prove physical reachability, whole matches or client acceptance. See [the logistics evidence](docs/parity/logistics.md#local-service-evidence-log-17).
+
+LOG-29 (finite-store territory restock) is `ported` by six isolated original-JavaScript component cases and 30 exact ordered-inventory checkpoints. Only caller-provided rates are covered; supply-network/World providers, whole-match proof and joint acceptance remain separate. See [the logistics evidence](docs/parity/logistics.md#finite-store-restock-evidence-log-29).
 
 ## What the inventory found
 

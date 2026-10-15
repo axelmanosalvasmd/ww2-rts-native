@@ -1,3 +1,5 @@
+use crate::shared::firing as common;
+use common::{compare, make, make_with_mode, snapshot};
 use serde_json::Value;
 use std::io::Read;
 use ww2_core::{
@@ -6,9 +8,6 @@ use ww2_core::{
     match_firing::{AbilityBlast, LaunchEvent},
     random::StreamId,
 };
-#[path = "common/firing.rs"]
-mod common;
-use common::{compare, make, make_with_mode, snapshot};
 fn fixture() -> Value {
     let mut text = String::new();
     flate2::read::GzDecoder::new(&include_bytes!("fixtures/match-firing.json.gz")[..])
@@ -19,6 +18,7 @@ fn fixture() -> Value {
 #[test]
 fn default_and_conquest_targeting_and_launches_match_original_source() {
     let fixture: Value = fixture();
+    assert_eq!(fixture["cases"].as_array().unwrap().len(), 131);
     let mut phases = 0;
     for (c, mode) in fixture["cases"]
         .as_array()
@@ -42,7 +42,9 @@ fn default_and_conquest_targeting_and_launches_match_original_source() {
                             .set_cell(c["lateWall"].as_u64().unwrap() as usize, b'B')
                             .unwrap();
                     }
-                    if c["variation"] == "flight-bounce" {
+                    if c["variation"] == "flight-bounce"
+                        || c["variation"] == "flight-explosive-bounce"
+                    {
                         let z = m.world.game.units[&1].z;
                         let t = m.world.game.units.get_mut(&2).unwrap();
                         t.x = 35.0;
@@ -73,13 +75,17 @@ fn default_and_conquest_targeting_and_launches_match_original_source() {
                     t.rot += 0.025;
                     m.grid.rebuild(&m.world.game.units);
                 }
-                m.begin_firing_tick(&[1, 2, 3]).unwrap_or_else(|e| {
+                let order = m.world.game.units.keys().copied().collect::<Vec<_>>();
+                m.begin_firing_tick(&order).unwrap_or_else(|e| {
                     panic!("{} {} tick {current}: {e}", c["shooter"], c["variation"])
                 });
                 m.advance_firing_timers(1, 0.05).unwrap();
                 if !run || current == 1 {
                     m.apply_unit_firing(1, c["variation"] == "moving", 0.05)
                         .unwrap();
+                    if c["variation"] == "choice-claims" {
+                        m.apply_unit_firing(4, false, 0.05).unwrap();
+                    }
                 }
                 if run {
                     m.step_firing_flights().unwrap();
@@ -106,7 +112,7 @@ fn default_and_conquest_targeting_and_launches_match_original_source() {
             phases += 1;
         }
     }
-    assert_eq!(phases, 588 * 2);
+    assert_eq!(phases, 668 * 2);
 }
 
 #[test]

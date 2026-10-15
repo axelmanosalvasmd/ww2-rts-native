@@ -1,0 +1,1 @@
+- Prepare the nine Tutorial step definitions and completion checks for MODE-61 through MODE-69, with an original-Source recorder and ten unrun tests. Source fixture generation, native verification and Tutorial match integration remain pending; live R1 hosting is unchanged.

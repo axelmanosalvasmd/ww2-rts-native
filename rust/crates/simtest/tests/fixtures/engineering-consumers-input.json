@@ -1,0 +1,2908 @@
+{
+  "reference": "e4e579a838aabae3b1d9dadbc17a0a87147bc52d",
+  "acceptance": [
+    "test.js:7502-7536 Roads and mud (complete block)",
+    "test.js:7101-7235 Weather (complete block)",
+    "test.js:4480-4497 AI weather (complete check)"
+  ],
+  "nativeSeed": 701,
+  "startupRandom": 0.5,
+  "runtimeRandomSeed": 733,
+  "map": {
+    "h": 20,
+    "spawns": [
+      {
+        "x": 1,
+        "y": 1
+      },
+      {
+        "x": 18,
+        "y": 1
+      },
+      {
+        "x": 1,
+        "y": 18
+      }
+    ],
+    "points": [
+      {
+        "x": 10,
+        "y": 10
+      }
+    ]
+  },
+  "names": [
+    "a",
+    "b"
+  ],
+  "shuffle": false,
+  "spawnSentinel": {
+    "x": -1000,
+    "z": -1000
+  },
+  "travel": [
+    {
+      "name": "tank-grass",
+      "type": "tank",
+      "z": 29,
+      "depth": null,
+      "group": "roads",
+      "x": 5,
+      "targetX": 151,
+      "w": 80,
+      "h": 20,
+      "terrain": ".",
+      "weather": "clear",
+      "warmup": 40,
+      "ticks": 80,
+      "mp": 5000,
+      "straight": false,
+      "wet": null,
+      "next": null
+    },
+    {
+      "name": "tank-shallow-mud",
+      "type": "tank",
+      "z": 29,
+      "depth": 0,
+      "group": "roads",
+      "x": 5,
+      "targetX": 151,
+      "w": 80,
+      "h": 20,
+      "terrain": "M",
+      "weather": "clear",
+      "warmup": 40,
+      "ticks": 80,
+      "mp": 5000,
+      "straight": false,
+      "wet": null,
+      "next": null
+    },
+    {
+      "name": "tank-deep-mud",
+      "type": "tank",
+      "z": 29,
+      "depth": 1,
+      "group": "roads",
+      "x": 5,
+      "targetX": 151,
+      "w": 80,
+      "h": 20,
+      "terrain": "M",
+      "weather": "clear",
+      "warmup": 40,
+      "ticks": 80,
+      "mp": 5000,
+      "straight": false,
+      "wet": null,
+      "next": null
+    },
+    {
+      "name": "rifle-shallow-mud",
+      "type": "rifle",
+      "z": 13,
+      "depth": 0,
+      "group": "roads",
+      "x": 5,
+      "targetX": 151,
+      "w": 80,
+      "h": 20,
+      "terrain": "M",
+      "weather": "clear",
+      "warmup": 40,
+      "ticks": 80,
+      "mp": 5000,
+      "straight": false,
+      "wet": null,
+      "next": null
+    },
+    {
+      "name": "rifle-grass",
+      "type": "rifle",
+      "z": 13,
+      "depth": null,
+      "group": "roads",
+      "x": 5,
+      "targetX": 151,
+      "w": 80,
+      "h": 20,
+      "terrain": ".",
+      "weather": "clear",
+      "warmup": 40,
+      "ticks": 80,
+      "mp": 5000,
+      "straight": false,
+      "wet": null,
+      "next": null
+    },
+    {
+      "name": "tank-road",
+      "type": "tank",
+      "group": "roads",
+      "x": 5,
+      "z": 5,
+      "targetX": 151,
+      "w": 80,
+      "h": 20,
+      "terrain": "road-lanes",
+      "depth": null,
+      "weather": "clear",
+      "warmup": 40,
+      "ticks": 80,
+      "mp": 5000,
+      "straight": false,
+      "wet": null,
+      "next": null
+    },
+    {
+      "name": "tank-edge",
+      "type": "tank",
+      "group": "roads",
+      "x": 5,
+      "z": 8.2,
+      "targetX": 151,
+      "w": 80,
+      "h": 20,
+      "terrain": "road-lanes",
+      "depth": null,
+      "weather": "clear",
+      "warmup": 40,
+      "ticks": 80,
+      "mp": 5000,
+      "straight": true,
+      "wet": null,
+      "next": null
+    },
+    {
+      "name": "clear-tank",
+      "type": "tank",
+      "group": "weather",
+      "x": 5,
+      "z": 21,
+      "targetX": 151,
+      "w": 80,
+      "h": 20,
+      "terrain": ".",
+      "depth": null,
+      "weather": "clear",
+      "warmup": 40,
+      "ticks": 100,
+      "mp": 1000,
+      "straight": false,
+      "wet": null,
+      "next": null
+    },
+    {
+      "name": "clear-rifle",
+      "type": "rifle",
+      "group": "weather",
+      "x": 5,
+      "z": 21,
+      "targetX": 151,
+      "w": 80,
+      "h": 20,
+      "terrain": ".",
+      "depth": null,
+      "weather": "clear",
+      "warmup": 40,
+      "ticks": 100,
+      "mp": 1000,
+      "straight": false,
+      "wet": null,
+      "next": null
+    },
+    {
+      "name": "clear-tank-road",
+      "type": "tank",
+      "group": "weather",
+      "x": 5,
+      "z": 21,
+      "targetX": 151,
+      "w": 80,
+      "h": 20,
+      "terrain": "D",
+      "depth": null,
+      "weather": "clear",
+      "warmup": 40,
+      "ticks": 100,
+      "mp": 1000,
+      "straight": false,
+      "wet": null,
+      "next": null
+    },
+    {
+      "name": "rain-tank",
+      "type": "tank",
+      "group": "weather",
+      "x": 5,
+      "z": 21,
+      "targetX": 151,
+      "w": 80,
+      "h": 20,
+      "terrain": ".",
+      "depth": null,
+      "weather": "rain",
+      "warmup": 40,
+      "ticks": 100,
+      "mp": 1000,
+      "straight": false,
+      "wet": null,
+      "next": null
+    },
+    {
+      "name": "rain-tank-road",
+      "type": "tank",
+      "group": "weather",
+      "x": 5,
+      "z": 21,
+      "targetX": 151,
+      "w": 80,
+      "h": 20,
+      "terrain": "D",
+      "depth": null,
+      "weather": "rain",
+      "warmup": 40,
+      "ticks": 100,
+      "mp": 1000,
+      "straight": false,
+      "wet": null,
+      "next": null
+    },
+    {
+      "name": "rain-rifle",
+      "type": "rifle",
+      "group": "weather",
+      "x": 5,
+      "z": 21,
+      "targetX": 151,
+      "w": 80,
+      "h": 20,
+      "terrain": ".",
+      "depth": null,
+      "weather": "rain",
+      "warmup": 40,
+      "ticks": 100,
+      "mp": 1000,
+      "straight": false,
+      "wet": null,
+      "next": null
+    },
+    {
+      "name": "mud-tank",
+      "type": "tank",
+      "group": "weather",
+      "x": 5,
+      "z": 21,
+      "targetX": 151,
+      "w": 80,
+      "h": 20,
+      "terrain": ".",
+      "depth": null,
+      "weather": "mud",
+      "warmup": 40,
+      "ticks": 100,
+      "mp": 1000,
+      "straight": false,
+      "wet": null,
+      "next": null
+    },
+    {
+      "name": "mud-rifle",
+      "type": "rifle",
+      "group": "weather",
+      "x": 5,
+      "z": 21,
+      "targetX": 151,
+      "w": 80,
+      "h": 20,
+      "terrain": ".",
+      "depth": null,
+      "weather": "mud",
+      "warmup": 40,
+      "ticks": 100,
+      "mp": 1000,
+      "straight": false,
+      "wet": null,
+      "next": null
+    },
+    {
+      "name": "snow-tank",
+      "type": "tank",
+      "group": "weather",
+      "x": 5,
+      "z": 21,
+      "targetX": 151,
+      "w": 80,
+      "h": 20,
+      "terrain": ".",
+      "depth": null,
+      "weather": "snow",
+      "warmup": 40,
+      "ticks": 100,
+      "mp": 1000,
+      "straight": false,
+      "wet": null,
+      "next": null
+    },
+    {
+      "name": "mud-tank-road",
+      "type": "tank",
+      "group": "weather",
+      "x": 5,
+      "z": 21,
+      "targetX": 151,
+      "w": 80,
+      "h": 20,
+      "terrain": "D",
+      "depth": null,
+      "weather": "mud",
+      "warmup": 40,
+      "ticks": 100,
+      "mp": 1000,
+      "straight": false,
+      "wet": null,
+      "next": null
+    },
+    {
+      "name": "snow-tank-road",
+      "type": "tank",
+      "group": "weather",
+      "x": 5,
+      "z": 21,
+      "targetX": 151,
+      "w": 80,
+      "h": 20,
+      "terrain": "D",
+      "depth": null,
+      "weather": "snow",
+      "warmup": 40,
+      "ticks": 100,
+      "mp": 1000,
+      "straight": false,
+      "wet": null,
+      "next": null
+    },
+    {
+      "name": "snow-rifle",
+      "type": "rifle",
+      "group": "weather",
+      "x": 5,
+      "z": 21,
+      "targetX": 151,
+      "w": 80,
+      "h": 20,
+      "terrain": ".",
+      "depth": null,
+      "weather": "snow",
+      "warmup": 40,
+      "ticks": 100,
+      "mp": 1000,
+      "straight": false,
+      "wet": null,
+      "next": null
+    },
+    {
+      "name": "fog-tank",
+      "type": "tank",
+      "group": "weather",
+      "x": 5,
+      "z": 21,
+      "targetX": 151,
+      "w": 80,
+      "h": 20,
+      "terrain": ".",
+      "depth": null,
+      "weather": "fog",
+      "warmup": 40,
+      "ticks": 100,
+      "mp": 1000,
+      "straight": false,
+      "wet": null,
+      "next": null
+    },
+    {
+      "name": "sink-clear",
+      "type": "tank",
+      "group": "weather",
+      "x": 4,
+      "z": 20,
+      "targetX": 38,
+      "w": 20,
+      "h": 20,
+      "terrain": "M",
+      "depth": 0.5,
+      "weather": "clear",
+      "warmup": 0,
+      "ticks": 60,
+      "mp": 1000,
+      "straight": false,
+      "wet": 1,
+      "next": 1000000000.0
+    },
+    {
+      "name": "sink-mud",
+      "type": "tank",
+      "group": "weather",
+      "x": 4,
+      "z": 20,
+      "targetX": 38,
+      "w": 20,
+      "h": 20,
+      "terrain": "M",
+      "depth": 0.5,
+      "weather": "mud",
+      "warmup": 0,
+      "ticks": 60,
+      "mp": 1000,
+      "straight": false,
+      "wet": 1,
+      "next": 1000000000.0
+    }
+  ],
+  "routes": [
+    {
+      "name": "mud-gap-tank",
+      "type": "tank",
+      "terrain": "mud-gap",
+      "from_": {
+        "x": 5,
+        "z": 21
+      },
+      "to": {
+        "x": 35,
+        "z": 21
+      }
+    },
+    {
+      "name": "mud-gap-rifle",
+      "type": "rifle",
+      "terrain": "mud-gap",
+      "from_": {
+        "x": 5,
+        "z": 21
+      },
+      "to": {
+        "x": 35,
+        "z": 21
+      }
+    },
+    {
+      "name": "adjacent-road-tank",
+      "type": "tank",
+      "terrain": "road-lanes",
+      "from_": {
+        "x": 3,
+        "z": 9
+      },
+      "to": {
+        "x": 37,
+        "z": 9
+      }
+    },
+    {
+      "name": "adjacent-road-rifle",
+      "type": "rifle",
+      "terrain": "road-lanes",
+      "from_": {
+        "x": 3,
+        "z": 9
+      },
+      "to": {
+        "x": 37,
+        "z": 9
+      }
+    }
+  ],
+  "showers": [
+    {
+      "name": "mud-held",
+      "weather": "mud",
+      "ticks": 700,
+      "events": [
+        {
+          "tick": 0,
+          "next": 0
+        },
+        {
+          "tick": 100,
+          "raining": false
+        }
+      ]
+    },
+    {
+      "name": "rain-to-mud",
+      "weather": "rain",
+      "ticks": 1100,
+      "events": [
+        {
+          "tick": 0,
+          "next": 0
+        },
+        {
+          "tick": 600,
+          "weather": "mud"
+        }
+      ]
+    },
+    {
+      "name": "snow-no-rain",
+      "weather": "snow",
+      "ticks": 100,
+      "events": [
+        {
+          "tick": 0,
+          "next": 0
+        }
+      ]
+    },
+    {
+      "name": "clear-shower",
+      "weather": "clear",
+      "ticks": 100,
+      "events": [
+        {
+          "tick": 0,
+          "next": 0
+        }
+      ]
+    }
+  ],
+  "announcement": {
+    "at": 600,
+    "ticks": 620,
+    "initial": "fog",
+    "next": "clear",
+    "sampleTicks": [
+      0,
+      380,
+      399,
+      400,
+      401,
+      420,
+      599,
+      600,
+      601,
+      620
+    ]
+  },
+  "sight": {
+    "weathers": [
+      "clear",
+      "fog",
+      "rain",
+      "snow"
+    ],
+    "ticks": 10,
+    "observer": {
+      "type": "rifle",
+      "owner": 0,
+      "x": 4,
+      "z": 20
+    },
+    "distances": [
+      10,
+      20,
+      28,
+      33
+    ],
+    "expected": [
+      [
+        10,
+        20,
+        28,
+        33
+      ],
+      [
+        10,
+        20
+      ],
+      [
+        10,
+        20,
+        28
+      ],
+      [
+        10,
+        20,
+        28
+      ]
+    ]
+  },
+  "planes": {
+    "weathers": [
+      "clear",
+      "fog",
+      "rain",
+      "mud",
+      "snow"
+    ],
+    "ticks": 40,
+    "w": 80,
+    "h": 80,
+    "actor": {
+      "type": "fighter",
+      "owner": 0,
+      "x": 5,
+      "z": 21,
+      "rot": 0
+    },
+    "mission": {
+      "kind": "patrol",
+      "x": 151,
+      "z": 21,
+      "id": 0
+    },
+    "sightProbe": {
+      "x": 120,
+      "z": 21
+    }
+  },
+  "plans": [
+    {
+      "name": "random-0",
+      "choice": "random",
+      "seed": 0,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-1",
+      "choice": "random",
+      "seed": 1,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-2",
+      "choice": "random",
+      "seed": 2,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-3",
+      "choice": "random",
+      "seed": 3,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-4",
+      "choice": "random",
+      "seed": 4,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-5",
+      "choice": "random",
+      "seed": 5,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-6",
+      "choice": "random",
+      "seed": 6,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-7",
+      "choice": "random",
+      "seed": 7,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-8",
+      "choice": "random",
+      "seed": 8,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-9",
+      "choice": "random",
+      "seed": 9,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-10",
+      "choice": "random",
+      "seed": 10,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-11",
+      "choice": "random",
+      "seed": 11,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-12",
+      "choice": "random",
+      "seed": 12,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-13",
+      "choice": "random",
+      "seed": 13,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-14",
+      "choice": "random",
+      "seed": 14,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-15",
+      "choice": "random",
+      "seed": 15,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-16",
+      "choice": "random",
+      "seed": 16,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-17",
+      "choice": "random",
+      "seed": 17,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-18",
+      "choice": "random",
+      "seed": 18,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-19",
+      "choice": "random",
+      "seed": 19,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-20",
+      "choice": "random",
+      "seed": 20,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-21",
+      "choice": "random",
+      "seed": 21,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-22",
+      "choice": "random",
+      "seed": 22,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-23",
+      "choice": "random",
+      "seed": 23,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-24",
+      "choice": "random",
+      "seed": 24,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-25",
+      "choice": "random",
+      "seed": 25,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-26",
+      "choice": "random",
+      "seed": 26,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-27",
+      "choice": "random",
+      "seed": 27,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-28",
+      "choice": "random",
+      "seed": 28,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-29",
+      "choice": "random",
+      "seed": 29,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-30",
+      "choice": "random",
+      "seed": 30,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-31",
+      "choice": "random",
+      "seed": 31,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-32",
+      "choice": "random",
+      "seed": 32,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-33",
+      "choice": "random",
+      "seed": 33,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-34",
+      "choice": "random",
+      "seed": 34,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-35",
+      "choice": "random",
+      "seed": 35,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-36",
+      "choice": "random",
+      "seed": 36,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-37",
+      "choice": "random",
+      "seed": 37,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-38",
+      "choice": "random",
+      "seed": 38,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-39",
+      "choice": "random",
+      "seed": 39,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-40",
+      "choice": "random",
+      "seed": 40,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-41",
+      "choice": "random",
+      "seed": 41,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-42",
+      "choice": "random",
+      "seed": 42,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-43",
+      "choice": "random",
+      "seed": 43,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-44",
+      "choice": "random",
+      "seed": 44,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-45",
+      "choice": "random",
+      "seed": 45,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-46",
+      "choice": "random",
+      "seed": 46,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-47",
+      "choice": "random",
+      "seed": 47,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-48",
+      "choice": "random",
+      "seed": 48,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-49",
+      "choice": "random",
+      "seed": 49,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-50",
+      "choice": "random",
+      "seed": 50,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-51",
+      "choice": "random",
+      "seed": 51,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-52",
+      "choice": "random",
+      "seed": 52,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-53",
+      "choice": "random",
+      "seed": 53,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-54",
+      "choice": "random",
+      "seed": 54,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-55",
+      "choice": "random",
+      "seed": 55,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-56",
+      "choice": "random",
+      "seed": 56,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-57",
+      "choice": "random",
+      "seed": 57,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-58",
+      "choice": "random",
+      "seed": 58,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-59",
+      "choice": "random",
+      "seed": 59,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-60",
+      "choice": "random",
+      "seed": 60,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-61",
+      "choice": "random",
+      "seed": 61,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-62",
+      "choice": "random",
+      "seed": 62,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-63",
+      "choice": "random",
+      "seed": 63,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-64",
+      "choice": "random",
+      "seed": 64,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-65",
+      "choice": "random",
+      "seed": 65,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-66",
+      "choice": "random",
+      "seed": 66,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-67",
+      "choice": "random",
+      "seed": 67,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-68",
+      "choice": "random",
+      "seed": 68,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-69",
+      "choice": "random",
+      "seed": 69,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-70",
+      "choice": "random",
+      "seed": 70,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-71",
+      "choice": "random",
+      "seed": 71,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-72",
+      "choice": "random",
+      "seed": 72,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-73",
+      "choice": "random",
+      "seed": 73,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-74",
+      "choice": "random",
+      "seed": 74,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-75",
+      "choice": "random",
+      "seed": 75,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-76",
+      "choice": "random",
+      "seed": 76,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-77",
+      "choice": "random",
+      "seed": 77,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-78",
+      "choice": "random",
+      "seed": 78,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-79",
+      "choice": "random",
+      "seed": 79,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-80",
+      "choice": "random",
+      "seed": 80,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-81",
+      "choice": "random",
+      "seed": 81,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-82",
+      "choice": "random",
+      "seed": 82,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-83",
+      "choice": "random",
+      "seed": 83,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-84",
+      "choice": "random",
+      "seed": 84,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-85",
+      "choice": "random",
+      "seed": 85,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-86",
+      "choice": "random",
+      "seed": 86,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-87",
+      "choice": "random",
+      "seed": 87,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-88",
+      "choice": "random",
+      "seed": 88,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-89",
+      "choice": "random",
+      "seed": 89,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-90",
+      "choice": "random",
+      "seed": 90,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-91",
+      "choice": "random",
+      "seed": 91,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-92",
+      "choice": "random",
+      "seed": 92,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-93",
+      "choice": "random",
+      "seed": 93,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-94",
+      "choice": "random",
+      "seed": 94,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-95",
+      "choice": "random",
+      "seed": 95,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-96",
+      "choice": "random",
+      "seed": 96,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-97",
+      "choice": "random",
+      "seed": 97,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-98",
+      "choice": "random",
+      "seed": 98,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-99",
+      "choice": "random",
+      "seed": 99,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-100",
+      "choice": "random",
+      "seed": 100,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-101",
+      "choice": "random",
+      "seed": 101,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-102",
+      "choice": "random",
+      "seed": 102,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-103",
+      "choice": "random",
+      "seed": 103,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-104",
+      "choice": "random",
+      "seed": 104,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-105",
+      "choice": "random",
+      "seed": 105,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-106",
+      "choice": "random",
+      "seed": 106,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-107",
+      "choice": "random",
+      "seed": 107,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-108",
+      "choice": "random",
+      "seed": 108,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-109",
+      "choice": "random",
+      "seed": 109,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-110",
+      "choice": "random",
+      "seed": 110,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-111",
+      "choice": "random",
+      "seed": 111,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-112",
+      "choice": "random",
+      "seed": 112,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-113",
+      "choice": "random",
+      "seed": 113,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-114",
+      "choice": "random",
+      "seed": 114,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-115",
+      "choice": "random",
+      "seed": 115,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-116",
+      "choice": "random",
+      "seed": 116,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-117",
+      "choice": "random",
+      "seed": 117,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-118",
+      "choice": "random",
+      "seed": 118,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-119",
+      "choice": "random",
+      "seed": 119,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-120",
+      "choice": "random",
+      "seed": 120,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-121",
+      "choice": "random",
+      "seed": 121,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-122",
+      "choice": "random",
+      "seed": 122,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-123",
+      "choice": "random",
+      "seed": 123,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-124",
+      "choice": "random",
+      "seed": 124,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-125",
+      "choice": "random",
+      "seed": 125,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-126",
+      "choice": "random",
+      "seed": 126,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-127",
+      "choice": "random",
+      "seed": 127,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-128",
+      "choice": "random",
+      "seed": 128,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-129",
+      "choice": "random",
+      "seed": 129,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-130",
+      "choice": "random",
+      "seed": 130,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-131",
+      "choice": "random",
+      "seed": 131,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-132",
+      "choice": "random",
+      "seed": 132,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-133",
+      "choice": "random",
+      "seed": 133,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-134",
+      "choice": "random",
+      "seed": 134,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-135",
+      "choice": "random",
+      "seed": 135,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-136",
+      "choice": "random",
+      "seed": 136,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-137",
+      "choice": "random",
+      "seed": 137,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-138",
+      "choice": "random",
+      "seed": 138,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-139",
+      "choice": "random",
+      "seed": 139,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-140",
+      "choice": "random",
+      "seed": 140,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-141",
+      "choice": "random",
+      "seed": 141,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-142",
+      "choice": "random",
+      "seed": 142,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-143",
+      "choice": "random",
+      "seed": 143,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-144",
+      "choice": "random",
+      "seed": 144,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-145",
+      "choice": "random",
+      "seed": 145,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-146",
+      "choice": "random",
+      "seed": 146,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-147",
+      "choice": "random",
+      "seed": 147,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-148",
+      "choice": "random",
+      "seed": 148,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-149",
+      "choice": "random",
+      "seed": 149,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-150",
+      "choice": "random",
+      "seed": 150,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-151",
+      "choice": "random",
+      "seed": 151,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-152",
+      "choice": "random",
+      "seed": 152,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-153",
+      "choice": "random",
+      "seed": 153,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-154",
+      "choice": "random",
+      "seed": 154,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-155",
+      "choice": "random",
+      "seed": 155,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-156",
+      "choice": "random",
+      "seed": 156,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-157",
+      "choice": "random",
+      "seed": 157,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-158",
+      "choice": "random",
+      "seed": 158,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-159",
+      "choice": "random",
+      "seed": 159,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-160",
+      "choice": "random",
+      "seed": 160,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-161",
+      "choice": "random",
+      "seed": 161,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-162",
+      "choice": "random",
+      "seed": 162,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-163",
+      "choice": "random",
+      "seed": 163,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-164",
+      "choice": "random",
+      "seed": 164,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-165",
+      "choice": "random",
+      "seed": 165,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-166",
+      "choice": "random",
+      "seed": 166,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-167",
+      "choice": "random",
+      "seed": 167,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-168",
+      "choice": "random",
+      "seed": 168,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-169",
+      "choice": "random",
+      "seed": 169,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-170",
+      "choice": "random",
+      "seed": 170,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-171",
+      "choice": "random",
+      "seed": 171,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-172",
+      "choice": "random",
+      "seed": 172,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-173",
+      "choice": "random",
+      "seed": 173,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-174",
+      "choice": "random",
+      "seed": 174,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-175",
+      "choice": "random",
+      "seed": 175,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-176",
+      "choice": "random",
+      "seed": 176,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-177",
+      "choice": "random",
+      "seed": 177,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-178",
+      "choice": "random",
+      "seed": 178,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-179",
+      "choice": "random",
+      "seed": 179,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-180",
+      "choice": "random",
+      "seed": 180,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-181",
+      "choice": "random",
+      "seed": 181,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-182",
+      "choice": "random",
+      "seed": 182,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-183",
+      "choice": "random",
+      "seed": 183,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-184",
+      "choice": "random",
+      "seed": 184,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-185",
+      "choice": "random",
+      "seed": 185,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-186",
+      "choice": "random",
+      "seed": 186,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-187",
+      "choice": "random",
+      "seed": 187,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-188",
+      "choice": "random",
+      "seed": 188,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-189",
+      "choice": "random",
+      "seed": 189,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-190",
+      "choice": "random",
+      "seed": 190,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-191",
+      "choice": "random",
+      "seed": 191,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-192",
+      "choice": "random",
+      "seed": 192,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-193",
+      "choice": "random",
+      "seed": 193,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-194",
+      "choice": "random",
+      "seed": 194,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-195",
+      "choice": "random",
+      "seed": 195,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-196",
+      "choice": "random",
+      "seed": 196,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-197",
+      "choice": "random",
+      "seed": 197,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-198",
+      "choice": "random",
+      "seed": 198,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-199",
+      "choice": "random",
+      "seed": 199,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-200",
+      "choice": "random",
+      "seed": 200,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-201",
+      "choice": "random",
+      "seed": 201,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-202",
+      "choice": "random",
+      "seed": 202,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-203",
+      "choice": "random",
+      "seed": 203,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-204",
+      "choice": "random",
+      "seed": 204,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-205",
+      "choice": "random",
+      "seed": 205,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-206",
+      "choice": "random",
+      "seed": 206,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-207",
+      "choice": "random",
+      "seed": 207,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-208",
+      "choice": "random",
+      "seed": 208,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-209",
+      "choice": "random",
+      "seed": 209,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-210",
+      "choice": "random",
+      "seed": 210,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-211",
+      "choice": "random",
+      "seed": 211,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-212",
+      "choice": "random",
+      "seed": 212,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-213",
+      "choice": "random",
+      "seed": 213,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-214",
+      "choice": "random",
+      "seed": 214,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-215",
+      "choice": "random",
+      "seed": 215,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-216",
+      "choice": "random",
+      "seed": 216,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-217",
+      "choice": "random",
+      "seed": 217,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-218",
+      "choice": "random",
+      "seed": 218,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-219",
+      "choice": "random",
+      "seed": 219,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-220",
+      "choice": "random",
+      "seed": 220,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-221",
+      "choice": "random",
+      "seed": 221,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-222",
+      "choice": "random",
+      "seed": 222,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-223",
+      "choice": "random",
+      "seed": 223,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-224",
+      "choice": "random",
+      "seed": 224,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-225",
+      "choice": "random",
+      "seed": 225,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-226",
+      "choice": "random",
+      "seed": 226,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-227",
+      "choice": "random",
+      "seed": 227,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-228",
+      "choice": "random",
+      "seed": 228,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-229",
+      "choice": "random",
+      "seed": 229,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-230",
+      "choice": "random",
+      "seed": 230,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-231",
+      "choice": "random",
+      "seed": 231,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-232",
+      "choice": "random",
+      "seed": 232,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-233",
+      "choice": "random",
+      "seed": 233,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-234",
+      "choice": "random",
+      "seed": 234,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-235",
+      "choice": "random",
+      "seed": 235,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-236",
+      "choice": "random",
+      "seed": 236,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-237",
+      "choice": "random",
+      "seed": 237,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-238",
+      "choice": "random",
+      "seed": 238,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-239",
+      "choice": "random",
+      "seed": 239,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-240",
+      "choice": "random",
+      "seed": 240,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-241",
+      "choice": "random",
+      "seed": 241,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-242",
+      "choice": "random",
+      "seed": 242,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-243",
+      "choice": "random",
+      "seed": 243,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-244",
+      "choice": "random",
+      "seed": 244,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-245",
+      "choice": "random",
+      "seed": 245,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-246",
+      "choice": "random",
+      "seed": 246,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-247",
+      "choice": "random",
+      "seed": 247,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-248",
+      "choice": "random",
+      "seed": 248,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-249",
+      "choice": "random",
+      "seed": 249,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-250",
+      "choice": "random",
+      "seed": 250,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-251",
+      "choice": "random",
+      "seed": 251,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-252",
+      "choice": "random",
+      "seed": 252,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-253",
+      "choice": "random",
+      "seed": 253,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-254",
+      "choice": "random",
+      "seed": 254,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-255",
+      "choice": "random",
+      "seed": 255,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-256",
+      "choice": "random",
+      "seed": 256,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-257",
+      "choice": "random",
+      "seed": 257,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-258",
+      "choice": "random",
+      "seed": 258,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-259",
+      "choice": "random",
+      "seed": 259,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-260",
+      "choice": "random",
+      "seed": 260,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-261",
+      "choice": "random",
+      "seed": 261,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-262",
+      "choice": "random",
+      "seed": 262,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-263",
+      "choice": "random",
+      "seed": 263,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-264",
+      "choice": "random",
+      "seed": 264,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-265",
+      "choice": "random",
+      "seed": 265,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-266",
+      "choice": "random",
+      "seed": 266,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-267",
+      "choice": "random",
+      "seed": 267,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-268",
+      "choice": "random",
+      "seed": 268,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-269",
+      "choice": "random",
+      "seed": 269,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-270",
+      "choice": "random",
+      "seed": 270,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-271",
+      "choice": "random",
+      "seed": 271,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-272",
+      "choice": "random",
+      "seed": 272,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-273",
+      "choice": "random",
+      "seed": 273,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-274",
+      "choice": "random",
+      "seed": 274,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-275",
+      "choice": "random",
+      "seed": 275,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-276",
+      "choice": "random",
+      "seed": 276,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-277",
+      "choice": "random",
+      "seed": 277,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-278",
+      "choice": "random",
+      "seed": 278,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-279",
+      "choice": "random",
+      "seed": 279,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-280",
+      "choice": "random",
+      "seed": 280,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-281",
+      "choice": "random",
+      "seed": 281,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-282",
+      "choice": "random",
+      "seed": 282,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-283",
+      "choice": "random",
+      "seed": 283,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-284",
+      "choice": "random",
+      "seed": 284,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-285",
+      "choice": "random",
+      "seed": 285,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-286",
+      "choice": "random",
+      "seed": 286,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-287",
+      "choice": "random",
+      "seed": 287,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-288",
+      "choice": "random",
+      "seed": 288,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-289",
+      "choice": "random",
+      "seed": 289,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-290",
+      "choice": "random",
+      "seed": 290,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-291",
+      "choice": "random",
+      "seed": 291,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-292",
+      "choice": "random",
+      "seed": 292,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-293",
+      "choice": "random",
+      "seed": 293,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-294",
+      "choice": "random",
+      "seed": 294,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-295",
+      "choice": "random",
+      "seed": 295,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-296",
+      "choice": "random",
+      "seed": 296,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-297",
+      "choice": "random",
+      "seed": 297,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-298",
+      "choice": "random",
+      "seed": 298,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "random-299",
+      "choice": "random",
+      "seed": 299,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "twin-0",
+      "choice": "random",
+      "seed": 12345,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "twin-1",
+      "choice": "random",
+      "seed": 12345,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "host-snow",
+      "choice": "snow",
+      "seed": 7,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "ardennes",
+      "choice": "map",
+      "seed": 7,
+      "meta": {
+        "name": "Ardennes Crossing"
+      },
+      "key": "ardennes-crossing"
+    },
+    {
+      "name": "pegasus",
+      "choice": "map",
+      "seed": 7,
+      "meta": {
+        "name": "Pegasus Bridge"
+      },
+      "key": "pegasus-bridge"
+    },
+    {
+      "name": "explicit-rain",
+      "choice": "map",
+      "seed": 7,
+      "meta": {
+        "weather": "rain"
+      },
+      "key": "x"
+    },
+    {
+      "name": "plain",
+      "choice": "map",
+      "seed": 7,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "unknown-choice",
+      "choice": "__proto__",
+      "seed": 7,
+      "meta": {},
+      "key": "x"
+    },
+    {
+      "name": "unknown-map-weather",
+      "choice": "map",
+      "seed": 7,
+      "meta": {
+        "weather": "constructor"
+      },
+      "key": "x"
+    },
+    {
+      "name": "mood-snow",
+      "choice": "map",
+      "seed": 7,
+      "meta": {
+        "mood": "snow"
+      },
+      "key": "x"
+    },
+    {
+      "name": "mood-dawn",
+      "choice": "map",
+      "seed": 7,
+      "meta": {
+        "mood": "dawn"
+      },
+      "key": "x"
+    },
+    {
+      "name": "key-dawn",
+      "choice": "map",
+      "seed": 7,
+      "meta": {},
+      "key": "river"
+    },
+    {
+      "name": "host-clear-over-snow",
+      "choice": "clear",
+      "seed": 7,
+      "meta": {
+        "mood": "snow"
+      },
+      "key": "x"
+    }
+  ],
+  "ai": {
+    "w": 80,
+    "h": 80,
+    "spawns": [
+      {
+        "x": 2,
+        "y": 2
+      },
+      {
+        "x": 77,
+        "y": 77
+      }
+    ],
+    "points": [
+      {
+        "x": 40,
+        "y": 40
+      }
+    ],
+    "names": [
+      "AI",
+      "enemy"
+    ],
+    "teams": [
+      0,
+      1
+    ],
+    "weathers": [
+      "clear",
+      "fog",
+      "rain",
+      "mud",
+      "snow"
+    ],
+    "probeStart": 4,
+    "probeLimit": 160,
+    "probeStep": 12,
+    "hiddenChangeTicks": 12000,
+    "announcedChangeTicks": 100
+  }
+}

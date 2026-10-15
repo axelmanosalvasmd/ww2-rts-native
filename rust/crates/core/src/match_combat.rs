@@ -151,14 +151,15 @@ impl DamageWorld<'_> {
         let g = &self.world.game;
         if g.tick < 0
             || g.tick as u64 > 9_007_199_254_740_941
-            || !matches!(self.mode, Mode::Default | Mode::Conquest)
+            || crate::match_actor::checked_game_mode(g, self.mode).is_err()
+            || self.mode == Mode::World && self.world.geography().is_none()
         {
             return Err(CombatError::InvalidInput("combat mode/tick"));
         }
         if g.units.iter().any(|(id, u)| {
             u.id != *id
                 || u.kind >= self.rules.kinds.len()
-                || u.owner >= g.players.len()
+                || crate::match_actor::checked_game_owner(g, u.owner).is_err()
                 || ![u.x, u.z, u.hp, u.supp, u.rot, u.sprint]
                     .iter()
                     .all(|v| v.is_finite())
@@ -201,6 +202,7 @@ impl DamageWorld<'_> {
     }
     fn source(&self, source: FlightSource) -> Result<(), CombatError> {
         if source.kind >= self.rules.kinds.len()
+            || source.owner < -1
             || source.owner >= 0 && source.owner as usize >= self.world.game.players.len()
         {
             return Err(CombatError::InvalidInput("source identity"));
@@ -230,9 +232,12 @@ impl DamageWorld<'_> {
         Ok(())
     }
     fn alliance(&self, owner: i32, target: usize) -> bool {
-        usize::try_from(owner)
-            .ok()
-            .is_some_and(|owner| self.world.game.allied(owner, target))
+        if owner == -1 && self.mode == Mode::World {
+            Some(crate::game::LOCAL_DEFENDER_OWNER)
+        } else {
+            usize::try_from(owner).ok()
+        }
+        .is_some_and(|owner| self.world.game.allied(owner, target))
     }
     fn context(&self, owner: i32, target: usize) -> CombatContext {
         CombatContext {
@@ -260,7 +265,8 @@ impl DamageWorld<'_> {
         let reserves = self.logistics.get(id);
         Ok(UnitCombatState {
             id,
-            owner: u.owner as i32,
+            owner: crate::match_actor::checked_game_owner(g, u.owner)
+                .map_err(|_| CombatError::InvalidInput("target actor"))?,
             kind: &self.rules.kinds[u.kind].name,
             hp: u.hp,
             xp: m.xp,
@@ -303,7 +309,8 @@ impl DamageWorld<'_> {
                 }
                 CombatEvent::LastHit { unit, owner } => (
                     *unit,
-                    *owner < 0 || (*owner as usize) < self.world.game.players.len(),
+                    *owner == -1
+                        || *owner >= 0 && (*owner as usize) < self.world.game.players.len(),
                 ),
                 CombatEvent::ResetRetarget { unit } | CombatEvent::SuppressionRecord { unit } => {
                     (*unit, true)
@@ -456,7 +463,7 @@ impl DamageWorld<'_> {
             .xp;
         let t = self.target(target)?;
         let result = combat::flight_damage(
-            self.context(source.owner, t.owner as usize),
+            self.context(source.owner, self.world.game.units[&target].owner),
             impact,
             CombatSource {
                 kind: &self.rules.kinds[source.kind].name,
@@ -479,8 +486,11 @@ impl DamageWorld<'_> {
         self.validate()?;
         input.already_suppressed = suppressed.contains(&target);
         let t = self.target(target)?;
-        let events =
-            combat::flight_suppress(self.context(input.owner, t.owner as usize), input, &t)?;
+        let events = combat::flight_suppress(
+            self.context(input.owner, self.world.game.units[&target].owner),
+            input,
+            &t,
+        )?;
         self.apply_events(&events, retarget, suppressed)
     }
     /// Apply environment LastHit to the same canonical combat owner history; return shot effects.
@@ -1260,6 +1270,13 @@ impl crate::match_runtime::Match {
                 .units
                 .get(&id)
                 .ok_or(CombatError::InvalidInput("death sidecar unit"))?;
+            let control = self
+                .commands
+                .units
+                .get(&id)
+                .ok_or(CombatError::InvalidInput("death construction control"))?;
+            crate::match_construction::validate_build_activity(unit, control)
+                .map_err(|_| CombatError::InvalidInput("death construction activity"))?;
             if unit.id != id
                 || self.abilities.get(id).is_none()
                 || self.recovery.get(id).is_none()
@@ -1281,8 +1298,13 @@ impl crate::match_runtime::Match {
         {
             return Err(CombatError::InvalidInput("death sidecar state"));
         }
-        crate::match_runtime::cancel_field_work_state(&mut self.field_works, unit)
-            .map_err(|_| CombatError::InvalidInput("death field work"))?;
+        let control = self
+            .commands
+            .units
+            .get_mut(&unit.id)
+            .ok_or(CombatError::InvalidInput("death construction control"))?;
+        crate::match_runtime::cancel_owned_work_state(&mut self.field_works, unit, control)
+            .map_err(|_| CombatError::InvalidInput("death owned work"))?;
         self.abilities.remove(unit.id);
         self.recovery.remove(unit.id);
         Ok(())
@@ -1295,8 +1317,7 @@ impl crate::match_runtime::Match {
         unit_order: &[UnitId],
         prospective_tick: u64,
     ) -> Result<(), CombatError> {
-        if self.world.game.tick < 0 || !matches!(self.options.mode, Mode::Default | Mode::Conquest)
-        {
+        if self.world.game.tick < 0 || self.validate_actor_mode().is_err() {
             return Err(CombatError::InvalidInput("death mode/tick"));
         }
         let mut seen = BTreeSet::new();
@@ -1316,7 +1337,7 @@ impl crate::match_runtime::Match {
         let bounty = number(cfg, "bounty")?;
         for id in &ordered {
             let u = &self.world.game.units[id];
-            if u.owner >= self.start.economy.players.len() || u.kind >= self.rules.kinds.len() {
+            if self.actor_policy(u.owner).is_err() || u.kind >= self.rules.kinds.len() {
                 return Err(CombatError::InvalidInput("unsupported dead unit"));
             }
             let m = self
@@ -1325,7 +1346,7 @@ impl crate::match_runtime::Match {
                 .ok_or(CombatError::InvalidInput("death metadata"))?;
             if !u.hp.is_finite()
                 || m.last_hit.is_some_and(|owner| {
-                    owner >= 0 && owner as usize >= self.start.economy.players.len()
+                    owner < -1 || owner >= 0 && owner as usize >= self.start.economy.players.len()
                 })
             {
                 return Err(CombatError::InvalidInput("death attribution"));
@@ -1367,8 +1388,7 @@ impl crate::match_runtime::Match {
                 .last_hit
                 .and_then(|o| usize::try_from(o).ok())
                 .filter(|o| {
-                    self.start.economy.players[*o].team != self.start.economy.players[u.owner].team
-                        && !self.start.economy.players[*o].out
+                    !self.world.game.allied(*o, u.owner) && !self.start.economy.players[*o].out
                 });
             if let Some(k) = killer {
                 wallets[k] += number(definition(u.kind, &self.rules)?, "cost")? * bounty;
@@ -1462,10 +1482,7 @@ impl crate::match_runtime::Match {
             let enemy = metadata
                 .last_hit
                 .and_then(|owner| usize::try_from(owner).ok())
-                .filter(|owner| {
-                    self.start.economy.players[*owner].team
-                        != self.start.economy.players[u.owner].team
-                });
+                .filter(|owner| !self.world.game.allied(*owner, u.owner));
             progress.removed.push(RetiredUnit {
                 unit: u,
                 last_hit: metadata.last_hit,

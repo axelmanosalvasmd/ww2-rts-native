@@ -47,6 +47,48 @@ for(const kind of ['source','grant','fallback','captured','dead']) {
  const result=S.supportProvision(g,u,owner,amount,{handoff:()=>true});
  support.push({kind,owner,amount,result,provisions:u.logistics.provisions,buckets:[...store.buckets],donations:[...store.donations].map(([p,r])=>[p,[...r]])});
 }
+// Empty component scenes isolate store restock from troop service, truck jobs and store synchronization.
+const finiteStores=[];
+for(const kind of ['full-rate','half-rate','zero-rate','inactive','source','partially-occupied']) {
+ const rate=kind==='half-rate'?0.5:kind==='zero-rate'?0:1;
+ const g={logisticsEnabled:true,mode:{kind:'conquest'},army:{pop:1},tick:0,w:2,chars:Array(4).fill('.'),points:[],aid:new Map(),players:[0,1].map(slot=>({slot,team:0,spawn:{x:1,z:1},out:false,away:true})),units:new Map(),winner:null};
+ const hooks={supplyRate:()=>rate}; S.setupConvoys(g); S.stepConvoys(g,0,hooks);
+ // The real empty scheduling pass leaves the next sync at tick 40. These service calls stay before it.
+ const store={id:'cache:4',owner:0,x:1,z:1,source:kind==='source',entity:null,capacity:{ammo:96,provisions:3840,fuel:5760},buckets:new Map(kind==='partially-occupied'?[[1,{ammo:24,provisions:960,fuel:3600}],[0,{ammo:24,provisions:1920,fuel:720}]]:[]),active:kind!=='inactive',support:false};
+ g.convoys.stores.set(store.id,store);
+ const initial=structuredClone(projection(g).stores),steps=[];
+ let elapsed=0;
+ for(const dt of [10,10,20,40,60]) {
+  g.tick++; elapsed+=dt; S.stepConvoys(g,dt,hooks);
+  assert.equal(g.units.size,0); assert.equal(g.convoys.stores.size,1);
+  assert.equal(g.convoys.events.length,0); assert.equal(g.convoys.jobs.size,0);
+  steps.push({tick:g.tick,dt,elapsed,stores:structuredClone(projection(g).stores)});
+ }
+ finiteStores.push({kind,rate,initial,steps});
+}
+// Local service uses public stepConvoys after an actual empty scheduling pass.
+const localService=[];
+for(const kind of ['source-rate','finite-continuation','nearest-recovery','store-filter','radius-inclusive','radius-outside','rejected-handoff','rider-carrier','recipient-exclusions']) {
+ const g={logisticsEnabled:true,mode:{kind:'conquest'},army:{pop:1},tick:0,w:2,chars:Array(4).fill('.'),points:[],aid:new Map(),players:[0,1,2].map(slot=>({slot,team:slot===2?1:0,spawn:{x:1,z:1},out:false,away:true})),units:new Map(),winner:null};
+ const handoff=kind!=='rejected-handoff',hooks={supplyRate:()=>0,handoff:()=>handoff};
+ S.setupConvoys(g); S.stepConvoys(g,0,hooks);
+ assert.equal(g.convoys.nextSchedule,40);
+ const recipient=unit(1,'tank',0,0,0); initializeUnit(g,recipient,UNITS.tank);
+ Object.assign(recipient.logistics,{ammo:0,ammoCredit:0,provisions:0,fuel:0,emergency:0,warning:5,forced:true,stranded:true,exhausted:true,supplyRate:0,cutFor:10});
+ if(kind==='recipient-exclusions')recipient.hp=0;
+ if(kind==='rider-carrier'){recipient.x=100;recipient.z=100;recipient.riding=2;g.units.set(2,unit(2,'halftrack',0,0,0));}
+ g.units.set(recipient.id,recipient);
+ if(kind==='recipient-exclusions')g.units.set(2,unit(2,'rifle',0,0,0));
+ const add=(id,x,{owner=1,active=true,source=false,stock={ammo:100,provisions:200,fuel:300}}={})=>g.convoys.stores.set(`cache:${id}`,{id:`cache:${id}`,owner,x,z:0,source,entity:null,capacity:{ammo:100,provisions:200,fuel:300},buckets:new Map([[0,{...stock}]]),active,support:false});
+ if(kind==='finite-continuation'){add(4,2);add(3,1,{stock:{ammo:0.05,provisions:10,fuel:20}});}
+ else if(kind==='nearest-recovery'){add(4,2);add(3,1);}
+ else if(kind==='store-filter'){add(3,0,{owner:2});add(4,1,{active:false});add(5,2);}
+ else add(3,kind==='radius-inclusive'?15:kind==='radius-outside'?15.001:1,{source:kind==='source-rate',stock:kind==='source-rate'?empty():{ammo:100,provisions:200,fuel:300}});
+ const initial=structuredClone({stores:projection(g).stores,units:projection(g).units}),steps=[];
+ const intervals=kind==='source-rate'?[2,6,1]:kind==='nearest-recovery'?[4]:[8];
+ for(const dt of intervals){g.tick++;S.stepConvoys(g,dt,hooks);assert.equal(g.convoys.nextSchedule,40);assert.equal(g.convoys.events.length,0);assert.equal(g.convoys.jobs.size,0);assert.equal(g.units.size,initial.units.length);steps.push({tick:g.tick,dt,stores:structuredClone(projection(g).stores),units:structuredClone(projection(g).units)});}
+ localService.push({kind,handoff,initial,steps});
+}
 // Record field deltas instead of duplicating the complete map of inventories on every tick.
 function differences(a,b,path=[],out=[]) {
  if(Object.is(a,b))return out;
@@ -55,4 +97,4 @@ function differences(a,b,path=[],out=[]) {
  out.push([path,b]);return out;
 }
 for(const scenario of scenarios){let previous=scenario.initial;for(const step of scenario.steps){const current=step.expected;step.delta=differences(previous,current);delete step.expected;previous=current;}}
-const output=JSON.stringify({reference:'e4e579a',scenarios,pools,support})+'\n',path=`${root}/rust/crates/core/tests/fixtures/convoys.json`;if(process.argv.includes('--check'))assert.equal(readFileSync(path,'utf8'),output);else writeFileSync(path,output);console.log(`${process.argv.includes('--check')?'Checked':'Recorded'} ${scenarios.length} startup/runtime traces, ${scenarios.reduce((n,s)=>n+s.steps.length,0)} steps, ${pools.length} payer-pool cases`);
+const output=JSON.stringify({reference:'e4e579a',scenarios,pools,support,finiteStores,localService})+'\n',path=`${root}/rust/crates/core/tests/fixtures/convoys.json`;if(process.argv.includes('--check'))assert.equal(readFileSync(path,'utf8'),output);else writeFileSync(path,output);console.log(`${process.argv.includes('--check')?'Checked':'Recorded'} ${scenarios.length} startup/runtime traces, ${scenarios.reduce((n,s)=>n+s.steps.length,0)} steps, ${pools.length} payer-pool cases, ${finiteStores.length} finite-store cases with ${finiteStores.reduce((n,s)=>n+s.steps.length,0)} checkpoints, ${localService.length} local-service cases with ${localService.reduce((n,s)=>n+s.steps.length,0)} checkpoints`);

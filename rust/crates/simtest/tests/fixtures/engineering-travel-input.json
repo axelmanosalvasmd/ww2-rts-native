@@ -1,0 +1,89 @@
+{
+  "reference": "e4e579a838aabae3b1d9dadbc17a0a87147bc52d",
+  "acceptance": "test.js:7502-7522 Roads and mud, selected shallow/deep/infantry travel assertions",
+  "map": {
+    "w": 80,
+    "h": 20,
+    "spawns": [
+      {
+        "x": 1,
+        "y": 1
+      },
+      {
+        "x": 18,
+        "y": 1
+      },
+      {
+        "x": 1,
+        "y": 18
+      }
+    ],
+    "points": [
+      {
+        "x": 10,
+        "y": 10
+      }
+    ]
+  },
+  "names": [
+    "a",
+    "b"
+  ],
+  "shuffle": false,
+  "options": {},
+  "startupRandom": 0.5,
+  "nativeSeed": 701,
+  "owner": 0,
+  "spawnSentinel": {
+    "x": -1000,
+    "z": -1000
+  },
+  "mpBeforeBuy": 5000,
+  "x": 5,
+  "targetX": 151,
+  "warmupTicks": 40,
+  "measuredTicks": 40,
+  "cases": [
+    {
+      "name": "tank-grass",
+      "type": "tank",
+      "z": 29,
+      "surface": ".",
+      "depth": null
+    },
+    {
+      "name": "tank-shallow-mud",
+      "type": "tank",
+      "z": 29,
+      "surface": "M",
+      "depth": 0
+    },
+    {
+      "name": "tank-deep-mud",
+      "type": "tank",
+      "z": 29,
+      "surface": "M",
+      "depth": 1
+    },
+    {
+      "name": "rifle-shallow-mud",
+      "type": "rifle",
+      "z": 13,
+      "surface": "M",
+      "depth": 0
+    },
+    {
+      "name": "rifle-grass",
+      "type": "rifle",
+      "z": 13,
+      "surface": ".",
+      "depth": null
+    }
+  ],
+  "predicates": {
+    "tankShallowRatio": 0.7,
+    "tankDeepRatio": 0.35,
+    "tankRatioAbsErrorLessThan": 0.1,
+    "infantryDistanceAbsDifferenceLessThan": 0.2
+  }
+}

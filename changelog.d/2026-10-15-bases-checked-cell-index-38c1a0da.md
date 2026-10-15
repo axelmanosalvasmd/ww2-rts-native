@@ -1,0 +1,1 @@
+- Convert every selected BASE actor footprint cell from u32 to usize with a checked conversion before canonical lookup and exact ordered structure-cell comparison. Preserve the original footprint, all assertions, recorded values, Source proof and fixture bytes. This addresses the retained E0308/E0277 compile failure; verification remains pending on the frozen child.

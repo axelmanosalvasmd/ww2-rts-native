@@ -11,6 +11,10 @@ use crate::navigation::{Navigation, NavigationError, Options, TerrainView};
 use crate::rules::UnitKind;
 use crate::vehicle_navigation::VehicleNavigation;
 
+#[cfg(test)]
+#[path = "../tests/support/pathfinding_selected_checks.rs"]
+mod selected_checks;
+
 /// Path cost and bunker clearance rules from the compiled catalog.
 #[derive(Clone, Copy, Debug)]
 pub struct PathRules {
@@ -136,7 +140,7 @@ pub struct PathResult {
     pub expansions: usize,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct Pathfinding {
     navigation: Navigation,
     scratch: Scratch,
@@ -179,7 +183,7 @@ impl Pathfinding {
     }
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 struct Scratch {
     scores: Vec<f32>,
     came: Vec<usize>,
@@ -755,7 +759,7 @@ fn cliff_clear(v: TerrainView<'_>, a: Point, b: Point) -> bool {
     x == ex && y == ey
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 struct Heap(Vec<(f64, usize)>);
 impl Heap {
     fn push(&mut self, score: f64, cell: usize) {

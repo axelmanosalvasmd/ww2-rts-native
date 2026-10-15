@@ -119,7 +119,18 @@ fn apply_inputs(m: &mut Match, id: u32, v: &Value) {
             "reverse" => u.reverse = (!value.is_null()).then(|| point(value)),
             "worldGoal" => u.world_goal = (!value.is_null()).then(|| point(value)),
             "dig" => u.dig = truth(value),
-            "build" => u.build = truth(value),
+            "build" => {
+                let c = m
+                    .commands
+                    .units
+                    .get_mut(&id)
+                    .expect("restored ability control");
+                c.build_target = value
+                    .as_u64()
+                    .filter(|id| *id != 0)
+                    .map(|id| u32::try_from(id).unwrap());
+                u.build = c.build_target.is_some();
+            }
             "entrench" => u.entrench = truth(value),
             "drift" => u.drift = truth(value),
             "holdPos" => u.hold_pos = value.as_bool().unwrap(),

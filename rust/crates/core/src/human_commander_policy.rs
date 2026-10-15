@@ -78,12 +78,12 @@ fn raw_command(command: &Command) -> Result<Value, Error> {
         Command::Move {
             orders,
             control_ids: None,
-            attack_move: false,
+            attack_move,
             queue: false,
             together: false,
             face: None,
         } => Ok(
-            json!({"t":"move","orders":orders.iter().map(|order|json!([order.unit,order.at.x,order.at.z])).collect::<Vec<_>>()}),
+            json!({"t":if *attack_move { "amove" } else { "move" },"orders":orders.iter().map(|order|json!([order.unit,order.at.x,order.at.z])).collect::<Vec<_>>()}),
         ),
         Command::Cover {
             ids,

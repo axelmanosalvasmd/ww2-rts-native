@@ -368,8 +368,18 @@ fn plan_inner(
         return Ok(Plan::default());
     }
     let research_commands = economic_prefix(observation)?;
+    // Without neutral captures, support guns could start an unported staged assault.
+    let rifle_reconnection = input.research.is_none()
+        && input
+            .units
+            .iter()
+            .all(|u| u.owner != input.slot || u.kind == "rifle")
+        && input
+            .points
+            .iter()
+            .any(|p| p.cut && p.owner.is_some_and(|o| input.players[o].team == me.team));
     if (input.tick >= 3600 && input.research.is_none())
-        || !input.points.iter().any(|p| p.owner.is_none())
+        || !(input.points.iter().any(|p| p.owner.is_none()) || rifle_reconnection)
     {
         return Err(PolicyError::NotOpening);
     }

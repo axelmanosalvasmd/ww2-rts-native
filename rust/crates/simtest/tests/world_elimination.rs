@@ -1,3 +1,4 @@
+use crate::shared::world_scene;
 use serde_json::{Value, json};
 use ww2_core::{
     catalog::Catalog,
@@ -6,8 +7,6 @@ use ww2_core::{
     match_runtime::Match,
     world::CellChange,
 };
-#[path = "common/world_scene.rs"]
-mod world_scene;
 fn fixture() -> Value {
     serde_json::from_str(include_str!("fixtures/world-elimination.json")).unwrap()
 }
@@ -314,8 +313,7 @@ fn unsupported_and_late_world_guards_preserve_every_canonical_owner() {
 }
 
 #[allow(dead_code)]
-#[path = "common/firing.rs"]
-mod firing_scene;
+use crate::shared::firing as firing_scene;
 #[test]
 fn administrative_removal_retains_captured_flight_xp_and_paid_metadata_has_no_refund() {
     use std::io::Read;
@@ -477,5 +475,34 @@ fn administrative_removal_retains_captured_flight_xp_and_paid_metadata_has_no_re
         );
     }
     assert_eq!(m.story, story);
-    assert!(m.apply_unit_firing(14, false, 0.05).is_err());
+
+    // Source leaves this collapsed garrison in the current list with negative HP.
+    // Represented World firing skips it before targeting, timers or output.
+    let source_survivor = scene["steps"][0]["postWreckUnits"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|unit| unit["id"] == 14)
+        .unwrap();
+    assert_eq!(
+        encode(json!(m.world.game.units[&14].hp)),
+        encode(source_survivor["hp"].clone())
+    );
+    assert!(m.world.game.units[&14].hp <= 0.0);
+    let before = protected(&m);
+    let end_state = snapshot(&m, &order);
+    let firing = m.firing.clone();
+    let paid_metadata = (
+        m.production.clone(),
+        m.field_works.clone(),
+        m.logistics.clone(),
+    );
+    m.apply_unit_firing(14, false, 0.05).unwrap();
+    assert_eq!(protected(&m), before);
+    assert_eq!(snapshot(&m, &order), end_state);
+    assert_eq!(m.firing, firing);
+    assert_eq!(
+        (&m.production, &m.field_works, &m.logistics),
+        (&paid_metadata.0, &paid_metadata.1, &paid_metadata.2)
+    );
 }

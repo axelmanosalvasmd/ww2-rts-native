@@ -10,6 +10,8 @@ use crate::{
 /// current remembered view and settled wreck projection without copying Game.
 pub struct TrafficKnowledge<'a> {
     source: Source<'a>,
+    actor: Option<(usize, &'a [u32])>,
+    read: Option<&'a std::cell::Cell<bool>>,
 }
 enum Source<'a> {
     Physical,
@@ -23,6 +25,8 @@ impl<'a> TrafficKnowledge<'a> {
     pub fn physical() -> Self {
         Self {
             source: Source::Physical,
+            actor: None,
+            read: None,
         }
     }
     /// Both projections must come from the same canonical recipient knowledge.
@@ -51,7 +55,36 @@ impl<'a> TrafficKnowledge<'a> {
                 knowledge,
                 wrecks,
             },
+            actor: None,
+            read: None,
         })
+    }
+    /// Visibility is borrowed from the caller's validated canonical actor policy.
+    /// A local World defender has no player-array seat.
+    pub(crate) fn with_actor(mut self, owner: usize, visible: &'a [u32]) -> Self {
+        self.actor = Some((owner, visible));
+        self
+    }
+    pub(crate) fn track_reads(mut self, read: &'a std::cell::Cell<bool>) -> Self {
+        self.read = Some(read);
+        self
+    }
+    fn terrain_read(&self) {
+        if let Some(read) = self.read {
+            read.set(true);
+        }
+    }
+    pub(crate) fn seen_by(&self, game: &Game, owner: usize, unit: &crate::game::Unit) -> bool {
+        match self.actor {
+            Some((bound, visible)) => {
+                bound == owner
+                    && (game.reveal
+                        || game.allied(unit.owner, owner)
+                        || (visible.contains(&unit.id)
+                            && (unit.air.is_none() || crate::vision::airborne(unit))))
+            }
+            None => crate::traffic::seen_by(game, owner, unit),
+        }
     }
     pub(crate) fn clear(
         &self,
@@ -62,6 +95,7 @@ impl<'a> TrafficKnowledge<'a> {
         mask: u16,
         half: f64,
     ) -> bool {
+        self.terrain_read();
         match &self.source {
             Source::Physical => crate::terrain::walkable(game, rules, a, b, mask, half),
             Source::Observed { navigation, .. } => {
@@ -70,6 +104,7 @@ impl<'a> TrafficKnowledge<'a> {
         }
     }
     pub(crate) fn open(&self, game: &Game, mask: u16, x: f64, z: f64) -> bool {
+        self.terrain_read();
         match &self.source {
             Source::Physical => game
                 .cell_of(x, z)
@@ -92,6 +127,7 @@ impl<'a> TrafficKnowledge<'a> {
         at: Point,
         from: Option<Point>,
     ) -> Result<u8, KnowledgeError> {
+        self.terrain_read();
         match &self.source {
             Source::Physical => Ok(crate::terrain::cover_rank(game, rules, at, from)),
             Source::Observed {

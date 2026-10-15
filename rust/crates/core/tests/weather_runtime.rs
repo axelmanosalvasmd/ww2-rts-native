@@ -15,6 +15,54 @@ fn kind(v: &Value) -> Option<WeatherKind> {
 fn fixture() -> Value {
     serde_json::from_str(include_str!("fixtures/weather-runtime.json")).unwrap()
 }
+
+#[test]
+fn original_smoke_wind_scene_matches_five_second_displacement_bounds() {
+    let f: Value = serde_json::from_str(include_str!("fixtures/smoke-wind-selected.json")).unwrap();
+    assert_eq!(f["reference"], "e4e579a838aabae3b1d9dadbc17a0a87147bc52d");
+    assert_eq!(f["node"], "v24.21.0");
+    assert_eq!(f["arch"], "x64");
+    let input = &f["input"];
+    assert_eq!(number(&input["wind"]["a"]).to_bits(), 0f64.to_bits());
+    assert_eq!(number(&input["wind"]["v"]).to_bits(), 1f64.to_bits());
+    let smoke = &input["smokes"].as_array().unwrap()[0];
+    assert_eq!(input["smokes"].as_array().unwrap().len(), 1);
+    assert_eq!(input["sourceCloudHasId"], false);
+    assert_eq!(input["sourceActors"].as_array().unwrap().len(), 0);
+    for (key, value) in [("x", 10f64), ("z", 10f64), ("r", 5f64), ("t", 60f64)] {
+        assert_eq!(number(&smoke[key]).to_bits(), value.to_bits());
+    }
+    let mut state = State::from(input);
+    let mut plan = kind(&input["weather"]["now"]).map(|now| WeatherPlan {
+        now,
+        next: kind(&input["weather"]["next"]),
+        at: input["weather"]["at"].as_u64().unwrap() as u32,
+    });
+    let steps = f["steps"].as_array().unwrap();
+    let expected = f["expected"].as_array().unwrap();
+    assert_eq!((steps.len(), expected.len()), (100, 100));
+    for (i, (action, expected)) in steps.iter().zip(expected).enumerate() {
+        let tick = action[0].as_u64().unwrap();
+        assert_eq!(tick, (i + 1) as u64);
+        assert_eq!(number(&action[1]).to_bits(), 0.05f64.to_bits());
+        if let Some(p) = plan.as_mut() {
+            p.step(tick);
+        }
+        state
+            .step(tick, number(&action[1]), plan.map(|p| p.now))
+            .unwrap();
+        assert_eq!(state.snapshot(plan), *expected, "original wind tick {tick}");
+    }
+    assert_eq!(state.clouds.len(), 1);
+    assert!(
+        state.clouds[0].x > 14.0,
+        "smoke drifts downwind after five seconds"
+    );
+    assert!(
+        (state.clouds[0].z - 10.0).abs() < 2.0,
+        "five-second lateral displacement bound"
+    );
+}
 #[derive(Clone, Debug, PartialEq)]
 struct Cloud {
     id: u32,
