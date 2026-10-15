@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Port the complete selected checks for ENG-04/13/14/48/66 after all six original checks pass together at `df9a0cff` (6 passed, 0 failed, 350 filtered), with formatting and fresh strict locked workspace/all-target Clippy passing. Preserve all incoming acceptance checks, other rows, fixtures and code. Historical failures retain their original head attribution; exact-final-head review and publication remain with Root.
+
 - Integrate the five ENG-04/13/14/48/66 material and mine checks from reviewed `6a6d2a01` with fixed main `396f6d8a`, preserving the complete incoming test, fixture, registry and row content. Retain the original failed map-count run and its corrected single-test pass on their producing heads. Fresh six-check and strict Clippy qualification remains pending at this integration checkpoint; no row is promoted yet.
 
 - Rebase the combat vision checks onto main `66592ae8`, retaining all incoming content and relocating the three owned vision notes beside the existing core vision section. Preserve all seven focused checks, three Source oracles and historical failures. CMB-124, CMB-125, CMB-131 and CMB-132 remain ported; CMB-128 remains held for its complete border-ray regression. Earlier test results stay attributed to their original heads.
