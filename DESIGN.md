@@ -1,5 +1,33 @@
 # Three Crossroads Native: design decisions
 
+## AUDIT_COMBAT protected-actuator consumers (2026-10-15, unrun)
+
+Start a new branch from fetched main f7b0e588 in the designated persistent
+3fa592e8 checkout and retain the exact dff2b353 packet as6e2939c9. Preserve
+all original refs, CMB38/42/63 components, CMB42 recorder/reader and corpora.
+Only an additive cfg(test) child-module declaration changes aligned_replay.rs;
+its existing constructor, draw/receipt, layout/startup, environment and shared
+storage bodies remain exact. No runtime provider or guard is changed.
+
+Six new ignored consumers contain the remaining funded B09 history, full
+Tank shells predicates, both aircraft Hold Fire assertions, automatic/area
+weapon counterfactuals, selected halftrack wreck and separate tank-rider
+contact/blast controls. B09 starts its fixed0/0.99 default tape before
+construction, purchases real actors through research/build/buy, and requires
+full-magazine depletion through actual reloads to1/0 before the final paid
+support attempt. No ammo assignment or running stream reset is used. The
+extra prefix/geometry is authored preparation, not captured correspondence.
+
+All six are uncompiled and unrun. Enabled logistics currently rejects the
+first B09 research tick. Native FireAt parsing/terrain firing, aircraft ground
+and area weapons, and dead-carrier ejection remain unavailable. Offshore
+drowning also needs the separate naval/shore caller. Original component
+inputs remain explicit; Source attackPick is not guessed into native fields.
+No row completes or moves. All Source/Node, native, format/lint, discovery,
+CI and release counts are zero. Root retains runtime scope, exact grants and
+publication. The [bounded readback](docs/testing/audit-combat-seven-protected-consumers.md)
+lists exact names, predicates, preserved bytes and provider gaps.
+
 ## AUDIT_COMBAT seven-row source task after consolidation (2026-10-15)
 
 Start from fetched main `f7b0e5889e3b707beb6d18c4ea8d20a7d9f7b578` in
