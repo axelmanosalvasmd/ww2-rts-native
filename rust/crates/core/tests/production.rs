@@ -132,6 +132,10 @@ fn snapshot(
 fn production_research_and_refunds_match_original_source_traces() {
     let fixture: Value = serde_json::from_str(include_str!("fixtures/production.json")).unwrap();
     assert_eq!(a(&fixture["scenarios"]).len(), 12);
+    replay_production_fixture(&fixture, false);
+}
+
+fn replay_production_fixture(fixture: &Value, dynamic_makers: bool) {
     for split in [false, true] {
         for scenario in a(&fixture["scenarios"]) {
             let mut config = scenario["input"].clone();
@@ -237,7 +241,11 @@ fn production_research_and_refunds_match_original_source_traces() {
                                             as u8)
                                         .unwrap(),
                                         action["kind"].as_str().unwrap(),
-                                        action["from"].as_u64().map(|i| i as u32),
+                                        if dynamic_makers {
+                                            source_maker(action)
+                                        } else {
+                                            action["from"].as_u64().map(|i| i as u32)
+                                        },
                                     )
                                     .map(|_| ()),
                             ),
@@ -418,4 +426,46 @@ fn aborted_research_and_training_guards_preserve_canonical_state() {
     });
     assert_eq!(state, before);
     assert_eq!(wallets, money);
+}
+
+// A present noncanonical Source maker is an invalid typed ID, never omission.
+// Tagged NaN/Infinity retain their Source identity in the fixture. The u32
+// production API cannot represent them; this adapter does not add a JSON API.
+fn source_maker(action: &Value) -> Option<u32> {
+    action.get("from").map(|value| {
+        value
+            .as_f64()
+            .filter(|n| n.is_finite() && n.fract() == 0.0 && *n > 0.0 && *n <= u32::MAX as f64)
+            .map_or(0, |n| n as u32)
+    })
+}
+
+#[test]
+fn base_production_existing_runtime_predicates_match_source() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("fixtures/base-production-predicates.json")).unwrap();
+    assert_eq!(
+        fixture["reference"],
+        "e4e579a838aabae3b1d9dadbc17a0a87147bc52d"
+    );
+    assert_eq!(a(&fixture["scenarios"]).len(), 5);
+    assert_eq!(a(&fixture["scenarios"][0]["trace"]).len(), 10);
+    let variants = a(&fixture["scenarios"][0]["trace"])[..8]
+        .iter()
+        .map(|row| row["action"]["variant"].as_str().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        variants,
+        [
+            "foreign",
+            "nonmaker",
+            "numeric-string",
+            "NaN",
+            "Infinity",
+            "null",
+            "zero",
+            "object"
+        ]
+    );
+    replay_production_fixture(&fixture, true);
 }

@@ -272,7 +272,12 @@ fn projection(m: &Match) -> Value {
 }
 #[test]
 fn original_ordinary_research_and_immediate_buy_ticks() {
-    let fixture = fixture();
+    let (steps, births) = replay_ordinary_production_fixture(&fixture());
+    assert_eq!(steps, 2429);
+    assert_eq!(births, 2);
+}
+
+fn replay_ordinary_production_fixture(fixture: &Value) -> (usize, usize) {
     assert_eq!(
         fixture["reference"],
         "e4e579a838aabae3b1d9dadbc17a0a87147bc52d"
@@ -399,8 +404,7 @@ fn original_ordinary_research_and_immediate_buy_ticks() {
             steps += 1;
         }
     }
-    assert_eq!(steps, 2429);
-    assert_eq!(births, 2);
+    (steps, births)
 }
 
 #[test]
@@ -452,4 +456,17 @@ fn restored_ordinary_training_queue_is_refused_before_the_clock() {
         assert_eq!(m.commands.pending_commands(), 0);
         assert_eq!(m.commands.next_tick(), Some(key.tick + 1));
     }
+}
+
+#[test]
+fn base_production_existing_runtime_hq_concurrency_matches_source() {
+    let mut text = String::new();
+    GzDecoder::new(include_bytes!("fixtures/base-production-hq-concurrency.json.gz").as_slice())
+        .read_to_string(&mut text)
+        .unwrap();
+    let fixture: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(fixture["traces"].as_array().unwrap().len(), 1);
+    let (steps, births) = replay_ordinary_production_fixture(&fixture);
+    assert_eq!(steps, 1310);
+    assert_eq!(births, 1);
 }
