@@ -341,7 +341,7 @@ fn complete_legacy_migration_definitions_match_original_source() {
             let points = names.iter().map(|id|PointOwner { id, owner:-1 }).collect::<Vec<_>>();
             let scenario = LegacyScenario::from_map(&map, &points);
             let actual = scenario.as_ref().map_or(Value::Null, LegacyScenario::definition_json);
-            assert_eq!(actual, c["expected"], "complete migration {}", c["name"]);
+            assert_eq!(encode(actual), encode(c["expected"].clone()), "complete migration {}", c["name"]);
         }
     }
     // Actual ordinary ticks, detached event delivery and once-only visibility for all four seats.
