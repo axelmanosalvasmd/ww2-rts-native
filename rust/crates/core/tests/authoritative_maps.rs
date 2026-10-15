@@ -28,6 +28,61 @@ fn materials(values: &std::collections::BTreeMap<usize, String>) -> Value {
     )
 }
 
+fn exact_validation_messages(names: &[&str]) {
+    let fixture: Value =
+        serde_json::from_str(include_str!("fixtures/authoritative-maps.json")).unwrap();
+    assert_eq!(
+        fixture["reference"],
+        "e4e579a838aabae3b1d9dadbc17a0a87147bc52d"
+    );
+    assert_eq!(fixture["node"], "v24.21.0");
+    assert_eq!(fixture["arch"], "x64");
+    for name in names {
+        let cases: Vec<_> = fixture["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|case| case["name"].as_str() == Some(*name))
+            .collect();
+        assert_eq!(cases.len(), 1, "one original fixture case for {name}");
+        let case = cases[0];
+        let error = AuthoritativeMap::from_json(&serde_json::to_vec(&case["map"]).unwrap())
+            .expect_err("the original invalid map must be rejected");
+        assert!(matches!(error, MapError::Invalid { .. }), "{name}");
+        assert_eq!(error.to_string(), case["error"].as_str().unwrap(), "{name}");
+    }
+}
+
+#[test]
+fn core_field_errors_match_original_validator_messages() {
+    exact_validation_messages(&[
+        "invalid:name-missing",
+        "invalid:name-long",
+        "invalid:width-low",
+        "invalid:width-high",
+        "invalid:height-fraction",
+        "invalid:row-count",
+        "invalid:row-width",
+        "invalid:row-unicode",
+        "invalid:row-building",
+        "invalid:row-aux",
+    ]);
+}
+
+#[test]
+fn height_errors_match_original_validator_messages() {
+    exact_validation_messages(&["invalid:height-letter", "invalid:height-null"]);
+}
+
+#[test]
+fn assault_authoring_errors_match_original_validator_messages() {
+    exact_validation_messages(&[
+        "invalid:defend-duplicate",
+        "invalid:defend-all",
+        "invalid:assault-time",
+    ]);
+}
+
 #[test]
 fn authoritative_maps_match_pinned_validation_and_static_terrain() {
     let fixture: Value =

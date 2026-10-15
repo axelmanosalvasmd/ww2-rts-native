@@ -13,6 +13,9 @@ mod original;
 #[path = "aligned_replay_comparison.rs"]
 mod canonical;
 
+#[path = "aligned_replay_startup.rs"]
+mod startup_state;
+
 #[derive(Clone, Debug)]
 pub struct Replay(Arc<Mutex<Tape>>);
 impl PartialEq for Replay {

@@ -230,8 +230,16 @@ fn compare(a: &Value, b: &Value, path: &str) {
 fn actual_support_admission_strikes_and_timers_match_source() {
     let fixture = fixture();
     let mut count = 0;
+    let mut mine_traces = 0;
+    let mut mine_frames = 0;
     for t in fixture["traces"].as_array().unwrap() {
         let mut m = make(t);
+        let mine_check = t["variation"] == "mine-overlay-clearing";
+        if mine_check {
+            assert_eq!(t["kind"], "dive");
+            assert_eq!(m.world.mine_layer.iter().filter(|v| **v != 0).count(), 4);
+            mine_traces += 1;
+        }
         let mut last = 0;
         for (i, frame) in t["frames"].as_array().unwrap().iter().enumerate() {
             let action = &frame["action"];
@@ -311,10 +319,20 @@ fn actual_support_admission_strikes_and_timers_match_source() {
                 &frame["expected"],
                 &format!("{} {} {} frame{i}", t["kind"], t["faction"], t["variation"]),
             );
-            count += 1;
+            if mine_check {
+                mine_frames += 1;
+            } else {
+                count += 1;
+            }
+        }
+        if mine_check {
+            assert!(m.world.mine_layer.iter().all(|v| *v == 0));
+            assert!(m.world.mines.is_empty());
         }
     }
     assert_eq!(count, 5922);
+    assert_eq!(mine_traces, 1);
+    assert!(mine_frames >= 3);
 }
 #[test]
 fn unknown_support_and_invalid_membership_do_not_charge_or_publish() {

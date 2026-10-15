@@ -141,6 +141,10 @@ fn perform(w: &mut World, a: &Value) -> Value {
                 .is_ok()
             )
         }
+        "material" => json!([
+            w.material_name(c, false).unwrap(),
+            w.material_name(c, true).unwrap()
+        ]),
         "set" => {
             w.set_cell(c, a["ch"].as_str().unwrap().as_bytes()[0])
                 .unwrap();
@@ -262,6 +266,8 @@ fn mutation_state_journals_and_pending_match_original_source() {
     let f: Value = serde_json::from_str(include_str!("fixtures/world.json")).unwrap();
     assert_eq!(f["reference"], "e4e579a838aabae3b1d9dadbc17a0a87147bc52d");
     let mut count = 0;
+    let mut material_actions = 0;
+    let mut material_queries = std::collections::BTreeSet::new();
     for case in f["cases"].as_array().unwrap() {
         let name = case["name"].as_str().unwrap();
         let m = AuthoritativeMap::from_json(&serde_json::to_vec(&case["map"]).unwrap()).unwrap();
@@ -273,7 +279,19 @@ fn mutation_state_journals_and_pending_match_original_source() {
                     case["results"][i - 1],
                     "{name} action {i}"
                 );
-                count += 1;
+                if name == "material-alphabet-and-overrides" {
+                    material_actions += 1;
+                    let action = &case["actions"][i - 1];
+                    if action["op"] == "material" {
+                        assert!(material_queries.insert((
+                            action["layer"].as_str().unwrap().to_owned(),
+                            action["ch"].as_str().unwrap().to_owned(),
+                            action["override"].as_bool().unwrap()
+                        )));
+                    }
+                } else {
+                    count += 1;
+                }
             }
             let actual = snapshot(&w);
             assert!(
@@ -287,6 +305,18 @@ fn mutation_state_journals_and_pending_match_original_source() {
         }
     }
     assert_eq!(count, 78);
+    assert_eq!(material_actions, 108);
+    let required: std::collections::BTreeSet<_> =
+        [("ground", ".D+MWF"), ("object", ".BH#TXY=RNAQKO")]
+            .into_iter()
+            .flat_map(|(layer, letters)| {
+                letters.chars().flat_map(move |letter| {
+                    [false, true]
+                        .map(|overridden| (layer.to_owned(), letter.to_string(), overridden))
+                })
+            })
+            .collect();
+    assert_eq!(material_queries, required);
 }
 
 #[test]

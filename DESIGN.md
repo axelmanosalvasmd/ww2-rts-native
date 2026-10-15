@@ -1,5 +1,148 @@
 # Three Crossroads Native: design decisions
 
+## Five complete selected MAP checks (2026-10-15)
+
+At producing runtime head `7cbfcdddf913625c48fd109d8d216151881cba20`,
+all six authorized unique native instances pass once: three exact validation
+message readers, the full authoritative corpus, complete original Assault
+check and affected BASE Pillbox replay. Each selects1/passes1/fails0; core
+instances filter140 and simtest instances filter224. Formatting recheck and
+strict locked core/simtest ci-test all-target Clippy exit0. The initial
+f192 formatting-only failure remains preserved; no native failure or rerun
+occurred. Raw logs and the report are `/tmp/map-7cbfcddd-S1-52b4776c/`.
+
+The complete original checks cover ten core-field and two height errors,
+three Assault-authoring errors, all138 map cases, all57 Assault constructors
+including four named XL maps and ten full raw Hill routes, both retained
+Assault validation messages and the affected BASE diagnostic/replay. No
+whole-match or recipient-delivery requirement is added to those components.
+MAP97 retains its separate producing0b default-debug/release120-action
+proof. These establish five selected Rust checks: MAP04/05/07/97/117.
+
+Root explicitly authorizes this docs-only child after the actual gates.
+Change only four new MAP Rust/Status pairs, retain MAP97, and preserve all
+140 Acceptance cells and all other table cells. The entire tested Rust
+tree remains `c707f7ebda7b519edb0071f42c7de0a875706949`. This child claims
+zero additional executions. The private maps table becomes93 ported,
+6 in progress and41 todo; MAP06/19/100 remain held. The separate unfinished
+MAP06/editor worktree is not imported.
+
+S1 scopes actually report CPU0-3,6GiB/swap0/quota400%, with jobs4/threads1,
+the current guard, exclusive target and disk floor checked before every job.
+Own-checkout core/simtest dep-info bind to producing7cbfcddd. Clippy's final
+process exits0 and the exact S1 lock is immediately free; Root is notified
+before any status edit. No Source, discovery, full, release, cleanup scan
+or sealing operation is added. Actual final-child independent review,
+normal preservation of newer main's test observer, Hermes acknowledgment
+of the exact runtime head and hosted gates remain Root-owned before merge.
+
+## MAP qualification formatting child (2026-10-15)
+
+The authorized S1 formatting check at frozen `f1928e13` exits1 with one
+BASE assertion wrap at construction_tick/base_selected.rs:63. Its raw log
+is retained at `/tmp/map-f192-S1-52b4776c/fmt.log`. The actual scope confirms
+CPU0-3, MemoryMax6442450944, MemorySwapMax0 and CPUQuota4s; the guard reports
+61522472960 available bytes above its20GiB floor. No native test ran.
+
+Apply only the reported assertion collapse. The complete non-whitespace
+Rust byte sequence is identical to the authorized runtime head, including
+all literals and assertions. Root explicitly allows this mechanical child
+and freezing it before the focused checks. The initial diagnostic remains
+a formatting failure; it is not a native test failure or a pass. After
+freezing, recheck formatting and run only the six named existing gates,
+then strict core/simtest ci-test all-target Clippy if all pass. Status cells
+remain unchanged until the complete authorized pass and review sequence.
+
+## Authorized map validation text repair (2026-10-15, execution pending)
+
+Root reviewed the concrete validator proposal and pinned Source validation
+at shared/sim.js:575-595, then authorized its bounded application directly
+on primary `13064504`, not the earlier status child. MapError keeps its
+existing variants and fields; its Display now returns the original text
+for name, width/height, rows/heights, defend and assaultTime errors. The
+existing rows helper supplies declared dimensions in row/height messages.
+Every validation condition, allowed character, accepted map and unsupported
+feature guard remains unchanged. Calls for other layer fields retain their
+original array-type, row-type, shape and content errors. This preserves the
+bounded scope where the shared helper serves unrelated layered inputs.
+
+Root also authorized the one dependent BASE diagnostic expectation at
+construction_tick/base_selected.rs:68. It now expects the original Source
+name-error text. The raw nameless/empty-points input, rejection, name-only
+point rejection, amended map and every replay assertion remain intact.
+Root is notifying IMPL_BASES; this is explicit authorization for that single
+expectation, not inferred consent to edit any other BASE consumer or row.
+The existing exact test
+`construction_tick::base_selected::base26_pillbox_slit_faces_out_from_home`
+loads the shared fixture and checks all four raw-map preparation receipts
+before its own replay. It is the proposed affected-consumer gate in addition
+to the five MAP native instances. No new duplicate diagnostic test is added.
+
+Measured execution status here is zero jobs and zero native results.
+No Source, Node, Cargo, rustc, native, fmt, lint, discovery, release or CI
+command runs without a new exact Root slot grant. The five-row status child
+for MAP04/05/07/97/117 remains conditional on actual gates and independent
+actual-head review. Only the already reviewed MAP97 status is applied now;
+all140 Acceptance cells and all other MAP cells remain exact. MAP06's
+unfinished constructor child stays separate, with no Source capture grant.
+Root retains Hermes exact-runtime-head acknowledgment before merge, the
+publication lease and hosted9/9. No ABI, protocol, interface or terrain
+policy change is introduced.
+
+## Recovered MAP97 eligibility on frozen main (2026-10-15)
+
+Recover only the owned MAP97 Rust/Status cells from reviewed private child
+`2687e2b8e7e1b8795c9f46d8f97ef6cf7dead3d6`. All 140 Acceptance cells,
+all other MAP cells and frozen main's complete files remain intact.
+The World memory provider, recorder, native consumer and both retained
+fixtures are byte-identical between producing `0b62374461` and frozen main.
+The raw debug and release logs each show the registered native test passing
+once, 1 passed/0 failed/217 filtered. Each instance consumes 120 actions.
+The full recovered review ACCEPTs that literal component check. These are
+historical producing-head results, not execution of this successor.
+
+[The current eight-row delivery note](docs/runtime/map-audit-delivery.md)
+records the other seven gaps and exact pending consumers. Native World
+recipient serialization and MAP100's delivery/reconnect history remain
+separate. No owner acceptance or client adoption is inferred. Root alone
+controls publication after fresh independent actual-head review.
+
+## MAP validation-message successor (2026-10-15, source only)
+
+Start from frozen main `379ba4e06c794708623c005ab6052bebd03d8809`
+in the isolated MAP_AUDIT checkout. Preserve the MAP97 status child
+`2687e2b8e7` and Hill draft `1ba5688a82` on their original branches.
+Only this roster's eight rows are owned; the eight different rows in the
+older `1c51720b5d` candidate must not overwrite current main.
+
+Three new consumers compare exact native validation text against ten
+core-field, two height and three Assault-authoring inputs in the existing
+original-source map fixture. The complete existing Assault consumer now
+also compares both retained validation messages after its four XL and ten
+Hill starts and full raw Hill waypoint comparisons. No fixture, oracle,
+constructor, raw-route predicate or runtime admission guard changes.
+These tests have not run. Current validation text still differs from the
+Source messages, so no pass or new row completion is claimed.
+
+MAP97's two historical native passes belong to `0b62374461`, one default
+test/debug and one release instance, 120 actions each. Its recovered ACCEPT
+is not a new-head execution. MAP06 still needs the complete twenty-start
+Assault-only-spawn scene; MAP19 needs the selected editor move/save/delete
+history, and MAP100 needs full World delivery/reconnect/hidden-change
+proof. Static structure and internal memory checks do not fill those gaps.
+No interface, ABI, protocol, private view, terrain policy, Source or
+publication changes. Root owns validator runtime scope, slot grants,
+independent review and publication. Issue5 receipt through6199190039
+acknowledges unchanged contracts and pending defaults; it grants no consent.
+
+## ENG_AUDIT recovery onto frozen main (2026-10-15, source only)
+
+Start this isolated delivery at frozen main `379ba4e06c794708623c005ab6052bebd03d8809` and normally merge recovered `dd035fe2033739d9831f909d5ccc5066166153b6`. Resolve only additive CHANGELOG and DESIGN conflicts by retaining both sides. Preserve every incoming runtime, aligned-replay hook, registry, acceptance cell and unrelated status. The five complete selected ENG-04/13/14/48/66 checks retain their reviewed recorder, test and authentic fixture bytes. Only those five Rust/Status pairs differ from the 80-row incoming engineering table. Main's 235/939 becomes a private 240/939 proposal, with no joint client acceptance.
+
+The current source audit checks the original predicates and the actual native consumers rather than adding a whole-match gate. All five owned checks are complete at the recovered checkpoint; no owned row has a missing selected consumer. Moved crushing, full-match scheduling, downstream material factors and mine socket/reconnect privacy remain separate capabilities. Historical preparation language below describes its producing checkpoint, not a fresh result. Six compiled passes, fmt and strict workspace Clippy remain attributed to `df9a0cff`; the map-counter failure at `03e6a9d6`, corrected pathfinding pass at `6a6d2a01` and initial guard launch exit126 are retained.
+
+No Source, Cargo, native, formatter, lint, discovery, full or release job runs in this recovery. The [frozen gate plan](docs/testing/eng-audit-five-379ba4e0-gates.md) selects the same six exact instances from the actual consolidated registries. Root must grant the exact slot before execution and arrange independent actual-head review. IMPL_ENGINEERING retains the engineering publication lease. Root alone pushes, opens and merges the eventual PR. Current issue #5 was read through Hermes173 and the subsequent native lifecycle result; receipt is acknowledged locally, with general defaults still pending and no consent inferred. ABI2, reference e4e579a and contract authority remain unchanged.
+
 ## MODE-05/28 existing-check eligibility (2026-10-15)
 
 The private docs successor starts with the complete 103-row modes table at
@@ -117,6 +260,15 @@ approval or row promotion and makes no new global equal-seed rule.
 No test seam is implemented or assigned here. ALIGNED_REPLAY owns that
 separate stream. This change touches no runtime, RNG, provider, guard,
 interface, terrain, ABI, reference, test, fixture or parity-row status.
+## Five reviewed engineering predicates on fixed main (2026-10-15)
+
+Normally integrate exact `6a6d2a01a0314239513d2413af74c8a7099bfa56` first, then `396f6d8a7014bd4a5ebe64f0a12ccd66865bf452`. Preserve all incoming and owned tests, fixtures, recorders, registrations and parity rows. The shared pathfinding test merges automatically, retaining main's additional proofs and the owned complete trap-wall comparison. Reviewer2 accepted all five complete literal Acceptance checks with no missing selected predicate. The existing component-proof policy applies; bridge, socket and material-factor consumers beyond those selected checks do not add promotion gates.
+
+The separate `f1231249` audit remains preserved on `audit/engineering-main396-preview-0e8d6d9b`; its broader consumer map does not override that selected-check decision. Historical evidence stays split: five passes and the original final map-counter failure at `03e6a9d6`, then the single corrected pathfinding pass at `6a6d2a01`. Freeze the actual integrated head before its six unique checks, formatting check and fresh strict locked workspace/all-target Clippy. No Source recording is repeated. The five owned Rust/Status cells may change only after that evidence; every Acceptance cell and other row remains incoming main. Exact-final-head review and Root's serial publication process remain separate gates.
+
+Qualification at clean integration `df9a0cfff0ecf290491175e671fe01afa6368c2d` passed formatting, all six original unique checks together (6 passed, 0 failed, 350 filtered across the two consolidated binaries), and fresh strict locked workspace/all-target Clippy. The six are core World and field works, simtest pathfinding and Match support, and both actual `every_test_file_is_compiled` registration guards. S3 used CPU 8-11, 6 GiB with no swap, 400% quota, four build jobs and one test thread. The checkout/tree-keyed guard retained its exclusive S3 target, with more than 90 GiB free before each Cargo invocation. The first launch exited 126 before Cargo because the guard was not executable; invoking that unchanged guard with Python succeeded. Logs remain under `/tmp/eng-integration-df9a0cff-0e8d6d9b/`. Focused log SHA256 is `b205db1714ae5b3ea5ef12c5fbee8bf90aceebd7c0157dadc69fdf8fdfe5db15`; strict Clippy log SHA256 is `bd4b0d9217c94b8ed584e23f225e3ec379ada4484e07d35423775ebbe0a81ca3`. All processes exited; no Source, full or release run was repeated. This docs child changes only the five owned Rust/Status cells, advancing fixed-main accounting from 211 to 216 ported out of 939. Its Rust tree and all authentic fixture bytes remain the tested integration tree. Exact-final-head review remains Root's gate before publication.
+
+Integration onto landed NET main (source only): normally merge exact `9e618217de2ac1d0a806c6804eda50c1c9da497f` as second parent after preserved `396d6c90b520b919e5ed51a4be11e21f45a56c03`. Compose both complete CHANGELOG histories and retain both DESIGN histories, including the incoming NET notes beside snapshot delivery. All six incoming NET status changes, four CMB vision rows, BASE-28, Tutorial rows and five owned ENG Rust/Status pairs remain intact. Every recorder, fixture, test and registration keeps its expected parent body. Incoming server test modules and cfg(test) instrumentation are retained exactly. No additional production or guard change is made. The original six selected tests remain the pending qualification: World, field works, pathfinding, Match support and both existing core/simtest registration guards. Incoming main changes no core/simtest registry, so no additional registration test is selected. There has been no Source, Cargo, native, formatter or discovery execution on this integration. Prior six-pass/fmt/Clippy evidence belongs to `df9a0cff`; freeze the new head before any future granted run. Root retains separate final-head review, the 256 then 259 queue and publication authority.
 
 ## Engineering supported scope and held aircraft consumer (2026-10-15)
 
@@ -4702,6 +4854,58 @@ Fresh strict locked core/simtest all-target Clippy and formatting check pass at 
 The measured canonical result remains MATCH61/61 with no first divergence; raw result remains MISMATCH0/61 at tick0 Fuel absence versus positive zero. All601 raw native frames are byte-identical to the baseline, every original raw report field remains equal, and the complete input receipt is unchanged. Each declared Source currency field maps601 times, with zero native mappings. This is a600-tick projected prefix under the explicit comparison exception, not a completed row or match outcome.
 
 Private actual-result artifacts, the first lint failure, exact stage commands and compiler/dependency provenance live under `/tmp/aligned-replay-canonical-d6308bcc/`. The immutable ordered-merge proof and both unequal/equal raw pairs remain under `/tmp/aligned-replay-d412-d6308bcc/`, scoped only to `58a8cb8b`. Original artifacts and eb15 are preserved. S1 processes are terminal and its lock is free. No Source run, repeated registration guard, full/release/list command or publication occurred during the comparison stage. Independent eb15 input/scope acceptance and fresh comparison-head review are separate; Root retains actual-successor review, baseline qualification, PR creation and the259-first merge queue.
+
+
+## MODE-21 footprint storage and test-only observation (2026-10-15)
+
+The existing BTreeMap footprint storage remains unchanged. Source inserts buildingCells in building/footprint order (`shared/sim.js:1028-1029`), but its shipping consumers use `.get(cell)` for owner updates and terrain visibility (`:1202,:5865`). Terrain output order comes from sorted pending cell-log indices (`:5859`), not footprint iteration. Source shares one footprint object across each building's cells and keys its visibility cache by that object. Native stores copied cell records, looks up each cell and keys the corresponding cache by building ID, preserving the same building-identity relationship. Deterministic ordered storage is a native architecture choice, not an observed startup porting defect.
+
+The authentic `4518bdac` diagnostic failed with 48 positional footprint differences and one house-wrapper difference. Complete offline inspection found 36/36 unique cell-key associations equal in every id/owner/x/z bit, and 6400/6400 indexed house values equal. [The full original failure table](docs/testing/r1-mode21-49-differences.md) remains readable without publishing private seed/capture contents. Raw graphs and their ordered comparisons are retained separately.
+
+This first group extracts the standalone MODE-21 observer onto main `379ba4e0` and changes only the named buildingCells semantic disposition: require the observed Map wrapper, unique exact keys, full four-field records and every numeric bit. No generic map sorting, array reordering or typed-array erasure is added. Negative controls reject missing, extra, duplicate or wrong keys, wrong associations, unknown fields, malformed types and unequal values. The house wrapper remains a separate unresolved group, so the manual constructor diagnostic may still fail. Source capture and ordinary constructor inputs are unchanged; all proposed defaults remain diagnostic pending Axel. No runtime, provider, RNG, ABI, terrain, admission, PARITY or row-status change occurs.
+
+The first group format check at `87d25070` found four line-wrapping sites in the new observer only. Its diagnostic is retained; the formatter child changes whitespace only, with every non-whitespace byte and string literal preserved before native execution.
+
+Strict Clippy at `45753411` rejected the test-only field dispatcher's eight arguments. Its sole caller now passes the unchanged Source/native values as one ordered pair, destructured immediately in the helper. No comparator, assertion, field registry, projection, Source observer or policy changes. The first footprint control passed at `45753411` while the manual startup check remained 0/1 on the known house wrapper; that producing-head attribution is retained.
+
+Independent review of `45753411` found that the footprint validator rejected a valid negative-zero bit wrapper whose JSON display is zero. The bounded test-only correction parses the exact 16 hexadecimal bits, permits that existing display ambiguity only for zero, and still compares associated values by exact bits. It keeps all footprint values finite and rejects inconsistent nonzero displays, malformed wrappers and unequal signed zeros. The swapped-association control now changes each side in turn. No Source, field matrix, raw observation, house encoding or policy changes; prior results stay attributed to their producing heads.
+
+
+The final footprint comparator review found that validated hexadecimal keys still used their original text for identity. Key the temporary comparison map by the validated cell's `to_bits()` value (`u64`), so letter case cannot change membership or bypass duplicate detection. Complete one-entry cell-445 controls accept lower/upper hex spellings in both directions and reject their duplicate combination on each side and against itself. Finite nonnegative integer validation, exact associated-value bits, signed-zero distinctions and all prior negative controls remain intact. This repairs a test-only comparator; no player-visible rule or runtime behavior changes. Locally acknowledge Hermes171/6198181645 and Hermes172/6198529621: the corrected head needs its own checks, independent ACCEPT and Hermes readback. The separate house diagnostic, MODE-21 todo status and pending general defaults decision remain unchanged.
+
+## Complete reserve component rows after roster recovery (2026-10-15)
+
+Treat LOG-04 weapon pricing, LOG-10 reserve recovery/latch release and LOG-15 stock transfer as the complete component operations selected by their existing Acceptance cells. The production methods and unchanged original-function oracle already compare all recorded values exactly. Do not require physical convoy movement, Classic startup or an unrelated whole-match replay to promote these three operations. Their historical named three-platform PASS evidence belongs to main `396f6d8a`, with production/test/fixture/recorder bytes preserved at frozen main `379ba4e0`; this private status proposal adds no execution or joint acceptance.
+
+Keep LOG-24 held until a real enemy-caused network-rate change drives grace and eventual cut in recipient state. Existing static mask correspondence proves its own complete predicates and is retained. BASE-09 also remains held: the first `254c079e` Source attempt failed visibility after 900 ticks; corrected `164ca543` passed visibility/distance, then failed natural final-hit retirement after another 1,200 ticks. Neither produced a fixture or native PASS. Preserve both heads, the `72cff9d7` diagnosis and `0cc0d170` recovery without retry. No runtime, interface, terrain, reference or comparison-default policy changes belong to this status proposal.
+
+## LOG-24 causal component draft (2026-10-15, source-only)
+
+Compose the existing canonical network, convoy and recipient components without admitting physical logistics to the full tick runner. Retain all ten ordinary constructor actors and real building footprints. Nine actual stance/autocast/Move commands bring an enemy rifle toward an own rifle. The computed network must change from positive rate to zero only after that real movement reaches the inclusive eight-metre closure. Starting from the constructor's zero cut timer, the real convoy method must produce positive owner-recipient grace two seconds after first closure and cut twelve seconds after it. Opponent reserve rows must omit the troop. Health, every other actor's pose, terrain and roster remain fixed; no supplied rate, predepletion, teleport, synthetic unit or expected-state installation is used.
+
+The Source side advances the original complete game; the native side explicitly composes the selected production components with a monotonic component clock. Only selected rate/timer/recipient values at the two causal boundaries are compared, with exact f64 bits for rate and timer. Positive integral grace seconds are checked before JSON integer encoding. The accepted original command inputs are independently compared as typed native commands. This is a component proposal, not aligned whole-match proof. It does not use the pending general defaults rule. The native test is private under cfg(test), so its access to the existing private convoy adapter adds no production interface.
+
+The recorder, fixture regeneration, native compilation and formatting are unrun. The fixture is absent with ENOENT. First Source or compiler/behavior failure must stop the authorized attempt and remain visible. Complete LOG-24 eligibility still requires review of the composed causal history alongside the existing point-exemption component. BASE-05 bridge/collapse/rubble/fill, BASE-12 node claim/remembered occupancy, BASE-13 paid Classic Fuel/queue and BASE-19 Tutorial no-maker purchase remain actual caller gaps. Root owns runtime-scope decisions; these guards are not relaxed here.
+
+The readiness child of exact `91f9bc12` records the actual Move target's cell, physical flags and non-occupancy plus all four retained constructor building footprints. Native derives and checks those same input facts independently before commands; it does not install the recorded outputs. The endpoint remains six metres north of the own constructor rifle, clear of the retained HQ, and all original commands, loop bounds and temporal predicates are unchanged. A future first Source failure can write an exclusive partial artifact containing actual accepted command prefix, captured frames, current actors/reserves and error. This preserves an authored precondition or runtime failure before any repair. No Source or native execution, runtime consumer edit, policy change or row promotion occurs in this child.
+
+Source generation and exact byte regeneration check each pass once at producing head `d50860e21dfdd47f1b0a0a3d8e6c9b4af9898c62`. The authentic fixture retains all ten constructor actors and all nine accepted commands, with 740 full original ticks and 740 causal frames. The enemy's real Move first closes the computed network at tick500. At tick540 the selected owner row retains supply1, grace8 and cutfalse; at tick740 it has supply0 and cuttrue. The timer and both actual network-rate observations remain recorded as exact f64 bits, alongside the unchanged roster, HP, terrain and other poses. The fixture is181681 bytes, produced by the unchanged declared inputs rather than expected-state installation. Both Source processes exit0 and release the inherited exclusive S2 lock. Actual limits are CPU4-7,6442450944-byte memory, zero swap and400000/100000 CPU quota, with more than20GiB free before each job. These are Source results only. Freeze the genuine fixture with this record, then obtain a new exact native scope before compiler, formatting or native qualification. LOG-24 and the two additional five-row status cells remain held until actual native proof and review.
+
+The first native-scope launcher exited before formatting because it ran from the repository root, above the pinned Rust toolchain file. Retain that preflight diagnostic and use the existing `rust/` working directory. The actual first format check at fixture head `368b19a8` reports only the new causal test. The authorized formatting child changes wrapping, trailing commas and expression-closure brace formatting, preserving all string literals, inputs, assertions, Source bytes and fixture bytes. No compiler or native test has run before this child is frozen; the one exact native qualification remains next under the granted scope.
+
+The three-row delivery is normally merged with post-G1 main `7c9df2d581a79de48fbec0cb4d7ab8e98b488d43`, preserving both parents and both sets of CHANGELOG/DESIGN additions. Every Rust, harness, fixture and G1 observer/document input remains exact incoming main. Only the three logistics Rust/Status pairs and additive evidence differ from main. Historical proof remains at its producing head; no Source/native rerun or extra gate is required for this unchanged component proof. Root commissions fresh source review and owns publication.
+
+Root assigns LOG-03 to the first five-row logistics batch LOG-03/04/10/15/24 and approves the existing pure initialization check scope. Its 708 original-function initialization records compare the actual native producer, and its canonical identity test preserves partially used reserves through reinitialization. The catalog conscript350 case shares every participating ammo-formula branch with the selected original custom seven-model rifle at interval1.8; the different positive range and damage values only affect the common armed-eligibility result. Record that source correspondence explicitly, without claiming the literal custom rifle was newly executed or adding a Classic whole-match gate. Keep parity cells unchanged until LOG-24's real enemy/network grace and cut witness passes and the resulting five-row proposal is reviewed. The old three-row delivery and historical producing-head evidence remain intact.
+
+## Qualified five-row logistics proposal (2026-10-15)
+
+The authentic LOG-24 causal witness now passes on actual native head `9efaac7daf0cb71dbef43527aac8b66c69721eeb`: exactly one core lib test, 0 failed and 142 filtered, plus final formatting and strict locked core all-target ci-test Clippy. Source generation/check remain attributed to d508, fixture freeze to368b and historical component passes to396f. The native test calls real movement/network/reserve/convoy/recipient components and compares the selected rate, timer and owner/private outcomes after genuine enemy arrival. No cut/rate/timer is installed, and no full-runner admission or default-normalization policy changes. This closes LOG-24's missing causal operation alongside its existing complete masks and held-point exemption checks.
+
+Prepare the five local Rust/Status pairs LOG-03/04/10/15/24 as a reviewable ported proposal. LOG-03's complete existing initialization/identity check retains its approved component scope and custom-rifle350 correspondence; LOG-04/10/15 preserve their prior complete checks. Retain both histories through the LOG03 binding/G1 merge and current main26232954, preserving all incoming engineering and observer changes. The status commit leaves its merged Rust tree unchanged. That union tree includes incoming tests and therefore differs from producing9efa; it has no newly assigned execution result. Final independent actual-head review, hosted checks and any required runtime readback remain separate before merge. All55 Acceptance cells, other row cells, public runtime, ABI, terrain and Source reference stay unchanged. The prior source failures remain visible. New entries use changelog fragments; resolving old CHANGELOG merge conflicts preserves both existing histories without adding a new direct entry.
+
+## Owned-only logistics rebase after MAP267 (2026-10-15)
+
+Rebase PR271 from preserved4cbc3922 onto exact incoming main f7b0e5889e3b707beb6d18c4ea8d20a7d9f7b578 by replaying only its seven owned non-merge commits. Main262 and all incoming G1/engineering history are already ancestors of f7 and are not replayed. Preserve the three owned base-correction annotations from mergec350 as an explicit owned documentation step; the other two old merges introduce no unique owned annotation lines. Retain complete incoming MAP five-row validation/runtime/tests and every incoming path. Reconstruct the aggregate typed union independently from common base262, old4cbc and incomingf7 before replay, then compare every path, mode, type and blob. Exactly five logistics Rust/Status pairs and all55 Acceptance/other cells remain as reviewed; causal fixture, reader and recorder stay byte-identical to producing9efa. The successor is a new integration head: prior4cbc ACCEPT and9efa execution do not transfer. No Source, Cargo, formatter, lint, native, discovery or hosted job is run during reconstruction; Root must record a new exact scope before reservedS1 is used.
 
 ## Round 20 HUD panels and original art (2026-10-15)
 
