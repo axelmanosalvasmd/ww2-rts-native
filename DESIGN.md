@@ -3562,3 +3562,32 @@ Issue #5 proposal 6181987121 asks Axel whether whole-match differential evidence
 ## Ordinary target-selection source replay
 
 The ordinary Match firing owner already holds target ID, retarget timer and team volley claims. Extend its existing pinned-source recorder with nine targeted ordinary firing scenes instead of adding a second combat model or an external interface. These scenes expose the Source-selected target for role weighting, shootability visibility, threat, hysteresis, delayed and immediate retargeting, shared claims, and trench or visible-crowd salvo value. They keep the original per-unit firing block and ordered claim rebuild. The native test compares the full recorded firing snapshot and Combat random bits in both ordinary mode aliases, Default and Conquest. This is component evidence for CMB-42, CMB-44 and CMB-86 through CMB-89; the wider row acceptance checks and whole-match outcomes remain open.
+
+## AI allied cut-point reconnection preparation (2026-10-15)
+
+The quiet planner already emits attack-moves for allied cut points. Its opening
+admission nevertheless required an unowned point, and the human policy adapter
+accepted only plain Move. The prepared change admits the existing allied-cut
+branch without a neutral sentinel and preserves the original plain attack-move
+shape through the human input helpers. The new no-neutral envelope requires
+rifle-only own rosters without research. Support guns can start the unported
+staged assault in this context and remain unsupported. The 180-second
+quiet-window limit and existing enemy, health, mode and economic restrictions
+remain in force.
+
+The new recorder executes the complete original Source test.js reconnection
+check and all three difficulty assertions. It retains the check's actual cleared
+scene, spawned rifles and supplied owner/cut view overlay. It records complete
+views, original memory, commands and waypoint draws, then calls the unchanged
+human filtering, formation and input helpers. The native test compares the full
+captured command and helper outputs and the private aim. The production planner
+keeps its existing per-seat purpose stream; no global-RNG or whole-match equality
+is claimed.
+
+This is source preparation for AI-11, AI-25, AI-26, AI-31, AI-39, AI-47 and AI-66.
+No Source recorder or native test has run for this change. The expected fixture
+is intentionally absent until Root grants generation; the new native test fails
+with an explicit missing-fixture message until then. The frozen predicate map
+and pending commands are in `docs/testing/ai-cut-reconnection.md`. No row status
+changes. The human policy still lacks a room-runtime consumer, issuer allocation
+and canonical physical admission. R1's two-human roster remains unchanged.
