@@ -38,7 +38,7 @@ fn actual_ground_support_ticks_match_source_effects_and_lifetimes() {
         let mut drifted = false;
         if is_smoke {
             assert!(m.world.game.smokes.is_empty());
-            assert_eq!(common::smoke_los(&m, smoke_query), *smoke_query);
+            common::compare_smoke_los(&m, &trace["initial"], name);
             assert_eq!(smoke_query["withSmoke"], true);
         }
         let initial_rng = m.start.random.snapshot();

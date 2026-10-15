@@ -258,6 +258,16 @@ pub fn smoke_los(m: &Match, query: &Value) -> Value {
     json!({"from":point_json(from),"to":point_json(to),"withSmoke":visible(g),"withoutSmoke":visible(&control)})
 }
 
+pub fn compare_smoke_los(m: &Match, encoded: &Value, context: &str) {
+    assert_source(
+        &smoke_los(m, &encoded["raw"]["smokeLos"]),
+        &encoded["raw"]["smokeLos"],
+        &encoded["floatBits"],
+        "smokeLos",
+        context,
+    );
+}
+
 pub fn compare(
     m: &Match,
     encoded: &Value,
