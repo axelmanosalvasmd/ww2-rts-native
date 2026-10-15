@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## CMB-140 required caller argument repair (2026-10-15)
+
+Root read the complete retained compile failure at `c20a45ef` and the actual `execute_command` signature/provider. Add only `let winner_decided = m.finish.is_some()` in the new test and supply it as the required third argument before the mutable call. The provider still applies its own `winner_decided || self.finish.is_some()` gate. No provider, admission rule, assertion, projection, Source recorder, scene or input changes. Freeze this child before the regranted S3 checks.
+
+The c20 E0061 exit 101 remains a genuine compile failure with zero native tests; Stop and Clippy were not run. Authentic Source generation/check remain on `4d60cfc4`, 450 ticks/451 frames and 905 draws, and are not repeated. Only the two pending new checks run, with strict core/simtest all-target ci-test Clippy conditional on success. All proposed defaults stay diagnostic with owner approval pending; raw and approved comparison results remain separate. No row promotion, publication or rebase onto newer main is included.
+
 CMB-140 formatting checkpoint: Source generation and serial check both exit 0 at `4d60cfc4`, with all genuine Stop branches qualified over 450 ticks/451 frames and 905 draws. The first fmtcheck reports only new aligned_stop.rs layout. The mechanical new-file rustfmt retains every original lexical token and every string literal, inserting only optional trailing commas. Source inputs, authentic read-only capture, observers, registry, predicates and all old files remain unchanged. Freeze this child before renewed fmt and the two new native checks; no native pass is claimed here. Raw evidence is `/tmp/cmb140-stop-s3-508272ac/`.
 
 ## CMB-140 genuine three-actor Stop diagnostic (2026-10-15, source freeze)

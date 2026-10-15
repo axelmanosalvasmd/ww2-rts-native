@@ -318,9 +318,12 @@ fn three_actor_stop_clears_real_intents_and_preserves_foreign_controls() {
             {
                 let before = stop_snapshot(&m, &replay, vec![], vec![], &[], 1, 4).unwrap();
                 let command = Command::from_json(&row["command"]).unwrap();
-                let denial = match m
-                    .execute_command(row["issuer"].as_u64().unwrap() as usize, &command)
-                {
+                let winner_decided = m.finish.is_some();
+                let denial = match m.execute_command(
+                    row["issuer"].as_u64().unwrap() as usize,
+                    &command,
+                    winner_decided,
+                ) {
                     Ok(d) => d.map_or(Value::Null, |d| json!(d.name())),
                     Err(e) => {
                         failure = Some(

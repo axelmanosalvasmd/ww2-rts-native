@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Supply the actual finished-match flag to the new CMB-140 diagnostic caller, as required by `execute_command`. Retain the earlier E0061 compile exit 101 with zero native tests; Source generation/check already passed and is not repeated. Providers, admission, assertions, projections and inputs remain unchanged.
+
 - Format only the new CMB-140 diagnostic module after Source generation/check passed at `4d60cfc4` (450 ticks, 451 frames, 905 draws). Preserve all original tokens and literals, allowing only formatter-added trailing commas. Native tests remain pending; retain the initial fmt diff.
 
 - Prepare CMB-140 as a private aligned Stop diagnostic: three genuine actors carry attack-move, an attack target and typed queued Move/Attack orders before one Stop. Preserve foreign/empty/mixed controls, raw observations and separate comparison modes; add six source-backed pending defaults only for newly observed work/traffic fields. No row promotion or new execution is claimed at this source freeze.
