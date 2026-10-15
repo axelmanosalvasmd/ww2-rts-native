@@ -108,6 +108,71 @@ The approved ABI 2 header and reference `e4e579a` remain exact. Existing ownersh
 
 The existing socket denial did not directly compare foreign unit and control state. One table-driven test now checks all four admitted command families in both seat directions, forged sender keys and mixed owned/foreign selection. It preserves current owner filtering and the owned-subset rule. The new reader compares the supported default NaN pace by exact IEEE bits, after retaining its initial derived-equality failure with identical native values. The focused ci-test passes once on Vostro, with zero failures or ignored tests. Existing helpers and tests remain byte-identical; no runtime mutation defect or mixed-selection mismatch was observed. Full workspace and separate review remain required before the per-stream PR. This defines no new role, visibility policy, public start or interface.
 
+## Recoverable changelog collection (2026-10-14)
+
+The collector's initial Git deletion preflight cannot reserve the index.
+A late index lock after changelog replacement left the fragments present,
+and a retry copied their bullets again. Before replacement, the collector
+now publishes a private per-worktree Git journal containing the complete
+original and assembled changelog, NUL-separated fragment paths, exact
+fragment contents and original NUL-separated Git index entries (blob, mode,
+stage and path). Changelog replacement uses a temporary file on its own
+filesystem. Each invocation requires exclusive access to the worktree,
+fragment paths and its Git index. No new locking tool is required.
+
+When validated, a retry accepts only the recorded original or assembled
+changelog,
+unchanged remaining fragments and their recorded index entries. From the
+original state it replaces the changelog; from the assembled state it resumes only the owned fragment
+removals. Already removed fragments are skipped. The journal survives
+process interruption and Git deletion failure and is removed only after
+all owned deletions finish. Unrelated changelog, fragment or index edits
+present when checked refuse recovery until the recorded state is
+restored. The collector never removes Git's index lock. Identity is the
+fragment path and exact contents, not bullet text, so distinct fragments
+with identical bullets both survive collection. New fragments wait for the
+next invocation after recovery.
+
+The first recovery candidate checked only worktree contents. A staged
+replacement whose worktree file was subsequently removed could therefore
+pass Git's deletion check and be lost. Recovery now verifies every remaining
+index entry's exact blob, mode, stage and path before any fragment removal,
+even when the worktree file is missing. A changed staged entry present when
+validated refuses recovery, retaining the index, journal and assembled
+changelog. A missing
+worktree file with the original index entry may still recover normally.
+
+A separate review showed that one collector alone does not reserve the
+index: another Git writer can stage a replacement and remove its worktree
+file after validation, and the collector's later deletion can remove that
+replacement. The checks and actual git rm are separate operations, not one
+atomic transaction. Each invocation therefore requires exclusive access to
+the worktree, fragment paths and Git index, with all other Git and worktree
+writers waiting until it exits. The guards check changes present at
+validation, including changes made between retry invocations; concurrent
+changes after those checks are unsupported.
+
+Final order remains newest date on top, with same-date topic filenames in
+descending order, retaining the existing insertion and spacing rules. This
+clarifies Axel review 084 and owner decision 085. Their process-sharing note
+is addressed by recommending local nextest after test-binary consolidation:
+plain cargo test shares a process across formerly separate test files,
+whereas nextest isolates each test. This collector follow-up changes no test
+layout, Cargo profile, runtime, workflow or interface.
+
+Collector validation passed 26 owned-scratch checks: 25 current-script
+behavior checks and one reproduction of the earlier index-loss bug. The
+current-script checks cover exact output against the original collector,
+ordering, dirty-input refusal, post-replacement process kill, late index
+lock, partial deletion, recovery
+refusal after unrelated edits, repeated no-op, identical legitimate bullets,
+new fragments arriving during recovery, unusual quoted paths and linked
+worktree isolation. The added index checks retain changed blobs, modes and
+conflict stages on refusal, then recover after the original index entry is
+restored. These checks do not cover concurrent writers. This documentation
+correction preserves all script commands and prior verification receipts,
+with no Cargo or native runs.
+
 ## World integration after merged Legacy #204 (2026-10-14, full validation pending)
 
 Normally merge main `113ca151eba1bf90073a14bc1d73fda7de0ce3b3` into World `1fc5fae976356dbd7d1fa6820f99731c42d8e394`, with merge base `0f267137d833976d8143b6636fcca23f04fd26e1`. Main's tree equals reviewed Legacy `71b611b7`. Independent source review and Root inspection clear exact World retention for the conflicts in `match_production.rs`, `match_tick.rs`, `simtest/tests/match_production.rs` and `ordinary_production_tick.rs`; `lib.rs`, `production.rs` and `simtest/tests/match_tick.rs` automatically retain their World blobs. All source, harness, test, fixture, dependency, profile, workflow, ABI/header and reference entries remain exact World bytes. There is no new runtime rewrite.
