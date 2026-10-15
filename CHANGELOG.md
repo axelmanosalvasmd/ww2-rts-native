@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Compare MODE-21 footprint keys by validated numeric bits, accepting hexadecimal letter-case variants and rejecting duplicate bit-identical keys. Preserve exact value-bit checks and signed-zero distinctions; no player-visible behavior changes.
+
 - Validate finite MODE-21 footprint bits using the existing JSON zero-display rule, while preserving signed-zero mismatches. Check swapped footprint associations on both sides and retain all other negative controls.
 
 - Pair Source and native values in the test-only MODE-21 field dispatcher after the retained strict Clippy argument-count diagnostic, preserving comparison order and every predicate.

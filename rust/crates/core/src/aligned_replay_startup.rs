@@ -89,7 +89,7 @@ fn building_cells_equal(source: &Value, native: &Value) -> bool {
         let consistent = display.to_bits() == bits || display == 0.0 && number == 0.0;
         (number.is_finite() && consistent).then_some(number)
     }
-    fn entries(value: &Value) -> Option<std::collections::BTreeMap<String, &Value>> {
+    fn entries(value: &Value) -> Option<std::collections::BTreeMap<u64, &Value>> {
         let object = value.as_object()?;
         if object.len() != 1 {
             return None;
@@ -112,7 +112,7 @@ fn building_cells_equal(source: &Value, native: &Value) -> bool {
             for field in ["id", "owner", "x", "z"] {
                 number(record.get(field)?)?;
             }
-            let key = row[0]["bits"].as_str()?.to_owned();
+            let key = cell.to_bits();
             if entries.insert(key, &row[1]).is_some() {
                 return None;
             }
@@ -943,6 +943,19 @@ fn building_cells_membership_preserves_complete_entries() {
     reordered["$map"].as_array_mut().unwrap().reverse();
     assert!(building_cells_equal(&source, &reordered));
     assert!(!exact(&source, &reordered)); // Raw order still differs.
+    let lowercase = map([(n(445.0), record(7.0, 0.0, 10.0, 20.0))]);
+    let mut uppercase = lowercase.clone();
+    uppercase["$map"][0][0]["bits"] = json!("407BD00000000000");
+    assert!(building_cells_equal(&lowercase, &uppercase));
+    assert!(building_cells_equal(&uppercase, &lowercase));
+    let mut duplicate_case = lowercase.clone();
+    duplicate_case["$map"]
+        .as_array_mut()
+        .unwrap()
+        .push(uppercase["$map"][0].clone());
+    assert!(!building_cells_equal(&duplicate_case, &lowercase));
+    assert!(!building_cells_equal(&lowercase, &duplicate_case));
+    assert!(!building_cells_equal(&duplicate_case, &duplicate_case));
     let mut negative_zero = source.clone();
     negative_zero["$map"][0][1]["x"] = json!({"bits":"8000000000000000","value":0});
     assert!(building_cells_equal(&negative_zero, &negative_zero));
