@@ -55,7 +55,7 @@ function frame(g, aliases) {
   return {tick: g.tick, units: Object.fromEntries(Object.entries(aliases).map(([name, id]) => {
     const u = g.units.get(id);
     assert.ok(u, `${name}: actual purchased actor remains present`);
-    return [name, {id, x: bits(u.x), z: bits(u.z), rot: bits(u.rot), speed: bits(u.moveSpeed),
+    return [name, {id, x: bits(u.x), z: bits(u.z), rot: bits(u.rot), speed: bits(u.moveSpeed), pace: bits(u.pace),
       path: u.path.map(point), vx: bits(u.vx), vz: bits(u.vz)}];
   }))};
 }
@@ -128,7 +128,7 @@ function trace(spec) {
   }
   for (const actor of spec.actors) {
     g.players[0].mp = manifest.producer.wallet;
-    const from = actor.kind === 'tank' ? maker : [...g.units.values()].find(u => u.owner === 0 && u.type === manifest.producer.rifleMaker);
+    const from = ['tank', 'at'].includes(actor.kind) ? maker : [...g.units.values()].find(u => u.owner === 0 && u.type === manifest.producer.rifleMaker);
     assert.ok(from, 'retained real producer');
     const buy = command({t: 'buy', unit: actor.kind, from: from.id});
     assert.equal(buy.births.length, 1, 'public Buy publishes one actor');
@@ -138,7 +138,13 @@ function trace(spec) {
   }
   refresh(g);
   const orders = spec.actors.filter(a => a.goal).map(a => [aliases[a.alias], ...a.goal]);
-  command({t: 'move', orders});
+  command({t: 'move', orders, ...(spec.together ? {together: true} : {})});
+  if (spec.together) {
+    const tank = g.units.get(aliases.tank), gun = g.units.get(aliases.gun);
+    assert.equal(tank.pace, sim.UNITS.at.speed, 'the group marches at its slowest unit');
+    assert.equal(gun.pace, sim.UNITS.at.speed, 'the slowest member receives the same pace');
+    active.march = {assigned: bits(tank.pace), gun: bits(gun.pace)};
+  }
   for (const a of spec.actors.filter(a => a.straight)) g.units.get(aliases[a.alias]).path = [{x: a.goal[0], z: a.goal[1]}];
   ticks('warmup', spec.warmup);
   const starts = Object.fromEntries(Object.entries(aliases).map(([name, id]) => [name, g.units.get(id).x]));
@@ -146,6 +152,13 @@ function trace(spec) {
   active.measurements = Object.fromEntries(Object.entries(aliases).map(([name, id]) => {
     const u = g.units.get(id); return [name, {distance: u.x - starts[name], x: u.x, z: u.z}];
   }));
+  if (spec.together) {
+    const tank = g.units.get(aliases.tank), gun = g.units.get(aliases.gun);
+    assert.ok(Math.abs((tank.x - 10) - (gun.x - 10)) < 2, 'tank and gun stay level on the march');
+    command({t: 'move', orders: [[tank.id, 90, 20]]});
+    assert.equal(tank.pace, 0, 'a plain order drops the march pace');
+    active.march.plain = bits(tank.pace);
+  }
   if (spec.rainTicks) {
     const u = g.units.get(aliases.subject);
     const flags = () => sim.snapshotFor(g, 0, []).units.find(row => row[0] === u.id)[12];

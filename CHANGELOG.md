@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Correct the private MOV companion input with one open neutral capture point worth zero MP and VP, preserving native map admission. Add a real Motor Pool tank/AT together march with the original slowest-speed, twenty-tick level-travel and plain-order reset predicates. Source recapture and native checks remain pending; retained failure packets and parity statuses are unchanged.
+
 - Recover MOV companion checkpoint `389ac81141` onto frozen main `379ba4e0` with a normal merge that retains both histories. Preserve both captured fixtures and the actual native map-admission failure. This source-only checkpoint changes no runtime or parity status.
 
 - Mark MAP-04/05/07/117 ported after six exact native checks pass at `7cbfcddd`: three strict original validation-message readers, the full map corpus, complete XL/Hill Assault check and affected BASE replay. Formatting recheck and strict core/simtest all-target Clippy also pass. Retain MAP-97's separate historical debug/release proof, all 140 Acceptance cells and the tested Rust tree; MAP-06/19/100 remain held.

@@ -68,8 +68,8 @@ fn fixture() -> Value {
         .iter()
         .map(|s| &s["name"])
         .collect();
-    assert_eq!(actual, expected, "all twelve scenes in authored order");
-    assert_eq!(actual.len(), 12);
+    assert_eq!(actual, expected, "all thirteen scenes in authored order");
+    assert_eq!(actual.len(), 13);
     f
 }
 fn n(v: &Value) -> f64 {
@@ -146,7 +146,7 @@ fn frame(m: &Match, aliases: &BTreeMap<String, u32>) -> Value {
     let units: BTreeMap<_, _> = aliases.iter().map(|(name, id)| {
         let u = &m.world.game.units[id];
         (name.clone(), json!({"id":id,"x":bits(u.x),"z":bits(u.z),"rot":bits(u.rot),
-            "speed":bits(u.move_speed),"path":u.path.iter().map(|p|vec![bits(p.x),bits(p.z)]).collect::<Vec<_>>(),
+            "speed":bits(u.move_speed),"pace":bits(u.pace),"path":u.path.iter().map(|p|vec![bits(p.x),bits(p.z)]).collect::<Vec<_>>(),
             "vx":bits(u.vx.unwrap_or(f64::NAN)),"vz":bits(u.vz.unwrap_or(f64::NAN))}))
     }).collect();
     json!({"tick":m.world.game.tick,"units":units})
@@ -325,7 +325,7 @@ impl<'a> Scene<'a> {
         }
         for actor in spec["actors"].as_array().unwrap() {
             let kind = actor["kind"].as_str().unwrap();
-            let producer = if kind == "tank" {
+            let producer = if matches!(kind, "tank" | "at") {
                 maker
             } else {
                 scene
@@ -480,7 +480,7 @@ impl<'a> Scene<'a> {
             control_ids: None,
             attack_move: false,
             queue: false,
-            together: false,
+            together: spec["together"] == true,
             face: None,
         });
     }
@@ -694,4 +694,68 @@ fn original_uphill_and_downhill_distances() {
         (hill["down"].1 - flat["down"].1).abs() < 0.3,
         "and loses nothing going down"
     );
+}
+
+#[test]
+fn original_together_twenty_ticks_and_plain_order_reset() {
+    let f = fixture();
+    let spec = f["manifest"]["scenes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["name"] == "together")
+        .unwrap();
+    let oracle = f["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["name"] == "together")
+        .unwrap();
+    let mut scene = Scene::new(&f["manifest"], spec, oracle);
+    let tank = scene.aliases["tank"];
+    let gun = scene.aliases["gun"];
+    let slowest = scene.m.rules.kinds[scene.m.world.game.units[&gun].kind].speed;
+    assert_eq!(
+        scene.m.world.game.units[&tank].pace,
+        slowest,
+        "the group marches at its slowest unit"
+    );
+    assert_eq!(scene.m.world.game.units[&gun].pace, slowest);
+    assert_eq!(bits(slowest), oracle["march"]["assigned"]);
+    assert_eq!(bits(slowest), oracle["march"]["gun"]);
+    scene.ticks("measure", 20);
+    let tank_x = scene.m.world.game.units[&tank].x;
+    let gun_x = scene.m.world.game.units[&gun].x;
+    assert!(
+        ((tank_x - 10.0) - (gun_x - 10.0)).abs() < 2.0,
+        "tank and gun stay level on the march"
+    );
+    for (name, x) in [("tank", tank_x), ("gun", gun_x)] {
+        assert_eq!(bits(x), bits(n(&oracle["measurements"][name]["x"])));
+        assert_eq!(
+            bits(x - 10.0),
+            bits(n(&oracle["measurements"][name]["distance"]))
+        );
+    }
+    scene.issue(Command::Move {
+        orders: vec![MoveOrder {
+            unit: i64::from(tank),
+            at: Point { x: 90.0, z: 20.0 },
+        }],
+        control_ids: None,
+        attack_move: false,
+        queue: false,
+        together: false,
+        face: None,
+    });
+    assert_eq!(
+        scene.m.world.game.units[&tank].pace,
+        0.0,
+        "a plain order drops the march pace"
+    );
+    assert_eq!(
+        bits(scene.m.world.game.units[&tank].pace),
+        oracle["march"]["plain"]
+    );
+    scene.finish();
 }

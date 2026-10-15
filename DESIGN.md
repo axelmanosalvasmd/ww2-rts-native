@@ -1,5 +1,13 @@
 # Three Crossroads Native: design decisions
 
+## MOV neutral-point input and together-march consumer (2026-10-15)
+
+The recovered terrain manifest has `points: []`, which the actual native attempt rejected before Match construction. Give both independent map builders the same authored open point at cell (40,90), with MP and VP both zero. This point is below the measurement band and away from the retained producer yard. Keep every actor, footprint, original distance window, native guard and old failure. This is a disclosed successor input requiring fresh Source generation/check; do not patch the old expected fixture or treat its frames as new results.
+
+Add a thirteenth scene for MOV-10's selected original test.js:3084-3089 slice. Build the real Motor Pool, buy its tank and AT gun through ordinary commands, author the original poses and destinations, issue `together: true`, and compare all twenty physical ticks through the actual runner. Both readers assert the original slowest-AT speed, under-two-metre travel difference and plain-order pace reset. Record pace in the motion projection and verify all three observed pace values. The existing command/movement components remain unchanged; this scene supplies the previously absent twenty-tick together trajectory. No runtime, expected-state import, synthetic birth or actor deletion is added.
+
+The committed old fixture intentionally fails the manifest equality check until a fresh granted capture succeeds and is frozen. The fixture loader requires all thirteen named scenes. No Source, Node, Cargo, rustc, fmt, lint, native test, discovery or CI execution occurs in this source checkpoint. MOV-04's missing fuel consumer and logistics refusal remain explicit, so no five-row status proposal is claimed complete.
+
 ## MOV implementation recovery on frozen main (2026-10-15)
 
 The MOV_IMPL replacement normally merges `389ac811412213fb3f6e212db75ea1f6ba1bcf65` into frozen main `379ba4e06c794708623c005ab6052bebd03d8809` in its own checkout. Keep both additive changelog histories, the incoming registry union and every prior fixture and assertion. The earlier source generation/check successes belong to `0e2334be`; formatting and the native map-admission failure belong to `389ac811`. No earlier result qualifies the assembled head.
