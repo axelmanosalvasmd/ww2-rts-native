@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## Second server-stream source freeze (2026-10-15)
+
+At baseline `34edf52a7eaa6cb6edba3e802c2190226228276f`, IMPL_NET_2 selects NET-64/65/66/67/69/70/72/74/80/81 for a source-inspected acceptance plan, not a completion claim. [The plan](docs/testing/net-2-row-plan.md) and [full 47-row predicate map](docs/testing/net-2-row-plan.json) preserve the original acceptance requirements and distinguish component fixtures from actual socket consumers. NET-98 is absent from the inventory and ownership map; NET-68 remains another owner's row. All parity statuses stay unchanged.
+
+Keep R1's approved two-human Conquest profile and existing wire/ABI. AI, spectator and client branches prevent full completion claims for several selected rows; missing controlled socket witnesses prevent the others. The native metadata builder has no AI-specific online/ping values, and the current dispatcher leaves host pause/resume unavailable. No runtime change or policy expansion is adopted. Cargo, server execution and Source recorders await an explicit Root slot grant; this documentation freeze has no new runtime proof. Root retains separate review and publication ownership.
+
 ## Parallel Rust verification and dependency caching (2026-10-14)
 
 PR #214 at `ee7bdc3c899b912f229dade7e5d58855052d87b7` separates lint, tests and release into three jobs on each of Ubuntu 24.04, Windows 2025 and macOS 15, for nine jobs total. Strict locked workspace/all-target Clippy remains on all three platforms. Locked workspace tests use cargo-nextest 0.9.148 with Cargo's existing `ci-test` profile and nextest's `ci` profile; explicit locked `cargo test --doc` retains doctests on all three. Locked release FFI builds remain on all three, with strict C11 linking and formation replay on Linux. Test jobs retain the 60-minute limit; lint and release jobs have 30-minute limits.

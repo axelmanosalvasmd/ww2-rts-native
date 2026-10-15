@@ -1,0 +1,1 @@
+- Freeze a source-inspected second server-stream plan for ten existing NET rows, with the full predicates and dispositions of all 47 owned rows. Record missing socket witnesses, excluded AI/spectator/client consumers and pending resource grants. No parity status, runtime, test, fixture, wire or ABI changes; no native or Source recorder execution is claimed.
