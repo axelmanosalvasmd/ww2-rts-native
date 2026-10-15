@@ -4,6 +4,8 @@ mod commander_ingress;
 mod lobby;
 mod maps;
 mod native_startup;
+mod trusted_room;
+pub use trusted_room::TrustedRoomConfig;
 pub mod room_runtime;
 pub mod snapshot_backpressure;
 pub mod snapshot_delta;
@@ -117,7 +119,28 @@ pub async fn serve_with_native_control(
     shutdown: impl Future<Output = ()> + Send + 'static,
     ready: Option<oneshot::Sender<NativeRoomControl>>,
 ) -> std::io::Result<()> {
-    let hub = Hub::new(config.max_rooms.clamp(1, 256), config.public_url);
+    serve_inner(listener, config, shutdown, ready, None).await
+}
+
+/// Serve the approved private R1 profile through ordinary JSON v0 start/restart.
+pub async fn serve_trusted_room(
+    listener: TcpListener,
+    config: Config,
+    shutdown: impl Future<Output = ()> + Send + 'static,
+    trusted: TrustedRoomConfig,
+) -> std::io::Result<()> {
+    serve_inner(listener, config, shutdown, None, Some(trusted)).await
+}
+
+async fn serve_inner(
+    listener: TcpListener,
+    config: Config,
+    shutdown: impl Future<Output = ()> + Send + 'static,
+    ready: Option<oneshot::Sender<NativeRoomControl>>,
+    trusted: Option<TrustedRoomConfig>,
+) -> std::io::Result<()> {
+    let mut hub = Hub::new(config.max_rooms.clamp(1, 256), config.public_url);
+    hub.configure_trusted_room(trusted);
     // Dropping or aborting this future invalidates the same stopped authority
     // used under the Hub lock, even when graceful shutdown never runs.
     let _lifetime = ServeLifetime(hub.stop_authority());
