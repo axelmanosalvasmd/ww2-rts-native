@@ -1,0 +1,1 @@
+- Prepare existing Source recorders and native readers for ENG-04, ENG-13, ENG-14, ENG-48 and ENG-66. Fixture recording, native verification and parity promotion remain pending a Root execution grant.

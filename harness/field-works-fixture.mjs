@@ -34,6 +34,7 @@ export function fieldStep(g,id,dt) {
 export const fieldHooks={digProgress,cellOf};\n`;
  writeFileSync(join(temp,'sim.mjs'),code);
  const sim=await import(pathToFileURL(join(temp,'sim.mjs')));
+ const {rebuildGrid}=await import(pathToFileURL(join(reference,'shared/grid.js')));
  const number=new DataView(new ArrayBuffer(8));
  const bits=value=>{number.setFloat64(0,value,false);return number.getBigUint64(0,false).toString(16).padStart(16,'0');};
  const encode=value=>typeof value==='number'?bits(value):Array.isArray(value)?value.map(encode):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).map(([k,v])=>[k,encode(v)])):value;
@@ -48,6 +49,7 @@ export const fieldHooks={digProgress,cellOf};\n`;
  const traces=[];
  function record(name,map,units,actions,mp=500) {
   const g=sim.createGame(map,[],false,[],[],{weather:false});g.players=[0,1].map(slot=>({slot,team:slot,mp,away:false,out:false}));g.tick=10;g.hidden=new Set();g.cellJournal=[];g.fieldEvents=[];g.fieldRoutes=[];
+  if(actions.some(action=>action.op==='blast')){g.shots=[];g.seed=123456789;g.nextId=1000;g.wx={rain:0,wet:0};g.wind={a:0,v:0};}
   for(const v of units){const d=sim.UNITS[v.type];g.units.set(v.id,{...v,hp:v.hp??d.hpPer*d.models,supp:0,garrison:-1,riding:v.riding??0,path:[],repath:0,retreating:v.retreating??false,orders:[]});}
   const initial=snapshot(g),rows=[];
   for(const action of actions){g.fieldEvents=[];g.fieldRoutes=[];let result=null;
@@ -57,6 +59,11 @@ export const fieldHooks={digProgress,cellOf};\n`;
    else if(action.op==='move'){Object.assign(g.units.get(action.unit),action.fields);}
    else if(action.op==='money')g.players[action.owner].mp=action.mp;
    else if(action.op==='mutate')sim.internals.setCell(g,action.cell,action.ch);
+   else if(action.op==='blast'){rebuildGrid(g);sim.damageCells(g,[...g.units.values()],action.at,action.radius,action.damage);}
+   else if(action.op==='roadState'){
+    const c=action.cell;
+    result={ch:g.chars[c],ground:g.ground[c],object:g.objects[c],mine:!!g.mineLayer[c],wear:g.wear[c],hp:g.cellHp[c],flags:g.flags[c],material:sim.worldMaterial(g,c).name,groundMaterial:sim.worldMaterial(g,c,true).name};
+   }
    else if(action.op==='seen')g.mineSeen.set(action.cell,action.mask);
    else if(action.op==='preview'){g.hidden=new Set(action.hidden??[]);const p=sim.placementCheck(g,{kind:action.kind,x:action.x,z:action.z,dir:action.dir??0,team:action.team},at=>!g.hidden.has(sim.fieldHooks.cellOf(g,at.x,at.z)));result={ok:p.ok,reason:p.reason??null,cells:p.cells??[]};}
    else throw Error(action.op);
@@ -79,6 +86,40 @@ export const fieldHooks={digProgress,cellOf};\n`;
  {const map=blank();map.rows[10]='........DDDD........';record('mine-road-and-known-clearing',map,[inputUnit(),inputUnit(2,'rifle',1,20,23)],[start('mines',{dir:0}),...Array.from({length:4},()=>step(3)),start('demine',{unit:2,owner:1,dir:0}),{op:'seen',cell:208,mask:2},{op:'seen',cell:209,mask:2},start('demine',{unit:2,owner:1,dir:0}),step(3,2),step(3,2),start('demine',{dir:0}),step(3),step(3)]);}
  {const map=blank();map.rows[10]='........NNNN........';record('demine-distant-cached-approach',map,[inputUnit(1,'engineer',0,1,21)],[{op:'seen',cell:208,mask:1},start('demine',{dir:0}),step(0),step(1),{op:'move',unit:1,fields:{x:14,z:21}},step(1.5)]);}
  for(const dir of [0,Math.PI/2,-1.2,7.5])record(`placement-angle:${dir}`,blank(),[inputUnit()], [{op:'preview',kind:'nest',x:1,z:1,dir},start('trench',{dir,x:1,z:1}),step(3)]);
+ // ENG-13: complete wire with both named builders, retaining the existing MG refusal.
+ for(const type of ['engineer','conscript']){
+  record(`complete:wire-${type}`,blank(),[inputUnit(1,type)],[start('wire',{dir:0}),...Array.from({length:5},()=>step(type==='engineer'?1.5:3))]);
+  const trace=traces.at(-1),last=trace.rows.at(-1).snapshot;
+  assert.equal([...last.world.chars].filter(ch=>ch==='X').length,5);
+  assert.equal(last.jobs.length,0);
+ }
+ // ENG-14: the entire visible plan is woods, with an independent open capture point.
+ {
+  const map=blank();map.points=[{x:4,y:4}];map.rows[10]='........OOOO........';assert.equal(sim.validateMap(map),null);
+  record('woods-trench-blocked',map,[inputUnit()],[start('trench',{dir:0})]);
+  const trace=traces.at(-1),row=trace.rows[0];
+  assert.equal(row.result,'blocked');assert.deepEqual(row.snapshot,trace.initial);
+ }
+ // ENG-66: real damage creates wear before paid laying and known clearing.
+ // The second real hit must cross the original road threshold beneath rubble.
+ {
+  const map=blank();map.points=[{x:4,y:4}];map.worldVersion=2;map.rows[10]='........RRRR........';
+  const ground=Array(20).fill('.'.repeat(20));ground[10]='........DDDD........';
+  map.layers={ground,objects:[...map.rows],groundMaterials:[{c:208,material:'concrete'}],objectMaterials:[{c:208,material:'stone'}]};
+  assert.equal(sim.validateMap(map),null);
+  const observe=phase=>({op:'roadState',cell:208,phase});
+  record('mine-rubble-road-damage-threshold',map,[inputUnit(1,'engineer')],[
+   {op:'blast',at:{x:17,z:21},radius:0,damage:120},observe('before'),
+   start('mines',{dir:0}),...Array.from({length:4},()=>step(1.5)),observe('mined'),
+   start('demine',{dir:0}),...Array.from({length:4},()=>step(1.5)),observe('cleared'),
+   {op:'blast',at:{x:17,z:21},radius:0,damage:85},observe('threshold'),
+  ]);
+  const values=traces.at(-1).rows.filter(row=>row.action.op==='roadState').map(row=>row.result);
+  const [before,mined,cleared,threshold]=values;
+  assert.equal(mined.mine,true);assert.equal(cleared.mine,false);
+  for(const value of [mined,cleared])for(const key of ['ground','object','wear','hp','flags','material','groundMaterial'])assert.equal(value[key],before[key],key);
+  assert.equal(threshold.ground,'+');assert.equal(threshold.object,'R');
+ }
  clean();const content=JSON.stringify({reference:pin,node:process.version,arch:process.arch,traces})+'\n',path=join(root,'rust/crates/core/tests/fixtures/field-works.json');
  if(process.argv.includes('--check'))assert.equal(readFileSync(path,'utf8'),content);else writeFileSync(path,content);
  console.log(`${process.argv.includes('--check')?'Verified':'Recorded'} ${traces.length} field-work traces, ${traces.reduce((n,t)=>n+t.rows.length,0)} actions`);

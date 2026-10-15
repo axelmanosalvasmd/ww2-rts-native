@@ -58,7 +58,29 @@ fn profile(name: &str, v: &Value) -> UnitKind {
 #[test]
 fn infantry_naval_and_vehicle_paths_match_original_find_path() {
     let fixture: Value = serde_json::from_str(include_str!("fixtures/pathfinding.json")).unwrap();
-    replay_paths(&fixture, (1529, 1108, 299, 122, 33));
+    let scene = fixture["scenarios"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["name"] == "fortifications-full-trap-wall")
+        .expect("ENG-04 paired trap-wall witness");
+    let queries = scene["queries"].as_array().unwrap();
+    assert_eq!(queries.len(), 2);
+    assert_eq!(queries[0]["type"], "tank");
+    assert_eq!(queries[1]["type"], "rifle");
+    assert!(
+        queries[0]["expected"]["points"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        !queries[1]["expected"]["points"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    replay_paths(&fixture, (1531, 1109, 300, 122, 34));
 }
 
 #[test]
