@@ -1,0 +1,1 @@
+- Correct the unrun MOV recorder's field boundary and cover-rank source lookup, retain u64 constructor seeds, and require full fresh retry allowances and equal idle pre-intervention inputs. No provider, fixture, status or execution result changes.

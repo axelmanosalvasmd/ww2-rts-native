@@ -67,12 +67,15 @@ fn snapshot(m: &Match) -> Value {
 }
 
 fn make(case: &Value) -> Match {
-    let map = AuthoritativeMap::from_json(&serde_json::to_vec(&case["map"]).unwrap())
+    let bridge: Option<Value> = (case["scenario"] == "bridge").then(||
+        serde_json::from_str(include_str!("../../../../harness/mov-bridge-inputs.json")).unwrap());
+    let map_input = bridge.as_ref().map_or(&case["map"], |input| &input["map"]);
+    let map = AuthoritativeMap::from_json(&serde_json::to_vec(map_input).unwrap())
         .expect("authored map must pass real map admission");
     let mut m = Match::new(
         &map,
         MatchOptions {
-            seed: 7301,
+            seed: bridge.as_ref().map_or(7301, |input| input["nativeSeed"].as_u64().unwrap()),
             mode: Mode::Conquest,
             players: vec![
                 PlayerConfig {
@@ -122,20 +125,32 @@ fn make(case: &Value) -> Match {
     }
     m.start.points.clear();
     m.capture_ticks.clear();
-    m.start.environment_seed = case["environment"]["seed"].as_u64().unwrap() as u32;
-    m.start.wind = (
-        number(&case["environment"]["wind"][0]),
-        number(&case["environment"]["wind"][1]),
-    );
-    m.world.game.wet = case["environment"]["wet"].as_f64();
-    m.initialize_tick_scene(
-        0,
-        TickPathConfig {
-            budget: case["environment"]["pathBudget"].as_u64().unwrap() as usize,
-            retry_limit: case["environment"]["pathRetryLimit"].as_u64().unwrap() as u32,
-        },
-    )
-    .expect("declared Source path budget and retry inputs");
+    if let Some(input) = &bridge {
+        // The original lab explicitly declares this seed after construction.
+        // Keep native constructor wind/wetness, never copy expected RNG state.
+        // Source and native wind are unused in this dry, no-firing component.
+        m.start.environment_seed = input["environmentSeed"].as_u64().unwrap() as u32;
+        assert_eq!(json!(m.world.game.wet), case["environment"]["wet"]);
+        m.initialize_tick_scene(0, TickPathConfig {
+            budget: input["pathBudget"].as_u64().unwrap() as usize,
+            retry_limit: input["pathRetryLimit"].as_u64().unwrap() as u32,
+        }).unwrap();
+    } else {
+        m.start.environment_seed = case["environment"]["seed"].as_u64().unwrap() as u32;
+        m.start.wind = (
+            number(&case["environment"]["wind"][0]),
+            number(&case["environment"]["wind"][1]),
+        );
+        m.world.game.wet = case["environment"]["wet"].as_f64();
+        m.initialize_tick_scene(
+            0,
+            TickPathConfig {
+                budget: case["environment"]["pathBudget"].as_u64().unwrap() as usize,
+                retry_limit: case["environment"]["pathRetryLimit"].as_u64().unwrap() as u32,
+            },
+        )
+        .expect("declared Source path budget and retry inputs");
+    }
     let initial = case["initial"].as_array().unwrap();
     assert_eq!(
         m.next_unit_id,
@@ -169,6 +184,22 @@ fn make(case: &Value) -> Match {
             continue;
         }
         assert_eq!(id, m.next_unit_id + staged.len() as u32);
+        let authored = bridge.as_ref().map(|input| &input["actors"][staged.len()]);
+        let (owner, kind, at, rot, aim, hold_fire, hold_pos, auto, retreat) = if let Some(input) = authored {
+            let name = if input["kind"] == "$type" { case["type"].as_str().unwrap() }
+                else { input["kind"].as_str().unwrap() };
+            let controls = &bridge.as_ref().unwrap()["controls"];
+            (input["owner"].as_u64().unwrap() as usize, m.rules.kind(name).unwrap(),
+                Point { x: number(&input["at"][0]), z: number(&input["at"][1]) },
+                number(&input["rot"]), 0.0,
+                controls["holdFire"].as_bool().unwrap(), controls["holdPos"].as_bool().unwrap(),
+                controls["auto"].as_bool().unwrap(), controls["autoRetreat"].as_bool().unwrap())
+        } else {
+            (owner, kind, Point { x: number(&row["x"]), z: number(&row["z"]) },
+                number(&row["rot"]), number(&row["aim"]), row["holdFire"].as_bool().unwrap(),
+                row["holdPos"].as_bool().unwrap(), row["auto"].as_bool().unwrap(),
+                row["autoRetreat"].as_bool().unwrap())
+        };
         let mut draft = StagedUnit::ordinary(
             &m.world.game,
             &m.rules,
@@ -177,18 +208,15 @@ fn make(case: &Value) -> Match {
             id,
             (retained.len() + staged.len()) as u32,
             m.start.players[owner].spawn,
-            Some(Point {
-                x: number(&row["x"]),
-                z: number(&row["z"]),
-            }),
+            Some(at),
         )
         .expect("canonical scatter and actor/control initialization");
-        draft.unit.rot = number(&row["rot"]);
-        draft.unit.hold_pos = row["holdPos"].as_bool().unwrap();
-        draft.control.aim = number(&row["aim"]);
-        draft.control.hold_fire = row["holdFire"].as_bool().unwrap();
-        draft.control.auto_cast = row["auto"].as_bool().unwrap();
-        draft.control.auto_retreat = row["autoRetreat"].as_bool().unwrap();
+        draft.unit.rot = rot;
+        draft.unit.hold_pos = hold_pos;
+        draft.control.aim = aim;
+        draft.control.hold_fire = hold_fire;
+        draft.control.auto_cast = auto;
+        draft.control.auto_retreat = retreat;
         staged.push(draft);
     }
     prepare_publication(
@@ -347,7 +375,17 @@ fn replay(case: &Value) {
             .is_some_and(|row| row["tick"].as_u64() == Some(tick))
         {
             let row = commands.next().unwrap();
-            let command = Command::from_json(&row["command"]).unwrap();
+            let command_input = if scenario == "bridge" {
+                let bridge_input: Value = serde_json::from_str(include_str!("../../../../harness/mov-bridge-inputs.json")).unwrap();
+                let i = row["sequence"].as_u64().unwrap() as usize - 1;
+                let actor = &bridge_input["actors"][i];
+                let authored = json!({"t":"move", "orders":[[first + i as u32, actor["goal"][0], actor["goal"][1]]]});
+                assert_eq!(row["tick"], bridge_input["commandTick"]);
+                assert_eq!(row["owner"], actor["owner"]);
+                assert_eq!(row["command"], authored);
+                authored
+            } else { row["command"].clone() };
+            let command = Command::from_json(&command_input).unwrap();
             m.enqueue_command(
                 OrderKey {
                     tick,
@@ -561,6 +599,13 @@ fn replay(case: &Value) {
                 x: if u.id == first { 80.0 } else { 40.0 },
                 z: 57.0,
             },
+            "bridge" => match u.id - first {
+                0 => Point { x: 92.0, z: 57.0 },
+                1 => Point { x: 40.0, z: 57.0 },
+                2 => Point { x: 92.0, z: 53.0 },
+                3 => Point { x: 40.0, z: 61.0 },
+                _ => panic!("bridge lost its four original moving actors"),
+            },
             "parked" => Point { x: 85.0, z: 57.0 },
             "road" => Point { x: 87.0, z: 73.0 },
             "queue" => Point { x: 45.0, z: 75.0 },
@@ -665,5 +710,73 @@ fn original_vehicle_selected_journeys_through_real_admission_and_ground_orders()
             "diagonal {index}"
         );
         assert_eq!(case["clear"], false);
+    }
+}
+
+
+#[test]
+fn original_bridge_all_types_preserve_the_complete_two_way_verdict() {
+    let bytes = std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/mov-bridge-predicates.json"
+    )).expect("Root must grant and freeze the separate authentic bridge capture first");
+    let fixture: Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(fixture["reference"], "e4e579a838aabae3b1d9dadbc17a0a87147bc52d");
+    assert_eq!(fixture["node"], "v24.21.0");
+    assert_eq!(fixture["arch"], "x64");
+    assert_eq!(fixture["types"], json!(TYPES));
+    let inputs: Value = serde_json::from_str(include_str!("../../../../harness/mov-bridge-inputs.json")).unwrap();
+    assert_eq!(fixture["authoredInputs"], inputs);
+    assert_eq!(fixture["sourceBindings"], inputs["sourceBindings"]);
+    assert_eq!(inputs["types"], json!(TYPES));
+    assert_eq!(fixture["scenarios"], json!(["bridge"]));
+    assert_eq!(fixture["cliffs"], json!([]));
+    let cases = fixture["cases"].as_array().unwrap();
+    assert_eq!(cases.len(), TYPES.len());
+    let actual: BTreeSet<_> = cases.iter().map(|c| c["type"].as_str().unwrap()).collect();
+    assert_eq!(actual, TYPES.into_iter().collect::<BTreeSet<_>>());
+    for case in cases {
+        assert_eq!(case["scenario"], "bridge");
+        assert_eq!(case["map"], inputs["map"], "complete shared authored bridge terrain");
+        assert_eq!(case["verdict"]["passed"], true);
+        assert_eq!(case["verdict"]["failures"], json!([]));
+        assert_eq!(case["verdict"]["seconds"], 120);
+        assert_eq!(case["ticks"], 2401, "initial tick plus all 120 seconds");
+        let first = case["subject"].as_u64().unwrap();
+        let movers: Vec<_> = case["initial"].as_array().unwrap().iter()
+            .filter(|u| u["structure"] == false).collect();
+        assert_eq!(movers.len(), 4, "subject, opposing AT, and two crossing infantry");
+        for (i, (kind, x, z)) in [
+            (case["type"].as_str().unwrap(), 40.0, 57.0),
+            ("at", 86.0, 57.0), ("rifle", 40.0, 51.0), ("rifle", 92.0, 63.0),
+        ].into_iter().enumerate() {
+            assert_eq!(movers[i]["id"].as_u64(), Some(first + i as u64));
+            assert_eq!(movers[i]["kind"], kind);
+            assert_eq!(number(&movers[i]["x"]), x);
+            assert_eq!(number(&movers[i]["z"]), z);
+        }
+        // A passing open-ground scene is not the selected narrow-crossing lab.
+        assert_eq!(case["map"]["w"], 64);
+        assert_eq!(case["map"]["h"], 64);
+        for (y, row) in case["map"]["rows"].as_array().unwrap().iter().enumerate() {
+            let row = row.as_str().unwrap().as_bytes();
+            assert_eq!(row.len(), 64);
+            for (x, ch) in row.iter().enumerate() {
+                let expected = if (29..=35).contains(&x) {
+                    if (27..=29).contains(&y) { b'=' } else { b'W' }
+                } else { b'.' };
+                assert_eq!(*ch, expected, "complete original bridge terrain");
+            }
+        }
+        let commands = case["commands"].as_array().unwrap();
+        assert_eq!(commands.len(), 4);
+        for (i, (x, z)) in [(92, 57), (40, 57), (92, 53), (40, 61)].into_iter().enumerate() {
+            assert_eq!(commands[i]["owner"], 0);
+            assert_eq!(commands[i]["command"]["t"], "move");
+            assert_eq!(commands[i]["command"]["orders"], json!([[first + i as u64, x, z]]));
+        }
+        // Reuse every original continuous hull/cliff/spin, final journey,
+        // actual queue/admission and full checkpoint assertion from the old corpus.
+        replay(case);
     }
 }

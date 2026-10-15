@@ -1,0 +1,2 @@
+- Prepare Source recorders and shared authored inputs for the complete MOV41/46/47/52/54 checks. Bind the ordinary native consumers and separate eleven-type bridge consumer to those inputs, retaining the full 78-case fixture, opposing verdicts and all 108 movement rows.
+- Keep captures, native qualification, formatting and strict lint pending new exact-head grants. No new result, runtime provider change or row promotion is claimed.

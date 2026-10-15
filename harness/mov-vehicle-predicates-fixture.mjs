@@ -2,6 +2,7 @@
 // Run only in Root's recorder slot. No Source function body is replaced.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -16,7 +17,15 @@ const clean = () => {
 };
 assert.equal(process.arch, 'x64');
 assert.equal(process.version, 'v24.21.0');
-assert.ok(process.argv.slice(2).every(arg => arg === '--check'));
+assert.ok(process.argv.slice(2).every(arg => arg === '--check' || arg === '--bridge'));
+const bridgeOnly = process.argv.includes('--bridge');
+const bridgeInputs = bridgeOnly ? JSON.parse(readFileSync(resolve(root, 'harness/mov-bridge-inputs.json'), 'utf8')) : null;
+if (bridgeOnly) {
+  assert.equal(bridgeInputs.reference, pin);
+  for (const [name, digest] of Object.entries(bridgeInputs.sourceBindings)) {
+    assert.equal(createHash('sha256').update(readFileSync(resolve(reference, name))).digest('hex'), digest);
+  }
+}
 clean();
 const source = await import(pathToFileURL(resolve(reference, 'shared/sim.js')));
 const motion = await import(pathToFileURL(resolve(reference, 'shared/vehicle-motion.js')));
@@ -24,7 +33,7 @@ const { MOVEMENT_TYPES } = await import(pathToFileURL(resolve(reference, 'tools/
 const { runMovementCase } = await import(pathToFileURL(resolve(reference, 'tools/movement-lab-runner.js')));
 assert.deepEqual(MOVEMENT_TYPES, ['tank', 'medium', 'tankdestroyer', 'tiger', 'churchill',
   'armoredcar', 'halftrack', 'flaktrack', 'rocket', 'rifle', 'at']);
-const scenarios = ['clearance', 'corner', 'cliff', 'opposing', 'parked', 'road', 'queue'];
+const scenarios = bridgeOnly ? ['bridge'] : ['clearance', 'corner', 'cliff', 'opposing', 'parked', 'road', 'queue'];
 const buffer = new DataView(new ArrayBuffer(8));
 const bits = value => {
   buffer.setFloat64(0, value);
@@ -85,9 +94,10 @@ const sim = {
     const saved = Math.random;
     let g;
     try {
-      Math.random = () => 0.5;
+      Math.random = () => bridgeOnly ? bridgeInputs.sourceConstructorSeed / 2 ** 32 : 0.5;
       g = source.createGame(binding, ...args);
     } finally { Math.random = saved; }
+    if (bridgeOnly) assert.deepEqual(binding, bridgeInputs.map, 'declared bridge terrain and constructor input');
     current.map = binding;
     canonicalBirths(g);
     return g;
@@ -110,6 +120,20 @@ const sim = {
         holdFire: !!u.holdFire, holdPos: !!u.holdPos, auto: !!u.auto, autoRetreat: !!u.autoRetreat }));
       current.environment = { seed: g.seed, wind: [g.wind.a, g.wind.v], wet: g.wx?.wet ?? null,
         pathBudget: g.pathBudget ?? 4096, pathRetryLimit: g.pathRetryLimit ?? 20 };
+      if (bridgeOnly) {
+        const movers = current.initial.filter(u => !u.structure);
+        assert.equal(movers.length, bridgeInputs.actors.length);
+        for (const [i, input] of bridgeInputs.actors.entries()) {
+          const u = movers[i];
+          assert.equal(u.kind, input.kind === '$type' ? current.type : input.kind);
+          assert.equal(u.owner, input.owner);
+          assert.deepEqual([u.x, u.z], input.at); assert.equal(u.rot, input.rot);
+          for (const [key, value] of Object.entries(bridgeInputs.controls)) assert.equal(u[key], value);
+        }
+        assert.equal(current.environment.seed, bridgeInputs.environmentSeed);
+        assert.equal(current.environment.pathBudget, bridgeInputs.pathBudget);
+        assert.equal(current.environment.pathRetryLimit, bridgeInputs.pathRetryLimit);
+      }
       current.checkpoints.push(snapshot(g));
     }
     source.step(g);
@@ -129,12 +153,24 @@ for (const type of MOVEMENT_TYPES) for (const scenario of scenarios) {
   current = { type, scenario, commands: [], checkpoints: [] };
   const verdict = runMovementCase(sim, motion, scenario, { type, seed: 7301 });
   assert.deepEqual(verdict.failures, [], `${type}/${scenario}: original selected verdict`);
+  if (bridgeOnly) {
+    assert.equal(current.ticks, bridgeInputs.ticks);
+    assert.equal(verdict.seconds, bridgeInputs.seconds);
+    assert.equal(verdict.passed, true);
+    assert.equal(current.commands.length, bridgeInputs.actors.length);
+    for (const [i, input] of bridgeInputs.actors.entries()) assert.deepEqual(current.commands[i], {
+      tick: bridgeInputs.commandTick, owner: input.owner, sequence: i + 1,
+      command: { t: 'move', orders: [[current.subject + i, ...input.goal]] },
+    });
+  }
   if (type === 'tank' && scenario === 'corner') assert.ok(current.cornerFinishTick <= 181, 'light tank corner within nine seconds');
   if (current.checkpoints.at(-1).tick !== current.last.tick) current.checkpoints.push(current.last);
   delete current.last;
   cases.push({ ...current, verdict });
 }
 
+// Preserve the existing default corpus. Bridge is a separate new packet.
+if (!bridgeOnly) {
 // Reproduce the selected engine acceleration and Stop timing using authentic
 // Source actors, public commands and actual recipient rows. No server timer is
 // required for these deterministic ground predicates.
@@ -189,10 +225,11 @@ assert.equal(tank.path.length, 0); assert.equal(tank.orders.length, 0); assert.e
 if (current.checkpoints.at(-1).tick !== current.last.tick) current.checkpoints.push(current.last);
 delete current.last;
 cases.push(current);
+}
 
 // The selected diagonal regression is separate from the lab's journey reader.
 const cliffs = [];
-for (const heights of [[0, 2, 0, 0], [0, 0, 2, 0], [0, 1, 1, 2]]) {
+for (const heights of (bridgeOnly ? [] : [[0, 2, 0, 0], [0, 0, 2, 0], [0, 1, 1, 2]])) {
   const g = { w: 2, h: 2, height: Int8Array.from(heights) };
   for (const [from, to] of [[{ x: 1, z: 1 }, { x: 3, z: 3 }], [{ x: 3, z: 3 }, { x: 1, z: 1 }]]) {
     const clear = motion.segmentCliffClear(g, from, to);
@@ -202,10 +239,14 @@ for (const heights of [[0, 2, 0, 0], [0, 0, 2, 0], [0, 1, 1, 2]]) {
 }
 clean();
 const output = JSON.stringify({ reference: pin, node: process.version, arch: process.arch,
-  scope: 'Original clearance/corner/cliff/opposing/parked/road/queue journeys across the original eleven lab types, canonical spawnUnit births, unchanged lab verdicts, light-tank nine-second corner and engine acceleration/Stop recipient-row predicates. Native admission and continuous verdicts remain required. MOV-15 delivered corner, MOV-20 reverse set and MOV-21 Horde remain separate.',
+  scope: bridgeOnly ? 'Complete original bridge verdicts for all eleven movement types, with canonical births and retained constructor bases. Original two-way crossing terrain, support gun and both infantry are required; no execution or row qualification follows from this source.' : 'Original clearance/corner/cliff/opposing/parked/road/queue journeys across the original eleven lab types, canonical spawnUnit births, unchanged lab verdicts, light-tank nine-second corner and engine acceleration/Stop recipient-row predicates. Native admission and continuous verdicts remain required. MOV-15 delivered corner, MOV-20 reverse set and MOV-21 Horde remain separate.',
   sourceFiles: ['test-movement-lab.js', 'tools/movement-lab-scenarios.js', 'tools/movement-lab-runner.js', 'shared/vehicle-motion.js', 'shared/sim.js'],
+  ...(bridgeOnly ? { authoredInputs: bridgeInputs, sourceBindings: bridgeInputs.sourceBindings } : {}),
   types: MOVEMENT_TYPES, scenarios, cases, cliffs }) + '\n';
-const target = resolve(root, 'rust/crates/simtest/tests/fixtures/mov-vehicle-predicates.json');
+const target = resolve(root, bridgeOnly
+  ? 'rust/crates/simtest/tests/fixtures/mov-bridge-predicates.json'
+  : 'rust/crates/simtest/tests/fixtures/mov-vehicle-predicates.json');
 if (process.argv.includes('--check')) assert.equal(readFileSync(target, 'utf8'), output);
 else writeFileSync(target, output);
-console.log(`Verified ${cases.length - 1} original lab journeys and one engine sequence, ${cases.reduce((sum, c) => sum + c.ticks, 0)} full steps and ${cliffs.length} diagonal checks`);
+if (bridgeOnly) console.log(`Verified ${cases.length} complete original bridge journeys, ${cases.reduce((sum, c) => sum + c.ticks, 0)} full steps`);
+else console.log(`Verified ${cases.length - 1} original lab journeys and one engine sequence, ${cases.reduce((sum, c) => sum + c.ticks, 0)} full steps and ${cliffs.length} diagonal checks`);

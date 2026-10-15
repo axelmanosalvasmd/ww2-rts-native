@@ -1,0 +1,2 @@
+- Prepare unrun ordinary-command consumers for MOV41 retry/reset and queued recovery, MOV46 spreading/capture/river/cliff destinations, and MOV47 four-second idle spacing with a timer-only causal control. Retain canonical actors and purchases without pose or HP resets.
+- Add a separate bridge-only original-lab capture path and full native consumer for all eleven movement types, preserving the existing vehicle fixture and complete verdicts. Source/native execution, raw historical opposing-proof audit and row eligibility remain pending; all parity statuses stay unchanged.
