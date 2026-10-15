@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Pair Source and native values in the test-only MODE-21 field dispatcher after the retained strict Clippy argument-count diagnostic, preserving comparison order and every predicate.
+
 - Apply the retained formatter diagnostic to line wrapping in the new MODE-21 footprint comparator and controls, preserving every non-whitespace byte.
 
 - Compare MODE-21 building footprints by complete cell-key membership in the test-only startup observer. Retain all 49 original raw differences, add strict negative controls and leave the separate house-wrapper difference unresolved.

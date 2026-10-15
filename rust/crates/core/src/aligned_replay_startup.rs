@@ -703,7 +703,7 @@ impl Semantic<'_> {
             let av = a.get(key).unwrap_or(&missing);
             let bv = b.get(key).unwrap_or(&missing);
             let rule = self.matrix[scope].get(key).cloned().unwrap_or(Value::Null);
-            self.field(scope, key, av, bv, &format!("{path}.{key}"), id, &rule);
+            self.field(scope, key, (av, bv), &format!("{path}.{key}"), id, &rule);
         }
     }
     fn array(&mut self, scope: &str, a: &Value, b: &Value, path: &str) {
@@ -766,12 +766,12 @@ impl Semantic<'_> {
         &mut self,
         scope: &str,
         key: &str,
-        a: &Value,
-        b: &Value,
+        values: (&Value, &Value),
         path: &str,
         id: Option<u32>,
         rule: &Value,
     ) {
+        let (a, b) = values;
         let Some(kind) = rule["disposition"].as_str() else {
             self.mismatch(path, a, b, &json!({"disposition":"UNKNOWN_OR_UNDISPOSED"}));
             return;
