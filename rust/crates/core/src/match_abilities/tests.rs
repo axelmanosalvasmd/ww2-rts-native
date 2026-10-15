@@ -839,7 +839,10 @@ fn conquest_abilities_match_original_source_phases() {
                 "cmb-120-idle-phase-window" => 30,
                 _ => panic!("unexpected appended CMB case {name}"),
             };
-            assert_eq!(phase_count, expected_phases, "{name} full acceptance window");
+            assert_eq!(
+                phase_count, expected_phases,
+                "{name} full acceptance window"
+            );
             if matches!(
                 name,
                 "cmb-105-approaching-phase-window"
