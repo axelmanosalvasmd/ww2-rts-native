@@ -1,5 +1,12 @@
 # Three Crossroads Native: design decisions
 
+## Five engineering rows: actual-consumer preparation (2026-10-15, source only)
+
+Extend the frozen `64d750e9` preparation on fixed main `446671b9` for the exclusively assigned ENG-59/73/74/75/76 rows. Preserve every prior test, fixture, assertion and status. New authored inputs and an unexecuted Source recorder prepare 22 travel scenes, four routes, four live-weather scenes, 620 warning ticks, four rifle sight scenes, five flying-plane scenes and 313 constructor plan cases. Eight new tests call actual Match movement/weather, pathfinding, vision, aircraft, constructor and recipient snapshot consumers. No target output is fabricated; authentic captures, compilation and results remain pending.
+
+[The full predicate map and limits](docs/runtime/engineering-five-row-preparation.md) identify the missing native AI weather/sight/caution packet and the existing aircraft snapshot refusal. The prior five weather helper proofs remain bounded. No runtime, provider, terrain, guard, ABI, policy, parity status or whole-match decision changes. No Source, Cargo, native or fmt job runs without a future Root grant.
+
+
 ## Original ENG-59 travel preparation (2026-10-15, source only)
 
 At base `446671b977abfa6bf689fcb8853833d36519faab`, a new shared-input recorder and native test prepare the original Roads and mud travel checks: shallow tank, deep tank and infantry at full speed. Five isolated scenes retain the original 40 acceleration ticks and 40 measurement ticks, default living weather and actual accumulated wear. The consumer uses `Match::advance_tick`, including routed movement, ground contact, separation and late weather. It does not substitute helper multipliers for displacement or feed recorded travel state back into the runner.
