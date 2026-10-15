@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Finish the comparison-only R1 handoff: four checks at `db854ef7` report canonical 61/61 with no divergence while retaining raw 0/61. Fresh strict Clippy and formatting pass at `24433da4`; preserve the earlier lint failure, both eb15 review limits and exact input/frame provenance. No row promotion or Source rerun.
+
 - Record the authorized R1 comparison result at `db854ef7`: canonical 61/61 checkpoints and all 600 stepped ticks match, while raw comparison remains 0/61 with the tick-0 Fuel presence difference. Preserve the first strict-Clippy unused-helper failure and make only the test-build delegate visibility public before retrying lint.
 
 - Format the frozen comparison-only R1 currency rule and its regression vectors before the authorized four-check native run. No comparison rule, input or engine behavior changes.
