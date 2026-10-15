@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Record the first aligned R1 native diagnostic at `cae6e358`: both engines complete 600 ticks and all 1,321 consumed random values agree, but 0/61 checkpoints match. The first difference is tick 0, player 0 fuel: Source absence versus native zero. Preserve full traces and correct a test-only visibility warning before strict Clippy. No runtime or row status changes.
+
 - Format the aligned-replay test seam after the authentic Source freeze; no input, projection, command or runtime behavior changed.
 
 - Freeze the first authentic aligned-input Source capture before Cargo: 600 ticks, 61 checkpoints, 1,321 consumed values and 15,063 unused, reproduced by a fresh capture at `864d6485`. Native alignment is pending.

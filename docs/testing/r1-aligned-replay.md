@@ -54,3 +54,9 @@ These are partial probes, not complete row checks. No row is eligible for promot
 At clean seam head `864d6485f2129d48c2a70635c1505ba16c8c4487`, generation and exact fresh capture check both exited 0 on Vostro Node v24.21.0/x64. Each completed 600 ticks, 352 moving ticks and 61 checkpoints, consuming 1,321 tape values with 15,063 unused. Observed roles include all five startup roles, both tick wind roles and all three direct-fire roles. No Source fault occurred.
 
 The private source trace, shared input and complete source input receipt are frozen read-only under `/tmp/aligned-replay-d6308bcc/`, before the first Cargo invocation. Both Source processes held S1 flock with kernel affinity 0-3, memory.max 6,442,450,944, memory.swap.max 0 and cpu.max 400000/100000. No native alignment or match count is claimed yet. Full logs and stage results retain the producing head.
+
+## First native result, retained before lint cleanup
+
+At `cae6e358f40429bddb5882ab7e6381b694dcc57c`, the finite-tape check and actual 61-checkpoint replay each pass as harness checks. Both engines complete 600 ticks, move during 352 ticks, accept all ten orders, and consume exactly the same 1,321 draw rows with 15,063 unused values. Startup observations match. The differential verdict is MISMATCH, 0/61; first divergence is tick 0, `$.players[0].fuel`, Source absence versus Rust zero bits `0000000000000000`. A successful harness check does not turn that result into parity. No owning row is assigned without separate source investigation.
+
+Immutable first-result copies are `native-report-cae6e358.json` and `native-frames-cae6e358.json` in the private directory. The raw first compiler log retains its test-only private-interface warning. The cleanup makes Replay public only within its private cfg(test) module, and adds the differential verdict to the sanitized stdout summary. Registration, fresh strict Clippy and the final focused-head qualification follow.

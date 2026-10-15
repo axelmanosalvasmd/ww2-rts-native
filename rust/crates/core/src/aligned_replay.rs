@@ -11,7 +11,7 @@ use std::{
 mod original;
 
 #[derive(Clone, Debug)]
-pub(crate) struct Replay(Arc<Mutex<Tape>>);
+pub struct Replay(Arc<Mutex<Tape>>);
 impl PartialEq for Replay {
     fn eq(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.0, &other.0)
@@ -233,7 +233,7 @@ fn original_r1_aligned_61_checkpoints() {
     std::fs::write(output, serde_json::to_vec(&report).unwrap()).unwrap();
     println!(
         "{}",
-        json!({"alignedInputs":aligned,"checkpointsMatched":report["checkpointsMatched"],"checkpointsCompared":report["checkpointsCompared"],"firstMismatch":report["firstMismatch"],"alignmentFirstDrawDifference":report["alignmentFirstDrawDifference"],"sourceDraws":source["consumed"],"nativeDraws":report["nativeInputReceipt"]["consumed"]})
+        json!({"alignedInputs":aligned,"differentialVerdict":report["differentialVerdict"],"checkpointsMatched":report["checkpointsMatched"],"checkpointsCompared":report["checkpointsCompared"],"firstMismatch":report["firstMismatch"],"alignmentFirstDrawDifference":report["alignmentFirstDrawDifference"],"sourceDraws":source["consumed"],"nativeDraws":report["nativeInputReceipt"]["consumed"]})
     );
     assert_eq!(
         report["harnessCompleted"], true,
