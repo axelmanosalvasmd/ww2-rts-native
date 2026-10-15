@@ -536,3 +536,332 @@ fn recorded_queued_cover_inherits_attack_site_and_project_anchors_without_starti
     assert_eq!(m.start.random.snapshot(), rng);
     assert_eq!(m.start.environment_seed, environment_seed);
 }
+
+#[test]
+fn r4_first_reached_guard_refuses_three_independent_faults_atomically() {
+    use crate::{
+        match_runtime::ProductionStepError,
+        match_tick::{TickPathConfig, TickState},
+        orders::{OrderKey, OrderSnapshot},
+        production::Error as ProductionError,
+        random::RandomSnapshot,
+    };
+
+    const CONSTRUCTION: &str = "waiting Build must already own a paid site and normalized Assist";
+    const SCENARIO: &str = "legacy scenario point state does not match this match";
+    const PRODUCTION_ADMISSION: &str =
+        "production admission: Production(InvalidInput(\"production building missing\"))";
+
+    #[derive(Debug, PartialEq)]
+    struct Readback {
+        world: String,
+        owners: Vec<String>,
+        queue: OrderSnapshot<Command>,
+        random: RandomSnapshot,
+        pace: Vec<(u32, u64)>,
+    }
+
+    fn readback(state: &Match) -> Readback {
+        Readback {
+            // Includes World's private pending, journal and terrain publication state.
+            world: format!("{:?}", state.world),
+            owners: vec![
+                format!("{:?}", state.grid),
+                format!("{:?}", state.commands.units),
+                format!("{:?}", state.commands.paths),
+                format!("{:?}", state.commands.requests),
+                format!("{:?}", state.production),
+                format!("{:?}", state.start.economy),
+                format!("{:?}", state.start.points),
+                format!("{:?}", state.start.players),
+                format!(
+                    "{:?}",
+                    (
+                        state.start.dimensions,
+                        state.start.win_vp.to_bits(),
+                        state.start.weather,
+                        state.start.weather_seed,
+                        state.start.environment_seed,
+                        state.start.living,
+                        (state.start.wind.0.to_bits(), state.start.wind.1.to_bits()),
+                        state.start.initial_rain.to_bits(),
+                        state.start.initial_wet.map(f64::to_bits),
+                        &state.start.starting_kinds,
+                    )
+                ),
+                format!("{:?}", state.environment),
+                format!("{:?}", state.firing),
+                format!("{:?}", state.support),
+                format!("{:?}", state.aviation),
+                format!("{:?}", state.combat),
+                format!("{:?}", state.abilities),
+                format!("{:?}", state.recovery),
+                format!("{:?}", state.field_works),
+                format!("{:?}", state.companions),
+                format!("{:?}", state.logistics),
+                format!("{:?}", state.supply_net),
+                format!("{:?}", state.scenario.as_ref().map(|value| value.state())),
+                format!("{:?}", state.recipients),
+                format!("{:?}", state.routing_fog),
+                format!("{:?}", state.building_cells),
+                format!("{:?}", state.building_rallies),
+                format!("{:?}", state.player_rallies),
+                format!("{:?}", state.recruit_metadata),
+                format!("{:?}", state.capture_ticks),
+                format!("{:?}", state.story),
+                format!("{:?}", state.fallen),
+                format!("{:?}", state.finish),
+                format!("{:?}", state.timeline),
+                format!("{:?}", state.next_unit_id),
+                format!("{:?}", state.options),
+                format!("{:?}", state.rules),
+                // Derived Debug includes the private started bit, fault and paths.
+                format!("{:?}", state.tick_state),
+            ],
+            queue: state.commands.queue.snapshot(),
+            random: state.start.random.snapshot(),
+            // Debug represents NaN symbolically. Preserve the actual pace bits too.
+            pace: state
+                .world
+                .game
+                .units
+                .iter()
+                .map(|(&id, unit)| (id, unit.pace.to_bits()))
+                .collect(),
+        }
+    }
+
+    fn make() -> Match {
+        let map = AuthoritativeMap::from_json(include_bytes!(
+            "../../server/src/authoritative-maps/el-alamein.json"
+        ))
+        .unwrap();
+        let mut state = Match::new(
+            &map,
+            MatchOptions {
+                seed: 701,
+                mode: Mode::Conquest,
+                players: vec![
+                    PlayerConfig {
+                        name: "A".into(),
+                        team: 0,
+                        faction: Faction::Usa,
+                    },
+                    PlayerConfig {
+                        name: "B".into(),
+                        team: 1,
+                        faction: Faction::Germany,
+                    },
+                ],
+                shuffle: false,
+                army: ArmySize::Standard,
+                weather: WeatherChoice::Map,
+                weather_seed: Some(1),
+                living_weather: false,
+                map_key: Some("el-alamein".into()),
+                tech: false,
+                supply: false,
+                logistics: false,
+                sandbox: false,
+            },
+        )
+        .unwrap();
+        state
+            .initialize_tick_scene(0, TickPathConfig::default())
+            .unwrap();
+        assert!(state.scenario.is_some());
+        assert!(!state.start.points.is_empty());
+        for key in [
+            OrderKey {
+                tick: 1,
+                issuer: 0,
+                sequence: 1,
+            },
+            OrderKey {
+                tick: 3,
+                issuer: 1,
+                sequence: 7,
+            },
+        ] {
+            state.enqueue_command(key, Command::Unsupported).unwrap();
+        }
+        assert_eq!(state.commands.pending_commands(), 2);
+        assert_eq!(state.commands.next_tick(), Some(1));
+        assert_eq!(
+            format!("{:?}", state.tick_state),
+            format!("{:?}", TickState::default())
+        );
+        let before = readback(&state);
+        state.validate_tick_state().unwrap();
+        state.validate_construction_tick().unwrap();
+        state
+            .validate_production_phases(state.rules.movement.tick)
+            .unwrap();
+        state.preflight_legacy_scenario().unwrap();
+        assert_eq!(readback(&state), before, "healthy admission mutated state");
+        state
+    }
+
+    fn earlier_inputs_are_healthy(state: &Match) {
+        assert_eq!(state.world.game.tick, 0);
+        assert_eq!(state.options.mode, Mode::Conquest);
+        assert!(state.world.game.mode.is_none());
+        assert!(!state.options.logistics);
+        assert!(state.convoys.is_none());
+        assert!(state.world_runtime.is_none());
+        assert!(state.assault.is_none());
+        assert!(!state.options.living_weather);
+        assert!(state.start.living.is_none());
+        assert_eq!(state.start.players.len(), state.world.game.players.len());
+        assert_eq!(
+            state.start.economy.players.len(),
+            state.world.game.players.len()
+        );
+        assert_eq!(state.capture_ticks.len(), state.start.points.len());
+        assert!(state.rules.movement.tick.is_finite());
+        assert!(state.rules.movement.tick > 0.0);
+        assert_eq!(state.tick_state.path_config(), TickPathConfig::default());
+        assert!(state.firing.events.is_empty());
+        assert!(state.support.events.is_empty());
+        assert!(state.aviation.events.is_empty());
+        state.validate_command_tick(1).unwrap();
+        state.validate_abilities().unwrap();
+        state.prepare_companion_tick().unwrap();
+        state.validate_aircraft_runner_boundary(1).unwrap();
+        state.validate_support_metadata().unwrap();
+        let actors = state.world.game.units.keys().copied().collect::<Vec<_>>();
+        state
+            .validate_support_tick_phases(&actors, state.rules.movement.tick, 1)
+            .unwrap();
+        state.validate_carrier_tick().unwrap();
+    }
+
+    fn guard(state: &Match, which: usize) -> Result<(), String> {
+        match which {
+            0 => state.validate_construction_tick(),
+            1 => state
+                .validate_production_phases(state.rules.movement.tick)
+                .map_err(|error| format!("{error:?}")),
+            2 => state.preflight_legacy_scenario(),
+            _ => unreachable!(),
+        }
+    }
+
+    let production_error = ProductionStepError::Production(ProductionError::InvalidInput(
+        "production building missing",
+    ));
+    let direct_reasons = [
+        CONSTRUCTION.to_owned(),
+        format!("{production_error:?}"),
+        SCENARIO.to_owned(),
+    ];
+    for defects in [0_u8, 1, 2, 4, 7] {
+        let mut state = make();
+        if defects & 1 != 0 {
+            let actor = state
+                .world
+                .game
+                .units
+                .values()
+                .find(|unit| state.rules.kinds[unit.kind].infantry)
+                .unwrap();
+            let id = actor.id;
+            let at = actor.at();
+            assert!(!actor.build);
+            let control = state.commands.units.get_mut(&id).unwrap();
+            assert!(control.build_target.is_none());
+            assert!(control.orders.is_empty());
+            control.orders.push_back(Command::Build {
+                ids: vec![i64::from(id)],
+                kind: "flakpos".into(),
+                at: Some(at),
+                direction: None,
+                queue: true,
+            });
+        }
+        if defects & 2 != 0 {
+            let absent = u32::MAX - 1;
+            assert!(!state.world.game.units.contains_key(&absent));
+            assert!(state.production.building(absent).is_none());
+            state.production.initialize_building(absent).unwrap();
+        }
+        if defects & 4 != 0 {
+            state.start.points[0].owner = Some(state.world.game.players.len());
+        }
+        let before = readback(&state);
+        earlier_inputs_are_healthy(&state);
+        for (which, reason) in direct_reasons.iter().enumerate() {
+            let expected = if defects & (1 << which) != 0 {
+                Err(reason.clone())
+            } else {
+                Ok(())
+            };
+            assert_eq!(guard(&state, which), expected, "defects={defects}");
+        }
+        if defects & 2 != 0 {
+            assert_eq!(
+                state.validate_production_phases(state.rules.movement.tick),
+                Err(ProductionStepError::Production(
+                    ProductionError::InvalidInput("production building missing")
+                )),
+                "the component refusal must precede the later Match wrapper refusal"
+            );
+        }
+        assert_eq!(
+            readback(&state),
+            before,
+            "individual guards, defects={defects}"
+        );
+        if defects == 7 {
+            for order in [
+                [0, 1, 2],
+                [0, 2, 1],
+                [1, 0, 2],
+                [1, 2, 0],
+                [2, 0, 1],
+                [2, 1, 0],
+            ] {
+                let result = order.iter().try_for_each(|&which| guard(&state, which));
+                assert_eq!(result, Err(direct_reasons[order[0]].clone()));
+                assert_eq!(readback(&state), before, "direct guard order={order:?}");
+            }
+        }
+        let expected = match defects {
+            0 => {
+                state.validate_tick_state().unwrap();
+                assert_eq!(readback(&state), before, "healthy whole admission");
+                continue;
+            }
+            1 => CONSTRUCTION,
+            2 => PRODUCTION_ADMISSION,
+            4 | 7 => SCENARIO,
+            _ => unreachable!(),
+        };
+        assert_eq!(state.validate_tick_state(), Err(expected.into()));
+        assert_eq!(
+            readback(&state),
+            before,
+            "whole admission, defects={defects}"
+        );
+        // Scenario admission is reached before production/construction and started=true.
+        // This checks core admission output, not a socket or post-command rollback.
+        let failure = state.advance_tick().unwrap_err();
+        assert_eq!(failure.reason, expected, "defects={defects}");
+        assert_eq!(failure.tick, 0);
+        assert!(failure.events.is_empty());
+        assert_eq!(failure.retirement, Default::default());
+        assert!(state.tick_state.fault().is_none());
+        assert_eq!(
+            format!("{:?}", state.tick_state),
+            format!("{:?}", TickState::default())
+        );
+        assert_eq!(state.world.game.tick, 0);
+        assert_eq!(state.commands.pending_commands(), 2);
+        assert_eq!(state.commands.next_tick(), Some(1));
+        assert_eq!(
+            readback(&state),
+            before,
+            "failed advance, defects={defects}"
+        );
+    }
+}
