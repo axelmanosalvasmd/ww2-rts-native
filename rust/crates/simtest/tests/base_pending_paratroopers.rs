@@ -80,44 +80,90 @@ fn make(f: &Value) -> Match {
 }
 
 fn identity(m: &Match, original: &BTreeSet<u32>) -> Value {
-    json!(original.iter().map(|id| {
-        let u = m.world.game.units.get(id).expect("original actor survives");
-        let kind = &m.rules.kinds[u.kind];
-        let structure = m.world.structures.iter().find(|s| s.entity_id == Some(*id));
-        let protected = if kind.structure || u.owner == 1 {
-            json!([bits(u.hp), bits(u.x), bits(u.z), u.cells, structure.map(|s| s.id.as_str())])
-        } else {
-            Value::Null
-        };
-        json!([id, u.owner, kind.name, protected])
-    }).collect::<Vec<_>>())
+    json!(
+        original
+            .iter()
+            .map(|id| {
+                let u = m.world.game.units.get(id).expect("original actor survives");
+                let kind = &m.rules.kinds[u.kind];
+                let structure = m.world.structures.iter().find(|s| s.entity_id == Some(*id));
+                let protected = if kind.structure || u.owner == 1 {
+                    json!([
+                        bits(u.hp),
+                        bits(u.x),
+                        bits(u.z),
+                        u.cells,
+                        structure.map(|s| s.id.as_str())
+                    ])
+                } else {
+                    Value::Null
+                };
+                json!([id, u.owner, kind.name, protected])
+            })
+            .collect::<Vec<_>>()
+    )
 }
 
 fn population(m: &Match) -> Value {
-    let queues = m.world.game.units.values().map(|u| {
-        m.production.building(u.id).map_or_else(Vec::new, |b| b.queue().collect::<Vec<_>>())
-    }).collect::<Vec<_>>();
-    let rows = m.world.game.units.values().zip(&queues).map(|(u, queue)| PopulationUnit {
-        id: u64::from(u.id),
-        owner: Some(u.owner),
-        kind: m.rules.kinds[u.kind].name.as_str(),
-        hp: u.hp,
-        built: u.built.unwrap_or(0.0),
-        queue,
-    }).collect::<Vec<_>>();
-    let field = rows.iter().zip(m.world.game.units.values())
+    let queues = m
+        .world
+        .game
+        .units
+        .values()
+        .map(|u| {
+            m.production
+                .building(u.id)
+                .map_or_else(Vec::new, |b| b.queue().collect::<Vec<_>>())
+        })
+        .collect::<Vec<_>>();
+    let rows = m
+        .world
+        .game
+        .units
+        .values()
+        .zip(&queues)
+        .map(|(u, queue)| PopulationUnit {
+            id: u64::from(u.id),
+            owner: Some(u.owner),
+            kind: m.rules.kinds[u.kind].name.as_str(),
+            hp: u.hp,
+            built: u.built.unwrap_or(0.0),
+            queue,
+        })
+        .collect::<Vec<_>>();
+    let field = rows
+        .iter()
+        .zip(m.world.game.units.values())
         .filter(|(_, u)| !m.rules.kinds[u.kind].structure)
-        .map(|(row, _)| *row).collect::<Vec<_>>();
-    let structures = rows.iter().zip(m.world.game.units.values())
+        .map(|(row, _)| *row)
+        .collect::<Vec<_>>();
+    let structures = rows
+        .iter()
+        .zip(m.world.game.units.values())
         .filter(|(_, u)| m.rules.kinds[u.kind].structure)
-        .map(|(row, _)| *row).collect::<Vec<_>>();
-    let drops = m.world.game.strikes.iter().map(|s| PendingDrop {
-        owner: s.owner,
-        kind: s.runtime.as_ref().expect("actual support timing").kind.name(),
-        live: s.live,
-    }).collect::<Vec<_>>();
+        .map(|(row, _)| *row)
+        .collect::<Vec<_>>();
+    let drops = m
+        .world
+        .game
+        .strikes
+        .iter()
+        .map(|s| PendingDrop {
+            owner: s.owner,
+            kind: s
+                .runtime
+                .as_ref()
+                .expect("actual support timing")
+                .kind
+                .name(),
+            live: s.live,
+        })
+        .collect::<Vec<_>>();
     let context = Context {
-        mode: ModeContext { kind: m.options.mode, ..Default::default() },
+        mode: ModeContext {
+            kind: m.options.mode,
+            ..Default::default()
+        },
         army: m.options.army,
         units: &rows,
         drops: &drops,
@@ -152,7 +198,13 @@ fn invariant(m: &Match, original: &BTreeSet<u32>, initial_identity: &Value) {
     assert!(!m.building_cells.contains_key(&cell));
     assert!(!m.world.sections.contains_key(&cell));
     let catalog = Catalog::compiled().unwrap();
-    let base_income = catalog.table("CFG").unwrap().get("mpBase").unwrap().number().unwrap();
+    let base_income = catalog
+        .table("CFG")
+        .unwrap()
+        .get("mpBase")
+        .unwrap()
+        .number()
+        .unwrap();
     for player in &m.start.economy.players {
         assert_eq!(player.vp, 0.0);
         assert_eq!(player.inc, base_income);
@@ -166,14 +218,27 @@ fn invariant(m: &Match, original: &BTreeSet<u32>, initial_identity: &Value) {
         assert!(m.recovery.get(u.id).is_some());
         assert!(m.logistics.get(u.id).is_none(), "logistics stays disabled");
         if m.rules.kinds[u.kind].building {
-            let s = m.world.structures.iter().find(|s| s.entity_id == Some(u.id))
+            let s = m
+                .world
+                .structures
+                .iter()
+                .find(|s| s.entity_id == Some(u.id))
                 .expect("canonical linked building structure");
             let cells = u.cells.as_ref().expect("canonical actor footprint");
-            assert_eq!(s.cells, cells.iter().map(|&c| usize::try_from(c).unwrap()).collect::<Vec<_>>());
+            assert_eq!(
+                s.cells,
+                cells
+                    .iter()
+                    .map(|&c| usize::try_from(c).unwrap())
+                    .collect::<Vec<_>>()
+            );
             for &c in cells {
                 assert_eq!(m.building_cells[&(c as usize)].unit, u.id);
             }
-            let producer = m.production.building(u.id).expect("canonical producer queue");
+            let producer = m
+                .production
+                .building(u.id)
+                .expect("canonical producer queue");
             assert!(producer.queue().next().is_none());
             assert!(producer.rows().is_empty());
         }
@@ -187,8 +252,12 @@ fn invariant(m: &Match, original: &BTreeSet<u32>, initial_identity: &Value) {
         assert!(ww2_core::math::hypot(x - p.at.x, z - p.at.z) > 40.0);
     }
     let pop = population(m);
-    assert_eq!(pop["total"].as_f64().unwrap(), pop["field"].as_f64().unwrap()
-        + pop["queued"].as_f64().unwrap() + pop["reserved"].as_f64().unwrap());
+    assert_eq!(
+        pop["total"].as_f64().unwrap(),
+        pop["field"].as_f64().unwrap()
+            + pop["queued"].as_f64().unwrap()
+            + pop["reserved"].as_f64().unwrap()
+    );
     assert_eq!(pop["queued"].as_f64(), Some(0.0));
     assert_eq!(pop["cap"].as_f64(), Some(12.0));
 }
@@ -205,21 +274,58 @@ fn snapshot(m: &Match, original: &BTreeSet<u32>, initial_identity: &Value) -> Va
         };
         random[key] = json!(format!("{state:016x}"));
     }
-    let actors = m.world.game.units.values().map(|u| {
-        let control = &m.commands.units[&u.id];
-        let structure = m.world.structures.iter().find(|s| s.entity_id == Some(u.id));
-        json!([
-            u.id, u.owner, m.rules.kinds[u.kind].name, bits(u.hp), bits(u.x), bits(u.z),
-            bits(u.rot), bits(control.aim), u.built.map(bits), u.cells,
-            structure.map(|s| s.id.as_str()), u.path.iter().map(|p| point(Some(*p))).collect::<Vec<_>>(),
-            bits(u.ghost), u.hold_pos, control.hold_fire, control.auto_cast, control.auto_retreat,
-            point(u.world_goal), control.rally_drift, bits(m.recovery.get(u.id).unwrap().reinforcement)
-        ])
-    }).collect::<Vec<_>>();
-    let producers = m.world.game.units.values().filter(|u| m.rules.kinds[u.kind].building).map(|u| {
-        let producer = m.production.building(u.id).unwrap();
-        json!([u.id, producer.queue().collect::<Vec<_>>(), bits(producer.progress()), point(m.building_rallies[&u.id])])
-    }).collect::<Vec<_>>();
+    let actors = m
+        .world
+        .game
+        .units
+        .values()
+        .map(|u| {
+            let control = &m.commands.units[&u.id];
+            let structure = m
+                .world
+                .structures
+                .iter()
+                .find(|s| s.entity_id == Some(u.id));
+            json!([
+                u.id,
+                u.owner,
+                m.rules.kinds[u.kind].name,
+                bits(u.hp),
+                bits(u.x),
+                bits(u.z),
+                bits(u.rot),
+                bits(control.aim),
+                u.built.map(bits),
+                u.cells,
+                structure.map(|s| s.id.as_str()),
+                u.path.iter().map(|p| point(Some(*p))).collect::<Vec<_>>(),
+                bits(u.ghost),
+                u.hold_pos,
+                control.hold_fire,
+                control.auto_cast,
+                control.auto_retreat,
+                point(u.world_goal),
+                control.rally_drift,
+                bits(m.recovery.get(u.id).unwrap().reinforcement)
+            ])
+        })
+        .collect::<Vec<_>>();
+    let producers = m
+        .world
+        .game
+        .units
+        .values()
+        .filter(|u| m.rules.kinds[u.kind].building)
+        .map(|u| {
+            let producer = m.production.building(u.id).unwrap();
+            json!([
+                u.id,
+                producer.queue().collect::<Vec<_>>(),
+                bits(producer.progress()),
+                point(m.building_rallies[&u.id])
+            ])
+        })
+        .collect::<Vec<_>>();
     json!({
         "tick": m.world.game.tick, "nextId": m.next_unit_id, "seed": m.start.environment_seed,
         "clearedFixtureEquality": population(m)["total"].as_f64().unwrap() == m.world.game.units.len() as f64,
@@ -243,13 +349,37 @@ fn snapshot(m: &Match, original: &BTreeSet<u32>, initial_identity: &Value) -> Va
 
 fn event(event: TickEvent) -> Value {
     match event {
-        TickEvent::Support(SupportEvent::Plane { kind, at, direction, owner }) => {
+        TickEvent::Support(SupportEvent::Plane {
+            kind,
+            at,
+            direction,
+            owner,
+        }) => {
             assert_eq!(kind, SupportKind::Para);
-            json!(["plane", kind.name(), bits(at.x), bits(at.z), bits(direction), owner])
+            json!([
+                "plane",
+                kind.name(),
+                bits(at.x),
+                bits(at.z),
+                bits(direction),
+                owner
+            ])
         }
         TickEvent::Support(SupportEvent::Chutes(at)) => json!(["chutes", bits(at.x), bits(at.z)]),
-        TickEvent::Support(SupportEvent::ShotDown { kind, at, direction, fighters }) => {
-            json!(["shotdown", kind.name(), bits(at.x), bits(at.z), bits(direction), fighters])
+        TickEvent::Support(SupportEvent::ShotDown {
+            kind,
+            at,
+            direction,
+            fighters,
+        }) => {
+            json!([
+                "shotdown",
+                kind.name(),
+                bits(at.x),
+                bits(at.z),
+                bits(direction),
+                fighters
+            ])
         }
         other => panic!("unexpected event in peaceful pending-drop scene: {other:?}"),
     }
@@ -259,7 +389,11 @@ type Input = (String, Option<(usize, Value)>);
 
 fn schedule(name: &str, hq: u32) -> Vec<Input> {
     let mut rows = Vec::new();
-    let fill = if name == "whole-stick-insufficient" { 7 } else { 6 };
+    let fill = if name == "whole-stick-insufficient" {
+        7
+    } else {
+        6
+    };
     let buy = json!({"t":"buy","unit":"rifle","from":hq});
     let para = json!({"t":"support","kind":"para","x":45,"z":81});
     for i in 1..=fill {
@@ -270,7 +404,10 @@ fn schedule(name: &str, hq: u32) -> Vec<Input> {
         return rows;
     }
     if name == "pending-then-intercepted" {
-        rows.push(("cover-accepted".into(), Some((1, json!({"t":"support","kind":"cover","x":45,"z":81})))));
+        rows.push((
+            "cover-accepted".into(),
+            Some((1, json!({"t":"support","kind":"cover","x":45,"z":81}))),
+        ));
         for i in 1..=41 {
             rows.push((format!("cover-tick-{i}"), None));
         }
@@ -291,17 +428,48 @@ fn resolved(m: &Match, intercepted: bool, before: &BTreeSet<u32>, events: &[Valu
     assert!(m.world.game.strikes.is_empty());
     assert_eq!(pop["reserved"].as_f64(), Some(0.0));
     assert_eq!(pop["total"].as_f64(), pop["field"].as_f64());
-    assert_ne!(pop["total"].as_f64().unwrap(), m.world.game.units.len() as f64,
-        "The original cleared-scene pop==global-size equality is unequal here");
-    let births = m.world.game.units.values().filter(|u| !before.contains(&u.id))
-        .map(|u| (u.owner, m.rules.kinds[u.kind].name.as_str())).collect::<Vec<_>>();
-    assert_eq!(births, if intercepted { vec![] } else { vec![(0, "rifle"), (0, "rifle"), (0, "mg")] });
-    for u in m.world.game.units.values().filter(|u| !before.contains(&u.id)) {
-        assert!(!m.recruit_metadata.contains_key(&u.id), "drop publication is not a producer purchase");
+    assert_ne!(
+        pop["total"].as_f64().unwrap(),
+        m.world.game.units.len() as f64,
+        "The original cleared-scene pop==global-size equality is unequal here"
+    );
+    let births = m
+        .world
+        .game
+        .units
+        .values()
+        .filter(|u| !before.contains(&u.id))
+        .map(|u| (u.owner, m.rules.kinds[u.kind].name.as_str()))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        births,
+        if intercepted {
+            vec![]
+        } else {
+            vec![(0, "rifle"), (0, "rifle"), (0, "mg")]
+        }
+    );
+    for u in m
+        .world
+        .game
+        .units
+        .values()
+        .filter(|u| !before.contains(&u.id))
+    {
+        assert!(
+            !m.recruit_metadata.contains_key(&u.id),
+            "drop publication is not a producer purchase"
+        );
     }
     assert_eq!(events.iter().filter(|v| v[0] == "plane").count(), 1);
-    assert_eq!(events.iter().filter(|v| v[0] == "chutes").count(), if intercepted { 0 } else { 3 });
-    assert_eq!(events.iter().filter(|v| v[0] == "shotdown").count(), usize::from(intercepted));
+    assert_eq!(
+        events.iter().filter(|v| v[0] == "chutes").count(),
+        if intercepted { 0 } else { 3 }
+    );
+    assert_eq!(
+        events.iter().filter(|v| v[0] == "shotdown").count(),
+        usize::from(intercepted)
+    );
     if intercepted {
         assert!(m.support.covers.is_empty());
         assert_eq!(events.iter().find(|v| v[0] == "shotdown").unwrap()[5], true);
@@ -317,19 +485,41 @@ fn original_pending_paratrooper_population_lifecycle() {
     // fail explicitly; a guard-only filter cannot qualify this missing replay.
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/base-pending-paratroopers.json");
-    let f: Value = serde_json::from_str(&std::fs::read_to_string(path)
-        .expect("Generate the pinned pending-drop fixture under a future Root slot first")).unwrap();
+    let f: Value = serde_json::from_str(
+        &std::fs::read_to_string(path)
+            .expect("Generate the pinned pending-drop fixture under a future Root slot first"),
+    )
+    .unwrap();
     assert_eq!(f["reference"], "e4e579a838aabae3b1d9dadbc17a0a87147bc52d");
     assert_eq!(f["node"], "v24.21.0");
     assert_eq!(f["arch"], "x64");
     assert_eq!(f["seed"], 701);
-    assert_eq!(f["scope"], "Complete selected pending-drop predicates on a retained admitted arena; original cleared-fixture pop==global-size is unequal here and requires independent correspondence review");
-    assert_eq!(f["opts"], json!({"mode":"conquest","weather":false,"weatherSeed":1,"tech":false,"supply":false,"logistics":false,"army":"standard","sandbox":false}));
-    assert_eq!(f["inputs"], json!({"names":["a","b"],"shuffle":false,"teams":[0,1],"factions":[0,1]}));
-    assert_eq!(f["setup"], json!({"mpPerSeat":10000,"originalControls":{"holdFire":true,"holdPos":true,"auto":false,"autoRetreat":false}}));
-    assert_eq!(f["map"], json!({"name":"BASE pending-drop retained arena","w":80,"h":80,"rows":vec![".".repeat(80);80],"spawns":[{"x":12,"y":40},{"x":68,"y":40}],"points":[{"x":40,"y":8}],"defend":[0]}));
+    assert_eq!(
+        f["scope"],
+        "Complete selected pending-drop predicates on a retained admitted arena; original cleared-fixture pop==global-size is unequal here and requires independent correspondence review"
+    );
+    assert_eq!(
+        f["opts"],
+        json!({"mode":"conquest","weather":false,"weatherSeed":1,"tech":false,"supply":false,"logistics":false,"army":"standard","sandbox":false})
+    );
+    assert_eq!(
+        f["inputs"],
+        json!({"names":["a","b"],"shuffle":false,"teams":[0,1],"factions":[0,1]})
+    );
+    assert_eq!(
+        f["setup"],
+        json!({"mpPerSeat":10000,"originalControls":{"holdFire":true,"holdPos":true,"auto":false,"autoRetreat":false}})
+    );
+    assert_eq!(
+        f["map"],
+        json!({"name":"BASE pending-drop retained arena","w":80,"h":80,"rows":vec![".".repeat(80);80],"spawns":[{"x":12,"y":40},{"x":68,"y":40}],"points":[{"x":40,"y":8}],"defend":[0]})
+    );
     let cases = f["cases"].as_array().unwrap();
-    let expected_names = ["whole-stick-insufficient", "pending-then-delivered", "pending-then-intercepted"];
+    let expected_names = [
+        "whole-stick-insufficient",
+        "pending-then-delivered",
+        "pending-then-intercepted",
+    ];
     assert_eq!(cases.len(), expected_names.len());
     let (mut total_commands, mut total_ticks) = (0, 0);
     for (c, name) in cases.iter().zip(expected_names) {
@@ -340,11 +530,22 @@ fn original_pending_paratrooper_population_lifecycle() {
         assert_eq!(json!(original), c["originalIds"]);
         let initial_identity = identity(&m, &original);
         assert_eq!(initial_identity, c["originalIdentity"]);
-        let hq = m.world.game.units.values().find(|u| u.owner == 0 && m.rules.kinds[u.kind].name == "hq").unwrap().id;
+        let hq = m
+            .world
+            .game
+            .units
+            .values()
+            .find(|u| u.owner == 0 && m.rules.kinds[u.kind].name == "hq")
+            .unwrap()
+            .id;
         assert_eq!(c["hq"], hq);
         assert_eq!(c["constructorDraws"], 1);
         assert_eq!(population(&m)["field"].as_f64(), Some(3.0));
-        assert_eq!(snapshot(&m, &original, &initial_identity), c["initial"], "{name}: canonical constructor");
+        assert_eq!(
+            snapshot(&m, &original, &initial_identity),
+            c["initial"],
+            "{name}: canonical constructor"
+        );
         let inputs = schedule(name, hq);
         let records = c["records"].as_array().unwrap();
         assert_eq!(records.len(), inputs.len());
@@ -356,14 +557,27 @@ fn original_pending_paratrooper_population_lifecycle() {
             let before = snapshot(&m, &original, &initial_identity);
             let ids = m.world.game.units.keys().copied().collect::<BTreeSet<_>>();
             let next = m.next_unit_id;
-            let wallets = m.start.economy.players.iter().map(|p| p.mp).collect::<Vec<_>>();
+            let wallets = m
+                .start
+                .economy
+                .players
+                .iter()
+                .map(|p| p.mp)
+                .collect::<Vec<_>>();
             let actual_events;
             if let Some((slot, raw)) = input {
                 assert_eq!(r["op"], "command");
                 assert_eq!(r["slot"], slot);
                 assert_eq!(r["cmd"], raw);
-                let denial = m.execute_command(slot, &Command::from_json(&raw).unwrap(), false).unwrap();
-                let expected_denial = if label == "whole-stick-denied" || label == "reserved-buy-denied" { Some("pop") } else { None };
+                let denial = m
+                    .execute_command(slot, &Command::from_json(&raw).unwrap(), false)
+                    .unwrap();
+                let expected_denial =
+                    if label == "whole-stick-denied" || label == "reserved-buy-denied" {
+                        Some("pop")
+                    } else {
+                        None
+                    };
                 assert_eq!(denial.map(|d| d.name()), expected_denial, "{name}:{label}");
                 assert_eq!(json!(expected_denial), r["result"]);
                 assert!(m.support.events.is_empty());
@@ -399,10 +613,17 @@ fn original_pending_paratrooper_population_lifecycle() {
                 }
             } else {
                 assert_eq!(r["op"], "tick");
-                let report = m.advance_tick().unwrap_or_else(|e| panic!("{name}:{label}: {e}"));
+                let report = m
+                    .advance_tick()
+                    .unwrap_or_else(|e| panic!("{name}:{label}: {e}"));
                 assert!(report.commands.is_empty());
                 assert!(report.retired.is_empty() && report.world_removed.is_empty());
-                for phase in [TickPhase::Support, TickPhase::AntiAir, TickPhase::SupportTimers, TickPhase::PointCaptureIncome] {
+                for phase in [
+                    TickPhase::Support,
+                    TickPhase::AntiAir,
+                    TickPhase::SupportTimers,
+                    TickPhase::PointCaptureIncome,
+                ] {
                     assert!(report.phases.contains(&phase));
                 }
                 actual_events = report.events.into_iter().map(event).collect::<Vec<_>>();
@@ -412,15 +633,31 @@ fn original_pending_paratrooper_population_lifecycle() {
                     assert!(m.world.game.strikes.is_empty());
                     assert_eq!(m.support.covers.len(), 1);
                     let cover = &m.support.covers[0];
-                    assert_eq!((cover.owner, cover.team, cover.at.x, cover.at.z), (1, 1, 45.0, 81.0));
+                    assert_eq!(
+                        (cover.owner, cover.team, cover.at.x, cover.at.z),
+                        (1, 1, 45.0, 81.0)
+                    );
                     assert!(cover.remaining > 0.0);
                 }
             }
-            assert_eq!(json!(actual_events), r["events"], "{name}:{label}: real ordered emissions");
+            assert_eq!(
+                json!(actual_events),
+                r["events"],
+                "{name}:{label}: real ordered emissions"
+            );
             events.extend(actual_events);
-            assert_eq!(snapshot(&m, &original, &initial_identity), r["expected"], "{name}:{label}: actual canonical projection");
+            assert_eq!(
+                snapshot(&m, &original, &initial_identity),
+                r["expected"],
+                "{name}:{label}: actual canonical projection"
+            );
             if label == "para-tick-124" {
-                resolved(&m, name == "pending-then-intercepted", &before_drop, &events);
+                resolved(
+                    &m,
+                    name == "pending-then-intercepted",
+                    &before_drop,
+                    &events,
+                );
             }
         }
         assert_eq!(snapshot(&m, &original, &initial_identity), c["final"]);

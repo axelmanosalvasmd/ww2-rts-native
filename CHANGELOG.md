@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Format the new BASE-15 pending-paratrooper replay after its first fmt-check diagnostic. Preserve every literal/assertion token and the authentic fixture; native lifecycle qualification remains pending.
+
 - Record the authentic BASE-15 pending-drop fixture from pinned Source at recorder head `162e7bd7`: 3 retained-constructor scenes, 26 actual commands and 289 complete ticks. Generation and exact regeneration check pass, with no post-constructor random draws. Native replay and complete row eligibility remain pending.
 
 - Draft the complete BASE-15 pending-paratrooper recorder and native replay over retained canonical constructors, real HQ purchases, actual delayed delivery/Fighter Cover interception and released-slot recruitment. Register one test module. The three scenes predict 26 commands and 289 full ticks; no fixture or execution exists yet. Preserve the original cleared-scene population/global-count difference for whole-predicate review. All parity statuses, runtime, guards, old tests and fixtures remain unchanged.
