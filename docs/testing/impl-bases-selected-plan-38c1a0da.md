@@ -1,6 +1,6 @@
 # IMPL_BASES selected-check plan
 
-This is the source-only checkpoint requested before implementation and execution. It selects six original checks across five existing rows. No check has run, no fixture has been generated, and no row is promoted. The next implementation adds an authentic recorder and native replay tests within the existing ordinary construction consumer. It does not broaden match admission.
+Root reviewed the source plan at `1207a469f0ceac9288c0f4439ed037d4d69bab4c` and authorized implementation of its six selected checks across five existing rows. The recorder, native child module and append-only registration are now written. No check has run, no fixture has been generated, and no row is promoted. Match admission and runtime code are unchanged.
 
 ## Baseline and ownership
 
@@ -38,15 +38,15 @@ Checks 3 and 4 select only the Conquest iteration of the original four-mode loop
 
 The current ordinary native consumer already exposes `execute_build`, `execute_assist`, `execute_command`, `recorded_buy` and the sole `advance_tick`. `match_construction.rs:158-165` explicitly restricts its phase to ordinary Conquest, and `:788-790` rejects depot, shipyard and supply-cache construction. Those guards stay intact. The existing full-step replay at `simtest/tests/construction_tick.rs:795` verifies one Construction receipt after Firing and before Separation. Preserve that test, its 113 actions, 1,919 steps and 2,013 snapshots, and the old recorder/fixture bytes.
 
-Planned new paths:
+Implementation paths:
 
 - `harness/base-construction-selected-fixture.mjs`: unmodified Source creation, actual commands and full steps, plus the selected original assertions. No execution until a Source slot grant.
-- `rust/crates/simtest/tests/fixtures/base-construction-selected.json.gz`: new deterministic Source capture, generated only under a granted slot.
+- `rust/crates/simtest/tests/fixtures/base-construction-selected.json.gz`: still absent. Generate only under a granted Source slot; no placeholder or expected output was fabricated.
 - `rust/crates/simtest/tests/construction_tick/base_selected.rs`: native replay and six explicit predicate checks. A child module can use the existing parent's private projection helpers without exporting a production interface.
 - `rust/crates/simtest/tests/construction_tick.rs`: append only the child-module registration. Do not rewrite its existing test or count assertions.
 - This plan, a unique changelog fragment and a DESIGN entry receive evidence updates after actual results.
 
-No runtime edit is currently justified by a reproduced failure. If a selected assertion fails, retain the failing Source/native capture and report the exact boundary before proposing a scoped fix. Do not make the fixture pass by changing a guard, an old assertion, the Source pin, a terrain owner or a public policy.
+No runtime edit is made or currently justified by a reproduced failure. If a selected assertion fails, retain the failing Source/native capture and report the exact boundary before proposing a scoped fix. Do not make the fixture pass by changing a guard, an old assertion, the Source pin, a terrain owner or a public policy.
 
 Every building uses the actual Source placement or native canonical construction publication: catalog-sized footprint, correct centre, built/HP values, owner, production/rally state, footprint memory, structure ID and section entity links. Existing bootstrap actors and structural state remain intact. Newborns come from the actual producer. Source setup records authored money, tech, quiet controls and unit poses separately from expected output. No expected structures, path, HP or terrain state is installed into native state. Constructor-only random input follows the existing documented component-fixture practice; native streams are not reseeded to fit output, and no whole-match evidence is claimed.
 
@@ -84,24 +84,87 @@ Every building uses the actual Source placement or native canonical construction
 | BASE-57 | Held: original Classic nearest-finished-producer retreat and remaining home variants. |
 | BASE-59 | Held: complete Classic public snapshot, filtering, queues/jobs/tech/nodes/rally. |
 
+## Implementation checkpoint
+
+The native child module defines six named tests matching the predicate names in the recorder. Four Source scenes supply those tests: pillbox facing/tier, B05, Motor Pool completion/repair and mortar/Motor Pool tier gating. Tests for the two shared scenes independently replay the same recording. Counts of unique Source steps and snapshots remain unknown until recording. B05 pins exactly 1 preparation step, 700 construction steps and 600 escape steps. Motor Pool completion retains the original 1,600-step bound followed by exactly 100 repair steps.
+
+The parent `make`, `prime`, `compare`, patch reader and event projection are reused without editing them. Every recorded initial/action/tick frame receives the existing full comparison of actors, positions, HP, footprints, structure identities and sections, production state, wallet, story, terrain batches/journal/versions, wind/environment seed, quiet Match random streams and chronological effects. The child additionally compares cooldown and canonical population. Explicit predicate assertions use native witnesses collected after that comparison. Neither a component-only placement check nor a caller-provided completion replaces the actual tick loop.
+
+The recorder and test loader require Source `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`, x64 Node `v24.21.0`, four cases and the six exact predicate names. The fixture is read at test runtime so this unrecorded checkpoint has no missing `include_bytes!` dependency. An absent fixture causes a clear test failure; it never skips or passes. This is not a compile claim. Formatting and native compilation have not run.
+
+### Declared setup differences
+
+- All scenes retain every constructor actor, HQ/Barracks footprint, footprint-memory entry and linked structure. No Source fixture wrapper, temporary producer, relabelled building or generic building spawn is used.
+- B05 replaces Source's cleared field and temporary negative-ID producer with a paid unwrapped rifle purchase from the retained own HQ. The resulting newborn is the builder; the constructor rifles remain. Buyer payment, real maker ID and newborn identity are recorded before the original explicit (31,31), still=5, cooldown=1e9 and empty path/order setup. Native setup asserts the authentic purchase already has no route or orders instead of erasing either. Both player wallets receive B05's 10,000 MP setup. The unused nonconstruction Munitions prime is omitted; no Munitions rule is exercised. Every original B05 assertion and the complete 700/600-step sequence remain.
+- The original two-spawn fortress/tech maps and three-spawn skirmish map are retained. Source's ordinary Conquest mode alias is omitted in options to match the existing helper's `Mode::Default` consumer. All those Source cases have an absent runtime mode object; this does not claim another mode consumer.
+- Every constructor actor is assigned quiet Hold Fire, Hold Position, Auto off and Auto Retreat off. Weather evolution, point supply and physical logistics are disabled. The real newborn tank receives the same declared quiet controls before the 100 repair steps; it is retained and compared throughout. No actor HP, position, route, structure or terrain expected output is imported into native state.
+- The common helper starts at 5,000 MP, then an explicit recorded prime sets the original selected checks' 10,000 MP. Tech starts at tier 1 where enabled. Only the fortress scene applies the original authored tier=2 input; it does not pretend to run tier research.
+- Motor Pool placement uses the unchanged original Source `siteNear` result as the Build command's declared coordinates. Native Build independently validates and stamps those coordinates; this does not test a native `siteNear` search.
+- Constructor randomness follows the existing seed-701 Weather-stream pairing. Source throws on any runtime `Math.random` call; native purpose streams remain unchanged throughout the quiet scene. Source's own environment seed is captured, never reset. These are selected component checks using full steps, with no whole-match claim.
+
+BASE-26 remains a selected facing/build check. BASE-28 does not include the separate Classic cache-invalidation check. BASE-29/30 cover only Conquest, excluding Assault, Annihilation and Horde. BASE-48 does not cover the concrete fortification branch. Cancellation and every previously held row remain held. BASE-51 and all existing ported rows remain untouched.
+
+Ack [130](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6185630559): the whole-match, gameplay, privacy, spectator, terrain, #199 and #201 decisions remain pending. The duplicate old BASE rows mentioned there are outside this implementation task; no inventory cleanup was performed. This is local readback only.
+
 ## Execution queue for Root
 
-At this checkpoint S1, S2 and S3 belong to CMB, MAP and ENG. No slot was requested implicitly or taken. Root alone writes the slot ledger. Source, Cargo, rustc and native execution remain at zero for this task. Static reading, diff inspection, hashing and prose checks do not establish runtime success.
+Recovery owns all three slots. Source, Cargo, rustc, nextest, Clippy, formatting and native execution remain at zero for this task. No slot is inferred from a ledger entry for another BASE stream. Only static source inspection, byte preservation, hashing, diff checks and prose lint were performed. Archived build outputs are historical evidence, with no current-binary availability claim. No completed gate is repeated because its binary was removed.
 
-After implementation is frozen, one focused serial slot is requested for these commands in order. Use the exact CPU set, process scope and limits Root grants, with kernel-affinity and memory/swap verification before running anything:
+Request one focused serial slot after Root reviews this implementation. Root supplies the exact systemd scope and CPU set. Preserve MemoryMax=6G, MemorySwapMax=0, CPUQuota=400%, four build jobs and four test threads; verify kernel affinity and scope limits before execution. The guard uses three coordinator Cargo locks and forces `/tmp/ww2-native-target-0e8d6d9b`. No task target directory or `--target-dir` override is permitted.
+
+Inside that granted scope, from this worktree, run in order and stop at the first failure:
 
 ```sh
 WW2_REFERENCE=/home/judiazm/Projects/ww2-rts-native/reference/ww2-rts /usr/bin/node24.21.0 harness/base-construction-selected-fixture.mjs
 WW2_REFERENCE=/home/judiazm/Projects/ww2-rts-native/reference/ww2-rts /usr/bin/node24.21.0 harness/base-construction-selected-fixture.mjs --check
 ```
 
-Then, from `rust/`, under the same granted scope:
+Freeze the authentic generated fixture in a successor commit and report its hash, all case/action/step/snapshot counts and the exact source hash before Cargo. The implementation commit intentionally has no fixture and is not integration-ready. Then, from `rust/`, inside the granted scope:
 
 ```sh
-cargo +1.99.0 test --locked --profile ci-test -p ww2-simtest --test it construction_tick::base_selected:: -j4 -- --nocapture --test-threads=1
-cargo +1.99.0 test --locked --profile ci-test -p ww2-simtest --test it construction_tick::original_paid_construction_replays_full_match_ticks -j4 -- --exact --nocapture --test-threads=1
+df -h /
+CARGO_BUILD_JOBS=4 RUST_TEST_THREADS=4 python3 /home/judiazm/.t3/handoffs/ww2-native-cargo-guard.py +1.99.0 test --locked --profile ci-test -p ww2-simtest --test it construction_tick::base_selected:: -j4 -- --nocapture --test-threads=4
+df -h /
+CARGO_BUILD_JOBS=4 RUST_TEST_THREADS=4 python3 /home/judiazm/.t3/handoffs/ww2-native-cargo-guard.py +1.99.0 test --locked --profile ci-test -p ww2-simtest --test it construction_tick::original_paid_construction_replays_full_match_ticks -j4 -- --exact --nocapture --test-threads=4
 ```
 
-These are future targets; the new recorder, fixture and test module do not exist at the plan checkpoint. Expected new predicate count is six; expected test names and actual case/step counts must be frozen with implementation before the grant. Do not invent pass counts now. Formatting, strict lint, full workspace, release and platform jobs require their own explicit Root scope. Stop and preserve the first failure. Record exact SHA, command exits, scope/caps, memory events and process cleanup before releasing any slot.
+The first command targets these six tests, under `construction_tick::base_selected::`:
 
-Root must assign a separate reviewer before push or PR. This task performs neither. Before a shared parity document is eventually changed or submitted, integrate Root's latest approved main and prove the complete cell union without overwriting other owners' edits. No parity file is modified in this checkpoint.
+```text
+base26_pillbox_slit_faces_out_from_home
+base28_b05_occupied_adjacent_complete_and_escape
+base29_conquest_construction_completes_and_buys_from_real_motorpool
+base30_conquest_builders_repair_after_real_tank_birth
+base48_mortar_needs_company_hq
+base48_pillbox_needs_company_hq
+```
+
+Root must separately authorize formatting, strict lint, full workspace, release and platform commands. The pending formatting check, also inside a granted scope and from `rust/`, is:
+
+```sh
+df -h /
+python3 /home/judiazm/.t3/handoffs/ww2-native-cargo-guard.py +1.99.0 fmt --all -- --check
+```
+
+The guard checks at least 20 GiB free immediately before Cargo. If it refuses, stop and report the refusal without cleaning another stream. Record exact SHA, command exits, scope/caps, memory events and process cleanup before releasing any slot. No result has been assumed from these command lines.
+
+Root owns separate review before push or PR. This task performs neither. Before a shared parity document is eventually changed or submitted, integrate Root's latest approved main and prove the complete cell union without overwriting other owners' edits. No parity file is modified here.
+
+## Source hashes at implementation freeze
+
+SHA256 values below identify the authored code and inspected inputs. They are byte checks, not execution results. `Source/` resolves against the pinned reference path above. The new gzip fixture has no hash because it does not exist yet.
+
+```text
+5869e46f9d01fa98721cd688df021c8b47a9d01b1e599a766828e0ddef3b1284  harness/base-construction-selected-fixture.mjs
+f18fced132e8b962e48c918d8806c3aa9c031ef4783b53c748f124f6a5ddae86  rust/crates/simtest/tests/construction_tick/base_selected.rs
+d9f7d2ebb1f9d19b5aef359ab3a2df875e936b04f0fb341ff70a0c8d9b000812  rust/crates/simtest/tests/construction_tick.rs
+641f59ab6203e8031debda917099c8b2559f8410958ab37cd81278cad69110b3  harness/construction-tick-fixture.mjs
+2f66a66c0feee03de75283c4c92ac53df96bfa5ef9a5b5799780bdaa7fdb0720  rust/crates/simtest/tests/fixtures/construction-tick.json
+7831cff6eb9df90f5c73cc849636c968599dd73f9ad86a2f93b3da17b4ca0207  Source/shared/sim.js
+11f3b12ba1c4ea366001c3ba29146e50c0be8a8c59442b4759358501d30248f1  Source/shared/grid.js
+af14eb064947e50dcaf3df31ef6118f073febc7ed80f87cbcc4f6a913dcd6e9c  Source/test-audit-combat.mjs
+c72e951d7ac3e06ceb157ee1e2048543f6d6ed0fb02a19c781c59a85515a5d76  Source/test-skirmish-bases.js
+12b04c0407b36bd184fba70b1ebc54c1c08dc7a7540f1d2668b4144372c9b971  Source/test-fortress.js
+05d4c359046b49313aff3fb7ab6d8afe4340c9b0ea99493200dc8fff10a49ff9  Source/test-tech.js
+6c666543534964cb2488ba90c13e0d7ff93218c5cf4b47431fb8279d4bf4b20d  Source/test-fixtures.js
+```
