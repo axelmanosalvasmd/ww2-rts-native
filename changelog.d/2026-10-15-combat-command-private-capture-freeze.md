@@ -1,0 +1,1 @@
+- Freeze two authentic combat command captures privately for the existing external-path readers: four Source passes at f8ff612c, 1,000 ticks and 1,001 observations per scene. Record ready replacement flight/damage and paid medic unseen/visible denials, preserving original hashes, receipts and historical failures. Native proof and row eligibility remain pending.
