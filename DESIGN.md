@@ -1,5 +1,13 @@
 # Three Crossroads Native: design decisions
 
+## BASE13 authentic paid boundary capture (2026-10-15)
+
+At exact producer `970ab0dbc5d5b3da7fbaa1576b29090421519b98`, Root's new S2 Source-only grant ran the unchanged maintained recorder once and its byte check once. Both exited 0 with x64 Node 24.21.0 against clean pinned `e4e579a`. Each run exercised one declared production component, four original Source Buy calls, three paid rifle jobs and five original client `buyCount` observations `[3, 2, 1, 0, 0]`, with zero ticks and zero draws. The fourth Buy returned `mp` with 1 MP left and unchanged paid jobs, next ID and progress.
+
+Freeze the authentic 1,938-byte `base13-paid-price.json`, SHA256 `588d8aa0403f106026c8f1c0481b3ee71fae9a1e1199560054ed38b921e5c053`. Both processes used CPUs 4-7, 6 GiB memory, zero swap and a 400% CPU quota, jobs 4/threads 1, an inherited exclusive S2 flock with the current guard's disk and affinity checks, external target and the 20 GiB disk floor, with free-g/df before each Node invocation. Terminal and lock release were reported before this child. Raw logs, grants, preimages and receipts remain in `/tmp/logistics271-rebase-f7-9add/base13-capture-20261015t2210/`.
+
+This child adds the fixture and documentation only. Native, Cargo, fmt and lint remain unrun. A new exact-child native grant is required for the registered paid-boundary consumer. The complete BASE13 price/Fuel, queue-room, maker and population clauses remain held; no row changes, Classic shipping admission or client adoption are claimed. BASE05/12/19 stay unrun and both original BASE09 failures remain untouched. All incoming parity cells, fixtures, typed modules, Source recorders and runtime providers are preserved.
+
 ## BASE05/09/12/13/19 owned source on f7 (2026-10-15, unrun)
 
 Recover only BASE05's a26 recorder/1045 consumer and BASE13's fa18 recorder/paid component onto fresh f7 main. Keep every incoming parity cell, fixture and proof blob. The BASE13 native consumer now compares all five original client count observations using real production admission on copies of current canonical state; no price formula, replacement wallet or expected job state supplies the answer. Four canonical buys and eleven copy-probe attempts are declared, not executed. Existing price/production fixture and helper bodies remain exact.

@@ -1,0 +1,2 @@
+- Record the authentic BASE13 paid-rifle boundary fixture: Source generation and byte check each pass once, with 4 buys, 3 paid jobs, 5 client count observations and 0 ticks or draws per run.
+- Keep native qualification and the remaining BASE13 price, Fuel, queue, maker and population clauses pending. Preserve both BASE09 failures and all incoming parity and proof files.
