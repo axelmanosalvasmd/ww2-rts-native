@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Freeze authentic MOV-12 and MOV-13 fixtures after all four Source commands pass at `9102d794`: the unchanged corner callback and canonical companion each complete 61 ticks, and the complete border-ray callback records 244 queries. Both regeneration checks match exact compressed bytes. Native checks and row promotions remain pending; older captures and failures stay unchanged.
+
 - Compare only the MOV companion weather rain assertion as a present finite Number with exact binary64 bits. Preserve the recorded Source value1, all thirteen physical scenes and the prior failed integer-storage-kind comparison. No runtime, fixture, default or parity-status change; new native validation is pending.
 
 - Bind the unrun MOV-12/13 consumers to complete original constructor/action records, exact source-body hashes, explicit return/failure shapes and all 61 corner steps or 244 ray inputs. Record a separate MOV-04 internal fuel-cap ownership proposal with BASE_AUDIT, keeping its reserve consumer and the logistics guard untouched. Freeze pending consumer commands without claiming execution or ported rows.

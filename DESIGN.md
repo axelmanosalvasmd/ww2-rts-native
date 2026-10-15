@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## Authentic MOV-12 and MOV-13 capture freeze (2026-10-15)
+
+After applying only Root's reviewed weather Number patch, clean `9102d79403a1caa4c7e48e6af6020bba31037342` runs exactly four Source commands under the S2 grant. Corner generation/check and border-ray generation/check each exit0, with both checks comparing exact gzip bytes. The complete original corner callback and retained-constructor companion each run61 ticks; the original border callback records244 queries. Full original constructor/action observations and native-independent companion inputs remain in the authentic fixtures. Freeze those two files before Cargo.
+
+Every job verifies actual CPU4-7, memory6442450944, swap0 and400% quota, Node24.21.0 x64 heap4096, exclusive S2 lock and immediate available disk above20GiB. Each process and lock ends before the next job. Logs and raw outputs remain `/tmp/mov-1921-S2-9102d794/`. No old thirteen-scene or World recorder repeats. Their results stay attributed to517/0e233/3a97; the ec3 native weather failure remains failed. New native validation and literal complete-row eligibility are pending. No runtime, guard, provider or Status cell changes.
+
 ## Applied weather-only typed Number assertion (2026-10-15)
 
 After Root review, change only the MOV companion wx[0] assertion to typed finite f64 access and exact bits against1.0. Retained actual Source case3/call964 and native ec3 Number(1.0) both denote finite bits `3ff0000000000000`, inferred from those recorded values and pinned serde source without a new native bit dump. Missing, null, wrong-type, zero, nonfinite and unequal-bit values remain failures. Keep all thirteen physical scenes, fixtures, original Source, other comparisons, runtime, guards and statuses unchanged. Preserve the old failure; the new assertion still needs a separate exact-head execution grant.
