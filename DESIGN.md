@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## Selected BASE raw/amended Source proof (2026-10-15, Vostro)
+
+At input head `26276eec39035f3cef0ded38966a6b21fd8d3684`, authentic Source generation and exact byte-check both pass. Four paired scenes retain all six selected predicates in each path, with 24 actions, 2,318 full steps and 2,341 snapshots per path. Every existing full-frame JSON byte string is identical between original raw control and amended input. Only the separately recorded map name and neutral zero-value point differ; the point remains uncaptured and pays no MP/VP. B05 completes its original 700-step build and 600-step escape; the real Motor Pool completes after 917 steps, then repairs through the exact 100-step sequence with its purchased tank retained. Native execution remains pending, and the raw invalid maps have no native admission.
+
+The 703,420-byte paired fixture has SHA256 `0eebee9ebd0020adb973a8e6f8fe099bf424baf1ca8b856d34a209e10b6757e6`. Generation and byte-check each execute both paths (4,636 steps each), so their combined 9,272 actual Source steps are separate from the 2,318 unique steps per path. Evidence and exact per-scene counts are in the owned handoff. This fixture is frozen before Cargo. Runtime/parser guards, old tests/fixtures, row statuses and the Source pin remain unchanged; no whole-match or broader mode proof is inferred.
+
 ## Selected BASE component-map preparation (2026-10-15, source checkpoint)
 
 The actual `a1678fde` Source generation stopped before creation: the original selected component maps omit the playable-map name. They also have no capture points, which both pinned Source and the native authoritative parser reject. Keep that failure packet immutable at `/tmp/impl-bases-a1678-S1-h7ttp1tq/`. Root authorizes only this input preparation: retain each raw original map and both validation errors, then add `name: "Base selected"` and one neutral point with zero MP/VP at cell (40,4) on the 80-cell maps or (32,4) on B05's 64-cell map. No parser or runtime guard changes.

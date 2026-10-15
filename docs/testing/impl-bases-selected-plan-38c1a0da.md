@@ -182,3 +182,20 @@ The fixture, if recording succeeds, retains both complete control and amended re
 This recorder/checker source child must be committed before Source execution. After successful raw/amended invariance, authentic generation and byte-check, the fixture must be frozen before Cargo. S1 is assigned CPU 0-3 with MemoryMax=6G, swap=0, quota=400%, jobs=4 and test threads=4. The current per-slot guard, `WW2_CARGO_SLOT=S1`, exclusive target and compiler wrapper apply; record `df -h /` immediately before each Cargo command and stop on the 20 GiB floor. Only fmt, the six named child tests and `every_test_file_is_compiled` are authorized. No old construction replay, full/release/list command, publication or status promotion is added to this grant.
 
 Earlier source hashes above identify the uncorrected a1678 inputs. New hashes and actual run counts belong to the new immutable execution packet. No equality or pass is claimed until those runs finish.
+
+## Authentic Source pair captured before Cargo
+
+Recorder/checker input head: `26276eec39035f3cef0ded38966a6b21fd8d3684`. Actual `/usr/bin/node` is v24.21.0/x64. Generation and exact byte-check both exited 0 under S1, CPU 0-3, 6 GiB, swap 0 and 400% quota. Source was tracked clean at the unchanged pin. No Cargo or native execution preceded this fixture freeze.
+
+Each invocation ran four raw controls and four amended scenes, with all six original predicates passing in both paths. Each path contains 24 actions, 2,318 actual full steps and 2,341 snapshots. The two paths have 2,341 byte-identical full-frame pairs. Generation executes 4,636 Source steps; independent byte-check executes another 4,636, for 9,272 actual Source steps across both invocations. These counts distinguish duplicated verification from unique recorded content.
+
+| Scene | Actions per path | Full steps per path | Compared frame pairs |
+| --- | --- | --- | --- |
+| Pillbox facing/tier | 4 | 0 | 5 |
+| B05 | 9 | 1,301 | 1,308 |
+| Conquest Motor Pool completion/repair | 8 | 1,017 | 1,024 |
+| Mortar/Motor Pool tier | 3 | 0 | 4 |
+
+B05 preserves 1 preparation step, 700 build steps and 600 escape steps. The Motor Pool completes in 917 steps, followed by the exact 100-step repair sequence with its authentic tank retained. The approved point is neutral, uncaptured and worth zero MP/VP at every recorded frame. Both paths pass every original selected assertion and every non-map setup/result comparison; no normalization was applied.
+
+The authentic gzip fixture is 703,420 bytes, SHA256 `0eebee9ebd0020adb973a8e6f8fe099bf424baf1ca8b856d34a209e10b6757e6`. Source evidence is at `/tmp/impl-bases-26276-S1-75l4dlp_/`, separate from the immutable original failure packet. The original 113-action/1,919-step/2,013-snapshot construction fixture and parent test bytes remain exact. Native raw-map admission is still expressly refused. Formatting, six selected native tests and the actual simtest registry guard remain pending after this fixture commit.
