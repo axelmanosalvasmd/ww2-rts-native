@@ -7,6 +7,94 @@
 #include <cstdio>
 #include <cstdlib>
 #include <time.h>
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "Misc/SecureHash.h"
+#include "HAL/FileManager.h"
+#include "Serialization/JsonReader.h"
+#include "Serialization/JsonSerializer.h"
+#include "Policies/CondensedJsonPrintPolicy.h"
+#if PLATFORM_UNIX
+#include <sys/stat.h>
+#endif
+
+bool FTCMatchView::IsValid() const
+{
+	return MatchId >= 0 && FMath::IsFinite(X) && FMath::IsFinite(Z) && FMath::IsFinite(Yaw) && FMath::IsFinite(Dist) && (!bHasY || FMath::IsFinite(Y));
+}
+
+TSharedPtr<FJsonObject> FTCMatchView::Json() const
+{
+	if (!IsValid()) return nullptr;
+	auto O = MakeShared<FJsonObject>(), C = MakeShared<FJsonObject>(), G = MakeShared<FJsonObject>();
+	O->SetNumberField(TEXT("matchId"), MatchId);
+	C->SetNumberField(TEXT("x"), X); C->SetNumberField(TEXT("z"), Z); C->SetNumberField(TEXT("yaw"), Yaw); C->SetNumberField(TEXT("dist"), Dist);
+	if (bHasY) C->SetNumberField(TEXT("y"), Y);
+	O->SetObjectField(TEXT("camera"), C);
+	auto Ids = [](const TArray<int32>& Values) { TArray<TSharedPtr<FJsonValue>> A; for (int32 Id : Values) A.Add(MakeShared<FJsonValueNumber>(Id)); return A; };
+	O->SetArrayField(TEXT("selected"), Ids(Selected));
+	for (int32 N = 1; N <= 9; N++) if (const auto* Members = Groups.Find(N)) G->SetArrayField(FString::FromInt(N), Ids(*Members));
+	O->SetObjectField(TEXT("groups"), G);
+	return O;
+}
+
+bool FTCMatchView::Parse(const FJsonObject& O, FTCMatchView& Out)
+{
+	FTCMatchView V;
+	double Id;
+	const TSharedPtr<FJsonObject>* C = nullptr;
+	if (!O.TryGetNumberField(TEXT("matchId"), Id) || !FMath::IsFinite(Id) || Id < 0 || Id > MAX_int32 || Id != FMath::FloorToDouble(Id) || !O.TryGetObjectField(TEXT("camera"), C) || !C || !C->IsValid()) return false;
+	V.MatchId = (int32)Id;
+	if (!(*C)->TryGetNumberField(TEXT("x"), V.X) || !(*C)->TryGetNumberField(TEXT("z"), V.Z) || !(*C)->TryGetNumberField(TEXT("yaw"), V.Yaw) || !(*C)->TryGetNumberField(TEXT("dist"), V.Dist)) return false;
+	V.bHasY = (*C)->TryGetNumberField(TEXT("y"), V.Y);
+	if (V.bHasY && !FMath::IsFinite(V.Y)) V.bHasY = false;
+	if (!V.IsValid()) return false;
+	auto Ids = [](const FJsonObject& From, const FString& Key) {
+		TArray<int32> R; const TArray<TSharedPtr<FJsonValue>>* A = nullptr;
+		if (From.TryGetArrayField(Key, A)) for (const auto& E : *A) { double N; if (E && E->Type == EJson::Number && E->TryGetNumber(N) && FMath::IsFinite(N) && N >= MIN_int32 && N <= MAX_int32 && N == FMath::FloorToDouble(N)) R.Add((int32)N); }
+		return R;
+	};
+	V.Selected = Ids(O, TEXT("selected"));
+	const TSharedPtr<FJsonObject>* G = nullptr;
+	if (O.TryGetObjectField(TEXT("groups"), G) && G && G->IsValid()) for (int32 N = 1; N <= 9; N++) if ((*G)->HasTypedField<EJson::Array>(FString::FromInt(N))) V.Groups.Add(N, Ids(**G, FString::FromInt(N)));
+	Out = MoveTemp(V); return true;
+}
+
+void FTCMatchViewMemory::Open(const FString& Directory, const FString& Server, const FString& Room, const FString& Token)
+{
+	File.Reset();
+	if (Directory.IsEmpty() || Token.IsEmpty()) return;
+	const FTCHARToUTF8 Key(*(Server + TEXT("\n") + Room + TEXT("\n") + Token));
+	uint8 Hash[FSHA1::DigestSize]; FSHA1::HashBuffer(Key.Get(), Key.Length(), Hash);
+	File = FPaths::Combine(Directory, BytesToHex(Hash, UE_ARRAY_COUNT(Hash)) + TEXT(".json"));
+}
+
+bool FTCMatchViewMemory::Read(FTCMatchView& Out) const
+{
+	if (File.IsEmpty() || IFileManager::Get().FileSize(*File) > 1024 * 1024) return false;
+	FString Text; TSharedPtr<FJsonObject> O;
+	return FFileHelper::LoadFileToString(Text, *File) && FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), O) && O && FTCMatchView::Parse(*O, Out);
+}
+
+bool FTCMatchViewMemory::Write(const FTCMatchView& View) const
+{
+	const auto O = View.Json();
+	if (File.IsEmpty() || !O) return false;
+	FString Text;
+	if (!FJsonSerializer::Serialize(O.ToSharedRef(), TJsonWriterFactory<TCHAR, TCondensedJsonPrintPolicy<TCHAR>>::Create(&Text))) return false;
+	IFileManager::Get().MakeDirectory(*FPaths::GetPath(File), true);
+#if PLATFORM_UNIX
+	chmod(TCHAR_TO_UTF8(*FPaths::GetPath(File)), 0700);
+#endif
+	const FString Pending = File + TEXT(".writing");
+	if (!FFileHelper::SaveStringToFile(Text, *Pending, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM)) return false;
+#if PLATFORM_UNIX
+	chmod(TCHAR_TO_UTF8(*Pending), 0600);
+#endif
+	return IFileManager::Get().Move(*File, *Pending, true, true);
+}
+
+void FTCMatchViewMemory::Clear() const { if (!File.IsEmpty()) IFileManager::Get().Delete(*File); }
 
 // Written from the reference at e4e579a (server/saves.js, server.js lobby/save/loadSave/saveRoom/loadRoom/tickRooms,
 // client/main.js renderLobby and renderMatchMenu, client/feedback.js, client/index.html). When the pin moves, compare

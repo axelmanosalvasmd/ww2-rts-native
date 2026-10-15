@@ -18,7 +18,8 @@
 //                                 the hemisphere light's (three r186 gives both to Lambert and Standard materials)
 //   model materials (M_TCModel*)  take no engine sky light (their Ambient Occlusion is 0); their 'TCLookIndirect'
 //                                 node adds three's own hemisphere, environment diffuse and environment reflection
-//                                 from MPC_TCLook and three's PMREM atlas (unreal/Tools/look/make-look-assets.py)
+//                                 from MPC_TCLook and three's PMREM atlas (unreal/Tools/look/make-look-assets.py).
+//                                 Static AO fraction 0 preserves that light when the High AO pass is enabled.
 //   tone mapping, haze, sky       M_TCLookPost replaces the engine tonemapper; exposure is locked at 1 and bloom,
 //                                 vignette, grain, fringe, flare, motion blur, GI and screen-space reflections are off
 #pragma once
@@ -199,6 +200,7 @@ private:
 	void Apply(bool bForceSky);
 	void AimSun(float BrowserYaw);
 	void CheckSkyCapture();
+	void Audit();
 	FTCMood Base, Look;
 	bool bLobbyLook = false;
 	FTCLobbyLook LobbyLook;
@@ -211,6 +213,8 @@ private:
 	int32 EnvLevel = -1; // the graphics level (Client/TCGraphics.h) the environment was last applied for
 	int32 bAoApplied = -1; // round 14 lead glue: the AO pass the post settings were last given (1 High, 0 Low)
 	FLinearColor SkyTop, SkyBottom;
+	FVector2D LastDiagnosticControls = FVector2D(1.f, 1.f);
+	double NextAuditAt = 0;
 	// the sky light capture check (CheckSkyCapture): pending until the capture holds at least half the cube's light
 	bool bSkyCheck = false, bSkyCaptured = false;
 	int32 SkyTries = 0;

@@ -10,7 +10,7 @@
 //   client/moods.js       MOODS and WEATHER_LOOK (through TCLook, Client/TCLighting.h, which applies the light);
 //   shared/weather.js     roadMask (where mud and puddles gather).
 // The light itself (sun, sky fill, haze, exposure) eases in ATCLighting with the same rules; this file draws what
-// atmosphere.js adds to the scene. Graphics Low does not exist in the native client: it always draws High.
+// atmosphere.js adds to the scene, including its High/Low budgets and blend modes.
 //
 // The first part (TCAtmosCore) is plain C++ with no engine types, so a standalone harness can compare its numbers with
 // the reference's own functions (unreal/Tools/atmosphere). Define TC_ATMOS_CORE_ONLY before including this header for that.
@@ -424,8 +424,12 @@ public:
 	FString Describe() const;
 
 private:
+#if WITH_DEV_AUTOMATION_TESTS
+	friend class FTCAtmosphereOracleTest;
+#endif
 	void Blend();
 	void ApplyMood();
+	void ApplyBlendMode();
 	void SwapFall(const FString& Kind);
 	void BuildFall();
 	void BuildSheets();

@@ -171,6 +171,8 @@ struct FTCAlertViewInput
 	float MinimapTop = 0.f;   // the minimap's top edge (the box sits 13 px above it)
 	float ViewW = 1280.f, ViewH = 720.f;
 	float UiScale = 1.f;      // CSS zoom, for device-pixel borders and 1/64 px line boxes
+	// Native presentation correction: keep whole cards inside the viewport and clear of existing HUD panels.
+	TArray<FBox2D> Avoid;
 	bool bMouse = false;
 	FVector2D Mouse = FVector2D::ZeroVector; // :hover
 	FString Focus;            // the hit tag the keyboard (Alt+Left/Right) is on, drawn with the brass outline

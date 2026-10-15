@@ -8,11 +8,11 @@ it is, how it is turned and tinted is the reference's layout code, ported line f
 
 | Reference (pin e4e579a) | Native |
 | --- | --- |
-| `client/structures.js` (every map builder, `put`, `compose`, KINDS) | `Source/ThreeCrossroads/World/TCWorldObjects.h` (`TCWorldCore`) |
+| `client/structures.js` (every map builder, `put`, `compose`, KINDS) | `Source/ThreeCrossroads/World/TCStructures.h/.cpp` (`TCStructures`), with placement/types in `TCWorldObjects.h` (`TCWorldCore`) |
 | `client/props.js`, `client/ground.js` (BIOME_LOOKS, fieldCells) | `Source/ThreeCrossroads/World/TCScatter.h` (`TCScatterCore`) |
 | `client/main.js` hulks, applyGhosts, setNodes, houseAt | `FTCWorldObjects`, `FTCWorldObjectsView` (`TCWorldObjects.cpp`) |
 
-Both cores are engine-free (`TC_WORLD_CORE_ONLY`), so they are checked against the reference outside Unreal too.
+The cores and structure builders are engine-free (`TC_WORLD_CORE_ONLY`), so they are checked against the reference outside Unreal too.
 
 ## Files
 
@@ -71,9 +71,9 @@ node unreal/Tools/world/compare/shoot.mjs --three $D --out <dir> --assets "map=d
 `+DirectoriesToAlwaysCook=(Path="/Game/World")` in `Config/DefaultGame.ini`, next to `/Game/Models`. That file is
 not this slice's; the line is left to the lead.
 
-## Not ported
+Graphics High/Low is connected through `FTCGraphics`, including structure detail, prop thinning and shadows. Trench builders read the carved relief floor once. The standalone harness links `World/TCStructures.cpp`; Terrain.StructureRules adds 72 source signatures and World.PiecesOracle retains its full instance comparison.
 
-- **Graphics preset.** The reference's Low preset (`gfx.low`) is in both cores and in the oracle (one case), but the native client has no graphics preset, so it always builds High. The view's far level of detail uses Low's thinning rule instead (see `TCWorldObjects.h`).
-- **Trench floor.** The native ground is not carved, so the trench builders stand on the ground less `TRENCH_DEPTH`, where the reference's carved floor would be.
+## Remaining review
+
 - **Moving wrecks.** A wreck still flying (debris motion, `wrecks[i][6]`) is drawn where its row puts it, not interpolated (`client/debris.js` pose).
 - **Ghost owner rings.** Ghosts are drawn without their owner ring. The ring is the unit renderer's.

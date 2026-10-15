@@ -101,6 +101,12 @@ bool FTCMarkerScene::TentForMode(const FString& Mode, bool bWorldMap)
 		Mode != TEXT("conquest") && Mode != TEXT("assault") && Mode != TEXT("annihilation") && Mode != TEXT("horde");
 }
 
+FString FTCMarkerScene::CampMode(const FString& StartMode, const FString& LobbyMode)
+{
+	// A same-token join can receive start before its first lobby. Rebuild when that lobby supplies the mode.
+	return LobbyMode.IsEmpty() ? StartMode : LobbyMode;
+}
+
 bool FTCMarkerScene::BagInside(double X, double Z, double W, double H)
 {
 	return X >= 0.75 && Z >= 0.75 && X <= W - 0.75 && Z <= H - 0.75;
@@ -221,7 +227,8 @@ void FTCMarkerScene::UpdateFog(const ATCGameMode& M)
 void FTCMarkerScene::SyncModels(const ATCGameMode& M)
 {
 	const auto& S = M.State;
-	FString Key = FString::Printf(TEXT("%d:%d:%s:%d"), S.Map.W, S.Map.H, *S.StartMode, M.Markers.ResourceNodes().Num());
+	const FString Mode = CampMode(S.StartMode, S.Mode);
+	FString Key = FString::Printf(TEXT("%d:%d:%s:%d:%d"), S.Map.W, S.Map.H, *Mode, S.Map.bWorld, M.Markers.ResourceNodes().Num());
 	for (int32 I = 0; I < S.Spawns.Num(); I++) if (S.Spawns[I].IsSet()) Key += FString::Printf(TEXT(":%d,%s,%d"), I, *S.Spawns[I]->ToString(), S.Factions.IsValidIndex(I) ? S.Factions[I] : 0);
 	if (Key == ModelKey) return;
 	for (auto C : Models) if (C.IsValid()) C->DestroyComponent(); Models.Reset();
@@ -229,7 +236,7 @@ void FTCMarkerScene::SyncModels(const ATCGameMode& M)
 	FString Error;
 	if (!Library.IsLoaded() && !Library.Load(Error)) { UE_LOG(LogTC, Error, TEXT("camp models: %s"), *Error); return; }
 	AActor* A = Actor.Get();
-	const bool bTent = TentForMode(S.StartMode, S.Map.bWorld);
+	const bool bTent = TentForMode(Mode, S.Map.bWorld);
 	UMaterialInterface* BagMat = WithFog(Surface(TEXT("burlap"))), *WoodMat = WithFog(Surface(TEXT("wood")));
 	UStaticMesh* BagMesh = ReferenceMesh(A, BagVertices, BagMat);
 	auto* Bags = InstanceComponent(A, BagMesh, { BagMat }); Models.Add(Bags);
@@ -302,6 +309,19 @@ bool FTCMarkerDepthTest::RunTest(const FString&)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCCampPlacementTest, "ThreeCrossroads.Markers.CampPlacement", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FTCCampPlacementTest::RunTest(const FString&)
 {
+	FTCModelLibrary CampLibrary;
+	FString LoadError;
+	if (TestTrue(TEXT("source camp catalog loads"), CampLibrary.Load(LoadError)))
+		for (int32 Faction = 0; Faction < 4; Faction++) for (bool bTent : { false, true })
+		{
+			const FString Key = FString::Printf(TEXT("%s|%d"), bTent ? TEXT("hq-camp") : TEXT("hq-camp-flagpole"), Faction);
+			const FTCModelEntry* Camp = CampLibrary.Find(Key);
+			if (TestNotNull(*Key, Camp))
+			{
+				TestEqual(TEXT("merged original camp has one part"), Camp->Parts.Num(), 1);
+				if (Camp->Parts.Num()) TestEqual(TEXT("tent has canvas, timber, mast and rope surfaces; bare pole has timber and rope"), Camp->Parts[0].Materials.Num(), bTent ? 3 : 2);
+			}
+		}
 	// main.js buildHQ and GEO.plane: no time-dependent vertex displacement at the pinned revision.
 	FBox FlagBounds(ForceInit);
 	for (const auto& V : FlagVertices)
@@ -329,6 +349,12 @@ bool FTCCampPlacementTest::RunTest(const FString&)
 	for (const FString Mode : { TEXT("conquest"), TEXT("classic"), TEXT("world"), TEXT("assault"), TEXT("annihilation"), TEXT("horde") }) TestFalse(*Mode, FTCMarkerScene::TentForMode(Mode, false));
 	TestTrue(TEXT("scenario uses tent"), FTCMarkerScene::TentForMode(TEXT("scenario"), false));
 	TestTrue(TEXT("tutorial uses tent"), FTCMarkerScene::TentForMode(TEXT("tutorial"), false));
+	const FString BeforeLobby = FTCMarkerScene::CampMode(TEXT(""), TEXT(""));
+	const FString AfterLobby = FTCMarkerScene::CampMode(TEXT(""), TEXT("tutorial"));
+	TestFalse(TEXT("start before lobby has no tent yet"), FTCMarkerScene::TentForMode(BeforeLobby, false));
+	TestTrue(TEXT("late Tutorial lobby enables the full camp"), FTCMarkerScene::TentForMode(AfterLobby, false));
+	TestNotEqual(TEXT("late lobby changes the model cache key"), BeforeLobby, AfterLobby);
+	TestEqual(TEXT("known start mode is retained until lobby arrives"), FTCMarkerScene::CampMode(TEXT("scenario"), TEXT("")), FString(TEXT("scenario")));
 	TestFalse(TEXT("World map suppresses tent"), FTCMarkerScene::TentForMode(TEXT("scenario"), true));
 	const TArray<TOptional<FVector2D>> SharedSpawns = { FVector2D(11, 43), FVector2D(11, 43), {}, FVector2D(137, 77) };
 	TestFalse(TEXT("coincident camp uses the last reference seat's paint"), FTCMarkerScene::CampSlotDrawn(0, SharedSpawns));

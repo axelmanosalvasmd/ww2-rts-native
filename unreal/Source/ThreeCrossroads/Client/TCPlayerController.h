@@ -53,6 +53,7 @@ struct FTCHousePick;
 
 struct FTCCoverKnown;
 
+struct FTCMatchView;
 class ATCGameMode;
 struct FTCAbilityPlan;
 struct FTCSupportPlan;
@@ -279,6 +280,7 @@ public:
 	// The browser's opening view of a new match (client/main.js receiveStart): look at the spawn from 60 m, from the
 	// side away from the map's centre, so the centre lies ahead. Spawn and MapMetres (width, height) in reference metres.
 	void StartView(FVector2D Spawn, FVector2D MapMetres);
+	void RestoreMatchView(const FTCMatchView& View, const FTCMatchState& State);
 	// Zoom to Metres (a verification switch); the next frame clamps it as the wheel's zoom is clamped. Ends the intro.
 	void ZoomTo(float Metres) { SkipIntro(); Distance = Metres; }
 	FVector2D ViewFocus() const { return Focus; }

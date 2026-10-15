@@ -54,43 +54,94 @@ namespace
 	}
 }
 
+void ATCHUD::DrawHudIcon(const FString& Key, const FBox2D& Box, FLinearColor Colour)
+{
+ UTexture2D* Atlas=HudIcons();
+ if (!Atlas || !Atlas->GetResource()) return;
+ int32 At=INDEX_NONE;
+ for (int32 K=0; K<UE_ARRAY_COUNT(HudIconKeys); K++) if (Key==HudIconKeys[K]) { At=K; break; }
+ if (At==INDEX_NONE) return;
+ const FVector2D Uv0(double(At%HudIconColumns)*HudIconSide/HudIconWidth,double(At/HudIconColumns)*HudIconSide/HudIconHeight);
+ const FVector2D Uv1=Uv0+FVector2D(double(HudIconSide)/HudIconWidth,double(HudIconSide)/HudIconHeight);
+ FCanvasTileItem Tile(Box.Min,Atlas->GetResource(),Box.GetSize(),Uv0,Uv1,Colour);
+ Tile.BlendMode=SE_BLEND_Translucent; Canvas->DrawItem(Tile);
+}
+
+bool ATCHUD::ScrollSelection(FVector2D Pixel, int32 Notch)
+{
+ if (!SelectionScrollBox.bIsValid || !SelectionScrollBox.IsInsideOrOn(Pixel)) return false;
+ SelectionFirst=FMath::Clamp(SelectionFirst+Notch,0,SelectionMax); return true;
+}
+
+bool ATCHUD::RunPanelCommand(const FTCUiCommand& Command, bool bShift, bool bCtrl)
+{
+ if (Command.Action!=ETCUiAction::MatchControl || !Command.Unit.StartsWith(TEXT("hudpanel:"))) return false;
+ ATCPlayerController* PC=Cast<ATCPlayerController>(GetOwningPlayerController());
+ ATCGameMode* M=GetWorld()->GetAuthGameMode<ATCGameMode>();
+ if (!PC || !M || !M->State.SeatConfirmed()) return true;
+ const FString Key=Command.Unit.RightChop(9);
+ if (Key==TEXT("idle")) PC->RunUi(bShift?ETCUiAction::IdleAll:ETCUiAction::Idle);
+ else if (Key==TEXT("destination")) { bGroupDropdown=!bGroupDropdown; PC->bBuildMenuOpen=false; PC->bTrenchMenuOpen=false; PC->Formation.bMenuOpen=false; }
+ else if (Key.StartsWith(TEXT("destination:"))) { GroupDestination=FMath::Clamp(FCString::Atoi(*Key.RightChop(12)),1,9); bGroupDropdown=false; }
+ else if (Key==TEXT("transfer")) { PC->GroupChord(GroupDestination,false,false,true); bGroupDropdown=false; }
+ else if (Key==TEXT("recruit"))
+ {
+  if (!TCArmyCommands::ClassicLobby(M->State)) { bRecruitLetters=!bRecruitLetters; PC->RecruitGroupOpen=-1; }
+  else PC->ShowFeedback(TEXT("In Classic, select a Production Building and press the letters on its cards"),4);
+ }
+ else if (Key.StartsWith(TEXT("type:")))
+ {
+  const FString Type=Key.RightChop(5); TSet<int32> Next;
+  for (int32 Id : PC->Selected) if (const FTCUnit* U=M->State.Units.Find(Id)) if (bShift?U->Type!=Type:U->Type==Type) Next.Add(Id);
+  PC->Selected=MoveTemp(Next);
+ }
+ else if (Key.StartsWith(TEXT("plane:")))
+ {
+  const int32 Id=FCString::Atoi(*Key.RightChop(6));
+  if (const FTCUnit* U=M->State.Units.Find(Id); U && M->State.IsOwn(*U))
+  {
+   if (!(bShift||bCtrl)) PC->Selected.Reset();
+   if ((bShift||bCtrl) && PC->Selected.Contains(Id)) PC->Selected.Remove(Id); else PC->Selected.Add(Id);
+  }
+ }
+ return true;
+}
+
+bool ATCHUD::RecruitKey(const FString& Code, bool bShift, bool bCtrl, bool bAlt)
+{
+ ATCPlayerController* PC=Cast<ATCPlayerController>(GetOwningPlayerController());
+ ATCGameMode* M=GetWorld()->GetAuthGameMode<ATCGameMode>();
+ if (!PC || !M || !M->State.SeatConfirmed() || bCtrl || bAlt || PC->Aim!=ETCAim::None) return false;
+ if (!bShift && (Code==TEXT("Tab") || Code==TEXT("Backquote"))) { FTCUiCommand C(ETCUiAction::MatchControl); C.Unit=TEXT("hudpanel:recruit"); RunPanelCommand(C,false); return true; }
+ if (!bRecruitLetters) return false;
+ if (!bShift && Code==TEXT("Escape")) { if (PC->RecruitGroupOpen>=0) PC->RecruitGroupOpen=-1; else bRecruitLetters=false; return true; }
+ if (!Code.StartsWith(TEXT("Key"))) return false;
+ const int32 Index=FString(TEXT("QWERTASDFGZXCVB")).Find(Code.RightChop(3));
+ if (Index<0) return false;
+ const FTCCommandCard Card=M->Recruit.Card(M->State,PC->Selected);
+ if (PC->RecruitGroupOpen<0)
+ {
+  if (!Card.Groups.IsValidIndex(Index)) return false;
+  PC->RecruitGroupOpen=Index; return true;
+ }
+ if (!Card.Groups.IsValidIndex(PC->RecruitGroupOpen) || !Card.Groups[PC->RecruitGroupOpen].Cards.IsValidIndex(Index)) return false;
+ FTCUiCommand Buy(ETCUiAction::Recruit); Buy.Unit=Card.Groups[PC->RecruitGroupOpen].Cards[Index].Type;
+ PC->RunCommand(Buy,bShift); return true;
+}
+
 void ATCHUD::DrawBottomLayout(const FTCHudFit::FBottomLayout& Layout, UFont* Font)
 {
-	FTCType::Draw(Layout.Paint,Canvas,Font,UiNow);
-	for (const FBox2D& P : Layout.Paint.Panels) Panels.Add(ToScreen(P));
-	UTexture2D* Atlas=HudIcons();
-	if (Atlas && Atlas->GetResource())
-		for (const FTCHudFit::FIcon& I : Layout.Icons)
-		{
-			int32 At=INDEX_NONE;
-			for (int32 K=0; K<UE_ARRAY_COUNT(HudIconKeys); K++) if (I.Key==HudIconKeys[K]) { At=K; break; }
-			if (At==INDEX_NONE) continue;
-			const FVector2D Uv0(double(At%HudIconColumns)*HudIconSide/HudIconWidth,double(At/HudIconColumns)*HudIconSide/HudIconHeight);
-			const FVector2D Uv1=Uv0+FVector2D(double(HudIconSide)/HudIconWidth,double(HudIconSide)/HudIconHeight);
-			FCanvasTileItem Tile(I.Box.Min,Atlas->GetResource(),I.Box.GetSize(),Uv0,Uv1,I.Colour);
-			Tile.BlendMode=SE_BLEND_Translucent; Canvas->DrawItem(Tile);
-		}
-	const FTCHudFit::FHit* Hover=nullptr;
-	float MX=0,MY=0;
-	const bool Mouse=GetOwningPlayerController()->GetMousePosition(MX,MY);
-	for (const FTCHudFit::FHit& H : Layout.Hits)
-	{
-		Buttons.Add({ToScreen(H.Box),H.Control.Command,H.Control.Label,H.Control.bEnabled});
-		if (Mouse && H.Box.IsInsideOrOn(FVector2D(MX,MY)/UiNow)) Hover=&H;
-	}
-	if (Hover && !Hover->Control.Hover.IsEmpty())
-	{
-		const FTCMeasure Measure=FTCType::IsLoaded()?FTCType::Measure():FTCPaint::CanvasMeasure(Font);
-		const FString Shown=TC_T(Hover->Control.Hover);
-		const float W=FMath::Min(360.f,Measure(Shown,13,false,0)+16);
-		const TArray<FString> Lines=FTCPaint::Wrap(Shown,W-16,13,false,Measure);
-		const float H=Lines.Num()*17.55f+12;
-		const float X=FMath::Clamp((float)Hover->Box.Min.X,8.f,Canvas->ClipX-W-8.f);
-		const float Y=FMath::Max(8.f,(float)Hover->Box.Min.Y-H-6.f);
-		FTCPaint Tip; Tip.Rect(X,Y,W,H,TCCss::PanelSolid); Tip.Frame(X,Y,W,H,TCCss::LineSoft);
-		for (int32 K=0; K<Lines.Num(); K++) Tip.Text(Lines[K],X+8,Y+6+K*17.55f,13,TCCss::Text);
-		FTCType::Draw(Tip,Canvas,Font,UiNow);
-	}
+ FTCType::Draw(Layout.Paint,Canvas,Font,UiNow);
+ for (const FBox2D& P : Layout.Paint.Panels) Panels.Add(ToScreen(P));
+ for (const FTCHudFit::FIcon& I : Layout.Icons) DrawHudIcon(I.Key,I.Box,I.Colour);
+ float MX=0,MY=0;
+ const bool Mouse=GetOwningPlayerController()->GetMousePosition(MX,MY);
+ for (const FTCHudFit::FHit& H : Layout.Hits)
+ {
+  Buttons.Add({ToScreen(H.Box),H.Control.Command,H.Control.Label,H.Control.bEnabled});
+  if (Mouse && H.Box.IsInsideOrOn(FVector2D(MX,MY)/UiNow))
+  { PendingTooltip=H.Control.Hover; TooltipAnchor=ToScreen(H.Box); }
+ }
 }
 
 namespace TCHudBottom
@@ -129,22 +180,52 @@ namespace TCHudBottom
 	{
 		if (!Key.IsEmpty()) L.Icons.Add({Key,Box(X,Y,Side,Side),C});
 	}
+	float KeyWidth(const FString& Key, const FTCMeasure& Measure)
+	{
+	 FString Rest=Key; const bool Shift=Rest.RemoveFromStart(TEXT("⇧"));
+	 return Measure(Rest,11,false,0)+(Shift?11.f:0.f);
+	}
+	void KeyBadge(FBottomLayout& L, const FString& Key, float Right, float Y, const FBox2D& Clip, const FTCMeasure& Measure, bool Cap=false)
+	{
+	 if (Key.IsEmpty()) return;
+	 const float W=KeyWidth(Key,Measure);
+	 if (Cap) { L.Paint.Rect(Right-W-4,Y-1,W+8,17,TCCss::Rgba(0,0,0,.18f),TEXT("bottom:keycap")); L.Paint.Frame(Right-W-4,Y-1,W+8,17,TCCss::LineSoft); }
+	 FString Rest=Key; const bool Shift=Rest.RemoveFromStart(TEXT("⇧"));
+	 Text(L,Rest,Right,Y,11,false,TCCss::Dim,Clip,Measure,TEXT("bottom:key"),ETCPaintAlign::Right);
+	 if (Shift) Icon(L,TEXT("key-shift"),Right-W,Y+1,11,TCCss::Dim);
+	}
+	FTCUiCommand Local(const FString& Key)
+	{ FTCUiCommand C(ETCUiAction::MatchControl); C.Unit=TEXT("hudpanel:")+Key; return C; }
+	void RowButton(FBottomLayout& L, const FControl& C, const FBox2D& B, const FTCMeasure& Measure, float Scale)
+	{
+	 L.Paint.Rect(B.Min.X,B.Min.Y,B.GetSize().X,B.GetSize().Y,C.bOn?TCCss::Rgba(214,178,94,.12f):TCCss::Hex(0x24282b));
+	 L.Paint.Frame(B.Min.X,B.Min.Y,B.GetSize().X,B.GetSize().Y,C.bOn?TCCss::Brass:TCCss::LineSoft,Border(Scale));
+	 Text(L,TC_T(C.Label),B.Min.X+7,B.Min.Y+4,13,false,TCCss::Text,B,Measure,TEXT("bottom:row-label"));
+	 if (C.bSubmenu) Icon(L,C.bOn?TEXT("menu-open"):TEXT("menu-closed"),B.Max.X-15,B.Min.Y+6,11,TCCss::Dim);
+	 L.Hits.Add({B,C});
+	}
 	void GridControl(FBottomLayout& L, const FControl& C, const FBox2D& B, const FTCMeasure& Measure, float Scale)
 	{
 		L.Paint.Rect(B.Min.X,B.Min.Y,B.GetSize().X,B.GetSize().Y,C.bOn ? TCCss::Rgba(214,178,94,.1f) : TCCss::Hex(0x24282b),TEXT("bottom:order"));
 		L.Paint.Frame(B.Min.X,B.Min.Y,B.GetSize().X,B.GetSize().Y,C.bOn ? TCCss::Brass : TCCss::LineSoft,Border(Scale));
 		Icon(L,C.Icon,B.GetCenter().X-11.5f,B.Min.Y+6,23,C.bEnabled ? TCCss::Text : TCCss::Dim);
-		// keys.js badge() uses U+21E7. Barlow lacks that glyph, so its browser fallback is in the generated atlas.
-		FString Key=C.Key; const bool Shift=Key.RemoveFromStart(TEXT("⇧"));
-		Text(L,Key,B.Max.X-3,B.Min.Y+1,11,false,TCCss::Dim,B,Measure,TEXT("bottom:key"),ETCPaintAlign::Right);
-		if (Shift) Icon(L,TEXT("key-shift"),B.Max.X-3-Measure(Key,11,false,0)-10,B.Min.Y+1,10,TCCss::Dim);
+		KeyBadge(L,C.Key,B.Max.X-3,B.Min.Y+2,B,Measure);
 		if (!C.Value.IsEmpty())
-		{
-			const TArray<FString> Lines = FTCPaint::Wrap(TC_T(C.Value),B.GetSize().X-4,13,false,Measure);
-			// Menu names use the browser's full 13px value line; taller labels add space rather than ellipsizing.
-			float Y = B.Max.Y-4-Lines.Num()*17.55f;
-			for (const FString& Line : Lines) { Text(L,Line,B.GetCenter().X,Y,13,false,C.bOn ? TCCss::Brass : TCCss::Text,B,Measure,TEXT("bottom:value"),ETCPaintAlign::Centre); Y += 17.55f; }
-		}
+        {
+            if (C.bSubmenu)
+            {
+                const FString Shown=TC_T(C.Value);
+                const float Px=FMath::Min(13.f,(B.GetSize().X-13)/FMath::Max(1.f,Measure(Shown,13,false,0))*13.f);
+                Text(L,Shown,B.GetCenter().X-5,B.Max.Y-4-Px*1.35f,Px,false,C.bOn?TCCss::Brass:TCCss::Text,B,Measure,TEXT("bottom:value"),ETCPaintAlign::Centre);
+            }
+            else
+            {
+                const TArray<FString> Lines=FTCPaint::Wrap(TC_T(C.Value),B.GetSize().X-4,13,false,Measure);
+                float Y=B.Max.Y-4-Lines.Num()*17.55f;
+                for (const FString& Line : Lines) { Text(L,Line,B.GetCenter().X,Y,13,false,C.bOn?TCCss::Brass:TCCss::Text,B,Measure,TEXT("bottom:value"),ETCPaintAlign::Centre); Y+=17.55f; }
+            }
+        }
+        if (C.bSubmenu) Icon(L,C.bOn?TEXT("menu-open"):TEXT("menu-closed"),B.Max.X-9,B.Max.Y-17,7,C.bOn?TCCss::Brass:TCCss::Text);
 		L.Hits.Add({B,C});
 	}
 	float Grid(FBottomLayout& L, const TArray<FControl>& Controls, float X, float Y, float W, const FTCMeasure& Measure, float Scale)
@@ -154,7 +235,7 @@ namespace TCHudBottom
 		{
 			float H = OrderH;
 			for (int32 K=First; K<FMath::Min(First+4,Controls.Num()); K++)
-				H=FMath::Max(H,33.f+FTCPaint::Wrap(TC_T(Controls[K].Value),CellW-4,13,false,Measure).Num()*17.55f);
+				if (!Controls[K].bSubmenu) H=FMath::Max(H,33.f+FTCPaint::Wrap(TC_T(Controls[K].Value),CellW-4,13,false,Measure).Num()*17.55f);
 			for (int32 K=First; K<FMath::Min(First+4,Controls.Num()); K++) GridControl(L,Controls[K],Box(X+(K-First)*(CellW+GridGap),Y,CellW,H),Measure,Scale);
 			Y+=H+GridGap;
 		}
@@ -168,37 +249,84 @@ namespace TCHudBottom
 		for (FHit& H : L.Hits) H.Box=FBox2D(H.Box.Min+By,H.Box.Max+By);
 		for (FTextFit& T : L.TextBounds) { T.Box=FBox2D(T.Box.Min+By,T.Box.Max+By); T.Clip=FBox2D(T.Clip.Min+By,T.Clip.Max+By); }
 		auto Move=[&](FBox2D& B) { if (B.bIsValid) B=FBox2D(B.Min+By,B.Max+By); };
-		Move(L.Selection); Move(L.Orders); Move(L.Recruit); Move(L.Economy);
+		Move(L.SelectionList); Move(L.Selection); Move(L.Orders); Move(L.Recruit); Move(L.Economy);
 	}
 }
 
 FTCHudFit::FBottomLayout FTCHudFit::LeftPanel(float ViewH, const FString& Title, const TArray<FSelection>& Selection,
-	const TArray<FString>& Details, const TArray<FControl>& Orders, const TArray<FControl>& Menu, const FTCMeasure& Measure, float Scale)
+	const TArray<FString>& Details, const TArray<FControl>& Orders, const TArray<FControl>& Menu, const FTCMeasure& Measure, float Scale, int32 Idle, int32 Destination, bool bTransfer, bool bDropdown, int32 SelectionFirst, float TopLimit)
 {
 	using namespace TCHudBottom;
 	FBottomLayout L;
 	const float X=ScreenGap, W=LeftW, Inner=W-14;
 	float Y=0;
-	if (!Selection.IsEmpty())
+	if (!Selection.IsEmpty() || Idle>0)
 	{
 		Y=8;
-		Text(L,TC_T(Title),X+7,Y,13,true,TCCss::Text,Box(X+7,Y,Inner,18),Measure,TEXT("bottom:selection-title")); Y+=20;
-		for (const FSelection& S : Selection)
+		float IdleW=0;
+		if (Idle>0)
 		{
-			L.Paint.Rect(X+7,Y,Inner,Border(Scale),TCCss::LineSoft);
+		 FControl C; C.Label=FString::Printf(TEXT("Idle %d"),Idle); C.Command=Local(TEXT("idle"));
+		 C.Hover=TEXT("Find the next idle unit. Shift+click selects all idle units");
+		 IdleW=Measure(TC_T(C.Label),13,false,0)+14;
+		 RowButton(L,C,Box(X+W-7-IdleW,Y-2,IdleW,22),Measure,Scale);
+		}
+		const float TitleW=Inner-(IdleW>0?IdleW+6:0);
+		Text(L,FTCPaint::Ellipsis(TC_T(Title),TitleW,13,true,Measure),X+7,Y,13,true,TCCss::Text,Box(X+7,Y,TitleW,18),Measure,TEXT("bottom:selection-title")); Y+=23;
+        const FBottomLayout OrdersOnly=LeftPanel(ViewH,TEXT(""),{},Details,Orders,Menu,Measure,Scale,0,Destination,bTransfer,bDropdown);
+        const float OrdersH=OrdersOnly.Orders.bIsValid?OrdersOnly.Orders.GetSize().Y:0.f;
+        const float ListH=FMath::Max(0.f,FMath::Min(ViewH*.4f,ViewH-ScreenGap-FMath::Max(80.f,TopLimit)-OrdersH-6-Y-6));
+        const float ListTop=Y;
+        int32 First=FMath::Clamp(SelectionFirst,0,FMath::Max(0,Selection.Num()-1));
+        L.SelectionMax=FMath::Max(0,Selection.Num()-1);
+        bool More=false;
+        for (int32 Index=First; Index<Selection.Num(); Index++)
+        {
+            const FSelection& S=Selection[Index];
+            FBottomLayout Row;
+			Row.Paint.Rect(X+7,Y,Inner,Border(Scale),TCCss::LineSoft);
 			const float Top=Y+5, NameX=X+7+48+8, NameW=Inner-48-8;
-			L.Paint.Rect(X+7,Top,48,36,TCCss::Rgba(0,0,0,.22f));
-			Icon(L,S.Type,X+7+10,Top+4,28,TCCss::Dim);
+			Row.Paint.Rect(X+7,Top,48,36,TCCss::Rgba(0,0,0,.22f));
+			Icon(Row,S.Type,X+7+10,Top+4,28,TCCss::Dim);
 			const FString Count=FString::Printf(TEXT("×%d"),S.Count);
 			const float CountW=Measure(Count,14,true,0);
 			float NameY=Top;
-			NameY+=Wrapped(L,TC_T(S.Name),NameX,NameY,NameW-CountW-4,14,true,TCCss::Text,Measure,TEXT("bottom:selection-name"));
-			Text(L,Count,X+W-7,Top,14,true,TCCss::Dim,Box(X+W-7-CountW,Top,CountW,18.9f),Measure,TEXT("bottom:selection-count"),ETCPaintAlign::Right);
-			FString State=TC_T(FString::Printf(TEXT("%d/%d hp"),S.Hp,S.MaxHp));
-			for (const FString& Tag : S.Tags) State+=TEXT("  ")+TC_T(Tag);
-			NameY+=Wrapped(L,State,NameX,NameY,NameW,13,false,TCCss::Dim,Measure,TEXT("bottom:selection-health"));
-			Y=FMath::Max(Top+36,NameY)+5;
-		}
+			Text(Row,FTCPaint::Ellipsis(TC_T(S.Name),NameW-CountW-4,14,true,Measure),NameX,NameY,14,true,TCCss::Text,Box(NameX,NameY,NameW-CountW-4,18.9f),Measure,TEXT("bottom:selection-name")); NameY+=18.9f;
+			Text(Row,Count,X+W-7,Top,14,true,TCCss::Dim,Box(X+W-7-CountW,Top,CountW,18.9f),Measure,TEXT("bottom:selection-count"),ETCPaintAlign::Right);
+			const FString State=TC_T(FString::Printf(TEXT("%d/%d hp"),S.Hp,S.MaxHp));
+			NameY+=Wrapped(Row,State,NameX,NameY,NameW,13,false,TCCss::Dim,Measure,TEXT("bottom:selection-health"));
+			float ChipX=NameX, ChipH=0;
+			for (const FString& Tag : S.Tags)
+			{
+			 const FString Shown=TC_T(Tag);
+			 const float CW=FMath::Min(NameW,Measure(Shown,13,false,0)+12);
+			 if (ChipX>NameX && ChipX+CW>NameX+NameW) { ChipX=NameX; NameY+=ChipH+3; ChipH=0; }
+			 const TArray<FString> Lines=FTCPaint::Wrap(Shown,CW-12,13,false,Measure);
+			 const float CH=Lines.Num()*17.55f+2;
+			 const FBox2D Chip=Box(ChipX,NameY,CW,CH);
+			 const bool Danger=Tag==TEXT("Pinned")||Tag==TEXT("AP round loaded")||Tag==TEXT("Low supplies")||Tag==TEXT("Stranded")||Tag==TEXT("Mandatory withdrawal")||Tag==TEXT("Cut off from supply");
+			 const bool Cover=Tag==TEXT("Hidden")||Tag==TEXT("Riding")||Tag==TEXT("Reinforcing")||Tag.Contains(TEXT("cover"))||Tag==TEXT("In trench")||Tag.StartsWith(TEXT("Garrisoned:"));
+			 const bool Supp=Tag==TEXT("Suppressed")||Tag==TEXT("Suppressive fire");
+			 const FLinearColor C=Danger?TCCss::RedHi:Cover?TCCss::Hex(0xa9b37b):Supp?TCCss::Brass:TCCss::Text;
+			 FLinearColor Edge=C; Edge.A=Danger?.6f:Cover?.45f:Supp?.5f:.24f;
+			 Row.Paint.Frame(Chip.Min.X,Chip.Min.Y,CW,CH,Edge,Border(Scale),TEXT("bottom:status-chip"));
+			 for (int32 I=0; I<Lines.Num(); I++) Text(Row,Lines[I],ChipX+6,NameY+1+I*17.55f,13,false,C,Chip,Measure,TEXT("bottom:status-text"));
+			 ChipX+=CW+6; ChipH=FMath::Max(ChipH,CH);
+			}
+			NameY+=ChipH;
+			FControl Pick; Pick.Label=S.Name; Pick.Hover=S.Hover; Pick.Command=Local(TEXT("type:" )+S.Type);
+			Row.Hits.Add({Box(X+7,Top,Inner,FMath::Max(36.f,NameY-Top)),Pick});
+            const float Bottom=FMath::Max(Top+36,NameY)+5;
+            if (Bottom>ListTop+ListH+.01f) { More=true; break; }
+            L.Paint.Append(Row.Paint); L.Icons.Append(Row.Icons); L.Hits.Append(Row.Hits); L.TextBounds.Append(Row.TextBounds);
+            Y=Bottom;
+        }
+        if (First>0 || More)
+        {
+            const float H=FMath::Max(18.f,Y-ListTop), Thumb=FMath::Max(9.f,H/Selection.Num());
+            L.Paint.Rect(X+W-4,ListTop+(H-Thumb)*First/FMath::Max(1,Selection.Num()-1),2,Thumb,TCCss::Line,TEXT("bottom:selection-scroll"));
+        }
+        L.SelectionList=Box(X+6,ListTop,Inner,FMath::Max(0.f,Y-ListTop));
 		Y+=6;
 		L.Selection=Box(X,0,W,Y);
 		FTCPaint Foreground=MoveTemp(L.Paint); L.Paint=FTCPaint(); Panel(L,L.Selection,TEXT("bottom:selection"),Scale); L.Paint.Append(Foreground);
@@ -209,9 +337,32 @@ FTCHudFit::FBottomLayout FTCHudFit::LeftPanel(float ViewH, const FString& Title,
 		const float Top=Y;
 		Y+=8;
 		Text(L,TC_T(FString(TEXT("Orders"))),X+7,Y,13,false,TCCss::Dim,Box(X+7,Y,Inner,18),Measure,TEXT("bottom:orders-title")); Y+=20;
-		Y=Grid(L,Orders,X+7,Y,Inner,Measure,Scale);
+		if (!bDropdown) Y=Grid(L,Orders,X+7,Y,Inner,Measure,Scale);
+		if (bTransfer)
+		{
+		 Y+=6;
+             const FString Label=TC_T(FString(TEXT("Control group")));
+             FControl Transfer; Transfer.Label=TEXT("Move to group"); Transfer.Command=Local(TEXT("transfer"));
+             Transfer.Hover=TEXT("Alt+1 to Alt+9 moves selected units and removes them from other groups");
+             const float TransferW=Measure(TC_T(Transfer.Label),13,false,0)+14;
+             const float LabelW=Inner-TransferW-32-6;
+             const float LabelPx=FMath::Min(13.f,LabelW/FMath::Max(1.f,Measure(Label,13,false,0))*13.f);
+             Text(L,Label,X+7,Y+4,LabelPx,false,TCCss::Dim,Box(X+7,Y,LabelW,25),Measure,TEXT("bottom:group-title"));
+             FControl Choose; Choose.Label=FString::FromInt(Destination); Choose.Command=Local(TEXT("destination")); Choose.bSubmenu=true; Choose.bOn=bDropdown;
+             Choose.Hover=TEXT("Destination control group"); RowButton(L,Choose,Box(X+7+LabelW+3,Y,32,25),Measure,Scale);
+             RowButton(L,Transfer,Box(X+W-7-TransferW,Y,TransferW,25),Measure,Scale); Y+=28;
+		 if (bDropdown)
+		 {
+		  for (int32 G=1; G<=9; G++)
+		  {
+		   FControl C; C.Label=FString::FromInt(G); C.Command=Local(FString::Printf(TEXT("destination:%d"),G)); C.bOn=G==Destination;
+		   RowButton(L,C,Box(X+7+(G-1)%3*(Inner+3)/3,Y+(G-1)/3*26,(Inner-6)/3,23),Measure,Scale);
+		  }
+		  Y+=78;
+		 }
+		}
 		for (const FString& Detail : Details) { Y+=6; Y+=Wrapped(L,TC_T(Detail),X+7,Y,Inner,13,false,TCCss::Dim,Measure,TEXT("bottom:detail")); }
-		if (Menu.Num()) { Y+=8; Y=Grid(L,Menu,X+7,Y,Inner,Measure,Scale); }
+		if (Menu.Num() && !bDropdown) { Y+=8; Y=Grid(L,Menu,X+7,Y,Inner,Measure,Scale); }
 		Y+=7;
 		L.Orders=Box(X,Top,W,Y-Top);
 		FTCPaint Foreground=MoveTemp(L.Paint); L.Paint=FTCPaint(); Panel(L,L.Orders,TEXT("bottom:orders"),Scale); L.Paint.Append(Foreground);
@@ -233,9 +384,10 @@ FTCHudFit::FBottomLayout FTCHudFit::RecruitPanel(float ViewW, float ViewH, float
 	for (const FControl& C : Tabs)
 	{
 		const FString Shown=TC_T(C.Label);
-		const float IW=Measure(Shown,13,true,0)+20+(C.Icon.IsEmpty()?0:22);
+		const float KeyRoom=C.Key.IsEmpty()?0:KeyWidth(C.Key,Measure)+14;
+		const float IW=Measure(Shown,13,true,0)+20+(C.Icon.IsEmpty()?0:22)+KeyRoom;
 		const float CW=FMath::Min(Inner,IW);
-		const TArray<FString> Lines=FTCPaint::Wrap(Shown,CW-20-(C.Icon.IsEmpty()?0:22),13,true,Measure);
+		const TArray<FString> Lines=FTCPaint::Wrap(Shown,CW-20-(C.Icon.IsEmpty()?0:22)-KeyRoom,13,true,Measure);
 		const float H=Lines.Num()*17.55f+12;
 		if (X>8 && X+CW>MaxW-8+.01f) { Y+=RowH+4; X=8; RowH=0; }
 		const FBox2D B=Box(X,Y,CW,H);
@@ -244,6 +396,7 @@ FTCHudFit::FBottomLayout FTCHudFit::RecruitPanel(float ViewW, float ViewH, float
 		Icon(L,C.Icon,X+10,Y+(H-17)/2,17,TCCss::Dim);
 		float Ty=Y+6;
 		for (const FString& Line : Lines) { Text(L,Line,X+10+(C.Icon.IsEmpty()?0:22),Ty,13,true,C.bOn?TCCss::Brass:TCCss::Dim,B,Measure,TEXT("bottom:tab-label")); Ty+=17.55f; }
+		KeyBadge(L,C.Key,B.Max.X-9,B.Min.Y+6,B,Measure,true);
 		L.Hits.Add({B,C}); RowH=FMath::Max(RowH,H); Widest=FMath::Max(Widest,X+CW+8); X+=CW+4;
 	}
 	if (Tabs.Num()) Y+=RowH+4;
@@ -261,7 +414,7 @@ FTCHudFit::FBottomLayout FTCHudFit::RecruitPanel(float ViewW, float ViewH, float
 			float H=0;
 			for (int32 K=First; K<First+N; K++)
 			{
-				const int32 Names=(CW>72 || Cards[K].Command.Action!=ETCUiAction::Recruit)?FTCPaint::Wrap(TC_T(Cards[K].Label),CW-6,13,true,Measure).Num():0;
+				const int32 Names=(CW>72 || Cards[K].Command.Action!=ETCUiAction::Recruit)?FTCPaint::Wrap(TC_T(Cards[K].Label),CW-6-(Cards[K].Key.IsEmpty()?0:KeyWidth(Cards[K].Key,Measure)+12),13,true,Measure).Num():0;
 				const int32 Costs=FTCPaint::Wrap(TC_T(Cards[K].Value),CW-6,14,true,Measure).Num();
 				H=FMath::Max(H,4.f+FMath::Max(0,Names)*17.55f+CW*.75f+Costs*18.9f+7);
 			}
@@ -272,11 +425,12 @@ FTCHudFit::FBottomLayout FTCHudFit::RecruitPanel(float ViewW, float ViewH, float
 				L.Paint.Rect(X,Y,CW,H,TCCss::Hex(0x24282b),TEXT("bottom:card")); L.Paint.Frame(X,Y,CW,H,TCCss::LineSoft,Border(Scale));
 				float Ty=Y+4;
 				// The reference's <=72px container rule keeps the full name in the hover text.
-				if (CW>72 || C.Command.Action!=ETCUiAction::Recruit) Ty+=Wrapped(L,TC_T(C.Label),X+3,Ty,CW-6,13,true,C.bEnabled?TCCss::Text:TCCss::Dim,Measure,TEXT("bottom:card-name"));
+				if (CW>72 || C.Command.Action!=ETCUiAction::Recruit) Ty+=Wrapped(L,TC_T(C.Label),X+3,Ty,CW-6-(C.Key.IsEmpty()?0:KeyWidth(C.Key,Measure)+12),13,true,C.bEnabled?TCCss::Text:TCCss::Dim,Measure,TEXT("bottom:card-name"));
 				L.Paint.Rect(X+1,Ty,CW-2,CW*.75f,TCCss::Rgba(0,0,0,.22f));
 				Icon(L,C.Icon,X+CW*.185f,Ty+CW*.06f,CW*.63f,C.bEnabled?TCCss::Text:TCCss::Dim);
 				Ty+=CW*.75f+3;
 				Wrapped(L,TC_T(C.Value),X+3,Ty,CW-6,14,true,TCCss::Text,Measure,TEXT("bottom:card-cost"));
+				KeyBadge(L,C.Key,B.Max.X-9,B.Min.Y+4,B,Measure,true);
 				L.Hits.Add({B,C}); Widest=FMath::Max(Widest,X+CW+8); X+=CW+4;
 			}
 			Y+=H+6;
@@ -310,19 +464,20 @@ FTCHudFit::FBottomLayout FTCHudFit::RecruitPanel(float ViewW, float ViewH, float
 	}
 	Y+=2;
 	float AboveW=16;
-	for (const FControl& C : Above) AboveW+=Measure(TC_T(C.Label),13,false,0)+26;
-	const float W=FMath::Min(MaxW,FMath::Max(Widest,FMath::Max(AboveW,80.f)));
+	for (const FControl& C : Above) AboveW+=Measure(TC_T(C.Label),13,false,0)+26+(C.Key.IsEmpty()?0:KeyWidth(C.Key,Measure)+18);
+	const float W=Lists.Num()?MaxW:FMath::Min(MaxW,FMath::Max(Widest,FMath::Max(AboveW,80.f)));
 	L.Recruit=Box(0,0,W,Y);
 	FTCPaint Foreground=MoveTemp(L.Paint); L.Paint=FTCPaint(); Panel(L,L.Recruit,TEXT("bottom:recruit"),Scale); L.Paint.Append(Foreground);
 	float AX=8;
 	for (int32 I=0; I<Above.Num(); I++)
 	{
 		const FControl& C=Above[I]; const FString Shown=TC_T(C.Label);
-		const float AW=Measure(Shown,13,false,0)+18, AH=27.55f;
+		const float AW=Measure(Shown,13,false,0)+18+(C.Key.IsEmpty()?0:KeyWidth(C.Key,Measure)+18), AH=27.55f;
 		const float At=I==Above.Num()-1 && I>0?FMath::Max(AX,W-8-AW):AX;
 		const FBox2D B=Box(At,-6-AH,AW,AH);
 		L.Paint.Rect(B.Min.X,B.Min.Y,AW,AH,TCCss::PanelSolid,TEXT("bottom:above")); L.Paint.Frame(B.Min.X,B.Min.Y,AW,AH,TCCss::LineSoft,Border(Scale));
 		Text(L,Shown,At+9,B.Min.Y+5,13,false,TCCss::Dim,B,Measure,TEXT("bottom:above-label"));
+		KeyBadge(L,C.Key,B.Max.X-12,B.Min.Y+6,B,Measure,true);
 		if (C.Command.Action!=ETCUiAction::None) L.Hits.Add({B,C});
 		L.Paint.Panels.Add(B);
 		AX=At+AW+8;
@@ -332,19 +487,75 @@ FTCHudFit::FBottomLayout FTCHudFit::RecruitPanel(float ViewW, float ViewH, float
 }
 
 FTCHudFit::FBottomLayout FTCHudFit::EconomyPanel(float ViewW, const FString& Money, const FString& Income, const FString& Population,
-	const TArray<FControl>& Support, const FTCMeasure& Measure, float Scale)
+	const TArray<FControl>& Support, const FTCMeasure& Measure, float Scale, const TArray<FControl>& Resources, const TArray<FControl>& Air)
 {
 	using namespace TCHudBottom;
 	FBottomLayout L;
 	const FString Second=TC_T(Income)+TEXT("   ")+TC_T(Population);
-	const float W=FMath::Max(238.f,FMath::Max(Measure(TC_T(Money),22,false,0),Measure(Second,13,false,0))+18), X=ViewW-ScreenGap-W;
+	const float W=FMath::Max(238.f,FMath::Max(Measure(TC_T(Money),28,false,0),Measure(Second,13,false,0))+18), X=ViewW-ScreenGap-W;
 	float Y=8;
-	Text(L,TC_T(Money),W-9,Y,22,false,TCCss::Brass,Box(8,Y,W-16,29.7f),Measure,TEXT("bottom:money"),ETCPaintAlign::Right); Y+=31;
-	Text(L,Second,W-9,Y,13,false,TCCss::Dim,Box(8,Y,W-16,17.55f),Measure,TEXT("bottom:population"),ETCPaintAlign::Right); Y+=23;
+	FString Number=Money;
+	if (Number.RemoveFromEnd(TEXT(" MP")))
+	{
+	 const FString Label=TC_T(FString(TEXT("MP"))); const float LabelW=Measure(Label,13,false,0), NumberW=Measure(Number,28,false,0);
+	 Text(L,Number,W-13-LabelW,Y,28,false,TCCss::Brass,Box(8,Y,W-16,37.8f),Measure,TEXT("bottom:money"),ETCPaintAlign::Right);
+	 Text(L,Label,W-9,Y+12,13,false,TCCss::Dim,Box(8,Y,W-16,37.8f),Measure,TEXT("bottom:money-label"),ETCPaintAlign::Right);
+	 Icon(L,TEXT("resource-mp"),W-33-LabelW-NumberW,Y+10,16,TCCss::Dim);
+	}
+	else Text(L,TC_T(Money),W-9,Y,28,false,TCCss::Brass,Box(8,Y,W-16,37.8f),Measure,TEXT("bottom:money"),ETCPaintAlign::Right);
+	Y+=38;
+	if (Resources.Num())
+	{
+	 float RX=8;
+	 for (const FControl& C : Resources)
+	 {
+	  const float CW=Measure(C.Value,22,false,0)+Measure(TC_T(C.Label),13,false,0)+30;
+	  if (RX>8 && RX+CW>W-8) { RX=8; Y+=30; }
+	  Icon(L,C.Icon,RX,Y+7,16,TCCss::Dim);
+	  Text(L,C.Value,RX+20,Y,22,false,TCCss::Text,Box(8,Y,W-16,30),Measure,TEXT("bottom:resource"));
+	  Text(L,TC_T(C.Label),RX+24+Measure(C.Value,22,false,0),Y+8,13,false,TCCss::Dim,Box(8,Y,W-16,30),Measure,TEXT("bottom:resource-label")); L.Hits.Add({Box(RX,Y,CW,30),C}); RX+=CW+8;
+	 }
+	 Y+=32;
+	}
+	const float PopW=Measure(TC_T(Population),13,false,0);
+	Text(L,TC_T(Population),W-9,Y,13,false,TCCss::Dim,Box(8,Y,W-16,17.55f),Measure,TEXT("bottom:population"),ETCPaintAlign::Right);
+	const float IncomeW=W-28-PopW;
+	const TArray<FString> IncLines=FTCPaint::Wrap(TC_T(Income),IncomeW,13,false,Measure);
+	for (int32 I=0; I<IncLines.Num(); I++) Text(L,IncLines[I],8,Y+I*17.55f,13,false,TCCss::Hex(0xa9b37b),Box(8,Y,IncomeW,IncLines.Num()*17.55f),Measure,TEXT("bottom:income"));
+	Y+=FMath::Max(1,IncLines.Num())*17.55f+7;
 	Y=Grid(L,Support,W-9-225,Y,225,Measure,Scale)+8;
+	for (const FControl& C : Air)
+	{
+	 const FString State=TC_T(C.Value);
+	 const float SW=Measure(State,13,false,0), NW=W-16-24-SW;
+	 const TArray<FString> Names=FTCPaint::Wrap(TC_T(C.Label),FMath::Max(60.f,NW),13,false,Measure);
+	 const float H=FMath::Max(1,Names.Num())*17.55f+8;
+	 const FBox2D B=Box(8,Y,W-16,H);
+	 L.Paint.Rect(B.Min.X,B.Min.Y,B.GetSize().X,H,C.bOn?TCCss::Rgba(214,178,94,.12f):TCCss::Hex(0x24282b)); L.Paint.Frame(B.Min.X,B.Min.Y,B.GetSize().X,H,C.bOn?TCCss::Brass:TCCss::LineSoft,Border(Scale));
+	 for (int32 I=0; I<Names.Num(); I++) Text(L,Names[I],15,Y+4+I*17.55f,13,false,TCCss::Text,B,Measure,TEXT("bottom:air-name"));
+	 Text(L,State,W-15,Y+4,13,false,TCCss::Dim,B,Measure,TEXT("bottom:air-state"),ETCPaintAlign::Right);
+	 L.Hits.Add({B,C}); Y+=H+3;
+	}
+
 	L.Economy=Box(0,0,W,Y);
 	FTCPaint Foreground=MoveTemp(L.Paint); L.Paint=FTCPaint(); Panel(L,L.Economy,TEXT("bottom:economy"),Scale); L.Paint.Append(Foreground);
 	Shift(L,FVector2D(X,ScreenGap)); return L;
+}
+
+FTCHudFit::FBottomLayout FTCHudFit::Tooltip(const FString& Shown, const FBox2D& Anchor, FVector2D View, const FTCMeasure& Measure)
+{
+ using namespace TCHudBottom;
+ FBottomLayout L;
+ const float W=FMath::Min3(360.f,(float)View.X-16,Measure(Shown,13,false,0)+16);
+ const TArray<FString> Lines=FTCPaint::Wrap(Shown,W-16,13,false,Measure);
+ const float H=FMath::Min((float)View.Y-16,Lines.Num()*17.55f+12);
+ const float X=FMath::Clamp((float)Anchor.Min.X,8.f,(float)View.X-W-8);
+ const float Above=Anchor.Min.Y-H-6;
+ const float Y=Above>=8?Above:FMath::Min((float)Anchor.Max.Y+6,(float)View.Y-H-8);
+ const FBox2D B=Box(X,Y,W,H);
+ L.Paint.Rect(X,Y,W,H,TCCss::PanelSolid,TEXT("bottom:tooltip")); L.Paint.Frame(X,Y,W,H,TCCss::LineSoft);
+ for (int32 I=0; I<Lines.Num() && 6+(I+1)*17.55f<=H; I++) Text(L,Lines[I],X+8,Y+6+I*17.55f,13,false,TCCss::Text,B,Measure,TEXT("bottom:tooltip-text"));
+ L.Paint.Panels.Add(B); return L;
 }
 
 FTCHudFit::FBottomLayout FTCHudFit::Toolbar(float MaxW, const TArray<FControl>& Controls, const FTCMeasure& Measure, float Scale)
@@ -377,12 +588,17 @@ FTCPaint FTCHudFit::BossCard(const FTCBossBar& Boss, FVector2D View, float Top, 
 	const TArray<FBox2D>& Avoid, double Now, const FTCMeasure& Measure, float Scale)
 {
 	using namespace TCHudBottom;
+    const float HistoryBottom=View.Y-ScreenGap-184-TCAlertLook::MinimapFrame-TCAlertLook::MinimapGap;
+    const float SummaryH=2*Border(Scale)+2*TCAlertLook::HistoryPadY+TCAlertLook::FontPx*TCAlertLook::LineHeight;
+    const FBox2D HistorySummary=Box(View.X-ScreenGap-176,HistoryBottom-SummaryH,176,SummaryH);
 	auto Clear=[&](const FTCPaint& P)
 	{
 		for (const FBox2D& B : P.Panels)
 		{
 			if (B.Min.X<8 || B.Max.X>View.X-8 || B.Min.Y<8 || B.Max.Y>View.Y-8) return false;
-			for (const FBox2D& A : Avoid) if (Overlap(B,A)) return false;
+            if (Overlap(B,HistorySummary)) return false;
+            const FBox2D ExistingPause=Box(View.X/2-65,Top+4+8/Scale,130,33/Scale);
+            for (const FBox2D& A : Avoid) if (Overlap(B,A) || (!(B.Min.X<View.X/2 && B.Max.X>View.X/2) && Overlap(ExistingPause,A))) return false;
 			// #roomBanners follows the central top stack. Reserve its ordinary paused row too.
 			if (B.Min.X<View.X/2 && B.Max.X>View.X/2)
 			{
@@ -402,8 +618,19 @@ FTCPaint FTCHudFit::BossCard(const FTCBossBar& Boss, FVector2D View, float Top, 
 		P=Boss.Layout(Economy.GetCenter().X,Economy.Max.Y+8,Economy.GetSize().X+32,Now,Measure,nullptr,Scale);
 		if (Clear(P)) return P;
 	}
-	// The side dock is also clear of the command card when that card is opened after the first frame.
-	return P;
+    // In the dense side column the original padding gives way before history loses its summary.
+    // Keep the source type, text, bar and colors; remove four top and eight bottom padding pixels.
+    if (Economy.bIsValid)
+    {
+        for (FTCPaintItem& I : P.Items)
+        {
+            if (I.Role==TEXT("boss:panel") || I.Role==TEXT("boss:frame")) I.Size.Y-=12;
+            else I.Pos.Y-=4;
+        }
+        for (FBox2D& B : P.Panels) B.Max.Y-=12;
+        if (Clear(P)) return P;
+    }
+    return P;
 }
 
 FTCHudFit::FBottomLayout FTCHudFit::SandboxToolbar(FVector2D View, float CornerRight, float ScoreLeft,
@@ -431,6 +658,7 @@ TArray<FString> FTCHudFit::LayoutErrors(const FBottomLayout& L, FVector2D View)
 	TArray<FString> Errors;
 	auto Inside=[](const FBox2D& A,const FBox2D& B) { return A.Min.X>=B.Min.X-.1 && A.Min.Y>=B.Min.Y-.1 && A.Max.X<=B.Max.X+.1 && A.Max.Y<=B.Max.Y+.1; };
 	const FBox2D Screen=Box(0,0,View.X,View.Y);
+	for (const FIcon& I : L.Icons) if (!Inside(I.Box,Screen)) Errors.Add(TEXT("icon outside screen: ")+I.Key);
 	for (const FTextFit& T : L.TextBounds) if (!Inside(T.Box,T.Clip) || !Inside(T.Box,Screen)) Errors.Add(TEXT("text outside its box: ")+T.Text);
 	for (int32 I=0; I<L.TextBounds.Num(); I++)
 	{
@@ -890,6 +1118,7 @@ float ATCHUD::DrawLobby(UFont* Font, float Y, float LobbyW)
 	struct FLine { FString Text; FLinearColor Colour; TArray<FItem> Items; float MaxW = 0.f; };
 	TArray<FLine> Lines;
 	const float W = LobbyW;
+	if (8.f + W + 170.f < Canvas->ClipX) M->Options.DrawPreview(Canvas, Font, FVector2D(W + 20.f, Y + 8.f));
 	auto Measure = [&](const FString& Lb) { float TW = 0, TH = 0; LabelSize(Lb, TW, TH, Font, 1.f); return TW + 2 * Pad; };
 	// buttons in rows that wrap at the panel's width, the first row after an optional text
 	auto AddButtons = [&](const TArray<FItem>& Items, const FString& Lead = FString(), FLinearColor Colour = FLinearColor::White)
@@ -1106,17 +1335,12 @@ float ATCHUD::DrawMatchPanel(UFont* Font, float Width, float TopLimit, bool bDra
 		FTCHudFit::FSelection& R=Selection[At]; const FTCUnitDef* D=M->UnitTable.Find(U->Type);
 		R.Count++; R.Hp+=U->Hp; R.MaxHp+=D?D->MaxHp():0;
 		for (const FString& Tag : UnitTags(*U,D)) R.Tags.AddUnique(Tag);
+		const FString Supply=M->Logistics.IndicatorFor(U->Id); if (!Supply.IsEmpty()) R.Tags.AddUnique(Supply);
+		R.Hover=R.Name+TEXT(". Click to keep this type; Shift+click removes it");
 	}
 	TArray<FString> Details;
 	if (PC->Aim!=ETCAim::None && !PC->AimHint.IsEmpty()) Details.Add(PC->AimHint);
-	if (S.SeatConfirmed() && PC->Selected.Num())
-	{
-		TArray<FString> Groups;
-		for (int32 G=1; G<=FTCControlGroups::GroupCount; G++)
-			if (const int32 N=PC->Groups.Members(G).Num()) Groups.Add(FString::Printf(TEXT("%d: %d"),G,N));
-		if (Groups.Num()) Details.Add(TEXT("Control group  ")+FString::Join(Groups,TEXT("   ")));
-		// The keyboard instructions belong in F1 and the control tooltip, not an extra two-line footer.
-	}
+
 	// The Form submenu owns its shape and spacing values, as in hud.js. A second always-visible summary squeezed
 	// selection and ability rows together and repeated those values outside the browser's layout.
 	// The buttons (client/hud.js drawOrders), in rows that wrap at the panel's width: Stop and Attack-move always; for a
@@ -1291,14 +1515,14 @@ float ATCHUD::DrawMatchPanel(UFont* Font, float Width, float TopLimit, bool bDra
 			break;
 		}
 		case ETCUiAction::Formation:
-			if (U==TEXT("menu")) { C.Icon=TEXT("f_wedge"); C.Value=TEXT("Form"); }
+			if (U==TEXT("menu")) { C.Icon=TEXT("f_wedge"); C.Value=TEXT("Form"); C.bSubmenu=true; }
 			else if (U.StartsWith(TEXT("shape:"))) C.Icon=TEXT("f_")+U.RightChop(6);
 			else if (U==TEXT("tighten")) { C.Icon=TEXT("f_tight"); C.Key=TEXT("["); }
 			else if (U==TEXT("spread")) { C.Icon=TEXT("f_spread"); C.Key=TEXT("]"); C.Value=FString::Printf(TEXT("%gx"),PC->Formation.Settings.Spread); }
 			else { C.Icon=U==TEXT("together")?TEXT("f_together"):TEXT("f_snap"); C.Value=U==TEXT("together")?(PC->Formation.Settings.bTogether?TEXT("On"):TEXT("Off")):(PC->Formation.Settings.bSnap?TEXT("On"):TEXT("Off")); }
 			break;
-		case ETCUiAction::BuildMenu: C.Icon=TEXT("sandbags"); C.Value=TEXT("Build"); break;
-		case ETCUiAction::TrenchMenu: C.Icon=TEXT("e_zigzag"); C.Value=TEXT("Trench"); break;
+		case ETCUiAction::BuildMenu: C.Icon=TEXT("sandbags"); C.Value=TEXT("Build"); C.bSubmenu=true; break;
+		case ETCUiAction::TrenchMenu: C.Icon=TEXT("e_zigzag"); C.Value=TEXT("Trench"); C.bSubmenu=true; break;
 		case ETCUiAction::Build: case ETCUiAction::Fort: case ETCUiAction::Entrench:
 		{
 			C.Icon=I.Command.Action==ETCUiAction::Entrench?TEXT("e_")+U:U;
@@ -1324,19 +1548,51 @@ float ATCHUD::DrawMatchPanel(UFont* Font, float Width, float TopLimit, bool bDra
 	for (const FItem& I : Menu) Submenu.Add(Convert(I));
 	for (const FItem& I : Bar) Support.Add(Convert(I));
 	for (const FItem& I : LogisticsButtons) Support.Add(Convert(I));
-	const FString Title=PC->Selected.Num()==1?TEXT("1 unit selected"):FString::Printf(TEXT("%d units selected"),PC->Selected.Num());
-	const FTCHudFit::FBottomLayout Layout=FTCHudFit::LeftPanel(Canvas->ClipY,Title,Selection,Details,Grid,Submenu,Measure,UiNow);
+	TArray<FTCKeyUnit> KeyRows;
+	for (const auto& Pair : S.Units)
+	{
+	 const FTCUnit& U=Pair.Value; const FTCUnitDef* D=M->UnitTable.Find(U.Type);
+	 FTCKeyUnit K; K.Id=U.Id; K.Type=U.Type; K.bOwn=S.IsOwn(U); K.Hp=U.Hp; K.Flags=U.Flags; K.bDef=D!=nullptr;
+	 if (D) { K.bStructure=D->bStructure; K.bBuilding=D->bBuilding; K.bRail=D->bRail; K.bAir=D->bAir; }
+	 int32 Kind=0; if (PC->PlanKindOf && PC->PlanKindOf(U.Id,Kind)) K.PlanKind=Kind;
+	 KeyRows.Add(K);
+	}
+	if (bRecruitLetters)
+	{
+	 const FTCCommandCard Card=M->Recruit.Card(S,PC->Selected);
+	 const int32 Count=PC->RecruitGroupOpen<0?Card.Groups.Num():Card.Groups.IsValidIndex(PC->RecruitGroupOpen)?Card.Groups[PC->RecruitGroupOpen].Cards.Num():0;
+	 const FString Used=FString(TEXT("QWERTASDFGZXCVB")).Left(Count);
+	 for (FTCHudFit::FControl& C : Grid) if (C.Key.Len()==1 && Used.Contains(C.Key)) C.Key.Reset();
+	 for (FTCHudFit::FControl& C : Support) if (C.Key.Len()==1 && Used.Contains(C.Key)) C.Key.Reset();
+	}
+	const int32 Idle=TCSelectionKeys::Idle(KeyRows,false).Num();
+	const FString Title=PC->Selected.IsEmpty()?TEXT("Selection"):PC->Selected.Num()==1?TEXT("1 unit selected"):FString::Printf(TEXT("%d units selected"),PC->Selected.Num());
+	const FTCHudFit::FBottomLayout Layout=FTCHudFit::LeftPanel(Canvas->ClipY,Title,Selection,Details,Grid,Submenu,Measure,UiNow,Idle,GroupDestination,PC->Selected.Num()>0,bGroupDropdown,SelectionFirst,TopLimit);
 	float Top=Canvas->ClipY-Gap;
 	for (const FBox2D& B : Layout.Paint.Panels) Top=FMath::Min(Top,(float)B.Min.Y);
 	if (!bDraw) return Top;
+	SelectionMax=Layout.SelectionMax; SelectionFirst=FMath::Clamp(SelectionFirst,0,SelectionMax); SelectionScrollBox=Layout.SelectionList.bIsValid?ToScreen(Layout.SelectionList):FBox2D(ForceInit);
 	MatchPanelBox=FBox2D(ForceInit); for (const FBox2D& B : Layout.Paint.Panels) MatchPanelBox+=B;
 	DrawBottomLayout(Layout,Font);
 	if (!S.bSpectator && S.SeatConfirmed())
 	{
 		double Pop=0,Cap=0; const bool Known=M->Recruit.ArmyUse(S,Pop,Cap);
-		const FString Money=FString::Printf(TEXT("%d MP%s"),S.Mp,M->Recruit.Fuel().IsSet()?*FString::Printf(TEXT("  %.0f Fuel"),M->Recruit.Fuel().GetValue()):TEXT(""));
+		const FString Money=FString::Printf(TEXT("%d MP"),S.Mp);
 		const FString Population=Known?FString::Printf(TEXT("%s/%s units"),*Js(Pop),*Js(Cap)):TEXT("");
-		DrawBottomLayout(FTCHudFit::EconomyPanel(Canvas->ClipX,Money,FTCObjectives::EconomyLine(S),Population,Support,Measure,UiNow),Font);
+		TArray<FTCHudFit::FControl> Resources, Air;
+		if (S.Mun.IsSet())
+		{
+		 FTCHudFit::FControl Mun; Mun.Label=TEXT("Mun"); Mun.Icon=TEXT("resource-mun"); Mun.Value=FString::FromInt(S.Mun.GetValue()); Mun.Hover=TEXT("Munitions: support calls and abilities. Hold points to earn them"); Resources.Add(Mun);
+		 FTCHudFit::FControl Fuel; Fuel.Label=TEXT("Fuel"); Fuel.Icon=TEXT("resource-fuel"); Fuel.Value=FString::FromInt(S.Fuel.Get(0)); Fuel.Hover=TEXT("Fuel: vehicles. Depots on the contested nodes and the HQ earn it"); Resources.Add(Fuel);
+		}
+		for (const FTCAirRow& Row : S.Air)
+		 if (const FTCUnit* U=S.Units.Find(Row.Id))
+		 {
+		  FTCHudFit::FControl C; const FTCUnitDef* D=M->UnitTable.Find(U->Type);
+		  C.Label=FTCAlerts::UnitName(S,&M->UnitTable,U->Type,S.You); C.Value=FTCObjectives::AirStateText(Row); C.bOn=PC->Selected.Contains(Row.Id);
+		  C.Command=TCHudBottom::Local(FString::Printf(TEXT("plane:%d"),Row.Id)); Air.Add(C);
+		 }
+		DrawBottomLayout(FTCHudFit::EconomyPanel(Canvas->ClipX,Money,FTCObjectives::EconomyLine(S),Population,Support,Measure,UiNow,Resources,Air),Font);
 	}
 	return Top;
 }
@@ -1530,7 +1786,8 @@ void ATCHUD::DrawRecruitPanel(UFont* Font, float Left, float Bottom)
 	for (const auto& L : Lines) Headings.Add(L.Key);
 	if (Card.Kind==ETCCardKind::Recruit)
 	{
-		FTCHudFit::FControl RecruitTitle; RecruitTitle.Label=TEXT("Recruit"); Above.Add(RecruitTitle);
+		FTCHudFit::FControl RecruitTitle; RecruitTitle.Label=bRecruitLetters?TEXT("Recruiting"):TEXT("Recruit"); RecruitTitle.Key=bRecruitLetters?TEXT("Esc"):TEXT("Tab"); RecruitTitle.Command=TCHudBottom::Local(TEXT("recruit")); RecruitTitle.bOn=bRecruitLetters;
+		RecruitTitle.Hover=bRecruitLetters?TEXT("A letter opens a group, a second letter buys from it (Q Q: Rifles); Shift+letter buys five. Esc goes back a step, Tab or a right-click stops"):TEXT("Recruit by letter (Tab): a letter opens a group, a second buys from it, Shift buys five. WASD pans again when you stop"); Above.Add(RecruitTitle);
 	}
 	for (const TArray<FItem>& List : Lists)
 	{
@@ -1543,9 +1800,11 @@ void ATCHUD::DrawRecruitPanel(UFont* Font, float Left, float Bottom)
 			{
 				static const TCHAR* const Icons[]={TEXT("rifle"),TEXT("at"),TEXT("tank"),TEXT("fighter"),TEXT("gunboat")};
 				const int32 G=Card.Groups.IsValidIndex(I.Command.Group)?Card.Groups[I.Command.Group].Group:0;
-				C.Icon=Icons[FMath::Clamp(G,0,4)]; TabControls.Add(C); continue;
+				C.Icon=Icons[FMath::Clamp(G,0,4)];
+				if (bRecruitLetters && PC->RecruitGroupOpen<0 && I.Command.Group<15) C.Key=FString::Chr(TEXT("QWERTASDFGZXCVB")[I.Command.Group]);
+				TabControls.Add(C); continue;
 			}
-			if (I.Command.Action==ETCUiAction::Rally) { Above.Add(C); continue; }
+			if (I.Command.Action==ETCUiAction::Rally) { C.Label=TEXT("Rally"); C.Key=TEXT("⇧H"); Above.Add(C); continue; }
 			if (I.Command.Action==ETCUiAction::Recruit)
 			{
 				C.Label=FTCAlerts::UnitName(S,&M->UnitTable,I.Command.Unit,S.You); C.Icon=I.Command.Unit;
@@ -1558,6 +1817,7 @@ void ATCHUD::DrawRecruitPanel(UFont* Font, float Left, float Bottom)
 				if (Sep>0) { C.Value=C.Label.Mid(Sep+2); C.Label=C.Label.Left(Sep); }
 				C.Icon=I.Command.Unit;
 			}
+			if (bRecruitLetters && PC->RecruitGroupOpen>=0 && Cards.Num()<15) C.Key=FString::Chr(TEXT("QWERTASDFGZXCVB")[Cards.Num()]);
 			Cards.Add(C);
 		}
 		if (Cards.Num()) CardLists.Add(Cards);
@@ -1833,6 +2093,7 @@ void ATCHUD::DrawHUD()
 	Super::DrawHUD();
 	Buttons.Reset();
 	Panels.Reset();
+	PendingTooltip.Reset(); TooltipAnchor=FBox2D(ForceInit); CornerBox=FBox2D(ForceInit); SelectionScrollBox=FBox2D(ForceInit);
 	EndUi(); // a frame starts unscaled
 	Frames++;
 	ATCGameMode* M = GetWorld()->GetAuthGameMode<ATCGameMode>();
@@ -1843,7 +2104,7 @@ void ATCHUD::DrawHUD()
 	const FTCMatchState& S = M->State;
 	const bool bStrip = S.bHasMatch && S.Snapshots > 0;
 	// round 15: a match's first frame starts the reference's start band (StartBand)
-	if (S.bHasMatch && !bHadMatch) { bStartBand = true; StartBandFrames = 0; PC->RecruitGroupOpen=-1; }
+	if (S.bHasMatch && !bHadMatch) { bStartBand = true; StartBandFrames = 0; PC->RecruitGroupOpen=-1; bRecruitLetters=false; bGroupDropdown=false; GroupDestination=1; SelectionFirst=0; }
 	bHadMatch = S.bHasMatch;
 	// round 14: the lobby's background over its battlefield (index.html #overlay #16191b, the backdrop at opacity 0.5)
 	if (!S.bHasMatch) M->Backdrop.DrawDim(Canvas);
@@ -1907,7 +2168,7 @@ void ATCHUD::DrawHUD()
 	}
 	if (!S.DenyReason.IsEmpty() || !S.DenyCmd.IsEmpty())
 	{
-		const FString Deny = FString::Printf(TEXT("Refused (%s): %s"), *S.DenyCmd, *TCOrders::DenySentence(S.DenyReason, S.DenyCmd));
+		const FString Deny = FString::Printf(TEXT("Refused (%s): %s"), *S.DenyCmd, *(M->Controls.TerminalNotice.IsEmpty() ? TCOrders::DenySentence(S.DenyReason, S.DenyCmd) : M->Controls.TerminalNotice));
 		const FString Shown = TC_T(Deny);
 		NoteKept(Deny, Shown);
 		Status.Add({ Shown, Warn });
@@ -1946,6 +2207,9 @@ void ATCHUD::DrawHUD()
 		}
 		const int32 StripFrom = Panels.Num();
 		const float StripBottom = DrawScoreStrip(Font, Big);
+		FBox2D MarkerExclusion = StripCard;
+		if (MarkerExclusion.bIsValid) MarkerExclusion.Max.Y = FMath::Max(MarkerExclusion.Max.Y, double(TopStackBottomPx));
+		TCMarkersHud::SetHudExclusion(MarkerExclusion);
 		// camera.js measures #top's border box. DrawScoreStrip also returns the gap for the next card.
 		BandTop = bStrip ? TopStackBottomPx : 0.f;
 		// round 15: the strip's left edge in screen pixels (its panels are recorded in screen pixels)
@@ -2053,6 +2317,7 @@ void ATCHUD::DrawHUD()
 			const bool bOverStrip = StripRight > StripLeft && StripLeft / UiNow < 8.f + CtlSize.X + 4.f && CtlTop < StripLowUi;
 			if (bOverStrip && StripLowUi + 4.f + CtlSize.Y <= Canvas->ClipY - Gap) CtlTop = StripLowUi + 4.f;
 		}
+		CornerBox=CtlSize.X>0?ToScreen(TCHudBottom::Box(8,CtlTop,CtlSize.X,CtlSize.Y)):FBox2D(ForceInit);
 		float CtlBottom = CtlSize.X > 0.f ? (CornerRight > 0.f && M->Controls.MenuOpen() ? Y + 4.f + MeasureControlRows(Font, CornerRows.Num() ? TArray<FTCControlRow>{ CornerRows[0] } : CornerRows).Y : CtlTop + CtlSize.Y) * UiNow : 0.f;
 		// round 16 (lead, controls' stats box on hudfit's corner): F2's box under the closed Menu panel (stats.js place:
 		// under #util; the open menu is a dropdown over it), the status column under both
@@ -2090,6 +2355,8 @@ void ATCHUD::DrawHUD()
 				const FBox2D Box=TCHudBottom::Box(X,Top,W,Count*Line);
 				for (const FBox2D& B : Panels) if (TCHudBottom::Overlap(Box,B)) return false;
 				if (SandboxScreen.bIsValid && TCHudBottom::Overlap(Box,SandboxScreen)) return false;
+                if (CornerBox.bIsValid && TCHudBottom::Overlap(Box,CornerBox)) return false;
+                if (Box.Min.Y<0 || Box.Max.Y>Canvas->ClipY) return false;
 				return true;
 			};
 			if (LeftW >= ColumnMinW) { Col = Rows(LeftW); bPlaced = LeftTop + Col.Num() * Line <= MatchTop - 4.f && ClearStatus(12,LeftTop,LeftW,Col.Num()); if (bPlaced) Cy = LeftTop; }
@@ -2107,7 +2374,12 @@ void ATCHUD::DrawHUD()
 					if (!bLoggedDiagDrop) { bLoggedDiagDrop = true; UE_LOG(LogTC, Log, TEXT("hud: no room for the status column's diagnostics at %.0f%% in %.0f x %.0f; they stay in the log"), Ui2 * 100.f, Canvas->ClipX, Canvas->ClipY); }
 				}
 			}
-			for (const FStatusLine& L : Col) { DrawShown(L.Shown, L.Colour, Cx, Cy, Font, 1.f); Cy += Line; }
+			for (const FStatusLine& L : Col)
+            {
+                float W=0,H=0; ShownSize(L.Shown,W,H,Font);
+                if (ClearStatus(Cx,Cy,W,1)) DrawShown(L.Shown,L.Colour,Cx,Cy,Font,1.f);
+                Cy+=Line;
+            }
 			BeginUi(Ui2);
 		}
 		// client/alerts.js: the alert feed over the minimap and the Alt+H history
@@ -2143,6 +2415,14 @@ void ATCHUD::DrawHUD()
 	}
 	EndUi();
 	DrawRoomBanners(Font); // round 16: #roomBanners (z-index 25: over the HUD, under the sheets)
+	if (!PendingTooltip.IsEmpty() && TooltipAnchor.bIsValid && !PC->ModalSheetOpen())
+	{
+	 const float Scale=S.bHasMatch?PC->UiScalePercent/100.f:1.f;
+	 BeginUi(Scale);
+	 const FTCMeasure Measure=FTCType::IsLoaded()?FTCType::Measure():FTCPaint::CanvasMeasure(Font);
+	 const FTCHudFit::FBottomLayout Tip=FTCHudFit::Tooltip(TC_T(PendingTooltip),FBox2D(TooltipAnchor.Min/Scale,TooltipAnchor.Max/Scale),FVector2D(Canvas->ClipX,Canvas->ClipY),Measure);
+	 FTCType::Draw(Tip.Paint,Canvas,Font,Scale); EndUi();
+	}
 	DrawControlsSheet(Font, Big);
 	DrawStatsSheet(Font); // round 16: Menu > Stats overlay
 
@@ -2185,14 +2465,16 @@ bool FTCHudBottomLayoutTest::RunTest(const FString&)
 	using namespace FTCHudFit;
 	if (!FTCType::IsLoaded() || !FTCLocale::IsLoaded()) { AddError(TEXT("The reference fonts and dictionary are required for the HUD fit check")); return false; }
 	const FTCMeasure Measure=FTCType::Measure();
+	for (FVector2D Pixels : {FVector2D(1280,720),FVector2D(1920,1080)})
 	for (ETCLanguage Language : {ETCLanguage::English,ETCLanguage::Spanish})
 	for (float Scale : {1.f,1.5f})
 	for (bool Open : {false,true})
 	for (int32 Groups : {1,3})
 	for (bool WithLogistics : {false,true})
+	for (bool Dropdown : {false,true})
 	{
 		FTCLocale::FScopedLanguage Lang(Language);
-		const FVector2D View(1280/Scale,720/Scale);
+		const FVector2D View=Pixels/Scale;
 		TArray<FSelection> Selected={{TEXT("rifle"),TEXT("Grenadiers"),1,100,100,{TEXT("In cover"),TEXT("Auto-retreat")}}};
 		if (Groups==3)
 		{
@@ -2215,12 +2497,13 @@ bool FTCHudBottomLayoutTest::RunTest(const FString&)
 		Order(TEXT("Build"),TEXT("sandbags"),TEXT(""),TEXT("Build"),ETCUiAction::BuildMenu);
 		Order(TEXT("Trench"),TEXT("e_zigzag"),TEXT(""),TEXT("Trench"),ETCUiAction::TrenchMenu);
 		Order(TEXT("Grenade"),TEXT("grenade"),TEXT("F A"),TEXT(""),ETCUiAction::Ability);
-		FBottomLayout L=LeftPanel(View.Y,TEXT("1 unit selected"),Selected,{},Orders,{},Measure,Scale);
+		for (FControl& C : Orders) if (C.Command.Action==ETCUiAction::Formation || C.Command.Action==ETCUiAction::BuildMenu || C.Command.Action==ETCUiAction::TrenchMenu) C.bSubmenu=true;
+		FBottomLayout L=LeftPanel(View.Y,TEXT("1 unit selected"),Selected,{},Orders,{},Measure,Scale,3,1,true,Dropdown);
 		const TCHAR* Names[]={TEXT("Infantry"),TEXT("Support weapons"),TEXT("Vehicles"),TEXT("Aircraft")};
 		const TCHAR* Icons[]={TEXT("rifle"),TEXT("at"),TEXT("tank"),TEXT("fighter")};
 		TArray<FControl> Tabs;
 		for (int32 I=0; I<4; I++) { FControl C; C.Label=Names[I]; C.Icon=Icons[I]; C.Command=FTCUiCommand(ETCUiAction::RecruitGroup); C.Command.Group=I; Tabs.Add(C); }
-		FControl Recruit; Recruit.Label=TEXT("Recruit"); FControl Rally; Rally.Label=TEXT("Rally (Shift+H)"); Rally.Command=FTCUiCommand(ETCUiAction::Rally);
+		FControl Recruit; Recruit.Label=TEXT("Recruit"); Recruit.Key=TEXT("Tab"); FControl Rally; Rally.Label=TEXT("Rally"); Rally.Key=TEXT("⇧H"); Rally.Command=FTCUiCommand(ETCUiAction::Rally);
 		TArray<TArray<FControl>> Lists;
 		if (Open)
 		{
@@ -2264,18 +2547,82 @@ bool FTCHudBottomLayoutTest::RunTest(const FString&)
 			L.Paint.Append(Rate); StackBottom=Rate.Panels.Last().Max.Y;
 		}
 		for (const FBox2D& B : BossPaint.Panels) if (B.Min.X<View.X/2 && B.Max.X>View.X/2) StackBottom=FMath::Max(StackBottom,(float)B.Max.Y);
-		L.Paint.Panels.Add(TCHudBottom::Box(View.X/2-57/Scale,StackBottom+8/Scale,114/Scale,33/Scale));
+		const FTCPaint Pause=FTCRoomBanners::Layout({FTCRoomBanner{TEXT("Paused by Alder"),false}},FMath::CeilToFloat(StackBottom*Scale+8),Pixels.X,FTCPaint::CanvasMeasure(GEngine->GetSmallFont()));
+        for (const FTCPaintItem& I : Pause.Items) if (I.Role==TEXT("banner:pause")) L.Paint.Panels.Add(FBox2D(I.Pos/Scale,(I.Pos+I.Size)/Scale));
 		TArray<FControl> Sandbox;
 		for (const TCHAR* Label : {TEXT("Sandbox"),TEXT("Rifle Squad"),TEXT("Enemy"),TEXT("Spawn")}) { FControl C; C.Label=Label; Sandbox.Add(C); }
 		Append(SandboxToolbar(View,70,Score.Min.X,Sandbox,L.Paint.Panels,Measure,Scale));
-		const FString Case=FString::Printf(TEXT("%s %g%% %s %d groups logistics %d"),Language==ETCLanguage::Spanish?TEXT("es"):TEXT("en"),Scale*100,Open?TEXT("open"):TEXT("tabs"),Groups,WithLogistics);
+		const FString Case=FString::Printf(TEXT("%g x %g %s %g%% %s %d groups logistics %d"),Pixels.X,Pixels.Y,Language==ETCLanguage::Spanish?TEXT("es"):TEXT("en"),Scale*100,Open?TEXT("open"):TEXT("tabs"),Groups,WithLogistics);
+		FTCAlerts Alerts;
+		Alerts.Push(TEXT("unitLost"),TEXT("Anti-Tank Rifle Squad destroyed"),true,FVector2D(20,20),0);
+		Alerts.Push(TEXT("unitLost"),TEXT("Self-Propelled Anti-Aircraft Gun destroyed"),true,FVector2D(80,80),0);
+		Alerts.Push(TEXT("base"),TEXT("Our base is under attack!"),true,FVector2D(20,20),0);
+		Alerts.Push(TEXT("ready"),TEXT("Rifle Squad ready"),true,FVector2D(20,20),0);
+		for (bool History : {false,true})
+		{
+		 Alerts.bHistoryOpen=History;
+		 FTCAlertViewInput Input; Input.Now=1; Input.ViewW=View.X; Input.ViewH=View.Y; Input.UiScale=Scale;
+		 Input.Right=View.X-8; Input.MinimapTop=View.Y-8-184; Input.Avoid=L.Paint.Panels;
+		 const FTCPaint Feed=Alerts.Layout(Input,Measure,FTCType::HeavyMeasure());
+		 TestNotNull(Case+FString::Printf(TEXT(" dropdown %d history %d: bounded history remains reachable"),Dropdown,History),Feed.Find(TEXT("alert:history")));
+		 for (const FBox2D& Box : Feed.Panels)
+		 {
+		  TestTrue(TEXT("alert panel in viewport"),Box.Min.X>=0 && Box.Min.Y>=0 && Box.Max.X<=View.X+.1 && Box.Max.Y<=View.Y+.1);
+		  for (const FBox2D& Other : L.Paint.Panels) TestFalse(TEXT("alert does not overlap an existing control panel"),TCHudBottom::Overlap(Box,Other));
+		 }
+		 for (int32 I=0; I<Feed.Panels.Num(); I++) for (int32 J=I+1; J<Feed.Panels.Num(); J++) TestFalse(TEXT("alert cards do not overlap"),TCHudBottom::Overlap(Feed.Panels[I],Feed.Panels[J]));
+		}
 		for (const FString& Error : LayoutErrors(L,View)) AddError(Case+TEXT(": ")+Error);
 		TestEqual(Case+TEXT(": selection preserved"),L.Paint.TextsOf(TEXT("bottom:selection-title")),TArray<FString>{TC_T(FString(TEXT("1 unit selected")))});
+		TestTrue(Case+TEXT(": first selected type stays visible"),L.Paint.TextsOf(TEXT("bottom:selection-name")).Num()>0);
+		TestEqual(Case+TEXT(": selected status chips stay visible"),L.Paint.TextsOf(TEXT("bottom:status-text")).Num(),2);
 		TestEqual(Case+TEXT(": full translated tabs"),R.Paint.TextsOf(TEXT("bottom:tab-label")),TArray<FString>{TC_T(FString(Names[0])),TC_T(FString(Names[1])),TC_T(FString(Names[2])),TC_T(FString(Names[3]))});
-		TestTrue(Case+TEXT(": Form value is present, with no extra clipped summary"),L.Paint.TextsOf(TEXT("bottom:value")).Contains(TC_T(FString(TEXT("Form")))));
+		if (!Dropdown) TestTrue(Case+TEXT(": Form value is present, with no extra clipped summary"),L.Paint.TextsOf(TEXT("bottom:value")).Contains(TC_T(FString(TEXT("Form")))));
 		TestEqual(Case+TEXT(": recruitment heading is above the tabs"),R.Paint.TextsOf(TEXT("bottom:above-label"))[0],TC_T(FString(TEXT("Recruit"))));
 	}
 	return !HasAnyErrors();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCHudPanelDetailsTest, "ThreeCrossroads.HUD.PanelDetails", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+bool FTCHudPanelDetailsTest::RunTest(const FString&)
+{
+ using namespace FTCHudFit;
+ const FTCMeasure Measure=FTCType::Measure();
+ for (ETCLanguage Language : {ETCLanguage::English,ETCLanguage::Spanish})
+ for (FVector2D Pixels : {FVector2D(1280,720),FVector2D(1920,1080)})
+ for (float Scale : {1.f,1.5f})
+ {
+  FTCLocale::FScopedLanguage Lang(Language); const FVector2D View=Pixels/Scale;
+  FControl Mun; Mun.Label=TEXT("Mun"); Mun.Value=TEXT("250"); Mun.Icon=TEXT("resource-mun");
+  FControl Fuel; Fuel.Label=TEXT("Fuel"); Fuel.Value=TEXT("75"); Fuel.Icon=TEXT("resource-fuel");
+  FControl Plane; Plane.Label=TEXT("Ground-attack Plane"); Plane.Value=TEXT("On station 25s"); Plane.Command=TCHudBottom::Local(TEXT("plane:42"));
+  const FBottomLayout E=EconomyPanel(View.X,TEXT("476 MP"),TEXT("+5/s (upkeep −2)"),TEXT("3/24 units"),{},Measure,Scale,{Mun,Fuel},{Plane});
+  for (const FString& Error : LayoutErrors(E,View)) AddError(Error);
+  TestEqual(TEXT("both construction resources survive"),E.Paint.TextsOf(TEXT("bottom:resource")).Num(),2);
+  TestEqual(TEXT("plane state survives"),E.Paint.TextsOf(TEXT("bottom:air-state")),TArray<FString>{TC_T(Plane.Value)});
+  FControl Order; Order.Label=TEXT("Formation"); Order.Icon=TEXT("f_wedge"); Order.Value=TEXT("Form"); Order.bSubmenu=true;
+  const FBottomLayout L=LeftPanel(View.Y,TEXT("1 unit selected"),{{TEXT("rifle"),TEXT("Grenadiers"),1,100,100,{TEXT("In cover"),TEXT("Auto-retreat")}}},{},{Order},{},Measure,Scale,3,2,true,true);
+  for (const FString& Error : LayoutErrors(L,View)) AddError(Error);
+  TestEqual(TEXT("each status has its own chip"),L.Paint.TextsOf(TEXT("bottom:status-text")).Num(),2);
+  TestEqual(TEXT("dropdown offers all nine groups"),L.Hits.FilterByPredicate([](const FHit& H) { return H.Control.Command.Unit.StartsWith(TEXT("hudpanel:destination:")); }).Num(),9);
+  TArray<FSelection> Types;
+  for (const TCHAR* Type : {TEXT("rifle"),TEXT("mg"),TEXT("sniper"),TEXT("tank"),TEXT("mortar"),TEXT("at")}) Types.Add({Type,Type,1,100,100,{TEXT("In cover"),TEXT("Auto-retreat")}});
+  const FBottomLayout Scrolled=LeftPanel(View.Y,TEXT("6 units selected"),Types,{},{Order},{},Measure,Scale,3,2,true,false,5);
+  for (const FString& Error : LayoutErrors(Scrolled,View)) AddError(Error);
+  TestEqual(TEXT("scrolling reaches the last selected type"),Scrolled.Paint.TextsOf(TEXT("bottom:selection-name")),TArray<FString>{TC_T(FString(TEXT("at")))});
+  TestEqual(TEXT("all types remain scrollable"),Scrolled.SelectionMax,5);
+  for (FVector2D Corner : {FVector2D(0,0),FVector2D(View.X-2,0),FVector2D(0,View.Y-2),View-FVector2D(2,2)})
+  {
+   const FBottomLayout Tip=Tooltip(TC_T(FString(TEXT("Find the next idle unit. Shift+click selects all idle units"))),TCHudBottom::Box(Corner.X,Corner.Y,2,2),View,Measure);
+   for (const FString& Error : LayoutErrors(Tip,View)) AddError(Error);
+  }
+ }
+ for (const TCHAR* Key : {TEXT("faction-0"),TEXT("faction-1"),TEXT("faction-2"),TEXT("faction-3"),TEXT("resource-mun"),TEXT("resource-fuel"),TEXT("menu-open"),TEXT("menu-closed"),TEXT("rifle"),TEXT("key-shift")})
+ {
+  bool Found=false; for (const TCHAR* Existing : HudIconKeys) Found|=FCString::Strcmp(Key,Existing)==0;
+  TestTrue(FString(TEXT("original art in generated atlas: "))+Key,Found);
+ }
+ return !HasAnyErrors();
 }
 
 // Round 16 (hudfit): the fit rules at UI 150% in a 1280 x 720 window (853.3 x 480 UI pixels), the case slice 1p left

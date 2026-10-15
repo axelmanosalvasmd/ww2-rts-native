@@ -97,6 +97,7 @@ public:
 	// (or any operation) first for a current count.
 	const TArray<int32>& Members(int32 Group) const;
 	// client/selection.js reset: every group empty, the double tap forgotten.
+	void Restore(const TMap<int32, TArray<int32>>& Saved, const FTCMatchState& State) { Sync(State); for (int32 N = 1; N <= 9; N++) Groups[N - 1] = Saved.FindRef(N); Prune(State); }
 	void Reset();
 
 private:

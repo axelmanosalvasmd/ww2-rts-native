@@ -32,8 +32,12 @@
 
 #include "CoreMinimal.h"
 #include "Client/TCLobbySettings.h" // FTCLobbyChoice
+#include "UObject/StrongObjectPtr.h"
 
 class FJsonObject;
+class UCanvas;
+class UFont;
+class UTexture2D;
 
 enum class ETCMatchOption : uint8
 {
@@ -181,11 +185,15 @@ struct FTCMapPreview
 	FLayout Layout(double CanvasWidth = 280.0, double CanvasHeight = 280.0) const;
 	// The canvas position of a cell's centre.
 	static FVector2D CellCentre(int32 X, int32 Y, const FLayout& At);
+	// The original 280 x 280 canvas, including its point rings and outlined spawn dots.
+	TArray<FColor> Raster(int32 Side = 280) const;
 };
 
 class FTCMatchOptions
 {
 public:
+	void TickPreview(const FString& SocketUrl, double Now);
+	void DrawPreview(UCanvas* Canvas, UFont* Font, FVector2D TopLeft, float Side = 150.f);
 	static constexpr const TCHAR* ReferencePin = TEXT("e4e579a");
 	static constexpr int32 MaxPlayers = 6;   // shared/sim.js MAX_PLAYERS (client/main.js COLORS.length)
 	static constexpr int32 CellMetres = 2;   // shared/sim.js CELL
@@ -278,6 +286,11 @@ public:
 	static const TCHAR* MessageType(ETCMatchOption Kind);
 
 private:
+	struct FDownload { FString Key, Body; bool bDone = false, bOk = false; };
+	TSharedPtr<FDownload> Download;
+	double NextMapTry = -1e9;
+	FString PreviewServer, PreviewImageKey;
+	TStrongObjectPtr<UTexture2D> PreviewImage;
 	struct FPending
 	{
 		ETCMatchOption Kind = ETCMatchOption::Weather;

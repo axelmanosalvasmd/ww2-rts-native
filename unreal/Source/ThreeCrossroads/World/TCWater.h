@@ -18,10 +18,9 @@
 //
 // Recipient knowledge: the mesh reads only the cells this client was told (the caller's Char returns '.' for a World
 // cell this side has not discovered, as the start map does) and never an unknown cell's level. Where known water meets
-// undiscovered ground the shore is not drawn (the reference's OPEN rule): that uses the known water only. One
-// deliberate difference: the reference freezes every cell's level when the water is first created, so a World cell
-// discovered later keeps the placeholder level 0 of the start map. Here a cell's level is frozen when it is first
-// known (FreezeLevel); for every cell known at creation, and so on every authored map, the two are the same.
+// undiscovered ground the shore is not drawn (the reference's OPEN rule): that uses the known water only. Levels
+// freeze when the mesh is created, including the public zero placeholder for undiscovered World cells. Discovering
+// a later cell never moves that frozen line, as in createWaterLevels. Hidden levels are never read.
 #pragma once
 
 #include <algorithm>
@@ -247,7 +246,6 @@ namespace TCWaterCore
 
 		int W = 0, H = 0;
 		std::vector<int8_t> Frozen;     // water-levels.js levels: read once
-		std::vector<uint8_t> FrozenSet; // which cells have a frozen level (FreezeLevel)
 
 		// geometry, reference metres (x, y up, z): (W + 1)(H + 1) corners, then the strips past the edge
 		std::vector<float> Pos, Normal, Flow;
@@ -259,7 +257,7 @@ namespace TCWaterCore
 		int Rebuilds = 0, GeometryBuilds = 0;
 
 		// water.js createWater: false (and nothing kept) when no cell is wet, as it returns null. Levels(c) is the
-		// level frozen for each cell this client knows (Known(c)); unknown cells get theirs when first known.
+		// level frozen for each cell this client knows (Known(c)); unknown cells freeze at the public placeholder 0.
 		template <typename LevelFn, typename KnownFn>
 		bool Create(int InW, int InH, LevelFn Level, KnownFn Known)
 		{
@@ -268,8 +266,8 @@ namespace TCWaterCore
 			bool Any = false;
 			for (int C = 0; C < N && !Any; C++) Any = IsWet(Char(C));
 			if (!Any) { W = H = 0; return false; }
-			Frozen.assign(N, 0); FrozenSet.assign(N, 0);
-			for (int C = 0; C < N; C++) if (Known(C)) { Frozen[C] = (int8_t)Level(C); FrozenSet[C] = 1; }
+			Frozen.assign(N, 0);
+			for (int C = 0; C < N; C++) if (Known(C)) Frozen[C] = (int8_t)Level(C);
 			MWs = W * Sub; MHs = H * Sub; Tw = (W + Tile - 1) / Tile;
 			Mask.assign((size_t)MWs * MHs * 4, 0);
 			WetA.assign(N, 0); BridgesA.assign(N, 0); FordsA.assign(N, 0); OpenA.assign(N, 0); RaisedA.assign(N, 0);
@@ -278,9 +276,6 @@ namespace TCWaterCore
 			return true;
 		}
 		bool Valid() const { return W > 0 && H > 0; }
-		// a cell first known now keeps the level it was learned at (see the file comment)
-		void FreezeLevel(int C, int Level) { if (C >= 0 && C < W * H && !FrozenSet[C]) { Frozen[C] = (int8_t)Level; FrozenSet[C] = 1; } }
-
 		// water.js changed(): one cell row [cell, char, level?] already written into the grid
 		void Changed(int C, uint8_t Ch, bool bHasLevel)
 		{

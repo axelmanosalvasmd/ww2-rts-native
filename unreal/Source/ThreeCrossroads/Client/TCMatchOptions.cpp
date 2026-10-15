@@ -3,6 +3,18 @@
 #include "Dom/JsonValue.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
+#include "Client/TCEndReport.h"
+#include "Client/TCLocale.h"
+#include "Client/TCStats.h"
+#include "ThreeCrossroads.h"
+#include "HttpModule.h"
+#include "Interfaces/IHttpRequest.h"
+#include "Interfaces/IHttpResponse.h"
+#include "Engine/Canvas.h"
+#include "Engine/Texture2D.h"
+#include "CanvasItem.h"
+#include "GlobalRenderResources.h"
+#include "Misc/App.h"
 
 namespace TCMOptL
 {
@@ -296,6 +308,106 @@ void FTCMatchOptions::Reset()
 	You = -1;
 	SeatList.Reset();
 	Pending.Reset();
+	Download.Reset(); NextMapTry = -1e9; PreviewImageKey.Reset(); PreviewImage.Reset();
+}
+
+void FTCMatchOptions::TickPreview(const FString& SocketUrl, double Now)
+{
+	if (PreviewServer != SocketUrl)
+	{
+		PreviewServer = SocketUrl; MapFiles.Reset(); Download.Reset(); NextMapTry = -1e9;
+		PreviewImage.Reset(); PreviewImageKey.Reset();
+	}
+	if (Download && Download->bDone)
+	{
+		if (Download->bOk) AddMapFileText(Download->Key, Download->Body);
+		Download.Reset();
+	}
+	const FString Key = WantedMap();
+	if (!InLobby() || Key.IsEmpty() || Download || Now < NextMapTry) return;
+	const FString Url = MapUrl(SocketUrl, Key);
+	if (Url.IsEmpty()) return;
+	NextMapTry = Now + 5.0;
+	Download = MakeShared<FDownload>(); Download->Key = Key;
+	const auto Result = Download;
+	const auto Request = FHttpModule::Get().CreateRequest();
+	Request->SetURL(Url); Request->SetVerb(TEXT("GET")); Request->SetTimeout(10.f);
+	// Capturing only the result keeps callbacks safe when a room closes or the owner is destroyed.
+	Request->OnProcessRequestComplete().BindLambda([Result](FHttpRequestPtr, FHttpResponsePtr Response, bool bOk)
+	{
+		Result->bOk = bOk && Response && Response->GetResponseCode() == 200;
+		if (Result->bOk) Result->Body = Response->GetContentAsString();
+		Result->bDone = true;
+	});
+	if (!Request->ProcessRequest()) Download->bDone = true;
+}
+
+TArray<FColor> FTCMapPreview::Raster(int32 Side) const
+{
+	TArray<FColor> Image;
+	if (Side < 1 || Side > 1024) return Image;
+	Image.Init(Background, Side * Side);
+	if (Status != ETCPreviewStatus::Ready || W < 1 || H < 1 || Pixels.Num() != W * H) return Image;
+	const FLayout L = Layout(Side, Side);
+	for (int32 Y = 0; Y < Side; Y++) for (int32 X = 0; X < Side; X++)
+	{
+		const int32 Cx = FMath::FloorToInt((X + 0.5 - L.OffsetX) / L.Scale), Cy = FMath::FloorToInt((Y + 0.5 - L.OffsetY) / L.Scale);
+		if (Cx >= 0 && Cx < W && Cy >= 0 && Cy < H) Image[Y * Side + X] = Pixels[Cy * W + Cx];
+	}
+	auto Circle = [&](FVector2D At, double R, const FColor& Color, bool bFill)
+	{
+		const int32 X0 = FMath::Max(0, FMath::FloorToInt(At.X - R - 2)), X1 = FMath::Min(Side - 1, FMath::CeilToInt(At.X + R + 2));
+		const int32 Y0 = FMath::Max(0, FMath::FloorToInt(At.Y - R - 2)), Y1 = FMath::Min(Side - 1, FMath::CeilToInt(At.Y + R + 2));
+		for (int32 Y = Y0; Y <= Y1; Y++) for (int32 X = X0; X <= X1; X++)
+		{
+			// One-pixel coverage at each arc edge. The browser uses a 2 px centred stroke.
+			const double D = FVector2D::Distance(At, FVector2D(X + 0.5, Y + 0.5));
+			const double A = FMath::Clamp(bFill ? R + 0.5 - D : 1.5 - FMath::Abs(D - R), 0.0, 1.0);
+			FColor& C = Image[Y * Side + X];
+			C = FColor(FMath::RoundToInt(C.R + (Color.R - C.R) * A), FMath::RoundToInt(C.G + (Color.G - C.G) * A), FMath::RoundToInt(C.B + (Color.B - C.B) * A), 255);
+		}
+	};
+	for (const auto& P : Points) Circle(CellCentre(P.X, P.Y, L), L.PointRadius, PointColor, false);
+	for (const auto& S : Spawns)
+	{
+		const FVector2D At = CellCentre(S.X, S.Y, L);
+		Circle(At, L.SpawnRadius, S.Color, true); Circle(At, L.SpawnRadius, SpawnOutline, false);
+	}
+	return Image;
+}
+
+void FTCMatchOptions::DrawPreview(UCanvas* Canvas, UFont* Font, FVector2D At, float Side)
+{
+	if (!Canvas || !Canvas->Canvas || !Font || !InLobby() || !FApp::CanEverRender()) return;
+	const FTCMapPreview P = Preview();
+	const FString Key = P.Key + TEXT(":") + P.Mode + FString::Printf(TEXT(":%d:%d:%d"), P.W, P.H, (int32)P.Status);
+	if (!PreviewImage || Key != PreviewImageKey)
+	{
+		PreviewImage.Reset(); PreviewImageKey = Key;
+		const TArray<FColor> Image = P.Raster();
+		auto* T = UTexture2D::CreateTransient(280, 280, PF_B8G8R8A8);
+		if (!T || Image.Num() != 280 * 280) return;
+		FTexture2DMipMap& Mip = T->GetPlatformData()->Mips[0];
+		void* Bytes = Mip.BulkData.Lock(LOCK_READ_WRITE);
+		FMemory::Memcpy(Bytes, Image.GetData(), Image.Num() * sizeof(FColor)); Mip.BulkData.Unlock();
+		T->SRGB = true; T->Filter = TF_Nearest; T->NeverStream = true; T->UpdateResource(); PreviewImage.Reset(T);
+		UE_LOG(LogTC, Log, TEXT("lobby preview: %s, %dx%d cells, 280x280 canvas, %d points, %d spawns"), *P.Key, P.W, P.H, P.Points.Num(), P.Spawns.Num());
+	}
+	FCanvasTileItem Tile(At, PreviewImage->GetResource(), FVector2D(Side, Side), FLinearColor::White);
+	Tile.BlendMode = SE_BLEND_Opaque; Canvas->DrawItem(Tile);
+	FTCPaint Words;
+	if (P.Status == ETCPreviewStatus::World)
+	{
+		Words.Text(TC_T(P.Title), At.X + Side / 2, At.Y + Side / 2 - 10, 18 * Side / 280, FLinearColor(P.TitleColor), false, ETCPaintAlign::Centre);
+		Words.Text(TC_T(P.Subtitle), At.X + Side / 2, At.Y + Side / 2 + 16 * Side / 280, 13 * Side / 280, FLinearColor(P.TitleColor), false, ETCPaintAlign::Centre);
+	}
+	float Y = At.Y + Side + 8;
+	for (const auto& Line : P.Info)
+	{
+		for (const FString& Text : FTCPaint::Wrap(TC_T(Line.Text), Side + 100, 13, Line.bBold, FTCPaint::CanvasMeasure(Font)))
+		{ Words.Text(Text, At.X, Y, 13, FLinearColor(FColor(0xe2, 0xdf, 0xd3)), Line.bBold); Y += 17; }
+	}
+	FTCType::Draw(Words, Canvas, Font);
 }
 
 bool FTCMatchOptions::ApplyLobby(const FJsonObject& M)
@@ -1255,6 +1367,15 @@ bool FTCMatchOptionsPreviewTest::RunTest(const FString& Parameters)
 		const struct { int32 X, Y; FColor C; } Samples[] = { { 3, 10, FColor(46, 71, 85) }, { 5, 0, FColor(47, 74, 34) }, { 0, 15, FColor(150, 128, 100) },
 			{ 0, 11, FColor(95, 104, 61) }, { 20, 0, FColor(160, 175, 102) }, { 19, 15, FColor(186, 159, 124) }, { 21, 17, FColor(134, 146, 86) } };
 		for (const auto& S : Samples) TestEqual(FString::Printf(TEXT("pixel %d,%d"), S.X, S.Y), P.Pixels.IsValidIndex(S.Y * P.W + S.X) ? P.Pixels[S.Y * P.W + S.X] : FColor(0, 0, 0, 0), S.C);
+		const TArray<FColor> Canvas = P.Raster();
+		TestEqual(TEXT("native preview retains the source 280px canvas"), Canvas.Num(), 280 * 280);
+		const auto At = P.Layout();
+		for (const auto& Spawn : P.Spawns)
+		{
+			const FVector2D Centre = FTCMapPreview::CellCentre(Spawn.X, Spawn.Y, At);
+			const int32 X = FMath::FloorToInt(Centre.X), Y = FMath::FloorToInt(Centre.Y);
+			if (X >= 0 && X < 280 && Y >= 0 && Y < 280) TestEqual(TEXT("spawn fills above terrain and capture rings"), Canvas[Y * 280 + X], Spawn.Color);
+		}
 		TestTrue(TEXT("the name is bold, the dots red then blue"), P.Info.Num() > 6 && P.Info[0].bBold && P.Info[6].Dots.Num() == 2 && P.Info[6].Dots[0] == FColor(0xd9, 0x4a, 0x3d) && P.Info[6].Dots[1] == FColor(0x3d, 0x7b, 0xd9));
 		TestEqual(TEXT("an empty mode draws as Conquest"), FTCMatchOptions::BuildPreview(&Syn, TEXT("test-ford"), TEXT(""), TEXT("huge")).Mode, FString(TEXT("conquest")));
 	}

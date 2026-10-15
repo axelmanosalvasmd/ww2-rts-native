@@ -390,8 +390,10 @@ FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measur
 			Items.Add(MoveTemp(F));
 		}
 		FBlock B;
-		B.W = W; B.H = H + LossBottom;
-		B.Paint = [this, Items, W, Now, Hover, Border, HeadingH, DetailH, HintH](FTCPaint& Out, float X, float Y)
+		for (const FLoss& Loss : Items)
+		{
+		B.W = W; B.H = Loss.H+(&Loss==&Items.Last()?LossBottom:LossGap-Gap);
+		B.Paint = [this, Items=TArray<FLoss>{Loss}, W, Now, Hover, Border, HeadingH, DetailH, HintH, ViewW=In.ViewW](FTCPaint& Out, float X, float Y)
 		{
 			for (const FLoss& F : Items)
 			{
@@ -425,12 +427,13 @@ FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measur
 				}
 				Out.Hit(FBox2D(FVector2D(X, Y), FVector2D(X + W, Y + F.H)), FString::Printf(TEXT("alert:line:%d"), F.L->Serial), F.L->Alert.Text);
 				Out.Panels.Add(FBox2D(FVector2D(X, Y), FVector2D(X + W, Y + F.H)));
-				Out.Shift(First, FVector2D(Slide, 0));
+				Out.Shift(First, FVector2D(FMath::Min(Slide,FMath::Max(0.f,ViewW-8-X-W)), 0));
 				Out.Fade(First, A);
 				Y += F.H + LossGap;
 			}
 		};
-		Blocks.Add(MoveTemp(B));
+		Blocks.Add(MoveTemp(B)); B=FBlock();
+		}
 	}
 	// the routine lines: padding 3px 10px, at most 320 px with an ellipsis; the newest semi-bold with the strong border
 	for (int32 I = 0; I < Routine.Num(); I++)
@@ -443,7 +446,7 @@ FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measur
 		B.W = FMath::Min(FMath::Min(LineMax, BoxW), Measure(Text, FontPx, bBold, 0.f) + 2 * PadX + 2);
 		B.H = LineBox + 2 * PadY + 2 * Border;
 		const float W = B.W, H = B.H;
-		B.Paint = [L, Text, W, H, Now, bBase, bNewest, bBold, LineBox, Hover, Border](FTCPaint& Out, float X, float Y)
+		B.Paint = [L, Text, W, H, Now, bBase, bNewest, bBold, LineBox, Hover, Border, ViewW=In.ViewW](FTCPaint& Out, float X, float Y)
 		{
 			float Slide = 0.f;
 			const float A = ShownAlpha(*L, Now, &Slide);
@@ -469,23 +472,61 @@ FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measur
 			T.Size.Y = LineBox;
 			Out.Hit(FBox2D(FVector2D(X, Y), FVector2D(X + W, Y + H)), FString::Printf(TEXT("alert:line:%d"), L->Serial), L->Alert.Text);
 			Out.Panels.Add(FBox2D(FVector2D(X, Y), FVector2D(X + W, Y + H)));
-			Out.Shift(First, FVector2D(Slide, 0));
+			Out.Shift(First, FVector2D(FMath::Min(Slide,FMath::Max(0.f,ViewW-8-X-W)), 0));
 			Out.Fade(First, A);
 		};
 		Blocks.Add(MoveTemp(B));
 	}
 	// the Alert history box: the summary always, the nav buttons and the list when open
 	{
-		const float W = FMath::Min(HistoryW, In.ViewW - BoxSide);
+		float W = FMath::Min(HistoryW, In.ViewW - BoxSide);
+        // Measure free vertical intervals at each possible column edge. Prefer the source width, then narrow it.
+        auto FreeHeight=[&](float Width)
+        {
+            const float Bottom=FMath::Min(In.ViewH-8,In.MinimapTop-MinimapFrame-MinimapGap);
+            TArray<float> Xs={Right-Width,8.f};
+            for (const FBox2D& B : In.Avoid) if (B.bIsValid) { Xs.Add(B.Min.X-Width-6); Xs.Add(B.Max.X+6); }
+            float Largest=0;
+            for (float X : Xs)
+            {
+                if (X<8 || X+Width>In.ViewW-8+.01f) continue;
+                TArray<FVector2D> Intervals;
+                for (const FBox2D& A : In.Avoid)
+                    if (A.bIsValid && X<A.Max.X+.01 && X+Width>A.Min.X-.01 && A.Min.Y<Bottom && A.Max.Y>8)
+                        Intervals.Add(FVector2D(A.Min.Y-6,A.Max.Y+6));
+                Intervals.Sort([](FVector2D A,FVector2D B) { return A.X<B.X; });
+                float Top=8;
+                for (FVector2D Interval : Intervals) { Largest=FMath::Max(Largest,float(Interval.X-Top)); Top=FMath::Max(Top,float(Interval.Y)); }
+                Largest=FMath::Max(Largest,Bottom-Top);
+            }
+            return Largest;
+        };
+        const float Minimum=2*Border+2*HistoryPadY+LineBox;
+        const float EntryMinimum=2*ListPad+2*EntryMargin+2*Border+2*EntryPad+LineBox;
+        float Available=FreeHeight(W);
+        bool Found=false;
+        for (float Extra : {bHistoryOpen?EntryMinimum:0.f,0.f})
+        {
+            for (float Width : {W,280.f,240.f,200.f,176.f}) if (Width<=W && FreeHeight(Width)>=Minimum+Extra)
+            { W=Width; Available=FreeHeight(Width); Found=true; break; }
+            if (Found) break;
+        }
+        const bool Expand=bHistoryOpen && Available>=Minimum+EntryMinimum;
 		const float SumH = Border + HistoryPadY + LineBox + HistoryPadY;
-		const float ButtonH = LineBox + 2 * ButtonPadY + 2 * Border, NavH = 2 * NavPad + ButtonH;
+		const float ButtonH = LineBox + 2 * ButtonPadY + 2 * Border;
+		float NavH = 2 * NavPad + ButtonH;
+        const float NavW=Measure(TC_T(FString(TEXT("Previous Alert"))),FontPx,false,0)+Measure(TC_T(FString(TEXT("Next Alert"))),FontPx,false,0)+4*ButtonPadX+4*Border+NavGap+2*NavPad;
+        if (NavW>W) NavH=0;
 		const TArray<FTCAlertHistoryEntry>& Entries = Hist.Entries();
-		const float ListMaxH = FMath::Min(ListMax, ListVh * In.ViewH);
+        // A short interval retains a readable entry through Alt+Left/Right; the nav buttons give way first.
+        if (Available-SumH-NavH-Border<EntryMinimum) NavH=0;
+        const float Room=FMath::Max(0.f,Available-SumH-NavH-2*ListPad-Border);
+		const float ListMaxH = FMath::Min3(ListMax,ListVh*In.ViewH,Room);
 		struct FEntry { const FTCAlertHistoryEntry* E; TArray<FString> Lines; float H; };
 		TArray<FEntry> Rows;
 		float ListH = 2 * ListPad, Content = 0.f;
 		int32 First = 0;
-		if (bHistoryOpen)
+		if (Expand)
 		{
 			const float TextW = W - 4 * Border - 2 * ListPad - 2 * EntryPad;
 			for (const FTCAlertHistoryEntry& E : Entries)
@@ -513,9 +554,9 @@ FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measur
 		}
 		FBlock B;
 		B.W = W;
-		B.H = SumH + (bHistoryOpen ? NavH + ListH : 0.f) + Border;
+		B.H = SumH + (Expand ? NavH + ListH : 0.f) + Border;
 		const float H = B.H;
-		const bool bOpen = bHistoryOpen;
+		const bool bOpen = Expand;
 		const int32 Selected = Hist.Selected();
 		B.Paint = [W, H, SumH, ButtonH, NavH, ListH, ListMaxH, Content, Rows, First, bOpen, Selected, LineBox, &Measure, this, Border](FTCPaint& Out, float X, float Y)
 		{
@@ -538,7 +579,7 @@ FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measur
 			// the nav: Previous Alert (navigate(1)), Next Alert (navigate(-1))
 			float Bx = X + Border + NavPad;
 			const float By = Y + SumH + NavPad;
-			for (int32 K = 0; K < 2; K++)
+			for (int32 K = 0; NavH>0 && K < 2; K++)
 			{
 				const FString Label = TC_T(FString(K == 0 ? TEXT("Previous Alert") : TEXT("Next Alert")));
 				const float Bw = Measure(Label, FontPx, false, 0.f) + 2 * ButtonPadX + 2 * Border;
@@ -578,7 +619,7 @@ FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measur
 			// the list's scrollbar when it overflows
 			if (Content > ListMaxH)
 			{
-				const float Track = Bottom - Top, Thumb = FMath::Max(12.f, Track * ListMaxH / Content);
+				const float Track = Bottom - Top, Thumb = FMath::Min(Track,FMath::Max(12.f, Track * ListMaxH / Content));
 				float Before = 0.f;
 				for (int32 K = 0; K < First; K++) Before += Rows[K].H + EntryMargin;
 				Out.Rect(X + W - 1 - 4, Top + (Track - Thumb) * FMath::Clamp(Before / FMath::Max(1.f, Content - ListMaxH), 0.f, 1.f), 3, Thumb, TCCss::Rgba(176, 164, 122, 0.46f), TEXT("alert:history-scroll"));
@@ -586,15 +627,58 @@ FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measur
 		};
 		Blocks.Add(MoveTemp(B));
 	}
-	// place(): the box's bottom 13 px over the minimap, its right edge on the minimap's; children aligned right
-	float Total = 0.f;
-	for (int32 I = 0; I < Blocks.Num(); I++) Total += (I ? Gap : 0.f) + Blocks[I].H;
-	float Y = In.MinimapTop - MinimapFrame - MinimapGap - Total;
+	// Keep the pinned anchor whenever it fits. Overflow is retained in history, never painted offscreen or over controls.
+	const float Bottom=FMath::Min(In.ViewH-8,In.MinimapTop-MinimapFrame-MinimapGap);
+	auto Intersects=[](const FBox2D& A,const FBox2D& B) { return A.bIsValid && B.bIsValid && A.Min.X<B.Max.X+.01 && A.Max.X>B.Min.X-.01 && A.Min.Y<B.Max.Y+.01 && A.Max.Y>B.Min.Y-.01; };
+	TArray<FBox2D> Used=In.Avoid;
+	auto Clear=[&](const FBox2D& B)
+	{
+	 if (B.Min.X<8 || B.Min.Y<8 || B.Max.X>In.ViewW-8+.01 || B.Max.Y>Bottom+.01) return false;
+	 return !Used.ContainsByPredicate([&](const FBox2D& A) { return Intersects(B,A); });
+	};
+	float Total=0;
+	for (int32 I=0; I<Blocks.Num(); I++) Total+=(I?Gap:0)+Blocks[I].H;
+	float Y=Bottom-Total;
+	bool Original=true;
 	for (const FBlock& B : Blocks)
 	{
-		B.Paint(P, Right - B.W, Y);
-		Y += B.H + Gap;
+	 if (!Clear(FBox2D(FVector2D(Right-B.W,Y),FVector2D(Right,Y+B.H)))) { Original=false; break; }
+	 Y+=B.H+Gap;
 	}
+	if (Original)
+	{
+	 Y=Bottom-Total;
+	 for (const FBlock& B : Blocks) { B.Paint(P,Right-B.W,Y); Y+=B.H+Gap; }
+	}
+	else
+	{
+	 TArray<int32> Order;
+	 if (Blocks.Num()) Order.Add(Blocks.Num()-1); // history remains reachable even during a burst
+	 for (int32 I=0; I<Blocks.Num()-1; I++) Order.Add(I); // newest losses, then routine lines
+	 for (int32 I : Order)
+	 {
+	  const FBlock& B=Blocks[I];
+	  TArray<float> Xs={Right-B.W,8.f}, Ys={Bottom-B.H,8.f};
+	  for (const FBox2D& A : Used) if (A.bIsValid) { Xs.Add(A.Min.X-B.W-6); Xs.Add(A.Max.X+6); Ys.Add(A.Min.Y-B.H-6); Ys.Add(A.Max.Y+6); }
+	  bool Placed=false;
+	  for (float X : Xs)
+	  {
+	   for (float Top : Ys)
+	   {
+	    const FBox2D Box(FVector2D(X,Top),FVector2D(X+B.W,Top+B.H));
+	    if (!Clear(Box)) continue;
+	    B.Paint(P,X,Top); Used.Add(Box); Placed=true; break;
+	   }
+	   if (Placed) break;
+	  }
+	 }
+	}
+
+    for (FTCPaintItem& Item : P.Items) if (Item.Role==TEXT("alert:loss-shadow"))
+    {
+        const FVector2D End(FMath::Min(double(In.ViewW),Item.Pos.X+Item.Size.X),FMath::Min(double(In.ViewH),Item.Pos.Y+Item.Size.Y));
+        Item.Pos=FVector2D(FMath::Max(0.0,Item.Pos.X),FMath::Max(0.0,Item.Pos.Y)); Item.Size=End-Item.Pos;
+    }
 	return P;
 }
 

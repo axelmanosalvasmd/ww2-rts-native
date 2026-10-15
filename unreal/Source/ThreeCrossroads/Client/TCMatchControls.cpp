@@ -1,4 +1,5 @@
 #include "Client/TCMatchControls.h"
+#include "Client/TCKeys.h"
 #include "Client/TCLocale.h"
 #include "Net/TCConnection.h"
 #include "Dom/JsonObject.h"
@@ -141,6 +142,21 @@ bool LexFromString(ETCMatchControl& Out, const TCHAR* Text)
 }
 
 TFunction<bool(const FString&)> FTCMatchControls::Clipboard;
+
+FString FTCMatchControls::RestartRefusal(bool bRust, bool bPlaying, const FString& Cmd, const FString& Reason)
+{
+	// v0 uses scenario for several start failures and exposes no fault bit. Explain the terminal case without
+	// claiming that every refusal proves a fault, and without introducing a new wire reason or a recovery action.
+	return bRust && bPlaying && Cmd == TEXT("restart") && Reason == TEXT("scenario")
+		? FString(TEXT("The Rust host refused to restart this match. A match stopped by a server fault cannot restart.")) : FString();
+}
+
+TArray<TSharedPtr<FJsonValue>> FTCMatchControls::PingDiagnostics(const FTCPerfStats& S)
+{
+	auto Number = [](double N) -> TSharedPtr<FJsonValue> { if (FMath::IsFinite(N)) return MakeShared<FJsonValueNumber>(N); return MakeShared<FJsonValueNull>(); };
+	auto Optional = [&](const TOptional<double>& N) -> TSharedPtr<FJsonValue> { if (N.IsSet()) return Number(N.GetValue()); return MakeShared<FJsonValueNull>(); };
+	return { Number(S.Fps), Number(S.Worst), Number(S.Cpu), Number(S.Snaps), Number(S.Gap), Number(S.Kbs), Optional(S.Ping), Optional(S.Jitter), Optional(S.Loss), MakeShared<FJsonValueNull>(), Number(S.Units), Number(S.Fx) };
+}
 
 TSharedRef<FJsonObject> FTCMatchControls::Msg(const TCHAR* Type)
 {
@@ -797,6 +813,18 @@ FTCPaint FTCRoomBanners::Layout(const TArray<FTCRoomBanner>& Banners, float Top,
 #include "Framework/Application/SlateApplication.h"
 #include "Engine/GameViewportClient.h"
 #include "Engine/Console.h"
+#include "Widgets/SWindow.h"
+
+void ATCPlayerController::RestoreMatchView(const FTCMatchView& V, const FTCMatchState& S)
+{
+	if (!V.IsValid() || V.MatchId != S.MatchId) return;
+	FocusOn(FVector2D(V.X, V.Z)); ZoomTo(V.Dist);
+	Yaw = -90.f - FMath::RadiansToDegrees(V.Yaw);
+	if (V.bHasY) { TargetHeight = V.Y; bHeightKnown = true; }
+	Selected.Reset();
+	for (int32 Id : V.Selected) if (const FTCUnit* U = S.Units.Find(Id)) if (S.IsOwn(*U) && U->Hp > 0) Selected.Add(Id);
+	Groups.Restore(V.Groups, S);
+}
 
 // Round 16 (controls): the window's text input for the text fields. SDL's text input (dead keys, compose and the
 // keyboard layout already applied) reaches the game viewport as InputChar; while a field is active the character goes
@@ -914,6 +942,13 @@ void ATCGameMode::ControlsMessage(const FString& T, const FJsonObject& M)
 	}
 	else if (T == TEXT("start"))
 	{
+		const int32 NextMatch = M.GetIntegerField(TEXT("matchId"));
+		if (State.bHasMatch && State.MatchId == NextMatch) SaveMatchView();
+		Controls.bResumePending = Controls.ViewMemory.Read(Controls.ResumeView) && Controls.ResumeView.MatchId == NextMatch;
+		Controls.TerminalNotice.Reset();
+		const TSharedPtr<SWindow> Window = GEngine && GEngine->GameViewport ? GEngine->GameViewport->GetWindow() : nullptr;
+		if (Window && Controls.NormalWindowTitle.IsEmpty()) Controls.NormalWindowTitle = Window->GetTitle().ToString();
+		Controls.StartFlash.Start(Window && !Window->IsActive(), Controls.bResumePending, FPlatformTime::Seconds());
 		bool bSandbox = false;
 		M.TryGetBoolField(TEXT("sandbox"), bSandbox);
 		Controls.OnStart(bSandbox);
@@ -942,12 +977,34 @@ void ATCGameMode::ControlsMessage(const FString& T, const FJsonObject& M)
 	}
 	else if (T == TEXT("left"))
 	{
+		Controls.bViewSeatActive = false;
 		// client/main.js connection.on('left'): the overlay (the lobby) shows again with its line, the HUD hides
 		Controls.OnLeft();
 		State.ClearMatch();
 		ClearMatchPresentation();
 		UE_LOG(LogTC, Log, TEXT("lobby controls: left: %s"), *FTCMatchControls::LeftLine());
 	}
+	else if (T == TEXT("replaced")) Controls.bViewSeatActive = false;
+	else if (T == TEXT("deny"))
+	{
+		FString Cmd, Reason;
+		M.TryGetStringField(TEXT("cmd"), Cmd); M.TryGetStringField(TEXT("reason"), Reason);
+		Controls.TerminalNotice = FTCMatchControls::RestartRefusal(Connection && Connection->IsRustHost(), State.bHasMatch, Cmd, Reason);
+	}
+}
+
+void ATCGameMode::SaveMatchView()
+{
+	if (!State.bHasMatch || !Controls.bViewSeatActive || !State.SeatConfirmed() || Controls.bResumePending) return;
+	const ATCPlayerController* PC = Cast<ATCPlayerController>(GetWorld()->GetFirstPlayerController());
+	if (!PC) return;
+	FTCMatchView V;
+	V.MatchId = State.MatchId; V.X = PC->ViewFocus().X; V.Z = PC->ViewFocus().Y;
+	V.Yaw = FMath::DegreesToRadians(-90.0 - PC->ViewYaw()); V.Dist = PC->ViewDistance();
+	V.Selected = PC->Selected.Array();
+	for (int32 N = 1; N <= 9; N++) V.Groups.Add(N, PC->Groups.Members(N));
+	Controls.ViewMemory.Write(V);
+	Controls.LastViewWrite = FPlatformTime::Seconds();
 }
 
 void ATCGameMode::ControlsOpened()
@@ -1094,6 +1151,31 @@ bool ATCGameMode::ControlsEnter(const FTCRoomEntry& E, bool bKeepSeat)
 void ATCGameMode::ControlsFrame()
 {
 	const double Now = FPlatformTime::Seconds();
+	Options.TickPreview(ServerUrl, Now);
+	if (Controls.bResumePending && State.Snapshots > 0 && State.SeatConfirmed())
+	{
+		if (ATCPlayerController* PC = Cast<ATCPlayerController>(GetWorld()->GetFirstPlayerController()))
+		{
+			PC->RestoreMatchView(Controls.ResumeView, State);
+			Controls.bResumePending = false;
+			UE_LOG(LogTC, Log, TEXT("match view: restored match %d, %d selected, %d groups after recipient snapshot %d"), State.MatchId, PC->Selected.Num(), Controls.ResumeView.Groups.Num(), State.Tick);
+		}
+	}
+	if (Now - Controls.LastViewWrite >= 1.0) SaveMatchView();
+	if (const TSharedPtr<SWindow> Window = GEngine && GEngine->GameViewport ? GEngine->GameViewport->GetWindow() : nullptr)
+	{
+		const bool bWasFlashing = Controls.StartFlash.bActive;
+		const bool bShowStarted = Controls.StartFlash.Frame(Window->IsActive(), Now);
+		if (bWasFlashing)
+		{
+			const FString Title = bShowStarted ? TC_T(TEXT("Match started")) : Controls.NormalWindowTitle;
+			if (Title != Window->GetTitle().ToString())
+			{
+				Window->SetTitle(FText::FromString(Title));
+				if (FParse::Param(FCommandLine::Get(), TEXT("TCSessionLog"))) UE_LOG(LogTC, Log, TEXT("session: window title '%s', active %d"), *Window->GetTitle().ToString(), Window->IsActive());
+			}
+		}
+	}
 	if (bRoomBrowserOpen)
 	{
 		const int32 AnswersBefore = Rooms.Answers();
@@ -1330,7 +1412,33 @@ void ATCGameMode::ControlsFrame()
 			}
 			else if (St.Action == TEXT("drop") && Connection) { Connection->SimulateDrop(); Did = TEXT("socket dropped"); }
 			else if (St.Action == TEXT("stop") && Connection) { Connection->Stop(); Did = TEXT("connection stopped (this client goes offline)"); }
-			else if (St.Action == TEXT("quit")) { FPlatformMisc::RequestExit(false, TEXT("TCControlsCheck")); Did = TEXT("quit"); }
+			else if (St.Action == TEXT("coverat") && PC)
+			{
+				FString X, Z;
+				if (St.Arg.Split(TEXT(","), &X, &Z))
+				{
+					const FVector2D At(FCString::Atod(*X), FCString::Atod(*Z));
+					PC->PinPointerGround(At); PC->FocusOn(At);
+					Did = FString::Printf(TEXT("cover pointer pinned at %.2f,%.2f"), At.X, At.Y);
+				}
+			}
+			else if (St.Action == TEXT("moveat") && PC)
+			{
+				// Native order entry for a nullrhi verification client, whose viewport cannot project a world click.
+				FString X, Z;
+				if (St.Arg.Split(TEXT(","), &X, &Z))
+				{
+					const FVector2D At(FCString::Atod(*X), FCString::Atod(*Z));
+					Did = FString::Printf(TEXT("native move at %.2f,%.2f: %d selected unit(s) ordered"), At.X, At.Y, PC->IssueMoveAt(At));
+				}
+			}
+			else if (St.Action == TEXT("view") && PC)
+			{
+				FString Groups;
+				for (int32 N = 1; N <= 9; N++) if (PC->Groups.Members(N).Num()) Groups += FString::Printf(TEXT(" %d:%s"), N, *FString::JoinBy(PC->Groups.Members(N), TEXT(","), [](int32 Id) { return FString::FromInt(Id); }));
+				Did = FString::Printf(TEXT("view x=%.3f z=%.3f yaw=%.3f dist=%.3f selected=%s groups=%s"), PC->ViewFocus().X, PC->ViewFocus().Y, PC->ViewYaw(), PC->ViewDistance(), *FString::JoinBy(PC->Selected, TEXT(","), [](int32 Id) { return FString::FromInt(Id); }), *Groups);
+			}
+			else if (St.Action == TEXT("quit")) { SaveMatchView(); FPlatformMisc::RequestExit(false, TEXT("TCControlsCheck")); Did = TEXT("quit"); }
 			else Did = TEXT("log");
 			TArray<FString> Menu;
 			for (const FTCControlButton& B : Controls.MenuButtons(Now)) if (B.bShown) Menu.Add(B.Label);
@@ -1353,6 +1461,16 @@ bool ATCGameMode::RunControl(const FTCUiCommand& Command, bool bBack)
 {
 	const double Now = FPlatformTime::Seconds();
 	const FString& Key = Command.Unit;
+	if (Key == TEXT("UseSeatHere"))
+	{
+		if (Connection && Connection->Notice().bReplaced)
+		{
+			Controls.bViewSeatActive = true;
+			Connection->Start();
+			UE_LOG(LogTC, Log, TEXT("session: Use it here, reconnecting the same seat"));
+		}
+		return true;
+	}
 	ETCTextField Typed = ETCTextField::None;
 	// a click elsewhere ends the typing first (the input's change event)
 	if (Form.Active != ETCTextField::None && !(TCCtlGlue::FieldFromKey(Key, Typed) && Typed == Form.Active))
@@ -1632,9 +1750,11 @@ void ATCHUD::DrawRoomBanners(UFont* Font)
 	ATCGameMode* M = GetWorld()->GetAuthGameMode<ATCGameMode>();
 	if (!M || !Canvas || !Font) return;
 	TArray<FTCRoomBanner> Banners;
-	bool bFull = false;
-	const int32 Left = M->ConnectionRetryLeft(&bFull);
-	if (Left > 0) Banners.Add(FTCRoomBanner{ FTCHudFit::ConnectionBannerText(bFull, Left), true });
+	const FTCConnectionNotice Notice = M->ConnectionNotice();
+	const FString ConnectionText = Notice.Text(FPlatformTime::Seconds());
+	if (!ConnectionText.IsEmpty()) Banners.Add(FTCRoomBanner{ ConnectionText, true });
+	if (!Notice.RoomLine().IsEmpty()) Banners.Add(FTCRoomBanner{ Notice.RoomLine(), true });
+	if (!M->Controls.TerminalNotice.IsEmpty()) Banners.Add(FTCRoomBanner{ M->Controls.TerminalNotice, true });
 	if (M->State.bPaused && !M->State.PauseText.IsEmpty()) Banners.Add(FTCRoomBanner{ M->State.PauseText, false });
 	if (!Banners.Num()) return;
 	// #top holds the strip and its centred lines. EndUi has reset UiNow, so use the saved physical bottom.
@@ -1642,6 +1762,13 @@ void ATCHUD::DrawRoomBanners(UFont* Font)
 	const float Top = bHud ? FMath::CeilToFloat(TopStackBottomPx + 8.f) : 16.f;
 	const FTCPaint P = FTCRoomBanners::Layout(Banners, Top, Canvas->ClipX, FTCPaint::CanvasMeasure(Font));
 	P.Draw(Canvas, Font);
+	if (Notice.bReplaced)
+	{
+		float Bottom = Top;
+		for (const FTCPaintItem& I : P.Items) Bottom = FMath::Max(Bottom, float(I.Pos.Y + I.Size.Y));
+		const FString Label = TEXT("Use it here"); float W = 0, H = 0; LabelSize(Label, W, H, Font, 1.f);
+		Button(Font, (Canvas->ClipX - W - 12.f) / 2.f, Bottom + 6.f, Label, ATCHUD::ControlCommand(TEXT("UseSeatHere"), -1), true, TCCtlGlue::ButtonFill);
+	}
 }
 #endif
 #endif // TC_HAS_LOBBY_GLUE

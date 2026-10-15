@@ -29,6 +29,20 @@ enum class ETCHostKind : uint8
 };
 const TCHAR* LexToString(ETCHostKind Kind);
 
+// connection.js and main.js presentation state, independent of a socket and a wall clock.
+// A retry banner survives the next connection attempt until the first valid server message.
+struct FTCConnectionNotice
+{
+	bool bReplaced = false, bLeft = false, bFull = false, bRetry = false;
+	double Until = 0;
+	FString FullReason;
+	void Retry(double Now, double Seconds, bool bRoomFull) { Until = Now + Seconds; bRetry = true; bFull = bRoomFull; }
+	void Receive(const FJsonObject& Message);
+	int32 Left(double Now) const { return bRetry ? FMath::Max(1, (int32)FMath::CeilToDouble(Until - Now)) : -1; }
+	FString Text(double Now) const;
+	FString RoomLine() const;
+};
+
 class FTCConnection : public TSharedFromThis<FTCConnection>
 {
 public:
@@ -80,15 +94,15 @@ public:
 	void SimulateDrop();
 
 	FString Status() const { return StatusText; }
+	const FTCConnectionNotice& Notice() const { return Banner; }
 	// Round 17 (hudui): connection.js's 'retry' event for main.js's #connectionBanner: the whole seconds left of the
 	// wait before the next try (at least 1, as the countdown shows until it opens), and whether it waits for a full room
 	// ('full': "Trying this room again in {n} s") or after a loss ("Connection lost. Retrying in {n} s"); -1 when no
 	// wait is running (connected, stopped, or a try is under way)
 	int32 RetryLeft(double Now, bool* bOutFull = nullptr) const
 	{
-		if (!bRunning || RetryAt < 0.0) return -1;
-		if (bOutFull) *bOutFull = bWaitingForRoom;
-		return FMath::Max(1, (int32)FMath::CeilToDouble(RetryAt - Now));
+		if (bOutFull) *bOutFull = Banner.bFull;
+		return Banner.Left(Now);
 	}
 	int32 Opens() const { return OpenCount; }
 	// Round 18 (rusthost): which server the last lobby came from, the proto it carried (-1 when it carried none, or a
@@ -129,4 +143,5 @@ private:
 	ETCHostKind Host = ETCHostKind::Unknown;
 	int32 HostProtoValue = -1;
 	FString HostRulesValue;
+	FTCConnectionNotice Banner;
 };

@@ -51,12 +51,14 @@ namespace FTCHudFit
 		FString Label, Icon, Key, Value, Hover;
 		FTCUiCommand Command;
 		bool bEnabled = true, bOn = false;
+		bool bSubmenu = false;
 	};
 	struct FSelection
 	{
 		FString Type, Name;
 		int32 Count = 1, Hp = 0, MaxHp = 0;
 		TArray<FString> Tags;
+		FString Hover;
 	};
 	struct FIcon { FString Key; FBox2D Box; FLinearColor Colour; };
 	struct FHit { FBox2D Box; FControl Control; };
@@ -67,15 +69,19 @@ namespace FTCHudFit
 		TArray<FIcon> Icons;
 		TArray<FHit> Hits;
 		TArray<FTextFit> TextBounds;
+		int32 SelectionMax = 0;
+		FBox2D SelectionList = FBox2D(ForceInit);
 		FBox2D Selection = FBox2D(ForceInit), Orders = FBox2D(ForceInit), Recruit = FBox2D(ForceInit), Economy = FBox2D(ForceInit);
 	};
 	THREECROSSROADS_API FBottomLayout LeftPanel(float ViewH, const FString& Title, const TArray<FSelection>& Selection,
-		const TArray<FString>& Details, const TArray<FControl>& Orders, const TArray<FControl>& Menu, const FTCMeasure& Measure, float Scale = 1.f);
+		const TArray<FString>& Details, const TArray<FControl>& Orders, const TArray<FControl>& Menu, const FTCMeasure& Measure, float Scale = 1.f,
+		int32 Idle = 0, int32 Destination = 1, bool bTransfer = false, bool bDropdown = false, int32 SelectionFirst = 0, float TopLimit = 80.f);
 	THREECROSSROADS_API FBottomLayout RecruitPanel(float ViewW, float ViewH, float Right, const TArray<FString>& Headings,
 		const TArray<FControl>& Tabs, const TArray<TArray<FControl>>& Lists, const TArray<FControl>& Above, const FTCMeasure& Measure, float Scale = 1.f,
 		const TArray<FString>& Logistics = {}, int32 TotalCards = 0);
 	THREECROSSROADS_API FBottomLayout EconomyPanel(float ViewW, const FString& Money, const FString& Income, const FString& Population,
-		const TArray<FControl>& Support, const FTCMeasure& Measure, float Scale = 1.f);
+		const TArray<FControl>& Support, const FTCMeasure& Measure, float Scale = 1.f, const TArray<FControl>& Resources = {}, const TArray<FControl>& Air = {});
+	THREECROSSROADS_API FBottomLayout Tooltip(const FString& Shown, const FBox2D& Anchor, FVector2D View, const FTCMeasure& Measure);
 	THREECROSSROADS_API FBottomLayout Toolbar(float MaxW, const TArray<FControl>& Controls, const FTCMeasure& Measure, float Scale = 1.f);
 	THREECROSSROADS_API FBottomLayout SandboxToolbar(FVector2D View, float CornerRight, float ScoreLeft,
 		const TArray<FControl>& Controls, const TArray<FBox2D>& Avoid, const FTCMeasure& Measure, float Scale = 1.f);
@@ -115,6 +121,12 @@ class THREECROSSROADS_API ATCHUD : public AHUD
 public:
 	virtual void DrawHUD() override;
 	virtual void EndPlay(const EEndPlayReason::Type Reason) override;
+	// Controller integration is a small lead patch. These local UI commands never cross the wire.
+	bool RunPanelCommand(const FTCUiCommand& Command, bool bShift, bool bCtrl = false);
+	bool RecruitKey(const FString& Code, bool bShift, bool bCtrl, bool bAlt);
+	bool ScrollSelection(FVector2D Pixel, int32 Notch);
+	bool Recruiting() const { return bRecruitLetters; }
+	void StopRecruiting() { bRecruitLetters=false; }
 	// Round 16 (controls): client/index.html #roomBanners (the pause banner) under the score strip, in screen pixels
 	// (Client/TCMatchControls.cpp, FTCRoomBanners)
 #define TC_HAS_ROOM_BANNERS 1
@@ -225,6 +237,13 @@ private:
 	bool bSettingsInMenu = false;
 	void DrawRecruitPanel(UFont* Font, float Left, float Bottom);
 	void DrawBottomLayout(const FTCHudFit::FBottomLayout& Layout, UFont* Font);
+	void DrawHudIcon(const FString& Key, const FBox2D& Box, FLinearColor Colour);
+	FString PendingTooltip;
+	FBox2D TooltipAnchor = FBox2D(ForceInit);
+	FBox2D SelectionScrollBox = FBox2D(ForceInit), CornerBox = FBox2D(ForceInit);
+	int32 SelectionFirst = 0, SelectionMax = 0;
+	int32 GroupDestination = 1;
+	bool bGroupDropdown = false, bRecruitLetters = false;
 	// A line over the ground through metre points (each leg split every 2 m so it follows the relief), Lift metres up.
 	void GroundLine(const ATCTerrain& T, const TArray<FVector2D>& Points, bool bClosed, const FLinearColor& Colour, float Thickness, float Lift = 0.3f);
 	void GroundRing(const ATCTerrain& T, FVector2D At, float Radius, const FLinearColor& Colour, float Thickness);

@@ -446,6 +446,8 @@ private:
 // canvas from the game mode's terrain and the canvas's scene view.
 namespace TCMarkersHud
 {
+	void SetHudExclusion(const FBox2D& Bounds);
+	FVector2D ClearHud(FVector2D Origin, FVector2D Size, const FBox2D& Bounds);
 	// Canvas->Project, the terrain's height (0 without terrain), the scene view's camera.
 	FTCMarkerPainter Painter(UCanvas* Canvas, const ATCGameMode& M);
 	// The weapon range and minimum range of a type (pinned shared/sim.js UNITS, TCMarkers.Ranges.inl); false when
@@ -462,6 +464,7 @@ namespace TCMarkersHud
 	int32 DrawRangeRings(FTCMarkerPainter& P, const ATCGameMode& M, const TSet<int32>& Selected);
 	// markers.js capturePoint's rings for an authored point (the HUD keeps its flag and tags).
 	void DrawCapturePoint(FTCMarkerPainter& P, const FTCCapturePoint& Point, const FTCPointRingFrame& Frame);
+	void DrawCaptureLabels(FTCMarkerPainter& P, const FTCCapturePoint& Point, const ATCGameMode& M, UFont* Font);
 	// world-regions.js for every known World region within three viewports: the border (1 px lines at 0.55), the
 	// capture point (rings, wash, arc, contested ring), its flag cloth and its two tags (the text, the name above).
 	void DrawWorldRegions(FTCMarkerPainter& P, ATCGameMode& M, UFont* Font);

@@ -278,6 +278,8 @@ bool ATCGameMode::Connect(FTCConnection::FSettings Settings, const FTCTokenReque
 
 	// Until a lobby says otherwise, -TCSpectate means watching: the start a spectator gets names seat 0.
 	State.bSpectator = Settings.bSpectate;
+	Controls.ViewMemory.Open(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("TCMatchViews")), Settings.Url, Settings.Room, Settings.Token);
+	Controls.bViewSeatActive = true;
 	Connection = MakeShared<FTCConnection>(Settings);
 	Settings.Token.Reset();
 	Connection->OnOpened = [this](int32)
@@ -300,6 +302,7 @@ bool ATCGameMode::Connect(FTCConnection::FSettings Settings, const FTCTokenReque
 
 void ATCGameMode::EndPlay(const EEndPlayReason::Type Reason)
 {
+	SaveMatchView();
 	if (Connection) { Connection->OnMessage = nullptr; Connection->OnOpened = nullptr; Connection->OnText = nullptr; Connection->Stop(); Connection.Reset(); }
 	RustShadow.End();
 	TokenStore.Reset(); // releases the token file's lock
@@ -606,7 +609,7 @@ void ATCGameMode::OnMessage(const FJsonObject& M, int32 Bytes)
 	{
 		State.ApplyDeny(M);
 		Persistence.ApplyDeny(M, FPlatformTime::Seconds());
-		UE_LOG(LogTC, Warning, TEXT("server refused %s (shown as: %s)"), *State.LastDeny, *TCOrders::DenySentence(State.DenyReason, State.DenyCmd));
+		UE_LOG(LogTC, Warning, TEXT("server refused %s (shown as: %s)"), *State.LastDeny, *(Controls.TerminalNotice.IsEmpty() ? TCOrders::DenySentence(State.DenyReason, State.DenyCmd) : Controls.TerminalNotice));
 		// client/main.js: connection.on('deny', m => feedback.show(denySentence(...))): the error blip with the sentence
 		if (ATCPlayerController* DPC = Cast<ATCPlayerController>(GetWorld()->GetFirstPlayerController())) DPC->Feedback(TEXT("error"));
 	}
@@ -880,6 +883,7 @@ void ATCGameMode::Tick(float DeltaSeconds)
 			TSharedRef<FJsonObject> Ping = MakeShared<FJsonObject>();
 			Ping->SetStringField(TEXT("t"), TEXT("ping"));
 			Ping->SetNumberField(TEXT("c"), Now * 1000.0);
+			Ping->SetArrayField(TEXT("d"), FTCMatchControls::PingDiagnostics(Perf.Stats()));
 			if (Rtt >= 0) Ping->SetNumberField(TEXT("rtt"), Rtt);
 			if (SendCommand(Ping)) Perf.Pinged(Now * 1000.0); // main.js: if (sendCmd(...)) perf.pinged(c)
 		}
@@ -1154,7 +1158,7 @@ void ATCGameMode::RunSlice3Switches(double Now)
 		const FString& T = RecruitTypes[RecruitIndex - 1];
 		UE_LOG(LogTC, Log, TEXT("recruit +%.1fs: %s: tick %d, MP %.0f (was %.0f), own %d (was %d), denies %d (was %d)%s"), ReportAt[RecruitReports], *T, State.Tick, Recruit.Mp(), RecruitMpBefore,
 			OwnCount(T), RecruitCountBefore, State.Denies, RecruitDeniesBefore,
-			State.Denies > RecruitDeniesBefore ? *FString::Printf(TEXT(", last refusal %s/%s shown as '%s'"), *State.DenyCmd, *State.DenyReason, *TCOrders::DenySentence(State.DenyReason, State.DenyCmd)) : TEXT(""));
+			State.Denies > RecruitDeniesBefore ? *FString::Printf(TEXT(", last refusal %s/%s shown as '%s'"), *State.DenyCmd, *State.DenyReason, *(Controls.TerminalNotice.IsEmpty() ? TCOrders::DenySentence(State.DenyReason, State.DenyCmd) : Controls.TerminalNotice)) : TEXT(""));
 		RecruitReports++;
 	}
 
@@ -1203,7 +1207,7 @@ void ATCGameMode::RunSlice3Switches(double Now)
 	if (ProbeBuyAt >= 0 && Now - ProbeBuyAt >= 2.0)
 	{
 		ProbeBuyAt = -1;
-		UE_LOG(LogTC, Log, TEXT("buy probe +2s: denies %d (was %d), last refusal cmd '%s' reason '%s', shown as '%s'"), State.Denies, ProbeBuyDenies, *State.DenyCmd, *State.DenyReason, *TCOrders::DenySentence(State.DenyReason, State.DenyCmd));
+		UE_LOG(LogTC, Log, TEXT("buy probe +2s: denies %d (was %d), last refusal cmd '%s' reason '%s', shown as '%s'"), State.Denies, ProbeBuyDenies, *State.DenyCmd, *State.DenyReason, *(Controls.TerminalNotice.IsEmpty() ? TCOrders::DenySentence(State.DenyReason, State.DenyCmd) : Controls.TerminalNotice));
 	}
 
 	// -TCGroupCheck and -TCMinimapCheck: timed scripts, one step a frame and never two in consecutive frames, so a
@@ -1491,7 +1495,7 @@ void ATCGameMode::RunSlice4Switches(double Now)
 		UE_LOG(LogTC, Log, TEXT("build +%.0fs: tick %d, own %s %d (was %d), MP %.0f (was %.0f), denies %d (was %d)%s%s"), BuildReportAt[BuildReports], State.Tick, *BuildCheckKind, OwnOfTypes({ BuildCheckKind }).Num(), BuildCountBefore,
 			Recruit.Mp(), BuildMpBefore, State.Denies, BuildDeniesBefore,
 			Site ? *FString::Printf(TEXT(", nearest site unit %d at (%.1f, %.1f), %.1f m from the click, built %.2f, hp %d"), Site->Id, Site->X, Site->Z, FVector2D::Distance(FVector2D(Site->X, Site->Z), BuildAt), Site->Built, Site->Hp) : TEXT(", no site held"),
-			State.Denies > BuildDeniesBefore ? *FString::Printf(TEXT(", last refusal %s/%s shown as '%s'"), *State.DenyCmd, *State.DenyReason, *TCOrders::DenySentence(State.DenyReason, State.DenyCmd)) : TEXT(""));
+			State.Denies > BuildDeniesBefore ? *FString::Printf(TEXT(", last refusal %s/%s shown as '%s'"), *State.DenyCmd, *State.DenyReason, *(Controls.TerminalNotice.IsEmpty() ? TCOrders::DenySentence(State.DenyReason, State.DenyCmd) : Controls.TerminalNotice)) : TEXT(""));
 		BuildReports++;
 	}
 	// -TCBuildProbe: a build where this side has never seen, past the client's check
@@ -1573,7 +1577,7 @@ void ATCGameMode::RunSlice4Switches(double Now)
 			const int32 Hq = PC->Selected.Num() ? *PC->Selected.CreateConstIterator() : 0;
 			const FTCProductionQueue* Q = Hq ? Recruit.QueueOf(Hq) : nullptr;
 			UE_LOG(LogTC, Log, TEXT("army check: HQ rally held %s; R with only the HQ: %s; denies %d, last refusal %s/%s shown as '%s'"), Q && Q->Rally.X >= 0 ? *FString::Printf(TEXT("(%.1f, %.1f)"), Q->Rally.X, Q->Rally.Y) : TEXT("none"),
-				*Note(), State.Denies, *State.DenyCmd, *State.DenyReason, *TCOrders::DenySentence(State.DenyReason, State.DenyCmd));
+				*Note(), State.Denies, *State.DenyCmd, *State.DenyReason, *(Controls.TerminalNotice.IsEmpty() ? TCOrders::DenySentence(State.DenyReason, State.DenyCmd) : Controls.TerminalNotice));
 			PC->SelectOwn(Army);
 		} });
 		Chord(T0 + 13.2, EKeys::R, false, TEXT("retreat the army"));
@@ -1647,7 +1651,7 @@ void ATCGameMode::RunSlice4Switches(double Now)
 		} });
 		Script.Add({ T0 + 11.0, TEXT("supply check: report the refusal, Truck select on, drag over the whole view"), [this, PC, Note]()
 		{
-			UE_LOG(LogTC, Log, TEXT("supply probe +2s: denies %d, last refusal %s/%s shown as '%s'"), State.Denies, *State.DenyCmd, *State.DenyReason, *TCOrders::DenySentence(State.DenyReason, State.DenyCmd));
+			UE_LOG(LogTC, Log, TEXT("supply probe +2s: denies %d, last refusal %s/%s shown as '%s'"), State.Denies, *State.DenyCmd, *State.DenyReason, *(Controls.TerminalNotice.IsEmpty() ? TCOrders::DenySentence(State.DenyReason, State.DenyCmd) : Controls.TerminalNotice));
 			PC->PressCommand(FTCUiCommand(ETCUiAction::TruckSelect));
 			int32 VX = 0, VY = 0;
 			PC->GetViewportSize(VX, VY);

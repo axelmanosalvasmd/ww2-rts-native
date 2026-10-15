@@ -557,6 +557,7 @@ void ATCPlayerController::UpdateCamera(float Dt, bool bFocused)
 
 	// the wheel over the view (the HUD's panels keep their own wheel; a notch that ended the intro is dropped)
 	const int32 Notch = (WasInputKeyJustPressed(EKeys::MouseScrollDown) ? 1 : 0) - (WasInputKeyJustPressed(EKeys::MouseScrollUp) ? 1 : 0);
+	if (Notch && bHasCursor && !bIntroDropWheel && !ModalSheetOpen()) if (ATCHUD* H=Cast<ATCHUD>(GetHUD())) H->ScrollSelection(Mouse,Notch);
 	if (Notch && M->StatsSheet.IsOpen() && !bControlsSheetOpen) M->StatsSheet.Scroll(Notch * 48.f); // round 16: the stats sheet scrolls
 	if (Notch && !bIntroDropWheel && !ModalSheetOpen() && (!bHasCursor || bOverView)) WheelZoom(Notch, bOverView, Mouse, VX, VY);
 
@@ -824,6 +825,7 @@ void ATCPlayerController::UpdatePointer(bool bFocused)
 	const bool bLeftPress = WasInputKeyJustPressed(EKeys::LeftMouseButton) && bInside && !bDragging;
 	// client/camera.js introPress: a right press that ended the intro is dropped (its order was aimed at the glide)
 	const bool bRightPress = WasInputKeyJustPressed(EKeys::RightMouseButton) && bInside && !bIntroDropRight;
+	if (bRightPress) if (ATCHUD* H=Cast<ATCHUD>(GetHUD())) H->StopRecruiting();
 	// round 16: the stats sheet is modal (showModal): a press reaches its controls or, outside it, closes it
 	if (M && M->StatsSheet.IsOpen() && !bControlsSheetOpen)
 	{
@@ -1150,6 +1152,7 @@ bool ATCPlayerController::KeyChord(const FKey& Key, bool bShift, bool bCtrl, boo
 	}
 	// client/keys.js match over keyContexts: targeting outranks a building's card letters, which outrank the base
 	// table; a letter with no card under it keeps its usual meaning, camera keys included (hud.hasCard)
+	if (ATCHUD* H=Cast<ATCHUD>(GetHUD()); H && H->RecruitKey(Code,bShift,bCtrl,bAlt)) return true;
 	const TArray<FTCUiCommand> Cards = LetteredCards();
 	TArray<ETCKeyContext> Contexts = KeyContexts(Cards.Num() > 0);
 	const FTCKeyBinding* B = TCKeys::Match(Code, bShift, bCtrl, bAlt, Contexts);
@@ -2491,6 +2494,7 @@ bool ATCPlayerController::RunCommand(const FTCUiCommand& Command, bool bShift)
 		UE_LOG(LogTC, Log, TEXT("Controls sheet %s"), bControlsSheetOpen ? TEXT("open (F1 or Esc closes it)") : TEXT("closed"));
 		return true;
 	case ETCUiAction::MatchControl:
+		if (ATCHUD* H=Cast<ATCHUD>(GetHUD()); H && H->RunPanelCommand(Command,bShift,IsInputKeyDown(EKeys::LeftControl)||IsInputKeyDown(EKeys::RightControl))) return true;
 		return M->RunControl(Command, Command.Job < 0); // round 15 (Client/TCMatchControls.cpp)
 	case ETCUiAction::Tutorial:
 		// client/public-lobby.js tutorial button: a new private room whose hello carries { tutorial: true }

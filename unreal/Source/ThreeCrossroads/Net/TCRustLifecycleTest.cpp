@@ -1,6 +1,11 @@
 // R1: an offline commander remains human while the host waits for the same seat to reconnect.
 #include "Client/TCMatchControls.h"
 #include "Client/TCLobbySettings.h"
+#include "Net/TCConnection.h"
+#include "Client/TCPersistence.h"
+#include "Client/TCKeys.h"
+#include "Misc/Paths.h"
+#include "HAL/FileManager.h"
 #if WITH_DEV_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
 #include "Dom/JsonObject.h"
@@ -48,6 +53,85 @@ bool FTCRustLifecycleOfflineCommanderTest::RunTest(const FString&)
 		TestEqual(TEXT("reference seat"), Sent.Message->GetIntegerField(TEXT("slot")), 1);
 	}
 	TestEqual(TEXT("reference send guard unchanged"), Settings.RustCommandRefusal(*Command), FString());
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCRustTerminalNoticeTest, "ThreeCrossroads.Net.RustLifecycle.TerminalNotice", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+bool FTCRustTerminalNoticeTest::RunTest(const FString&)
+{
+	const FString Notice = FTCMatchControls::RestartRefusal(true, true, TEXT("restart"), TEXT("scenario"));
+	TestTrue(TEXT("in-play restart refusal explains terminal fault restriction"), Notice.Contains(TEXT("server fault")) && Notice.Contains(TEXT("cannot restart")));
+	TestTrue(TEXT("reference keeps its sentence"), FTCMatchControls::RestartRefusal(false, true, TEXT("restart"), TEXT("scenario")).IsEmpty());
+	TestTrue(TEXT("initial start keeps its sentence"), FTCMatchControls::RestartRefusal(true, false, TEXT("start"), TEXT("scenario")).IsEmpty());
+	TestTrue(TEXT("other reasons untouched"), FTCMatchControls::RestartRefusal(true, true, TEXT("restart"), TEXT("blocked")).IsEmpty());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCSessionNoticeTest, "ThreeCrossroads.Session.ConnectionNotice", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+bool FTCSessionNoticeTest::RunTest(const FString&)
+{
+	FTCConnectionNotice N; N.Retry(100, 4, false);
+	TestEqual(TEXT("retry countdown"), N.Left(101.1), 3);
+	TestEqual(TEXT("new socket attempt retains banner"), N.Text(104), FString(TEXT("Connection lost. Retrying in 1 s")));
+	FJsonObject M; M.SetStringField(TEXT("t"), TEXT("lobby")); N.Receive(M);
+	TestTrue(TEXT("first server message hides it"), N.Text(104).IsEmpty());
+	M.SetStringField(TEXT("t"), TEXT("full")); M.SetStringField(TEXT("reason"), TEXT("started")); N.Receive(M); N.Retry(110, 10, true);
+	TestEqual(TEXT("full ten-second wait"), N.Text(110), FString(TEXT("Trying this room again in 10 s")));
+	TestEqual(TEXT("full started reason"), N.RoomLine(), FString(TEXT("A match is running in this room. You will join when it ends.")));
+	M.SetStringField(TEXT("t"), TEXT("replaced")); N.Receive(M);
+	TestTrue(TEXT("replaced offers reclaim without automatic retry"), N.bReplaced && N.Left(111) < 0 && N.Text(111) == TEXT("Open in another tab"));
+	N = FTCConnectionNotice(); TestFalse(TEXT("Use it here resets notice"), N.bReplaced);
+	M.SetStringField(TEXT("t"), TEXT("left")); N.Receive(M);
+	TestTrue(TEXT("left explains AI takeover"), N.bLeft && N.Left(112) < 0 && N.Text(112).Contains(TEXT("an AI took over")));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCSessionPingTest, "ThreeCrossroads.Session.PingDiagnostics", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+bool FTCSessionPingTest::RunTest(const FString&)
+{
+	FTCPerf P; P.Pinged(100); P.Pinged(2000);
+	FJsonObject Pong; Pong.SetNumberField(TEXT("c"), 2000); Pong.SetArrayField(TEXT("srv"), { MakeShared<FJsonValueNumber>(2.5), MakeShared<FJsonValueNumber>(2) });
+	P.Pong(Pong, 2040); P.Frame(100, 100, 0, 0, 0, 8, 3, 0); P.Frame(3201, 3201, 0, 0, 0, 8, 3, 0);
+	const auto D = FTCMatchControls::PingDiagnostics(P.Stats());
+	TestEqual(TEXT("twelve diagnostics in reference order"), D.Num(), 12);
+	TestEqual(TEXT("ping RTT"), D[6]->AsNumber(), 40.0);
+	TestEqual(TEXT("one stalled and one answered ping, 50 percent loss"), D[8]->AsNumber(), 50.0);
+	TestTrue(TEXT("JS heap unavailable natively"), D[9]->IsNull());
+	TestEqual(TEXT("server p95 read"), P.Stats().SrvTick.Get(0), 2.5);
+	TestEqual(TEXT("entities"), D[10]->AsNumber(), 8.0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCSessionFlashTest, "ThreeCrossroads.Session.MatchStarted", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+bool FTCSessionFlashTest::RunTest(const FString&)
+{
+	FTCMatchStartFlash F; F.Start(true, false, 10);
+	TestTrue(TEXT("inactive new match flashes"), F.Frame(false, 10));
+	TestFalse(TEXT("normal title after a second"), F.Frame(false, 11));
+	TestTrue(TEXT("match title after two seconds"), F.Frame(false, 12));
+	TestFalse(TEXT("focus stops flash"), F.Frame(true, 12));
+	TestFalse(TEXT("stays stopped"), F.Frame(false, 14));
+	F.Start(true, true, 20); TestFalse(TEXT("resume never flashes"), F.Frame(false, 20));
+	F.Start(false, false, 30); TestFalse(TEXT("visible match never flashes"), F.Frame(false, 30));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCSessionViewTest, "ThreeCrossroads.Session.ViewMemory", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+bool FTCSessionViewTest::RunTest(const FString&)
+{
+	FTCMatchView V; V.MatchId = 7; V.X = 12; V.Z = 34; V.Yaw = 0.2; V.Dist = 70; V.Selected = { 4, 5 }; V.Groups.Add(3, { 5, 4 });
+	const FString Dir = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Automation/SessionViewMemory"));
+	FTCMatchViewMemory First; First.Open(Dir, TEXT("ws://localhost:123/ws"), TEXT("room1"), TEXT("fixture-seat"));
+	TestTrue(TEXT("saved"), First.Write(V));
+	FTCMatchViewMemory AfterRestart; AfterRestart.Open(Dir, TEXT("ws://localhost:123/ws"), TEXT("room1"), TEXT("fixture-seat"));
+	FTCMatchView R;
+	TestTrue(TEXT("fresh store reads persisted view"), AfterRestart.Read(R));
+	TestTrue(TEXT("camera, selection and group order survive"), R.MatchId == 7 && R.X == 12 && R.Yaw == 0.2 && R.Selected == V.Selected && R.Groups.FindRef(3) == V.Groups.FindRef(3));
+	FTCMatchViewMemory Other; Other.Open(Dir, TEXT("ws://localhost:123/ws"), TEXT("room1"), TEXT("another-seat"));
+	TestFalse(TEXT("different token cannot restore"), Other.Read(R));
+	auto O = V.Json(); O->GetObjectField(TEXT("camera"))->SetNumberField(TEXT("x"), NAN);
+	TestFalse(TEXT("corrupt camera ignored"), FTCMatchView::Parse(*O, R));
+	AfterRestart.Clear(); TestFalse(TEXT("clear persists"), First.Read(R));
+	IFileManager::Get().DeleteDirectory(*Dir);
 	return true;
 }
 #endif

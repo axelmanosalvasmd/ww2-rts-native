@@ -19,6 +19,7 @@ public:
 	void Triangle(const FVector& A, const FVector& B, const FVector& C, const FLinearColor& Colour, bool bDepthTest);
 	void Flush();
 	static bool TentForMode(const FString& Mode, bool bWorldMap);
+	static FString CampMode(const FString& StartMode, const FString& LobbyMode);
 	static bool BagInside(double X, double Z, double W, double H);
 	static bool CampSlotDrawn(int32 Slot, const TArray<TOptional<FVector2D>>& Spawns);
 private:

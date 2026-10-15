@@ -24,6 +24,100 @@
 #include "Client/TCMarkers.Ranges.inl"
 #include "Client/TCMarkers.Badges.inl"
 #include "Engine/Texture2D.h"
+#include "ImageUtils.h"
+#include "Misc/Base64.h"
+#include "UObject/StrongObjectPtr.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "Fonts/SlateFontInfo.h"
+
+namespace TCMarkerText
+{
+	// Barlow has no VP star. Keep the reference text and use the engine's Unicode font for missing glyphs,
+	// as the browser's sans-serif fallback does. This font and its metrics are confined to marker labels.
+	FString FallbackPath() { return FPaths::EngineContentDir() / TEXT("Slate/Fonts/DroidSansFallback.ttf"); }
+	const FTCTypeFace* FallbackFace()
+	{
+		static FTCTypeFace Face;
+		static bool bTried = false;
+		if (!bTried)
+		{
+			bTried = true;
+			TArray<uint8> Bytes;
+			if (FFileHelper::LoadFileToArray(Bytes, *FallbackPath(), FILEREAD_Silent)) Face.Parse(Bytes);
+		}
+		return Face.IsValid() ? &Face : nullptr;
+	}
+	void Pens(const FString& Text, float Px, float Tracking, TArray<float>& Out)
+	{
+		const FTCTypeFace* Face = FTCType::Face(true);
+		Face->Pens(Text, Px, Tracking, Out, false);
+		float Extra = 0.f;
+		for (int32 I = 0; I < Text.Len(); I++)
+		{
+			Out[I] += Extra;
+			if (Face->Glyph(Text[I]) != 0) continue;
+			const FTCTypeFace* Fallback = FallbackFace();
+			if (Fallback && Fallback->Glyph(Text[I]))
+				Extra += Fallback->Width(FString::Chr(Text[I]), Px, 0.f, false) - float(Face->Advance(0)) * Px / Face->UnitsPerEm();
+		}
+		Out.Last() += Extra;
+	}
+	double Width(const FString& Text, float Px, float Tracking)
+	{
+		TArray<float> P; Pens(Text, Px, Tracking, P); return P.Last();
+	}
+	UFont* Font()
+	{
+		static TStrongObjectPtr<UFont> MarkerFont;
+		if (!MarkerFont)
+		{
+			MarkerFont.Reset(NewObject<UFont>());
+			MarkerFont->FontCacheType = EFontCacheType::Runtime;
+			MarkerFont->LegacyFontSize = 11;
+			FCompositeFont& Composite = MarkerFont->GetMutableInternalCompositeFont();
+			Composite = *FTCType::Font()->GetCompositeFont();
+			FTypefaceEntry& E = Composite.FallbackTypeface.Typeface.Fonts.AddDefaulted_GetRef();
+			E.Name = TEXT("Regular");
+			E.Font = FFontData(FallbackPath(), EFontHinting::AutoLight, EFontLoadingPolicy::LazyLoad);
+		}
+		return MarkerFont.Get();
+	}
+	void Draw(UCanvas* Canvas, const FString& Text, FVector2D At, float Px, float Tracking, FLinearColor Colour)
+	{
+		TArray<float> P; Pens(Text, Px, Tracking, P);
+		const FSlateFontInfo Info(Font(), Px * 0.75f, TEXT("SemiBold"));
+		for (int32 I = 0; I < Text.Len(); I++)
+		{
+			if (FChar::IsWhitespace(Text[I])) continue;
+			FCanvasTextItem Item(At + FVector2D(P[I], 0), FText::FromString(FString::Chr(Text[I])), Info, Colour);
+			Canvas->DrawItem(Item);
+		}
+	}
+}
+
+namespace TCMarkerIcons
+{
+#include "Client/TCHUD.Icons.inl"
+	void Hq(UCanvas* Canvas, FVector2D Origin, double Size, const FLinearColor& Colour)
+	{
+		static TStrongObjectPtr<UTexture2D> Atlas;
+		if (!Atlas)
+		{
+			TArray<uint8> Bytes;
+			if (FBase64::Decode(HudIconPng, Bytes)) Atlas.Reset(FImageUtils::ImportBufferAsTexture2D(Bytes));
+			if (Atlas) { Atlas->SRGB = true; Atlas->Filter = TF_Bilinear; Atlas->UpdateResource(); }
+		}
+		if (!Atlas || !Atlas->GetResource()) return;
+		int32 Index = INDEX_NONE;
+		for (int32 I = 0; I < UE_ARRAY_COUNT(HudIconKeys); I++) if (FString(HudIconKeys[I]) == TEXT("hq")) { Index = I; break; }
+		if (Index == INDEX_NONE) return;
+		const FVector2D Uv0(double(Index % HudIconColumns) * HudIconSide / HudIconWidth, double(Index / HudIconColumns) * HudIconSide / HudIconHeight);
+		const FVector2D Uv1 = Uv0 + FVector2D(double(HudIconSide) / HudIconWidth, double(HudIconSide) / HudIconHeight);
+		FCanvasTileItem Tile(Origin, Atlas->GetResource(), FVector2D(Size, Size), Uv0, Uv1, Colour);
+		Tile.BlendMode = SE_BLEND_Translucent; Canvas->DrawItem(Tile);
+	}
+}
 
 namespace
 {
@@ -34,6 +128,7 @@ namespace
 	const FLinearColor TagPlate = SrgbA(22, 25, 27, 0.88f);       // rgba(22, 25, 27, 0.88)
 	const FLinearColor TagHairline = SrgbA(176, 164, 122, 0.55f); // rgba(176, 164, 122, 0.55)
 	const FLinearColor TagText = FLinearColor(FColor(0xe2, 0xdf, 0xd3));
+	FBox2D MarkerHudExclusion(ForceInit);
 
 	bool JsonNumber(const TSharedPtr<FJsonValue>& V, double& Out)
 	{
@@ -364,14 +459,14 @@ bool FTCMarkerPainter::Tag(UFont* Font, const FString& Text, double X, double Z,
 	Canvas->TextSize(Font, Text, TW1, TH1, 1.f, 1.f);
 	if (TH1 <= 0) return false;
 	const float TextScale = (float)(St.Px * K * 1.2 / TH1); // the font's line height to the tag's text size
-	double TextW = bBarlow ? FTCType::Face(true)->Width(Text, Px, Tracking, false) : TW1 * TextScale / K;              // in canvas pixels
+	double TextW = bBarlow ? TCMarkerText::Width(Text, Px, Tracking) : TW1 * TextScale / K; // in canvas pixels
 	const double Lead = St.bSwatch && Swatch ? St.H - 20 : 0;
 	const double Cw = FMath::Max(St.W, FMath::CeilToDouble((TextW * 1.1 + 40 + Lead) / 32) * 32);
 	if (bBarlow) while (TextW > Cw - 32 - (St.bSwatch && Swatch ? St.H - 20 : 0) - 8 && Px > 12)
-	{ Px -= 2; TextW = FTCType::Face(true)->Width(Text, Px, Tracking, false); }
+	{ Px -= 2; TextW = TCMarkerText::Width(Text, Px, Tracking); }
 	const double Bh = St.H - 12, Y0 = 6, Pad = 16, Sw = St.bSwatch && Swatch ? Bh - 22 : 0, LeadIn = Sw > 0 ? Sw + 14 : 0;
 	const double Bw = FMath::Min(Cw - 4, TextW + 2 * Pad + LeadIn), X0 = (Cw - Bw) / 2;
-	const FVector2D Origin(At.X - Cw * K / 2, At.Y - St.H * K / 2);
+	const FVector2D Origin = TCMarkersHud::ClearHud(FVector2D(At.X - Cw * K / 2, At.Y - St.H * K / 2), FVector2D(Cw * K, St.H * K), MarkerHudExclusion);
 	auto Rect = [&](double Cx0, double Cy0, double Cw0, double Ch0, FLinearColor C)
 	{
 		C.A *= Alpha;
@@ -385,16 +480,20 @@ bool FTCMarkerPainter::Tag(UFont* Font, const FString& Text, double X, double Z,
 	Rect(X0, Y0 + Bh - 3, Bw, 3, TagHairline);
 	Rect(X0, Y0 + 3, 3, Bh - 6, TagHairline);
 	Rect(X0 + Bw - 3, Y0 + 3, 3, Bh - 6, TagHairline);
-	if (Sw > 0) Rect(X0 + 11, (St.H - Sw) / 2, Sw, Sw, *Swatch); // the HQ symbol on it is not drawn (CLI-72: no icons yet)
+	if (Sw > 0)
+	{
+		Rect(X0 + 11, (St.H - Sw) / 2, Sw, Sw, *Swatch);
+		const FColor C = Swatch->ToFColor(true);
+		const double Lum = (C.R * 0.2126 + C.G * 0.7152 + C.B * 0.0722) / 255.0;
+		FLinearColor Ink(FColor(Lum > 0.6 ? 0x1a1d1f : 0xf2efe6)); Ink.A = Alpha;
+		TCMarkerIcons::Hq(Canvas, Origin + FVector2D(X0 + 11 + Sw * 0.07, (St.H - Sw * 0.86) / 2) * K, Sw * 0.86 * K, Ink);
+	}
 	FLinearColor TC = TagText;
 	TC.A *= Alpha;
 	const double TextCx = X0 + LeadIn + (Bw - LeadIn) / 2, TextCy = St.H / 2 + 2;
 	if (bBarlow)
 	{
-		FTCPaint P;
-		FTCPaintItem& Label = P.Text(Text, Origin.X + TextCx * K, Origin.Y + (TextCy - Px * 0.6) * K, Px * K, TC, true, ETCPaintAlign::Centre);
-		Label.Tracking = Tracking * K;
-		FTCType::Draw(P, Canvas, Font, 1.f, false); // canvas labels use proportional figures, unlike the DOM HUD
+		TCMarkerText::Draw(Canvas, Text, Origin + FVector2D(TextCx - TextW / 2, TextCy - Px * 0.6) * K, Px * K, Tracking * K, TC);
 	}
 	else
 	{
@@ -408,6 +507,14 @@ bool FTCMarkerPainter::Tag(UFont* Font, const FString& Text, double X, double Z,
 }
 
 // ------------------------------------------------------------------------------------------------ TCMarkersHud
+
+void TCMarkersHud::SetHudExclusion(const FBox2D& Bounds) { MarkerHudExclusion = Bounds; }
+
+FVector2D TCMarkersHud::ClearHud(FVector2D Origin, FVector2D Size, const FBox2D& Bounds)
+{
+	if (Bounds.bIsValid && Bounds.Intersect(FBox2D(Origin, Origin + Size))) Origin.Y = Bounds.Max.Y + 8;
+	return Origin;
+}
 
 namespace
 {
@@ -530,6 +637,14 @@ void TCMarkersHud::DrawCapturePoint(FTCMarkerPainter& P, const FTCCapturePoint& 
 	St.bFlip = Frame.bFlip; St.FlipOpacity = Frame.FlipOpacity; St.FlipScale = Frame.FlipScale;
 	for (const MC::FRingDraw& D : MC::CaptureRings(St)) P.Ring(Point.Centre.X, Point.Centre.Y, D.R, D.Ribbon, D.Look, D.Segments);
 	Stats().CapturePoints++;
+}
+
+void TCMarkersHud::DrawCaptureLabels(FTCMarkerPainter& P, const FTCCapturePoint& Point, const ATCGameMode& M, UFont* Font)
+{
+	const float Fade = M.WarMap.LabelFade();
+	if (Point.bTagVisible) Stats().Tags += P.Tag(Font, FTCLocale::T(Point.Label), Point.Centre.X, Point.Centre.Y, MC::PointTagLift, MC::TagStyle(), Fade);
+	if (Point.CutTag()) Stats().Tags += P.Tag(Font, FTCLocale::T(TEXT("Cut off: no supply")), Point.Centre.X, Point.Centre.Y, 13, MC::TagStyle(), Fade);
+	if (Point.LockTag()) Stats().Tags += P.Tag(Font, FTCLocale::T(TEXT("Locked: take the linked point first")), Point.Centre.X, Point.Centre.Y, 15, MC::TagStyle(), Fade);
 }
 
 void TCMarkersHud::DrawWorldRegions(FTCMarkerPainter& P, ATCGameMode& M, UFont* Font)
@@ -691,11 +806,27 @@ void TCMarkersHud::DrawStars(UCanvas* Canvas, FVector2D BarCentre, float PxPerMe
 #include "Serialization/JsonSerializer.h"
 #include "Client/TCMarkers.Oracle.inl"
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCMarkersUnicodeTest, "ThreeCrossroads.Markers.UnicodeLabels", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FTCMarkersUnicodeTest::RunTest(const FString&)
+{
+	if (!TestTrue(TEXT("reference Barlow loads"), FTCType::IsLoaded())) return false;
+	const FTCTypeFace* Fallback = TCMarkerText::FallbackFace();
+	if (!TestNotNull(TEXT("packaged engine fallback metrics load"), Fallback)) return false;
+	TestTrue(TEXT("the source VP star has a real fallback glyph"), Fallback->Glyph(0x2605) != 0);
+	TestEqual(TEXT("star width uses that glyph instead of Barlow's missing box"), float(TCMarkerText::Width(TEXT("★"), 30, 0)), Fallback->Width(TEXT("★"), 30, 0, false));
+	TestEqual(TEXT("income label keeps reference Barlow metrics"), float(TCMarkerText::Width(TEXT("+1 MP/s"), 30, 0)), FTCType::Face(true)->Width(TEXT("+1 MP/s"), 30, 0, false));
+	TestNotNull(TEXT("mixed marker typeface is available"), TCMarkerText::Font());
+	return true;
+}
+
 // Run: -ExecCmds="Automation RunTests ThreeCrossroads.Markers; Quit" (no rendering needed).
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCMarkersGeometryTest, "ThreeCrossroads.Markers.Geometry", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
 
 bool FTCMarkersGeometryTest::RunTest(const FString& Parameters)
 {
+	const FBox2D Scores(FVector2D(400, 8), FVector2D(880, 130));
+	TestTrue(TEXT("HQ tag moves below scores and its rate row"), TCMarkersHud::ClearHud(FVector2D(570, 115), FVector2D(156, 34), Scores).Equals(FVector2D(570, 138)));
+	TestTrue(TEXT("a tag beside scores retains its world anchor"), TCMarkersHud::ClearHud(FVector2D(80, 115), FVector2D(128, 32), Scores).Equals(FVector2D(80, 115)));
 	// every ring and line against the pinned overlay.js Builder (TCMarkers.Oracle.inl, ribbon-oracle.mjs)
 	for (const TCMarkersOracle::FCase& C : TCMarkersOracle::Cases)
 	{

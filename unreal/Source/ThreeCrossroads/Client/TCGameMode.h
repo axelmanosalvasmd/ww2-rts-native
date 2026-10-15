@@ -284,6 +284,8 @@ public:
 	const FString& LastSendProblem() const { return LastSendProblemText; }
 	FString ConnectionStatus() const;
 	// Round 17 (hudui): the connection's retry countdown for #connectionBanner (FTCConnection::RetryLeft; -1: none)
+	FTCConnectionNotice ConnectionNotice() const { return Connection ? Connection->Notice() : FTCConnectionNotice(); }
+	void SaveMatchView();
 	int32 ConnectionRetryLeft(bool* bOutFull = nullptr) const { return Connection ? Connection->RetryLeft(FPlatformTime::Seconds(), bOutFull) : -1; }
 
 	FTCMatchState State;

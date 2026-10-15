@@ -53,12 +53,14 @@ terrain's, `MarkCells(State, DirtyCells, FogDirtyCells)` before the terrain's, `
 decode sRGB and whether they are raw photos or ground.js's already tinted tiles). `FogGamma` (both) is 1: the fog
 multiplier dims linear colour as the world pieces' FogMap does; 2.2 matches a ground that scales sRGB bytes.
 
-## Not ported, or different
+## Integration notes and remaining review
 
 - **Frozen levels of later-discovered World cells.** The reference freezes every cell's level when the water is made, so a
-  World cell discovered later keeps the start map's placeholder level 0. Here a cell's level is frozen when it is first
-  known (`FreezeLevel`). The harness feeds the reference's frozen levels, so the comparison is exact either way.
-- **gfx.low.** The material has the `Low` switch (no drift), but the native client always draws High.
+  World cell discovered later keeps the start map's placeholder level 0. The native adapter now does the same, without
+  reading hidden levels. Terrain.WaterDiscovery checks the actual adapter, in addition to the standalone source oracle.
+- **gfx.low.** The native Graphics preset connects the material's `Low` switch at creation and on live changes, freezing
+  the drift as the reference does. World.GraphicsSwitch protects that connection.
 - **The apron's mist and cloud shade.** `fowMist` (surfaces.js) and the cloud shade overlay over the near rows
-  (`overlayGeometry`, `CloudCount` in the core) belong to the atmosphere scope.
+  (`overlayGeometry`, `CloudCount` in the core) are supplied by the integrated atmosphere. Weather visual acceptance
+  remains tracked separately in the parity table.
 - **Textures.** Until `SetTiles`, the apron uses the reference's flat colours (its look before the textures load).

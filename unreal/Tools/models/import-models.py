@@ -1169,6 +1169,20 @@ def brick_png():
 
 # ------------------------------------------------------------------------------------------------ material code
 
+# client/infantry-material.js. Shared with refresh-normal-atlas.py for existing master/crowd/track assets.
+INFANTRY_NORMAL_HLSL = '''if (atlas && InfantryDetail > 0.5) {
+	// Swapping Three Y/Z reflects the coordinate system. With UE screen derivatives, use ddy here.
+	float2 st0 = ddx(AtlasUV), st1 = ddy(AtlasUV);
+	float3 q1perp = cross(-q1, nrm), q0perp = cross(nrm, q0);
+	float3 t = q1perp * st0.x + q0perp * st1.x;
+	float3 b = q1perp * st0.y + q0perp * st1.y;
+	float tscale = rsqrt(max(max(dot(t, t), dot(b, b)), 1e-12));
+	float3 mapN = InfantryNormal.Sample(InfantryNormalSampler, AtlasUV).rgb * 2.0 - 1.0;
+	mapN.xy *= 0.65;
+	nrm = normalize(t * tscale * mapN.x + b * tscale * mapN.y + nrm * mapN.z);
+}'''
+
+
 def model_hlsl(means):
     """The Custom node of the M_TCModel masters: client/model-textures.js (MODEL_TEX, MODEL_SURFACE, MODEL_GRIME, the
     rim), client/infantry-material.js (the atlas and its normal map), client/models/blender-baked.js (owner and vehicle
@@ -1283,16 +1297,7 @@ float rough = ModelTextures > 0.5 ? clamp(surf.x - detail * 0.055 + max(grime, 0
 float metal = ModelTextures > 0.5 ? surf.y * (1.0 - clamp(grime, 0.0, 0.85)) : BaseMetalness;
 float3 nrm = N;
 float3 q0 = ddx(WorldPos), q1 = -ddy(WorldPos); // the reference's derivatives run up the screen (GL); Unreal's run down
-if (atlas && InfantryDetail > 0.5) {
-	float2 st0 = ddx(AtlasUV), st1 = -ddy(AtlasUV);
-	float3 q1perp = cross(q1, nrm), q0perp = cross(nrm, q0);
-	float3 t = q1perp * st0.x + q0perp * st1.x;
-	float3 b = q1perp * st0.y + q0perp * st1.y;
-	float tscale = rsqrt(max(max(dot(t, t), dot(b, b)), 1e-12));
-	float2 nxy = InfantryNormal.Sample(InfantryNormalSampler, AtlasUV).rg * 2.0 - 1.0;
-	float3 mapN = float3(nxy * 0.65, sqrt(saturate(1.0 - dot(nxy, nxy))));
-	nrm = normalize(t * tscale * mapN.x + b * tscale * mapN.y + nrm * mapN.z);
-}
+%(atlas_normal)s
 if (ModelTextures > 0.5) {
 	// surface-gradient relief from the detail sample (invariant to the screen's y direction)
 	float2 hg = float2(ddx(height), ddy(height));
@@ -1322,7 +1327,7 @@ Specular = spec * (1.0 - Damage);
 NormalWS = normalize(lerp(nrm, N, Damage));
 Emissive = emissive * (1.0 - Damage);
 return color;
-''' % dict(n=len(MATS), layer=layer, surface=surface, film=film, mean=mean, mud=MATS.index('mud'), mudscale=f(MUD_TEXELS / float(SIZE)), size=SIZE,
+''' % dict(atlas_normal=INFANTRY_NORMAL_HLSL, n=len(MATS), layer=layer, surface=surface, film=film, mean=mean, mud=MATS.index('mud'), mudscale=f(MUD_TEXELS / float(SIZE)), size=SIZE,
            pm0=STRUCTURE_PER_METRE[0], pm1=STRUCTURE_PER_METRE[1], pm2=STRUCTURE_PER_METRE[2], pm3=STRUCTURE_PER_METRE[3], pm4=STRUCTURE_PER_METRE[4], pm5=STRUCTURE_PER_METRE[5])
 
 
@@ -1443,7 +1448,7 @@ class UE(object):
         models = os.path.join(ref, 'client/textures/models')
         self.infantry = (self.texture(os.path.join(models, 'infantry-v3-color.jpg'), 'Textures', 'T_InfantryColor', stream=False),
                          self.texture(os.path.join(models, 'infantry-v3-normal.jpg'), 'Textures', 'T_InfantryNormal', srgb=False,
-                                      compression=unreal.TextureCompressionSettings.TC_NORMALMAP, stream=False))
+                                      compression=unreal.TextureCompressionSettings.TC_VECTOR_DISPLACEMENTMAP, stream=False))
         # structures.js MODEL_MAT samples detail.jpg without color conversion (NoColorSpace)
         self.detail = self.texture(os.path.join(ref, 'client/textures/detail.jpg'), 'Textures', 'T_StructureDetail', srgb=False)
         self.surface_tex = {}

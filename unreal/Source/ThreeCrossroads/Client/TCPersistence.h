@@ -50,6 +50,32 @@ class FJsonObject;
 class FJsonValue;
 class FTCMatchState;
 
+// room-session.js matchStorage: one view per server/room/token, including process restarts.
+// Storage filenames contain only a digest. No token or match view is written to a log.
+struct FTCMatchView
+{
+	int32 MatchId = -1;
+	double X = 0, Z = 0, Y = 0, Yaw = 0, Dist = 85;
+	bool bHasY = false;
+	TArray<int32> Selected;
+	TMap<int32, TArray<int32>> Groups;
+	bool IsValid() const;
+	TSharedPtr<FJsonObject> Json() const;
+	static bool Parse(const FJsonObject& Object, FTCMatchView& Out);
+};
+
+class FTCMatchViewMemory
+{
+public:
+	void Open(const FString& Directory, const FString& Server, const FString& Room, const FString& Token);
+	bool Read(FTCMatchView& Out) const;
+	bool Write(const FTCMatchView& View) const;
+	void Clear() const;
+	bool IsOpen() const { return !File.IsEmpty(); }
+private:
+	FString File;
+};
+
 // One row of the lobby's saves panel (server.js lobby saves; client/main.js renderLobby saveList).
 struct FTCSaveRow
 {

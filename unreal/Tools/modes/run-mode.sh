@@ -10,6 +10,7 @@
 # Environment:
 #   TC_MODES_PROJECT  the .uproject to run (default: this checkout's unreal/ThreeCrossroads.uproject)
 #   TC_RUN_DIR        the tc-local.sh server folder (its port file), or TC_MODES_URL=ws://127.0.0.1:<port>/ws
+#   TC_MODES_CONFIG   optional explicit lane table (default modes.json beside this script)
 #   TC_MODES_TOKENS   folder for the seat token files (required: tokens never go into the out dir)
 #   TC_MODES_GRAPHICS high (default) or low, explicitly applied before every client; auto-drop disabled for the lane
 #   UE                engine folder (default ~/Applications/UnrealEngine-5.8.3)
@@ -19,6 +20,7 @@
 # timing.txt, and row.json + row.md from summarize.mjs.
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+TABLE="${TC_MODES_CONFIG:-$HERE/modes.json}"
 ID="$1"; OUT="$2"; ROOM="${3:-m$(date +%H%M%S)$((RANDOM % 100))}"
 UE="${UE:-$HOME/Applications/UnrealEngine-5.8.3}"
 P="${TC_MODES_PROJECT:-$(cd "$HERE/../.." && pwd)/ThreeCrossroads.uproject}"
@@ -39,9 +41,11 @@ c.set('ThreeCrossroads', 'UIScale', '100')
 with ini.open('w') as f: c.write(f)
 PY
 PREFERENCES=(-ini:GameUserSettings:ThreeCrossroads:Graphics="$GRAPHICS" -ini:GameUserSettings:ThreeCrossroads:GraphicsAutoDropped=1 -ini:GameUserSettings:ThreeCrossroads:UIScale=100 -TCGraphicsAt="$GRAPHICS@0")
+# Avoid the observed UE pre-init race between trace-worker logging and LLM teardown. These lanes do not record traces.
+DIAGNOSTICS=(-trace=none -notracethreading -notraceserver -nollm)
 if [ -n "${TC_MODES_URL:-}" ]; then URL="$TC_MODES_URL"; else URL="ws://127.0.0.1:$(cat "${TC_RUN_DIR:?set TC_RUN_DIR or TC_MODES_URL}/port")/ws"; fi
 mkdir -p "$OUT/host" "$OUT/guest" "$T"
-CFG=$(python3 - "$HERE/modes.json" "$ID" "${TC_MODES_CAP:-}" <<'PY'
+CFG=$(python3 - "$TABLE" "$ID" "${TC_MODES_CAP:-}" <<'PY'
 import json, sys, shlex
 table, mid, cap = sys.argv[1], sys.argv[2], sys.argv[3]
 c = json.load(open(table))[mid]
@@ -65,7 +69,7 @@ SEATS=1; [ "$GUEST" = 1 ] && SEATS=2
 # -TCHostStart=N adds AI seats until the lobby holds 1 + N seats: the guest counts among them
 HOSTSTART=$((AI + SEATS - 1))
 HOST=(env TC_DECODER=rust SDL_AUDIODRIVER=dummy SDL_AUDIO_DRIVER=dummy "$UE/Engine/Binaries/Linux/UnrealEditor" "$P" -game -RenderOffscreen -ResX=1280 -ResY=720 -unattended -nosplash
-  "${PREFERENCES[@]}"
+  "${PREFERENCES[@]}" "${DIAGNOSTICS[@]}"
   -TCServer="$URL" -TCRoom="$ROOM" -TCName=Alder -TCTokenFile="$T/host-$ROOM.txt" -TCLang=en -TCObjectivesLog
   -TCHostStart="$HOSTSTART" -TCHostMode="$MODE" -TCHostSeats="$SEATS"
   -TCControlsCheck="$SCRIPT" -TCControlsShotDir="$OUT/host"
@@ -83,7 +87,7 @@ HOST+=(-TCEndAfter="$CAP")
 # "spectator": true a third native (rendered, English) watches as a spectator and flies the tour instead: a spectator sees
 # every cell (server.js watchGame), where a seat only learns of a change its units see (shared/sim.js observedTerrainFor)
 SPECCMD=(env TC_DECODER=rust SDL_AUDIODRIVER=dummy SDL_AUDIO_DRIVER=dummy "$UE/Engine/Binaries/Linux/UnrealEditor" "$P" -game -RenderOffscreen -ResX=1280 -ResY=720 -unattended -nosplash
-  "${PREFERENCES[@]}"
+  "${PREFERENCES[@]}" "${DIAGNOSTICS[@]}"
   -TCServer="$URL" -TCRoom="$ROOM" -TCName=Wren -TCSpectate -TCTokenFile="$T/spectator-$ROOM.txt" -TCLang=en -TCObjectivesLog -TCExitAfterResult=6
   -TCExitAfter=$((CAP + 300)) -abslog="$OUT/spectator.log")
 if [ -n "$TOUR" ] && [ "$SPECTATOR" = 1 ]; then mkdir -p "$OUT/spectator"; SPECCMD+=(-TCTourFile="$HERE/tours/$TOUR" -TCTourDir="$OUT/spectator")
@@ -91,28 +95,28 @@ elif [ -n "$TOUR" ]; then HOST+=(-TCTourFile="$HERE/tours/$TOUR" -TCTourDir="$OU
 [ "$GUESTRENDER" = 1 ] && TC_MODES_GUEST_RENDER=1
 if [ "${TC_MODES_GUEST_RENDER:-0}" = 1 ]; then GR=(-RenderOffscreen -ResX=1280 -ResY=720 -TCEpilogueShotFile="$OUT/guest/modes-$ID-epilogue-es.png" -TCResultShotFile="$OUT/guest/modes-$ID-end-report-es.png"); else GR=(-nullrhi -nosound); fi
 GUESTCMD=(env TC_DECODER=rust SDL_AUDIODRIVER=dummy SDL_AUDIO_DRIVER=dummy "$UE/Engine/Binaries/Linux/UnrealEditor" "$P" -game "${GR[@]}" -unattended -nosplash
-  "${PREFERENCES[@]}"
+  "${PREFERENCES[@]}" "${DIAGNOSTICS[@]}"
   -TCServer="$URL" -TCRoom="$ROOM" -TCName=Fern -TCTokenFile="$T/guest-$ROOM.txt" -TCLang=es -TCObjectivesLog -TCExitAfterResult=6
   -TCExitAfter=$((CAP + 300)) -abslog="$OUT/guest.log")
 [ "$CAPTURE" = 1 ] && GUESTCMD+=(-TCCapturePlay)
 [ "$DRIVE" = 1 ] && { GUESTCMD+=(-TCTutorialDrive); [ "${TC_MODES_GUEST_RENDER:-0}" = 1 ] && GUESTCMD+=(-TCTutorialShots="$OUT/guest" -TCTutorialShotTag=es); }
-{ echo "mode id: $ID; room $ROOM; server $URL; decoder TC_DECODER=rust"; echo "graphics: $GRAPHICS"; echo "config: $(python3 -c "import json,sys; print(json.dumps(json.load(open('$HERE/modes.json'))['$ID']))")";
+{ echo "mode id: $ID; room $ROOM; server $URL; decoder TC_DECODER=rust"; echo "graphics: $GRAPHICS"; echo "config: $(python3 -c "import json,sys; print(json.dumps(json.load(open('$TABLE'))['$ID']))")";
   so="$(dirname "$P")/Binaries/Linux/libUnrealEditor-ThreeCrossroads.so"; [ -f "$so" ] && echo "module: $(stat -c '%y, %s bytes' "$so"), md5 $(md5sum "$so" | cut -c1-12)"
   echo "host: ${HOST[*]}"; [ "$GUEST" = 1 ] && echo "guest: ${GUESTCMD[*]}"; [ "$SPECTATOR" = 1 ] && echo "spectator: ${SPECCMD[*]}"; } > "$OUT/cmdlines.txt"
 echo "begin $(date -u +%FT%TZ)" > "$OUT/timing.txt"
-"${HOST[@]}" > "$OUT/host.out" 2>&1 & H=$!
+"${HOST[@]}" > "$OUT/host-console.log" 2>&1 & H=$!
 echo "host pid $H" >> "$OUT/timing.txt"
 G=""
 if [ "$GUEST" = 1 ]; then
   # the host must make the room first (the first seat is the host)
   for i in $(seq 1 360); do grep -q "LogTC: lobby: room $ROOM" "$OUT/host.log" 2>/dev/null && break; kill -0 $H 2>/dev/null || break; sleep 0.5; done
-  "${GUESTCMD[@]}" > "$OUT/guest.out" 2>&1 & G=$!
+  "${GUESTCMD[@]}" > "$OUT/guest-console.log" 2>&1 & G=$!
   echo "guest pid $G" >> "$OUT/timing.txt"
 fi
 W=""
 if [ "$SPECTATOR" = 1 ]; then
   for i in $(seq 1 360); do grep -q "LogTC: lobby: room $ROOM" "$OUT/host.log" 2>/dev/null && break; kill -0 $H 2>/dev/null || break; sleep 0.5; done
-  "${SPECCMD[@]}" > "$OUT/spectator.out" 2>&1 & W=$!
+  "${SPECCMD[@]}" > "$OUT/spectator-console.log" 2>&1 & W=$!
   echo "spectator pid $W" >> "$OUT/timing.txt"
 fi
 # a guest that dies before the match starts (out of GPU memory at its first frame, say) would leave the host waiting in
@@ -139,3 +143,10 @@ fi
 echo "end $(date -u +%FT%TZ)" >> "$OUT/timing.txt"
 node "$HERE/summarize.mjs" --id "$ID" --cap "$CAP" "$OUT" > "$OUT/row.md" 2> "$OUT/summarize.err"
 cat "$OUT/row.md"
+# A rendered table is not proof of a successful lane: preserve the row and fail on a missing start or client failure.
+python3 - "$OUT/row.json" <<'PY'
+import json, sys
+row = json.load(open(sys.argv[1]))
+if not row.get('started') or any(value != 0 for key, value in row.get('exits', {}).items() if key in ('host', 'guest', 'spectator')):
+    sys.exit(1)
+PY

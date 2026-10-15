@@ -27,9 +27,19 @@
 #include "CoreMinimal.h"
 #include "Engine/GameViewportClient.h"
 #include "Client/TCEndReport.h"
+#include "Client/TCPersistence.h"
 #include "TCMatchControls.generated.h"
 
 class FJsonObject;
+struct FTCPerfStats;
+
+struct FTCMatchStartFlash
+{
+	bool bActive = false;
+	double At = 0;
+	void Start(bool bHidden, bool bResume, double Now) { bActive = bHidden && !bResume; At = Now; }
+	bool Frame(bool bFocused, double Now) { if (bFocused) bActive = false; return bActive && ((int64)FMath::Max(0.0, Now - At) % 2 == 0); }
+};
 
 enum class ETCMatchControl : uint8
 {
@@ -214,6 +224,18 @@ public:
 	struct FSeat { FString Name; bool bAi = false; bool bConnected = false; };
 	const TArray<FSeat>& Seats() const { return SeatList; }
 	const TArray<FString>& Spectators() const { return SpectatorNames; }
+	// Native counterpart of room-session.js matchMemory. The caller only writes while this seat is active.
+	FTCMatchViewMemory ViewMemory;
+	FTCMatchView ResumeView;
+	bool bResumePending = false, bViewSeatActive = true;
+	double LastViewWrite = -1e9;
+	FTCMatchStartFlash StartFlash;
+	FString NormalWindowTitle;
+	FString TerminalNotice;
+	// The host has no fault wire field. Scope this notice to its existing in-play restart/scenario refusal.
+	static FString RestartRefusal(bool bRust, bool bPlaying, const FString& Cmd, const FString& Reason);
+	// perf.diag's native equivalents in the reference's twelve-field order. Heap is unavailable, so it stays null.
+	static TArray<TSharedPtr<FJsonValue>> PingDiagnostics(const FTCPerfStats& Stats);
 
 private:
 	bool bHasLobby = false;

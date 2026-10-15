@@ -33,7 +33,8 @@ namespace TCAtmosImpl
 	// A transient RGBA8 texture with a full box-filtered mip chain (three generates mipmaps for these) or one level.
 	UTexture2D* MakeTexture(UObject* Outer, const TCHAR* Name, int32 W, int32 H, TArray<FColor> Level, bool bMips, bool bWrap)
 	{
-		UTexture2D* T = NewObject<UTexture2D>(Outer, Name, RF_Transient);
+		// A second view or a restarted match can still hold the previous transient texture.
+		UTexture2D* T = NewObject<UTexture2D>(Outer, MakeUniqueObjectName(Outer, UTexture2D::StaticClass(), FName(Name)), RF_Transient);
 		FTexturePlatformData* PD = new FTexturePlatformData();
 		PD->SizeX = W; PD->SizeY = H; PD->PixelFormat = PF_B8G8R8A8;
 		int32 LW = W, LH = H;
@@ -211,8 +212,7 @@ void FTCAtmosphere::StartMatch(const FTCMatchState& State, const FString& MapKey
 	for (UMaterialInstanceDynamic* M : { GroundMat.Get(), MistMat.Get(), BankMat.Get(), BirdMat.Get(), FallMat.Get() }) if (M) M->SetScalarParameterValue(TEXT("Exposure"), MoodRow.Exposure);
 	// round 14: Graphics High's composer blends these layers in linear light (the engine's blend); -TCHazeAfterTone
 	// (ATCLighting: the direct path, Low) keeps the display-space emulation
-	const float LinearBlend = FParse::Param(FCommandLine::Get(), TEXT("TCHazeAfterTone")) ? 0.f : 1.f;
-	for (UMaterialInstanceDynamic* M : { GroundMat.Get(), MistMat.Get(), BankMat.Get(), BirdMat.Get(), FallMat.Get() }) if (M) M->SetScalarParameterValue(TEXT("LinearBlend"), LinearBlend);
+	ApplyBlendMode();
 	ApplyMood();
 
 	Sites = MoodRow.bMist ? MistSites(W, H, Ch, Cell, Height, MistCap) : std::vector<FSheet>();
@@ -302,6 +302,15 @@ void FTCAtmosphere::Blend()
 }
 
 // atmosphere.js applyMood (the light is ATCLighting's): cloud strength, the wet ground's numbers, the mist's tint
+void FTCAtmosphere::ApplyBlendMode()
+{
+	// light.js uses its linear composer on High and draws straight to sRGB on Low. All atmosphere layers,
+	// including a fall created after a weather change, must follow the same path as the haze post process.
+	const bool bLinear = FTCGraphics::Get().Budget().bAmbientOcclusion && !FParse::Param(FCommandLine::Get(), TEXT("TCHazeAfterTone"));
+	for (UMaterialInstanceDynamic* M : { GroundMat.Get(), MistMat.Get(), BankMat.Get(), BirdMat.Get(), FallMat.Get() })
+		if (M) M->SetScalarParameterValue(TEXT("LinearBlend"), bLinear ? 1.f : 0.f);
+}
+
 void FTCAtmosphere::ApplyMood()
 {
 	if (GroundMat)
@@ -343,6 +352,7 @@ void FTCAtmosphere::BuildFall()
 	FallData(F, Pos, Rnd);
 	if (!FallMesh.IsValid()) FallMesh = NewMesh(TEXT("AtmosFall"), TCAtmos::SortFall, false);
 	if (!FallMat) { FallMat.Reset(Mid(TCAtmos::FallPath, TEXT("MID_TCAtmosFall"))); bFogParamsStale = true; }
+	ApplyBlendMode();
 	if (FallMat) FallMat->SetScalarParameterValue(TEXT("Exposure"), MoodRow.Exposure);
 	UProceduralMeshComponent* FM = FallMesh.Get();
 	if (!FM) return;
@@ -465,6 +475,7 @@ void FTCAtmosphere::Update(float Dt, const FTCMatchState& State, const ATCTerrai
 	// the middle of a match (clouds, birds and the dust fall read the level every frame below)
 	if (GfxWatch.TakeChanged() && FTCGraphics::Get().IsLow() != GfxLow)
 	{
+		ApplyBlendMode();
 		BuildSheets();
 		if (!FallNow.IsEmpty()) BuildFall();
 		LevelSwitches++;
@@ -970,6 +981,37 @@ bool FTCAtmosphereOracleTest::RunTest(const FString& Parameters)
 	View.Update(0.25f, State, Terrain, nullptr, FVector2D(90, 100));
 	TestEqual(TEXT("a shower's rain"), View.FallKind(), FString(TEXT("rain")));
 	TestEqual(TEXT("rain points"), View.FallPoints(), TCAtmosCore::Fall(0).N);
+	// High's composer blends in linear light; Low's direct path needs the atmosphere's output-space emulation.
+	// Inspect the actual MIDs on both transitions, including rain created after a Low match has started.
+	auto CheckBlend = [this](const FTCAtmosphere& V, bool bLinear)
+	{
+		for (const auto* M : { V.GroundMat.Get(), V.MistMat.Get(), V.BankMat.Get(), V.BirdMat.Get(), V.FallMat.Get() })
+			if (M)
+			{
+				float Value = -1.f;
+				TestTrue(TEXT("atmosphere blend parameter exists"), M->GetScalarParameterValue(FMaterialParameterInfo(TEXT("LinearBlend")), Value));
+				TestEqual(TEXT("atmosphere blend follows the graphics path"), Value, bLinear ? 1.f : 0.f);
+			}
+	};
+	CheckBlend(View, true);
+	{
+		FTCGraphicsLevelScope LowLevel(ETCGraphicsLevel::Low);
+		View.Update(0.f, State, Terrain, nullptr, FVector2D(90, 100));
+		CheckBlend(View, false);
+		FTCAtmosphere LowView;
+		LowView.Attach(Scratch.World);
+		FTCMatchState LowState = State;
+		LowState.Wx.Rain = LowState.Wx.Wet = 0;
+		LowView.StartMatch(LowState, TEXT("pegasus-bridge"), Terrain);
+		CheckBlend(LowView, false);
+		LowState.Wx.Rain = 0.8;
+		LowView.Update(0.25f, LowState, Terrain, nullptr, FVector2D(90, 100));
+		TestEqual(TEXT("Low starts a new rain material"), LowView.FallKind(), FString(TEXT("rain")));
+		CheckBlend(LowView, false);
+		LowView.Detach();
+	}
+	View.Update(0.f, State, Terrain, nullptr, FVector2D(90, 100));
+	CheckBlend(View, true);
 	TestTrue(TEXT("wind from wx"), View.Wind().Equals(FVector2D(FMath::Cos(1.0) * 0.55, FMath::Sin(1.0) * 0.55), 1e-4));
 	for (int32 I = 0; I < 200; I++) View.Update(0.1f, State, Terrain, nullptr, FVector2D(90, 100));
 	TestTrue(TEXT("the ground is wet after the shower"), View.CoverOn() && View.Look().Wet > 0.55f && View.Look().Sheen > 0.55f);

@@ -22,6 +22,8 @@
 #include "Engine/Font.h"
 #include "CanvasItem.h"
 #include "GlobalRenderResources.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "Camera/PlayerCameraManager.h"
 
 namespace TCHudSlice9
@@ -316,7 +318,8 @@ FTCPaint FTCHudFit::ScoreCard(const FTCScoreStrip& S, float ViewW, const FTCMeas
 				for (const FTCScoreSeat& Seat : T.Seats)
 				{
 					P.Rect(Tx, Ty + 5, 12, 12, ATCUnitRenderer::SeatColor(Seat.Slot));
-					// The faction mark occupies the reference's 18px slot (art is supplied by the icon scope).
+					// Original hud.js MARKS, rasterized by the icon exporter. Transparent geometry carries its slot.
+					P.Rect(Tx+18,Ty+2,18,18,FLinearColor(0,0,0,0),*FString::Printf(TEXT("scores:faction:%d"),Seat.Faction));
 					const FString You = Seat.bYou ? TC_T(FString(TEXT("you"))) : FString();
 					const float YouW = You.IsEmpty() ? 0.f : Measure(You, 13, false, 0) + 6;
 					// i18n.js also observes .sc-name text nodes (for example the server's "Horde" becomes "Horda").
@@ -375,6 +378,8 @@ float ATCHUD::DrawScoreStrip(UFont* Font, UFont* Big)
 	const FTCControlButton NextWave = M->Controls.NextWaveButton();
 	const FTCPaint Scores = FTCHudFit::ScoreCard(Strip, Canvas->ClipX, Measure, Strip.Lead.bShown && NextWave.bShown, UiNow);
 	FTCType::Draw(Scores, Canvas, Font, UiNow);
+	for (const FTCPaintItem& I : Scores.Items)
+	 if (I.Role.StartsWith(TEXT("scores:faction:"))) DrawHudIcon(TEXT("faction-")+I.Role.RightChop(15),FBox2D(I.Pos,I.Pos+I.Size),FLinearColor::White);
 	const FTCPaintItem* Card = Scores.Find(TEXT("scores:panel"));
 	const float X0 = Card->Pos.X, Y0 = Card->Pos.Y, H = Card->Size.Y, W = Card->Size.X;
 	StripCard = ToScreen(FBox2D(Card->Pos, Card->Pos + Card->Size));
@@ -470,22 +475,8 @@ void ATCHUD::DrawCapturePoints(UFont* Font)
 				const FVector2D Q[4] = { FVector2D(C0.X, C0.Y), FVector2D(C1.X, C1.Y), FVector2D(C2.X, C2.Y), FVector2D(Top.X, Top.Y) };
 				FillQuad(Q, P.FlagSlot >= 0 ? ATCUnitRenderer::SeatColor(P.FlagSlot) : FLinearColor(NeutralFlag));
 			}
-			// the label steps aside while the point is being taken; the cut and locked tags stay
-			TArray<FString> Tags;
-			if (P.bTagVisible && !P.Label.IsEmpty()) Tags.Add(P.Label);
-			if (P.CutTag()) Tags.Add(TEXT("Cut off: no supply"));
-			if (P.LockTag()) Tags.Add(TEXT("Locked: take the linked point first"));
-			float Ly = Top.Y - 6.f - Tags.Num() * LineH;
-			for (const FString& Tg : Tags)
-			{
-				float TW = 0, TH = 0;
-				LabelSize(Tg, TW, TH, Font, 1.f);
-				// round 17: a tag under the score strip's card is left out (see DrawScoreStrip)
-				if (StripCard.bIsValid && StripCard.Intersect(FBox2D(FVector2D(Top.X - TW / 2 - 4.f, Ly - 1.f), FVector2D(Top.X + TW / 2 + 4.f, Ly - 1.f + LineH)))) { Ly += LineH; continue; }
-				DrawRect(WithAlpha(Plate, 0.8f), Top.X - TW / 2 - 4.f, Ly - 1.f, TW + 8.f, LineH);
-				{ FLinearColor Lc = Tg == P.Label ? TextC : Red; Lc.A *= M->WarMap.LabelFade(); DrawLabel(Tg, Lc, Top.X - TW / 2, Ly, Font, 1.f); } // round 14: fadeLabels
-				Ly += LineH;
-			}
+			FTCMarkerPainter Labels = TCMarkersHud::Painter(Canvas, *M);
+			TCMarkersHud::DrawCaptureLabels(Labels, P, *M, Font);
 		}
 	}
 }
@@ -588,6 +579,26 @@ void ATCHUD::DrawHealthBars()
 	}
 }
 
+namespace
+{
+    // Other session glue may be integrated after this scope. Use each available banner without depending on it.
+    template<class T> TArray<FTCRoomBanner> AlertRoomBanners(const T& Mode, double Now)
+    {
+        TArray<FTCRoomBanner> Banners;
+        if constexpr (requires { Mode.ConnectionNotice(); })
+        {
+            const auto Notice=Mode.ConnectionNotice();
+            const FString Connection=Notice.Text(Now);
+            if (!Connection.IsEmpty()) Banners.Add({Connection,true});
+            if (!Notice.RoomLine().IsEmpty()) Banners.Add({Notice.RoomLine(),true});
+        }
+        if constexpr (requires { Mode.Controls.TerminalNotice; })
+            if (!Mode.Controls.TerminalNotice.IsEmpty()) Banners.Add({Mode.Controls.TerminalNotice,true});
+        if (Mode.State.bPaused && !Mode.State.PauseText.IsEmpty()) Banners.Add({Mode.State.PauseText,false});
+        return Banners;
+    }
+}
+
 void ATCHUD::DrawAlertFeed(UFont* Font)
 {
 	// round 15: client/alerts.css and alerts.js as FTCAlerts::Layout draws them (Client/TCAlerts.h): the loss column,
@@ -596,10 +607,27 @@ void ATCHUD::DrawAlertFeed(UFont* Font)
 	if (!M || !Canvas) return;
 	FTCAlertViewInput In;
 	In.Now = FPlatformTime::Seconds(); // the alert clock (alerts.js now(); ATCGameMode::OnCombatSnapshot)
+    // Verification only, matching the browser's held presentation clock on archived seated input.
+    static bool Parsed=false; static double AlertAge=-1;
+    if (!Parsed)
+    {
+        Parsed=true;
+        if (FParse::Value(FCommandLine::Get(),TEXT("TCHudAlertAge="),AlertAge))
+            UE_LOG(LogTC,Log,TEXT("hud: verification holds the latest loss presentation at age %.3f seconds"),AlertAge);
+    }
+    if (AlertAge>=0) for (const FTCAlertLine& L : M->AlertFeed.Lines()) if (L.IsLoss()) { In.Now=L.Born+AlertAge; break; }
 	In.Right = Minimap.Rect().bIsValid ? ToUi((float)Minimap.Rect().Max.X) : Canvas->ClipX - 8.f;
 	In.MinimapTop = Minimap.Rect().bIsValid ? ToUi((float)Minimap.Rect().Min.Y) : Canvas->ClipY - 200.f;
 	In.ViewW = Canvas->ClipX; In.ViewH = Canvas->ClipY; In.UiScale = UiNow;
-	// alerts.js place() anchors to the minimap, independently of the recruit panel and the boss bar.
+	// Native bounded placement keeps the pinned anchor where free and docks whole cards elsewhere when crowded.
+	for (const FBox2D& B : Panels) In.Avoid.Add(FBox2D(B.Min/UiNow,B.Max/UiNow));
+	if (RecruitBox.bIsValid) In.Avoid.Add(FBox2D(RecruitBox.Min/UiNow,RecruitBox.Max/UiNow));
+    if (CornerBox.bIsValid) In.Avoid.Add(FBox2D(CornerBox.Min/UiNow,CornerBox.Max/UiNow));
+    // These banners paint after the HUD at physical scale 1. Reserve their actual measured boxes first.
+    const TArray<FTCRoomBanner> Banners=AlertRoomBanners(*M,FPlatformTime::Seconds());
+    const float BannerTop=TopStackBottomPx>=0?FMath::CeilToFloat(TopStackBottomPx+8.f):16.f;
+    const FTCPaint BannerPaint=FTCRoomBanners::Layout(Banners,BannerTop,Canvas->ClipX*UiNow,FTCPaint::CanvasMeasure(Font));
+    for (const FTCPaintItem& I : BannerPaint.Items) if (I.Kind==ETCPaintKind::Rect && I.Role.StartsWith(TEXT("banner:"))) In.Avoid.Add(FBox2D(I.Pos/UiNow,(I.Pos+I.Size)/UiNow));
 	float Mx = 0, My = 0;
 	if (APlayerController* PC = GetOwningPlayerController(); PC && PC->GetMousePosition(Mx, My)) { In.bMouse = true; In.Mouse = FVector2D(ToUi(Mx), ToUi(My)); }
 	M->AlertFeed.Frame(In.Now);

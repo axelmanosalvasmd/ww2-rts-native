@@ -312,8 +312,7 @@ void FTCWater::MarkCells(const FTCMatchState& State, const TSet<int32>& Shaped, 
 	for (const int32 C : Shaped)
 	{
 		if (C < 0 || C >= W * H) continue;
-		// a cell first known now keeps the level it was learned at (TCWater.h: the one difference from the reference)
-		if (Known[C]) Core.FreezeLevel(C, Levels[C]);
+		// createWaterLevels froze all lines when this mesh was made. Later discoveries keep their zero placeholder.
 		// every cell row carries its level, so a changed cell is always a possible dent (water.js changed)
 		Core.Changed(C, Chars[C], true);
 	}

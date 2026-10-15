@@ -51,6 +51,34 @@ ETCHostKind FTCConnection::HostKindOf(const FJsonObject& Message, int32* OutProt
 
 FTCConnection::FTCConnection(const FSettings& InSettings) : Settings(InSettings) {}
 
+void FTCConnectionNotice::Receive(const FJsonObject& M)
+{
+	FString T;
+	if (!M.TryGetStringField(TEXT("t"), T)) return;
+	bRetry = false;
+	bFull = T == TEXT("full");
+	bReplaced = T == TEXT("replaced"); bLeft = T == TEXT("left");
+	if (T == TEXT("full")) M.TryGetStringField(TEXT("reason"), FullReason);
+	else FullReason.Reset();
+}
+
+FString FTCConnectionNotice::Text(double Now) const
+{
+	if (bReplaced) return TEXT("Open in another tab");
+	if (bLeft) return TEXT("You left the match; an AI took over your army. Reload to rejoin the lobby when the match is over.");
+	const int32 N = Left(Now);
+	if (N < 0) return FString();
+	return bFull ? FString::Printf(TEXT("Trying this room again in %d s"), N) : FString::Printf(TEXT("Connection lost. Retrying in %d s"), N);
+}
+
+FString FTCConnectionNotice::RoomLine() const
+{
+	if (!bFull) return FString();
+	if (FullReason == TEXT("capacity")) return TEXT("The server cannot create more rooms right now. Browse matches to join an existing room, or wait for a retry.");
+	if (FullReason == TEXT("started")) return TEXT("A match is running in this room. You will join when it ends.");
+	return TEXT("This room is full. You will join when a seat opens.");
+}
+
 FTCConnection::~FTCConnection() { bRunning = false; Retire(); Graveyard.Reset(); }
 
 int32 FTCConnection::Utf8Length(const FString& Text)
@@ -72,6 +100,7 @@ void FTCConnection::Start()
 	RetryAt = -1.0; Retire();
 	LastNow = FPlatformTime::Seconds(); // the clock Tick is given: a failure before the first Tick still waits
 	Attempts = 0; bWaitingForRoom = false; bRunning = true;
+	Banner = FTCConnectionNotice();
 	Host = ETCHostKind::Unknown; HostProtoValue = -1; HostRulesValue.Reset();
 	Open();
 }
@@ -79,6 +108,7 @@ void FTCConnection::Start()
 void FTCConnection::Stop()
 {
 	bRunning = false; RetryAt = -1.0;
+	Banner = FTCConnectionNotice();
 	Retire();
 	StatusText = TEXT("stopped");
 }
@@ -165,6 +195,7 @@ void FTCConnection::Open()
 		TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Text);
 		FString Type;
 		if (!FJsonSerializer::Deserialize(Reader, Message) || !Message.IsValid() || !Message->TryGetStringField(TEXT("t"), Type)) return;
+		Self->Banner.Receive(*Message);
 		if (Type == TEXT("replaced"))
 		{
 			// Another client took this seat with the same token: stop for good (connection.js)
@@ -231,6 +262,7 @@ void FTCConnection::Lost()
 void FTCConnection::Retry(double Seconds, const TCHAR* Why)
 {
 	RetryAt = LastNow + Seconds;
+	Banner.Retry(LastNow, Seconds, bWaitingForRoom);
 	StatusText = FString::Printf(TEXT("%s: retrying in %.0f s"), Why, Seconds);
 	UE_LOG(LogTC, Log, TEXT("%s"), *StatusText);
 }

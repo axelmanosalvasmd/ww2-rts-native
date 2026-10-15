@@ -120,8 +120,9 @@ for (let i = 0; i < timeout * 4 && !t0; i++) {
   try { if (await evaluate(`!!(window.__game && window.__game.snapshot)`)) t0 = Date.now(); } catch {}
 }
 if (!t0) { log({ error: 'no snapshot' }); kill(); process.exit(5); }
-// A held loss clock can also hold the opening sweep. Skip it through the reference camera API.
-if (freezeOnLoss) await evaluate(`window.__game.rig.skipIntro()`);
+// Use the source camera API to finish the opening sweep before setting an exact diagnostic pose.
+// Software rendering can outlast the fixed wall-clock intro wait while game dt remains clamped.
+await evaluate(`window.__game.rig.skipIntro()`);
 // the camera's opening sweep (camera.js intro) runs first: the tour starts once it has settled
 for (let i = 0; i < 240; i++) { if (await evaluate(`!window.__game.rig.intro`)) break; await sleep(250); }
 await evaluate(`(() => { window.__game.renderer.domElement.setAttribute('data-tc-main', '1'); return true; })()`);
@@ -183,6 +184,9 @@ for (const s of tour) {
   // frames drawn while the view settles, 4 s (requestAnimationFrame intervals: the software renderer's, not a measure of the game)
   const frames = await evaluate(`new Promise((done) => { const t = []; let last = performance.now(); const t0 = last, end = last + 4000; const f = (now) => { t.push(now - last); last = now; if ((now < end || t.length < ${minFrames}) && now < t0 + 90000) requestAnimationFrame(f); else done(t); }; requestAnimationFrame(f); })`);
   const state = await evaluate(`(() => { const g = window.__game, s = g.snapshot; return { mood: g.atmos.mood, weather: g.atmos.weather, wx: s && s.wx, cam: { x: g.cam.x, z: g.cam.z, dist: g.cam.dist, yaw: g.cam.yaw }, wide: g.rig.wide, paper: g.mapView ? g.mapView.fade : null, fog: [g.scene.fog.near, g.scene.fog.far, g.scene.fog.color.getHexString()], composer: g.renderer.info.programs.some((p) => p.name === 'OutputShader') }; })()`);
+  if (!s.unit && !s.frontier && !s.step && (Math.abs(state.cam.x - s.x) > 0.05 || Math.abs(state.cam.z - s.z) > 0.05 || (s.dist != null && Math.abs(state.cam.dist - s.dist) > 0.05) || Math.abs(state.cam.yaw - yaw) > 1e-7)) {
+    log({ error: 'camera did not reach the requested pose', requested: s, actual: state.cam }); kill(); process.exit(9);
+  }
   // the lobby backdrop's side effects (round 14): its canvas, the match's map pieces, the fog map the apron overlay reads
   const sideEffects = await evaluate(`(() => { const g = window.__game, K = new Set(['brick','stone','gableBrick','roof','paint','pane','wall','gable','window','earth','shrub','leaves','wood','dark','rail','duck']); let pieces = 0; g.scene.traverse((o) => { if (o.isInstancedMesh && K.has(o.name)) pieces += o.count; }); const u = g.renderer.properties.get(g.apron.fogMesh.material).uniforms || {}; return { lobbyBackdrop: document.querySelectorAll('canvas.lobby-view').length, pieces, fowSize: u.fowSize?.value?.toArray(), fogMapIsMatch: u.fowMap?.value === g.fog?.texture }; })()`);
   if (s.unit) {

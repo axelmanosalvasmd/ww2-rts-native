@@ -13,6 +13,7 @@
 #include "Net/TCMatchState.h"
 #include "ThreeCrossroads.h"
 #include "Components/DirectionalLightComponent.h"
+#include "Components/ExponentialHeightFogComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/PostProcessComponent.h"
 #include "Components/SceneCaptureComponent2D.h"
@@ -37,6 +38,8 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialParameterCollection.h"
 #include "Materials/MaterialParameterCollectionInstance.h"
+#include "Materials/MaterialRenderProxy.h"
+#include "MaterialShared.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
@@ -52,6 +55,14 @@
 #endif
 
 DEFINE_LOG_CATEGORY_STATIC(LogTCLook, Log, All);
+
+// Independent controls for matched-frame diagnosis. Defaults preserve the pinned light.js values.
+// Change one at a time with -ExecCmds="tc.Look.Haze 0", for example. These never affect match state.
+static TAutoConsoleVariable<float> CVarLookHaze(TEXT("tc.Look.Haze"), 1.f, TEXT("Reference haze density multiplier; 0 disables distance haze."));
+static TAutoConsoleVariable<float> CVarLookExposure(TEXT("tc.Look.Exposure"), 1.f, TEXT("Reference tone-mapping exposure multiplier."));
+static TAutoConsoleVariable<int32> CVarLookNeutral(TEXT("tc.Look.Neutral"), 0, TEXT("Diagnostic: use the reference lobby's Neutral curve instead of the match's ACES curve."));
+static TAutoConsoleVariable<float> CVarLookIndirect(TEXT("tc.Look.Indirect"), 1.f, TEXT("Hemisphere and environment intensity multiplier."));
+static TAutoConsoleVariable<float> CVarLookShadow(TEXT("tc.Look.Shadow"), 1.f, TEXT("Reference sun shadow strength multiplier."));
 
 // ------------------------------------------------------------------------------------------------- color and moods
 
@@ -306,7 +317,11 @@ namespace TCLook
 		S.bOverride_LensFlareIntensity = true; S.LensFlareIntensity = 0.f;
 		S.bOverride_MotionBlurAmount = true; S.MotionBlurAmount = 0.f;
 		S.bOverride_AmbientOcclusionIntensity = true; S.AmbientOcclusionIntensity = AmbientOcclusion;
-		S.bOverride_AmbientOcclusionRadius = true; S.AmbientOcclusionRadius = 160.f; // light.js AO.radius 1.6 m
+		S.bOverride_AmbientOcclusionRadius = true; S.AmbientOcclusionRadius = 160.f; // Existing view-space setting; source GTAO radius 1.6 is world-space. Parity remains open.
+		// DiffuseIndirectComposite multiplies the existing scene color by material AO in its static-lighting pass.
+		// Model AO is zero to suppress the engine sky fill; that multiplication also erases their own hemisphere and
+		// environment light in Emissive. Keep screen AO for the sky pass, without applying material AO to scene color.
+		S.bOverride_AmbientOcclusionStaticFraction = true; S.AmbientOcclusionStaticFraction = 0.f;
 		S.bOverride_DynamicGlobalIlluminationMethod = true; S.DynamicGlobalIlluminationMethod = EDynamicGlobalIlluminationMethod::None;
 		S.bOverride_ReflectionMethod = true; S.ReflectionMethod = EReflectionMethod::None;
 		if (PostMaterial) S.WeightedBlendables.Array.Add(FWeightedBlendable(1.f, PostMaterial));
@@ -500,7 +515,7 @@ void ATCLighting::Apply(bool bForceSky)
 	Look = TCLook::Applied(Base, Cur, HazeNow);
 	Sun->SetIntensity(Look.SunI);
 	Sun->SetLightColor(Look.Sun);
-	Sun->SetShadowAmount(FMath::Clamp(Look.Shadow, 0.f, 1.f));
+	Sun->SetShadowAmount(FMath::Clamp(Look.Shadow * FMath::Max(0.f, CVarLookShadow.GetValueOnGameThread()), 0.f, 1.f));
 	TCLook::MatchUnitSun(UnitSun, Sun);
 	// light.js applyGfx: scene.environment = low ? null : the PMREM sky (Client/TCGraphics.h)
 	EnvLevel = (int32)FTCGraphics::Get().Level();
@@ -519,19 +534,22 @@ void ATCLighting::Apply(bool bForceSky)
 		}
 	}
 	const float Env = FTCGraphics::Get().Budget().bEnvironment ? TCLook::EnvironmentIntensity(Look.SunI) : 0.f;
-	TCLook::SetCollection(GetWorld(), Look, Env, Yaw, TCLook::IndirectInMaterials());
+	const float IndirectScale = FMath::Max(0.f, CVarLookIndirect.GetValueOnGameThread());
+	FTCMood IndirectLook = Look;
+	IndirectLook.HemiI *= IndirectScale;
+	TCLook::SetCollection(GetWorld(), IndirectLook, Env * IndirectScale, Yaw, TCLook::IndirectInMaterials());
 	// the sky light's cube is rebuilt only when what it holds moved by more than half a percent
 	const bool bSkyMoved = SkyEnv < 0.f || FMath::Abs(Env - SkyEnv) > 0.005f * SkyEnv || !SkyTop.Equals(Look.Top * Look.HemiI, 0.002f) || !SkyBottom.Equals(Look.Bottom * Look.HemiI, 0.002f);
 	if (bForceSky || bSkyMoved)
 	{
-		SkyCube = TCLook::MakeSkyCube(Look, Env, Yaw);
+		SkyCube = TCLook::MakeSkyCube(IndirectLook, Env * IndirectScale, Yaw);
 		Sky->SetCubemap(SkyCube);
 		Sky->SetIntensity(1.f);
 		Sky->SetLightColor(FLinearColor::White);
 		Sky->RecaptureSky();
 		SkyEnv = Env; SkyTop = Look.Top * Look.HemiI; SkyBottom = Look.Bottom * Look.HemiI;
 		// what the capture must hold: the cube's own cosine integral for a white surface facing up
-		SkyWantUp = TCLook::ExpectedDiffuse(FVector(0, 0, 1), Look, Env, Yaw);
+		SkyWantUp = TCLook::ExpectedDiffuse(FVector(0, 0, 1), IndirectLook, Env * IndirectScale, Yaw);
 		bSkyCheck = true; bSkyCaptured = false; SkyTries = 1;
 		SkyCheckAt = GetWorld() ? GetWorld()->GetRealTimeSeconds() + 0.25 : 0.0;
 	}
@@ -628,6 +646,13 @@ void ATCLighting::Tick(float Dt)
 		TCLook::SetPost(PostMaterial, FTCLobbyLook::Exposure, LobbyLook.FogNear, LobbyLook.FogFar, LobbyLook.Fog, LobbyLook.bHazeBeforeTone, LobbyLook.bNeutralToneMapping);
 		return;
 	}
+	const FVector2D Controls(CVarLookIndirect.GetValueOnGameThread(), CVarLookShadow.GetValueOnGameThread());
+	if (!Controls.Equals(LastDiagnosticControls))
+	{
+		LastDiagnosticControls = Controls;
+		Apply(true);
+		UE_LOG(LogTCLook, Log, TEXT("look controls: indirect %.4f shadow %.4f"), Controls.X, Controls.Y);
+	}
 	// atmosphere.js update: ease toward the weather, about 8 s to settle
 	const float K = 1.f - FMath::Exp(-Dt / 2.5f);
 	auto Near = [](float A, float B) { return FMath::Abs(A - B) <= 5e-4f; };
@@ -662,7 +687,59 @@ void ATCLighting::Tick(float Dt)
 	}
 	LastFogNear = Dist * 0.6f / Look.HazeK;
 	LastFogFar = Dist * 3.8f / Look.HazeK;
-	TCLook::SetPost(PostMaterial, Look.Exposure, LastFogNear, LastFogFar, Look.Haze, bHazeBeforeTone);
+	const float HazeScale = FMath::Max(0.f, CVarLookHaze.GetValueOnGameThread());
+	if (HazeScale > 0.f) { LastFogNear /= HazeScale; LastFogFar /= HazeScale; }
+	else { LastFogNear = LastFogFar = 0.f; }
+	TCLook::SetPost(PostMaterial, Look.Exposure * FMath::Max(0.f, CVarLookExposure.GetValueOnGameThread()), LastFogNear, LastFogFar, Look.Haze, bHazeBeforeTone, CVarLookNeutral.GetValueOnGameThread() != 0);
+	if (FParse::Param(FCommandLine::Get(), TEXT("TCLookAudit"))) Audit();
+}
+
+void ATCLighting::Audit()
+{
+	UWorld* World = GetWorld();
+	if (!World || World->GetRealTimeSeconds() < NextAuditAt) return;
+	NextAuditAt = World->GetRealTimeSeconds() + 2.0;
+	int32 HeightFogs = 0;
+	for (TObjectIterator<UExponentialHeightFogComponent> It; It; ++It)
+		if (It->GetWorld() == World && It->IsRegistered() && It->IsVisible()) ++HeightFogs;
+	UE_LOG(LogTCLook, Log, TEXT("look audit passes: AO %.4f static fraction %.4f sky intensity %.4f engine height fogs %d neutral curve %d"),
+		Post->Settings.AmbientOcclusionIntensity, Post->Settings.AmbientOcclusionStaticFraction, Sky->Intensity, HeightFogs, CVarLookNeutral.GetValueOnGameThread());
+	if (auto* Collection = LoadObject<UMaterialParameterCollection>(nullptr, TCLook::CollectionPath))
+		if (auto* Instance = World->GetParameterCollectionInstance(Collection))
+		{
+			FLinearColor Env, Top, Bottom;
+			Instance->GetVectorParameterValue(TEXT("Env"), Env);
+			Instance->GetVectorParameterValue(TEXT("HemiTop"), Top);
+			Instance->GetVectorParameterValue(TEXT("HemiBottom"), Bottom);
+			UE_LOG(LogTCLook, Log, TEXT("look audit collection: env %s top %s bottom %s sun %.6f unitSun %.6f"),
+				*Env.ToString(), *Top.ToString(), *Bottom.ToString(), Sun->Intensity, UnitSun->Intensity);
+		}
+	if (const auto* PC = World->GetFirstPlayerController(); PC && PC->PlayerCameraManager)
+	{
+		const auto& V = PC->PlayerCameraManager->GetCameraCacheView();
+		UE_LOG(LogTCLook, Log, TEXT("look audit: camera %s rotation %s fov %.6f exposure %.6f fog %.6f %.6f beforeTone %d indirect %.6f shadow %.6f"),
+			*V.Location.ToString(), *V.Rotation.ToString(), V.FOV, Look.Exposure * CVarLookExposure.GetValueOnGameThread(),
+			LastFogNear, LastFogFar, bHazeBeforeTone, CVarLookIndirect.GetValueOnGameThread(), CVarLookShadow.GetValueOnGameThread());
+	}
+	TMap<FString, UMaterialInterface*> Surfaces;
+	for (TObjectIterator<UInstancedStaticMeshComponent> It; It; ++It)
+		if (It->GetWorld() == World && It->IsRegistered())
+			for (int32 I = 0; I < It->GetNumMaterials(); I++) if (auto* M = It->GetMaterial(I))
+				Surfaces.FindOrAdd(M->GetMaterial()->GetName(), M);
+	TArray<FString> Names; Surfaces.GetKeys(Names); Names.Sort();
+	for (const FString& Name : Names)
+	{
+		const FMaterialRenderProxy* Proxy = Surfaces[Name]->GetRenderProxy();
+		const auto FeatureLevel = World->GetFeatureLevel();
+		ENQUEUE_RENDER_COMMAND(TCLookAudit)([Proxy, FeatureLevel, Name](FRHICommandListImmediate&)
+		{
+			const FMaterial* Requested = Proxy->GetMaterialNoFallback(FeatureLevel);
+			const FMaterialRenderProxy* Fallback = nullptr;
+			const FMaterial& Actual = Proxy->GetMaterialWithFallback(FeatureLevel, Fallback);
+			UE_LOG(LogTCLook, Log, TEXT("look audit material: %s requested %s actual %s ready %d"), *Name,
+				Requested ? *Requested->GetFriendlyName() : TEXT("missing"), *Actual.GetFriendlyName(), Requested == &Actual);
+		});
+	}
 }
 
 // ------------------------------------------------------------------------------------------------- the comparison
@@ -1330,6 +1407,11 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCLookReferenceTest, "ThreeCrossroads.Look.Ref
 bool FTCLookReferenceTest::RunTest(const FString& Parameters)
 {
 	using namespace TCLook;
+	FPostProcessSettings Settings;
+	LockPostProcess(Settings, nullptr, 0.85f);
+	TestTrue(TEXT("custom indirect light is protected from static material AO"),
+		Settings.bOverride_AmbientOcclusionStaticFraction && Settings.AmbientOcclusionStaticFraction == 0.f);
+	TestEqual(TEXT("High screen ambient occlusion remains enabled"), Settings.AmbientOcclusionIntensity, 0.85f);
 	auto Rgb = [](const FLinearColor& A, const FLinearColor& B, float Tol) { return FMath::Abs(A.R - B.R) <= Tol && FMath::Abs(A.G - B.G) <= Tol && FMath::Abs(A.B - B.B) <= Tol; };
 	TestEqual(TEXT("six moods"), Moods().Num(), 6);
 	TestEqual(TEXT("day is the default"), DefaultMood().Name, FName(TEXT("day")));

@@ -58,7 +58,7 @@ git lfs install --local
 
 You need Rust (stable) for `rust/`, Node.js to run the reference game and its tests, Git LFS, and Unreal Engine 5.8 only for `unreal/`.
 
-## Unreal client (slices 1a to 1t)
+## Unreal client (slices 1a to 1u)
 
 Built and run on Linux with the installed Unreal 5.8.3; Windows and Mac are not built yet. The project uses the engine's empty Entry map and spawns everything from C++.
 
@@ -197,3 +197,8 @@ The bottom HUD uses the original symbol paths, embedded by `Tools/hudfit/export-
 Generate the exact static HQ cloth with `Tools/bridge-replay/capture-browser.mjs --cloth-out <PNG>` and `Tools/bridge-replay/make-lookfx-assets.py` using `LOOKFX_CLOTH=<PNG>`, then regenerate camp geometry with `Client/TCCampModels.Export.mjs`. These generated assets remain build outputs, consistent with the existing content policy. The package verifier requires both cloth assets. `TC_PACKAGE_STAGE` can place staged build output separately from scratch.
 
 Rust hosts disable the unsupported Hand to AI action, including direct menu and common send paths. The renderer skips model/ring allocation in headless runs. The integrated suite covers these paths and terrain, HUD, cloth and collapse formulas. Soldier brightness, some bridge-face shading, broader visual acceptance and unrecorded later collapse motion remain open.
+
+
+### Slice 1u integration
+
+The original-art HUD now includes faction and resource icons, idle/type/group controls, recruitment letters and bounded alerts. Session view memory, retry/reclaim notices, actual map previews, source marker labels and Tutorial camps are integrated. The required-FFI Linux editor build passes 138 automation tests, including real Vulkan normal-buffer checks. The source normal atlas and eleven material masters can be refreshed with `unreal/Tools/look/refresh-normal-atlas.py`; generate them before cooking. World water discovery retains creation-time heights and structure builders live in `World/TCStructures`. Faulted Rust Restart uses a dedicated client notice without changing the host policy. Colour/contrast and broader visual acceptance remain open; no parity row is accepted. Final slice 1u verification: sixteen explicit-Graphics mode rows, six private Rust-host lanes (6,053 adopted/agreeing) and a Linux Development package with verified hashes and headless/rendered client pairs. Live/package counters total 144,329 adopted/agreeing across 55 final logs; failed tries and recorded presentation are excluded.

@@ -23,6 +23,7 @@
 #include "Client/TCPlayerController.h"
 #include "Client/TCHUD.h"
 #include "World/TCTerrain.h"
+#include "Camera/PlayerCameraManager.h"
 #include "ThreeCrossroads.h"
 #include "Engine/World.h"
 #include "Misc/FileHelper.h"
@@ -120,10 +121,15 @@ void ATCGameMode::RunSlice13Switches(double Now)
 	}
 	// round 14: a unit pose follows its unit while the view settles, so a moving vehicle stays in the middle of the shot
 	if (const FTCUnit* U = P.UnitId >= 0 ? State.Units.Find(P.UnitId) : nullptr) PC->FocusOn(FVector2D(U->X, U->Z));
-	if (Now < TourShotAt) { TourFrames.Add(FApp::GetDeltaTime() * 1000.0); return; }
+	if (Now < TourShotAt || TourFrames.N < 8) { TourFrames.Add(FApp::GetDeltaTime() * 1000.0); return; }
 	if (FScreenshotRequest::IsScreenshotRequested()) return;
 	const FString File = FPaths::Combine(TourDir, P.Name + TEXT(".png"));
 	FScreenshotRequest::RequestScreenshot(File, false, false);
+	if (PC->PlayerCameraManager)
+	{
+		const FMinimalViewInfo& V = PC->PlayerCameraManager->GetCameraCacheView();
+		UE_LOG(LogTC, Log, TEXT("look camera: %s camera %s rotation %s fov %.6f"), *P.Name, *V.Location.ToString(), *V.Rotation.ToString(), V.FOV);
+	}
 	TourShots++;
 	int32 Verts = 0, Unowned = 0;
 	const int32 OnUnknown = Terrain->DrawnOnUnknown(State, &Verts, &Unowned);

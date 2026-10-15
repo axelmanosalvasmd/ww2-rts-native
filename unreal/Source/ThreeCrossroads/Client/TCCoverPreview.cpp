@@ -1,5 +1,8 @@
 #include "Client/TCCoverPreview.h"
 #include "Net/TCMatchState.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
+#include "ThreeCrossroads.h"
 
 const TCHAR* const FTCCoverPreview::ReferencePin = TEXT("e4e579a");
 
@@ -435,6 +438,18 @@ const FTCCoverView& FTCCoverPreview::Frame(double Dt, const FTCCoverKnown& Known
 	V.bFlashGround = Fo > 0 && Flashed.Ground.Num() > 0;
 	V.bFlashThrough = Fo > 0 && Flashed.Through.Num() > 0;
 	V.bVisible = V.bCursorGround || V.bCursorThrough || V.bFlashGround || V.bFlashThrough;
+	if (FParse::Param(FCommandLine::Get(), TEXT("TCCoverLog")))
+	{
+		static double NextLog = 0;
+		const double Now = FPlatformTime::Seconds();
+		if (Now >= NextLog)
+		{
+			NextLog = Now + 2;
+			int32 Heavy = 0, Light = 0, Open = 0, Chevrons = 0;
+			for (const auto& G : Cursor.Ground) { if (G.bChevron) Chevrons++; else if (G.Kind == ETCCoverKind::Heavy) Heavy++; else if (G.Kind == ETCCoverKind::Light) Light++; else Open++; }
+			UE_LOG(LogTC, Log, TEXT("cover markers: visible %d; cursor cell %d,%d; ground %d (heavy %d light %d open %d chevrons %d) depth tested, through %d opacity %.3f; flash ground %d through %d"), V.bVisible, CurX, CurY, Cursor.Ground.Num(), Heavy, Light, Open, Chevrons, Cursor.Through.Num(), V.CursorThroughOpacity, Flashed.Ground.Num(), Flashed.Through.Num());
+		}
+	}
 	return V;
 }
 
@@ -457,3 +472,38 @@ void FTCCoverPreview::OnGraphicsChanged(bool bLow)
 	TCCoverImpl::Clear(Flashed);
 	FlT = FlashSeconds;
 }
+
+#if WITH_DEV_AUTOMATION_TESTS
+#include "Misc/AutomationTest.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCCoverLayerTest, "ThreeCrossroads.Markers.CoverLayers", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+bool FTCCoverLayerTest::RunTest(const FString&)
+{
+	TArray<uint8> Cells, Explored;
+	Cells.Init('.', 49); Explored.Init(1, 49);
+	Cells[3 * 7 + 3] = 'T';
+	Cells[3 * 7 + 4] = '+';
+	Cells[2 * 7 + 3] = 'B';
+	Cells[4 * 7 + 3] = 'H';
+	FTCCoverKnown Known;
+	Known.Grid.W = Known.Grid.H = 7; Known.Grid.Chars = Cells; Known.Explored = Explored;
+	Known.bInfantrySelected = Known.bGarrisonSelected = true;
+	FTCCoverPreview Preview; Preview.Start(Known);
+	FTCCoverPointer Pointer;
+	Pointer.bInside = Pointer.bOverView = Pointer.bGroundHit = true; Pointer.Ground = FVector2D(7, 7);
+	const FTCCoverView& View = Preview.Frame(0.05, Known, Pointer);
+	bool Heavy = false, Light = false, Chevron = false, HouseThrough = false;
+	for (const FTCCoverGlyph& G : Preview.CursorMarks().Ground)
+	{
+		Heavy |= !G.bChevron && G.Kind == ETCCoverKind::Heavy;
+		Light |= !G.bChevron && G.Kind == ETCCoverKind::Light;
+		Chevron |= G.bChevron;
+	}
+	for (const FTCCoverGlyph& G : Preview.CursorMarks().Through) HouseThrough |= G.X == 7 && G.Z == 5 && G.Kind == ETCCoverKind::Heavy;
+	TestTrue(TEXT("explored cover draws heavy and light ground shields and directional chevrons"), View.bCursorGround && Heavy && Light && Chevron);
+	TestTrue(TEXT("a house shield uses the faint through-model layer"), View.bCursorThrough && HouseThrough && FMath::IsNearlyEqual(View.CursorThroughOpacity, View.CursorGroundOpacity * float(FTCCoverPreview::XrayOpacity)));
+	Pointer.bOverView = false;
+	TestFalse(TEXT("a pointer over the HUD hides both cursor layers"), Preview.Frame(0.05, Known, Pointer).bVisible);
+	return true;
+}
+#endif
