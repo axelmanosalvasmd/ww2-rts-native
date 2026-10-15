@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## Prospective NET socket predicates on main68 (2026-10-15, code only)
+
+A separate checkout at exact `68f2812b9fe00b9eb4ee2435d0f1eb0baf05872f` prepares one Source recorder and ordinary-binary TCP target for NET-05, NET-34 and the ordinary-human start/reset predicates of NET-68. The thirteen-input malformed-play helper retains every original assertion byte for byte. Source recording, generated expectations, syntax/format checks and native execution are pending a central-ledger grant. No result, parity promotion or runtime choice is claimed. The complete predicate map, exact future commands and unsuccessful search for three additional complete new gains are in [the checkpoint brief](docs/testing/net-socket-predicates-68f-b804ec47.md).
+
+The original NET-15 split-surrogate failure stays frozen at `0f93ab4c`; no assertion, expected code unit or display policy changes. NET-16/20 runtime gaps and NET-22/25 literal acceptance gaps remain held. Full private object identity, AI/commander reset, delivered-after-close, timed lifecycle, spectator and client rate-limit clauses are not replaced by narrower socket observations. The original R4 branch remains at b637. This checkpoint changes no existing source/helper/fixture, contract, ABI/header, reference, terrain, workflow or parity status. Separate actual-head review remains required before publication or tracking changes.
+
 ## Parallel Rust verification and dependency caching (2026-10-14)
 
 PR #214 at `ee7bdc3c899b912f229dade7e5d58855052d87b7` separates lint, tests and release into three jobs on each of Ubuntu 24.04, Windows 2025 and macOS 15, for nine jobs total. Strict locked workspace/all-target Clippy remains on all three platforms. Locked workspace tests use cargo-nextest 0.9.148 with Cargo's existing `ci-test` profile and nextest's `ci` profile; explicit locked `cargo test --doc` retains doctests on all three. Locked release FFI builds remain on all three, with strict C11 linking and formation replay on Linux. Test jobs retain the 60-minute limit; lint and release jobs have 30-minute limits.

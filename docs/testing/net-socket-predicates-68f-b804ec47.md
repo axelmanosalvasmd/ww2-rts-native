@@ -1,0 +1,59 @@
+# NET socket predicate code checkpoint
+
+Base: exact main `68f2812b9fe00b9eb4ee2435d0f1eb0baf05872f`. Exclusive branch: `test/net-six-sockets-68f-b804ec47`, in the previously clean automatic checkout `t3-b804ec47`. Reference remains `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. This checkpoint contains Source-backed recorder/test code only. No Source process, recorder generation/check, Node syntax check, Cargo, native test or formatter has run. It is not an executed proof or a row promotion.
+
+The first proposed six-row batch was too broad. NET-16/20 retain runtime gaps, while NET-22/25 retain unwaived literal acceptance gaps. Source inspection found one strong additional complete candidate, NET-34. It did not establish three additional complete new gains under the ordinary-binary boundary. Do not pad the requested 5-15-row batch with narrower slices or old provider proofs. The active code is therefore NET-05/34/68, pending Root's fresh review. The larger candidate search and held reasons below are part of this checkpoint's result.
+
+## Frozen layout and provenance
+
+- `harness/net-socket-predicates-inputs.json`: exact borrowed thirteen-input play sequence and original recorded predicates, twelve malformed JSON/type inputs, plus 20 original numeric-slot actions and 41 value/authority/boundary actions. It contains no newly fabricated Source outputs.
+- `harness/net-socket-predicates-fixture.mjs`: one shared recorder. It starts unchanged original Source servers over loopback TCP, uses original `client/world-state.js`, and writes `rust/crates/server/tests/fixtures/net-socket-predicates.json` only after an execution grant.
+- `rust/crates/server/tests/net_socket_predicates.rs`: one named ordinary-binary TCP/WebSocket batch test. It uses the unchanged shared binary/client helper and actual ClientView decoding. The generated fixture is read at runtime and is absent at this code checkpoint. A missing fixture fails explicitly; there is no fallback expected value.
+- One unique changelog fragment and a short DESIGN entry record preparation and the held boundaries. `docs/parity/server.md` and every existing status/acceptance remain unchanged.
+
+The borrowed play helper is byte-exact `0f93` from `fn play` through its closing brace. Its SHA256 is `c48ceb496d30c4ed6cbb2e7c242d9378e2b6f985690fa84b6bdf5e7f300140cf`. Every assertion and all thirteen inputs/recorded play predicates are retained. Attribution is explicit in the input file. The original failed lifecycle batch is not copied into main with its failing title assertion removed; this new target has its own declared smaller acceptance scope.
+
+## Predicate and test map
+
+**NET-05.** Pinned `test-audit-server.mjs:59-62` sends malformed move orders `[null]`, observes an ordered Pong and requires the room to stay in play. `server.js:584-589` supplies the JSON/prehello guards, and `:712-715` the original seated command path. The new test runs the exact existing thirteen-input `play` witness, keeping later decoded progress, no native fault and actual same-seat drop/reconnect assertions. A separate malformed-text phase checks all twelve inputs before hello and after hello, with immediate lobby/Pong silence barriers. This is the row's selected malformed-play acceptance, not the unrelated Horde map-selection assertions elsewhere in the Source audit file. A malformed move can receive a denial; survival is the named assertion.
+
+**NET-34.** Read the complete SRV@5089 scenario at `test.js:5089-5105`. A normal lobby starts with one human and one existing AI row. For each slot `'1'`, `[1]`, `1.5`, `-1`, null and true, the original check sends faction, team and kick, preserving faction/team and roster count. It then accepts integer faction slot 1 value 2 and integer kick slot 1. All 20 actions are present. The second ordinary lobby adds every valid team value 0-5 and faction value 0-3, malformed/out-of-range/missing values/slots, host-versus-guest authority, and the host's prohibition on changing another human's faction. An accepted no-op team message broadcasts a fresh real roster after each action, so rejection is compared through actual observable state rather than a retained synthetic expected object. Source `server.js:655-658` and native `lobby.rs:488-546` supply these existing rules. Existing lobby AI support is used; no AI match is started. The ordinary two-human R1 phase also sends in-play team/faction changes and verifies unchanged teams/factions in the subsequent actual start. Native blocked denials are not represented as Source silence equality.
+
+**NET-68.** Pinned `server.js:454-468` resets the seat's sent record; `client/main.js:501-506` and original `client/world-state.js` reset the client. Read HELD's full unit-delta check at `test.js:3739-3758`, including fresh rows, quiet omission, changed/gone, held fingerprint and explicit full resend. This batch covers the row-specific start/reconnect reset: initial starts, same-token replacement, actual socket drop/return, and a healthy same-socket restart. Every observed start must clear warmed actual decoder history before reading a later snapshot. Every first snapshot must have unique nonempty rows, no gone list, complete held count/XOR and a consistent actual ClientView. `all:true` is not required for an empty reset record. A clone of prior actual ClientView history is carried into the replacement client; no expected row is injected. Same-socket restart separately proves reset without that transfer. This does not claim the other NET-64 delta/role variants merely because HELD is cited.
+
+Source uses its original network Conquest profile and logistics on. Native uses only the already approved private two-human R1 profile, temporary logistics off and its existing host-private test seed. Compare parsing, identity/reset and frame-structure predicates, not simulation rows, whole-match outcomes or RNG alignment. The complete original Source server, map and function bodies remain unchanged.
+
+The single native target is `source_recorded_socket_predicates_use_actual_binary_tcp`. Its explicit phase order is play, malformed text, reset/reconnect, then slot/authority cases. On any real failure, preserve the raw first failure and mark later phases unrun. A printed successful subcase inside a failing target is not a passing test count. No row can change status based on test presence or this code-only checkpoint.
+
+## Held rows and candidate search
+
+- **NET-15 remains separately frozen at 0f93.** Source split title ends D83D, native FFFD. The original exact assertion and first failure are untouched. The old final BOM title, all nine native name cases and eight native capacity cases remain unreached. No lossy normalization, alternate title bound or Unicode policy is introduced.
+- **NET-16.** The full MAX_ROOMS matrix and existing-room reachability remain required. Native ordinary `main.rs` does not read MAX_ROOMS. This is a source-level lead, not a newly observed failure; no runtime repair is authorized. Its previous unexecuted broad draft is parked in scratch, outside the active checkpoint.
+- **NET-20.** Complete string guards and Source name/token boundaries remain required, including the split surrogate and differing trim boundaries. SRV@5135's malformed conversions and silent rename stay in scope for any future full check. No Source expectation is changed to match Rust's lossy string representation.
+- **NET-22.** Literal RL@5824 includes natural match end, retained player objects, per-player outcomes, aligned result/story/name/team rows, newcomer unused team and later cleanup. Six human defaults plus a lobby kick/rejoin are narrower. Those observations cannot waive the literal scenario or promote the row.
+- **NET-25/27.** RL@5845 requires private player-object identity; SRV@5048 delivers through a server-side emitter after socket closure and later tests AI handover. Actual replace/close/same-match socket behavior is useful but does not prove those private/late-delivery facts. Source AI and commander resets delete private WeakMap entries (`shared/ai.js:162`, `shared/ai-human.js:72`); ordinary human-only sockets do not supply nontrivial AI/helper state proof. Role variants, cleanup cancellation and retained deny state remain unwaived.
+- **NET-66.** A two-human online/RTT/drop case is testable, but the full row requires AI online=true and ping=-1. Native `lobby.rs:1049-1054` reads only connection readiness and raw rtt. No admitted R1 AI producer supplies the missing branch. Human-only metrics are not a complete new gain.
+- **NET-67.** A dropped actual consumer application followed by real resync/all is testable. The full row also includes the spectator producer and the client's one-second request limit. The latter is inline in `client/main.js:916-923`; manually issuing resync from a Rust test is not rate-limit proof. Keep the row held rather than add a new client API or spectator policy.
+- **NET-70.** The exact deterministic one-second stall/cap/drop/resume case already exists in `harness/tick-timing-fixture.mjs:96` and the native CatchUpClock consumer at `tick_timing.rs:256-265`. Repackaging that component as a new socket gain would add no coverage. Actual host-loop linkage remains distinct from formula/provider proof.
+- **NET-72.** Complete CAD and BEAT cover adaptation and AI delivery scheduling. CAD uses a configurable Source ten-sample snapshot ring (`test.js:6912,6937`), while this native provider has a fixed fifty-sample ring. Selected cadence examples do not complete the named checks or AI schedule/handover coverage. No provider/gate change is included.
+- **NET-33.** The full SRV slot check is available, but literal RL@5781 also checks an explicit fake-clock 9,999 ms offline-seat hold. A wall-clock socket sleep is not an exact deterministic substitute. Complete proof needs the existing internal clock boundary, beyond this ordinary-binary target.
+- **NET-09/21/23/28/30/32/41.** Full named checks add private directory-state mutation, in-play spectator/AI paths, timed lifecycle or edited Horde/start contexts. Existing simple lobby observations are not substituted for those complete acceptances. These are not counted to reach five rows.
+
+This search yields two continuing predicate targets plus one additional strong candidate, not five newly complete rows. Root's fresh review can identify further complete existing checks or revise the implementation route. No acceptance text, status, privacy, role, ABI/header, wire, runtime API or hosting decision is changed to meet a row count.
+
+## Future commands, not executed
+
+Only after a concrete central-ledger grant, inside its verified resource/affinity scope and with a clean pinned Source checkout:
+
+```sh
+WW2_REFERENCE=/tmp/net-session-batch-0e8d6d9b/reference-e4 /usr/bin/node harness/net-socket-predicates-fixture.mjs
+WW2_REFERENCE=/tmp/net-session-batch-0e8d6d9b/reference-e4 /usr/bin/node harness/net-socket-predicates-fixture.mjs --check
+```
+
+Freeze and hash the generated Source output in a new input commit before native execution. It is absent now and no values are invented in its place. Reconfirm the actual compiler/Node/reference pins at grant time.
+
+```sh
+CARGO_BUILD_JOBS=4 cargo +1.99.0 test --manifest-path rust/Cargo.toml --locked --profile ci-test -p ww2-server --test net_socket_predicates -j4 source_recorded_socket_predicates_use_actual_binary_tcp -- --exact --nocapture --test-threads=4
+```
+
+The eventual command must use Root's assigned memory/swap/CPU/quota scope, capture kernel affinity, raw counts/exits and cleanup, and stop at the first real failure. No old R4 slot is reused. Formatting/syntax checks are pending with the execution grant. Separate actual-head review precedes any PR or status change. R4 #218 stays at b637; held NET stays at 0f93. This checkpoint neither waits for nor acts on #218 CI.
