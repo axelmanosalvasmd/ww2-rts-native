@@ -1,0 +1,1 @@
+- Add five source-read engineering checks for mud speed, weather definitions and application, seeded plans and warning boundaries (ENG-59 and ENG-73 through ENG-76). Preserve all existing tests and fixtures. Native execution, fresh Source checks and broader travel, vision and snapshot evidence remain pending; no parity row is promoted.
