@@ -385,7 +385,11 @@ fn replay(name: &str, predicate: &str) -> Replay {
                             .iter()
                             .map(|cell| usize::try_from(*cell).expect("actor cell fits usize"))
                             .collect::<Vec<_>>();
-                        assert!(indexed_cells.iter().all(|cell| m.building_cells[cell].unit == id));
+                        assert!(
+                            indexed_cells
+                                .iter()
+                                .all(|cell| m.building_cells[cell].unit == id)
+                        );
                         assert!(
                             m.world
                                 .structures
