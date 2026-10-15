@@ -148,6 +148,33 @@ fn authored_map(input: &Value, terrain: &str, w: usize, h: usize) -> Value {
     map
 }
 
+fn assert_input_json_bits(actual: &Value, expected: &Value, path: &str) {
+    match (actual, expected) {
+        (Value::Number(a), Value::Number(b)) => assert_eq!(
+            a.as_f64().expect("JSON number").to_bits(),
+            b.as_f64().expect("JSON number").to_bits(),
+            "{path}: numeric input bits"
+        ),
+        (Value::Array(a), Value::Array(b)) => {
+            assert_eq!(a.len(), b.len(), "{path}: input array length");
+            for (index, (a, b)) in a.iter().zip(b).enumerate() {
+                assert_input_json_bits(a, b, &format!("{path}/{index}"));
+            }
+        }
+        (Value::Object(a), Value::Object(b)) => {
+            assert_eq!(
+                a.keys().collect::<Vec<_>>(),
+                b.keys().collect::<Vec<_>>(),
+                "{path}: input object keys"
+            );
+            for (key, value) in a {
+                assert_input_json_bits(value, &b[key], &format!("{path}/{key}"));
+            }
+        }
+        _ => assert_eq!(actual, expected, "{path}: input value and type"),
+    }
+}
+
 fn fixture() -> Value {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let input: Value = serde_json::from_slice(
@@ -167,7 +194,7 @@ fn fixture() -> Value {
     );
     assert_eq!(fixture["node"], "v24.21.0");
     assert_eq!(fixture["arch"], "x64");
-    assert_eq!(fixture["input"], input);
+    assert_input_json_bits(&fixture["input"], &input, "input");
     fixture
 }
 
