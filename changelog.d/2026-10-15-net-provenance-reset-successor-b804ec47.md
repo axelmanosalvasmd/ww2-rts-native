@@ -1,0 +1,1 @@
+- Validate pinned Source provenance before importing the NET socket recorder, retain delivered decoder history through replacement, and check guest initial and warmed restart snapshots alongside the host. All original malformed-play and numeric-slot assertions remain; authentic Source and focused native execution are pending.
