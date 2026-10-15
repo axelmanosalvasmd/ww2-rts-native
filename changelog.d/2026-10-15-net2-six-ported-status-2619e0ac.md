@@ -1,0 +1,1 @@
+- Mark NET-64, NET-65, NET-69, NET-70, NET-72 and NET-74 ported after the reviewed Source fixture and socket checks. Keep NET-66, NET-67, NET-80 and NET-81 held, with all acceptance requirements unchanged.
