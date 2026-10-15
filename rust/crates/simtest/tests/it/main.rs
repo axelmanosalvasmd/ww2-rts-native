@@ -83,8 +83,14 @@ mod match_tick;
 mod match_tick_companions;
 #[path = "../match_tick_events.rs"]
 mod match_tick_events;
+#[path = "../mode14_spawn_layout.rs"]
+mod mode14_spawn_layout;
 #[path = "../mode_predicates.rs"]
 mod mode_predicates;
+#[path = "../mode_startup_checks.rs"]
+mod mode_startup_checks;
+#[path = "../mov_vehicle_predicates.rs"]
+mod mov_vehicle_predicates;
 #[path = "../movement.rs"]
 mod movement;
 #[path = "../movement_routing.rs"]
