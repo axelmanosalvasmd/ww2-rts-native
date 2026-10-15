@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## Second server-stream source freeze (2026-10-15)
+
+At baseline `34edf52a7eaa6cb6edba3e802c2190226228276f`, IMPL_NET_2 selects NET-64/65/66/67/69/70/72/74/80/81 for a source-inspected acceptance plan, not a completion claim. [The plan](docs/testing/net-2-row-plan.md) and [full 47-row predicate map](docs/testing/net-2-row-plan.json) preserve the original acceptance requirements and distinguish component fixtures from actual socket consumers. NET-98 is absent from the inventory and ownership map; NET-68 remains another owner's row. All parity statuses stay unchanged.
+
+Keep R1's approved two-human Conquest profile and existing wire/ABI. AI, spectator and client branches prevent full completion claims for several selected rows; missing controlled socket witnesses prevent the others. The native metadata builder has no AI-specific online/ping values, and the current dispatcher leaves host pause/resume unavailable. No runtime change or policy expansion is adopted. Cargo, server execution and Source recorders await an explicit Root slot grant; this documentation freeze has no new runtime proof. Root retains separate review and publication ownership.
+
 ## Engineering supported scope and held aircraft consumer (2026-10-15)
 
 The supported engineering gate contains 20 original checks. Preserve the full `f2b48700` candidate under `refs/heads/held/eng-five-row-aircraft-f2b48700` and move its aircraft test function verbatim to the [unregistered checkpoint](docs/checkpoints/engineering-aircraft-f2b48700/README.md). That function remains FAILED / HELD: the first firing-enabled Clear patrol is refused before tick 1 because the automatic aircraft ground-fire actuator is unavailable. Its Source input and complete five-weather capture remain intact. The checkpoint records the precise provider boundary and pending consumer work.
