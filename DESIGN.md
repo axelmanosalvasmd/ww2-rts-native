@@ -2185,6 +2185,10 @@ At clean `0e2334bea37d1d5d41c5f308e54bb3ffabb5b0e9`, only the four remaining Sou
 
 All four invocations used actual x64 Node24.21.0 with4096MiB V8 heap, S2 CPU4-7,6GiB/swap0/400% and exclusive flock; each disk-floor preflight passed. Peaks in stage order were415,846,400,312,573,952,381,403,136 and363,622,400 bytes. Freeze only the authentic terrain/World companion fixtures, leaving original raw capture private and every first failure unchanged. This commit precedes Cargo: native tests, whole-row eligibility and all statuses remain pending. Companion proof is not literal original cleared-map admission.
 
+### MOV consumer formatting before native compilation
+
+The first guarded fmtcheck at fixture head `e99b92af` exited1 with diagnostics only in the two new MOV consumer files. Guarded rustfmt exited0 and changed only those files. Static readback preserves non-import token order apart from grouping braces/trailing commas, exact literal/comment sequence and all assertions; added braces wrap expression closures without behavior changes. The first preservation scratch comparison rejected rustfmt's added grouping braces, then the actual diff was inspected and the qualified comparison passed. Source recorders, fixtures, predicates and runtime stay unchanged. Freeze this formatting child and require fmtcheck before the exact seven-test selection.
+
 ## Routing inside movement (2026-10-13)
 
 The movement block now has `move_unit_with_routes` and `move_units_with_routes` entry points. They invoke the caller's route handler at the reference's actual recovery point, after traffic has selected its steering goal. Infantry stalls request budgeted recovery; vehicle stalls and traffic replans request an immediate search. The handler owns terrain selection, scheduling, errors and path replacement. A replaced path advances `path_gen`, preserving the identity checks used by lane and clearance caches. Existing entry points retain the disabled-search behavior needed by the frozen benchmark.
