@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Bind the newly assigned LOG-03 complete initialization check to the existing 708 original-function inputs, actual native reserve producer, seven-model 350-round formula and stable identity test. Preserve the three proved logistics rows and every parity cell while LOG-24 causal qualification and five-row review remain pending. No Source or native job is run by this readback.
+
 - Normally merge the three complete logistics-row proposal onto main `7c9df2d5`, preserving both histories and all incoming MODE-21 G1 files. Correct only delivery-base metadata; all Rust and proof inputs remain exact main, all 55 logistics Acceptance cells stay unchanged, and no Source or native check is rerun.
 
 - Mark MAP-04/05/07/117 ported after six exact native checks pass at `7cbfcddd`: three strict original validation-message readers, the full map corpus, complete XL/Hill Assault check and affected BASE replay. Formatting recheck and strict core/simtest all-target Clippy also pass. Retain MAP-97's separate historical debug/release proof, all 140 Acceptance cells and the tested Rust tree; MAP-06/19/100 remain held.
