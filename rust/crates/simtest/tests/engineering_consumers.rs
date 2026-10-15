@@ -379,10 +379,10 @@ fn scene(input: &Value, trace: &Value, spec: Option<&Value>) -> Match {
         p.spawn = point(&input["spawnSentinel"]);
         m.start.economy.players[slot].mp = number(&setup["players"][slot]["mp"]);
     }
-    if let Some(spec) = spec {
-        if let Some(depth) = spec["depth"].as_f64() {
-            m.world.game.wear.as_mut().unwrap().fill(depth as f32);
-        }
+    if let Some(spec) = spec
+        && let Some(depth) = spec["depth"].as_f64()
+    {
+        m.world.game.wear.as_mut().unwrap().fill(depth as f32);
     }
     restore_environment(&mut m, setup);
     publish(&mut m, input, setup);
