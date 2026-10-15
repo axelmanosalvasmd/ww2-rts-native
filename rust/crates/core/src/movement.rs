@@ -172,6 +172,63 @@ pub(crate) fn move_unit_with_march(
     }))
 }
 
+/// One movement step computed on a copy of the unit. `Game` and the grid are
+/// unchanged until `keep_trial_move` applies it, so a caller can discard it.
+pub(crate) struct TrialMove {
+    id: UnitId,
+    unit: Unit,
+    speed: Result<f64, KnowledgeError>,
+}
+
+/// `move_unit_with_march` split in two: the same `block` call on a copy of the
+/// unit, with the original left in place. Keeping the trial then performs the
+/// same grid update and reinsertion, so the end state is identical.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn trial_move_with_march(
+    g: &mut Game,
+    rules: &Rules,
+    grid: &SpatialGrid,
+    id: UnitId,
+    supp_speed: f64,
+    routes: &mut impl FnMut(&Game, &Rules, &mut Unit, Point, RouteRequest),
+    knowledge: &TrafficKnowledge<'_>,
+    march: f64,
+) -> Result<Option<TrialMove>, KnowledgeError> {
+    if !march.is_finite() || march < 0.0 {
+        return Err(KnowledgeError::InvalidValue);
+    }
+    let Some(original) = g.units.remove(&id) else {
+        return Ok(None);
+    };
+    let mut u = original.clone();
+    let speed = block(g, rules, grid, &mut u, supp_speed, routes, knowledge, march);
+    g.units.insert(id, original);
+    Ok(Some(TrialMove { id, unit: u, speed }))
+}
+
+impl TrialMove {
+    pub(crate) fn succeeded(&self) -> bool {
+        self.speed.is_ok()
+    }
+}
+
+pub(crate) fn keep_trial_move(
+    g: &mut Game,
+    rules: &Rules,
+    grid: &mut SpatialGrid,
+    trial: TrialMove,
+) -> Result<Moved, KnowledgeError> {
+    let TrialMove { id, unit: u, speed } = trial;
+    grid.update(id, &u);
+    let infantry = rules.kinds[u.kind].infantry;
+    g.units.insert(id, u);
+    Ok(Moved {
+        id,
+        speed: speed?,
+        infantry,
+    })
+}
+
 #[allow(clippy::too_many_arguments)]
 fn block(
     g: &Game,
