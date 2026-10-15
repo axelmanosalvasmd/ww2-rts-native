@@ -97,6 +97,8 @@ mod mode14_spawn_layout;
 mod mode_predicates;
 #[path = "../mode_startup_checks.rs"]
 mod mode_startup_checks;
+#[path = "../mov_terrain_companion.rs"]
+mod mov_terrain_companion;
 #[path = "../mov_vehicle_predicates.rs"]
 mod mov_vehicle_predicates;
 #[path = "../movement.rs"]
