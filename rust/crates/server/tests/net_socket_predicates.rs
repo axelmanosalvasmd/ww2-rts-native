@@ -107,19 +107,29 @@ fn malformed(fixture: &Value) {
     }
     client.send(json!({"t":"hello","token":"malformed","name":"malformed"}));
     let first = client.receive();
-    assert_eq!(first["t"], "lobby", "NET-05 prehello malformed text is silent");
+    assert_eq!(
+        first["t"], "lobby",
+        "NET-05 prehello malformed text is silent"
+    );
     assert_eq!(roster(&first), fixture["first"]);
     for input in fixture["invalid"].as_array().unwrap() {
         text(&mut client, input.as_str().unwrap());
     }
     client.send(json!({"t":"ping","c":fixture["pong"]["c"]}));
-    assert_eq!(client.receive(), fixture["pong"], "NET-05 posthello malformed text is silent");
+    assert_eq!(
+        client.receive(),
+        fixture["pong"],
+        "NET-05 posthello malformed text is silent"
+    );
 }
 
 fn receive_checked(client: &mut Client) -> Value {
     let message = client.receive();
     if message["t"] == "s" {
-        assert!(!client.view.needs_resync(), "actual decoded held fingerprint");
+        assert!(
+            !client.view.needs_resync(),
+            "actual decoded held fingerprint"
+        );
     }
     message
 }
@@ -135,7 +145,11 @@ fn until_checked(client: &mut Client, predicate: impl Fn(&Value) -> bool) -> Val
 }
 
 fn cleared(client: &Client) {
-    assert_eq!(client.view.unit_count(), 0, "start clears actual warmed rows");
+    assert_eq!(
+        client.view.unit_count(),
+        0,
+        "start clears actual warmed rows"
+    );
     assert!(client.view.state().is_null());
     assert!(!client.view.needs_resync());
 }
@@ -149,7 +163,10 @@ fn full(client: &Client, snapshot: &Value, expected: &Value) {
         .collect::<BTreeSet<_>>();
     assert_eq!(ids.len(), rows.len());
     assert!(snapshot.get("gone").is_none());
-    assert_eq!(snapshot["held"], json!([ids.len(), ids.iter().fold(0_u64, |xor, id| xor ^ *id)]));
+    assert_eq!(
+        snapshot["held"],
+        json!([ids.len(), ids.iter().fold(0_u64, |xor, id| xor ^ *id)])
+    );
     assert_eq!(client.view.unit_count(), rows.len());
     assert!(!client.view.needs_resync());
     assert_eq!(
@@ -176,7 +193,9 @@ fn resets(fixture: &Value) {
     host.send(json!({"t":"team","slot":0,"v":5}));
     host.send(json!({"t":"faction","slot":0,"v":3}));
     host.send(json!({"t":"ping","c":"settings-refused-in-play"}));
-    until_checked(&mut host, |m| m["t"] == "pong" && m["c"] == "settings-refused-in-play");
+    until_checked(&mut host, |m| {
+        m["t"] == "pong" && m["c"] == "settings-refused-in-play"
+    });
     assert!(host.view.unit_count() > 0);
     let mut replacement = join(server.address, "ABC", "a", "Replacement");
     // This is actual prior decoder history, not injected expected rows.
@@ -186,8 +205,14 @@ fn resets(fixture: &Value) {
     let incoming = until_checked(&mut replacement, |m| m["t"] == "start");
     assert_eq!(incoming["matchId"], start["matchId"]);
     assert_eq!(incoming["you"], start["you"]);
-    assert_eq!(incoming["teams"], start["teams"], "NET-34 team refused in play");
-    assert_eq!(incoming["factions"], start["factions"], "NET-34 faction refused in play");
+    assert_eq!(
+        incoming["teams"], start["teams"],
+        "NET-34 team refused in play"
+    );
+    assert_eq!(
+        incoming["factions"], start["factions"],
+        "NET-34 faction refused in play"
+    );
     cleared(&replacement);
     let first = until_checked(&mut replacement, |m| m["t"] == "s");
     full(&replacement, &first, &fixture["rejoined"]);
@@ -195,18 +220,25 @@ fn resets(fixture: &Value) {
     let mut saw_barrier = false;
     for _ in 0..512 {
         let message = receive_checked(&mut guest);
-        assert!(message["t"] != "pause" || message["reason"] != "drop" || message["paused"] != true);
+        assert!(
+            message["t"] != "pause" || message["reason"] != "drop" || message["paused"] != true
+        );
         if message["t"] == "pong" && message["c"] == "after-replace" {
             saw_barrier = true;
             break;
         }
     }
-    assert!(saw_barrier, "replacement continuity barrier was actually received");
+    assert!(
+        saw_barrier,
+        "replacement continuity barrier was actually received"
+    );
     let history = guest.view.clone();
     assert!(history.unit_count() > 0);
     guest.socket.shutdown(Shutdown::Both).unwrap();
     drop(guest);
-    until_checked(&mut replacement, |m| m["t"] == "pause" && m["paused"] == true && m["reason"] == "drop");
+    until_checked(&mut replacement, |m| {
+        m["t"] == "pause" && m["paused"] == true && m["reason"] == "drop"
+    });
     let mut returned = join(server.address, "ABC", "b", "b");
     returned.view = history;
     let drop_start = until_checked(&mut returned, |m| m["t"] == "start");
@@ -218,8 +250,13 @@ fn resets(fixture: &Value) {
     full(&returned, &drop_full, &fixture["dropFull"]);
     assert!(replacement.view.unit_count() > 0);
     replacement.send(json!({"t":"restart"}));
-    let restart = until_checked(&mut replacement, |m| m["t"] == "start" && m["matchId"] != start["matchId"]);
-    assert_eq!(restart["matchId"].as_u64().unwrap(), start["matchId"].as_u64().unwrap() + 1);
+    let restart = until_checked(&mut replacement, |m| {
+        m["t"] == "start" && m["matchId"] != start["matchId"]
+    });
+    assert_eq!(
+        restart["matchId"].as_u64().unwrap(),
+        start["matchId"].as_u64().unwrap() + 1
+    );
     cleared(&replacement);
     let restarted = until_checked(&mut replacement, |m| m["t"] == "s");
     full(&replacement, &restarted, &fixture["restarted"]);
@@ -248,10 +285,17 @@ fn slots(fixture: &Value) {
             None
         };
         host.send(json!({"t":"addAi"}));
-        let initial = host.until(|m| m["t"] == "lobby" && m["players"].as_array().unwrap().len() == case["initial"].as_array().unwrap().len());
+        let initial = host.until(|m| {
+            m["t"] == "lobby"
+                && m["players"].as_array().unwrap().len()
+                    == case["initial"].as_array().unwrap().len()
+        });
         assert_eq!(roster(&initial), case["initial"]);
         if let Some(client) = guest.as_mut() {
-            assert_eq!(roster(&client.until(|m| m["t"] == "lobby")), case["initial"]);
+            assert_eq!(
+                roster(&client.until(|m| m["t"] == "lobby")),
+                case["initial"]
+            );
         }
         for step in case["steps"].as_array().unwrap() {
             let is_guest = step["actor"] == "guest";
@@ -266,12 +310,24 @@ fn slots(fixture: &Value) {
                     client.until(|m| m["t"] == "lobby");
                 }
             }
-            let actor = if is_guest { guest.as_mut().unwrap() } else { &mut host };
+            let actor = if is_guest {
+                guest.as_mut().unwrap()
+            } else {
+                &mut host
+            };
             actor.send(json!({"t":"ping","c":step["barrier"]["c"]}));
-            assert_eq!(actor.receive(), step["barrier"], "NET-34 named slot guard is silent");
+            assert_eq!(
+                actor.receive(),
+                step["barrier"],
+                "NET-34 named slot guard is silent"
+            );
             host.send(step["probe"].clone());
             let actual = host.until(|m| m["t"] == "lobby");
-            assert_eq!(roster(&actual), step["roster"], "NET-34 complete fresh roster after action and no-op probe");
+            assert_eq!(
+                roster(&actual),
+                step["roster"],
+                "NET-34 complete fresh roster after action and no-op probe"
+            );
             if let Some(client) = guest.as_mut() {
                 assert_eq!(roster(&client.until(|m| m["t"] == "lobby")), step["roster"]);
             }
@@ -283,10 +339,14 @@ fn slots(fixture: &Value) {
 fn source_recorded_socket_predicates_use_actual_binary_tcp() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/net-socket-predicates.json");
-    let bytes = std::fs::read(path)
-        .expect("record original Source predicates under a central-ledger grant before native execution");
+    let bytes = std::fs::read(path).expect(
+        "record original Source predicates under a central-ledger grant before native execution",
+    );
     let fixture: Value = serde_json::from_slice(&bytes).unwrap();
-    assert_eq!(fixture["reference"], "e4e579a838aabae3b1d9dadbc17a0a87147bc52d");
+    assert_eq!(
+        fixture["reference"],
+        "e4e579a838aabae3b1d9dadbc17a0a87147bc52d"
+    );
     assert_eq!(fixture["recorded"], true);
     assert_eq!(fixture["provenance"]["node"], "v24.21.0");
     assert_eq!(fixture["provenance"]["arch"], "x64");
