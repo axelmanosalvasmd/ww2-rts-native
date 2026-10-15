@@ -1,5 +1,145 @@
 # Three Crossroads Native: design decisions
 
+
+## Owned BASE witness drafts after #249 (2026-10-15, unrun)
+
+This source-only continuation starts at fixed main `396f6d8a7014bd4a5ebe64f0a12ccd66865bf452`, after the actual #249 merge `66592ae8`. BASE-28 and every other already ported row remain read-only. The consolidated IMPL_BASES roster owns BASE-20 through BASE-59 except BASE-25/34/42/43/51/58. Hermes 151's four provider gaps remain held; there is no status promotion or production/admission change. The [predicate/provider map](docs/testing/impl-bases-next-396f-38c1a0da.md) covers the seven active rows and next five production rows, with concrete declared scopes and unregistered test drafts for missing providers.
+
+Five new witness drafts use the existing admitted ordinary BASE map, constructor inputs, natural roster, stances and canonical producers: eight queued Moves followed by refused Build/Stop/paid retry, visible blocked placement, hidden blocked placement, actual unfinished/dead/foreign producer refusal with a real retained Barracks positive control, and HQ-plus-rifle scuttling through the actual next tick. BASE-32 is scuttling in the fixed inventory; recruitment remains supplemental BASE-20/26/29 evidence. The native root adds only a child registration; passed test bodies and every old fixture stay exact. Source records a fixed actor/control/wallet/story-result/grid/identity projection, and native compares it without installing expected state. This is a component observation, not a complete raw state, Classic correspondence, native preview API or client input proof.
+
+The dedicated recorder and five native tests have not run. The prospective five scenes contain 24 commands, one authored mobile pose and one full step, yielding 31 projected frames; those are planned counts only. The authentic new fixture is absent, and its loader fails explicitly until Root authorizes generation/check and a fixture freeze before Cargo. Formatting and compilation are also unverified. No slot is held. Complete cancellation and five-reason preview, Classic Depot and all-mode construction/repair, the original breach/Engineer/queued-production composition and Wall/Gate remain provider work requiring declared owner scope. The previous Source proofs and nine-pass native gates remain attributed to their producing commits, including `aba4955e`; none is transferred to this source candidate.
+
+## BASE build-target capture correction (2026-10-15, unrun)
+
+R1 in `/tmp/roster16-reviewer1-bases-f2b/REVIEW.md` identified a schema mismatch in frozen `f2b61bdf`: Source Move/Stop set `u.build` to numeric zero while native clears `UnitControl::build_target` to `None`, which JSON represents as null. This private child changes only the new Source projection to `u.build === undefined || u.build === 0 ? null : u.build`. The mapping is undefined -> null, numeric 0 -> null, and every positive target ID -> that exact ID. Null stays null and other values are not silently discarded. This is explicit semantic capture normalization, not a mutation of Source input/runtime state or an imported native expectation.
+
+Pinned Source `shared/sim.js:1796` declares the initial undefined value, `:3452` and `:3513` write zero for Move/Stop, and `:3707` assigns the actual site's positive ID for active Build. Native `match_commands.rs:206,1362,1561` defines the Option and clears it to None. The same recorder projection runs for initial and subsequent frames. Native code, all predicates/commands/assertions, queue/refusal/Stop/payment/identity/terrain/retry history and old fixtures remain unchanged. The review's partial-witness limits remain: no complete preview provider or cross-mode/Classic proof, the dead unfinished maker does not isolate HP, and this new scuttle projection omits last-hit. There is no row expansion or promotion. The later caller-closure checkpoint `da25e4a72742b8daee823045024ca9e7bafb5fde` and frozen f2b branch remain preserved separately. No Source/Cargo/native/formatter/discovery execution occurred; a fresh independent review must judge this correction, not retroactively clear the old REVISE.
+
+## BASE owned-witness Source capture (2026-10-15, Vostro)
+
+At frozen source child `50db42276a35da2526d46dca42b2aeb05109268b`, authentic generation and byte-check both exit 0 with `/usr/bin/node` v24.21.0/x64 and clean reference `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. Each invocation records five original-constructor command scenes: 24 commands, one mobile pose, one actual full step and 31 projected frames. Together generation/check execute 48 commands and two steps, distinct from the one-step unique replay. The new JSON fixture is 275,818 bytes and is frozen before Cargo. Queue/refusal/Stop/payment/identity/terrain/retry, both Source placement reasons and actual producer/scuttle assertions pass in Source. The reviewed undefined/zero build-target absence mapping is the only added semantic capture normalization.
+
+Formatting, compilation, the five native behaviors and both actual registry guards remain pending at this fixture checkpoint. This is the declared partial component projection, not a complete raw-state, preview API, Classic/other-mode or whole-row proof. Existing BASE-26/29/30/48 gaps and every parity status remain held. The separate `da25e4a7` caller plan, previous fixtures/tests and runtime are unchanged.
+
+## BASE owned-witness formatting child (2026-10-15, Vostro)
+
+The first fmt check at authentic fixture checkpoint `a25da1ec10faed42affa5c2da1f3863ff733be94` exits 1 with only wrapping diagnostics in the new `owned_witnesses.rs` child. The retained log is `/tmp/bases50db-S2-uGmsvQ/fmt-check.log`. Apply exactly those three assertion-layout changes under Root's formatter authorization. A string-aware token comparison confirms unchanged literals, tokens and all assertions; recorder, Source inputs and the authentic fixture remain byte-exact. No native compilation or behavior ran at the initial fmt checkpoint. This child must pass fmt and the seven selected instances before strict Clippy; no row or whole-check eligibility is promoted.
+
+## BASE witness recovery on frozen 379ba4e0
+
+Recover the complete `2424ec4d` witness history through a normal merge with frozen main `379ba4e0`. Retain the exact original recorder, fixture and native witness child, all current main runtime and every parity cell. The only conflict is additive Unreleased history; keep both sides. Earlier Source generation/check belongs to `50db4227`, and the failed fmt check belongs to `a25da1ec`. The recovered branch starts source-only, without a slot, native result or new row qualification.
+
+## Additional BASE command and repair consumers (source only)
+
+The recovered witness child gains two native tests over the retained ordinary Conquest constructor. The maker test decodes foreign, nonmaker, numeric-string, null, zero and object `from` values through the actual `Command::from_json` and `execute_command` boundary. Each refusal preserves the measured actor/terrain/wallet/identity projection, complete control map and canonical production state. Explicit and omitted real-HQ positive controls publish real rifles with canonical maker metadata. The original eight-variant component fixture keeps NaN and Infinity as tagged Source identities; neither is a JSON command value. This test does not pretend that six JSON inputs complete the original Classic queue check.
+
+The repair test pays for a new Barracks, runs 650 full ticks, buys a real MG from that exact producer, breaches its first canonical section through `DamageWorld::section_hit`, retains producer identity/state, then issues actual Assist and runs two full ticks. Its assertions require supported-section HP/K restoration without MP spending, followed by genuine section damage and ordinary Death retirement. No building or section HP is assigned by the test. The constructor's natural rifle supplies work; Conquest produces the MG immediately. The original Classic Engineer and queued-MG history, other skirmish modes and an authentic new Source comparison remain missing. Both tests are source drafts with no native result and qualify no row.
+
+### Recovered BASE execution attribution
+
+The earlier `2424ec4d` result exists in `/tmp/bases50db-S2-uGmsvQ`: five component behaviors plus both registration guards pass, with final fmt and strict workspace/all-target Clippy. Read these actual retained logs instead of treating an absent `impl-bases*` filename match as absence of evidence. The initial `a25da1ec` fmt failure remains retained. This recovery does not run or qualify the current branch. The [18:21 recovery checkpoint](docs/testing/bases-restore-1821.md) separates the existing eight-input Source component, new six-input actual JSON consumer, new supported-section native draft and the full original checks still held. No status change follows.
+
+## Native BASE command consumers, first runtime provider
+
+Root's follow-up to `bdbada02` authorizes private internal production, training, rally, cancellation and construction consumer work. The precise delta was sent before editing runtime files. The subsequently needed native Rust input additions were declared separately before editing the public Rust enum: `Command::Rally` and `Command::CancelProduction`. That enum is documented as internal recorded input. The server still recognizes and admits only Move, attack-move, Stop and Stance; its ingress code is unchanged. No FFI/header, network envelope, reference pin, recipient field, privacy rule or terrain policy changes.
+
+`match_base_commands.rs` is private under `match_runtime`. It supplies the actual dispatcher consumers rather than assigning rally fields in tests or canceling a borrowed queue directly. Selected-building rally preserves scalar-ID presence, including an explicit invalid/null scalar that must not fall back to `ids`. Building coordinates use Source's inclusive clamping; personal rally requires finite in-map coordinates on a cell without MOVE and preserves the prior value on refusal. Every selected maker is validated before the first rally write. Supported Conquest/World ownership remains unchanged; Horde and Classic contexts are not relabeled or silently admitted.
+
+`ProductionState::cancel` retains its public signature and prior denial order. It now delegates to a crate-private prepared cancellation token. Preparation verifies the actual living finished owned maker, waiting identity, stored original charge and finite refund without changing jobs or wallets. Match preflights the negative MP-spent tally while that token holds the queue and wallet, then commits both infallibly. Dropping the token after a story error leaves the original paid jobs, head progress and wallet intact. Safe negative job integers remain an unmatched lookup, while malformed/unsafe input is unseen. Native World queued-command admission names the two new represented actuators; no other unsupported command or phase is enabled.
+
+The new recorder uses only declared map/settings from the existing match-production input and calls the original pinned constructors, command bodies and exported unmodified training helper. It records five cases: five-slot queue and six JSON-invalid maker forms, waiting cancellation/refund/head identity/promotion, real rifle births after five plus eleven seconds with an actual building Rally, personal Rally refusal and actual newborn endpoint, and selected-building Rally/clamping/refusal/actual newborn endpoint. It retains natural World local actors. No actor, HP, allocator, terrain or expected output is installed in native state. The helper calls are component time, not full simulation ticks. The native replay compares every declared initial/action frame and fails explicitly if authentic recording has not been authorized and frozen. A sixth native-only fault control removes story bookkeeping to verify that an error cannot publish a partial refund.
+
+These are source drafts with zero capture, syntax, formatter, compiler or native execution. No existing passed test body or fixture was changed. The prior c9/bdb two-test selection remains unrun, and the five inherited2424 behaviors remain historical passes with no repeat request. This provider advances BASE-20/21/22/23 and the earlier BASE-30 construction consumer draft, but does not qualify five whole rows. Original Classic startup/queues, complete cancel recipient/reconnect history, Assault/Horde rally/build/repair, the Classic deadline and concrete/depot providers remain explicit follow-on work. Root owns exact-head independent review, Hermes readback and all publication before a runtime merge.
+
+### BASE source inspection refinements before any execution
+
+The source command clips `ids` to `max(50, current unit count)` before Rally. Preserve that cap in the new consumer and add a decisive scene with fifty owned nonmakers followed by a producer beyond the cap. Personal Rally also refuses the actual own HQ's occupied MOVE cell. Unsupported Classic/Horde input returns an explicit unsupported denial instead of accidentally treating the missing context as a represented actuator. These are source-inspection corrections to an unrun draft, not repairs of an executed failure.
+
+The five authored Source scenes now contain 42 commands, five training helper calls, 47 action frames and five initial frames. They have zero full ticks. A seventh native test separately enqueues Rally and waiting cancellation into the real World recorded queue and requests one complete native tick with Commands/Production available, preserved active-job identity and the original-charge spending refund. It has no new Source comparison claim. All seven new tests and the earlier two c9 tests remain uncompiled/unrun; all old failure and producing-head records remain retained.
+
+
+### Private BASE owner rows and caller transactions
+
+Extract the existing queue and paid-job encoding into `recipient_snapshot/production.rs`, consumed by the existing Conquest owner projection. Preserve field names, array order, progress rounding, original charges and owner filtering. The same private reader can inspect a canonical World match in core tests. It is not an external view or full World snapshot: `SnapshotCache::new` keeps its World refusal. No ABI, transport, spectator policy, StartPlan or public constructor changes. Invalid recipients are refused before row access.
+
+The five new Source scenes now author 43 commands and five training helper calls, with 48 action frames and five initial frames. A genuine foreign-owner purchase makes private-job exclusion observable. Each initial/action checkpoint additionally records actual cached and uncached `snapshotFor` queue/job rows for both commanders, requires their equality and verifies every row's stored owner. Native core replays will compare both paths against the shared private encoder; Conquest also checks the existing full projection path, while World must retain full-projection refusal. The fixture is still absent, so these are authored counts and pending comparisons, not Source measurements.
+
+Strengthen the existing cancellation story-failure test and add real World queue/Conquest routed-recruit failure controls. Each refusal or preflight error compares all production state, exact wallet bits and economy metadata, story, controls, rallies, actor/identity projection, cell log, new cells, journal bounds/history and registered pending terrain sets. Malformed-wallet injection changes only the wallet; missing-story and later-maker-rally injection change only bookkeeping. Actual paid heterogeneous jobs supply nonzero index 2 then index 1 refund controls, preserving the active identity/progress and using the stored charge. No actor HP, pose, charge or RNG is assigned.
+
+An additional full World caller test enqueues Rally and three actual buys, then cancels waiting index 2 at the next recorded boundary. It executes ordinary full ticks until the rules-derived rifle training bound, requiring a genuine birth at the real producer, the commanded route endpoint and untouched waiter's identity. It does not move the clock or relax admission. All eleven tests in the new simtest child, both private core recipient tests, and the earlier two c9 consumers are uncompiled/unrun. No inherited five-test rerun or Source job is authorized.
+
+The [Classic provider proposal](docs/runtime/classic-base-provider-proposal.md) specifies natural HQ-before-mobile startup, ordered resource nodes, canonical production/construction state, actual phase composition and the real late Sudden Death transition. It declares prospective Rust source-shape and admission changes before any implementation. Private routine core work is already authorized; Root retains exact-head review and Hermes readback before merging runtime. No whole-row status changes follow this checkpoint, and existing complete component checks remain valid under PARITY.
+
+
+### Canonical Classic startup and bounded base caller
+
+Root's 19:21 instruction continues implementation toward BASE-20/21/22/23/56 and authorizes the worker to open the first five-row PR once complete literal proof exists. The BASE file lease belongs to IMPL_BASES. This does not turn unrun work into a completed row. A complete existing component check remains valid under PARITY; no extra whole-mode gate is introduced.
+
+Before editing, declare the additive Rust-only `Match::new_classic(map, options)` and `Match::advance_classic_base_tick()` methods, private `StartupProfile::Classic`/`StartPlan::prepare_classic`, and the crate-private optional `ClassicRuntime` field on `Match`. Public `StartPlan::prepare`, ordinary `Match::new`, ordinary `advance_tick`, server room admission, ingress, protocol and FFI remain unchanged. World initializes the added private state to None. This is an internal component entry and an explicitly bounded caller, with exact-head runtime review and Hermes readback still required before merge.
+
+Split canonical empty-shell allocation from initial-force publication. Existing skirmish callers still spawn their force before their bases. Classic allocates the real terrain and players, starts IDs at one, clears and publishes each actual HQ footprint, builds its ordered resource nodes, then publishes each player's natural Engineer/Rifle force through the existing publication metadata consumer. Its wallet uses catalog Classic MP followed by the actual later constructor army-income scaling, with zero Fuel/Munitions. Resource requests preserve player/pair order, stable nearest-enemy ties and strict score improvement; contested Fuel sites compare actual native walking paths from the HQ doorstep. No Conquest state is constructed then relabeled, and no expected actor, node, pose, wallet or deadline is imported.
+
+Paid Classic Buy uses the canonical queue token and preflights story and producer metadata before committing payment. Existing training and cancellation receive actual canonical Sudden Death state. Conquest's nonempty queue refusal remains for Conquest; World and genuine Classic use construction-mode queues. The connected birth path retains existing unsupported aircraft/rail/naval and logistics checks. Selected-building Rally operates on the real Classic producers with no personal fallback. The private queue/job reader admits this canonical Classic context for owner-row comparison; full snapshot/delivery admission remains unchanged.
+
+Source `knowledgeOf` uses observed routing for Classic just as for Conquest. Connect the existing immutable observed-memory/path provider to the actual Classic constructor, retaining all owner, terrain, shape and identity checks. Declare that Rust routing context expansion before editing. Match entry validates canonical Classic state; the shared borrowed context requires exact Classic options and Game mode. No World memory, global visibility shortcut, spectator policy or external view is introduced.
+
+`advance_classic_base_tick` consumes only represented base commands at the actual next recorded boundary and increments the canonical clock by exactly catalog TICK. It runs research, actual completed-building production, native income, then the late Classic deadline: decrement undecided time, clear queues/jobs/progress once with no refund, and apply producer decay. It records a fault if an error follows mutation, refusing later continuation. Its admission explicitly refuses unfinished construction, unsupported commands/reserves and a producer death that needs the full retirement caller. It does not claim movement, combat, construction, elimination, full-match equivalence or playable Classic. The ordinary full runner keeps its original refusal until its missing adapters exist.
+
+The separate unrun Classic recorder calls original constructors, commands and full Source steps. Its three scenes cover a three-seat Large startup with allied owner-only queue rows; real income before five paid slots, waiting index 2 cancellation, a genuine rifle and building-rally endpoint; and startup through the real 1500-second deadline, two owners' queue clearing/no-refund, ten seconds of decay and command refusals. Actual cached and uncached recipient rows are compared separately at each record; both use exact numeric bits. Four native tests are authored, including a bookkeeping-only story fault after actual purchases that preserves jobs, wallet, controls, cell logs, journal and pending terrain. Their registration is under the private runtime module. No fixture exists or Source/native result is claimed. The earlier e801 fifteen tests remain unrun at their own frozen head; this successor requires its own named slot and review.
+
+
+### Classic startup source-inspection failure at ab8c06ec
+
+Preserve `ab8c06ec` as the producing head for a concrete source-level defect: the draft treated Classic's `setupClassic` assignment of 200 MP as final. Current pinned `shared/sim.js:801-802` subsequently selects the army and multiplies every player's MP by its income factor. Therefore a Large army must start at Classic MP times Large income. Correct the native expression and authored Source/native assertion to that complete constructor order. The original `ab8c06ec` proposal and private source-failure receipt remain evidence of the mistaken assumption, not executed test evidence. No Source/native/fmt/lint run occurred, and no row status follows.
+
+### Classic Depot transaction, 19:51 and 20:16 recovery
+
+Continue from `026aa55e` on the isolated `impl/bases-classic-depot-1951-d699fc97` branch. Preserve `026aa55e`, `e801e17b` and `ab8c06ec` with their original source-inspection findings and no transferred test result. The restart found two modified tracked files and the intended private provider/recorder drafts. Preserve that WIP without resetting it. The replacement AGENTS instruction records this change in a new `changelog.d` fragment, without editing the accumulated CHANGELOG.
+
+Declare the private Depot files before editing: `match_construction.rs`, `match_commands.rs`, new `match_classic_depot.rs`, new `classic_depot_tests.rs`, and `harness/classic-depot-fixture.mjs`, plus DESIGN and the fragment. No new public type, method, enum variant, protocol field, server ingress, ABI, privacy or terrain policy is introduced by this child. The existing Classic constructor/base caller remains the separately reviewed parent scope.
+
+The dedicated Depot adapter first validates actual canonical ClassicRuntime, mode, commander identities, map dimensions/terrain shape, clock, actor/control work projections, observed routing, unique node geometry and existing live node bindings. It does not relabel an ordinary match or remove the ordinary Conquest construction validator. `validate_construction_tick` and ordinary `advance_tick` keep their full-mode refusal. The recorded Build dispatcher reaches `execute_build`, whose explicit Classic branch admits only Depot and retains the canonical Sudden Death refusal; other missing Classic build providers remain unsupported.
+
+Reuse the existing construction transaction for the actual placement. Share only selected-unit filtering after each caller's own context checks. Select an unbound canonical node within 8 metres of the click, replace the best candidate only on a strictly shorter distance, and retain node insertion order on equal distances. If none is free, retain Source's nearby-hidden-node visibility denial before the ordinary blocked denial. A Depot uses its selected node's exact top-left cell and centre rather than a rounded click. Existing visibility, footprint occupancy, terrain, level, wallet, prerequisite, tier and newborn-identity checks still apply.
+
+Stage the real catalog-cost payment, 25-percent-HP four-cell site, structure registration, grid, production metadata, Engineer activity and observed route in the existing private world preview. Carry only the optional selected node index with the staged birth. Before physical/story publication, revalidate that the node is free and the actual staged Depot matches its geometry and owner. Bind the node only after every fallible guard has succeeded, in the same infallible tail that publishes the footprint, controls, identity, canonical wallet charge and MP-spent tally. A failed story token must discard the staged stamp, route and binding together.
+
+The new recorder authors a valid neutral zero-VP/zero-MP point before both constructors, away from the HQs. Constructor node placement itself retains the point avoidance rule. This preserves the separate source-inspection objection that the `026aa55e` recipe authored `points: []` while current native ordinary-map admission requires 1-9 capture points. Do not change MAP admission or the MAP-owned expectation, amend recorded expected state, or call that old unrun recipe a pass. The prior late army-income correction at `026aa55e` and the original `ab8c06ec` receipt remain retained.
+
+Four new native tests are source-written. Three paired cases independently build canonical Classic state, retain its HQs, natural Engineers, original wallets and generated nodes, and request one genuine original-Source warmup step. The native side uses the parent's explicitly bounded base caller for that interval; the comparison claims only the stated projection, never full Classic tick equivalence. The first case uses an offset click to prove node-anchored placement and one 60 MP charge, then checks duplicate refusal. The second uses the real Rifle and foreign Engineer as nonbuilder/foreign controls, a remote invalid site, then actual paid HQ purchases to exhaust MP before a refused Depot. The third uses authored nearby allied HQs and real constructor nodes: their exact midpoint must provide a visible two-node distance tie; successive paid commands must bind the first node, then the next free node, then refuse when both are occupied. If that genuine scene fails its precondition, retain the first failure rather than moving nodes or actors to force it.
+
+The fourth test clears only story bookkeeping immediately before a real Depot command, requiring the actual final story guard to fail. Negative checks compare production, wallets, story, complete actors/controls, node identities and bindings, footprint registry, structure metadata and HP, terrain flags/heights/HP bits, rally metadata, grid queries around all real nodes, cell/new-cell logs, journal bounds/history and every registered pending terrain set. Unit pace is compared by exact bits before the rest of the struct is compared on copies, preserving NaN bits without changing canonical state. No actor, node, wallet, HP, pose, clock or RNG is assigned from expected output.
+
+The three Source recipes author 11 commands, three full Source warmup ticks, 14 action frames and three initial frames. These are source counts, not measured results. The new fixture is absent; the four tests are uncompiled/unrun and need their own exact-head slot, distinct from the prior nineteen. No Source, Cargo, native, format/lint/discovery, release or CI job runs during this implementation. BASE-26 remains incomplete for full construction, site cancellation/node release and the other selected checks; no row is promoted. BASE-15/28/51, MAP's expectation, the earlier Rally/cancel cases and every earlier failure remain unchanged. Root retains independent actual-head review and Hermes readback before runtime merge.
+
+### Classic Depot completion and administrative cancellation
+
+Continue from `fa1a0cd68c6002934703b64579d56b579de5dc96` without modifying its Source recipe or transferring a result. Source inspection covers all BASE-26 literal checks: Classic's paid Depot, completion and node income; the full Engineer order-queue refusal; and Fortress's Pillbox tier and outward slit. The new work supplies the missing Depot lifecycle components. It does not complete the other selected predicates or move a row. Existing complete component checks remain valid under PARITY; no additional whole-Classic-match gate is imposed.
+
+Declare the bounded file changes before editing: the Classic Depot provider, its existing test module and new `classic_depot_lifecycle_tests.rs`, the existing construction and section-repair owners, `classic_runtime.rs`, recorded commands, World's structure owner, Environment's falling-body owner, a separate `harness/classic-depot-lifecycle-fixture.mjs`, DESIGN and a new changelog fragment. Two additive Rust source interfaces are declared explicitly: internal recorded `Command::CancelConstruction { id: Option<u32> }` and `Match::advance_classic_depot_tick()`. The latter is a public Rust component entry so an actual runtime consumer can call it without a test-only provider. No external ingress, StartPlan, room, network, C ABI, privacy or terrain-policy change follows. Root still obtains exact-head runtime review and Hermes readback before merge.
+
+Preserve the existing Conquest construction wrappers and share their worker and finish bodies privately. The new fixed-tick caller validates canonical Classic state, actual node/commander identity, routing, terrain shape and represented ground activity before advancing. It refuses reserves, convoys, dead actors, aircraft, riding, retreat, projects, combat targets and waiting orders rather than pretending to execute them. It calls the existing path scheduler, movement and crowd separation providers, captures crews before each worker's movement, and finishes those crews before separation and income. Suppression and route timers use their actual catalog tick. The common section-repair owner receives an explicit validated Classic adapter; its Conquest branch and supported-section checks remain. Construction stops during canonical Sudden Death, and completed-building repair uses the Source decay cap. The base-only caller still refuses unfinished sites; the ordinary full `advance_tick` still refuses missing Classic composition. The component caller retains the existing post-mutation fault boundary and producer-death refusal.
+
+Source cancellation is not combat retirement. It refunds 75 percent of the catalog cost, removes the unit and registered site structure, prunes that structure's falling sections, clears the cells and releases every node bound to the site. It does not create rubble, a death event, a bounty or a loss. Implement this through a temporary World transaction and prepared story update. Validate the actual owned unfinished Depot and finite wallet/refund first; stage its real footprint, sections and unit removal and a cloned grid. Only after physical and story guards succeed, publish those drafts, remove unit-owned metadata, release canonical node bindings, credit the wallet and commit the negative MP-spent tally. Keep historical building-cell rows and combat metadata under their existing owners. A builder retains its stale target until its own next worker turn, as Source does. Rebuilding uses the newly free real node and a new canonical unit identity.
+
+The fourth recorder starts independently from a valid authored map with the neutral zero-income point, original HQs, actual Engineers, catalog wallets and generated nodes. It keeps the original Source constructor, commands and full steps, preserving raw actor, wallet, node, story, section, terrain and falling-body observations. It contains two scenes, eight commands, 904 Source steps, fifteen action frames and two initial frames by source inspection. One scene gives the natural Engineer ten seconds to reach and start its site, then the original 25-second work window, finished-site cancellation refusal and one actual completed-node income step. The other cancels a genuinely partial site after ten seconds, checks foreign and missing-site refusal, the 45 MP refund and no loss, then repays for a replacement on the same node, cancels it and lets the real worker turn clear its target. No pose, HP, node, wallet or clock is assigned to manufacture these outcomes. A failed natural precondition must remain a failure.
+
+Five new native tests independently construct the same authored input. Literal command payment/refund, node placement/binding, ownership/refusal, footprint/section removal and completed section HP are compared with Source. Completion uses the genuine native fixed-tick movement/crew caller and the same work window; the completed-node income step compares the actual component rate and delta. Raw whole-match poses and earlier construction-time income are retained but are not imposed as a new acceptance gate. No Source expected value initializes native gameplay state. Failure tests change only story or wallet bookkeeping. Cancellation's final story guard and nonfinite-wallet refusal must preserve actual production, wallet, actor/control rows, node, footprints, structures, terrain HP/flags/heights, cell logs, journal and pending-recipient sets. The final-turn completion story check reaches that turn through real walking and ticks, captures the real crew and checks the existing preflight before site/section publication. Extend the shared atomic observation with actual falling sections, firing/combat, abilities, recovery, logistics and field-work metadata.
+
+All five tests and the new fixture remain uncompiled/unrun. The pending groups stay distinct: e801's fifteen, 026's four, fa1a's four and this child's five. There is no execution-slot inheritance, historical-result transfer, Source rerun, row promotion or quota PR. The 026 empty-points admission objection and ab8's late army-income finding remain attributed to their original heads; protected BASE-15/28/51 and MAP paths remain untouched.
+
+### Missing cancellation identity and real node-income coverage
+
+Continue the owned-range loop after the frozen `d2915ab364af38db881e65e365ccfb20f2cb3f46` checkpoint. A checkpoint, pending slot or review packet does not complete the task. Keep each pending group and its raw producing-head evidence separate, and continue independent owned work without a polling loop. No current execution grant exists.
+
+Current Source `sim.js:3407-3425,3749-3761` applies ordinary command/owner gates, then looks up `cmd.id` directly for cancellation. It has no cancellation mode gate or selected-IDs fallback. A missing, null or unknown identity therefore answers `unseen`, even in ordinary Conquest or with an actual owned building in `ids`. The d2915 handler checked Classic mode first and returned `unsupported` for this ordinary refusal. Record this as a source-inspection finding at d2915, not an executed failure. Move only identity/eligibility refusals before the existing Classic physical-provider gate. Keep missing physical cancellation consumers unsupported; no other mode obtains teardown capability from a refusal. Let the existing base-only recorded caller consume `CancelConstruction { id: None }` so the canonical input boundary emits that ordinary denial instead of a caller-capability error. No new method, enum shape, external ingress, wire, ABI or privacy scope is introduced.
+
+Declare overlap before editing the existing private Depot handler, Classic base whitelist and shared test helper, plus new `classic_depot_income_tests.rs`, a fifth separate Source recipe, DESIGN and a changelog fragment. The four older recipes remain byte-for-byte unchanged. Generalize only the private atomic observer's optional Classic node projection so real ordinary constructor state receives the same wallet, production, actor/control, terrain, structure, metadata, journal and pending-recipient refusal checks. No canonical state is normalized or copied from expected output.
+
+The new recipe uses original Classic/Conquest constructors and cancellation commands. Its Classic scene records baseline income, a real bound unfinished Depot, missing-ID refusals with that site selected, cancellation and a subsequent income step, then a paid rebuild, natural Engineer work, completion and two paying steps around a refused finished-site cancellation. Unfinished and cancelled nodes must add no MP; the completed actual MP node adds its rate exactly once. The native test compares actual Source income/Fuel/upkeep bits and one-step wallet deltas through the existing fixed-tick caller. It retains raw Source observations without imposing earlier whole-match wallet/pose equality as an additional gate on the component. The ordinary scene verifies all four missing/null/zero/selected-ID forms without mutating either independently constructed match. An actual queued missing-ID command also reaches the existing Classic base boundary and returns `unseen` while only the real fixed clock and income advance.
+
+The fifth recipe authors two scenes, twelve commands, 705 genuine Source steps, nineteen action frames and two initial frames. Two new native tests are source-written and unrun; the earlier 28 stay pending at their own heads. The immediate missing proof remains a fresh exact-head Source-first grant and the actual compiled results. No Source/Node/Cargo/native/fmt/lint/discovery job, public PR update or parity promotion occurs. Protected BASE and MAP paths remain unchanged. Root's future runtime review and Hermes readback do not transfer from another head.
+
 ## Five complete selected MAP checks (2026-10-15)
 
 At producing runtime head `7cbfcdddf913625c48fd109d8d216151881cba20`,
@@ -4115,3 +4255,100 @@ Independent review of `45753411` found that the footprint validator rejected a v
 
 
 The final footprint comparator review found that validated hexadecimal keys still used their original text for identity. Key the temporary comparison map by the validated cell's `to_bits()` value (`u64`), so letter case cannot change membership or bypass duplicate detection. Complete one-entry cell-445 controls accept lower/upper hex spellings in both directions and reject their duplicate combination on each side and against itself. Finite nonnegative integer validation, exact associated-value bits, signed-zero distinctions and all prior negative controls remain intact. This repairs a test-only comparator; no player-visible rule or runtime behavior changes. Locally acknowledge Hermes171/6198181645 and Hermes172/6198529621: the corrected head needs its own checks, independent ACCEPT and Hermes readback. The separate house diagnostic, MODE-21 todo status and pending general defaults decision remain unchanged.
+
+## Classic construction queue completion on fetched main (2026-10-15, source only)
+
+The bounded IMPL_BASES replacement starts a fresh branch at fetched main
+`f7b0e5889e3b707beb6d18c4ea8d20a7d9f7b578`. Preserve committed `46e8ab04`
+and the exact four tracked WIP files plus untracked sixth recipe before switching.
+The handoff patch and recipe compare byte for byte with the live WIP. A retained
+stash ref preserves tracked, index and untracked state independently. Apply the
+owned checkpoint source delta, then restore that WIP. Retain incoming MAP,
+engineering, observer, contract, table and other-owner source unchanged. The old
+BASE additions to CHANGELOG and DESIGN are retained as historical text; new
+work uses its own changelog fragment. Direct application of the old DESIGN patch
+could not find its old final context on newer main and changed no file. The
+additive history is instead inserted without replacing any incoming text.
+
+The declared internal overlap remains the canonical construction, command,
+production, routing, recovery and World providers already needed by the retained
+Classic checkpoint. This child completes the existing Rust-only component scope,
+without a new public type, field, enum variant or method. Ordinary StartPlan,
+Match::new, advance_tick, Conquest construction admission, external server input,
+ABI, wire, privacy and terrain policy remain unchanged. BASE-15/28/51 and MAP's
+construction expectation stay protected. No other owner approval is inferred.
+
+The existing Classic construction adapter admits Barracks alongside Depot.
+Both use the same prepared footprint/grid/control/production/story transaction.
+Barracks placement also reserves every real two-by-two resource-node footprint,
+as pinned Source placementCheck does at shared/sim.js:3300-3302. Do not admit
+coastal producers or caches. The dedicated adapter retains canonical Classic
+identity, routing, node, commander, clock and actor validation. The ordinary
+Conquest guard is preserved; its normalized Assist validator is shared privately.
+
+Waiting Move rows must have one actual actor, finite coordinates, no replacement
+control selection, and false queue/together/attack-move flags. Waiting Assist
+rows retain the shared exact actor/site/finite-anchor checks. The eight-slot cap
+remains. The caller accepts recorded ground Move and Stop only within this
+construction component entry, and invokes the existing sole waiting-order owner
+before each actor's worker turn. Finite ground route goals and endpoints are
+represented so a genuine Move or a trained MG's building-rally route can continue.
+Combat, projects and other missing phases remain excluded. No Conquest or
+engineering validator is skipped to admit these scenes.
+
+Write the previously missing registered classic_construction_queue_tests.rs.
+Two native tests replay a sixth independent Source recipe; a third reaches the
+queued Barracks story preflight through real income, Move commands, eight
+waiting slots and Stop. Its only fault changes story bookkeeping. Its nine Move inputs and subsequent
+Build refusal/Stop batch also traverse the actual recorded tick boundary. Typed refusal
+checks retain actual paid jobs, exact wallet/control/actor rows, nodes, terrain,
+structures, sections, metadata, grid queries, logs and pending recipient sets,
+plus the canonical time bits, team count, deadline flag, tick and allocator.
+Source snapshots and authored expected data never initialize native state.
+
+The first original-Source scene earns funds, refuses a Barracks over a resource
+node, keeps eight queued Moves through one real tick, refuses paid Build without
+mutation, Stops and accepts the identical queued placement. The real normalized
+Assist starts naturally, the unfinished Barracks refuses MG training, one
+Engineer completes it, and an actual paid MG is absent at 15 seconds and born
+after the 19-second work window with the commanded building-rally endpoint.
+The second uses a natural allied Engineer: nonbuilder and foreign selections
+refuse, allied Assist costs nothing, the ally cannot cancel the owner's site,
+and eight waiting Assists fill the cap. Actual owner cancellation releases the
+node and the next turn clears stale allied work. A paid rebuild on that node,
+real allied Assist and eight new waiting Assists finish naturally and clear
+without an ally debit. Owner spending retains both payments and the 75-percent
+refund. Raw Source observations remain intact; focused native checks compare
+literal command results, waiting identities/anchors, job identity/charge/progress,
+payment, complete HP/sections, node bindings, cancellation and rally endpoints.
+Whole-match actor poses and earlier income totals are not additional gates.
+
+By authored source inspection, the new recipe contains two scenes, 41 commands,
+2,684 original steps, 50 action frames and two initial frames. These are planned
+counts, not executed measurements. All five older recipes remain exact and their
+fixtures remain absent. Pending groups retain producing-head attribution:
+e801e17b fifteen, 026aa55e four, fa1a0cd6 four, d2915ab3 five, 46e8ab04 two.
+This child adds three unrun tests, for 33 pending tests across the named groups.
+The 026 empty-points admission objection and ab8 late army-income finding remain
+retained. The new recipe authors its valid neutral point before either constructor.
+
+Local ACK of issue #5 comments 6201127263, 6201600295, 6201618030,
+6202564980 and 6202580526 records receipt and scope only. The last two retain
+Root's serial 271,268,269,270 queue and require new readback per changed head. No comparison-default mapping is used. PR267's Hermes
+readback applies to its named head, not this runtime. The six ABI 2 calls and
+startup content/schema agreement stay authoritative in their existing scope;
+transport/privacy drafts remain unadopted. The local reference directory is
+uninitialized, so current Source inspection uses immutable e4e579a Git objects
+from the prototype repository, without editing any reference checkout.
+
+Source, Node, Cargo, native, rustc, formatter, lint, discovery, release and CI
+execution remain zero. No slot is held or granted. No publication or row change
+occurs. Root must freeze the actual source head, select the sixth recipe's
+Source generation then exact byte check, freeze its authentic fixture, and
+separately grant the three exact native names and an exclusive external target.
+Old prefix grants do not expand to these descendants. The private preparation
+packet records the exact selection and preserves older missing-fixture groups.
+Stop and release the granted slot on the first actual executed failure, keeping
+its head and raw log. No retry, historical PASS transfer or broader whole-match
+gate is implied. Root owns independent review, hosted checks and exact-head
+Hermes readback before any runtime merge.

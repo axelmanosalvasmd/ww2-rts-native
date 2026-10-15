@@ -154,6 +154,28 @@ pub struct CompletedUnit {
     pub kind: String,
     pub job_id: u64,
 }
+
+/// Waiting-job removal and its original refund publish only after caller preflight.
+#[must_use = "commit the refund with caller bookkeeping, or drop unchanged"]
+pub(crate) struct PreparedCancellation<'a> {
+    state: &'a mut ProductionState,
+    wallets: &'a mut EconomyState,
+    slot: usize,
+    building: u32,
+    index: usize,
+    refund: Price,
+}
+impl PreparedCancellation<'_> {
+    pub(crate) fn refund(&self) -> Price {
+        self.refund
+    }
+    pub(crate) fn commit(self) -> Price {
+        self.state.buildings.get_mut(&self.building).unwrap().jobs.remove(self.index);
+        self.wallets.players[self.slot].mp += self.refund.mp;
+        self.wallets.players[self.slot].fuel += self.refund.fuel;
+        self.refund
+    }
+}
 /// A staged single-building progress/completion transaction. It holds only
 /// production state, so unit placement and metadata can validate before commit.
 #[must_use = "stage publication and commit, or drop unchanged"]
@@ -760,6 +782,16 @@ impl ProductionState {
         building: u32,
         job: u64,
     ) -> Result<Price, Error> {
+        Ok(self.prepare_cancel(c, wallets, slot, building, job)?.commit())
+    }
+    pub(crate) fn prepare_cancel<'a>(
+        &'a mut self,
+        c: &Context<'_>,
+        wallets: &'a mut EconomyState,
+        slot: usize,
+        building: u32,
+        job: u64,
+    ) -> Result<PreparedCancellation<'a>, Error> {
         self.validate(c, wallets)?;
         self.slot(slot)?;
         if !c.mode.kind.is_construction() {
@@ -792,14 +824,7 @@ impl ProductionState {
         if !(p.mp + refund.mp).is_finite() || !(p.fuel + refund.fuel).is_finite() {
             return Err(Error::InvalidInput("refund overflow"));
         }
-        self.buildings
-            .get_mut(&building)
-            .unwrap()
-            .jobs
-            .remove(index);
-        wallets.players[slot].mp += refund.mp;
-        wallets.players[slot].fuel += refund.fuel;
-        Ok(refund)
+        Ok(PreparedCancellation { state: self, wallets, slot, building, index, refund })
     }
     pub fn prepare_research<'a, 'facts>(
         &'a mut self,

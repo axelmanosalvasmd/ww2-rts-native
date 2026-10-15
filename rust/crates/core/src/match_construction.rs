@@ -9,6 +9,8 @@ use crate::{
     math,
 };
 use std::collections::{BTreeMap, BTreeSet};
+#[path = "match_classic_depot.rs"]
+mod classic_depot;
 
 /// One tick's worker references, in the source's first-site and unit-turn order.
 /// A worker's later movement or health change does not revise this captured membership.
@@ -163,6 +165,10 @@ impl Match {
             return Err("construction phases require ordinary Conquest".into());
         }
         self.validate_building_activity_rows()?;
+        self.validate_construction_orders()
+    }
+
+    fn validate_construction_orders(&self) -> Result<(), String> {
         for (&id, unit) in &self.world.game.units {
             let control = &self.commands.units[&id];
             for waiting in &control.orders {
@@ -219,6 +225,14 @@ impl Match {
         {
             return Err("construction worker requires ordinary Conquest".into());
         }
+        self.step_construction_worker_in_context(id, frame)
+    }
+
+    fn step_construction_worker_in_context(
+        &mut self,
+        id: UnitId,
+        frame: &mut ConstructionFrame,
+    ) -> Result<(), String> {
         if frame.tick != self.world.game.tick || frame.workers.contains(&id) {
             return Err("stale or repeated construction worker turn".into());
         }
@@ -304,6 +318,10 @@ impl Match {
             return Err("stale construction crew frame".into());
         }
         self.validate_conquest_finish_state()?;
+        self.finish_construction_in_context(frame)
+    }
+
+    fn finish_construction_in_context(&mut self, frame: ConstructionFrame) -> Result<(), String> {
         let dt = self.rules.movement.tick;
         if !dt.is_finite() || dt <= 0.0 {
             return Err("invalid construction interval".into());
@@ -346,13 +364,17 @@ impl Match {
                         available = f64::INFINITY;
                     }
                 }
+                let rate = number(classic, "repair")? * crew * (recovery / workers.len() as f64);
+                let rate = if self.classic_sudden_death() {
+                    math::min(rate, number(classic, "decay")? * 0.6)
+                } else { rate };
                 let amount = math::min(
                     available,
-                    full * (number(classic, "repair")? * crew * (recovery / workers.len() as f64))
-                        * dt,
+                    full * rate * dt,
                 );
                 (built, amount)
             } else {
+                if self.classic_sudden_death() { continue; }
                 let time = definition
                     .get("buildTime")
                     .and_then(Value::number)
@@ -440,6 +462,14 @@ impl Match {
     ) -> Result<Vec<UnitId>, String> {
         self.validate_construction_tick()?;
         self.validate_conquest_finish_state()?;
+        self.construction_selected_rows(owner, ids, command)
+    }
+    fn construction_selected_rows(
+        &self,
+        owner: usize,
+        ids: &[i64],
+        command: &crate::match_commands::Command,
+    ) -> Result<Vec<UnitId>, String> {
         if owner >= self.world.game.players.len()
             || !self.start.economy.players[owner].mp.is_finite()
         {
@@ -620,11 +650,21 @@ impl Match {
         &mut self,
         preview: ConstructionPreview,
         mut replaced: Vec<(Unit, UnitControl)>,
-        born: Option<(UnitId, u32, crate::production::ProductionState)>,
+        born: Option<(UnitId, u32, crate::production::ProductionState, Option<usize>)>,
         owner: usize,
         charge: f64,
     ) -> Result<(), String> {
         use crate::match_story::{StoryChange, StoryKey, prepare_story_updates};
+        if let Some((id, _, _, Some(node))) = &born {
+            self.validate_classic_depot_context()?;
+            let n = self.classic_runtime.as_ref().ok_or("missing Classic runtime")?.nodes
+                .get(*node).ok_or("missing staged Depot node")?;
+            let unit = preview.physical.world.game.units.get(id).ok_or("missing staged Depot")?;
+            if n.depot.is_some() || self.rules.kinds[unit.kind].name != "depot"
+                || unit.at() != n.at || unit.owner != owner {
+                return Err("Classic Depot binding changed during preparation".into());
+            }
+        }
         let ConstructionPreview {
             physical,
             grid,
@@ -662,7 +702,7 @@ impl Match {
             self.commands.paths = paths;
         }
         self.commands.units = controls;
-        if let Some((id, next_id, production)) = born {
+        if let Some((id, next_id, production, node)) = born {
             self.next_unit_id = next_id;
             self.production = production;
             self.building_rallies.insert(id, None);
@@ -670,6 +710,9 @@ impl Match {
             self.firing.initialize(id);
             self.abilities.initialize(id);
             self.recovery.initialize(id);
+            if let Some(node) = node {
+                self.classic_runtime.as_mut().expect("preflighted Classic runtime").nodes[node].depot = Some(id);
+            }
         }
         self.start.economy.players[owner].mp -= charge;
         story.commit();
@@ -692,7 +735,10 @@ impl Match {
             at: None,
             queue,
         };
-        let selected = self.construction_selection(owner, ids, &command)?;
+        let selected = if self.options.mode == Mode::Classic {
+            self.validate_classic_depot_context()?;
+            self.construction_selected_rows(owner, ids, &command)?
+        } else { self.construction_selection(owner, ids, &command)? };
         let Some(target) = u32::try_from(target)
             .ok()
             .filter(|id| self.world.game.units.contains_key(id))
@@ -759,8 +805,8 @@ impl Match {
 
 impl Match {
     /// Pay and stamp an admitted static site before computing any crew route.
-    /// Depot nodes, coastal producers, caches and construction modes require their
-    /// canonical providers and are refused explicitly by this ordinary caller.
+    /// The explicit Classic Depot/Barracks adapter shares staged publication. Coastal
+    /// producers, caches and other construction-mode providers remain unsupported.
     pub fn execute_build(
         &mut self,
         owner: usize,
@@ -783,14 +829,21 @@ impl Match {
             direction,
             queue,
         };
-        let selected = self.construction_selection(owner, ids, &command)?;
+        let selected = if self.options.mode == Mode::Classic {
+            self.validate_classic_depot_context()?;
+            if self.classic_sudden_death() { return Ok(Some(Denial::SuddenDeath)); }
+            if !matches!(name, "depot" | "barracks") { return Ok(Some(Denial::Unsupported)); }
+            self.construction_selected_rows(owner, ids, &command)?
+        } else {
+            self.construction_selection(owner, ids, &command)?
+        };
         if !crate::economy::build_kinds(self.options.mode)
             .map_err(|e| e.to_string())?
             .contains(&name)
         {
             return Ok(Some(Denial::Blocked));
         }
-        if matches!(name, "depot" | "shipyard" | "supplycache") {
+        if matches!(name, "shipyard" | "supplycache") || name == "depot" && self.options.mode != Mode::Classic {
             return Ok(Some(Denial::Unsupported));
         }
         let types = crate::economy::builder_types(self.options.mode).map_err(|e| e.to_string())?;
@@ -872,19 +925,38 @@ impl Match {
             return self.construction_denial(&selected, Denial::Tier);
         }
         let size = number(definition, "size")? as usize;
-        let x = math::round(at.x / CELL - size as f64 / 2.0);
-        let z = math::round(at.z / CELL - size as f64 / 2.0);
+        let depot_node = if name == "depot" {
+            match self.classic_depot_node(owner, at)? {
+                Ok(node) => Some(node),
+                Err(denial) => return self.construction_denial(&selected, denial),
+            }
+        } else { None };
+        let cell = if let Some(node) = depot_node {
+            self.classic_runtime.as_ref().ok_or("missing Classic runtime")?.nodes[node].cell
+        } else {
+            let x = math::round(at.x / CELL - size as f64 / 2.0);
+            let z = math::round(at.z / CELL - size as f64 / 2.0);
+            let g = &self.world.game;
+            if x < 0.0 || z < 0.0 || x >= g.w as f64 || z >= g.h as f64 {
+                return self.construction_denial(&selected, Denial::Blocked);
+            }
+            z as usize * g.w + x as usize
+        };
         let g = &self.world.game;
-        if x < 0.0 || z < 0.0 || x >= g.w as f64 || z >= g.h as f64 {
-            return self.construction_denial(&selected, Denial::Blocked);
-        }
-        let cell = z as usize * g.w + x as usize;
         let Some(cells) = footprint(g, cell, size) else {
             return self.construction_denial(&selected, Denial::Blocked);
         };
         let center = foot_center(g, cell, size);
         if !self.recipient_sees(owner, center)? {
             return self.construction_denial(&selected, Denial::NotVisible);
+        }
+        // Source placementCheck reserves every canonical resource footprint for
+        // its Depot, even before a Depot occupies it. Ordinary callers have no nodes.
+        if name != "depot" && self.classic_runtime.as_ref().is_some_and(|state| {
+            state.nodes.iter().any(|node| footprint(&self.world.game, node.cell, 2)
+                .is_some_and(|reserved| reserved.iter().any(|cell| cells.contains(cell))))
+        }) {
+            return self.construction_denial(&selected, Denial::Blocked);
         }
         self.world
             .preflight_cell_rows(&cells)
@@ -1039,7 +1111,7 @@ impl Match {
         self.publish_construction_preview(
             preview,
             replaced,
-            Some((id, next_id, production)),
+            Some((id, next_id, production, depot_node)),
             owner,
             cost,
         )?;

@@ -305,6 +305,7 @@ impl Match {
             routing_fog: crate::fog::Fog::default(),
             tick_state: crate::match_tick::TickState::default(),
             world_runtime: Some(runtime),
+            classic_runtime: None,
             commands: crate::match_commands::MatchCommands::new(4096),
             grid: SpatialGrid::new(&world.game.units, 16.0),
             world,

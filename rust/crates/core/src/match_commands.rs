@@ -67,6 +67,10 @@ pub enum Stance {
 /// Internal recorded input. This is not a WebSocket or C interface.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Command {
+    /// Recorded native site teardown. External command allowlists are separate.
+    CancelConstruction {
+        id: Option<u32>,
+    },
     Build {
         ids: Vec<i64>,
         kind: String,
@@ -109,6 +113,17 @@ pub enum Command {
     Buy {
         kind: String,
         from: Option<u32>,
+    },
+    /// Recorded native input only. Network ingress keeps its own command allowlist.
+    CancelProduction {
+        building: Option<u32>,
+        job: Option<i64>,
+    },
+    Rally {
+        ids: Vec<i64>,
+        id: Option<i64>,
+        explicit_id: bool,
+        at: Option<Point>,
     },
     /// Trusted room binding. Raw gameplay JSON cannot select a journal identity.
     CompanionJoin {
@@ -548,6 +563,22 @@ impl Command {
                     _ => return Err(Denial::Blocked),
                 },
             }),
+            Some("cancel") => Ok(Self::CancelConstruction {
+                id: object.get("id").and_then(safe_id).and_then(|id| u32::try_from(id).ok()),
+            }),
+            Some("cancelProduction") => Ok(Self::CancelProduction {
+                building: object.get("id").and_then(safe_id).and_then(|id| u32::try_from(id).ok()),
+                job: object.get("job").and_then(safe_id),
+            }),
+            Some("rally") => Ok(Self::Rally {
+                ids,
+                id: object.get("id").and_then(safe_id),
+                explicit_id: object.contains_key("id"),
+                at: object.get("x").and_then(|v| v.as_f64())
+                    .zip(object.get("z").and_then(|v| v.as_f64()))
+                    .filter(|(x, z)| x.is_finite() && z.is_finite())
+                    .map(|(x, z)| Point { x, z }),
+            }),
             Some("buy") => Ok(Self::Buy {
                 kind: object
                     .get("unit")
@@ -823,6 +854,15 @@ impl crate::match_runtime::Match {
             return Ok(Some(Denial::Unsupported));
         }
         self.validate_building_activity_rows()?;
+        if let Command::CancelConstruction { id } = command {
+            return self.execute_classic_site_cancel(owner, *id);
+        }
+        if let Command::CancelProduction { building, job } = command {
+            return self.execute_production_cancel(owner, *building, *job);
+        }
+        if let Command::Rally { ids, id, explicit_id, at } = command {
+            return self.execute_rally(owner, ids, *id, *explicit_id, *at);
+        }
         if let Command::Build {
             ids,
             kind,
@@ -904,6 +944,19 @@ impl crate::match_runtime::Match {
             if kind == "worldbase" {
                 return Ok(Some(Denial::Blocked));
             }
+            if self.options.mode == Mode::Classic {
+                if Catalog::compiled().and_then(|c| c.table("UNITS"))
+                    .map_err(|e| e.to_string())?.get(kind).is_none() {
+                    return Ok(Some(Denial::Blocked));
+                }
+                return match self.recorded_classic_buy(owner, kind, *from) {
+                    Ok(_) => Ok(None),
+                    Err(crate::match_runtime::ProductionStepError::Production(
+                        crate::production::Error::Denied(d),
+                    )) => Ok(Some(d.into())),
+                    Err(e) => Err(format!("recorded Classic buy: {e:?}")),
+                };
+            }
             if self.options.mode == Mode::World {
                 if Catalog::compiled()
                     .and_then(|catalog| catalog.table("UNITS"))
@@ -980,6 +1033,9 @@ impl crate::match_runtime::Match {
             | Command::Dig { .. }
             | Command::Technology { .. }
             | Command::Buy { .. }
+            | Command::CancelProduction { .. }
+            | Command::CancelConstruction { .. }
+            | Command::Rally { .. }
             | Command::CompanionJoin { .. }
             | Command::CompanionInput { .. }
             | Command::Support { .. }
@@ -1336,6 +1392,9 @@ impl crate::match_runtime::Match {
             | Command::Dig { .. }
             | Command::Technology { .. }
             | Command::Buy { .. }
+            | Command::CancelProduction { .. }
+            | Command::CancelConstruction { .. }
+            | Command::Rally { .. }
             | Command::CompanionJoin { .. }
             | Command::CompanionInput { .. }
             | Command::Support { .. }

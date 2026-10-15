@@ -20,6 +20,8 @@ mod engineering;
 mod falling;
 #[path = "recipient_snapshot/owners.rs"]
 mod owners;
+#[path = "recipient_snapshot/production.rs"]
+mod production;
 #[path = "recipient_snapshot/public_state.rs"]
 mod public_state;
 #[path = "recipient_snapshot/selected.rs"]
@@ -201,6 +203,10 @@ fn seen_by(state: &Match, slot: usize, id: u32) -> bool {
     g.reveal && u.is_some()
         || u.is_some_and(|u| g.allied(u.owner, slot))
         || g.players[slot].sees(id) && u.is_none_or(|u| u.air.is_none() || vision::airborne(u))
+}
+
+pub(crate) fn production_for(state: &Match, slot: usize) -> Result<Map<String, Value>, SnapshotError> {
+    production::capture(state, slot)
 }
 
 pub(crate) fn movement_for(state: &Match, slot: usize) -> Result<Value, SnapshotError> {

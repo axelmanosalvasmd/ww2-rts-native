@@ -20,6 +20,9 @@ fn bits(n: f64) -> Value {
     json!(format!("{:016x}", n.to_bits()))
 }
 
+#[path = "base_ordinary_checks/owned_witnesses.rs"]
+mod owned_witnesses;
+
 fn refresh(m: &mut Match) {
     m.grid.rebuild(&m.world.game.units);
     vision::update_vision(&mut m.world.game, &m.rules, &m.grid);

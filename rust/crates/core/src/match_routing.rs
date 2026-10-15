@@ -335,6 +335,7 @@ impl Match {
         Ok(())
     }
     pub(crate) fn validate_routing_context(&self) -> Result<(), String> {
+        if self.options.mode == Mode::Classic { self.validate_classic_base_state()?; }
         validate_context(
             RecipientContext {
                 world: &self.world,
@@ -601,8 +602,9 @@ fn validate_context<'a>(
     }) {
         return Err("routing needs valid unique wreck identities and positions".into());
     }
-    if !matches!(context.options.mode, Mode::Default | Mode::Conquest) || g.mode.is_some() {
-        return Err("owned routing currently supports ordinary Conquest".into());
+    if !matches!((context.options.mode, g.mode),
+        (Mode::Default | Mode::Conquest, None) | (Mode::Classic, Some(crate::game::ModeKind::Classic))) {
+        return Err("owned routing requires represented Conquest or Classic".into());
     }
     if g.players.len() != context.start.players.len()
         || g.players.len() != context.options.players.len()

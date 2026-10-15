@@ -1149,6 +1149,35 @@ impl World {
         });
         Ok(())
     }
+    /// Erase an administratively cancelled site's current sections and terrain.
+    /// Call on a transaction draft: a later refusal must discard every cell row.
+    pub(crate) fn cancel_building_structure(
+        &mut self,
+        unit: u32,
+        cells: &[usize],
+    ) -> Result<BTreeSet<String>, WorldError> {
+        self.preflight_cell_rows(cells)?;
+        let index = self.structures.iter().position(|s| s.entity_id == Some(unit))
+            .ok_or(WorldError::InvalidTerrain)?;
+        let structure = &self.structures[index];
+        if structure.kind != "building" || structure.cells.as_slice() != cells
+            || structure.section_ids.len() != cells.len()
+            || cells.iter().zip(&structure.section_ids).any(|(c, id)| {
+                self.sections.get(c).is_none_or(|s| s.structure_id != structure.id || s.id != *id)
+                    || !self.game.sections.contains_key(&(*c as u32))
+            }) {
+            return Err(WorldError::InvalidTerrain);
+        }
+        let ids = structure.section_ids.iter().cloned().collect();
+        self.structures.remove(index);
+        for &cell in cells {
+            self.sections.remove(&cell);
+            self.game.sections.remove(&(cell as u32));
+            self.set_cell(cell, b'.')?;
+        }
+        Ok(ids)
+    }
+
     /// Validate every array read by cell logging before a prepared mutation batch.
     pub(crate) fn preflight_cell_rows(&self, cells: &[usize]) -> Result<(), WorldError> {
         let n = self

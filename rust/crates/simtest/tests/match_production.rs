@@ -18,6 +18,8 @@ use ww2_core::{
     },
     weather::WeatherChoice,
 };
+#[path = "match_production/base_commands.rs"]
+mod base_commands;
 fn fixture() -> Value {
     serde_json::from_str(include_str!("fixtures/match-production.json")).unwrap()
 }

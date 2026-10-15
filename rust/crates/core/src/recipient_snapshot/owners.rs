@@ -1,48 +1,19 @@
 use super::*;
-use crate::{game::Point, match_commands::Command, production::JobStatus};
+use crate::{game::Point, match_commands::Command};
 
 pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, SnapshotError> {
     let mut owners = vec![Map::new(); state.world.game.players.len()];
     for owner in &mut owners {
-        for name in ["plans", "orders", "queues", "productionJobs"] {
+        for name in ["plans", "orders"] {
             owner.insert(name.into(), Value::Array(Vec::new()));
         }
     }
     for (slot, owner) in owners.iter_mut().enumerate() {
         owner.insert("movement".into(), super::movement_for(state, slot)?);
+        owner.extend(super::production_for(state, slot)?);
     }
-    let catalog = Catalog::compiled().map_err(|_| SnapshotError::Rules)?;
     for u in state.world.game.units.values() {
         let own = &mut owners[u.owner];
-        if let Some(building) = state.production.building(u.id) {
-            let mut row = vec![json!(u.id)];
-            let progress = if let Some(head) = building.jobs().first() {
-                let train = catalog
-                    .unit(&head.kind)
-                    .map_err(|_| SnapshotError::Rules)?
-                    .get("train")
-                    .and_then(crate::catalog::Value::number)
-                    .filter(|n| n.is_finite() && *n > 0.)
-                    .ok_or(SnapshotError::Rules)?;
-                building.progress() / train
-            } else {
-                0.
-            };
-            finite(&[progress])?;
-            row.push(json!(r(progress)));
-            let rally = state.building_rallies.get(&u.id).copied().flatten();
-            let point = rally.unwrap_or(Point { x: -1., z: -1. });
-            finite(&[point.x, point.z])?;
-            row.extend([json!(r(point.x)), json!(r(point.z))]);
-            row.extend(building.queue().map(|kind| json!(kind)));
-            push(own, "queues", json!(row));
-            let jobs = building.rows().into_iter().map(|row| {
-                finite(&[row.job.charge.mp, row.job.charge.fuel])?;
-                Ok(json!({"id":row.job.id,"type":row.job.kind,"mp":row.job.charge.mp,
-                    "fuel":row.job.charge.fuel,"status":match row.status { JobStatus::Active=>"active",JobStatus::Waiting=>"waiting"}}))
-            }).collect::<Result<Vec<_>, SnapshotError>>()?;
-            push(own, "productionJobs", json!([u.id, jobs]));
-        }
         let control = state
             .commands
             .units

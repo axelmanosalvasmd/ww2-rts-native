@@ -4,6 +4,29 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+
+- Correct the unrun Classic Large startup draft after inspecting the rest of Source createGame: the later army-income multiplication applies to Classic too. Preserve ab8c06ec and its source-inspection failure receipt. Match the scaled starting MP in runtime and the original-Source witness; no Source or native execution occurred.
+
+- Add an explicit Rust Classic constructor with real HQ-before-force publication, ordered resource nodes and the Classic starting wallet. Connect actual paid queue, cancellation, rally and observed-path consumers to canonical Classic state. Add a bounded base caller for real-clock production, income and deadline clearing/decay, plus four unrun tests and an original-Source recorder. Keep ordinary full-runner and external admission unchanged; construction, retirement and full-mode gaps remain explicit.
+
+- Share the private owner queue/job encoder with the existing Conquest snapshot consumer. Draft original cached/uncached recipient comparisons and real World queued-birth, stored-refund and atomic failure checks. Add a concrete internal Classic constructor/runner proposal with public admission held separate. All new Source/native checks remain unrun; preserve every parity cell and historical failure.
+
+- Preserve Source's capped Rally selection and add real-HQ impassable and beyond-cap maker controls. Keep unsupported Classic/Horde contexts explicit. Add an unrun native test that enqueues Rally and cancellation through the actual World tick boundary, separately from the five zero-tick Source component scenes.
+
+- Add native recorded Rally and waiting-production cancellation consumers. Stage the original-charge refund with MP-spent bookkeeping, preserve explicit malformed inputs and route real recruits through stored personal/building rallies. Connect both represented command families to the internal World command boundary; the network allowlist and all ABI/view contracts stay unchanged. Draft five original-Source component scenes and six native checks, including a cancellation preflight fault control. Source capture, compilation and row qualification remain pending.
+
+- Recover the actual `2424ec4d` seven-pass BASE packet and record the two new unrun native consumers, all ten owned whole-check gaps and the exact pending two-test selection. Keep prior results on their producing heads and every parity cell unchanged.
+
+- Add unrun native BASE witnesses for six JSON maker refusals with real HQ birth controls, and paid Barracks section breach, actual Assist, two-tick restoration and normal retirement. Use canonical actors and damage rather than imported state. Preserve the Classic queue, other-mode and full-row gaps; no status changes or execution are claimed.
+
+- Recover BASE witness checkpoint `2424ec4d` onto frozen main `379ba4e0` in an isolated branch, preserving both histories, the authentic fixture and all incoming rows. Prior Source and formatting results keep their original producing heads; this merged checkpoint has no execution or status promotion.
+- Apply the retained fmt diagnostic's wrapping changes only to the new BASE witness child. Preserve every assertion token, literal, authentic fixture and recorder input. The initial fmt check at fixture checkpoint `a25da1ec` exits 1 before native compilation; focused behavior and Clippy validation remain pending on the formatting child.
+
+- Freeze the authentic five-scene BASE witness fixture from source child `50db4227`: generation and byte-check both pass on Vostro with Node v24.21.0/x64 and pinned clean Source. Each records 24 commands, one full step and 31 projected frames; the fixture is 275,818 bytes. Native validation and formatting remain pending, with all whole-row gaps and statuses unchanged.
+
+- Correct the new BASE witness capture schema: Source undefined and numeric-zero build targets both record as null, matching native absence; every positive target ID remains exact. This changes only the projected observation, preserving actual inputs/state and all queue, refusal, Stop, payment, identity, terrain and retry assertions. The child is unrun and awaits fresh independent review; the earlier R1 REVISE remains historical evidence.
+
+- Draft five ordinary BASE component witnesses for queued Build refusal/retry, visible and hidden placement reasons, real recruitment makers and next-tick scuttling. Record the complete seven-row construction gap map and next five production rows without changing their statuses, runtime or guards. Source recording, the new fixture, formatting and native validation remain unrun; cancellation, complete preview, Classic/other-mode and concrete-project providers still need declared scope.
 - Mark MAP-04/05/07/117 ported after six exact native checks pass at `7cbfcddd`: three strict original validation-message readers, the full map corpus, complete XL/Hill Assault check and affected BASE replay. Formatting recheck and strict core/simtest all-target Clippy also pass. Retain MAP-97's separate historical debug/release proof, all 140 Acceptance cells and the tested Rust tree; MAP-06/19/100 remain held.
 
 - Apply the single mechanical BASE assertion wrap reported by the first authorized MAP formatting check at `f1928e13`. Preserve every assertion/literal and the failed log; native checks have not started.

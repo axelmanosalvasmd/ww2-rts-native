@@ -120,14 +120,19 @@ impl Match {
     /// Read-only whole-operation admission for callers that stage several crew repairs.
     /// Returns a conservative mutation reservation; no health or terrain is published.
     pub(crate) fn preflight_building_repair(&self, id: UnitId, amount: f64) -> Result<u64, String> {
-        if !matches!(
+        if self.options.mode == crate::economy::Mode::Classic {
+            self.validate_classic_depot_context()?;
+        } else if !matches!(
             self.options.mode,
             crate::economy::Mode::Default | crate::economy::Mode::Conquest
         ) || self.world.game.mode.is_some()
-            || !amount.is_finite()
-            || amount < 0.0
         {
             return Err("invalid Conquest repair request".into());
+        }
+        if !amount.is_finite() || amount < 0.0 {
+            return Err(if self.options.mode == crate::economy::Mode::Classic {
+                "invalid Classic repair request"
+            } else { "invalid Conquest repair request" }.into());
         }
         let unit = self
             .world
@@ -177,15 +182,6 @@ impl Match {
     /// Repair existing sections in source order. Dead buildings cannot be restored.
     pub fn repair_building_sections(&mut self, id: UnitId, amount: f64) -> Result<f64, String> {
         self.preflight_building_repair(id, amount)?;
-        if !matches!(
-            self.options.mode,
-            crate::economy::Mode::Default | crate::economy::Mode::Conquest
-        ) || self.world.game.mode.is_some()
-            || !amount.is_finite()
-            || amount < 0.
-        {
-            return Err("invalid Conquest repair request".into());
-        }
         let unit = self
             .world
             .game

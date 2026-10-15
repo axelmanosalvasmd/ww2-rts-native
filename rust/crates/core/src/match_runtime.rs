@@ -6,6 +6,10 @@ pub use recruitment::{CompletedRecruitUnit, RecruitError, RecruitMetadata, Recru
 #[path = "match_production.rs"]
 mod production_step;
 pub use production_step::{CompletedTrainingUnit, ProductionStepError};
+#[path = "match_base_commands.rs"]
+mod base_commands;
+#[path = "classic_runtime.rs"]
+mod classic_runtime;
 use std::collections::BTreeMap;
 
 use crate::{
@@ -93,6 +97,7 @@ fn number(v: &Value, name: &str) -> Result<f64, String> {
 
 enum StartupProfile {
     Conquest,
+    Classic,
     World(MatchRandom),
     Assault { defender_team: i32 },
 }
@@ -111,6 +116,15 @@ impl StartPlan {
             #[cfg(test)]
             None,
         )
+    }
+
+    pub(crate) fn prepare_classic(
+        map: &crate::map::AuthoritativeMap,
+        options: &MatchOptions,
+        rules: &Rules,
+    ) -> Result<Self, String> {
+        Self::prepare_mode(map, options, rules, StartupProfile::Classic,
+            #[cfg(test)] None)
     }
 
     pub(crate) fn prepare_world(
@@ -153,6 +167,10 @@ impl StartPlan {
         #[cfg(test)] replay: Option<crate::aligned_replay::Replay>,
     ) -> Result<Self, String> {
         let world_mode = matches!(&profile, StartupProfile::World(_));
+        let classic_mode = matches!(&profile, StartupProfile::Classic);
+        if classic_mode && options.mode != Mode::Classic {
+            return Err("Classic startup requires explicit Classic mode".into());
+        }
         let defender_team = match &profile {
             StartupProfile::Assault { defender_team } => Some(*defender_team),
             _ => None,
@@ -164,6 +182,7 @@ impl StartPlan {
             return Err("Assault startup requires explicit Assault mode".into());
         }
         if !world_mode
+            && !classic_mode
             && defender_team.is_none()
             && !matches!(options.mode, Mode::Default | Mode::Conquest)
         {
@@ -320,7 +339,7 @@ impl StartPlan {
         };
         let income_scale = number(field(field(cfg, "armies")?, army_key)?, "income")?;
         let initial_mp = number(
-            if world_mode {
+            if world_mode || classic_mode {
                 field(cfg, "classic")?
             } else {
                 cfg
@@ -457,7 +476,7 @@ impl StartPlan {
             l
         });
         let starting_kinds = field(
-            if world_mode {
+            if world_mode || classic_mode {
                 field(cfg, "classic")?
             } else {
                 cfg
@@ -527,6 +546,10 @@ impl StartPlan {
             }
         }
         game.units = units;
+        self.initialize_start_terrain(game, rules);
+        Ok(next_id)
+    }
+    fn initialize_start_terrain(&self, game: &mut Game, rules: &Rules) {
         game.players = self
             .players
             .iter()
@@ -543,8 +566,8 @@ impl StartPlan {
             .position(|w| w.name == self.weather.now.name());
         game.rain = self.initial_rain;
         game.wet = self.initial_wet;
-        Ok(next_id)
     }
+
 }
 
 /// Owner and position retained for a building footprint after its unit is removed.
@@ -569,6 +592,7 @@ pub struct Match {
     pub environment: crate::environment::EnvironmentRuntime,
     pub companions: crate::companions::Companions,
     pub world_runtime: Option<crate::match_world::WorldRuntime>,
+    pub(crate) classic_runtime: Option<classic_runtime::ClassicRuntime>,
     pub world: World,
     pub start: StartPlan,
     pub options: MatchOptions,
@@ -697,8 +721,23 @@ impl Match {
         rules: Rules,
         start: StartPlan,
     ) -> Result<Self, String> {
+        Self::match_shell(map, options, rules, start, true)
+    }
+
+    fn match_shell(
+        map: &crate::map::AuthoritativeMap,
+        options: MatchOptions,
+        rules: Rules,
+        start: StartPlan,
+        initial_force: bool,
+    ) -> Result<Self, String> {
         let mut world = World::from_map(map).map_err(|e| e.to_string())?;
-        let next_unit_id = start.spawn_initial_force(&mut world.game, &rules)?;
+        let next_unit_id = if initial_force {
+            start.spawn_initial_force(&mut world.game, &rules)?
+        } else {
+            start.initialize_start_terrain(&mut world.game, &rules);
+            1
+        };
         for slot in 0..start.players.len() {
             world.register_recipient(crate::world::Recipient::Player(slot));
         }
@@ -739,6 +778,7 @@ impl Match {
             environment: crate::environment::EnvironmentRuntime::default(),
             companions: crate::companions::Companions::default(),
             world_runtime: None,
+            classic_runtime: None,
             grid: SpatialGrid::new(&world.game.units, 16.0),
             recipients: Vec::new(),
             routing_fog: crate::fog::Fog::default(),
@@ -1161,7 +1201,7 @@ pub(crate) fn foot_center(game: &Game, cell: usize, size: usize) -> Point {
         z: (cell / game.w) as f64 * CELL + size as f64 * CELL / 2.0,
     }
 }
-fn find_site(game: &Game, at: Point, size: usize, avoid: &[(Point, f64)]) -> Option<usize> {
+pub(super) fn find_site(game: &Game, at: Point, size: usize, avoid: &[(Point, f64)]) -> Option<usize> {
     let x = at.x.max(0.0).min(game.w as f64 * CELL - 1.0);
     let z = at.z.max(0.0).min(game.h as f64 * CELL - 1.0);
     let start = (z / CELL).floor() as usize * game.w + (x / CELL).floor() as usize;

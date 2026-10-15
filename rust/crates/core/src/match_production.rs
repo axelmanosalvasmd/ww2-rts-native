@@ -37,7 +37,7 @@ pub struct CompletedTrainingUnit {
     pub completion: production::CompletedUnit,
     pub route_status: Option<PathStatus>,
 }
-fn units<'a>(
+pub(super) fn units<'a>(
     game: &Game,
     rules: &'a Rules,
     count: usize,
@@ -67,11 +67,12 @@ fn units<'a>(
         })
         .collect()
 }
-fn context<'a>(
+pub(super) fn context<'a>(
     options: &super::MatchOptions,
     naval: bool,
     units: &'a [UnitView<'a>],
     regions: Option<&'a [Region]>,
+    sudden_death: bool,
 ) -> Context<'a> {
     Context {
         mode: ModeContext {
@@ -81,17 +82,20 @@ fn context<'a>(
         army: options.army,
         tech_enabled: options.tech,
         naval,
-        sudden_death: false,
+        sudden_death,
         units,
         drops: &[],
         world: regions.map(|regions| WorldContext { regions }),
     }
 }
 impl Match {
-    fn production_step_context(&self) -> Result<usize, ProductionStepError> {
+    pub(super) fn production_step_context(&self) -> Result<usize, ProductionStepError> {
         let count = self.start.players.len();
         let supported = match self.options.mode {
             Mode::Default | Mode::Conquest => self.world.game.mode.is_none(),
+            Mode::Classic => {
+                self.world.game.mode == Some(ModeKind::Classic) && self.classic_runtime.is_some()
+            }
             Mode::World => {
                 self.world.game.mode == Some(ModeKind::World) && self.world_runtime.is_some()
             }
@@ -122,7 +126,7 @@ impl Match {
         }
         Ok(count)
     }
-    fn production_regions(&self) -> Result<Option<Vec<Region>>, ProductionStepError> {
+    pub(super) fn production_regions(&self) -> Result<Option<Vec<Region>>, ProductionStepError> {
         if self.options.mode == Mode::World {
             Ok(Some(
                 self.world_economy_regions()
@@ -143,6 +147,7 @@ impl Match {
             self.world.game.naval,
             &units,
             regions.as_deref(),
+            self.classic_sudden_death(),
         );
         self.production
             .validate_phases(&context, &self.start.economy, dt)?;
@@ -161,7 +166,7 @@ impl Match {
                 ));
             }
             if !row.jobs().is_empty() {
-                if self.options.mode != Mode::World {
+                if !self.options.mode.is_construction() {
                     return Err(ProductionStepError::InvalidState(
                         "nonempty Conquest training queue",
                     ));
@@ -220,6 +225,7 @@ impl Match {
             self.world.game.naval,
             &units,
             Some(&phase.regions),
+            false,
         );
         let registered = self
             .production
@@ -268,6 +274,37 @@ impl Match {
         story.commit();
         Ok(job)
     }
+    /// Actual Classic paid queue caller. No World context or admission is reused.
+    pub(crate) fn recorded_classic_buy(
+        &mut self, slot: usize, kind: &str, from: Option<u32>,
+    ) -> Result<u64, ProductionStepError> {
+        self.validate_classic_base_state().map_err(ProductionStepError::Control)?;
+        if self.finish.is_some() || self.start.economy.players.get(slot).is_none_or(|p| p.away || p.out) {
+            return Err(production::Error::Denied(production::Denial::Blocked).into());
+        }
+        let count = self.production_step_context()?;
+        let units = units(&self.world.game, &self.rules, count)?;
+        let context = context(&self.options, self.world.game.naval, &units, None, self.classic_sudden_death());
+        let registered = self.production.buildings().map(|(id, _)| id).collect::<Vec<_>>();
+        let prepared = self.production.prepare_queue_unit(&context, &mut self.start.economy,
+            slot, self.start.players[slot].config.faction, kind, from)?;
+        // The connected birth provider currently represents ordinary ground
+        // units. Preserve the unrepresented air/rail/naval boundary before pay.
+        crate::match_world_tick::validate_world_future_birth(&self.rules, kind)
+            .map_err(ProductionStepError::Control)?;
+        let building = prepared.building();
+        if !registered.contains(&building) || !self.building_rallies.contains_key(&building) {
+            return Err(ProductionStepError::InvalidState("Classic canonical producer metadata"));
+        }
+        let story = crate::match_story::prepare_story_updates(&mut self.story, false,
+            &[crate::match_story::StoryChange { slot: Some(slot),
+                key: crate::match_story::StoryKey::MpSpent, amount: prepared.charge().mp }])
+            .map_err(ProductionStepError::Control)?;
+        let job = prepared.commit();
+        story.commit();
+        Ok(job)
+    }
+
     /// Typed source `tech` admission. Global command gates precede the research
     /// denials. Wallet, lab and canonical MP-spent story publish together.
     pub fn request_research(
@@ -293,6 +330,7 @@ impl Match {
             self.world.game.naval,
             &units,
             regions.as_deref(),
+            self.classic_sudden_death(),
         );
         let prepared =
             self.production
@@ -325,6 +363,7 @@ impl Match {
             self.world.game.naval,
             &units,
             regions.as_deref(),
+            self.classic_sudden_death(),
         );
         Ok(self
             .production
@@ -341,7 +380,7 @@ impl Match {
         if !dt.is_finite() || dt < 0.0 {
             return Err(production::Error::InvalidInput("dt").into());
         }
-        if self.options.mode != Mode::World
+        if !self.options.mode.is_construction()
             && self
                 .production
                 .building(building)
@@ -379,6 +418,7 @@ impl Match {
                 self.world.game.naval,
                 &units,
                 regions.as_deref(),
+            self.classic_sudden_death(),
             );
             let prepared = self.production.prepare_building_step(
                 &context,
@@ -523,6 +563,7 @@ impl Match {
             self.world.game.naval,
             &units,
             regions.as_deref(),
+            self.classic_sudden_death(),
         );
         let prepared =
             self.production

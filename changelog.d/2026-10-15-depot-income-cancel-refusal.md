@@ -1,0 +1,2 @@
+- Return Source's `unseen` refusal for cancellation without a site identity, including ordinary mode and selected-building inputs. Admit that refusal through the existing Classic base command boundary without expanding physical teardown admission.
+- Add a separate original-Source recipe and two native test drafts for live Depot income before completion, after cancellation and after completion, plus missing-ID refusals. Keep all four earlier recipes frozen. The new recipe and tests remain unrun pending an exact-head Source-first grant; no parity row is promoted.
