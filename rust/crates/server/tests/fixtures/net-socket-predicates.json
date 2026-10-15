@@ -1,0 +1,3596 @@
+{
+  "reference": "e4e579a838aabae3b1d9dadbc17a0a87147bc52d",
+  "provenance": {
+    "node": "v24.21.0",
+    "arch": "x64",
+    "sourceHashes": {
+      "server.js": "79baa6671dc9e26a504811a7d656491c3d2177d3567a3e69b3eb8ccbbd06b297",
+      "shared/sim.js": "7831cff6eb9df90f5c73cc849636c968599dd73f9ad86a2f93b3da17b4ca0207",
+      "client/world-state.js": "03f51896f243b9b58f7c219f7859accca3d7f83e12efa424319eb0f921eee3e2",
+      "test-audit-server.mjs": "3baaa59fd9a335e00ae766688af5553f42acd5281014bc38c0deac065d267063",
+      "test.js": "886a77743bcb4618fb22b3be4d2fa859de0c6efdcef1dd66cca1767d717e66b8",
+      "package-lock.json": "1a6f2b332f963bc5145a1fc927b20d8b7264c5b02a9b8577ae89547e56d620e4"
+    }
+  },
+  "recorded": true,
+  "rows": [
+    "NET-05",
+    "NET-34",
+    "NET-68"
+  ],
+  "scope": "Selected complete predicates for NET-05/34 and ordinary-human start/reset NET-68. No NET-16/20/22/25 completion.",
+  "play": {
+    "inputs": [
+      "{",
+      "null",
+      "[]",
+      "[1]",
+      "42",
+      "true",
+      "\"hello\"",
+      "{}",
+      "{\"t\":null}",
+      "{\"t\":7}",
+      "{\"t\":[]}",
+      "{\"t\":{}}",
+      "{\"t\":\"move\",\"orders\":[null]}"
+    ],
+    "pong": {
+      "t": "pong",
+      "c": "after-invalid-order"
+    },
+    "advanced": true,
+    "unitsPresent": true,
+    "sameMatchAfterReconnect": true,
+    "you": 1
+  },
+  "malformed": {
+    "invalid": [
+      "{",
+      "null",
+      "[]",
+      "[1]",
+      "42",
+      "true",
+      "\"hello\"",
+      "{}",
+      "{\"t\":null}",
+      "{\"t\":7}",
+      "{\"t\":[]}",
+      "{\"t\":{}}"
+    ],
+    "first": [
+      {
+        "nameUnits": [
+          109,
+          97,
+          108,
+          102,
+          111,
+          114,
+          109,
+          101,
+          100
+        ],
+        "team": 0,
+        "faction": 0,
+        "connected": true,
+        "ai": false,
+        "level": null
+      }
+    ],
+    "pong": {
+      "t": "pong",
+      "c": "after-invalid"
+    }
+  },
+  "replacement": {
+    "replaced": {
+      "t": "replaced"
+    },
+    "oldClose": {
+      "code": 1005,
+      "reason": ""
+    },
+    "sameSeat": true,
+    "sameMatch": true,
+    "noDropPause": true,
+    "initial": {
+      "nonempty": true,
+      "unique": true,
+      "noGone": true,
+      "completeHeld": true
+    },
+    "guestInitial": {
+      "nonempty": true,
+      "unique": true,
+      "noGone": true,
+      "completeHeld": true
+    },
+    "rejoined": {
+      "nonempty": true,
+      "unique": true,
+      "noGone": true,
+      "completeHeld": true
+    },
+    "dropFull": {
+      "nonempty": true,
+      "unique": true,
+      "noGone": true,
+      "completeHeld": true
+    },
+    "restarted": {
+      "nonempty": true,
+      "unique": true,
+      "noGone": true,
+      "completeHeld": true
+    },
+    "guestRestarted": {
+      "nonempty": true,
+      "unique": true,
+      "noGone": true,
+      "completeHeld": true
+    },
+    "startClearsWarmedRows": true,
+    "restartIncrements": true,
+    "settingsRefusedInPlay": true,
+    "roles": "two human commanders only",
+    "unobserved": [
+      "private object identity",
+      "AI/commander WeakMap reset",
+      "late-delivery injection",
+      "manual pause",
+      "spectator/operative variants"
+    ]
+  },
+  "slots": [
+    {
+      "code": "Slots",
+      "guest": false,
+      "initial": [
+        {
+          "nameUnits": [
+            72,
+            111,
+            115,
+            116
+          ],
+          "team": 0,
+          "faction": 0,
+          "connected": true,
+          "ai": false,
+          "level": null
+        },
+        {
+          "nameUnits": [
+            65,
+            73,
+            32,
+            49
+          ],
+          "team": 1,
+          "faction": 1,
+          "connected": true,
+          "ai": true,
+          "level": "normal"
+        }
+      ],
+      "steps": [
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": "1",
+            "v": 2
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-0"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 0,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 1,
+              "faction": 1,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": "1",
+            "v": 4
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-1"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 0,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 1,
+              "faction": 1,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "kick",
+            "slot": "1"
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-2"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 0,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 1,
+              "faction": 1,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": [
+              1
+            ],
+            "v": 2
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-3"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 0,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 1,
+              "faction": 1,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": [
+              1
+            ],
+            "v": 4
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-4"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 0,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 1,
+              "faction": 1,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "kick",
+            "slot": [
+              1
+            ]
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-5"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 0,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 1,
+              "faction": 1,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 1.5,
+            "v": 2
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-6"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 0,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 1,
+              "faction": 1,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 1.5,
+            "v": 4
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-7"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 0,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 1,
+              "faction": 1,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "kick",
+            "slot": 1.5
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-8"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 0,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 1,
+              "faction": 1,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": -1,
+            "v": 2
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-9"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 0,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 1,
+              "faction": 1,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": -1,
+            "v": 4
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-10"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 0,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 1,
+              "faction": 1,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "kick",
+            "slot": -1
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-11"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 0,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 1,
+              "faction": 1,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": null,
+            "v": 2
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-12"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 0,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 1,
+              "faction": 1,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": null,
+            "v": 4
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-13"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 0,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 1,
+              "faction": 1,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "kick",
+            "slot": null
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-14"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 0,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 1,
+              "faction": 1,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": true,
+            "v": 2
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-15"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 0,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 1,
+              "faction": 1,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": true,
+            "v": 4
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-16"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 0,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 1,
+              "faction": 1,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "kick",
+            "slot": true
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-17"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 0,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 1,
+              "faction": 1,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 1,
+            "v": 2
+          },
+          "broadcast": true,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-18"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 0,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 1,
+              "faction": 2,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "kick",
+            "slot": 1
+          },
+          "broadcast": true,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-19"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 0,
+              "connected": true,
+              "ai": false,
+              "level": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "code": "Authority",
+      "guest": true,
+      "initial": [
+        {
+          "nameUnits": [
+            72,
+            111,
+            115,
+            116
+          ],
+          "team": 0,
+          "faction": 0,
+          "connected": true,
+          "ai": false,
+          "level": null
+        },
+        {
+          "nameUnits": [
+            71,
+            117,
+            101,
+            115,
+            116
+          ],
+          "team": 1,
+          "faction": 1,
+          "connected": true,
+          "ai": false,
+          "level": null
+        },
+        {
+          "nameUnits": [
+            65,
+            73,
+            32,
+            49
+          ],
+          "team": 2,
+          "faction": 2,
+          "connected": true,
+          "ai": true,
+          "level": "normal"
+        }
+      ],
+      "steps": [
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 2,
+            "v": 5
+          },
+          "broadcast": true,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-0"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 0,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 1,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 2,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "guest",
+          "message": {
+            "t": "team",
+            "slot": 2,
+            "v": 0
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-1"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 0,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 1,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 2,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 1,
+            "v": 2
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-2"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 0,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 1,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 2,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "guest",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": 3
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-3"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 0,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 1,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 2,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "guest",
+          "message": {
+            "t": "faction",
+            "slot": 1,
+            "v": 3
+          },
+          "broadcast": true,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-4"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 0,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 2,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": 2
+          },
+          "broadcast": true,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-5"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 2,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 2,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 2,
+            "v": 3
+          },
+          "broadcast": true,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-6"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 2,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "broadcast": true,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-7"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 2,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "broadcast": true,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-8"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 5,
+              "faction": 2,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": 0
+          },
+          "broadcast": true,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-9"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 5,
+              "faction": 0,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": 3
+          },
+          "broadcast": true,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-10"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": "1"
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-11"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": [
+              1
+            ]
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-12"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": 1.5
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-13"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": -1
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-14"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": null
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-15"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": true
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-16"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": 6
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-17"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": "1"
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-18"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": [
+              1
+            ]
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-19"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": 1.5
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-20"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": -1
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-21"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": null
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-22"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": true
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-23"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": 4
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-24"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "broadcast": true,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-25"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 0,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": 1
+          },
+          "broadcast": true,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-26"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 1
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": 2
+          },
+          "broadcast": true,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-27"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 2
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 2,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": 3
+          },
+          "broadcast": true,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-28"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 3
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 3,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": 4
+          },
+          "broadcast": true,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-29"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 4
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 4,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "broadcast": true,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-30"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "v": 0
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-31"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-32"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 99,
+            "v": 0
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-33"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": 0
+          },
+          "broadcast": true,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-34"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 5,
+              "faction": 0,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": 1
+          },
+          "broadcast": true,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-35"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 5,
+              "faction": 1,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": 2
+          },
+          "broadcast": true,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-36"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 5,
+              "faction": 2,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": 3
+          },
+          "broadcast": true,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-37"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "v": 0
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-38"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-39"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 99,
+            "v": 0
+          },
+          "broadcast": false,
+          "barrier": {
+            "t": "pong",
+            "c": "slot-40"
+          },
+          "probe": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "roster": [
+            {
+              "nameUnits": [
+                72,
+                111,
+                115,
+                116
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                71,
+                117,
+                101,
+                115,
+                116
+              ],
+              "team": 1,
+              "faction": 3,
+              "connected": true,
+              "ai": false,
+              "level": null
+            },
+            {
+              "nameUnits": [
+                65,
+                73,
+                32,
+                49
+              ],
+              "team": 5,
+              "faction": 3,
+              "connected": true,
+              "ai": true,
+              "level": "normal"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

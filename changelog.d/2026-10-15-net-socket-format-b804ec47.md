@@ -1,0 +1,1 @@
+- Format the NET socket predicate test without changing predicates, literals, assertions, input actions or the authentic Source fixture. Preserve the original failed formatting check as evidence.

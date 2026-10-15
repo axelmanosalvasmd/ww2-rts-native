@@ -1,0 +1,621 @@
+{
+  "reference": "e4e579a838aabae3b1d9dadbc17a0a87147bc52d",
+  "rows": [
+    "NET-05",
+    "NET-34",
+    "NET-68"
+  ],
+  "attribution": {
+    "borrowed_fixture_head": "0f93ab4c3e0ac1a613cfe9ef5a96b7c333fe6439",
+    "borrowed_fixture_sha256": "9fa157acad31045fca6c4d51a09a8c5de631ac00c38c7e2d21727b1e10b981c7",
+    "scope": "Original recorded thirteen-input play sequence only. New predicate output is absent until an assigned Source recording; no whole-batch or row completion claim."
+  },
+  "play": {
+    "inputs": [
+      "{",
+      "null",
+      "[]",
+      "[1]",
+      "42",
+      "true",
+      "\"hello\"",
+      "{}",
+      "{\"t\":null}",
+      "{\"t\":7}",
+      "{\"t\":[]}",
+      "{\"t\":{}}",
+      "{\"t\":\"move\",\"orders\":[null]}"
+    ],
+    "pong": {
+      "t": "pong",
+      "c": "after-invalid-order"
+    },
+    "advanced": true,
+    "unitsPresent": true,
+    "sameMatchAfterReconnect": true,
+    "you": 1
+  },
+  "invalid": [
+    "{",
+    "null",
+    "[]",
+    "[1]",
+    "42",
+    "true",
+    "\"hello\"",
+    "{}",
+    "{\"t\":null}",
+    "{\"t\":7}",
+    "{\"t\":[]}",
+    "{\"t\":{}}"
+  ],
+  "heldRows": [
+    "NET-15",
+    "NET-16",
+    "NET-20",
+    "NET-22",
+    "NET-25"
+  ],
+  "slotCases": [
+    {
+      "code": "Slots",
+      "guest": false,
+      "actions": [
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": "1",
+            "v": 2
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": "1",
+            "v": 4
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "kick",
+            "slot": "1"
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": [
+              1
+            ],
+            "v": 2
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": [
+              1
+            ],
+            "v": 4
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "kick",
+            "slot": [
+              1
+            ]
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 1.5,
+            "v": 2
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 1.5,
+            "v": 4
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "kick",
+            "slot": 1.5
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": -1,
+            "v": 2
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": -1,
+            "v": 4
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "kick",
+            "slot": -1
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": null,
+            "v": 2
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": null,
+            "v": 4
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "kick",
+            "slot": null
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": true,
+            "v": 2
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": true,
+            "v": 4
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "kick",
+            "slot": true
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 1,
+            "v": 2
+          },
+          "broadcast": true
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "kick",
+            "slot": 1
+          },
+          "broadcast": true
+        }
+      ]
+    },
+    {
+      "code": "Authority",
+      "guest": true,
+      "actions": [
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 2,
+            "v": 5
+          },
+          "broadcast": true
+        },
+        {
+          "actor": "guest",
+          "message": {
+            "t": "team",
+            "slot": 2,
+            "v": 0
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 1,
+            "v": 2
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "guest",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": 3
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "guest",
+          "message": {
+            "t": "faction",
+            "slot": 1,
+            "v": 3
+          },
+          "broadcast": true
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": 2
+          },
+          "broadcast": true
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 2,
+            "v": 3
+          },
+          "broadcast": true
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "broadcast": true
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "broadcast": true
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": 0
+          },
+          "broadcast": true
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": 3
+          },
+          "broadcast": true
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": "1"
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": [
+              1
+            ]
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": 1.5
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": -1
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": null
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": true
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": 6
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": "1"
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": [
+              1
+            ]
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": 1.5
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": -1
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": null
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": true
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": 4
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": 0
+          },
+          "broadcast": true
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": 1
+          },
+          "broadcast": true
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": 2
+          },
+          "broadcast": true
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": 3
+          },
+          "broadcast": true
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": 4
+          },
+          "broadcast": true
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0,
+            "v": 5
+          },
+          "broadcast": true
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "v": 0
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 0
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "team",
+            "slot": 99,
+            "v": 0
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": 0
+          },
+          "broadcast": true
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": 1
+          },
+          "broadcast": true
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": 2
+          },
+          "broadcast": true
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0,
+            "v": 3
+          },
+          "broadcast": true
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "v": 0
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 0
+          },
+          "broadcast": false
+        },
+        {
+          "actor": "host",
+          "message": {
+            "t": "faction",
+            "slot": 99,
+            "v": 0
+          },
+          "broadcast": false
+        }
+      ]
+    }
+  ]
+}
