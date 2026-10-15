@@ -1,5 +1,31 @@
 # Three Crossroads Native: design decisions
 
+## Restored combat S2 native stop at daaa4743 (2026-10-15)
+
+At producing `daaa4743bc257235378b561b639641f69f07271b`, renewed fmt passes
+and the exact core CMB-64 test passes (1 passed, 138 skipped). The subsequent
+five-name simtest invocation runs CMB-65 first, then stops with 0 passed,
+1 failed, 224 skipped and four selected instances unrun, exit 100. Its failure
+is the asserted true result of send_aircraft_mission at test line 692. Read-only
+inspection finds the exact mismatch: the reused original fighter-continuous-aa
+input has station-state aircraft ammo 0, whereas the unchanged new-mission
+admission rejects ammo <= 0. Continuous AA itself is independent of that sortie
+ammo. No runtime defect or guard change follows from this test-input conflict.
+No repair, refill, input mutation or rerun is performed.
+
+The CMB-39, CMB-69, extracted connected-tick and CMB-41 instances did not run.
+The conditional strict core/simtest ci-test all-target Clippy did not run.
+Two unique native instances executed in total, one pass and one failure.
+The initial e80d formatting diagnostic remains preserved, and its authorized
+mechanical application was frozen before this producing head. Every job
+confirmed actual S2 CPUs 4-7, 6 GiB, swap 0, quota 400%, jobs 4/threads 1,
+current guard/target and 56-57 GiB free above the 20 GiB floor. Cargo/nextest
+exited and S2 flock was released; Root was notified before the report/dep-info.
+The [terminal result](docs/testing/audit-combat-1821-s2-result.md) points to exact raw logs,
+producing-head binding and the held witness. All parity cells and fixtures
+remain unchanged. The separate eb4e97b3 sniper child stays unrun. This docs child
+executes no new check and carries no first-five completion or publication claim.
+
 ## Restored combat S2 formatting child (2026-10-15)
 
 Root grants exact e80d qualification on S2, CPUs 4-7, 6 GiB memory, zero swap,

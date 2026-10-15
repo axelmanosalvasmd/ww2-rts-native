@@ -1,5 +1,11 @@
 # AUDIT_COMBAT complete-check assessment at restored main
 
+Latest native qualification stops at producing daaa4743: CMB-64 PASS, CMB-65 FAIL
+on the reused fighter's zero-ammo new-mission refusal. Four selected simtest
+instances and conditional strict Clippy remain unrun. See the
+[terminal result](audit-combat-1821-s2-result.md). No repair/retry or row edit.
+The per-row mappings below are the preparation assessment, not a later PASS.
+
 Base: `379ba4e06c794708623c005ab6052bebd03d8809`. These are private proposals,
 not completed reviews, current-head passes or actual status changes. New tests
 must pass under Root's exact slot grant before the first five can be proposed
@@ -12,7 +18,7 @@ is completed/success at producing `7a7348cbac35924b5876531e318140d13b7a42c1`.
 The run's raw logs were opened, not inferred from a green badge. The existing
 catalog, production, combat, aviation, firing and connected-tick instances each
 show PASS on Ubuntu 24.04, Windows 2025 and macOS 15. Source comparison confirms
-frozen main `379ba4e` retains that Rust tree. New child tests have zero passes.
+frozen main `379ba4e` retains that Rust tree. The old hosted results are separate from the new partial qualification above.
 Raw downloaded log: `/tmp/audit-combat-1821-main-38776054627.log`.
 
 ## First five selected checks
@@ -46,4 +52,5 @@ frozen main. No other table is edited. The five-row Rust/Status patch under
 native proof plus independent exact-head review. Earlier CMB-61 failure logs and
 all prior branches remain intact. No translated/source model counts as native
 execution. Source, Cargo, rustc, native, fmt, lint, discovery, full/release and CI
-execution counts for this worker remain zero at this source checkpoint.
+execution counts were zero at that preparation checkpoint. The later S2 result
+above records one native pass, one native failure and all unrun work exactly.

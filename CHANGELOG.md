@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Record restored combat S2's first native failure at daaa4743: CMB-64 passes, then CMB-65's new explicit fighter mission is refused because its reused continuous-AA fixture starts with zero aircraft ammo. Stop without repair or retry; CMB-39/CMB-69/connected tick/CMB-41 and conditional strict Clippy remain unrun. Renewed fmt passes, all parity cells stay unchanged and the initial fmt diagnostic is retained.
+
 - Apply the four formatting-only changes requested by the granted e80d S2 format check. Preserve all test inputs, assertions, fixtures and runtime behavior. Keep the initial formatting diagnostic; the six exact native checks remain pending on the frozen child.
 
 - Add a source-only CMB-41 witness that buys four real Soviet Conscripts through the existing recorded purchase caller, retains the full native starting roster, and checks actual field/queue population after each paid birth. The original four-squads-count-three check is authored but unrun; no status is changed.
