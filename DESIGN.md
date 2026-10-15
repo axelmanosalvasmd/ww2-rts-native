@@ -1,5 +1,140 @@
 # Three Crossroads Native: design decisions
 
+## Five complete selected MAP checks (2026-10-15)
+
+At producing runtime head `7cbfcdddf913625c48fd109d8d216151881cba20`,
+all six authorized unique native instances pass once: three exact validation
+message readers, the full authoritative corpus, complete original Assault
+check and affected BASE Pillbox replay. Each selects1/passes1/fails0; core
+instances filter140 and simtest instances filter224. Formatting recheck and
+strict locked core/simtest ci-test all-target Clippy exit0. The initial
+f192 formatting-only failure remains preserved; no native failure or rerun
+occurred. Raw logs and the report are `/tmp/map-7cbfcddd-S1-52b4776c/`.
+
+The complete original checks cover ten core-field and two height errors,
+three Assault-authoring errors, all138 map cases, all57 Assault constructors
+including four named XL maps and ten full raw Hill routes, both retained
+Assault validation messages and the affected BASE diagnostic/replay. No
+whole-match or recipient-delivery requirement is added to those components.
+MAP97 retains its separate producing0b default-debug/release120-action
+proof. These establish five selected Rust checks: MAP04/05/07/97/117.
+
+Root explicitly authorizes this docs-only child after the actual gates.
+Change only four new MAP Rust/Status pairs, retain MAP97, and preserve all
+140 Acceptance cells and all other table cells. The entire tested Rust
+tree remains `c707f7ebda7b519edb0071f42c7de0a875706949`. This child claims
+zero additional executions. The private maps table becomes93 ported,
+6 in progress and41 todo; MAP06/19/100 remain held. The separate unfinished
+MAP06/editor worktree is not imported.
+
+S1 scopes actually report CPU0-3,6GiB/swap0/quota400%, with jobs4/threads1,
+the current guard, exclusive target and disk floor checked before every job.
+Own-checkout core/simtest dep-info bind to producing7cbfcddd. Clippy's final
+process exits0 and the exact S1 lock is immediately free; Root is notified
+before any status edit. No Source, discovery, full, release, cleanup scan
+or sealing operation is added. Actual final-child independent review,
+normal preservation of newer main's test observer, Hermes acknowledgment
+of the exact runtime head and hosted gates remain Root-owned before merge.
+
+## MAP qualification formatting child (2026-10-15)
+
+The authorized S1 formatting check at frozen `f1928e13` exits1 with one
+BASE assertion wrap at construction_tick/base_selected.rs:63. Its raw log
+is retained at `/tmp/map-f192-S1-52b4776c/fmt.log`. The actual scope confirms
+CPU0-3, MemoryMax6442450944, MemorySwapMax0 and CPUQuota4s; the guard reports
+61522472960 available bytes above its20GiB floor. No native test ran.
+
+Apply only the reported assertion collapse. The complete non-whitespace
+Rust byte sequence is identical to the authorized runtime head, including
+all literals and assertions. Root explicitly allows this mechanical child
+and freezing it before the focused checks. The initial diagnostic remains
+a formatting failure; it is not a native test failure or a pass. After
+freezing, recheck formatting and run only the six named existing gates,
+then strict core/simtest ci-test all-target Clippy if all pass. Status cells
+remain unchanged until the complete authorized pass and review sequence.
+
+## Authorized map validation text repair (2026-10-15, execution pending)
+
+Root reviewed the concrete validator proposal and pinned Source validation
+at shared/sim.js:575-595, then authorized its bounded application directly
+on primary `13064504`, not the earlier status child. MapError keeps its
+existing variants and fields; its Display now returns the original text
+for name, width/height, rows/heights, defend and assaultTime errors. The
+existing rows helper supplies declared dimensions in row/height messages.
+Every validation condition, allowed character, accepted map and unsupported
+feature guard remains unchanged. Calls for other layer fields retain their
+original array-type, row-type, shape and content errors. This preserves the
+bounded scope where the shared helper serves unrelated layered inputs.
+
+Root also authorized the one dependent BASE diagnostic expectation at
+construction_tick/base_selected.rs:68. It now expects the original Source
+name-error text. The raw nameless/empty-points input, rejection, name-only
+point rejection, amended map and every replay assertion remain intact.
+Root is notifying IMPL_BASES; this is explicit authorization for that single
+expectation, not inferred consent to edit any other BASE consumer or row.
+The existing exact test
+`construction_tick::base_selected::base26_pillbox_slit_faces_out_from_home`
+loads the shared fixture and checks all four raw-map preparation receipts
+before its own replay. It is the proposed affected-consumer gate in addition
+to the five MAP native instances. No new duplicate diagnostic test is added.
+
+Measured execution status here is zero jobs and zero native results.
+No Source, Node, Cargo, rustc, native, fmt, lint, discovery, release or CI
+command runs without a new exact Root slot grant. The five-row status child
+for MAP04/05/07/97/117 remains conditional on actual gates and independent
+actual-head review. Only the already reviewed MAP97 status is applied now;
+all140 Acceptance cells and all other MAP cells remain exact. MAP06's
+unfinished constructor child stays separate, with no Source capture grant.
+Root retains Hermes exact-runtime-head acknowledgment before merge, the
+publication lease and hosted9/9. No ABI, protocol, interface or terrain
+policy change is introduced.
+
+## Recovered MAP97 eligibility on frozen main (2026-10-15)
+
+Recover only the owned MAP97 Rust/Status cells from reviewed private child
+`2687e2b8e7e1b8795c9f46d8f97ef6cf7dead3d6`. All 140 Acceptance cells,
+all other MAP cells and frozen main's complete files remain intact.
+The World memory provider, recorder, native consumer and both retained
+fixtures are byte-identical between producing `0b62374461` and frozen main.
+The raw debug and release logs each show the registered native test passing
+once, 1 passed/0 failed/217 filtered. Each instance consumes 120 actions.
+The full recovered review ACCEPTs that literal component check. These are
+historical producing-head results, not execution of this successor.
+
+[The current eight-row delivery note](docs/runtime/map-audit-delivery.md)
+records the other seven gaps and exact pending consumers. Native World
+recipient serialization and MAP100's delivery/reconnect history remain
+separate. No owner acceptance or client adoption is inferred. Root alone
+controls publication after fresh independent actual-head review.
+
+## MAP validation-message successor (2026-10-15, source only)
+
+Start from frozen main `379ba4e06c794708623c005ab6052bebd03d8809`
+in the isolated MAP_AUDIT checkout. Preserve the MAP97 status child
+`2687e2b8e7` and Hill draft `1ba5688a82` on their original branches.
+Only this roster's eight rows are owned; the eight different rows in the
+older `1c51720b5d` candidate must not overwrite current main.
+
+Three new consumers compare exact native validation text against ten
+core-field, two height and three Assault-authoring inputs in the existing
+original-source map fixture. The complete existing Assault consumer now
+also compares both retained validation messages after its four XL and ten
+Hill starts and full raw Hill waypoint comparisons. No fixture, oracle,
+constructor, raw-route predicate or runtime admission guard changes.
+These tests have not run. Current validation text still differs from the
+Source messages, so no pass or new row completion is claimed.
+
+MAP97's two historical native passes belong to `0b62374461`, one default
+test/debug and one release instance, 120 actions each. Its recovered ACCEPT
+is not a new-head execution. MAP06 still needs the complete twenty-start
+Assault-only-spawn scene; MAP19 needs the selected editor move/save/delete
+history, and MAP100 needs full World delivery/reconnect/hidden-change
+proof. Static structure and internal memory checks do not fill those gaps.
+No interface, ABI, protocol, private view, terrain policy, Source or
+publication changes. Root owns validator runtime scope, slot grants,
+independent review and publication. Issue5 receipt through6199190039
+acknowledges unchanged contracts and pending defaults; it grants no consent.
+
 ## ENG_AUDIT recovery onto frozen main (2026-10-15, source only)
 
 Start this isolated delivery at frozen main `379ba4e06c794708623c005ab6052bebd03d8809` and normally merge recovered `dd035fe2033739d9831f909d5ccc5066166153b6`. Resolve only additive CHANGELOG and DESIGN conflicts by retaining both sides. Preserve every incoming runtime, aligned-replay hook, registry, acceptance cell and unrelated status. The five complete selected ENG-04/13/14/48/66 checks retain their reviewed recorder, test and authentic fixture bytes. Only those five Rust/Status pairs differ from the 80-row incoming engineering table. Main's 235/939 becomes a private 240/939 proposal, with no joint client acceptance.

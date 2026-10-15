@@ -4,6 +4,16 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Mark MAP-04/05/07/117 ported after six exact native checks pass at `7cbfcddd`: three strict original validation-message readers, the full map corpus, complete XL/Hill Assault check and affected BASE replay. Formatting recheck and strict core/simtest all-target Clippy also pass. Retain MAP-97's separate historical debug/release proof, all 140 Acceptance cells and the tested Rust tree; MAP-06/19/100 remain held.
+
+- Apply the single mechanical BASE assertion wrap reported by the first authorized MAP formatting check at `f1928e13`. Preserve every assertion/literal and the failed log; native checks have not started.
+
+- Match the pinned Source validation text for map names, sizes, rows, heights, defenders and Assault clocks without changing admission. Update the single BASE raw-map name-error expectation to the same text, retaining its invalid input and refusal. The three strict message tests, full map corpus, complete Assault check and affected BASE replay have not run; MAP-04/05/07/117 remain held pending Root execution and review.
+
+- Recover the reviewed MAP-97 ported status on frozen main, retaining its original two 120-action native passes at `0b62374461` and unchanged memory source/fixtures. Keep the seven other assigned statuses held pending their complete checks; no execution ran in this successor.
+
+- Prepare exact original validation-message consumers for MAP-04/05/07/117 using the retained map and Assault fixtures. Preserve all existing constructor, raw-route and rejection coverage. Native validation and the bounded validator-message repair remain pending; MAP-06/19/100 remain held.
+
 - Recover the complete ENG-04/13/14/48/66 checks onto frozen main `379ba4e0`, preserving both histories, every incoming row and the authentic four-fixture extensions. The private five-row proposal raises this baseline from 235 to 240 ported rows. Prior six native passes remain attributed to `df9a0cff`; this source-only integration awaits Root's slot and independent actual-head review.
 - Compare MODE-21 footprint keys by validated numeric bits, accepting hexadecimal letter-case variants and rejecting duplicate bit-identical keys. Preserve exact value-bit checks and signed-zero distinctions; no player-visible behavior changes.
 

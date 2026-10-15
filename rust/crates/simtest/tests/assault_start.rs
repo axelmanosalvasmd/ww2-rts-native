@@ -460,8 +460,13 @@ fn explicit_assault_start_matches_original_create_game() {
     let validation = fixture["selectedValidation"].as_array().unwrap();
     assert_eq!(validation.len(), 2);
     for invalid in validation {
-        assert!(
-            AuthoritativeMap::from_json(&serde_json::to_vec(&invalid["map"]).unwrap()).is_err()
+        let error = AuthoritativeMap::from_json(&serde_json::to_vec(&invalid["map"]).unwrap())
+            .expect_err("the original invalid Assault map must be rejected");
+        assert_eq!(
+            error.to_string(),
+            invalid["error"].as_str().unwrap(),
+            "{}: exact original validation message",
+            invalid["name"]
         );
     }
     // Retain the exact actor-count guard for all original 43 cases.
