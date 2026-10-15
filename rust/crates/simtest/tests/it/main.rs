@@ -79,6 +79,8 @@ mod match_tick;
 mod match_tick_companions;
 #[path = "../match_tick_events.rs"]
 mod match_tick_events;
+#[path = "../mode_predicates.rs"]
+mod mode_predicates;
 #[path = "../movement.rs"]
 mod movement;
 #[path = "../movement_routing.rs"]
