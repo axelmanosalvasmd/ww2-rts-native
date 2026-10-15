@@ -1535,6 +1535,10 @@ This step expanded the catalog from 42 to 46 tables. Four additions provide `TRA
 
 One equivalence test reuses the existing vision recording and its independent `load_rules` parser. It compares every typed field, optional value, list order and floating-point bit for all 47 unit types, all five weather kinds and the movement/vision settings. The existing movement and vision replay tests remain unchanged. This does not connect the server to the core, implement a full simulation or change the ABI. `RULES_HASH` remains limited to formation constants; compiling these additional tables does not expand its agreed scope.
 
+## Selected ordinary base checks, source plan (2026-10-15)
+
+The [IMPL_BASES plan](docs/testing/impl-bases-selected-plan-38c1a0da.md) selects six original predicates across BASE-26, BASE-28, BASE-29, BASE-30 and BASE-48 from native baseline `34edf52a7eaa6cb6edba3e802c2190226228276f`. It uses actual purchases and canonical building placement, retaining existing actors, footprints and structure identities. The B05 test's temporary producer is replaced by a disclosed purchase from the real constructor HQ; its complete occupancy, completion and escape assertions remain required. Construction and repair select the Conquest iteration only. Other modes, cancellation, interfaces and every parity status remain unchanged. This checkpoint contains a plan, with no recorder or native execution and no implementation or acceptance claim. Root owns execution slots and separate review.
+
 ## Wallet, population and income state (2026-10-12)
 
 `economy_state.rs` owns each player's wallet, income readouts and VP. It borrows an ordered view of units, building queues, pending drops, capture points, depots and World regions. The player vector index is the slot. This keeps the operations independent of the legacy `Game` and lets a future match runner supply authoritative state directly. World node-to-region resolution belongs to that runner; this module requires explicit regions and does not infer territory from hidden global state. The catalog now contains 47 tables, including the original exported `WORLD_TUNING`.

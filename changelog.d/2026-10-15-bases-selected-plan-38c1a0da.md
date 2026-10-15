@@ -1,0 +1,1 @@
+- Freeze the IMPL_BASES source plan for six selected checks across BASE-26, BASE-28, BASE-29, BASE-30 and BASE-48. Require real producers and canonical footprints, preserve existing tests and leave every parity status unchanged. Source recording and native execution await Root's slot grant; Classic, other mode variants and site cancellation remain outside this batch.
