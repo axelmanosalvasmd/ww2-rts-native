@@ -1,0 +1,2065 @@
+{
+  "game": {
+    "w": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "World.game.w",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "h": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "n(g.h as f64)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "flags": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "typed(\"Uint16Array\",g.flags.iter().map(|v|f64::from(*v)))",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "tick": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "n(g.tick as f64)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "nextId": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "n(f64::from(m.next_unit_id))",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "winVp": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "n(m.start.win_vp)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "units": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "map(g.units.iter().map(|(id,u)|(n(f64::from(*id)),unit(m,u))))",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "shots": {
+      "source": "shared/sim.js:711; shared/structures.js",
+      "provider": "array_or_raw(&m.firing.events)",
+      "note": "Both actual containers must be empty. Nonempty data fails, never becomes empty.",
+      "priorInventoryStatus": "raw-only",
+      "disposition": "empty",
+      "consumingExpression": "createGame initializes pending effects empty"
+    },
+    "flights": {
+      "source": "shared/sim.js:711; shared/structures.js",
+      "provider": "if m.firing.flights.is_empty(){map([])}else{raw(&m.firing.flights)}",
+      "note": "Both actual containers must be empty. Nonempty data fails, never becomes empty.",
+      "priorInventoryStatus": "raw-only",
+      "disposition": "empty",
+      "consumingExpression": "createGame initializes pending effects empty"
+    },
+    "nextFlight": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "n(m.firing.next_flight as f64)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "nades": {
+      "source": "shared/sim.js:711; shared/structures.js",
+      "provider": "array_or_raw(&m.firing.grenades)",
+      "note": "Both actual containers must be empty. Nonempty data fails, never becomes empty.",
+      "priorInventoryStatus": "raw-only",
+      "disposition": "empty",
+      "consumingExpression": "createGame initializes pending effects empty"
+    },
+    "salvos": {
+      "source": "shared/sim.js:711; shared/structures.js",
+      "provider": "array_or_raw(&m.firing.salvos)",
+      "note": "Both actual containers must be empty. Nonempty data fails, never becomes empty.",
+      "priorInventoryStatus": "raw-only",
+      "disposition": "empty",
+      "consumingExpression": "createGame initializes pending effects empty"
+    },
+    "smokes": {
+      "source": "shared/sim.js:711; shared/structures.js",
+      "provider": "array_or_raw(&g.smokes)",
+      "note": "Both actual containers must be empty. Nonempty data fails, never becomes empty.",
+      "priorInventoryStatus": "raw-only",
+      "disposition": "empty",
+      "consumingExpression": "createGame initializes pending effects empty"
+    },
+    "strikes": {
+      "source": "shared/sim.js:711; shared/structures.js",
+      "provider": "array_or_raw(&g.strikes)",
+      "note": "Both actual containers must be empty. Nonempty data fails, never becomes empty.",
+      "priorInventoryStatus": "raw-only",
+      "disposition": "empty",
+      "consumingExpression": "createGame initializes pending effects empty"
+    },
+    "wrecks": {
+      "source": "shared/sim.js:711; shared/structures.js",
+      "provider": "array_or_raw(&g.wrecks)",
+      "note": "Both actual containers must be empty. Nonempty data fails, never becomes empty.",
+      "priorInventoryStatus": "raw-only",
+      "disposition": "empty",
+      "consumingExpression": "createGame initializes pending effects empty"
+    },
+    "winner": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "m.finish.as_ref().map_or(Value::Null,|v|n(f64::from(v.winner)))",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "cellLog": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "json!(w.cell_log().iter().map(cell_row).collect::<Vec<_>>())",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "newCells": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "json!(w.new_cells().iter().map(cell_row).collect::<Vec<_>>())",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "claims": {
+      "source": "shared/sim.js:716-720,779-826; shared/story.js:18,33,62; shared/supply-convoys.js:13-15",
+      "provider": "FiringState::target_claims(): every ((targetId,team),amount), Source key targetId*8+team; actual empty iterator predicate",
+      "note": "Source must be exactly declared undefined; actual native readers must verify the field-specific inactive facts. Debug strings do not qualify.",
+      "priorInventoryStatus": "missing-provider",
+      "disposition": "inactive",
+      "consumingExpression": "lazy initialization under its actual feature/phase precondition"
+    },
+    "visionTick": {
+      "source": "shared/sim.js:716,827",
+      "provider": "option(g.vision_tick,|v|n(v as f64))",
+      "note": "Source undefined and actual native Option::None represent no vision pass; any present value compares exactly.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none",
+      "consumingExpression": "no Conquest constructor vision pass"
+    },
+    "fog": {
+      "source": "shared/sim.js:716-720,779-826; shared/story.js:18,33,62; shared/supply-convoys.js:13-15",
+      "provider": "inactive_game(): field-specific actual Option/container/branch predicate for fog; raw observation retained",
+      "note": "Source must be exactly declared undefined; actual native readers must verify the field-specific inactive facts. Debug strings do not qualify.",
+      "priorInventoryStatus": "missing-provider",
+      "disposition": "inactive",
+      "consumingExpression": "lazy initialization under its actual feature/phase precondition"
+    },
+    "fogTerrain": {
+      "source": "shared/sim.js:716-720,779-826; shared/story.js:18,33,62; shared/supply-convoys.js:13-15",
+      "provider": "inactive_game(): field-specific actual Option/container/branch predicate for fogTerrain; raw observation retained",
+      "note": "Source must be exactly declared undefined; actual native readers must verify the field-specific inactive facts. Debug strings do not qualify.",
+      "priorInventoryStatus": "missing-provider",
+      "disposition": "inactive",
+      "consumingExpression": "lazy initialization under its actual feature/phase precondition"
+    },
+    "fogSources": {
+      "source": "shared/sim.js:716-720,779-826; shared/story.js:18,33,62; shared/supply-convoys.js:13-15",
+      "provider": "inactive_game(): field-specific actual Option/container/branch predicate for fogSources; raw observation retained",
+      "note": "Source must be exactly declared undefined; actual native readers must verify the field-specific inactive facts. Debug strings do not qualify.",
+      "priorInventoryStatus": "missing-provider",
+      "disposition": "inactive",
+      "consumingExpression": "lazy initialization under its actual feature/phase precondition"
+    },
+    "timeline": {
+      "source": "shared/sim.js:716-720,779-826; shared/story.js:18,33,62; shared/supply-convoys.js:13-15",
+      "provider": "inactive_game(): field-specific actual Option/container/branch predicate for timeline; raw observation retained",
+      "note": "Source must be exactly declared undefined; actual native readers must verify the field-specific inactive facts. Debug strings do not qualify.",
+      "priorInventoryStatus": "raw-only",
+      "disposition": "inactive",
+      "consumingExpression": "lazy initialization under its actual feature/phase precondition"
+    },
+    "story": {
+      "source": "shared/sim.js:716-720,779-826; shared/story.js:18,33,62; shared/supply-convoys.js:13-15",
+      "provider": "inactive_game(): field-specific actual Option/container/branch predicate for story; raw observation retained",
+      "note": "Source must be exactly declared undefined; actual native readers must verify the field-specific inactive facts. Debug strings do not qualify.",
+      "priorInventoryStatus": "raw-only",
+      "disposition": "inactive",
+      "consumingExpression": "lazy initialization under its actual feature/phase precondition"
+    },
+    "fallen": {
+      "source": "shared/sim.js:716-720,779-826; shared/story.js:18,33,62; shared/supply-convoys.js:13-15",
+      "provider": "inactive_game(): field-specific actual Option/container/branch predicate for fallen; raw observation retained",
+      "note": "Source must be exactly declared undefined; actual native readers must verify the field-specific inactive facts. Debug strings do not qualify.",
+      "priorInventoryStatus": "raw-only",
+      "disposition": "inactive",
+      "consumingExpression": "lazy initialization under its actual feature/phase precondition"
+    },
+    "pathStats": {
+      "source": "shared/sim.js:716-720,779-826; shared/story.js:18,33,62; shared/supply-convoys.js:13-15",
+      "provider": "inactive_game(): field-specific actual Option/container/branch predicate for pathStats; raw observation retained",
+      "note": "Source must be exactly declared undefined; actual native readers must verify the field-specific inactive facts. Debug strings do not qualify.",
+      "priorInventoryStatus": "missing-provider",
+      "disposition": "inactive",
+      "consumingExpression": "lazy initialization under its actual feature/phase precondition"
+    },
+    "navalRegionVersion": {
+      "source": "shared/navigation.js:11; shared/sim.js:2727",
+      "provider": "n(w.versions.naval as f64)",
+      "note": "DIAGNOSTIC_PROPOSED_DEFAULTS; source absent/undefined only to exact +0. Present values and types remain exact.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "default-zero",
+      "consumingExpression": "g.navalRegionVersion ?? 0"
+    },
+    "worldFootprintRadius": {
+      "source": "shared/sim.js:716-720,779-826; shared/story.js:18,33,62; shared/supply-convoys.js:13-15",
+      "provider": "inactive_game(): field-specific actual Option/container/branch predicate for worldFootprintRadius; raw observation retained",
+      "note": "Source must be exactly declared undefined; actual native readers must verify the field-specific inactive facts. Debug strings do not qualify.",
+      "priorInventoryStatus": "missing-provider",
+      "disposition": "inactive",
+      "consumingExpression": "lazy initialization under its actual feature/phase precondition"
+    },
+    "ghosts": {
+      "source": "shared/sim.js:716-720,779-826; shared/story.js:18,33,62; shared/supply-convoys.js:13-15",
+      "provider": "inactive_game(): field-specific actual Option/container/branch predicate for ghosts; raw observation retained",
+      "note": "Source must be exactly declared undefined; actual native readers must verify the field-specific inactive facts. Debug strings do not qualify.",
+      "priorInventoryStatus": "missing-provider",
+      "disposition": "inactive",
+      "consumingExpression": "lazy initialization under its actual feature/phase precondition"
+    },
+    "nextProductionJob": {
+      "source": "shared/sim.js:1038,1047",
+      "provider": "n(m.production.next_job_id() as f64)",
+      "note": "DIAGNOSTIC_PROPOSED_DEFAULTS; this is last allocated ID, not the next proposed job. Full queues/jobs are independently checked.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "default-zero",
+      "consumingExpression": "g.nextProductionJob ?? 0"
+    },
+    "projectSeq": {
+      "source": "shared/sim.js:3677",
+      "provider": "n(m.field_works.project_sequence() as f64)",
+      "note": "DIAGNOSTIC_PROPOSED_DEFAULTS; full active/retained project state is independently checked.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "default-zero",
+      "consumingExpression": "g.projectSeq ?? 0"
+    },
+    "projects": {
+      "source": "shared/sim.js:716-720,779-826; shared/story.js:18,33,62; shared/supply-convoys.js:13-15",
+      "provider": "inactive_game(): field-specific actual Option/container/branch predicate for projects; raw observation retained",
+      "note": "Source must be exactly declared undefined; actual native readers must verify the field-specific inactive facts. Debug strings do not qualify.",
+      "priorInventoryStatus": "raw-only",
+      "disposition": "inactive",
+      "consumingExpression": "lazy initialization under its actual feature/phase precondition"
+    },
+    "covers": {
+      "source": "shared/sim.js:716-720,779-826; shared/story.js:18,33,62; shared/supply-convoys.js:13-15",
+      "provider": "inactive_game(): field-specific actual Option/container/branch predicate for covers; raw observation retained",
+      "note": "Source must be exactly declared undefined; actual native readers must verify the field-specific inactive facts. Debug strings do not qualify.",
+      "priorInventoryStatus": "raw-only",
+      "disposition": "inactive",
+      "consumingExpression": "lazy initialization under its actual feature/phase precondition"
+    },
+    "convoys": {
+      "source": "shared/sim.js:716-720,779-826; shared/story.js:18,33,62; shared/supply-convoys.js:13-15",
+      "provider": "inactive_game(): field-specific actual Option/container/branch predicate for convoys; raw observation retained",
+      "note": "Source must be exactly declared undefined; actual native readers must verify the field-specific inactive facts. Debug strings do not qualify.",
+      "priorInventoryStatus": "raw-only",
+      "disposition": "inactive",
+      "consumingExpression": "lazy initialization under its actual feature/phase precondition"
+    },
+    "operatives": {
+      "source": "shared/sim.js:716-720,779-826; shared/story.js:18,33,62; shared/supply-convoys.js:13-15",
+      "provider": "inactive_game(): field-specific actual Option/container/branch predicate for operatives; raw observation retained",
+      "note": "Source must be exactly declared undefined; actual native readers must verify the field-specific inactive facts. Debug strings do not qualify.",
+      "priorInventoryStatus": "missing-provider",
+      "disposition": "inactive",
+      "consumingExpression": "lazy initialization under its actual feature/phase precondition"
+    },
+    "pits": {
+      "source": "shared/sim.js:716-720,779-826; shared/story.js:18,33,62; shared/supply-convoys.js:13-15",
+      "provider": "inactive_game(): field-specific actual Option/container/branch predicate for pits; raw observation retained",
+      "note": "Source must be exactly declared undefined; actual native readers must verify the field-specific inactive facts. Debug strings do not qualify.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "inactive",
+      "consumingExpression": "lazy initialization under its actual feature/phase precondition"
+    },
+    "tough": {
+      "source": "shared/sim.js:738,753-763",
+      "provider": "option(g.tough.as_ref(),|v|typed(\"RustVecF64\",v.iter().copied()))",
+      "note": "Only undefined versus actual None is absent; present arrays remain strict complete values.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none",
+      "consumingExpression": "optional authored terrain branches"
+    },
+    "supplyGraph": {
+      "source": "shared/sim.js:716-720,779-826; shared/story.js:18,33,62; shared/supply-convoys.js:13-15",
+      "provider": "inactive_game(): field-specific actual Option/container/branch predicate for supplyGraph; raw observation retained",
+      "note": "Source must be exactly declared undefined; actual native readers must verify the field-specific inactive facts. Debug strings do not qualify.",
+      "priorInventoryStatus": "missing-provider",
+      "disposition": "inactive",
+      "consumingExpression": "lazy initialization under its actual feature/phase precondition"
+    },
+    "supplyNet": {
+      "source": "shared/sim.js:716-720,779-826; shared/story.js:18,33,62; shared/supply-convoys.js:13-15",
+      "provider": "inactive_game(): field-specific actual Option/container/branch predicate for supplyNet; raw observation retained",
+      "note": "Source must be exactly declared undefined; actual native readers must verify the field-specific inactive facts. Debug strings do not qualify.",
+      "priorInventoryStatus": "missing-provider",
+      "disposition": "inactive",
+      "consumingExpression": "lazy initialization under its actual feature/phase precondition"
+    },
+    "trenchFront": {
+      "source": "shared/sim.js:738,753-763",
+      "provider": "initial.trench_front.as_ref().map_or(Value::Null,|v|numbers(v.iter().map(|v|f64::from(*v))))}",
+      "note": "Only undefined versus actual None is absent; present arrays remain strict complete values.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none",
+      "consumingExpression": "optional authored terrain branches"
+    },
+    "shoal": {
+      "source": "shared/sim.js:738,753-763",
+      "provider": "option(w.shoal.as_ref(),|v|typed(\"Uint8Array\",v.iter().map(|v|f64::from(*v))))",
+      "note": "Only undefined versus actual None is absent; present arrays remain strict complete values.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none",
+      "consumingExpression": "optional authored terrain branches"
+    },
+    "scenario": {
+      "source": "shared/sim.js:716-720,779-826; shared/story.js:18,33,62; shared/supply-convoys.js:13-15",
+      "provider": "inactive_game(): field-specific actual Option/container/branch predicate for scenario; raw observation retained",
+      "note": "Source must be exactly declared undefined; actual native readers must verify the field-specific inactive facts. Debug strings do not qualify.",
+      "priorInventoryStatus": "raw-only",
+      "disposition": "inactive",
+      "consumingExpression": "lazy initialization under its actual feature/phase precondition"
+    },
+    "world": {
+      "source": "shared/sim.js:716-720,779-826; shared/story.js:18,33,62; shared/supply-convoys.js:13-15",
+      "provider": "inactive_game(): field-specific actual Option/container/branch predicate for world; raw observation retained",
+      "note": "Source must be exactly declared undefined; actual native readers must verify the field-specific inactive facts. Debug strings do not qualify.",
+      "priorInventoryStatus": "raw-only",
+      "disposition": "inactive",
+      "consumingExpression": "lazy initialization under its actual feature/phase precondition"
+    },
+    "players": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "json!(players)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "points": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "json!(points)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "logisticsEnabled": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "json!(m.options.logistics)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "chars": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "chars(&g.chars)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "ground": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "observe(): complete actual LIVE World/Game storage, independently from World.initial()",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "objects": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "observe(): complete actual LIVE World/Game storage, independently from World.initial()",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "mineLayer": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "observe(): complete actual LIVE World/Game storage, independently from World.initial()",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "materials": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "map(w.materials.iter().map(|(k,v)|(n(*k as f64),json!(v))))",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "baseMaterials": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "map(w.base_materials.iter().map(|(k,v)|(n(*k as f64),json!(v))))",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "objectMaterials": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "map(w.object_materials.iter().map(|(k,v)|(n(*k as f64),json!(v))))",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "mineMaterials": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "map(w.mine_materials.iter().map(|(k,v)|(n(*k as f64),json!(v))))",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "roads": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "json!(w.roads)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "naval": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "json!(g.naval)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "mines": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "map(w.mines.iter().map(|(k,v)|(n(*k as f64),n(f64::from(*v)))))",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "mineSeen": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "map(w.mine_seen.iter().map(|(k,v)|(n(*k as f64),n(f64::from(*v)))))",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "aid": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "map(w.aid.iter().map(|(k,v)|(n(*k as f64),n(*v as f64))))",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "supply": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "json!(m.options.supply)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "sandbox": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "json!(m.options.sandbox)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "house": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "numbers(g.house.iter().map(|v|f64::from(*v)))",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "cellHp": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "typed(\"Float32Array\",g.cell_hp.iter().map(|v|f64::from(*v)))",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "surfaceWear": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "typed(\"Float32Array\",w.surface_wear.iter().map(|v|f64::from(*v)))",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "wear": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "option(g.wear.as_ref(),|v|typed(\"Float32Array\",v.iter().map(|v|f64::from(*v))))",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "burnt": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "typed(\"Uint8Array\",w.burnt.iter().map(|v|f64::from(*v)))",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "cellState": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "typed(\"Uint8Array\",w.cell_state.iter().map(|v|f64::from(*v)))",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "fires": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "map(w.fires.iter().map(|(k,v)|(n(*k as f64),n(*v))))",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "scar": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "typed(\"Float32Array\",w.scar.iter().map(|v|f64::from(*v)))",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "soak": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "set(w.soak().iter().map(|v|n(*v as f64)))",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "seed": {
+      "source": "shared/sim.js:2345; harness/r1-aligned-replay.mjs startup receipt",
+      "provider": "n(f64::from(m.start.environment_seed))",
+      "note": "Compare the exact existing 32-bit state observation. Preserve the raw signed Number difference separately; no general numeric normalization.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "seed-bits",
+      "consumingExpression": "g.seed >>> 0"
+    },
+    "wind": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "obj!{\"a\"=>n(m.start.wind.0)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "wx": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "m.start.living.map_or(Value::Null,|v|obj!{\"rain\"=>n(g.rain)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "height": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "observe(): complete actual LIVE World/Game storage, independently from World.initial()",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "initialTerrain": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "obj!{\"chars\"=>chars(&initial.chars)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "structures": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "structures",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "structuralCells": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "map(w.structures.iter().flat_map(|s|s.section_ids.iter().zip(&s.cells).map(move |(id,c)|(n(*c as f64),section(m,id,*c,s.entity_id)))))",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "fallingSections": {
+      "source": "shared/sim.js:711; shared/structures.js",
+      "provider": "array_or_raw(m.environment.falling_sections())",
+      "note": "Both actual containers must be empty. Nonempty data fails, never becomes empty.",
+      "priorInventoryStatus": "raw-only",
+      "disposition": "empty",
+      "consumingExpression": "createGame initializes pending effects empty"
+    },
+    "worldContacts": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "set(m.environment.contacts().iter().map(|v|json!(v)))",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "tech": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "json!(m.options.tech)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "army": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "army",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "weather": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "obj!{\"now\"=>json!(m.start.weather.now.name())",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "buildingCells": {
+      "source": "shared/sim.js:1028-1029,1202,5859-5868",
+      "provider": "map(m.building_cells.iter().map(|(c,b)|(n(*c as f64),obj!{\"id\"=>n(f64::from(b.unit))",
+      "note": "Only this cell-keyed footprint map compares complete unique membership and all id/owner/x/z bits. Preserve ordered raw entries. Reject malformed Map wrappers, duplicate/missing/extra keys, unknown fields and every unequal key-associated value.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "building-cells-membership"
+    },
+    "cellLogIndexes": {
+      "source": "shared/sim.js:2650-2658",
+      "provider": "DERIVED from actual World.cell_log() row indices, with unique keys and complete raw rows; not World.log_indexes storage",
+      "note": "Source index-to-row consistency and actual native cell-log key uniqueness; native index is explicitly derived, never a private-storage read.",
+      "priorInventoryStatus": "missing-provider",
+      "disposition": "derived-index",
+      "consumingExpression": "indexes.get(c) selects the unique actual cellLog row"
+    },
+    "terrainVersion": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "n(f64::from(g.terrain_version))",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "obstructionVersion": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "n(w.versions.obstruction as f64)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "infantryRegionVersion": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "n(w.versions.infantry as f64)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "vehicleRegionVersion": {
+      "source": "shared/sim.js:709-826, setupStructures:2465-2510, mutateWorldCell/logCell:2650-2729",
+      "provider": "n(w.versions.vehicle as f64)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "cellJournal": {
+      "source": "shared/sim.js:1165-1171,2662",
+      "provider": "numbers(w.journal().iter().map(|v|*v as f64))",
+      "note": "No World runtime at actual R1 startup. Native journal is retained internal storage; validate its cell bounds. No absence-to-nonempty-data equality claim.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "internal-journal",
+      "consumingExpression": "g.cellJournal?.push(c)"
+    },
+    "journalBase": {
+      "source": "shared/sim.js:1165-1171,2662",
+      "provider": "n(w.journal_base() as f64)",
+      "note": "No World runtime at actual R1 startup. Native journal is retained internal storage; validate its cell bounds. No absence-to-nonempty-data equality claim.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "internal-journal",
+      "consumingExpression": "g.cellJournal?.push(c)"
+    }
+  },
+  "unit": {
+    "id": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "n(f64::from(u.id))",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "type": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "json!(m.rules.kinds[u.kind].name)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "owner": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "n(u.owner as f64)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "x": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "n(u.x)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "z": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "n(u.z)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "rot": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "n(u.rot)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "aim": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "n(c.aim)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "moveSpeed": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "n(u.move_speed)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "vx": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "option(u.vx,n)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "vz": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "option(u.vz,n)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "travelDir": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "option(u.travel_dir,n)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "hp": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "n(u.hp)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "supp": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "n(u.supp)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "path": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "json!(u.path.iter().copied().map(point).collect::<Vec<_>>())",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "orders": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "if c.orders.is_empty(){json!([])}else{raw(&c.orders)}",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "raw-only",
+      "disposition": "exact"
+    },
+    "attackId": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "n(f64::from(c.attack_id))",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "targetId": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "n(f64::from(f.target_id))",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "still": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "option(u.still,n)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "retarget": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "n(f.retarget)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "repath": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "n(u.repath)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "stuck": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "n(u.stuck)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "cd": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "n(a.cooldown)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "buff": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "n(a.buff)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "ap": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "json!(a.ap)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "nade": {
+      "source": "shared/sim.js:1779-1785,1027",
+      "provider": "option(c.nade,point)",
+      "note": "Only actual Option::None versus exact null (or undefined for a nonbuilding rally) is a no-intent sentinel; positive/present values remain strict.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none-null",
+      "consumingExpression": "null marks no target/destination/rally"
+    },
+    "retreating": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "json!(u.retreating)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "reinf": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "n(r.reinforcement)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "dig": {
+      "source": "shared/sim.js:1779,2406,5883",
+      "provider": "json!(u.dig)",
+      "note": "Exact constructor null and actual false/no active dig job describe no dig intent; this is a field-specific semantic predicate, not a general null/false mapping.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "no-dig",
+      "consumingExpression": "u.dig ? 16 : 0"
+    },
+    "garrison": {
+      "source": "shared/sim.js:1780",
+      "provider": "option(u.garrison,|v|n(v as f64))",
+      "note": "Only exact -1 versus actual None is the declared no-cell sentinel.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none-minus-one",
+      "consumingExpression": "u.garrison >= 0; u.enter >= 0; u.fireAt >= 0"
+    },
+    "enter": {
+      "source": "shared/sim.js:1780",
+      "provider": "option(c.enter,|v|n(v as f64))",
+      "note": "Only exact -1 versus actual None is the declared no-cell sentinel.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none-minus-one",
+      "consumingExpression": "u.garrison >= 0; u.enter >= 0; u.fireAt >= 0"
+    },
+    "amove": {
+      "source": "shared/sim.js:1779-1785,1027",
+      "provider": "option(u.amove,point)",
+      "note": "Only actual Option::None versus exact null (or undefined for a nonbuilding rally) is a no-intent sentinel; positive/present values remain strict.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none-null",
+      "consumingExpression": "null marks no target/destination/rally"
+    },
+    "face": {
+      "source": "shared/sim.js:1779-1808,1888,2229-2234,5437; shared/logistics.js:38-41",
+      "provider": "inactive_unit(): field-specific actual Option/container/branch predicate for face; raw observation retained",
+      "note": "Only the exact constructor null/undefined form is permitted; actual native Option/container/branch predicates must pass. No aircraft/convoy admission required.",
+      "priorInventoryStatus": "raw-only",
+      "disposition": "inactive",
+      "consumingExpression": "declared lazy intent/history or inactive World/air/logistics branch"
+    },
+    "xp": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "n(h.xp)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "fireAt": {
+      "source": "shared/sim.js:1780",
+      "provider": "option(c.fire_at,|v|n(v as f64))",
+      "note": "Only exact -1 versus actual None is the declared no-cell sentinel.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none-minus-one",
+      "consumingExpression": "u.garrison >= 0; u.enter >= 0; u.fireAt >= 0"
+    },
+    "sprint": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "n(u.sprint)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "hitBy": {
+      "source": "shared/sim.js:1782-1785",
+      "provider": "option(h.hit_by,|v|n(f64::from(v)))",
+      "note": "Only exact positive zero versus actual None is the declared no-identity sentinel; native riding flag must also be false.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none-zero",
+      "consumingExpression": "zero means no attacker/carrier identity"
+    },
+    "hitAt": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "n(h.hit_at)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "hitFrom": {
+      "source": "shared/sim.js:1779-1785,1027",
+      "provider": "option(u.hit_from,point)",
+      "note": "Only actual Option::None versus exact null (or undefined for a nonbuilding rally) is a no-intent sentinel; positive/present values remain strict.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none-null",
+      "consumingExpression": "null marks no target/destination/rally"
+    },
+    "drift": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "json!(u.drift)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "reverse": {
+      "source": "shared/sim.js:1779-1785,1027",
+      "provider": "option(u.reverse,point)",
+      "note": "Only actual Option::None versus exact null (or undefined for a nonbuilding rally) is a no-intent sentinel; positive/present values remain strict.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none-null",
+      "consumingExpression": "null marks no target/destination/rally"
+    },
+    "react": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "n(c.react)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "auto": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "json!(c.auto_cast)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "autoRetreat": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "json!(c.auto_retreat)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "motionBefore": {
+      "source": "shared/sim.js:1779-1808,1888,2229-2234,5437; shared/logistics.js:38-41",
+      "provider": "inactive_unit(): field-specific actual Option/container/branch predicate for motionBefore; raw observation retained",
+      "note": "Only the exact constructor null/undefined form is permitted; actual native Option/container/branch predicates must pass. No aircraft/convoy admission required.",
+      "priorInventoryStatus": "raw-only",
+      "disposition": "inactive",
+      "consumingExpression": "declared lazy intent/history or inactive World/air/logistics branch"
+    },
+    "motionClearance": {
+      "source": "shared/sim.js:1779-1808,1888,2229-2234,5437; shared/logistics.js:38-41",
+      "provider": "inactive_unit(): field-specific actual Option/container/branch predicate for motionClearance; raw observation retained",
+      "note": "Only the exact constructor null/undefined form is permitted; actual native Option/container/branch predicates must pass. No aircraft/convoy admission required.",
+      "priorInventoryStatus": "raw-only",
+      "disposition": "inactive",
+      "consumingExpression": "declared lazy intent/history or inactive World/air/logistics branch"
+    },
+    "traffic": {
+      "source": "shared/sim.js:1779-1808,1888,2229-2234,5437; shared/logistics.js:38-41",
+      "provider": "inactive_unit(): field-specific actual Option/container/branch predicate for traffic; raw observation retained",
+      "note": "Only the exact constructor null/undefined form is permitted; actual native Option/container/branch predicates must pass. No aircraft/convoy admission required.",
+      "priorInventoryStatus": "raw-only",
+      "disposition": "inactive",
+      "consumingExpression": "declared lazy intent/history or inactive World/air/logistics branch"
+    },
+    "trafficWait": {
+      "source": "shared/local-traffic.js:11",
+      "provider": "n(u.traffic_wait)",
+      "note": "DIAGNOSTIC_PROPOSED_DEFAULTS: absent/undefined only to exact positive zero.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "default-zero",
+      "consumingExpression": "u.trafficWait ?? 0"
+    },
+    "trafficTrail": {
+      "source": "shared/sim.js:1779-1808,1888,2229-2234,5437; shared/logistics.js:38-41",
+      "provider": "inactive_unit(): field-specific actual Option/container/branch predicate for trafficTrail; raw observation retained",
+      "note": "Only the exact constructor null/undefined form is permitted; actual native Option/container/branch predicates must pass. No aircraft/convoy admission required.",
+      "priorInventoryStatus": "raw-only",
+      "disposition": "inactive",
+      "consumingExpression": "declared lazy intent/history or inactive World/air/logistics branch"
+    },
+    "trafficEntered": {
+      "source": "shared/local-traffic.js:15",
+      "provider": "json!(u.traffic_entered)",
+      "note": "DIAGNOSTIC_PROPOSED_DEFAULTS: absent/undefined only to exact false; present null/numeric/nondefault values never map.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "default-false",
+      "consumingExpression": "!!a.trafficEntered"
+    },
+    "queuedBehind": {
+      "source": "shared/local-traffic.js:37",
+      "provider": "n(f64::from(u.queued_behind))",
+      "note": "DIAGNOSTIC_PROPOSED_DEFAULTS: absent/undefined only to exact positive-zero identity; no positive ID is discarded.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "default-zero",
+      "consumingExpression": "w?.queuedBehind"
+    },
+    "laneScan": {
+      "source": "shared/sim.js:1779-1808,1888,2229-2234,5437; shared/logistics.js:38-41",
+      "provider": "inactive_unit(): field-specific actual Option/container/branch predicate for laneScan; raw observation retained",
+      "note": "Only the exact constructor null/undefined form is permitted; actual native Option/container/branch predicates must pass. No aircraft/convoy admission required.",
+      "priorInventoryStatus": "raw-only",
+      "disposition": "inactive",
+      "consumingExpression": "declared lazy intent/history or inactive World/air/logistics branch"
+    },
+    "follow": {
+      "source": "shared/sim.js:2157",
+      "provider": "n(f64::from(c.follow))",
+      "note": "DIAGNOSTIC_PROPOSED_DEFAULTS: absent/undefined only to exact positive-zero identity; no positive ID is discarded.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "default-zero",
+      "consumingExpression": "!s.follow"
+    },
+    "routeEnd": {
+      "source": "shared/sim.js:1793-1804",
+      "provider": "option(c.route_end,point)",
+      "note": "Only exact undefined versus actual None; every observed present value retains its original bits/type/order.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none",
+      "consumingExpression": "declared undefined until this specific intent/event is recorded"
+    },
+    "moveOutcome": {
+      "source": "shared/sim.js:1779-1808,1888,2229-2234,5437; shared/logistics.js:38-41",
+      "provider": "inactive_unit(): field-specific actual Option/container/branch predicate for moveOutcome; raw observation retained",
+      "note": "Only the exact constructor null/undefined form is permitted; actual native Option/container/branch predicates must pass. No aircraft/convoy admission required.",
+      "priorInventoryStatus": "raw-only",
+      "disposition": "inactive",
+      "consumingExpression": "declared lazy intent/history or inactive World/air/logistics branch"
+    },
+    "moveOutcomeTick": {
+      "source": "shared/sim.js:1793-1804",
+      "provider": "option(c.outcome_tick,|v|n(v as f64))",
+      "note": "Only exact undefined versus actual None; every observed present value retains its original bits/type/order.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none",
+      "consumingExpression": "declared undefined until this specific intent/event is recorded"
+    },
+    "moveResult": {
+      "source": "shared/sim.js:1779-1808,1888,2229-2234,5437; shared/logistics.js:38-41",
+      "provider": "inactive_unit(): field-specific actual Option/container/branch predicate for moveResult; raw observation retained",
+      "note": "Only the exact constructor null/undefined form is permitted; actual native Option/container/branch predicates must pass. No aircraft/convoy admission required.",
+      "priorInventoryStatus": "raw-only",
+      "disposition": "inactive",
+      "consumingExpression": "declared lazy intent/history or inactive World/air/logistics branch"
+    },
+    "worldGoal": {
+      "source": "shared/sim.js:1793-1804",
+      "provider": "option(u.world_goal,point)",
+      "note": "Only exact undefined versus actual None; every observed present value retains its original bits/type/order.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none",
+      "consumingExpression": "declared undefined until this specific intent/event is recorded"
+    },
+    "pace": {
+      "source": "shared/sim.js:1795,5483; shared/movement.js",
+      "provider": "n(u.pace)",
+      "note": "Exact undefined and the actual native NaN sentinel are permitted only before movement with empty path and +0 moveSpeed. All present numeric values/nonfinite values stay strict.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "no-pace",
+      "consumingExpression": "if (u.pace && ...)"
+    },
+    "ghost": {
+      "source": "shared/local-traffic.js:9",
+      "provider": "n(u.ghost)",
+      "note": "DIAGNOSTIC_PROPOSED_DEFAULTS: absent/undefined only to exact positive zero.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "default-zero",
+      "consumingExpression": "a.ghost ?? 0"
+    },
+    "build": {
+      "source": "shared/sim.js:2406",
+      "provider": "json!(u.build)",
+      "note": "DIAGNOSTIC_PROPOSED_DEFAULTS: absent/undefined only to exact false; present null/numeric/nondefault values never map.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "default-false",
+      "consumingExpression": "!!u.build"
+    },
+    "entrench": {
+      "source": "shared/sim.js:5883",
+      "provider": "json!(u.entrench)",
+      "note": "DIAGNOSTIC_PROPOSED_DEFAULTS: absent/undefined only to exact false; present null/numeric/nondefault values never map.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "default-false",
+      "consumingExpression": "u.entrench ? 1024 : 0"
+    },
+    "garrisonEntry": {
+      "source": "shared/sim.js:1779-1808,1888,2229-2234,5437; shared/logistics.js:38-41",
+      "provider": "inactive_unit(): field-specific actual Option/container/branch predicate for garrisonEntry; raw observation retained",
+      "note": "Only the exact constructor null/undefined form is permitted; actual native Option/container/branch predicates must pass. No aircraft/convoy admission required.",
+      "priorInventoryStatus": "missing-provider",
+      "disposition": "inactive",
+      "consumingExpression": "declared lazy intent/history or inactive World/air/logistics branch"
+    },
+    "holdFire": {
+      "source": "shared/sim.js:3334",
+      "provider": "json!(c.hold_fire)",
+      "note": "DIAGNOSTIC_PROPOSED_DEFAULTS: absent/undefined only to exact false; present null/numeric/nondefault values never map.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "default-false",
+      "consumingExpression": "u.holdFire ? 2048 : 0"
+    },
+    "holdPos": {
+      "source": "shared/sim.js:3334",
+      "provider": "json!(u.hold_pos)",
+      "note": "DIAGNOSTIC_PROPOSED_DEFAULTS: absent/undefined only to exact false; present null/numeric/nondefault values never map.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "default-false",
+      "consumingExpression": "u.holdPos ? 4096 : 0"
+    },
+    "guardHome": {
+      "source": "shared/sim.js:1793-1804",
+      "provider": "option(c.guard_home,point)",
+      "note": "Only exact undefined versus actual None; every observed present value retains its original bits/type/order.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none",
+      "consumingExpression": "declared undefined until this specific intent/event is recorded"
+    },
+    "shotAt": {
+      "source": "shared/sim.js:1793-1804",
+      "provider": "option(u.shot_at,n)",
+      "note": "Only exact undefined versus actual None; every observed present value retains its original bits/type/order.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none",
+      "consumingExpression": "declared undefined until this specific intent/event is recorded"
+    },
+    "lastHit": {
+      "source": "shared/sim.js:1793-1804",
+      "provider": "option(h.last_hit,|v|n(f64::from(v)))",
+      "note": "Only exact undefined versus actual None; every observed present value retains its original bits/type/order.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none",
+      "consumingExpression": "declared undefined until this specific intent/event is recorded"
+    },
+    "deathImpulse": {
+      "source": "shared/sim.js:1779-1808,1888,2229-2234,5437; shared/logistics.js:38-41",
+      "provider": "inactive_unit(): field-specific actual Option/container/branch predicate for deathImpulse; raw observation retained",
+      "note": "Only the exact constructor null/undefined form is permitted; actual native Option/container/branch predicates must pass. No aircraft/convoy admission required.",
+      "priorInventoryStatus": "raw-only",
+      "disposition": "inactive",
+      "consumingExpression": "declared lazy intent/history or inactive World/air/logistics branch"
+    },
+    "hpWas": {
+      "source": "shared/sim.js:1793-1804",
+      "provider": "option(r.hp_was,n)",
+      "note": "Only exact undefined versus actual None; every observed present value retains its original bits/type/order.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none",
+      "consumingExpression": "declared undefined until this specific intent/event is recorded"
+    },
+    "woundAt": {
+      "source": "shared/sim.js:1793-1804",
+      "provider": "option(r.wound_at,|v|n(v as f64))",
+      "note": "Only exact undefined versus actual None; every observed present value retains its original bits/type/order.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none",
+      "consumingExpression": "declared undefined until this specific intent/event is recorded"
+    },
+    "healAt": {
+      "source": "shared/sim.js:1793-1804",
+      "provider": "option(r.heal_at,|v|n(v as f64))",
+      "note": "Only exact undefined versus actual None; every observed present value retains its original bits/type/order.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none",
+      "consumingExpression": "declared undefined until this specific intent/event is recorded"
+    },
+    "attackPick": {
+      "source": "shared/sim.js:1779-1808,1888,2229-2234,5437; shared/logistics.js:38-41",
+      "provider": "inactive_unit(): field-specific actual Option/container/branch predicate for attackPick; raw observation retained",
+      "note": "Only the exact constructor null/undefined form is permitted; actual native Option/container/branch predicates must pass. No aircraft/convoy admission required.",
+      "priorInventoryStatus": "missing-provider",
+      "disposition": "inactive",
+      "consumingExpression": "declared lazy intent/history or inactive World/air/logistics branch"
+    },
+    "atHit": {
+      "source": "shared/sim.js:1793-1804",
+      "provider": "option(h.at_hit,n)",
+      "note": "Only exact undefined versus actual None; every observed present value retains its original bits/type/order.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none",
+      "consumingExpression": "declared undefined until this specific intent/event is recorded"
+    },
+    "aaShot": {
+      "source": "shared/sim.js:1779-1808,1888,2229-2234,5437; shared/logistics.js:38-41",
+      "provider": "inactive_unit(): field-specific actual Option/container/branch predicate for aaShot; raw observation retained",
+      "note": "Only the exact constructor null/undefined form is permitted; actual native Option/container/branch predicates must pass. No aircraft/convoy admission required.",
+      "priorInventoryStatus": "missing-provider",
+      "disposition": "inactive",
+      "consumingExpression": "declared lazy intent/history or inactive World/air/logistics branch"
+    },
+    "aaReserve": {
+      "source": "shared/sim.js:1779-1808,1888,2229-2234,5437; shared/logistics.js:38-41",
+      "provider": "inactive_unit(): field-specific actual Option/container/branch predicate for aaReserve; raw observation retained",
+      "note": "Only the exact constructor null/undefined form is permitted; actual native Option/container/branch predicates must pass. No aircraft/convoy admission required.",
+      "priorInventoryStatus": "missing-provider",
+      "disposition": "inactive",
+      "consumingExpression": "declared lazy intent/history or inactive World/air/logistics branch"
+    },
+    "dust": {
+      "source": "shared/sim.js:1793-1804",
+      "provider": "option(u.dust,n)",
+      "note": "Only exact undefined versus actual None; every observed present value retains its original bits/type/order.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none",
+      "consumingExpression": "declared undefined until this specific intent/event is recorded"
+    },
+    "cells": {
+      "source": "shared/sim.js:1793-1804",
+      "provider": "option(u.cells.as_ref(),|v|numbers(v.iter().map(|v|f64::from(*v))))",
+      "note": "Only exact undefined versus actual None; every observed present value retains its original bits/type/order.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none",
+      "consumingExpression": "declared undefined until this specific intent/event is recorded"
+    },
+    "built": {
+      "source": "shared/sim.js:1793-1804",
+      "provider": "option(u.built,n)",
+      "note": "Only exact undefined versus actual None; every observed present value retains its original bits/type/order.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none",
+      "consumingExpression": "declared undefined until this specific intent/event is recorded"
+    },
+    "queue": {
+      "source": "shared/sim.js:1022-1030,1800-1801",
+      "provider": "ProductionState.building(u.id): queue(), jobs(), progress(); absent record remains missing",
+      "note": "Undefined/absent native record only when actual nonbuilding predicate proves no production/structure record; present building data is compared completely.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "optional-building",
+      "consumingExpression": "building-only records installed by placeBuilding"
+    },
+    "productionJobs": {
+      "source": "shared/sim.js:1022-1030,1800-1801",
+      "provider": "ProductionState.building(u.id): queue(), jobs(), progress(); absent record remains missing",
+      "note": "Undefined/absent native record only when actual nonbuilding predicate proves no production/structure record; present building data is compared completely.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "optional-building",
+      "consumingExpression": "building-only records installed by placeBuilding"
+    },
+    "prog": {
+      "source": "shared/sim.js:1022-1030,1800-1801",
+      "provider": "ProductionState.building(u.id): queue(), jobs(), progress(); absent record remains missing",
+      "note": "Undefined/absent native record only when actual nonbuilding predicate proves no production/structure record; present building data is compared completely.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "optional-building",
+      "consumingExpression": "building-only records installed by placeBuilding"
+    },
+    "rally": {
+      "source": "shared/sim.js:1779-1785,1027",
+      "provider": "Match.building_rallies.get(u.id): actual Option<Point>",
+      "note": "Only actual Option::None versus exact null (or undefined for a nonbuilding rally) is a no-intent sentinel; positive/present values remain strict.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none-null",
+      "consumingExpression": "null marks no target/destination/rally"
+    },
+    "structureId": {
+      "source": "shared/sim.js:1022-1030,1800-1801",
+      "provider": "World.structures.find(entity_id == u.id): actual structure id",
+      "note": "Undefined/absent native record only when actual nonbuilding predicate proves no production/structure record; present building data is compared completely.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "optional-building",
+      "consumingExpression": "building-only records installed by placeBuilding"
+    },
+    "region": {
+      "source": "shared/sim.js:1779-1808,1888,2229-2234,5437; shared/logistics.js:38-41",
+      "provider": "inactive_unit(): field-specific actual Option/container/branch predicate for region; raw observation retained",
+      "note": "Only the exact constructor null/undefined form is permitted; actual native Option/container/branch predicates must pass. No aircraft/convoy admission required.",
+      "priorInventoryStatus": "missing-provider",
+      "disposition": "inactive",
+      "consumingExpression": "declared lazy intent/history or inactive World/air/logistics branch"
+    },
+    "gateT": {
+      "source": "shared/sim.js:1779-1808,1888,2229-2234,5437; shared/logistics.js:38-41",
+      "provider": "inactive_unit(): field-specific actual Option/container/branch predicate for gateT; raw observation retained",
+      "note": "Only the exact constructor null/undefined form is permitted; actual native Option/container/branch predicates must pass. No aircraft/convoy admission required.",
+      "priorInventoryStatus": "missing-provider",
+      "disposition": "inactive",
+      "consumingExpression": "declared lazy intent/history or inactive World/air/logistics branch"
+    },
+    "open": {
+      "source": "shared/sim.js:1779-1808,1888,2229-2234,5437; shared/logistics.js:38-41",
+      "provider": "inactive_unit(): field-specific actual Option/container/branch predicate for open; raw observation retained",
+      "note": "Only the exact constructor null/undefined form is permitted; actual native Option/container/branch predicates must pass. No aircraft/convoy admission required.",
+      "priorInventoryStatus": "missing-provider",
+      "disposition": "inactive",
+      "consumingExpression": "declared lazy intent/history or inactive World/air/logistics branch"
+    },
+    "logistics": {
+      "source": "shared/sim.js:1779-1808,1888,2229-2234,5437; shared/logistics.js:38-41",
+      "provider": "inactive_unit(): field-specific actual Option/container/branch predicate for logistics; raw observation retained",
+      "note": "Only the exact constructor null/undefined form is permitted; actual native Option/container/branch predicates must pass. No aircraft/convoy admission required.",
+      "priorInventoryStatus": "raw-only",
+      "disposition": "inactive",
+      "consumingExpression": "declared lazy intent/history or inactive World/air/logistics branch"
+    },
+    "convoy": {
+      "source": "shared/sim.js:1779-1808,1888,2229-2234,5437; shared/logistics.js:38-41",
+      "provider": "inactive_unit(): field-specific actual Option/container/branch predicate for convoy; raw observation retained",
+      "note": "Only the exact constructor null/undefined form is permitted; actual native Option/container/branch predicates must pass. No aircraft/convoy admission required.",
+      "priorInventoryStatus": "missing-provider",
+      "disposition": "inactive",
+      "consumingExpression": "declared lazy intent/history or inactive World/air/logistics branch"
+    },
+    "supplyStarted": {
+      "source": "shared/sim.js:1988",
+      "provider": "json!(c.supply_started)",
+      "note": "DIAGNOSTIC_PROPOSED_DEFAULTS: absent/undefined only to exact false; present null/numeric/nondefault values never map.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "default-false",
+      "consumingExpression": "u.supplyStarted && !r?.forced"
+    },
+    "supplyEscape": {
+      "source": "shared/sim.js:1991",
+      "provider": "json!(c.supply_escape)",
+      "note": "DIAGNOSTIC_PROPOSED_DEFAULTS: absent/undefined only to exact false; present null/numeric/nondefault values never map.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "default-false",
+      "consumingExpression": "u.supplyEscape && (u.path.length || u.orders.length || u.worldGoal)"
+    },
+    "supplyHold": {
+      "source": "shared/sim.js:1990",
+      "provider": "json!(c.supply_hold)",
+      "note": "DIAGNOSTIC_PROPOSED_DEFAULTS: absent/undefined only to exact false; present null/numeric/nondefault values never map.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "default-false",
+      "consumingExpression": "if(u.supplyHold)"
+    },
+    "supplyRetry": {
+      "source": "shared/sim.js:1793-1804",
+      "provider": "option(c.supply_retry,|v|n(v as f64))",
+      "note": "Only exact undefined versus actual None; every observed present value retains its original bits/type/order.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none",
+      "consumingExpression": "declared undefined until this specific intent/event is recorded"
+    },
+    "air": {
+      "source": "shared/sim.js:1779-1808,1888,2229-2234,5437; shared/logistics.js:38-41",
+      "provider": "inactive_unit(): field-specific actual Option/container/branch predicate for air; raw observation retained",
+      "note": "Only the exact constructor null/undefined form is permitted; actual native Option/container/branch predicates must pass. No aircraft/convoy admission required.",
+      "priorInventoryStatus": "raw-only",
+      "disposition": "inactive",
+      "consumingExpression": "declared lazy intent/history or inactive World/air/logistics branch"
+    },
+    "cooldown": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "n(f.cooldown)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "board": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "n(f64::from(u.board))",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "riding": {
+      "source": "shared/sim.js:1782-1785",
+      "provider": "option(h.carrier,|v|n(f64::from(v)))",
+      "note": "Only exact positive zero versus actual None is the declared no-identity sentinel; native riding flag must also be false.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none-zero",
+      "consumingExpression": "zero means no attacker/carrier identity"
+    },
+    "cargo": {
+      "source": "shared/sim.js:1776-1804, placeBuilding:1017-1030",
+      "provider": "numbers(h.cargo.iter().map(|v|f64::from(*v)))",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "supplyRouteReason": {
+      "source": "shared/sim.js:1779-1808,1888,2229-2234,5437; shared/logistics.js:38-41",
+      "provider": "inactive_unit(): field-specific actual Option/container/branch predicate for supplyRouteReason; raw observation retained",
+      "note": "Only the exact constructor null/undefined form is permitted; actual native Option/container/branch predicates must pass. No aircraft/convoy admission required.",
+      "priorInventoryStatus": "missing-provider",
+      "disposition": "inactive",
+      "consumingExpression": "declared lazy intent/history or inactive World/air/logistics branch"
+    }
+  },
+  "player": {
+    "slot": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "observe(): actual StartPlan.players, Game.players, EconomyState.players, ProductionState.player(slot).tech()/jobs()",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "name": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "observe(): actual StartPlan.players, Game.players, EconomyState.players, ProductionState.player(slot).tech()/jobs()",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "team": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "observe(): actual StartPlan.players, Game.players, EconomyState.players, ProductionState.player(slot).tech()/jobs()",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "faction": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "observe(): actual StartPlan.players, Game.players, EconomyState.players, ProductionState.player(slot).tech()/jobs()",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "vp": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "observe(): actual StartPlan.players, Game.players, EconomyState.players, ProductionState.player(slot).tech()/jobs()",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "mp": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "observe(): actual StartPlan.players, Game.players, EconomyState.players, ProductionState.player(slot).tech()/jobs()",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "inc": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "observe(): actual StartPlan.players, Game.players, EconomyState.players, ProductionState.player(slot).tech()/jobs()",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "sup": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "observe(): actual StartPlan.players, Game.players, EconomyState.players, ProductionState.player(slot).tech()/jobs()",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "spawn": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "observe(): actual StartPlan.players, Game.players, EconomyState.players, ProductionState.player(slot).tech()/jobs()",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "visible": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "observe(): actual StartPlan.players, Game.players, EconomyState.players, ProductionState.player(slot).tech()/jobs()",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "tier": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "observe(): actual StartPlan.players, Game.players, EconomyState.players, ProductionState.player(slot).tech()/jobs()",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "armory": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "observe(): actual StartPlan.players, Game.players, EconomyState.players, ProductionState.player(slot).tech()/jobs()",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "lab": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "observe(): actual StartPlan.players, Game.players, EconomyState.players, ProductionState.player(slot).tech()/jobs()",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "fuel": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "observe(): actual StartPlan.players, Game.players, EconomyState.players, ProductionState.player(slot).tech()/jobs()",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "mun": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "observe(): actual StartPlan.players, Game.players, EconomyState.players, ProductionState.player(slot).tech()/jobs()",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    }
+  },
+  "point": {
+    "scenarioId": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "observe(): actual StartPlan.points (Objective)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "x": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "observe(): actual StartPlan.points (Objective)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "z": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "observe(): actual StartPlan.points (Objective)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "vp": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "observe(): actual StartPlan.points (Objective)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "mp": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "observe(): actual StartPlan.points (Objective)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "owner": {
+      "source": "shared/sim.js:727,731-733",
+      "provider": "observe(): actual StartPlan.points (Objective)",
+      "note": "Exact -1 versus actual None is the named no-owner/capper/dependency sentinel; real IDs remain exact.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none-minus-one",
+      "consumingExpression": "owner/capper/needs = -1"
+    },
+    "capper": {
+      "source": "shared/sim.js:727,731-733",
+      "provider": "observe(): actual StartPlan.points (Objective)",
+      "note": "Exact -1 versus actual None is the named no-owner/capper/dependency sentinel; real IDs remain exact.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none-minus-one",
+      "consumingExpression": "owner/capper/needs = -1"
+    },
+    "progress": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "observe(): actual StartPlan.points (Objective)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "cut": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "observe(): actual StartPlan.points (Objective)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "kind": {
+      "source": "shared/sim.js:727",
+      "provider": "observe(): actual StartPlan.points (Objective)",
+      "note": "Only exact undefined versus actual None, otherwise compare the complete present kind.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none",
+      "consumingExpression": "kind: p.kind"
+    },
+    "needs": {
+      "source": "shared/sim.js:727,731-733",
+      "provider": "observe(): actual StartPlan.points (Objective)",
+      "note": "Exact -1 versus actual None is the named no-owner/capper/dependency sentinel; real IDs remain exact.",
+      "priorInventoryStatus": "representation-pending",
+      "disposition": "none-minus-one",
+      "consumingExpression": "owner/capper/needs = -1"
+    }
+  },
+  "structure": {
+    "id": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "observe(): World.structures; section_by_id(id), actual cells/section_ids/entity_id",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "kind": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "observe(): World.structures; section_by_id(id), actual cells/section_ids/entity_id",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "sections": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "observe(): World.structures; section_by_id(id), actual cells/section_ids/entity_id",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "entityId": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "observe(): World.structures; section_by_id(id), actual cells/section_ids/entity_id",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    }
+  },
+  "section": {
+    "id": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "section(): World.section_by_id(id), SectionMetadata + Game.sections",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "structureId": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "section(): World.section_by_id(id), SectionMetadata + Game.sections",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "c": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "section(): World.section_by_id(id), SectionMetadata + Game.sections",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "hp": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "section(): World.section_by_id(id), SectionMetadata + Game.sections",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "maxHp": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "section(): World.section_by_id(id), SectionMetadata + Game.sections",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "material": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "section(): World.section_by_id(id), SectionMetadata + Game.sections",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "anchor": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "section(): World.section_by_id(id), SectionMetadata + Game.sections",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "supports": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "section(): World.section_by_id(id), SectionMetadata + Game.sections",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "state": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "section(): World.section_by_id(id), SectionMetadata + Game.sections",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "rubble": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "section(): World.section_by_id(id), SectionMetadata + Game.sections",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "entityId": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "section(): World.section_by_id(id), SectionMetadata + Game.sections",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    }
+  },
+  "initialTerrain": {
+    "chars": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "World.initial(): chars, ground, objects, mines, height, trench_front",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "ground": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "World.initial(): chars, ground, objects, mines, height, trench_front",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "objects": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "World.initial(): chars, ground, objects, mines, height, trench_front",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "mineLayer": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "World.initial(): chars, ground, objects, mines, height, trench_front",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "height": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "World.initial(): chars, ground, objects, mines, height, trench_front",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "trenchFront": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "World.initial(): chars, ground, objects, mines, height, trench_front",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    }
+  },
+  "wind": {
+    "a": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "StartPlan.wind",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "v": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "StartPlan.wind",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    }
+  },
+  "wx": {
+    "rain": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "StartPlan.living + Game.rain/wet",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "raining": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "StartPlan.living + Game.rain/wet",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "wet": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "StartPlan.living + Game.rain/wet",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "next": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "StartPlan.living + Game.rain/wet",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    }
+  },
+  "weather": {
+    "now": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "StartPlan.weather",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "next": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "StartPlan.weather",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "at": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "StartPlan.weather",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    }
+  },
+  "army": {
+    "pop": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "actual MatchOptions.army selects compiled CFG.armies object; no arithmetic",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "income": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "actual MatchOptions.army selects compiled CFG.armies object; no arithmetic",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    }
+  },
+  "armory": {
+    "inf": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "ProductionState.player(slot).tech().level(Technology)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "guns": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "ProductionState.player(slot).tech().level(Technology)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "armor": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "ProductionState.player(slot).tech().level(Technology)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    }
+  },
+  "spawn": {
+    "x": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "StartPlan.players[slot].spawn",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "z": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "StartPlan.players[slot].spawn",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    }
+  },
+  "cellData": {
+    "ground": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "cell_row(): actual CellRow.data; optional fields emitted only from actual Option/boolean values",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "object": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "cell_row(): actual CellRow.data; optional fields emitted only from actual Option/boolean values",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "material": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "cell_row(): actual CellRow.data; optional fields emitted only from actual Option/boolean values",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "groundMaterial": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "cell_row(): actual CellRow.data; optional fields emitted only from actual Option/boolean values",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "groundWear": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "cell_row(): actual CellRow.data; optional fields emitted only from actual Option/boolean values",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "trenchFront": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "cell_row(): actual CellRow.data; optional fields emitted only from actual Option/boolean values",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "mine": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "cell_row(): actual CellRow.data; optional fields emitted only from actual Option/boolean values",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "mineMaterial": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "cell_row(): actual CellRow.data; optional fields emitted only from actual Option/boolean values",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "section": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "cell_row(): actual CellRow.data; optional fields emitted only from actual Option/boolean values",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "rail": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "cell_row(): actual CellRow.data; optional fields emitted only from actual Option/boolean values",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "station": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "cell_row(): actual CellRow.data; optional fields emitted only from actual Option/boolean values",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    }
+  },
+  "cellSection": {
+    "id": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "cell_row(): actual CellData.section",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "structureId": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "cell_row(): actual CellData.section",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "state": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "cell_row(): actual CellData.section",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "hp": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "cell_row(): actual CellData.section",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "maxHp": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "cell_row(): actual CellData.section",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "material": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "cell_row(): actual CellData.section",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "anchor": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "cell_row(): actual CellData.section",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    }
+  },
+  "footprint": {
+    "id": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "Match.building_cells values (BuildingCell)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "owner": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "Match.building_cells values (BuildingCell)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "x": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "Match.building_cells values (BuildingCell)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    },
+    "z": {
+      "source": "Pinned original createGame and called initialization functions; see companion document",
+      "provider": "Match.building_cells values (BuildingCell)",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    }
+  },
+  "support": {
+    "*": {
+      "source": "shared/sim.js:723; SUPPORT_TYPES = Object.keys(SUPPORT):414",
+      "provider": "Every actual StartPlan.players[slot].support key/value, no filtering",
+      "note": "Compare the complete actual value with the existing strict bits comparator; nested semantic scopes are exhaustive.",
+      "priorInventoryStatus": "semantic",
+      "disposition": "exact"
+    }
+  }
+}

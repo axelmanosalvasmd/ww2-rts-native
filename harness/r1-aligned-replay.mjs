@@ -4,12 +4,17 @@ import {execFileSync} from 'node:child_process';
 import {resolve, dirname} from 'node:path';
 import {SourceTextModule, SyntheticModule} from 'node:vm';
 import {isDeepStrictEqual} from 'node:util';
+import {observeStartup} from './r1-startup-observer.mjs';
 
 if (process.arch !== 'x64' || process.version !== 'v24.21.0') throw Error('Use x64 Node v24.21.0');
 const args = process.argv.slice(2);
 const option = name => { const i=args.indexOf(name); if (i<0 || !args[i+1]) throw Error(`Required ${name}`); return args[i+1]; };
 const reference = resolve(option('--reference')), output = resolve(option('--output'));
 const seedText = option('--seed');
+const startupOutput = args.includes('--startup-output') ? resolve(option('--startup-output')) : null;
+const baselinePath = startupOutput ? resolve(option('--startup-baseline')) : null;
+if (startupOutput && (startupOutput === output || baselinePath === output || startupOutput === baselinePath)) throw Error('startup capture and frozen baseline paths must be distinct');
+let startupObservation = null, startupReceipt = null;
 if (!/^(0|[1-9][0-9]*)$/.test(seedText) || BigInt(seedText) > (1n<<64n)-1n) throw Error('seed must be a decimal u64');
 const pin='e4e579a838aabae3b1d9dadbc17a0a87147bc52d';
 const git=(...a)=>execFileSync('git',['-C',reference,...a],{encoding:'utf8'}).trim();
@@ -107,6 +112,13 @@ try{
   if(![1,2,3].every(id=>g.units.get(id)?.owner===0)||![4,5,6].every(id=>g.units.get(id)?.owner===1))throw Error('canonical IDs no longer bind original orders');
   startup={spawns:g.players.map(p=>[bits(p.spawn.x),bits(p.spawn.z)]),environmentSeed32:g.seed>>>0,weatherSeed:1,
     wind:[bits(g.wind.a),bits(g.wind.v)],shower:g.wx?{raining:g.wx.raining,next:bits(g.wx.next)}:null,rain:bits(g.wx.rain),wet:bits(g.wx.wet),weather:g.weather,nextId:g.nextId};
+  if (startupOutput) {
+    const drawsBefore = consumed.length, rawBefore = snapshot(g);
+    startupObservation = observeStartup(g);
+    if (drawsBefore !== consumed.length || !isDeepStrictEqual(rawBefore, snapshot(g)) || !isDeepStrictEqual(startupObservation, observeStartup(g))) throw Error('startup observer changed state or consumed input');
+    startupReceipt = {capacity: values.length, consumed: consumed.length, unconsumed: values.length-consumed.length,
+      exhausted: consumed.length === values.length, draws: structuredClone(consumed), layout: structuredClone(layoutReceipt), startup: structuredClone(startup)};
+  }
   frames.push(snapshot(g));
   for(let tick=1;tick<=600;tick++){
     const previous=[...g.units.values()].map(u=>[u.id,u.x,u.z]);
@@ -124,12 +136,21 @@ const trace={format:'r1-whole-match-differential-v1',alignedFormat:'r1-aligned-i
   node:process.version,requestedTicks:600,checkpointEvery:10,map,
   profile:{mode:'conquest',army:'standard',weather:'clear',shuffle:true,tech:true,supply:true,livingWeather:true,logistics:false,sandbox:false,weatherSeed:null},
   orders,frames,completed,movedTicks,draws:consumed.length,denials,failure};
+if (startupOutput) {
+  const baseline = JSON.parse(readFileSync(baselinePath));
+  const comparable = {...trace, sourceHead: baseline.sourceHead};
+  if (!isDeepStrictEqual(comparable, baseline)) throw Error('additive startup capture changed the frozen trace or complete draw ledger');
+  if (failure || !startupObservation) throw Error('startup observation or baseline preservation incomplete');
+  writeFileSync(startupOutput, JSON.stringify({format: 'r1-mode21-startup-v1', sourceHead, baselineSourceHead: baseline.sourceHead,
+    baselinePreserved: true, trace: baseline, startupReceipt, observation: startupObservation})+'\n', {mode: 0o600, flag: 'wx'});
+  chmodSync(startupOutput, 0o400);
+}
 const bytes=JSON.stringify(trace)+'\n';
 if(args.includes('--check')){
   const prior=JSON.parse(readFileSync(output));
   // A later fixture-only Git commit does not alter the producing source head.
   trace.sourceHead=prior.sourceHead;
   if(!isDeepStrictEqual(trace,prior))throw Error('fresh aligned Source capture differs from frozen fixture');
-}else{writeFileSync(output,bytes,{mode:0o600});chmodSync(output,0o400);}
+}else{writeFileSync(output,bytes,{mode:0o600,flag:startupOutput?'wx':'w'});chmodSync(output,0o400);}
 console.log(JSON.stringify({engine:'Source',sourceHead,completed,movedTicks,checkpoints:frames.filter(f=>f.tick%10===0).length,draws:consumed.length,unconsumed:values.length-consumed.length,failure}));
 if(failure)process.exitCode=2;
