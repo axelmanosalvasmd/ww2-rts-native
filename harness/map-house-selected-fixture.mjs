@@ -28,6 +28,9 @@ const blank = rows => ({ name: 't', w: rows[0].length, h: rows.length, rows,
   spawns: [{ x: 1, y: 1 }, { x: 18, y: 1 }, { x: 1, y: 18 }], points: [{ x: 10, y: 10 }] });
 function create(map, fresh) {
   assert.equal(sim.validateMap(map), null);
+  return createOriginal(map, fresh);
+}
+function createOriginal(map, fresh) {
   const g = sim.createGame(map, ['a', 'b'], false);
   clearFixtureUnits(g);
   if (fresh) g.players.forEach(p => { p.spawn = { x: -1000, z: -1000 }; });
@@ -51,6 +54,21 @@ function cells(g, indices) {
       section: [s.id, s.structureId, s.material, s.anchor, s.supports, s.state, s.rubble, bits(s.hp), bits(s.maxHp)] };
   });
 }
+function houseResult(g) {
+  const indices = [20, 80, 208], initial = cells(g, indices);
+  const structures = [...g.structures.values()].map(s => [s.id, s.kind, s.sections.map(x =>
+    [x.id, x.structureId, x.c, x.material, x.anchor, x.supports, x.state, x.rubble, bits(x.hp), bits(x.maxHp)])]);
+  assert.deepEqual(indices.map(c => g.house[c]), [0, 1, 2]);
+  assert.deepEqual(indices.map(c => g.cellHp[c]), sim.CFG.houses.slice(0, 3).map(h => h.hp));
+  const full = indices.map(c => sim.garrisonMul(g, c));
+  assert.deepEqual(full, sim.CFG.houses.slice(0, 3).map(h => h.mul));
+  g.cellHp[80] /= 2;
+  const half = sim.garrisonMul(g, 80);
+  assert.ok(Math.abs(half - (sim.CFG.houses[1].mul + sim.CFG.houses[1].worn) / 2) < 1e-6);
+  const actor = put(g, 3, 21, 208);
+  assert.equal(actor.kind, 2);
+  return { initial, structures, full: full.map(bits), half: bits(half), halfHp: bits(g.cellHp[80]), actor };
+}
 const originalRandom = Math.random;
 let draws = 0;
 Math.random = () => { draws++; return 0.5; };
@@ -60,19 +78,16 @@ try {
     const rows = [...empty]; rows[1] = 'B' + '.'.repeat(19);
     for (const y of [4, 5, 6]) rows[y] = 'BBBB' + '.'.repeat(16);
     for (const y of [10, 11, 12, 13]) rows[y] = '.'.repeat(8) + 'BBBBBB' + '.'.repeat(6);
-    const map = blank(rows), g = create(map, true), indices = [20, 80, 208];
-    const initial = cells(g, indices);
-    assert.deepEqual(indices.map(c => g.house[c]), [0, 1, 2]);
-    assert.deepEqual(indices.map(c => g.cellHp[c]), sim.CFG.houses.slice(0, 3).map(h => h.hp));
-    const full = indices.map(c => sim.garrisonMul(g, c));
-    assert.deepEqual(full, sim.CFG.houses.slice(0, 3).map(h => h.mul));
-    g.cellHp[80] /= 2;
-    const half = sim.garrisonMul(g, 80);
-    assert.ok(Math.abs(half - (sim.CFG.houses[1].mul + sim.CFG.houses[1].worn) / 2) < 1e-6);
-    const actor = put(g, 3, 21, 208);
-    assert.equal(actor.kind, 2);
-    cases.push({ name: 'House types', source: 'test.js:773-784', map, initial,
-      full: full.map(bits), half: bits(half), halfHp: bits(g.cellHp[80]), actor });
+    const originalMap = blank(rows);
+    const originalError = sim.validateMap(originalMap);
+    assert.equal(originalError, 'points must be on open ground, vp and mp 0-5');
+    // The named Source test calls createGame directly with this invalid point.
+    const original = houseResult(createOriginal(originalMap, true));
+    const map = { ...originalMap, points: [{ x: 10, y: 9 }] };
+    const amended = houseResult(create(map, true));
+    assert.deepEqual(amended, original, 'point relocation preserves all named results and structure inputs');
+    cases.push({ name: 'House types', source: 'test.js:773-784', map, ...amended,
+      setupCorrection: { originalMap, originalError, original, from: [10, 10], to: [10, 9] } });
   }
   {
     const rows = [...empty]; rows[1] = 'B' + '.'.repeat(19);
