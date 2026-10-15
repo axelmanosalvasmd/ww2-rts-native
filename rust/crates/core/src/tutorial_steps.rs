@@ -206,7 +206,7 @@ impl TutorialStep {
             return Err("invalid Tutorial completion facts");
         }
         let mine = |u: &&TutorialUnit<'_>| u.hp > 0.0 && view.players[u.owner].team == 0;
-        let held = |index| -> Result<bool, &'static str> {
+        let held = |index: usize| -> Result<bool, &'static str> {
             Ok(view
                 .point_owners
                 .get(index)
