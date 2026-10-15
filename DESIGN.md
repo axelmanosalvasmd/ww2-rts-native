@@ -1,5 +1,36 @@
 # Three Crossroads Native: design decisions
 
+## Six restored combat checks after S3 qualification (2026-10-15)
+
+Promote only CMB39/40/41/64/65/69 Rust/Status cells after actual selected-check
+qualification. Producing `39b004f2e180b334a27a51c9b0ce47db1ff27126` passes renewed
+fmt, five unique selected simtests (5 passed, 0 failed, 224 skipped) and strict
+locked core/simtest all-target ci-test Clippy. The status/documentation child
+retains its exact Rust tree `deadbd9f81413f8bc03aa9cd847f715051b8a5ad`.
+The five are corrected ordinary-command MG/flak/fighter AA, real four-Conscript
+population, the 800-tick death trace with eight decisive controls, the extracted
+original connected replay, and paired clear-weather tower 12/60 vision.
+
+Carry the existing second-Tiger max check and unchanged complete components
+from actual main 7a7348cb run 38776054627, with eight named instances passing on
+each of three platforms. CMB64's focused native PASS stays attributed to daaa4743;
+the core subtree is unchanged and that test was excluded from this new grant.
+The old zero-ammo fighter refusal remains a recorded failure. Its replacement
+uses a different complete captured real-aircraft initialization and ordinary
+Patrol/Attack admission, with no ammo injection or guard relaxation. Root
+accepted this bounded new native consumer; its concatenated sequence is not a
+new matched Source capture. No Source, CMB42 or whole-match qualification is
+inferred. Existing full component checks count under PARITY without a new gate.
+
+The [terminal report](docs/testing/audit-combat-1821-s3-result.md) records exact
+commands, resource limits, raw logs, preserved failures and producing heads.
+The [whole-check brief](docs/testing/audit-combat-1821-review-brief.md) maps every
+selected predicate and all eight death controls. Preserve all Acceptance cells,
+other table rows and held CMB38/42/62/63/66/67/68. Opening the first row PR still
+requires Root's combat publication lease handover after CMB_IMPL; independent
+actual-head review, hosted checks, Hermes runtime acknowledgment and merge
+authority remain separate. This status child runs no executable job.
+
 ## CMB-65 S3 mechanical format child (2026-10-15)
 
 The exact 3ca67777 S3 format check requests two expression wraps in the new

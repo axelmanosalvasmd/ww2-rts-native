@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Mark CMB-39/40/41/64/65/69 ported for their complete selected checks. Producing 39b004f2 passes the five granted simtests, renewed fmt and strict locked core/simtest all-target ci-test Clippy. Carry CMB-64's single PASS at daaa4743 and unchanged complete three-platform main components at 7a7348cb with their original attribution. Preserve the prior zero-ammo CMB-65 failure, all Acceptance cells and seven held owned rows; no runtime, fixture or Source change.
+
 - Apply the two mechanical command-expression wraps from CMB-65's granted S3 format check. Preserve every test input, assertion, fixture and runtime byte; freeze the child before the five selected native checks.
 
 - Prepare a source-only CMB-65 correction using the complete existing ready-fighter capture, ordinary Patrol/Attack command admission and one actual aircraft step before the six held AA calls. Preserve all positive damage/XP/event checks and the zero-ammo failure history. No ammo, HP, type, pose, guard, fixture or status edit; the composed sequence has no new Source capture or native result.

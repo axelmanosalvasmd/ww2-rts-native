@@ -1,1 +1,1 @@
-Prove five existing combat checks for tower vision, caps, bounty, anti-air and death timing
+Port six combat checks for vision, caps, population, anti-air and death timing
