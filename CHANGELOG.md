@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Compare MODE-21 building footprints by complete cell-key membership in the test-only startup observer. Retain all 49 original raw differences, add strict negative controls and leave the separate house-wrapper difference unresolved.
+
 - Mark MODE-05 and MODE-28 ported from their complete existing six-join and four-map XL constructor checks. Both named tests pass on Linux, Windows and macOS in main `396f6d8a` run `38740304188`. Preserve every Acceptance cell, all other MODE rows and generic Assault runner guards. This documentation proposal has no new native execution.
 
 - Mark BASE-15 ported after complete-row ACCEPT: actual HQ purchases, whole-stick reservation/refusal, denied recruitment, delayed delivery, Fighter Cover interception and full reservation release. Source generation/check at `162e7bd7` records 3 scenes, 26 commands and 289 ticks; integrated native `ce3d5026` passes 3 tests (0 failed, 313 skipped), fmt check and strict workspace/all-target Clippy. Preserve the setup-specific population/global-count inequality and all runtime, fixture, test and acceptance bytes.
