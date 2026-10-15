@@ -1,26 +1,23 @@
 # Three Crossroads Native: design decisions
 
-## R4 base qualification after main #210 and #215 (2026-10-14)
+## Named fine-search branch evidence (2026-10-15, source recording)
 
-Normally merge exact main `d29112671ee2e1855f3ed3c7104e29ba85c2c4da` into private accepted R4 `ed7002c18607c29c38cd8fe872046179fa301eba`, from common base `4917049ebfbdcb34319cf8bbe9b6329f2fa204cd`. The only overlapping path and conflict is DESIGN; retain its complete main and R4 histories. All incoming runtime and two-client test changes remain exact main. The R4 test retains its original 329-line append and SHA256 `739c4a896f85f6129aaf75d6b9dd413c5d558c7a4769a974975beb4f842a24b4`, with its dedicated fragment and parity note unchanged.
+The route-search batch adds one shared component fixture for existing MOV-31 through MOV-35, MOV-38 and MOV-39. It records the original `findPath` and `navigationLeg` at pinned Source `e4e579a`: 603 searches in 24 named scenarios across five infantry, three naval and twelve non-rail vehicle definitions. Expected output contains exact waypoint and endpoint bits, expansion count, search status, local goal and bounded-leg flag. The recorder appends only an export declaration for original `nearestFree` and `cellOf`; it replaces no function body and edits no reference file. Explicit selected routing views keep this evidence separate from memory visibility selection, command scheduling and whole-match outcome criteria.
 
-The incoming and actual base-update patches use all eleven explicit full-index/binary/no-renames/no-ext-diff/no-textconv/no-color/source-prefix/destination-prefix/unified/Myers/no-indent flags, excluding exactly CHANGELOG.md, DESIGN.md and PARITY.md. Their non-documentation bytes are equal: 17,710 bytes, SHA256 `829c2f65a00f310b9eb64aff34d3f2de991f5f21509806a1f7ae3f63a36a9ca8`. Preserve both complete zero-exclusion raw patches in the private evidence; their documentation differences are disclosed rather than normalized or excluded more broadly.
+The native consumer reuses the existing pathfinding replay checker while preserving its 1,529 original searches and count assertions. New cases cover directional cliff corners, costs, repeated heap ties, blocked and same-cell starts/goals, string-pulling, the ordinary 128-cell boundary versus World/large-map legs, and fine-search budget thresholds. Scoped Source regeneration matches the committed fixture. On Vostro Linux, all three `ci-test` pathfinding checks pass: the new 603-search fixture, the existing 1,529-search fixture and invalid/unsupported input guards. The scope confirms four build jobs, a 6 GiB memory limit, no swap and kernel affinity on CPUs 4-7; peak memory is 1,166,381,056 bytes, with no memory-limit or OOM events. Full workspace/release checks and separate review remain pending, and the rows retain their existing status. The new bounded-leg cases do not reach the default 16,384-expansion cap. MOV-30, MOV-43 and MOV-44 remain separate, and MOV-09 stays paused. No runtime rule, terrain provider, old fixture, ABI or interface changes.
 
-Carry the original focused result only at source candidate `19818ff9`: 1 passed, 0 failed, 0 ignored and 130 filtered out, raw log SHA256 `4dfd377d7ebc6708836293db830297ba51972ae786973cffc62ff41b47e73ce9`. Four jobs, CPU quota 400%, 6 GiB/no swap, observed peak and cleanup retain that original attribution. AllowedCPUs 8-11 was requested; effective affinity remains unverified because cpuset was not delegated. This exact incoming-byte qualification runs no duplicate native, full, Clippy, release, collector, recorder, replay or profiling job. Separate final-head review precedes publication; fresh exact-head hosted checks precede merge.
+## Approved R1 private executable host (owner 097)
 
-Locally acknowledge Hermes 097/098 and Root's current-base qualification direction. R1 remains held for owner choices; World profiling, R3's public/client admission restriction, contracts, ABI/header, reference and all reserved policies remain separate. MOV-09/new parity rows remain paused, and #211, #212, #213, #214 retain their priority.
+Owner [axel-decision-r1-profile-lifecycle-097](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6181065743), authored by Axel account ID 283409233, selects the concrete trusted Conquest profile. A separate opt-in serving entry point preserves the lobby-only default and existing Rust callers. The ordinary binary accepts `--trusted-room CODE --seed U64`; policy is installed before requests. A current commander host resolves through the existing connected-human authority, not client-supplied slot/issuer fields. A private fixed two-human opposing roster, committed bound map/current weather, Standard army and sandbox off remain mandatory.
 
-## R4 first-reached native admission guard (2026-10-14)
+Canonical Match construction uses shuffle, tech, point supply and living weather true, logistics false, and weather seed None. Physical logistics off is an explicit temporary Source deviation, not a runtime fix. Existing reserve/convoy, contact, snapshot and all other capability guards stay. Existing LOG-01/45/46, MODE-07/11/21, NET-39/41 and IF-20/21 rows record the bounded choice with every original status preserved. Point supply remains enabled separately. No fixture or assertion is rewritten to claim Source-default Conquest equality.
 
-Locally acknowledge Axel's owner decision R1-R4 (090), issue #5 comment `6179562683`, the approved proposal 087 (`6178678986`) and Hermes readback 091 (`6179633387`). Root's public acknowledgment is `6180046554`. R4 defines multiple-fault refusal by the first guard actually reached in `Match::advance_tick`. Pinned Source's live research, training, worker collection, aggregate construction and scenario phases do not define an equivalent global preflight.
+Initial start and healthy restart prepare the entire authored map/roster-bound runtime and both canonical start baselines before publishing room, identity or accounts. A failed replacement leaves the prior runtime, command queue, result, delivery accounts and identity intact. A successful replacement creates a fresh identity/queue/ingress/Fog/list/meter state but preserves tokens and connections; outstanding old socket-write tickets remain charged and cannot regain current authority. Retained absent or unready seats auto-pause at preparation and resume by the same token. A latched fault refuses manual restart, never retries the old tick and never restarts automatically. Terminal client fault notification remains future wire review.
 
-The current read-only admission reaches Legacy scenario before ordinary production and construction. It returns before `started=true`, recorded command dispatch, structure synchronization or clock advancement. The later ordinary post-command block checks construction, production and scenario; the historical Legacy endpoint's production/scenario/construction ordering is a separate boundary. Keep that distinction instead of asserting construction is the first whole-runner refusal.
+The explicit full-range u64 seed is reused on every fresh start/restart. Existing native derivation owns layout/environment/weather; there is no Source global-RNG correspondence claim. Every publication retains and privately logs the complete options plus actual derived weather/environment seed under its fresh identity. Host-only diagnostics expose exact admission/contact gaps without adding client fields. Existing JSON v0 start stays 13 fields, and six ABI 2 calls/header, reference e4e579a, contracts, privacy/roles and four-family ingress remain unchanged. Unreal's fixed `Logistics: off (temporary)` presentation and actual consumer proof belong to Axel. #199/#201 and wider ingress remain separate.
 
-One appended core unit test uses canonical El Alamein startup, seed 701 and an untouched two-team ordinary constructor. Healthy, construction-only, production-only, scenario-only and all-three-invalid contexts preserve their genuine units, building footprints, structures and metadata. Construction's defect is a waiting Build without the required paid site and normalized Assist, with current build activity and identities still valid. Production's defect is an empty row for an absent building, producing the exact component InvalidInput refusal. Scenario's defect is an out-of-range owner on an existing point. Earlier abilities, aircraft, support, carrier and recorded-boundary checks remain healthy. All six direct guard permutations refuse at their first invalid guard; actual all-three admission returns the scenario refusal.
+The successful focused source cycle passes three internal and five ordinary-binary TCP/WebSocket tests. All 231 committed map/weather combinations were checked: 224 admit, while No Man's Land refuses all seven weather choices with `native startup authoring map binding changed`, leaving no runtime/accounts/identity publication. Its authored setup is unchanged; the gap stays refused. The process tests use actual ClientView and a genuine El Alamein owned rifle, holdPos, clear staging cell (46,39), then authored mine (47,39). The actual contact guard latches a fault; subsequent host/guest restart attempts are refused with no postfault frame or new identity. Internal exact-state tests protect preparation rollback and old outstanding writes; their explicit fault latch setup is not described as binary proof. The first new-test run retained two incorrect assumptions as failures (every map admits and a hard-coded next tick); source-verified corrections pin the exact existing refusal and authoritative next clock. A strict-lint cycle found only a complex new test tuple, now named with aliases. These earlier results do not qualify the final head. Root owns separate actual-head review and full runtime/release validation before the readiness report; fresh hosted checks and explicit final-head owner acknowledgment remain merge gates.
 
-The test compares the canonical complete queue snapshot, random streams, World including pending/journal state, owner readbacks and unit pace bits, plus the private started/path/fault projection through existing TickState Debug. Empty failure events and default retirement accompany unchanged state. Debug is a readback, not a complete byte serialization of Match; the inspected immutable admission path returns before runtime mutation. This is core admission evidence only. It establishes no socket, ClientView, Unreal delivery or post-command rollback result. Later runtime faults retain their emitted phase prefix and existing fault latch.
-
-On Vostro, the named focused ci-test passed once: 1 passed, 0 failed, 0 ignored and 130 filtered out. Cargo and the resource scope exited zero under four jobs, CPU quota 400%, 6 GiB and no swap; AllowedCPUs 8-11 was requested, but effective affinity was not verified because cpuset was not delegated; observed scope peak was 1,633,509,376 bytes, with no observed OOM or memory-cap event. The scope is inactive with no owned Cargo process remaining. No runtime order, guard, fixture, interface, ABI/header, contract or reference change is included. R3's World restriction remains: Unreal/public play waits for connected crush, hostile-mine contact and constructor-logistics parity proof. R1 hosting is separate, C03 needs its own jointly reviewed contract, World profiling belongs to the overseer, and MOV-09/new parity rows remain paused. The candidate uses a unique changelog fragment and requires separate exact-head review before publication and fresh exact-head hosted checks before merge.
 
 ## Reconnect source-only update after movement optimization #215 (2026-10-14)
 
@@ -116,6 +113,71 @@ The approved ABI 2 header and reference `e4e579a` remain exact. Existing ownersh
 ## Real-socket foreign-order invariants (2026-10-14)
 
 The existing socket denial did not directly compare foreign unit and control state. One table-driven test now checks all four admitted command families in both seat directions, forged sender keys and mixed owned/foreign selection. It preserves current owner filtering and the owned-subset rule. The new reader compares the supported default NaN pace by exact IEEE bits, after retaining its initial derived-equality failure with identical native values. The focused ci-test passes once on Vostro, with zero failures or ignored tests. Existing helpers and tests remain byte-identical; no runtime mutation defect or mixed-selection mismatch was observed. Full workspace and separate review remain required before the per-stream PR. This defines no new role, visibility policy, public start or interface.
+
+## Recoverable changelog collection (2026-10-14)
+
+The collector's initial Git deletion preflight cannot reserve the index.
+A late index lock after changelog replacement left the fragments present,
+and a retry copied their bullets again. Before replacement, the collector
+now publishes a private per-worktree Git journal containing the complete
+original and assembled changelog, NUL-separated fragment paths, exact
+fragment contents and original NUL-separated Git index entries (blob, mode,
+stage and path). Changelog replacement uses a temporary file on its own
+filesystem. Each invocation requires exclusive access to the worktree,
+fragment paths and its Git index. No new locking tool is required.
+
+When validated, a retry accepts only the recorded original or assembled
+changelog,
+unchanged remaining fragments and their recorded index entries. From the
+original state it replaces the changelog; from the assembled state it resumes only the owned fragment
+removals. Already removed fragments are skipped. The journal survives
+process interruption and Git deletion failure and is removed only after
+all owned deletions finish. Unrelated changelog, fragment or index edits
+present when checked refuse recovery until the recorded state is
+restored. The collector never removes Git's index lock. Identity is the
+fragment path and exact contents, not bullet text, so distinct fragments
+with identical bullets both survive collection. New fragments wait for the
+next invocation after recovery.
+
+The first recovery candidate checked only worktree contents. A staged
+replacement whose worktree file was subsequently removed could therefore
+pass Git's deletion check and be lost. Recovery now verifies every remaining
+index entry's exact blob, mode, stage and path before any fragment removal,
+even when the worktree file is missing. A changed staged entry present when
+validated refuses recovery, retaining the index, journal and assembled
+changelog. A missing
+worktree file with the original index entry may still recover normally.
+
+A separate review showed that one collector alone does not reserve the
+index: another Git writer can stage a replacement and remove its worktree
+file after validation, and the collector's later deletion can remove that
+replacement. The checks and actual git rm are separate operations, not one
+atomic transaction. Each invocation therefore requires exclusive access to
+the worktree, fragment paths and Git index, with all other Git and worktree
+writers waiting until it exits. The guards check changes present at
+validation, including changes made between retry invocations; concurrent
+changes after those checks are unsupported.
+
+Final order remains newest date on top, with same-date topic filenames in
+descending order, retaining the existing insertion and spacing rules. This
+clarifies Axel review 084 and owner decision 085. Their process-sharing note
+is addressed by recommending local nextest after test-binary consolidation:
+plain cargo test shares a process across formerly separate test files,
+whereas nextest isolates each test. This collector follow-up changes no test
+layout, Cargo profile, runtime, workflow or interface.
+
+Collector validation passed 26 owned-scratch checks: 25 current-script
+behavior checks and one reproduction of the earlier index-loss bug. The
+current-script checks cover exact output against the original collector,
+ordering, dirty-input refusal, post-replacement process kill, late index
+lock, partial deletion, recovery
+refusal after unrelated edits, repeated no-op, identical legitimate bullets,
+new fragments arriving during recovery, unusual quoted paths and linked
+worktree isolation. The added index checks retain changed blobs, modes and
+conflict stages on refusal, then recover after the original index entry is
+restored. These checks do not cover concurrent writers. This documentation
+correction preserves all script commands and prior verification receipts,
+with no Cargo or native runs.
 
 ## World integration after merged Legacy #204 (2026-10-14, full validation pending)
 
@@ -3462,3 +3524,17 @@ The native trusted scene reader validates declared Source cells against the cata
 ## Ground contact module formatting
 
 The frozen `b45ed53` native run passed all six focused contact, construction and ground-order tests. Its formatting gate exited 1 because `match_ground_contact` appeared after `match_construction`; rustfmt requires it after `match_firing`. Move only that declaration. Every module body, fixture, test and interface remains unchanged. This is a mechanical formatting correction, not additional native acceptance; final successor gates remain pending.
+
+## R1 whole-match differential prototype (2026-10-15)
+
+The test-only recorder runs unmodified pinned Source createGame and step for 600 actual ticks on committed Default authoring. The Rust diagnostic independently constructs canonical Match with owner 097's bounded A profile and advances its sole tick runner through the same 600 scheduled boundaries. Both receive the same explicit private u64 seed and ten legal orders for the two opposing commanders. Source Math.random uses one declared global SplitMix64 stream; Rust retains its existing purpose streams. No state, actor, terrain, wind, environment seed, draws or expected outputs are aligned. Existing fixtures and runtime guards remain unchanged.
+
+Startup and every tenth tick compare unit IDs/kinds/ownership/positions/health, resources, runtime mode, VP/winner score and objective state. Private per-tick frames locate the precise first difference without stopping either engine early. Exact IEEE bit wrappers preserve signed zero; Source resource absence is explicit. This projection does not claim every internal field or row variant. Both engines completed 600 actual ticks with movement in 352 ticks; Rust emitted 132 events and neither engine denied a recorded order. The first real difference is tick 0, $.units[0].x: Source 27 m (403b000000000000) versus Rust 85 m (4055400000000000). Zero actual ticks and zero of 61 checkpoints matched. MODE-22 owns this constructor position-list check; MODE-21 and IF-20/IF-21 are related investigation areas, without a causal claim.
+
+The first red diagnostic falsely distinguished Source JSON 100 from native 100.0 despite identical health bits. Its source and log remain preserved privately. Root independently verified the representation defect before a validated bits-first numeric-wrapper correction and a focused parsed-number/signed-zero regression. No tolerance or simulation repair was introduced. The default runner remains red for the real mismatch. Explicit report-only success means both complete tick loops and actual movement executed, while its JSON retains MISMATCH. It is not a parity pass. Runner faults report an incomplete prefix rather than changing a guard or synthesizing later ticks.
+
+Issue #5 proposal 6181987121 asks Axel whether whole-match differential evidence may support selected existing rows. That criterion is pending; all row statuses remain unchanged. A 600-tick prefix is not a completed Conquest outcome, a server/socket proof or Unreal adoption. The seed and full trace stay private. Reproduction and the exact projection are described in docs/testing/r1-whole-match-differential.md. Focused native evidence and independent exact-head review qualify only this diagnostic source; no full local workspace pass is claimed.
+
+## Ordinary target-selection source replay
+
+The ordinary Match firing owner already holds target ID, retarget timer and team volley claims. Extend its existing pinned-source recorder with nine targeted ordinary firing scenes instead of adding a second combat model or an external interface. These scenes expose the Source-selected target for role weighting, shootability visibility, threat, hysteresis, delayed and immediate retargeting, shared claims, and trench or visible-crowd salvo value. They keep the original per-unit firing block and ordered claim rebuild. The native test compares the full recorded firing snapshot and Combat random bits in both ordinary mode aliases, Default and Conquest. This is component evidence for CMB-42, CMB-44 and CMB-86 through CMB-89; the wider row acceptance checks and whole-match outcomes remain open.
