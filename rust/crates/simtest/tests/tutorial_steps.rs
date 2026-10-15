@@ -22,6 +22,41 @@ fn fixture() -> Value {
     f
 }
 
+/// Compare every entry field, retaining number bits including the sign of zero.
+fn assert_entry_json(actual: &Value, expected: &Value, path: &str) {
+    match (actual, expected) {
+        (Value::Number(a), Value::Number(b)) => {
+            assert_eq!(
+                a.as_f64().expect("actual JSON number").to_bits(),
+                b.as_f64().expect("expected JSON number").to_bits(),
+                "{path}"
+            );
+        }
+        (Value::Array(a), Value::Array(b)) => {
+            assert_eq!(a.len(), b.len(), "{path}: array length");
+            for (index, (a, b)) in a.iter().zip(b).enumerate() {
+                assert_entry_json(a, b, &format!("{path}[{index}]"));
+            }
+        }
+        (Value::Object(a), Value::Object(b)) => {
+            assert_eq!(a.len(), b.len(), "{path}: object length");
+            assert_eq!(
+                a.keys().collect::<Vec<_>>(),
+                b.keys().collect::<Vec<_>>(),
+                "{path}: object keys"
+            );
+            for (key, b) in b {
+                assert_entry_json(
+                    a.get(key).expect("checked object key"),
+                    b,
+                    &format!("{path}.{key}"),
+                );
+            }
+        }
+        _ => assert_eq!(actual, expected, "{path}: JSON type or value"),
+    }
+}
+
 fn check(index: usize, required: &[&str]) {
     let f = fixture();
     let step = TutorialStep::ALL[index];
@@ -38,7 +73,11 @@ fn check(index: usize, required: &[&str]) {
             },
         })).collect::<Vec<_>>(),
     });
-    assert_eq!(actual, f["definitions"][index], "step {} entry", index + 1);
+    assert_entry_json(
+        &actual,
+        &f["definitions"][index],
+        &format!("step {} entry", index + 1),
+    );
     let rows: Vec<_> = f["cases"]
         .as_array()
         .unwrap()
