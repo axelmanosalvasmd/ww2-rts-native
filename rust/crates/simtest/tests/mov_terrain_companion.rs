@@ -581,7 +581,15 @@ fn run(f: &Value, name: &str) -> BTreeMap<String, (f64, f64)> {
             .expect("real weather snapshot")
             .recipient(0)
             .unwrap();
-        assert_eq!(delivered.fields["wx"][0], 1, "clients are told the weather");
+        let delivered_rain = delivered.fields["wx"][0]
+            .as_f64()
+            .filter(|rain| rain.is_finite())
+            .expect("delivered wx[0] must be a present finite Number");
+        assert_eq!(
+            delivered_rain.to_bits(),
+            1.0_f64.to_bits(),
+            "clients are told the weather"
+        );
         scene.m.world.game.wet = Some(1.0);
         scene.m.start.living.as_mut().unwrap().next = 1e9;
         let id = scene.aliases["subject"];

@@ -1,5 +1,9 @@
 # Three Crossroads Native: design decisions
 
+## Applied weather-only typed Number assertion (2026-10-15)
+
+After Root review, change only the MOV companion wx[0] assertion to typed finite f64 access and exact bits against1.0. Retained actual Source case3/call964 and native ec3 Number(1.0) both denote finite bits `3ff0000000000000`, inferred from those recorded values and pinned serde source without a new native bit dump. Missing, null, wrong-type, zero, nonfinite and unequal-bit values remain failures. Keep all thirteen physical scenes, fixtures, original Source, other comparisons, runtime, guards and statuses unchanged. Preserve the old failure; the new assertion still needs a separate exact-head execution grant.
+
 ## MOV-12/13 strict source wrappers and MOV-04 ownership proposal (2026-10-15)
 
 Strengthen only the unrun new MOV12/13 recorders and consumers. MOV12 now binds the unchanged original helpers/body, complete constructor input/state, actual fixtureCommand before/after/input/undefined return and61 complete steps with consecutive sequence numbers and preserved failures. Native requires those exact authored inputs and Source-body binding before independently running the canonical companion. MOV13 retains full constructor state, complete dimensions/flags/height/smoke for every one of244 queries, typed completion/failure observations and exact original body binding. No Source result initializes native state. The [consumer and pending command record](docs/checkpoints/mov12-13-consumer-gates.md) preserves the existing four-instance selection and requires a fresh slot for every future job. No new fixture or execution exists.
