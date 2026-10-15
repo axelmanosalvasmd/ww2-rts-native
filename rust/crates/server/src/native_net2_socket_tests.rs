@@ -47,7 +47,10 @@ impl Rig {
                 loop {
                     let absent = {
                         let hub = self.hub.lock().await;
-                        hub.rooms["ABC"].players.iter().all(|p| p.connection.is_none())
+                        hub.rooms["ABC"]
+                            .players
+                            .iter()
+                            .all(|p| p.connection.is_none())
                     };
                     if absent {
                         break;
@@ -169,8 +172,25 @@ async fn r1_eligibility_skips_production_and_reconnects_real_receivers() {
             hub.poll_native(100, 100_000_000);
             hub.poll_native(150, 150_000_000);
             let room = &hub.rooms["ABC"];
-            assert_eq!(room.native.as_ref().unwrap().runtime.state().world.game.tick, 4);
-            assert_eq!(room.native.as_ref().unwrap().runtime.snapshot_production_calls(), 1);
+            assert_eq!(
+                room.native
+                    .as_ref()
+                    .unwrap()
+                    .runtime
+                    .state()
+                    .world
+                    .game
+                    .tick,
+                4
+            );
+            assert_eq!(
+                room.native
+                    .as_ref()
+                    .unwrap()
+                    .runtime
+                    .snapshot_production_calls(),
+                1
+            );
             for (c, history) in connections.iter().zip(histories) {
                 assert_eq!(hub.accounts[&c.id].delivery, history);
                 assert_eq!(hub.accounts[&c.id].pressure.inflight(), 0);
@@ -183,7 +203,12 @@ async fn r1_eligibility_skips_production_and_reconnects_real_receivers() {
         rig.poll(10_000, 10_000_000_000);
         assert_eq!(rig.calls(), 1);
         rig.change(|hub| {
-            assert!(hub.rooms["ABC"].players.iter().all(|p| p.connection.is_none()));
+            assert!(
+                hub.rooms["ABC"]
+                    .players
+                    .iter()
+                    .all(|p| p.connection.is_none())
+            );
         });
         let mut returned = [
             Receiver::connect(rig.address, "a"),
@@ -197,7 +222,10 @@ async fn r1_eligibility_skips_production_and_reconnects_real_receivers() {
             let frames = barrier(client);
             assert_eq!(frames.len(), 1);
             assert_eq!(frames[0]["online"], json!([true, true]));
-            assert_eq!(frames[0]["held"][0].as_u64(), Some(client.view.unit_count() as u64));
+            assert_eq!(
+                frames[0]["held"][0].as_u64(),
+                Some(client.view.unit_count() as u64)
+            );
         }
     })
     .await;
@@ -251,7 +279,10 @@ fn sample(rig: &Rig, now: u64, duration: f64, sent: bool, expected: u8) {
                 now,
             )
             .unwrap();
-        assert_eq!(interval, expected, "now={now}, duration={duration}, sent={sent}");
+        assert_eq!(
+            interval, expected,
+            "now={now}, duration={duration}, sent={sent}"
+        );
     });
 }
 fn fill(rig: &Rig, now: u64, duration: f64, expected: u8) {
@@ -384,7 +415,11 @@ async fn r1_backpressure_preserves_skipped_history_and_drains_one_catchup() {
         rig.step();
         rig.step();
         for client in &mut clients {
-            assert_eq!(ticks(&barrier(client)), [4], "one below the gate is eligible");
+            assert_eq!(
+                ticks(&barrier(client)),
+                [4],
+                "one below the gate is eligible"
+            );
         }
         let edge = reservation(rig, 0, "x");
         let (delivery, full) = rig.change(|hub| {
@@ -439,7 +474,10 @@ async fn r1_backpressure_preserves_skipped_history_and_drains_one_catchup() {
         assert_eq!(barrier(&mut clients[1]).len(), 1);
         rig.change(|hub| {
             assert!(hub.accounts[&old.connection_id].pressure.owed());
-            assert_eq!(hub.accounts[&old.connection_id].pressure.inflight(), SEAT_INFLIGHT_LIMIT);
+            assert_eq!(
+                hub.accounts[&old.connection_id].pressure.inflight(),
+                SEAT_INFLIGHT_LIMIT
+            );
         });
         let identity = begin(&mut clients, "restart");
         assert!(identity > old.epoch);
@@ -453,7 +491,11 @@ async fn r1_backpressure_preserves_skipped_history_and_drains_one_catchup() {
         for client in &mut clients {
             assert!(barrier(client).is_empty());
         }
-        assert_eq!(rig.calls(), 0, "fresh runtime did not produce a catch-up for an old epoch");
+        assert_eq!(
+            rig.calls(),
+            0,
+            "fresh runtime did not produce a catch-up for an old epoch"
+        );
 
         let stale = reservation(rig, 0, &"x".repeat(SEAT_INFLIGHT_LIMIT as usize));
         rig.step();
@@ -473,12 +515,20 @@ async fn r1_backpressure_preserves_skipped_history_and_drains_one_catchup() {
             assert_eq!(hub.accounts[&current_id].delivery, history);
             assert_eq!(hub.accounts[&current_id].pressure.inflight(), 0);
             // The real socket loop may already have retired the old account.
-            assert!(hub.accounts.get(&stale.connection_id).is_none_or(|a| a.pressure.inflight() == 0));
+            assert!(
+                hub.accounts
+                    .get(&stale.connection_id)
+                    .is_none_or(|a| a.pressure.inflight() == 0)
+            );
             assert_eq!(hub.native_status("ABC").unwrap().epoch, identity);
             assert!(!hub.native_status("ABC").unwrap().paused);
         });
         assert!(barrier(&mut clients[0]).is_empty());
-        assert_eq!(rig.calls(), calls, "stale completion cannot schedule the replacement");
+        assert_eq!(
+            rig.calls(),
+            calls,
+            "stale completion cannot schedule the replacement"
+        );
         rig.step();
         rig.step();
         for client in &mut clients {
