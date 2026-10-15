@@ -23,3 +23,6 @@ fn vision_and_fog_match_the_reference() {
         assert_eq!(lines, expected, "threaded: {threaded}");
     }
 }
+
+#[path = "vision/rows.rs"]
+mod rows;

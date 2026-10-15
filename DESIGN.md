@@ -3562,3 +3562,12 @@ Issue #5 proposal 6181987121 asks Axel whether whole-match differential evidence
 ## Ordinary target-selection source replay
 
 The ordinary Match firing owner already holds target ID, retarget timer and team volley claims. Extend its existing pinned-source recorder with nine targeted ordinary firing scenes instead of adding a second combat model or an external interface. These scenes expose the Source-selected target for role weighting, shootability visibility, threat, hysteresis, delayed and immediate retargeting, shared claims, and trench or visible-crowd salvo value. They keep the original per-unit firing block and ordered claim rebuild. The native test compares the full recorded firing snapshot and Combat random bits in both ordinary mode aliases, Default and Conquest. This is component evidence for CMB-42, CMB-44 and CMB-86 through CMB-89; the wider row acceptance checks and whole-match outcomes remain open.
+
+
+## Vision row source checks (2026-10-15, unrun candidate)
+
+The second combat stream prepares five existing row checks, CMB-124/125/128/131/132, against native baseline `34edf52a7eaa6cb6edba3e802c2190226228276f`. The new recorder reads original Source at `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. It adds exports for `visionOf` and `visionRange` only, calls the existing vision/LOS/fog functions, and records exact inputs and outputs. Canonical `placeBuilding` supplies the target footprint and structural cells in aim-point cases. Component scenes isolate observer inputs; recipient delivery retains original constructor actors.
+
+The native side uses compiled rules and existing `vision`/`Fog` consumers, plus the actual recipient `DeliveryState` and run encoder. Full masks, ordered visibility, packet presence, cursor/base state and floating-point bits are compared. Source and native cold recomputations independently check cache reuse. No runtime algorithm, gameplay rule, consumer interface, acceptance criterion or old fixture changes.
+
+The prepared inventory is 18 range cases, 30 visibility cases, 18 LOS cases, 20 fog frames, eight three-recipient delivery frames and 64 run-encoding cases. These are source counts, not execution results. Root has not granted this stream a native/recorder slot. Fixtures are not generated, tests have not run, and all five rows retain their previous statuses. The exact predicate map and consumer names are in `docs/parity/combat.md`. A generated and verified successor and independent review remain required before integration.
