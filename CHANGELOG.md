@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Record Axel's exact aligned whole-match evidence decision in PARITY.md. Preserve the existing component, outcome and owner rules. Both owners record readback of the final documentation head on #5 before merge; no parity row is promoted.
+
 - Complete MODE-15's raw observed Hill 112 path check on 10 canonical Assault starts, comparing all 30 full waypoints with the unchanged Source fixture; the three selected tests pass at 0b60e793.
 
 - Rebase the four existing MOV43/62/79/83 checks from accepted local `4873cd90` onto exact post-255 main `9e618217`. Preserve every incoming row, module, fixture and old predicate body; relocate the two owned DESIGN notes verbatim beside movement. MOV72 remains held. Prior passes retain their original producing heads; new focused validation is pending.
