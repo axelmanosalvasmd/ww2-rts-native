@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## CMB-61 renewed S3 stop after hitAt repair (2026-10-15)
+
+At frozen `d01d213a999c2d1cacbc3e50be79e8e7b009e857`, fmt passes and the exact accuracy test compiles, then fails at the retained strict whole-metadata equality, now line 56. Its first failing case is `choice-flamer-open-below`: Source represents the actor's `cooldown` as integer `1000000000`, while authored input retains float `1000000000.0`. The authorized exact-bit `hitAt` check succeeds. Do not extend that exception to cooldown or change any input, fixture or replay assertion. The raw failure remains `/tmp/cmb61-flame-s3-d01d213a/accuracy.log`.
+
+Control flow reaches this first choice case after replaying all six launch scenes in both modes, but the test never returns from its replay helper and never reaches its final paired-velocity assertions. Report the actual result as 0 passed, 1 failed, 219 filtered out, exit 101. Target-choice, registry and fresh strict Clippy remain unrun under the first-further-failure STOP rule. No Source, old component or full/release gate is rerun. CMB-61 stays held and CMB-69 remains an unapplied proposal.
+
 ## CMB-61 exact hitAt metadata representation check (2026-10-15)
 
 Root authorizes a minimal new-consumer repair after reading the first failure at `556a2ad5`. Clone only the recorded and authored metadata for comparison. Require equal actor counts, convert each actor's `hitAt` through `as_f64`, and compare its complete `to_bits` value. Only after that equality succeeds, put the same f64 representation into both metadata clones at those `hitAt` cells and retain strict whole-JSON equality. This uses no epsilon or general number normalization. All other keys, types and values remain strict, and neither clone initializes the replay match.

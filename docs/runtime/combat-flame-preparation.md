@@ -1,5 +1,15 @@
 # CMB-61 missing flame components, source-only preparation
 
+## Renewed S3 result after the authorized hitAt repair
+
+Tested head: `d01d213a999c2d1cacbc3e50be79e8e7b009e857`, a clean direct child of `0563eb91`. Its Rust tree is `f98be6df380f133240d36cd8acacc9fd539ca29d`. Only the new consumer's metadata comparison changes: every actor's `hitAt` must have equal `as_f64().to_bits()` on both sides, then only those verified cells are canonicalized in local metadata clones for strict whole-JSON equality. Every other field/type remains strict. The entire consumer outside that block, all replay assertions, authored inputs, both Source recorders/fixtures, old tests, registry, parity table and CMB-69 proposal remain exact. No metadata clone initializes native state.
+
+Fmt passed. The exact accuracy test compiled and failed at `match_firing_flame.rs:56` on case `choice-flamer-open-below`: Source `cooldown=1000000000` is an integer, authored `cooldown=1000000000.0` is a float. The `hitAt` checks pass. The failure occurs before the choice group filter, after all six launch scenes have traversed their two-mode replay loops. The helper never returns, so the test's final paired-velocity assertions remain unexecuted. This is partial traversal, not a passing accuracy test or complete row proof. Actual result: 0 passed, 1 failed, 219 filtered out, exit 101.
+
+STOP. No cooldown normalization or other repair is applied. Target-choice, simtest registry and fresh strict workspace/all-target Clippy remain unrun. No Source, old damage/suppression, full/release or discovery execution occurs in this renewal. CMB-61 remains held; CMB-69 stays an unapplied proposal. Raw logs: `/tmp/cmb61-flame-s3-d01d213a/fmt.log` and `accuracy.log`. The earlier failure logs and authentic 16-scene/202-checkpoint fixture remain unchanged.
+
+Dep-info `it-ccf03549903ef5ff.d` includes the flame consumer and authored inputs. The compiler manifest is this checkout's `rust/crates/simtest`, bound to the tested Rust tree above by workspace key `23cb40ba455b7118b8844974`. All granted jobs use S3, CPUs 8-11, 6 GiB memory, swap 0, quota 400%, jobs 4, threads 1 and the current guard's exclusive target/lock and 20 GiB floor.
+
 ## Terminal result under the S3 grant
 
 Producing native head: `556a2ad5e24e22b9e5c4736813b0dbf8da978d49`, Rust tree `c30a8070c28d257273acb10f2c54d74b85e35b82`. Authentic fixture checkpoint: `a5411f799a8887cd83bce2b8bba192f5a69d8a95`. Source generation and serial `--check` each passed at preparation `7a762f65`: 16 actual scenes and 202 actual checkpoints. The first fmt check found two whitespace-only wraps; they were corrected with complete non-whitespace token preservation. The fmt recheck passed at `556a2ad5`.
