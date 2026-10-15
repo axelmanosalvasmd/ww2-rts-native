@@ -1,17 +1,19 @@
 //! Shared Source-backed MODE predicates. Fixture generation and native execution need a ledger grant.
 use serde_json::{Value, json};
 use ww2_core::{
+    catalog::Catalog,
     deployment::{self, Spawn},
-    economy::{Faction, Mode},
+    economy::{Faction, Mode, Technology},
     economy_state::ArmySize,
     game::{LOCAL_DEFENDER_OWNER, ModeKind, Point},
     legacy_scenario::{LegacyScenario, PointOwner},
     map::AuthoritativeMap,
     match_commands::Command,
     match_end::{EndReason, MatchSample},
-    match_runtime::{Match, MatchOptions, PlayerConfig},
+    match_runtime::{BuildingCell, Match, MatchOptions, PlayerConfig},
     objectives::{Objective, ObjectivePlayer, ObjectiveUnit, capture_points},
     recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCache},
+    unit_publication::{PublicationParts, StagedUnit, prepare_publication},
     vision,
     weather::{WeatherChoice, WeatherKind},
 };
@@ -116,6 +118,102 @@ fn source_slot(slot: &Value) -> usize {
     }
 }
 
+// Declared completed motor pool, with the same publication and linked-footprint
+// metadata as canonical starting buildings. It remains present after the purchase.
+fn faction_purchase(f: &Value) {
+    let c = &f["factionPurchase"];
+    let slot = c["slot"].as_u64().unwrap() as usize;
+    let authored = AuthoritativeMap::from_json(&serde_json::to_vec(&f["map"]).unwrap()).unwrap();
+    let mut o = options(f, &teams(&f["roster"]), Mode::Conquest);
+    for (player, faction) in o.players.iter_mut().zip(c["factions"].as_array().unwrap()) {
+        player.faction = Faction::try_from(faction.as_u64().unwrap() as u8).unwrap();
+    }
+    let mut m = Match::new(&authored, o).unwrap();
+    assert_eq!(slot, 2);
+    assert_eq!(m.start.players[slot].config.faction, Faction::Germany);
+    let before = anchors(&m);
+    let constructor_ids = m.world.game.units.keys().copied().collect::<std::collections::BTreeSet<_>>();
+    let cell = c["cell"].as_u64().unwrap() as usize;
+    let definition = Catalog::compiled().unwrap();
+    let definition = definition.unit("motorpool").unwrap();
+    let size = definition.get("size").unwrap().number().unwrap() as usize;
+    let hp = definition.get("hpPer").unwrap().number().unwrap();
+    let width = m.world.game.w;
+    let cells = (0..size).flat_map(|y| (0..size).map(move |x| cell + y * width + x)).collect::<Vec<_>>();
+    assert!(cells.iter().all(|&c| m.world.game.chars[c] == b'.'));
+    let at = Point { x: (cell % width) as f64 * 2.0 + size as f64, z: (cell / width) as f64 * 2.0 + size as f64 };
+    assert!(m.world.game.units.values().all(|u| (u.x-at.x)*(u.x-at.x)+(u.z-at.z)*(u.z-at.z) > 36.0));
+    let id = m.next_unit_id;
+    assert!(id > 0 && !constructor_ids.contains(&id));
+    let mut draft = StagedUnit::ordinary(&m.world.game, &m.rules, slot,
+        m.rules.kind("motorpool").unwrap(), id, m.world.game.units.len() as u32,
+        m.start.players[slot].spawn, Some(at)).unwrap();
+    draft.unit.built = Some(1.0);
+    draft.unit.hp = hp;
+    draft.unit.cells = Some(cells.iter().map(|&c|c as u32).collect());
+    for &cell in &cells { m.world.set_cell(cell, b'K').unwrap(); }
+    prepare_publication(PublicationParts {
+        units: &mut m.world.game.units, grid: &mut m.grid,
+        controls: &mut m.commands.units, recruitment: &mut m.recruit_metadata,
+        next_id: &mut m.next_unit_id,
+    }, &m.rules, m.start.players.len(), vec![draft]).unwrap().publish_with(|u, _| {
+        m.combat.initialize(u.id); m.firing.initialize(u.id);
+        m.abilities.initialize(u.id); m.recovery.initialize(u.id);
+    });
+    m.production.initialize_building(id).unwrap();
+    m.building_rallies.insert(id, None);
+    for &cell in &cells { m.building_cells.insert(cell, BuildingCell { unit: id, owner: slot, at }); }
+    m.world.register_building_structure(id, &cells, hp, hp).unwrap();
+    let producer = |m: &Match| {
+        let u = &m.world.game.units[&id];
+        let b = m.production.building(id).unwrap();
+        let structure = m.world.structures.iter().find(|s|s.id == format!("building:{id}")).unwrap();
+        assert_eq!(structure.entity_id, Some(id));
+        for &cell in &cells {
+            let footprint = &m.building_cells[&cell];
+            assert_eq!((footprint.unit, footprint.owner, footprint.at), (id, slot, at));
+            assert_eq!(m.world.sections[&cell].structure_id, structure.id);
+            assert!(m.world.game.sections.contains_key(&(cell as u32)));
+        }
+        json!({"id":id,"owner":u.owner,"type":m.rules.kinds[u.kind].name,
+            "x":u.x,"z":u.z,"cells":u.cells,"built":u.built,"hp":u.hp,
+            "queue":b.queue().collect::<Vec<_>>(),
+            "jobs":b.jobs().iter().enumerate().map(|(i,j)|json!({"id":j.id,"type":j.kind,
+                "mp":j.charge.mp,"fuel":j.charge.fuel,"status":if i == 0 { "active" } else { "waiting" }})).collect::<Vec<_>>(),
+            "progress":b.progress(),
+            "rally":m.building_rallies[&id].map(|p|json!({"x":p.x,"z":p.z})),
+            "structure":{"id":structure.id,"entityId":structure.entity_id,
+                "cells":structure.cells,"sections":structure.section_ids}})
+    };
+    let producer_before = producer(&m);
+    m.start.economy.players[slot].mp = c["mp"].as_f64().unwrap();
+    for (i, seconds) in c["researchSeconds"].as_array().unwrap().iter().enumerate() {
+        assert_eq!(m.execute_command(slot, &Command::Technology { kind: Technology::Tier }, false).unwrap(), None);
+        assert_eq!(m.production.player(slot).unwrap().jobs().len(), 1);
+        assert_eq!(m.step_research(seconds.as_f64().unwrap()).unwrap(), vec![(slot, Technology::Tier)]);
+        assert_eq!(m.production.player(slot).unwrap().tech().tier(), (i + 2) as u8);
+        assert!(m.production.player(slot).unwrap().jobs().is_empty());
+    }
+    let before_ids = m.world.game.units.keys().copied().collect::<std::collections::BTreeSet<_>>();
+    let before_mp = m.start.economy.players[slot].mp;
+    assert_eq!(m.execute_command(slot, &Command::Buy { kind: "tiger".into(), from: Some(id) }, false).unwrap(), None);
+    let purchased = m.world.game.units.values().filter(|u|!before_ids.contains(&u.id)).collect::<Vec<_>>();
+    assert_eq!(purchased.len(), 1);
+    assert_eq!(m.rules.kinds[purchased[0].kind].name, "tiger");
+    assert_eq!(purchased[0].owner, slot);
+    assert!(m.start.economy.players[slot].mp < before_mp);
+    assert_eq!(producer(&m), producer_before);
+    assert_eq!(anchors(&m).into_iter().filter(|u|constructor_ids.contains(&u.0)).collect::<Vec<_>>(), before);
+    let actual = encode(json!({
+        "factions":m.start.players.iter().map(|p|p.config.faction as u8).collect::<Vec<_>>(),
+        "tier":m.production.player(slot).unwrap().tech().tier(),
+        "beforeMp":before_mp,"afterMp":m.start.economy.players[slot].mp,
+        "purchased":purchased.iter().map(|u|json!([u.id,m.rules.kinds[u.kind].name,u.owner])).collect::<Vec<_>>(),
+        "countBefore":before_ids.len(),"countAfter":m.world.game.units.len(),"producer":producer_before,
+    }));
+    assert_eq!(actual, c["expected"], "player faction and actual admitted Tiger purchase");
+}
+
 #[test]
 fn alliance_predicate_and_existing_consumers_match_source() {
     let f = fixture();
@@ -175,6 +273,7 @@ fn alliance_predicate_and_existing_consumers_match_source() {
     assert_eq!(anchors(&m), before);
     assert_eq!(f["alliance"].as_array().unwrap().len(), 4);
     assert_eq!(f["captureCases"].as_array().unwrap().len(), 4);
+    faction_purchase(&f);
 }
 
 #[test]

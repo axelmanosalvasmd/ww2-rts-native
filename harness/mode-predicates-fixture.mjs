@@ -29,7 +29,7 @@ registerHooks({ load(url, context, next) {
   const loaded = next(url, context);
   if (url !== pathToFileURL(`${reference}/shared/sim.js`).href) return loaded;
   // Append exports and an unchanged source statement block. No function body is replaced.
-  return { ...loaded, source: `${String(loaded.source)}\nexport { updateVision as __modeVision, rebuildGrid as __modeGrid };\nexport function __modeCapture(g, list, dt) {\n${capture}}\n` };
+  return { ...loaded, source: `${String(loaded.source)}\nexport { updateVision as __modeVision, rebuildGrid as __modeGrid, stepLab as __modeLab };\nexport function __modeCapture(g, list, dt) {\n${capture}}\n` };
 } });
 const sim = await import(pathToFileURL(`${reference}/shared/sim.js`));
 const scenarios = await import(pathToFileURL(`${reference}/shared/scenarios.js`));
@@ -43,14 +43,14 @@ const bits = n => { const b = Buffer.alloc(8); b.writeDoubleBE(n); return b.toSt
 const encode = v => typeof v === 'number' ? bits(v) : Array.isArray(v) ? v.map(encode) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, encode(x)])) : v;
 const map = { name: 'Mode predicate components', w: 64, h: 64, rows: Array(64).fill('.'.repeat(64)), spawns: [{ x: 8, y: 8 }, { x: 20, y: 8 }, { x: 53, y: 53 }, { x: 53, y: 8 }], points: [{ x: 32, y: 32 }] };
 const roster = [2, 5, 2, 5];
-function make(authored = map, teams = roster, mode = 'conquest', defender = 5) {
+function make(authored = map, teams = roster, mode = 'conquest', defender = 5, factions = teams.map((_, i) => i % 4)) {
   assert.equal(sim.validateMap(authored), null);
   const old = Math.random;
   let g;
   // Explicit constructor input, not a claim of shared native/Source random streams.
   Math.random = () => 0.5;
   try {
-    g = sim.createGame(authored, teams.map((_, i) => `P${i}`), false, teams, teams.map((_, i) => i % 4), { mode, defenderTeam: defender, army: 'standard', weather: 'clear', weatherSeed: 31, tech: true, supply: false, logistics: false, sandbox: false });
+    g = sim.createGame(authored, teams.map((_, i) => `P${i}`), false, teams, factions, { mode, defenderTeam: defender, army: 'standard', weather: 'clear', weatherSeed: 31, tech: true, supply: false, logistics: false, sandbox: false });
   } finally { Math.random = old; }
   for (const u of g.units.values()) { u.holdPos = true; u.holdFire = true; }
   return g;
@@ -88,6 +88,45 @@ sim.command(consumers, 0, { t: 'attack', ids: [own.id], target: ally.id });
 assert.equal(own.attackId, 0);
 assert.deepEqual(anchors(consumers), consumerAnchors);
 const allianceConsumers = { shooter: own.id, ally: ally.id, expected: encode({ visible: consumers.players.map(p => [...p.visible].sort((a, b) => a - b)), recipients: recipients(consumers), attackId: own.attackId }) };
+// A declared finished producer uses original canonical placement, not the test.js
+// helper's temporary factory. Purchase and research still use real command admission.
+const factionInput = { factions: [0, 1, 1, 2], slot: 2, cell: 42 * map.w + 40, mp: 5000, researchSeconds: [60, 90] };
+const purchaseGame = make(map, roster, 'conquest', 5, factionInput.factions);
+const purchaseAnchors = anchors(purchaseGame), constructorIds = new Set(purchaseAnchors.map(u => u[0]));
+assert.equal(purchaseGame.players[2].faction, 1, 'factions per player, not slot');
+const factoryCells = Array.from({ length: 9 }, (_, i) => factionInput.cell + Math.floor(i / 3) * map.w + i % 3);
+assert(factoryCells.every(c => purchaseGame.chars[c] === '.'));
+assert([...purchaseGame.units.values()].every(u => Math.hypot(u.x - 83, u.z - 87) > 6));
+const factory = sim.internals.placeBuilding(purchaseGame, factionInput.slot, 'motorpool', factionInput.cell, true);
+assert(factory.id > 0 && !constructorIds.has(factory.id));
+assert.deepEqual(factory.cells, factoryCells);
+const producerProjection = () => {
+  const structure = purchaseGame.structures.get(factory.structureId);
+  assert(structure && structure.entityId === factory.id);
+  assert(factory.cells.every(c => purchaseGame.buildingCells.get(c)?.id === factory.id && purchaseGame.structuralCells.get(c)?.structureId === factory.structureId));
+  return { id: factory.id, owner: factory.owner, type: factory.type, x: factory.x, z: factory.z, cells: factory.cells, built: factory.built, hp: factory.hp, queue: factory.queue, jobs: factory.productionJobs, progress: factory.prog, rally: factory.rally, structure: { id: structure.id, entityId: structure.entityId, cells: structure.sections.map(s => s.c), sections: structure.sections.map(s => s.id) } };
+};
+const producer = structuredClone(producerProjection());
+const purchaser = purchaseGame.players[factionInput.slot];
+purchaser.mp = factionInput.mp;
+for (const [i, seconds] of factionInput.researchSeconds.entries()) {
+  assert.equal(sim.command(purchaseGame, factionInput.slot, { t: 'tech', kind: 'tier' }), undefined);
+  assert.equal(purchaser.lab.length, 1);
+  sim.__modeLab(purchaseGame, purchaser, seconds);
+  assert.equal(purchaser.tier, i + 2);
+  assert.equal(purchaser.lab.length, 0);
+}
+const beforeIds = new Set(purchaseGame.units.keys()), beforeMp = purchaser.mp;
+assert.equal(sim.command(purchaseGame, factionInput.slot, { t: 'buy', unit: 'tiger', from: factory.id }), undefined);
+const purchased = [...purchaseGame.units.values()].filter(u => !beforeIds.has(u.id));
+assert.equal(purchased.length, 1);
+assert.equal(purchased[0].type, 'tiger', 'actual purchase uses player faction, not slot');
+assert.equal(purchased[0].owner, factionInput.slot);
+assert(purchaser.mp < beforeMp);
+assert.deepEqual(producerProjection(), producer);
+assert.deepEqual(anchors(purchaseGame).filter(u => constructorIds.has(u[0])), purchaseAnchors);
+const factionPurchase = { ...factionInput, expected: encode({ factions: purchaseGame.players.map(p => p.faction), tier: purchaser.tier, beforeMp, afterMp: purchaser.mp, purchased: purchased.map(u => [u.id, u.type, u.owner]), countBefore: beforeIds.size, countAfter: purchaseGame.units.size, producer }) };
+
 const captureCases = [];
 for (const input of [
   { name: 'allies-first-slot', owners: [0, 2], owner: -1, capper: 0, progress: 1 - 1 / 160 },
@@ -212,8 +251,8 @@ for (const finishTick of [1, 199, 200, 201]) {
   finishCases.push({ name: `actual-vp-tick-${finishTick}`, finishTick, unfinished, expected });
 }
 clean();
-const fixture = { format: 1, reference: pin, node: process.version, arch: process.arch, kind: 'isolated-components-not-whole-match', source: { captureBlockSha256: hash(capture), seatsExpressionSha256: hash(seats) }, map, roster, seed: 3936341, alliance, allianceConsumers, captureCases, teamVictory, maps, spawnCases, spawnConstructors, minimumCases, normalizationCases, legacyCases, legacyTrace, finishCases };
+const fixture = { format: 1, reference: pin, node: process.version, arch: process.arch, kind: 'isolated-components-not-whole-match', source: { captureBlockSha256: hash(capture), seatsExpressionSha256: hash(seats) }, map, roster, seed: 3936341, alliance, allianceConsumers, factionPurchase, captureCases, teamVictory, maps, spawnCases, spawnConstructors, minimumCases, normalizationCases, legacyCases, legacyTrace, finishCases };
 const output = `${JSON.stringify(fixture)}\n`;
 const path = `${root}/rust/crates/simtest/tests/fixtures/mode-predicates.json`;
 if (process.argv.includes('--check')) assert.equal(readFileSync(path, 'utf8'), output); else writeFileSync(path, output);
-console.log(`MODE predicates: alliance=${alliance.length}, consumers=1, captures=${captureCases.length}, alliedVictory=1, spawnFiltersAndCapacities=${spawnCases.length}, spawnConstructors=${spawnConstructors.length}, minimum=${minimumCases.length}, normalizations=${normalizationCases.length}, migrations=${legacyCases.length}, finishes=${finishCases.length}`);
+console.log(`MODE predicates: alliance=${alliance.length}, consumers=1, factionPurchases=1, captures=${captureCases.length}, alliedVictory=1, spawnFiltersAndCapacities=${spawnCases.length}, spawnConstructors=${spawnConstructors.length}, minimum=${minimumCases.length}, normalizations=${normalizationCases.length}, migrations=${legacyCases.length}, finishes=${finishCases.length}`);
