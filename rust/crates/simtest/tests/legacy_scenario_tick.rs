@@ -1,7 +1,5 @@
 //! Actual ordinary caller replays of the five authored legacy-trigger maps.
-#[path = "common/aviation.rs"]
-#[allow(dead_code)]
-mod comparisons;
+use crate::shared::aviation as comparisons;
 use comparisons::assert_json;
 use flate2::read::GzDecoder;
 use serde_json::{Value, json};

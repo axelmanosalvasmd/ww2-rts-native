@@ -1,4 +1,3 @@
-#![recursion_limit = "256"]
 //! Original support/aircraft component calls, with persistent canonical native owners.
 //! This does not run or certify a complete Match tick. SourceRest remains in the oracle.
 //! The source-only random draw counter is retained; the actual OffMap state is compared.

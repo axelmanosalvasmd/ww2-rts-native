@@ -1,3 +1,4 @@
+use crate::shared::world_scene;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use ww2_core::{
@@ -7,8 +8,6 @@ use ww2_core::{
     match_story::{PlayerStory, StoryKey},
     match_world_phases::WorldIncomeUnit,
 };
-#[path = "common/world_scene.rs"]
-mod world_scene;
 
 fn fixture() -> Value {
     serde_json::from_str(include_str!("fixtures/world-epilogue.json")).unwrap()

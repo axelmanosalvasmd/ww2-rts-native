@@ -204,18 +204,6 @@ The separate ability/recovery assembly adds ordinary timers/autocast/aimed execu
 
 The component does not schedule phases, disable supply by mode, apply capture story events, add income or decide a winner. Match wiring and territory refill networks remain incomplete. The affected rows stay in progress; see `DESIGN.md` for the exact capture-circle, supply-square and seed behavior.
 
-## Shared Conquest capture, score and terminal batch
-
-`harness/conquest-mode-batch-fixture.mjs` executes pinned e4e579a capture, point/income, periodic-sample and victory statements, plus original `sim.step` for the actual scoring and terminal traces. One fixture and `conquest_capture_score_and_terminal_rules_match_pinned_source` replay those checks in Rust. This is component evidence under the existing parity rule, not a whole-match differential criterion or an agreed outcome tolerance.
-
-The batch covers five existing rows. MODE-23, MODE-25 and MODE-88 are `ported`: 16 capture cases compare 500 checkpoints, with six pure goal vectors and nine canonical score/victory checkpoints. The actual 420-tick trace captures with a real owned rifle, pauses its VP and MP for 200 away ticks, then resumes both over 40 ticks. The 220-tick terminal trace retires a real rifle after the winner, refuses commands, and keeps the first result, story and timeline fixed across tick 200. Source and Rust compare the entire declared component projection at each checkpoint. The Source wording for MODE-23 now correctly limits contesting to qualifying non-allied infantry; vehicles do not contest.
-
-The primary canonical setup retains the approved two-opposing-seat Conquest/Standard profile, supply/tech/living weather true, physical logistics false, weather seed None and sandbox off. No actors are stripped. Phase isolation moves only nonstructure actors, preserving canonical building anchors/footprints; the actual scoring trace moves only its real rifle. Forced-reserve capture eligibility is a separate pure ObjectiveUnit input, not physical logistics enabled in the canonical match. All unsupported runtime guards remain.
-
-MODE-26 and MODE-27 stay `in progress`: the six pure goal vectors do not establish canonical 2v2 Match goal integration, and two opposing seats do not establish allied-player team-sum victory. MODE-87/90/91/93/95 and all ten R1 deviation rows retain their statuses. No server disconnect propagation, other mode, full match, new wire/header/ABI, client acceptance or whole-match outcome equivalence is claimed.
-
-The final recorder regenerates its fixture byte for byte with `--check`; the focused native batch passes once with zero failures or ignored/filtered tests on the Vostro. The first recorder attempt failed before fixture production or Cargo because a Source trailing comment consumed a new wrapper brace; its raw source/logs are preserved, and Root verified the newline correction. The earlier successful 220-tick source cycle remains separately attributed. Full workspace/release and separate actual-head review are required before readiness; fresh hosted checks and the applicable owner acknowledgment remain merge gates.
-
 ## Existing limitations
 
 - **Tutorial has no fail state.** Only finishing step 9 ends it; a player who loses every unit stays in a running match. `shared/tutorial.js:109-117`, `shared/sim.js:5770`.
