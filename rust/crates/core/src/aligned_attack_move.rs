@@ -797,3 +797,6 @@ fn attack_move_and_plain_move_match_with_complete_branches() {
         "diagnostic comparison or complete branch failed; raw report retained, no parity eligibility"
     );
 }
+
+#[path = "aligned_stances.rs"]
+mod stances;

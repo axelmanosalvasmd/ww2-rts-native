@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Add a separate test-only CMB-83 stance diagnostic using genuine constructor actors, ordinary JSON commands, malformed/foreign dispositions and actual recipient flags. Author nearby cover and staged natural fire to check Hold Position, Hold Fire on/off and explicit-attack override; toggle all three boolean keys and autocast through commands. Keep proposed defaults pending, old evidence intact and rows held. Execution pending.
+
 - Record diagnostic-only attack-move and plain-Move results at 10feb6aa: each matches all 4,800 ticks and 481/481 checkpoints with equal consumed-input receipts and complete actual branches. Raw strict and approved currency-only remain 0/481 at tick-0 holdFire absence versus false. Two focused checks, formatting and fresh strict core/simtest Clippy pass. Boolean-default owner approval remains pending; no row eligibility or Source rerun.
 
 - Format the frozen diagnostic registry/report changes after preserving the first formatting diff. No comparison predicate, registry evidence, input, projection or engine behavior changes; diagnostic results remain pending.

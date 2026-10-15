@@ -1,5 +1,13 @@
 # Three Crossroads Native: design decisions
 
+## Targeted CMB-83 stance diagnostic (2026-10-15)
+
+Create a separate private child of `68bd3ba2`, preserving the full `10feb6aa` diagnostic and original first failure/Source/OOM artifacts. The literal row includes strict stance-key and boolean validation, own-unit selection and owner-only bits 2048/4096/8192/16384. Pinned test.js1227-1246 additionally checks suppressed fire, explicit attack while holding fire and switching off. Its synthetic fresh/put/HP setup is not reused. Actual constructor autoRetreat starts true at sim.js1789, unlike that check's older all-switches-off comment; record actual values without forcing them.
+
+[The authored scene and provider plan](docs/testing/aligned-stances.md) uses only genuine construction, an explicit terrain/layout input, shared finite random inputs and scripted ordinary commands. Native JSON decode and ordinary execute_command run at the same pre-tick boundary as Source command; decoder failures retain their actual denial rather than fabricating a typed malformed command. Per-command input/disposition plus before/after actual recipient flags are compared. SnapshotCache/recipient supplies native flags; original snapshotFor direct/cached supplies Source flags. These are existing internal providers, not network or ABI proof.
+
+Reuse the complete attack-move raw unit/movement/combat projection without changing its body, plus actual command receipts and recipient id/owner/full flags. A nested test module can borrow the private existing helpers. No runtime hook, provider/getter, engine, RNG, pin or old fixture change. Keep raw strict, approved four-currency-only and DIAGNOSTIC_PROPOSED_DEFAULTS results separate. Only the existing two proposed false defaults apply; the registry is unchanged and no old vector is repeated. Source capture/check, one exact new scenario, formatting and conditional fresh strict Clippy require the frozen head and granted S1 caps. Stop and retain the first genuine Source/provider/compiler/behavior/comparison failure. No row promotion or publication while owner approval remains pending.
+
 ## Proposed-default diagnostic mode and bounded report memory (2026-10-15)
 
 ### Actual diagnostic execution and retained strict results
