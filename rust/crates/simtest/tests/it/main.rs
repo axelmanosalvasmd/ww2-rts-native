@@ -45,6 +45,8 @@ mod ground_orders;
 mod ground_support_tick;
 #[path = "../legacy_scenario_tick.rs"]
 mod legacy_scenario_tick;
+#[path = "../mode_predicates.rs"]
+mod mode_predicates;
 #[path = "../mass_project_tick.rs"]
 mod mass_project_tick;
 #[path = "../match_aircraft_runner.rs"]
