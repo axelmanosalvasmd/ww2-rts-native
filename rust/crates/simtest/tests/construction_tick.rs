@@ -903,3 +903,6 @@ fn original_paid_construction_replays_full_match_ticks() {
     }
     assert_eq!((actions, steps, snapshots), (113, 1919, 2013));
 }
+
+#[path = "construction_tick/base_selected.rs"]
+mod base_selected;
