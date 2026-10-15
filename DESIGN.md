@@ -2,6 +2,8 @@
 
 ## First five NET network components on current main (2026-10-15)
 
+The authorized S1 formatter check on `0210274f` reported layout differences only. Apply its formatter output in a mechanical child; removing whitespace from the before/after test module produces identical bytes. The focused tests run only after that child is committed.
+
 This publication branch starts at current main7c9df2d5 and preserves its complete test-observer265 tree. It selects six real WebSocket functions for candidate rowsNET19/22/23/24/30. The test transport/clock helpers are exactde30e9a1 bytes; production builds exclude the optional clock seam and existing test constructors selectNone. Ordinary HTTP upgrade, socket pump, Hub consumers, close handling and maintenance owners are unchanged. No Source fixture, expected game state, RNG, runtime policy, public schema or ABI changes.
 
 The selected NET19 function is exactde30e9a1, where its affected exact test passes once (1PASS/0FAIL/64filtered), fmt passes and strict locked ci-test core/server all-target Clippy passes. NET24's complete135case capacity matrix and NET30's complete selected connected-human/kick component retain their9aa846d5 passes. They are not rerun or relabeled fresh on this source. The three appended team allocation, AI factory and host-recomputation functions are exact546558ac source and remain uncompiled/unrun here. Root's new scoped grant and whole-component review remain before status changes.

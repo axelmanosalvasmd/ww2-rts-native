@@ -211,21 +211,32 @@ async fn net22_websocket_lowest_unused_team_is_independent_of_seat_and_faction_c
         let (mut ana, _) = rig.join("Defaults", "ana", "Ana", false);
         let (ben, _) = rig.join("Defaults", "ben", "Ben", false);
         let (cy, initial) = rig.join("Defaults", "cy", "Cy", false);
-        let defaults: Vec<_> = initial["players"].as_array().unwrap().iter()
-            .map(|p| (p["team"].as_u64().unwrap(), p["faction"].as_u64().unwrap())).collect();
+        let defaults: Vec<_> = initial["players"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|p| (p["team"].as_u64().unwrap(), p["faction"].as_u64().unwrap()))
+            .collect();
         assert_eq!(defaults, vec![(0, 0), (1, 1), (2, 2)]);
         ana.send(json!({"t":"team","slot":0,"v":4}));
         ana.until(|m| m["t"] == "lobby" && m["players"][0]["team"] == 4);
         let (dana, lobby) = rig.join("Defaults", "dana", "Dana", false);
-        assert_eq!(lobby["players"][3]["team"], 0, "lowest unused team, not seat index3");
+        assert_eq!(
+            lobby["players"][3]["team"], 0,
+            "lowest unused team, not seat index3"
+        );
         assert_eq!(lobby["players"][3]["faction"], 0, "seat count modulo3");
         drop(ben);
         ana.until(|m| m["t"] == "lobby" && m["players"][1]["connected"] == false);
         ana.send(json!({"t":"kick","slot":1}));
         ana.until(|m| m["t"] == "lobby" && m["players"].as_array().unwrap().len() == 3);
         let (eli, lobby) = rig.join("Defaults", "eli", "Eli", false);
-        let defaults: Vec<_> = lobby["players"].as_array().unwrap().iter()
-            .map(|p| (p["team"].as_u64().unwrap(), p["faction"].as_u64().unwrap())).collect();
+        let defaults: Vec<_> = lobby["players"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|p| (p["team"].as_u64().unwrap(), p["faction"].as_u64().unwrap()))
+            .collect();
         assert_eq!(defaults, vec![(4, 0), (2, 2), (0, 0), (1, 0)]);
         drop((cy, dana, eli));
     })
@@ -239,7 +250,8 @@ async fn net23_websocket_ai_numbering_and_defaults_follow_actual_remaining_ai() 
         let (guest, _) = rig.join("AiDefaults", "guest", "Guest", false);
         for (count, name) in [(3, "AI 1"), (4, "AI 2")] {
             host.send(json!({"t":"addAi"}));
-            let lobby = host.until(|m| m["t"] == "lobby" && m["players"].as_array().unwrap().len() == count);
+            let lobby = host
+                .until(|m| m["t"] == "lobby" && m["players"].as_array().unwrap().len() == count);
             let ai = &lobby["players"][count - 1];
             assert_eq!(ai["name"], name);
             assert_eq!(ai["level"], "normal");
@@ -254,12 +266,23 @@ async fn net23_websocket_ai_numbering_and_defaults_follow_actual_remaining_ai() 
         let lobby = host.lobby();
         assert_eq!(lobby["players"][2]["name"], "AI 2");
         assert_eq!(lobby["players"][2]["level"], "hard");
-        assert_eq!(lobby["players"][3]["name"], "AI 2", "n counts current AI, not a global counter");
+        assert_eq!(
+            lobby["players"][3]["name"], "AI 2",
+            "n counts current AI, not a global counter"
+        );
         assert_eq!(lobby["players"][3]["level"], "normal");
         rig.read(|hub| {
             let room = &hub.rooms["AiDefaults"];
-            assert!(room.players[2..].iter().all(|p| p.ai && p.token.is_empty() && p.connection.is_none()));
-            assert!(room.players[..2].iter().all(|p| !p.ai && p.connection.is_some()));
+            assert!(
+                room.players[2..]
+                    .iter()
+                    .all(|p| p.ai && p.token.is_empty() && p.connection.is_none())
+            );
+            assert!(
+                room.players[..2]
+                    .iter()
+                    .all(|p| !p.ai && p.connection.is_some())
+            );
         });
         drop(guest);
     })
@@ -388,10 +411,14 @@ async fn net30_websocket_host_recomputes_across_humans_offline_fallback_and_watc
         assert_eq!(lobby["amHost"], true);
         drop(ben);
         let lobby = fern.until(|m| m["t"] == "lobby" && m["players"][1]["connected"] == false);
-        assert_eq!(lobby["host"], 0, "first offline human remains ahead of watchers");
+        assert_eq!(
+            lobby["host"], 0,
+            "first offline human remains ahead of watchers"
+        );
         assert_eq!(lobby["amHost"], false);
         rig.poll(10_000);
-        let lobby = fern.until(|m| m["t"] == "lobby" && m["players"].as_array().unwrap().len() == 1);
+        let lobby =
+            fern.until(|m| m["t"] == "lobby" && m["players"].as_array().unwrap().len() == 1);
         assert_eq!(lobby["host"], -1);
         assert_eq!(lobby["amHost"], true);
         let lobby = gus.until(|m| m["t"] == "lobby" && m["players"].as_array().unwrap().len() == 1);
@@ -404,11 +431,11 @@ async fn net30_websocket_host_recomputes_across_humans_offline_fallback_and_watc
         assert_eq!(lobby["players"].as_array().unwrap().len(), 2);
         assert_eq!(lobby["amHost"], true);
         drop(fern);
-        let lobby = gus.until(|m| m["t"] == "lobby" && m["spectators"].as_array().unwrap().len() == 1);
+        let lobby =
+            gus.until(|m| m["t"] == "lobby" && m["spectators"].as_array().unwrap().len() == 1);
         assert_eq!(lobby["amHost"], true);
         gus.send(json!({"t":"addAi"}));
         assert_eq!(gus.lobby()["players"].as_array().unwrap().len(), 3);
     })
     .await;
 }
-
