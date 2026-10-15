@@ -2,15 +2,15 @@
 
 Base: `91c1d4453b8ba74b511bb950b5c651f36398f78b`, branch `test/mov-vehicle-predicates-0e8d6d9b`. Source: `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. The recovered checkout had no tracked or untracked dirty draft. Its reference submodule was initially absent and is now initialized at the unchanged pin.
 
-This batch targets five existing selected row checks. The original source-only checkpoint was `66f65c03bc6fb546c0cd933de1b52426f8bb18d8`. Its ordinary merge of exact main `90ce32f59508a1c991397aa6d0bb7b562b19c695` is `3f4f46461ca00d89f6cc5666018f3c0b96db2d4e`, with those two ordered parents. The incoming consolidated test layout is retained, with the same consumer registered in `rust/crates/simtest/tests/it/main.rs`. No helper import adaptation was needed. Source generation and a byte-equal regeneration check pass inside Root's S1 scope. Frozen `1ac386e6a03b299d7ddd123bcb348911dd3fd134` compiled and reached its first native comparison failure, retained below. The comparison-only successor awaits its own focused run. No row is promoted.
+Five complete selected row checks pass at frozen `1cc0995ffe70eb7805885212706939b2bd7e8b2b`: MOV-16, MOV-17, MOV-18, MOV-19 and MOV-22. The original source-only checkpoint was `66f65c03bc6fb546c0cd933de1b52426f8bb18d8`. Its ordinary merge of exact main `90ce32f59508a1c991397aa6d0bb7b562b19c695` is `3f4f46461ca00d89f6cc5666018f3c0b96db2d4e`, with those two ordered parents. The incoming consolidated test layout is retained, with the same consumer registered in `rust/crates/simtest/tests/it/main.rs`. No helper import adaptation was needed. Source generation and byte-equal regeneration pass inside Root's S1 scope. The first failure at frozen `1ac386e6` remains retained below. Row statuses remain unchanged for Root's heavy-queue integration.
 
 ## Selected batch
 
-The recorder imports the original `runMovementCase` and `createMovementCase` through the original runner. It selects seven complete journeys across the original eleven lab types: tank, medium, tankdestroyer, tiger, churchill, armoredcar, halftrack, flaktrack, rocket, rifle and AT gun. Source generation and regeneration pass 77 complete journeys, one engine acceleration/Stop sequence, 74,970 actual Source steps and six diagonal component checks. These are Source results; complete native row checks remain pending.
+The recorder imports the original `runMovementCase` and `createMovementCase` through the original runner. It selects seven complete journeys across the original eleven lab types: tank, medium, tankdestroyer, tiger, churchill, armoredcar, halftrack, flaktrack, rocket, rifle and AT gun. Source generation and regeneration pass 77 complete journeys, one engine acceleration/Stop sequence, 74,970 actual Source steps and six diagonal component checks. The focused native test passes the entire packet, including 3,978 exact movement checkpoints, 113 accepted recorded commands and all six diagonal checks.
 
 All Source paths below are relative to `reference/ww2-rts` at the pin. The acceptance cells in `movement.md` are unchanged.
 
-| Row | Complete selected predicates prepared | Exact Source evidence |
+| Row | Complete selected predicates passing in focus | Exact Source evidence |
 |---|---|---|
 | MOV-16 | All eleven types finish `clearance` and `corner`; every driven hull stays clear; no stationary spin exceeds the original limit. | `test-movement-lab.js:28-31`; `tools/movement-lab-scenarios.js:2-29`; `tools/movement-lab-runner.js:31-62` |
 | MOV-17 | All eleven types finish the `cliff` journey without a trajectory height violation. All three selected diagonal height layouts fail in both directions. | `test-movement-lab.js:28-31,57-60`; independent trajectory reader `tools/movement-lab-runner.js:4-21,47,59`; solver `shared/vehicle-motion.js:58-80` |
@@ -60,7 +60,27 @@ The first focused run at frozen `1ac386e6a03b299d7ddd123bcb348911dd3fd134` compi
 
 The Source row producer rounds double values (`shared/sim.js:5876-5891`); native `recipient_snapshot.rs:210-211,359-382` produces the same rounded doubles. JavaScript JSON writes integral Number values without a fractional suffix. The new consumer's `delivered_bits` comparison therefore retains the exact row count, five-column shape, integer actor identity and all four measured f64 bit patterns. It changes only the comparison of represented unit rows. Every original movement, braking, arrival, admission, plan and diagonal assertion remains. Source recorder and fixture bytes are unchanged. The corrected consumer SHA256 is `ecb4f21dc3bca5388a7d4ccb943dcb14f3536229bfcdbc0386a6a578065cfaaf`.
 
-The failed run's peak memory is 1,956,352,000 bytes, with all memory event counters zero and the scope inactive afterward. Original log: `harness/out/mov-s1/04-focus-1ac386e6.log`, SHA256 `21a01dd77f957605c6903a42895756b6df0ad63ee32f38cd211c1766897c17ab`. It is retained without rewriting or retrying that head. Independent read-only review confirms the new comparison preserves every selected numeric predicate; native retry remains pending until the successor is frozen.
+The failed run's peak memory is 1,956,352,000 bytes, with all memory event counters zero and the scope inactive afterward. Original log: `harness/out/mov-s1/04-focus-1ac386e6.log`, SHA256 `21a01dd77f957605c6903a42895756b6df0ad63ee32f38cd211c1766897c17ab`. It is retained without rewriting or retrying that head. Independent read-only review confirms the new comparison preserves every selected numeric predicate. The successor was frozen and recorded before its own Cargo invocation.
+
+### Passing successor and heavy-queue handoff
+
+Frozen `1cc0995ffe70eb7805885212706939b2bd7e8b2b` passes the sole selected nextest test: one passed, zero failed, 162 other simtest tests skipped. It executes all 78 cases through real native tick admission, the full engine recipient-row/plan sequence and the exact six diagonal checks. Source seed is 7301; the packet retains 74,970 full step inputs, 3,978 sampled movement checkpoints and 113 accepted commands. Compilation takes 35.12 seconds and the focused test takes 6.686 seconds on the Vostro. These are execution records, not a movement benchmark or whole-match comparison.
+
+The successful S1 run peaks at 1,884,160,000 bytes. All memory event counters remain zero, actual affinity is CPUs 0-3 and the transient scope is inactive afterward. Success log: `harness/out/mov-s1/07-focus-1cc0995f.log`, SHA256 `0c1bb03190377ac06d87eb6891aba03127fed20d2d33d3a391038b124953cbcd`. The numeric-comparison source review is `harness/out/mov-s1/08-comparison-source-review.md`, SHA256 `6a65320617dd5a1d6904769bce61267f00549b22f185c166d7e96e3d69d2f689`. Source/test/fixture bytes remain frozen; subsequent evidence-only notes do not constitute another execution.
+
+The batch is ready for Root's new-fixture heavy queue. No full-workspace, release or standalone list job ran. MOV-15, MOV-20 and MOV-21 remain held; no runtime, constructor, routing or terrain guard was weakened or removed. No row status is promoted before Root completes the remaining integration gates.
+
+Post-focus independent source review verified the retained passing-log hash, packet counts and unchanged recorder/consumer/fixture/registration bytes against tested 1cc0995f. It found no final blocker or omitted selected predicate. The review ran no jobs. The final evidence-only successor changes this report, the five owned Evidence cells and the unique fragment; it carries the tested code rather than claiming another execution.
+
+Owned paths relative to exact main 90ce32f5 are:
+
+- `harness/mov-vehicle-predicates-fixture.mjs`
+- `rust/crates/simtest/tests/mov_vehicle_predicates.rs`
+- `rust/crates/simtest/tests/fixtures/mov-vehicle-predicates.json`
+- `rust/crates/simtest/tests/it/main.rs` (two registration lines)
+- `docs/parity/movement.md` (only five owned Evidence cells)
+- `docs/parity/mov-vehicle-predicates.md`
+- `changelog.d/2026-10-15-mov-vehicle-selected-predicates.md`
 
 Read-only source review found and corrected an initial false assumption that Conquest startup had no base footprints. `Match::new` actually stamps bases (`match_runtime.rs:627-632,713-715,901-955`) and retained production rows require their actors (`match_production.rs:137-157`). The draft now retains those complete constructor bindings on both sides. This correction was made before any Source or native job; no failed execution is represented as a pass.
 
