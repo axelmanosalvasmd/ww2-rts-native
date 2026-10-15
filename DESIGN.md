@@ -1,5 +1,9 @@
 # Three Crossroads Native: design decisions
 
+## Mechanical MOV-12/13 consumer formatting (2026-10-15)
+
+The first guarded fmt check on authentic fixture child `19d728ce` reports formatting only in mov_corner.rs and mov_border_rays.rs. The explicitly allowed formatter exits0 and changes only those two files: layout, import ordering, closure grouping and trailing commas. Inspection preserves every assertion, literal, Source input, fixture and runtime path. Freeze this mechanical child before the exact eight native instances; old failures and all row statuses remain unchanged.
+
 ## Authentic MOV-12 and MOV-13 capture freeze (2026-10-15)
 
 After applying only Root's reviewed weather Number patch, clean `9102d79403a1caa4c7e48e6af6020bba31037342` runs exactly four Source commands under the S2 grant. Corner generation/check and border-ray generation/check each exit0, with both checks comparing exact gzip bytes. The complete original corner callback and retained-constructor companion each run61 ticks; the original border callback records244 queries. Full original constructor/action observations and native-independent companion inputs remain in the authentic fixtures. Freeze those two files before Cargo.
