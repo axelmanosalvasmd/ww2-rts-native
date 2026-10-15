@@ -127,7 +127,7 @@ TEXT("ardennes-crossing"), TEXT("bastogne"), TEXT("bocage"), TEXT("crater-field"
 	L.ApplyLobby(*Offline); TestTrue(TEXT("097 offline seat does not block start"), L.StartAllowed());
 	L.ApplyLobby(*Base);
 	for (const TPair<FString, FString>& Pair : TArray<TPair<FString, FString>>{
-		{ TEXT("addAi"), TEXT("Rust host: no AI commanders.") }, { TEXT("spectate"), TEXT("Rust host: no spectators.") }, { TEXT("fps"), TEXT("Rust host: no operatives.") } })
+		{ TEXT("addAi"), TEXT("Rust host: no AI commanders.") }, { TEXT("handAi"), TEXT("Rust host: no AI commanders.") }, { TEXT("spectate"), TEXT("Rust host: no spectators.") }, { TEXT("fps"), TEXT("Rust host: no operatives.") } })
 	{
 		const auto C = MakeShared<FJsonObject>(); C->SetStringField(TEXT("t"), Pair.Key);
 		TestEqual(TEXT("raw command refusal matches UI"), L.RustCommandRefusal(*C), Pair.Value);
@@ -164,7 +164,7 @@ bool FTCReferenceMatrixUnchangedTest::RunTest(const FString&)
 	O->SetBoolField(TEXT("sandbox"), true); O->SetBoolField(TEXT("listed"), true); O->SetStringField(TEXT("army"), TEXT("endless"));
 	O->GetArrayField(TEXT("players"))[1]->AsObject()->SetBoolField(TEXT("ai"), true);
 	L.ApplyLobby(*O); TestTrue(TEXT("reference keeps AI, public, sandbox, Endless combination"), L.StartAllowed());
-	for (const TCHAR* Type : { TEXT("addAi"), TEXT("spectate"), TEXT("sit"), TEXT("fps"), TEXT("start"), TEXT("restart") })
+	for (const TCHAR* Type : { TEXT("addAi"), TEXT("handAi"), TEXT("spectate"), TEXT("sit"), TEXT("fps"), TEXT("start"), TEXT("restart") })
 	{
 		const auto C = MakeShared<FJsonObject>(); C->SetStringField(TEXT("t"), Type);
 		TestEqual(TEXT("reference commands untouched"), L.RustCommandRefusal(*C), FString());

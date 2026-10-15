@@ -5,6 +5,7 @@
 #include "Client/TCLighting.h"
 #include "Client/TCGraphics.h"
 #include "Client/TCPlayerController.h"
+#include "Client/TCGameMode.h"
 #include "GameFramework/HUD.h"
 #include "UnrealClient.h"
 #include "Net/TCMatchState.h"
@@ -35,6 +36,9 @@
 #include "SceneView.h"
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialRelevance.h"
+#include "Materials/Material.h"
+#include "Materials/MaterialRenderProxy.h"
+#include "MaterialShared.h"
 #include "Engine/Texture.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "Components/SkyLightComponent.h"
@@ -53,7 +57,6 @@
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 #if WITH_EDITOR
-#include "Materials/Material.h"
 #include "Materials/MaterialExpressionCollectionParameter.h"
 #include "Materials/MaterialExpressionCustom.h"
 #endif
@@ -260,6 +263,11 @@ FTransform TCFxSections::Transform(const FTCDebrisRow& Row)
 	// The tilt becomes Unreal pitch, then yaw. Roll tumbles about the wrong edge.
 	return FTransform(FRotator(-FMath::RadiansToDegrees(Row.Tilt), FMath::RadiansToDegrees(Row.Dir), 0).Quaternion(),
 		FVector(Row.X, Row.Z, Row.Y) * 100.0, FVector(1.8, 0.2, 2.8));
+}
+
+FLinearColor TCFxLight::Hemisphere(const FLinearColor& ColourTimesIntensity)
+{
+	return ColourTimesIntensity / PI;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
@@ -603,6 +611,7 @@ int32 FTCCombatEffects::Emit(ETCFxPreset Id, const FVector& P, const FVector& V,
 	// fx.js emit: a particle from its preset (field by field as fx.js writes its record); cap(): Low 1600 (Client/TCGraphics.h)
 	if (Live.Num() >= FTCGraphics::Get().Budget().ParticleCap) { Counters.Dropped++; return -1; }
 	const FTCFxPreset& Pr = TCFxPresets::Get(Id);
+	if (Pr.bLit && !Pr.bCover) Size *= FTCGraphics::Get().Budget().LitSmokeScale;
 	FTCFxParticle& X = Live.AddDefaulted_GetRef();
 	X.Preset = Id; X.Look = Pr.Look;
 	X.P = P; X.V = V; X.Age = 0.f; X.Life = FMath::Max(1e-4f, Life);
@@ -1073,7 +1082,8 @@ void FTCCombatEffects::WorldContact(const FTCShot& Sh, const FTCShotExtra& Ex)
 	const double Dir = Ex.bHasDir ? Ex.Dir : FMath::Atan2(Ex.bHasDirection ? Ex.Direction.Z : 0.0, Ex.bHasDirection ? Ex.Direction.X : 1.0);
 	const double Gy = Sh.bHasY ? Sh.Y : Ground(Sh.X, Sh.Z) + 0.6;
 	const double Speed = FMath::Min(3.2, Impulse * 800.0 / TCFxImpl::SectionMass(Material));
-	const int32 Count = bCollapsing ? 9 : 3;
+	const bool bLow = FTCGraphics::Get().IsLow();
+	const int32 Count = bCollapsing ? (bLow ? 5 : 9) : (bLow ? 1 : 3);
 	for (int32 I = 0; I < Count; I++)
 	{
 		const double A = Dir + Rr(-0.65, 0.65), Sp = Speed * Rr(0.65, 1);
@@ -1081,7 +1091,7 @@ void FTCCombatEffects::WorldContact(const FTCShot& Sh, const FTCShotExtra& Ex)
 	}
 	if (bCollapsing)
 	{
-		for (int32 I = 0; I < 4; I++) Emit(ETCFxPreset::Collapse, At(Sh.X + Rr(-0.7, 0.7), Gy, Sh.Z + Rr(-0.7, 0.7)), At(FMath::Cos(Dir) * Speed * 0.3, 0.35, FMath::Sin(Dir) * Speed * 0.3), Rr(0.7, 1.1), Rr(1.5, 2.2));
+		for (int32 I = 0; I < (bLow ? 2 : 4); I++) Emit(ETCFxPreset::Collapse, At(Sh.X + Rr(-0.7, 0.7), Gy, Sh.Z + Rr(-0.7, 0.7)), At(FMath::Cos(Dir) * Speed * 0.3, 0.35, FMath::Sin(Dir) * Speed * 0.3), Rr(0.7, 1.1), Rr(1.5, 2.2));
 		Sound(TEXT("collapse"));
 	}
 }
@@ -2207,6 +2217,13 @@ UInstancedStaticMeshComponent* ATCEffects::Batch(int32 Key, UStaticMesh* Mesh, c
 void ATCEffects::EnsureComponents()
 {
 	if (SpriteBatch || !GetWorld()) return;
+	if (!SectionMaterial) SectionMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Effects/Materials/M_TCFxSection.M_TCFxSection"), nullptr, LOAD_NoWarn);
+#if WITH_EDITOR
+	// UE 5.8 uncooked -game can leave these generated materials on the default fallback under ODSC.
+	// Complete them once at setup, before an arriving collapse can need them. Cooked games use cooked shaders.
+	for (auto* Material : { SectionMaterial.Get(), SpriteMaterial.Get(), CraterMaterial.Get(), RubbleMaterial.Get() })
+		if (Material) Material->GetMaterial()->EnsureIsComplete();
+#endif
 	if (!HasLook() && !bWarnedLook)
 	{
 		bWarnedLook = true;
@@ -2235,10 +2252,7 @@ void ATCEffects::EnsureComponents()
 
 void ATCEffects::UpdateLight()
 {
-	// fx.js light(): the smoke is lit by the world's sun and sky. This scene's sun is read (direction, colour, lux);
-	// the sky and ground fill is the scene's sky light (the material reads its irradiance), or without one the
-	// reference's hemisphere (moods.js 'day') scaled by this sun's strength over the reference's; the glow of fire is
-	// scaled the same way, so the effects sit in whatever exposure the scene uses.
+	// fx.js light(): sun and hemisphere irradiance divided by PI, with unscaled hot sprites.
 	if (!SpriteLight || !GetWorld()) return;
 	const UDirectionalLightComponent* Sun = nullptr;
 	for (TObjectIterator<UDirectionalLightComponent> It; It; ++It)
@@ -2248,25 +2262,31 @@ void ATCEffects::UpdateLight()
 	}
 	FVector SunDir(0.45, 0.3, 0.84); // no sun: about the reference's (42 degrees up)
 	FLinearColor SunCol(1.019f, 0.814f, 0.596f);
-	float K = 1.f;
 	if (Sun)
 	{
 		SunDir = -Sun->GetDirection();
 		FLinearColor E = Sun->GetLightColor() * Sun->Intensity;
 		if (Sun->bUseTemperature) E *= FLinearColor::MakeFromColorTemperature(Sun->Temperature);
 		SunCol = E / PI;
-		K = FMath::Max(0.f, Sun->Intensity) / TCFxImpl::RefSunIntensity;
 	}
 	SpriteLight->SetVectorParameterValue(TEXT("SunDir"), FLinearColor(SunDir.GetSafeNormal()));
 	SpriteLight->SetVectorParameterValue(TEXT("Up"), FLinearColor(0.f, 0.f, 1.f));
 	SpriteLight->SetVectorParameterValue(TEXT("SunCol"), SunCol);
-	SpriteLight->SetVectorParameterValue(TEXT("SkyCol"), FLinearColor(TCFxImpl::RefSky.X * K, TCFxImpl::RefSky.Y * K, TCFxImpl::RefSky.Z * K));
-	SpriteLight->SetVectorParameterValue(TEXT("GroundCol"), FLinearColor(TCFxImpl::RefGround.X * K, TCFxImpl::RefGround.Y * K, TCFxImpl::RefGround.Z * K));
-	SpriteLight->SetScalarParameterValue(TEXT("Glow"), K);
-	// the world's sky light, when there is one, fills the shadows of the smoke as it fills the ground's
-	bool bSky = false;
-	for (TObjectIterator<USkyLightComponent> It; It && !bSky; ++It) bSky = It->GetWorld() == GetWorld() && It->IsRegistered() && It->IsVisible() && It->Intensity > 0.f;
-	SpriteLight->SetScalarParameterValue(TEXT("SkyFromScene"), bSky ? 1.f : 0.f);
+	FLinearColor Top(TCFxImpl::RefSky.X, TCFxImpl::RefSky.Y, TCFxImpl::RefSky.Z, 1.f);
+	FLinearColor Bottom(TCFxImpl::RefGround.X, TCFxImpl::RefGround.Y, TCFxImpl::RefGround.Z, 1.f);
+	// fx.js light() uses only the hemisphere, divided by PI. The engine's sky also contains the PMREM
+	// environment and must not be substituted for it. Read the live mood, including weather, in linear light.
+	if (auto* Collection = LoadObject<UMaterialParameterCollection>(nullptr, TEXT("/Game/Models/Materials/Look/MPC_TCLook.MPC_TCLook")))
+		if (auto* I = GetWorld()->GetParameterCollectionInstance(Collection))
+		{
+			FLinearColor Value;
+			if (I->GetVectorParameterValue(TEXT("HemiTop"), Value)) Top = TCFxLight::Hemisphere(Value);
+			if (I->GetVectorParameterValue(TEXT("HemiBottom"), Value)) Bottom = TCFxLight::Hemisphere(Value);
+		}
+	SpriteLight->SetVectorParameterValue(TEXT("SkyCol"), Top);
+	SpriteLight->SetVectorParameterValue(TEXT("GroundCol"), Bottom);
+	SpriteLight->SetScalarParameterValue(TEXT("Glow"), 1.f); // fx.js hot sprites do not scale with sun intensity
+	SpriteLight->SetScalarParameterValue(TEXT("SkyFromScene"), 0.f);
 }
 
 void ATCEffects::SyncRubble()
@@ -2324,7 +2344,10 @@ void ATCEffects::Tick(float DeltaSeconds)
 	if (Alerts) Alerts->Frame(FPlatformTime::Seconds()); // alerts.js frame and pings.js frame (the alert clock)
 	if (!State || !State->bHasMatch) { if (LastInstances) Reset(); return; }
 	const double Clock = GetWorld()->GetRealTimeSeconds();
-	Fx.Frame(MakeContext(), Clock, DeltaSeconds);
+	// The replay's age-zero image matches the browser's controlled presentation clock. A preceding screenshot
+	// hitch must not advance newly received particles before their first captured draw. Ordinary play is unchanged.
+	const bool bCaptureBirth = !BridgeShotPrefix.IsEmpty() && State->Tick >= 8400 && BridgeCollapse < 0;
+	Fx.Frame(MakeContext(), Clock, bCaptureBirth ? 0.f : DeltaSeconds);
 	DamageFrame(DeltaSeconds);
 	// the sounds of the same shots are chosen and placed by UTCAudio (Client/TCAudio.h, FTCAudioCues: fx.js's own
 	// sound calls with their positions); this list of names is only logged now and then
@@ -2481,6 +2504,7 @@ void ATCEffects::CaptureBridge(double Clock)
 	{
 		bBridgeCaptureRead = true;
 		FParse::Value(FCommandLine::Get(), TEXT("TCBridgeCapture="), BridgeShotPrefix);
+		FParse::Value(FCommandLine::Get(), TEXT("TCBridgeView="), BridgeView);
 	}
 	if (BridgeShotPrefix.IsEmpty() || !State || State->Tick < 8398) return;
 	APlayerController* PC = GetWorld()->GetFirstPlayerController();
@@ -2488,7 +2512,26 @@ void ATCEffects::CaptureBridge(double Clock)
 	if (BridgeSeen < 0)
 	{
 		BridgeSeen = Clock;
-		if (ATCPlayerController* TPC = Cast<ATCPlayerController>(PC)) { TPC->SetViewYawForChecks(-90.f); TPC->EpilogueCamera(FVector2D(119, 98), 70.f); }
+		// Camp meshes normally start from the HUD's world-overlay pass. Keep that geometry when the capture
+		// hides screen panels, so a camp close-up includes the reference pole and cloth.
+		if (BridgeView == TEXT("camp"))
+			if (auto* Match = Cast<ATCGameMode>(GetWorld()->GetAuthGameMode())) Match->Markers.WorldScene(*Match);
+		if (ATCPlayerController* TPC = Cast<ATCPlayerController>(PC))
+		{
+			FVector2D Focus(119, 98); float Distance = 70.f;
+			if (BridgeView == TEXT("camp") && State->Spawns.IsValidIndex(0) && State->Spawns[0].IsSet())
+			{
+				Focus = State->Spawns[0].GetValue(); Distance = 40.f;
+			}
+			else if (BridgeView == TEXT("soldier"))
+			{
+				int32 Lowest = MAX_int32;
+				for (const auto& Pair : State->Units) if (Pair.Value.Type == TEXT("rifle") && Pair.Key < Lowest)
+				{ Lowest = Pair.Key; Focus = FVector2D(Pair.Value.X, Pair.Value.Z); }
+				Distance = 25.f; // the normal reference camera's minimum distance
+			}
+			TPC->SetViewYawForChecks(-90.f); TPC->EpilogueCamera(Focus, Distance);
+		}
 		if (PC->GetHUD()) PC->GetHUD()->bShowHUD = false;
 	}
 	if (State->Tick >= 8400 && BridgeCollapse < 0) BridgeCollapse = Clock;
@@ -2497,11 +2540,46 @@ void ATCEffects::CaptureBridge(double Clock)
 	if (BridgeShot >= 4) return;
 	if (BridgeShot == 0 ? (State->Tick != 8398 || Clock - BridgeSeen < 4) : (BridgeCollapse < 0 || Clock - BridgeCollapse < Times[BridgeShot])) return;
 	const FString File = BridgeShotPrefix + TEXT("-") + Names[BridgeShot] + TEXT(".png");
+	// Evidence must identify the surface the render thread actually draws, including any shader fallback.
+	TMap<FString, UMaterialInterface*> Surfaces;
+	if (SectionMaterial) Surfaces.Add(TEXT("section"), SectionMaterial);
+	if (SpriteLight) Surfaces.Add(TEXT("particles"), SpriteLight);
+	for (TObjectIterator<UInstancedStaticMeshComponent> It; It; ++It)
+	{
+		if (It->GetWorld() != GetWorld() || !It->IsRegistered()) continue;
+		for (int32 I = 0; I < It->GetNumMaterials(); I++) if (auto* Mat = It->GetMaterial(I))
+		{
+			const FString Name = Mat->GetMaterial()->GetName();
+			if (Name.Contains(TEXT("Infantry")) || Name == TEXT("M_TCHQCloth")) Surfaces.FindOrAdd(Name, Mat);
+		}
+	}
+	TArray<FString> SurfaceNames; Surfaces.GetKeys(SurfaceNames); SurfaceNames.Sort();
+	for (const FString& Name : SurfaceNames)
+	{
+		const FMaterialRenderProxy* Proxy = Surfaces[Name]->GetRenderProxy();
+		const auto FeatureLevel = GetWorld()->GetFeatureLevel();
+		ENQUEUE_RENDER_COMMAND(TCBridgeSurface)([Proxy, FeatureLevel, Name](FRHICommandListImmediate&)
+		{
+			const FMaterial* Requested = Proxy->GetMaterialNoFallback(FeatureLevel);
+			const FMaterialRenderProxy* Fallback = nullptr;
+			const FMaterial& Actual = Proxy->GetMaterialWithFallback(FeatureLevel, Fallback);
+			UE_LOG(LogTC, Log, TEXT("lookfx surface: %s requested %s actual %s ready %d"), *Name,
+				Requested ? *Requested->GetFriendlyName() : TEXT("missing"), *Actual.GetFriendlyName(), Requested == &Actual);
+		});
+	}
 	FScreenshotRequest::RequestScreenshot(File, false, false);
 	const FMinimalViewInfo& View = PC->PlayerCameraManager->GetCameraCacheView();
 	UE_LOG(LogTC, Log, TEXT("bridgefx capture: %s tick %d collapse age %.4f, sections %d, sprites %d, camera %s rotation %s fov %.5f"),
 		*File, State->Tick, BridgeCollapse < 0 ? -1.0 : Clock - BridgeCollapse, Fx.Sections().Num(), LastSprites,
 		*View.Location.ToString(), *View.Rotation.ToString(), View.FOV);
+	if (const auto* TPC = Cast<ATCPlayerController>(PC))
+		UE_LOG(LogTC, Log, TEXT("lookfx framing: focus %.6f %.6f distance %.6f"), TPC->ViewFocus().X, TPC->ViewFocus().Y, TPC->ViewDistance());
+	if (!Fx.Particles().IsEmpty())
+	{
+		float MinAge = MAX_flt, MaxAge = -MAX_flt;
+		for (const FTCFxParticle& P : Fx.Particles()) { MinAge = FMath::Min(MinAge, P.Age); MaxAge = FMath::Max(MaxAge, P.Age); }
+		UE_LOG(LogTC, Log, TEXT("lookfx particle ages: %.6f %.6f"), MinAge, MaxAge);
+	}
 	BridgeShot++;
 }
 
@@ -3029,6 +3107,55 @@ namespace TCFxTest
 		return FString::Printf(TEXT(R"({"t":"s","tick":%d,"units":[%s],"points":[]%s%s})"), Tick, *FString::Join(Units, TEXT(",")), Extra.IsEmpty() ? TEXT("") : TEXT(","), *Extra);
 	}
 	int32 CountLook(const FTCCombatEffects& Fx, ETCFxLook L) { int32 N = 0; for (const FTCFxParticle& P : Fx.Particles()) N += P.Look == L; return N; }
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCEffectsCollapseLookTest, "ThreeCrossroads.Effects.CollapseLook", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+bool FTCEffectsCollapseLookTest::RunTest(const FString&)
+{
+	using namespace TCFxTest;
+	// Values from THREE.Color.setHex at the pin. Convert colour bytes once, then keep every lighting term linear.
+	const FLinearColor Stone = TCFxImpl::SectionColour(TCFxImpl::SectionTint(TEXT("stone")));
+	TestTrue(TEXT("stone sRGB to linear"), Stone.Equals(FLinearColor(.2501582847f, .2050787364f, .1470272665f), 1e-7f));
+	const FLinearColor Top = TCFxLight::Hemisphere(FLinearColor(FColor(0xc3,0xcd,0xdd)) * 1.25f);
+	TestTrue(TEXT("fx.js hemisphere is colour times intensity divided by PI"), Top.Equals(FLinearColor(.217136854f,.242913468f,.287694733f,1.25f / PI), 2e-4f));
+	for (ETCGraphicsLevel Level : {ETCGraphicsLevel::High, ETCGraphicsLevel::Low})
+	{
+		const FTCGraphicsLevelScope Graphics(Level);
+		const bool Low = Level == ETCGraphicsLevel::Low;
+		FTCMatchState St; St.ApplyLobby(*Parse(DispatchLobby)); St.ApplyStart(*Parse(DispatchStart()));
+		FTCCombatEffects Fx; Fx.Start(St);
+		FTCFxContext Context; Context.HeightAt = [](float, float) { return -1.f; };
+		const auto Snapshot = Parse(Snap(8400, {}, TEXT(R"("shots":[{"k":"collapse","id":"section:0","at":420,"x":30,"y":1.6,"z":30,"material":"stone","impulse":4,"dir":0}])")));
+		St.ApplySnapshot(*Snapshot); Fx.Snapshot(St, Snapshot.Get(), Context, 1.0);
+		int32 Chips = 0, Dust = 0;
+		for (const FTCFxParticle& Particle : Fx.Particles())
+		{
+			if (Particle.Preset == ETCFxPreset::Masonry)
+			{
+				Chips++; TestEqual(TEXT("collapse chips live 1.5 seconds"), Particle.Life, 1.5f);
+				TestEqual(TEXT("chips have no fade-in, visible at birth"), Particle.Fin, 0.f);
+			}
+			if (Particle.Preset == ETCFxPreset::Collapse)
+			{
+				Dust++;
+				const float Scale = Low ? .85f : 1.f;
+				TestTrue(TEXT("dust size from fx.js, including Low scale"), Particle.Size0 >= .7f*Scale && Particle.Size0 <= 1.1f*Scale);
+				TestTrue(TEXT("dust life from fx.js"), Particle.Life >= 1.5f && Particle.Life <= 2.2f);
+			}
+		}
+		TestEqual(TEXT("reference collapse chip count"), Chips, Low ? 5 : 9);
+		TestEqual(TEXT("reference collapse dust count"), Dust, Low ? 2 : 4);
+		TArray<FTCFxSpriteDraw> Draws; Fx.SpriteDraws(Draws);
+		int32 VisibleChips = 0;
+		for (const auto& Draw : Draws) VisibleChips += Draw.Alpha == 1.f;
+		TestEqual(TEXT("all chips are visible on the first presentation frame"), VisibleChips, Chips);
+		// A repeated delivered collapse is not replayed, as debris.js events is a Set.
+		Fx.Snapshot(St, Snapshot.Get(), Context, 1.0);
+		TestEqual(TEXT("duplicate contact does not emit again"), Fx.Particles().Num(), Chips + Dust);
+		for (int32 I = 0; I < 180; I++) Fx.Frame(Context, 1.0 + (I+1)/60.0, 1.f/60.f);
+		TestEqual(TEXT("local collapse dust and chips expire by three seconds"), Fx.Particles().Num(), 0);
+	}
+	return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCEffectsDispatchTest, "ThreeCrossroads.Effects.Dispatch", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)

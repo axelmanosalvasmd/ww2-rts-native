@@ -323,10 +323,11 @@ int32 UTCModelCompareCommandlet::Main(const FString& Params)
 
 #if WITH_DEV_AUTOMATION_TESTS
 #include "Misc/AutomationTest.h"
+#include "Misc/App.h"
 
 // The renderer's model path against the imported content: which units take it, the instances it makes for each, the
-// level-of-detail swap, the turret traverse, owner tint and the build-up scale. Runs under -nullrhi (meshes load and
-// instance; nothing is rendered). Skips with a note when Content/Models has not been imported.
+// level-of-detail swap, the turret traverse, owner tint and the build-up scale. A headless run checks that Draw
+// allocates no model or ring resources. Rendered runs cover instances, or report missing imported content.
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCUnitModelsRendererTest, "ThreeCrossroads.Models.Renderer", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
 
 bool FTCUnitModelsRendererTest::RunTest(const FString& Parameters)
@@ -369,6 +370,14 @@ bool FTCUnitModelsRendererTest::RunTest(const FString& Parameters)
 	State.Units.Add(6, Inside);
 	R->SetViewPoint(FVector(1000, 3000, 3000));
 	R->Draw(State, Table, nullptr, TSet<int32>(), 0.f);
+	if (!FApp::CanEverRender())
+	{
+		TestFalse(TEXT("headless draw does not load render models"), R->ModelsLoaded());
+		TestEqual(TEXT("headless draw creates no rings"), R->ModelStats().Rings, 0);
+		TestEqual(TEXT("headless draw creates no models"), R->ModelStats().ModelUnits, 0);
+		TestEqual(TEXT("headless draw creates no placeholders"), R->ModelStats().PlaceholderUnits, 0);
+		return true;
+	}
 	if (!R->ModelsLoaded())
 	{
 		AddWarning(TEXT("no imported models (") + R->ModelLoadError() + TEXT("): the model path is untested here; every unit fell back to a placeholder"));

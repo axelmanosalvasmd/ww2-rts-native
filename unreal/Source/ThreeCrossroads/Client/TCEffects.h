@@ -272,6 +272,11 @@ namespace TCFxSections
 	FTransform Transform(const FTCDebrisRow& Row);
 }
 
+namespace TCFxLight
+{
+	FLinearColor Hemisphere(const FLinearColor& ColourTimesIntensity);
+}
+
 // The debris view (client/debris.js) on its own.
 class FTCDebrisView
 {
@@ -634,7 +639,7 @@ private:
 	int32 LastInstances = 0, LastSprites = 0;
 	double LastSoundLog = 0.0;
 	bool bWarnedLook = false;
-	FString BridgeShotPrefix;
+	FString BridgeShotPrefix, BridgeView;
 	double BridgeSeen = -1.0, BridgeCollapse = -1.0;
 	int32 BridgeShot = 0;
 	bool bBridgeCaptureRead = false;

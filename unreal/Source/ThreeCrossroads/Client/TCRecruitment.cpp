@@ -725,3 +725,43 @@ FTCCommandCard FTCRecruitment::Card(const FTCMatchState& State, const TSet<int32
 	if (bWorldRecovery) { Card.Kind = ETCCardKind::NotPorted; Card.Why = TEXT("World recovery (Restore HQ or Engineer)"); return Card; }
 	return Card;
 }
+
+#if WITH_DEV_AUTOMATION_TESTS
+#include "Misc/AutomationTest.h"
+#include "Serialization/JsonReader.h"
+#include "Serialization/JsonSerializer.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCRecruitArmyCountTest, "ThreeCrossroads.Recruitment.ArmyCount", EAutomationTestFlags::EditorContext | EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+bool FTCRecruitArmyCountTest::RunTest(const FString&)
+{
+	// availability.js popTotal counts weighted field squads/vehicles plus queued recruits. Entity rows include
+	// structures, while individual soldier models, health and control-group assignments do not change population.
+	FTCMatchState S; S.bHasMatch=true; S.You=0; S.LobbySeat=0; S.bLobbySinceOpen=true;
+	FTCRecruitment R;
+	auto Parse=[](const FString& Text) { TSharedPtr<FJsonObject> O; FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text),O); return O; };
+	R.ApplyStart(*Parse(TEXT(R"({"factions":[0,1],"map":{}})")));
+	auto Snap=[&](const FString& Tail) { R.ApplySnapshot(*Parse(TEXT("{\"mp\":100,\"units\":[],\"held\":[0,0],")+Tail+TEXT("}"))); };
+	auto Unit=[&](int32 Id,const TCHAR* Type,int32 Owner=0) { FTCUnit U; U.Id=Id; U.Type=Type; U.Owner=Owner; U.Hp=100; S.Units.Add(Id,U); };
+	Unit(1,TEXT("hq")); Unit(2,TEXT("barracks")); Unit(3,TEXT("rifle")); Unit(4,TEXT("rifle")); Unit(5,TEXT("mg"));
+	Snap(TEXT("\"queues\":[]"));
+	double Pop=0,Cap=0;
+	TestTrue(TEXT("a confirmed seat has an army count"),R.ArmyUse(S,Pop,Cap));
+	TestEqual(TEXT("five own entity rows"),S.Units.Num(),5);
+	TestEqual(TEXT("HQ and barracks take no population, three field groups use three"),Pop,3.0);
+	TestEqual(TEXT("standard skirmish cap"),Cap,12.0);
+	S.Units[3].Hp=1;
+	TestTrue(TEXT("casualties within a squad preserve its population"),R.ArmyUse(S,Pop,Cap)&&Pop==3.0);
+	Unit(6,TEXT("conscript")); Unit(7,TEXT("truck")); Unit(8,TEXT("train")); Unit(9,TEXT("tank"),1);
+	Snap(TEXT("\"queues\":[[1,0.4,-1,-1,\"rifle\",\"conscript\"]],\"army\":{\"pop\":1.5}"));
+	TestTrue(TEXT("weights plus own queued recruits, allied/enemy rows excluded"),R.ArmyUse(S,Pop,Cap));
+	TestEqual(TEXT("conscripts use 0.75, supply trucks and trains zero, queue uses 1.75"),Pop,5.5);
+	TestEqual(TEXT("army size scales the skirmish cap"),Cap,18.0);
+	Snap(TEXT("\"mode\":{\"kind\":\"classic\"},\"army\":{\"pop\":1.5}"));
+	TestTrue(TEXT("Classic uses its 24 base cap"),R.ArmyUse(S,Pop,Cap)&&Cap==36.0);
+	Snap(TEXT("\"mode\":{\"kind\":\"world\"},\"world\":{\"cap\":37}"));
+	TestTrue(TEXT("World uses the recipient's delivered cap"),R.ArmyUse(S,Pop,Cap)&&Cap==37.0);
+	S.bSpectator=true;
+	TestFalse(TEXT("a spectator has no commanded population"),R.ArmyUse(S,Pop,Cap));
+	return true;
+}
+#endif

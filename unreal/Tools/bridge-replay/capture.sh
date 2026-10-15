@@ -10,6 +10,13 @@ PROJECT=${TC_PROJECT:-$(cd "$HERE/../.." && pwd)/ThreeCrossroads.uproject}
 UE=${UE_ROOT:-$HOME/Applications/UnrealEngine-5.8.3}
 WORK=${TC_CAPTURE_WORK:?set TC_CAPTURE_WORK to a scratch directory}
 PREFIX=${TC_SHOT_PREFIX:-$OUT/bridge-$STEM-$LANGUAGE}
+EXTRA=()
+if [ -n "${TC_CAPTURE_BUFFER:-}" ]; then
+  case "$TC_CAPTURE_BUFFER" in BaseColor|WorldNormal|PreTonemapHDRColor|LightingOnly) ;; *) echo 'Unsupported buffer'; exit 2;; esac
+  EXTRA+=("-ExecCmds=viewmode VisualizeBuffer,r.BufferVisualizationTarget $TC_CAPTURE_BUFFER")
+fi
+if [ -n "${TC_CAPTURE_VIEW:-}" ]; then EXTRA+=("-TCBridgeView=$TC_CAPTURE_VIEW"); fi
+if [ "${TC_CAPTURE_NO_SHADOWS:-0}" = 1 ]; then EXTRA+=("-ExecCmds=ShowFlag.DynamicShadows 0"); fi
 mkdir -p "$OUT" "$WORK" "$(dirname "$PREFIX")"
 for NAME in before at after1s after3s; do
   [ ! -e "$PREFIX-$NAME.png" ] || { echo "Capture already exists: $PREFIX-$NAME.png. Choose a fresh prefix."; exit 1; }
@@ -38,9 +45,9 @@ SERVER=$!
 for _ in $(seq 100); do [ -s "$WORK/port" ] && break; sleep 0.1; done
 PORT=$(cat "$WORK/port")
 echo "replay pid $SERVER port $PORT"
-env TC_DECODER=rust SDL_AUDIODRIVER=dummy SDL_AUDIO_DRIVER=dummy "$UE/Engine/Binaries/Linux/UnrealEditor" "$PROJECT" -game -RenderOffscreen -ResX=1280 -ResY=720 -unattended -nosplash -nosound \
+env WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-1}" SDL_VIDEO_DRIVER=wayland SDL_VIDEODRIVER=wayland TC_DECODER=rust SDL_AUDIODRIVER=dummy SDL_AUDIO_DRIVER=dummy "$UE/Engine/Binaries/Linux/UnrealEditor" "$PROJECT" -game -RenderOffscreen -ResX=1280 -ResY=720 -unattended -nosplash -nosound \
   -TCServer="ws://127.0.0.1:$PORT/ws" -TCRoom=bridge -TCName=Alder -TCTokenFile="$WORK/token.txt" -TCLang="$LANGUAGE" -TCObjectivesLog \
-  -TCBridgeCapture="$PREFIX" -TCGraphicsAt=high@0 -TCExitAfter=40 -abslog="$OUT/game.log" > /dev/null 2>&1 &
+  -TCBridgeCapture="$PREFIX" -TCGraphicsAt=high@0 -TCExitAfter=40 -abslog="$OUT/game.log" "${EXTRA[@]}" > /dev/null 2>&1 &
 GAME=$!
 READY=0
 for _ in $(seq 1200); do

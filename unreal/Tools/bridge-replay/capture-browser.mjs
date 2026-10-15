@@ -17,6 +17,9 @@ if (!origin || !out || !profile || !process.argv.includes('--block-maps')) {
   throw Error('Required: --origin URL --out PREFIX --profile SCRATCH --block-maps');
 }
 const nativeLog = arg('native-log');
+const framing = nativeLog ? [...fs.readFileSync(nativeLog, 'utf8').matchAll(
+  /lookfx framing: focus ([\d.-]+) ([\d.-]+) distance ([\d.-]+)/g,
+)].map(m=>({x:+m[1],z:+m[2],dist:+m[3]})) : [];
 const eyes = nativeLog ? [...fs.readFileSync(nativeLog, 'utf8').matchAll(
   /bridgefx capture: .*?camera X=([\d.-]+) Y=([\d.-]+) Z=([\d.-]+) rotation P=([\d.-]+) Y=([\d.-]+) R=([\d.-]+)/g,
 )].map(m => {
@@ -89,13 +92,29 @@ try {
   if (!await evaluate(`window.__game?.snapshot?.tick === 8398`)) throw Error('Replay did not hold tick 8398');
   // Wait for actual rendered frames before reading rig.intro. It may still be pending at the first snapshot.
   await evaluate(`new Promise(done => { let n=0; const f=()=>{ if (++n>=8 && !window.__game.rig.intro) done(true); else requestAnimationFrame(f); }; requestAnimationFrame(f); })`);
-  await evaluate(`Object.assign(window.__game.cam,{x:119,z:98,dist:70,yaw:0});true`);
+  const initialFraming = framing[0] ?? { x: 119, z: 98, dist: 70 };
+  await evaluate(`Object.assign(window.__game.cam,${JSON.stringify({ ...initialFraming, yaw: 0 })});true`);
   await sleep(2000);
   log({ ready: true, tick: 8398, graphics: 'high', controlledVisualClock: controlled, matchedNativeCameras: !!eyes });
+
+  if (arg('cloth-out')) {
+    const png = await evaluate(`(() => {
+      const {scene}=window.__game; let canvas;
+      scene.traverse(o=>{for(const m of Array.isArray(o.material)?o.material:[o.material]) {
+        const c=m?.map?.image;
+        if(m?.isMeshLambertMaterial && c?.width===128 && c?.height===64 && c.toDataURL) canvas=c;
+      }});
+      if(!canvas) throw Error('Reference flagMat cloth canvas missing');
+      return canvas.toDataURL('image/png').split(',')[1];
+    })()`);
+    fs.writeFileSync(arg('cloth-out'), Buffer.from(png,'base64'));
+    log({cloth:arg('cloth-out'),source:'client/markers.js flagMat, original browser canvas'});
+  }
 
   await evaluate(`(async () => {
     const g=window.__game;
     window.__bridgeRender=(await import('/client/light.js')).renderFrame;
+    window.__bridgeSoldiers=(await import('/client/unit-models.js')).drawSoldiers;
     window.__bridgeAdvance=g.effects.update.bind(g.effects);
     window.__bridgeVisualAge=0;
     return true;
@@ -103,9 +122,11 @@ try {
   // Capture and metadata come from the same render task, before the WebGL drawing buffer can be discarded.
   const capture = async (name, index, targetAge) => {
     const eye = eyes?.[index] ?? null;
+    const frame = framing[index] ?? {x:119,z:98,dist:70};
     const result = await evaluate(`(async () => {
       const g=window.__game,targetAge=${targetAge},controlled=${controlled};
-      Object.assign(g.cam,{x:119,z:98,dist:70,yaw:0});
+      const frame=${JSON.stringify(frame)};
+      Object.assign(g.cam,{...frame,yaw:0});
       if (controlled) {
         while(window.__bridgeVisualAge<targetAge) {
           const dt=Math.min(1/60,targetAge-window.__bridgeVisualAge);
@@ -115,11 +136,14 @@ try {
       }
       const draw=()=>{
         const eye=${JSON.stringify(eye)};
-        const y=eye ? eye[1]-70*Math.sin(.95) : g.hAt(119,98);
+        const y=eye ? eye[1]-frame.dist*Math.sin(.95) : g.hAt(frame.x,frame.z);
         g.cam.y=y;
-        g.camera.position.set(...(eye ?? [119,y+70*Math.sin(.95),98+70*Math.cos(.95)]));
+        g.camera.position.set(...(eye ?? [frame.x,y+frame.dist*Math.sin(.95),frame.z+frame.dist*Math.cos(.95)]));
         g.camera.quaternion.set(-Math.sin(.95/2),0,0,Math.cos(.95/2));
         g.camera.updateMatrixWorld();
+        // main.js rebuilds the crowd for the current camera before renderFrame. Do the same after placing
+        // a matched capture eye, or detail views can inherit the previous frame's frustum-culling result.
+        window.__bridgeSoldiers(g.units.values(),g.camera);
         window.__bridgeRender(g.cam,g.groundMesh);
         let section;
         const lights=[];

@@ -54,6 +54,7 @@ if hasattr(M, 'set_base_material_usage'):
     M.set_base_material_usage(material,unreal.MaterialUsage.MATUSAGE_INSTANCED_STATIC_MESHES)
 else:
     M.set_material_usage(material,unreal.MaterialUsage.MATUSAGE_INSTANCED_STATIC_MESHES)
-M.recompile_material(material)
+errors = M.recompile_material(material)
+assert not errors, str(errors)
 E.save_loaded_asset(material)
 unreal.log('bridgefx: generated '+path)

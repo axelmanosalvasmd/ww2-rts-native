@@ -13,6 +13,7 @@
 #include "Engine/Texture2D.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "Misc/App.h"
 #include "HAL/PlatformTime.h"
 
 // The engine's basic shapes are 100 cm across (cylinder and cone 100 cm tall, centred; the cone's apex is at +Z).
@@ -77,6 +78,8 @@ bool ATCUnitRenderer::DrawnAt(int32 Id, FVector2D& Out) const
 
 void ATCUnitRenderer::Draw(const FTCMatchState& State, const FTCUnitTable& Table, const ATCTerrain* Terrain, const TSet<int32>& Selected, float DeltaSeconds)
 {
+	// A cooked headless client cannot initialize the ring meshes' render resources.
+	if (!FApp::CanEverRender()) return;
 	EnsureModels();
 	UpdateRingLooks();
 	TMap<UInstancedStaticMeshComponent*, TArray<FTransform>> Frames;
@@ -308,6 +311,26 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCInfantryMaterialLookTest, "ThreeCrossroads.I
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::ProductFilter)
 bool FTCInfantryMaterialLookTest::RunTest(const FString&)
 {
+	// infantry-authored.js tints the atlas by faction/sourceGrey in linear light, with one sRGB texture decode.
+	const FLinearColor SourceGrey(FColor(0x5d, 0x66, 0x68));
+	const TCHAR* Tags[] = { TEXT("US"), TEXT("DE"), TEXT("SU"), TEXT("UK") };
+	const FColor Tunics[] = { FColor(0x5f, 0x60, 0x46), FColor(0x5d, 0x66, 0x68), FColor(0x7f, 0x7a, 0x5c), FColor(0x6e, 0x5f, 0x42) };
+	for (int32 I = 0; I < 4; I++)
+	{
+		auto* Mat = LoadObject<UMaterialInterface>(nullptr, *FString::Printf(TEXT("/Game/Models/Motion/MI_InfantryCrowdLook_%s"), Tags[I]));
+		if (!TestNotNull(Tags[I], Mat)) continue;
+		FLinearColor Actual;
+		const FLinearColor Tunic(Tunics[I]);
+		const FLinearColor Expected(Tunic.R / SourceGrey.R, Tunic.G / SourceGrey.G, Tunic.B / SourceGrey.B, 1.f);
+		TestTrue(TEXT("linear faction tint is bound"), Mat->GetVectorParameterValue(FMaterialParameterInfo(TEXT("Tunic")), Actual));
+		TestTrue(TEXT("faction tint uses linear colour ratios"), Actual.Equals(Expected, 2e-6f));
+		for (const TCHAR* Name : { TEXT("InfantryColor"), TEXT("InfantryNormal") })
+		{
+			UTexture* Texture = nullptr;
+			TestTrue(TEXT("the drawn crowd atlas is bound"), Mat->GetTextureParameterValue(FMaterialParameterInfo(Name), Texture));
+			if (TestNotNull(Name, Texture)) TestEqual(TEXT("only the drawn colour atlas is sRGB"), Texture->SRGB != 0, FString(Name) == TEXT("InfantryColor"));
+		}
+	}
 	auto Node = [](UMaterial* M, const TCHAR* Name) -> UMaterialExpressionCustom*
 	{
 		if (M) for (UMaterialExpression* E : M->GetExpressions())

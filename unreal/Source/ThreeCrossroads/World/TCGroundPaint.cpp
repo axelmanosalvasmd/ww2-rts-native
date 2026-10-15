@@ -31,7 +31,6 @@ namespace TCGroundPaintImpl
 	constexpr float FogSeen = 1.f, FogExplored = 0.55f, FogDark = 0.32f;
 	constexpr float FogRate = (FogSeen - FogDark) / 0.25f;
 	static_assert(FogSeen > FogExplored && FogExplored > FogDark, "TCFogLook::Multiplier returns these for the three looks");
-	constexpr int32 RubbleCapacity = 2048, CraterCapacity = 1536; // rubble-decals.js, crater-decals.js CAPACITY
 
 	bool Num(const TSharedPtr<FJsonValue>& V, double& Out)
 	{
@@ -279,7 +278,7 @@ bool FTCGroundPaint::ApplyStart(const FJsonObject& M, const FTCMatchState& State
 	FogActive.Reset(); FogPending.Reset();
 	bFogAll = true; bLastReveal = false;
 	// decals: every known rubble cell (and World crater) on the next Tick, on the ground as it is drawn then
-	Rubble.Init(RubbleCapacity, true); Craters.Init(CraterCapacity, false);
+	Decals.Reset();
 	DecalChanged.Reset(); bDecalsAll = true; bDecalMeshDirty = true;
 	Starts++; RowsApplied += (int32)Cells.size();
 	UE_LOG(LogTC, Log, TEXT("ground paint: %s %dx%d, %d px a cell (graphics %s, %d texels across; %dx%d canvas), %s, %d start cells, painted in %.0f ms; %d known cells"),
@@ -326,7 +325,7 @@ void FTCGroundPaint::Clear()
 	Core = TCGroundPaintCore::FGround();
 	Core.Mode = TCGroundPaintCore::EKnownMode::Native;
 	Core.bDeferred = true;
-	Rubble.Init(TCGroundPaintImpl::RubbleCapacity, true); Craters.Init(TCGroundPaintImpl::CraterCapacity, false);
+	Decals.Reset();
 	DecalChanged.Reset(); bDecalsAll = false; bDecalMeshDirty = true;
 	Mips.Reset(); MipSizes.Reset();
 	FogWant.Reset(); FogNow.Reset(); FogBytes.Reset(); FogActive.Reset(); FogPending.Reset();
@@ -515,28 +514,16 @@ void FTCGroundPaint::DecalTick(TFunctionRef<float(float, float)> GroundHeight)
 	const int32 W = Core.MapW(), H = Core.MapH(), N = W * H;
 	if (!N) return;
 	const std::function<double(double, double)> HAt = [&GroundHeight](double X, double Z) { return (double)GroundHeight((float)X, (float)Z); };
-	auto RubbleWanted = [this](int C) { return Core.IsKnown(C) && Core.ObjectAt(C) == 'R'; };
-	auto RubbleWrite = [&](int Slot, int C) { RubbleQuad(C, W, Core.MaterialAt(C), HAt, &Rubble.Pos[(size_t)Slot * 75], &Rubble.Uv[(size_t)Slot * 50]); };
-	const std::function<uint8_t(int)> KnownChar = [this](int C) { return Core.IsKnown(C) ? Core.CharAt(C) : (uint8_t)0; };
-	auto CraterWant = [&](int C) { return Core.IsKnown(C) && CraterWanted(C, W, H, KnownChar); };
-	auto CraterWrite = [&](int Slot, int C) { CraterQuad(C, W, HAt, &Craters.Pos[(size_t)Slot * 75]); };
-	if (bDecalsAll)
+	if (bDecalsAll || DecalChanged.Num())
 	{
-		// client/main.js: the rubble decals for every rubble cell; World Conquest's lasting craters for every crater cell
-		std::vector<int> AllR, AllC;
-		for (int C = 0; C < N; C++) { if (Core.ObjectAt(C) == 'R') AllR.push_back(C); if (Core.CharAt(C) == '+') AllC.push_back(C); }
-		bDecalMeshDirty |= Rubble.Update(AllR, RubbleWanted, RubbleWrite);
-		if (Core.IsWorld()) bDecalMeshDirty |= Craters.Update(AllC, CraterWant, CraterWrite);
+		std::vector<int> Changed;
+		Changed.reserve((size_t)DecalChanged.Num());
+		for (const int32 C : DecalChanged) Changed.push_back(C);
+		bDecalMeshDirty |= Decals.Update(Core, bDecalsAll, Changed, HAt);
 		bDecalsAll = false;
 		DecalChanged.Reset();
 	}
-	else if (DecalChanged.Num())
-	{
-		std::vector<int> Changed(DecalChanged.GetData(), DecalChanged.GetData() + DecalChanged.Num());
-		bDecalMeshDirty |= Rubble.Update(RubbleLook(Changed, N), RubbleWanted, RubbleWrite);
-		if (Core.IsWorld()) bDecalMeshDirty |= Craters.Update(CraterLook(Changed, W, N), CraterWant, CraterWrite);
-		DecalChanged.Reset();
-	}
+
 	UProceduralMeshComponent* Mesh = DecalMesh.Get();
 	if (!Mesh || !bDecalMeshDirty) return;
 	bDecalMeshDirty = false;
@@ -570,8 +557,8 @@ void FTCGroundPaint::DecalTick(TFunctionRef<float(float, float)> GroundHeight)
 		Mesh->SetMaterial(Index, Mat);
 		SectionVerts = Verts.Num();
 	};
-	Section(0, Rubble, RubbleMid.IsValid() ? (UMaterialInterface*)RubbleMid.Get() : RubbleMat.Get(), RubbleSectionVerts);
-	Section(1, Craters, CraterMid.IsValid() ? (UMaterialInterface*)CraterMid.Get() : CraterMat.Get(), CraterSectionVerts);
+	Section(0, Decals.Rubble(), RubbleMid.IsValid() ? (UMaterialInterface*)RubbleMid.Get() : RubbleMat.Get(), RubbleSectionVerts);
+	Section(1, Decals.Craters(), CraterMid.IsValid() ? (UMaterialInterface*)CraterMid.Get() : CraterMat.Get(), CraterSectionVerts);
 }
 
 void FTCGroundPaint::Tick(const FTCMatchState& State, float DeltaSeconds, bool bEndRevealed, TFunctionRef<float(float, float)> GroundHeight)
@@ -633,5 +620,5 @@ FString FTCGroundPaint::StatusLine() const
 {
 	return FString::Printf(TEXT("ground paint: %dx%d cells, %d px a cell, %s%s, %d tiles queued, last paint %.1f ms, upload %.1f ms, fog fading %d, rubble %d, craters %d, starts %d, snapshots %d, rows %d"),
 		Core.MapW(), Core.MapH(), Core.PixelsPerCell(), Core.Textured() ? TEXT("textured") : TEXT("flat"), TileError.IsEmpty() ? TEXT("") : *(TEXT(" (") + TileError + TEXT(")")),
-		Core.PendingTiles(), LastPaintMs, LastUploadMs, FogActive.Num(), Rubble.Count(), Craters.Count(), Starts, Snapshots, RowsApplied);
+		Core.PendingTiles(), LastPaintMs, LastUploadMs, FogActive.Num(), Decals.Rubble().Count(), Decals.Craters().Count(), Starts, Snapshots, RowsApplied);
 }

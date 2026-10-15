@@ -41,6 +41,7 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "World/TCDecals.h"
 
 namespace TCGroundPaintCore
 {
@@ -232,6 +233,15 @@ namespace TCGroundPaintCore
 	}
 	inline constexpr int Tile = 4;       // cells per repaint tile
 	inline constexpr double Warp = 0.32; // how far (in cells) the blend edges wander
+	// ground.js raster: secondary coverage at a patch-noise value. Kept in double until the
+	// mixed-material branch writes its weights into the reference Float32Array.
+	inline double SecondaryWeight(double Amount, double Patch)
+	{
+		if (Amount <= 0) return 0;
+		const double S = (Amount - Patch) * 5.5 + 0.5;
+		return S < 0 ? 0 : S > 1 ? 1 : S * S * (3 - 2 * S);
+	}
+
 	inline constexpr double Foam[3] = { 184, 178, 146 };
 
 	// ---------- noise: the periodic 512 x 512 fBm table and its equalized copy ----------
@@ -468,6 +478,15 @@ namespace TCGroundPaintCore
 			std::vector<float> Amt, Lev, Depth, Tr, Tg, Tb;
 		};
 		const FAttrs& Attributes() const { return Attrs; }
+		// main.js isRoad: relief sinks exactly the cells the painter assigns ROAD. This includes
+		// field exclusions and discovered biome looks, which a second field generator cannot infer.
+		void CopyRoadMask(std::vector<uint8_t>& Out) const
+		{
+			Out.assign((size_t)N, 0);
+			if (!Attrs.Valid) return;
+			for (int C = 0; C < N; C++) Out[(size_t)C] = IsKnown(C) && Attrs.Prim[(size_t)C] == Road;
+		}
+
 		const std::vector<uint8_t>& FieldMap() const { return Fields; }
 
 		// ---------- implementation ----------
@@ -1007,8 +1026,7 @@ namespace TCGroundPaintCore
 					{
 						const int Pm = A.Prim[(size_t)C00], Q = A.Sec[(size_t)C00];
 						const double Am = ((double)A.Amt[(size_t)C00] * (1 - Tx) + (double)A.Amt[(size_t)C01] * Tx) * (1 - Ty) + ((double)A.Amt[(size_t)C10] * (1 - Tx) + (double)A.Amt[(size_t)C11] * Tx) * Ty;
-						double S = 0;
-						if (Am > 0) { S = (Am - Pn) * 5.5 + 0.5; S = S < 0 ? 0 : S > 1 ? 1 : S * S * (3 - 2 * S); }
+						const double S = SecondaryWeight(Am, Pn);
 						if (S < 1) { const uint8_t* D = &TData[Pm][(size_t)TQ(Pm, I, J)]; const double F = 1 - S; R = F * D[0]; G = F * D[1]; Bl = F * D[2]; if (Pm == Water) WWater = F; }
 						if (S > 0) { const uint8_t* D = &TData[Q][(size_t)TQ(Q, I, J)]; R += S * D[0]; G += S * D[1]; Bl += S * D[2]; if (Q == Water) WWater += S; }
 					}
@@ -1025,8 +1043,7 @@ namespace TCGroundPaintCore
 							const double Wc = Ws[K] / Sum, Am = A.Amt[(size_t)Ci];
 							if (Am > 0)
 							{
-								double S = (Am - Pn) * 5.5 + 0.5;
-								S = S < 0 ? 0 : S > 1 ? 1 : S * S * (3 - 2 * S);
+								const double S = SecondaryWeight(Am, Pn);
 								Wt[A.Sec[(size_t)Ci]] = F32((double)Wt[A.Sec[(size_t)Ci]] + Wc * S);
 								Wt[A.Prim[(size_t)Ci]] = F32((double)Wt[A.Prim[(size_t)Ci]] + Wc * (1 - S));
 							}
@@ -1399,64 +1416,9 @@ namespace TCGroundPaintCore
 		if (!Crater(X, Y)) return false;
 		return !((Crater(X - 1, Y) || Crater(X, Y - 1)) && CraterHash(C, 3) < 0.5);
 	}
-	// The decal slots as rubble-decals.js and crater-decals.js keep them: one 25-vertex grid per cell, a removed cell's
-	// slot takes the last one's vertices (so the draw order matches the browser's).
-	struct FDecalSet
-	{
-		int Capacity = 0;
-		bool bUv = false;
-		std::vector<int> Cells;
-		std::unordered_map<int, int> Slots;
-		std::vector<float> Pos, Uv;
-		void Init(int InCapacity, bool bInUv) { Capacity = InCapacity; bUv = bInUv; Cells.clear(); Slots.clear(); Pos.assign((size_t)Capacity * 75, 0.f); Uv.assign(bUv ? (size_t)Capacity * 50 : 0, 0.f); }
-		int Count() const { return (int)Cells.size(); }
-		// Look: the cells to recheck, in order. Wanted(c): it should have a picture; Write(slot, c): fill that slot.
-		bool Update(const std::vector<int>& Look, const std::function<bool(int)>& Wanted, const std::function<void(int, int)>& Write)
-		{
-			bool bDirty = false;
-			for (const int C : Look)
-			{
-				auto It = Slots.find(C);
-				if (Wanted(C))
-				{
-					int Slot;
-					if (It == Slots.end()) { if ((int)Cells.size() >= Capacity) continue; Slot = (int)Cells.size(); Cells.push_back(C); Slots.emplace(C, Slot); }
-					else Slot = It->second;
-					Write(Slot, C); bDirty = true;
-				}
-				else if (It != Slots.end())
-				{
-					const int Slot = It->second, Last = Cells.back();
-					Cells.pop_back(); Slots.erase(It);
-					if (Slot < (int)Cells.size())
-					{
-						Cells[(size_t)Slot] = Last; Slots[Last] = Slot;
-						std::copy_n(&Pos[(size_t)Cells.size() * 75], 75, &Pos[(size_t)Slot * 75]);
-						if (bUv) std::copy_n(&Uv[(size_t)Cells.size() * 50], 50, &Uv[(size_t)Slot * 50]);
-					}
-					bDirty = true;
-				}
-			}
-			return bDirty;
-		}
-	};
-	// rubble-decals.js update(changed): the changed cells themselves
-	inline std::vector<int> RubbleLook(const std::vector<int>& Changed, int Cells)
-	{
-		std::vector<int> Out;
-		for (const int C : Changed) if (C >= 0 && C < Cells) Out.push_back(C);
-		return Out;
-	}
-	// crater-decals.js update(changed): each changed cell and its four neighbours by index (c - 1 wraps a row, as there),
-	// each once, in first-seen order
-	inline std::vector<int> CraterLook(const std::vector<int>& Changed, int W, int Cells)
-	{
-		std::vector<int> Out;
-		std::unordered_map<int, bool> Seen;
-		for (const int C : Changed) for (const int Nn : { C, C - 1, C + 1, C - W, C + W })
-			if (Nn >= 0 && Nn < Cells && Seen.emplace(Nn, true).second) Out.push_back(Nn);
-		return Out;
-	}
+	using TCDecals::FDecalSet;
+	using TCDecals::RubbleLook;
+	using TCDecals::CraterLook;
 
 	// the crater picture: a turned square 1.5 to 2.1 m across each way from a jittered centre, 5 cm over the ground
 	inline void CraterQuad(int C, int W, const std::function<double(double, double)>& HAt, float Pos[75])
@@ -1551,8 +1513,8 @@ public:
 	bool StartedLow() const { return bStartedLow; }
 	int32 TilesQueued() const { return Core.PendingTiles(); }
 	bool Textured() const { return Core.Textured(); }
-	int32 RubbleDecals() const { return Rubble.Count(); }
-	int32 CraterDecals() const { return Craters.Count(); }
+	int32 RubbleDecals() const { return Decals.Rubble().Count(); }
+	int32 CraterDecals() const { return Decals.Craters().Count(); }
 	const TCGroundPaintCore::FGround& Painter() const { return Core; }
 	FString StatusLine() const;
 	// The painted canvas as RGBA bytes (row 0 north), for captures and checks.
@@ -1574,7 +1536,7 @@ private:
 	static void ReadCellRow(const TArray<TSharedPtr<FJsonValue>>& Row, TCGroundPaintCore::FCellRow& Out, int32 Cells);
 
 	TCGroundPaintCore::FGround Core;
-	TCGroundPaintCore::FDecalSet Rubble, Craters;
+	TCDecals::FKnownCells Decals;
 	TWeakObjectPtr<AActor> Actor;
 	TWeakObjectPtr<UProceduralMeshComponent> DecalMesh;
 	TStrongObjectPtr<UTexture2D> PaintTex, FogTex;

@@ -11,6 +11,9 @@
 #include "Materials/MaterialInstanceConstant.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
+#if WITH_EDITOR
+#include "Materials/Material.h"
+#endif
 #include "MeshDescription.h"
 #include "StaticMeshAttributes.h"
 #include "Misc/Compression.h"
@@ -751,7 +754,14 @@ UInstancedStaticMeshComponent* UTCSoldierCrowd::MakeBatch(UStaticMesh* Mesh, int
 	Ism->SetBoundsScale(2.f);
 	Ism->SetupAttachment(this);
 	if (GetWorld()) Ism->RegisterComponent();
-	for (int32 S = 0; S < Materials.Num(); S++) if (Materials[S]) Ism->SetMaterial(S, Materials[S]);
+	for (int32 S = 0; S < Materials.Num(); S++) if (Materials[S])
+	{
+#if WITH_EDITOR
+		// Generated crowd shaders must be ready before the first draw in uncooked -game (UE 5.8 ODSC).
+		Materials[S]->GetMaterial()->EnsureIsComplete();
+#endif
+		Ism->SetMaterial(S, Materials[S]);
+	}
 	Owned.Add(Ism);
 	AllBatches.Add(Ism);
 	return Ism;

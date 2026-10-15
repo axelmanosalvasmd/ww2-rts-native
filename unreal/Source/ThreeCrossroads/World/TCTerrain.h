@@ -24,6 +24,7 @@ class UMaterialInterface;
 class UMaterialInstanceDynamic;
 class FTCMatchState;
 class FTCWorldObjects;
+class FTCGroundPaint;
 
 UCLASS()
 class THREECROSSROADS_API ATCTerrain : public AActor
@@ -45,6 +46,8 @@ public:
 	// The physical grid (client/main.js terrain.physicalGrid: a known mine drawn as the ground and object under it). Without
 	// it the start's and cell rows' characters are used, a mine ('N') as open ground.
 	void SetCellSource(const FTCWorldObjects* Objects) { CellSource = Objects; }
+	// main.js isRoad reads the painted ground, including fields and World biome looks.
+	void SetPaintSource(const FTCGroundPaint* Paint) { PaintSource = Paint; }
 
 	// Ground height in metres at a reference position: the drawn ground (rock models aside, which are decoration). At cell
 	// centres it is the level x 2.5 m, except banks, trenches, roads and crater lips (docs/contracts/terrain.md).
@@ -85,7 +88,7 @@ private:
 	void UploadChunk(const FTCMatchState& State, int32 Chunk, bool bShape);
 	FLinearColor CellColor(const FTCMatchState& State, int32 C) const;
 	void Queue_(int32 Chunk, bool bShape);
-	void CopyInputs(const FTCMatchState& State, bool bFrozen);
+	void CopyInputs(const FTCMatchState& State, bool bFrozen, std::vector<int>* RoadChanges = nullptr);
 	void EnsureMaterial(bool bLow);
 
 	UPROPERTY() TObjectPtr<UProceduralMeshComponent> Mesh;
@@ -100,6 +103,7 @@ private:
 	FTCGraphicsWatch GfxWatch;        // round 15: relief.js subscribes rebuildGeometry to gfx.onChange
 	int32 ReliefSwitches = 0;
 	const FTCWorldObjects* CellSource = nullptr;
+	const FTCGroundPaint* PaintSource = nullptr;
 	int32 W = 0, H = 0, ChunksX = 0, ChunksY = 0, MeshedTotal = 0, DrawnCells = 0;
 	TArray<uint8> StartRows;          // the map rows at the start (ground.js town check on an authored map)
 	TArray<int32> SectionVerts;       // vertices in each chunk's mesh section (0: none)

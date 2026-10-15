@@ -13,6 +13,157 @@
 //     height (0.1 m);
 //   - steps of two or more levels drawn as vertical cliffs: for every such neighbour pair, the drawn ground drops by at
 //     least 85% of the step within 0.1 m horizontally somewhere within 1 m of the shared edge (three lines across it).
+// Small formula checks run both as Unreal automation and as a standalone C++ binary. Expected
+// values were recorded from the unmodified e4e579a relief and decal builders under Node.
+#include "World/TCRelief.h"
+#include "World/TCGroundPaint.h"
+#include <cmath>
+#include <cstdio>
+#include <string>
+#include <vector>
+
+namespace TCTerrainFormulas
+{
+	struct FChecks
+	{
+		std::vector<std::string> Errors;
+		void Require(bool Good, const char* What) { if (!Good) Errors.emplace_back(What); }
+		void Near(double Got, double Expected, double Tolerance, const char* What)
+		{
+			if (!std::isfinite(Got) || std::abs(Got - Expected) > Tolerance)
+			{
+				char Detail[192]; std::snprintf(Detail, sizeof Detail, "%s: %.17g vs %.17g", What, Got, Expected);
+				Errors.emplace_back(Detail);
+			}
+		}
+	};
+
+	FChecks ReliefRules()
+	{
+		FChecks T;
+		for (const bool Low : { false, true }) for (int Kind = 0; Kind < 4; Kind++)
+		{
+			TCRelief::FRelief R;
+			R.Reset(7, 7, Low, 0, false);
+			for (int Y = 0; Y < 7; Y++) for (int X = 0; X < 7; X++)
+			{
+				const int C = Y * 7 + X;
+				R.InKnown[(size_t)C] = 1;
+				R.InGrid[(size_t)C] = Kind == 0 && X == 3 && Y == 3 ? 'T' : '.';
+				R.InRoad[(size_t)C] = Kind == 0 && Y == 3 && (X == 2 || X == 4);
+				R.InLevel[(size_t)C] = (int8_t)(Kind == 0 ? 2 : Kind == 1 ? (X < 3 ? 0 : 1)
+					: Kind == 2 ? (X < 3 ? 0 : 3) : ((X < 3) == (Y < 3) ? 0 : 2));
+				R.InFrozen[(size_t)C] = R.InLevel[(size_t)C];
+			}
+			R.Build();
+			if (Kind == 0)
+			{
+				T.Near(R.HAt(1, 1), 5, 1e-7, "centre = level x 2.5");
+				T.Near(R.HAt(5, 7), 4.9, 1e-7, "road sink 0.1");
+				T.Near(R.HAt(7, 7), 4.099999904632568, 1e-7, "trench sink 0.9");
+				T.Near(R.HAt(7, 6), 4.974999904632568, 1e-7, "isolated trench keeps its shoulder");
+			}
+			if (Kind == 1)
+			{
+				const double Xs[] = { 5, 5.5, 5.95, 6.05, 6.5, 7 };
+				const double Ys[] = { 0, 0.46875, 1.171875, 1.328125, 2.03125, 2.5 };
+				for (int I = 0; I < 6; I++) T.Near(R.HAt(Xs[I], 7), Ys[I], 1e-7, "connected one-step ramp");
+				T.Require(R.Stats.CliffEdges == 0, "one step has no cliff");
+			}
+			if (Kind == 2)
+			{
+				T.Require(R.Stats.CliffEdges == 7, "three-step face is sealed along all seven cells");
+				T.Require(R.Stats.Vertices == (Low ? 4462 : 11278), "reference fractured-rock geometry in each graphics variant");
+				T.Near(R.HAt(5.95, 7), 0, 1e-7, "cliff low side stays flat");
+				T.Near(R.HAt(6.5, 7), 7.5, 1e-7, "cliff high side stays flat");
+			}
+			if (Kind == 3)
+			{
+				T.Near(R.HAt(5.95, 5.95), 0, 1e-7, "disconnected diagonal low corner");
+				T.Near(R.HAt(6.05, 5.95), 5, 1e-7, "disconnected diagonal east corner");
+				T.Near(R.HAt(5.95, 6.05), 5, 1e-7, "disconnected diagonal south corner");
+				T.Near(R.HAt(6.05, 6.05), 0, 1e-7, "no diagonal ramp across cliffs");
+			}
+		}
+		return T;
+	}
+
+	FChecks PaintRules()
+	{
+		using namespace TCGroundPaintCore;
+		FChecks T;
+		const double Cases[][3] = { { 0, 0, 0 }, { .3, .3, .5 }, { .3, .25, .87090625 },
+			{ .3, .35, .12909375 }, { .3, 0, 1 }, { .3, 1, 0 } };
+		for (const auto& C : Cases) T.Near(SecondaryWeight(C[0], C[1]), C[2], 1e-14, "reference noise-patch coverage");
+		T.Require(FGround::PixelsPerCell(110, 120, false, false) == 17, "High paint texel budget");
+		T.Require(FGround::PixelsPerCell(110, 120, false, true) == 10, "Low paint texel budget");
+		FStartMap Map; Map.W = 7; Map.H = 5;
+		Map.Rows = { ".W.....", "..BD...", ".......", ".......", "......." };
+		FGround G; G.Start(Map, {}, nullptr);
+		std::vector<uint8_t> Roads; G.CopyRoadMask(Roads);
+		T.Require(Roads.size() == 35 && !Roads[1] && !Roads[9] && Roads[10] && Roads[17], "roads follow painted water, house, road and yard decisions");
+		T.Require(G.Attributes().Sec[0] == Mud, "mud beside water");
+		T.Near(G.Attributes().Amt[0], .55, 1e-7, "wet-bank mud coverage");
+		FCellRow Wear; Wear.C = 28; Wear.Ch = '.'; Wear.bState = true; Wear.State = 3;
+		G.Apply({ Wear });
+		T.Require(G.Attributes().Sec[28] == Mud, "three quarters wear exposes mud");
+		T.Near(G.Attributes().Amt[28], .72, 1e-7, "worn coverage");
+		Wear.State = 3 << 5; G.Apply({ Wear });
+		T.Require(G.Attributes().Sec[28] == Shell && G.Attributes().Scar[28] == 1, "damage stage three makes a blast scar");
+		T.Near(G.Attributes().Amt[28], .7, 1e-7, "damage-stage coverage");
+		Wear.State = 4; G.Apply({ Wear });
+		T.Require(G.Attributes().Char[28] == 1, "burned ground receives char tint");
+		return T;
+	}
+
+	FChecks DecalRules()
+	{
+		using namespace TCGroundPaintCore;
+		FChecks T;
+		const auto Height = [](double X, double Z) { return X * .1 - Z * .2; };
+		float Pos[75], Uv[50]; RubbleQuad(12, 7, "wood", Height, Pos, Uv);
+		T.Near(Pos[0], 10.119999885559082, 1e-7, "rubble stays inside its cell");
+		T.Near(Pos[1], .6129999756813049, 1e-7, "rubble drapes 2.5 cm above relief");
+		T.Near(Pos[74], 3.880000114440918, 1e-7, "rubble far corner");
+		T.Near(Uv[0], .001, 1e-7, "wood atlas inset");
+		T.Near(Uv[1], .499, 1e-7, "deterministic atlas quarter-turn");
+		T.Require(RubbleQuadrant("brick") == 0 && RubbleQuadrant("concrete") == 1
+			&& RubbleQuadrant("wood") == 2 && RubbleQuadrant("road") == 3, "reference material quadrants");
+
+		FStartMap Map; Map.W = Map.H = 64; Map.bWorld = true; Map.Rows.assign(64, std::string(64, '+'));
+		FGround G; G.Mode = EKnownMode::Reference; G.Start(Map, {}, nullptr);
+		TCDecals::FKnownCells D; D.Reset(); D.Update(G, true, {}, Height);
+		T.Require(D.Craters().Count() == 1536, "reference World crater capacity");
+		const int First[] = { 0, 1, 2, 65, 3, 67, 5, 68, 6, 7, 71, 73, 76, 77, 78, 79 };
+		for (int I = 0; I < 16; I++) T.Require(D.Craters().Cells[(size_t)I] == First[I], "hydration uses update neighbour order");
+		const int Last[] = { 3087, 3088, 3089, 3092, 3098, 3099, 3107, 3108 };
+		for (int I = 0; I < 8; I++) T.Require(D.Craters().Cells[(size_t)(1528 + I)] == Last[I], "capacity retains the same reference cells");
+		T.Near(D.Craters().Pos[0], 3.531231641769409, 1e-7, "crater radius, rotation and jitter");
+		T.Near(D.Craters().Pos[1], .19017401337623596, 1e-7, "crater drapes 5 cm above relief");
+
+		Map.W = Map.H = 2; Map.Rows.assign(2, "++"); G.Mode = EKnownMode::Native; G.Start(Map, {}, nullptr);
+		D.Reset(); D.Update(G, true, {}, Height);
+		T.Require(D.Craters().Count() == 0, "unknown World craters never allocate pictures");
+		FCellRow Cell; Cell.C = 0; Cell.Ch = '+'; G.Apply({ Cell }); D.Update(G, false, { 0 }, Height);
+		T.Require(D.Craters().Cells == std::vector<int>{ 0 }, "a discovered crater gains a picture");
+		Cell.Ch = 'W'; G.Apply({ Cell }); D.Update(G, false, { 0 }, Height);
+		T.Require(D.Craters().Count() == 0, "a flooded crater loses its picture");
+		Map.bWorld = false; G.Start(Map, {}, nullptr); D.Reset(); D.Update(G, true, {}, Height);
+		T.Require(D.Craters().Count() == 0, "authored maps keep painted shell holes without World crater pictures");
+		return T;
+	}
+}
+
+#if defined(TC_TERRAIN_CONTRACT_CORE_ONLY)
+int main()
+{
+	int Failures = 0;
+	for (const auto& Result : { TCTerrainFormulas::ReliefRules(), TCTerrainFormulas::PaintRules(), TCTerrainFormulas::DecalRules() })
+		for (const auto& Error : Result.Errors) { std::fprintf(stderr, "%s\n", Error.c_str()); Failures++; }
+	std::printf("terrain reference formulas: 3 checks, %d failures\n", Failures);
+	return Failures ? 1 : 0;
+}
+#else
 #include "CoreMinimal.h"
 #include "Misc/AutomationTest.h"
 #include "Misc/FileHelper.h"
@@ -46,6 +197,28 @@ namespace TCTerrainContract
 		if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(FString(UTF8_TO_TCHAR((const ANSICHAR*)Raw.GetData()))), Root) || !Root.IsValid()) { T.AddError(FString::Printf(TEXT("cannot parse %s"), *Path)); return nullptr; }
 		return Root;
 	}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCTerrainRampRulesTest, "ThreeCrossroads.Terrain.RampRules", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FTCTerrainRampRulesTest::RunTest(const FString& Parameters)
+{
+	const auto Result = TCTerrainFormulas::ReliefRules();
+	for (const auto& Error : Result.Errors) AddError(UTF8_TO_TCHAR(Error.c_str()));
+	return Result.Errors.empty();
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCTerrainPaintRulesTest, "ThreeCrossroads.Terrain.PaintRules", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FTCTerrainPaintRulesTest::RunTest(const FString& Parameters)
+{
+	const auto Result = TCTerrainFormulas::PaintRules();
+	for (const auto& Error : Result.Errors) AddError(UTF8_TO_TCHAR(Error.c_str()));
+	return Result.Errors.empty();
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCTerrainDecalRulesTest, "ThreeCrossroads.Terrain.DecalRules", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FTCTerrainDecalRulesTest::RunTest(const FString& Parameters)
+{
+	const auto Result = TCTerrainFormulas::DecalRules();
+	for (const auto& Error : Result.Errors) AddError(UTF8_TO_TCHAR(Error.c_str()));
+	return Result.Errors.empty();
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCTerrainHeightOracle33Test, "ThreeCrossroads.Terrain.HeightOracle33", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -264,3 +437,5 @@ bool FTCTerrainHeightOracle33Test::RunTest(const FString& Parameters)
 }
 
 #endif
+
+#endif // TC_TERRAIN_CONTRACT_CORE_ONLY

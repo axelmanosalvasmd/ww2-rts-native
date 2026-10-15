@@ -1,5 +1,6 @@
 #include "Client/TCMatchControls.h"
 #include "Client/TCLocale.h"
+#include "Net/TCConnection.h"
 #include "Dom/JsonObject.h"
 #include "Dom/JsonValue.h"
 #include "Math/UnrealMathUtility.h"
@@ -171,6 +172,7 @@ bool FTCMatchControls::ApplyLobby(const FJsonObject& M)
 		for (const TSharedPtr<FJsonValue>& V : *Watchers) if (V.IsValid() && V->Type == EJson::String) NewSpectators.Add(V->AsString());
 
 	bHasLobby = true;
+	bRustHost = FTCConnection::HostKindOf(M) == ETCHostKind::Rust;
 	State = NewState;
 	SeatList = MoveTemp(NewSeats);
 	SpectatorNames = MoveTemp(NewSpectators);
@@ -455,6 +457,11 @@ FTCControlButton FTCMatchControls::MenuControl(ETCMatchControl Kind, int32 Slot,
 		B.Label = TEXT("Click again to confirm");
 	if (!B.bShown) B.Why = Kind == ETCMatchControl::Leave ? TEXT("a spectator has no army to hand over") : Kind == ETCMatchControl::HandAi ? TEXT("only the host, in a match, for an offline player") : TEXT("only the host");
 	else if (!Sendable(Type)) { B.bEnabled = false; B.Why = TEXT("an operative sends no match controls"); }
+	else if (bRustHost && Kind == ETCMatchControl::HandAi)
+	{
+		B.bEnabled = false;
+		B.Why = TEXT("Rust host: no AI commanders.");
+	}
 	return B;
 }
 
@@ -476,7 +483,7 @@ FTCControlRequest FTCMatchControls::PressMenu(ETCMatchControl Kind, int32 Slot, 
 	R.Kind = Kind;
 	R.Slot = Slot;
 	const FTCControlButton B = MenuControl(Kind, Slot, Now);
-	if (!B.bShown) { R.Note = B.Why.IsEmpty() ? FString(TEXT("not a menu button")) : B.Why; return R; }
+	if (!B.bShown || !B.bEnabled) { R.Note = B.Why.IsEmpty() ? FString(TEXT("not a menu button")) : B.Why; return R; }
 	auto Out = [&](const TCHAR* Type)
 	{
 		if (!Sendable(Type)) { R.Note = TEXT("sendCmd drops it"); return; }

@@ -185,6 +185,7 @@ void FTCLobbyBackdrop::Build(const FString& Name, const TSharedPtr<FJsonObject>&
 		// the match's order (ATCGameMode start): objects, the cell source, the paint, the relief, the paint bound, water
 		Objects->ApplyStart(*StartMsg, *State);
 		T->SetCellSource(Objects.Get());
+		T->SetPaintSource(Paint.Get());
 	}
 	else if (BuildStep == 1) Paint->ApplyStart(*StartMsg, *State);
 	else if (BuildStep == 2) { Terrain->ResetFrom(*State); State->bMapReset = false; Paint->Bind(Terrain->GroundMaterialInstance()); }

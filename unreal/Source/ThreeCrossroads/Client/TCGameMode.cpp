@@ -498,6 +498,7 @@ void ATCGameMode::OnMessage(const FJsonObject& M, int32 Bytes)
 		}
 		if (!WorldObjects.ApplyStart(M, State)) UE_LOG(LogTC, Error, TEXT("world objects: the start's map could not be read; no houses or wrecks this match"));
 		Terrain->SetCellSource(&WorldObjects); // relief: the physical grid (a known mine drawn as what lies under it)
+		Terrain->SetPaintSource(&GroundPaint);
 		if (!GroundPaint.ApplyStart(M, State)) UE_LOG(LogTC, Error, TEXT("ground paint: the start's map could not be read; the ground keeps its plain colours this match"));
 		const double StartAt = FPlatformTime::Seconds();
 		Persistence.ApplyStart(M, StartAt); // a pending load is answered by this start

@@ -58,7 +58,7 @@ git lfs install --local
 
 You need Rust (stable) for `rust/`, Node.js to run the reference game and its tests, Git LFS, and Unreal Engine 5.8 only for `unreal/`.
 
-## Unreal client (slices 1a to 1l)
+## Unreal client (slices 1a to 1t)
 
 Built and run on Linux with the installed Unreal 5.8.3; Windows and Mac are not built yet. The project uses the engine's empty Entry map and spawns everything from C++.
 
@@ -189,3 +189,11 @@ Before building or cooking, regenerate the reference HQ camp surface slots with 
 The mode driver sets Graphics High explicitly before every client and records the observed level in its table; set `TC_MODES_GRAPHICS=low` for a Low lane. The browser tour can reconnect a real guest with `--token-file`, use `--lang es --ui 150`, and open actual alert history with `--alert-history`. Tokens stay in local owner-only files and are never logged. For slow capture of a real loss, `--freeze-on-loss` holds only the browser presentation clock at loss age 2.5 seconds and records the delivered tick/removed IDs; it is not evidence of later simulation state.
 
 The verification-only `-TCProbeForeignStop=<id>` sends one existing Stop command for a supplied foreign unit, bypassing local selection filtering to test server ownership. Use a known other commander's unit in an isolated test room. It changes no normal input path.
+
+## Slice 1t presentation and lifecycle
+
+The bottom HUD uses the original symbol paths, embedded by `Tools/hudfit/export-icons.mjs`, with measured English/Spanish layouts at 100% and 150%. Reproduce the atlas against an isolated pinned reference server; the exporter checks the source pin. No font, icon or translation replacement is introduced.
+
+Generate the exact static HQ cloth with `Tools/bridge-replay/capture-browser.mjs --cloth-out <PNG>` and `Tools/bridge-replay/make-lookfx-assets.py` using `LOOKFX_CLOTH=<PNG>`, then regenerate camp geometry with `Client/TCCampModels.Export.mjs`. These generated assets remain build outputs, consistent with the existing content policy. The package verifier requires both cloth assets. `TC_PACKAGE_STAGE` can place staged build output separately from scratch.
+
+Rust hosts disable the unsupported Hand to AI action, including direct menu and common send paths. The renderer skips model/ring allocation in headless runs. The integrated suite covers these paths and terrain, HUD, cloth and collapse formulas. Soldier brightness, some bridge-face shading, broader visual acceptance and unrecorded later collapse motion remain open.

@@ -18,6 +18,7 @@
 #   TC_PACKAGE_WORK          work folder: the project copy, its build output, the cook and the logs
 #                            (default unreal/Saved/PackageWork). Kept between runs, so a second build is incremental.
 #   TC_PACKAGE_ARCHIVE       UAT archive folder (default <work>/archive); a build-output folder keeps scratch smaller
+#   TC_PACKAGE_STAGE         UAT stage folder (default <work>/staged)
 #   TC_PACKAGE_CLEAN=1       empty the work folder's project copy first (a build from nothing)
 #   TC_PACKAGE_JOBS          compile processes at once (default: half the logical cores, at most 8)
 #   TC_PACKAGE_MIN_FREE_GB   free space needed in the work and output folders (default 30)
@@ -159,7 +160,7 @@ uat() {
 	[[ "${TC_PACKAGE_DEBUGINFO:-0}" == 1 ]] || ubt+=" -NoDebugInfo"
 	local cmd=("$RUNUAT" BuildCookRun -project="$MIRROR/$PROJECT_NAME.uproject" -target="$PROJECT_NAME" -platform=Linux
 		-clientconfig=Development -build -cook -stage -pak -iostore -compressed -package -archive
-		-stagingdirectory="$WORK/staged" -archivedirectory="$archive" "${debug[@]}"
+		-stagingdirectory="${TC_PACKAGE_STAGE:-$WORK/staged}" -archivedirectory="$archive" "${debug[@]}"
 		-unattended -utf8output -nop4 -ubtargs="$ubt")
 	printf '%q ' "${cmd[@]}" >"$logs/uat-command.txt"; echo >>"$logs/uat-command.txt"
 	say "RunUAT BuildCookRun (log $logs/uat.log, $JOBS compile processes; shader compiling keeps the engine's default of half the cores free)"
@@ -270,6 +271,7 @@ verify() {
 		ThreeCrossroads/Content/Markers/M_TCMarkerGround.uasset ThreeCrossroads/Content/Markers/M_TCMarkerThrough.uasset ThreeCrossroads/Content/Markers/T_TCUnitBadges.uasset \
 		ThreeCrossroads/Content/World/Materials/Instances/MI_TCWorld_Surface_canvas_Painted.uasset ThreeCrossroads/Content/World/Materials/Instances/MI_TCWorld_Surface_darkwood_Painted.uasset \
 		ThreeCrossroads/Content/Effects/Materials/M_TCFxSection.uasset \
+		ThreeCrossroads/Content/Effects/Textures/T_HQCloth.uasset ThreeCrossroads/Content/Effects/Materials/M_TCHQCloth.uasset \
 		ThreeCrossroads/Content/Models/Motion/MI_InfantryFarLook.uasset ThreeCrossroads/Content/Models/Motion/MI_InfantryFarLookFaded.uasset \
 		ThreeCrossroads/Content/WarMap/Fonts/F_TCWarMapMono.uasset; do
 		grep -q "^$need"$'\t' "$manifest" || die "verify: $need is not in the package (see the cook settings in Config/DefaultGame.ini)"

@@ -457,9 +457,7 @@ void TCMarkersHud::DrawHqCamps(FTCMarkerPainter& P, const ATCGameMode& M, UFont*
 		P.Disc(Sp.X, Sp.Y, MC::HqZoneRadius(), MC::HqZoneSegments, Zone, MC::HqZoneLift, Clip);
 		MC::FLook Ring; Ring.Hex = HexOf(Seat); Ring.Opacity = MC::HqRingOpacity;
 		P.Ring(Sp.X, Sp.Y, MC::HqRingRadius(), MC::HqRingRibbon(), Ring, -1, Clip);
-		// the tall flag: a 4.5 x 2.8 m cloth centred 2.3 m east of the spawn, 13 m up
-		const FVector Cloth[4] = { FVector(Sp.X + 0.05, Sp.Y, 11.6), FVector(Sp.X + 4.55, Sp.Y, 11.6), FVector(Sp.X + 4.55, Sp.Y, 14.4), FVector(Sp.X + 0.05, Sp.Y, 14.4) };
-		P.Quad(Cloth, Seat, Sp);
+		// TCCampModels draws main.js buildHQ's textured, lit cloth.
 		Stats().HqCamps++;
 	}
 	// the tags last, over the rings

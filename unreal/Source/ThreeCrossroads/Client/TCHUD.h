@@ -39,10 +39,51 @@
 
 class UFont;
 class ATCTerrain;
+class FTCBossBar;
 
 // Round 16 (hudfit): the HUD's fit rules at a large UI scale in a small window, pure so tests read them.
 namespace FTCHudFit
 {
+	// index.html's lower-left column and #buy. Drawing and tests consume the same measured boxes.
+	constexpr float LeftW = 248.f, ScreenGap = 8.f, GridGap = 3.f, OrderH = 50.f;
+	struct FControl
+	{
+		FString Label, Icon, Key, Value, Hover;
+		FTCUiCommand Command;
+		bool bEnabled = true, bOn = false;
+	};
+	struct FSelection
+	{
+		FString Type, Name;
+		int32 Count = 1, Hp = 0, MaxHp = 0;
+		TArray<FString> Tags;
+	};
+	struct FIcon { FString Key; FBox2D Box; FLinearColor Colour; };
+	struct FHit { FBox2D Box; FControl Control; };
+	struct FTextFit { FString Text; FBox2D Box, Clip; };
+	struct FBottomLayout
+	{
+		FTCPaint Paint;
+		TArray<FIcon> Icons;
+		TArray<FHit> Hits;
+		TArray<FTextFit> TextBounds;
+		FBox2D Selection = FBox2D(ForceInit), Orders = FBox2D(ForceInit), Recruit = FBox2D(ForceInit), Economy = FBox2D(ForceInit);
+	};
+	THREECROSSROADS_API FBottomLayout LeftPanel(float ViewH, const FString& Title, const TArray<FSelection>& Selection,
+		const TArray<FString>& Details, const TArray<FControl>& Orders, const TArray<FControl>& Menu, const FTCMeasure& Measure, float Scale = 1.f);
+	THREECROSSROADS_API FBottomLayout RecruitPanel(float ViewW, float ViewH, float Right, const TArray<FString>& Headings,
+		const TArray<FControl>& Tabs, const TArray<TArray<FControl>>& Lists, const TArray<FControl>& Above, const FTCMeasure& Measure, float Scale = 1.f,
+		const TArray<FString>& Logistics = {}, int32 TotalCards = 0);
+	THREECROSSROADS_API FBottomLayout EconomyPanel(float ViewW, const FString& Money, const FString& Income, const FString& Population,
+		const TArray<FControl>& Support, const FTCMeasure& Measure, float Scale = 1.f);
+	THREECROSSROADS_API FBottomLayout Toolbar(float MaxW, const TArray<FControl>& Controls, const FTCMeasure& Measure, float Scale = 1.f);
+	THREECROSSROADS_API FBottomLayout SandboxToolbar(FVector2D View, float CornerRight, float ScoreLeft,
+		const TArray<FControl>& Controls, const TArray<FBox2D>& Avoid, const FTCMeasure& Measure, float Scale = 1.f);
+	// Prefer the browser's position. A crowded HUD docks the boss beside the centre stack and wraps the sandbox.
+	THREECROSSROADS_API FTCPaint BossCard(const FTCBossBar& Boss, FVector2D View, float Top, const FBox2D& Economy,
+		const TArray<FBox2D>& Avoid, double Now, const FTCMeasure& Measure, float Scale = 1.f);
+	// Empty on a sound layout. Text is checked against its actual container, controls against each other and panels.
+	THREECROSSROADS_API TArray<FString> LayoutErrors(const FBottomLayout& Layout, FVector2D View);
 	THREECROSSROADS_API FTCPaint NoticeCard(const FString& Shown, float ViewW, float Top, FLinearColor Colour, const FTCMeasure& Measure, float Scale = 1.f, bool bEliminated = false);
 	THREECROSSROADS_API FTCPaint MatchNoticeCard(const FString& Rate, const FString& Bonus, const FString& Notice, float ViewW, float Top, const FTCMeasure& Measure, float Scale = 1.f);
 	// index.html scores flex layout, in CSS pixels, shared by drawing and geometry tests.
@@ -57,34 +98,13 @@ namespace FTCHudFit
 	THREECROSSROADS_API double QueueDashPixelWidth(FVector2D Along, FVector2D Across);
 	// client/index.html #sandbox: left 50%, translateX(-50%), bottom 230px (zoomed with #hud)
 	constexpr float SandboxBottom = 230.f;
-	// The strip's widest: centred, its left edge right of the corner's Menu panel (CornerRight) by 4 px
-	THREECROSSROADS_API float StripMaxWidth(float ClipX, float CornerRight);
-	// Where the sandbox panel goes (UI pixels): #sandbox's own place when it is under the strip and clear of every box
-	// in Avoid (the match panel, the recruit card); else centred under the strip (StripLow). Round 17: at either place
-	// a box in SlideFrom (the alert history, which hugs the right edge) does not push it away: the panel slides left
-	// until it is 4 px clear of it (never past 8 px from the left edge).
-	THREECROSSROADS_API FBox2D SandboxPlace(float ClipX, float ClipY, FVector2D Size, float StripLow, const TArray<FBox2D>& Avoid, bool* bOutBrowserSpot = nullptr, const TArray<FBox2D>& SlideFrom = TArray<FBox2D>());
-	// The match panel's levels: 0 as built; 1 the support bar shows what the browser's buttons show (the key and the
-	// cost, no name); 2 the formation summary line goes and the logistics rows stop at 2; 3 at 1, without the heading.
-	// Round 17: 4, the browser's own fit (index.html #lowerleft { max-height } over #selection .list { min-height: 0;
-	// overflow: auto }): the panel is held under the limit, its text rows cut from the end where the list would scroll
-	// (a count '... +n' in their place, no words, as the logistics rows'), the buttons kept whole, and the hover line
-	// becomes a tooltip over the panel (the browser's title) instead of a reserved row.
-	// The first level whose top (ClipY - Gap - height) is at or under TopLimit; the last when none is.
-	THREECROSSROADS_API int32 FitLevel(const TArray<float>& Heights, float ClipY, float BottomGap, float TopLimit);
-	constexpr int32 MaxLevel = 4;
-	// Level 4's text rows: how many of Lines text rows show in Room px of rows, the last of them the count of the rest
-	// (RowPx a row); 0 when not even the count fits. Lines when they all fit.
-	THREECROSSROADS_API int32 TextRowsShown(int32 Lines, float Room, float RowPx);
 	// Round 17: main.js renderLobby's Horde record sentence after #modeInfo (leading space included), from the lobby's
 	// hordeBest (FTCMatchState::LobbyHordeBest with the lead patch; empty without it)
 	THREECROSSROADS_API FString HordeRecordText(int32 Defenders, bool bBest, int32 Wave, int32 Time, const TArray<FString>& Names);
 	THREECROSSROADS_API FString HordeRecordText(const class FTCMatchState& S);
 	// Round 17: main.js's #connectionBanner text for connection.js's 'retry' (English; drawn through TC_T: es.js has both)
 	THREECROSSROADS_API FString ConnectionBannerText(bool bFullRoom, int32 SecondsLeft);
-	// The narrowest width from Start down to Floor (in Step px steps, Floor itself last) at which Fits holds, trying
-	// narrower only while the previous width fitted; Start when nothing narrower fits.
-	THREECROSSROADS_API float NarrowerPanel(float Start, float Floor, float Step, TFunctionRef<bool(float)> Fits);
+
 }
 
 UCLASS()
@@ -164,7 +184,6 @@ private:
 	static constexpr float LobbyPanelW = 700.f, LobbyPanelMinW = 480.f;
 	// round 16: the recruit card's room the match panel gives way to (UI pixels) at a large UI scale in a small window
 	static constexpr float RecruitWantW = 300.f;
-	static float MatchPanelWidth(float RoomRight);
 	// The native status column (the connection, room and tick diagnostics, the key reminder, the pause, graphics and
 	// refusal lines and the last order's note), drawn unscaled in screen pixels. Round 15: it stays in the top left
 	// corner beside the score strip, its lines wrapped at their ' | ' columns, so it no longer runs over the paper war
@@ -204,14 +223,8 @@ private:
 	// the top it would have. Settings stay here only when there is no match menu to hold them (bSettingsInMenu).
 	float DrawMatchPanel(UFont* Font, float Width = MatchPanelW, float TopLimit = 0.f, bool bDraw = true);
 	bool bSettingsInMenu = false;
-	int32 MatchPanelLevel = 0, LoggedPanelLevel = -1;
 	void DrawRecruitPanel(UFont* Font, float Left, float Bottom);
-	// Round 17: the recruit card's top limit this frame (UI pixels; 0: none) and the browser's #buy.fit card width
-	// (.uc: clamp(50px, ..., 100px)); MatchPanelCut: the text rows the match panel's last layout cut (fit level 4)
-	float RecruitTopLimit = 0.f;
-	static constexpr float RecruitFitMinW = 50.f;
-	FString RecruitFitLogged;
-	int32 MatchPanelCut = 0;
+	void DrawBottomLayout(const FTCHudFit::FBottomLayout& Layout, UFont* Font);
 	// A line over the ground through metre points (each leg split every 2 m so it follows the relief), Lift metres up.
 	void GroundLine(const ATCTerrain& T, const TArray<FVector2D>& Points, bool bClosed, const FLinearColor& Colour, float Thickness, float Lift = 0.3f);
 	void GroundRing(const ATCTerrain& T, FVector2D At, float Radius, const FLinearColor& Colour, float Thickness);

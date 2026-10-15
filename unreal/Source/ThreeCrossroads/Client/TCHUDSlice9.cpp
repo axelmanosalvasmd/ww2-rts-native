@@ -406,14 +406,7 @@ float ATCHUD::DrawScoreStrip(UFont* Font, UFont* Big)
 	// Weather is the final row inside #scores.
 	// round 15: hud.js drawBoss, #boss in #top under the strip (Client/TCBossBar.h): the Kaiju's health while one lives
 	M->BossBar.Snapshot(S, FPlatformTime::Seconds());
-	if (M->BossBar.Shown())
-	{
-		float BossBottom = Y;
-		const FTCPaint Boss = M->BossBar.Layout(Canvas->ClipX / 2, Y, Canvas->ClipX, FPlatformTime::Seconds(), (FTCType::IsLoaded() ? FTCType::Measure() : FTCPaint::CanvasMeasure(Font)), &BossBottom, UiNow);
-		FTCType::Draw(Boss, Canvas, Font, UiNow);
-		for (const FBox2D& B : Boss.Panels) Panels.Add(ToScreen(B));
-		Y = BossBottom + 4.f;
-	}
+	// The boss is placed after #buy has been measured, so an open card cannot cover it at large zoom.
 	// round 14: objectives.js's goal box and collapse banner as objectives.css draws them (FTCScenarioText), under the
 	// strip and its lines
 	float Bottom = Y - 4.f;
@@ -852,6 +845,31 @@ bool FTCHudReferenceLayoutTest::RunTest(const FString& Parameters)
 		int32 Translated = 0;
 		for (const FTCPaintItem& I : P.Items) if (I.Kind == ETCPaintKind::Text && I.Text == TEXT("Horda")) Translated++;
 		TestEqual(TEXT("the browser observes both the Horde seat name and its role"), Translated, 2);
+	}
+	// endgame.css keeps the rate in #top, 4 CSS px after #scores. The tied line is ordinary rate text,
+	// not a world-label tooltip. Round 19 browser DOM, Conquest/Default, two seats, clear weather.
+	for (ETCLanguage Language : {ETCLanguage::English,ETCLanguage::Spanish})
+	for (float Scale : {1.f,1.5f})
+	{
+		FTCLocale::FScopedLanguage Lang(Language);
+		FTCScoreStrip Conquest; Conquest.Kind=TEXT("conquest"); Conquest.bWeather=true; Conquest.Weather=TEXT("Clear: no effect");
+		for (const TCHAR* Name : {TEXT("Alder"),TEXT("Fern")})
+		{
+			FTCScoreTeam Team; Team.bBar=true; Team.Num=TEXT("0 / 1200"); Team.U=TEXT("VP");
+			FTCScoreSeat Player; Player.Name=Name; Player.Held=TEXT("0 pts, 0 held"); Team.Seats.Add(Player); Conquest.Teams.Add(Team);
+		}
+		const FTCPaint Scores=FTCHudFit::ScoreCard(Conquest,1280/Scale,Measure,false,Scale);
+		const FBox2D Card=Scores.Panels[0];
+		const FTCPaint Rate=FTCHudFit::MatchNoticeCard(TC_T(FString(TEXT("Scores tied"))),TEXT(""),TEXT(""),1280/Scale,Card.Max.Y+4,Measure,Scale);
+		const FBox2D Notice=Rate.Panels[0];
+		TestEqual(TEXT("tied rate appears exactly once"),Rate.TextsOf(TEXT("notice:text")),TArray<FString>{TC_T(FString(TEXT("Scores tied")))});
+		TestEqual(TEXT("tied rate follows the score stack with the browser gap"),(float)(Notice.Min.Y-Card.Max.Y),4.f,.01f);
+		TestEqual(TEXT("tied rate is centred on the viewport"),(float)Notice.GetCenter().X*Scale,640.f,.01f);
+		if (Language==ETCLanguage::English)
+		{
+			TestEqual(TEXT("English tied rate width against browser DOM"),(float)Notice.GetSize().X*Scale,Scale==1?83.65625f:124.46875f,.04f);
+			TestEqual(TEXT("tied rate top against browser DOM"),(float)Notice.Min.Y*Scale,Scale==1?135.6875f:322.640625f,.04f);
+		}
 	}
 	// Browser DOM fixture at 1280x720, UI 100% and 150% (round-18/hudlook/browser-en).
 	for (const float Scale : {1.f, 1.5f})

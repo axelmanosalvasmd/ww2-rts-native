@@ -1,5 +1,7 @@
 #include "Client/TCCampModels.h"
 #include "Client/TCGameMode.h"
+#include "Client/TCUnitRenderer.h"
+#include "Client/TCLighting.h"
 #include "Client/TCMarkers.h"
 #include "World/TCTerrain.h"
 #include "World/TCFogFrontier.h"
@@ -29,7 +31,14 @@ namespace
 		C->SetStaticMesh(Mesh);
 		C->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		C->NumCustomDataFloats = 6;
-		for (int32 I = 0; I < Materials.Num(); I++) C->SetMaterial(I, Materials[I]);
+		for (int32 I = 0; I < Materials.Num(); I++)
+		{
+#if WITH_EDITOR
+			// Complete generated materials once before these dynamic meshes draw in uncooked -game.
+			if (Materials[I]) Materials[I]->GetMaterial()->EnsureIsComplete();
+#endif
+			C->SetMaterial(I, Materials[I]);
+		}
 		A->AddInstanceComponent(C); C->RegisterComponent();
 		return C;
 	}
@@ -224,6 +233,8 @@ void FTCMarkerScene::SyncModels(const ATCGameMode& M)
 	UMaterialInterface* BagMat = WithFog(Surface(TEXT("burlap"))), *WoodMat = WithFog(Surface(TEXT("wood")));
 	UStaticMesh* BagMesh = ReferenceMesh(A, BagVertices, BagMat);
 	auto* Bags = InstanceComponent(A, BagMesh, { BagMat }); Models.Add(Bags);
+	UMaterialInterface* FlagBase = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Effects/Materials/M_TCHQCloth.M_TCHQCloth"));
+	UStaticMesh* FlagMesh = ReferenceMesh(A, FlagVertices, FlagBase);
 	int32 BagCount = 0;
 	for (int32 Slot = 0; Slot < S.Spawns.Num(); Slot++)
 	{
@@ -237,6 +248,16 @@ void FTCMarkerScene::SyncModels(const ATCGameMode& M)
 			Add(Bags, FTransform(FQuat(B[3], B[4], B[5], B[6]), Origin + FVector(B[0], B[1], B[2]), FVector(B[7], B[8], B[9])), FLinearColor(B[10], B[11], B[12])); BagCount++;
 		}
 		if (!CampSlotDrawn(Slot, S.Spawns)) continue;
+		if (FlagBase)
+		{
+			auto* FlagMat = UMaterialInstanceDynamic::Create(FlagBase, A);
+			FlagMat->SetVectorParameterValue(TEXT("Color"), ATCUnitRenderer::SeatColor(Slot));
+			auto* Flag = InstanceComponent(A, FlagMesh, { FlagMat }); Models.Add(Flag);
+			Flag->SetCastShadow(false); // main.js buildHQ's flag does not cast a shadow
+			if (TCLook::HasUnitSun(M.GetWorld())) Flag->SetLightingChannels(false, true, false);
+			Add(Flag, FTransform(Origin));
+		}
+		else UE_LOG(LogTC, Error, TEXT("camp models: missing M_TCHQCloth; run Tools/bridge-replay/make-lookfx-assets.py"));
 		const int32 Faction = S.Factions.IsValidIndex(Slot) ? S.Factions[Slot] : 0;
 		const FString Type = bTent ? TEXT("hq-camp") : TEXT("hq-camp-flagpole");
 		const FTCModelEntry* Entry = Library.Find(FString::Printf(TEXT("%s|%d"), *Type, Faction));
@@ -281,6 +302,26 @@ bool FTCMarkerDepthTest::RunTest(const FString&)
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCCampPlacementTest, "ThreeCrossroads.Markers.CampPlacement", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FTCCampPlacementTest::RunTest(const FString&)
 {
+	// main.js buildHQ and GEO.plane: no time-dependent vertex displacement at the pinned revision.
+	FBox FlagBounds(ForceInit);
+	for (const auto& V : FlagVertices)
+	{
+		FlagBounds += FVector(V[0], V[1], V[2]);
+		TestTrue(TEXT("flag faces reference +Z (Unreal +Y)"), FVector(V[3], V[4], V[5]).Equals(FVector(0, 1, 0), 1e-9));
+	}
+	TestTrue(TEXT("HQ cloth dimensions from main.js"), FlagBounds.GetSize().Equals(FVector(450, 0, 280), 1e-4));
+	TestTrue(TEXT("HQ cloth is attached 5 cm from the mast at 13 m"), FlagBounds.GetCenter().Equals(FVector(230, 0, 1300), 1e-4));
+	UMaterialInterface* FlagMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Effects/Materials/M_TCHQCloth.M_TCHQCloth"));
+	if (TestNotNull(TEXT("reference cloth surface loads"), FlagMaterial)) TestTrue(TEXT("reference DoubleSide cloth"), FlagMaterial->IsTwoSided());
+	UTexture2D* Cloth = LoadObject<UTexture2D>(nullptr, TEXT("/Game/Effects/Textures/T_HQCloth.T_HQCloth"));
+	if (TestNotNull(TEXT("exported flagMat canvas loads"), Cloth))
+	{
+		TestTrue(TEXT("cloth colour texture is decoded from sRGB exactly once"), Cloth->SRGB);
+#if WITH_EDITORONLY_DATA
+		TestEqual(TEXT("reference cloth width"), int32(Cloth->Source.GetSizeX()), 128);
+		TestEqual(TEXT("reference cloth height"), int32(Cloth->Source.GetSizeY()), 64);
+#endif
+	}
 	TestEqual(TEXT("reference sandbag instances"), int32(UE_ARRAY_COUNT(CampBags)), 472);
 	TestFalse(TEXT("bag centre outside 0.75 m pad is omitted"), FTCMarkerScene::BagInside(0.74, 5, 20, 20));
 	TestTrue(TEXT("bag centre at pad is kept"), FTCMarkerScene::BagInside(0.75, 19.25, 20, 20));
@@ -316,6 +357,7 @@ bool FTCCampPlacementTest::RunTest(const FString&)
 	};
 	CheckFaces(ReferenceMesh(GetTransientPackage(), BagVertices, nullptr));
 	CheckFaces(ReferenceMesh(GetTransientPackage(), NodeVertices, nullptr));
+	CheckFaces(ReferenceMesh(GetTransientPackage(), FlagVertices, nullptr));
 #endif
 	return true;
 }

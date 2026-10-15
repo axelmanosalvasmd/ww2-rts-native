@@ -8,6 +8,7 @@
 #include "World/TCGroundSurface.h"
 #include "World/TCScatter.h"
 #include "World/TCWorldObjects.h"
+#include "World/TCGroundPaint.h"
 #include <algorithm>
 #include <limits>
 
@@ -118,7 +119,7 @@ void ATCTerrain::EnsureMaterial(bool bLow)
 	if (MaterialMid) MaterialMid->SetScalarParameterValue(TEXT("Low"), bLow ? 1.f : 0.f);
 }
 
-void ATCTerrain::CopyInputs(const FTCMatchState& State, bool bFrozen)
+void ATCTerrain::CopyInputs(const FTCMatchState& State, bool bFrozen, std::vector<int>* RoadChanges)
 {
 	const int32 N = W * H;
 	TCRelief::FRelief& R = ReliefCore;
@@ -135,31 +136,40 @@ void ATCTerrain::CopyInputs(const FTCMatchState& State, bool bFrozen)
 		R.InGrid[(size_t)C] = bSource ? CellSource->Physical(C) : Ch == 'N' ? (uint8)'.' : Ch;
 		if (bFrozen) R.InFrozen[(size_t)C] = State.Map.Levels[C];
 	}
-	// client/main.js hands relief.js ground.js's road mask (prim === ROAD): 'D' cells, and open ground by a house of the
-	// map rows that is no field and has no water beside it. Fields: ground.js fieldsOf over the rows (TCScatter.h
-	// FieldCells), clear of the capture points and the seats' spawns. World maps: no region looks are held here, so field
-	// blocks use the default chance (ground.js look?.fields ?? 0.24).
-	TCScatterCore::FScatterMap FM;
-	FM.W = W; FM.H = H;
-	FM.Rows.resize((size_t)H);
-	std::vector<uint8_t> Rows((size_t)N);
-	for (int32 Y = 0; Y < H; Y++)
+	const std::vector<uint8_t> Before = RoadChanges ? R.InRoad : std::vector<uint8_t>();
+	if (PaintSource && PaintSource->HasMap() && PaintSource->Painter().MapW() == W && PaintSource->Painter().MapH() == H)
+		PaintSource->Painter().CopyRoadMask(R.InRoad);
+	else
 	{
-		std::string& Row = FM.Rows[(size_t)Y];
-		Row.resize((size_t)W);
-		for (int32 X = 0; X < W; X++)
+		// client/main.js hands relief.js ground.js's road mask (prim === ROAD): 'D' cells, and open ground by a house of the
+		// map rows that is no field and has no water beside it. Fields: ground.js fieldsOf over the rows (TCScatter.h
+		// FieldCells), clear of the capture points and the seats' spawns. World maps: no region looks are held here, so field
+		// blocks use the default chance (ground.js look?.fields ?? 0.24).
+		TCScatterCore::FScatterMap FM;
+		FM.W = W; FM.H = H;
+		FM.Rows.resize((size_t)H);
+		std::vector<uint8_t> Rows((size_t)N);
+		for (int32 Y = 0; Y < H; Y++)
 		{
-			const int32 C = Y * W + X;
-			const uint8 Ch = State.Map.bWorld ? State.Map.Chars[C] : StartRows.IsValidIndex(C) ? StartRows[C] : (uint8)'.';
-			Row[(size_t)X] = (char)Ch;
-			Rows[(size_t)C] = Ch;
+			std::string& Row = FM.Rows[(size_t)Y];
+			Row.resize((size_t)W);
+			for (int32 X = 0; X < W; X++)
+			{
+				const int32 C = Y * W + X;
+				const uint8 Ch = State.Map.bWorld ? State.Map.Chars[C] : StartRows.IsValidIndex(C) ? StartRows[C] : (uint8)'.';
+				Row[(size_t)X] = (char)Ch;
+				Rows[(size_t)C] = Ch;
+			}
 		}
+		for (const FTCMapPoint& P : State.MapPoints) FM.Points.push_back(TCScatterCore::FCellXY{ P.X, P.Y });
+		for (const TOptional<FVector2D>& S : State.Spawns)
+			if (S.IsSet()) FM.Spawns.push_back(TCScatterCore::FCellXY{ (int)FMath::FloorToInt(S->X / TCRelief::Cell), (int)FMath::FloorToInt(S->Y / TCRelief::Cell) });
+		const std::vector<unsigned char> Fields = TCScatterCore::FieldCells(FM);
+		TCRelief::RoadMask(W, H, R.InGrid, Rows, std::vector<uint8_t>(Fields.begin(), Fields.end()), R.InKnown, R.InRoad);
 	}
-	for (const FTCMapPoint& P : State.MapPoints) FM.Points.push_back(TCScatterCore::FCellXY{ P.X, P.Y });
-	for (const TOptional<FVector2D>& S : State.Spawns)
-		if (S.IsSet()) FM.Spawns.push_back(TCScatterCore::FCellXY{ (int)FMath::FloorToInt(S->X / TCRelief::Cell), (int)FMath::FloorToInt(S->Y / TCRelief::Cell) });
-	const std::vector<unsigned char> Fields = TCScatterCore::FieldCells(FM);
-	TCRelief::RoadMask(W, H, R.InGrid, Rows, std::vector<uint8_t>(Fields.begin(), Fields.end()), R.InKnown, R.InRoad);
+	// A discovery can remove a whole 10 x 8 field block and expose roads away from the changed cell.
+	// Feed every changed road to relief.update, so those shoulders are rebuilt as well.
+	if (RoadChanges) for (int32 C = 0; C < N; C++) if (Before[(size_t)C] != R.InRoad[(size_t)C]) RoadChanges->push_back(C);
 }
 
 void ATCTerrain::Queue_(int32 Chunk, bool bShape)
@@ -204,11 +214,12 @@ void ATCTerrain::Flush(const FTCMatchState& State)
 	if (PendingCells.Num())
 	{
 		// relief.js update(cells): the cells within 3 rebuild, the chunks within 7 of them re-emit (crater lips read that far)
-		CopyInputs(State, false);
 		std::vector<int> Cells;
-		Cells.reserve((size_t)PendingCells.Num());
+		CopyInputs(State, false, &Cells);
+		Cells.reserve(Cells.size() + (size_t)PendingCells.Num());
 		for (const int32 C : PendingCells) Cells.push_back(C);
 		std::sort(Cells.begin(), Cells.end());
+		Cells.erase(std::unique(Cells.begin(), Cells.end()), Cells.end());
 		ReliefCore.Update(Cells);
 		for (const int P : ReliefCore.TakeRebuilt()) Queue_(P, true);
 		PendingCells.Reset();
@@ -511,6 +522,47 @@ bool FTCTerrainReliefOracleTest::RunTest(const FString& Parameters)
 // a bridge), then as a World map known only in part: centres per docs/contracts/terrain.md, HeightAt and RayToGround on
 // the drawn triangles, the cliff's wall hit by a level ray, unknown cells never drawn nor shaping known ground, a reveal
 // rebuilding only its chunks and matching a fresh build, and a fog flip that only recolours.
+// Relief must use the same road cells as the paint, including map spawn exclusions, and
+// refresh a road changed outside the caller's shape list (a discovered field can change as a block).
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCTerrainPaintRoadSourceTest, "ThreeCrossroads.Terrain.PaintRoadSource", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FTCTerrainPaintRoadSourceTest::RunTest(const FString& Parameters)
+{
+	using namespace TCTerrainImpl;
+	const int32 W = 40, H = 32;
+	TArray<FString> Rows, Heights;
+	Rows.Init(FString::ChrN(W, '.'), H); Heights.Init(FString::ChrN(W, '2'), H);
+	TArray<TSharedPtr<FJsonValue>> Spawns;
+	for (int32 Y = 4; Y < H; Y += 8) for (int32 X = 5; X < W; X += 10)
+	{
+		TSharedRef<FJsonObject> Spawn = MakeShared<FJsonObject>();
+		Spawn->SetNumberField(TEXT("x"), X); Spawn->SetNumberField(TEXT("y"), Y);
+		Spawns.Add(MakeShared<FJsonValueObject>(Spawn));
+		if (X + 4 < W) Rows[Y][X + 4] = 'B';
+	}
+	const auto Start = StartMessage(TEXT("paint-road-source"), W, H, Rows, Heights, false, {});
+	Start->GetObjectField(TEXT("map"))->SetArrayField(TEXT("spawns"), Spawns);
+	FTCMatchState State;
+	if (!TestTrue(TEXT("fixture start"), State.ApplyStart(*Start))) return false;
+	FTCGroundPaint Paint;
+	if (!TestTrue(TEXT("paint start"), Paint.ApplyStart(*Start, State))) return false;
+	FScratchWorld Scratch(TEXT("PaintRoadSource"));
+	ATCTerrain* Terrain = Scratch.World->SpawnActor<ATCTerrain>();
+	Terrain->SetPaintSource(&Paint); Terrain->ResetFrom(State);
+	std::vector<uint8_t> Roads; Paint.Painter().CopyRoadMask(Roads);
+	TestTrue(TEXT("relief reads the painter's complete road mask"), Terrain->Relief().InRoad == Roads);
+	ATCTerrain* Fallback = Scratch.World->SpawnActor<ATCTerrain>(); Fallback->ResetFrom(State);
+	TestTrue(TEXT("fixture exposes missing map-spawn field exclusions in the old reconstruction"), Fallback->Relief().InRoad != Roads);
+	const int32 Remote = W * H - 1;
+	TSharedRef<FJsonObject> Snapshot = MakeShared<FJsonObject>();
+	Snapshot->SetArrayField(TEXT("cells"), { MakeShared<FJsonValueArray>(TArray<TSharedPtr<FJsonValue>>{
+		MakeShared<FJsonValueNumber>(Remote), MakeShared<FJsonValueString>(TEXT("D")) }) });
+	Paint.ApplySnapshot(*Snapshot); State.Map.Chars[Remote] = 'D';
+	Terrain->MarkCells(TSet<int32>{ 0 }, {}); Terrain->Flush(State);
+	TestTrue(TEXT("a changed road outside the shape list reaches the relief"), Terrain->Relief().InRoad[(size_t)Remote] != 0);
+	TestTrue(TEXT("the newly exposed road shoulder was rebuilt"), FMath::Abs(Terrain->HeightAt((W - .5f) * 2.f, (H - .5f) * 2.f) - 4.9f) < 1e-5f);
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FTCTerrainPickingTest, "ThreeCrossroads.Terrain.Picking", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FTCTerrainPickingTest::RunTest(const FString& Parameters)
 {

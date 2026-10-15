@@ -219,7 +219,7 @@ private:
 	bool bHasLobby = false;
 	FString State, Role, Mode, Code, PublicUrlText;
 	int32 You = -1, Host = -1, Spawns = -1;
-	bool bAmHost = false, bWatching = false, bListed = false;
+	bool bAmHost = false, bWatching = false, bListed = false, bRustHost = false;
 	TArray<FSeat> SeatList;
 	TArray<FString> SpectatorNames;
 

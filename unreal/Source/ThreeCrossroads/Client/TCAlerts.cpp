@@ -492,7 +492,10 @@ FTCPaint FTCAlerts::Layout(const FTCAlertViewInput& In, const FTCMeasure& Measur
 			{
 				FEntry R;
 				R.E = &E;
-				R.Lines = FTCPaint::Wrap(TC_T(FString::Printf(TEXT("%s · %s"), *MatchClock(E.Time), *E.Text)), TextW, FontPx, false, Measure);
+				// alerts.js translates the stored loss text before renderHistory prefixes its clock. Translating the
+				// combined string lets es.js's '{0} lost' pattern move the clock into 'Perdido: {0}'.
+				const FString Shown = MatchClock(E.Time) + TEXT(" · ") + TC_T(E.Text);
+				R.Lines = FTCPaint::Wrap(Shown, TextW, FontPx, false, Measure);
 				R.H = 2 * Border + 2 * EntryPad + R.Lines.Num() * LineBox;
 				Rows.Add(MoveTemp(R));
 			}
@@ -1431,6 +1434,18 @@ bool FTCAlertsViewTest::RunTest(const FString&)
 		TestEqual(TEXT("es hint"), FString::Join(Q.TextsOf(TEXT("alert:loss-hint")), TEXT(" ")), FString(TEXT("Espacio o clic: mirar allí")));
 		TestEqual(TEXT("es summary"), Q.TextsOf(TEXT("alert:history-summary")), TArray<FString>{ TEXT("Historial de alertas") });
 		TestEqual(TEXT("es nav"), Q.TextsOf(TEXT("alert:nav-label")), TArray<FString>{ TEXT("Alerta anterior"), TEXT("Alerta siguiente") });
+		FTCAlerts LossHistory;
+		LossHistory.Mirror(TEXT("unitLost"), TEXT("MG 42 Team lost"), FVector2D(5, 5), 1800, 90.0);
+		LossHistory.bHistoryOpen = true;
+		TestEqual(TEXT("es history clock precedes the translated loss prefix"),
+			FString::Join(LossHistory.Layout(I4, M).TextsOf(TEXT("alert:entry-text")), TEXT(" ")),
+			FString(TEXT("1:30 · Perdido: Equipo MG 42")));
+		{
+			FTCLocale::FScopedLanguage English(ETCLanguage::English);
+			TestEqual(TEXT("en history keeps the same clock separator"),
+				FString::Join(LossHistory.Layout(I4, M).TextsOf(TEXT("alert:entry-text")), TEXT(" ")),
+				FString(TEXT("1:30 · MG 42 Team lost")));
+		}
 		FTCAlerts Empty;
 		Empty.bHistoryOpen = true;
 		TestEqual(TEXT("es empty list"), Empty.Layout(I4, M).TextsOf(TEXT("alert:history-empty")), TArray<FString>{ TEXT("Todavía no hay alertas") });

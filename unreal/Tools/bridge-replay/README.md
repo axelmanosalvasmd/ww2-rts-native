@@ -17,7 +17,7 @@ the cell row decode the replay relies on (state, data and structural sections) o
 Round 18 adds reference section transforms and a generated lit surface. Generate it before rendering or cooking:
 
 ```
-UnrealEditor-Cmd <scratch project> -run=pythonscript -script=<absolute path>/make-section-material.py -nullrhi -unattended
+UnrealEditor-Cmd <scratch project> -run=pythonscript -script=<absolute path>/make-section-material.py -AllowCommandletRendering -RenderOffscreen -unattended
 node section-oracle.mjs <pinned reference root> <three package root> section-oracle.json
 TC_BRIDGE_TEST_WORK=<scratch>/tests node --test replay-server.test.mjs
 ```
@@ -43,8 +43,12 @@ The archive ends at tick 8400 with 84 upright stone sections on a grid. The late
 poses and ageing local dust, not unrecorded server physics. The browser's unseeded visual randomness and the native
 particle seed differ. Software-rendered browser frames can arrive later than the requested 1 and 3 seconds; read the
 capture log's actual ages. Do not present those frames as proof of later simulation tumble.
-Round 18 capture review still finds darker native section faces and lighter dust than the browser. The section
-surface and sky inputs are ported, but rendered lighting parity remains open.
+Round 18 found darker native section faces and lighter dust. Round 19 identified an uncooked UE 5.8 ODSC
+shader fallback to WorldGridMaterial, despite a correct Color parameter. The scoped renderers now complete the
+generated material shaders during setup. Replay captures log `lookfx surface` with the requested and actual
+render-thread material, so a fallback cannot be mistaken for a palette or lighting discrepancy. Cooked shader
+behaviour is unchanged. Dust uses the live reference hemisphere divided by PI, without the engine sky/environment
+substitution or sun-scaled hot sprites. High/Low contact emission follows fx.js.
 
 Optional browser capture refinements: `--native-log <native game.log>` uses the four recorded native eye positions
 in the browser's camera, including orientation (to remove differences in ground-height easing). `--visual-clock`
@@ -54,3 +58,28 @@ the page loop and advances the unmodified effects update in at most 1/60 s subst
 render and canvas readback share one task. This drives only local
 presentation. Delivered section poses stay unchanged. The browser log includes wall age and visual age; keep normal
 timing captures when diagnosing renderer timing. This controlled pass is not a normal-browser wall-time run.
+
+
+Round 19 HQ cloth and detail views:
+
+- `capture-browser.mjs --cloth-out <scratch>/flag-cloth.png` also exports the actual reference `flagMat` canvas.
+  The supplied tick-8398 scene already contains it. The canvas is deterministic, 128 x 64, with the painted folds,
+  weave and pole-side hem. SHA256: `0bd4dcc58c36c7446afbf001b97c22f9ea3b80a35ba6b7a45cd1c0fc36d71a80`.
+- Generate the texture and Lambert cloth material on the scratch project with `LOOKFX_CLOTH=<PNG path>` and
+  `UnrealEditor-Cmd <project> -run=pythonscript -script=<absolute path>/make-lookfx-assets.py
+  -AllowCommandletRendering -RenderOffscreen -unattended`. `LOOKFX_ASSET_LOG=<JSON>` records provenance.
+  Use a real RHI for material generation checks. NullRHI cannot detect shader compile errors.
+- `TCCampModels.Export.mjs --deps <pinned npm install>` exports the reference plane with the other camp geometry.
+  The pinned `main.js` uses a static 4.5 x 2.8 m plane centred at (2.3,13,0). It contains no flag-wave formula or
+  faction emblem. The material uses the exact sRGB cloth canvas, seat tint, DoubleSide and hemisphere Lambert fill.
+  Remove the superseded flat quad in TCMarkers when integrating the camp cloth.
+- `TC_CAPTURE_VIEW=camp|soldier` changes the native replay camera to spawn 0 at 40 m or the lowest-id rifle
+  at the normal 25 m minimum.
+  `--native-log` reads that framing as well as the eye positions, so the browser camera matches detail views too.
+  Browser warm-up uses the same focus and distance. Each readback rebuilds the reference crowd for the matched
+  eye before rendering, as the normal main.js loop does.
+- Diagnostics only: `TC_CAPTURE_BUFFER=BaseColor|WorldNormal|PreTonemapHDRColor|LightingOnly` and
+  `TC_CAPTURE_NO_SHADOWS=1`. Buffer visualizations can still be affected by the custom post process.
+
+No random pose spread or client physics was added. `section-oracle.mjs` continues to exercise the reference
+`debris-motion.js` spread/tumble at five ages and four directions; live poses remain entirely packet-driven.

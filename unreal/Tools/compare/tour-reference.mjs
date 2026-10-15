@@ -120,13 +120,15 @@ for (let i = 0; i < timeout * 4 && !t0; i++) {
   try { if (await evaluate(`!!(window.__game && window.__game.snapshot)`)) t0 = Date.now(); } catch {}
 }
 if (!t0) { log({ error: 'no snapshot' }); kill(); process.exit(5); }
+// A held loss clock can also hold the opening sweep. Skip it through the reference camera API.
+if (freezeOnLoss) await evaluate(`window.__game.rig.skipIntro()`);
 // the camera's opening sweep (camera.js intro) runs first: the tour starts once it has settled
 for (let i = 0; i < 240; i++) { if (await evaluate(`!window.__game.rig.intro`)) break; await sleep(250); }
 await evaluate(`(() => { window.__game.renderer.domElement.setAttribute('data-tc-main', '1'); return true; })()`);
-const identity = await evaluate(`({ me: window.__game.me, selected: [...window.__game.selected] })`);
+const identity = await evaluate(`({ me: window.__game.me, watching: document.body.classList.contains('watching'), selected: [...window.__game.selected] })`);
 if (tokenFile && !(Number.isInteger(identity.me) && identity.me >= 0)) { log({ error: 'requested seat was not admitted', identity }); kill(); process.exit(7); }
 if (showHistory) await evaluate(`import('/client/alerts.js').then(({ alerts }) => { alerts.toggleHistory(); return alerts.history.length; })`);
-log({ watching: identity.me < 0, identity, room, lang, ui, gfx: await evaluate(`localStorage.getItem('ww2-gfx')`), mood: await evaluate(`window.__game.atmos.mood`), weather: await evaluate(`window.__game.atmos.weather`), wide: await evaluate(`window.__game.rig.wide`) });
+log({ watching: identity.watching, identity, room, lang, ui, gfx: await evaluate(`localStorage.getItem('ww2-gfx')`), mood: await evaluate(`window.__game.atmos.mood`), weather: await evaluate(`window.__game.atmos.weather`), wide: await evaluate(`window.__game.rig.wide`) });
 for (const s of tour) {
   // match time: the snapshot's tick / 20 (shared/sim.js TICK), as the native switch reads it
   for (;;) { const tick = await evaluate(`window.__game.snapshot ? window.__game.snapshot.tick : 0`); if (tick / 20 >= s.t) break; await sleep(200); }
@@ -161,6 +163,22 @@ for (const s of tour) {
   if (selectType) {
     const sel = await evaluate(`(() => { const g = window.__game, seat = ${seatArg === '' ? '(Number.isInteger(g.me) && g.me >= 0 ? g.me : 0)' : +seatArg}; let best = null; for (const [id, v] of g.units) { if (v.type === ${JSON.stringify(selectType)} && v.owner === seat && v.hp > 0 && (best === null || +id < best)) best = +id; } g.selected.clear(); if (best !== null) g.selected.add(best); return best; })()`);
     log({ selected: sel, type: selectType, pose: s.name });
+    // Paused snapshots do not redraw the selection DOM after a direct camera-tool selection.
+    // Use the reference Idle control to refresh it, and require the requested type to be visible.
+    const drawn = await evaluate(`(() => {
+      const g = window.__game, type = ${JSON.stringify(selectType)};
+      const hasRow = () => [...document.querySelectorAll('#selection .srow')].some(e => e.dataset.type === type);
+      if (hasRow()) return true;
+      for (let i = 0; i < 32; i++) {
+        const idle = document.querySelector('#selection [data-idle]');
+        if (!idle) break;
+        idle.click();
+        if ([...g.selected].some(id => g.units.get(id)?.type === type) && hasRow()) return true;
+      }
+      return false;
+    })()`);
+    if (!drawn) { log({ error: 'requested selection has no visible HUD row', type: selectType }); kill(); process.exit(8); }
+    await evaluate(`(() => { const c = window.__game.cam; c.x = ${s.x}; c.z = ${s.z}; c.yaw = ${yaw}; c.dist = ${s.wide != null ? `window.__game.rig.wide * ${s.wide}` : s.dist}; return true; })()`);
   }
   // frames drawn while the view settles, 4 s (requestAnimationFrame intervals: the software renderer's, not a measure of the game)
   const frames = await evaluate(`new Promise((done) => { const t = []; let last = performance.now(); const t0 = last, end = last + 4000; const f = (now) => { t.push(now - last); last = now; if ((now < end || t.length < ${minFrames}) && now < t0 + 90000) requestAnimationFrame(f); else done(t); }; requestAnimationFrame(f); })`);
