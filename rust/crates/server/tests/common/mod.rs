@@ -1,0 +1,249 @@
+use serde_json::{Value, json};
+use std::{
+    fs::{self, File},
+    io::{BufRead, BufReader, Read, Write},
+    net::{SocketAddr, TcpStream},
+    path::PathBuf,
+    process::{Child, Command, Stdio},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        mpsc,
+    },
+    time::Duration,
+};
+use ww2_core::client_view::ClientView;
+
+static NEXT: AtomicU64 = AtomicU64::new(1);
+
+pub struct BinaryServer {
+    child: Child,
+    pub address: SocketAddr,
+    log: PathBuf,
+}
+impl BinaryServer {
+    pub fn start(trusted: bool, seed: u64) -> Self {
+        let log = std::env::temp_dir().join(format!(
+            "ww2-r1-{}-{}.log",
+            std::process::id(),
+            NEXT.fetch_add(1, Ordering::Relaxed)
+        ));
+        let mut command = Command::new(env!("CARGO_BIN_EXE_ww2-server"));
+        command
+            .args(["--bind", "127.0.0.1:0"])
+            .env_remove("PUBLIC_URL")
+            .env_remove("WW2_BIND")
+            .stdout(Stdio::piped())
+            .stderr(File::create(&log).unwrap());
+        if trusted {
+            command.args(["--trusted-room", "ABC", "--seed", &seed.to_string()]);
+        }
+        let mut child = command.spawn().unwrap();
+        let stdout = child.stdout.take().unwrap();
+        let (sender, receiver) = mpsc::channel();
+        std::thread::spawn(move || {
+            let mut line = String::new();
+            let result = BufReader::new(stdout).read_line(&mut line).map(|_| line);
+            let _ = sender.send(result);
+        });
+        let mut server = Self {
+            child,
+            address: "127.0.0.1:0".parse().unwrap(),
+            log,
+        };
+        let line = receiver
+            .recv_timeout(Duration::from_secs(20))
+            .expect("ordinary binary listening deadline")
+            .unwrap();
+        server.address = line
+            .trim()
+            .strip_prefix("LISTENING http://")
+            .expect("ordinary binary address")
+            .parse()
+            .unwrap();
+        server
+    }
+    pub fn log(&self) -> String {
+        fs::read_to_string(&self.log).unwrap()
+    }
+    pub fn receipts(&self) -> Vec<Value> {
+        self.log()
+            .lines()
+            .filter_map(|line| line.strip_prefix("NATIVE_MATCH "))
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect()
+    }
+    pub fn wait_fault(&self) -> Value {
+        let began = std::time::Instant::now();
+        loop {
+            if let Some(line) = self
+                .log()
+                .lines()
+                .find_map(|line| line.strip_prefix("NATIVE_FAULT "))
+            {
+                return serde_json::from_str(line).unwrap();
+            }
+            assert!(
+                began.elapsed() < Duration::from_secs(90),
+                "no actual contact fault in host log: {}",
+                self.log()
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    }
+    pub fn directory(&self) -> Value {
+        let mut stream = TcpStream::connect(self.address).unwrap();
+        stream
+            .set_read_timeout(Some(Duration::from_secs(10)))
+            .unwrap();
+        write!(
+            stream,
+            "GET /api/rooms HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n",
+            self.address
+        )
+        .unwrap();
+        let mut text = String::new();
+        stream.read_to_string(&mut text).unwrap();
+        let (_, body) = text.split_once("\r\n\r\n").unwrap();
+        serde_json::from_str(body).unwrap()
+    }
+}
+impl Drop for BinaryServer {
+    fn drop(&mut self) {
+        let _ = self.child.kill();
+        let _ = self.child.wait();
+        if std::thread::panicking() {
+            eprintln!(
+                "ordinary binary host log: {}\n{}",
+                self.log.display(),
+                self.log()
+            );
+        } else {
+            let _ = fs::remove_file(&self.log);
+        }
+    }
+}
+
+pub struct Client {
+    pub socket: TcpStream,
+    pub view: ClientView,
+    pub messages: Vec<Value>,
+    marker: u64,
+}
+impl Client {
+    pub fn open(address: SocketAddr, room: &str, hello: Value) -> Self {
+        let mut socket = TcpStream::connect(address).unwrap();
+        socket
+            .set_read_timeout(Some(Duration::from_secs(10)))
+            .unwrap();
+        socket
+            .set_write_timeout(Some(Duration::from_secs(10)))
+            .unwrap();
+        write!(socket,"GET /ws?room={room} HTTP/1.1\r\nHost: {address}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n").unwrap();
+        let mut headers = Vec::new();
+        while !headers.ends_with(b"\r\n\r\n") {
+            let mut byte = [0];
+            socket.read_exact(&mut byte).unwrap();
+            headers.push(byte[0]);
+            assert!(headers.len() < 8192);
+        }
+        assert!(
+            String::from_utf8(headers)
+                .unwrap()
+                .starts_with("HTTP/1.1 101")
+        );
+        let mut client = Self {
+            socket,
+            view: ClientView::new(),
+            messages: Vec::new(),
+            marker: 0,
+        };
+        client.send(hello);
+        client
+    }
+    pub fn join(address: SocketAddr, token: &str) -> Self {
+        let mut client = Self::open(
+            address,
+            "ABC",
+            json!({"t":"hello","name":token,"token":token,"proto":0}),
+        );
+        client.until(|m| m["t"] == "lobby");
+        client
+    }
+    pub fn send(&mut self, message: Value) {
+        let bytes = message.to_string().into_bytes();
+        let mask = [13_u8, 17, 19, 23];
+        let mut frame = vec![0x81];
+        match bytes.len() {
+            n if n < 126 => frame.push(0x80 | n as u8),
+            n => {
+                frame.push(0x80 | 126);
+                frame.extend(u16::try_from(n).unwrap().to_be_bytes());
+            }
+        }
+        frame.extend(mask);
+        frame.extend(bytes.iter().enumerate().map(|(i, b)| b ^ mask[i % 4]));
+        self.socket.write_all(&frame).unwrap();
+    }
+    pub fn frame(&mut self) -> (u8, Vec<u8>) {
+        let mut header = [0; 2];
+        self.socket.read_exact(&mut header).unwrap();
+        assert_eq!(header[1] & 0x80, 0);
+        assert_ne!(header[0] & 0x80, 0);
+        let size = match header[1] & 127 {
+            126 => {
+                let mut b = [0; 2];
+                self.socket.read_exact(&mut b).unwrap();
+                usize::from(u16::from_be_bytes(b))
+            }
+            127 => {
+                let mut b = [0; 8];
+                self.socket.read_exact(&mut b).unwrap();
+                usize::try_from(u64::from_be_bytes(b)).unwrap()
+            }
+            n => usize::from(n),
+        };
+        assert!(size < 16 * 1024 * 1024);
+        let mut body = vec![0; size];
+        self.socket.read_exact(&mut body).unwrap();
+        (header[0] & 15, body)
+    }
+    pub fn receive(&mut self) -> Value {
+        let (kind, body) = self.frame();
+        assert_eq!(kind, 1, "expected JSON text frame");
+        let text = String::from_utf8(body).unwrap();
+        let message: Value = serde_json::from_str(&text).unwrap();
+        self.view
+            .apply(&text)
+            .unwrap_or_else(|e| panic!("actual ClientView rejected {}: {e}", message["t"]));
+        assert!(
+            message.get("seed").is_none()
+                && message.get("weatherSeed").is_none()
+                && message.get("options").is_none()
+        );
+        if message["t"] == "start" {
+            assert_eq!(message.as_object().unwrap().len(), 13);
+        }
+        self.messages.push(message.clone());
+        message
+    }
+    pub fn until(&mut self, wanted: impl Fn(&Value) -> bool) -> Value {
+        for _ in 0..512 {
+            let message = self.receive();
+            if wanted(&message) {
+                return message;
+            }
+        }
+        panic!("expected packet not received within 512 messages");
+    }
+    pub fn barrier(&mut self) -> Vec<Value> {
+        self.marker += 1;
+        let marker = self.marker;
+        let begin = self.messages.len();
+        self.send(json!({"t":"ping","c":marker}));
+        self.until(|m| m["t"] == "pong" && m["c"] == marker);
+        self.messages[begin..].to_vec()
+    }
+    pub fn deny(&mut self, command: &str) -> Value {
+        self.until(|m| m["t"] == "deny" && m["cmd"] == command)
+    }
+}
