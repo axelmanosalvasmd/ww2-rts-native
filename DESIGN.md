@@ -1,5 +1,15 @@
 # Three Crossroads Native: design decisions
 
+## Queued-Dig component arrival phase repair (2026-10-15, source only)
+
+The exact `ef81d708359013bdf31224a993f35dbcb7cf3f54` qualification passed five native checks, then selection 6 failed at `match_projects_original_checks.rs:423`: `the dig activates after the leading move`. Eight checks, including the authentic optional fixture consumer, and Clippy remained unrun. Preserve the actual report, results and raw failure in `/tmp/eng-five-native-2152-e92ceac8/`; this child does not rerun or relabel them.
+
+The authored component clock omitted Move completion. Pinned Source `shared/sim.js:5349-5351` completes the current Move and retries an empty route before `startQueuedOrders`. Native `match_tick.rs` calls `prepare_unit_commands_observing` at that same pre-timer phase. Its public `prepare_unit_commands` wrapper uses the existing route-end distance, empty-path and speed checks before clearing `world_goal` and serving the queue. A Move sets `world_goal`; both native queued-Dig busy checks retain it. The old clock called only `start_queued_orders`, so even reaching the waypoint could not release that goal. Its idle project/work phases and physical movement do not supply the missing completion phase. This is a witness composition defect; the failure does not demonstrate a runtime provider defect.
+
+Replace only that clock call with `prepare_unit_commands(id, false)`. All fourteen named test bodies, original assertions, authored inputs, coordinates and bounds remain byte for byte unchanged, including the 160-step activation bound, 400-step completion bound and 80-step unaffordable-skip bound. Canonical movement and arrival checks remain responsible for reaching the destination. The repair adds no direct pose, wallet, RNG, queue, goal or work-state assignments. Runtime providers, fixtures, BASES, Acceptance cells, kind-7 owner-view guard and unapplied proposals stay exact.
+
+This is a source-only child of ef81. Cargo, native tests, Source, formatting, lint and reruns are not authorized here; the repaired head has no execution result. Root retains the ledger, a fresh exact-scope grant and final review/publication/merge. The Source producer remains a52 with immutable ada3b28c capture; the ca56 failure stays a failure. ENG-15/16/17/23/24 remain in progress, and IMPL_ENGINEERING retains first publication priority. Receipt of issue #5 owner and Hermes replies is separate from consent to this child.
+
 ## Queued-Dig qualification formatting child (2026-10-15)
 
 The first S1 formatting check at `a52a77764d56c593fbf4731c5471a4d5780a94ae` exits1 on five owned Rust files. Keep its full diagnostic at `/tmp/eng-five-native-2152-e92ceac8/fmt.log`. Apply exactly the formatter output to those five files. The token receipt records only comma and closure-brace changes beyond whitespace. Every literal, assertion and authored input remains intact. No native check has run at this checkpoint.

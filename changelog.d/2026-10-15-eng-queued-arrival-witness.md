@@ -1,0 +1,1 @@
+- Repair the queued-Dig component clock to run native Move completion before queue activation. Keep every original predicate, input and wait bound. The earlier five-pass, one-failure, eight-unrun result remains attributed to ef81; this source-only repair has not been executed.

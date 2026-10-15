@@ -48,7 +48,7 @@ fn step(m: &mut Match) {
     m.begin_path_tick(4096, 20).unwrap();
     let ids = m.world.game.units.keys().copied().collect::<Vec<_>>();
     for &id in &ids {
-        m.start_queued_orders(id, false).unwrap();
+        m.prepare_unit_commands(id, false).unwrap();
     }
     for id in ids {
         m.world.game.units.get_mut(&id).unwrap().repath -= 0.05;
