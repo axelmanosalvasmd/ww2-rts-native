@@ -29,6 +29,8 @@ mod air_retirement;
 mod assault_finish;
 #[path = "../assault_start.rs"]
 mod assault_start;
+#[path = "../base_ordinary_checks.rs"]
+mod base_ordinary_checks;
 #[path = "../compiled_rules.rs"]
 mod compiled_rules;
 #[path = "../conquest_finish.rs"]
@@ -79,6 +81,8 @@ mod match_tick;
 mod match_tick_companions;
 #[path = "../match_tick_events.rs"]
 mod match_tick_events;
+#[path = "../mode_predicates.rs"]
+mod mode_predicates;
 #[path = "../movement.rs"]
 mod movement;
 #[path = "../movement_existing_checks.rs"]

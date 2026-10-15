@@ -12,6 +12,12 @@ At baseline `34edf52a7eaa6cb6edba3e802c2190226228276f`, IMPL_MOV_2 prepares MOV-
 No Source recorder, Cargo, rustc or native run is performed: Root's three slots are assigned elsewhere. The new fixture remains absent and the new tests fail on its absence; this source-only checkpoint is not integration-ready. No row becomes ported. [The handoff](docs/parity/movement-stream-two-preparation.md) records complete predicates, missing consumers, exact pending commands and resource requirements. No terrain provider, ABI, gameplay/privacy decision or whole-match criterion changes.
 
 
+## Engineering weather predicate checkpoint (2026-10-15, unexecuted)
+
+At base `34edf52a7eaa6cb6edba3e802c2190226228276f`, the `IMPL_ENGINEERING` batch adds five focused tests for existing ENG-59 and ENG-73 through ENG-76. They exercise the current mud-speed, weather-speed, sight, catalog, plan and warning providers. The five-state application matrix covers all 47 unit kinds, including completed buildings and explicitly constructed aircraft. Existing weather fixtures and all old assertions remain unchanged.
+
+The checkpoint runs no native or Source job without Root's slot grant and promotes no row. Literal expectations are read from pinned Source, not a new recording. Fresh helper-matrix Source checks, native execution and the broader travel, live vision/AI and recipient-snapshot scenarios remain pending. No runtime, terrain, public interface or gameplay decision changes. The [predicate map and exact pending commands](docs/runtime/engineering-weather-checkpoint.md) distinguish the existing recorded oracle from the new unexecuted assertions.
+
 ## Parallel Rust verification and dependency caching (2026-10-14)
 
 PR #214 at `ee7bdc3c899b912f229dade7e5d58855052d87b7` separates lint, tests and release into three jobs on each of Ubuntu 24.04, Windows 2025 and macOS 15, for nine jobs total. Strict locked workspace/all-target Clippy remains on all three platforms. Locked workspace tests use cargo-nextest 0.9.148 with Cargo's existing `ci-test` profile and nextest's `ci` profile; explicit locked `cargo test --doc` retains doctests on all three. Locked release FFI builds remain on all three, with strict C11 linking and formation replay on Linux. Test jobs retain the 60-minute limit; lint and release jobs have 30-minute limits.
