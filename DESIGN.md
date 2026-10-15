@@ -1,5 +1,9 @@
 # Three Crossroads Native: design decisions
 
+## BASE-15 pending-drop composition plan (2026-10-15, unexecuted)
+
+The source-only [BASE-15 checkpoint](docs/runtime/base15-pending-drop-checkpoint.md) maps the complete selected pending-paratrooper history to existing ordinary support/recruitment/tick consumers. Its proposed three scenes preserve canonical constructors, fill capacity through real purchases and obtain interception through an actual opposing Cover request. The original Source fixture clears actors and inserts temporary makers/cover, so the retained-scene population/global-count correspondence must be reviewed explicitly. This checkpoint adds no recorder, test, runtime rule or eligibility claim; recording, registration and native execution remain future granted work. BASE-15 and every other parity cell stay exact.
+
 ## Engineering weather predicate checkpoint (2026-10-15, unexecuted)
 
 At base `34edf52a7eaa6cb6edba3e802c2190226228276f`, the `IMPL_ENGINEERING` batch adds five focused tests for existing ENG-59 and ENG-73 through ENG-76. They exercise the current mud-speed, weather-speed, sight, catalog, plan and warning providers. The five-state application matrix covers all 47 unit kinds, including completed buildings and explicitly constructed aircraft. Existing weather fixtures and all old assertions remain unchanged.

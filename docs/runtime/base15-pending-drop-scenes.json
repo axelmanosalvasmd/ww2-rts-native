@@ -1,0 +1,21 @@
+{
+  "status": "source-only unimplemented scene plan, no generated expectation or pass",
+  "base": "446671b977abfa6bf689fcb8853833d36519faab",
+  "row": "BASE-15",
+  "source_pin": "e4e579a838aabae3b1d9dadbc17a0a87147bc52d",
+  "original_check": "Pending paratroopers reserve population for the whole stick until it arrives or its plane is shot down",
+  "scene_admission": "paired original constructors with all ten actors; one declared remote neutral point; no actor/structure deletion, temporary maker or cover injection",
+  "map": {"w": 80, "h": 80, "ground": "all open", "spawns": [[12, 40], [68, 40]], "neutral_point": [40, 8]},
+  "options": {"mode": "conquest", "army": "standard", "seed": 701, "shuffle": false, "weather": false, "tech": false, "supply": false, "logistics": false, "sandbox": false},
+  "target_world": [45, 81],
+  "setup": {"names": ["a", "b"], "teams": [0, 1], "factions": [0, 1], "mp_per_seat": 10000, "preserve_canonical_spawns_and_all_original_actor_ids": true, "initial_pop_to_assert": 3, "cap_to_assert": 12, "para_roster_to_assert": ["rifle", "rifle", "mg"]},
+  "scenes": [
+    {"name": "whole-stick-insufficient", "actual_rifle_buys": 7, "commands": 8, "ticks": 0, "owned_pop_before": 10, "para": "actual Support must deny Pop with every canonical identity/wallet/queue/strike unchanged"},
+    {"name": "pending-then-delivered", "actual_rifle_buys": 6, "commands": 8, "ticks": 124, "owned_pop_before": 9, "pending_pop": 12, "denied_buy": "actual Buy rifle before arrival, no debit or ID/queue change", "resolution": "exactly three real births; no para strike/reservation; actual owned field pop12; global count16->19 with original actors retained"},
+    {"name": "pending-then-intercepted", "actual_rifle_buys": 6, "commands": 10, "ticks": 165, "cover": "owner1 real Support cover; 41 full ticks before para", "pending_pop": 12, "denied_buy": "actual Buy rifle before interception, no debit or ID/queue change", "resolution": "actual fighters ShotDown; no para births; no para strike/reservation; real subsequent Buy succeeds, one real newborn, owned pop10"}
+  ],
+  "count_plan": {"scenes": 3, "support_and_Buy_commands": 26, "complete_ticks": 289, "future_native_tests_after_registration": 3, "future_guards": 2, "executed": 0},
+  "evidence_limit": "canonical scene correspondence requires independent review; original cleared-fixture popOf==global size is not literal in this retained two-player actor scene",
+  "runtime_provider_gap_found": false,
+  "missing_work": "implement one new original-Source recorder and actual full-tick native composition; register module only when authorized; record/compile only after Root grant"
+}
