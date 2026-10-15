@@ -63,7 +63,12 @@ fn compare(actual: &Value, expected: &Value, label: &str) {
             (Value::Array(a), Value::Array(b)) => {
                 assert_eq!(a.len(), b.len(), "{label}:{path}");
                 for (i, (a, b)) in a.iter().zip(b).enumerate() {
-                    visit(a, b, bits, &format!("{path}.{i}"), label);
+                    let child = if path.is_empty() {
+                        i.to_string()
+                    } else {
+                        format!("{path}.{i}")
+                    };
+                    visit(a, b, bits, &child, label);
                 }
             }
             (Value::Object(a), Value::Object(b)) => {
