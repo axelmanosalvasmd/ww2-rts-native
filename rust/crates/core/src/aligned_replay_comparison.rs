@@ -33,7 +33,11 @@ impl R1Profile {
 fn canonical_snapshot(snapshot: &Value, _: &R1Profile) -> (Value, Vec<String>) {
     let mut result = snapshot.clone();
     let mut mapped = Vec::new();
-    if let Some(players) = result.get_mut("players").and_then(Value::as_array_mut).filter(|p| p.len() == 2) {
+    if let Some(players) = result
+        .get_mut("players")
+        .and_then(Value::as_array_mut)
+        .filter(|p| p.len() == 2)
+    {
         for (slot, player) in players.iter_mut().enumerate() {
             if player["slot"].as_u64() != Some(slot as u64)
                 || player["team"].as_u64() != Some(slot as u64)
@@ -42,7 +46,9 @@ fn canonical_snapshot(snapshot: &Value, _: &R1Profile) -> (Value, Vec<String>) {
             }
             if let Some(object) = player.as_object_mut() {
                 for field in FIELDS {
-                    let absent = object.get(field).is_none_or(|v| *v == json!({"absent":true}));
+                    let absent = object
+                        .get(field)
+                        .is_none_or(|v| *v == json!({"absent":true}));
                     if absent {
                         object.insert(field.into(), zero());
                         mapped.push(format!("$.players[{slot}].{field}"));
@@ -56,7 +62,9 @@ fn canonical_snapshot(snapshot: &Value, _: &R1Profile) -> (Value, Vec<String>) {
 
 pub(super) fn compare_frames(trace: &Value, native: &Value) -> Result<Value, String> {
     let profile = R1Profile::validate(trace)?;
-    let source = trace["frames"].as_array().ok_or("missing raw Source frames")?;
+    let source = trace["frames"]
+        .as_array()
+        .ok_or("missing raw Source frames")?;
     let native = native.as_array().ok_or("missing raw native frames")?;
     if source.len() != 601 || native.len() != 601 {
         return Err("canonical comparison requires all 601 raw frames".into());
@@ -74,13 +82,23 @@ pub(super) fn compare_frames(trace: &Value, native: &Value) -> Result<Value, Str
         }
         let (source, source_fields) = canonical_snapshot(source, &profile);
         let (native, native_fields) = canonical_snapshot(native, &profile);
-        for field in source_fields { *source_mapped.entry(field).or_default() += 1; }
-        for field in native_fields { *native_mapped.entry(field).or_default() += 1; }
+        for field in source_fields {
+            *source_mapped.entry(field).or_default() += 1;
+        }
+        for field in native_fields {
+            *native_mapped.entry(field).or_default() += 1;
+        }
         if let Some(delta) = original::compare_projection_for_test(&source, &native) {
-            if first.is_none() { first = Some(json!({"tick":tick,"difference":delta})); }
+            if first.is_none() {
+                first = Some(json!({"tick":tick,"difference":delta}));
+            }
         } else {
-            if tick % 10 == 0 { matched += 1; }
-            if tick > 0 { ticks_matched += 1; }
+            if tick % 10 == 0 {
+                matched += 1;
+            }
+            if tick > 0 {
+                ticks_matched += 1;
+            }
         }
     }
     Ok(json!({
@@ -103,8 +121,11 @@ fn currency_defaults_are_symmetric_and_preserve_real_differences() {
     let frame = |field: &str, value: Option<Value>| {
         let mut frame = json!({"players":[{"slot":0,"team":0,"fuel":zero(),"mun":zero()},{"slot":1,"team":1,"fuel":zero(),"mun":zero()}],"tick":0});
         let object = frame["players"][0].as_object_mut().unwrap();
-        if let Some(value) = value { object.insert(field.into(), value); }
-        else { object.remove(field); }
+        if let Some(value) = value {
+            object.insert(field.into(), value);
+        } else {
+            object.remove(field);
+        }
         frame
     };
     let equal = |a: &Value, b: &Value| {
@@ -131,8 +152,14 @@ fn currency_defaults_are_symmetric_and_preserve_real_differences() {
                 number("8000000000000000", json!(-0.0)),
                 number("7ff0000000000000", json!("Infinity")),
                 number("7ff8000000000000", json!("NaN")),
-                Value::Null, json!(false), json!([]), json!({}), json!("0"), json!(0),
-                json!({"absent":false}), json!({"absent":true,"extra":1}),
+                Value::Null,
+                json!(false),
+                json!([]),
+                json!({}),
+                json!("0"),
+                json!(0),
+                json!({"absent":false}),
+                json!({"absent":true,"extra":1}),
             ] {
                 let present = frame(field, Some(nondefault));
                 assert_eq!(canonical_snapshot(&present, &validated).0, present);
@@ -162,9 +189,22 @@ fn currency_defaults_are_symmetric_and_preserve_real_differences() {
     assert!(!equal(&null_players, &missing_players));
     let absent_both = json!({"players":[{"slot":0,"team":0},{"slot":1,"team":1}],"tick":0});
     let (all_defaults, mapped) = canonical_snapshot(&absent_both, &validated);
-    assert_eq!(mapped, vec!["$.players[0].fuel", "$.players[0].mun", "$.players[1].fuel", "$.players[1].mun"]);
+    assert_eq!(
+        mapped,
+        vec![
+            "$.players[0].fuel",
+            "$.players[0].mun",
+            "$.players[1].fuel",
+            "$.players[1].mun"
+        ]
+    );
     assert_eq!(all_defaults, frame("fuel", Some(zero())));
-    for (key, value) in [("logistics",json!(true)),("weatherSeed",json!(0)),("mode",json!("classic")),("army",json!("large"))] {
+    for (key, value) in [
+        ("logistics", json!(true)),
+        ("weatherSeed", json!(0)),
+        ("mode", json!("classic")),
+        ("army", json!("large")),
+    ] {
         let mut changed = context.clone();
         changed["profile"][key] = value;
         assert!(R1Profile::validate(&changed).is_err());

@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Format the frozen comparison-only R1 currency rule and its regression vectors before the authorized four-check native run. No comparison rule, input or engine behavior changes.
+
 - Add the explicitly authorized R1 comparison-only currency rule: absent Fuel/Munitions keys or exact absence markers use positive-zero defaults on both projected snapshots. Preserve every present value, the raw 0/61 result and all source/native traces. Add focused positive and negative vectors; canonical 61-checkpoint results and fresh review are pending.
 
 - Merge the frozen aligned R1 test seam onto exact post-256 main d412aad6, preserving both complete histories and every incoming row, registry and fixture. Keep the measured 0/61 MISMATCH and tick-0 Fuel absence versus zero; earlier execution stays on its producing heads, with successor review pending and no reruns or row moves.

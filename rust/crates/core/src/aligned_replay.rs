@@ -244,7 +244,8 @@ fn original_r1_aligned_61_checkpoints() {
         Err("raw runner did not complete".into())
     };
     let canonical_complete = canonical_result.is_ok();
-    report["canonicalComparison"] = canonical_result.unwrap_or_else(|error| json!({"failure":error}));
+    report["canonicalComparison"] =
+        canonical_result.unwrap_or_else(|error| json!({"failure":error}));
     let output = std::env::var_os("WW2_ALIGNED_REPORT").expect("private report path required");
     std::fs::write(output, serde_json::to_vec(&report).unwrap()).unwrap();
     println!(
