@@ -1,5 +1,22 @@
 # Three Crossroads Native: design decisions
 
+## MAP qualification formatting child (2026-10-15)
+
+The authorized S1 formatting check at frozen `f1928e13` exits1 with one
+BASE assertion wrap at construction_tick/base_selected.rs:63. Its raw log
+is retained at `/tmp/map-f192-S1-52b4776c/fmt.log`. The actual scope confirms
+CPU0-3, MemoryMax6442450944, MemorySwapMax0 and CPUQuota4s; the guard reports
+61522472960 available bytes above its20GiB floor. No native test ran.
+
+Apply only the reported assertion collapse. The complete non-whitespace
+Rust byte sequence is identical to the authorized runtime head, including
+all literals and assertions. Root explicitly allows this mechanical child
+and freezing it before the focused checks. The initial diagnostic remains
+a formatting failure; it is not a native test failure or a pass. After
+freezing, recheck formatting and run only the six named existing gates,
+then strict core/simtest ci-test all-target Clippy if all pass. Status cells
+remain unchanged until the complete authorized pass and review sequence.
+
 ## Authorized map validation text repair (2026-10-15, execution pending)
 
 Root reviewed the concrete validator proposal and pinned Source validation

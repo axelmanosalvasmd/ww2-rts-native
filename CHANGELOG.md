@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Apply the single mechanical BASE assertion wrap reported by the first authorized MAP formatting check at `f1928e13`. Preserve every assertion/literal and the failed log; native checks have not started.
+
 - Match the pinned Source validation text for map names, sizes, rows, heights, defenders and Assault clocks without changing admission. Update the single BASE raw-map name-error expectation to the same text, retaining its invalid input and refusal. The three strict message tests, full map corpus, complete Assault check and affected BASE replay have not run; MAP-04/05/07/117 remain held pending Root execution and review.
 
 - Recover the reviewed MAP-97 ported status on frozen main, retaining its original two 120-action native passes at `0b62374461` and unchanged memory source/fixtures. Keep the seven other assigned statuses held pending their complete checks; no execution ran in this successor.
