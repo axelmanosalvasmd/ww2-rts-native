@@ -172,7 +172,7 @@ fn resets(fixture: &Value) {
     assert_eq!(guest_start["matchId"], start["matchId"]);
     cleared(&guest);
     let guest_first = until_checked(&mut guest, |m| m["t"] == "s");
-    full(&guest, &guest_first, &fixture["initial"]);
+    full(&guest, &guest_first, &fixture["guestInitial"]);
     host.send(json!({"t":"team","slot":0,"v":5}));
     host.send(json!({"t":"faction","slot":0,"v":3}));
     host.send(json!({"t":"ping","c":"settings-refused-in-play"}));
@@ -213,6 +213,7 @@ fn resets(fixture: &Value) {
     assert_eq!(drop_start["matchId"], start["matchId"]);
     assert_eq!(drop_start["you"], 1);
     cleared(&returned);
+    until_checked(&mut returned, |m| m["t"] == "pause" && m["paused"] == false);
     let drop_full = until_checked(&mut returned, |m| m["t"] == "s");
     full(&returned, &drop_full, &fixture["dropFull"]);
     assert!(replacement.view.unit_count() > 0);
@@ -222,6 +223,12 @@ fn resets(fixture: &Value) {
     cleared(&replacement);
     let restarted = until_checked(&mut replacement, |m| m["t"] == "s");
     full(&replacement, &restarted, &fixture["restarted"]);
+    let guest_restart = until_checked(&mut returned, |m| m["t"] == "start");
+    assert_eq!(guest_restart["matchId"], restart["matchId"]);
+    assert_eq!(guest_restart["you"], 1);
+    cleared(&returned);
+    let guest_restarted = until_checked(&mut returned, |m| m["t"] == "s");
+    full(&returned, &guest_restarted, &fixture["guestRestarted"]);
     assert_eq!(server.receipts().len(), 2);
     assert!(!server.log().contains("NATIVE_FAULT "));
 }
@@ -281,6 +288,8 @@ fn source_recorded_socket_predicates_use_actual_binary_tcp() {
     let fixture: Value = serde_json::from_slice(&bytes).unwrap();
     assert_eq!(fixture["reference"], "e4e579a838aabae3b1d9dadbc17a0a87147bc52d");
     assert_eq!(fixture["recorded"], true);
+    assert_eq!(fixture["provenance"]["node"], "v24.21.0");
+    assert_eq!(fixture["provenance"]["arch"], "x64");
     assert_eq!(fixture["rows"], json!(["NET-05", "NET-34", "NET-68"]));
     play(&fixture["play"]);
     malformed(&fixture["malformed"]);

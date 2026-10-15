@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -13,11 +14,21 @@ const reference = resolve(process.env.WW2_REFERENCE ?? `${root}/reference/ww2-rt
 const output = resolve(root, 'rust/crates/server/tests/fixtures/net-socket-predicates.json');
 const inputs = JSON.parse(await readFile(resolve(root, 'harness/net-socket-predicates-inputs.json'), 'utf8'));
 assert.equal(inputs.reference, pin);
-const { createWorldState } = await import(pathToFileURL(resolve(reference, 'client/world-state.js')));
-const views = new WeakMap();
+assert.equal(process.arch, 'x64');
+assert.equal(process.version, 'v24.21.0');
 assert.ok(process.argv.slice(2).every(arg => arg === '--check'));
 assert.equal(execFileSync('git', ['-C', reference, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), pin);
 assert.equal(execFileSync('git', ['--no-optional-locks', '-C', reference, 'status', '--porcelain'], { encoding: 'utf8' }).trim(), '');
+const sourcePaths = ['server.js', 'shared/sim.js', 'client/world-state.js', 'test-audit-server.mjs', 'test.js', 'package-lock.json'];
+const sourceHashes = {};
+for (const path of sourcePaths) {
+  const bytes = await readFile(resolve(reference, path));
+  const pinned = execFileSync('git', ['-C', reference, 'show', `${pin}:${path}`]);
+  assert.ok(bytes.equals(pinned), `Source file differs from the pin: ${path}`);
+  sourceHashes[path] = createHash('sha256').update(bytes).digest('hex');
+}
+const { createWorldState } = await import(pathToFileURL(resolve(reference, 'client/world-state.js')));
+const views = new WeakMap();
 const require = createRequire(resolve(reference, 'package.json'));
 assert.equal(require('ws/package.json').version, '8.22.0');
 const WebSocket = require('ws');
@@ -207,7 +218,7 @@ async function recordReplacement() {
   assert.equal(views.get(host).size, 0);
   const initial = full(await untilState(host, m => m.t === 's'));
   await untilState(guest, m => m.t === 'start');
-  full(await untilState(guest, m => m.t === 's'));
+  const guestInitial = full(await untilState(guest, m => m.t === 's'));
   host.send({ t: 'team', slot: 0, v: 5 });
   host.send({ t: 'faction', slot: 0, v: 3 });
   await stateBarrier(host, 'settings-refused-in-play');
@@ -215,7 +226,7 @@ async function recordReplacement() {
   const replacement = await connect(source.base, '/ws?room=ABC');
   views.set(replacement, views.get(host));
   replacement.send({ t: 'hello', token: 'a', name: 'Replacement' });
-  await until(host, m => m.t === 'replaced');
+  await untilState(host, m => m.t === 'replaced');
   const closed = await host.closeFrame();
   const incoming = await untilState(replacement, m => m.t === 'start');
   assert.equal(incoming.matchId, firstStart.matchId);
@@ -235,6 +246,7 @@ async function recordReplacement() {
   assert.equal(dropStart.matchId, firstStart.matchId);
   assert.equal(dropStart.you, 1);
   assert.equal(views.get(returned).size, 0);
+  await untilState(returned, m => m.t === 'pause' && m.paused === false);
   const dropFull = full(await untilState(returned, m => m.t === 's'));
   assert.ok(views.get(replacement).size > 0);
   replacement.send({ t: 'restart' });
@@ -242,8 +254,13 @@ async function recordReplacement() {
   assert.equal(restart.matchId, firstStart.matchId + 1);
   assert.equal(views.get(replacement).size, 0);
   const restarted = full(await untilState(replacement, m => m.t === 's'));
+  const guestRestart = await untilState(returned, m => m.t === 'start');
+  assert.equal(guestRestart.matchId, restart.matchId);
+  assert.equal(guestRestart.you, 1);
+  assert.equal(views.get(returned).size, 0);
+  const guestRestarted = full(await untilState(returned, m => m.t === 's'));
   await stopSource(source);
-  return { replaced: { t: 'replaced' }, oldClose: closed, sameSeat: true, sameMatch: true, noDropPause: true, initial, rejoined, dropFull, restarted, startClearsWarmedRows: true, restartIncrements: true, settingsRefusedInPlay: true, roles: 'two human commanders only', unobserved: ['private object identity', 'AI/commander WeakMap reset', 'late-delivery injection', 'manual pause', 'spectator/operative variants'] };
+  return { replaced: { t: 'replaced' }, oldClose: closed, sameSeat: true, sameMatch: true, noDropPause: true, initial, guestInitial, rejoined, dropFull, restarted, guestRestarted, startClearsWarmedRows: true, restartIncrements: true, settingsRefusedInPlay: true, roles: 'two human commanders only', unobserved: ['private object identity', 'AI/commander WeakMap reset', 'late-delivery injection', 'manual pause', 'spectator/operative variants'] };
 }
 async function recordMalformed() {
   const source = await startSource();
@@ -307,7 +324,11 @@ try {
   const malformed = await recordMalformed();
   const replacement = await recordReplacement();
   const slots = await recordSlots();
-  const fixture = { reference: pin, recorded: true, rows: inputs.rows, scope: 'Selected complete predicates for NET-05/34 and ordinary-human start/reset NET-68. No NET-16/20/22/25 completion.', play, malformed, replacement, slots };
+  for (const path of sourcePaths) {
+    assert.equal(createHash('sha256').update(await readFile(resolve(reference, path))).digest('hex'), sourceHashes[path], `Source changed during recording: ${path}`);
+  }
+  assert.equal(execFileSync('git', ['--no-optional-locks', '-C', reference, 'status', '--porcelain'], { encoding: 'utf8' }).trim(), '');
+  const fixture = { reference: pin, provenance: { node: process.version, arch: process.arch, sourceHashes }, recorded: true, rows: inputs.rows, scope: 'Selected complete predicates for NET-05/34 and ordinary-human start/reset NET-68. No NET-16/20/22/25 completion.', play, malformed, replacement, slots };
   const bytes = JSON.stringify(fixture, null, 2) + '\n';
   if (process.argv.includes('--check')) assert.equal(await readFile(output, 'utf8'), bytes, 'Source socket predicate fixture changed');
   else await writeFile(output, bytes);
