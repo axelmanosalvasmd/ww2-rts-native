@@ -4,10 +4,6 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
-- Bind the newly assigned LOG-03 complete initialization check to the existing 708 original-function inputs, actual native reserve producer, seven-model 350-round formula and stable identity test. Preserve the three proved logistics rows and every parity cell while LOG-24 causal qualification and five-row review remain pending. No Source or native job is run by this readback.
-
-- Normally merge the three complete logistics-row proposal onto main `7c9df2d5`, preserving both histories and all incoming MODE-21 G1 files. Correct only delivery-base metadata; all Rust and proof inputs remain exact main, all 55 logistics Acceptance cells stay unchanged, and no Source or native check is rerun.
-
 - Mark MAP-04/05/07/117 ported after six exact native checks pass at `7cbfcddd`: three strict original validation-message readers, the full map corpus, complete XL/Hill Assault check and affected BASE replay. Formatting recheck and strict core/simtest all-target Clippy also pass. Retain MAP-97's separate historical debug/release proof, all 140 Acceptance cells and the tested Rust tree; MAP-06/19/100 remain held.
 
 - Apply the single mechanical BASE assertion wrap reported by the first authorized MAP formatting check at `f1928e13`. Preserve every assertion/literal and the failed log; native checks have not started.
@@ -17,6 +13,17 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 - Recover the reviewed MAP-97 ported status on frozen main, retaining its original two 120-action native passes at `0b62374461` and unchanged memory source/fixtures. Keep the seven other assigned statuses held pending their complete checks; no execution ran in this successor.
 
 - Prepare exact original validation-message consumers for MAP-04/05/07/117 using the retained map and Assault fixtures. Preserve all existing constructor, raw-route and rejection coverage. Native validation and the bounded validator-message repair remain pending; MAP-06/19/100 remain held.
+
+- Record the authentic LOG-24 causal fixture from pinned Source at `d50860e2`: 10 retained constructor actors, nine commands and 740 full ticks. Generation and exact byte check each pass once. Real enemy arrival closes the network at tick 500; the owner view shows grace 8 and no cut 40 ticks later, then zero supply and cut 240 ticks later. Native qualification and row promotion remain pending under a new grant.
+
+- Add LOG-24 authored-input readiness checks for the actual open Move endpoint and retained building footprints, plus an exclusive partial-failure artifact for the first future Source attempt. Preserve the exact scene, commands, bounds, rate/grace/cut assertions and runtime bytes from `91f9bc12`. Source and native checks remain unrun.
+
+- Draft a LOG-24 network-to-grace/cut witness using retained constructor units, actual stance and Move commands, the real network/convoy methods and owner-recipient rows. Keep its fixture absent until authorized Source recording, preserve the BASE-09 failures and all held BASE callers, and make no LOG-24 status or runtime change. Source, native and format checks are unrun.
+
+- Bind the newly assigned LOG-03 complete initialization check to the existing 708 original-function inputs, actual native reserve producer, seven-model 350-round formula and stable identity test. Preserve the three proved logistics rows and every parity cell while LOG-24 causal qualification and five-row review remain pending. No Source or native job is run by this readback.
+
+- Normally merge the three complete logistics-row proposal onto main `7c9df2d5`, preserving both histories and all incoming MODE-21 G1 files. Correct only delivery-base metadata; all Rust and proof inputs remain exact main, all 55 logistics Acceptance cells stay unchanged, and no Source or native check is rerun.
+
 
 - Recover the complete ENG-04/13/14/48/66 checks onto frozen main `379ba4e0`, preserving both histories, every incoming row and the authentic four-fixture extensions. The private five-row proposal raises this baseline from 235 to 240 ported rows. Prior six native passes remain attributed to `df9a0cff`; this source-only integration awaits Root's slot and independent actual-head review.
 - Compare MODE-21 footprint keys by validated numeric bits, accepting hexadecimal letter-case variants and rejecting duplicate bit-identical keys. Preserve exact value-bit checks and signed-zero distinctions; no player-visible behavior changes.
@@ -28,12 +35,6 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 - Apply the retained formatter diagnostic to line wrapping in the new MODE-21 footprint comparator and controls, preserving every non-whitespace byte.
 
 - Compare MODE-21 building footprints by complete cell-key membership in the test-only startup observer. Retain all 49 original raw differences, add strict negative controls and leave the separate house-wrapper difference unresolved.
-
-- Record the authentic LOG-24 causal fixture from pinned Source at `d50860e2`: 10 retained constructor actors, nine commands and 740 full ticks. Generation and exact byte check each pass once. Real enemy arrival closes the network at tick 500; the owner view shows grace 8 and no cut 40 ticks later, then zero supply and cut 240 ticks later. Native qualification and row promotion remain pending under a new grant.
-
-- Add LOG-24 authored-input readiness checks for the actual open Move endpoint and retained building footprints, plus an exclusive partial-failure artifact for the first future Source attempt. Preserve the exact scene, commands, bounds, rate/grace/cut assertions and runtime bytes from `91f9bc12`. Source and native checks remain unrun.
-
-- Draft a LOG-24 network-to-grace/cut witness using retained constructor units, actual stance and Move commands, the real network/convoy methods and owner-recipient rows. Keep its fixture absent until authorized Source recording, preserve the BASE-09 failures and all held BASE callers, and make no LOG-24 status or runtime change. Source, native and format checks are unrun.
 
 - Propose LOG-04, LOG-10 and LOG-15 as ported from their complete existing price, recovery and transfer component checks. Preserve the original Acceptance cells and LOG-24 causal grace/cut hold. Historical three-platform named passes stay attributed to main `396f6d8a`; this private documentation head has no new execution.
 
