@@ -1,6 +1,29 @@
-# CMB-61 missing flame components, source-only preparation
+# CMB-61 flame proof and preparation history
 
-## Current result: three exact tests and strict lint pass
+## Current private status: CMB-61 ported
+
+Root authorized this private documentation/status child of clean `cfc8263e827e9aa4030fd3775b923a5434fbca43` after reading the complete independent [whole-row ACCEPT](/tmp/review-cmb61-cfc826-whole-final/REVIEW.md). The complete literal CMB-61 check is PORT-eligible with no remaining held clause. Only its Rust and Status table cells change. All 160 acceptance cells and all other cells remain exact, including CMB-49 and CMB-69. CMB-69's separate Rust/Status proposal remains unapplied.
+
+| CMB-61 clause | Complete selected evidence and producing head |
+| --- | --- |
+| Accuracy through cover/walls/trenches/houses | Existing ordinary plain/wall-cover firing proof stays at main 396f. New six-scene open/trench/garrison flame/rifle launch replay passes at 25c76d6c: 384 state/RNG comparisons across both modes and the final assertions that flame velocities match and rifle velocities differ. |
+| Cover-independent flame suppression | All 64 existing flame cover/behind/garrison/trench/veterancy combinations and ordered events remain proved at main 396f. |
+| Trench/garrison x1.5 damage | Existing damage entries 737/738 prove open 9 versus trench 13.5; entries 739/740 prove garrison/both 13.5. Full bits and ordered mutations remain proved at main 396f. |
+| Corresponding x1.5 target value | New ten-scene actual selection replay passes at 25c76d6c: covered target at 12 m wins against 8.1 m open target and loses against 7.9 m, with open/rifle/unseen/dead controls, all 20 state/RNG comparisons and final target/no-launch assertions. |
+
+The new test proof belongs to tested `25c76d6c0bb5be6384d95ee2db3c63847baed07f`: two behavior tests plus the actual simtest registry guard are three unique passes, with fmt and strict locked workspace/all-target Clippy. Original Source generation/check belongs to `7a762f6573891a2564cbd7aa4e0ee8566c0ad300`: 16 scenes and 202 checkpoints, fixture frozen at `a5411f799a8887cd83bce2b8bba192f5a69d8a95`. Existing damage/suppression/ordinary-firing proof remains separate at main `396f6d8a7014bd4a5ebe64f0a12ccd66865bf452`, [hosted push run 38740304188](https://github.com/axelmanosalvasmd/ww2-rts-native/actions/runs/38740304188), success 9/9. No result is transferred to a later unexecuted head.
+
+The documentation/status child shares `cfc8263e`'s exact Rust tree `ec3b8ac10b09a8090071bd07534c8516ec6206e2`. Source, authored inputs, fixtures, recorder bodies, registry, replay assertions and runtime bytes remain exact. New Source/Cargo/native/fmt/discovery/full/release executions: zero. No slot is inferred.
+
+Private delivery only. Local ACK of current #5 Hermes 156 preserves the reference/contracts and queue 256 then 259. Do not merge current main yet. Root must later compose the ordered joint union with CMB_IMPL's private a7889 candidate, preserving both owners' rows and preparation work, before one combat PR after that queue. ALIGNED S1 is unaffected. No push, PR, post or public acceptance is made here.
+
+## Private PR body draft
+
+Mark CMB-61 ported after independent whole-row ACCEPT. Existing damage, suppression and wall-cover firing proof combines with the passing original-Source trench/garrison launch and x1.5 target-choice comparisons; literal acceptance and all other rows remain unchanged.
+
+Validation: three exact tests, fmt and strict Clippy at 25c76d6c; Source 16 scenes/202 checkpoints at 7a762f65, fixture a5411f79; old component proof at main 396f/run 38740304188. This docs-only child preserves the reviewed Rust tree. Ordered joint integration and publication remain Root-owned.
+
+## Recorded native passes at 25c76d6c
 
 Producing head: `25c76d6c0bb5be6384d95ee2db3c63847baed07f`, a clean direct child of `281f4b36`. Rust tree: `ec3b8ac10b09a8090071bd07534c8516ec6206e2`. The authorized metadata-only recursive comparator uses exact f64 bits for numbers, exact object key sets, ordered equal-length arrays and strict nonnumeric values, without mutation. Replay comparisons, every outcome assertion and integer identity checks elsewhere remain byte-identical. Authored inputs, Source, both fixtures and the old firing suite remain exact.
 
@@ -16,9 +39,13 @@ Exactly three unique native test instances ran in this renewal. Source reruns 0;
 
 Raw logs: `/tmp/cmb61-flame-s3-25c76d6c/{fmt,accuracy,choice,registry,clippy}.log`. All commands run serially under S3, CPUs 8-11, 6 GiB memory, swap 0, quota 400%, jobs 4, threads 1 and the current guard's exclusive S3 target/lock with 20 GiB floor. Native dep-info `it-6576708762656383.d` and Clippy dep-info `it-884b87c31258606f.d` include the new consumer. Workspace provenance under key `cde5f99448f48ff551b5cdd7` binds the compiler to this absolute checkout and producing Rust tree.
 
-CMB-61 launch accuracy and target preference now have these focused passes for Root review. Damage 9/13.5 and flame suppression retain their existing producing main 396f component proof, without reruns. Actual CMB-61 status remains in progress; Root still owns whole-row review, any status change and publication. CMB-69 remains only an unapplied Rust/Status proposal. All 160 combat rows and their literal acceptance remain unchanged. Local ack of Hermes 155 preserves the pin, contracts and Root queue 256 then 259; this stream makes no whole-match, runtime or interface decision. The sections below are historical checkpoints.
+These producing-head passes now support the completed whole-row review recorded above. Damage, flame suppression and ordinary wall-cover firing retain their separate main 396f component proof, without reruns. This private child changes only CMB-61 Rust/Status; all 160 acceptance cells, all other cells and CMB-69's unapplied proposal remain exact. Root owns joint integration and publication. The sections below are historical checkpoints, including the actual earlier failures and their then-current HOLD decisions.
 
-## Renewed S3 result after the authorized hitAt repair
+## Historical preparation and failure checkpoints
+
+These records describe their named historical heads. Their pending or held wording is superseded by the current reviewed completion above; both 0-pass/1-fail logs remain actual failures.
+
+### Renewed S3 result after the authorized hitAt repair
 
 Tested head: `d01d213a999c2d1cacbc3e50be79e8e7b009e857`, a clean direct child of `0563eb91`. Its Rust tree is `f98be6df380f133240d36cd8acacc9fd539ca29d`. Only the new consumer's metadata comparison changes: every actor's `hitAt` must have equal `as_f64().to_bits()` on both sides, then only those verified cells are canonicalized in local metadata clones for strict whole-JSON equality. Every other field/type remains strict. The entire consumer outside that block, all replay assertions, authored inputs, both Source recorders/fixtures, old tests, registry, parity table and CMB-69 proposal remain exact. No metadata clone initializes native state.
 
@@ -28,7 +55,7 @@ STOP. No cooldown normalization or other repair is applied. Target-choice, simte
 
 Dep-info `it-ccf03549903ef5ff.d` includes the flame consumer and authored inputs. The compiler manifest is this checkout's `rust/crates/simtest`, bound to the tested Rust tree above by workspace key `23cb40ba455b7118b8844974`. All granted jobs use S3, CPUs 8-11, 6 GiB memory, swap 0, quota 400%, jobs 4, threads 1 and the current guard's exclusive target/lock and 20 GiB floor.
 
-## Terminal result under the S3 grant
+### Terminal result under the S3 grant
 
 Producing native head: `556a2ad5e24e22b9e5c4736813b0dbf8da978d49`, Rust tree `c30a8070c28d257273acb10f2c54d74b85e35b82`. Authentic fixture checkpoint: `a5411f799a8887cd83bce2b8bba192f5a69d8a95`. Source generation and serial `--check` each passed at preparation `7a762f65`: 16 actual scenes and 202 actual checkpoints. The first fmt check found two whitespace-only wraps; they were corrected with complete non-whitespace token preservation. The fmt recheck passed at `556a2ad5`.
 
@@ -38,11 +65,11 @@ STOP applies. Target-choice, the simtest registry guard and fresh strict locked 
 
 Dep-info `it-8f64e9b318a856f5.d` names the new flame consumer and authored inputs. Compiler provenance in `/home/judiazm/.t3/handoffs/ww2-native-cargo-wrappers/1fbc157023959f0c051d20e6/compiler-invocations.jsonl` binds the compiled simtest target to this absolute checkout and the frozen Rust tree above. S3 used CPUs 8-11, 6 GiB memory, swap 0, CPU quota 400%, four Cargo jobs and one test thread. The guard enforced the S3 target, exclusive lock and 20 GiB disk floor.
 
-## Granted formatting follow-up
+### Granted formatting follow-up
 
 The first S3 formatting check at `a5411f79` failed only on two new-consumer line wraps. Apply those exact whitespace changes under the explicit formatter-only allowance. Static comparison confirms every non-whitespace byte, assertion and literal remains unchanged. Keep the raw failure in `/tmp/cmb61-flame-s3-7a762f65/fmt-check-a5411f79.log`. No compile or behavior test has run at this point.
 
-## Authentic Source capture after preparation
+### Authentic Source capture after preparation
 
 S3 granted generation and a serial byte check at frozen `7a762f6573891a2564cbd7aa4e0ee8566c0ad300`. Both commands exited 0. The authentic new fixture contains 16 scenes and 202 checkpoints, with x64 Node v24.21.0 and Source `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. The recorder and inputs remain exact. Raw logs: `/tmp/cmb61-flame-s3-7a762f65/source-generate.log` and `source-check.log`. Both invocations held the exclusive S3 flock and ran with CPUs 8-11, 6 GiB memory, zero swap and 400% CPU quota. This fixture is frozen before Cargo; native results remain pending. The source-only statements below describe the original preparation checkpoint, not this later capture. CMB-61 stays held and the CMB-69 patch stays unapplied.
 
@@ -50,7 +77,7 @@ Base: `396f6d8a7014bd4a5ebe64f0a12ccd66865bf452`. Original Source: `e4e579a838aa
 
 Root's independent review at `/tmp/roster16-reviewer1-cmb61-69/REVIEW.md` holds CMB-61 for launch accuracy and target value. Its earlier damage/suppression proofs remain valid. This checkpoint adds recorder and consumer source, with no generated `rust/crates/simtest/tests/fixtures/match-firing-flame.json.gz`. The consumer fails explicitly when that authentic fixture is absent. No expected observation initializes or repairs the native match. There is no runtime, terrain-rule, guard, interface or randomness-policy change.
 
-## Complete predicate map
+### Original prepared predicate map before capture
 
 | Row / predicate | Original source and native consumer | Evidence or pending check |
 | --- | --- | --- |
@@ -62,7 +89,7 @@ Root's independent review at `/tmp/roster16-reviewer1-cmb61-69/REVIEW.md` holds 
 
 CMB-61 remains `in progress`. Its literal acceptance remains `new port test: flamer vs squad in trench and in open (no JS test exists)`. The new observations cover firing components; they do not introduce a new whole-match or Unreal gate, and the previously passing damage and suppression checks are not weakened or replaced.
 
-## Source schedule and authored setup
+### Source schedule and authored setup
 
 `harness/match-firing-flame-inputs.json` contains the map, every initial unit field, target cells, garrison membership and visibility. Both sides read this same authored setup. Source uses ordinary `createGame` and `spawnUnit`, then existing `setCell` for target trench/house authoring. Native uses the unchanged shared firing constructor, existing `World::set_cell`, and authored garrison membership. Garrison occupants stand at the actual house cell center; the recorder asserts that invariant. Initial HP is 66 for a flamer and 100 for a rifle squad. Units start settled for 20 seconds, unsuppressed, with zero veterancy and no recent threat. Equal target kind, HP and facing avoid armor, threat and role differences between choices. Source constructor randomness remains the existing constant setup value; firing randomness uses only the existing seed 701 adapter.
 
@@ -74,7 +101,7 @@ The native consumer follows the same authored pulses, `begin_firing_tick`, `adva
 
 There is no missing firing provider identified in the inspected source. Authentic Source acceptance of the setup, compilation and actual native comparison remain unverified. Any refusal or mismatch stays a blocker; do not change runtime, terrain or guards to manufacture a pass.
 
-## Preservation and CMB-69 proposal
+### Preservation and CMB-69 proposal
 
 The ordinary `harness/match-firing-fixture.mjs`, `simtest/tests/fixtures/match-firing.json.gz`, `simtest/tests/match_firing.rs` and shared firing helper are untouched. All 131 old traces, 668 Source checkpoints, 1,336 Default/Conquest comparisons and ordinary test assertions remain exact. Existing damage/suppression/tick fixtures and tests also remain exact. All 160 combat rows, their literal acceptance and actual statuses stay byte-identical to fixed main, including CMB-49 and CMB-69.
 
@@ -82,9 +109,9 @@ The ordinary `harness/match-firing-fixture.mjs`, `simtest/tests/fixtures/match-f
 
 Local coordination acknowledgment: Hermes 152 and 153 preserve the pin, agreed contracts and queue 255 then 256 then 259. This stream keeps its fixed 396f base and makes no network, ABI, role, privacy or gameplay decisions. No external acknowledgment or publication was sent. Direct CHANGELOG/Unreleased and DESIGN updates follow the explicit task instruction.
 
-## Exact pending commands and slots
+### Original command plan before the granted executions
 
-No commands below ran. A future Root Source slot must first provide x64 Node 24.21.0 and grant this recorder. Run from the repository root:
+At preparation 7a762f65 the commands below were unrun and required a future Root slot. Their later actual results are recorded above on their producing heads. They are retained as the original plan, not a new execution request or grant. The recorder command was planned from the repository root:
 
 ```sh
 WW2_REFERENCE=/home/judiazm/Projects/ww2-rts-native/reference/ww2-rts node harness/match-firing-flame-fixture.mjs
