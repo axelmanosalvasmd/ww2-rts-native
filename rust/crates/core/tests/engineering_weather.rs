@@ -81,8 +81,16 @@ fn eng59_mud_depth_and_wetness_reach_the_unit_speed_provider() {
             g.wet = wet;
             // The named values are the Source's shallow, middle and deep mud rules.
             let expected = dry_speed * wet_factor;
-            same_bits(ground_mul(&g, &rules, cell, true), expected, "mud vehicle cell");
-            same_bits(ground_mul(&g, &rules, cell, false), 1.0, "mud infantry cell");
+            same_bits(
+                ground_mul(&g, &rules, cell, true),
+                expected,
+                "mud vehicle cell",
+            );
+            same_bits(
+                ground_mul(&g, &rules, cell, false),
+                1.0,
+                "mud infantry cell",
+            );
             // Five identical samples still take the production footprint-averaging path.
             let average = (expected + expected + expected + expected + expected) / 5.0;
             same_bits(speed_mul(&g, &rules, &tank), average, "tank footprint");
@@ -107,7 +115,12 @@ fn eng73_five_weather_definitions_and_player_descriptions() {
         ("snow", 0.9, 0.9, 0.85, 1.0),
     ];
     assert_eq!(
-        catalog.table("WEATHER_KINDS").unwrap().array().unwrap().len(),
+        catalog
+            .table("WEATHER_KINDS")
+            .unwrap()
+            .array()
+            .unwrap()
+            .len(),
         5
     );
     for (name, sight, infantry, vehicle, off_road) in expected {
@@ -196,7 +209,11 @@ fn eng74_weather_applies_to_ground_kinds_and_spares_aircraft() {
     g.weather = None;
     same_bits(g.sight_mul(&rules), 1.0, "missing weather");
     for kind in &rules.kinds {
-        same_bits(weather_speed(&g, &rules, kind), 1.0, "missing weather speed");
+        same_bits(
+            weather_speed(&g, &rules, kind),
+            1.0,
+            "missing weather speed",
+        );
     }
 }
 
