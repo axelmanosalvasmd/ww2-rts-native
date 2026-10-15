@@ -1,0 +1,1 @@
+- Reconstruct the owned Retreat paid-work preflight and ground evidence consumers on current main, preserving the original six-tick and carrier cases. Add 19 input-receipt counterfactuals before native construction. All new work remains unrun; Root owns shared test registration, and Stop, broader Retreat and loaded-carrier proof remain held.

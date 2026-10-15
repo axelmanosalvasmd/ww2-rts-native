@@ -23,6 +23,9 @@ use std::{
 };
 #[path = "field_projects.rs"]
 mod projects;
+#[cfg(test)]
+#[path = "field_reservation_faults.rs"]
+pub(crate) mod reservation_faults;
 pub use projects::{
     Pattern, PreparedProject, PreparedSegment, Project, ProjectId, ProjectMaterial, ProjectOrder,
     ProjectRequest, Segment, SegmentPreparation, entrench_plan, line_fort, segment_cost,

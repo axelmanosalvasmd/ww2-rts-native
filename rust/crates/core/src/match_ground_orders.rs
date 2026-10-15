@@ -290,9 +290,14 @@ impl Match {
         let selected = self.ground_order_rows(owner, ids, &command)?;
         for &id in &selected {
             self.ground_order_identity(id)?;
-            if self.world.game.units[&id].build {
-                return Ok(Some(Denial::Unsupported));
-            }
+            // The sole retreat commit cancels represented work without refunding
+            // its paid site. Validate every builder before any route publishes.
+            crate::match_construction::validate_build_activity(
+                &self.world.game.units[&id],
+                &self.commands.units[&id],
+            )?;
+            self.field_works.validate_retreat_reservation(&self.world, id)
+                .map_err(|error| format!("ground retreat reservation: {error}"))?;
         }
         self.ground_order_capacity(&selected)?;
         let mut forced = Vec::new();

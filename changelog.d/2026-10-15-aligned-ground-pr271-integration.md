@@ -1,0 +1,1 @@
+- Integrate the owned ground source on PR271 main, preserving all incoming fixtures, parity rows and shared replay code. Retain the original checks and receipt controls; four work Source generate/check proposals require fresh exact-head grants. Source and native behavior remain unrun.

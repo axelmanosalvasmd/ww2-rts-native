@@ -1,5 +1,23 @@
 # Three Crossroads Native: design decisions
 
+## Owned ground source on PR271 main (2026-10-15, unrun)
+
+Integrate the owned ground delta from preserved `ad658b7521cc74ecf0ddb8e9de738f5c85d468b9` onto literal PR271 main `f7c51b1a0ebf850c5c22b560a595e4095ce39fdc`. Retain every incoming typed tree entry except the three declared ground providers and this additive design history. Build independent three-way expected providers and compare their full bytes. All owned recorder, receipt validator, scenario, consumer and typed-fault bodies remain exact to that producer. Preserve all incoming fixtures, registrations, parity rows, Acceptance cells and historical failures.
+
+The shared replay adapter stays exact to main. Root's three-line ground registration remains UNAPPLIED for its private union with AUDIT_COMBAT. Future native paths are `aligned_replay::ground_commands::{work_cancellation,destroy_work}`. No Source or native grant transfers to this head. The private exact-head packet proposes four work cases with separate generate/check argv; original six-tick Retreat stays a separate fifth Source candidate. Complete original assertions remain present but unrun. No Stop numeric/null mapping, loaded-carrier ejection workaround, actor state write or row promotion is added. Root owns final review, hosted checks and runtime-head owner readback.
+
+## Ground failure prefixes and checked process bindings (2026-10-15, unrun)
+
+Resume the owned `6f4dd5e3` ground candidate above fetched main `f7b0e588`, preserving its branch and the frozen approved siblings. Add a test-only Source process wrapper that retains actual exit/signal/error, raw stdout/stderr and artifact hashes. Recorder exceptions retain the actual consumed input prefix, including exceptions before normal startup publication. A successful real recheck writes exclusive byte copies of the capture and authored input. Native construction requires both successful process results and those exact copies; completion compares the complete layout receipt, including original selection and injection boundary. No dependency, shipping provider or shared-adapter change is added.
+
+The 19 input controls, 22 prefix controls, all 33 typed faults and 136 planned atomicity attempts remain intact. Original six-tick Retreat and loaded/unloaded scuttle bodies, all four paid-work consumers and all seven story-field assertions stay exact. The original `test.js:378-389` uses different authoring and forced draws, so retaining its assertions in a genuine-input scene does not establish execution of that literal fixture. Every new Source/native assertion and process-binding path is UNRUN. [The bounded packet](docs/testing/aligned-ground-f7b0-integration.md#checked-process-successor) records the remaining original-check, routing, work-membership and owner gates. No row is promoted and no historical result transfers to this head.
+
+## Ground reconstruction and Source receipt binding (2026-10-15, source only)
+
+Reconstruct only the owned ground work from 59e8e993 on main f7b0e588. Manual Retreat preflights selected construction and canonical reservation state before publishing routes, then uses the existing sole cancellation authority. Full snapshot scope, retained records and signed cached counters remain intact. Destroy keeps ordinary retirement as its teardown owner. Preserve the original six-tick Retreat, loaded/unloaded scuttle bodies, all 33 typed fault definitions, paid-work consumers and incoming fixtures/tables. No carrier or shipping RNG change is adopted.
+
+Add 19 decisive input-receipt controls before native construction, alongside the retained 22 prefix controls and 136 planned typed atomicity attempts. Bind actual consumed indexes/bits, finite-tape counts, startup/layout evidence and completion draw count without importing Source state. All are UNRUN. Root's shared-adapter direction keeps aligned_replay.rs unchanged here; registration remains an unapplied private patch for the later union. The [exact five Source candidates and four proposed native selectors](docs/testing/aligned-ground-f7b0-integration.md) require fresh grants and authentic captures on the new producing heads. Approved sibling evidence remains on `26986d6c`/`069d472e`/`34f93777`. Stop mappings, broader Retreat and loaded-carrier ejection stay held, with no row or public action.
+
 ## Five complete selected MAP checks (2026-10-15)
 
 At producing runtime head `7cbfcdddf913625c48fd109d8d216151881cba20`,
