@@ -1,0 +1,1 @@
+- Record the unchanged original movement checks for editor paths, both crowd scenes and the held tank-rider scene, plus five complete rail networks and aircraft tables. Source generation and byte regeneration pass on Vostro in S2; four native checks remain pending and MOV-72's canonical purchase setup stays held.

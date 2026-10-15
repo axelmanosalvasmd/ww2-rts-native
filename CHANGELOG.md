@@ -12,6 +12,34 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 - Integrate the nine combat component checks from frozen `ee03a77a` with fixed main `396f6d8a`, preserving both histories, every older fixture case and all incoming tests and rows. Attribute the four Source command successes and five native passes to `ee03a77a`; independent review accepts its nine literal row predicates. The successor `df39366e` passes fmt, the original five selected tests and fresh strict Clippy; the docs child adds only the nine approved ported rows.
 
+- Record Axel's exact aligned whole-match evidence decision in PARITY.md. Preserve the existing component, outcome and owner rules. Both owners record readback of the final documentation head on #5 before merge; no parity row is promoted.
+
+- Complete MODE-15's raw observed Hill 112 path check on 10 canonical Assault starts, comparing all 30 full waypoints with the unchanged Source fixture; the three selected tests pass at 0b60e793.
+
+- Finish the comparison-only R1 handoff: four checks at `db854ef7` report canonical 61/61 with no divergence while retaining raw 0/61. Fresh strict Clippy and formatting pass at `24433da4`; preserve the earlier lint failure, both eb15 review limits and exact input/frame provenance. No row promotion or Source rerun.
+
+- Record the authorized R1 comparison result at `db854ef7`: canonical 61/61 checkpoints and all 600 stepped ticks match, while raw comparison remains 0/61 with the tick-0 Fuel presence difference. Preserve the first strict-Clippy unused-helper failure and make only the test-build delegate visibility public before retrying lint.
+
+- Format the frozen comparison-only R1 currency rule and its regression vectors before the authorized four-check native run. No comparison rule, input or engine behavior changes.
+
+- Add the explicitly authorized R1 comparison-only currency rule: absent Fuel/Munitions keys or exact absence markers use positive-zero defaults on both projected snapshots. Preserve every present value, the raw 0/61 result and all source/native traces. Add focused positive and negative vectors; canonical 61-checkpoint results and fresh review are pending.
+
+- Merge the frozen aligned R1 test seam onto exact post-256 main d412aad6, preserving both complete histories and every incoming row, registry and fixture. Keep the measured 0/61 MISMATCH and tick-0 Fuel absence versus zero; earlier execution stays on its producing heads, with successor review pending and no reruns or row moves.
+
+- Rebase the four existing MOV43/62/79/83 checks from accepted local `4873cd90` onto exact post-255 main `9e618217`. Preserve every incoming row, module, fixture and old predicate body; relocate the two owned DESIGN notes verbatim beside movement. MOV72 remains held. Prior passes retain their original producing heads; new focused validation is pending.
+
+- Complete the aligned-replay handoff: final Source check at `23ad8570` reproduces the frozen trace and input receipt, with native evidence kept on `87dfae5c`. Retain 0/61 MISMATCH and the Fuel presence difference, document private artifacts and commands, and release S1 for Root.
+
+- Extend the aligned Source recorder's unseeded-random refusal to module initialization. At `87dfae5c`, three focused harness checks, both registration guards, formatting and fresh strict core/simtest Clippy pass; aligned R1 remains MISMATCH at 0/61.
+
+- Record the first aligned R1 native diagnostic at `cae6e358`: both engines complete 600 ticks and all 1,321 consumed random values agree, but 0/61 checkpoints match. The first difference is tick 0, player 0 fuel: Source absence versus native zero. Preserve full traces and correct a test-only visibility warning before strict Clippy. No runtime or row status changes.
+
+- Format the aligned-replay test seam after the authentic Source freeze; no input, projection, command or runtime behavior changed.
+
+- Freeze the first authentic aligned-input Source capture before Cargo: 600 ticks, 61 checkpoints, 1,321 consumed values and 15,063 unused, reproduced by a fresh capture at `864d6485`. Native alignment is pending.
+
+- Add a test-only R1 constructor layout input and finite consumed-random tape at the actual Rust and pinned JavaScript consumers. Reuse #220's original projection, ten orders and 61 checkpoints without moving rows. Source capture, native alignment and comparison are pending at this implementation checkpoint; historical #220 remains 0/61.
+
 - Rebase NET2 snapshot and cadence checks onto current main, retain the six ported NET rows and held gaps, and move the two original NET2 design notes beside snapshot delivery history without changing their text.
 
 - Mark CMB-61 ported privately after independent whole-row ACCEPT of `cfc8263e`. Change only its Rust evidence and Status cells; preserve all 160 acceptance cells and every other row/cell. Keep new passes at `25c76d6c`, Source capture at `7a762f65`/`a5411f79` and old main 396f component proof separate. No new execution, runtime change or publication.

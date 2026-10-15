@@ -1,13 +1,18 @@
 use crate::shared::startup_projection as projection;
 use projection::{bits, equivalent, terrain};
 use serde_json::{Value, json};
+use std::collections::BTreeMap;
 use ww2_core::{
     economy::{Faction, Mode, Technology},
     economy_state::ArmySize,
-    game::ModeKind,
+    game::{CELL, ModeKind, Point},
     map::AuthoritativeMap,
     match_runtime::{Match, MatchOptions, PlayerConfig, StartPlan},
+    observed_memory::{FootprintFact, ObservationFacts, ObservationFrame, ObservedMemory},
+    pathfinding::{PathResult, PathRules, PathStatus, Pathfinding},
+    route_knowledge::{InitialTerrain, LiveRouting, RouteKnowledge},
     rules::Rules,
+    vision::team_sees,
     weather::WeatherChoice,
 };
 fn options(c: &Value) -> MatchOptions {
@@ -59,6 +64,133 @@ fn fixture() -> Value {
     let compact: Value = serde_json::from_str(include_str!("fixtures/assault-start.json")).unwrap();
     assert_eq!(compact["format"], 2);
     unpack(&compact["data"], &compact["table"])
+}
+// Source findPath first derives observedPathView for the actual asking rifle's owner.
+// Compose the same existing components here without admitting Match recipient routing.
+struct HillFacts {
+    visible: Vec<bool>,
+    footprints: BTreeMap<usize, FootprintFact>,
+}
+impl ObservationFacts for HillFacts {
+    fn cell_visible(&mut self, cell: usize, _: i32) -> bool {
+        self.visible[cell]
+    }
+    fn mine_known(&mut self, _: usize, _: i32) -> bool {
+        false // The actual Hill constructor is checked to contain no mines below.
+    }
+    fn mine_owned(&mut self, _: usize, _: i32) -> bool {
+        false
+    }
+    fn footprint(&mut self, cell: usize, _: usize, _: i32) -> Option<FootprintFact> {
+        self.footprints.get(&cell).copied()
+    }
+}
+fn hill_raw_route(m: &mut Match, actor_id: u32, target: Point) -> PathResult {
+    let g = &m.world.game;
+    let owner = g.units[&actor_id].owner;
+    let team = g.players[owner].team;
+    let n = g.w * g.h;
+    assert!(m.world.mines.is_empty());
+    assert!(m.world.mine_seen.iter().next().is_none());
+    assert!(m.world.fires.is_empty());
+    let mut facts = HillFacts {
+        visible: vec![false; n],
+        footprints: BTreeMap::new(),
+    };
+    for row in m.world.cell_log() {
+        let c = row.cell;
+        facts.visible[c] = team_sees(
+            g,
+            &m.rules,
+            &m.grid,
+            team,
+            Point {
+                x: (c % g.w) as f64 * CELL + CELL / 2.0,
+                z: (c / g.w) as f64 * CELL + CELL / 2.0,
+            },
+        );
+        if let Some(b) = m.building_cells.get(&c) {
+            let live = g.units.get(&b.unit);
+            let at = live.map_or(b.at, |u| u.at());
+            facts.footprints.insert(
+                c,
+                FootprintFact {
+                    identity: u64::from(b.unit),
+                    allied: g.allied(live.map_or(b.owner, |u| u.owner), owner),
+                    live: live.is_some(),
+                    visible: g.players[owner].sees(b.unit),
+                    ruin_visible: team_sees(g, &m.rules, &m.grid, team, at),
+                },
+            );
+        }
+    }
+    let initial = m.world.initial();
+    let shoals = m
+        .world
+        .shoal
+        .as_ref()
+        .map(|v| v.iter().map(|&v| v != 0).collect::<Vec<_>>());
+    let mut routes = RouteKnowledge::observed(
+        InitialTerrain {
+            width: g.w,
+            height: g.h,
+            chars: &initial.chars,
+            ground: Some(&initial.ground),
+            objects: Some(&initial.objects),
+            heights: initial.height.as_deref(),
+            shoals: shoals.as_deref(),
+            house_kinds: Some(&g.house),
+            toughness: g.tough.as_deref(),
+            trench_front: initial.trench_front.as_deref(),
+        },
+        owner as u64,
+        m.rules.clone(),
+    )
+    .unwrap();
+    let mut memory = ObservedMemory::new(&m.world, owner, owner as u64).unwrap();
+    // Refresh acknowledges remembered log rows, as the Source query does. No terrain setter is used.
+    memory
+        .refresh(
+            &mut m.world,
+            ObservationFrame {
+                team,
+                skip_fog: false,
+            },
+            &mut facts,
+        )
+        .unwrap();
+    memory.apply_routes(&mut routes).unwrap();
+    let g = &m.world.game;
+    let actor = &g.units[&actor_id];
+    let bunkers = g
+        .units
+        .values()
+        .filter(|u| {
+            m.rules.kinds[u.kind].name == "bunker"
+                && u.hp > 0.0
+                && (g.reveal || g.allied(u.owner, owner) || g.players[owner].sees(u.id))
+        })
+        .map(|u| u.at())
+        .collect::<Vec<_>>();
+    let fires = vec![false; n]; // Canonical empty fires were asserted above.
+    let query = routes.query();
+    Pathfinding::new()
+        .find_path(
+            query
+                .path_terrain(LiveRouting {
+                    fires: &fires,
+                    bunkers: &bunkers,
+                    wetness: g.wet.unwrap_or(0.0),
+                    roads: m.world.roads,
+                })
+                .unwrap(),
+            PathRules::compiled().unwrap(),
+            &m.rules.kinds[actor.kind],
+            actor.at(),
+            target,
+            None,
+        )
+        .unwrap()
 }
 #[test]
 fn explicit_assault_start_matches_original_create_game() {
@@ -290,7 +422,25 @@ fn explicit_assault_start_matches_original_create_game() {
                     let target = m.start.players[2].spawn;
                     assert_eq!(json!([bits(target.x), bits(target.z)]), route["target"]);
                     assert!(!route["path"].as_array().unwrap().is_empty());
-                    // This is a retained native admission limit, not a successful route comparison.
+                    let actor_id = actor.id;
+                    let native = hill_raw_route(&mut m, actor_id, target);
+                    assert_eq!(native.status, PathStatus::Found, "case{index} Hill route");
+                    assert!(
+                        !native.waypoints.is_empty(),
+                        "a way up from the HQ doorstep"
+                    );
+                    assert_eq!(
+                        json!(
+                            native
+                                .waypoints
+                                .iter()
+                                .map(|p| [bits(p.x), bits(p.z)])
+                                .collect::<Vec<_>>()
+                        ),
+                        route["path"],
+                        "case{index} complete Hill waypoint bits"
+                    );
+                    // Live owned-recipient routing stays refused separately from the raw component query.
                     assert_eq!(
                         m.refresh_recipient_routing(0).unwrap_err(),
                         "owned routing currently supports ordinary Conquest"
@@ -307,6 +457,13 @@ fn explicit_assault_start_matches_original_create_game() {
         assert!(m.apply_point_economy(&[], false).is_err());
     }
     assert_eq!(fixture["cases"].as_array().unwrap().len(), 57);
+    let validation = fixture["selectedValidation"].as_array().unwrap();
+    assert_eq!(validation.len(), 2);
+    for invalid in validation {
+        assert!(
+            AuthoritativeMap::from_json(&serde_json::to_vec(&invalid["map"]).unwrap()).is_err()
+        );
+    }
     // Retain the exact actor-count guard for all original 43 cases.
     assert_eq!(units, 702);
     assert_eq!(

@@ -21,7 +21,6 @@ use crate::{
     rules::Rules,
     unit_spawn::{self, SpawnPlacer},
     weather::{MapWeatherInfo, WeatherChoice, WeatherKind, WeatherPlan, WeatherRules},
-    weather_runtime::environment_random,
     world::World,
 };
 
@@ -104,7 +103,14 @@ impl StartPlan {
         options: &MatchOptions,
         rules: &Rules,
     ) -> Result<Self, String> {
-        Self::prepare_mode(map, options, rules, StartupProfile::Conquest)
+        Self::prepare_mode(
+            map,
+            options,
+            rules,
+            StartupProfile::Conquest,
+            #[cfg(test)]
+            None,
+        )
     }
 
     pub(crate) fn prepare_world(
@@ -113,7 +119,14 @@ impl StartPlan {
         rules: &Rules,
         random: MatchRandom,
     ) -> Result<Self, String> {
-        Self::prepare_mode(map, options, rules, StartupProfile::World(random))
+        Self::prepare_mode(
+            map,
+            options,
+            rules,
+            StartupProfile::World(random),
+            #[cfg(test)]
+            None,
+        )
     }
 
     pub(crate) fn prepare_assault(
@@ -127,6 +140,8 @@ impl StartPlan {
             options,
             rules,
             StartupProfile::Assault { defender_team },
+            #[cfg(test)]
+            None,
         )
     }
 
@@ -135,6 +150,7 @@ impl StartPlan {
         options: &MatchOptions,
         rules: &Rules,
         profile: StartupProfile,
+        #[cfg(test)] replay: Option<crate::aligned_replay::Replay>,
     ) -> Result<Self, String> {
         let world_mode = matches!(&profile, StartupProfile::World(_));
         let defender_team = match &profile {
@@ -219,6 +235,10 @@ impl StartPlan {
             StartupProfile::World(random) => random,
             _ => MatchRandom::new(options.seed),
         };
+        #[cfg(test)]
+        {
+            random.replay = replay.clone();
+        }
         let selection = if options.shuffle && !world_mode {
             LayoutSelection::RandomFraction(random.next_fraction(StreamId::Terrain))
         } else {
@@ -254,6 +274,11 @@ impl StartPlan {
                     slot
                 };
             }
+        }
+        #[cfg(test)]
+        if let Some(replay) = &replay {
+            // Explicit constructor input, before player positions, placement or IDs exist.
+            authored_slots = replay.layout(&authored_slots, &available, options.players.len())?;
         }
         let support = catalog
             .table("SUPPORT_TYPES")
@@ -363,8 +388,16 @@ impl StartPlan {
             .collect();
         let mut living_seed = random.next_u64(StreamId::Weather) as u32;
         let wind = (
-            environment_random(&mut living_seed) * std::f64::consts::TAU,
-            0.3 + environment_random(&mut living_seed) * 0.5,
+            aligned_environment_draw!(
+                &mut living_seed,
+                replay.as_ref(),
+                serde_json::json!(["startup.wind.angle"])
+            ) * std::f64::consts::TAU,
+            0.3 + aligned_environment_draw!(
+                &mut living_seed,
+                replay.as_ref(),
+                serde_json::json!(["startup.wind.strength"])
+            ) * 0.5,
         );
         let wx = field(cfg, "weather")?;
         let living = if options.living_weather {
@@ -373,7 +406,12 @@ impl StartPlan {
                 .and_then(|v| v.first())
                 .and_then(Value::number)
                 .ok_or("invalid dry interval")?;
-            let next = number(wx, "firstRain")? + environment_random(&mut living_seed) * dry;
+            let next = number(wx, "firstRain")?
+                + aligned_environment_draw!(
+                    &mut living_seed,
+                    replay.as_ref(),
+                    serde_json::json!(["startup.shower"])
+                ) * dry;
             Some(LivingWeather {
                 raining: false,
                 next,
@@ -629,6 +667,27 @@ impl Match {
         let start = StartPlan::prepare(map, &options, &rules)?;
         let mut result = Self::skirmish_shell(map, options, rules, start)?;
         result.complete_skirmish_start()?;
+        Ok(result)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn new_aligned(
+        map: &crate::map::AuthoritativeMap,
+        options: MatchOptions,
+        replay: crate::aligned_replay::Replay,
+    ) -> Result<Self, String> {
+        let rules = Rules::compiled().map_err(|e| e.to_string())?;
+        let start = StartPlan::prepare_mode(
+            map,
+            &options,
+            &rules,
+            StartupProfile::Conquest,
+            Some(replay.clone()),
+        )?;
+        let mut result = Self::skirmish_shell(map, options, rules, start)?;
+        result.environment.replay = Some(replay.clone());
+        result.complete_skirmish_start()?;
+        replay.startup(&result);
         Ok(result)
     }
 

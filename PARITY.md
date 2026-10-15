@@ -13,6 +13,16 @@ The JavaScript game is a prototype: it was built to try the game's ideas out, an
 
 Some rows were written before this rule and propose copying a JavaScript accident exactly (for example IF-20: one shared random stream, discarded draws included). Where a row and the decisions below disagree, the decisions win.
 
+### Aligned whole-match evidence amendment
+
+Item 1 of [Axel's owner answer](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6194079987) is quoted verbatim, in response to [the narrowed proposal](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6182315380). Both owners record readback of the final documentation head on #5 before merge. The existing component, outcome and owner rules above remain in place.
+
+> 1. Aligned whole-match evidence (julio-differential-owner-single-followup-20261015): **YES**, exactly as narrowed in 6182315380.
+>    - Exact whole-match snapshots count as shared evidence only for existing rows whose complete approved check the replay exercises, and only when the harness demonstrates aligned inputs (startup layout plus every consumed random value).
+>    - Permitted row groups: any group (MODE, CMB, MOV, NET and others), on that row-by-row condition. No group is pre-approved as a block; each moved row must name the check it fully exercises.
+>    - Partial branches cannot move a row. Unaligned or independent-stream runs (including #220 at 2e7f827f, 0/61 checkpoints) stay outcome-judged diagnostics and move no rows.
+>    - PARITY.md "How parity is judged" may be amended to say this; that docs PR needs a normal both-owner readback. A test-only seam that aligns inputs is in scope under the 085 test-only waiver if it changes no runtime code; any runtime RNG change needs a separate ack.
+
 **Status: draft from the Rust side, 2026-10-12.** Julio's agents wrote the rows by reading the code at the pin; `DESIGN.md` and `CHANGELOG.md` served only to find things, and the code decided. The "Unreal (Axel)" column is a first guess written from the Rust side; Axel owns it and may rewrite it. Axel's 140-row client presentation/input inventory is published as [`docs/parity/client.md` at `9551d3976e9145c81030cf5a81ec7f0764b04d12`](https://github.com/axelmanosalvasmd/ww2-rts-native/blob/9551d3976e9145c81030cf5a81ec7f0764b04d12/docs/parity/client.md) in draft [PR #201](https://github.com/axelmanosalvasmd/ww2-rts-native/pull/201), explicitly not for merge. That file is not on main, and no client row is accepted. Its Axel-reported Linux build/automation on Rust `92fb7fe` is separate from live/package evidence on `03a49ac`. Fresh live adoption, Windows/macOS client and input checks, physical mouse/keyboard tests, complete decoder adoption and broader rules-query integration remain pending.
 
 ## Reference pin
