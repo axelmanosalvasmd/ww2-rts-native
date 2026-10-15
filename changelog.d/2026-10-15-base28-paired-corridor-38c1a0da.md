@@ -1,1 +1,2 @@
 - Add an unrun paired Classic/Conquest corridor experiment for BASE-28, retaining natural actors and testing paid placement, destruction and settled rubble against the original three route predicates. Preserve all old fixtures, assertions and row statuses; equivalence and native success remain unproved until execution and independent review.
+- Capture and byte-check the authentic paired corridor fixture: 61 exact measured frame pairs, 54 full steps per path and all original route/rubble assertions passing. Native replay and whole-row review remain pending.
