@@ -1,5 +1,9 @@
 # Three Crossroads Native: design decisions
 
+## CMB-61 formatter-only follow-up (2026-10-15)
+
+The first guarded formatting check at `a5411f79` reports two line-wrap differences in the new flame consumer. Apply only those whitespace changes and verify the complete non-whitespace byte sequence remains exact. Preserve the initial log at `/tmp/cmb61-flame-s3-7a762f65/fmt-check-a5411f79.log`. The authentic Source fixture and all assertions/literals remain unchanged. Freeze this follow-up before the granted formatting recheck and native checks.
+
 ## CMB-61 authentic firing capture (2026-10-15)
 
 Frozen preparation `7a762f6573891a2564cbd7aa4e0ee8566c0ad300` records 16 original-Source scenes and 202 firing checkpoints. Generation and serial `--check` both exit 0 using `/usr/bin/node` v24.21.0 x64 and clean pinned Source `e4e579a`, under the exclusive S3 lock, CPUs 8-11, 6 GiB memory, zero swap and 400% CPU quota. Freeze this authentic supplemental fixture before Cargo. No recorder, authored input, expected predicate, ordinary firing fixture or runtime changes. Native comparisons remain pending, CMB-61 stays held and the CMB-69 proposal remains unapplied.

@@ -146,7 +146,11 @@ fn cmb61_flame_launch_accuracy_ignores_trench_and_garrison() {
         for cover in ["trench", "garrison"] {
             assert_eq!(
                 flame,
-                velocities(named(&observations, &format!("launch-flamer-{cover}"), mode))
+                velocities(named(
+                    &observations,
+                    &format!("launch-flamer-{cover}"),
+                    mode
+                ))
             );
             assert_ne!(
                 rifle,
@@ -164,7 +168,11 @@ fn cmb61_flame_target_value_has_decisive_one_point_five_preference() {
         let preferred = name.starts_with("choice-flamer-")
             && !name.starts_with("choice-flamer-open-")
             && name.contains("-below-");
-        assert_eq!(snapshot["units"][0][1], if preferred { 3 } else { 2 }, "{name}");
+        assert_eq!(
+            snapshot["units"][0][1],
+            if preferred { 3 } else { 2 },
+            "{name}"
+        );
         assert!(snapshot["flights"].as_array().unwrap().is_empty());
     }
 }

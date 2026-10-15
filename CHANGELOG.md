@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Apply the two whitespace-only changes requested by the CMB-61 formatting check. Preserve all test tokens, assertions, literals and the authentic Source fixture. The initial formatting failure is retained; native tests remain pending.
+
 - Record the 16 CMB-61 flame firing scenes from pinned original Source, with 202 checkpoints. Generation and the serial byte check pass with x64 Node 24.21.0 under S3 caps. Preserve the old firing fixture and all row statuses; native comparison remains pending.
 
 - Prepare two CMB-61 flame comparisons through the existing Match firing provider: paired trench/open/garrison launch accuracy and the x1.5 target preference with negative controls. Keep the ordinary 131 firing traces and 668 checkpoints unchanged. Add only an unapplied Rust/Status proposal for CMB-69. Authentic recording and native execution remain pending; no row status or runtime changes.

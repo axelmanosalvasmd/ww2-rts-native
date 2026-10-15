@@ -1,5 +1,9 @@
 # CMB-61 missing flame components, source-only preparation
 
+## Granted formatting follow-up
+
+The first S3 formatting check at `a5411f79` failed only on two new-consumer line wraps. Apply those exact whitespace changes under the explicit formatter-only allowance. Static comparison confirms every non-whitespace byte, assertion and literal remains unchanged. Keep the raw failure in `/tmp/cmb61-flame-s3-7a762f65/fmt-check-a5411f79.log`. No compile or behavior test has run at this point.
+
 ## Authentic Source capture after preparation
 
 S3 granted generation and a serial byte check at frozen `7a762f6573891a2564cbd7aa4e0ee8566c0ad300`. Both commands exited 0. The authentic new fixture contains 16 scenes and 202 checkpoints, with x64 Node v24.21.0 and Source `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. The recorder and inputs remain exact. Raw logs: `/tmp/cmb61-flame-s3-7a762f65/source-generate.log` and `source-check.log`. Both invocations held the exclusive S3 flock and ran with CPUs 8-11, 6 GiB memory, zero swap and 400% CPU quota. This fixture is frozen before Cargo; native results remain pending. The source-only statements below describe the original preparation checkpoint, not this later capture. CMB-61 stays held and the CMB-69 patch stays unapplied.
