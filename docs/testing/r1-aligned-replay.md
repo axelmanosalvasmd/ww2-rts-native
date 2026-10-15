@@ -73,3 +73,13 @@ Source investigation identifies BASE-01 as the row describing the first field's 
 Local ACK of Hermes 156, comment 6194582243: test-only bounds, no row moves and separate Root review/publication are observed. No external acknowledgment or PR action is performed here.
 
 A final source-review correction moves the unseeded Math.random refusal ahead of module evaluation, covering import-time code and any captured callback. The Rust tree and already frozen shared inputs are unchanged. Check this frozen harness child against the original authentic fixture before final handoff; do not regenerate or replace the first fixture.
+
+## Final handoff
+
+The initialization-guard child `23ad85706130349f773381ddc19c67a625c9624d` passes a fresh Source check against the original immutable capture. All 600 ticks, 61 checkpoints, 1,321 draw records, startup observations and full frames reproduce exactly. The fixture's producing head remains `864d6485`; the final check log names `23ad8570`. The entire Rust tree equals native-tested `87dfae5c`, so no Rust check is repeated for this harness/documentation child. Native evidence remains attributed to that actual producing head.
+
+Private evidence directory: `/tmp/aligned-replay-d6308bcc/`. `source-trace.json`, `shared-input.json` and `source-input-receipt.json` are the pre-Cargo freeze. `native-report.json` and `native-frames.json` retain the final native result; the `-cae6e358` copies retain the first result. Each stage has its raw log and result JSON with head, exact command, exit status and limits. No seed or full trace is published.
+
+Final native command selected `aligned_replay::` with `--include-ignored --nocapture --test-threads=1`, yielding three passed checks and zero failed or ignored. Both registrations selected `every_test_file_is_compiled --exact`. Strict Clippy selected only core and simtest with `--all-targets -- -D warnings`. Formatting passed `--all -- --check`. No full/release/list command or historical unaligned replay ran.
+
+One-line dependency provenance confirms `ww2_core-82f7ed540759d581.d` includes this seam and the compiler record points to this checkout's core manifest and Rust cwd. All invoked processes are terminal and S1 flock is released. Root may reclaim the slot immediately. Root retains independent review and all PR, review and publication actions; none are performed by this implementation stream.

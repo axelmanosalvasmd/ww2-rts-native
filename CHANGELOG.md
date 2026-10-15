@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Complete the aligned-replay handoff: final Source check at `23ad8570` reproduces the frozen trace and input receipt, with native evidence kept on `87dfae5c`. Retain 0/61 MISMATCH and the Fuel presence difference, document private artifacts and commands, and release S1 for Root.
+
 - Extend the aligned Source recorder's unseeded-random refusal to module initialization. At `87dfae5c`, three focused harness checks, both registration guards, formatting and fresh strict core/simtest Clippy pass; aligned R1 remains MISMATCH at 0/61.
 
 - Record the first aligned R1 native diagnostic at `cae6e358`: both engines complete 600 ticks and all 1,321 consumed random values agree, but 0/61 checkpoints match. The first difference is tick 0, player 0 fuel: Source absence versus native zero. Preserve full traces and correct a test-only visibility warning before strict Clippy. No runtime or row status changes.
