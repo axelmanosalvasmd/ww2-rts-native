@@ -276,30 +276,65 @@ impl Match {
     }
     /// Actual Classic paid queue caller. No World context or admission is reused.
     pub(crate) fn recorded_classic_buy(
-        &mut self, slot: usize, kind: &str, from: Option<u32>,
+        &mut self,
+        slot: usize,
+        kind: &str,
+        from: Option<u32>,
     ) -> Result<u64, ProductionStepError> {
-        self.validate_classic_base_state().map_err(ProductionStepError::Control)?;
-        if self.finish.is_some() || self.start.economy.players.get(slot).is_none_or(|p| p.away || p.out) {
+        self.validate_classic_base_state()
+            .map_err(ProductionStepError::Control)?;
+        if self.finish.is_some()
+            || self
+                .start
+                .economy
+                .players
+                .get(slot)
+                .is_none_or(|p| p.away || p.out)
+        {
             return Err(production::Error::Denied(production::Denial::Blocked).into());
         }
         let count = self.production_step_context()?;
         let units = units(&self.world.game, &self.rules, count)?;
-        let context = context(&self.options, self.world.game.naval, &units, None, self.classic_sudden_death());
-        let registered = self.production.buildings().map(|(id, _)| id).collect::<Vec<_>>();
-        let prepared = self.production.prepare_queue_unit(&context, &mut self.start.economy,
-            slot, self.start.players[slot].config.faction, kind, from)?;
+        let context = context(
+            &self.options,
+            self.world.game.naval,
+            &units,
+            None,
+            self.classic_sudden_death(),
+        );
+        let registered = self
+            .production
+            .buildings()
+            .map(|(id, _)| id)
+            .collect::<Vec<_>>();
+        let prepared = self.production.prepare_queue_unit(
+            &context,
+            &mut self.start.economy,
+            slot,
+            self.start.players[slot].config.faction,
+            kind,
+            from,
+        )?;
         // The connected birth provider currently represents ordinary ground
         // units. Preserve the unrepresented air/rail/naval boundary before pay.
         crate::match_world_tick::validate_world_future_birth(&self.rules, kind)
             .map_err(ProductionStepError::Control)?;
         let building = prepared.building();
         if !registered.contains(&building) || !self.building_rallies.contains_key(&building) {
-            return Err(ProductionStepError::InvalidState("Classic canonical producer metadata"));
+            return Err(ProductionStepError::InvalidState(
+                "Classic canonical producer metadata",
+            ));
         }
-        let story = crate::match_story::prepare_story_updates(&mut self.story, false,
-            &[crate::match_story::StoryChange { slot: Some(slot),
-                key: crate::match_story::StoryKey::MpSpent, amount: prepared.charge().mp }])
-            .map_err(ProductionStepError::Control)?;
+        let story = crate::match_story::prepare_story_updates(
+            &mut self.story,
+            false,
+            &[crate::match_story::StoryChange {
+                slot: Some(slot),
+                key: crate::match_story::StoryKey::MpSpent,
+                amount: prepared.charge().mp,
+            }],
+        )
+        .map_err(ProductionStepError::Control)?;
         let job = prepared.commit();
         story.commit();
         Ok(job)
@@ -418,7 +453,7 @@ impl Match {
                 self.world.game.naval,
                 &units,
                 regions.as_deref(),
-            self.classic_sudden_death(),
+                self.classic_sudden_death(),
             );
             let prepared = self.production.prepare_building_step(
                 &context,

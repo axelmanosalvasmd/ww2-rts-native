@@ -42,8 +42,7 @@ fn base20_json_maker_refusals_preserve_real_constructor_state() {
         let before = projection(&m);
         let controls = m.commands.units.clone();
         let production = m.production.clone();
-        let command = Command::from_json(&json!({"t":"buy", "unit":"rifle", "from":from}))
-            .unwrap();
+        let command = Command::from_json(&json!({"t":"buy", "unit":"rifle", "from":from})).unwrap();
         let Command::Buy { from, .. } = &command else {
             panic!("Buy must retain explicit maker presence");
         };
@@ -167,5 +166,10 @@ fn base30_paid_barracks_supported_breach_assist_and_retirement() {
     let report = m.advance_tick().unwrap();
     assert!(report.retired.iter().any(|r| r.unit.id == site));
     assert!(!m.world.game.units.contains_key(&site));
-    assert!(structure.cells.iter().all(|c| !m.building_cells.contains_key(c)));
+    assert!(
+        structure
+            .cells
+            .iter()
+            .all(|c| !m.building_cells.contains_key(c))
+    );
 }

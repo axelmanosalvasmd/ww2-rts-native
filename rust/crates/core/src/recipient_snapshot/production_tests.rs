@@ -20,10 +20,22 @@ fn make(input: &Value) -> Match {
     let map = AuthoritativeMap::from_json(&serde_json::to_vec(&map).unwrap()).unwrap();
     let options = MatchOptions {
         seed: 701,
-        mode: if input["map"]["world"].is_null() { Mode::Conquest } else { Mode::World },
+        mode: if input["map"]["world"].is_null() {
+            Mode::Conquest
+        } else {
+            Mode::World
+        },
         players: vec![
-            PlayerConfig { name: "A".into(), team: 0, faction: Faction::Usa },
-            PlayerConfig { name: "B".into(), team: 1, faction: Faction::Germany },
+            PlayerConfig {
+                name: "A".into(),
+                team: 0,
+                faction: Faction::Usa,
+            },
+            PlayerConfig {
+                name: "B".into(),
+                team: 1,
+                faction: Faction::Germany,
+            },
         ],
         shuffle: false,
         army: ArmySize::Standard,
@@ -40,13 +52,17 @@ fn make(input: &Value) -> Match {
         Match::new_world(&map, options, MatchRandom::new(701))
     } else {
         Match::new(&map, options)
-    }.unwrap();
+    }
+    .unwrap();
     for p in &mut state.start.economy.players {
         p.mp = 5000.125;
         p.mun = 500.5;
         p.fuel = 500.25;
     }
-    assert_eq!(json!(state.world.game.units.keys().collect::<Vec<_>>()), input["initialIds"]);
+    assert_eq!(
+        json!(state.world.game.units.keys().collect::<Vec<_>>()),
+        input["initialIds"]
+    );
     state
 }
 
@@ -59,11 +75,15 @@ fn equal(actual: &Value, expected: &Value) {
         }
         (Value::Array(a), Value::Array(b)) => {
             assert_eq!(a.len(), b.len());
-            for (a, b) in a.iter().zip(b) { equal(a, b); }
+            for (a, b) in a.iter().zip(b) {
+                equal(a, b);
+            }
         }
         (Value::Object(a), Value::Object(b)) => {
             assert_eq!(a.keys().collect::<Vec<_>>(), b.keys().collect::<Vec<_>>());
-            for (key, value) in a { equal(value, &b[key]); }
+            for (key, value) in a {
+                equal(value, &b[key]);
+            }
         }
         _ => assert_eq!(actual, expected),
     }
@@ -87,19 +107,35 @@ fn check(state: &Match, recipients: &Value) {
                 equal(&recipient.fields[name], &rows[name]);
             }
         } else {
-            assert!(matches!(SnapshotCache::new(state), Err(SnapshotError::UnsupportedMode)));
+            assert!(matches!(
+                SnapshotCache::new(state),
+                Err(SnapshotError::UnsupportedMode)
+            ));
         }
     }
-    assert_eq!(capture(state, state.world.game.players.len()), Err(SnapshotError::InvalidRecipient));
+    assert_eq!(
+        capture(state, state.world.game.players.len()),
+        Err(SnapshotError::InvalidRecipient)
+    );
 }
 fn replay(world: bool) {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../simtest/tests/fixtures/base-command-consumers.json");
-    let fixture: Value = serde_json::from_str(&std::fs::read_to_string(path)
-        .expect("original Source recording remains queued until Root grants its exact slot")).unwrap();
-    assert_eq!(fixture["reference"], "e4e579a838aabae3b1d9dadbc17a0a87147bc52d");
-    let cases = fixture["cases"].as_array().unwrap().iter()
-        .filter(|case| !case["input"]["map"]["world"].is_null() == world).collect::<Vec<_>>();
+    let fixture: Value = serde_json::from_str(
+        &std::fs::read_to_string(path)
+            .expect("original Source recording remains queued until Root grants its exact slot"),
+    )
+    .unwrap();
+    assert_eq!(
+        fixture["reference"],
+        "e4e579a838aabae3b1d9dadbc17a0a87147bc52d"
+    );
+    let cases = fixture["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|case| !case["input"]["map"]["world"].is_null() == world)
+        .collect::<Vec<_>>();
     assert_eq!(cases.len(), if world { 3 } else { 2 });
     for case in cases {
         let mut state = make(&case["input"]);
@@ -113,8 +149,12 @@ fn replay(world: bool) {
                     assert_eq!(json!(denial.map(|d| d.name())), record["result"]);
                 }
                 "train" => {
-                    state.step_training(record["maker"].as_u64().unwrap() as u32,
-                        record["dt"].as_f64().unwrap()).unwrap();
+                    state
+                        .step_training(
+                            record["maker"].as_u64().unwrap() as u32,
+                            record["dt"].as_f64().unwrap(),
+                        )
+                        .unwrap();
                 }
                 _ => panic!("unexpected Source action"),
             }

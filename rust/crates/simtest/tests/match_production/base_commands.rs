@@ -33,20 +33,35 @@ fn observed(m: &Match, makers: &[u32], initial_next: u32) -> Value {
 fn replay(name: &str) -> Match {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/base-command-consumers.json");
-    let f: Value = serde_json::from_str(&std::fs::read_to_string(path)
-        .expect("Root must authorize original Source recording and fixture freeze before these tests")).unwrap();
+    let f: Value = serde_json::from_str(&std::fs::read_to_string(path).expect(
+        "Root must authorize original Source recording and fixture freeze before these tests",
+    ))
+    .unwrap();
     assert_eq!(f["reference"], "e4e579a838aabae3b1d9dadbc17a0a87147bc52d");
     assert_eq!(f["node"], "v24.21.0");
     assert_eq!(f["arch"], "x64");
-    assert_eq!(f["scope"], "Five original native-command component scenes. Training helpers are not full ticks. No Classic, Horde, wire or whole-row equivalence claim.");
+    assert_eq!(
+        f["scope"],
+        "Five original native-command component scenes. Training helpers are not full ticks. No Classic, Horde, wire or whole-row equivalence claim."
+    );
     assert_eq!(f["cases"].as_array().unwrap().len(), 5);
-    let case = f["cases"].as_array().unwrap().iter().find(|c| c["name"] == name).unwrap();
+    let case = f["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == name)
+        .unwrap();
     let mut m = make(&case["input"]);
     let initial_next = m.next_unit_id;
     assert_eq!(json!(initial_next), case["initialNext"]);
-    let makers = m.world.game.units.values()
+    let makers = m
+        .world
+        .game
+        .units
+        .values()
         .filter(|u| u.owner != LOCAL_DEFENDER_OWNER && m.production.building(u.id).is_some())
-        .map(|u| u.id).collect::<Vec<_>>();
+        .map(|u| u.id)
+        .collect::<Vec<_>>();
     assert_eq!(json!(makers), case["makers"]);
     assert_eq!(observed(&m, &makers, initial_next), case["initial"]);
     let expected_count = match name {
@@ -65,7 +80,11 @@ fn replay(name: &str) -> Match {
                 let command = Command::from_json(&record["cmd"]).unwrap();
                 let slot = record["slot"].as_u64().unwrap() as usize;
                 let result = m.execute_command(slot, &command, false).unwrap();
-                assert_eq!(json!(result.map(|d| d.name())), record["result"], "{name}:{index}");
+                assert_eq!(
+                    json!(result.map(|d| d.name())),
+                    record["result"],
+                    "{name}:{index}"
+                );
                 if !record["result"].is_null() {
                     assert_eq!(observed(&m, &makers, initial_next), before);
                 }
@@ -78,7 +97,11 @@ fn replay(name: &str) -> Match {
             }
             _ => panic!("unexpected Source action"),
         }
-        assert_eq!(observed(&m, &makers, initial_next), record["expected"], "{name}:{index}");
+        assert_eq!(
+            observed(&m, &makers, initial_next),
+            record["expected"],
+            "{name}:{index}"
+        );
     }
     m
 }
@@ -121,8 +144,12 @@ fn base23_building_rally_selection_and_actual_recruit_endpoint() {
 #[test]
 fn base22_cancel_story_preflight_failure_preserves_paid_jobs_and_wallet() {
     let old = fixture();
-    let input = old["cases"].as_array().unwrap().iter()
-        .find(|c| !c["map"]["world"].is_null()).unwrap();
+    let input = old["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| !c["map"]["world"].is_null())
+        .unwrap();
     let mut m = make(input);
     let hq = resolve(&m, 0, "hq");
     for _ in 0..2 {
@@ -133,14 +160,23 @@ fn base22_cancel_story_preflight_failure_preserves_paid_jobs_and_wallet() {
     // Fault injection removes bookkeeping, never an actor or a paid job. This
     // verifies the transaction's failure boundary, not a valid Source state.
     m.story.clear();
-    preserves(&mut m, 0, json!({"t":"cancelProduction","id":hq,"job":job}), Err(()));
+    preserves(
+        &mut m,
+        0,
+        json!({"t":"cancelProduction","id":hq,"job":job}),
+        Err(()),
+    );
 }
 
 #[test]
 fn base22_world_recorded_cancel_and_rally_reach_the_actual_tick_boundary() {
     let old = fixture();
-    let input = old["cases"].as_array().unwrap().iter()
-        .find(|c| !c["map"]["world"].is_null()).unwrap();
+    let input = old["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| !c["map"]["world"].is_null())
+        .unwrap();
     let mut m = make(input);
     let hq = resolve(&m, 0, "hq");
     for _ in 0..2 {
@@ -152,16 +188,28 @@ fn base22_world_recorded_cancel_and_rally_reach_the_actual_tick_boundary() {
     for (index, raw) in [
         json!({"t":"rally","id":hq,"x":57,"z":33}),
         json!({"t":"cancelProduction","id":hq,"job":jobs[1].id}),
-    ].into_iter().enumerate() {
-        m.enqueue_command(ww2_core::orders::OrderKey {
-            tick: 1, issuer: 0, sequence: index as u64 + 1,
-        }, Command::from_json(&raw).unwrap()).unwrap();
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        m.enqueue_command(
+            ww2_core::orders::OrderKey {
+                tick: 1,
+                issuer: 0,
+                sequence: index as u64 + 1,
+            },
+            Command::from_json(&raw).unwrap(),
+        )
+        .unwrap();
     }
     let report = m.advance_tick().unwrap();
     assert_eq!(report.tick, 1);
     assert_eq!(report.commands.len(), 2);
     assert!(report.commands.iter().all(|c| c.denial.is_none()));
-    for phase in [ww2_core::match_tick::TickPhase::Commands, ww2_core::match_tick::TickPhase::Production] {
+    for phase in [
+        ww2_core::match_tick::TickPhase::Commands,
+        ww2_core::match_tick::TickPhase::Production,
+    ] {
         assert!(report.phases.contains(&phase));
         assert!(!report.unavailable.contains(&phase));
     }
@@ -171,7 +219,6 @@ fn base22_world_recorded_cancel_and_rally_reach_the_actual_tick_boundary() {
     assert_eq!(m.story[0].mp_spent, spent - jobs[1].charge.mp);
     assert_eq!(m.building_rallies[&hq], Some(Point { x: 57.0, z: 33.0 }));
 }
-
 
 #[derive(Debug, PartialEq)]
 struct JournalState {
@@ -190,31 +237,62 @@ fn journals(m: &Match) -> JournalState {
         journal: m.world.journal().to_vec(),
         base: m.world.journal_base(),
         end: m.world.journal_end().unwrap(),
-        pending: (0..m.world.game.players.len()).map(Recipient::Player)
+        pending: (0..m.world.game.players.len())
+            .map(Recipient::Player)
             .chain(std::iter::once(Recipient::Spectators))
-            .map(|r| m.world.pending(r).cloned()).collect(),
+            .map(|r| m.world.pending(r).cloned())
+            .collect(),
     }
 }
-fn preserves(m: &mut Match, slot: usize, raw: Value,
-    expected: Result<Option<ww2_core::match_commands::Denial>, ()>) {
-    let makers = m.world.game.units.values()
+fn preserves(
+    m: &mut Match,
+    slot: usize,
+    raw: Value,
+    expected: Result<Option<ww2_core::match_commands::Denial>, ()>,
+) {
+    let makers = m
+        .world
+        .game
+        .units
+        .values()
         .filter(|u| u.owner != LOCAL_DEFENDER_OWNER && m.production.building(u.id).is_some())
-        .map(|u| u.id).collect::<Vec<_>>();
+        .map(|u| u.id)
+        .collect::<Vec<_>>();
     let initial_next = m.next_unit_id;
     let projection = observed(m, &makers, initial_next);
     let production = m.production.clone();
     // Keep wallet bits exact even for explicit malformed-wallet fault injection.
-    let wallet = |m: &Match| m.start.economy.players.iter().map(|p| json!([
-        p.team,p.away,p.out,bits(p.mp),bits(p.mun),bits(p.fuel),bits(p.vp),bits(p.inc),
-        p.fuel_inc.map(bits),p.upkeep.map(bits),
-    ])).collect::<Vec<_>>();
+    let wallet = |m: &Match| {
+        m.start
+            .economy
+            .players
+            .iter()
+            .map(|p| {
+                json!([
+                    p.team,
+                    p.away,
+                    p.out,
+                    bits(p.mp),
+                    bits(p.mun),
+                    bits(p.fuel),
+                    bits(p.vp),
+                    bits(p.inc),
+                    p.fuel_inc.map(bits),
+                    p.upkeep.map(bits),
+                ])
+            })
+            .collect::<Vec<_>>()
+    };
     let wallets = wallet(m);
     let story = m.story.clone();
     let control = m.commands.units.clone();
     let rallies = m.building_rallies.clone();
     let logs = journals(m);
     let command = Command::from_json(&raw).unwrap();
-    assert_eq!(m.execute_command(slot, &command, false).map_err(|_| ()), expected);
+    assert_eq!(
+        m.execute_command(slot, &command, false).map_err(|_| ()),
+        expected
+    );
     assert_eq!(observed(m, &makers, initial_next), projection);
     assert_eq!(m.production, production);
     assert_eq!(wallet(m), wallets);
@@ -225,8 +303,12 @@ fn preserves(m: &mut Match, slot: usize, raw: Value,
 }
 fn actual(world: bool) -> Match {
     let old = fixture();
-    let input = old["cases"].as_array().unwrap().iter()
-        .find(|c| !c["map"]["world"].is_null() == world).unwrap();
+    let input = old["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| !c["map"]["world"].is_null() == world)
+        .unwrap();
     make(input)
 }
 #[test]
@@ -237,17 +319,47 @@ fn base20_actual_world_queue_and_conquest_recruit_preflight_failures_preserve_st
         let hq = resolve(&m, 0, "hq");
         // A real route is prepared by the Conquest buy before its story token.
         let rally = json!({"t":"rally","id":hq,"x":41,"z":41});
-        assert_eq!(m.execute_command(0, &Command::from_json(&rally).unwrap(), false).unwrap(), None);
+        assert_eq!(
+            m.execute_command(0, &Command::from_json(&rally).unwrap(), false)
+                .unwrap(),
+            None
+        );
         let foreign = resolve(&m, 1, "hq");
-        preserves(&mut m, 1, json!({"t":"buy","unit":"rifle","from":hq}),
-            Ok(Some(if world { Denial::QueueFull } else { Denial::Needs })));
-        preserves(&mut m, 0, json!({"t":"buy","unit":"rifle","from":foreign}),
-            Ok(Some(if world { Denial::QueueFull } else { Denial::Needs })));
+        preserves(
+            &mut m,
+            1,
+            json!({"t":"buy","unit":"rifle","from":hq}),
+            Ok(Some(if world {
+                Denial::QueueFull
+            } else {
+                Denial::Needs
+            })),
+        );
+        preserves(
+            &mut m,
+            0,
+            json!({"t":"buy","unit":"rifle","from":foreign}),
+            Ok(Some(if world {
+                Denial::QueueFull
+            } else {
+                Denial::Needs
+            })),
+        );
         m.start.economy.players[0].mp = 0.0;
-        preserves(&mut m, 0, json!({"t":"buy","unit":"rifle","from":hq}), Ok(Some(Denial::Mp)));
+        preserves(
+            &mut m,
+            0,
+            json!({"t":"buy","unit":"rifle","from":hq}),
+            Ok(Some(Denial::Mp)),
+        );
         m.start.economy.players[0].mp = 5000.125;
         m.story.clear();
-        preserves(&mut m, 0, json!({"t":"buy","unit":"rifle","from":hq}), Err(()));
+        preserves(
+            &mut m,
+            0,
+            json!({"t":"buy","unit":"rifle","from":hq}),
+            Err(()),
+        );
     }
 }
 #[test]
@@ -261,30 +373,55 @@ fn base22_actual_waiter_wallet_failure_and_nonzero_index_stored_refunds() {
     let paid = m.production.building(hq).unwrap().jobs().to_vec();
     assert_ne!(paid[0].charge, paid[1].charge);
     m.step_training(hq, 5.0).unwrap();
-    preserves(&mut m, 1, json!({"t":"cancelProduction","id":hq,"job":paid[2].id}),
-        Ok(Some(ww2_core::match_commands::Denial::Unseen)));
+    preserves(
+        &mut m,
+        1,
+        json!({"t":"cancelProduction","id":hq,"job":paid[2].id}),
+        Ok(Some(ww2_core::match_commands::Denial::Unseen)),
+    );
     let original_mp = m.start.economy.players[0].mp;
     // Corrupt wallet data only. No charge, actor, progress or RNG is replaced.
     m.start.economy.players[0].mp = f64::NAN;
-    preserves(&mut m, 0, json!({"t":"cancelProduction","id":hq,"job":paid[2].id}), Err(()));
+    preserves(
+        &mut m,
+        0,
+        json!({"t":"cancelProduction","id":hq,"job":paid[2].id}),
+        Err(()),
+    );
     m.start.economy.players[0].mp = original_mp;
     for (index, job) in [(2, &paid[2]), (1, &paid[1])] {
         assert_eq!(m.production.building(hq).unwrap().jobs()[index].id, job.id);
         let before = m.start.economy.players[0].clone();
         let spent = m.story[0].mp_spent;
         let logs = journals(&m);
-        let cancel = Command::from_json(&json!({"t":"cancelProduction","id":hq,"job":job.id})).unwrap();
+        let cancel =
+            Command::from_json(&json!({"t":"cancelProduction","id":hq,"job":job.id})).unwrap();
         assert_eq!(m.execute_command(0, &cancel, false).unwrap(), None);
-        assert_eq!(m.start.economy.players[0].mp.to_bits(), (before.mp + job.charge.mp).to_bits());
-        assert_eq!(m.start.economy.players[0].fuel.to_bits(), (before.fuel + job.charge.fuel).to_bits());
-        assert_eq!(m.start.economy.players[0].mun.to_bits(), before.mun.to_bits());
-        assert_eq!(m.story[0].mp_spent.to_bits(), (spent - job.charge.mp).to_bits());
+        assert_eq!(
+            m.start.economy.players[0].mp.to_bits(),
+            (before.mp + job.charge.mp).to_bits()
+        );
+        assert_eq!(
+            m.start.economy.players[0].fuel.to_bits(),
+            (before.fuel + job.charge.fuel).to_bits()
+        );
+        assert_eq!(
+            m.start.economy.players[0].mun.to_bits(),
+            before.mun.to_bits()
+        );
+        assert_eq!(
+            m.story[0].mp_spent.to_bits(),
+            (spent - job.charge.mp).to_bits()
+        );
         let b = m.production.building(hq).unwrap();
         assert_eq!(b.jobs()[0], paid[0]);
         assert_eq!(b.progress(), 5.0);
         assert_eq!(journals(&m), logs);
     }
-    assert_eq!(m.production.building(hq).unwrap().jobs(), &[paid[0].clone(), paid[3].clone()]);
+    assert_eq!(
+        m.production.building(hq).unwrap().jobs(),
+        &[paid[0].clone(), paid[3].clone()]
+    );
 }
 #[test]
 fn base23_actual_multi_maker_rally_preflights_all_selected_rows() {
@@ -295,13 +432,22 @@ fn base23_actual_multi_maker_rally_preflights_all_selected_rows() {
     // A foreign valid maker is ignored. It never receives the selected rally.
     let foreign_rally = m.building_rallies[&foreign];
     let raw = json!({"t":"rally","ids":[hq,foreign,barracks],"x":20,"z":18});
-    assert_eq!(m.execute_command(0, &Command::from_json(&raw).unwrap(), false).unwrap(), None);
+    assert_eq!(
+        m.execute_command(0, &Command::from_json(&raw).unwrap(), false)
+            .unwrap(),
+        None
+    );
     assert_eq!(m.building_rallies[&hq], Some(Point { x: 20.0, z: 18.0 }));
     assert_eq!(m.building_rallies[&barracks], m.building_rallies[&hq]);
     assert_eq!(m.building_rallies[&foreign], foreign_rally);
     // Missing metadata on the later owned maker must not change the first one.
     m.building_rallies.remove(&barracks);
-    preserves(&mut m, 0, json!({"t":"rally","ids":[hq,barracks],"x":31,"z":27}), Err(()));
+    preserves(
+        &mut m,
+        0,
+        json!({"t":"rally","ids":[hq,barracks],"x":31,"z":27}),
+        Err(()),
+    );
 }
 
 #[test]
@@ -315,9 +461,19 @@ fn base21_world_recorded_paid_queue_cancel_and_rally_run_through_actual_birth() 
         json!({"t":"buy","unit":"rifle","from":hq}),
         json!({"t":"buy","unit":"engineer","from":hq}),
         json!({"t":"buy","unit":"rifle","from":hq}),
-    ].into_iter().enumerate() {
-        m.enqueue_command(OrderKey { tick: 1, issuer: 0, sequence: sequence as u64 + 1 },
-            Command::from_json(&raw).unwrap()).unwrap();
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        m.enqueue_command(
+            OrderKey {
+                tick: 1,
+                issuer: 0,
+                sequence: sequence as u64 + 1,
+            },
+            Command::from_json(&raw).unwrap(),
+        )
+        .unwrap();
     }
     let report = m.advance_tick().unwrap();
     assert_eq!(report.commands.len(), 4);
@@ -325,19 +481,37 @@ fn base21_world_recorded_paid_queue_cancel_and_rally_run_through_actual_birth() 
     assert_eq!(m.next_unit_id, initial_next);
     let jobs = m.production.building(hq).unwrap().jobs().to_vec();
     assert_eq!(jobs.len(), 3);
-    assert_eq!(jobs.iter().map(|j| j.kind.as_str()).collect::<Vec<_>>(), ["rifle", "engineer", "rifle"]);
+    assert_eq!(
+        jobs.iter().map(|j| j.kind.as_str()).collect::<Vec<_>>(),
+        ["rifle", "engineer", "rifle"]
+    );
     let spent = m.story[0].mp_spent;
-    m.enqueue_command(OrderKey { tick: 2, issuer: 0, sequence: 5 },
-        Command::from_json(&json!({"t":"cancelProduction","id":hq,"job":jobs[2].id})).unwrap()).unwrap();
+    m.enqueue_command(
+        OrderKey {
+            tick: 2,
+            issuer: 0,
+            sequence: 5,
+        },
+        Command::from_json(&json!({"t":"cancelProduction","id":hq,"job":jobs[2].id})).unwrap(),
+    )
+    .unwrap();
     let report = m.advance_tick().unwrap();
     assert_eq!(report.commands.len(), 1);
     assert_eq!(report.commands[0].denial, None);
     assert_eq!(m.production.building(hq).unwrap().jobs(), &jobs[..2]);
-    assert_eq!(m.story[0].mp_spent.to_bits(), (spent - jobs[2].charge.mp).to_bits());
+    assert_eq!(
+        m.story[0].mp_spent.to_bits(),
+        (spent - jobs[2].charge.mp).to_bits()
+    );
     // This is a bounded wait for a genuine queued birth, not a clock rewrite or
     // a synthetic Classic deadline. Every interval executes the full World tick.
-    let train = Catalog::compiled().unwrap().unit("rifle").unwrap()
-        .get("train").and_then(ww2_core::catalog::Value::number).unwrap();
+    let train = Catalog::compiled()
+        .unwrap()
+        .unit("rifle")
+        .unwrap()
+        .get("train")
+        .and_then(ww2_core::catalog::Value::number)
+        .unwrap();
     let bound = (train / m.rules.movement.tick) as usize + 4;
     let mut birth_tick = None;
     for _ in 0..bound {
@@ -351,12 +525,18 @@ fn base21_world_recorded_paid_queue_cancel_and_rally_run_through_actual_birth() 
             break;
         }
     }
-    assert!(birth_tick.is_some(), "actual paid rifle did not emerge within its rules-derived full-tick bound");
+    assert!(
+        birth_tick.is_some(),
+        "actual paid rifle did not emerge within its rules-derived full-tick bound"
+    );
     assert_eq!(m.next_unit_id, initial_next + 1);
     let rifle = &m.world.game.units[&initial_next];
     assert_eq!(rifle.owner, 0);
     assert_eq!(m.rules.kinds[rifle.kind].name, "rifle");
-    assert_eq!(m.commands.units[&initial_next].route_end, Some(Point { x: 57.0, z: 33.0 }));
+    assert_eq!(
+        m.commands.units[&initial_next].route_end,
+        Some(Point { x: 57.0, z: 33.0 })
+    );
     assert_eq!(rifle.path.last(), Some(&Point { x: 57.0, z: 33.0 }));
     assert_eq!(m.production.building(hq).unwrap().jobs(), &jobs[1..2]);
     assert_eq!(m.production.building(hq).unwrap().progress(), 0.0);

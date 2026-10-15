@@ -9,8 +9,12 @@ pub(super) fn capture(state: &Match, slot: usize) -> Result<Map<String, Value>, 
     }
     let supported = match state.options.mode {
         Mode::Default | Mode::Conquest => g.mode.is_none() && state.world_runtime.is_none(),
-        Mode::Classic => g.mode == Some(crate::game::ModeKind::Classic) && state.classic_runtime.is_some(),
-        Mode::World => g.mode == Some(crate::game::ModeKind::World) && state.world_runtime.is_some(),
+        Mode::Classic => {
+            g.mode == Some(crate::game::ModeKind::Classic) && state.classic_runtime.is_some()
+        }
+        Mode::World => {
+            g.mode == Some(crate::game::ModeKind::World) && state.world_runtime.is_some()
+        }
         _ => false,
     };
     if !supported {
@@ -55,7 +59,12 @@ pub(super) fn capture(state: &Match, slot: usize) -> Result<Map<String, Value>, 
     Ok(rows)
 }
 fn push(owner: &mut Map<String, Value>, name: &str, row: Value) {
-    owner.get_mut(name).unwrap().as_array_mut().unwrap().push(row);
+    owner
+        .get_mut(name)
+        .unwrap()
+        .as_array_mut()
+        .unwrap()
+        .push(row);
 }
 
 #[cfg(test)]

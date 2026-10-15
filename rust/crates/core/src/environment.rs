@@ -188,7 +188,8 @@ pub struct EnvironmentRuntime {
 impl EnvironmentRuntime {
     /// Administrative site teardown has no falling-body or collapse effect.
     pub(crate) fn forget_building_sections(&mut self, sections: &BTreeSet<String>) {
-        self.falling_sections.retain(|body| !sections.contains(&body.section));
+        self.falling_sections
+            .retain(|body| !sections.contains(&body.section));
     }
     pub fn contacts(&self) -> &[String] {
         &self.contacts

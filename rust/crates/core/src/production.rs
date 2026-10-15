@@ -170,7 +170,12 @@ impl PreparedCancellation<'_> {
         self.refund
     }
     pub(crate) fn commit(self) -> Price {
-        self.state.buildings.get_mut(&self.building).unwrap().jobs.remove(self.index);
+        self.state
+            .buildings
+            .get_mut(&self.building)
+            .unwrap()
+            .jobs
+            .remove(self.index);
         self.wallets.players[self.slot].mp += self.refund.mp;
         self.wallets.players[self.slot].fuel += self.refund.fuel;
         self.refund
@@ -782,7 +787,9 @@ impl ProductionState {
         building: u32,
         job: u64,
     ) -> Result<Price, Error> {
-        Ok(self.prepare_cancel(c, wallets, slot, building, job)?.commit())
+        Ok(self
+            .prepare_cancel(c, wallets, slot, building, job)?
+            .commit())
     }
     pub(crate) fn prepare_cancel<'a>(
         &'a mut self,
@@ -824,7 +831,14 @@ impl ProductionState {
         if !(p.mp + refund.mp).is_finite() || !(p.fuel + refund.fuel).is_finite() {
             return Err(Error::InvalidInput("refund overflow"));
         }
-        Ok(PreparedCancellation { state: self, wallets, slot, building, index, refund })
+        Ok(PreparedCancellation {
+            state: self,
+            wallets,
+            slot,
+            building,
+            index,
+            refund,
+        })
     }
     pub fn prepare_research<'a, 'facts>(
         &'a mut self,

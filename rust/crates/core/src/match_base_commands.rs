@@ -22,7 +22,9 @@ impl Match {
         if !matches!(self.options.mode, Mode::World | Mode::Classic) {
             return Ok(Some(Denial::Unsupported));
         }
-        let count = self.production_step_context().map_err(|e| format!("production cancel context: {e:?}"))?;
+        let count = self
+            .production_step_context()
+            .map_err(|e| format!("production cancel context: {e:?}"))?;
         // Source checks the deadline before looking up the building or job.
         if self.classic_sudden_death() {
             return Ok(Some(Denial::SuddenDeath));
@@ -30,25 +32,41 @@ impl Match {
         let (Some(building), Some(job)) = (building, job) else {
             return Ok(Some(Denial::Unseen));
         };
-        let regions = self.production_regions().map_err(|e| format!("production cancel regions: {e:?}"))?;
+        let regions = self
+            .production_regions()
+            .map_err(|e| format!("production cancel regions: {e:?}"))?;
         let units = production_step::units(&self.world.game, &self.rules, count)
             .map_err(|e| format!("production cancel actors: {e:?}"))?;
         let context = production_step::context(
-            &self.options, self.world.game.naval, &units, regions.as_deref(), self.classic_sudden_death(),
+            &self.options,
+            self.world.game.naval,
+            &units,
+            regions.as_deref(),
+            self.classic_sudden_death(),
         );
         // A negative safe integer is a valid Source job lookup that cannot match
         // a positive allocated identity. Invalid numbers were retained as None.
         let job = u64::try_from(job).unwrap_or(0);
         let prepared = match self.production.prepare_cancel(
-            &context, &mut self.start.economy, slot, building, job,
+            &context,
+            &mut self.start.economy,
+            slot,
+            building,
+            job,
         ) {
             Ok(prepared) => prepared,
             Err(crate::production::Error::Denied(reason)) => return Ok(Some(reason.into())),
             Err(error) => return Err(format!("production cancel: {error}")),
         };
-        let story = prepare_story_updates(&mut self.story, self.finish.is_some(), &[StoryChange {
-            slot: Some(slot), key: StoryKey::MpSpent, amount: -prepared.refund().mp,
-        }])?;
+        let story = prepare_story_updates(
+            &mut self.story,
+            self.finish.is_some(),
+            &[StoryChange {
+                slot: Some(slot),
+                key: StoryKey::MpSpent,
+                amount: -prepared.refund().mp,
+            }],
+        )?;
         prepared.commit();
         story.commit();
         Ok(None)
@@ -63,20 +81,29 @@ impl Match {
         explicit_id: bool,
         at: Option<Point>,
     ) -> Result<Option<Denial>, String> {
-        if !matches!(self.options.mode, Mode::Default | Mode::Conquest | Mode::World | Mode::Classic) {
+        if !matches!(
+            self.options.mode,
+            Mode::Default | Mode::Conquest | Mode::World | Mode::Classic
+        ) {
             return Ok(Some(Denial::Unsupported));
         }
-        self.production_step_context().map_err(|e| format!("rally context: {e:?}"))?;
+        self.production_step_context()
+            .map_err(|e| format!("rally context: {e:?}"))?;
         let Some(at) = at.filter(|p| p.x.is_finite() && p.z.is_finite()) else {
             return Ok(Some(Denial::Blocked));
         };
         let game = &self.world.game;
-        let selected_building = self.options.mode.is_construction() || explicit_id || !ids.is_empty();
+        let selected_building =
+            self.options.mode.is_construction() || explicit_id || !ids.is_empty();
         if !selected_building {
             if !matches!(self.options.mode, Mode::Default | Mode::Conquest) {
                 return Ok(Some(Denial::Unsupported));
             }
-            if at.x < 0.0 || at.z < 0.0 || at.x >= game.w as f64 * CELL || at.z >= game.h as f64 * CELL {
+            if at.x < 0.0
+                || at.z < 0.0
+                || at.x >= game.w as f64 * CELL
+                || at.z >= game.h as f64 * CELL
+            {
                 return Ok(Some(Denial::Blocked));
             }
             let cell = (at.z / CELL) as usize * game.w + (at.x / CELL) as usize;
@@ -95,7 +122,9 @@ impl Match {
         let mut own = false;
         let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
         for id in selected.into_iter().filter_map(|id| u32::try_from(id).ok()) {
-            let Some(unit) = game.units.get(&id) else { continue; };
+            let Some(unit) = game.units.get(&id) else {
+                continue;
+            };
             own |= unit.owner == slot;
             // The supported Conquest/World contexts grant only owner access.
             // Horde access needs its actual context, never an owner relabel.
@@ -103,8 +132,15 @@ impl Match {
                 continue;
             }
             let kind = self.rules.kinds.get(unit.kind).ok_or("rally actor kind")?;
-            if catalog.unit(&kind.name).map_err(|e| e.to_string())?.get("makes").is_some() {
-                if self.production.building(id).is_none() || !self.building_rallies.contains_key(&id) {
+            if catalog
+                .unit(&kind.name)
+                .map_err(|e| e.to_string())?
+                .get("makes")
+                .is_some()
+            {
+                if self.production.building(id).is_none()
+                    || !self.building_rallies.contains_key(&id)
+                {
                     return Err("rally producer metadata missing".into());
                 }
                 makers.push(id);

@@ -132,7 +132,10 @@ impl Match {
         if !amount.is_finite() || amount < 0.0 {
             return Err(if self.options.mode == crate::economy::Mode::Classic {
                 "invalid Classic repair request"
-            } else { "invalid Conquest repair request" }.into());
+            } else {
+                "invalid Conquest repair request"
+            }
+            .into());
         }
         let unit = self
             .world

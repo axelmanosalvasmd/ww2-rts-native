@@ -1,0 +1,1 @@
+- Apply the mechanical Rust formatter output to the BASE consumer candidate after its first fmt check failed. Preserve that failure and all fixture and test attribution; native qualification remains pending.

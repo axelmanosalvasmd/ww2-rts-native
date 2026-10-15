@@ -123,8 +123,14 @@ impl StartPlan {
         options: &MatchOptions,
         rules: &Rules,
     ) -> Result<Self, String> {
-        Self::prepare_mode(map, options, rules, StartupProfile::Classic,
-            #[cfg(test)] None)
+        Self::prepare_mode(
+            map,
+            options,
+            rules,
+            StartupProfile::Classic,
+            #[cfg(test)]
+            None,
+        )
     }
 
     pub(crate) fn prepare_world(
@@ -567,7 +573,6 @@ impl StartPlan {
         game.rain = self.initial_rain;
         game.wet = self.initial_wet;
     }
-
 }
 
 /// Owner and position retained for a building footprint after its unit is removed.
@@ -1201,7 +1206,12 @@ pub(crate) fn foot_center(game: &Game, cell: usize, size: usize) -> Point {
         z: (cell / game.w) as f64 * CELL + size as f64 * CELL / 2.0,
     }
 }
-pub(super) fn find_site(game: &Game, at: Point, size: usize, avoid: &[(Point, f64)]) -> Option<usize> {
+pub(super) fn find_site(
+    game: &Game,
+    at: Point,
+    size: usize,
+    avoid: &[(Point, f64)],
+) -> Option<usize> {
     let x = at.x.max(0.0).min(game.w as f64 * CELL - 1.0);
     let z = at.z.max(0.0).min(game.h as f64 * CELL - 1.0);
     let start = (z / CELL).floor() as usize * game.w + (x / CELL).floor() as usize;

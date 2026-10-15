@@ -4506,3 +4506,27 @@ absent. This child freezes only the authentic new fixture, this decision record
 and a changelog fragment. The five exact new native names require a separate
 Root grant on this child. No parity or Acceptance cell changes, public Rust
 shape, external interface, public post or runtime integration follows.
+
+
+## BASE seventh-fixture mechanical formatting qualification (2026-10-15)
+
+The first S3 fmt check on frozen fixture producer
+`8b6837f2b1a56af223d56a8ddf95536e7691cc68` exits 1. Preserve its complete
+4,527-line log at `/tmp/impl-bases-consumer-cycle2-d699fc97/native5-8b6837/fmtcheck.log`.
+Root explicitly permits mechanical formatter output. Run only `cargo fmt --all`
+through the current guard: it exits 0 and changes exactly the 23 Rust files
+diagnosed by that check. No Rust file is manually edited. Existing native test
+bodies receive only formatter output; literals, assertions and all historical
+failure attribution remain retained. The seventh fixture, six absent earlier
+fixtures, recorder, parity cells and every other preexisting file remain exact.
+
+Both formatter jobs use actual CPUs 8-11, 6 GiB, zero swap, CPU quota 400 percent,
+jobs4/thread1, the current guard, exclusive inherited S3 flock and external target.
+Each logs free -g and the 20 GiB disk floor before execution. The first available
+memory reading is 8 GB, so both jobs stay focused at 6 GiB. Both processes exit
+and release their slot lock. This child freezes formatting only. Its full SHA
+must reach Root for the new exact-head binding before any native job. The five
+selected native tests, strict Clippy, old 33 test results and all broader row
+clauses remain unqualified here. No Source rerun, semantic repair, public action,
+full-mode admission or interface change follows. Root owns independent review,
+hosted checks, Hermes readback and runtime integration.

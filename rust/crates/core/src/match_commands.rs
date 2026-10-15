@@ -564,17 +564,25 @@ impl Command {
                 },
             }),
             Some("cancel") => Ok(Self::CancelConstruction {
-                id: object.get("id").and_then(safe_id).and_then(|id| u32::try_from(id).ok()),
+                id: object
+                    .get("id")
+                    .and_then(safe_id)
+                    .and_then(|id| u32::try_from(id).ok()),
             }),
             Some("cancelProduction") => Ok(Self::CancelProduction {
-                building: object.get("id").and_then(safe_id).and_then(|id| u32::try_from(id).ok()),
+                building: object
+                    .get("id")
+                    .and_then(safe_id)
+                    .and_then(|id| u32::try_from(id).ok()),
                 job: object.get("job").and_then(safe_id),
             }),
             Some("rally") => Ok(Self::Rally {
                 ids,
                 id: object.get("id").and_then(safe_id),
                 explicit_id: object.contains_key("id"),
-                at: object.get("x").and_then(|v| v.as_f64())
+                at: object
+                    .get("x")
+                    .and_then(|v| v.as_f64())
                     .zip(object.get("z").and_then(|v| v.as_f64()))
                     .filter(|(x, z)| x.is_finite() && z.is_finite())
                     .map(|(x, z)| Point { x, z }),
@@ -860,7 +868,13 @@ impl crate::match_runtime::Match {
         if let Command::CancelProduction { building, job } = command {
             return self.execute_production_cancel(owner, *building, *job);
         }
-        if let Command::Rally { ids, id, explicit_id, at } = command {
+        if let Command::Rally {
+            ids,
+            id,
+            explicit_id,
+            at,
+        } = command
+        {
             return self.execute_rally(owner, ids, *id, *explicit_id, *at);
         }
         if let Command::Build {
@@ -945,8 +959,12 @@ impl crate::match_runtime::Match {
                 return Ok(Some(Denial::Blocked));
             }
             if self.options.mode == Mode::Classic {
-                if Catalog::compiled().and_then(|c| c.table("UNITS"))
-                    .map_err(|e| e.to_string())?.get(kind).is_none() {
+                if Catalog::compiled()
+                    .and_then(|c| c.table("UNITS"))
+                    .map_err(|e| e.to_string())?
+                    .get(kind)
+                    .is_none()
+                {
                     return Ok(Some(Denial::Blocked));
                 }
                 return match self.recorded_classic_buy(owner, kind, *from) {

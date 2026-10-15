@@ -205,7 +205,10 @@ fn seen_by(state: &Match, slot: usize, id: u32) -> bool {
         || g.players[slot].sees(id) && u.is_none_or(|u| u.air.is_none() || vision::airborne(u))
 }
 
-pub(crate) fn production_for(state: &Match, slot: usize) -> Result<Map<String, Value>, SnapshotError> {
+pub(crate) fn production_for(
+    state: &Match,
+    slot: usize,
+) -> Result<Map<String, Value>, SnapshotError> {
     production::capture(state, slot)
 }
 

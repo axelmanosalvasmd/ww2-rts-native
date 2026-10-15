@@ -367,14 +367,15 @@ impl Match {
                 let rate = number(classic, "repair")? * crew * (recovery / workers.len() as f64);
                 let rate = if self.classic_sudden_death() {
                     math::min(rate, number(classic, "decay")? * 0.6)
-                } else { rate };
-                let amount = math::min(
-                    available,
-                    full * rate * dt,
-                );
+                } else {
+                    rate
+                };
+                let amount = math::min(available, full * rate * dt);
                 (built, amount)
             } else {
-                if self.classic_sudden_death() { continue; }
+                if self.classic_sudden_death() {
+                    continue;
+                }
                 let time = definition
                     .get("buildTime")
                     .and_then(Value::number)
@@ -650,18 +651,37 @@ impl Match {
         &mut self,
         preview: ConstructionPreview,
         mut replaced: Vec<(Unit, UnitControl)>,
-        born: Option<(UnitId, u32, crate::production::ProductionState, Option<usize>)>,
+        born: Option<(
+            UnitId,
+            u32,
+            crate::production::ProductionState,
+            Option<usize>,
+        )>,
         owner: usize,
         charge: f64,
     ) -> Result<(), String> {
         use crate::match_story::{StoryChange, StoryKey, prepare_story_updates};
         if let Some((id, _, _, Some(node))) = &born {
             self.validate_classic_depot_context()?;
-            let n = self.classic_runtime.as_ref().ok_or("missing Classic runtime")?.nodes
-                .get(*node).ok_or("missing staged Depot node")?;
-            let unit = preview.physical.world.game.units.get(id).ok_or("missing staged Depot")?;
-            if n.depot.is_some() || self.rules.kinds[unit.kind].name != "depot"
-                || unit.at() != n.at || unit.owner != owner {
+            let n = self
+                .classic_runtime
+                .as_ref()
+                .ok_or("missing Classic runtime")?
+                .nodes
+                .get(*node)
+                .ok_or("missing staged Depot node")?;
+            let unit = preview
+                .physical
+                .world
+                .game
+                .units
+                .get(id)
+                .ok_or("missing staged Depot")?;
+            if n.depot.is_some()
+                || self.rules.kinds[unit.kind].name != "depot"
+                || unit.at() != n.at
+                || unit.owner != owner
+            {
                 return Err("Classic Depot binding changed during preparation".into());
             }
         }
@@ -711,7 +731,11 @@ impl Match {
             self.abilities.initialize(id);
             self.recovery.initialize(id);
             if let Some(node) = node {
-                self.classic_runtime.as_mut().expect("preflighted Classic runtime").nodes[node].depot = Some(id);
+                self.classic_runtime
+                    .as_mut()
+                    .expect("preflighted Classic runtime")
+                    .nodes[node]
+                    .depot = Some(id);
             }
         }
         self.start.economy.players[owner].mp -= charge;
@@ -738,7 +762,9 @@ impl Match {
         let selected = if self.options.mode == Mode::Classic {
             self.validate_classic_depot_context()?;
             self.construction_selected_rows(owner, ids, &command)?
-        } else { self.construction_selection(owner, ids, &command)? };
+        } else {
+            self.construction_selection(owner, ids, &command)?
+        };
         let Some(target) = u32::try_from(target)
             .ok()
             .filter(|id| self.world.game.units.contains_key(id))
@@ -831,8 +857,12 @@ impl Match {
         };
         let selected = if self.options.mode == Mode::Classic {
             self.validate_classic_depot_context()?;
-            if self.classic_sudden_death() { return Ok(Some(Denial::SuddenDeath)); }
-            if !matches!(name, "depot" | "barracks") { return Ok(Some(Denial::Unsupported)); }
+            if self.classic_sudden_death() {
+                return Ok(Some(Denial::SuddenDeath));
+            }
+            if !matches!(name, "depot" | "barracks") {
+                return Ok(Some(Denial::Unsupported));
+            }
             self.construction_selected_rows(owner, ids, &command)?
         } else {
             self.construction_selection(owner, ids, &command)?
@@ -843,7 +873,9 @@ impl Match {
         {
             return Ok(Some(Denial::Blocked));
         }
-        if matches!(name, "shipyard" | "supplycache") || name == "depot" && self.options.mode != Mode::Classic {
+        if matches!(name, "shipyard" | "supplycache")
+            || name == "depot" && self.options.mode != Mode::Classic
+        {
             return Ok(Some(Denial::Unsupported));
         }
         let types = crate::economy::builder_types(self.options.mode).map_err(|e| e.to_string())?;
@@ -930,9 +962,15 @@ impl Match {
                 Ok(node) => Some(node),
                 Err(denial) => return self.construction_denial(&selected, denial),
             }
-        } else { None };
+        } else {
+            None
+        };
         let cell = if let Some(node) = depot_node {
-            self.classic_runtime.as_ref().ok_or("missing Classic runtime")?.nodes[node].cell
+            self.classic_runtime
+                .as_ref()
+                .ok_or("missing Classic runtime")?
+                .nodes[node]
+                .cell
         } else {
             let x = math::round(at.x / CELL - size as f64 / 2.0);
             let z = math::round(at.z / CELL - size as f64 / 2.0);
@@ -952,10 +990,14 @@ impl Match {
         }
         // Source placementCheck reserves every canonical resource footprint for
         // its Depot, even before a Depot occupies it. Ordinary callers have no nodes.
-        if name != "depot" && self.classic_runtime.as_ref().is_some_and(|state| {
-            state.nodes.iter().any(|node| footprint(&self.world.game, node.cell, 2)
-                .is_some_and(|reserved| reserved.iter().any(|cell| cells.contains(cell))))
-        }) {
+        if name != "depot"
+            && self.classic_runtime.as_ref().is_some_and(|state| {
+                state.nodes.iter().any(|node| {
+                    footprint(&self.world.game, node.cell, 2)
+                        .is_some_and(|reserved| reserved.iter().any(|cell| cells.contains(cell)))
+                })
+            })
+        {
             return self.construction_denial(&selected, Denial::Blocked);
         }
         self.world
