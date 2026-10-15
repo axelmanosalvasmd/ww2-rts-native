@@ -1,6 +1,6 @@
 # Proposed gates, no execution grant
 
-Freeze this candidate's actual SHA, Git tree and Rust tree before Root considers a grant. The full report in `/tmp/logistics271-rebase-f7-9add/base-five-20261015/` binds those identities. Do not run commands from this document without Root's new exact named exclusive slot grant. A free S1/S2/S3 lock is not permission, and old LOG24 grants/results are not reusable.
+This private candidate normally incorporates main `f7c51b1a0ebf850c5c22b560a595e4095ce39fdc` after Root's PR271 merge. Freeze this candidate's actual SHA, Git tree and Rust tree before Root considers a grant. The full report in `/tmp/logistics271-rebase-f7-9add/base-five-20261015/` binds those identities. Do not run commands from this document without Root's new exact named exclusive slot grant. A free S1/S2/S3 lock is not permission, and old LOG24 grants/results are not reusable.
 
 Source first: propose BASE13 generation once, then exact byte check once only if generation succeeds. It is the smallest independent component: one declared HQ input, zero ticks, four Source Buy calls, three paid jobs and five original client count observations. Use x64 Node24.21.0, the clean pinned reference and a new private failure directory. BASE05 may follow under a separate exact grant: three constructors/30 retained initial actors, 36 authored commands, at most 10,171 ticks in total (3,312/3,312/3,547), one blast per case, plus three ground mutations in the rubble case. Actual ticks and results are unknown.
 

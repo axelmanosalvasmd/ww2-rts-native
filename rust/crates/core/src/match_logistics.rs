@@ -1,4 +1,7 @@
 //! Executable ordinary-Conquest supply phases over canonical Match state.
+#[cfg(test)]
+mod causal_tests;
+
 use crate::{
     catalog::Catalog,
     game::{CELL, Game, MOVE, Point, Pose, Unit, VBLOCK},
