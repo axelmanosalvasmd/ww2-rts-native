@@ -1903,6 +1903,30 @@ The core carries its own math (`rust/crates/core/src/math.rs`) instead of Rust's
 - **Ported as the reference has it, for now:** the fog's sight walk ignores the woods depth rule that `los` applies (`docs/parity/combat.md`, limitations), and the vision pass still runs one team after another.
 - **Not ported yet** (Conquest does not use them): Horde stragglers and the Kaiju shown through the fog, the remembered enemy buildings of Classic and World Conquest, World Conquest's guards and its visible-cell list.
 
+## Vision row source checks (2026-10-15, unrun candidate)
+
+The second combat stream prepares five existing row checks, CMB-124/125/128/131/132, against native baseline `34edf52a7eaa6cb6edba3e802c2190226228276f`. The new recorder reads original Source at `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. It adds exports for `visionOf` and `visionRange` only, calls the existing vision/LOS/fog functions, and records exact inputs and outputs. Canonical `placeBuilding` supplies the target footprint and structural cells in aim-point cases. Component scenes isolate observer inputs; recipient delivery retains original constructor actors.
+
+The native side uses compiled rules and existing `vision`/`Fog` consumers, plus the actual recipient `DeliveryState` and run encoder. Full masks, ordered visibility, packet presence, cursor/base state and floating-point bits are compared. Source and native cold recomputations independently check cache reuse. No runtime algorithm, gameplay rule, consumer interface, acceptance criterion or old fixture changes.
+
+The prepared inventory is 18 range cases, 30 visibility cases, 18 LOS cases, 20 fog frames, eight three-recipient delivery frames and 64 run-encoding cases. These are source counts, not execution results. Root has not granted this stream a native/recorder slot. Fixtures are not generated, tests have not run, and all five rows retain their previous statuses. The exact predicate map and consumer names are in `docs/parity/combat.md`. A generated and verified successor and independent review remain required before integration.
+
+
+
+## Supplemental fog witness preparation (2026-10-15, source only)
+
+Independent review of combat head `9aa20852e6c055fd94b9d56b26178a48553903cf` found two non-decisive CMB-131 witnesses. An allied source already covered the old dusty target cell, and a pre-existing sight blocker hid the old height edit. Root independently verified both against the frozen JSON. No runtime bug is established and no runtime algorithm changes.
+
+Preserve the complete historical recorder, its 18 range/30 visibility/18 LOS cases, 20 fog frames, eight delivery frames, 64 packing cases and both authentic fixtures. Add only separate supplemental recording/test data: a three-frame dusty-target sequence with every allied source excluded and an explicit visibility-fact counterfactual; and an independent four-frame height-only transition from warmed stable cells to a changed mask, version and nonempty delta. Both Source and native tests compare complete outputs and cold recomputation. Native tests retain persistent Fog for each actual/control sequence in both serial and threaded paths. The single-source masks and removed-visible-fact inputs are declared component counterfactuals, never room or whole-match admissions.
+
+The new fixture remains absent and the new two tests remain unrun. The five original checks retain only their exact `9aa20852` results; those results are not promoted to this child. No Source, Cargo, native test or formatter is authorized in this preparation turn. CMB-131 status/acceptance, terrain policy, privacy, ABI/header/contracts and runtime guards stay unchanged. The exact supplemental inputs and predicates are recorded in `docs/parity/combat.md`; a later reviewer must receive both verified findings and these responses.
+
+
+
+## Canonical bases outside the supplemental sight domain (2026-10-15)
+
+A single authorized diagnostic proved the supplemental no-SIGHT-anywhere assertion rejected all 54 retained constructor footprint cells, K/1027, belonging to six HQ/barracks structures. Their nearest centre is 40.496913463 m from the observer, beyond its clear-ground 36 m sight. Preserve those flags, ground/objects and full structural links. Replace only that impossible global precondition with a conservative cell-rectangle exclusion against the actual observer sight provider and exact canonical exception checks. The entire possible sight domain, edit cell and probe remain free of sight/woods blockers. The recorder additionally captures existing canonical metadata for native assertions; it changes no physical input, expected mask or runtime provider. Full-map canonical bases remain present. The two original review objections, failed Source attempt and diagnostic stay in the evidence packet; fresh execution is still required for this corrected child.
+
 ## Formation spots and the first C calls (2026-10-12)
 
 `shared/formation.js` is ported to `rust/crates/core/src/formation.rs` and gives the reference's spots bit for bit; `rust/crates/ffi` (`ww2-ffi`) exposes it to Unreal (`docs/contracts/rust-unreal-abi.md`, First calls).

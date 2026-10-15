@@ -1,0 +1,1 @@
+- Move only the prepared CMB-131 building-footprint witness anchor 2 m east, from (69,47) to (71,47), so its farthest cell is outside the 28.8 m observer range. Preserve the visibility, outside-range and complete-footprint assertions, the original failure evidence and every other recorder input. Source regeneration and native validation remain pending.
