@@ -18,6 +18,7 @@ fn fixture() -> Value {
 #[test]
 fn default_and_conquest_targeting_and_launches_match_original_source() {
     let fixture: Value = fixture();
+    assert_eq!(fixture["cases"].as_array().unwrap().len(), 123);
     let mut phases = 0;
     for (c, mode) in fixture["cases"]
         .as_array()
@@ -72,13 +73,17 @@ fn default_and_conquest_targeting_and_launches_match_original_source() {
                     t.rot += 0.025;
                     m.grid.rebuild(&m.world.game.units);
                 }
-                m.begin_firing_tick(&[1, 2, 3]).unwrap_or_else(|e| {
+                let order = m.world.game.units.keys().copied().collect::<Vec<_>>();
+                m.begin_firing_tick(&order).unwrap_or_else(|e| {
                     panic!("{} {} tick {current}: {e}", c["shooter"], c["variation"])
                 });
                 m.advance_firing_timers(1, 0.05).unwrap();
                 if !run || current == 1 {
                     m.apply_unit_firing(1, c["variation"] == "moving", 0.05)
                         .unwrap();
+                    if c["variation"] == "choice-claims" {
+                        m.apply_unit_firing(4, false, 0.05).unwrap();
+                    }
                 }
                 if run {
                     m.step_firing_flights().unwrap();
@@ -105,7 +110,7 @@ fn default_and_conquest_targeting_and_launches_match_original_source() {
             phases += 1;
         }
     }
-    assert_eq!(phases, 588 * 2);
+    assert_eq!(phases, 624 * 2);
 }
 
 #[test]
