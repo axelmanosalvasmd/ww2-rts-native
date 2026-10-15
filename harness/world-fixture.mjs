@@ -36,6 +36,7 @@ try {
   const snapshots=[structuredClone(snapshot(g))],results=[];
   for(const a of actions){let result=null;
    if(a.op==='mutate') result=sim.mutateWorldCell(g,a.c,a.change);
+   else if(a.op==='material')result=[sim.worldMaterial(g,a.c).name,sim.worldMaterial(g,a.c,true).name];
    else if(a.op==='set')H.setCell(g,a.c,a.ch);
    else if(a.op==='level')H.setLevel(g,a.c,a.height);
    else if(a.op==='touch')H.touch(g,a.c);
@@ -83,6 +84,19 @@ try {
   const letter=filename==='no-mans-land.json'?'T':filename==='the-great-bridge.json'?'=':filename==='three-islands.json'?'W':'N';
   const c=m.rows.join('').indexOf(letter);
   scenario(filename,m,[{op:'drainSoak'},{op:'register',slot:0},{op:'mutate',c,change:{material:'concrete'}},{op:'set',c,ch:'.'},{op:'set',c,ch:'='},{op:'level',c,height:-2}]);
+ }
+ // ENG-48: query the original material owner after valid runtime mutations.
+ // N exercises the mine overlay. A/K/Q are never authored into v2 map rows.
+ {
+  const actions=[];let c=0;
+  for(const layer of ['ground','object'])for(const ch of layer==='ground'?'.D+MWF':'.BH#TXY=RNAQKO')for(const override of [false,true]){
+   const material=override?{material:layer==='ground'?'concrete':'steel'}:{};
+   actions.push({op:'mutate',c,change:{ground:layer==='ground'?ch:ch==='='?'W':'D',...material}});
+   if(layer==='object')actions.push({op:'mutate',c,change:{object:ch,...(override?{material:'concrete'}:{})}});
+   actions.push({op:'material',c,layer,ch,override});c++;
+  }
+  assert.equal(c,40);
+  scenario('material-alphabet-and-overrides',blank(),actions);
  }
  Math.random=random;clean();const content=JSON.stringify({reference:pin,node:process.version,arch:process.arch,cases})+'\n';const path=join(root,'rust/crates/core/tests/fixtures/world.json');
  if(process.argv.includes('--check'))assert.equal(readFileSync(path,'utf8'),content);else writeFileSync(path,content);

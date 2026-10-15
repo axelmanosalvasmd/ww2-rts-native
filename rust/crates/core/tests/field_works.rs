@@ -2,8 +2,10 @@ use serde_json::{Value, json};
 use ww2_core::{
     catalog::Catalog,
     economy_state::PlayerEconomy,
+    environment::{Blast, Context, DamageContext, EnvironmentRuntime},
     field_works::*,
     game::{Player, Point},
+    grid::SpatialGrid,
     map::AuthoritativeMap,
     rules::Rules,
     unit_spawn::initial_unit,
@@ -131,10 +133,15 @@ fn paid_placement_and_timed_cells_match_original_source() {
         fixture["reference"],
         "e4e579a838aabae3b1d9dadbc17a0a87147bc52d"
     );
+    let mut selected_traces = std::collections::BTreeSet::new();
     for trace in fixture["traces"].as_array().unwrap() {
         let name = trace["name"].as_str().unwrap();
         let mut w = world(trace);
         let mut runtime = FieldWorksRuntime::default();
+        let mut environment = EnvironmentRuntime::default();
+        let (mut seed, mut next_id) = (123456789, 1000);
+        let mut road_before = Value::Null;
+        let mut road_phases = std::collections::BTreeSet::new();
         let mut wallets: Vec<_> = (0..2)
             .map(|team| PlayerEconomy {
                 team,
@@ -214,6 +221,79 @@ fn paid_placement_and_timed_cells_match_original_source() {
                     )
                     .unwrap();
                 }
+                "blast" => {
+                    let order = w.game.units.keys().copied().collect::<Vec<_>>();
+                    let grid = SpatialGrid::new(&w.game.units, 16.);
+                    let mut ctx = Context {
+                        tick: 10,
+                        seed: &mut seed,
+                        next_id: &mut next_id,
+                        unit_order: &order,
+                        grid: &grid,
+                        rain: 0.,
+                        wet: 0.,
+                        wind_angle: 0.,
+                        wind_strength: 0.,
+                    };
+                    let skip = std::collections::BTreeSet::new();
+                    environment
+                        .damage_cells(
+                            &mut w,
+                            Blast {
+                                at: point(&a["at"]),
+                                radius: n(&a["radius"]),
+                                damage: n(&a["damage"]),
+                                scar: 0.,
+                            },
+                            &mut ctx,
+                            &mut DamageContext::plain(&skip),
+                        )
+                        .unwrap();
+                }
+                "roadState" => {
+                    let c = a["cell"].as_u64().unwrap() as usize;
+                    result = json!({
+                        "ch":char::from(w.game.chars[c]).to_string(),
+                        "ground":char::from(w.game.ground.as_ref().unwrap()[c]).to_string(),
+                        "object":char::from(w.game.objects.as_ref().unwrap()[c]).to_string(),
+                        "mine":w.mine_layer[c] != 0,
+                        "wear":w.game.wear.as_ref().unwrap()[c],
+                        "hp":w.game.cell_hp[c],
+                        "flags":w.game.flags[c],
+                        "material":w.material_name(c, false).unwrap(),
+                        "groundMaterial":w.material_name(c, true).unwrap()
+                    });
+                    let phase = a["phase"].as_str().unwrap();
+                    assert!(road_phases.insert(phase));
+                    match phase {
+                        "before" => {
+                            assert_eq!(result["ground"], "D");
+                            assert_eq!(result["object"], "R");
+                            assert!(result["wear"].as_f64().unwrap() > 0.);
+                            road_before = result.clone();
+                        }
+                        "mined" | "cleared" => {
+                            assert_eq!(result["mine"], a["phase"] == "mined");
+                            for key in [
+                                "ground",
+                                "object",
+                                "wear",
+                                "hp",
+                                "flags",
+                                "material",
+                                "groundMaterial",
+                            ] {
+                                assert_eq!(result[key], road_before[key], "{label}: {key}");
+                            }
+                        }
+                        "threshold" => {
+                            assert_eq!(result["ground"], "+");
+                            assert_eq!(result["object"], "R");
+                            assert_eq!(result["mine"], false);
+                        }
+                        phase => panic!("unknown road observation {phase}"),
+                    }
+                }
                 "seen" => {
                     w.mine_seen.insert(
                         a["cell"].as_u64().unwrap() as usize,
@@ -250,7 +330,55 @@ fn paid_placement_and_timed_cells_match_original_source() {
                 &format!("{label}:snapshot"),
             );
         }
+        match name {
+            "complete:wire-engineer" | "complete:wire-conscript" => {
+                assert_eq!(w.game.chars.iter().filter(|ch| **ch == b'X').count(), 5);
+                assert!(runtime.jobs().is_empty());
+                selected_traces.insert(name);
+            }
+            "woods-trench-blocked" => {
+                assert_eq!(w.game.chars.iter().filter(|ch| **ch == b'O').count(), 4);
+                assert!(runtime.jobs().is_empty());
+                equal(&snapshot(&w, &runtime, &wallets), &trace["initial"], name);
+                selected_traces.insert(name);
+            }
+            "mine-rubble-road-damage-threshold" => {
+                assert_eq!(
+                    road_phases,
+                    ["before", "mined", "cleared", "threshold"]
+                        .into_iter()
+                        .collect()
+                );
+                selected_traces.insert(name);
+            }
+            "mine-road-and-known-clearing" => {
+                for c in 208..212 {
+                    assert_eq!(w.game.chars[c], b'D');
+                    assert_eq!(w.game.objects.as_ref().unwrap()[c], b'.');
+                    assert_eq!(w.mine_layer[c], 0);
+                }
+                selected_traces.insert(name);
+            }
+            "nonbuilders-retreat-riding-and-empty-plan" => {
+                assert_eq!(trace["rows"][0]["result"], "noBuilders");
+                selected_traces.insert(name);
+            }
+            _ => {}
+        }
     }
+    assert_eq!(
+        selected_traces,
+        [
+            "complete:wire-conscript",
+            "complete:wire-engineer",
+            "mine-road-and-known-clearing",
+            "mine-rubble-road-damage-threshold",
+            "nonbuilders-retreat-riding-and-empty-plan",
+            "woods-trench-blocked",
+        ]
+        .into_iter()
+        .collect()
+    );
 }
 #[test]
 fn preparation_and_invalid_steps_preserve_canonical_state() {

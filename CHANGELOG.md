@@ -4,6 +4,7 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Recover the complete ENG-04/13/14/48/66 checks onto frozen main `379ba4e0`, preserving both histories, every incoming row and the authentic four-fixture extensions. The private five-row proposal raises this baseline from 235 to 240 ported rows. Prior six native passes remain attributed to `df9a0cff`; this source-only integration awaits Root's slot and independent actual-head review.
 - Compare MODE-21 footprint keys by validated numeric bits, accepting hexadecimal letter-case variants and rejecting duplicate bit-identical keys. Preserve exact value-bit checks and signed-zero distinctions; no player-visible behavior changes.
 
 - Validate finite MODE-21 footprint bits using the existing JSON zero-display rule, while preserving signed-zero mismatches. Check swapped footprint associations on both sides and retain all other negative controls.
@@ -60,6 +61,11 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 - Freeze the first authentic aligned-input Source capture before Cargo: 600 ticks, 61 checkpoints, 1,321 consumed values and 15,063 unused, reproduced by a fresh capture at `864d6485`. Native alignment is pending.
 
 - Add a test-only R1 constructor layout input and finite consumed-random tape at the actual Rust and pinned JavaScript consumers. Reuse #220's original projection, ten orders and 61 checkpoints without moving rows. Source capture, native alignment and comparison are pending at this implementation checkpoint; historical #220 remains 0/61.
+- Normally merge exact main `9e618217` into the qualified ENG-04/13/14/48/66 candidate, preserving all incoming NET, CMB, BASE and Tutorial proofs and both documentation histories. Keep the five owned status cells and authentic replay bodies unchanged. The six-pass/fmt/Clippy evidence remains attributed to `df9a0cff`; this new integration has no execution evidence and awaits its six-check qualification and separate final review.
+
+- Port the complete selected checks for ENG-04/13/14/48/66 after all six original checks pass together at `df9a0cff` (6 passed, 0 failed, 350 filtered), with formatting and fresh strict locked workspace/all-target Clippy passing. Preserve all incoming acceptance checks, other rows, fixtures and code. Historical failures retain their original head attribution; exact-final-head review and publication remain with Root.
+
+- Integrate the five ENG-04/13/14/48/66 material and mine checks from reviewed `6a6d2a01` with fixed main `396f6d8a`, preserving the complete incoming test, fixture, registry and row content. Retain the original failed map-count run and its corrected single-test pass on their producing heads. Fresh six-check and strict Clippy qualification remains pending at this integration checkpoint; no row is promoted yet.
 
 - Rebase NET2 snapshot and cadence checks onto current main, retain the six ported NET rows and held gaps, and move the two original NET2 design notes beside snapshot delivery history without changing their text.
 
