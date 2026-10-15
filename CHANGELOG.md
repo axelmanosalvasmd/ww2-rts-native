@@ -4,6 +4,14 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Normally merge accepted combat `7c017b2c` with fixed main `9e618217`, preserving both histories, all nine accepted combat rows, four incoming vision rows, six incoming NET rows and all source, tests and fixtures. This private source-only union runs zero checks; the earlier five native passes remain evidence for `df39366e`. Final-head review and authorized execution remain pending.
+
+- Mark only CMB-34/35/36/37/81/105/118/119/120 ported after independent exact-`ee03a77a` acceptance and fresh `df39366e` fmt, five unique selected native passes and strict locked workspace/all-target Clippy. Fixed-main count rises from 211 to 220 of 939; all other rows stay unchanged, including held CMB-128. No Source regeneration, runtime, guard, terrain or ABI change. Root final-head review and hosted gates remain pending.
+
+- Wrap one existing combat phase-count assertion to satisfy the integration format check, preserving all tokens, literals and assertions. The failed fmt log belongs to `34ccd823`; the repaired `df39366e` passes fmt and the five selected tests.
+
+- Integrate the nine combat component checks from frozen `ee03a77a` with fixed main `396f6d8a`, preserving both histories, every older fixture case and all incoming tests and rows. Attribute the four Source command successes and five native passes to `ee03a77a`; independent review accepts its nine literal row predicates. The successor `df39366e` passes fmt, the original five selected tests and fresh strict Clippy; the docs child adds only the nine approved ported rows.
+
 - Record Axel's exact aligned whole-match evidence decision in PARITY.md. Preserve the existing component, outcome and owner rules. Both owners record readback of the final documentation head on #5 before merge; no parity row is promoted.
 
 - Complete MODE-15's raw observed Hill 112 path check on 10 canonical Assault starts, comparing all 30 full waypoints with the unchanged Source fixture; the three selected tests pass at 0b60e793.
@@ -33,6 +41,24 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 - Add a test-only R1 constructor layout input and finite consumed-random tape at the actual Rust and pinned JavaScript consumers. Reuse #220's original projection, ten orders and 61 checkpoints without moving rows. Source capture, native alignment and comparison are pending at this implementation checkpoint; historical #220 remains 0/61.
 
 - Rebase NET2 snapshot and cadence checks onto current main, retain the six ported NET rows and held gaps, and move the two original NET2 design notes beside snapshot delivery history without changing their text.
+
+- Mark CMB-61 ported privately after independent whole-row ACCEPT of `cfc8263e`. Change only its Rust evidence and Status cells; preserve all 160 acceptance cells and every other row/cell. Keep new passes at `25c76d6c`, Source capture at `7a762f65`/`a5411f79` and old main 396f component proof separate. No new execution, runtime change or publication.
+
+- Verify the CMB-61 metadata comparator and existing firing consumers at `25c76d6c`: launch accuracy, x1.5 target preference and the simtest registration guard each pass, with formatting and strict locked workspace/all-target Clippy. Keep the authentic fixture and both earlier failures intact; CMB-61 awaits Root whole-row review and no status is changed.
+
+- Compare CMB-61 input metadata recursively with exact f64 bits for JSON numbers, exact object key sets, ordered arrays and strict nonnumeric values. Replace the field-specific representation exception without mutating metadata or changing any replay comparison, input or fixture. Preserve both earlier failed test logs.
+
+- Retain the renewed CMB-61 failure at `d01d213a`: exact `hitAt` comparison succeeds, then strict metadata equality rejects a choice actor's integer versus float `cooldown`. The accuracy test reports 0 passed and 1 failed; stop without widening normalization. Target-choice, registry and Clippy remain unrun.
+
+- Compare CMB-61 metadata actor `hitAt` values by exact f64 bits before canonicalizing only those verified cells for strict whole-JSON equality. Keep every other metadata type, key and value strict. Preserve authored inputs, Source, authentic fixtures and all replay assertions; retain the earlier failure.
+
+- Retain the first CMB-61 native test failure at `556a2ad5`: exact authored-input metadata equality rejects Source integer `hitAt` against the input JSON float before firing replay. Stop after 0 passed and 1 failed; target-choice, registry and Clippy checks remain unrun. Source generation/check and the formatting recheck passed. No predicate, input, fixture, runtime or row-status repair is applied.
+
+- Apply the two whitespace-only changes requested by the CMB-61 formatting check. Preserve all test tokens, assertions, literals and the authentic Source fixture. The initial formatting failure is retained; native tests remain pending.
+
+- Record the 16 CMB-61 flame firing scenes from pinned original Source, with 202 checkpoints. Generation and the serial byte check pass with x64 Node 24.21.0 under S3 caps. Preserve the old firing fixture and all row statuses; native comparison remains pending.
+
+- Prepare two CMB-61 flame comparisons through the existing Match firing provider: paired trench/open/garrison launch accuracy and the x1.5 target preference with negative controls. Keep the ordinary 131 firing traces and 668 checkpoints unchanged. Add only an unapplied Rust/Status proposal for CMB-69. Authentic recording and native execution remain pending; no row status or runtime changes.
 
 - Rebase the combat vision checks onto main `66592ae8`, retaining all incoming content and relocating the three owned vision notes beside the existing core vision section. Preserve all seven focused checks, three Source oracles and historical failures. CMB-124, CMB-125, CMB-131 and CMB-132 remain ported; CMB-128 remains held for its complete border-ray regression. Earlier test results stay attributed to their original heads.
 
