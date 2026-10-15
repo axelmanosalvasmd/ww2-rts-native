@@ -1921,6 +1921,12 @@ Preserve the complete historical recorder, its 18 range/30 visibility/18 LOS cas
 
 The new fixture remains absent and the new two tests remain unrun. The five original checks retain only their exact `9aa20852` results; those results are not promoted to this child. No Source, Cargo, native test or formatter is authorized in this preparation turn. CMB-131 status/acceptance, terrain policy, privacy, ABI/header/contracts and runtime guards stay unchanged. The exact supplemental inputs and predicates are recorded in `docs/parity/combat.md`; a later reviewer must receive both verified findings and these responses.
 
+
+
+## Canonical bases outside the supplemental sight domain (2026-10-15)
+
+A single authorized diagnostic proved the supplemental no-SIGHT-anywhere assertion rejected all 54 retained constructor footprint cells, K/1027, belonging to six HQ/barracks structures. Their nearest centre is 40.496913463 m from the observer, beyond its clear-ground 36 m sight. Preserve those flags, ground/objects and full structural links. Replace only that impossible global precondition with a conservative cell-rectangle exclusion against the actual observer sight provider and exact canonical exception checks. The entire possible sight domain, edit cell and probe remain free of sight/woods blockers. The recorder additionally captures existing canonical metadata for native assertions; it changes no physical input, expected mask or runtime provider. Full-map canonical bases remain present. The two original review objections, failed Source attempt and diagnostic stay in the evidence packet; fresh execution is still required for this corrected child.
+
 ## Formation spots and the first C calls (2026-10-12)
 
 `shared/formation.js` is ported to `rust/crates/core/src/formation.rs` and gives the reference's spots bit for bit; `rust/crates/ffi` (`ww2-ffi`) exposes it to Unreal (`docs/contracts/rust-unreal-abi.md`, First calls).
