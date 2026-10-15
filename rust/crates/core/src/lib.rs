@@ -7,9 +7,13 @@
 macro_rules! aligned_environment_draw {
     ($seed:expr, $replay:expr, $consumer:expr) => {{
         #[cfg(not(test))]
-        { crate::weather_runtime::environment_random($seed) }
+        {
+            crate::weather_runtime::environment_random($seed)
+        }
         #[cfg(test)]
-        { crate::aligned_replay::environment_draw($seed, $replay, $consumer) }
+        {
+            crate::aligned_replay::environment_draw($seed, $replay, $consumer)
+        }
     }};
 }
 #[cfg(test)]

@@ -283,7 +283,8 @@ pub(crate) fn run_with_match(
         && !orders.is_empty();
     #[cfg(test)]
     if let Some(path) = std::env::var_os("WW2_ALIGNED_NATIVE_FRAMES") {
-        std::fs::write(path, serde_json::to_vec(&native_frames).unwrap()).map_err(|e| e.to_string())?;
+        std::fs::write(path, serde_json::to_vec(&native_frames).unwrap())
+            .map_err(|e| e.to_string())?;
     }
     Ok(json!({
         "harnessCompleted":complete,"differentialVerdict":if !complete {"INCOMPLETE"} else if first.is_some() {"MISMATCH"} else {"MATCH"},

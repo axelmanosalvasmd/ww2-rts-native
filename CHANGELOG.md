@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Format the aligned-replay test seam after the authentic Source freeze; no input, projection, command or runtime behavior changed.
+
 - Freeze the first authentic aligned-input Source capture before Cargo: 600 ticks, 61 checkpoints, 1,321 consumed values and 15,063 unused, reproduced by a fresh capture at `864d6485`. Native alignment is pending.
 
 - Add a test-only R1 constructor layout input and finite consumed-random tape at the actual Rust and pinned JavaScript consumers. Reuse #220's original projection, ten orders and 61 checkpoints without moving rows. Source capture, native alignment and comparison are pending at this implementation checkpoint; historical #220 remains 0/61.

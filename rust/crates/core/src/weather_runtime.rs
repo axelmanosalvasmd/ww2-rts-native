@@ -141,12 +141,26 @@ pub fn advance(
     let decay = dt * (1.0 + 0.5 * shower.map_or(0.0, |w| w.2));
     finite(decay, "smoke decay")?;
     let mut seed = *environment.seed;
-    let angle = *environment.wind_angle + (aligned_environment_draw!(&mut seed, replay, serde_json::json!(["weather.wind.angle", tick])) - 0.5) * 0.6 * dt;
+    let angle = *environment.wind_angle
+        + (aligned_environment_draw!(
+            &mut seed,
+            replay,
+            serde_json::json!(["weather.wind.angle", tick])
+        ) - 0.5)
+            * 0.6
+            * dt;
     let strength = math::min(
         1.0,
         math::max(
             0.15,
-            *environment.wind_strength + (aligned_environment_draw!(&mut seed, replay, serde_json::json!(["weather.wind.strength", tick])) - 0.5) * 0.3 * dt,
+            *environment.wind_strength
+                + (aligned_environment_draw!(
+                    &mut seed,
+                    replay,
+                    serde_json::json!(["weather.wind.strength", tick])
+                ) - 0.5)
+                    * 0.3
+                    * dt,
         ),
     );
     finite(angle, "wind angle result")?;
@@ -172,7 +186,12 @@ pub fn advance(
             if *next <= 0.0 {
                 *raining = !*raining;
                 let [lo, hi] = if *raining { rules.rain } else { rules.dry };
-                *next = lo + aligned_environment_draw!(&mut seed, replay, serde_json::json!(["weather.shower", tick])) * (hi - lo);
+                *next = lo
+                    + aligned_environment_draw!(
+                        &mut seed,
+                        replay,
+                        serde_json::json!(["weather.shower", tick])
+                    ) * (hi - lo);
             }
         }
         *rain = math::min(

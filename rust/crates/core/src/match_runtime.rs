@@ -103,8 +103,13 @@ impl StartPlan {
         options: &MatchOptions,
         rules: &Rules,
     ) -> Result<Self, String> {
-        Self::prepare_mode(map, options, rules, StartupProfile::Conquest,
-            #[cfg(test)] None,
+        Self::prepare_mode(
+            map,
+            options,
+            rules,
+            StartupProfile::Conquest,
+            #[cfg(test)]
+            None,
         )
     }
 
@@ -114,8 +119,13 @@ impl StartPlan {
         rules: &Rules,
         random: MatchRandom,
     ) -> Result<Self, String> {
-        Self::prepare_mode(map, options, rules, StartupProfile::World(random),
-            #[cfg(test)] None,
+        Self::prepare_mode(
+            map,
+            options,
+            rules,
+            StartupProfile::World(random),
+            #[cfg(test)]
+            None,
         )
     }
 
@@ -130,7 +140,8 @@ impl StartPlan {
             options,
             rules,
             StartupProfile::Assault { defender_team },
-            #[cfg(test)] None,
+            #[cfg(test)]
+            None,
         )
     }
 
@@ -225,7 +236,9 @@ impl StartPlan {
             _ => MatchRandom::new(options.seed),
         };
         #[cfg(test)]
-        { random.replay = replay.clone(); }
+        {
+            random.replay = replay.clone();
+        }
         let selection = if options.shuffle && !world_mode {
             LayoutSelection::RandomFraction(random.next_fraction(StreamId::Terrain))
         } else {
@@ -375,8 +388,16 @@ impl StartPlan {
             .collect();
         let mut living_seed = random.next_u64(StreamId::Weather) as u32;
         let wind = (
-            aligned_environment_draw!(&mut living_seed, replay.as_ref(), serde_json::json!(["startup.wind.angle"])) * std::f64::consts::TAU,
-            0.3 + aligned_environment_draw!(&mut living_seed, replay.as_ref(), serde_json::json!(["startup.wind.strength"])) * 0.5,
+            aligned_environment_draw!(
+                &mut living_seed,
+                replay.as_ref(),
+                serde_json::json!(["startup.wind.angle"])
+            ) * std::f64::consts::TAU,
+            0.3 + aligned_environment_draw!(
+                &mut living_seed,
+                replay.as_ref(),
+                serde_json::json!(["startup.wind.strength"])
+            ) * 0.5,
         );
         let wx = field(cfg, "weather")?;
         let living = if options.living_weather {
@@ -385,7 +406,12 @@ impl StartPlan {
                 .and_then(|v| v.first())
                 .and_then(Value::number)
                 .ok_or("invalid dry interval")?;
-            let next = number(wx, "firstRain")? + aligned_environment_draw!(&mut living_seed, replay.as_ref(), serde_json::json!(["startup.shower"])) * dry;
+            let next = number(wx, "firstRain")?
+                + aligned_environment_draw!(
+                    &mut living_seed,
+                    replay.as_ref(),
+                    serde_json::json!(["startup.shower"])
+                ) * dry;
             Some(LivingWeather {
                 raining: false,
                 next,
@@ -651,7 +677,13 @@ impl Match {
         replay: crate::aligned_replay::Replay,
     ) -> Result<Self, String> {
         let rules = Rules::compiled().map_err(|e| e.to_string())?;
-        let start = StartPlan::prepare_mode(map, &options, &rules, StartupProfile::Conquest, Some(replay.clone()))?;
+        let start = StartPlan::prepare_mode(
+            map,
+            &options,
+            &rules,
+            StartupProfile::Conquest,
+            Some(replay.clone()),
+        )?;
         let mut result = Self::skirmish_shell(map, options, rules, start)?;
         result.environment.replay = Some(replay.clone());
         result.complete_skirmish_start()?;

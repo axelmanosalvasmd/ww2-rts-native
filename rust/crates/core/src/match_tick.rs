@@ -737,7 +737,8 @@ impl crate::match_runtime::Match {
                     }),
             },
             &mut smokes,
-            #[cfg(test)] self.start.random.replay.as_ref(),
+            #[cfg(test)]
+            self.start.random.replay.as_ref(),
         )
         .map_err(|e| format!("living weather: {e:?}"))?;
         drop(smokes);
