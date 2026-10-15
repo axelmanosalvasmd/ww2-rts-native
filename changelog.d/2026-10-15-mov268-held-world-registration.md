@@ -1,0 +1,1 @@
+- Exclude the two held World movement companions from default test execution until the actual World automatic salvo tick actuator is connected. Preserve their full tests and fixtures, all six qualified movement behaviors and both registration guards. The retained three-platform failures stop at admission before the first tick; World movement qualification remains pending.

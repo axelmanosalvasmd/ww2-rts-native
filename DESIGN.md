@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## Held World movement test registration (2026-10-15)
+
+Published PR #268 at `9c7b07963471e8f58bb2978e90b239a65561ea3f` registered two held World companions for default CI: `original_public_world_300_plus_40_plus_40_distance` and `physical_world_march_calm_boundary_200_and_201`. The retained Ubuntu, macOS and Windows failures all reach `mov_world_distance.rs:141` before the first tick, where full-runner admission refuses with `World automatic salvo tick actuator is not connected`. The World provider and refusal guard are identical at historical `a5a1d52b`, main `f7c51b1a` and published `9c7b0796`; the incoming LOG registration does not change this admission.
+
+Mark only these two tests ignored, with the pending actual World automatic salvo tick actuator stated in each reason. Keep their complete bodies, helpers, assertions, authentic fixture and compiled module registration. These companions remain held outside the six promoted MOV-05/06/07/10/12/13 rows and eight qualified behavior/guard instances. Restore default execution only after the actual actuator is connected and the full World consumers receive fresh qualification. This source-only child changes no runtime, refusal, CI workflow or parity cell. Prior results keep their producing heads; Root owns new exact-head review, any native grant and publication.
+
 ## Six complete MOV checks and first row delivery (2026-10-15)
 
 At frozen `8d7d892bd61eb8fe447df30c73b6453fea1915fa`, exactly six named behavior tests and two real registration guards pass once across two integration binaries:8 passed,0 failed,363 skipped. Final fmt and strict locked core/simtest all-target ci-test Clippy both exit0 on that same head. The six complete predicates cover road/mud/infantry and churn/wet travel, half-road travel, uphill/downhill tank travel, tank/AT together pace and twenty-tick travel plus plain reset, the61-tick obstructed-corner journey, and244 border-ray queries including both wall controls. The [movement evidence](docs/parity/movement.md#six-complete-speed-slope-together-corner-and-ray-checks-2026-10-15) records the precise native/Source scopes.
