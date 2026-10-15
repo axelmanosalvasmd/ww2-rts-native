@@ -1,5 +1,5 @@
 {
-  "status": "source-only implemented recorder/replay draft, no generated fixture or pass",
+  "status": "ported: complete selected predicate accepted; results attributed to producing heads",
   "base": "446671b977abfa6bf689fcb8853833d36519faab",
   "row": "BASE-15",
   "source_pin": "e4e579a838aabae3b1d9dadbc17a0a87147bc52d",
@@ -10,12 +10,14 @@
   "target_world": [45, 81],
   "setup": {"names": ["a", "b"], "teams": [0, 1], "factions": [0, 1], "mp_per_seat": 10000, "preserve_canonical_spawns_and_all_original_actor_ids": true, "initial_pop_to_assert": 3, "cap_to_assert": 12, "para_roster_to_assert": ["rifle", "rifle", "mg"]},
   "scenes": [
-    {"name": "whole-stick-insufficient", "actual_rifle_buys": 7, "commands": 8, "ticks": 0, "owned_pop_before": 10, "para": "actual Support must deny Pop with every canonical identity/wallet/queue/strike unchanged"},
+    {"name": "whole-stick-insufficient", "actual_rifle_buys": 7, "commands": 8, "ticks": 0, "owned_pop_before": 10, "para": "actual Support denies Pop with every canonical identity/wallet/queue/strike unchanged"},
     {"name": "pending-then-delivered", "actual_rifle_buys": 6, "commands": 8, "ticks": 124, "owned_pop_before": 9, "pending_pop": 12, "denied_buy": "actual Buy rifle before arrival, no debit or ID/queue change", "resolution": "exactly three real births; no para strike/reservation; actual owned field pop12; global count16->19 with original actors retained"},
     {"name": "pending-then-intercepted", "actual_rifle_buys": 6, "commands": 10, "ticks": 165, "cover": "owner1 real Support cover; 41 full ticks before para", "pending_pop": 12, "denied_buy": "actual Buy rifle before interception, no debit or ID/queue change", "resolution": "actual fighters ShotDown; no para births; no para strike/reservation; real subsequent Buy succeeds, one real newborn, owned pop10"}
   ],
-  "count_plan": {"scenes": 3, "support_and_Buy_commands": 26, "complete_ticks": 289, "future_native_tests_after_registration": 3, "future_guards": 2, "executed": 0},
-  "evidence_limit": "canonical scene correspondence requires independent review; original cleared-fixture popOf==global size is not literal in this retained two-player actor scene",
+  "observed_counts": {"scenes": 3, "support_and_Buy_commands": 26, "complete_ticks": 289, "selected_native_tests": 3, "registration_guards": 2, "passed": 3, "failed": 0, "skipped": 313},
+  "evidence_limit": "selected-predicate proof on the declared admitted arena; original cleared-fixture popOf==global size is setup-specific and remains unequal here: owned/global12/19 delivered,9/16 intercepted,10/17 after released Buy; not literal fixture equality, zero-point-map admission, whole-match or client proof",
   "runtime_provider_gap_found": false,
-  "missing_work": "Source generation/check, generated-fixture freeze, compilation/execution and independent whole-predicate review remain pending; record/compile only after Root grant"
+  "producing_evidence": {"source_generation_and_check_head": "162e7bd7bf9506b0fd54f0544592fd201dbca6c8", "source_generation_exit": 0, "source_check_exit": 0, "authentic_fixture_commit": "dd93d575658daf848cc28f1e133f8c918010fbce", "integrated_native_head": "ce3d50260d464a6bbad5dc461c8c522549e55f95", "fmt_check_exit": 0, "focused_exit": 0, "strict_locked_workspace_all_target_clippy_exit": 0, "whole_row_review": "ACCEPT and PORT eligible; Source-only review, actual gates verified separately by Root"},
+  "historical_preparation": "source-only plan at130f3144 and draft at162e7bd7 preceded generation and qualification; absent-fixture/unexecuted/held descriptions applied then and are superseded by the attributed results and whole-row ACCEPT",
+  "remaining_delivery_steps": "Root final docs-child review, publication authorization and fresh hosted checks; no new execution on this docs/status successor"
 }
