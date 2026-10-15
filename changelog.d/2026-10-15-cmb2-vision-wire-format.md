@@ -1,0 +1,1 @@
+- Apply the formatter-requested line wrap to the new vision wire fixture reader. Every Rust token, literal, assertion, fixture and runtime body remains unchanged.
