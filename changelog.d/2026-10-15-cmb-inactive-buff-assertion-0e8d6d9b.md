@@ -1,0 +1,1 @@
+- Correct the new combat witness assertions to accept inactive buff timers below zero, matching the existing unclamped timer. Exact Source/native snapshot comparison and positive activation checks remain unchanged.

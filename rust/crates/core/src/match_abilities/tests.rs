@@ -754,7 +754,7 @@ fn conquest_abilities_match_original_source_phases() {
                         ability.cooldown <= 0.,
                         "{name} stays ready without activating"
                     );
-                    assert_eq!(ability.buff, 0.);
+                    assert!(ability.buff <= 0.);
                     assert!(!ability.ap);
                     assert!(u.sprint <= 0.);
                     assert!(m.world.game.smokes.is_empty());
