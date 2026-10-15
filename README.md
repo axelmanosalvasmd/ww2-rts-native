@@ -9,3 +9,4 @@ Evidence images for issue #4 checkpoints. Captured offscreen from local, uncommi
 - slice-1m: Rust decoder default, polish (rings, tracers, damage smoke, tossed bodies), Spanish, packaged client frames
 - slice-1n: terrain (relief, painted ground, water, apron, railways, atmosphere); left browser reference, right Unreal
 - slice-1q: every mode played live, garrison/escort/queue/rail/recovery, F2 stats sheet, text fields, HUD fit at UI 150%, Spanish end report, lobby tone; left browser reference, right Unreal
+- slice-1s: first two-native match on Julio's Rust host (R1, current-main CLI, native and packaged), Great Bridge collapse, HQ camp, queue dashes, UI 150% Spanish loss; left browser reference, right Unreal
