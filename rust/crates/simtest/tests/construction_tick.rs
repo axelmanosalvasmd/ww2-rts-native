@@ -906,3 +906,6 @@ fn original_paid_construction_replays_full_match_ticks() {
 
 #[path = "construction_tick/base_selected.rs"]
 mod base_selected;
+
+#[path = "construction_tick/base28_corridor.rs"]
+mod base28_corridor;
