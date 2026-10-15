@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Prepare exact original validation-message consumers for MAP-04/05/07/117 using the retained map and Assault fixtures. Preserve all existing constructor, raw-route and rejection coverage. Native validation and the bounded validator-message repair remain pending; MAP-06/19/100 remain held.
+
 - Recover the complete ENG-04/13/14/48/66 checks onto frozen main `379ba4e0`, preserving both histories, every incoming row and the authentic four-fixture extensions. The private five-row proposal raises this baseline from 235 to 240 ported rows. Prior six native passes remain attributed to `df9a0cff`; this source-only integration awaits Root's slot and independent actual-head review.
 - Compare MODE-21 footprint keys by validated numeric bits, accepting hexadecimal letter-case variants and rejecting duplicate bit-identical keys. Preserve exact value-bit checks and signed-zero distinctions; no player-visible behavior changes.
 

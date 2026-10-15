@@ -1,5 +1,33 @@
 # Three Crossroads Native: design decisions
 
+## MAP validation-message successor (2026-10-15, source only)
+
+Start from frozen main `379ba4e06c794708623c005ab6052bebd03d8809`
+in the isolated MAP_AUDIT checkout. Preserve the MAP97 status child
+`2687e2b8e7` and Hill draft `1ba5688a82` on their original branches.
+Only this roster's eight rows are owned; the eight different rows in the
+older `1c51720b5d` candidate must not overwrite current main.
+
+Three new consumers compare exact native validation text against ten
+core-field, two height and three Assault-authoring inputs in the existing
+original-source map fixture. The complete existing Assault consumer now
+also compares both retained validation messages after its four XL and ten
+Hill starts and full raw Hill waypoint comparisons. No fixture, oracle,
+constructor, raw-route predicate or runtime admission guard changes.
+These tests have not run. Current validation text still differs from the
+Source messages, so no pass or new row completion is claimed.
+
+MAP97's two historical native passes belong to `0b62374461`, one default
+test/debug and one release instance, 120 actions each. Its recovered ACCEPT
+is not a new-head execution. MAP06 still needs the complete twenty-start
+Assault-only-spawn scene; MAP19 needs the selected editor move/save/delete
+history, and MAP100 needs full World delivery/reconnect/hidden-change
+proof. Static structure and internal memory checks do not fill those gaps.
+No interface, ABI, protocol, private view, terrain policy, Source or
+publication changes. Root owns validator runtime scope, slot grants,
+independent review and publication. Issue5 receipt through6199190039
+acknowledges unchanged contracts and pending defaults; it grants no consent.
+
 ## ENG_AUDIT recovery onto frozen main (2026-10-15, source only)
 
 Start this isolated delivery at frozen main `379ba4e06c794708623c005ab6052bebd03d8809` and normally merge recovered `dd035fe2033739d9831f909d5ccc5066166153b6`. Resolve only additive CHANGELOG and DESIGN conflicts by retaining both sides. Preserve every incoming runtime, aligned-replay hook, registry, acceptance cell and unrelated status. The five complete selected ENG-04/13/14/48/66 checks retain their reviewed recorder, test and authentic fixture bytes. Only those five Rust/Status pairs differ from the 80-row incoming engineering table. Main's 235/939 becomes a private 240/939 proposal, with no joint client acceptance.
