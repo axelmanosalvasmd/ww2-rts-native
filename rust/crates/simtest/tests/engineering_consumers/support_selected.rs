@@ -174,9 +174,16 @@ fn replay(trace: &Value, m: &mut Match, expected_ticks: usize, rounds: usize, ki
             .advance_tick()
             .unwrap_or_else(|e| panic!("{} tick {}: {e}", trace["name"], index + 1));
         assert_eq!(report.tick, index as i64 + 1);
-        assert_eq!(report.commands.len(), applied - before_applied, "actual support dispatch count");
+        assert_eq!(
+            report.commands.len(),
+            applied - before_applied,
+            "actual support dispatch count"
+        );
         for command in &report.commands {
-            assert!(command.denial.is_none(), "original support request must be accepted");
+            assert!(
+                command.denial.is_none(),
+                "original support request must be accepted"
+            );
             assert_eq!(command.key.tick, report.tick as u64);
             assert_eq!(command.key.issuer, 0);
         }
@@ -221,7 +228,10 @@ fn replay(trace: &Value, m: &mut Match, expected_ticks: usize, rounds: usize, ki
         }
     }
     assert_eq!(applied, rounds);
-    assert_eq!(dispatched, rounds, "every original purchased support request dispatched");
+    assert_eq!(
+        dispatched, rounds,
+        "every original purchased support request dispatched"
+    );
     compare(&support_projection(m), &trace["final"], "support final");
 }
 
@@ -399,22 +409,34 @@ fn moved_trace(f: &Value, name: &str) -> Match {
     assert_eq!(name, "Fortifications wire:0");
     assert!(trace["queries"].as_array().unwrap().is_empty());
     compare(&support_projection(&m), &trace["initial"], "moved initial");
-    let wire_first = (32.0 / m.rules.kinds[m.rules.kind("rifle").unwrap()].speed * 20.0).ceil() as usize;
+    let wire_first =
+        (32.0 / m.rules.kinds[m.rules.kind("rifle").unwrap()].speed * 20.0).ceil() as usize;
     for (index, frame) in frames.iter().enumerate() {
         let before_tick = m.world.game.tick;
-        for action in actions.iter().filter(|a| a["tick"].as_i64() == Some(before_tick)) {
+        for action in actions
+            .iter()
+            .filter(|a| a["tick"].as_i64() == Some(before_tick))
+        {
             assert_ne!(action["kind"], "put");
             assert_eq!(action["denial"], Value::Null);
             assert_eq!(action["owner"], 0);
             assert_eq!(action["resetCooldown"], false);
             sequence += 1;
-            m.enqueue_command(OrderKey {
-                tick: m.world.game.tick as u64 + 1, issuer: 0, sequence,
-            }, Command::from_json(&action["request"]).unwrap()).unwrap();
+            m.enqueue_command(
+                OrderKey {
+                    tick: m.world.game.tick as u64 + 1,
+                    issuer: 0,
+                    sequence,
+                },
+                Command::from_json(&action["request"]).unwrap(),
+            )
+            .unwrap();
             applied += 1;
         }
         let before_chars = m.world.game.chars.clone();
-        let report = m.advance_tick().unwrap_or_else(|e| panic!("{name} tick {}: {e}", index + 1));
+        let report = m
+            .advance_tick()
+            .unwrap_or_else(|e| panic!("{name} tick {}: {e}", index + 1));
         assert!(report.commands.iter().all(|c| c.denial.is_none()));
         dispatched += report.commands.len();
         assert!(report.phases.contains(&TickPhase::Movement));
@@ -425,33 +447,64 @@ fn moved_trace(f: &Value, name: &str) -> Match {
             {
                 let g = &m.world.game;
                 let cell = g.cell_of(collapse.position.x, collapse.position.z).unwrap();
-                assert!(matches!(before_chars[cell],b'H'|b'X'|b'#'|b'T'));
-                assert!(g.units.values().any(|u| m.rules.kinds[u.kind].name == "tank" && g.cell_of(u.x,u.z)==Some(cell)), "actual tank contact caused the terrain change");
+                assert!(matches!(before_chars[cell], b'H' | b'X' | b'#' | b'T'));
+                assert!(
+                    g.units
+                        .values()
+                        .any(|u| m.rules.kinds[u.kind].name == "tank"
+                            && g.cell_of(u.x, u.z) == Some(cell)),
+                    "actual tank contact caused the terrain change"
+                );
                 moved_crushes += 1;
             }
         }
-        let shots: Vec<_> = report.events.iter().filter_map(|event| match event {
-            ww2_core::match_tick::TickEvent::Environment(effect)
-            | ww2_core::match_tick::TickEvent::Support(ww2_core::match_support::SupportEvent::Environment(effect)) => Some(effect),
-            _ => None,
-        }).filter_map(|effect| {
-            if let ww2_core::environment::Effect::Collapse(c) = effect
-                && c.section.is_none()
-            {
-                Some(effect.to_json())
-            } else { None }
-        }).collect();
+        let shots: Vec<_> = report
+            .events
+            .iter()
+            .filter_map(|event| match event {
+                ww2_core::match_tick::TickEvent::Environment(effect)
+                | ww2_core::match_tick::TickEvent::Support(
+                    ww2_core::match_support::SupportEvent::Environment(effect),
+                ) => Some(effect),
+                _ => None,
+            })
+            .filter_map(|effect| {
+                if let ww2_core::environment::Effect::Collapse(c) = effect
+                    && c.section.is_none()
+                {
+                    Some(effect.to_json())
+                } else {
+                    None
+                }
+            })
+            .collect();
         if !shots.is_empty() {
             collapses.push(json!({"tick":report.tick,"shots":shots}));
         }
-        compare(&support_projection(&m), frame, &format!("{name}:{}", index + 1));
+        compare(
+            &support_projection(&m),
+            frame,
+            &format!("{name}:{}", index + 1),
+        );
         if index + 1 == wire_first {
-            let rifle = m.world.game.units.values().find(|u| m.rules.kinds[u.kind].name == "rifle").unwrap();
-            assert!(rifle.x < 30.0, "wire slows the squad in the original open-ground time");
+            let rifle = m
+                .world
+                .game
+                .units
+                .values()
+                .find(|u| m.rules.kinds[u.kind].name == "rifle")
+                .unwrap();
+            assert!(
+                rifle.x < 30.0,
+                "wire slows the squad in the original open-ground time"
+            );
         }
     }
     assert_eq!(applied, actions.len());
-    assert_eq!(dispatched as u64, sequence, "every original request used actual command dispatch");
+    assert_eq!(
+        dispatched as u64, sequence,
+        "every original request used actual command dispatch"
+    );
     assert!(moved_crushes > 0, "actual moved crushing emitted effects");
     let expected = trace["contactCollapses"].as_array().unwrap();
     assert_eq!(collapses.len(), expected.len());
@@ -467,11 +520,18 @@ fn eng45_original_wire_crossing_uses_moved_crushing_and_events() {
     let f = selected_fixture();
     let m = moved_trace(&f, "Fortifications wire:0");
     let g = &m.world.game;
-    let rifle = g.units.values().find(|u| m.rules.kinds[u.kind].name == "rifle").unwrap();
+    let rifle = g
+        .units
+        .values()
+        .find(|u| m.rules.kinds[u.kind].name == "rifle")
+        .unwrap();
     assert!(rifle.x > 34.0, "but it gets through");
-    assert_eq!(g.chars[15 * g.w + 10], b'.', "the tank flattened the wire it drove over");
+    assert_eq!(
+        g.chars[15 * g.w + 10],
+        b'.',
+        "the tank flattened the wire it drove over"
+    );
 }
-
 
 #[test]
 fn eng51_original_scarring_dive_has_the_complete_round_hole_before_fill() {
@@ -479,19 +539,54 @@ fn eng51_original_scarring_dive_has_the_complete_round_hole_before_fill() {
     let trace = selected_scene(&f, "Scarring:0");
     let mut m = make_scene(&f["input"], trace);
     let action = &trace["actions"][0];
-    assert_eq!(action["request"], json!({"t":"support","kind":"dive","x":21,"z":21}));
-    m.enqueue_command(OrderKey {tick:1,issuer:0,sequence:1}, Command::from_json(&action["request"]).unwrap()).unwrap();
-    compare(&support_projection(&m), &trace["initial"], "round hole initial");
-    for (index, frame) in trace["frames"].as_array().unwrap().iter().take(120).enumerate() {
-        let report = m.advance_tick().unwrap_or_else(|e| panic!("Scarring dive tick{}: {e}", index + 1));
+    assert_eq!(
+        action["request"],
+        json!({"t":"support","kind":"dive","x":21,"z":21})
+    );
+    m.enqueue_command(
+        OrderKey {
+            tick: 1,
+            issuer: 0,
+            sequence: 1,
+        },
+        Command::from_json(&action["request"]).unwrap(),
+    )
+    .unwrap();
+    compare(
+        &support_projection(&m),
+        &trace["initial"],
+        "round hole initial",
+    );
+    for (index, frame) in trace["frames"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .take(120)
+        .enumerate()
+    {
+        let report = m
+            .advance_tick()
+            .unwrap_or_else(|e| panic!("Scarring dive tick{}: {e}", index + 1));
         assert!(report.commands.iter().all(|c| c.denial.is_none()));
-        compare(&support_projection(&m), frame, "original Scarring before Fill");
+        compare(
+            &support_projection(&m),
+            frame,
+            "original Scarring before Fill",
+        );
     }
     assert_eq!(m.world.game.tick, 120);
     let g = &m.world.game;
     let h = g.height.as_ref().unwrap();
-    assert_eq!([h[10*g.w+10],h[10*g.w+11],h[11*g.w+11],h[12*g.w+12]], [-2,-1,-1,0]);
-    assert_eq!(g.chars[10*g.w+11], b'+', "the ring is cratered too");
+    assert_eq!(
+        [
+            h[10 * g.w + 10],
+            h[10 * g.w + 11],
+            h[11 * g.w + 11],
+            h[12 * g.w + 12]
+        ],
+        [-2, -1, -1, 0]
+    );
+    assert_eq!(g.chars[10 * g.w + 11], b'+', "the ring is cratered too");
     // The original paid Fill continuation belongs to ENG-52 and stays unexecuted here.
 }
 
@@ -499,8 +594,12 @@ fn eng51_original_scarring_dive_has_the_complete_round_hole_before_fill() {
 fn eng50_original_short_shelling_uses_actual_cell_damage_and_client_state() {
     use ww2_core::environment::{Blast, Context, DamageContext};
     let f = selected_fixture();
-    let scenes: Vec<_> = f["scenes"].as_array().unwrap().iter()
-        .filter(|s| s["name"] == "Shelling short of a crater marks the ground:0").collect();
+    let scenes: Vec<_> = f["scenes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|s| s["name"] == "Shelling short of a crater marks the ground:0")
+        .collect();
     assert_eq!(scenes.len(), 1);
     let trace = scenes[0];
     assert!(trace["frames"].as_array().unwrap().is_empty());
@@ -508,11 +607,18 @@ fn eng50_original_short_shelling_uses_actual_cell_damage_and_client_state() {
     let mut authored = f["input"]["map"].clone();
     authored["w"] = json!(20);
     authored["h"] = json!(20);
-    authored["rows"] = json!(vec![".".repeat(20);20]);
+    authored["rows"] = json!(vec![".".repeat(20); 20]);
     assert_eq!(trace["map"], authored);
     let mut m = make_scene(&f["input"], trace);
-    compare(&support_projection(&m), &trace["initial"], "short shelling initial");
-    assert!(m.world.game.units.is_empty(), "the original component actor list is empty");
+    compare(
+        &support_projection(&m),
+        &trace["initial"],
+        "short shelling initial",
+    );
+    assert!(
+        m.world.game.units.is_empty(),
+        "the original component actor list is empty"
+    );
     let random = m.start.random.snapshot();
     let tick = m.world.game.tick;
     let ids = Vec::new();
@@ -528,16 +634,34 @@ fn eng50_original_short_shelling_uses_actual_cell_damage_and_client_state() {
         wind_strength: m.start.wind.1,
     };
     let skip = std::collections::BTreeSet::new();
-    m.environment.damage_cells(
-        &mut m.world,
-        Blast {at: Point{x:21.0,z:21.0},radius:1.0,damage:40.0,scar:1.0},
-        &mut context,
-        &mut DamageContext::plain(&skip),
-    ).unwrap();
-    assert_eq!(m.world.game.tick, tick, "the original component check advances no clock");
-    assert_eq!(m.start.random.snapshot(), random, "this component consumes no OffMap draw");
-    compare(&support_projection(&m), &trace["componentFinal"], "original short shelling complete output");
-    let cell = m.world.game.cell_of(21.0,21.0).unwrap();
+    m.environment
+        .damage_cells(
+            &mut m.world,
+            Blast {
+                at: Point { x: 21.0, z: 21.0 },
+                radius: 1.0,
+                damage: 40.0,
+                scar: 1.0,
+            },
+            &mut context,
+            &mut DamageContext::plain(&skip),
+        )
+        .unwrap();
+    assert_eq!(
+        m.world.game.tick, tick,
+        "the original component check advances no clock"
+    );
+    assert_eq!(
+        m.start.random.snapshot(),
+        random,
+        "this component consumes no OffMap draw"
+    );
+    compare(
+        &support_projection(&m),
+        &trace["componentFinal"],
+        "original short shelling complete output",
+    );
+    let cell = m.world.game.cell_of(21.0, 21.0).unwrap();
     assert!(m.world.scar[cell] > 0.02 && m.world.scar[cell] < 1.0);
     assert_eq!(m.world.game.chars[cell], b'.', "churned, not cratered");
     assert_ne!((m.world.cell_state[cell] >> 5) & 3, 0, "clients are told");
@@ -560,13 +684,23 @@ fn eng51_actual_dive_skips_the_second_dent_under_a_river() {
         assert_eq!(m.world.game.height.as_ref().unwrap()[cell], 0);
         assert_eq!(m.world.game.chars[cell], surface.as_bytes()[0]);
         m.enqueue_command(
-            OrderKey {tick:1,issuer:0,sequence:1},
+            OrderKey {
+                tick: 1,
+                issuer: 0,
+                sequence: 1,
+            },
             Command::from_json(&json!({"t":"support","kind":"dive","x":21,"z":21})).unwrap(),
-        ).unwrap();
+        )
+        .unwrap();
         let mut dispatched = 0;
         for _ in 0..120 {
             let report = m.advance_tick().unwrap();
-            assert!(report.commands.iter().all(|command| command.denial.is_none()));
+            assert!(
+                report
+                    .commands
+                    .iter()
+                    .all(|command| command.denial.is_none())
+            );
             dispatched += report.commands.len();
             assert!(report.phases.contains(&TickPhase::Support));
             assert!(m.finish.is_none(), "the actual dive timeline must complete");
@@ -575,6 +709,9 @@ fn eng51_actual_dive_skips_the_second_dent_under_a_river() {
         assert_eq!(m.world.game.tick, 120);
         assert_eq!(m.world.game.height.as_ref().unwrap()[cell], expected_level);
         assert_eq!(m.world.game.chars[cell], expected_surface);
-        assert!(m.world.game.strikes.is_empty(), "the real dive was consumed");
+        assert!(
+            m.world.game.strikes.is_empty(),
+            "the real dive was consumed"
+        );
     }
 }

@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## Engineering exact formatter child (2026-10-15, native pending)
+
+The actual guarded format check at `ad3bfdfac0fc341712db1c7ee2a9d8009a414662` exited 1 with 60 formatting hunks in nine Rust files. It reached the existing `engineering_consumers/support_selected.rs` child without the previous missing-module diagnostic. This is formatter traversal evidence, with no rustc or native result. The full log and actual 4-7 affinity, 6 GiB memory, zero swap, 400% quota and 9 GiB available-memory receipt remain in `/tmp/eng-ad3-qualification-254aa68e/`.
+
+Root explicitly permits exact mechanical formatter output. Reconstruct all 60 diagnostic replacements, including the private module ordering, expression layout and trailing commas, directly from the retained log. Preserve every quoted literal, test name, assertion, input and fixture. Change no other Rust path. Freeze this child with this note and its changelog fragment, then obtain Root's exact child binding before the format recheck and unchanged twenty native selections. Source is not rerun; producing Source remains `0ea36432`, authentic fixture freeze remains `0a006369`, and prior c49/f32/d81d failures remain attributed and preserved. All five rows remain in progress; strict core/simtest Clippy is conditional on all twenty actual passes.
+
 ## Engineering private child path after the S2 module-resolution failure (2026-10-15, source only)
 
 The actual S2 formatting check at `c49be698b4c90bae1e1ee32ffd1043346d260572` exited 1 because it could not resolve `support_selected` at `rust/crates/simtest/tests/it/../support_selected.rs`. Its full report and raw log remain in `/tmp/eng-five-main-f7c51b1a-254aa68e/REPORT.md` and `fmt.log`. The log also contains layout differences. This is a module-resolution failure during formatting; no rustc or native test ran. The earlier source-only ACCEPT did not prove compilation.

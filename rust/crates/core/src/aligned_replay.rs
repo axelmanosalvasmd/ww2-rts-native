@@ -13,10 +13,10 @@ mod original;
 #[path = "aligned_replay_comparison.rs"]
 mod canonical;
 
-#[path = "aligned_replay_startup.rs"]
-mod startup_state;
 #[path = "engineering_support_replay.rs"]
 mod engineering_support;
+#[path = "aligned_replay_startup.rs"]
+mod startup_state;
 
 #[derive(Clone, Debug)]
 pub struct Replay(Arc<Mutex<Tape>>);
@@ -70,7 +70,10 @@ impl Replay {
     }
     pub(crate) fn draw(&self, consumer: Value) -> f64 {
         let mut tape = self.0.lock().unwrap();
-        assert!(tape.engineering.is_none(), "engineering input requires a checked support consumer");
+        assert!(
+            tape.engineering.is_none(),
+            "engineering input requires a checked support consumer"
+        );
         let index = tape.used.len();
         let value = *tape
             .values
@@ -80,7 +83,10 @@ impl Replay {
         value
     }
     pub(crate) fn integer(&self, purpose: StreamId, caller: &Location<'_>) -> u64 {
-        assert!(self.0.lock().unwrap().engineering.is_none(), "engineering input does not admit integer draws");
+        assert!(
+            self.0.lock().unwrap().engineering.is_none(),
+            "engineering input does not admit integer draws"
+        );
         let consumer =
             if purpose == StreamId::Weather && caller.file().ends_with("match_runtime.rs") {
                 json!(["startup.environment.seed32"])
@@ -99,7 +105,8 @@ impl Replay {
         let engineering = self.0.lock().unwrap().engineering.is_some();
         if engineering {
             let role = engineering_support::role(caller.file(), caller.line());
-            return self.engineering_draw(purpose, role)
+            return self
+                .engineering_draw(purpose, role)
                 .expect("original hedge explicit entropy consumer refused");
         }
         let consumer =
@@ -191,7 +198,8 @@ impl Replay {
 pub(crate) fn environment_draw(seed: &mut u32, replay: Option<&Replay>, consumer: Value) -> f64 {
     // Execute the original generator, including its seed advance, at the real consumer.
     let original = crate::weather_runtime::environment_random(seed);
-    replay.filter(|r| r.0.lock().unwrap().engineering.is_none())
+    replay
+        .filter(|r| r.0.lock().unwrap().engineering.is_none())
         .map_or(original, |r| r.draw(consumer))
 }
 
@@ -207,32 +215,73 @@ fn tape_rejects_malformed_inputs_and_records_every_consumption() {
     assert_eq!(receipt["unconsumed"], 16382);
     assert_eq!(receipt["draws"][1]["index"], 1);
     assert_eq!(receipt["draws"][1]["consumer"], json!(["probe", 1]));
-    assert_eq!(receipt["capacity"],16384);
-    assert!(receipt.get("engineering").is_none(),"R1 receipt has no engineering mode");
-    for capacity in [20,16383,16385] {
+    assert_eq!(receipt["capacity"], 16384);
+    assert!(
+        receipt.get("engineering").is_none(),
+        "R1 receipt has no engineering mode"
+    );
+    for capacity in [20, 16383, 16385] {
         assert!(Replay::new(&json!({"tape":vec!["3fe0000000000000";capacity]})).is_err());
     }
-    for bits in ["7ff8000000000000","7ff0000000000000","fff0000000000000","3ff0000000000000","bfe0000000000000","invalid",""] {
-        let mut invalid=input.clone();invalid["tape"][0]=json!(bits);
-        assert!(Replay::new(&invalid).is_err(),"invalid R1 fraction: {bits}");
+    for bits in [
+        "7ff8000000000000",
+        "7ff0000000000000",
+        "fff0000000000000",
+        "3ff0000000000000",
+        "bfe0000000000000",
+        "invalid",
+        "",
+    ] {
+        let mut invalid = input.clone();
+        invalid["tape"][0] = json!(bits);
+        assert!(
+            Replay::new(&invalid).is_err(),
+            "invalid R1 fraction: {bits}"
+        );
     }
-    let mut actual_seed=739;let mut ordinary_seed=actual_seed;
+    let mut actual_seed = 739;
+    let mut ordinary_seed = actual_seed;
     crate::weather_runtime::environment_random(&mut ordinary_seed);
-    assert_eq!(environment_draw(&mut actual_seed,Some(&replay),json!(["weather.wind.angle",1])).to_bits(),0.5_f64.to_bits());
-    assert_eq!(actual_seed,ordinary_seed,"R1 still advances its original seeded generator");
-    assert_eq!(replay.receipt()["consumed"],3,"R1 still injects its generic tape value");
-    for index in 3..16384 {assert_eq!(replay.draw(json!(["exhaustion",index])).to_bits(),0.5_f64.to_bits());}
-    let full=replay.receipt();
-    assert_eq!(full["capacity"],16384);assert_eq!(full["consumed"],16384);
-    assert_eq!(full["unconsumed"],0);assert_eq!(full["exhausted"],true);
+    assert_eq!(
+        environment_draw(
+            &mut actual_seed,
+            Some(&replay),
+            json!(["weather.wind.angle", 1])
+        )
+        .to_bits(),
+        0.5_f64.to_bits()
+    );
+    assert_eq!(
+        actual_seed, ordinary_seed,
+        "R1 still advances its original seeded generator"
+    );
+    assert_eq!(
+        replay.receipt()["consumed"],
+        3,
+        "R1 still injects its generic tape value"
+    );
+    for index in 3..16384 {
+        assert_eq!(
+            replay.draw(json!(["exhaustion", index])).to_bits(),
+            0.5_f64.to_bits()
+        );
+    }
+    let full = replay.receipt();
+    assert_eq!(full["capacity"], 16384);
+    assert_eq!(full["consumed"], 16384);
+    assert_eq!(full["unconsumed"], 0);
+    assert_eq!(full["exhausted"], true);
 
     assert!(replay.layout(&[1, 0], &[0, 1], 2).is_ok());
     assert!(replay.layout(&[1, 0], &[0], 2).is_err());
     // The failed draw intentionally poisons this disposable tape's mutex.
-    let failure=std::panic::catch_unwind(||replay.draw(json!(["exhausted.no-fallback"])));
-    let failure=failure.expect_err("the 16,385th draw must fail");
-    let message=failure.downcast_ref::<String>().map(String::as_str)
-        .or_else(||failure.downcast_ref::<&str>().copied()).unwrap();
+    let failure = std::panic::catch_unwind(|| replay.draw(json!(["exhausted.no-fallback"])));
+    let failure = failure.expect_err("the 16,385th draw must fail");
+    let message = failure
+        .downcast_ref::<String>()
+        .map(String::as_str)
+        .or_else(|| failure.downcast_ref::<&str>().copied())
+        .unwrap();
     assert!(message.contains("shared random tape exhausted; no fallback"));
 }
 

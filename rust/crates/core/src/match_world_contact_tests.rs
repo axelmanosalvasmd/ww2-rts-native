@@ -182,8 +182,10 @@ fn canonical_world_contacts_match_original_commander_and_local_boundaries() {
             let versions = m.world.versions;
             // The workload mover's premature dust must not survive an infantry no-op or wet/mud contact.
             m.world.game.units.get_mut(&id).unwrap().dust = Some(999.0);
-            m.apply_moved_ground_contact_emitting(id, before, prior_dust, &mut |effect| shots.push(effect.to_json()))
-                .unwrap();
+            m.apply_moved_ground_contact_emitting(id, before, prior_dust, &mut |effect| {
+                shots.push(effect.to_json())
+            })
+            .unwrap();
             assert_eq!(
                 m.world.game.wear.as_ref().unwrap()[c].to_bits(),
                 expected["wearF32Bits"].as_u64().unwrap() as u32,
@@ -262,7 +264,10 @@ fn canonical_world_contacts_match_original_commander_and_local_boundaries() {
                 ),
                 expected["mines"]
             );
-            assert!(super::tests::exact_json_numbers(&json!(shots), &expected["shots"]));
+            assert!(super::tests::exact_json_numbers(
+                &json!(shots),
+                &expected["shots"]
+            ));
             assert_eq!(m.start.random.snapshot(), random);
             assert_eq!(m.start.wind, wind);
             assert_eq!(m.start.environment_seed, seed);

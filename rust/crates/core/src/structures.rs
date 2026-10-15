@@ -330,12 +330,18 @@ pub(crate) fn parse(
                 .ok_or_else(|| invalid("section footprints must be unique cells inside the map"))?
                 as usize;
             if !cells.insert(cell) {
-                return Err(invalid("section footprints must be unique cells inside the map"));
+                return Err(invalid(
+                    "section footprints must be unique cells inside the map",
+                ));
             }
             if physical(layers, cell) != kind.cell() {
                 return Err(invalid("section footprint must match its structure"));
             }
-            let metadata_error = || invalid("sections need health, material, an anchor flag and bounded support references");
+            let metadata_error = || {
+                invalid(
+                    "sections need health, material, an anchor flag and bounded support references",
+                )
+            };
             let hp = value["hp"]
                 .as_f64()
                 .filter(|hp| hp.is_finite() && *hp > 0.0 && *hp <= 100_000.0)
@@ -350,9 +356,7 @@ pub(crate) fn parse(
                 })
                 .ok_or_else(metadata_error)?
                 .to_owned();
-            let anchor = value["anchor"]
-                .as_bool()
-                .ok_or_else(metadata_error)?;
+            let anchor = value["anchor"].as_bool().ok_or_else(metadata_error)?;
             let input_supports = value["supports"]
                 .as_array()
                 .filter(|a| a.len() <= 8)
@@ -392,7 +396,9 @@ pub(crate) fn parse(
                 let dx = (section.cell % w).abs_diff(to.cell % w);
                 let dy = (section.cell / w).abs_diff(to.cell / w);
                 if id == &section.id || dx + dy != 1 {
-                    return Err(invalid("supports must reference neighboring sections in the same structure"));
+                    return Err(invalid(
+                        "supports must reference neighboring sections in the same structure",
+                    ));
                 }
             }
         }

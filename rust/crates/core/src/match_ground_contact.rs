@@ -68,11 +68,18 @@ impl Match {
             .and_then(|v| v.boolean())
             .unwrap_or(false);
         let ch = g.chars[c];
-        if let Some(into) = crushes.then(|| cfg.get("crush")
-            .and_then(|v| v.get(&(ch as char).to_string()))).flatten()
+        if let Some(into) = crushes
+            .then(|| {
+                cfg.get("crush")
+                    .and_then(|v| v.get(&(ch as char).to_string()))
+            })
+            .flatten()
         {
-            let into = into.string().filter(|s| s.len() == 1)
-                .ok_or("invalid crushing replacement")?.as_bytes()[0];
+            let into = into
+                .string()
+                .filter(|s| s.len() == 1)
+                .ok_or("invalid crushing replacement")?
+                .as_bytes()[0];
             let ids: Vec<_> = g.units.keys().copied().collect();
             let mut context = crate::environment::Context {
                 tick: u64::try_from(g.tick).map_err(|_| "invalid crushing clock")?,
@@ -85,7 +92,8 @@ impl Match {
                 wind_angle: self.start.wind.0,
                 wind_strength: self.start.wind.1,
             };
-            self.environment.wreck_cell_emitting(&mut self.world, c, Some(into), &mut context, out)
+            self.environment
+                .wreck_cell_emitting(&mut self.world, c, Some(into), &mut context, out)
                 .map_err(|e| format!("moved crushing: {e:?}"))?;
         }
         // Contact can change the physical cell. Wear and dust read its new state.
