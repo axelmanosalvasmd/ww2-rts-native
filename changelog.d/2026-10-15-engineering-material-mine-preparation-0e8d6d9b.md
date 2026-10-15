@@ -1,1 +1,1 @@
-- Prepare existing Source recorders and native readers for ENG-04, ENG-13, ENG-14, ENG-48 and ENG-66. Fixture recording, native verification and parity promotion remain pending a Root execution grant.
+- Prepare existing Source recorders and native readers for ENG-04, ENG-13, ENG-14, ENG-48 and ENG-66. Record 186 World actions, 396 field-work actions, 1,531 path queries and 5,943 support checkpoints, preserving all prior recorded entries byte for byte. Native verification and parity promotion remain pending.

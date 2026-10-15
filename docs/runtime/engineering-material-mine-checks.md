@@ -56,3 +56,11 @@ Only after all selected checks pass may the five owned status cells change. Free
 ENG-03/45 require moved-vehicle crushing; ENG-05 lacks the firing pit range consumer; ENG-15 lacks queued Dig; ENG-37 has Source/native validation reason differences. ENG-16,17,23,24,38,41,42,44,47,50,51,67,70,71,78,79,80 remain held for their full selected witnesses or owner decisions. The prior ten-row matrix and 27-row audit are retained at `/tmp/eng-next-after240-0e8d6d9b/`. No partial subset is used to pad this five-row batch.
 
 Coordination was read through Axel 128 (`6185037590`). Its exact-head and owner-decision boundaries are retained. ABI 2 remains authoritative only for its approved six calls; no protocol/terrain draft is adopted. No public acknowledgment was posted, following the stream instruction.
+
+## Recorded Source checkpoint
+
+All four planned generate/check pairs passed with x64 Node v24.21.0 under the S3 six-GiB, zero-swap, CPU 8-11, 400% quota scope. World records seven cases and 186 actions; field work records 26 traces and 396 actions; pathfinding records 67 scenarios and 1,531 queries (1,109 Found, 300 Unreachable, 122 ExpansionLimit); support records 269 traces and 5,943 checkpoints. The new material scene has 108 actions and 40 query pairs, and the new Dive trace has 21 checkpoints.
+
+Raw JSON array-entry comparison preserves all six original World cases, 22 field-work traces and 66 path scenarios as exact prefixes. All 268 original support trace identities and their raw decompressed JSON bytes survive in original relative order. Top-level metadata outside those arrays remains unchanged. The pathfinding output was installed only after its recorder exited successfully.
+
+The source scope ended with zero memory-cap/OOM events and no remaining child. These results establish Source recording and fixture preservation, not native passes or row promotion. Native execution awaits this fixture commit and the separately recorded focused-stage result. The earlier predicted 33/34 path count denotes the native reader's changed-map counter; the actual serialized scenario count is 66/67.
