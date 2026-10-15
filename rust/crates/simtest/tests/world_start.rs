@@ -1,6 +1,5 @@
 //! Bounded original World startup and native seed continuity.
-#[path = "common/startup.rs"]
-mod startup;
+use crate::shared::startup;
 use serde_json::{Value, json};
 use ww2_core::{
     economy::{Faction, Mode},

@@ -1,5 +1,5 @@
 // Writes rust/crates/core/tests/fixtures/math.txt: what Node computes for each function that
-// rust/crates/core/src/math.rs ports from V8. `cargo test -p ww2-core --test math` checks the port
+// rust/crates/core/src/math.rs ports from V8. `cargo test -p ww2-core --test it math` checks the port
 // against it bit for bit. Run it from the repo root with an x86-64 build of the Node the game pins
 // (24.21.0, V8 13.6): on the Vostro, or on an Apple Silicon Mac the darwin-x64 build under Rosetta:
 //

@@ -1,8 +1,5 @@
 //! Original createGame startup, with troop capture before starting bases are stamped.
-#[path = "common/startup_projection.rs"]
-mod projection;
-#[path = "common/startup.rs"]
-mod startup;
+use crate::shared::startup_projection as projection;
 use projection::{bits, equivalent, terrain};
 use serde_json::{Value, json};
 use ww2_core::{

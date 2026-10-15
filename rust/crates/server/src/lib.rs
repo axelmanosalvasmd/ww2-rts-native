@@ -221,7 +221,7 @@ async fn upgrade(
 fn room_query(query: &str) -> Option<String> {
     for part in query.split('&') {
         let (key, value) = part.split_once('=').unwrap_or((part, ""));
-        if decode_query(key)? == "room" {
+        if decode_query(key).as_deref() == Some("room") {
             return decode_query(value);
         }
     }
@@ -348,3 +348,7 @@ mod tests {
 #[cfg(test)]
 #[path = "native_socket_tests.rs"]
 mod native_socket_tests;
+
+#[cfg(test)]
+#[path = "session_batch_socket_tests.rs"]
+mod session_batch_socket_tests;

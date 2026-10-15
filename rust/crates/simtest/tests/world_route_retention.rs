@@ -1,6 +1,5 @@
 #[allow(dead_code)]
-#[path = "common/staged_observer.rs"]
-mod common;
+use crate::shared::staged_observer as common;
 use common::{bits, idx, load};
 use serde_json::{Value, json};
 use ww2_core::{
