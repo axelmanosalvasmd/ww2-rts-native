@@ -1,0 +1,1 @@
+- Extended the pinned Source firing replay with nine ordinary target-selection scenes covering role value, visibility, threat, hysteresis, retarget timing, team claims and salvo preferences. The fixture now has 123 traces and 624 checkpoints, compared bit for bit in native Default and Conquest. The broader CMB row checks and whole-match outcomes remain open.
