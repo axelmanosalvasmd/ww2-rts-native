@@ -6,7 +6,7 @@ use ww2_core::fog::Fog;
 use ww2_core::game::Game;
 use ww2_core::grid::SpatialGrid;
 use ww2_core::rules::Rules;
-use ww2_core::vision::{update_vision, update_vision_threaded};
+use ww2_core::vision::{update_vision, update_vision_threaded, vision_range};
 
 fn fixture() -> Value {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -64,6 +64,82 @@ fn assert_cold(g: &Game, rules: &Rules, cached: &Value, expected: &Value, thread
     assert_eq!(cold, *expected);
     for team in 0..2 {
         assert_eq!(cached[team]["vis"], cold[team]["vis"]);
+    }
+}
+
+fn assert_height_sight_domain(g: &Game, rules: &Rules, case: &Value) {
+    use ww2_core::game::{CELL, SIGHT, WOOD};
+    use ww2_core::math;
+
+    let observer = &g.units[&(case["observer"].as_u64().unwrap() as u32)];
+    assert_eq!(rules.kinds[observer.kind].name, "rifle");
+    assert!(observer.garrison.is_none() && observer.air.is_none());
+    assert_eq!(g.level_at(observer.x, observer.z), 0);
+    assert_eq!(g.rain, 0.0);
+    let reach = math::max(6.0, vision_range(g, rules, observer));
+    assert_eq!(reach, 36.0);
+    let domain = &case["sightDomain"];
+    assert_eq!(domain["reach"].as_f64().unwrap(), reach);
+    let bases = [(10, 0, 5, 5, 97), (11, 0, 17, 5, 103),
+        (12, 1, 5, 123, 5761), (13, 1, 17, 123, 5767),
+        (14, 2, 187, 123, 5852), (15, 2, 175, 123, 5846)];
+    let expected_bases: Vec<_> = bases.iter().map(|&(id, owner, x, z, c)| {
+        json!({"id":id,"owner":owner,"x":x,"z":z,"c":c})
+    }).collect();
+    assert_eq!(json!(expected_bases), domain["bases"]);
+    let mut canonical: Vec<usize> = bases.iter().flat_map(|&(_, _, _, _, c)| {
+        (0..9).map(move |i| c + i % 3 + i / 3 * g.w)
+    }).collect();
+    canonical.sort_unstable();
+    let flagged: Vec<_> = g.flags.iter().enumerate()
+        .filter_map(|(cell, flags)| (flags & (SIGHT | WOOD) != 0).then_some(cell)).collect();
+    assert_eq!(flagged, canonical);
+    assert_eq!(flagged.len(), 54);
+    assert_eq!(g.sections.len(), 54);
+    let exceptions = domain["exceptions"].as_array().unwrap();
+    let structures = domain["structures"].as_array().unwrap();
+    assert_eq!(exceptions.len(), 54);
+    assert_eq!(structures.len(), 6);
+    let mut minimum = f64::INFINITY;
+    for (cell, declared) in flagged.into_iter().zip(exceptions) {
+        assert_eq!(declared["cell"].as_u64().unwrap() as usize, cell);
+        let (x, y) = (cell % g.w, cell / g.w);
+        let dx = math::max(math::max(x as f64 * CELL - observer.x, 0.0), observer.x - (x + 1) as f64 * CELL);
+        let dz = math::max(math::max(y as f64 * CELL - observer.z, 0.0), observer.z - (y + 1) as f64 * CELL);
+        let distance = math::hypot(dx, dz);
+        assert!(distance > reach, "entire flagged cell outside possible sight domain");
+        assert_eq!(distance.to_bits(), declared["distance"].as_f64().unwrap().to_bits());
+        minimum = math::min(minimum, distance);
+        assert_eq!(g.flags[cell], 1027);
+        assert_eq!(g.flags[cell] & WOOD, 0);
+        assert_eq!(declared["flags"], 1027);
+        assert_eq!(declared["chars"], "K");
+        assert_eq!(declared["ground"], ".");
+        assert_eq!(declared["object"], "K");
+        let &(id, owner, bx, bz, _) = bases.iter().find(|&&(_, _, _, _, c)| {
+            (0..9).any(|i| c + i % 3 + i / 3 * g.w == cell)
+        }).unwrap();
+        assert_eq!(declared["building"], json!({"id":id,"owner":owner,"x":bx,"z":bz}));
+        let section = &declared["section"];
+        assert_eq!(section["id"], json!(format!("building:{id}:{cell}")));
+        assert_eq!(section["structureId"], json!(format!("building:{id}")));
+        assert_eq!(section["entityId"], id);
+        assert_eq!(section["c"].as_u64().unwrap() as usize, cell);
+        assert_eq!(section["state"], "intact");
+        let actual = &g.sections[&(cell as u32)];
+        assert!(!actual.failed && actual.hp > 0.0);
+        assert_eq!(actual.hp.to_bits(), section["hp"].as_f64().unwrap().to_bits());
+        let structure = structures.iter().find(|s| s["entityId"] == id).unwrap();
+        assert_eq!(structure["id"], section["structureId"]);
+        assert_eq!(structure["kind"], "building");
+        let sections = structure["sections"].as_array().unwrap();
+        assert_eq!(sections.len(), 9);
+        assert!(sections.contains(section));
+        assert!(!g.units.contains_key(&(id as u32)));
+    }
+    assert_eq!(minimum.to_bits(), domain["minimumRectangleDistance"].as_f64().unwrap().to_bits());
+    for key in ["editCell", "probeCell"] {
+        assert_eq!(g.flags[case[key].as_u64().unwrap() as usize] & (SIGHT | WOOD), 0);
     }
 }
 
@@ -160,7 +236,7 @@ fn cmb131_height_only_edit_invalidates_warmed_cells() {
             let g = advance(frame, &rules, threaded);
             assert_eq!(g.units.len(), 1);
             assert!(g.smokes.is_empty() && g.strikes.is_empty());
-            assert!(g.flags.iter().all(|flags| flags & (ww2_core::game::SIGHT | ww2_core::game::WOOD) == 0));
+            assert_height_sight_domain(&g, &rules, case);
             let actual = observe(&g, &rules, &mut fog, threaded);
             assert_eq!(actual, frame["expected"]);
             assert_cold(&g, &rules, &actual, &frame["coldExpected"], threaded);

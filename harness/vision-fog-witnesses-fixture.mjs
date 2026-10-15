@@ -38,6 +38,7 @@ registerHooks({
 });
 const sim = await import(actualReference + 'shared/sim.js');
 const { rebuildGrid } = await import(actualReference + 'shared/grid.js');
+const { sightMul } = await import(actualReference + 'shared/weather.js');
 const { trim } = await import('./vision-fixture.mjs');
 const map = {
   name: 'Isolated supplemental fog witnesses', w: 96, h: 64,
@@ -140,7 +141,8 @@ assertStablePacket(dustFrames[1], dustFrames[2]);
 for (const id of [observer.id, ally.id]) assert(dustGame.fogSources.get(id).cells.length > 0);
 
 // A separate open, flat scene warms the same source cache before one height edit.
-// There is no blocker, smoke, recon or enemy cell contribution to mask its effect.
+// Canonical base footprints remain outside the observer's complete sight domain.
+// No smoke, recon or enemy cell contribution masks the height edit.
 const heightGame = create(), heightObserver = spawn(heightGame, 0, 41, 41);
 const heightFrames = [];
 for (const [name, tick] of [['cold', 201], ['warm', 205], ['stable-cache', 209]]) {
@@ -153,7 +155,56 @@ const editCell = cell(49, 41), probeCell = cell(65, 41);
 const beforeInput = input(heightGame);
 assert.equal(heightGame.height[editCell], 0);
 assert.equal(heightGame.flags[editCell] & sim.SIGHT, 0);
-assert([...heightGame.flags].every(flags => !(flags & (sim.SIGHT | sim.WOOD))));
+// Source's ordinary rifle fogReach reduces to max(6, vision * sightMul) under
+// these checked clear-ground observer facts. Keep every distant base intact.
+assert.equal(heightObserver.type, 'rifle');
+assert.equal(heightObserver.garrison, -1);
+assert.equal(heightGame.height[cell(heightObserver.x, heightObserver.z)], 0);
+assert.equal(heightGame.weather.now, 'clear');
+assert.equal(heightGame.wx.rain, 0);
+assert.equal(sightMul(heightGame), 1);
+const sightReach = Math.max(6, sim.UNITS[heightObserver.type].vision * sightMul(heightGame));
+assert.equal(sightReach, 36);
+const bases = [
+  { id: 10, owner: 0, x: 5, z: 5, c: 97 },
+  { id: 11, owner: 0, x: 17, z: 5, c: 103 },
+  { id: 12, owner: 1, x: 5, z: 123, c: 5761 },
+  { id: 13, owner: 1, x: 17, z: 123, c: 5767 },
+  { id: 14, owner: 2, x: 187, z: 123, c: 5852 },
+  { id: 15, owner: 2, x: 175, z: 123, c: 5846 },
+];
+const canonicalCells = bases.flatMap(base => Array.from({ length: 9 }, (_, i) => base.c + i % 3 + Math.floor(i / 3) * heightGame.w));
+const flaggedCells = [...heightGame.flags].flatMap((flags, c) => flags & (sim.SIGHT | sim.WOOD) ? [c] : []);
+assert.deepEqual(flaggedCells, canonicalCells.toSorted((a, b) => a - b));
+assert.equal(flaggedCells.length, 54);
+assert.equal(heightGame.structures.size, 6);
+assert.equal(heightGame.structuralCells.size, 54);
+assert.equal(heightGame.buildingCells.size, 54);
+let minimumRectangleDistance = Infinity;
+const exceptions = flaggedCells.map(c => {
+  const x = c % heightGame.w, y = Math.floor(c / heightGame.w);
+  const dx = Math.max(x * sim.CELL - heightObserver.x, 0, heightObserver.x - (x + 1) * sim.CELL);
+  const dz = Math.max(y * sim.CELL - heightObserver.z, 0, heightObserver.z - (y + 1) * sim.CELL);
+  const distance = Math.hypot(dx, dz);
+  assert(distance > sightReach, `entire flagged cell ${c} outside sight domain`);
+  minimumRectangleDistance = Math.min(minimumRectangleDistance, distance);
+  assert.equal(heightGame.flags[c], 1027); assert.equal(heightGame.flags[c] & sim.WOOD, 0);
+  assert.equal(heightGame.chars[c], 'K'); assert.equal(heightGame.ground[c], '.'); assert.equal(heightGame.objects[c], 'K');
+  const section = heightGame.structuralCells.get(c), building = heightGame.buildingCells.get(c);
+  const base = bases.find(b => b.id === building?.id);
+  assert(base); assert.equal(building.owner, base.owner); assert.equal(building.x, base.x); assert.equal(building.z, base.z);
+  assert.equal(section.id, `building:${base.id}:${c}`); assert.equal(section.entityId, base.id);
+  assert.equal(section.structureId, `building:${base.id}`); assert.equal(section.c, c);
+  assert.equal(section.state, 'intact'); assert(section.hp > 0);
+  const structure = heightGame.structures.get(section.structureId);
+  assert.equal(structure.entityId, base.id); assert.equal(structure.kind, 'building');
+  assert.equal(structure.sections.length, 9); assert(structure.sections.includes(section));
+  assert.equal(heightGame.units.has(base.id), false);
+  return { cell: c, distance, flags: heightGame.flags[c], chars: heightGame.chars[c],
+    ground: heightGame.ground[c], object: heightGame.objects[c], section: structuredClone(section), building: structuredClone(building) };
+});
+for (const c of [editCell, probeCell]) assert.equal(heightGame.flags[c] & (sim.SIGHT | sim.WOOD), 0);
+const sightDomain = { reach: sightReach, minimumRectangleDistance, bases, exceptions, structures: structuredClone([...heightGame.structures.values()]) };
 heightGame.height[editCell] = 2;
 heightGame.terrainVersion = (heightGame.terrainVersion ?? 0) + 1;
 const after = advance(heightGame, 'height-only-edit', 213);
@@ -176,7 +227,7 @@ const content = JSON.stringify({
   pin, sourceBlob: git('rev-parse', `${pin}:shared/sim.js`), node: process.version, arch: process.arch,
   historical, scope: 'isolated-component-witnesses-with-explicit-counterfactuals',
   seenGround: { target: target.id, targetCell, frames: dustFrames },
-  heightOnly: { observer: heightObserver.id, editCell, oldHeight: 0, newHeight: 2, probeCell, changedCells, frames: heightFrames },
+  heightOnly: { observer: heightObserver.id, editCell, oldHeight: 0, newHeight: 2, probeCell, changedCells, sightDomain, frames: heightFrames },
 }) + '\n';
 const output = resolve(root, 'rust/crates/simtest/tests/fixtures/vision-fog-witnesses.json');
 if (process.argv.includes('--check')) assert.equal(readFileSync(output, 'utf8'), content);
