@@ -662,10 +662,14 @@ fn aircraft_tick_preflight_rejects_unrepresented_phases_before_mutation() {
 
 #[test]
 fn cmb65_mg_flak_and_fighter_hold_then_resume_permitted_anti_air() {
-    use ww2_core::match_commands::Command;
+    use ww2_core::{match_aviation::MissionKind, match_commands::Command};
     let fixture = fixture();
     for kind in ["mg", "flak", "fighter"] {
-        let name = format!("{kind}-continuous-aa");
+        let name = if kind == "fighter" {
+            "held-fighter-attack-air-target-loss".to_owned()
+        } else {
+            format!("{kind}-continuous-aa")
+        };
         let trace = fixture["traces"]
             .as_array()
             .unwrap()
@@ -673,12 +677,48 @@ fn cmb65_mg_flak_and_fighter_hold_then_resume_permitted_anti_air() {
             .find(|trace| trace["name"] == name)
             .unwrap();
         let mut m = scene(trace);
+        assert_json(
+            &snapshot(&m, &[]),
+            &trace["initial"],
+            "complete captured initial state",
+        );
         let shooter = 1000;
         let target = 1001;
         let hold =
             Command::from_json(&json!({"t":"stance","ids":[shooter],"key":"holdFire","on":true}))
                 .unwrap();
         assert_eq!(m.execute_command(0, &hold, false).unwrap(), None);
+        if kind == "fighter" {
+            assert_eq!(m.world.game.units[&shooter].air, Some(PlaneState::Base));
+            assert!(m.aviation.planes[&shooter].ammo > 0.0);
+            assert!(m.aviation.planes[&shooter].fuel > 0.0);
+            assert!(m.world.game.players[0].sees(target));
+            let at = m.world.game.units[&target].at();
+            let patrol = Command::from_json(
+                &json!({"t":"move","orders":[[shooter,at.x,at.z]]}),
+            )
+            .unwrap();
+            assert_eq!(m.execute_command(0, &patrol, false).unwrap(), None);
+            let sent = m.aviation.planes[&shooter].mission.unwrap();
+            assert_eq!(sent.kind, MissionKind::Patrol);
+            assert_eq!(sent.target, None);
+            assert_eq!(m.world.game.units[&shooter].air, Some(PlaneState::Out));
+            m.step_aircraft(shooter, 0.05).unwrap();
+            assert!(matches!(
+                m.world.game.units[&shooter].air,
+                Some(PlaneState::Out | PlaneState::Station)
+            ));
+            assert!(m.commands.units[&shooter].hold_fire);
+            let caster = &m.world.game.units[&shooter];
+            let victim = &m.world.game.units[&target];
+            assert!(victim.hp > 0.0);
+            assert!(matches!(
+                victim.air,
+                Some(PlaneState::Out | PlaneState::Station | PlaneState::Home)
+            ));
+            assert!(m.world.game.players[0].sees(target));
+            assert!(ww2_core::math::hypot(caster.x - victim.x, caster.z - victim.z) < 30.0);
+        }
         let hp = m.world.game.units[&target].hp;
         let xp = m.combat.get(shooter).unwrap().xp;
         for _ in 0..6 {
@@ -688,15 +728,17 @@ fn cmb65_mg_flak_and_fighter_hold_then_resume_permitted_anti_air() {
             assert!(m.aviation.take_events().is_empty());
         }
         if kind == "fighter" {
-            let at = m.world.game.units[&target].at();
-            assert!(
-                m.send_aircraft_mission(
-                    0,
-                    shooter,
-                    mission(&json!({"kind":"attack","id":target,"x":at.x,"z":at.z})),
-                )
-                .unwrap()
-            );
+            let ammo = m.aviation.planes[&shooter].ammo;
+            let attack = Command::from_json(
+                &json!({"t":"attack","ids":[shooter],"target":target}),
+            )
+            .unwrap();
+            assert_eq!(m.execute_command(0, &attack, false).unwrap(), None);
+            let admitted = m.aviation.planes[&shooter].mission.unwrap();
+            assert_eq!(admitted.kind, MissionKind::Attack);
+            assert_eq!(admitted.target, Some(target));
+            assert_eq!(m.world.game.units[&shooter].air, Some(PlaneState::Out));
+            assert_eq!(m.aviation.planes[&shooter].ammo.to_bits(), ammo.to_bits());
             assert!(m.commands.units[&shooter].hold_fire);
         } else {
             let fire = Command::from_json(

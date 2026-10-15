@@ -1,5 +1,32 @@
 # Three Crossroads Native: design decisions
 
+## CMB-65 ready-fighter source correction (2026-10-15)
+
+The separate private child starts at ccad825a and preserves daaa4743's real
+zero-ammo mission-refusal failure and its logs. Select the complete unchanged
+held-fighter-attack-air-target-loss initialization for the new fighter
+transition. Its real captured Base fighter has fuel 50/ammo 60 and its original
+first Attack is admitted. Require complete initial snapshot equality. Use
+ordinary Move to admit Patrol, then one existing aircraft step to establish an
+actually airborne, in-range held actor. Retain six held calls with unchanged
+HP/XP/no events, dispatch ordinary Attack, require committed Attack/target/Out
+and unchanged ammo, then retain all six positive damage/XP/AA-event calls.
+No ammo, HP, type, pose, visibility, mission or RNG setter is added. The original
+mg/flak inputs and complete 42-trace corpus remain exact; no guard or existing
+positive assertion is weakened. Direct mission admission is now checked through
+its ordinary command path and actual committed mission state.
+
+Ordinary rearm is available in the unchanged provider and its captured
+fighter-rearm-denial/fuel-home-rearm cases. It is not executed here or used as a
+synthetic refill. The [source/caller gap declaration](docs/testing/cmb65-mission-eligible-source.md)
+separates the full authentic initialization and old captured components from the
+new concatenated transition, which has no matched new Source trace or native
+PASS. A bounded new-only recorder and Root grant would be required if review
+requires that capture. CMB-39/69/connected/41 remain source-preserved and unrun;
+old CMB-64 PASS stays at daaa4743. The sniper source branch stays separate.
+All actual parity cells remain unchanged. This child executes no job and needs
+Root's exact successor review and grant before any future execution.
+
 ## Restored combat S2 native stop at daaa4743 (2026-10-15)
 
 At producing `daaa4743bc257235378b561b639641f69f07271b`, renewed fmt passes
