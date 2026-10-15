@@ -1,5 +1,21 @@
 # Three Crossroads Native: design decisions
 
+## Aligned whole-match documentation proposal (2026-10-15)
+
+This amendment quotes item 1 of Axel's owner answer `6194079987` exactly in
+PARITY.md, following narrowed proposal `6182315380`. The existing component
+comparison, natural whole-match outcome judgment and owner rules remain
+byte-for-byte intact. Both owners record readback of the final documentation
+head on #5 before merge. [Axel-side readback 156](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6194582243)
+covered only old head `24520743`; [Hermes 157](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6194837091)
+requires new-head readback after rebase. This amendment grants no block
+approval or row promotion and makes no new global equal-seed rule.
+#220's unaligned diagnostic stays diagnostic.
+
+No test seam is implemented or assigned here. ALIGNED_REPLAY owns that
+separate stream. This change touches no runtime, RNG, provider, guard,
+interface, terrain, ABI, reference, test, fixture or parity-row status.
+
 ## Engineering supported scope and held aircraft consumer (2026-10-15)
 
 The supported engineering gate contains 20 original checks. Preserve the full `f2b48700` candidate under `refs/heads/held/eng-five-row-aircraft-f2b48700` and move its aircraft test function verbatim to the [unregistered checkpoint](docs/checkpoints/engineering-aircraft-f2b48700/README.md). That function remains FAILED / HELD: the first firing-enabled Clear patrol is refused before tick 1 because the automatic aircraft ground-fire actuator is unavailable. Its Source input and complete five-weather capture remain intact. The checkpoint records the precise provider boundary and pending consumer work.
