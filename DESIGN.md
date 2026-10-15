@@ -4461,3 +4461,48 @@ Horde/Assault/Annihilation producer and Rally admission, full recipient/reconnec
 history, aircraft/naval birth, logistics repair, Classic total-failure retirement,
 concrete Wall/Gate and the broader mode matrix remain explicit gaps. This draft
 does not qualify a five-row PR or transfer any historical pass to a new head.
+
+## BASE seventh-recipe authentic Source capture (2026-10-15, Vostro)
+
+Root's new S3 Source-only grant executes generation once and the serial byte
+check once at unchanged source head `aaf0cf6ff0140d09885fb1c7a5e98bfc3269c910`.
+Both exit 0 with original clean Source `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`
+and `/usr/bin/node` v24.21.0/x64. The authentic `base-consumer-completion.json`
+is 486,928 bytes, SHA256
+`0a6bf3a9dbf01f1efa578a2b3b882dd1854ca96dd3533cb01063f079e31702ca`.
+It retains all original recorded observations without input or expectation
+changes. The recorder and all 38 pending native definitions remain unchanged.
+
+Each invocation observes five scenes, 50 commands, five original storyResult
+reads, two section contacts, 38,986 Source steps, 63 action frames and five
+initial frames. Both invocations repeat the same coverage: 100 commands and
+77,972 executed steps are not additional unique cases. Ordinary Default and
+Conquest each record 11 commands and zero steps; Classic owner identity records
+13 commands and 3,320 steps; construction/repair records nine commands, two
+contacts and 5,462 steps; the genuine deadline records six commands and 30,204
+steps. Every constructor consumes one recorded global draw of 0.5; no global
+draw occurs after construction. Native startup RNG equivalence is not claimed.
+
+Both jobs run with actual CPU affinity 8-11, memory.max 6,442,450,944,
+memory.swap.max 0, CPU quota 400 percent, jobs4/thread1 and a 400-second bound.
+Before each job, free -g reports 13 GB available and df reports 120G available.
+The current guard and all 1,076 repository and 644 Source file preimages remain
+exact. Both Node processes are terminal and their inherited exclusive S3 locks
+are released before this fixture freeze. Receipts and raw logs are retained in
+`/tmp/impl-bases-consumer-cycle2-d699fc97/proof-aaf0cf6f/`. Root owns the ledger.
+Main's reported `f7c51b1a` merge does not replace this granted source head.
+
+The repeated-contact zero follows an already failed section. It proves no
+second entity debit in this history, while the failed-section early return
+means it does not independently isolate contact-ID deduplication on a live
+section. Total retirement, spectator/reconnect, Shipyard/enemy node claims and
+the broader mode matrix stay held. The immutable BASE12 API/gap handoff went to
+Root and BASE_AUDIT; dependent consumers remain proposals until a reviewed
+provider union is scoped. MODE home Buy remains read-only.
+
+No other recipe, native test, compiler, formatter, lint or discovery command ran.
+All 38 native definitions remain unrun and the six older pending fixtures remain
+absent. This child freezes only the authentic new fixture, this decision record
+and a changelog fragment. The five exact new native names require a separate
+Root grant on this child. No parity or Acceptance cell changes, public Rust
+shape, external interface, public post or runtime integration follows.

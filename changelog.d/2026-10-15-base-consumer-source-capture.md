@@ -1,0 +1,1 @@
+- Freeze the authentic seventh BASE Source fixture after generation and byte check each pass once: five scenes, 50 commands and 38,986 steps per invocation. Keep all 38 native tests unrun pending a separate exact-head grant; retain every parity row and the six older missing fixtures.
