@@ -1,0 +1,1 @@
+- Apply the retained rustfmt diagnostic to the engineering weather tests. Formatting changes only; all predicates and expected values are unchanged.
