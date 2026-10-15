@@ -26,3 +26,6 @@ fn vision_and_fog_match_the_reference() {
 
 #[path = "vision/rows.rs"]
 mod rows;
+
+#[path = "vision/supplemental.rs"]
+mod supplemental;

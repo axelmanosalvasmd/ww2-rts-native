@@ -1911,6 +1911,16 @@ The native side uses compiled rules and existing `vision`/`Fog` consumers, plus 
 
 The prepared inventory is 18 range cases, 30 visibility cases, 18 LOS cases, 20 fog frames, eight three-recipient delivery frames and 64 run-encoding cases. These are source counts, not execution results. Root has not granted this stream a native/recorder slot. Fixtures are not generated, tests have not run, and all five rows retain their previous statuses. The exact predicate map and consumer names are in `docs/parity/combat.md`. A generated and verified successor and independent review remain required before integration.
 
+
+
+## Supplemental fog witness preparation (2026-10-15, source only)
+
+Independent review of combat head `9aa20852e6c055fd94b9d56b26178a48553903cf` found two non-decisive CMB-131 witnesses. An allied source already covered the old dusty target cell, and a pre-existing sight blocker hid the old height edit. Root independently verified both against the frozen JSON. No runtime bug is established and no runtime algorithm changes.
+
+Preserve the complete historical recorder, its 18 range/30 visibility/18 LOS cases, 20 fog frames, eight delivery frames, 64 packing cases and both authentic fixtures. Add only separate supplemental recording/test data: a three-frame dusty-target sequence with every allied source excluded and an explicit visibility-fact counterfactual; and an independent four-frame height-only transition from warmed stable cells to a changed mask, version and nonempty delta. Both Source and native tests compare complete outputs and cold recomputation. Native tests retain persistent Fog for each actual/control sequence in both serial and threaded paths. The single-source masks and removed-visible-fact inputs are declared component counterfactuals, never room or whole-match admissions.
+
+The new fixture remains absent and the new two tests remain unrun. The five original checks retain only their exact `9aa20852` results; those results are not promoted to this child. No Source, Cargo, native test or formatter is authorized in this preparation turn. CMB-131 status/acceptance, terrain policy, privacy, ABI/header/contracts and runtime guards stay unchanged. The exact supplemental inputs and predicates are recorded in `docs/parity/combat.md`; a later reviewer must receive both verified findings and these responses.
+
 ## Formation spots and the first C calls (2026-10-12)
 
 `shared/formation.js` is ported to `rust/crates/core/src/formation.rs` and gives the reference's spots bit for bit; `rust/crates/ffi` (`ww2-ffi`) exposes it to Unreal (`docs/contracts/rust-unreal-abi.md`, First calls).
