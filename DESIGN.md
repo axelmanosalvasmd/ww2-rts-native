@@ -1,5 +1,13 @@
 # Three Crossroads Native: design decisions
 
+## Engineering private child path after the S2 module-resolution failure (2026-10-15, source only)
+
+The actual S2 formatting check at `c49be698b4c90bae1e1ee32ffd1043346d260572` exited 1 because it could not resolve `support_selected` at `rust/crates/simtest/tests/it/../support_selected.rs`. Its full report and raw log remain in `/tmp/eng-five-main-f7c51b1a-254aa68e/REPORT.md` and `fmt.log`. The log also contains layout differences. This is a module-resolution failure during formatting; no rustc or native test ran. The earlier source-only ACCEPT did not prove compilation.
+
+Incoming `simtest/tests/it/main.rs:46-47` loads `../engineering_consumers.rs` through a path attribute. Give that file's existing private child declaration the explicit path `engineering_consumers/support_selected.rs`. The declaration is outside an inline module, so the attribute resolves relative to the containing source file's directory, as specified by the [Rust Reference](https://doc.rust-lang.org/reference/items/modules.html#the-path-attribute). Static inspection of the registration, directory and tracked child confirms the exact target. Keep both module names and the consolidated registry unchanged. Preserve every other parent-file byte and the complete child body.
+
+This repair adds only that attribute, this DESIGN section and one changelog fragment. All assertions, consumers, providers, fixtures, twenty selectors, parity tables and incoming logistics work remain intact. Source results retain producing head `0ea36432`; authentic fixtures retain child `0a006369`; the old f32 Source and d81d native failures remain preserved. All twenty native selections (eight core-lib, four core-it, eight simtest-it), formatting and strict Clippy need a new Root grant at the frozen child. No Source, Cargo, rustc, formatting, lint, native, discovery or CI job runs in this repair. ENG-37/45/47/50/51 stay in progress. MODE's separate `ea2869a` repair remains outside this branch.
+
 ## First engineering five integrated onto PR271 main (2026-10-15, native pending)
 
 Integrate the qualified engineering source `0ea364323157337003865abdedac65d5dbdb9696` and both authentic fixtures from `0a00636947695e43c5935d3d231ba069fcc274b0` onto main `f7c51b1a0ebf850c5c22b560a595e4095ce39fdc`. Main's incoming logistics additions, complete parity tables and Acceptance cells remain intact. Independently freeze the expected full typed-tree union before applying it; the engineering code and fixture leaves retain their qualified mode, type and object IDs. Preserve main's complete DESIGN body and the engineering history below. No new Source run or semantic repair occurs.
