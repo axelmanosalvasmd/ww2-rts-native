@@ -611,7 +611,9 @@ impl crate::match_runtime::Match {
             if let Some(result) = self.move_unit_with_command_routes(id, factor)? {
                 moved.push(result);
             }
-            self.apply_moved_ground_contact(id, before, before_dust)?;
+            self.apply_moved_ground_contact_emitting(id, before, before_dust, &mut |effect| {
+                events.push(TickEvent::Environment(effect));
+            })?;
             let unit = &self.world.game.units[&id];
             let moving = !unit.path.is_empty()
                 || crate::math::hypot(unit.x - before.x, unit.z - before.z) > 0.001;

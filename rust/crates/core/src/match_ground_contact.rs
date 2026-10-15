@@ -1,13 +1,24 @@
-//! Source-positioned vehicle wear through the canonical World owner.
+//! Source-positioned crushing and vehicle wear through the canonical World owner.
 use crate::{catalog::Catalog, game::Pose, grid::UnitId, match_runtime::Match, math};
 
 impl Match {
-    /// After real movement and before firing. Crush and hostile mines remain unavailable.
+    #[cfg(test)]
     pub(crate) fn apply_moved_ground_contact(
         &mut self,
         id: UnitId,
         before: Pose,
         before_dust: Option<f64>,
+    ) -> Result<(), String> {
+        self.apply_moved_ground_contact_emitting(id, before, before_dust, &mut |_| {})
+    }
+
+    /// After real movement and before firing. Hostile mines remain unavailable.
+    pub(crate) fn apply_moved_ground_contact_emitting(
+        &mut self,
+        id: UnitId,
+        before: Pose,
+        before_dust: Option<f64>,
+        out: &mut dyn FnMut(crate::environment::Effect),
     ) -> Result<(), String> {
         let unit = self
             .world
@@ -57,14 +68,30 @@ impl Match {
             .and_then(|v| v.boolean())
             .unwrap_or(false);
         let ch = g.chars[c];
-        if crushes
-            && cfg
-                .get("crush")
-                .and_then(|v| v.get(&(ch as char).to_string()))
-                .is_some()
+        if let Some(into) = crushes.then(|| cfg.get("crush")
+            .and_then(|v| v.get(&(ch as char).to_string()))).flatten()
         {
-            return Err("moved vehicle crushing is not connected".into());
+            let into = into.string().filter(|s| s.len() == 1)
+                .ok_or("invalid crushing replacement")?.as_bytes()[0];
+            let ids: Vec<_> = g.units.keys().copied().collect();
+            let mut context = crate::environment::Context {
+                tick: u64::try_from(g.tick).map_err(|_| "invalid crushing clock")?,
+                seed: &mut self.start.environment_seed,
+                next_id: &mut self.next_unit_id,
+                unit_order: &ids,
+                grid: &self.grid,
+                rain: g.rain,
+                wet: g.wet.unwrap_or(0.0),
+                wind_angle: self.start.wind.0,
+                wind_strength: self.start.wind.1,
+            };
+            self.environment.wreck_cell_emitting(&mut self.world, c, Some(into), &mut context, out)
+                .map_err(|e| format!("moved crushing: {e:?}"))?;
         }
+        // Contact can change the physical cell. Wear and dust read its new state.
+        let g = &self.world.game;
+        let unit = &g.units[&id];
+        let ch = g.chars[c];
         if ch == b'N' {
             let source_owner = self.world.mines.get(&c).copied().unwrap_or(-1);
             let owner = if source_owner >= 0 {

@@ -257,7 +257,7 @@ fn invalid(reason: &str) -> MapError {
         reason: reason.into(),
     }
 }
-fn identifier(v: &Value) -> Result<String, MapError> {
+fn identifier(v: &Value) -> Option<String> {
     v.as_str()
         .filter(|s| {
             !s.is_empty()
@@ -266,7 +266,6 @@ fn identifier(v: &Value) -> Result<String, MapError> {
                     .all(|c| c.is_ascii_alphanumeric() || b"_-".contains(&c))
         })
         .map(str::to_owned)
-        .ok_or_else(|| invalid("ids must be short ASCII identifiers"))
 }
 fn physical(layers: &Layers, c: usize) -> u8 {
     if layers.objects[c] == b'.' {
@@ -303,41 +302,44 @@ pub(crate) fn parse(
     let mut cells = BTreeSet::new();
     let mut result = Vec::with_capacity(list.len());
     for value in list {
-        let id = identifier(&value["id"])?;
+        let id = identifier(&value["id"])
+            .ok_or_else(|| invalid("structure ids must be unique short identifiers"))?;
         if !ids.insert(id.clone()) {
-            return Err(invalid("structure ids must be unique"));
+            return Err(invalid("structure ids must be unique short identifiers"));
         }
         let kind = match value["kind"].as_str() {
             Some("house") => StructureKind::House,
             Some("bridge") => StructureKind::Bridge,
-            _ => return Err(invalid("unknown structure kind")),
+            _ => return Err(invalid("a structure needs a kind and 1-128 sections")),
         };
         let input = value["sections"]
             .as_array()
             .filter(|s| !s.is_empty() && s.len() <= MAX_SECTIONS)
-            .ok_or_else(|| invalid("a structure needs 1-128 sections"))?;
+            .ok_or_else(|| invalid("a structure needs a kind and 1-128 sections"))?;
         let mut local = BTreeMap::new();
         let mut sections = Vec::with_capacity(input.len());
         for value in input {
-            let id = identifier(&value["id"])?;
+            let id = identifier(&value["id"])
+                .ok_or_else(|| invalid("section ids must be unique short identifiers"))?;
             if local.contains_key(&id) {
-                return Err(invalid("section ids must be unique in their structure"));
+                return Err(invalid("section ids must be unique short identifiers"));
             }
             let cell = value["c"]
                 .as_f64()
                 .filter(|n| n.fract() == 0.0 && *n >= 0.0 && *n < (w * h) as f64)
-                .ok_or_else(|| invalid("section cell must be inside the map"))?
+                .ok_or_else(|| invalid("section footprints must be unique cells inside the map"))?
                 as usize;
             if !cells.insert(cell) {
-                return Err(invalid("section cells must be unique"));
+                return Err(invalid("section footprints must be unique cells inside the map"));
             }
             if physical(layers, cell) != kind.cell() {
                 return Err(invalid("section footprint must match its structure"));
             }
+            let metadata_error = || invalid("sections need health, material, an anchor flag and bounded support references");
             let hp = value["hp"]
                 .as_f64()
                 .filter(|hp| hp.is_finite() && *hp > 0.0 && *hp <= 100_000.0)
-                .ok_or_else(|| invalid("section health must be positive and at most 100000"))?;
+                .ok_or_else(metadata_error)?;
             let material = value["material"]
                 .as_str()
                 .filter(|m| {
@@ -346,24 +348,30 @@ pub(crate) fn parse(
                     ]
                     .contains(m)
                 })
-                .ok_or_else(|| invalid("unknown section material"))?
+                .ok_or_else(metadata_error)?
                 .to_owned();
             let anchor = value["anchor"]
                 .as_bool()
-                .ok_or_else(|| invalid("section anchor must be a boolean"))?;
+                .ok_or_else(metadata_error)?;
             let input_supports = value["supports"]
                 .as_array()
                 .filter(|a| a.len() <= 8)
-                .ok_or_else(|| invalid("supports must be a list of at most eight references"))?;
+                .ok_or_else(metadata_error)?;
+            // Source validates primitive duplicates now and resolves references only
+            // after every section's metadata. JSON objects have distinct identities.
+            for (index, a) in input_supports.iter().enumerate() {
+                if input_supports[..index].iter().any(|b| match (a, b) {
+                    (Value::Number(a), Value::Number(b)) => a.as_f64() == b.as_f64(),
+                    (Value::Array(_) | Value::Object(_), _) => false,
+                    _ => a == b,
+                }) {
+                    return Err(metadata_error());
+                }
+            }
             let mut supports = Vec::with_capacity(input_supports.len());
             for input in input_supports {
-                let id = input
-                    .as_str()
-                    .ok_or_else(|| invalid("support must reference a section id"))?
-                    .to_owned();
-                if supports.contains(&id) {
-                    return Err(invalid("support references must be unique"));
-                }
+                // A non-string cannot resolve to any admitted nonempty section id.
+                let id = input.as_str().unwrap_or("").to_owned();
                 supports.push(id);
             }
             local.insert(id.clone(), sections.len());
@@ -379,12 +387,12 @@ pub(crate) fn parse(
         for section in &sections {
             for id in &section.supports {
                 let to = local.get(id).map(|i| &sections[*i]).ok_or_else(|| {
-                    invalid("support must reference a section in the same structure")
+                    invalid("supports must reference neighboring sections in the same structure")
                 })?;
                 let dx = (section.cell % w).abs_diff(to.cell % w);
                 let dy = (section.cell / w).abs_diff(to.cell / w);
                 if id == &section.id || dx + dy != 1 {
-                    return Err(invalid("supports must reference neighboring sections"));
+                    return Err(invalid("supports must reference neighboring sections in the same structure"));
                 }
             }
         }
