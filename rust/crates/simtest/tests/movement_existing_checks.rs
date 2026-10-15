@@ -63,7 +63,9 @@ fn typed_numbers(value: &Value, kind: &str) -> Vec<i64> {
     value["runs"]
         .as_array()
         .unwrap()
-        .chunks_exact(2)
+        .as_chunks::<2>()
+        .0
+        .iter()
         .flat_map(|pair| {
             std::iter::repeat_n(
                 pair[0].as_i64().unwrap(),
