@@ -97,9 +97,13 @@ fn snapshot(m: &Match, aliases: &BTreeMap<String, u32>, retired: &[(i64, u32)]) 
                 let structure =
                     structure.expect("actual building must retain its canonical structure");
                 let cells = u.cells.as_ref().expect("actual building footprint");
-                assert_eq!(structure.cells, *cells);
+                let indices = cells
+                    .iter()
+                    .map(|&cell| usize::try_from(cell).unwrap())
+                    .collect::<Vec<_>>();
+                assert_eq!(structure.cells, indices);
                 assert_eq!(structure.entity_id, Some(u.id));
-                for &cell in cells {
+                for cell in indices {
                     assert_eq!(m.building_cells[&cell].unit, u.id);
                 }
             }
@@ -414,7 +418,7 @@ fn original_base_building_acceptance_checks() {
                     assert!(
                         original_hq_cells
                             .iter()
-                            .all(|c| m.world.game.chars[*c] == b'R')
+                            .all(|&c| m.world.game.chars[usize::try_from(c).unwrap()] == b'R')
                     );
                 }
                 "hq-rebuilt" => {
