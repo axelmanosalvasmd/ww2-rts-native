@@ -1,5 +1,38 @@
 # Three Crossroads Native: design decisions
 
+## AUDIT_COMBAT restored batch and seeded death controls (2026-10-15)
+
+The private branch starts directly at frozen main `379ba4e06c794708623c005ab6052bebd03d8809`.
+It owns only CMB-38/39/40/41/42/62/63/64/65/66/67/68/69. The ledger and
+roster remain Root-owned. CMB_IMPL retains the next combat publication lease.
+Current issue #5 through Hermes 173 (`6199107614`) and the lifecycle result
+`6199190039` is read locally. This acknowledges receipt, not consent to the
+pending general defaults proposal. The reference stays `e4e579a`; approved
+ABI 2 and contract status are unchanged. No public acknowledgment is posted.
+
+CMB-69 already has a real seeded component runner: the retained case at index
+7 of `match-tick.json` advances 800 canonical ticks, with Combat seed 701 and
+environment seed 305419896. Its 15 authentic Source checkpoints carry a
+cumulative death trace, with unit 2 retiring at tick 483. The scene uses initial
+positions and ownership inputs, with no health prime, mid-run health write,
+random reset or expected-state import into Match.
+
+Extract the existing replay loop without changing its assertions or input
+handling. A read-only callback receives the canonical tick and accumulated
+retirement records. The new focused test uses that same complete replay once
+and compares the due prefix of the final Source death trace on every tick.
+Eight altered oracle-only traces must first fail at tick 482 or 483: early,
+late, wrong ID, owner, type, hitter, missing and duplicate death. All original
+snapshot comparisons remain active. No runtime, provider, guard, scene,
+projection, ABI, protocol or terrain policy changes. This is a component
+check under PARITY's existing rules; it does not depend on proposed whole-match
+defaults or assert completion of every death family.
+
+Source-only checkpoint: zero Cargo, Node, rustc, native, fmt, lint, discovery,
+release or CI execution. The new test is authored, not passed. The exact gate
+plan is [the restored combat batch](docs/testing/audit-combat-1821-gates.md).
+All parity cells remain unchanged until whole-check evidence is reviewed.
+
 ## Held World movement test registration (2026-10-15)
 
 Published PR #268 at `9c7b07963471e8f58bb2978e90b239a65561ea3f` registered two held World companions for default CI: `original_public_world_300_plus_40_plus_40_distance` and `physical_world_march_calm_boundary_200_and_201`. The retained Ubuntu, macOS and Windows failures all reach `mov_world_distance.rs:141` before the first tick, where full-runner admission refuses with `World automatic salvo tick actuator is not connected`. The World provider and refusal guard are identical at historical `a5a1d52b`, main `f7c51b1a` and published `9c7b0796`; the incoming LOG registration does not change this admission.
