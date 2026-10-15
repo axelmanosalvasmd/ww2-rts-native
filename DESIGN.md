@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## Vehicle parity audit uses the existing component recording (2026-10-15)
+
+The MOV-14 to MOV-22 audit keeps `movement.json`, its Source recorder and the runtime unchanged. The existing movement replay test now checks all five compiled vehicle-profile numbers against the recording's independent table as floating-point bits, and applies the pinned Source lab's forward/reverse start assertions to ten named profiles and three fallback kinds (13 profiles, 26 starts). The exact profile-name set and compiled profile count prevent an omitted kind from passing silently. Native validation is pending.
+
+The three-tick recording still compares 636 movement calls and 1,362 post-separation/progress states. Its workload disables route searches, reaction, weather/debris evolution, crushing and wear, and uses physical terrain for voluntary routing. The replay restores states at component boundaries. This cannot establish the all-type journeys, completed braking/corner timing, ordered short retreat, remembered-terrain decisions or Horde recovery required by the other eight broad rows. Their statuses stay in progress. No runtime defect is inferred, and the owner decision on whole-match parity remains pending.
+
 ## Reconnect source-only update after movement optimization #215 (2026-10-14)
 
 Normally merge main `d29112671ee2e1855f3ed3c7104e29ba85c2c4da` into published reconnect `898968dd82eb37ee07787b5e0aa472ccdd6ce984`, from common base `3c83cf799716cffc9b4aa0830f452faf07ab8c4e`. Preserve both complete document histories, the frozen reconnect test and main's complete startup file plus B's original registration. Inherit main's two movement source changes byte for byte; this test branch adds no runtime, fixture, guard, header or reference change.

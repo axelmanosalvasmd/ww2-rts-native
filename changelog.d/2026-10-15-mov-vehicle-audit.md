@@ -1,0 +1,1 @@
+- Extend the existing Source-backed movement test with exact comparisons for 13 compiled vehicle profiles and 26 forward/reverse starts. Audit MOV-14 through MOV-22 and record the eight remaining full-check gaps without changing runtime or fixtures. Native validation is pending.
