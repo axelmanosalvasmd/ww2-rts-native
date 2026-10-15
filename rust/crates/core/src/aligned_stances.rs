@@ -3,26 +3,43 @@ use super::*;
 
 fn recipient_flags(m: &Match) -> Result<Value, String> {
     let project = |cache: &crate::recipient_snapshot::SnapshotCache<'_>, slot| {
-        let view = cache.recipient(slot).map_err(|e| format!("recipient provider: {e:?}"))?;
-        let rows = view.fields["units"].as_array().ok_or("recipient units absent")?;
-        Ok::<_, String>(json!({"slot":slot,"units":rows.iter().map(|r|json!({"id":r[0],"owner":r[2],"flags":r[12]})).collect::<Vec<_>>()}))
+        let view = cache
+            .recipient(slot)
+            .map_err(|e| format!("recipient provider: {e:?}"))?;
+        let rows = view.fields["units"]
+            .as_array()
+            .ok_or("recipient units absent")?;
+        Ok::<_, String>(
+            json!({"slot":slot,"units":rows.iter().map(|r|json!({"id":r[0],"owner":r[2],"flags":r[12]})).collect::<Vec<_>>()}),
+        )
     };
     let mut direct = Vec::new();
     for slot in 0..2 {
-        let cache = crate::recipient_snapshot::SnapshotCache::new(m).map_err(|e| format!("fresh recipient cache: {e:?}"))?;
+        let cache = crate::recipient_snapshot::SnapshotCache::new(m)
+            .map_err(|e| format!("fresh recipient cache: {e:?}"))?;
         direct.push(project(&cache, slot)?);
     }
-    let cache = crate::recipient_snapshot::SnapshotCache::new(m).map_err(|e| format!("shared recipient cache: {e:?}"))?;
-    let cached = (0..2).map(|slot|project(&cache,slot)).collect::<Result<Vec<_>,_>>()?;
+    let cache = crate::recipient_snapshot::SnapshotCache::new(m)
+        .map_err(|e| format!("shared recipient cache: {e:?}"))?;
+    let cached = (0..2)
+        .map(|slot| project(&cache, slot))
+        .collect::<Result<Vec<_>, _>>()?;
     Ok(json!({"direct":direct,"cached":cached}))
 }
 fn dispatch(m: &mut Match, authored: &Value, tick: usize) -> Result<Vec<Value>, String> {
     let mut receipts = Vec::new();
-    for row in authored["orders"].as_array().unwrap().iter().filter(|r|r["tick"] == tick) {
+    for row in authored["orders"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|r| r["tick"] == tick)
+    {
         let before = recipient_flags(m)?;
         // This actual decoder can faithfully reject malformed JSON calls. No invented Command variant.
         let denial = match Command::from_json(&row["command"]) {
-            Ok(command) => m.execute_command(row["issuer"].as_u64().unwrap() as usize, &command, false)?,
+            Ok(command) => {
+                m.execute_command(row["issuer"].as_u64().unwrap() as usize, &command, false)?
+            }
             Err(reason) => Some(reason),
         };
         receipts.push(json!({"tick":tick,"issuer":row["issuer"],"sequence":row["sequence"],"label":row["label"],"command":row["command"],
@@ -31,43 +48,110 @@ fn dispatch(m: &mut Match, authored: &Value, tick: usize) -> Result<Vec<Value>, 
     Ok(receipts)
 }
 #[allow(clippy::too_many_arguments)]
-fn stance_snapshot(m: &Match, replay: &Replay, births: Vec<u32>, deaths: Vec<u32>, retired: &[crate::match_combat::RetiredUnit], actor: u32, foe: u32, commands: Vec<Value>) -> Result<Value,String> {
-    let mut frame = snapshot(m,replay,births,deaths,retired,actor,foe)?;
+fn stance_snapshot(
+    m: &Match,
+    replay: &Replay,
+    births: Vec<u32>,
+    deaths: Vec<u32>,
+    retired: &[crate::match_combat::RetiredUnit],
+    actor: u32,
+    foe: u32,
+    commands: Vec<Value>,
+) -> Result<Value, String> {
+    let mut frame = snapshot(m, replay, births, deaths, retired, actor, foe)?;
     frame["recipientFlags"] = recipient_flags(m)?;
     frame["commands"] = json!(commands);
     Ok(frame)
 }
 fn branches(frames: &[Value], scene: &Value) -> Value {
-    let unit = |tick: usize,id|frames.get(tick).and_then(|f|actor(f,id));
-    let n = |tick,id,key|unit(tick,id).map(|u|value(u,key));
-    let same = |a: Option<&Value>,b: Option<&Value>|a.zip(b).is_some_and(|(a,b)|a["x"]["bits"]==b["x"]["bits"] && a["z"]["bits"]==b["z"]["bits"]);
-    let commands = frames.iter().flat_map(|f|f["commands"].as_array().unwrap()).collect::<Vec<_>>();
-    let malformed = commands.iter().filter(|c|c["label"].as_str().unwrap().starts_with("malformed-")||c["label"]=="missing-on").collect::<Vec<_>>();
-    let foreign = commands.iter().filter(|c|c["label"].as_str().unwrap().starts_with("foreign-")).collect::<Vec<_>>();
+    let unit = |tick: usize, id| frames.get(tick).and_then(|f| actor(f, id));
+    let n = |tick, id, key| unit(tick, id).map(|u| value(u, key));
+    let same = |a: Option<&Value>, b: Option<&Value>| {
+        a.zip(b).is_some_and(|(a, b)| {
+            a["x"]["bits"] == b["x"]["bits"] && a["z"]["bits"] == b["z"]["bits"]
+        })
+    };
+    let commands = frames
+        .iter()
+        .flat_map(|f| f["commands"].as_array().unwrap())
+        .collect::<Vec<_>>();
+    let malformed = commands
+        .iter()
+        .filter(|c| {
+            c["label"].as_str().unwrap().starts_with("malformed-") || c["label"] == "missing-on"
+        })
+        .collect::<Vec<_>>();
+    let foreign = commands
+        .iter()
+        .filter(|c| c["label"].as_str().unwrap().starts_with("foreign-"))
+        .collect::<Vec<_>>();
     let authored = scene["cases"][0]["orders"].as_array().unwrap();
-    let dispositions = commands.len()==authored.len()&&commands.iter().zip(authored).all(|(a,b)|a["denial"]==b["expectedDenial"]);
-    let in_range = frames.iter().skip(500).take(101).any(|f|f["canShootFoe"]==true);
-    let held_fire = in_range&&n(500,4,"hp")==Some(100.0)&&n(600,4,"hp")==Some(100.0);
-    let incoming = n(600,1,"hp").zip(n(520,1,"hp")).is_some_and(|(a,b)|a<b);
-    let held_position = incoming&&frames.len()>600&&(520..=600).all(|tick|same(unit(tick,1),unit(520,1)));
-    let explicit = n(700,4,"hp").zip(n(619,4,"hp")).is_some_and(|(a,b)|a<b);
-    let resumed = n(779,4,"hp").zip(n(701,4,"hp")).is_some_and(|(a,b)|a<b);
-    let released = (821..frames.len()).find(|&tick|unit(tick,1).is_some()&&!same(unit(tick,1),unit(820,1)));
-    let toggles = [(16,"holdPos",false),(17,"holdPos",true),(20,"autoRetreat",true),(21,"autoRetreat",false),(702,"holdFire",false),(780,"holdFire",true)].iter().all(|&(tick,key,on)|unit(tick,1).is_some_and(|u|u[key]==on));
-    let mut owner_bits=0;
-    let mut visible_foreign=0;
-    let mut leaked=false;
-    for f in frames { for mode in ["direct","cached"] { for view in f["recipientFlags"][mode].as_array().unwrap() { for row in view["units"].as_array().unwrap() {
-        let flags=row["flags"].as_u64().unwrap();
-        if row["owner"]==view["slot"] {owner_bits|=flags&30720;} else {
-            leaked |= flags&30720 != 0;
-            let owner=row["owner"].as_u64().unwrap() as usize;
-            if f["recipientFlags"][mode][owner]["units"].as_array().unwrap().iter().any(|u|u["id"]==row["id"]&&u["flags"].as_u64().unwrap()&30720 != 0) {visible_foreign+=1;}
+    let dispositions = commands.len() == authored.len()
+        && commands
+            .iter()
+            .zip(authored)
+            .all(|(a, b)| a["denial"] == b["expectedDenial"]);
+    let in_range = frames
+        .iter()
+        .skip(500)
+        .take(101)
+        .any(|f| f["canShootFoe"] == true);
+    let held_fire = in_range && n(500, 4, "hp") == Some(100.0) && n(600, 4, "hp") == Some(100.0);
+    let incoming = n(600, 1, "hp")
+        .zip(n(520, 1, "hp"))
+        .is_some_and(|(a, b)| a < b);
+    let held_position =
+        incoming && frames.len() > 600 && (520..=600).all(|tick| same(unit(tick, 1), unit(520, 1)));
+    let explicit = n(700, 4, "hp")
+        .zip(n(619, 4, "hp"))
+        .is_some_and(|(a, b)| a < b);
+    let resumed = n(779, 4, "hp")
+        .zip(n(701, 4, "hp"))
+        .is_some_and(|(a, b)| a < b);
+    let released = (821..frames.len())
+        .find(|&tick| unit(tick, 1).is_some() && !same(unit(tick, 1), unit(820, 1)));
+    let toggles = [
+        (16, "holdPos", false),
+        (17, "holdPos", true),
+        (20, "autoRetreat", true),
+        (21, "autoRetreat", false),
+        (702, "holdFire", false),
+        (780, "holdFire", true),
+    ]
+    .iter()
+    .all(|&(tick, key, on)| unit(tick, 1).is_some_and(|u| u[key] == on));
+    let mut owner_bits = 0;
+    let mut visible_foreign = 0;
+    let mut leaked = false;
+    for f in frames {
+        for mode in ["direct", "cached"] {
+            for view in f["recipientFlags"][mode].as_array().unwrap() {
+                for row in view["units"].as_array().unwrap() {
+                    let flags = row["flags"].as_u64().unwrap();
+                    if row["owner"] == view["slot"] {
+                        owner_bits |= flags & 30720;
+                    } else {
+                        leaked |= flags & 30720 != 0;
+                        let owner = row["owner"].as_u64().unwrap() as usize;
+                        if f["recipientFlags"][mode][owner]["units"]
+                            .as_array()
+                            .unwrap()
+                            .iter()
+                            .any(|u| {
+                                u["id"] == row["id"] && u["flags"].as_u64().unwrap() & 30720 != 0
+                            })
+                        {
+                            visible_foreign += 1;
+                        }
+                    }
+                }
+            }
         }
-    }}}}
-    let privacy = owner_bits==30720&&visible_foreign>0&&!leaked;
-    let malformed_blocked = malformed.len()==5&&malformed.iter().all(|c|c["denial"]=="blocked");
-    let foreign_needs = foreign.len()==2&&foreign.iter().all(|c|c["denial"]=="needs");
+    }
+    let privacy = owner_bits == 30720 && visible_foreign > 0 && !leaked;
+    let malformed_blocked =
+        malformed.len() == 5 && malformed.iter().all(|c| c["denial"] == "blocked");
+    let foreign_needs = foreign.len() == 2 && foreign.iter().all(|c| c["denial"] == "needs");
     json!({"allDispositions":dispositions,"malformedBlocked":malformed_blocked,"foreignNeeds":foreign_needs,"inRange":in_range,"holdFirePreventsDamage":held_fire,
         "naturalIncoming":incoming,"holdPositionUnderFire":held_position,"explicitAttackOverridesHoldFire":explicit,"holdFireOffResumesDamage":resumed,"releasedMoveTick":released,
         "actualBooleanToggles":toggles,"ownerBits":owner_bits,"visibleForeignPrivateChecks":visible_foreign,"ownerOnlyRecipientBits":privacy,
@@ -147,7 +231,11 @@ fn run_case(
     let mut unavailable = BTreeSet::new();
     let source_frames = source["frames"].as_array().unwrap();
     for tick in 0..=ticks {
-        let commands = if tick == 0 { Vec::new() } else { dispatch(&mut m, authored, tick)? };
+        let commands = if tick == 0 {
+            Vec::new()
+        } else {
+            dispatch(&mut m, authored, tick)?
+        };
         let (births, deaths, retired) = if tick == 0 {
             (initial_ids.clone(), Vec::new(), Vec::new())
         } else {
@@ -174,7 +262,8 @@ fn run_case(
                 report.retired,
             )
         };
-        let frame = match stance_snapshot(&m, &replay, births, deaths, &retired, id, foe, commands) {
+        let frame = match stance_snapshot(&m, &replay, births, deaths, &retired, id, foe, commands)
+        {
             Ok(f) => f,
             Err(e) => {
                 failure = Some(json!({"kind":"provider","tick":tick,"reason":e}));

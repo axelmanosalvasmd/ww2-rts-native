@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Apply mechanical formatting to the stance consumer after preserving the first format-check diff. Authentic corrected Source generation/check pass at 6d646c6e, with all required branches and 35 actual command dispositions; freeze its read-only capture before native. No predicate, registry, scene or input change in this formatting child.
+
 - Retain the read-only gate probe: every old frame/input matches, while the old branch failure still exits 2. Original actor LOS is blocked despite ammo, visibility and 22 m reach within 28 m range; the foe cannot see actor 1 and targets barracks 8. Author one added ordinary actor Move to the observed open lane (23,27) for the single bounded corrected trial. Keep all 34 prior commands, terrain, actors and positive branch assertions. Results pending.
 
 - Add one read-only stance shootability probe using actual pinned Source gate functions and structural cells. Keep the failed scene, tape, branch assertions and raw frames exact; the expected old branch failure remains a failure. No native execution or row change.
