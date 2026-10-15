@@ -1,0 +1,1 @@
+- Preserve the three historical delivery-base annotations originally introduced in owned merge c350b9b5 as an explicit documentation step, without replaying incoming G1 or engineering commits. Preserve the complete prior changelog and decisions.

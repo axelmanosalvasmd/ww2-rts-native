@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Normally merge the three complete logistics-row proposal onto main `7c9df2d5`, preserving both histories and all incoming MODE-21 G1 files. Correct only delivery-base metadata; all Rust and proof inputs remain exact main, all 55 logistics Acceptance cells stay unchanged, and no Source or native check is rerun.
+
 - Mark MAP-04/05/07/117 ported after six exact native checks pass at `7cbfcddd`: three strict original validation-message readers, the full map corpus, complete XL/Hill Assault check and affected BASE replay. Formatting recheck and strict core/simtest all-target Clippy also pass. Retain MAP-97's separate historical debug/release proof, all 140 Acceptance cells and the tested Rust tree; MAP-06/19/100 remain held.
 
 - Apply the single mechanical BASE assertion wrap reported by the first authorized MAP formatting check at `f1928e13`. Preserve every assertion/literal and the failed log; native checks have not started.
