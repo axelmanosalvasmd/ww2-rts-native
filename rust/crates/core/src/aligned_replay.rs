@@ -16,6 +16,9 @@ mod canonical;
 #[path = "aligned_replay_startup.rs"]
 mod startup_state;
 
+#[path = "aligned_walk_route.rs"]
+pub(crate) mod walk_route;
+
 #[derive(Clone, Debug)]
 pub struct Replay(Arc<Mutex<Tape>>);
 impl PartialEq for Replay {
@@ -32,6 +35,8 @@ struct Tape {
     layout: Option<Value>,
     startup: Option<Value>,
     shot: Option<(i64, u32, u32, u32)>,
+    scenario_branches: Vec<Value>,
+    scenario_motion: Vec<Value>,
 }
 impl Replay {
     fn new(input: &Value) -> Result<Self, String> {
@@ -62,6 +67,8 @@ impl Replay {
             layout: None,
             startup: None,
             shot: None,
+            scenario_branches: Vec::new(),
+            scenario_motion: Vec::new(),
         }))))
     }
     pub(crate) fn draw(&self, consumer: Value) -> f64 {

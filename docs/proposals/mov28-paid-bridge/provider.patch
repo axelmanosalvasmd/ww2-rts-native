@@ -1,0 +1,262 @@
+diff --git a/rust/crates/core/src/field_works.rs b/rust/crates/core/src/field_works.rs
+--- a/rust/crates/core/src/field_works.rs
++++ b/rust/crates/core/src/field_works.rs
+@@ -40,0 +41 @@
++    Bridge,
+@@ -52,0 +54 @@
++            Self::Bridge => "bridge",
+@@ -65 +67,2 @@
+-            "bridge" | "fill" | "wall" | "gate" => Err(Error::UnsupportedKind),
++            "bridge" => Ok(Self::Bridge),
++            "fill" | "wall" | "gate" => Err(Error::UnsupportedKind),
+@@ -215,0 +219 @@
++            FortKind::Bridge,
+@@ -344,0 +349,2 @@
++        } else if kind == FortKind::Bridge {
++            w.game.chars[cell] == b'W'
+@@ -353,0 +360,3 @@
++    }
++    if kind == FortKind::Bridge {
++        cells = w.supported_bridge_plan(cells)?;
+@@ -420 +429,2 @@
+-                math::atan2(at.z - unit.z, at.x - unit.x) + std::f64::consts::FRAC_PI_2
++                math::atan2(at.z - unit.z, at.x - unit.x)
++                    + if request.kind == FortKind::Bridge { 0.0 } else { std::f64::consts::FRAC_PI_2 }
+@@ -479,0 +490,13 @@
++        // The standalone helper has no canonical Match ID allocator. It must
++        // not complete paid bridge sections with an invented local counter.
++        if self.jobs.get(&unit_id).is_some_and(|job| job.kind == FortKind::Bridge) {
++            return Err(Error::UnsupportedKind);
++        }
++        self.step_unit_inner(w, unit_id, dt, None)
++    }
++    pub(crate) fn step_unit_with_ids(&mut self, w: &mut World, unit_id: u32, dt: f64,
++        next_id: &mut u32) -> Result<StepResult, Error> {
++        self.step_unit_inner(w, unit_id, dt, Some(next_id))
++    }
++    fn step_unit_inner(&mut self, w: &mut World, unit_id: u32, dt: f64,
++        mut next_id: Option<&mut u32>) -> Result<StepResult, Error> {
+@@ -485,0 +509,3 @@
++        if job.kind == FortKind::Bridge && job.project.is_some() {
++            return Err(Error::InvalidInput);
++        }
+@@ -556 +582,9 @@
+-        if job.kind == FortKind::Demine {
++        if job.kind == FortKind::Bridge {
++            // A due paid cell is consumed even when its ground/support changed.
++            // Preparation precedes every publication. Ordinary cancellation and
++            // completion continue through the existing singular job owner.
++            if w.game.chars[cell.cell] == b'W' && w.bridge_supported_at(cell.cell)? {
++                let ids = next_id.as_deref_mut().ok_or(Error::UnsupportedKind)?;
++                w.prepare_paid_bridge_cell(cell.cell,ids)?.commit();
++            }
++        } else if job.kind == FortKind::Demine {
+diff --git a/rust/crates/core/src/match_engineering.rs b/rust/crates/core/src/match_engineering.rs
+--- a/rust/crates/core/src/match_engineering.rs
++++ b/rust/crates/core/src/match_engineering.rs
+@@ -340 +340 @@
+-            .step_unit(&mut self.world, id, dt)
++            .step_unit_with_ids(&mut self.world, id, dt, &mut self.next_unit_id)
+diff --git a/rust/crates/core/src/world.rs b/rust/crates/core/src/world.rs
+--- a/rust/crates/core/src/world.rs
++++ b/rust/crates/core/src/world.rs
+@@ -13,0 +14,2 @@
++#[path = "bridge_field_work.rs"]
++mod bridge_field_work;
+diff --git a/rust/crates/core/src/bridge_field_work.rs b/rust/crates/core/src/bridge_field_work.rs
+new file mode 100644
+--- /dev/null
++++ b/rust/crates/core/src/bridge_field_work.rs
+@@ -0,0 +1,192 @@
++//! UNAPPLIED: World-owned paid bridge preparation and publication.
++//! Intended as a child of world.rs. No crate loads this proposal.
++use super::{Appearance, DetachedSection, FailureMetadata, SectionMetadata, World, WorldError, WorldStructure};
++use crate::{
++    catalog::Catalog,
++    field_works::WorkCell,
++    game::Section,
++    structures::{SectionState, StructuralSection, Structure, StructureKind, supported_sections},
++};
++use std::collections::BTreeSet;
++
++fn neighbors(c: usize, width: usize, count: usize) -> impl Iterator<Item = usize> {
++    [c.checked_sub(width), (c + width < count).then_some(c + width),
++        c.checked_sub(1).filter(|_| !c.is_multiple_of(width)),
++        (c % width + 1 < width).then_some(c + 1)].into_iter().flatten()
++}
++
++impl World {
++    /// Existing structural support traversal over the actual canonical graph.
++    /// No cached or expected Source graph is accepted as input.
++    pub(crate) fn bridge_supported_at(&self, cell: usize) -> Result<bool, WorldError> {
++        self.valid_cell(cell)?;
++        for near in neighbors(cell, self.game.w, self.game.chars.len()) {
++            if self.game.chars[near] != b'=' {
++                let ground = self.game.ground.as_ref().map_or(self.game.chars[near], |g| g[near]);
++                if !b"WF".contains(&ground) { return Ok(true); }
++                continue;
++            }
++            let Some(meta) = self.sections.get(&near) else { return Ok(true); };
++            let Some(owner) = self.structures.iter().find(|s| s.id == meta.structure_id) else {
++                // This is the Source helper's missing-structure behavior. A
++                // genuine prepared finish separately validates canonical owners.
++                return Ok(true);
++            };
++            let sections = owner.cells.iter().zip(&owner.section_ids).map(|(c,id)| {
++                let (meta,state) = self.section_by_id(id).ok_or(WorldError::InvalidTerrain)?;
++                Ok(StructuralSection {
++                    id:meta.id.clone(),structure_id:meta.structure_id.clone(),cell:*c,
++                    hp:state.hp,max_hp:state.max_hp.ok_or(WorldError::InvalidTerrain)?,
++                    material:meta.material.clone(),anchor:meta.anchor,supports:meta.supports.clone(),
++                    state:if state.failed { SectionState::Failed } else { SectionState::Intact },
++                    rubble:meta.rubble.clone(),
++                })
++            }).collect::<Result<Vec<_>, WorldError>>()?;
++            let graph = Structure {
++                id:owner.id.clone(),
++                // Traversal depends on anchors, HP, failed state and supports,
++                // not on the kind. Building graphs use the same traversal.
++                kind:if owner.kind == "bridge" { StructureKind::Bridge } else { StructureKind::House },
++                sections,
++            };
++            if supported_sections(&graph).contains(&meta.id.as_str()) { return Ok(true); }
++        }
++        Ok(false)
++    }
++
++    /// Source Map/Set insertion order: scan pending cells repeatedly, accepting
++    /// a supported bank/deck or a cell accepted earlier in this same plan.
++    pub(crate) fn supported_bridge_plan(&self, cells: Vec<WorkCell>) -> Result<Vec<WorkCell>, WorldError> {
++        let mut pending = cells;
++        let mut accepted = BTreeSet::new();
++        let mut result = Vec::new();
++        for _ in 0..pending.len() {
++            let mut rest = Vec::new();
++            for cell in pending {
++                if self.bridge_supported_at(cell.cell)? ||
++                    neighbors(cell.cell,self.game.w,self.game.chars.len()).any(|n|accepted.contains(&n)) {
++                    accepted.insert(cell.cell);
++                    result.push(cell);
++                } else { rest.push(cell); }
++            }
++            if rest.is_empty() { break; }
++            pending = rest;
++        }
++        Ok(result)
++    }
++
++    /// Prepare the whole due-cell operation before terrain, section, ID or row
++    /// publication. The exclusive borrows prevent intervening owner mutations.
++    pub(crate) fn prepare_paid_bridge_cell<'a>(&'a mut self, cell: usize,
++        next_id: &'a mut u32) -> Result<PreparedBridgeCell<'a>, WorldError> {
++        self.preflight_cell_rows(&[cell])?;
++        self.mutation_capacity(2)?;
++        self.journal_end()?.checked_add(2).ok_or(WorldError::VersionExhausted)?;
++        if self.game.chars[cell] != b'W' || !self.bridge_supported_at(cell)? {
++            return Err(WorldError::InvalidChange);
++        }
++        if self.sections.contains_key(&cell) != self.game.sections.contains_key(&(cell as u32)) {
++            return Err(WorldError::InvalidTerrain);
++        }
++        let old = self.sections.get(&cell).cloned();
++        let existing = old.as_ref().and_then(|meta|
++            self.structures.iter().position(|s|s.id == meta.structure_id && s.kind == "bridge"));
++        let needs_section = existing.is_none();
++        // Source allocates `bridge:${nextId++}` before trying to join a neighbor,
++        // even when that generated identifier is never used for a new structure.
++        let after_id = if needs_section {
++            next_id.checked_add(1).ok_or(WorldError::VersionExhausted)?
++        } else { *next_id };
++        let generated = format!("bridge:{}",*next_id);
++        let structure = existing.or_else(||neighbors(cell,self.game.w,self.game.chars.len()).find_map(|c|
++            self.sections.get(&c).and_then(|m|
++                self.structures.iter().position(|s|s.id == m.structure_id && s.kind == "bridge" && s.cells.len()<128))));
++        let structure_id = structure.map_or_else(||generated.clone(),|i|self.structures[i].id.clone());
++        if structure.is_none() && self.structures.iter().any(|s|s.id == structure_id) {
++            return Err(WorldError::InvalidTerrain);
++        }
++        if let Some(i) = structure {
++            let s = &self.structures[i];
++            if s.cells.len()!=s.section_ids.len() || s.cells.iter().zip(&s.section_ids).any(|(c,id)|
++                self.sections.get(c).is_none_or(|m|m.id!=*id || m.structure_id!=s.id) ||
++                !self.game.sections.contains_key(&(*c as u32))) {
++                return Err(WorldError::InvalidTerrain);
++            }
++            if existing.is_some() && !s.cells.contains(&cell) { return Err(WorldError::InvalidTerrain); }
++        }
++        let hp = Catalog::compiled().map_err(|_|WorldError::InvalidTerrain)?
++            .table("CFG").map_err(|_|WorldError::InvalidTerrain)?
++            .get("terrainHp").and_then(|v|v.get("=")).and_then(|v|v.number())
++            .filter(|v|v.is_finite() && *v>0.0).ok_or(WorldError::InvalidTerrain)?;
++        let detached = if needs_section {
++            old.as_ref().map(|metadata| -> Result<DetachedSection,WorldError> { Ok(DetachedSection { cell,metadata:metadata.clone(),
++                state:self.game.sections.get(&(cell as u32)).ok_or(WorldError::InvalidTerrain)?.clone() }) })
++                .transpose()?
++        } else { None };
++        let mut metadata = if needs_section {
++            SectionMetadata { id:format!("{structure_id}:{cell}"),structure_id:structure_id.clone(),
++                material:"wood".into(),anchor:false,supports:Vec::new(),rubble:Vec::new(),
++                appearance:Appearance::Intact,failure:FailureMetadata::default() }
++        } else { old.ok_or(WorldError::InvalidTerrain)? };
++        metadata.material = "wood".into();
++        metadata.appearance = Appearance::Intact;
++        metadata.anchor = neighbors(cell,self.game.w,self.game.chars.len())
++            .any(|c|!b"WF".contains(&self.game.ground.as_ref().unwrap()[c]));
++        metadata.supports = neighbors(cell,self.game.w,self.game.chars.len())
++            .filter_map(|c|self.sections.get(&c)).filter(|m|m.structure_id==structure_id)
++            .map(|m|m.id.clone()).collect();
++        // Existing failed-section rubble/failure metadata is retained, as in
++        // Source's Object.assign reset of HP/material/state/anchor/supports only.
++        Ok(PreparedBridgeCell { world:self,next_id,after_id,cell,hp,structure,
++            structure_id,metadata,needs_section,detached })
++    }
++}
++
++pub(crate) struct PreparedBridgeCell<'a> {
++    world: &'a mut World,
++    next_id: &'a mut u32,
++    after_id: u32,
++    cell: usize,
++    hp: f64,
++    structure: Option<usize>,
++    structure_id: String,
++    metadata: SectionMetadata,
++    needs_section: bool,
++    detached: Option<DetachedSection>,
++}
++impl PreparedBridgeCell<'_> {
++    pub(crate) fn commit(self) {
++        let Self { world:w,next_id,after_id,cell,hp,structure,structure_id,
++            metadata,needs_section,detached } = self;
++        // Canonical mutation preserves flags allocation, layered ground/wear,
++        // toughness reset, version increments and its first Source cell row.
++        w.set_cell(cell,b'=').expect("prepared bridge terrain publication");
++        *next_id = after_id;
++        let index = structure.unwrap_or_else(|| {
++            w.structures.push(WorldStructure { id:structure_id,kind:"bridge",cells:Vec::new(),
++                section_ids:Vec::new(),entity_id:None });
++            w.structures.len()-1
++        });
++        if needs_section {
++            w.structures[index].cells.push(cell);
++            w.structures[index].section_ids.push(metadata.id.clone());
++        }
++        if let Some(old) = detached {
++            w.detached_sections.insert(old.metadata.id.clone(),old);
++        }
++        let supports = metadata.supports.clone();
++        let section_id = metadata.id.clone();
++        w.sections.insert(cell,metadata);
++        w.game.sections.insert(cell as u32,Section { hp,max_hp:Some(hp),failed:false });
++        for &near in &w.structures[index].cells {
++            let neighbor = w.sections.get_mut(&near).expect("prepared bridge owner");
++            if supports.contains(&neighbor.id) && !neighbor.supports.contains(&section_id) {
++                neighbor.supports.push(section_id.clone());
++            }
++        }
++        w.game.cell_hp[cell] = hp as f32;
++        // Preserve Source's second row and terrainVersion advance after section
++        // registration. No additional geometry-version or shoal update occurs.
++        w.log_cell(cell,false).expect("prepared registered bridge row");
++    }
++}

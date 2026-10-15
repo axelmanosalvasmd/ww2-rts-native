@@ -2065,11 +2065,19 @@ impl crate::match_runtime::Match {
             return Ok(());
         };
         if crate::math::hypot(u.x - goal.x, u.z - goal.z) < 2.5 {
+            #[cfg(test)]
+            if let Some(replay) = &self.start.random.replay {
+                replay.observe_attack_move(self, id, "arrival");
+            }
             self.world.game.units.get_mut(&id).expect("unit").amove = None;
             return Ok(());
         }
         let target = self.firing.units.get(&id).map_or(0, |f| f.target_id);
         if target != 0 && self.can_shoot_target(id, target)? {
+            #[cfg(test)]
+            if let Some(replay) = &self.start.random.replay {
+                replay.observe_attack_move(self, id, "halt");
+            }
             if u.path_gen == u64::MAX {
                 return Err("unit path identity exhausted".into());
             }
@@ -2077,6 +2085,10 @@ impl crate::match_runtime::Match {
             u.path.clear();
             u.path_gen += 1;
         } else if u.path.is_empty() && u.repath <= 0.0 {
+            #[cfg(test)]
+            if let Some(replay) = &self.start.random.replay {
+                replay.observe_attack_move(self, id, "resumeRequest");
+            }
             self.request_command_path(id, goal, crate::path_requests::RequestKind::Amove)?;
         }
         Ok(())

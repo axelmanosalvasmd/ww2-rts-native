@@ -1,6 +1,7 @@
 //! Complete selected lab journeys through admitted ticks and recorded ground orders.
 //! Source recording and execution require Root's central slot. No runtime adapters.
 use std::collections::{BTreeMap, BTreeSet};
+use std::io::{BufWriter, Write};
 
 use serde_json::{Value, json};
 use ww2_core::{
@@ -19,6 +20,7 @@ use ww2_core::{
     unit_publication::{PublicationParts, StagedUnit, prepare_publication},
     vehicle::{angle_delta, vehicle_position_clear},
     weather::WeatherChoice,
+    world::CellChange,
 };
 
 const TYPES: [&str; 11] = [
@@ -56,18 +58,64 @@ fn point(p: Option<Point>) -> Value {
 fn distance(a: Point, b: Point) -> f64 {
     math::hypot(a.x - b.x, a.z - b.z)
 }
-fn snapshot(m: &Match) -> Value {
+fn snapshot(m: &Match, extended: bool) -> Value {
     json!({"tick":m.world.game.tick,"units":m.world.game.units.values().map(|u| {
         let c = &m.commands.units[&u.id];
-        json!({"id":u.id,"x":bits(u.x),"z":bits(u.z),"rot":bits(u.rot),
+        let mut row = json!({"id":u.id,"x":bits(u.x),"z":bits(u.z),"rot":bits(u.rot),
             "speed":bits(u.move_speed),"path":u.path.iter().map(|p|point(Some(*p))).collect::<Vec<_>>(),
             "goal":point(u.world_goal),"orders":c.orders.len(),"reverse":point(u.reverse),
-            "clearance":u.clearance.is_some(),"outcome":c.outcome.map(|o|o.name())})
+            "clearance":u.clearance.is_some(),"outcome":c.outcome.map(|o|o.name())});
+        if extended {
+            row["kind"] = json!(m.rules.kinds[u.kind].name);
+            row["hp"] = bits(u.hp);
+            row["routeEnd"] = point(c.route_end);
+        }
+        row
     }).collect::<Vec<_>>()})
 }
 
+// Factory inputs from pinned movement-lab-scenarios.js, not recorded terrain.
+fn original_lab_map(scenario: &str) -> Value {
+    let mut rows = vec![vec![b'.'; 64]; 64];
+    match scenario {
+        "wall-arrival" => rows[30][30] = b'B',
+        "obstacle" | "wreck" => {},
+        "closure" => {
+            for (y, row) in rows.iter_mut().enumerate() {
+                for cell in &mut row[29..=35] {
+                    *cell = if (27..=29).contains(&y) { b'=' }
+                        else if (42..=46).contains(&y) { b'F' } else { b'W' };
+                }
+            }
+        },
+        _ => panic!("not an owned original map: {scenario}"),
+    }
+    json!({"name":"Movement lab","w":64,"h":64,
+        "rows":rows.into_iter().map(|row|String::from_utf8(row).unwrap()).collect::<Vec<_>>(),
+        "spawns":[{"x":8,"y":8},{"x":55,"y":55}],
+        "points":[{"id":"lab-binding","x":4,"y":59}]})
+}
+
+fn original_lab_commands(scenario: &str, subject: u32) -> Vec<Value> {
+    let target = match scenario {
+        "wall-arrival" => json!([61.3,57.9]),
+        "obstacle" | "wreck" => json!([100,50.27]),
+        "closure" => json!([92,57]),
+        _ => panic!("not an owned original command: {scenario}"),
+    };
+    vec![json!({"tick":2,"owner":0,"sequence":1,
+        "command":{"t":"move","orders":[[subject,target[0],target[1]]]},
+        "result":{"absent":true}})]
+}
+
 fn make(case: &Value) -> Match {
-    let map = AuthoritativeMap::from_json(&serde_json::to_vec(&case["map"]).unwrap())
+    let authored = case["authoredOriginalLab"] == true;
+    let map_input = if authored {
+        let input = original_lab_map(case["scenario"].as_str().unwrap());
+        assert_eq!(case["map"], input, "complete original terrain, spawns and disclosed objective binding");
+        input
+    } else { case["map"].clone() };
+    let map = AuthoritativeMap::from_json(&serde_json::to_vec(&map_input).unwrap())
         .expect("authored map must pass real map admission");
     let mut m = Match::new(
         &map,
@@ -99,6 +147,13 @@ fn make(case: &Value) -> Match {
         },
     )
     .expect("canonical Conquest startup");
+    if authored {
+        let mut writer = Some(BufWriter::new(std::fs::OpenOptions::new().append(true)
+            .open(std::env::var_os("WW2_MOV24_27_REPORT").expect("private report required")).unwrap()));
+        record_frame(&mut writer, &format!("{}/{}/constructor", case["type"], case["scenario"]),
+            &json!({"units":format!("{:?}",m.world.game.units),"controls":format!("{:?}",m.commands.units),
+                "nextId":m.next_unit_id,"environmentSeed":m.start.environment_seed,"wind":m.start.wind}));
+    }
     // Keep actual constructor bases and all linked owners. The Source adapter
     // removes only initial mobile forces, then publishes canonical lab births.
     let kinds = &m.rules.kinds;
@@ -122,21 +177,34 @@ fn make(case: &Value) -> Match {
     }
     m.start.points.clear();
     m.capture_ticks.clear();
-    m.start.environment_seed = case["environment"]["seed"].as_u64().unwrap() as u32;
-    m.start.wind = (
-        number(&case["environment"]["wind"][0]),
-        number(&case["environment"]["wind"][1]),
-    );
-    m.world.game.wet = case["environment"]["wet"].as_f64();
+    if authored {
+        // Inputs declared by createMovementCase, never a Source after-image.
+        assert_eq!(case["environment"]["seed"], 7301);
+        assert_eq!(case["environment"]["wet"], Value::Null);
+        m.start.environment_seed = 7301;
+        m.world.game.wet = None;
+    } else {
+        m.start.environment_seed = case["environment"]["seed"].as_u64().unwrap() as u32;
+        m.start.wind = (
+            number(&case["environment"]["wind"][0]),
+            number(&case["environment"]["wind"][1]),
+        );
+        m.world.game.wet = case["environment"]["wet"].as_f64();
+    }
     m.initialize_tick_scene(
         0,
         TickPathConfig {
-            budget: case["environment"]["pathBudget"].as_u64().unwrap() as usize,
-            retry_limit: case["environment"]["pathRetryLimit"].as_u64().unwrap() as u32,
+            budget: if authored { 4096 } else { case["environment"]["pathBudget"].as_u64().unwrap() as usize },
+            retry_limit: if authored { 3 } else { case["environment"]["pathRetryLimit"].as_u64().unwrap() as u32 },
         },
     )
     .expect("declared Source path budget and retry inputs");
     let initial = case["initial"].as_array().unwrap();
+    if authored {
+        assert_eq!(initial.len(), retained.len() + 1, "one original subject and every constructor base");
+        assert_eq!(case["environment"]["pathBudget"], 4096);
+        assert_eq!(case["environment"]["pathRetryLimit"], 3);
+    }
     assert_eq!(
         m.next_unit_id,
         case["subject"].as_u64().unwrap() as u32,
@@ -169,6 +237,13 @@ fn make(case: &Value) -> Match {
             continue;
         }
         assert_eq!(id, m.next_unit_id + staged.len() as u32);
+        let (at, rot) = if authored {
+            assert_eq!(owner, 0);
+            assert_eq!(row["kind"], case["type"]);
+            original_lab_birth(case["scenario"].as_str().unwrap())
+        } else {
+            (Point { x: number(&row["x"]), z: number(&row["z"]) }, number(&row["rot"]))
+        };
         let mut draft = StagedUnit::ordinary(
             &m.world.game,
             &m.rules,
@@ -177,18 +252,30 @@ fn make(case: &Value) -> Match {
             id,
             (retained.len() + staged.len()) as u32,
             m.start.players[owner].spawn,
-            Some(Point {
-                x: number(&row["x"]),
-                z: number(&row["z"]),
-            }),
+            Some(at),
         )
         .expect("canonical scatter and actor/control initialization");
-        draft.unit.rot = number(&row["rot"]);
-        draft.unit.hold_pos = row["holdPos"].as_bool().unwrap();
-        draft.control.aim = number(&row["aim"]);
-        draft.control.hold_fire = row["holdFire"].as_bool().unwrap();
-        draft.control.auto_cast = row["auto"].as_bool().unwrap();
-        draft.control.auto_retreat = row["autoRetreat"].as_bool().unwrap();
+        draft.unit.rot = rot;
+        if authored {
+            draft.unit.hold_pos = true;
+            draft.control.hold_fire = true;
+            draft.control.auto_cast = false;
+            draft.control.auto_retreat = false;
+            for (actual, expected) in [(draft.unit.x, &row["x"]), (draft.unit.z, &row["z"]),
+                (draft.unit.rot, &row["rot"]), (draft.unit.hp, &row["hp"]), (draft.control.aim, &row["aim"])] {
+                assert_eq!(bits(actual), bits(number(expected)), "authored birth versus actual Source constructor-derived actor");
+            }
+            assert_eq!(row["holdPos"], true);
+            assert_eq!(row["holdFire"], true);
+            assert_eq!(row["auto"], false);
+            assert_eq!(row["autoRetreat"], false);
+        } else {
+            draft.unit.hold_pos = row["holdPos"].as_bool().unwrap();
+            draft.control.aim = number(&row["aim"]);
+            draft.control.hold_fire = row["holdFire"].as_bool().unwrap();
+            draft.control.auto_cast = row["auto"].as_bool().unwrap();
+            draft.control.auto_retreat = row["autoRetreat"].as_bool().unwrap();
+        }
         staged.push(draft);
     }
     prepare_publication(
@@ -213,6 +300,35 @@ fn make(case: &Value) -> Match {
     m.validate_tick_state()
         .expect("complete real tick admission before first step");
     m
+}
+
+// Original authored lab inputs, independently selected from the pinned factory.
+fn original_lab_birth(scenario: &str) -> (Point, f64) {
+    match scenario {
+        "wall-arrival" => (Point { x: 54.0, z: 50.0 }, 0.0),
+        "obstacle" | "wreck" => (Point { x: 50.13, z: 50.27 }, 0.15),
+        "closure" => (Point { x: 40.0, z: 57.0 }, 0.0),
+        _ => panic!("not an authorized original lab input: {scenario}"),
+    }
+}
+
+fn original_lab_mutations(scenario: &str) -> Vec<Value> {
+    match scenario {
+        "wall-arrival" => vec![],
+        "obstacle" | "wreck" => (22..=28).map(|y| json!({"tick":42,"cell":y*64+36,
+            "change":{"object":if scenario == "wreck" { "Q" } else { "Y" }}})).collect(),
+        "closure" => (27..=29).flat_map(|y| (29..=35).map(move |x|
+            json!({"tick":22,"cell":y*64+x,"change":{"ground":"W","object":"."}}))).collect(),
+        _ => panic!("unexpected original mutation input: {scenario}"),
+    }
+}
+
+fn record_frame(writer: &mut Option<BufWriter<std::fs::File>>, label: &str, frame: &Value) {
+    if let Some(writer) = writer {
+        serde_json::to_writer(&mut *writer, &json!({"case":label,"actual":frame})).unwrap();
+        writer.write_all(b"\n").unwrap();
+        writer.flush().unwrap();
+    }
 }
 
 #[derive(Default)]
@@ -315,6 +431,16 @@ fn replay(case: &Value) {
         case["scenario"].as_str().unwrap()
     );
     let scenario = case["scenario"].as_str().unwrap();
+    let authored = case["authoredOriginalLab"] == true;
+    let mut writer = authored.then(|| BufWriter::new(std::fs::OpenOptions::new().append(true)
+        .open(std::env::var_os("WW2_MOV24_27_REPORT").expect("private report required")).unwrap()));
+    let mutations = if authored { original_lab_mutations(scenario) } else { vec![] };
+    if authored {
+        assert_eq!(case["mutations"], json!(mutations), "retain the complete original timed terrain inputs");
+        let seconds = match scenario { "wall-arrival" => 30, "obstacle" | "wreck" => 50, "closure" => 60, _ => unreachable!() };
+        assert_eq!(case["ticks"], seconds * 20 + 1);
+        assert_eq!(case["frames"].as_array().unwrap().len(), seconds as usize * 20 + 2);
+    }
     let mut m = make(case);
     let ids: Vec<_> = m.world.game.units.keys().copied().collect();
     let first = case["subject"].as_u64().unwrap() as u32;
@@ -333,15 +459,32 @@ fn replay(case: &Value) {
     let mut journeys: BTreeMap<u32, Journey> =
         ids.iter().map(|id| (*id, Journey::default())).collect();
     let mut checkpoints = case["checkpoints"].as_array().unwrap().iter().peekable();
-    let mut commands = case["commands"].as_array().unwrap().iter().peekable();
+    let command_inputs = if authored {
+        let inputs = original_lab_commands(scenario, first);
+        assert_eq!(case["commands"], json!(inputs), "all original command inputs and actual Source acceptance");
+        inputs
+    } else { case["commands"].as_array().unwrap().clone() };
+    let mut commands = command_inputs.iter().peekable();
     let mut corner_finish = None;
     let mut milestones = BTreeMap::new();
+    let initial_frame = snapshot(&m, authored);
+    record_frame(&mut writer, &label, &initial_frame);
+    if authored { assert_eq!(initial_frame, case["frames"][0], "{label}: initial actual frame"); }
     assert_eq!(
-        snapshot(&m),
+        initial_frame,
         *checkpoints.next().unwrap(),
         "{label}: initial canonical state"
     );
     for tick in 1..=case["ticks"].as_u64().unwrap() {
+        for row in mutations.iter().filter(|row| row["tick"].as_u64() == Some(tick)) {
+            let character = |key| row["change"][key].as_str().map(|s| {
+                assert_eq!(s.len(), 1);
+                s.as_bytes()[0]
+            });
+            m.world.mutate_cell(row["cell"].as_u64().unwrap() as usize, CellChange {
+                ground: character("ground"), object: character("object"), ..CellChange::default()
+            }).expect("actual authoritative original terrain event");
+        }
         while commands
             .peek()
             .is_some_and(|row| row["tick"].as_u64() == Some(tick))
@@ -377,6 +520,9 @@ fn replay(case: &Value) {
         let report = m
             .advance_tick()
             .unwrap_or_else(|error| panic!("{label}: tick {tick}: {error:?}"));
+        let actual_frame = snapshot(&m, authored);
+        record_frame(&mut writer, &label, &actual_frame);
+        if authored { assert_eq!(actual_frame, case["frames"][tick as usize], "{label}: actual frame at tick {tick}"); }
         assert!(
             report.commands.iter().all(|result| result.denial.is_none()),
             "{label}: every Source-accepted ground command must admit at tick {tick}"
@@ -494,7 +640,7 @@ fn replay(case: &Value) {
             .is_some_and(|row| row["tick"].as_u64() == Some(tick))
         {
             assert_eq!(
-                snapshot(&m),
+                snapshot(&m, authored),
                 *checkpoints.next().unwrap(),
                 "{label}: Source checkpoint tick {tick}"
             );
@@ -564,6 +710,9 @@ fn replay(case: &Value) {
             "parked" => Point { x: 85.0, z: 57.0 },
             "road" => Point { x: 87.0, z: 73.0 },
             "queue" => Point { x: 45.0, z: 75.0 },
+            "wall-arrival" => Point { x: 61.3, z: 57.9 },
+            "obstacle" | "wreck" => Point { x: 100.0, z: 50.27 },
+            "closure" => Point { x: 92.0, z: 57.0 },
             _ => panic!("unexpected scenario {scenario}"),
         };
         let destination = m.commands.units[&u.id].route_end.unwrap_or(goal);
@@ -588,6 +737,50 @@ fn replay(case: &Value) {
             "selected light-tank corner must finish within nine seconds"
         );
     }
+}
+
+#[test]
+#[ignore = "requires the private complete MOV24/27 Source capture and Root execution grant"]
+fn original_all_eleven_wall_arrivals_and_dynamic_recovery_journeys() {
+    let source = std::env::var_os("WW2_MOV24_27_TRACE").expect("private complete Source packet required");
+    let fixture: Value = serde_json::from_slice(&std::fs::read(source).unwrap()).unwrap();
+    assert_eq!(fixture["format"], "mov24-27-original-lab-v1");
+    assert_eq!(fixture["reference"], "e4e579a838aabae3b1d9dadbc17a0a87147bc52d");
+    assert_eq!(fixture["node"], "v24.21.0");
+    assert_eq!(fixture["arch"], "x64");
+    assert_eq!(fixture["failure"], Value::Null);
+    assert_eq!(fixture["incomplete"], Value::Null);
+    assert_eq!(fixture["exit"], 0);
+    assert_eq!(fixture["types"], json!(TYPES));
+    let scenarios = ["wall-arrival", "obstacle", "wreck", "closure"];
+    assert_eq!(fixture["scenarios"], json!(scenarios));
+    let cases = fixture["cases"].as_array().unwrap();
+    assert_eq!(cases.len(), 44);
+    let observed = cases.iter().map(|case| (case["type"].as_str().unwrap(), case["scenario"].as_str().unwrap())).collect::<BTreeSet<_>>();
+    let expected = TYPES.iter().flat_map(|kind| scenarios.iter().map(move |scenario| (*kind,*scenario))).collect::<BTreeSet<_>>();
+    assert_eq!(observed, expected, "all eleven original types in every complete original journey");
+    let output = std::fs::OpenOptions::new().write(true).create_new(true)
+        .open(std::env::var_os("WW2_MOV24_27_REPORT").expect("fresh private native report required")).unwrap();
+    let mut writer = BufWriter::new(output);
+    serde_json::to_writer(&mut writer, &json!({"format":"mov24-27-native-original-lab-v1",
+        "nativeHead":std::env::var("WW2_MOV24_27_NATIVE_HEAD").expect("frozen producing head required"),
+        "sourceHead":fixture["sourceHead"],"scope":"existing canonical-birth lab setup; independently authored inputs and actual ordinary command/tick/terrain actuators; no production-roster equivalence"})).unwrap();
+    writer.write_all(b"\n").unwrap();
+    writer.flush().unwrap();
+    for case in cases {
+        assert_eq!(case["authoredOriginalLab"], true);
+        let scenario = case["scenario"].as_str().unwrap();
+        assert_eq!(case["map"], original_lab_map(scenario));
+        assert_eq!(case["commands"], json!(original_lab_commands(scenario,
+            case["subject"].as_u64().unwrap().try_into().unwrap())),
+            "complete unchanged original command input and actual acceptance");
+        assert_eq!(case["verdict"]["passed"], true);
+        assert_eq!(case["verdict"]["failures"], json!([]));
+        replay(case);
+    }
+    assert_eq!(cases.iter().map(|case| case["ticks"].as_u64().unwrap()).sum::<u64>(), 41_844);
+    assert_eq!(cases.iter().map(|case| case["frames"].as_array().unwrap().len()).sum::<usize>(), 41_888);
+    println!("44 original wall-arrival/recovery journeys, 41,844 actual admitted ticks, 41,888 complete recorded frame comparisons; original windows and all arrival/hull/cliff/spin checks");
 }
 
 #[test]

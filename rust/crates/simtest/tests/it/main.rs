@@ -97,6 +97,10 @@ mod mode14_spawn_layout;
 mod mode_predicates;
 #[path = "../mode_startup_checks.rs"]
 mod mode_startup_checks;
+#[path = "../mov28_paid_bridge.rs"]
+mod mov28_paid_bridge;
+#[path = "../mov33_routehash.rs"]
+mod mov33_routehash;
 #[path = "../mov_vehicle_predicates.rs"]
 mod mov_vehicle_predicates;
 #[path = "../movement.rs"]

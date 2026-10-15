@@ -1,0 +1,1 @@
+- Record an unapplied internal paid-bridge provider proposal covering supported placement, canonical payment, timed finishing, section registration and routing versions. Declare the shared FieldWorks overlap with ENG_AUDIT. Runtime code, bridge readers and parity status remain unchanged; compilation and execution are pending.

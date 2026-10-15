@@ -1,0 +1,1 @@
+- Prepare a private MOV28 recorder and registered native consumer for the original paid bridge path-availability component, using real constructor rifles, ordinary income and commands, three fixed build windows and one persistent Pathfinder. Execution is pending. The existing native parser still rejects bridge fieldwork; no runtime provider or parity status changed.

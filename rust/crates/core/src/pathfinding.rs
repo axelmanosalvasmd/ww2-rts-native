@@ -257,6 +257,8 @@ impl Pathfinding {
         to: Point,
         expansion_limit: Option<usize>,
     ) -> Result<PathResult, PathError> {
+        #[cfg(test)]
+        crate::aligned_replay::walk_route::observe_path_query();
         if profile.air || profile.rail || profile.structure {
             return Err(PathError::UnsupportedProfile);
         }

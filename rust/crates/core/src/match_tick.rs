@@ -154,6 +154,11 @@ enum EnvironmentPhase<'a> {
 }
 
 impl crate::match_runtime::Match {
+    #[cfg(test)]
+    pub(crate) fn aligned_walk_budget(&mut self, budget: usize) {
+        self.tick_state.paths.budget = budget;
+    }
+
     /// Prime a trusted initial scene without executing inputs or simulation phases.
     /// A running/faulted match or any pending recorded input cannot be rewound.
     pub fn initialize_tick_scene(
@@ -615,6 +620,10 @@ impl crate::match_runtime::Match {
             let unit = &self.world.game.units[&id];
             let moving = !unit.path.is_empty()
                 || crate::math::hypot(unit.x - before.x, unit.z - before.z) > 0.001;
+            #[cfg(test)]
+            if let Some(replay) = &self.start.random.replay {
+                replay.observe_moving(id, moving);
+            }
             let result = self.apply_unit_firing(id, moving, dt);
             self.take_firing_tick_events(events);
             result?;

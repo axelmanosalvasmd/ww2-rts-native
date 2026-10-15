@@ -405,6 +405,8 @@ fn walk_route(
     knowledge: &TrafficKnowledge<'_>,
 ) -> bool {
     let block = kind.block();
+    #[cfg(test)]
+    crate::aligned_replay::walk_route::observe(g, u, "enter", route, speed, dt, back, steer, None);
     if kind.infantry && !steer.yielding {
         // Crowded squads can pass beside a waypoint. Keep required terrain corners and the exact final spot.
         while route.len() > 1
@@ -412,6 +414,8 @@ fn walk_route(
             && knowledge.clear(g, rules, u.at(), route[1], block | WIRE, 0.9)
         {
             route.remove(0);
+            #[cfg(test)]
+            crate::aligned_replay::walk_route::observe(g, u, "skip", route, speed, dt, back, steer, None);
         }
     }
     let mut budget = speed
@@ -421,6 +425,8 @@ fn walk_route(
         } else {
             1.0
         };
+    #[cfg(test)]
+    crate::aligned_replay::walk_route::observe(g, u, "budget", route, speed, dt, back, steer, Some(budget));
     while budget > 0.0 && !route.is_empty() {
         let wp = route[0];
         let d = dist(u.at(), wp);
@@ -431,23 +437,40 @@ fn walk_route(
         };
         if !walkable(g, rules, u.at(), next, block, 0.9) {
             u.repath = 0.2;
+            #[cfg(test)]
+            {
+                crate::aligned_replay::walk_route::observe(g, u, if steer.yielding { "blocked-keep" } else { "blocked-drop" }, route, speed, dt, back, steer, Some(budget));
+                crate::aligned_replay::walk_route::observe(g, u, "exit", route, speed, dt, back, steer, Some(budget));
+            }
             return !steer.yielding;
         }
         if !back {
             u.rot = math::atan2(wp.z - u.z, wp.x - u.x);
+            #[cfg(test)]
+            crate::aligned_replay::walk_route::observe(g, u, "face", route, speed, dt, back, steer, Some(budget));
         }
         u.x = next.x;
         u.z = next.z;
         budget -= advance;
+        #[cfg(test)]
+        crate::aligned_replay::walk_route::observe(g, u, "advance", route, speed, dt, back, steer, Some(budget));
         if d <= advance + 1e-9 {
             if steer.yielding {
+                #[cfg(test)]
+                crate::aligned_replay::walk_route::observe(g, u, "reached-yield", route, speed, dt, back, steer, Some(budget));
                 break;
             }
             route.remove(0);
+            #[cfg(test)]
+            crate::aligned_replay::walk_route::observe(g, u, "reached-shift", route, speed, dt, back, steer, Some(budget));
         } else {
+            #[cfg(test)]
+            crate::aligned_replay::walk_route::observe(g, u, "partial", route, speed, dt, back, steer, Some(budget));
             break;
         }
     }
+    #[cfg(test)]
+    crate::aligned_replay::walk_route::observe(g, u, "exit", route, speed, dt, back, steer, Some(budget));
     false
 }
 

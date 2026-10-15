@@ -7,7 +7,13 @@ import { resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const reference = resolve(root, 'reference/ww2-rts');
+const args = process.argv.slice(2);
+const extraAt = args.indexOf('--recovery-output');
+const extra = extraAt >= 0;
+const referenceAt = args.indexOf('--reference');
+const reference = resolve(referenceAt < 0 ? resolve(root, 'reference/ww2-rts') : args[referenceAt + 1]);
+const extraTarget = extra ? resolve(args[extraAt + 1]) : null;
+const checking = args.includes('--check');
 const pin = 'e4e579a838aabae3b1d9dadbc17a0a87147bc52d';
 const git = args => execFileSync('git', ['-C', reference, ...args], { encoding: 'utf8' }).trim();
 const clean = () => {
@@ -16,7 +22,12 @@ const clean = () => {
 };
 assert.equal(process.arch, 'x64');
 assert.equal(process.version, 'v24.21.0');
-assert.ok(process.argv.slice(2).every(arg => arg === '--check'));
+if (extra) {
+  assert(args[extraAt + 1] && args[extraAt + 1] !== '--check');
+  const expected = ['--recovery-output', args[extraAt + 1], ...(referenceAt < 0 ? [] : ['--reference', args[referenceAt + 1]]), ...(checking ? ['--check'] : [])];
+  assert.deepEqual(args, expected, 'explicit private recovery selection only');
+  assert.equal(execFileSync('git', ['-C', root, 'status', '--porcelain'], { encoding: 'utf8' }).trim(), '', 'freeze the child first');
+} else assert.ok(args.every(arg => arg === '--check'));
 clean();
 const source = await import(pathToFileURL(resolve(reference, 'shared/sim.js')));
 const motion = await import(pathToFileURL(resolve(reference, 'shared/vehicle-motion.js')));
@@ -24,20 +35,47 @@ const { MOVEMENT_TYPES } = await import(pathToFileURL(resolve(reference, 'tools/
 const { runMovementCase } = await import(pathToFileURL(resolve(reference, 'tools/movement-lab-runner.js')));
 assert.deepEqual(MOVEMENT_TYPES, ['tank', 'medium', 'tankdestroyer', 'tiger', 'churchill',
   'armoredcar', 'halftrack', 'flaktrack', 'rocket', 'rifle', 'at']);
-const scenarios = ['clearance', 'corner', 'cliff', 'opposing', 'parked', 'road', 'queue'];
+const scenarios = extra ? ['wall-arrival', 'obstacle', 'wreck', 'closure']
+  : ['clearance', 'corner', 'cliff', 'opposing', 'parked', 'road', 'queue'];
 const buffer = new DataView(new ArrayBuffer(8));
 const bits = value => {
   buffer.setFloat64(0, value);
   return buffer.getBigUint64(0).toString(16).padStart(16, '0');
 };
 const pt = p => p ? [bits(p.x), bits(p.z)] : null;
+const raw = value => value === undefined ? { absent: true }
+  : typeof value === 'number' ? { bits: bits(value), value: Number.isFinite(value) ? value : String(value) }
+  : value instanceof Map ? { map: [...value].map(([k,v]) => [raw(k),raw(v)]) }
+  : value instanceof Set ? { set: [...value].map(raw) }
+  : ArrayBuffer.isView(value) ? { typed: value.constructor.name, values: [...value].map(raw) }
+  : Array.isArray(value) ? value.map(raw)
+  : value && typeof value === 'object' ? Object.fromEntries(Object.entries(value).map(([k,v]) => [k,raw(v)])) : value;
 const snapshot = g => ({ tick: g.tick, units: [...g.units.values()].map(u => ({
   id: u.id, x: bits(u.x), z: bits(u.z), rot: bits(u.rot), speed: bits(u.moveSpeed ?? 0),
   path: u.path.map(pt), goal: pt(u.worldGoal), orders: u.orders.length,
   reverse: pt(u.reverse), clearance: !!u.motionClearance,
   outcome: u.moveOutcome ?? null,
+  ...(extra && { kind: u.type, hp: bits(u.hp), routeEnd: pt(u.routeEnd) }),
 })) });
 let current;
+let currentGame;
+const cases = [];
+let captureFailure = null;
+if (extra) {
+  process.on('uncaughtExceptionMonitor', error => { captureFailure = { message: String(error), stack: error.stack }; });
+  process.on('exit', code => {
+    const output = { format: 'mov24-27-original-lab-v1', reference: pin, node: process.version, arch: process.arch,
+      sourceHead: execFileSync('git', ['-C', root, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
+      types: MOVEMENT_TYPES, scenarios, cases, incomplete: current && !cases.includes(current) ? current : null,
+      finalActualPrefix: currentGame ? { tick: currentGame.tick, nextId: currentGame.nextId,
+        roster: raw([...currentGame.units.values()]), pathStats: raw(currentGame.pathStats) } : null,
+      failure: captureFailure, exit: process.exitCode ?? code,
+      scope: 'Existing canonical-birth lab adapter; original authored poses, events, commands, windows and all runner verdicts. No production-roster or whole-match equivalence claim.' };
+    const text = JSON.stringify(output) + '\n';
+    writeFileSync(checking ? extraTarget + '.check-actual.json' : extraTarget, text, { flag: 'wx', mode: 0o400 });
+    if (checking) assert.equal(readFileSync(extraTarget, 'utf8'), text);
+  });
+}
 
 function clearStartingForces(g) {
   for (const [id, row] of g.units) if (!source.UNITS[row.type].structure) g.units.delete(id);
@@ -89,15 +127,27 @@ const sim = {
       g = source.createGame(binding, ...args);
     } finally { Math.random = saved; }
     current.map = binding;
+    if (extra) {
+      currentGame = g;
+      current.constructorRoster = raw([...g.units.values()]);
+      current.constructorStartup = raw({ seed: g.seed, nextId: g.nextId, wind: g.wind, players: g.players, army: g.army });
+    }
     canonicalBirths(g);
     return g;
   },
   command(g, owner, command) {
     const input = structuredClone(command);
+    const row = { tick: g.tick + 1, owner, sequence: current.commands.length + 1, command: input };
+    if (extra) current.commands.push(row);
     const result = source.command(g, owner, command);
+    if (extra) row.result = result === undefined ? { absent: true } : result;
     assert.equal(result, undefined, 'selected lab input must be accepted');
-    current.commands.push({ tick: g.tick + 1, owner, sequence: current.commands.length + 1, command: input });
+    if (!extra) current.commands.push(row);
     return result;
+  },
+  mutateWorldCell(g, cell, change) {
+    if (extra) current.mutations.push({ tick: g.tick + 1, cell, change: structuredClone(change) });
+    return source.mutateWorldCell(g, cell, change);
   },
   step(g) {
     if (!current.initial) {
@@ -111,6 +161,7 @@ const sim = {
       current.environment = { seed: g.seed, wind: [g.wind.a, g.wind.v], wet: g.wx?.wet ?? null,
         pathBudget: g.pathBudget ?? 4096, pathRetryLimit: g.pathRetryLimit ?? 20 };
       current.checkpoints.push(snapshot(g));
+      if (extra) current.frames.push(snapshot(g));
     }
     source.step(g);
     current.ticks = g.tick;
@@ -121,19 +172,28 @@ const sim = {
     }
     if (g.tick === 1 || g.tick % 20 === 0) current.checkpoints.push(snapshot(g));
     current.last = snapshot(g);
+    if (extra) current.frames.push(current.last);
   },
 };
-const cases = [];
 const random = Math.random;
 for (const type of MOVEMENT_TYPES) for (const scenario of scenarios) {
   current = { type, scenario, commands: [], checkpoints: [] };
+  if (extra) Object.assign(current, { authoredOriginalLab: true, frames: [], mutations: [] });
   const verdict = runMovementCase(sim, motion, scenario, { type, seed: 7301 });
+  if (extra) current.verdict = verdict;
   assert.deepEqual(verdict.failures, [], `${type}/${scenario}: original selected verdict`);
   if (type === 'tank' && scenario === 'corner') assert.ok(current.cornerFinishTick <= 181, 'light tank corner within nine seconds');
   if (current.checkpoints.at(-1).tick !== current.last.tick) current.checkpoints.push(current.last);
   delete current.last;
-  cases.push({ ...current, verdict });
+  if (extra) cases.push(current);
+  else cases.push({ ...current, verdict });
 }
+if (extra) {
+  current = null;
+  clean();
+  assert.equal(cases.length, 44);
+  console.log(`Verified ${cases.length} original recovery/wall-arrival lab journeys, ${cases.reduce((sum, c) => sum + c.ticks, 0)} full steps`);
+} else {
 
 // Reproduce the selected engine acceleration and Stop timing using authentic
 // Source actors, public commands and actual recipient rows. No server timer is
@@ -209,3 +269,4 @@ const target = resolve(root, 'rust/crates/simtest/tests/fixtures/mov-vehicle-pre
 if (process.argv.includes('--check')) assert.equal(readFileSync(target, 'utf8'), output);
 else writeFileSync(target, output);
 console.log(`Verified ${cases.length - 1} original lab journeys and one engine sequence, ${cases.reduce((sum, c) => sum + c.ticks, 0)} full steps and ${cliffs.length} diagonal checks`);
+}

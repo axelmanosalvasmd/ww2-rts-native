@@ -1,0 +1,1 @@
+- Bind the private MOV11 reader to the recorder runtime, authored case identity, actual manifest counters and complete sequential frame labels. Preserve the recorder, original inputs and assertions; Source and native qualification need a new Root grant.
