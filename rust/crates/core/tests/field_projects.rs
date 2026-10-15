@@ -35,6 +35,7 @@ fn original_shared_pattern_order_front_and_segment_prices() {
             fort,
         )
         .unwrap();
+        assert!(jobs.len() <= 24, "patterns stay small enough to order at once: {input}");
         let actual:Vec<_>=jobs.iter().map(|j|json!({"kind":j.kind.as_str(),"x":bits(j.at.x),"z":bits(j.at.z),"dir":bits(j.direction),"front":bits(j.front)})).collect();
         assert_eq!(json!(actual), case["jobs"], "{input}");
         if fort == FortKind::Trench {
@@ -67,6 +68,21 @@ fn original_shared_pattern_order_front_and_segment_prices() {
     let line = plan(Pattern::Line, b);
     assert_eq!(line.len(), 5, "a 40 m line is five trench segments");
     assert_eq!(line[0].at, Point { x: 40.0, z: 40.0 });
+    assert_eq!(
+        plan(Pattern::Strongpoint, b)
+            .iter()
+            .map(|job| job.kind)
+            .collect::<Vec<_>>(),
+        vec![
+            FortKind::Trench,
+            FortKind::Trench,
+            FortKind::Trench,
+            FortKind::Trench,
+            FortKind::Wire,
+            FortKind::Wire,
+        ],
+        "a strongpoint is a trench square with wire in front"
+    );
     assert!(
         line.iter()
             .all(|job| job.front.to_bits() == (-std::f64::consts::FRAC_PI_2).to_bits())

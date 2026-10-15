@@ -878,18 +878,8 @@ impl crate::match_runtime::Match {
         if let Command::Cover { ids, queue, .. } = command {
             return self.execute_cover_command(owner, ids, *queue);
         }
-        if let Command::Dig {
-            ids,
-            kind,
-            at,
-            direction,
-            queue,
-        } = command
-        {
-            if *queue {
-                return Ok(Some(Denial::Unsupported));
-            }
-            return self.execute_dig(owner, ids, *kind, *at, *direction, winner_decided);
+        if matches!(command, Command::Dig { .. }) {
+            return self.execute_dig_command(owner, command, winner_decided);
         }
         if let Command::Technology { kind } = command {
             return match self.request_research(owner, *kind) {
@@ -1983,6 +1973,76 @@ impl crate::match_runtime::Match {
     pub fn start_queued_orders(&mut self, id: UnitId, winner_decided: bool) -> Result<(), String> {
         self.start_queued_orders_observing(id, winner_decided, &mut |_, _| Ok(()))
     }
+
+    // Dig has a fallible paid-start preparation. Keep its canonical waiting
+    // order and any yielding drift path until that preparation succeeds.
+    fn start_queued_dig(
+        &mut self,
+        id: UnitId,
+        winner_decided: bool,
+        observer: &mut impl FnMut(&mut Self, &Command) -> Result<(), String>,
+    ) -> Result<bool, String> {
+        let u = &self.world.game.units[&id];
+        let c = &self.commands.units[&id];
+        if c.orders.len() > 8 {
+            return Err("invalid queued Dig capacity".into());
+        }
+        let order = c.orders.front().ok_or("missing queued Dig")?;
+        let Command::Dig { ids, queue: false, .. } = order else {
+            return Err("invalid queued Dig intent".into());
+        };
+        if ids.as_slice() != [i64::from(id)] {
+            return Err("queued Dig selects another unit".into());
+        }
+        let clear_drift = u.drift && !c.rally_drift;
+        if clear_drift && u.path_gen.checked_add(2).is_none() {
+            return Err("unit path identity exhausted".into());
+        }
+        let attack = c.attack_id != 0
+            && self.world.game.players[u.owner].sees(c.attack_id)
+            && self.world.game.units.contains_key(&c.attack_id);
+        let busy = u.retreating
+            || attack
+            || c.fire_at.is_some()
+            || c.nade.is_some()
+            || u.dig
+            || self.project_goal(id)?.is_some()
+            || c.build_target.is_some_and(|site| self.world.game.units.contains_key(&site))
+            || c.enter.is_some()
+            || u.board != 0
+            || u.amove.is_some()
+            || u.world_goal.is_some()
+            || (!u.path.is_empty() && !clear_drift);
+        let owner = u.owner;
+        if !busy {
+            let order = order.clone();
+            let mut remaining = VecDeque::new();
+            remaining.try_reserve(c.orders.len() - 1).map_err(|_| "dig queue reservation failed")?;
+            remaining.extend(c.orders.iter().skip(1).cloned());
+            // The existing immediate Dig provider stages wallet, story, exit
+            // and control changes. Err leaves both work and this queue intact.
+            self.execute_command(owner, &order, winner_decided)?;
+            self.commands.units.get_mut(&id).unwrap().orders = remaining;
+            if clear_drift {
+                let u = self.world.game.units.get_mut(&id).unwrap();
+                u.drift = false;
+                u.path.clear();
+                u.path_gen += 1;
+                u.reverse = None;
+            }
+            observer(self, &order)?;
+            return Ok(true);
+        }
+        if clear_drift {
+            let u = self.world.game.units.get_mut(&id).unwrap();
+            u.drift = false;
+            u.path.clear();
+            u.path_gen += 1;
+            u.reverse = None;
+        }
+        Ok(false)
+    }
+
     fn start_queued_orders_observing(
         &mut self,
         id: UnitId,
@@ -2012,6 +2072,13 @@ impl crate::match_runtime::Match {
             .get(&id)
             .ok_or("missing queued control")?;
         crate::match_construction::validate_build_activity(u, control)?;
+        if matches!(control.orders.front(), Some(Command::Dig { .. }))
+            && !self.start_queued_dig(id, winner_decided, observer)?
+        {
+            return Ok(());
+        }
+        let u = &self.world.game.units[&id];
+        let control = &self.commands.units[&id];
         if !control.orders.is_empty() && u.drift && !control.rally_drift {
             if u.path_gen.checked_add(2).is_none() {
                 return Err("unit path identity exhausted".into());
@@ -2044,6 +2111,12 @@ impl crate::match_runtime::Match {
                 || c.orders.is_empty()
             {
                 break;
+            }
+            if matches!(c.orders.front(), Some(Command::Dig { .. })) {
+                if !self.start_queued_dig(id, winner_decided, observer)? {
+                    break;
+                }
+                continue;
             }
             let owner = u.owner;
             let c = self.commands.units.get_mut(&id).expect("control");

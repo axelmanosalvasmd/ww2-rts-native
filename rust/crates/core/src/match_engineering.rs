@@ -3,7 +3,7 @@ use super::{Error, FortKind, Reason, StartRequest};
 use crate::{
     game::{CELL, MOVE, Point},
     grid::UnitId,
-    match_commands::{Denial, MoveOutcome},
+    match_commands::{Command, Denial, MoveOutcome},
     match_runtime::Match,
     match_story::{StoryChange, StoryKey, prepare_story_updates},
     math,
@@ -12,6 +12,13 @@ use crate::{
     unit_spawn::SpawnPlacer,
 };
 use std::collections::BTreeMap;
+
+struct DigIntent {
+    kind: FortKind,
+    at: Point,
+    direction: Option<f64>,
+    queued: bool,
+}
 
 fn denial(reason: Reason) -> Denial {
     match reason {
@@ -74,7 +81,7 @@ impl Match {
     }
 
     /// Called by the typed dispatcher after its global recorded-input checks.
-    /// Only the first selected ID is considered. Queued digs are explicitly unsupported.
+    /// Only the first selected ID is considered. This entry starts paid work now.
     pub fn execute_dig(
         &mut self,
         owner: usize,
@@ -84,6 +91,39 @@ impl Match {
         direction: Option<f64>,
         winner_decided: bool,
     ) -> Result<Option<Denial>, String> {
+        self.execute_dig_intent(
+            owner,
+            ids,
+            DigIntent { kind, at, direction, queued: false },
+            winner_decided,
+        )
+    }
+
+    pub(crate) fn execute_dig_command(
+        &mut self,
+        owner: usize,
+        command: &Command,
+        winner_decided: bool,
+    ) -> Result<Option<Denial>, String> {
+        let Command::Dig { ids, kind, at, direction, queue } = command else {
+            return Err("expected a Dig command".into());
+        };
+        self.execute_dig_intent(
+            owner,
+            ids,
+            DigIntent { kind: *kind, at: *at, direction: *direction, queued: *queue },
+            winner_decided,
+        )
+    }
+
+    fn execute_dig_intent(
+        &mut self,
+        owner: usize,
+        ids: &[i64],
+        intent: DigIntent,
+        winner_decided: bool,
+    ) -> Result<Option<Denial>, String> {
+        let DigIntent { kind, at, direction, queued } = intent;
         let Some(player) = self.start.economy.players.get(owner) else {
             return Ok(Some(Denial::Blocked));
         };
@@ -131,10 +171,11 @@ impl Match {
         loop {
             let mut missing = None;
             let probe = {
-                let prepared = self.field_works.prepare_start(
+                self.field_works.prepare_dig(
                     &self.world,
-                    &mut self.start.economy.players[owner],
+                    &self.start.economy.players[owner],
                     request,
+                    !queued,
                     |point| {
                         let cell = self
                             .world
@@ -146,14 +187,7 @@ impl Match {
                             false
                         })
                     },
-                );
-                match prepared {
-                    Ok(prepared) => {
-                        drop(prepared);
-                        Ok(())
-                    }
-                    Err(error) => Err(error),
-                }
+                )
             };
             match probe {
                 Err(Error::Refused(Reason::NotVisible)) if missing.is_some() => {
@@ -167,7 +201,26 @@ impl Match {
                     return Ok(Some(denial(reason)));
                 }
                 Err(error) => return Err(format!("dig admission: {error}")),
-                Ok(()) => {
+                Ok(job) if queued => {
+                    if self.commands.units[&id].orders.len() >= 8 {
+                        self.commands.units.get_mut(&id).unwrap().follow = 0;
+                        return Ok(Some(Denial::QueueFull));
+                    }
+                    let mut orders = self.commands.units[&id].orders.clone();
+                    orders.try_reserve(1).map_err(|_| "dig queue reservation failed")?;
+                    orders.push_back(Command::Dig {
+                        ids: vec![i64::from(id)],
+                        kind,
+                        at: job.at,
+                        direction: Some(job.direction),
+                        queue: false,
+                    });
+                    let control = self.commands.units.get_mut(&id).unwrap();
+                    control.follow = 0;
+                    control.orders = orders;
+                    return Ok(None);
+                }
+                Ok(_) => {
                     let prepared = self
                         .field_works
                         .prepare_start(

@@ -385,6 +385,25 @@ impl FieldWorksRuntime {
         request: StartRequest,
         sees: impl FnMut(Point) -> bool,
     ) -> Result<PreparedStart<'a>, Error> {
+        let job = self.prepare_dig(w, wallet, request, true, sees)?;
+        Ok(PreparedStart {
+            wallet,
+            unit: request.unit,
+            cost: definitions()?.forts[&request.kind].cost,
+            job,
+        })
+    }
+
+    // Queue admission resolves the same real placement without borrowing a
+    // payment reservation. Activation prepares again against the current world.
+    fn prepare_dig(
+        &self,
+        w: &World,
+        wallet: &PlayerEconomy,
+        request: StartRequest,
+        pay_now: bool,
+        sees: impl FnMut(Point) -> bool,
+    ) -> Result<Dig, Error> {
         let defs = definitions()?;
         let d = &defs.forts[&request.kind];
         if !request.at.x.is_finite() || !request.at.z.is_finite() {
@@ -406,7 +425,7 @@ impl FieldWorksRuntime {
         if !position(unit.at()) || !wallet.mp.is_finite() {
             return Err(Error::InvalidInput);
         }
-        if wallet.mp < d.cost {
+        if pay_now && wallet.mp < d.cost {
             return Err(Error::Refused(Reason::Mp));
         }
         let at = Point {
@@ -432,22 +451,17 @@ impl FieldWorksRuntime {
         {
             return Err(Error::Refused(Reason::Max));
         }
-        Ok(PreparedStart {
-            wallet,
-            unit: request.unit,
-            cost: d.cost,
-            job: Dig {
-                project: None,
-                kind: request.kind,
-                at,
-                direction,
-                cells,
-                elapsed: 0.,
-                original_cells: None,
-                front: None,
-                reach: d.reach,
-                from: None,
-            },
+        Ok(Dig {
+            project: None,
+            kind: request.kind,
+            at,
+            direction,
+            cells,
+            elapsed: 0.,
+            original_cells: None,
+            front: None,
+            reach: d.reach,
+            from: None,
         })
     }
     pub fn progress(&self, w: &World, unit: u32) -> Result<f64, Error> {
