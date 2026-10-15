@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## Original ENG-59 travel preparation (2026-10-15, source only)
+
+At base `446671b977abfa6bf689fcb8853833d36519faab`, a new shared-input recorder and native test prepare the original Roads and mud travel checks: shallow tank, deep tank and infantry at full speed. Five isolated scenes retain the original 40 acceleration ticks and 40 measurement ticks, default living weather and actual accumulated wear. The consumer uses `Match::advance_tick`, including routed movement, ground contact, separation and late weather. It does not substitute helper multipliers for displacement or feed recorded travel state back into the runner.
+
+Starting-base cells are restored in place so the existing routing owner retains its initial-terrain binding. Native map authoring receives an empty textual name for Source's unnamed blank map; both retain Clear default weather. No runtime, provider, guard, interface or policy changes. No Source or native job ran, and no authentic output fixture is committed yet. The [predicate/input map and pending commands](docs/runtime/engineering-travel-preparation.md) record the setup, observations and remaining limits. All parity statuses and the earlier weather fixtures/tests stay unchanged.
+
 ## Engineering weather predicate checkpoint (2026-10-15, unexecuted)
 
 At base `34edf52a7eaa6cb6edba3e802c2190226228276f`, the `IMPL_ENGINEERING` batch adds five focused tests for existing ENG-59 and ENG-73 through ENG-76. They exercise the current mud-speed, weather-speed, sight, catalog, plan and warning providers. The five-state application matrix covers all 47 unit kinds, including completed buildings and explicitly constructed aircraft. Existing weather fixtures and all old assertions remain unchanged.
