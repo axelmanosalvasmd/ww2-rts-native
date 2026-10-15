@@ -1903,6 +1903,14 @@ The core carries its own math (`rust/crates/core/src/math.rs`) instead of Rust's
 - **Ported as the reference has it, for now:** the fog's sight walk ignores the woods depth rule that `los` applies (`docs/parity/combat.md`, limitations), and the vision pass still runs one team after another.
 - **Not ported yet** (Conquest does not use them): Horde stragglers and the Kaiju shown through the fog, the remembered enemy buildings of Classic and World Conquest, World Conquest's guards and its visible-cell list.
 
+## Vision row source checks (2026-10-15, unrun candidate)
+
+The second combat stream prepares five existing row checks, CMB-124/125/128/131/132, against native baseline `34edf52a7eaa6cb6edba3e802c2190226228276f`. The new recorder reads original Source at `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. It adds exports for `visionOf` and `visionRange` only, calls the existing vision/LOS/fog functions, and records exact inputs and outputs. Canonical `placeBuilding` supplies the target footprint and structural cells in aim-point cases. Component scenes isolate observer inputs; recipient delivery retains original constructor actors.
+
+The native side uses compiled rules and existing `vision`/`Fog` consumers, plus the actual recipient `DeliveryState` and run encoder. Full masks, ordered visibility, packet presence, cursor/base state and floating-point bits are compared. Source and native cold recomputations independently check cache reuse. No runtime algorithm, gameplay rule, consumer interface, acceptance criterion or old fixture changes.
+
+The prepared inventory is 18 range cases, 30 visibility cases, 18 LOS cases, 20 fog frames, eight three-recipient delivery frames and 64 run-encoding cases. These are source counts, not execution results. Root has not granted this stream a native/recorder slot. Fixtures are not generated, tests have not run, and all five rows retain their previous statuses. The exact predicate map and consumer names are in `docs/parity/combat.md`. A generated and verified successor and independent review remain required before integration.
+
 ## Formation spots and the first C calls (2026-10-12)
 
 `shared/formation.js` is ported to `rust/crates/core/src/formation.rs` and gives the reference's spots bit for bit; `rust/crates/ffi` (`ww2-ffi`) exposes it to Unreal (`docs/contracts/rust-unreal-abi.md`, First calls).

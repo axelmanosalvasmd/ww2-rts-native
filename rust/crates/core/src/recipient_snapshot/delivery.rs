@@ -1,6 +1,10 @@
 use super::*;
 use crate::observed_memory::ObservedRow;
 
+#[cfg(test)]
+#[path = "vision_wire_batch.rs"]
+mod vision_wire_batch;
+
 #[derive(Clone, Debug, PartialEq)]
 struct SeatFog {
     version: u32,
