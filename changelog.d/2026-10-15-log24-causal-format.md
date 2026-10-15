@@ -1,0 +1,1 @@
+- Format the LOG-24 causal component test after its first format diagnostic. Preserve every scene input, assertion, string and authentic Source fixture. Native qualification remains pending; the earlier launcher diagnostic and format-check output remain attributed to fixture head `368b19a8`.
