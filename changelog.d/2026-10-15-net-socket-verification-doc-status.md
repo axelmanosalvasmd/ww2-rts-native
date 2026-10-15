@@ -1,0 +1,1 @@
+- Update the NET socket design note with the completed Source capture and two passing integration tests at `57563c49`, retaining the held acceptance clauses and exact-head hosted gates.
