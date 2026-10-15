@@ -1,13 +1,12 @@
+use crate::shared::world_scene;
 use serde_json::{Value, json};
+use world_scene::{make_match, projection, reset, sorted_units, update_region};
 use ww2_core::{
     game::Point,
     match_end::MatchSample,
     match_runtime::Match,
     match_story::{PlayerStory, StoryKey},
 };
-#[path = "common/world_scene.rs"]
-mod world_scene;
-use world_scene::{make_match, projection, reset, sorted_units, update_region};
 fn fixture() -> Value {
     serde_json::from_str(include_str!("fixtures/world-finish.json")).unwrap()
 }

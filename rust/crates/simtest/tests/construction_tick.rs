@@ -1,7 +1,7 @@
 //! Original full-step construction replay through the sole Match runner.
 //! Bare Source Map insertion order and removed historical actor objects are not native state.
 //! Runtime proof requires the separately reviewed construction phase wiring.
-#![recursion_limit = "256"]
+use crate::shared::startup;
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 use ww2_core::{
@@ -21,8 +21,6 @@ use ww2_core::{
     weather::WeatherChoice,
     world::Appearance,
 };
-#[path = "common/startup.rs"]
-mod startup;
 fn bits(n: f64) -> Value {
     json!(format!("{:016x}", n.to_bits()))
 }

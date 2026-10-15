@@ -1,9 +1,7 @@
 //! Actual original steps through the canonical operative tick consumer.
 //! The authored cases stop grenade flights before contact and leave unsupported
 //! ordinary body geometry, scenarios and other unavailable phases explicit.
-#![recursion_limit = "256"]
-#[path = "common/companion_tick.rs"]
-mod source;
+use crate::shared::companion_tick as source;
 
 use serde_json::json;
 use ww2_core::{

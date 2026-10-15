@@ -1,6 +1,5 @@
 //! Complete ordinary Source steps compared with the sole native tick runner.
 //! Scene inputs are authored. No expected runtime state is imported into Match.
-#![recursion_limit = "256"]
 use flate2::read::GzDecoder;
 use serde_json::{Value, json};
 use std::io::Read;
