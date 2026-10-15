@@ -12,7 +12,9 @@ fn replay_held(client: &Client) {
             assert_eq!(message["held"][0].as_u64(), Some(ids.len() as u64));
             assert_eq!(
                 message["held"][1].as_i64(),
-                Some(i64::from(ids.iter().fold(0_i32, |xor, id| xor ^ *id as i32)))
+                Some(i64::from(
+                    ids.iter().fold(0_i32, |xor, id| xor ^ *id as i32)
+                ))
             );
             assert!(!view.needs_resync());
         }
@@ -53,7 +55,10 @@ fn ordinary_r1_socket_metadata_resync_and_drop_pause_use_live_receivers() {
     let paused = host.until(|m| m["t"] == "s" && m["online"] == json!([true, false]));
     host.until(|m| m["t"] == "pause" && m["paused"] == true);
     let repeated = host.until(|m| m["t"] == "s");
-    assert_eq!(repeated["tick"], paused["tick"], "periodic paused frames do not step the match");
+    assert_eq!(
+        repeated["tick"], paused["tick"],
+        "periodic paused frames do not step the match"
+    );
     assert_eq!(repeated["online"], json!([true, false]));
     assert_eq!(repeated["ping"], json!([9999.0, 0.0]));
 
