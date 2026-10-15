@@ -1,0 +1,1 @@
+- Record the complete pinned Source reconnection acceptance check at all three difficulties, including full supplied views, planner memory, raw commands, RNG fractions and human input helper outputs. Generation and byte-for-byte check pass on Vostro; native comparison remains pending.

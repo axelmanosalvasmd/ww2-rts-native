@@ -1,0 +1,1 @@
+- Bind the existing imported assert object into the extracted original AI reconnection helper. Preserve the original helper, acceptance body and assertions after the retained missing-binding failure.

@@ -1,5 +1,37 @@
 # Three Crossroads Native: design decisions
 
+## Five reviewed engineering predicates on fixed main (2026-10-15)
+
+Normally integrate exact `6a6d2a01a0314239513d2413af74c8a7099bfa56` first, then `396f6d8a7014bd4a5ebe64f0a12ccd66865bf452`. Preserve all incoming and owned tests, fixtures, recorders, registrations and parity rows. The shared pathfinding test merges automatically, retaining main's additional proofs and the owned complete trap-wall comparison. Reviewer2 accepted all five complete literal Acceptance checks with no missing selected predicate. The existing component-proof policy applies; bridge, socket and material-factor consumers beyond those selected checks do not add promotion gates.
+
+The separate `f1231249` audit remains preserved on `audit/engineering-main396-preview-0e8d6d9b`; its broader consumer map does not override that selected-check decision. Historical evidence stays split: five passes and the original final map-counter failure at `03e6a9d6`, then the single corrected pathfinding pass at `6a6d2a01`. Freeze the actual integrated head before its six unique checks, formatting check and fresh strict locked workspace/all-target Clippy. No Source recording is repeated. The five owned Rust/Status cells may change only after that evidence; every Acceptance cell and other row remains incoming main. Exact-final-head review and Root's serial publication process remain separate gates.
+
+## Engineering supported scope and held aircraft consumer (2026-10-15)
+
+The supported engineering gate contains 20 original checks. Preserve the full `f2b48700` candidate under `refs/heads/held/eng-five-row-aircraft-f2b48700` and move its aircraft test function verbatim to the [unregistered checkpoint](docs/checkpoints/engineering-aircraft-f2b48700/README.md). That function remains FAILED / HELD: the first firing-enabled Clear patrol is refused before tick 1 because the automatic aircraft ground-fire actuator is unavailable. Its Source input and complete five-weather capture remain intact. The checkpoint records the precise provider boundary and pending consumer work.
+
+This explicit scope split changes no runtime, guard, setup, expected value, policy, ABI or row status. The two historical travel passes belong only to `4b0471d5`; the other 18 supported passes and aircraft refusal belong to `f2b48700`. A fresh supported-head gate after the ordered main merge selects all 20 supported checks, with separate actual-head review and hosted checks still required. The missing AI weather/sight/caution consumer and public aircraft-row refusal remain held.
+
+
+## Five engineering rows: actual-consumer preparation (2026-10-15, source only)
+
+Extend the frozen `64d750e9` preparation on fixed main `446671b9` for the exclusively assigned ENG-59/73/74/75/76 rows. Preserve every prior test, fixture, assertion and status. New authored inputs and an unexecuted Source recorder prepare 22 travel scenes, four routes, four live-weather scenes, 620 warning ticks, four rifle sight scenes, five flying-plane scenes and 313 constructor plan cases. Eight new tests call actual Match movement/weather, pathfinding, vision, aircraft, constructor and recipient snapshot consumers. No target output is fabricated; authentic captures, compilation and results remain pending.
+
+[The full predicate map and limits](docs/runtime/engineering-five-row-preparation.md) identify the missing native AI weather/sight/caution packet and the existing aircraft snapshot refusal. The prior five weather helper proofs remain bounded. No runtime, provider, terrain, guard, ABI, policy, parity status or whole-match decision changes. No Source, Cargo, native or fmt job runs without a future Root grant.
+
+
+## Original ENG-59 travel preparation (2026-10-15, source only)
+
+At base `446671b977abfa6bf689fcb8853833d36519faab`, a new shared-input recorder and native test prepare the original Roads and mud travel checks: shallow tank, deep tank and infantry at full speed. Five isolated scenes retain the original 40 acceleration ticks and 40 measurement ticks, default living weather and actual accumulated wear. The consumer uses `Match::advance_tick`, including routed movement, ground contact, separation and late weather. It does not substitute helper multipliers for displacement or feed recorded travel state back into the runner.
+
+Starting-base cells are restored in place so the existing routing owner retains its initial-terrain binding. Native map authoring receives an empty textual name for Source's unnamed blank map; both retain Clear default weather. No runtime, provider, guard, interface or policy changes. No Source or native job ran, and no authentic output fixture is committed yet. The [predicate/input map and pending commands](docs/runtime/engineering-travel-preparation.md) record the setup, observations and remaining limits. All parity statuses and the earlier weather fixtures/tests stay unchanged.
+
+## Engineering weather predicate checkpoint (2026-10-15, unexecuted)
+
+At base `34edf52a7eaa6cb6edba3e802c2190226228276f`, the `IMPL_ENGINEERING` batch adds five focused tests for existing ENG-59 and ENG-73 through ENG-76. They exercise the current mud-speed, weather-speed, sight, catalog, plan and warning providers. The five-state application matrix covers all 47 unit kinds, including completed buildings and explicitly constructed aircraft. Existing weather fixtures and all old assertions remain unchanged.
+
+The checkpoint runs no native or Source job without Root's slot grant and promotes no row. Literal expectations are read from pinned Source, not a new recording. Fresh helper-matrix Source checks, native execution and the broader travel, live vision/AI and recipient-snapshot scenarios remain pending. No runtime, terrain, public interface or gameplay decision changes. The [predicate map and exact pending commands](docs/runtime/engineering-weather-checkpoint.md) distinguish the existing recorded oracle from the new unexecuted assertions.
+
 ## Parallel Rust verification and dependency caching (2026-10-14)
 
 PR #214 at `ee7bdc3c899b912f229dade7e5d58855052d87b7` separates lint, tests and release into three jobs on each of Ubuntu 24.04, Windows 2025 and macOS 15, for nine jobs total. Strict locked workspace/all-target Clippy remains on all three platforms. Locked workspace tests use cargo-nextest 0.9.148 with Cargo's existing `ci-test` profile and nextest's `ci` profile; explicit locked `cargo test --doc` retains doctests on all three. Locked release FFI builds remain on all three, with strict C11 linking and formation replay on Linux. Test jobs retain the 60-minute limit; lint and release jobs have 30-minute limits.
@@ -1509,6 +1541,56 @@ This step expanded the catalog from 42 to 46 tables. Four additions provide `TRA
 
 One equivalence test reuses the existing vision recording and its independent `load_rules` parser. It compares every typed field, optional value, list order and floating-point bit for all 47 unit types, all five weather kinds and the movement/vision settings. The existing movement and vision replay tests remain unchanged. This does not connect the server to the core, implement a full simulation or change the ABI. `RULES_HASH` remains limited to formation constants; compiling these additional tables does not expand its agreed scope.
 
+## Selected BASE evidence and BASE-28 candidate (2026-10-15)
+
+The dated sections below retain their original checkpoint wording verbatim, including their historical unrun/held statements. Producing heads remain explicit: `26276eec39035f3cef0ded38966a6b21fd8d3684` recorded and byte-checked the six selected checks, with the authentic fixture frozen at `a1a6a73ce51f0d4d709356e14f4785c1103ad712`; `65ad2b6b7be7732a0097110513353c6ce1e6f808` passed six behaviors and both registry guards. The two equivalent Clippy corrections at `8be1204e484515bbc62877311f69beaf052dafdb` passed fmt and strict workspace/all-target Clippy without changing the assertions.
+
+For the missing BASE-28 lifecycle, Source child `0d2df9f8d5e85b34317773235ff6c8039919f106` generated and byte-checked the original Classic control followed by admitted Conquest with natural actors/defaults: 61 exact measured frame pairs, 54 full steps and three queries per path, with every original corridor and settled-rubble assertion. The authentic fixture was frozen before Cargo at `6d8473e32e6c34098172cba03e5af001c519c74b`. Formatting child `5e50a2a8c11c67e608191584284dd008a5a204c8` passed fmt, the new corridor behavior, both actual guards and fresh strict workspace/all-target Clippy. Its native corridor replay performed 54 actual ticks and 61 comparisons with a persistent pathfinder reading the live World. Raw original/amended mode, roster, IDs, versions, income and RNG remain separate; this is admitted component correspondence, not Classic runtime admission or whole-match equivalence.
+
+BASE-28 is the sole ported candidate in this rebase: complete B05 plus the complete paired corridor lifecycle supplement existing stamp, slope-leveling, canonical footprint/structure and warm-routing checks. Independent final whole-row review remains required before publication. BASE-26 still lacks the node-bound Classic Depot and complete eight-order rejection/retry witness. BASE-29 lacks Classic Depot and Assault/Annihilation/Horde completion. BASE-30 lacks those repair-mode variants and the combined breach/Engineer-Assist restoration witness. BASE-48 lacks the concrete tier denial/success provider. None of those four is promoted, and BASE-51 remains another owner.
+
+The true rebase onto exact main `3a7d1b96ddc6eb2572214117e567d4fcd2651f52` retains all owned executable/recorder/fixture bytes and all incoming runtime, guards, registries and unrelated parity cells. Prior native results remain attributed to their producing heads. The new frozen successor must pass fmt, exactly nine selected tests (six behaviors, corridor and both guards), fresh strict Clippy and separate final review; no Source capture is repeated and no gameplay rule changes.
+
+## BASE-28 corridor component experiment (2026-10-15, unrun)
+
+The missing corridor check at pinned `test.js:6818-6835` measures warmed routing before a paid Barracks stamp, while its footprint blocks the corridor, and after actual destruction with settled rubble. Root authorizes a paired experiment using the untouched Classic control and an admitted ordinary Conquest scene with identical 80 by 44 metre geometry, query endpoints, placement and destruction sequence. The amended map adds only its required name and one distant neutral zero-value point. Natural constructor actors, footprints, controls, weather and supply remain. The constructor rifle replaces the Classic Engineer at the same authored pose; the test selects the actual Build newborn rather than Conquest's pre-existing Barracks.
+
+The dedicated recorder fixes its measured projection before either run and requires exact equality of all measured frames. Full raw game-state graphs and absolute global/mode/roster/identity/version/RNG differences remain separate. The native scene uses actual Build, Stop and full tick retirement/settlement, with one persistent pathfinder reading live flags, heights and published World versions. No expected terrain, version changes, cache resets, actor clearing or guard changes are supplied. B05 and every old fixture/assertion remain unchanged. Execution and component correspondence are unproved at this checkpoint; any interference, mismatch or further real failure stops the experiment. BASE-28 remains held until successful complete-predicate evidence receives independent review.
+
+## Selected BASE checked footprint indices (2026-10-15, source child)
+
+The first selected native compilation at `8ade5c103f0a6a6127151234893591de48a46bfc` exited 101 before any test instance ran. The new test used `u32` actor footprint cells directly against `usize` canonical lookup/structure cells. Root authorizes only a local full-vector checked conversion through `usize::try_from(*cell).expect`, preserving order, every value and the original actor footprint. Both the lookup assertion and exact ordered structure equality remain. The immutable compiler diagnostic and Source/fmt proof stay in `/tmp/impl-bases-26276-S1-75l4dlp_/`. No Source recording is repeated and the authentic gzip fixture SHA256 remains `0eebee9ebd0020adb973a8e6f8fe099bf424baf1ca8b856d34a209e10b6757e6`. Freeze this child before fmt and the original six-test plus registry gate. No native success is claimed here; runtime/parser guards, old assertions, BASE-51 and parity statuses are unchanged.
+
+## Selected BASE native formatting child (2026-10-15)
+
+The granted formatting check at fixture head `a1a6a73ce51f0d4d709356e14f4785c1103ad712` exited 1 with layout diagnostics confined to `construction_tick/base_selected.rs`. Retain the diagnostic and apply only its authorized formatting changes. A token/literal comparison confirms identical strings, predicates, values and statements; differences are whitespace, trailing commas and the equivalent block around the unchanged Auto Retreat assignment match arm. The Source recorder and authentic paired fixture remain byte-identical. Freeze this child before the new formatting check and native tests. Evidence is separate under `/tmp/impl-bases-26276-S1-75l4dlp_/`; no native result is claimed yet.
+
+## Selected BASE raw/amended Source proof (2026-10-15, Vostro)
+
+At input head `26276eec39035f3cef0ded38966a6b21fd8d3684`, authentic Source generation and exact byte-check both pass. Four paired scenes retain all six selected predicates in each path, with 24 actions, 2,318 full steps and 2,341 snapshots per path. Every existing full-frame JSON byte string is identical between original raw control and amended input. Only the separately recorded map name and neutral zero-value point differ; the point remains uncaptured and pays no MP/VP. B05 completes its original 700-step build and 600-step escape; the real Motor Pool completes after 917 steps, then repairs through the exact 100-step sequence with its purchased tank retained. Native execution remains pending, and the raw invalid maps have no native admission.
+
+The 703,420-byte paired fixture has SHA256 `0eebee9ebd0020adb973a8e6f8fe099bf424baf1ca8b856d34a209e10b6757e6`. Generation and byte-check each execute both paths (4,636 steps each), so their combined 9,272 actual Source steps are separate from the 2,318 unique steps per path. Evidence and exact per-scene counts are in the owned handoff. This fixture is frozen before Cargo. Runtime/parser guards, old tests/fixtures, row statuses and the Source pin remain unchanged; no whole-match or broader mode proof is inferred.
+
+## Selected BASE component-map preparation (2026-10-15, source checkpoint)
+
+The actual `a1678fde` Source generation stopped before creation: the original selected component maps omit the playable-map name. They also have no capture points, which both pinned Source and the native authoritative parser reject. Keep that failure packet immutable at `/tmp/impl-bases-a1678-S1-h7ttp1tq/`. Root authorizes only this input preparation: retain each raw original map and both validation errors, then add `name: "Base selected"` and one neutral point with zero MP/VP at cell (40,4) on the 80-cell maps or (32,4) on B05's 64-cell map. No parser or runtime guard changes.
+
+The recorder first runs unchanged Source creation, commands and full steps with the raw original component input through an explicitly unchecked control path. That path has no native playable-map admission. It then asserts normal Source validation on the amended map and runs the identical actor/action/option setup. Every complete existing snapshot JSON byte string, all six original predicates and every non-map result/setup field must match exactly, without normalization. Raw and amended map inputs and point-presence/state traces are recorded separately; the new point must remain neutral, uncaptured and worth zero income/VP at every frame. The native checker preserves both raw parser refusals, consumes only the amended map through the existing helper and checks the neutral point separately. Any mismatch or further substantive failure stops before changing another input. This is the specific selected-component preparation Root approved, with no whole-match or other-row exception. Source invariance, fixture capture and native verification remain pending at this checkpoint.
+
+## Selected ordinary base checks, unrun implementation (2026-10-15)
+
+Root reviewed plan `1207a469f0ceac9288c0f4439ed037d4d69bab4c`. Its new recorder and native child module implement six selected predicates across BASE-26/28/29/30/48 in four scenes, reusing the existing construction Match setup and complete snapshot comparison. The B05 scene buys its builder from the real retained constructor HQ, retains all original actors and footprints, and requires the complete 700-step construction and 600-step escape sequence. Motor Pool completion and repair retain the actual tank birth from that same finished producer. Pillbox facing and two tier denials use the original selected command inputs. Other mode variants, Classic checks and cancellation remain held. The [implementation handoff](docs/testing/impl-bases-selected-plan-38c1a0da.md#implementation-checkpoint) records every setup difference and guarded pending command.
+
+The parent construction test gains only an appended child registration. Existing tests, assertions, fixture bytes, runtime/admission guards, reference pin, ABI/header and parity statuses remain unchanged. No Source recorder, Cargo, native, formatting or Rust lint job has run at this checkpoint. The new fixture is absent until Root grants recording; its native reader fails explicitly if it is missing. Compilation, selected-predicate success, independent review and broader verification remain pending. Historical archived outputs do not establish current binary availability or require a completed gate to be repeated.
+
+## Selected ordinary base checks, source plan (2026-10-15)
+
+The [IMPL_BASES plan](docs/testing/impl-bases-selected-plan-38c1a0da.md) selects six original predicates across BASE-26, BASE-28, BASE-29, BASE-30 and BASE-48 from native baseline `34edf52a7eaa6cb6edba3e802c2190226228276f`. It uses actual purchases and canonical building placement, retaining existing actors, footprints and structure identities. The B05 test's temporary producer is replaced by a disclosed purchase from the real constructor HQ; its complete occupancy, completion and escape assertions remain required. Construction and repair select the Conquest iteration only. Other modes, cancellation, interfaces and every parity status remain unchanged. This checkpoint contains a plan, with no recorder or native execution and no implementation or acceptance claim. Root owns execution slots and separate review.
+
+## BASE-28 paired Source capture (2026-10-15)
+
+At recorder/test child `0d2df9f8d5e85b34317773235ff6c8039919f106`, pinned Source generation and byte-check both exit 0. Each invocation runs the original Classic control before the admitted Conquest scene: 54 full steps, 61 snapshots and three corridor queries per path. All 61 measured frame pairs compare exactly, including local terrain and cell-indexed settled sections. Every original corridor and settled-rubble assertion passes; full raw states and absolute mode/roster/identity/version/income/RNG differences remain separate. The authentic gzip is 987909 bytes, SHA256 `c83e8f641ddf577e508c0ec82393d91a97cdeecf8f072fe48a6189604fce8d3c`, frozen before Cargo. Generation and byte-check together execute 216 Source steps, distinct from 54 unique steps per path. Native replay and independent whole-BASE-28 review remain pending; no row or status is promoted.
+
 ## Wallet, population and income state (2026-10-12)
 
 `economy_state.rs` owns each player's wallet, income readouts and VP. It borrows an ordered view of units, building queues, pending drops, capture points, depots and World regions. The player vector index is the slot. This keeps the operations independent of the legacy `Game` and lets a future match runner supply authoritative state directly. World node-to-region resolution belongs to that runner; this module requires explicit regions and does not infer territory from hidden global state. The catalog now contains 47 tables, including the original exported `WORLD_TUNING`.
@@ -1826,6 +1908,30 @@ The core carries its own math (`rust/crates/core/src/math.rs`) instead of Rust's
 - **Units are in ascending id order.** The reference iterates its units Map in insertion order; ids only grow and no unit is put back, so `Game::units` is a `BTreeMap` by id. The loader refuses a state where the Map is in another order.
 - **Ported as the reference has it, for now:** the fog's sight walk ignores the woods depth rule that `los` applies (`docs/parity/combat.md`, limitations), and the vision pass still runs one team after another.
 - **Not ported yet** (Conquest does not use them): Horde stragglers and the Kaiju shown through the fog, the remembered enemy buildings of Classic and World Conquest, World Conquest's guards and its visible-cell list.
+
+## Vision row source checks (2026-10-15, unrun candidate)
+
+The second combat stream prepares five existing row checks, CMB-124/125/128/131/132, against native baseline `34edf52a7eaa6cb6edba3e802c2190226228276f`. The new recorder reads original Source at `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. It adds exports for `visionOf` and `visionRange` only, calls the existing vision/LOS/fog functions, and records exact inputs and outputs. Canonical `placeBuilding` supplies the target footprint and structural cells in aim-point cases. Component scenes isolate observer inputs; recipient delivery retains original constructor actors.
+
+The native side uses compiled rules and existing `vision`/`Fog` consumers, plus the actual recipient `DeliveryState` and run encoder. Full masks, ordered visibility, packet presence, cursor/base state and floating-point bits are compared. Source and native cold recomputations independently check cache reuse. No runtime algorithm, gameplay rule, consumer interface, acceptance criterion or old fixture changes.
+
+The prepared inventory is 18 range cases, 30 visibility cases, 18 LOS cases, 20 fog frames, eight three-recipient delivery frames and 64 run-encoding cases. These are source counts, not execution results. Root has not granted this stream a native/recorder slot. Fixtures are not generated, tests have not run, and all five rows retain their previous statuses. The exact predicate map and consumer names are in `docs/parity/combat.md`. A generated and verified successor and independent review remain required before integration.
+
+
+
+## Supplemental fog witness preparation (2026-10-15, source only)
+
+Independent review of combat head `9aa20852e6c055fd94b9d56b26178a48553903cf` found two non-decisive CMB-131 witnesses. An allied source already covered the old dusty target cell, and a pre-existing sight blocker hid the old height edit. Root independently verified both against the frozen JSON. No runtime bug is established and no runtime algorithm changes.
+
+Preserve the complete historical recorder, its 18 range/30 visibility/18 LOS cases, 20 fog frames, eight delivery frames, 64 packing cases and both authentic fixtures. Add only separate supplemental recording/test data: a three-frame dusty-target sequence with every allied source excluded and an explicit visibility-fact counterfactual; and an independent four-frame height-only transition from warmed stable cells to a changed mask, version and nonempty delta. Both Source and native tests compare complete outputs and cold recomputation. Native tests retain persistent Fog for each actual/control sequence in both serial and threaded paths. The single-source masks and removed-visible-fact inputs are declared component counterfactuals, never room or whole-match admissions.
+
+The new fixture remains absent and the new two tests remain unrun. The five original checks retain only their exact `9aa20852` results; those results are not promoted to this child. No Source, Cargo, native test or formatter is authorized in this preparation turn. CMB-131 status/acceptance, terrain policy, privacy, ABI/header/contracts and runtime guards stay unchanged. The exact supplemental inputs and predicates are recorded in `docs/parity/combat.md`; a later reviewer must receive both verified findings and these responses.
+
+
+
+## Canonical bases outside the supplemental sight domain (2026-10-15)
+
+A single authorized diagnostic proved the supplemental no-SIGHT-anywhere assertion rejected all 54 retained constructor footprint cells, K/1027, belonging to six HQ/barracks structures. Their nearest centre is 40.496913463 m from the observer, beyond its clear-ground 36 m sight. Preserve those flags, ground/objects and full structural links. Replace only that impossible global precondition with a conservative cell-rectangle exclusion against the actual observer sight provider and exact canonical exception checks. The entire possible sight domain, edit cell and probe remain free of sight/woods blockers. The recorder additionally captures existing canonical metadata for native assertions; it changes no physical input, expected mask or runtime provider. Full-map canonical bases remain present. The two original review objections, failed Source attempt and diagnostic stay in the evidence packet; fresh execution is still required for this corrected child.
 
 ## Formation spots and the first C calls (2026-10-12)
 
@@ -3562,3 +3668,56 @@ Issue #5 proposal 6181987121 asks Axel whether whole-match differential evidence
 ## Ordinary target-selection source replay
 
 The ordinary Match firing owner already holds target ID, retarget timer and team volley claims. Extend its existing pinned-source recorder with nine targeted ordinary firing scenes instead of adding a second combat model or an external interface. These scenes expose the Source-selected target for role weighting, shootability visibility, threat, hysteresis, delayed and immediate retargeting, shared claims, and trench or visible-crowd salvo value. They keep the original per-unit firing block and ordered claim rebuild. The native test compares the full recorded firing snapshot and Combat random bits in both ordinary mode aliases, Default and Conquest. This is component evidence for CMB-42, CMB-44 and CMB-86 through CMB-89; the wider row acceptance checks and whole-match outcomes remain open.
+
+## AI allied cut-point reconnection preparation (2026-10-15)
+
+The quiet planner already emits attack-moves for allied cut points. Its opening
+admission nevertheless required an unowned point, and the human policy adapter
+accepted only plain Move. The prepared change admits the existing allied-cut
+branch without a neutral sentinel and preserves the original plain attack-move
+shape through the human input helpers. The new no-neutral envelope requires
+rifle-only own rosters without research. Support guns can start the unported
+staged assault in this context and remain unsupported. The 180-second
+quiet-window limit and existing enemy, health, mode and economic restrictions
+remain in force.
+
+The new recorder executes the complete original Source test.js reconnection
+check and all three difficulty assertions. It retains the check's actual cleared
+scene, spawned rifles and supplied owner/cut view overlay. It records complete
+views, original memory, commands and waypoint draws, then calls the unchanged
+human filtering, formation and input helpers. The native test compares the full
+captured command and helper outputs and the private aim. The production planner
+keeps its existing per-seat purpose stream; no global-RNG or whole-match equality
+is claimed.
+
+This is source preparation for AI-11, AI-25, AI-26, AI-31, AI-39, AI-47 and AI-66.
+No Source recorder or native test has run for this change. The expected fixture
+is intentionally absent until Root grants generation; the new native test fails
+with an explicit missing-fixture message until then. The frozen predicate map
+and pending commands are in `docs/testing/ai-cut-reconnection.md`. No row status
+changes. The human policy still lacks a room-runtime consumer, issuer allocation
+and canonical physical admission. R1's two-human roster remains unchanged.
+
+## Recorded NET socket predicates and fixed-main verification (2026-10-15)
+
+The Source recorder and ordinary Rust executable TCP test cover the selected NET-05, NET-34 and ordinary-human start/reset predicates of NET-68. The thirteen-input malformed-play helper retains every original assertion byte for byte. Source generation and exact check passed at `1b5be783`; the authentic 78,471-byte fixture was frozen at `d8d5f9ca` before Cargo. Its SHA256 is `64307e48921fdaa5a349fbe1305368736256ef6f4240cca12cf95fa6f21914ad`. The original source-only preparation and complete predicate limits remain in [the checkpoint brief](docs/testing/net-socket-predicates-68f-b804ec47.md).
+
+Integration head `57563c498ac5a73d19ce540d1e857dfa1a4e6405` has ordered parents `7114846ac3a2cf69806ed831e7669ac10bd62c36`, then main `446671b977abfa6bf689fcb8853833d36519faab`. Its complete 884-entry union preserves the NET inputs and incoming files. Formatting and strict server all-target Clippy passed. Exactly two selected tests passed with zero failures: one socket test executes four sequential phases against four ordinary server processes, and one incoming MODE lobby-capacity test runs separately. Compiler inputs, runtime fixture and executable identities were verified under the exclusive S2 target; all server children and sockets were cleaned up. Independent review accepted this exact head. These results belong to `57563c49`; later documentation successors require their own hosted checks.
+
+The original NET-15 split-surrogate failure stays frozen at `0f93ab4c`; no assertion, expected code unit or display policy changes. NET-16/20 runtime gaps and NET-22/25 literal acceptance gaps remain held. Full private object identity, AI/commander reset, delivered-after-close, timed lifecycle, spectator and client rate-limit clauses are not replaced by narrower socket observations. The original R4 branch remains at b637. No parity promotion, runtime policy, ABI/header, reference, terrain, workflow or client-adoption change follows from these bounded tests.
+
+
+## Tutorial step provider candidate (2026-10-15, unrun)
+
+The second MODE stream prepares `tutorial_steps` for existing MODE-61 through MODE-69. It exposes the nine source entry definitions and completion predicates over borrowed player, unit, point-owner and current-step spawned-ID facts. Team zero includes allied slots; dead units are ignored by living-unit predicates, while clearing a step checks only that step's retained IDs. Cell centres convert through the core's `CELL`; no random stream, clock, actor ID or Game state is owned by the provider. Invalid internal owner indices, duplicate unit IDs and nonfinite facts return an error.
+
+The candidate recorder reads pinned `shared/tutorial.js`, appends only a private-helper export in memory, and calls the original completion functions for 50 declared boundary cases. Nine native row tests compare complete selected entry data and every named case; a tenth checks malformed facts. Neither Source recording nor native execution has run, and the oracle fixture has deliberately not been fabricated. The frozen plan and complete per-row gap map are in `docs/checkpoints/2026-10-15-mode2-tutorial/PLAN.md`.
+
+This provider is not connected to a Tutorial constructor, tick runner, canonical spawns, wallet floors, accepted commands, garrison arrival or final finish. Health shares still require canonical ceil-scaled application. Tutorial income, fail state, queued dialogue and broader mode policy remain separate. All nine rows stay in progress. Existing R1 startup and tick guards still exclude Tutorial, and the approved two-human Conquest host, ABI, wire and recipient policy are unchanged. Root must grant a slot before recording, formatting or native checks, and commission separate review before any publication.
+
+
+## Tutorial original component fixture (2026-10-15, S2)
+
+Root grants S2 at `bf62462d35309559f2f0da6c3596a28644ee3c88`. Pinned Source generation and deterministic check both pass serially with `/usr/bin/node` v24.21.0 x64: nine original entry definitions and 50 original completion callbacks. The generated fixture is 24,788 bytes, SHA256 `35cc4ae1ab3ba12681f58360f066ac2152951f5d7bdabb27ae31cdaab625db3c`. Original begin uses declared spawn/command hooks; no actual unit creation, accepted command or native admission follows from that evidence. The earlier missing-cpuset receipt preflight stopped before Node; its failure is retained separately. Effective kernel affinity is CPUs 4-7, memory.max 6 GiB, swap.max zero and cpu.max 400000/100000. Source scope memory peak is 21,094,400 bytes, with zero memory-limit or OOM events.
+
+The authentic runtime-read fixture is frozen before any Cargo invocation. Formatting, ten selected native tests and strict core/simtest all-target Clippy are still pending at this freeze. All nine rows remain in progress and all missing Tutorial Match consumers remain as listed in the candidate plan. Runtime provider review and an exact-head Hermes ack after hosted green remain required before a future merge; the test-only waiver is not inferred.

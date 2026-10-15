@@ -251,6 +251,11 @@ fn apply_patches(state: &mut Value, patches: &Value) {
 #[test]
 fn authoritative_environment_matches_original_actions_and_order() {
     let fixture: Value = serde_json::from_str(include_str!("fixtures/environment.json")).unwrap();
+    let count = replay_environment_fixture(&fixture);
+    assert!(count > 200);
+}
+
+fn replay_environment_fixture(fixture: &Value) -> usize {
     let rules = Rules::compiled().unwrap();
     let catalog = Catalog::compiled().unwrap();
     assert_eq!(
@@ -551,7 +556,7 @@ fn authoritative_environment_matches_original_actions_and_order() {
             );
         }
     }
-    assert!(count > 200);
+    count
 }
 
 #[test]
@@ -808,5 +813,95 @@ fn captured_burn_rejects_bad_membership_and_full_context_capacity_atomically() {
             before
         );
         next_id = 1000;
+    }
+}
+
+#[test]
+fn selected_engineering_environment_acceptance_matches_original_source() {
+    use ww2_core::environment_debris::{
+        ContactMaterial, DebrisBody, DebrisInput, DebrisKind, Environment, wreck_mass,
+    };
+    let fixture: Value = serde_json::from_str(include_str!(
+        "fixtures/engineering-environment-acceptance.json"
+    ))
+    .unwrap();
+    assert_eq!(fixture["cases"].as_array().unwrap().len(), 8);
+    assert_eq!(replay_environment_fixture(&fixture), 228);
+    let expected_checks = [
+        (
+            "ENG-39",
+            "a disconnected support cycle cannot support itself",
+        ),
+        ("ENG-39", "the far anchored deck survives"),
+        ("ENG-39", "the breach and its unsupported dependent fail"),
+        ("ENG-39", "the independent supported section survives"),
+        ("ENG-40", "duplicate contact cannot repeat collapse"),
+        (
+            "ENG-43",
+            "the wall passes through a damaged stage before it falls",
+        ),
+        ("ENG-43", "clients are told"),
+        ("ENG-53", "the crater on the bank fills first"),
+        ("ENG-53", "as deep as the crater was"),
+        ("ENG-53", "a crater above the water stays dry"),
+        (
+            "ENG-68",
+            "falling section contacts do not crush living units",
+        ),
+        (
+            "ENG-68",
+            "a large collapse obeys the authoritative active body cap",
+        ),
+        ("ENG-68", "both hulls become static in bounded time:tank"),
+        ("ENG-68", "both hulls become static in bounded time:tiger"),
+    ];
+    let actual_checks = fixture["checks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| (v["row"].as_str().unwrap(), v["label"].as_str().unwrap()))
+        .collect::<Vec<_>>();
+    assert_eq!(actual_checks, expected_checks);
+    struct FlatHull;
+    impl Environment for FlatHull {
+        fn ground(&mut self, _: f64, _: f64) -> f64 {
+            0.
+        }
+        fn material(&mut self, _: f64, _: f64) -> Option<ContactMaterial> {
+            Some(ContactMaterial {
+                rebound: Some(0.15),
+                absorption: Some(0.7),
+            })
+        }
+    }
+    let hulls = fixture["hulls"].as_array().unwrap();
+    assert_eq!(hulls.len(), 2);
+    for (case, name) in hulls.iter().zip(["tank", "tiger"]) {
+        let input = &case["input"];
+        assert_eq!(input["id"], name);
+        let mass = wreck_mass(name, None);
+        assert_eq!(mass.to_bits(), input["mass"].as_f64().unwrap().to_bits());
+        let mut body = DebrisBody::new(DebrisInput {
+            id: name.into(),
+            kind: DebrisKind::Wreck,
+            x: input["x"].as_f64().unwrap(),
+            y: input["y"].as_f64().unwrap(),
+            z: input["z"].as_f64().unwrap(),
+            impulse: input["impulse"].as_f64().unwrap(),
+            mass,
+            ..Default::default()
+        })
+        .unwrap();
+        let states = case["states"].as_array().unwrap();
+        assert_eq!(states.len(), 60);
+        for state in states {
+            body.step(0.05, &mut FlatHull).unwrap();
+            let values = [body.x, body.y, body.z, body.vx, body.vy, body.vz]
+                .map(|n| format!("{:016x}", n.to_bits()));
+            assert_eq!(json!(values), state["values"]);
+            assert_eq!(json!(body.settled), state["settled"]);
+        }
+        assert!(body.settled);
+        assert_eq!([body.vx, body.vy, body.vz], [0.; 3]);
     }
 }

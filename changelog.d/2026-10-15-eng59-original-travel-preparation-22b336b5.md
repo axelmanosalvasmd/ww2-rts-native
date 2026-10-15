@@ -1,0 +1,1 @@
+- Prepare a shared-input Source recorder and actual Match-tick consumer for ENG-59's original shallow-mud, deep-mud and infantry travel checks. Preserve the 40-tick acceleration and 40-tick measurement windows, living weather and ground wear. Authentic output capture and all execution remain pending; existing tests, fixtures and parity statuses are unchanged.

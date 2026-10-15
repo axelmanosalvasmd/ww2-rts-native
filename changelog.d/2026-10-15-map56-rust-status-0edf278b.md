@@ -1,0 +1,1 @@
+- Mark MAP-56 ported for its selected Rust component check: all 1,000 pinned Source height-query samples and 5,000 binary64 columns match the existing native providers in PR #250. Unreal overlays, broader terrain/runtime adoption and owner acceptance remain separate.

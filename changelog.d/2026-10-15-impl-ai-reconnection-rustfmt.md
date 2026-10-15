@@ -1,0 +1,1 @@
+- Apply rustfmt layout to the AI reconnection predicate and comparison test. Token comparison preserves all literals, comments, assertions and behavior after the retained formatting diagnostic.

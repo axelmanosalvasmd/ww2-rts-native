@@ -1,0 +1,1 @@
+- Apply the retained formatting diagnostic to the selected BASE native child module. Keep every literal, predicate, input, recorded value and fixture unchanged; only layout, trailing commas and rustfmt's equivalent assignment-arm braces change. Native verification remains pending on the frozen formatting child.
