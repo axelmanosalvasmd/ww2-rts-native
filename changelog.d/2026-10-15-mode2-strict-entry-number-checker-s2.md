@@ -1,0 +1,1 @@
+- Compare every Tutorial entry JSON field recursively, treating integer and float number representations by exact f64 bits while preserving signed zero, types, object keys and counts, and array length and order. The authentic Source fixture and all 50 completion cases stay unchanged; validation of the nine behavior tests is pending.

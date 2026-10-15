@@ -1,0 +1,1 @@
+- Match Source float-bit keys when comparing an engineering fixture whose root value is an array. Keep numeric bit equality, array lengths and order, object keys and strict values unchanged.

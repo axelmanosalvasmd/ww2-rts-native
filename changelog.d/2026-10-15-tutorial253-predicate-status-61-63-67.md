@@ -1,0 +1,1 @@
+- Mark MODE-61, MODE-63 and MODE-67 ported using the reviewed Tutorial completion predicates and existing movement, capture and retreat evidence. The other six Tutorial step rows remain in progress; Tutorial activation is unchanged.

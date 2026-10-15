@@ -11,6 +11,10 @@ use crate::navigation::{Navigation, NavigationError, Options, TerrainView};
 use crate::rules::UnitKind;
 use crate::vehicle_navigation::VehicleNavigation;
 
+#[cfg(test)]
+#[path = "../tests/support/pathfinding_selected_checks.rs"]
+mod selected_checks;
+
 /// Path cost and bunker clearance rules from the compiled catalog.
 #[derive(Clone, Copy, Debug)]
 pub struct PathRules {

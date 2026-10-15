@@ -1,0 +1,1 @@
+- Prepare allied cut-point reconnection without a neutral-point sentinel and preserve the planner's attack-move through the human input adapter. Add the complete original Source acceptance recorder and native comparison for all three difficulties. Source fixture generation and native validation await a Root slot; full AI and room activation remain incomplete.

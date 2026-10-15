@@ -65,7 +65,7 @@ fn infantry_naval_and_vehicle_paths_match_original_find_path() {
 fn named_fine_search_branches_match_original_find_path() {
     let fixture: Value =
         serde_json::from_str(include_str!("fixtures/pathfinding-branches.json")).unwrap();
-    assert_eq!(fixture["scenarios"].as_array().unwrap().len(), 24);
+    assert_eq!(fixture["scenarios"].as_array().unwrap().len(), 25);
     let covered: std::collections::BTreeSet<_> = fixture["scenarios"]
         .as_array()
         .unwrap()
@@ -81,7 +81,7 @@ fn named_fine_search_branches_match_original_find_path() {
         .into_iter()
         .collect()
     );
-    replay_paths(&fixture, (603, 487, 36, 80, 0));
+    replay_paths(&fixture, (606, 489, 37, 80, 0));
 }
 
 fn replay_paths(fixture: &Value, expected_counts: (usize, usize, usize, usize, usize)) {
@@ -759,3 +759,6 @@ fn authored_reachability_near_walls(width: usize, flags: &[u16]) -> Vec<u8> {
     }
     near
 }
+
+#[path = "common/pathfinding_selected.rs"]
+mod selected_original_checks;

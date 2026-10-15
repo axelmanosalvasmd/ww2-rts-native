@@ -1,0 +1,2 @@
+- Add an unrun Source recorder and six native replay tests for selected BASE-26/28/29/30/48 predicates, using retained constructor actors and real HQ/Motor Pool purchases. Keep the complete B05 construction and escape sequence and the Conquest-only scope. Preserve the old construction test and fixture, runtime guards and parity statuses. Fixture generation, formatting and native verification await Root's execution slot.
+- Fix two Clippy `err_expect` findings in the selected BASE map-refusal checks with `expect_err`, preserving both panic messages and all error assertions.

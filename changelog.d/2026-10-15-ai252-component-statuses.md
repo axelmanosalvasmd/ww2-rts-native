@@ -1,0 +1,1 @@
+- Mark AI-25 order filtering, AI-26 human input construction and AI-39 point allocation/reconnection as ported using the reviewed original-Source component checks. Keep AI-11, AI-31, AI-47 and AI-66 held. Runtime publication still requires hosted green and Hermes acknowledgment of the exact head; no AI activation is added.
