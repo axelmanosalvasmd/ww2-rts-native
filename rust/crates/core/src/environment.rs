@@ -6,7 +6,6 @@ use crate::{
     game::{MOVE, Point, Smoke},
     math,
     rules::Rules,
-    weather_runtime::environment_random,
     world::{Appearance, CellChange, World, WorldError},
 };
 #[path = "environment_lifecycle.rs"]
@@ -179,6 +178,8 @@ pub struct FallingSection {
 }
 #[derive(Clone, Debug, Default)]
 pub struct EnvironmentRuntime {
+    #[cfg(test)]
+    pub(crate) replay: Option<crate::aligned_replay::Replay>,
     contacts: Vec<String>,
     contact_members: BTreeSet<String>,
     falling_sections: Vec<FallingSection>,
@@ -889,7 +890,7 @@ impl EnvironmentRuntime {
             let n = near(w, c);
             for next in [n[2], n[3], n[0], n[1]].into_iter().flatten() {
                 if !b".D+M".contains(&w.game.chars[next])
-                    || environment_random(ctx.seed) >= t.rubble_spill
+                    || aligned_environment_draw!(ctx.seed, self.replay.as_ref(), serde_json::json!(["environment.rubble", ctx.tick, c, next])) >= t.rubble_spill
                 {
                     continue;
                 }
@@ -1062,7 +1063,7 @@ impl EnvironmentRuntime {
                 }
                 if damage >= 60.
                     && t.ignite.get(&ch).is_some_and(|p| *p != 0.)
-                    && environment_random(ctx.seed) < t.ignite[&ch]
+                    && aligned_environment_draw!(ctx.seed, self.replay.as_ref(), serde_json::json!(["environment.ignite", ctx.tick, c])) < t.ignite[&ch]
                 {
                     self.ignite_inner(w, c, ctx, t)?;
                 }
@@ -1269,7 +1270,7 @@ impl EnvironmentRuntime {
                         / math::hypot(dx as f64, dy as f64)
                         * ctx.wind_strength;
                     // Even zero dt/rain consumes the draw for every flammable candidate.
-                    let random = environment_random(ctx.seed);
+                    let random = aligned_environment_draw!(ctx.seed, self.replay.as_ref(), serde_json::json!(["environment.spread", ctx.tick, c, n]));
                     if random
                         < t.spread
                             .get(&w.game.physical(n))

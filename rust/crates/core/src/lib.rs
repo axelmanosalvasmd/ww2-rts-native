@@ -3,6 +3,20 @@
 
 #![cfg_attr(test, recursion_limit = "256")]
 
+// Test-only adapters vanish, including their unused arguments, in ordinary builds.
+macro_rules! aligned_environment_draw {
+    ($seed:expr, $replay:expr, $consumer:expr) => {{
+        #[cfg(not(test))]
+        { crate::weather_runtime::environment_random($seed) }
+        #[cfg(test)]
+        { crate::aligned_replay::environment_draw($seed, $replay, $consumer) }
+    }};
+}
+#[cfg(test)]
+extern crate self as ww2_core;
+#[cfg(test)]
+mod aligned_replay;
+
 pub mod assault_runtime;
 pub mod catalog;
 pub mod client_view;
