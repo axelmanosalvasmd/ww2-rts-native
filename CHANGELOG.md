@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Apply the retained formatter diagnostic to line wrapping in the new MODE-21 footprint comparator and controls, preserving every non-whitespace byte.
+
 - Compare MODE-21 building footprints by complete cell-key membership in the test-only startup observer. Retain all 49 original raw differences, add strict negative controls and leave the separate house-wrapper difference unresolved.
 
 - Mark MODE-05 and MODE-28 ported from their complete existing six-join and four-map XL constructor checks. Both named tests pass on Linux, Windows and macOS in main `396f6d8a` run `38740304188`. Preserve every Acceptance cell, all other MODE rows and generic Assault runner guards. This documentation proposal has no new native execution.

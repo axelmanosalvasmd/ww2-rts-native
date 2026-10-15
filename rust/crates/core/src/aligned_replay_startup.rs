@@ -116,7 +116,9 @@ fn building_cells_equal(source: &Value, native: &Value) -> bool {
         return false;
     };
     source.len() == native.len()
-        && source.iter().all(|(cell, record)| native.get(cell).is_some_and(|other| exact(record, other)))
+        && source
+            .iter()
+            .all(|(cell, record)| native.get(cell).is_some_and(|other| exact(record, other)))
 }
 
 fn set(values: impl IntoIterator<Item = Value>) -> Value {
@@ -946,7 +948,10 @@ fn building_cells_membership_preserves_complete_entries() {
         missing["$map"].as_array_mut().unwrap().pop();
         rejected(missing);
         let mut extra = source.clone();
-        extra["$map"].as_array_mut().unwrap().push(json!([n(9.0), record(9.0, 0.0, 10.0, 20.0)]));
+        extra["$map"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!([n(9.0), record(9.0, 0.0, 10.0, 20.0)]));
         rejected(extra);
         let mut duplicate = source.clone();
         duplicate["$map"][1] = duplicate["$map"][0].clone();
@@ -959,7 +964,10 @@ fn building_cells_membership_preserves_complete_entries() {
             wrong_value["$map"][0][1][field] = n(99.0);
             rejected(wrong_value);
             let mut missing_field = source.clone();
-            missing_field["$map"][0][1].as_object_mut().unwrap().remove(field);
+            missing_field["$map"][0][1]
+                .as_object_mut()
+                .unwrap()
+                .remove(field);
             rejected(missing_field);
         }
         let mut signed_zero = source.clone();
@@ -972,7 +980,11 @@ fn building_cells_membership_preserves_complete_entries() {
         unknown_wrapper["unregisteredField"] = json!(true);
         rejected(unknown_wrapper);
         let mut wrong_wrapper = source.clone();
-        let rows = wrong_wrapper.as_object_mut().unwrap().remove("$map").unwrap();
+        let rows = wrong_wrapper
+            .as_object_mut()
+            .unwrap()
+            .remove("$map")
+            .unwrap();
         wrong_wrapper["$set"] = rows;
         rejected(wrong_wrapper);
         let mut wrong_type = source.clone();
