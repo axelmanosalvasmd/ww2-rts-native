@@ -4331,3 +4331,22 @@ grant must precede focused native qualification. Strict locked core/simtest
 all-target ci-test Clippy is conditional on all16 passing and that grant.
 No parity row is promoted or quota PR prepared. Root retains independent
 review, hosted checks, Hermes runtime readback and publication.
+
+
+## MODE provider-union mechanical formatting child (2026-10-15)
+
+The first exact S2 formatter check on `e0162f5a` exits1 with one printed
+line-wrap replacement at match_tutorial/tests.rs:592. Its process is terminal
+and the inherited S2 flock is released before notification and this change.
+Apply only that exact printed replacement: collapse the current-unit ID
+collection chain onto one line. Every non-whitespace byte stays identical.
+The complete original progression, all inputs/assertions/literals, all
+incoming fixtures and parity files remain exact. Raw fmt failure and scope
+receipts stay in `/tmp/mode-main-union-20261015/`; this is not a native failure.
+
+Root explicitly permits this mechanical child and requires its frozen full
+SHA before any further native binding. The same original10 plus affected6
+names remain selected in order, each UNRUN. No Source repeat, native test,
+Clippy or semantic repair occurs while creating this child. All historical
+failures retain their producer attribution. No row, quota, interface or
+public action changes. Qualification awaits Root's exact child binding.

@@ -1,0 +1,1 @@
+- Apply the single printed Tutorial ID-collection line wrap from the first S2 formatter check. Preserve all non-whitespace Rust bytes, the original progression and the raw formatting failure; all 16 native instances remain unrun pending the child binding.

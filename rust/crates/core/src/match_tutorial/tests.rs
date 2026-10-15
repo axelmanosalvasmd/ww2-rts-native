@@ -592,13 +592,7 @@ fn tutorial_constructor_is_explicit_and_shared_ground_modes_stay_bounded() {
                 assert_eq!(contact.world.game.units[&id].dust, Some(tick as f64));
                 // The generic Environment guard accepts the actual Tutorial
                 // owners and still rejects an incomplete current-unit order.
-                let ids = contact
-                    .world
-                    .game
-                    .units
-                    .keys()
-                    .copied()
-                    .collect::<Vec<_>>();
+                let ids = contact.world.game.units.keys().copied().collect::<Vec<_>>();
                 {
                     let mut context = crate::environment::Context {
                         tick: tick as u64,
