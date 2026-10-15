@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Compare CMB-61 input metadata recursively with exact f64 bits for JSON numbers, exact object key sets, ordered arrays and strict nonnumeric values. Replace the field-specific representation exception without mutating metadata or changing any replay comparison, input or fixture. Preserve both earlier failed test logs.
+
 - Retain the renewed CMB-61 failure at `d01d213a`: exact `hitAt` comparison succeeds, then strict metadata equality rejects a choice actor's integer versus float `cooldown`. The accuracy test reports 0 passed and 1 failed; stop without widening normalization. Target-choice, registry and Clippy remain unrun.
 
 - Compare CMB-61 metadata actor `hitAt` values by exact f64 bits before canonicalizing only those verified cells for strict whole-JSON equality. Keep every other metadata type, key and value strict. Preserve authored inputs, Source, authentic fixtures and all replay assertions; retain the earlier failure.

@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## CMB-61 exact JSON Number semantics for metadata (2026-10-15)
+
+Root authorizes replacing the field-specific `hitAt` normalization in the new consumer with a recursive comparator used only for recorded `output.input` versus authored input. JavaScript metadata numbers use one Number type; require their `as_f64().to_bits()` values to match exactly, with no epsilon. Objects require equal key counts and every authored key, so missing or extra keys fail. Arrays require equal lengths and recursively compare each position. All nonnumeric types and values remain strictly equal. The comparator reads metadata without mutation and never initializes the replay match.
+
+The consumer outside the metadata helper/call is byte-identical to `281f4b36`; every replay assertion and integer identity check elsewhere remains unchanged. Preserve authored inputs, Source, both fixtures, ordinary firing tests, runtime, registry and all parity rows. Both prior 0-pass/1-fail logs remain attributed to their producing heads; earlier partial launch traversal is not a test pass. Freeze this child before S3 fmt, the two named behavior tests, simtest registry guard and conditional fresh strict Clippy. No Source or old case is rerun.
+
 ## CMB-61 renewed S3 stop after hitAt repair (2026-10-15)
 
 At frozen `d01d213a999c2d1cacbc3e50be79e8e7b009e857`, fmt passes and the exact accuracy test compiles, then fails at the retained strict whole-metadata equality, now line 56. Its first failing case is `choice-flamer-open-below`: Source represents the actor's `cooldown` as integer `1000000000`, while authored input retains float `1000000000.0`. The authorized exact-bit `hitAt` check succeeds. Do not extend that exception to cooldown or change any input, fixture or replay assertion. The raw failure remains `/tmp/cmb61-flame-s3-d01d213a/accuracy.log`.

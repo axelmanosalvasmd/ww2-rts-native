@@ -26,6 +26,32 @@ fn fixture() -> Value {
     serde_json::from_str(&text).unwrap()
 }
 
+fn compare_metadata(actual: &Value, authored: &Value, path: &str) {
+    match (actual, authored) {
+        (Value::Number(actual), Value::Number(authored)) => assert_eq!(
+            actual.as_f64().unwrap().to_bits(),
+            authored.as_f64().unwrap().to_bits(),
+            "{path}"
+        ),
+        (Value::Object(actual), Value::Object(authored)) => {
+            assert_eq!(actual.len(), authored.len(), "{path}: object key count");
+            for (key, expected) in authored {
+                let value = actual
+                    .get(key)
+                    .unwrap_or_else(|| panic!("{path}: missing key {key}"));
+                compare_metadata(value, expected, &format!("{path}.{key}"));
+            }
+        }
+        (Value::Array(actual), Value::Array(authored)) => {
+            assert_eq!(actual.len(), authored.len(), "{path}: array length");
+            for (index, (value, expected)) in actual.iter().zip(authored).enumerate() {
+                compare_metadata(value, expected, &format!("{path}[{index}]"));
+            }
+        }
+        _ => assert_eq!(actual, authored, "{path}"),
+    }
+}
+
 fn replay(group: &str) -> Vec<(String, Value)> {
     let spec = inputs();
     let oracle = fixture();
@@ -41,19 +67,7 @@ fn replay(group: &str) -> Vec<(String, Value)> {
     assert_eq!(recorded.len(), authored.len());
     let mut observations = Vec::new();
     for (input, output) in authored.iter().zip(recorded) {
-        let mut actual_metadata = output["input"].clone();
-        let mut authored_metadata = input.clone();
-        let actual_actors = actual_metadata["input"].as_array_mut().unwrap();
-        let authored_actors = authored_metadata["input"].as_array_mut().unwrap();
-        assert_eq!(actual_actors.len(), authored_actors.len());
-        for (actual, authored) in actual_actors.iter_mut().zip(authored_actors) {
-            let actual_hit_at = actual["hitAt"].as_f64().unwrap();
-            let authored_hit_at = authored["hitAt"].as_f64().unwrap();
-            assert_eq!(actual_hit_at.to_bits(), authored_hit_at.to_bits());
-            actual["hitAt"] = json!(authored_hit_at);
-            authored["hitAt"] = json!(authored_hit_at);
-        }
-        assert_eq!(actual_metadata, authored_metadata);
+        compare_metadata(&output["input"], input, "input");
         assert_eq!(output["name"], input["name"]);
         if input["group"] != group {
             continue;
