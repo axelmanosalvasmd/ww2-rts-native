@@ -17,16 +17,23 @@ fn array(v: &Value) -> &[Value] {
     v.as_array().unwrap()
 }
 fn integers(v: &Value) -> Vec<usize> {
-    array(v).iter().map(|n| n.as_u64().unwrap() as usize).collect()
+    array(v)
+        .iter()
+        .map(|n| n.as_u64().unwrap() as usize)
+        .collect()
 }
 fn teams(v: &Value) -> Vec<i32> {
-    array(v).iter().map(|n| n.as_i64().unwrap() as i32).collect()
+    array(v)
+        .iter()
+        .map(|n| n.as_i64().unwrap() as i32)
+        .collect()
 }
 fn fixture() -> Value {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/mode14-spawn-layout.json");
     let f: Value = serde_json::from_str(
-        &std::fs::read_to_string(path).expect("generate the authorized MODE14 fixture before Cargo"),
+        &std::fs::read_to_string(path)
+            .expect("generate the authorized MODE14 fixture before Cargo"),
     )
     .unwrap();
     assert_eq!(f["format"], 1);
@@ -150,8 +157,12 @@ fn native_constructor(
     } else {
         LayoutSelection::First
     };
-    let relative = deployment::spawn_slots(usable.len(), roster, Some(distances), selection).unwrap();
-    assert_eq!(slots, relative.iter().map(|&i| usable[i]).collect::<Vec<_>>());
+    let relative =
+        deployment::spawn_slots(usable.len(), roster, Some(distances), selection).unwrap();
+    assert_eq!(
+        slots,
+        relative.iter().map(|&i| usable[i]).collect::<Vec<_>>()
+    );
     expected_random.next_u64(StreamId::Weather);
     assert_eq!(m.start.random.snapshot(), expected_random.snapshot());
     assert_eq!(m.world.game.tick, 0);
@@ -167,14 +178,22 @@ fn native_constructor(
     if roster.len() <= usable.len() {
         assert_eq!(unique.len(), roster.len());
     } else {
-        assert!(unique.len() < roster.len(), "more players than spawns must share");
+        assert!(
+            unique.len() < roster.len(),
+            "more players than spawns must share"
+        );
     }
     slots
 }
 fn source_good_contains(observation: &Value, usable: &[usize], actual: &[usize]) {
     assert!(!array(&observation["good"]).is_empty());
     assert!(array(&observation["good"]).iter().any(|c| {
-        integers(&c["slots"]).iter().map(|&i| usable[i]).collect::<Vec<_>>().as_slice() == actual
+        integers(&c["slots"])
+            .iter()
+            .map(|&i| usable[i])
+            .collect::<Vec<_>>()
+            .as_slice()
+            == actual
     }));
 }
 fn assert_observation_input(
@@ -184,7 +203,10 @@ fn assert_observation_input(
     distances: &[f64],
     shuffle: bool,
 ) {
-    assert_eq!(observation["nSpawns"].as_u64().unwrap() as usize, usable.len());
+    assert_eq!(
+        observation["nSpawns"].as_u64().unwrap() as usize,
+        usable.len()
+    );
     assert_eq!(teams(&observation["teams"]).as_slice(), roster);
     assert_eq!(observation["shuffle"].as_bool().unwrap(), shuffle);
     let expected: Vec<Value> = array(&observation["dist"])
@@ -227,13 +249,17 @@ fn mode14_original_walking_and_layout_checklist_matches_source() {
     assert_eq!(fixed.len(), 3);
     let mut selected = Vec::new();
     for c in fixed {
-        let slots = deployment::spawn_slots(6, &teams(&c["teams"]), None, LayoutSelection::First).unwrap();
+        let slots =
+            deployment::spawn_slots(6, &teams(&c["teams"]), None, LayoutSelection::First).unwrap();
         assert_eq!(slots, integers(&c["slots"]));
         selected.push(slots);
     }
     assert_eq!(selected[0], [0, 3]);
     let side = &selected[1];
-    assert_eq!(ring(side[0], side[2]) + ring(side[2], side[4]) + ring(side[0], side[4]), 4);
+    assert_eq!(
+        ring(side[0], side[2]) + ring(side[2], side[4]) + ring(side[0], side[4]),
+        4
+    );
     let ffa = &selected[2];
     assert!(ring(ffa[0], ffa[1]) == 2 && ring(ffa[1], ffa[2]) == 2);
     assert_eq!(array(&f["ringShuffled"]).len(), 20);
@@ -248,14 +274,23 @@ fn mode14_original_walking_and_layout_checklist_matches_source() {
         assert_eq!(slots, integers(&c["slots"]));
         assert_eq!(slots.iter().collect::<BTreeSet<_>>().len(), 6);
     }
-    let peg = array(&f["maps"]).iter().find(|c| c["name"] == "pegasus-bridge.json").unwrap();
+    let peg = array(&f["maps"])
+        .iter()
+        .find(|c| c["name"] == "pegasus-bridge.json")
+        .unwrap();
     let map = shipped_map(peg);
     let usable = integers(&peg["usable"]);
     let distances = authored_distances(map.source(), &usable);
     assert_distances(&distances, &peg["distances"]);
     assert_eq!(array(&f["pegasusConstructors"]).len(), 20);
     for (seed, source) in array(&f["pegasusConstructors"]).iter().enumerate() {
-        assert_observation_input(&source["observation"], &[0, 1, 0, 1], &usable, &distances, true);
+        assert_observation_input(
+            &source["observation"],
+            &[0, 1, 0, 1],
+            &usable,
+            &distances,
+            true,
+        );
         let slots = native_constructor(&map, &[0, 1, 0, 1], seed as u64, true, &distances, &usable);
         source_good_contains(&source["observation"], &usable, &slots);
         let north = |slot: usize| map.spawns()[slots[slot]].y < map.dimensions().1 / 2;
@@ -286,14 +321,33 @@ fn mode14_all_shipped_map_constructor_layouts_preserve_source_candidates() {
             let roster = teams(&case["teams"]);
             assert!((2..=6).contains(&roster.len()));
             assert!(rosters.insert(roster.clone()));
-            assert_observation_input(&case["fixed"]["observation"], &roster, &usable, &distances, false);
-            assert_observation_input(&case["shuffled"]["observation"], &roster, &usable, &distances, true);
+            assert_observation_input(
+                &case["fixed"]["observation"],
+                &roster,
+                &usable,
+                &distances,
+                false,
+            );
+            assert_observation_input(
+                &case["shuffled"]["observation"],
+                &roster,
+                &usable,
+                &distances,
+                true,
+            );
             let fixed = native_constructor(&map, &roster, 701, false, &distances, &usable);
             assert_eq!(fixed, integers(&case["fixed"]["slots"]));
             source_good_contains(&case["fixed"]["observation"], &usable, &fixed);
             constructor_count += 1;
             for seed in array(&f["nativeSeeds"]) {
-                let slots = native_constructor(&map, &roster, seed.as_u64().unwrap(), true, &distances, &usable);
+                let slots = native_constructor(
+                    &map,
+                    &roster,
+                    seed.as_u64().unwrap(),
+                    true,
+                    &distances,
+                    &usable,
+                );
                 // Only Source candidate membership is compared for independent RNG streams.
                 source_good_contains(&case["shuffled"]["observation"], &usable, &slots);
                 constructor_count += 1;
@@ -305,16 +359,24 @@ fn mode14_all_shipped_map_constructor_layouts_preserve_source_candidates() {
             assert!(rosters.contains(&(0..count).map(|i| i % 2).collect::<Vec<i32>>()));
         }
     }
-    let map_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../server/src/authoritative-maps");
+    let map_dir =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../server/src/authoritative-maps");
     let shipped: BTreeSet<String> = std::fs::read_dir(map_dir)
         .unwrap()
         .map(|entry| entry.unwrap().path())
         .filter(|path| path.extension().is_some_and(|ext| ext == "json"))
         .map(|path| path.file_name().unwrap().to_string_lossy().into_owned())
         .collect();
-    assert_eq!(names.into_iter().map(str::to_owned).collect::<BTreeSet<_>>(), shipped);
+    assert_eq!(
+        names
+            .into_iter()
+            .map(str::to_owned)
+            .collect::<BTreeSet<_>>(),
+        shipped
+    );
     assert_eq!(roster_count, 297);
     assert_eq!(constructor_count, 891);
-    eprintln!("MODE14 maps=33 rosters=297 native_constructors=891 seeded_whole_match_equality=held");
+    eprintln!(
+        "MODE14 maps=33 rosters=297 native_constructors=891 seeded_whole_match_equality=held"
+    );
 }
