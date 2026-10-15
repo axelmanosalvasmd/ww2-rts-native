@@ -1,0 +1,3 @@
+- Reconstruct the CMB-82/87/88/89/93 source candidate on main f7b0e588, preserving incoming startup hooks, parity tables and old firing fixtures. Keep held combat callers separate and earlier passes and failures on their producing heads.
+- Correct command ordering in the unrun combat recorder, require an acquisition-tick physical flight and prompt replacement damage, and bind the purchased medic to its real producer and120MP payment. Compare global draw receipts and per-tick environment state without assigning actor or wallet state.
+- Record every original predicate and the proposed two-scene Source-first scope. All execution remains frozen; the1,000-tick scenes and new ignored native consumers have not run, and no row is promoted.

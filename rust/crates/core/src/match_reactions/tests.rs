@@ -389,3 +389,43 @@ fn accepted_retreat_cancels_paid_work_after_route_preflight_without_refund() {
     assert!(m.world.game.units[&id].retreating);
     assert_eq!(m.start.economy.players[u.owner].mp, paid);
 }
+
+#[test]
+fn younger_idle_squad_follows_spacing_route_without_losing_shelter() {
+    let f = fixture();
+    let c = f["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["name"] == "idle-spacing")
+        .unwrap();
+    let mut m = make(&f, c);
+    let older = m.world.game.units[&1].at();
+    let initial = m.world.game.units[&2].at();
+    let threat = Some(m.world.game.units[&3].at());
+    let rank = crate::terrain::cover_rank(&m.world.game, &m.rules, initial, threat);
+    let random = m.start.random.snapshot();
+    m.react_unit(1).unwrap();
+    assert!(m.world.game.units[&1].path.is_empty());
+    m.react_unit(2).unwrap();
+    let mut expected = c["expected"].clone();
+    expected["drift"] = json!(truth(&expected["drift"]));
+    assert_eq!(snapshot(&m, 2), expected);
+    let route = m.world.game.units[&2].path.clone();
+    assert!(!route.is_empty());
+    assert_eq!(m.commands.units[&2].react, 1.0);
+    m.react_unit(2).unwrap();
+    assert_eq!(m.world.game.units[&2].path, route);
+    for _ in 0..80 {
+        m.world.game.tick += 1;
+        m.begin_path_tick(4096, 4).unwrap();
+        m.decrement_reaction_timer(2, 0.05).unwrap();
+        m.move_unit_with_command_routes(2, 1.0).unwrap();
+    }
+    let moved = &m.world.game.units[&2];
+    assert!(moved.path.is_empty());
+    assert_eq!(m.world.game.units[&1].at(), older);
+    assert!(crate::math::hypot(moved.x - older.x, moved.z - older.z) >= 2.75);
+    assert!(crate::terrain::cover_rank(&m.world.game, &m.rules, moved.at(), threat) <= rank);
+    assert_eq!(m.start.random.snapshot(), random);
+}

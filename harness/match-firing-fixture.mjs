@@ -16,9 +16,12 @@ registerHooks({load(url,context,next){const result=next(url,context);if(url!==pa
  const source=String(result.source),begin='    // A vehicle standing still keeps its front armor',end='  // more engineers build faster';
  assert.equal(source.split(begin).length,2);assert.equal(source.split(end).length,2);
  const block=source.slice(source.indexOf(begin),source.indexOf(end));
+ const attackBegin='    // explicit attack order: chase until we can shoot (paused while an autocast satchel is carried up to the target)',attackEnd='    // incoming fire and spacing for units with nothing ordered (see react)';
+ assert.equal(source.split(attackBegin).length,2);assert.equal(source.split(attackEnd).length,2);
+ const orderedAttack=source.slice(source.indexOf(attackBegin),source.indexOf(attackEnd));
  const salvo=source.slice(source.indexOf('  for (const s of g.salvos) {',source.indexOf(end)),source.indexOf('  stepStrikes(g, list, dt);',source.indexOf(end)));
  assert(salvo.includes('g.salvos = g.salvos.filter'));
- return {...result,source:source+'\nexport function __firing(g,id,moving,dt){ for(const u of [g.units.get(id)]) { const def=UNITS[u.type],w=def.w,sm=suppMul(u);\n'+block+'}\nexport function __salvos(g,dt){const list=[...g.units.values()];\n'+salvo+'}\nexport {claim,flightContact,stepFlights,setCell};\n'};
+ return {...result,source:source+'\nexport function __orderedAttack(g,id){const u=g.units.get(id);\n'+orderedAttack+'}\nexport function __firing(g,id,moving,dt){ for(const u of [g.units.get(id)]) { const def=UNITS[u.type],w=def.w,sm=suppMul(u);\n'+block+'}\nexport function __salvos(g,dt){const list=[...g.units.values()];\n'+salvo+'}\nexport {claim,flightContact,stepFlights,setCell};\n'};
 }});
 const sim=await import(pathToFileURL(resolve(reference,'shared/sim.js')));
 const grid=await import(pathToFileURL(resolve(reference,'shared/grid.js')));
@@ -30,10 +33,12 @@ const vector=p=>[bits(p.x),bits(p.y),bits(p.z)];
 const sparse=a=>Array.from(a,(v,i)=>v?[i,bits(v)]:null).filter(Boolean);
 function snapshot(g){const retained=new Map();for(const p of g.flights.values())if(!g.units.has(p.shooter))retained.set(p.shooter,bits(p.source.xp));return {ammo:[...g.units.values()].filter(u=>u.logistics).map(u=>[u.id,bits(u.logistics.ammo)]),retained:[...retained],environment:[g.seed>>>0,g.nextId],terrain:{chars:g.chars.join(''),hp:sparse(g.cellHp),wear:sparse(g.wear),scar:sparse(g.scar),burnt:Array.from(g.burnt,(v,i)=>v?[i,v]:null).filter(Boolean),versions:[g.terrainVersion??0,g.obstructionVersion??0,g.infantryRegionVersion??0,g.vehicleRegionVersion??0,g.navalRegionVersion??0]},units:[...g.units.values()].map(u=>[u.id,u.targetId,bits(u.cooldown),bits(u.retarget),bits(u.aim),bits(u.rot),u.shotAt??null,bits(u.hp),bits(u.supp),bits(u.xp),u.hitBy??null,bits(u.hitAt),u.lastHit??null,u.hitFrom??null,u.deathImpulse??null]),claims:[...g.claims].sort((a,b)=>a[0]-b[0]).map(([k,v])=>[k,bits(v)]),flights:[...g.flights.values()].map(p=>({id:p.id,shooter:p.shooter,owner:p.owner,kind:p.kind,origin:vector(p),velocity:[bits(p.vx),bits(p.vy),bits(p.vz)],gravity:bits(p.gravity),stamp:bits(p.stamp),launched:bits(p.launched),last:bits(p.last),expires:bits(p.expires),energy:bits(p.energy),sequence:p.sequence,maxContacts:p.maxContacts,near:bits(p.near),startCell:p.startCell,intended:p.intended??null,damageScale:bits(p.damageScale??1),suppression:bits(p.suppression??0),suppressionScale:bits(p.suppressionScale??1),ap:!!p.ap,apMultiplier:bits(p.apMultiplier??1.5),apNaval:!!p.apNaval,explosive:!!p.explosive,terrain:bits(p.terrain??0),scar:bits(p.scar??0),blastRadius:p.blastRadius===undefined?null:bits(p.blastRadius),blastSource:!!p.blastSource,effect:p.effect??null,sent:!!p.sent})),shots:g.shots,salvos:g.salvos.map(s=>({owner:s.owner,at:[bits(s.x),bits(s.z)],left:s.left,next:bits(s.next),every:bits(s.w.every),spread:bits(s.spread)}))};}
 const cases=[];
+const selected=process.argv.includes('--selected');
+const selectedScenarios=[['rifle','selected-spread-six'],['mortar','selected-crowd-hidden'],['mortar','selected-crowd-visible'],['mortar','selected-crowd-passenger'],['rifle','selected-retarget'],['rifle','selected-ordered']];
 const originalScenarios=[];
 for(const shooter of ['rifle','mg','sniper','at','tank','flamer','mortar','howitzer','rocket','gunboat','destroyer'])for(const variation of ['plain','cover','moving','hold','unseen','hurt','flight','flight-cover','flight-wall','flight-bounce','flight-expiry','flight-motion','flight-dead-shooter','ammo-low','ammo-empty','attack','flight-attack','choice-role','choice-threat','choice-hysteresis','choice-visibility','choice-invalid','choice-timer','choice-claims','choice-dug','choice-crowd'])originalScenarios.push([shooter,variation]);
 const launchContactScenarios=[['gunboat','naval-bow'],['mg','supp-0'],['mg','supp-50'],['mg','supp-90'],['rifle','aim-dispersion'],['rifle','flight-ally'],['rifle','flight-intervene'],['tank','flight-explosive-bounce']];
-for(const [shooter,variation] of [...originalScenarios,...launchContactScenarios]){
+for(const [shooter,variation] of selected?selectedScenarios:[...originalScenarios,...launchContactScenarios]){
  if(!sim.UNITS[shooter])continue;
  if(variation==='choice-role'&&shooter!=='at')continue;
  if(['choice-threat','choice-hysteresis','choice-visibility','choice-invalid','choice-timer','choice-claims'].includes(variation)&&shooter!=='rifle')continue;
@@ -49,7 +54,7 @@ for(const [shooter,variation] of [...originalScenarios,...launchContactScenarios
  if(naval){map.rows=map.rows.map((_,i)=>i<8?'.'.repeat(80):'W'.repeat(80));map.spawns=[{x:0,y:0},{x:79,y:0}];}
  const original=Math.random;Math.random=()=>.5;let g;try{g=sim.createGame(map,['A','B'],false,[0,1],[0,1],{weather:false,logistics:false,tech:false});}finally{Math.random=original;}
  g.units.clear();g.nextId=1;g.seed=123;g.wind={a:0,v:.5};g.wx={rain:0,wet:0};
- const otherKind=variation==='choice-role'?'tank':variation.startsWith('choice-')?'rifle':naval?'gunboat':'tank';
+ const otherKind=variation==='choice-role'?'tank':(variation.startsWith('choice-')||variation.startsWith('selected-'))?'rifle':naval?'gunboat':'tank';
  const u=sim.internals.spawnUnit(g,0,shooter),t=sim.internals.spawnUnit(g,1,variation==='naval-bow'?'destroyer':naval?'gunboat':'rifle'),other=sim.internals.spawnUnit(g,1,otherKind);
  const range=sim.UNITS[shooter].w.range,minimum=sim.UNITS[shooter].w.minRange??0,distance=Math.max(minimum+(naval?16:2),Math.min(range-2,30));
  Object.assign(u,{x:25,z:naval?30:15,rot:0,aim:0,still:20,cooldown:0,retarget:0,targetId:0,auto:false,buff:0,ap:false,holdFire:variation==='hold'});
@@ -87,17 +92,53 @@ for(const [shooter,variation] of [...originalScenarios,...launchContactScenarios
    }
   }
  }
+ if(variation==='selected-spread-six'){
+  Object.assign(u,{x:5,z:11,cooldown:1e9});
+  Object.assign(t,{x:25,z:19,hp:20,holdFire:true});
+  Object.assign(other,{x:27.5,z:19,holdFire:true});
+  for(let i=1;i<6;i++){
+   const ally=sim.internals.spawnUnit(g,0,'rifle');
+   Object.assign(ally,{x:5,z:11+i*3,still:20,cooldown:1e9,retarget:0,auto:false});
+  }
+ }
+ if(variation.startsWith('selected-crowd-')){
+  Object.assign(u,{x:10,z:24,cooldown:1e9});
+  Object.assign(t,{x:40,z:9});Object.assign(other,{x:40,z:39});
+  const neighbour=sim.internals.spawnUnit(g,1,'rifle');
+  Object.assign(neighbour,{x:41,z:39,cooldown:1e9,retarget:1e9});
+  if(variation==='selected-crowd-passenger'){
+   const carrier=sim.internals.spawnUnit(g,1,'halftrack');
+   Object.assign(carrier,{x:41,z:39,cooldown:1e9,retarget:1e9});
+   carrier.cargo.push(neighbour.id);neighbour.riding=carrier.id;
+  }
+ }
+ if(variation==='selected-ordered'){
+  Object.assign(u,{cooldown:1e9});Object.assign(t,{x:45,z:u.z});Object.assign(other,{x:29,z:u.z+1});
+ }
+ if(variation==='selected-retarget'){
+  Object.assign(t,{x:42,z:u.z,hp:1,cooldown:1e9,retarget:1e9});
+  Object.assign(other,{x:45,z:u.z+3,cooldown:1e9,retarget:1e9});
+ }
  if(variation==='attack'||variation==='flight-attack'||variation.startsWith('ammo')){u.attackId=2;u.targetId=2;}
  if(variation.startsWith('ammo'))u.logistics={ammo:variation==='ammo-low'?2:0,ammoMax:20,ammoPrice:1,ammoCredit:0,provisions:120,forced:false,stranded:false,exhausted:false};
  if(variation.endsWith('cover')){const c=Math.floor(t.z/2)*g.w+Math.floor(t.x/2);sim.setCell(g,c,'#');}
  if(variation==='hurt'){Object.assign(u,{supp:55,xp:sim.UNITS[shooter].cost*5,hitBy:3,hitAt:1,hitFrom:{x:other.x,z:other.z}});Object.assign(other,{targetId:1,shotAt:1});}
- g.players[0].visible=new Set(variation==='unseen'?[]:variation==='choice-visibility'?[3]:[...g.units.values()].filter(v=>v.owner===1).map(v=>v.id));g.players[1].visible=new Set([1]);grid.rebuildGrid(g);
- const input=[...g.units.values()].map(u=>({id:u.id,kind:u.type,owner:u.owner,x:u.x,z:u.z,rot:u.rot,hp:u.hp,still:u.still,supp:u.supp,xp:u.xp,hitBy:u.hitBy??null,hitAt:u.hitAt,hitFrom:u.hitFrom??null,target:u.targetId,shotAt:u.shotAt??null,logistics:u.logistics?structuredClone(u.logistics):null,hold:u.holdFire,attack:u.attackId,aim:u.aim,cooldown:u.cooldown,retarget:u.retarget}));
+ g.players[0].visible=new Set(variation==='unseen'?[]:variation==='choice-visibility'?[3]:[...g.units.values()].filter(v=>v.owner===1).map(v=>v.id));g.players[1].visible=new Set([1]);
+ if(variation==='selected-retarget')g.players[0].visible=new Set();
+ if(variation==='selected-crowd-hidden')g.players[0].visible=new Set([2,3]);
+ if(variation==='selected-crowd-passenger')g.players[0].visible=new Set([2,3,4]);
+ grid.rebuildGrid(g);
+ const initialVisible=[...g.players[0].visible];
+ const input=[...g.units.values()].map(u=>({id:u.id,kind:u.type,owner:u.owner,x:u.x,z:u.z,rot:u.rot,hp:u.hp,still:u.still,supp:u.supp,xp:u.xp,hitBy:u.hitBy??null,hitAt:u.hitAt,hitFrom:u.hitFrom??null,target:u.targetId,shotAt:u.shotAt??null,logistics:u.logistics?structuredClone(u.logistics):null,hold:u.holdFire,attack:u.attackId,aim:u.aim,cooldown:u.cooldown,retarget:u.retarget,...(selected?{riding:u.riding,cargo:[...u.cargo]}:{})}));
  g.nextId=1000;
  const random=combatRandom(701),steps=[],contacts=[];
- const run=variation.startsWith('flight'), checkpoints=run?[1,2,11,21,41,81,121,161]:[1,2,11,21];
+ const continuous=variation==='selected-retarget';
+ const run=variation.startsWith('flight'), checkpoints=continuous?Array.from({length:80},(_,i)=>i+1):run?[1,2,11,21,41,81,121,161]:[1,2,11,21];
+ let acquired=0,replaced=0,deadTick=0;
  for(const tick of run?Array.from({length:161},(_,i)=>i+1):checkpoints){
   const prior=new Map([...g.units.values()].map(v=>[v.id,{x:v.x,z:v.z,rot:v.rot}]));g.tick=tick;
+  if(variation==='selected-ordered'&&tick===1)assert.equal(sim.command(g,0,{t:'attack',ids:[1],target:2}),undefined);
+  if(continuous&&tick===2)g.players[0].visible=new Set([2,3]);
   if(run&&tick===2){
    if(variation==='flight-wall')sim.setCell(g,Math.floor(u.z/2)*g.w+Math.floor((u.x+5)/2),'B');
    if(['flight-bounce','flight-explosive-bounce'].includes(variation)){Object.assign(t,{x:35,z:u.z+1.18});prior.set(t.id,{x:t.x,z:t.z,rot:t.rot});grid.rebuildGrid(g);for(const p of g.flights.values())p.vy=0;}
@@ -108,10 +149,25 @@ for(const [shooter,variation] of [...originalScenarios,...launchContactScenarios
   if(!run||tick===1)g.shots=[];
   g.claims=new Map();for(const v of g.units.values())if(v.targetId&&v.hp>0)sim.claim(g,v,v.targetId,1);u.cooldown-=.05;u.retarget-=.05;
   const old=Math.random;Math.random=()=>random.next();try{
-   if(!run||tick===1){sim.__firing(g,1,variation==='moving',.05);if(variation==='choice-claims')sim.__firing(g,4,false,.05);}
-   if(run){sim.stepFlights(g,prior);sim.__salvos(g,.05);}
+   if(variation==='selected-ordered')sim.__orderedAttack(g,1);
+   if(!run||tick===1){sim.__firing(g,1,variation==='moving',.05);if(variation==='choice-claims')sim.__firing(g,4,false,.05);if(variation==='selected-spread-six')for(const id of [4,5,6,7,8])sim.__firing(g,id,false,.05);}
+   if(run||continuous){sim.stepFlights(g,prior);sim.__salvos(g,.05);}
   }finally{Math.random=old;}
   for(const e of g.shots)if(e.k==='contact'&&!contacts.some(v=>v.contactId===e.contactId))contacts.push(e);
+  if(variation==='selected-spread-six'){
+   const targets=[1,4,5,6,7,8].map(id=>g.units.get(id).targetId);
+   assert.equal(targets.filter(id=>id===2||id===3).length,6);
+   assert(targets.filter(id=>id===2).length>=1);
+   assert(targets.filter(id=>id===3).length>=2);
+  }
+  if(variation==='selected-ordered')assert.equal(u.targetId,2,'the ordinary ordered target beats the closer automatic candidate');
+  if(variation.startsWith('selected-crowd-'))assert.equal(u.targetId,variation==='selected-crowd-visible'?3:2);
+  if(continuous){
+   if(tick<10)assert.equal(u.targetId,0,'an idle actor waits for the scheduled search');
+   if(u.targetId===2&&!acquired)acquired=tick;
+   if(t.hp<=0&&!deadTick)deadTick=tick;
+   if(u.targetId===3&&!replaced)replaced=tick;
+  }
   if(checkpoints.includes(tick)){
    if(tick===1&&variation==='naval-bow'){
     assert(Math.hypot(t.x-u.x,t.z-u.z)>range,'ship centre is beyond weapon range');
@@ -124,7 +180,7 @@ for(const [shooter,variation] of [...originalScenarios,...launchContactScenarios
     assert.equal(u.targetId,expected,`${variation} tick ${tick}: Source selected target`);
     if(variation==='choice-claims')assert.equal(g.units.get(4).targetId,3,'second shooter spreads its claim');
    }
-   steps.push({tick,expected:snapshot(g),random:random.state()});g.shots=[];
+   steps.push({tick,expected:snapshot(g),random:random.state(),...(selected?{drawCount:random.draws.length}:{})});g.shots=[];
   }
  }
  if(variation==='flight-ally'){
@@ -140,10 +196,11 @@ for(const [shooter,variation] of [...originalScenarios,...launchContactScenarios
   assert(incidence>0&&incidence<.28,'the impact is shallow enough to bounce without the explosive guard');
   assert(!contacts.some(e=>e.seq>1),'Source does not ricochet the explosive round');
  }
- cases.push({map,shooter,variation,lateWall:variation==='flight-wall'?Math.floor(u.z/2)*g.w+Math.floor((u.x+5)/2):null,cells:variation.endsWith('cover')?[[Math.floor(t.z/2)*g.w+Math.floor(t.x/2),'#']]:variation==='choice-dug'?[[Math.floor(other.z/2)*g.w+Math.floor(other.x/2),'T']]:[],input,visible:[...g.players[0].visible],steps});
+ if(continuous){assert(acquired>=10&&acquired<=12);assert(deadTick>acquired);assert.equal(replaced,deadTick+1,'a dead target is replaced on the next firing phase');assert(other.hp<sim.UNITS.rifle.models*sim.UNITS.rifle.hpPer,'the replacement volley arrives');}
+ cases.push({map,shooter,variation,lateWall:variation==='flight-wall'?Math.floor(u.z/2)*g.w+Math.floor((u.x+5)/2):null,cells:variation.endsWith('cover')?[[Math.floor(t.z/2)*g.w+Math.floor(t.x/2),'#']]:variation==='choice-dug'?[[Math.floor(other.z/2)*g.w+Math.floor(other.x/2),'T']]:[],input,visible:initialVisible,steps});
 }
 clean();const output=JSON.stringify({reference:pin,node:process.version,arch:process.arch,seed:701,cases})+'\n';
-const path=`${root}/rust/crates/simtest/tests/fixtures/match-firing.json.gz`;
+const path=`${root}/rust/crates/simtest/tests/fixtures/${selected?'combat-target-selected':'match-firing'}.json.gz`;
 const compressed=gzipSync(output,{level:9});
 if(process.argv.includes('--check'))assert.deepEqual(readFileSync(path),compressed);else writeFileSync(path,compressed);
 console.log(`Verified ${cases.length} Match firing traces, ${cases.reduce((n,c)=>n+c.steps.length,0)} phases`);

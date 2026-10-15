@@ -258,3 +258,175 @@ fn equal_fraction_contacts_use_lower_id_despite_grid_history() {
         assert_eq!(m.world.game.units[&3].hp, 100.0);
     }
 }
+
+fn selected_fixture() -> Value {
+    let mut text = String::new();
+    flate2::read::GzDecoder::new(&include_bytes!("fixtures/combat-target-selected.json.gz")[..])
+        .read_to_string(&mut text)
+        .unwrap();
+    let fixture: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(
+        fixture["reference"],
+        "e4e579a838aabae3b1d9dadbc17a0a87147bc52d"
+    );
+    assert_eq!(fixture["cases"].as_array().unwrap().len(), 6);
+    fixture
+}
+
+fn replay_selected(c: &Value, mode: Mode) {
+    let mut m = make_with_mode(c, mode);
+    let initial_random = m.start.random.snapshot();
+    let variation = c["variation"].as_str().unwrap();
+    let continuous = variation == "selected-retarget";
+    let mut acquired = 0;
+    let mut dead = 0;
+    let mut replaced = 0;
+    for step in c["steps"].as_array().unwrap() {
+        let tick = step["tick"].as_i64().unwrap();
+        m.world.game.tick = tick - 1;
+        m.capture_firing_prior().unwrap();
+        m.world.game.tick = tick;
+        if variation == "selected-ordered" && tick == 1 {
+            let command = ww2_core::match_commands::Command::Attack {
+                ids: vec![1],
+                target: 2,
+                queue: false,
+                at: None,
+            };
+            assert!(m.execute_command(0, &command, false).unwrap().is_none());
+        }
+        if continuous && tick == 2 {
+            m.world.game.players[0].visible = vec![2, 3];
+        }
+        let order = m.world.game.units.keys().copied().collect::<Vec<_>>();
+        m.begin_firing_tick(&order).unwrap();
+        m.advance_firing_timers(1, 0.05).unwrap();
+        if variation == "selected-ordered" {
+            m.apply_ground_attack(1).unwrap();
+        }
+        m.apply_unit_firing(1, false, 0.05).unwrap();
+        if variation == "selected-spread-six" {
+            for id in [4, 5, 6, 7, 8] {
+                m.apply_unit_firing(id, false, 0.05).unwrap();
+            }
+            let targets = [1, 4, 5, 6, 7, 8].map(|id| m.firing.get(id).unwrap().target_id);
+            assert_eq!(targets.iter().filter(|&&id| id == 2 || id == 3).count(), 6);
+            assert!(targets.iter().filter(|&&id| id == 2).count() >= 1);
+            assert!(targets.iter().filter(|&&id| id == 3).count() >= 2);
+        }
+        if variation == "selected-ordered" {
+            assert_eq!(m.firing.get(1).unwrap().target_id, 2);
+        }
+        if variation.starts_with("selected-crowd-") {
+            let expected = if variation == "selected-crowd-visible" {
+                3
+            } else {
+                2
+            };
+            assert_eq!(m.firing.get(1).unwrap().target_id, expected);
+            if variation == "selected-crowd-passenger" {
+                assert!(m.world.game.units[&4].riding);
+                assert_eq!(m.combat.get(5).unwrap().cargo, [4]);
+                assert_eq!(m.combat.get(4).unwrap().carrier, Some(5));
+            }
+        }
+        if continuous {
+            m.step_firing_flights().unwrap();
+            m.advance_firing_salvos(0.05).unwrap();
+            let target = m.firing.get(1).unwrap().target_id;
+            if tick < 10 {
+                assert_eq!(target, 0);
+            }
+            if target == 2 && acquired == 0 {
+                acquired = tick;
+            }
+            if m.world.game.units[&2].hp <= 0.0 && dead == 0 {
+                dead = tick;
+            }
+            if target == 3 && replaced == 0 {
+                replaced = tick;
+            }
+        }
+        compare(
+            &snapshot(&mut m),
+            &step["expected"],
+            &format!("{variation}/{mode:?}/{tick}"),
+        );
+        let random = m.start.random.snapshot();
+        let state = random
+            .streams
+            .iter()
+            .find(|(id, _)| *id == StreamId::Combat);
+        if step["drawCount"].as_u64().unwrap() == 0 {
+            assert_eq!(random, initial_random);
+            assert!(state.is_none());
+        } else {
+            let state = state.unwrap().1;
+            assert_eq!(format!("{state:016x}"), step["random"].as_str().unwrap());
+        }
+    }
+    if continuous {
+        assert!((10..=12).contains(&acquired));
+        assert!(dead > acquired);
+        assert_eq!(replaced, dead + 1);
+        assert!(m.world.game.units[&3].hp < 100.0);
+    }
+}
+
+#[test]
+fn six_shooters_rebuild_and_update_actual_volley_claims() {
+    let f = selected_fixture();
+    let c = f["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["variation"] == "selected-spread-six")
+        .unwrap();
+    for mode in [Mode::Default, Mode::Conquest] {
+        replay_selected(c, mode);
+    }
+}
+
+#[test]
+fn salvo_clusters_ignore_hidden_and_riding_neighbors() {
+    let f = selected_fixture();
+    let cases = f["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|c| {
+            c["variation"]
+                .as_str()
+                .unwrap()
+                .starts_with("selected-crowd-")
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(cases.len(), 3);
+    for c in cases {
+        for mode in [Mode::Default, Mode::Conquest] {
+            replay_selected(c, mode);
+        }
+    }
+}
+
+#[test]
+fn scheduled_search_and_natural_target_death_launch_replacement_volley() {
+    let f = selected_fixture();
+    let c = f["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|c| c["variation"] == "selected-retarget")
+        .unwrap();
+    assert_eq!(c["steps"].as_array().unwrap().len(), 80);
+    for mode in [Mode::Default, Mode::Conquest] {
+        replay_selected(c, mode);
+        let ordered = f["cases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["variation"] == "selected-ordered")
+            .unwrap();
+        replay_selected(ordered, mode);
+    }
+}

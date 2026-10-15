@@ -1,0 +1,1 @@
+- Integrate only the frozen CMB-82/87/88/89/93 candidate onto PR271 main, preserving all incoming logistics, replay hooks, fixtures and parity cells. Both new Source scenes remain unrun pending a new exact-head grant; historical passes and failures retain their original heads.

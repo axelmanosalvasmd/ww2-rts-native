@@ -1043,3 +1043,56 @@ fn invalid_world_recovery_actor_rejects_before_health_wallet_or_metadata() {
     );
     assert_eq!(m.recovery, metadata);
 }
+
+#[test]
+fn idle_medic_follows_its_real_route_then_heals_without_spending_manpower() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("../../tests/fixtures/match-recovery.json")).unwrap();
+    let case = fixture["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["name"] == "medic-idle-pathseek-and-exclusions")
+        .unwrap();
+    let (mut m, order) = make(case);
+    let wallet = m.start.economy.players[0].mp;
+    let random = m.start.random.snapshot();
+    let initial = m.world.game.units[&1].at();
+    let routes = m.heal_wounded(&order, 0.5).unwrap();
+    assert_eq!(routes.len(), 1);
+    assert_eq!(routes[0].unit, 1);
+    assert_eq!(routes[0].goal, m.world.game.units[&2].at());
+    assert_eq!(
+        m.world.game.units[&1].path,
+        case["snapshots"][1]["units"][0]["path"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(point)
+            .collect::<Vec<_>>()
+    );
+    for _ in 0..400 {
+        m.world.game.tick += 1;
+        m.begin_path_tick(4096, 4).unwrap();
+        m.move_unit_with_command_routes(1, 1.0).unwrap();
+        let frame = m.prepare_recovery(&order).unwrap();
+        m.heal_and_sweep(&frame, 0.05).unwrap();
+    }
+    let medic = &m.world.game.units[&1];
+    let patient = &m.world.game.units[&2];
+    assert!(crate::math::hypot(medic.x - patient.x, medic.z - patient.z) <= 10.0);
+    assert!(crate::math::hypot(medic.x - initial.x, medic.z - initial.z) > 10.0);
+    assert!(patient.hp > 60.0 && patient.hp <= 100.0);
+    assert_eq!(m.start.economy.players[0].mp, wallet);
+    assert_eq!(m.start.random.snapshot(), random);
+    let command = crate::match_commands::Command::Attack {
+        ids: vec![1],
+        target: 5,
+        queue: false,
+        at: None,
+    };
+    assert_eq!(
+        m.execute_command(0, &command, false).unwrap(),
+        Some(crate::match_commands::Denial::QueueFull)
+    );
+}

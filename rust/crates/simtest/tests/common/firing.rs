@@ -80,6 +80,7 @@ pub fn make_with_mode(c: &Value, mode: Mode) -> Match {
             point(v),
         )
         .unwrap();
+        u.riding = v["riding"].as_u64().is_some_and(|id| id != 0);
         u.rot = v["rot"].as_f64().unwrap();
         u.hp = v["hp"].as_f64().unwrap();
         u.still = v["still"].as_f64();
@@ -98,6 +99,13 @@ pub fn make_with_mode(c: &Value, mode: Mode) -> Match {
         state.retarget = v["retarget"].as_f64().unwrap();
         m.abilities.initialize(id);
         let meta = m.combat.initialize(id);
+        meta.cargo = v["cargo"].as_array().map_or_else(Vec::new, |ids| {
+            ids.iter().map(|id| id.as_u64().unwrap() as u32).collect()
+        });
+        meta.carrier = v["riding"]
+            .as_u64()
+            .filter(|id| *id != 0)
+            .map(|id| id as u32);
         meta.xp = v["xp"].as_f64().unwrap();
         meta.hit_at = v["hitAt"].as_f64().unwrap();
         meta.hit_by = v["hitBy"].as_u64().map(|n| n as u32);
