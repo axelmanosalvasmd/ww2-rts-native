@@ -41,6 +41,10 @@ mod conquest_mode_batch;
 mod conquest_team_result;
 #[path = "../construction_tick.rs"]
 mod construction_tick;
+#[path = "../engineering_consumers.rs"]
+mod engineering_consumers;
+#[path = "../engineering_travel.rs"]
+mod engineering_travel;
 #[path = "../fps_effects.rs"]
 mod fps_effects;
 #[path = "../fps_runtime.rs"]

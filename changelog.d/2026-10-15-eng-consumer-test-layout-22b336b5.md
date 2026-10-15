@@ -1,0 +1,1 @@
+- Format the two new engineering consumer test files while preserving their literals, assertions and non-format tokens. Retain the initial formatting diagnostic and the proof for rustfmt's optional commas and single-expression block delimiters.
