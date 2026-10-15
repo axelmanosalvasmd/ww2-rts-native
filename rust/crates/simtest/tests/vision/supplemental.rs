@@ -271,7 +271,7 @@ fn cmb131_seen_enemy_cell_requires_actual_visible_fact() {
         }
         for fog in [&actual_fog, &control_fog] {
             for source in [1, 2] {
-                assert!(fog.kept[&source].seen.as_ref().unwrap().cells.len() > 0);
+                assert!(!fog.kept[&source].seen.as_ref().unwrap().cells.is_empty());
             }
         }
     }
@@ -304,7 +304,7 @@ fn cmb131_height_only_edit_invalidates_warmed_cells() {
                     actual, before,
                     "stable scene retains masks, versions and deltas"
                 );
-                assert!(fog.kept[&observer].seen.as_ref().unwrap().cells.len() > 0);
+                assert!(!fog.kept[&observer].seen.as_ref().unwrap().cells.is_empty());
             }
             if index == 3 {
                 let previous = prior_game.as_ref().unwrap();

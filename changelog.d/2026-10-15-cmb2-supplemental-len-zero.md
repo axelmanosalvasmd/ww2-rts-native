@@ -1,0 +1,1 @@
+- Use explicit nonempty checks in both supplemental fog cache assertions to satisfy strict Clippy without changing their predicates.
