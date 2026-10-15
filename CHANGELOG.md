@@ -4,6 +4,15 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Mark BASE-15 ported after complete-row ACCEPT: actual HQ purchases, whole-stick reservation/refusal, denied recruitment, delayed delivery, Fighter Cover interception and full reservation release. Source generation/check at `162e7bd7` records 3 scenes, 26 commands and 289 ticks; integrated native `ce3d5026` passes 3 tests (0 failed, 313 skipped), fmt check and strict workspace/all-target Clippy. Preserve the setup-specific population/global-count inequality and all runtime, fixture, test and acceptance bytes.
+
+- Format the new BASE-15 pending-paratrooper replay after its first fmt-check diagnostic. Preserve every literal/assertion token and the authentic fixture; native lifecycle qualification remains pending.
+
+- Record the authentic BASE-15 pending-drop fixture from pinned Source at recorder head `162e7bd7`: 3 retained-constructor scenes, 26 actual commands and 289 complete ticks. Generation and exact regeneration check pass, with no post-constructor random draws. Native replay and complete row eligibility remain pending.
+
+- Draft the complete BASE-15 pending-paratrooper recorder and native replay over retained canonical constructors, real HQ purchases, actual delayed delivery/Fighter Cover interception and released-slot recruitment. Register one test module. The three scenes predict 26 commands and 289 full ticks; no fixture or execution exists yet. Preserve the original cleared-scene population/global-count difference for whole-predicate review. All parity statuses, runtime, guards, old tests and fixtures remain unchanged.
+
+
 - Normally merge accepted combat `7c017b2c` with fixed main `9e618217`, preserving both histories, all nine accepted combat rows, four incoming vision rows, six incoming NET rows and all source, tests and fixtures. This private source-only union runs zero checks; the earlier five native passes remain evidence for `df39366e`. Final-head review and authorized execution remain pending.
 
 - Mark only CMB-34/35/36/37/81/105/118/119/120 ported after independent exact-`ee03a77a` acceptance and fresh `df39366e` fmt, five unique selected native passes and strict locked workspace/all-target Clippy. Fixed-main count rises from 211 to 220 of 939; all other rows stay unchanged, including held CMB-128. No Source regeneration, runtime, guard, terrain or ABI change. Root final-head review and hosted gates remain pending.
