@@ -1,0 +1,1 @@
+- Record and exactly recheck two original-Source fixtures for the five combat vision and fog checks: 18 range cases, 30 visibility cases, 18 LOS cases, 20 fog frames, eight three-recipient delivery frames and 64 packing cases. Preserve the original failed recorder and its assertions; native validation and row promotion remain pending.
