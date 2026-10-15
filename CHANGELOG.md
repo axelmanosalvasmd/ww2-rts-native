@@ -4,6 +4,10 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Record Axel's exact aligned whole-match evidence decision in PARITY.md. Preserve the existing component, outcome and owner rules. Both owners record readback of the final documentation head on #5 before merge; no parity row is promoted.
+
+- Complete MODE-15's raw observed Hill 112 path check on 10 canonical Assault starts, comparing all 30 full waypoints with the unchanged Source fixture; the three selected tests pass at 0b60e793.
+
 - Finish the comparison-only R1 handoff: four checks at `db854ef7` report canonical 61/61 with no divergence while retaining raw 0/61. Fresh strict Clippy and formatting pass at `24433da4`; preserve the earlier lint failure, both eb15 review limits and exact input/frame provenance. No row promotion or Source rerun.
 
 - Record the authorized R1 comparison result at `db854ef7`: canonical 61/61 checkpoints and all 600 stepped ticks match, while raw comparison remains 0/61 with the tick-0 Fuel presence difference. Preserve the first strict-Clippy unused-helper failure and make only the test-build delegate visibility public before retrying lint.
