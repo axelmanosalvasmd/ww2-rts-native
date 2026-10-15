@@ -173,9 +173,18 @@ impl Replay {
 }
 
 pub(crate) fn environment_draw(seed: &mut u32, replay: Option<&Replay>, consumer: Value) -> f64 {
+    let before = *seed;
     // Execute the original generator, including its seed advance, at the real consumer.
     let original = crate::weather_runtime::environment_random(seed);
+    if let Some(replay) = replay.filter(|r| startup_state::cmb42::is_ordinary(r)) {
+        startup_state::cmb42::environment_observation(replay, before, *seed, original, consumer);
+        return original;
+    }
     replay.map_or(original, |r| r.draw(consumer))
+}
+
+pub(crate) fn observe_cmb42_command(m: &Match, command: &crate::match_commands::Command) -> Result<(), String> {
+    startup_state::cmb42::command_observation(m, command)
 }
 
 #[test]

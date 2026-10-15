@@ -1,5 +1,60 @@
 # Three Crossroads Native: design decisions
 
+## AUDIT_COMBAT seven-row source task after consolidation (2026-10-15)
+
+Start from fetched main `f7b0e5889e3b707beb6d18c4ea8d20a7d9f7b578` in
+the persistent combat-audit checkout. Recover only the separate CMB42 recorder
+and two native witnesses from `30f186a4` and `7aab8df4`. PR269 at `2f130c32`,
+its eight-commit reconstruction packet and its producing-head proof stay separate.
+No parity or Acceptance cell changes. All incoming main history is retained.
+
+The new private tagged-packet reader admits constructor and command inputs from
+an explicit input list. Expected raw state, recipients, probes and bindings are
+comparison evidence only. The only state setters it admits are the named
+original funding input, once per seat at tick zero, and the named original
+cooldown input, once on the actual purchased shooter. It never imports expected
+actors, health, pose, wallets, RNG state, targets, visibility or later timers.
+Purchases and research/build/movement use their actual existing consumers.
+
+The optional ordinary replay mode takes exactly the captured global draws.
+It checks their continuous SplitMix64 seed transitions, indexes and value bits.
+The actual environment generator executes once at every native consumer; the
+mode records its original return and before/after u32 seed bits without
+substitution. Source receipts retain signed seed values as well as those u32
+bits. Layout receipts check the independently computed native layout before
+injection against the declared input and the observed Source layout. Real
+queued-command observations execute inside the existing dispatch boundary.
+The recorder retains raw per-command/per-tick state, both recipients, actual
+canShoot probes and a separate declared-input manifest. The native reader stops
+at its first raw/input difference or runner error and writes partial evidence.
+
+Root and ALIGNED acknowledged the internal optional adapter scope. The old
+Replay::new, exact 16,384-fraction contract, draw/receipt/shot/layout/startup
+bodies, default environment substitution and shared Arc/Mutex ownership remain
+intact. The startup observer only gains a child module. The tick observer gains
+one cfg(test) call; shipping/release command and random behavior is unchanged.
+No protocol, ABI, public interface or privacy policy is adopted.
+
+Two additional authored consumers address actual missing checks. CMB38 invokes
+real section contact for rifle and AT hits on a completed 2x2 pillbox, front and
+rear, checking section/entity health and actual XP. CMB63 retains the original
+zero/two-star and recipient-row predicate, then uses identical preconstructor
+0.75 test tapes to distinguish actual rifle accuracy 0.7 from two-star 0.84.
+It checks all five launched flights and their actual accuracy/offset receipts,
+then invokes actual received-damage and suppression consumers. These are
+explicit component inputs and composed effects, not continuous ordinary-match
+proof. They do not use the CMB42 ordinary RNG mode.
+
+Every new/restored native name and the recorder remain unexecuted. No packet,
+compile, test, formatter, linter, discovery, CI, release or fresh row proof is
+claimed. The strict raw reader applies no comparison defaults; existing native
+absence/unmapped markers and recipient missing capabilities remain visible.
+CMB62 terrain firing, CMB67 ground aircraft weapons and CMB68 thrown-carrier
+exits still need their protected runtime consumers. CMB66 still needs genuine
+one-round hit/miss/empty histories without ammo assignment or stream resets.
+[The bounded handoff](docs/testing/audit-combat-seven-source-f7.md) lists the
+exact names, inputs, preservation and pending qualification.
+
 ## Five complete selected MAP checks (2026-10-15)
 
 At producing runtime head `7cbfcdddf913625c48fd109d8d216151881cba20`,

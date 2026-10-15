@@ -702,3 +702,6 @@ fn mid_tick_removal_keeps_surviving_spatial_bucket_order() {
     let owned = m.grid.owned_by(&m.world.game.units, 1);
     assert_eq!(owned, [3]);
 }
+
+#[path = "match_combat/audit_owned.rs"]
+mod audit_owned;

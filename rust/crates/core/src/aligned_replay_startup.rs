@@ -1,5 +1,8 @@
 //! Complete-startup candidate. Included only by the existing cfg(test) replay module.
 //! Every observed field has an exact, source-backed sentinel/default or checked inactive disposition.
+#[path = "aligned_replay_cmb42.rs"]
+pub(super) mod cmb42;
+
 use super::{Match, Replay};
 use crate::{
     economy::{Faction, Mode, Technology},

@@ -275,6 +275,8 @@ impl crate::match_runtime::Match {
         &self,
         _command: &crate::match_commands::Command,
     ) -> Result<(), String> {
+        #[cfg(test)]
+        crate::aligned_replay::observe_cmb42_command(self, _command)?;
         // Represented commands publish state only. Any emitting command needs
         // its owner to expose exact output order before this boundary admits it.
         self.require_detached_tick_events()

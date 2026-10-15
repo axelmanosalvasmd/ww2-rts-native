@@ -1,4 +1,7 @@
 //! Actual reference steps over friendly matches and the connected ordered phases.
+#[path = "match_tick/cmb42.rs"]
+mod cmb42;
+
 use serde_json::{Value, json};
 use ww2_core::{
     economy::{Faction, Mode},

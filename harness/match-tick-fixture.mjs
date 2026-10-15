@@ -11,6 +11,12 @@ const git=a=>execFileSync('git',['-C',reference,...a],{encoding:'utf8'}).trim();
 const clean=()=>{if(git(['rev-parse','HEAD'])!==pin||git(['status','--porcelain','--untracked-files=no']))throw Error('Pinned clean reference required');};
 if(process.arch!=='x64'||process.version!=='v24.21.0')throw Error('Use x64 Node v24.21.0');
 clean();
+// This scope returns before the historical corpus and its loader are loaded.
+if(process.argv.includes('--cmb42-ordinary-only')){
+ const {recordCmb42Ordinary}=await import('./cmb42-ordinary-scenes.mjs');
+ await recordCmb42Ordinary({reference,pin,clean});
+ process.exit(0);
+}
 registerHooks({load(url,context,next){const result=next(url,context);if(url!==pathToFileURL(resolve(reference,'shared/sim.js')).href)return result;
  const source=String(result.source),begin='  // teammates standing on it keep it theirs.',end='  stepConvoys(g, dt, supplyHooks(g));';
  if(source.split(begin).length!==2||source.split(end).length!==2)throw Error('Point anchors changed');
