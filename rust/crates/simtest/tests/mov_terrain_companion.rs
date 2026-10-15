@@ -65,7 +65,7 @@ fn scene_map(manifest: &Value, spec: &Value) -> Value {
     let h = manifest["map"]["h"].as_u64().unwrap() as usize;
     let surface = spec["surface"].as_str().unwrap();
     let rows: Vec<_> = (0..h).map(|y| {
-        if y < 20 && surface == "mud" { "M".repeat(w) }
+        if y < manifest["map"]["mudRows"].as_u64().unwrap() as usize && surface == "mud" { "M".repeat(w) }
         else if (1..=3).contains(&y) && surface == "road" { "D".repeat(w) }
         else { ".".repeat(w) }
     }).collect();
@@ -165,7 +165,8 @@ impl<'a> Scene<'a> {
         scene.retained_structures = structures(&scene.m);
         if let Some(wear) = spec["wear"].as_f64() {
             // Authored measurement-band wear, matching Source. Never write a footprint cell.
-            let band = manifest["map"]["w"].as_u64().unwrap() as usize * 20;
+            let rows = if spec["surface"] == "mud" { manifest["map"]["mudRows"].as_u64().unwrap() as usize } else { 20 };
+            let band = manifest["map"]["w"].as_u64().unwrap() as usize * rows;
             assert!(scene.m.building_cells.keys().all(|c| *c >= band));
             scene.m.world.game.wear.as_mut().unwrap()[..band].fill(wear as f32);
         }

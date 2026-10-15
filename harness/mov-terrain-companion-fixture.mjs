@@ -40,7 +40,7 @@ const roster = g => [...g.units.values()].map(u => ({id: u.id, kind: u.type, own
 function sceneMap(spec) {
   const {w, h, spawns, points} = manifest.map;
   const rows = Array.from({length: h}, (_, y) =>
-    y < 20 && spec.surface === 'mud' ? 'M'.repeat(w) :
+    y < manifest.map.mudRows && spec.surface === 'mud' ? 'M'.repeat(w) :
       y >= 1 && y <= 3 && spec.surface === 'road' ? 'D'.repeat(w) : '.'.repeat(w));
   const heights = Array.from({length: h}, (_, y) =>
     y < 20 && spec.surface === 'hill' ? '0'.repeat(10) + '1'.repeat(10) + '0'.repeat(w - 20) : '0'.repeat(w));
@@ -119,7 +119,7 @@ function trace(spec) {
   active.producer = roster(g).find(row => row.id === maker.id);
   if (spec.wear !== undefined) {
     // Only the measurement band is an authored input. Every base footprint remains untouched.
-    g.wear.fill(spec.wear, 0, manifest.map.w * 20);
+    g.wear.fill(spec.wear, 0, manifest.map.w * (spec.surface === 'mud' ? manifest.map.mudRows : 20));
   }
   Object.assign(g.wx, {rain: 0, raining: false, wet: 0, next: 1e9});
   if (spec.name === 'wet-ground') {

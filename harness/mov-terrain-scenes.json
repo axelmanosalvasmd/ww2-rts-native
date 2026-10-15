@@ -2,7 +2,7 @@
   "schema": 1,
   "reference": "e4e579a838aabae3b1d9dadbc17a0a87147bc52d",
   "scope": "Disclosed canonical companion; not literal admission of the cleared original fixtures",
-  "map": {"w": 80, "h": 96, "spawns": [{"x": 10, "y": 82}, {"x": 70, "y": 82}], "points": []},
+  "map": {"w": 80, "h": 96, "mudRows": 70, "spawns": [{"x": 10, "y": 82}, {"x": 70, "y": 82}], "points": []},
   "startup": {"seed": 7301, "environmentSeed": 123, "wind": [0, 0.5], "weather": "clear", "weatherSeed": 1, "livingWeather": true, "tech": false, "supply": false, "logistics": false, "army": "standard", "names": ["A", "B"], "teams": [0, 1], "factions": [0, 1]},
   "producer": {"kind": "motorpool", "builderKind": "rifle", "rifleMaker": "hq", "at": [45, 145], "limitTicks": 2400, "wallet": 5000},
   "scenes": [

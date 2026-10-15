@@ -252,6 +252,26 @@ execution occurs. Existing single-record OOM and I/O recovery limits remain;
 a fresh independent review and Root grant are still required. The following
 future commands and expected counts are unchanged, with no new execution.
 
+## Paired mud-arena input correction after the first Source failure
+
+Root authorized the concrete proposal in
+`/tmp/mov3a97-terrain-arena-diagnosis-0e8d6d9b/REPORT.md` after reading the
+actual failed packet and pinned costs. Shared manifest map.mudRows70 now
+drives both Source/native mud bounds and mud wear bounds; nonmud wear stays20.
+The native footprint assertion remains exact. No other scene, actor, order,
+goal, pose, time window, predicate, original recorder/stream codec/helper/RNG,
+reference or runtime changes. Direct CHANGELOG and the owned DESIGN note
+record the canonical setup difference and first failure, with no forecast PASS.
+
+Original gen/check0/0 and compressed bytes stay attributed to clean3a97.
+Keep its private original.jsonl.gz and all prior failure packets/logs unchanged.
+Do not repeat those two completed commands below. Under the new S2 grant,
+run only terrain gen/check then World gen/check in a fresh output directory,
+using that original capture. CPU4-7 supersedes the older draft S3 CPU8-11.
+All four must exit0 before the two authentic companion fixtures are frozen
+and Cargo starts. Source/native producing heads remain separately attributed.
+No status promotion, literal original-map admission or public action is inferred.
+
 ## Commands prepared for a future grant only
 
 Read back the actual successor SHA and clean state before any execution.
