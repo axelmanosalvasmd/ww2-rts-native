@@ -248,3 +248,11 @@ with raw local logs in `/tmp/fix302-r7-clippy-initial-failure.log`,
 `/tmp/fix302-r7-queue-diagnostic-failure.log`. The passing receipt is
 `/tmp/fix302-r7-checks.log`. No prototype execution, Unreal run or hosted
 CI qualification is claimed.
+
+After validation, main advanced only through the status-docs PR #361 to
+`97f8ed8a488a5a2474abbc552ace270b175440d8`. A second normal merge keeps
+that main head as a parent. It auto-merges without conflicts and changes only
+`docs/parity/combat.md`, `docs/parity/server.md` and its existing main changelog
+fragment. No manual parity edits are made. The Rust tree remains exactly
+`b14272e32e1fce153c49f7a9a72c784bfe18bfeb`, matching all passing checks above.
+Only this merge record is appended after that source-tree verification.
