@@ -62,7 +62,7 @@ fn scene() -> Match {
     state
 }
 
-fn record(state: &mut Match, kind: &str) {
+fn record(state: &mut Match, kind: &str, at: Point) {
     state
         .enqueue_command(
             OrderKey {
@@ -72,7 +72,7 @@ fn record(state: &mut Match, kind: &str) {
             },
             Command::Support {
                 kind: kind.into(),
-                at: Point { x: 128.0, z: 128.0 },
+                at,
                 direction: Some(0.0),
             },
         )
@@ -91,7 +91,8 @@ fn hosted_recorded_plane_support_pays_once_and_keeps_every_seat_deliverable() {
         let cost = economy::sup_cost(Mode::Conquest, kind).unwrap().cost;
         let spent = state.story[0].mp_spent;
         let calls = state.story[0].support_calls;
-        record(&mut state, kind);
+        let at = state.start.players[0].spawn;
+        record(&mut state, kind, at);
         let selected = (0..2)
             .map(|slot| SelectedSeat {
                 slot,
@@ -149,7 +150,7 @@ fn hosted_recorded_artillery_still_pays_once_and_delivers_every_seat() {
     let cost = economy::sup_cost(Mode::Conquest, "artillery").unwrap().cost;
     let spent = state.story[0].mp_spent;
     let calls = state.story[0].support_calls;
-    record(&mut state, "artillery");
+    record(&mut state, "artillery", Point { x: 128.0, z: 128.0 });
     let selected = (0..2)
         .map(|slot| SelectedSeat {
             slot,
