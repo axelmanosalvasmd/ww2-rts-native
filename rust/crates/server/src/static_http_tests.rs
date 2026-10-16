@@ -65,14 +65,14 @@ impl TestServer {
             static_root: root,
             ..Config::default()
         };
-        let shutdown = async {
+        let shutdown_wait = async {
             let _ = stopped.await;
         };
         let task = tokio::spawn(async move {
             if shards == 1 {
-                serve(listener, config, shutdown).await
+                serve(listener, config, shutdown_wait).await
             } else {
-                crate::shards::serve_sharded(listener, config, shutdown, None, shards).await
+                crate::shards::serve_sharded(listener, config, shutdown_wait, None, shards).await
             }
         });
         Self {
