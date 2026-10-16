@@ -51,6 +51,8 @@ mod legacy_scenario;
 mod logistics;
 #[path = "../logistics_features.rs"]
 mod logistics_features;
+#[path = "../map_world_batch2.rs"]
+mod map_world_batch2;
 #[path = "../match_combat.rs"]
 mod match_combat;
 #[path = "../match_routing.rs"]
