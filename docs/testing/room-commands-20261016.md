@@ -161,3 +161,9 @@ Final workspace Clippy found four seated test adapters missing main's
 `net_runtime_command_tests.rs`, `room_command_ingress_tests.rs` and
 `trusted_room_lobby_tests.rs` now panic explicitly if watcher output reaches
 a seated commander. No prior assertion or runtime guard is removed.
+
+The final 353-test selection found one remaining composed expectation: the
+spectator silence witness expected a pong without #296's timing tuple. Its
+exact expected message now includes `srv: [0.0, 2]`, matching the unchanged
+room producer and prototype `server.js:625-628`. All silence, unchanged control
+state and zero pending-input assertions remain. No runtime code changes.

@@ -480,7 +480,7 @@ fn intent_net46_spectator_army_commands_are_silent_and_never_queued() {
     watcher.send(&mut hub, json!({"t":"ping","c":123}), 0);
     assert_eq!(
         watcher.drain(&mut hub, 0),
-        vec![json!({"t":"pong","c":123})]
+        vec![json!({"t":"pong","c":123,"srv":[0.0,2]})]
     );
 }
 
