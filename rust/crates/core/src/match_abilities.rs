@@ -157,10 +157,11 @@ impl Match {
             crate::economy::Mode::Default
                 | crate::economy::Mode::Conquest
                 | crate::economy::Mode::Classic
+                | crate::economy::Mode::Tutorial
                 | crate::economy::Mode::World
         ) {
             return Err(
-                "abilities currently require represented Conquest, Classic or World state".into(),
+                "abilities currently require represented Conquest, Classic, Tutorial or World state".into(),
             );
         }
         self.validate_actor_mode()?;
