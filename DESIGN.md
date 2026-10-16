@@ -4732,3 +4732,20 @@ Only the three failed test bodies change. Preserve every other test and all
 remain held independently; the14 passes belong only to0f537aeb. This child is
 UNRUN and needs a fresh exact-head grant. No semantic retry, old13 execution,
 Source capture, extra job or new provenance bundle is performed.
+
+## Corrected NET checks pass at their producing head (2026-10-16)
+
+Root's fresh S2 grant runs only the three corrected checks at306a282c,
+Rustf0b89c5756cb2689e519bd725b053d08ad721416. Actual result:3PASS,0FAIL,
+90skipped,exit0. The runner verifies CPUs4-7,6GiB,swap0,quota400%,jobs4,
+threads1,currenta007,assigned external target and inherited exclusive flock;
+free-g reports16GiB available and df82GiB free. Cargo/nextest, systemd and
+outer launcher terminate; inherited S2 release is reported before row results.
+Raw outputs remain /tmp/native-feature-batches-0350/net_impl/.
+
+The fourteen passing tests at0f537aeb are not rerun or reassigned. Its three
+original failures and the full17-name source selection remain. The compact
+50-row map records thirteen potential intent candidates and37 partial or
+unsupported rows. No status, provider, contract or gameplay change follows.
+Root owns prototype review, integration, test PR merge and later status PR.
+No Source, formatter, Clippy, discovery or additional job runs here.

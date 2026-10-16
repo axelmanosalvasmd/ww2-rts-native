@@ -23,10 +23,21 @@ inherited S2 lock release were reported to Root before these results.
 
 The successor compares numeric values without changing expected numbers,
 and checks that the first delta drains the retained baseline before requiring
-the next unchanged delta to be empty. These three corrected checks are UNRUN;
-all other passes retain attribution to `0f537aeb`, not this child. NET-53 drops
-from that producing head's potential candidates; all its dependent coverage
-stays held. A new literal Root grant is required for successor execution.
+the next unchanged delta to be empty. Root's second S2 grant at
+`306a282c9d157f4967e0c9584e5a2982711848f6`, Rust tree
+`f0b89c5756cb2689e519bd725b053d08ad721416`, runs only those three corrected
+checks once: three passed, zero failed and 90 other tests skipped, exit0.
+The fourteen earlier passes were not rerun and retain attribution to
+`0f537aeb`. The original three failures are not erased. Raw second-job outputs
+stay at `/tmp/native-feature-batches-0350/net_impl/`. Process and inherited
+S2 release were reported to Root before this compact result.
+
+The thirteen potential intent candidates are NET-05/09/14/15/27/31/32/33/34/
+35/44/45/53, subject to the coverage qualifications below and prototype review.
+The other 37 candidates remain partial or unsupported for their stated reasons.
+This is not a claim that all17 tests ran on306a; it records two producing heads.
+No row status changes. Root owns integration, test-PR merge, review and any
+later status PR.
 
 A candidate becomes eligible only after its mapped native checks pass and the
 required prototype review confirms coverage.
@@ -39,7 +50,7 @@ One Root-granted focused nextest invocation runs the whole selection with
 `--no-fail-fast`, four build jobs and one test thread. This selects only the
 new modules below. It does not rerun the historical 13 or discover tests in a
 separate job. There are 17 native checks. The original one-job result stays
-at its producing head; this correction has no execution. No fmt, lint, Source
+at its producing head; the second job selects only the corrected three. No fmt, lint, Source
 or CI command ran in either preparation. A fresh literal head/tree/selection/slot
 grant is required.
 The proposed command, inside Root's assigned scope, is:

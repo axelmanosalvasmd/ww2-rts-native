@@ -1,0 +1,1 @@
+- Record three corrected NET checks passing once at 306a282c. Keep the earlier 14 passes and three failures attributed to 0f537aeb, with all 50 candidate mappings and parity statuses unchanged. No Source capture or previous passing-test replay ran.
