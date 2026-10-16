@@ -154,21 +154,6 @@ impl BinaryServer {
             .collect::<Result<_, _>>()
             .unwrap()
     }
-    pub fn wait_fault(&self) -> Value {
-        let began = std::time::Instant::now();
-        loop {
-            let bytes = fs::read(&self.log).unwrap();
-            if let Some(record) = complete_records(&bytes, b"NATIVE_FAULT ").next() {
-                return record.unwrap();
-            }
-            assert!(
-                began.elapsed() < Duration::from_secs(90),
-                "no actual contact fault in host log: {}",
-                self.log()
-            );
-            std::thread::sleep(Duration::from_millis(20));
-        }
-    }
     pub fn directory(&self) -> Value {
         let mut stream = TcpStream::connect(self.address).unwrap();
         stream
