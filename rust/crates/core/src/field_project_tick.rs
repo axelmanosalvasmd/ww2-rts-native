@@ -130,7 +130,7 @@ impl Match {
     /// Common terrain, combat and runner admission remain the caller's responsibility.
     pub fn validate_field_project_tick(&self, current_order: &[UnitId]) -> Result<(), String> {
         if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
-            return Err("field-project tick supports ordinary Conquest only".into());
+            return Err("field-project tick requires a matching ordinary mode".into());
         }
         let game = &self.world.game;
         if !(0..SAFE_INTEGER).contains(&game.tick) {

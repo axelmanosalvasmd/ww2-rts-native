@@ -2,7 +2,6 @@
 //! Combat owns HP attribution/XP and Logistics owns physical ground AA rounds.
 use crate::{
     catalog::{Catalog, Value},
-    economy::Mode,
     game::{PlaneState, Point},
     grid::UnitId,
     match_firing::FiringUnit,
@@ -11,7 +10,7 @@ use crate::{
     math,
 };
 use std::collections::BTreeMap;
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum MissionKind {
     Patrol,
     Escort,
@@ -28,13 +27,13 @@ impl MissionKind {
         }
     }
 }
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PlaneMission {
     pub kind: MissionKind,
     pub target: Option<UnitId>,
     pub at: Point,
 }
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AircraftRuntime {
     pub fuel: f64,
     pub ammo: f64,
@@ -45,12 +44,12 @@ pub struct AircraftRuntime {
     pub attack_pick: UnitId,
     pub downed: bool,
 }
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AntiAirRuntime {
     pub shot: Option<f64>,
     pub reserve: Option<f64>,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum AviationEvent {
     AntiAir {
         shooter: UnitId,
@@ -66,7 +65,7 @@ pub enum AviationEvent {
         direction: f64,
     },
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AviationState {
     pub planes: BTreeMap<UnitId, AircraftRuntime>,
     pub anti_air: BTreeMap<UnitId, AntiAirRuntime>,
@@ -152,12 +151,12 @@ impl Match {
         let g = &self.world.game;
         if !(crate::match_actor::ordinary_ground_mode(g, self.options.mode)
             || horde_spawn
-                && self.options.mode == Mode::Horde
+                && self.options.mode == crate::economy::Mode::Horde
                 && g.mode == Some(crate::game::ModeKind::Horde)
                 && self.start.shared_defenders.is_some())
         {
             return Err(AviationError::Unsupported(
-                "aviation currently requires ordinary Conquest",
+                "aviation requires a matching ordinary mode",
             ));
         }
         if g.tick < 0
@@ -252,12 +251,12 @@ impl Match {
     /// Nearest finished own airfield, otherwise the source off-map base past HQ.
     pub fn aircraft_base(&self, owner: usize, at: Point) -> Result<Point, AviationError> {
         if !(crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
-            || self.options.mode == Mode::Horde
+            || self.options.mode == crate::economy::Mode::Horde
                 && self.world.game.mode == Some(crate::game::ModeKind::Horde)
                 && self.start.shared_defenders.is_some())
         {
             return Err(AviationError::Unsupported(
-                "air base currently requires ordinary Conquest",
+                "air base requires a matching ordinary mode",
             ));
         }
         if owner >= self.start.players.len() || !finite(at) {

@@ -8,7 +8,7 @@ use crate::{
     math,
 };
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PlayerStory {
     pub kills: f64,
     pub losses: f64,
@@ -146,7 +146,7 @@ pub fn prepare_story_updates<'a>(
     }
     Ok(PreparedStoryUpdates { story, updates })
 }
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FallenLocations {
     pub structure: Option<Point>,
     pub bunker: Option<Point>,

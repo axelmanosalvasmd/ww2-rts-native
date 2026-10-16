@@ -90,8 +90,11 @@ mod math;
 mod mode_intent_batch1;
 #[path = "../mode_point_services.rs"]
 mod mode_point_services;
+
 #[path = "../mode_runtime_batch4.rs"]
 mod mode_runtime_batch4;
+#[path = "../mode_runtime_world.rs"]
+mod mode_runtime_world;
 #[path = "../mov_aircraft_controls.rs"]
 mod mov_aircraft_controls;
 #[path = "../mov_aircraft_immunity.rs"]
