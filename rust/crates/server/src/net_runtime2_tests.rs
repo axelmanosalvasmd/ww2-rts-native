@@ -249,15 +249,25 @@ fn net41_r1_restart_repeats_settings_resets_pause_and_reconnects_absent_seat() {
     ] {
         assert_eq!(start[field], first[field], "{field}");
     }
-    let mut receipt = hub.rooms["ABC"]
+    let receipt = hub.rooms["ABC"]
         .native
         .as_ref()
         .unwrap()
         .receipt
         .clone()
         .unwrap();
-    receipt["matchId"] = original["matchId"].clone();
-    assert_eq!(receipt, original);
+    for recorded in [&original, &receipt] {
+        assert!(recorded["options"]["weatherSeed"].as_u64().unwrap() < (1 << 31));
+        assert_eq!(
+            recorded["options"]["weatherSeed"],
+            recorded["derivedWeatherSeed"]
+        );
+    }
+    let mut expected = original.clone();
+    expected["matchId"] = start["matchId"].clone();
+    expected["options"]["weatherSeed"] = receipt["options"]["weatherSeed"].clone();
+    expected["derivedWeatherSeed"] = receipt["options"]["weatherSeed"].clone();
+    assert_eq!(receipt, expected);
     assert_eq!(hub.rooms["ABC"].weather, "rain");
     assert_eq!(hub.native_status("ABC").unwrap().tick, 0);
     assert!(!hub.native_status("ABC").unwrap().paused);

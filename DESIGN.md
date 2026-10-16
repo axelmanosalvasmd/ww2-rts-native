@@ -1,5 +1,17 @@
 ## Owner parity decisions A, B and C (2026-10-16)
 
+## Server weather entropy and replay inputs (2026-10-16)
+
+Trusted start and restart now sample weather entropy at the server boundary,
+using `getrandom` 0.4.3 (already present in the lockfile) and the prototype's
+31-bit seed range. Each constructed match stores that input in
+`MatchOptions.weather_seed` and the existing private `NATIVE_MATCH` receipt.
+Replays use the recorded seed, and core ticks consume no operating-system
+entropy. Seed failure refuses startup before publication. This replaces the
+constructor-derived weather seed described in the historical R1 profile below;
+the configured match seed still owns layout and other purpose streams.
+
+
 The [recorded owner decisions](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6217590741) approve the differences below, the Rust-only acceptance of the listed client rows, and World deferral for milestone R1. Julio recorded both owners' decisions after Axel's voice approval; Axel's written confirmation on #5 is requested in that comment. This section records the decisions for STATUS-ABC.
 
 Approved `differs` decisions relative to prototype `e4e579a`:

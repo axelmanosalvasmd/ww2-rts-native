@@ -178,11 +178,16 @@ fn ordinary_binary_two_seats_move_stop_takeover_and_restart_with_private_seed() 
     clients[0].barrier();
     let receipts = server.receipts();
     assert_eq!(receipts.len(), 2);
-    assert_eq!(receipts[0]["options"], receipts[1]["options"]);
+    for (key, value) in receipts[0]["options"].as_object().unwrap() {
+        if key != "weatherSeed" {
+            assert_eq!(value, &receipts[1]["options"][key], "{key}");
+        }
+    }
     for receipt in receipts {
         let options = &receipt["options"];
         assert_eq!(options["seed"].as_u64(), Some(u64::MAX));
-        assert_eq!(options["weatherSeed"], Value::Null);
+        assert!(options["weatherSeed"].as_u64().unwrap() < (1 << 31));
+        assert_eq!(options["weatherSeed"], receipt["derivedWeatherSeed"]);
         for key in ["shuffle", "tech", "supply", "livingWeather"] {
             assert_eq!(options[key], true);
         }
@@ -284,7 +289,13 @@ fn ordinary_binary_refuses_unsupported_settings_before_any_start_publication() {
         host.barrier();
         begin(&mut host, &mut guest);
         host.until(|m| m["t"] == "s");
-        assert_eq!(server.receipts()[0]["options"]["weather"], weather);
+        let receipts = server.receipts();
+        assert_eq!(receipts[0]["options"]["weather"], weather);
+        assert!(receipts[0]["options"]["weatherSeed"].as_u64().unwrap() < (1 << 31));
+        assert_eq!(
+            receipts[0]["options"]["weatherSeed"],
+            receipts[0]["derivedWeatherSeed"]
+        );
     }
 }
 
