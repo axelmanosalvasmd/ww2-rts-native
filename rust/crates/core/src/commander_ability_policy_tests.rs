@@ -5,6 +5,8 @@ fn setup() -> (Match, u32, u32) {
     let mut m = scene::scene();
     let own = scene::spawn(&mut m, "mg", 0, scene::point(50.0, 50.0));
     let enemy = scene::spawn(&mut m, "rifle", 1, scene::point(58.0, 50.0));
+    m.recovery.initialize(own);
+    m.recovery.initialize(enemy);
     m.world.game.players[0].visible = vec![enemy];
     m.firing.get_mut(own).unwrap().target_id = enemy;
     for (id, ability) in m

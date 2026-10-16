@@ -16,6 +16,9 @@ fn setup() -> (Match, [u32; 2], [u32; 2]) {
         scene::spawn(&mut m, "rifle", 1, scene::point(60.0, 50.0)),
         scene::spawn(&mut m, "rifle", 1, scene::point(62.0, 50.0)),
     ];
+    for id in own.into_iter().chain(enemy) {
+        m.recovery.initialize(id);
+    }
     m.world.game.units.get_mut(&enemy[1]).unwrap().hp = 20.0;
     m.world.game.players[0].visible = enemy.to_vec();
     let onward = Command::Move {

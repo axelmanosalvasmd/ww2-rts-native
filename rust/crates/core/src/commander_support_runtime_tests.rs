@@ -4,6 +4,7 @@ use crate::{game::Point, match_support::SupportDenial, mov_audit_test_support as
 fn setup() -> (Match, u32) {
     let mut m = scene::scene();
     let enemy = scene::spawn(&mut m, "mg", 1, scene::point(70.0, 50.0));
+    m.recovery.initialize(enemy);
     m.world.game.players[0].visible = vec![enemy];
     m.start.economy.players[0].mp = 1000.0;
     for (kind, cd) in &mut m.start.players[0].support {
