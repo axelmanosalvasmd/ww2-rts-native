@@ -964,7 +964,11 @@ fn queued_points(control: &UnitControl, id: u32, non_truck: bool) -> Result<Vec<
     // Only manual truck interception reads queued waypoint geometry. Other
     // actors retain their own typed queues and need only orders_pending here.
     if non_truck {
-        if control.orders.iter().any(|c| matches!(c, Command::Unsupported)) {
+        if control
+            .orders
+            .iter()
+            .any(|c| matches!(c, Command::Unsupported))
+        {
             return Err("unsupported queued supply command".into());
         }
         return Ok(Vec::new());

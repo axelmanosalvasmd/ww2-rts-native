@@ -198,9 +198,25 @@ fn intent_log44_exact_fields_rounding_and_private_allied_stock_in_complete_frame
         ally["logistics"]["events"],
         json!([{"id":3,"type":"private","count":1,"message":"Ally only"}])
     );
+    assert_eq!(
+        ally["logistics"]["stores"][0]["stock"],
+        json!({"ammo":92.75,"provisions":185.5,"fuel":371.})
+    );
     assert_eq!(enemy["logistics"]["units"][0]["id"], ids[2]);
+    assert_eq!(enemy["logistics"]["units"].as_array().unwrap().len(), 1);
+    assert!(
+        enemy["units"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|row| row[0] == truck && row[2] == 0)
+    );
     assert_eq!(enemy["logistics"]["stores"][0]["id"], "cache:83");
     assert_eq!(enemy["logistics"]["stores"].as_array().unwrap().len(), 1);
+    assert_eq!(
+        enemy["logistics"]["stores"][0]["stock"],
+        json!({"ammo":999.,"provisions":1998.,"fuel":3996.})
+    );
     assert_eq!(enemy["logistics"]["trucks"], json!([]));
     assert_eq!(enemy["logistics"]["events"], json!([]));
     assert!(own["logistics"].get("regions").is_none());
