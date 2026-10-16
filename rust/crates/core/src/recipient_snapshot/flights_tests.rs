@@ -187,3 +187,32 @@ fn live_flight_fog_clipping_keeps_original_stamp_and_ballistic_trajectory() {
     assert_eq!(event_until.to_bits(), 0.5931472081218274_f64.to_bits());
     assert_ne!(until.to_bits(), event_until.to_bits());
 }
+
+#[test]
+fn watcher_retains_hidden_live_flights_and_bounds_them_by_full_map_contacts() {
+    let mut state = scene();
+    for team in state.routing_fog.teams.values_mut() {
+        team.vis.fill(0);
+    }
+    for player in &mut state.world.game.players {
+        player.visible.clear();
+    }
+    assert_eq!(project(&state, 2).unwrap(), json!([]));
+    let before = format!("{:?}{:?}", state.world, state.routing_fog);
+    let mut watcher = super::super::SpectatorDelivery::new(&state).unwrap();
+    let view = watcher.capture(&state, &[], true).unwrap();
+    assert_eq!(view["flights"][0]["flight"], 7);
+    assert_eq!(view["flights"][0]["f"], 1);
+    assert_eq!(view["flights"][0]["until"], 1.15);
+    assert_eq!(format!("{:?}{:?}", state.world, state.routing_fog), before);
+    state.firing.flights.get_mut(&7).unwrap().solution.origin.y = 1.0;
+    let target = state.world.game.units.get_mut(&3).unwrap();
+    target.x = 27.0;
+    target.z = 25.0;
+    state.grid = crate::grid::SpatialGrid::new(&state.world.game.units, 16.0);
+    let view = watcher.capture(&state, &[], false).unwrap();
+    assert_eq!(view["flights"][0]["until"], 1.04);
+    assert_eq!(project(&state, 2).unwrap(), json!([]));
+    state.firing.flights.clear();
+    assert_eq!(watcher.capture(&state, &[], false).unwrap()["flights"], json!([]));
+}

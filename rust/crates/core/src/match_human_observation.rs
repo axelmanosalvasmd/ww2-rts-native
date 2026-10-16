@@ -481,6 +481,46 @@ impl Match {
         }
         let sightings = staged.sightings.iter().map(|s| HumanSighting { id: s.id,
             payload: json!({"id":s.id,"type":s.kind,"owner":s.owner,"x":s.at.x,"z":s.at.z,"t":s.time,"val":s.worth}) }).collect();
+        let found = self.prepare_ordinary_recipient_lists(&[owner])?.results()[0]
+            .1
+            .found_mines
+            .clone();
+        let initial = self.world.initial();
+        let width = input.width;
+        let field = crate::commander_field_policy::Facts {
+            initial_chars: initial
+                .chars
+                .iter()
+                .enumerate()
+                .map(|(cell, &ch)| {
+                    if initial.mines[cell] == 0 {
+                        ch
+                    } else if initial.objects[cell] != b'.' {
+                        initial.objects[cell]
+                    } else {
+                        initial.ground[cell]
+                    }
+                })
+                .collect(),
+            initial_height: initial.height.clone(),
+            ground: initial.ground.clone(),
+            bridges: initial
+                .chars
+                .iter()
+                .enumerate()
+                .filter_map(|(c, &ch)| (ch == b'=').then_some(c))
+                .collect(),
+            mines: vec![],
+            found_mines: found
+                .into_iter()
+                .map(|c| Point {
+                    x: (c % width) as f64 * crate::game::CELL + 1.0,
+                    z: (c / width) as f64 * crate::game::CELL + 1.0,
+                })
+                .collect(),
+            free_nodes: vec![],
+        };
+        input.runtime.as_mut().unwrap().field = Some(field);
         let spawn = Some(self.start.players[owner].spawn);
         let preview = prepare_recipient_routing(
             RecipientContext {
@@ -540,6 +580,18 @@ fn apply_view_rows(
         // ai-view retains the received N character while decoding its delivered surface mask.
         input.chars[row.cell] = row.ch;
         input.flags[row.cell] = flag as u16;
+        if let Some(field) = input.runtime.as_mut().and_then(|r| r.field.as_mut()) {
+            field.ground[row.cell] = row.data.ground;
+            if row.ch == b'=' {
+                field.bridges.insert(row.cell);
+            }
+            if row.ch == b'N' && observed.mine_owned == Some(true) {
+                field.mines.push(Point {
+                    x: (row.cell % input.width) as f64 * crate::game::CELL + 1.0,
+                    z: (row.cell / input.width) as f64 * crate::game::CELL + 1.0,
+                });
+            }
+        }
         if let Some(runtime) = &mut input.runtime
             && let Some(height) = &mut runtime.height
         {

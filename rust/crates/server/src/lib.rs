@@ -312,9 +312,17 @@ async fn socket_loop(
             _ = stop.changed() => { close(&mut socket,1001,"server shutdown").await; break; }
             _ = cancelled.changed() => { close(&mut socket,1013,"too far behind").await; break; }
             Some(output) = rx.recv() => {
-                let diagnostic_bytes = if diagnostics { output.diagnostic_bytes() } else { 0 };
+                let diagnostic_bytes = output.diagnostic_bytes();
                 match output {
                     Output::Json(v) => if socket.send(Message::Text(v.to_string().into())).await.is_err() { break; },
+                    Output::Watcher(json) => {
+                        let result = tokio::select! {
+                            result = socket.send(Message::Text(json.to_string().into())) => result.is_ok(),
+                            _ = stop.changed() => false,
+                            _ = cancelled.changed() => false,
+                        };
+                        if !result { break; }
+                    },
                     Output::Snapshot(mut write) => {
                         let message = Message::Text(std::mem::take(&mut write.json).into());
                         let result = tokio::select! {

@@ -50,8 +50,8 @@ impl Hub {
         } else if room.native.is_some() {
             return Err("start requires lobby state".into());
         }
-        if !(1..=5).contains(&room.players.len()) || !room.spectators.is_empty() {
-            return Err("Horde needs one through five commanders without spectators".into());
+        if !(1..=5).contains(&room.players.len()) {
+            return Err("Horde needs one through five commanders".into());
         }
         let map = self.horde_map(&room.map)?;
         if map.defend().is_none_or(|spawns| spawns.is_empty()) {

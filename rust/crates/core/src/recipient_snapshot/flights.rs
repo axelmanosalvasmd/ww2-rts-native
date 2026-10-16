@@ -3,6 +3,14 @@ use super::*;
 use crate::{game::Point, projectiles};
 
 pub(super) fn project(state: &Match, slot: usize) -> Result<Value, SnapshotError> {
+    project_perspective(state, slot, false)
+}
+
+pub(super) fn project_perspective(
+    state: &Match,
+    slot: usize,
+    full_map: bool,
+) -> Result<Value, SnapshotError> {
     let g = &state.world.game;
     let time = g.tick as f64 * state.rules.movement.tick;
     finite(&[time])?;
@@ -29,7 +37,7 @@ pub(super) fn project(state: &Match, slot: usize) -> Result<Value, SnapshotError
         let at = projectiles::flight_at(p.solution, time).map_err(|_| SnapshotError::Rules)?;
         let velocity =
             projectiles::velocity_at(p.solution, time).map_err(|_| SnapshotError::Rules)?;
-        if !shots::flight_visible(state, visible, Point { x: at.x, z: at.z }) {
+        if !full_map && !shots::flight_visible(state, visible, Point { x: at.x, z: at.z }) {
             continue;
         }
         let mut row = json!({
@@ -41,19 +49,25 @@ pub(super) fn project(state: &Match, slot: usize) -> Result<Value, SnapshotError
         if let Some(effect) = p.effect {
             row["effect"] = json!(effect);
         }
-        let mut until = shots::trajectory_until(state, visible, p.solution, time, p.expires)?;
+        let mut until = if full_map {
+            math::min(p.expires, time + 0.15)
+        } else {
+            shots::trajectory_until(state, visible, p.solution, time, p.expires)?
+        };
         if state.rules.kinds[p.source_kind].weapon && until > time {
             let end =
                 projectiles::flight_at(p.solution, until).map_err(|_| SnapshotError::Rules)?;
             if let Some(hit) = state
-                .visible_flight_contact(p, at, end, slot)
+                .visible_flight_contact_perspective(p, at, end, slot, full_map)
                 .map_err(|_| SnapshotError::Rules)?
             {
                 until = time + (until - time) * hit.hit.fraction;
             }
         }
         row["until"] = json!(until);
-        if seen_by(state, slot, p.shooter) {
+        if (full_map && g.units.contains_key(&p.shooter))
+            || (!full_map && seen_by(state, slot, p.shooter))
+        {
             row["f"] = json!(p.shooter);
             row["fo"] = json!(p.owner);
         }

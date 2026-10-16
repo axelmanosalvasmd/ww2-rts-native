@@ -1,4 +1,4 @@
-//! Ordinary retreat and support checks, including both support economies.
+//! Bounded retreat and support checks, including an explicit Classic core constructor.
 use crate::{
     catalog::{Catalog, Value},
     economy::{self, Currency, Faction, Mode},
@@ -14,7 +14,7 @@ use crate::{
 };
 use serde_json::json;
 
-fn scene(mode: Mode) -> Match {
+pub(crate) fn scene(mode: Mode) -> Match {
     let map = AuthoritativeMap::from_json(
         &serde_json::to_vec(&json!({
             "name":"Retreat and support", "w":128,"h":128,"rows":vec![".".repeat(128);128],
@@ -25,35 +25,38 @@ fn scene(mode: Mode) -> Match {
         .unwrap(),
     )
     .unwrap();
-    let options = MatchOptions {
-        seed: 701,
-        mode,
-        players: (0..2)
-            .map(|slot| PlayerConfig {
-                name: format!("p{slot}"),
-                team: slot,
-                faction: Faction::try_from(slot as u8).unwrap(),
-            })
-            .collect(),
-        shuffle: false,
-        army: ArmySize::Standard,
-        weather: WeatherChoice::Map,
-        weather_seed: Some(1),
-        living_weather: false,
-        map_key: None,
-        tech: false,
-        supply: false,
-        logistics: false,
-        sandbox: false,
-    };
-    if mode == Mode::Classic {
-        Match::new_classic(&map, options)
+    let constructor = if mode == Mode::Classic {
+        Match::new_classic
     } else {
-        Match::new(&map, options)
-    }
+        Match::new
+    };
+    constructor(
+        &map,
+        MatchOptions {
+            seed: 701,
+            mode,
+            players: (0..2)
+                .map(|slot| PlayerConfig {
+                    name: format!("p{slot}"),
+                    team: slot,
+                    faction: Faction::try_from(slot as u8).unwrap(),
+                })
+                .collect(),
+            shuffle: false,
+            army: ArmySize::Standard,
+            weather: WeatherChoice::Map,
+            weather_seed: Some(1),
+            living_weather: false,
+            map_key: None,
+            tech: false,
+            supply: false,
+            logistics: false,
+            sandbox: false,
+        },
+    )
     .unwrap()
 }
-fn publish_rifle(state: &mut Match, at: Point) -> u32 {
+pub(crate) fn publish_rifle(state: &mut Match, at: Point) -> u32 {
     let id = state.next_unit_id;
     let staged = StagedUnit::ordinary(
         &state.world.game,
@@ -87,7 +90,7 @@ fn publish_rifle(state: &mut Match, at: Point) -> u32 {
     });
     id
 }
-fn seats(state: &Match) -> Vec<SelectedSeat> {
+pub(crate) fn seats(state: &Match) -> Vec<SelectedSeat> {
     (0..state.world.game.players.len())
         .map(|slot| SelectedSeat {
             slot,
@@ -96,7 +99,11 @@ fn seats(state: &Match) -> Vec<SelectedSeat> {
         })
         .collect()
 }
-fn delivered_tick(state: &mut Match, delivery: &mut DeliveryState, selected: &[SelectedSeat]) {
+pub(crate) fn delivered_tick(
+    state: &mut Match,
+    delivery: &mut DeliveryState,
+    selected: &[SelectedSeat],
+) {
     let report = state.advance_tick().unwrap();
     let frame = delivery
         .capture_selected_with_tick_events(state, selected, &report.events)
