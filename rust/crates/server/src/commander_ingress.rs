@@ -34,6 +34,9 @@ impl CommanderIngress {
                 | "destroy"
                 | "buy"
                 | "support"
+                | "fireat"
+                | "supply"
+                | "logisticsResume"
         )
     }
     pub fn enqueue(&mut self, state: &mut Match, slot: usize, raw: &Value) -> Result<(), Denial> {
@@ -55,6 +58,9 @@ impl CommanderIngress {
             Some("destroy") => "destroy",
             Some("buy") => "buy",
             Some("support") => "support",
+            Some("fireat") => "fireat",
+            Some("supply") => "supply",
+            Some("logisticsResume") => "logisticsResume",
             _ => return Err(Denial::Blocked),
         };
         let command = Command::from_json(raw)?;
@@ -76,6 +82,9 @@ impl CommanderIngress {
                 | Command::Destroy { .. }
                 | Command::Buy { .. }
                 | Command::Support { .. }
+                | Command::FireAt { .. }
+                | Command::Supply { .. }
+                | Command::LogisticsResume { .. }
         ) {
             return Err(Denial::Blocked);
         }
@@ -104,7 +113,8 @@ impl CommanderIngress {
         let rows = match &command {
             Command::Move { orders, .. } => orders.iter().map(|o| o.unit).collect::<Vec<_>>(),
             Command::Stop { ids } | Command::Stance { ids, .. } => ids.clone(),
-            Command::Enter { ids, .. }
+            Command::FireAt { ids, .. }
+            | Command::Enter { ids, .. }
             | Command::Dig { ids, .. }
             | Command::Entrench { ids, .. }
             | Command::Cover { ids, .. }
@@ -146,9 +156,8 @@ impl CommanderIngress {
             if forced && !allowed_forced {
                 continue;
             }
-            if kind.air
-                || kind.naval
-                || unit.air.is_some()
+            if (kind.air || unit.air.is_some()) && !matches!(command, Command::FireAt { .. })
+                || kind.naval && !matches!(command, Command::FireAt { .. })
                 || matches!(command, Command::Move { .. } | Command::Stop { .. }) && unit.build
                 || matches!(
                     command,
@@ -517,28 +526,28 @@ mod tests {
     }
 
     #[test]
-    fn fire_at_and_compound_orders_remain_blocked_at_public_ingress() {
+    fn compound_orders_remain_blocked_at_public_ingress() {
         let mut state = crate::lobby::native_tests::native_match();
         let mut ingress = CommanderIngress::default();
-        for raw in [
-            json!({"t":"fireat","ids":[1],"x":10,"z":10}),
-            json!({"t":"orders","commands":[{"t":"fireat","ids":[1],"x":10,"z":10}]}),
-        ] {
-            let before = format!(
+        let raw = json!({"t":"orders","commands":[{"t":"fireat","ids":[1],"x":10,"z":10}]});
+        let before = format!(
+            "{:?}",
+            (&state.world.game.units, &state.commands.units, &ingress)
+        );
+        assert_eq!(state.commands.pending_commands(), 0);
+        assert!(!CommanderIngress::recognizes(raw["t"].as_str().unwrap()));
+        assert_eq!(ingress.enqueue(&mut state, 0, &raw), Err(Denial::Blocked));
+        assert_eq!(state.commands.pending_commands(), 0);
+        assert_eq!(
+            format!(
                 "{:?}",
                 (&state.world.game.units, &state.commands.units, &ingress)
-            );
-            assert_eq!(state.commands.pending_commands(), 0);
-            assert!(!CommanderIngress::recognizes(raw["t"].as_str().unwrap()));
-            assert_eq!(ingress.enqueue(&mut state, 0, &raw), Err(Denial::Blocked));
-            assert_eq!(state.commands.pending_commands(), 0);
-            assert_eq!(
-                format!(
-                    "{:?}",
-                    (&state.world.game.units, &state.commands.units, &ingress)
-                ),
-                before
-            );
-        }
+            ),
+            before
+        );
     }
 }
+
+#[cfg(test)]
+#[path = "room_fireat_tests.rs"]
+mod room_fireat_tests;
