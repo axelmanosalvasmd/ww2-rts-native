@@ -504,47 +504,100 @@ fn malformed_context_and_hidden_knowledge_are_atomic() {
 
 #[test]
 fn map99_map100_map102_hidden_changes_memory_reconnect_and_node_station_filter() {
-    let mut m=load(1,None);
-    m.world.game.units.clear();m.grid.rebuild(&m.world.game.units);
-    let at=Point{x:41.0,z:41.0};
-    let id=m.next_unit_id;
-    let eye=unit_spawn::initial_unit(&m.rules,Catalog::compiled().unwrap(),
-        m.rules.kind("rifle").unwrap(),id,0,at).unwrap();
-    m.next_unit_id+=1;m.world.game.units.insert(id,eye);m.grid.rebuild(&m.world.game.units);
-    m.world.game.tick=1;m.refresh_world_visibility().unwrap();
-    let c=m.world.game.cell_of(at.x,at.z).unwrap();
-    let before=m.world_recipient_metadata(0,true).unwrap();
-    let before_json=before.to_json();
-    let remembered=before.geography.as_ref().unwrap().rows[c/m.world.game.w].as_bytes()[c%m.world.game.w];
-    assert_ne!(remembered,b'B');
+    let mut m = load(1, None);
+    m.world.game.units.clear();
+    m.grid.rebuild(&m.world.game.units);
+    let at = Point { x: 41.0, z: 41.0 };
+    let id = m.next_unit_id;
+    let eye = unit_spawn::initial_unit(
+        &m.rules,
+        Catalog::compiled().unwrap(),
+        m.rules.kind("rifle").unwrap(),
+        id,
+        0,
+        at,
+    )
+    .unwrap();
+    m.next_unit_id += 1;
+    m.world.game.units.insert(id, eye);
+    m.grid.rebuild(&m.world.game.units);
+    m.world.game.tick = 1;
+    m.refresh_world_visibility().unwrap();
+    let c = m.world.game.cell_of(at.x, at.z).unwrap();
+    let before = m.world_recipient_metadata(0, true).unwrap();
+    let before_json = before.to_json();
+    let remembered =
+        before.geography.as_ref().unwrap().rows[c / m.world.game.w].as_bytes()[c % m.world.game.w];
+    assert_ne!(remembered, b'B');
     // Leave the explored cell, then change its current terrain in the fog.
-    let eye=m.world.game.units.get_mut(&id).unwrap();eye.x=201.0;eye.z=201.0;
-    m.grid.rebuild(&m.world.game.units);m.world.game.tick=2;m.refresh_world_visibility().unwrap();
-    let left=m.world_recipient_metadata(0,true).unwrap();
-    m.world.set_cell(c,b'B').unwrap();
-    let hidden=m.world_recipient_metadata(0,true).unwrap();
-    assert_eq!(left.to_json(),hidden.to_json(),"a hidden change alters no recipient metadata");
-    let known=hidden.geography.as_ref().unwrap();
-    assert_eq!(known.rows[c/m.world.game.w].as_bytes()[c%m.world.game.w],remembered);
-    for (slot,spawn) in known.spawns.iter().enumerate() {
-        assert_eq!(spawn.is_some(),m.world.game.allied(slot,0));
+    let eye = m.world.game.units.get_mut(&id).unwrap();
+    eye.x = 201.0;
+    eye.z = 201.0;
+    m.grid.rebuild(&m.world.game.units);
+    m.world.game.tick = 2;
+    m.refresh_world_visibility().unwrap();
+    let left = m.world_recipient_metadata(0, true).unwrap();
+    m.world.set_cell(c, b'B').unwrap();
+    let hidden = m.world_recipient_metadata(0, true).unwrap();
+    assert_eq!(
+        left.to_json(),
+        hidden.to_json(),
+        "a hidden change alters no recipient metadata"
+    );
+    let known = hidden.geography.as_ref().unwrap();
+    assert_eq!(
+        known.rows[c / m.world.game.w].as_bytes()[c % m.world.game.w],
+        remembered
+    );
+    for (slot, spawn) in known.spawns.iter().enumerate() {
+        assert_eq!(spawn.is_some(), m.world.game.allied(slot, 0));
     }
-    let team=m.world.game.players[0].team;
-    let memory=m.world_runtime.as_ref().unwrap().memory.team(team).unwrap();
-    let runtime=m.world_runtime.as_ref().unwrap();
-    assert_eq!(hidden.lists.nodes.as_ref().unwrap().len(),runtime.nodes.iter().filter(|n|memory.contains_cell(n.cell)).count());
-    assert_eq!(hidden.world.stations.as_ref().map_or(0,Vec::len),runtime.rails.stations.iter().filter(|s|memory.contains_cell(s.cell)).count());
-    let unseen=(0..m.world.game.chars.len()).find(|&cell|!memory.contains_cell(cell)).unwrap();
-    assert_eq!(known.rows[unseen/m.world.game.w].as_bytes()[unseen%m.world.game.w],b'.');
-    assert_eq!(known.heights[unseen/m.world.game.w].as_bytes()[unseen%m.world.game.w],b'0');
-    let json=hidden.to_json();
+    let team = m.world.game.players[0].team;
+    let memory = m.world_runtime.as_ref().unwrap().memory.team(team).unwrap();
+    let runtime = m.world_runtime.as_ref().unwrap();
+    assert_eq!(
+        hidden.lists.nodes.as_ref().unwrap().len(),
+        runtime
+            .nodes
+            .iter()
+            .filter(|n| memory.contains_cell(n.cell))
+            .count()
+    );
+    assert_eq!(
+        hidden.world.stations.as_ref().map_or(0, Vec::len),
+        runtime
+            .rails
+            .stations
+            .iter()
+            .filter(|s| memory.contains_cell(s.cell))
+            .count()
+    );
+    let unseen = (0..m.world.game.chars.len())
+        .find(|&cell| !memory.contains_cell(cell))
+        .unwrap();
+    assert_eq!(
+        known.rows[unseen / m.world.game.w].as_bytes()[unseen % m.world.game.w],
+        b'.'
+    );
+    assert_eq!(
+        known.heights[unseen / m.world.game.w].as_bytes()[unseen % m.world.game.w],
+        b'0'
+    );
+    let json = hidden.to_json();
     assert!(json["map"]["world"].get("seed").is_none());
     assert!(json["map"]["points"].as_array().unwrap().is_empty());
     // Reconnect receives the complete remembered map with the old cell. Returning
     // the observer accepts the current terrain rather than an injected answer.
-    let eye=m.world.game.units.get_mut(&id).unwrap();eye.x=at.x;eye.z=at.z;
-    m.grid.rebuild(&m.world.game.units);m.world.game.tick=3;m.refresh_world_visibility().unwrap();
-    let seen=m.world_recipient_metadata(0,true).unwrap();
-    assert_eq!(seen.geography.as_ref().unwrap().rows[c/m.world.game.w].as_bytes()[c%m.world.game.w],b'B');
-    assert_ne!(before_json,seen.to_json());
+    let eye = m.world.game.units.get_mut(&id).unwrap();
+    eye.x = at.x;
+    eye.z = at.z;
+    m.grid.rebuild(&m.world.game.units);
+    m.world.game.tick = 3;
+    m.refresh_world_visibility().unwrap();
+    let seen = m.world_recipient_metadata(0, true).unwrap();
+    assert_eq!(
+        seen.geography.as_ref().unwrap().rows[c / m.world.game.w].as_bytes()[c % m.world.game.w],
+        b'B'
+    );
+    assert_ne!(before_json, seen.to_json());
 }

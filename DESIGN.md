@@ -4777,3 +4777,10 @@ validation strings differ from the retained exact oracle. Do not silently mark
 these differences as intentional or transfer earlier passes to this head.
 Root owns the next literal execution grant, reviewer assignment, public actions
 and integration. Only actual passing rows with reviewer confirmation may move.
+
+Root's explicit formatter grant runs the existing pinned 1.99.0 rustfmt once,
+with edition 2024 and skip_children=true, on only map_feature_tests.rs and the
+changed map_terrain_components/world_start/world_memory test modules. It exits
+0. Fixed strings, test names and assertion/call order compare unchanged;
+git diff --check passes. Freeze a mechanical successor. Cargo/native/Source
+counts remain zero and the separate World validation test is not reformatted.

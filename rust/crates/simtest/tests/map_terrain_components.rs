@@ -478,7 +478,10 @@ fn map49_complete_original_cliff_and_depression_checks() {
     )
     .game;
     let direct = path(&slope, &rules, "rifle", from, across);
-    assert!(!direct.is_empty(), "the one-level control must find a route");
+    assert!(
+        !direct.is_empty(),
+        "the one-level control must find a route"
+    );
     assert!(
         direct.iter().all(|p| p.z < 15.0 * 2.0),
         "test.js:646: a one-level slope may cross directly"
@@ -548,8 +551,13 @@ fn map01_cell_coordinates_centres_and_seeded_boundary_queries() {
     let y = spawn["y"].as_u64().unwrap() as f64;
     assert_eq!(((x + 0.5) * CELL, (y + 0.5) * CELL), (81.0, 13.0));
     for c in 0..w.game.w * w.game.h {
-        assert_eq!(w.game.cell_of((c % w.game.w) as f64 * 2.0 + 1.0,
-            (c / w.game.w) as f64 * 2.0 + 1.0), Some(c));
+        assert_eq!(
+            w.game.cell_of(
+                (c % w.game.w) as f64 * 2.0 + 1.0,
+                (c / w.game.w) as f64 * 2.0 + 1.0
+            ),
+            Some(c)
+        );
     }
     // Integer numerators make the independent expected floor exact, including
     // negative subcell coordinates. A fixed LCG never uses wall-clock entropy.
@@ -562,8 +570,13 @@ fn map01_cell_coordinates_centres_and_seeded_boundary_queries() {
         let (cx, cy) = (nx.div_euclid(512), nz.div_euclid(512));
         let expected = if cx < 0 || cy < 0 || cx >= w.game.w as i64 || cy >= w.game.h as i64 {
             -1
-        } else { cy * w.game.w as i64 + cx };
-        assert_eq!(w.game.cell_index(nx as f64 / 256.0, nz as f64 / 256.0), expected);
+        } else {
+            cy * w.game.w as i64 + cx
+        };
+        assert_eq!(
+            w.game.cell_index(nx as f64 / 256.0, nz as f64 / 256.0),
+            expected
+        );
     }
 }
 
@@ -613,7 +626,10 @@ fn map16_layer_composition_material_round_trip_and_invalid_stacks() {
     batch_put(&mut hedge["layers"], "objects", 8, 8, b'H');
     let map = AuthoritativeMap::from_json(&serde_json::to_vec(&hedge).unwrap()).unwrap();
     assert!(!map.layers().materials.contains_key(&168));
-    assert_eq!(World::from_map(&map).unwrap().material_name(168, false), Some("wood"));
+    assert_eq!(
+        World::from_map(&map).unwrap().material_name(168, false),
+        Some("wood")
+    );
     for (ground, object, mine, composed, valid) in [
         (b'W', b'=', b'.', b'=', true),
         (b'.', b'=', b'.', b'=', false),
@@ -627,28 +643,44 @@ fn map16_layer_composition_material_round_trip_and_invalid_stacks() {
         batch_put(&mut m["layers"], "objects", 8, 8, object);
         batch_put(&mut m["layers"], "mines", 8, 8, mine);
         batch_put(&mut m, "rows", 8, 8, composed);
-        assert_eq!(AuthoritativeMap::from_json(&serde_json::to_vec(&m).unwrap()).is_ok(), valid,
-            "stack {ground}/{object}/{mine}/{composed}");
+        assert_eq!(
+            AuthoritativeMap::from_json(&serde_json::to_vec(&m).unwrap()).is_ok(),
+            valid,
+            "stack {ground}/{object}/{mine}/{composed}"
+        );
     }
 }
 
 #[test]
 fn map21_all_authored_moods_defaults_overrides_and_fog_lift() {
     use ww2_core::weather::{MapWeatherInfo, WeatherKind, WeatherRules, map_mood};
-    let fixture: Value = serde_json::from_str(include_str!(
-        "../../core/tests/fixtures/weather.json")).unwrap();
+    let fixture: Value =
+        serde_json::from_str(include_str!("../../core/tests/fixtures/weather.json")).unwrap();
     let rules = WeatherRules::compiled().unwrap();
     let mut checked = 0;
     for row in fixture["authored"].as_array().unwrap() {
         let name = row["name"].as_str().unwrap();
         let input = original_map(&format!("authored:{name}.json"));
-        let info = MapWeatherInfo { name:input["name"].as_str(), mood:input["mood"].as_str(),
-            weather:input["weather"].as_str() };
-        let expected = fixture["metadata"].as_array().unwrap().iter()
-            .find(|r| r["key"] == name).unwrap();
-        assert_eq!(map_mood(info, Some(name)).name(), expected["mood"].as_str().unwrap());
+        let info = MapWeatherInfo {
+            name: input["name"].as_str(),
+            mood: input["mood"].as_str(),
+            weather: input["weather"].as_str(),
+        };
+        let expected = fixture["metadata"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["key"] == name)
+            .unwrap();
+        assert_eq!(
+            map_mood(info, Some(name)).name(),
+            expected["mood"].as_str().unwrap()
+        );
         let mut plan = rules.map_weather(info, Some(name));
-        assert_eq!(plan.now.name(), expected["expected"]["now"].as_str().unwrap());
+        assert_eq!(
+            plan.now.name(),
+            expected["expected"]["now"].as_str().unwrap()
+        );
         if plan.now == WeatherKind::Fog {
             assert!(!plan.step(4_799));
             assert!(plan.step(4_800));
@@ -658,14 +690,21 @@ fn map21_all_authored_moods_defaults_overrides_and_fog_lift() {
         checked += 1;
     }
     assert_eq!(checked, 33);
-    let override_map = MapWeatherInfo { name:Some("winter"), mood:Some("dust"), weather:Some("rain") };
+    let override_map = MapWeatherInfo {
+        name: Some("winter"),
+        mood: Some("dust"),
+        weather: Some("rain"),
+    };
     assert_eq!(map_mood(override_map, Some("ardennes")).name(), "dust");
     assert_eq!(rules.map_weather(override_map, None).now.name(), "rain");
 }
 
 #[test]
 fn map27_map28_map35_map40_cover_flags_health_fire_and_destruction() {
-    use ww2_core::{environment::{Context, EnvironmentRuntime}, game::{COVER, SIGHT}};
+    use ww2_core::{
+        environment::{Context, EnvironmentRuntime},
+        game::{COVER, SIGHT},
+    };
     let rules = Rules::compiled().unwrap();
     for (ch, hp, blocks_sight, burn, into) in [
         (b'H', 60.0, true, Some(14.0), b'.'),
@@ -674,19 +713,31 @@ fn map27_map28_map35_map40_cover_flags_health_fire_and_destruction() {
         (b'O', 200.0, false, Some(20.0), b'.'),
     ] {
         let mut rows = empty();
-        let mut bytes = rows[8].as_bytes().to_vec(); bytes[8] = ch;
+        let mut bytes = rows[8].as_bytes().to_vec();
+        bytes[8] = ch;
         rows[8] = String::from_utf8(bytes).unwrap();
         let mut w = original_scene(rows, None);
         let c = 168;
         assert_eq!(w.game.cell_hp[c], hp);
         assert_eq!(w.game.flags[c] & SIGHT != 0, blocks_sight);
         assert_eq!(w.game.flags[c] & MOVE, 0);
-        if ch != b'X' { assert_ne!(w.game.flags[c] & COVER, 0); }
+        if ch != b'X' {
+            assert_ne!(w.game.flags[c] & COVER, 0);
+        }
         let mut env = EnvironmentRuntime::default();
         let grid = SpatialGrid::new(&w.game.units, 16.0);
         let (mut seed, mut next_id) = (123456789, 1000);
-        let mut ctx = Context { tick:0, seed:&mut seed, next_id:&mut next_id,
-            unit_order:&[], grid:&grid, rain:0.0, wet:0.0, wind_angle:0.0, wind_strength:0.0 };
+        let mut ctx = Context {
+            tick: 0,
+            seed: &mut seed,
+            next_id: &mut next_id,
+            unit_order: &[],
+            grid: &grid,
+            rain: 0.0,
+            wet: 0.0,
+            wind_angle: 0.0,
+            wind_strength: 0.0,
+        };
         if let Some(duration) = burn {
             env.ignite(&mut w, c, &mut ctx).unwrap();
             assert_eq!(w.fires.get(&c).copied(), Some(duration));
@@ -701,21 +752,30 @@ fn map27_map28_map35_map40_cover_flags_health_fire_and_destruction() {
 #[test]
 fn map29_crater_start_depth_quality_clamp_and_woods_sight_budget() {
     let rules = Rules::compiled().unwrap();
-    let mut rows = empty(); rows[8] = "+".repeat(20);
+    let mut rows = empty();
+    rows[8] = "+".repeat(20);
     let mut w = original_scene(rows, None);
     for c in 160..180 {
         assert!((0.3..=0.6).contains(&w.game.wear.as_ref().unwrap()[c]));
     }
     for wear in [0.0f32, 0.3, 0.6, 1.0] {
         w.game.wear.as_mut().unwrap()[168] = wear;
-        exact(ww2_core::terrain::cover_q(&w.game, &rules, 168),
-            (0.55 + f64::from(wear)).min(1.4), "crater cover quality");
+        exact(
+            ww2_core::terrain::cover_q(&w.game, &rules, 168),
+            (0.55 + f64::from(wear)).min(1.4),
+            "crater cover quality",
+        );
     }
     for (trees, visible) in [(3, true), (4, false)] {
-        let mut rows = empty(); rows[8] = format!("....{}{}", "O".repeat(trees), ".".repeat(16-trees));
+        let mut rows = empty();
+        rows[8] = format!("....{}{}", "O".repeat(trees), ".".repeat(16 - trees));
         let w = original_scene(rows, None);
-        assert_eq!(los(&w.game, &rules, (1.0,17.0), (35.0,17.0)), visible);
-        exact(ww2_core::terrain::cover_q(&w.game, &rules, 164), 0.6, "woods quality");
+        assert_eq!(los(&w.game, &rules, (1.0, 17.0), (35.0, 17.0)), visible);
+        exact(
+            ww2_core::terrain::cover_q(&w.game, &rules, 164),
+            0.6,
+            "woods quality",
+        );
     }
 }
 
@@ -723,20 +783,27 @@ fn map29_crater_start_depth_quality_clamp_and_woods_sight_budget() {
 fn map32_map37_map38_authored_depth_road_presence_and_wet_speeds() {
     let rules = Rules::compiled().unwrap();
     for ch in [b'F', b'M', b'D'] {
-        let mut rows = empty(); rows[8] = String::from_utf8(vec![ch;20]).unwrap();
+        let mut rows = empty();
+        rows[8] = String::from_utf8(vec![ch; 20]).unwrap();
         let mut w = original_scene(rows, None);
         assert_eq!(w.roads, ch == b'D');
         for c in 160..180 {
             let depth = w.game.wear.as_ref().unwrap()[c];
-            if ch != b'D' { assert!((0.2..=0.8).contains(&depth)); }
+            if ch != b'D' {
+                assert!((0.2..=0.8).contains(&depth));
+            }
             for wet in [0.0, 1.0] {
                 w.game.wet = Some(wet);
                 let expected = match ch {
-                    b'F' => (0.75 + (0.35 - 0.75)*f64::from(depth))*(1.0-0.3*wet),
-                    b'M' => (0.7 + (0.35 - 0.7)*f64::from(depth))*(1.0-0.2*wet),
-                    _ => 1.35 + (1.0-1.35)*f64::from(depth),
+                    b'F' => (0.75 + (0.35 - 0.75) * f64::from(depth)) * (1.0 - 0.3 * wet),
+                    b'M' => (0.7 + (0.35 - 0.7) * f64::from(depth)) * (1.0 - 0.2 * wet),
+                    _ => 1.35 + (1.0 - 1.35) * f64::from(depth),
                 };
-                exact(ground_mul(&w.game,&rules,c,true),expected,"authored ground speed");
+                exact(
+                    ground_mul(&w.game, &rules, c, true),
+                    expected,
+                    "authored ground speed",
+                );
             }
         }
     }
@@ -745,121 +812,250 @@ fn map32_map37_map38_authored_depth_road_presence_and_wet_speeds() {
 #[test]
 fn map90_rails_eight_direction_masks_bridge_cells_and_station_yards() {
     use ww2_core::match_world_rails::WorldRails;
-    let mut chars = vec![b'.';400]; chars[210] = b'=';
+    let mut chars = vec![b'.'; 400];
+    chars[210] = b'=';
     // Ordered loop exercises all eight directions and both bit contributions.
-    let cells = [210,211,232,252,271,270,249,229,210];
+    let cells = [210, 211, 232, 252, 271, 270, 249, 229, 210];
     let metadata = json!({"stations":[{"region":0,"x":10,"y":10}],
         "lines":[{"a":0,"b":1,"cells":cells,"regions":[0,1]}]});
-    let rails = WorldRails::from_metadata(Some(&metadata),&chars,20,20,64).unwrap();
-    assert_eq!(rails.lines[0].bridges, [210,210]);
-    assert_eq!(rails.station_at, [(210,0)]);
-    assert_eq!((rails.stations[0].x,rails.stations[0].z),(21.0,21.0));
-    let expected = [(210,9),(211,18),(232,36),(252,72),(271,144),(270,33),(249,66),(229,132)];
-    assert_eq!(rails.rail_at,expected);
-    assert_eq!(rails.yard.len(),121);
-    for y in 5..=15 { for x in 5..=15 { assert!(rails.yard.contains(&(y*20+x))); } }
-    assert!(!rails.yard.contains(&(10*20+16)));
+    let rails = WorldRails::from_metadata(Some(&metadata), &chars, 20, 20, 64).unwrap();
+    assert_eq!(rails.lines[0].bridges, [210, 210]);
+    assert_eq!(rails.station_at, [(210, 0)]);
+    assert_eq!((rails.stations[0].x, rails.stations[0].z), (21.0, 21.0));
+    let expected = [
+        (210, 9),
+        (211, 18),
+        (232, 36),
+        (252, 72),
+        (271, 144),
+        (270, 33),
+        (249, 66),
+        (229, 132),
+    ];
+    assert_eq!(rails.rail_at, expected);
+    assert_eq!(rails.yard.len(), 121);
+    for y in 5..=15 {
+        for x in 5..=15 {
+            assert!(rails.yard.contains(&(y * 20 + x)));
+        }
+    }
+    assert!(!rails.yard.contains(&(10 * 20 + 16)));
 }
 
 #[test]
 fn map24_public_authored_maps_remove_mines_and_private_scripts() {
-    mod public { include!("../../server/src/map-data.rs"); }
-    assert_eq!(public::MAPS.len(),33);
-    let mut private_mines=0;
-    for (name,text) in public::MAPS {
-        let private=original_map(&format!("authored:{name}.json"));
-        let public:Value=serde_json::from_str(text).unwrap();
-        let authoritative=AuthoritativeMap::from_json(&serde_json::to_vec(&private).unwrap()).unwrap();
+    mod public {
+        include!("../../server/src/map-data.rs");
+    }
+    assert_eq!(public::MAPS.len(), 33);
+    let mut private_mines = 0;
+    for (name, text) in public::MAPS {
+        let private = original_map(&format!("authored:{name}.json"));
+        let public: Value = serde_json::from_str(text).unwrap();
+        let authoritative =
+            AuthoritativeMap::from_json(&serde_json::to_vec(&private).unwrap()).unwrap();
         assert!(public.get("triggers").is_none() && public.get("scenario").is_none());
-        assert!(public["layers"]["mines"].as_array().unwrap().iter().all(|r|r.as_str().unwrap().bytes().all(|c|c==b'.')));
-        assert!(public["layers"]["mineMaterials"].as_array().is_none_or(Vec::is_empty));
-        for (y,row) in public["rows"].as_array().unwrap().iter().enumerate() {
-            for (x,ch) in row.as_str().unwrap().bytes().enumerate() {
-                let c=y*authoritative.dimensions().0+x;
-                assert_ne!(ch,b'N');
-                if authoritative.layers().mines[c]!=0 {
-                    let object=authoritative.layers().objects[c];
-                    let beneath=if object==b'.'{authoritative.layers().ground[c]}else{object};
-                    assert_eq!(ch,beneath);
-                    private_mines+=1;
+        assert!(
+            public["layers"]["mines"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|r| r.as_str().unwrap().bytes().all(|c| c == b'.'))
+        );
+        assert!(
+            public["layers"]["mineMaterials"]
+                .as_array()
+                .is_none_or(Vec::is_empty)
+        );
+        for (y, row) in public["rows"].as_array().unwrap().iter().enumerate() {
+            for (x, ch) in row.as_str().unwrap().bytes().enumerate() {
+                let c = y * authoritative.dimensions().0 + x;
+                assert_ne!(ch, b'N');
+                if authoritative.layers().mines[c] != 0 {
+                    let object = authoritative.layers().objects[c];
+                    let beneath = if object == b'.' {
+                        authoritative.layers().ground[c]
+                    } else {
+                        object
+                    };
+                    assert_eq!(ch, beneath);
+                    private_mines += 1;
                 }
             }
         }
     }
-    assert!(private_mines>0);
+    assert!(private_mines > 0);
 }
 
 fn batch_match(input: &Value) -> ww2_core::match_runtime::Match {
-    use ww2_core::{economy::{Faction,Mode},economy_state::ArmySize,
-        match_runtime::{Match,MatchOptions,PlayerConfig},weather::WeatherChoice};
-    let map=AuthoritativeMap::from_json(&serde_json::to_vec(input).unwrap()).unwrap();
-    let mut m=Match::new(&map,MatchOptions { seed:701,mode:Mode::Conquest,
-        players:(0..2).map(|team|PlayerConfig{name:format!("p{team}"),team,
-            faction:Faction::try_from(team as u8).unwrap()}).collect(),
-        shuffle:false,army:ArmySize::Standard,weather:WeatherChoice::Map,
-        weather_seed:Some(1),living_weather:false,map_key:None,
-        tech:false,supply:false,logistics:false,sandbox:false }).unwrap();
-    m.world.game.units.clear();m.commands.units.clear();m.grid.rebuild(&m.world.game.units);
-    for p in &mut m.start.economy.players { p.mp=5000.0; }
+    use ww2_core::{
+        economy::{Faction, Mode},
+        economy_state::ArmySize,
+        match_runtime::{Match, MatchOptions, PlayerConfig},
+        weather::WeatherChoice,
+    };
+    let map = AuthoritativeMap::from_json(&serde_json::to_vec(input).unwrap()).unwrap();
+    let mut m = Match::new(
+        &map,
+        MatchOptions {
+            seed: 701,
+            mode: Mode::Conquest,
+            players: (0..2)
+                .map(|team| PlayerConfig {
+                    name: format!("p{team}"),
+                    team,
+                    faction: Faction::try_from(team as u8).unwrap(),
+                })
+                .collect(),
+            shuffle: false,
+            army: ArmySize::Standard,
+            weather: WeatherChoice::Map,
+            weather_seed: Some(1),
+            living_weather: false,
+            map_key: None,
+            tech: false,
+            supply: false,
+            logistics: false,
+            sandbox: false,
+        },
+    )
+    .unwrap();
+    m.world.game.units.clear();
+    m.commands.units.clear();
+    m.grid.rebuild(&m.world.game.units);
+    for p in &mut m.start.economy.players {
+        p.mp = 5000.0;
+    }
     m
 }
 
 #[test]
 fn map33_bridge_artillery_and_timed_whole_span_collapse_with_occupants() {
-    use ww2_core::{match_commands::Command,match_tick::{TickPathConfig,TickEvent},orders::OrderKey,
-        unit_publication::{StagedUnit,PublicationParts,prepare_publication}};
-    fn put(m:&mut ww2_core::match_runtime::Match,at:Point)->u32 {
-        let staged=StagedUnit::ordinary(&m.world.game,&m.rules,1,m.rules.kind("rifle").unwrap(),
-            m.next_unit_id,m.world.game.units.len() as u32,m.start.players[1].spawn,Some(at)).unwrap();
-        let id=staged.unit.id;
-        prepare_publication(PublicationParts{units:&mut m.world.game.units,grid:&mut m.grid,
-            controls:&mut m.commands.units,recruitment:&mut m.recruit_metadata,next_id:&mut m.next_unit_id},
-            &m.rules,m.world.game.players.len(),vec![staged]).unwrap().publish();
-        m.combat.initialize(id);m.firing.initialize(id);m.abilities.initialize(id);m.recovery.initialize(id);
-        let control=m.commands.units.get_mut(&id).unwrap();control.auto_cast=false;
-        control.auto_retreat=false;control.hold_fire=true;
-        m.world.game.units.get_mut(&id).unwrap().hold_pos=true;
+    use ww2_core::{
+        match_commands::Command,
+        match_tick::{TickEvent, TickPathConfig},
+        orders::OrderKey,
+        unit_publication::{PublicationParts, StagedUnit, prepare_publication},
+    };
+    fn put(m: &mut ww2_core::match_runtime::Match, at: Point) -> u32 {
+        let staged = StagedUnit::ordinary(
+            &m.world.game,
+            &m.rules,
+            1,
+            m.rules.kind("rifle").unwrap(),
+            m.next_unit_id,
+            m.world.game.units.len() as u32,
+            m.start.players[1].spawn,
+            Some(at),
+        )
+        .unwrap();
+        let id = staged.unit.id;
+        prepare_publication(
+            PublicationParts {
+                units: &mut m.world.game.units,
+                grid: &mut m.grid,
+                controls: &mut m.commands.units,
+                recruitment: &mut m.recruit_metadata,
+                next_id: &mut m.next_unit_id,
+            },
+            &m.rules,
+            m.world.game.players.len(),
+            vec![staged],
+        )
+        .unwrap()
+        .publish();
+        m.combat.initialize(id);
+        m.firing.initialize(id);
+        m.abilities.initialize(id);
+        m.recovery.initialize(id);
+        let control = m.commands.units.get_mut(&id).unwrap();
+        control.auto_cast = false;
+        control.auto_retreat = false;
+        control.hold_fire = true;
+        m.world.game.units.get_mut(&id).unwrap().hold_pos = true;
         id
     }
-    let rows=(0..20).map(|y|format!("{}{}{}",".".repeat(10),
-        if y==5 {'='}else if y==15 {'F'}else{'W'},".".repeat(9))).collect();
-    let mut input=original_scene_input(rows,None);input["points"]=json!([{"x":2,"y":2}]);
-    let mut m=batch_match(&input);
-    let from=Point{x:5.0,z:3.0};let to=Point{x:35.0,z:3.0};
-    let route=path(&m.world.game,&m.rules,"rifle",from,to);
-    assert!(!route.is_empty() && route.iter().all(|p|(p.z-11.0).abs()<6.0 || p.x<20.0 || p.x>22.0));
-    assert!(los(&m.world.game,&m.rules,(5.0,25.0),(35.0,25.0)));
-    let victim=put(&mut m,Point{x:21.0,z:11.0});
-    m.world.game.reveal=true;
-    m.initialize_tick_scene(0,TickPathConfig::default()).unwrap();
-    m.enqueue_command(OrderKey{tick:1,issuer:0,sequence:1},Command::Support{
-        kind:"artillery".into(),at:Point{x:21.0,z:11.0},direction:Some(0.0)}).unwrap();
+    let rows = (0..20)
+        .map(|y| {
+            format!(
+                "{}{}{}",
+                ".".repeat(10),
+                if y == 5 {
+                    '='
+                } else if y == 15 {
+                    'F'
+                } else {
+                    'W'
+                },
+                ".".repeat(9)
+            )
+        })
+        .collect();
+    let mut input = original_scene_input(rows, None);
+    input["points"] = json!([{"x":2,"y":2}]);
+    let mut m = batch_match(&input);
+    let from = Point { x: 5.0, z: 3.0 };
+    let to = Point { x: 35.0, z: 3.0 };
+    let route = path(&m.world.game, &m.rules, "rifle", from, to);
+    assert!(
+        !route.is_empty()
+            && route
+                .iter()
+                .all(|p| (p.z - 11.0).abs() < 6.0 || p.x < 20.0 || p.x > 22.0)
+    );
+    assert!(los(&m.world.game, &m.rules, (5.0, 25.0), (35.0, 25.0)));
+    let victim = put(&mut m, Point { x: 21.0, z: 11.0 });
+    m.world.game.reveal = true;
+    m.initialize_tick_scene(0, TickPathConfig::default())
+        .unwrap();
+    m.enqueue_command(
+        OrderKey {
+            tick: 1,
+            issuer: 0,
+            sequence: 1,
+        },
+        Command::Support {
+            kind: "artillery".into(),
+            at: Point { x: 21.0, z: 11.0 },
+            direction: Some(0.0),
+        },
+    )
+    .unwrap();
     for tick in 1..=300 {
-        let report=m.advance_tick().unwrap();
-        if tick==1 { assert_eq!(report.commands.len(),1);assert_eq!(report.commands[0].denial,None); }
-    }
-    assert_eq!(m.world.game.physical(110),b'W');
-    assert!(!m.world.game.units.contains_key(&victim));
-    let detour=path(&m.world.game,&m.rules,"rifle",from,to);
-    assert!(!detour.is_empty() && detour.iter().any(|p|p.z>25.0));
-
-    let mut rows=empty();rows[7]=".....WWWW==WWWW.....".into();
-    let mut input=original_scene_input(rows,None);
-    input["buildings"]=json!([{"x":9,"y":7,"kind":"stone bridge"}]);
-    input["triggers"]=json!([{"at":1,"say":"The bridge is going up!"},
-        {"at":2,"blow":[9,7,10,7],"say":"Bridge down"}]);
-    let mut m=batch_match(&input);
-    assert_eq!(m.world.game.cell_hp[149],2400.0);assert_eq!(m.world.game.cell_hp[150],2400.0);
-    let victim=put(&mut m,Point{x:19.0,z:15.0});
-    m.initialize_tick_scene(0,TickPathConfig::default()).unwrap();
-    let mut said=Vec::new();
-    for _ in 0..50 {
-        let report=m.advance_tick().unwrap();
-        for event in report.events {
-            if let TickEvent::Scenario(say)=event { said.push(say.shot_json()["text"].as_str().unwrap().to_owned()); }
+        let report = m.advance_tick().unwrap();
+        if tick == 1 {
+            assert_eq!(report.commands.len(), 1);
+            assert_eq!(report.commands[0].denial, None);
         }
     }
-    assert_eq!(said,["The bridge is going up!","Bridge down"]);
-    assert_eq!(m.world.game.physical(149),b'W');assert_eq!(m.world.game.physical(150),b'W');
+    assert_eq!(m.world.game.physical(110), b'W');
+    assert!(!m.world.game.units.contains_key(&victim));
+    let detour = path(&m.world.game, &m.rules, "rifle", from, to);
+    assert!(!detour.is_empty() && detour.iter().any(|p| p.z > 25.0));
+
+    let mut rows = empty();
+    rows[7] = ".....WWWW==WWWW.....".into();
+    let mut input = original_scene_input(rows, None);
+    input["buildings"] = json!([{"x":9,"y":7,"kind":"stone bridge"}]);
+    input["triggers"] = json!([{"at":1,"say":"The bridge is going up!"},
+        {"at":2,"blow":[9,7,10,7],"say":"Bridge down"}]);
+    let mut m = batch_match(&input);
+    assert_eq!(m.world.game.cell_hp[149], 2400.0);
+    assert_eq!(m.world.game.cell_hp[150], 2400.0);
+    let victim = put(&mut m, Point { x: 19.0, z: 15.0 });
+    m.initialize_tick_scene(0, TickPathConfig::default())
+        .unwrap();
+    let mut said = Vec::new();
+    for _ in 0..50 {
+        let report = m.advance_tick().unwrap();
+        for event in report.events {
+            if let TickEvent::Scenario(say) = event {
+                said.push(say.shot_json()["text"].as_str().unwrap().to_owned());
+            }
+        }
+    }
+    assert_eq!(said, ["The bridge is going up!", "Bridge down"]);
+    assert_eq!(m.world.game.physical(149), b'W');
+    assert_eq!(m.world.game.physical(150), b'W');
     assert!(!m.world.game.units.contains_key(&victim));
 }

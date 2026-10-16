@@ -1,1 +1,2 @@
 - Add 17 native MAP feature tests and a literal test map for all 42 remaining owned map rows under Axel's approved native-intent rule. Twenty-five candidate rows await native execution and prototype review; seventeen remain in progress with explicit provider or exact-value gaps. Preserve existing fixtures, failures and the unrun MAP-49 checks. No runtime behavior changes.
+- Apply Root's one targeted pinned-formatter grant to the four authorized MAP test modules. Preserve all test inputs, assertions and provider code; native execution remains pending.
