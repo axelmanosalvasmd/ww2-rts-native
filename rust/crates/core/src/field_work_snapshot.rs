@@ -14,7 +14,11 @@ impl FieldWorksRuntime {
 
     /// Manual Retreat consumes only selected reservations. Reuse the canonical
     /// descriptor rules, including signed cached counts and retained records.
-    pub(crate) fn validate_retreat_reservation(&self, world: &World, unit: u32) -> Result<(), String> {
+    pub(crate) fn validate_retreat_reservation(
+        &self,
+        world: &World,
+        unit: u32,
+    ) -> Result<(), String> {
         self.validate_snapshot_scope(world, Some(unit))
     }
 
@@ -35,10 +39,17 @@ impl FieldWorksRuntime {
             .iter()
             .filter(|(id, _)| relevant(**id))
             .map(|(_, project)| *project)
-            .chain(self.jobs.iter().filter(|(id, _)| relevant(**id)).filter_map(|(_, job)| job.project))
+            .chain(
+                self.jobs
+                    .iter()
+                    .filter(|(id, _)| relevant(**id))
+                    .filter_map(|(_, job)| job.project),
+            )
             .collect::<BTreeSet<_>>();
         for (&id, &project) in &self.projects.members {
-            if !relevant(id) { continue; }
+            if !relevant(id) {
+                continue;
+            }
             let unit = game.units.get(&id).ok_or("orphan field-work membership")?;
             if id == 0
                 || unit.id != id
@@ -49,7 +60,9 @@ impl FieldWorksRuntime {
             }
         }
         for (&id, project) in &self.projects.records {
-            if selected.is_some() && !references.contains(&id) { continue; }
+            if selected.is_some() && !references.contains(&id) {
+                continue;
+            }
             if id != project.id {
                 return Err("field-work project identity mismatch".into());
             }
@@ -73,7 +86,9 @@ impl FieldWorksRuntime {
             }
         }
         for (&id, job) in &self.jobs {
-            if !relevant(id) { continue; }
+            if !relevant(id) {
+                continue;
+            }
             let unit = game.units.get(&id).ok_or("orphan paid field-work job")?;
             if id == 0
                 || unit.id != id
@@ -112,7 +127,9 @@ impl FieldWorksRuntime {
             }
         }
         for (&id, unit) in &game.units {
-            if !relevant(id) { continue; }
+            if !relevant(id) {
+                continue;
+            }
             if unit.dig != self.is_active(id) || unit.entrench != self.membership(id).is_some() {
                 return Err("field-work activity binding mismatch".into());
             }

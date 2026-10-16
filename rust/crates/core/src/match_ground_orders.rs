@@ -296,7 +296,8 @@ impl Match {
                 &self.world.game.units[&id],
                 &self.commands.units[&id],
             )?;
-            self.field_works.validate_retreat_reservation(&self.world, id)
+            self.field_works
+                .validate_retreat_reservation(&self.world, id)
                 .map_err(|error| format!("ground retreat reservation: {error}"))?;
         }
         self.ground_order_capacity(&selected)?;

@@ -1,0 +1,1 @@
+- Replay exactly the 76 formatting-diagnostic hunks from the failed 66cbb076 check across nine ground Rust files. Preserve all quoted literals, inputs, assertions and control flow; retain the original failure. No formatter or native check ran on this child.
