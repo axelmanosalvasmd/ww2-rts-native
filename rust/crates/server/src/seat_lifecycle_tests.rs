@@ -138,164 +138,49 @@ fn net66_presence_and_ping_survive_scheduled_paused_catchup_and_reconnect_delive
 }
 
 #[test]
-fn net79_host_controls_freeze_ticks_and_orders_with_operative_admission_closed() {
+fn client_pause_and_resume_remain_unavailable_even_for_native_host() {
     let (mut hub, host, mut host_rx, guest, mut guest_rx) = setup();
-    let id = hub.rooms["ABC"]
-        .native
-        .as_ref()
-        .unwrap()
-        .runtime
-        .state()
-        .world
-        .game
-        .units
-        .values()
-        .find(|u| {
-            u.owner == 0
-                && hub.rooms["ABC"]
-                    .native
-                    .as_ref()
-                    .unwrap()
-                    .runtime
-                    .state()
-                    .rules
-                    .kinds[u.kind]
-                    .name
-                    == "rifle"
-        })
-        .unwrap()
-        .id;
-    let original = hub.rooms["ABC"]
-        .native
-        .as_ref()
-        .unwrap()
-        .runtime
-        .state()
-        .commands
-        .units[&id]
-        .hold_fire;
-    hub.message(
-        "ABC",
-        &host,
-        &mut true,
-        json!({"t":"stance","ids":[id],"key":"holdFire","on":!original}),
-        1,
-    );
-    hub.message("ABC", &guest, &mut true, json!({"t":"pause"}), 2);
-    assert!(!hub.native_status("ABC").unwrap().paused);
-    hub.message("ABC", &host, &mut true, json!({"t":"pause"}), 3);
-    for rx in [&mut host_rx, &mut guest_rx] {
-        assert!(
-            drain(&mut hub, rx, 3)
-                .iter()
-                .any(|m| *m
-                    == json!({"t":"pause","paused":true,"by":"host","reason":"host","left":0}))
-        );
-    }
-    hub.message(
-        "ABC",
-        &host,
-        &mut true,
-        json!({"t":"stance","ids":[id],"key":"holdFire","on":original}),
-        4,
-    );
-    hub.message("ABC", &guest, &mut true, json!({"t":"resume"}), 5);
-    assert!(hub.native_status("ABC").unwrap().paused);
-    let random = hub.rooms["ABC"]
-        .native
-        .as_ref()
-        .unwrap()
-        .runtime
-        .state()
-        .start
-        .random
-        .snapshot();
-    for (now, monotonic, expect_frame) in [
-        (1002, 0, false),
-        (1003, 50_000_000, true),
-        (2002, 100_000_000, false),
-        (2003, 150_000_000, true),
-    ] {
-        hub.poll_native(now, monotonic);
-        for rx in [&mut host_rx, &mut guest_rx] {
-            let messages = drain(&mut hub, rx, now);
-            assert_eq!(snapshots(&messages).count(), usize::from(expect_frame));
-            assert_eq!(
-                messages.iter().filter(|m| m["t"] == "pause").count(),
-                usize::from(expect_frame)
-            );
+    for paused in [false, true] {
+        if paused {
+            hub.rooms
+                .get_mut("ABC")
+                .unwrap()
+                .native
+                .as_mut()
+                .unwrap()
+                .runtime
+                .pause(0, "host", crate::room_runtime::PauseReason::Host, 1)
+                .unwrap();
         }
-        let state = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state();
-        assert_eq!(state.world.game.tick, 0);
-        assert_eq!(state.start.random.snapshot(), random);
-        assert_eq!(state.commands.pending_commands(), 1);
-        assert_eq!(state.commands.units[&id].hold_fire, original);
+        for client in [&host, &guest] {
+            for command in ["pause", "resume"] {
+                assert!(UNAVAILABLE.contains(&command));
+                let runtime = &hub.rooms["ABC"].native.as_ref().unwrap().runtime;
+                let tick = runtime.state().world.game.tick;
+                let random = runtime.state().start.random.snapshot();
+                let pending = runtime.state().commands.pending_commands();
+                let pause = runtime.pause_message(2);
+                hub.message("ABC", client, &mut true, json!({"t":command}), 2);
+                let denial = vec![json!({"t":"deny","cmd":command,"reason":"blocked"})];
+                let host_messages = drain(&mut hub, &mut host_rx, 2);
+                let guest_messages = drain(&mut hub, &mut guest_rx, 2);
+                if client.id == host.id {
+                    assert_eq!(host_messages, denial);
+                    assert!(guest_messages.is_empty());
+                } else {
+                    assert_eq!(guest_messages, denial);
+                    assert!(host_messages.is_empty());
+                }
+                let runtime = &hub.rooms["ABC"].native.as_ref().unwrap().runtime;
+                assert_eq!(runtime.paused(), paused);
+                assert_eq!(runtime.pause_message(2), pause);
+                assert_eq!(runtime.state().world.game.tick, tick);
+                assert_eq!(runtime.state().start.random.snapshot(), random);
+                assert_eq!(runtime.state().commands.pending_commands(), pending);
+                assert!(runtime.fault().is_none());
+            }
+        }
     }
-    let (operative, mut operative_rx) = peer(8);
-    let mut joined = false;
-    hub.message(
-        "ABC",
-        &operative,
-        &mut joined,
-        json!({"t":"hello","token":"op","name":"op","role":"operative","commander":0}),
-        2004,
-    );
-    assert!(!joined);
-    assert!(matches!(operative_rx.try_recv(), Ok(Output::Json(m)) if m["reason"] == "commander"));
-    assert!(matches!(
-        operative_rx.try_recv(),
-        Ok(Output::Close(1008, _))
-    ));
-    hub.message(
-        "ABC",
-        &operative,
-        &mut joined,
-        json!({"t":"fps","seq":1,"fire":true}),
-        2005,
-    );
-    assert_eq!(hub.rooms["ABC"].players.len(), 2);
-    hub.message("ABC", &host, &mut true, json!({"t":"resume"}), 2006);
-    assert!(!hub.native_status("ABC").unwrap().paused);
-    for rx in [&mut host_rx, &mut guest_rx] {
-        assert!(
-            drain(&mut hub, rx, 2006)
-                .iter()
-                .any(|m| m["t"] == "pause" && m["paused"] == false)
-        );
-    }
-    for beat in 4..10 {
-        hub.poll_native(2006 + beat * 50, beat * 50_000_000);
-        drain(&mut hub, &mut host_rx, 2506);
-        drain(&mut hub, &mut guest_rx, 2506);
-    }
-    let state = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state();
-    assert_eq!(state.world.game.tick, 6);
-    assert_eq!(state.commands.pending_commands(), 0);
-    assert_eq!(state.commands.units[&id].hold_fire, !original);
-    assert!(hub.native_status("ABC").unwrap().fault.is_none());
-
-    // Finish by the ordinary Conquest victory rule, then complete the result hold.
-    let win_vp = state.start.win_vp;
-    hub.rooms
-        .get_mut("ABC")
-        .unwrap()
-        .native
-        .as_mut()
-        .unwrap()
-        .runtime
-        .state_mut()
-        .start
-        .economy
-        .players[0]
-        .vp = win_vp;
-    for beat in 10..=130 {
-        hub.poll_native(2006 + beat * 50, beat * 50_000_000);
-        drain(&mut hub, &mut host_rx, 2006 + beat * 50);
-        drain(&mut hub, &mut guest_rx, 2006 + beat * 50);
-        assert!(hub.native_status("ABC").unwrap().fault.is_none());
-    }
-    assert!(hub.native_status("ABC").unwrap().ending_complete);
-    assert!(hub.rooms["ABC"].native.is_none());
 }
 
 #[test]
@@ -325,7 +210,15 @@ fn net80_human_drop_expiry_reconnect_host_release_and_fresh_match_allowance() {
     hub.publish_native("ABC", prepared);
     drain(&mut hub, &mut host_rx, 30_013);
     assert!(hub.native_status("ABC").unwrap().paused);
-    hub.message("ABC", &host, &mut true, json!({"t":"resume"}), 30_014);
+    // Exercise the existing host API without admitting a client resume message.
+    hub.rooms
+        .get_mut("ABC")
+        .unwrap()
+        .native
+        .as_mut()
+        .unwrap()
+        .runtime
+        .resume(30_014);
     assert!(!hub.native_status("ABC").unwrap().paused);
     let (returned, mut rx) = peer(4);
     join(&mut hub, &returned, "guest", 30_015);

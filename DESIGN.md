@@ -1,10 +1,10 @@
 ## Seat lifecycle controls and metadata (2026-10-16)
 
-Host pause and resume reuse the server's existing `RoomRuntime` pause state. The server owns the supplied wall-clock deadlines and the one-second pause/frame cadence; the deterministic core receives no timer. Paused ingress ignores new orders while preserving the queue for resume. Operative and AI room admission remain closed on R1.
+Socket `pause` and `resume` remain rejected through `UNAVAILABLE`, including for the host. The existing host-side `RoomRuntime` pause APIs remain available without a public client caller. The server owns the supplied wall-clock deadlines and the one-second pause/frame cadence; the deterministic core receives no timer. Paused ingress ignores new orders while preserving the queue for resume. Operative and AI room admission remain closed on R1.
 
 Every admitted seat receives the existing roster-ordered `online` and `ping` arrays, as in reference `e4e579a` (`server.js:504,774`, `server/room-tick.js:30`). AI seats project `true` and `-1`, and unknown human RTT stays null. The common frame sender applies these fields to scheduled, paused and catch-up delivery without changing recipient visibility or wire shape.
 
-AI-19 evidence covers the existing detached core state: lazy spawn camera, private RNG, sampled opening delay and explicit resets through ordinary ticks and both recipient snapshots. It does not enable room AI or its takeover/departure callers. NET-80 remains outside the proven set because live AI handover and loaded-save pause need separate activation and save work.
+AI-19 evidence covers the existing detached core state: lazy spawn camera, private RNG, sampled opening delay and explicit resets through ordinary ticks and both recipient snapshots. It does not enable room AI or its takeover/departure callers. Only AI-19 and NET-66 are claimed. NET-79 is dropped because socket pause/resume ingress needs owner approval. NET-80 remains outside the proven set because live AI handover and loaded-save pause need separate activation and save work.
 
 ## Concrete work and waiting Dig orders (2026-10-16)
 

@@ -500,36 +500,6 @@ impl Room {
             }
             return false;
         }
-        if matches!(t, "pause" | "resume")
-            && host
-            && let Some(native) = &mut self.native
-        {
-            if native.runtime.fault().is_some() || native.runtime.held() >= 120 {
-                return false;
-            }
-            let message = if t == "pause" {
-                native.runtime.pause(
-                    seated.expect("native host has a commander seat"),
-                    &me.name,
-                    crate::room_runtime::PauseReason::Host,
-                    now,
-                )
-            } else {
-                Ok(Some(native.runtime.resume(now)))
-            };
-            match message {
-                Ok(Some(message)) => {
-                    for person in self.people() {
-                        if let Some(connection) = &person.connection {
-                            connection.send(message.clone());
-                        }
-                    }
-                }
-                Ok(None) => {}
-                Err(error) => self.native.as_mut().unwrap().runtime.fault_stop(error),
-            }
-            return false;
-        }
         if CommanderIngress::recognizes(t)
             && let Some(native) = &mut self.native
         {

@@ -23,14 +23,13 @@ Proposed row evidence:
   reconnect. Unknown and clamped RTTs are covered. The same production
   projection checks AI online and -1 even with a stale RTT; AI attachment
   remains refused, so this is component evidence for that branch.
-- NET-79: `lobby::seat_lifecycle_tests::net79_host_controls_freeze_ticks_and_orders_with_operative_admission_closed`.
-  Host messages pause and resume; non-host messages cannot do so. No tick,
-  simulation RNG or queued-command progress occurs during pause. A frame and
-  pause update go out at each one-second boundary. Already queued input runs
-  after resume, and input received during pause is absent. Operative hello is
-  refused before admission and its subsequent input cannot enter the match.
-  The test reaches an ordinary Conquest victory and completes all 120 ending
-  callbacks with recipient frames and no fault. Room AI remains unavailable.
+
+Dropped rows:
+
+- NET-79: needs owner approval to admit socket pause/resume ingress.
+  `lobby::seat_lifecycle_tests::client_pause_and_resume_remain_unavailable_even_for_native_host`
+  checks the exact blocked denial for host and guest clients in running and
+  host-paused rooms, with no peer broadcast or runtime state change.
 
 NET-80 is dropped from the proven set: live AI handover needs room AI
 activation, which is outside this batch. The human-only subset is covered by
@@ -39,8 +38,8 @@ first drop, just-before/exact 30-second expiry, reconnect, host resume, a used
 allowance within the same match and a restored allowance in a new match.
 Loaded-save pause remains excluded pending the save contract.
 
-The new host controls use the existing RoomRuntime pause state. No new core
-field, flag, command variant or actor link is added. Ordinary tick, snapshot,
-command-admission and elimination guards therefore see the existing state;
-the lifecycle test runs through resumed ticks, recipient publication and the
-result hold. Pause deadlines use only the server-supplied clock.
+Socket pause/resume use the existing `UNAVAILABLE` rejection, as on main.
+The existing host-side RoomRuntime pause APIs and disconnect/reconnect paths
+remain available. The NET-80 subset uses the host API directly for release;
+it does not admit a client message. No new core field, flag, command variant
+or actor link is added. Pause deadlines use only the server-supplied clock.
