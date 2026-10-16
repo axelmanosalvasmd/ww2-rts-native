@@ -15,7 +15,7 @@ use crate::{
     math,
 };
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct EliminationState {
     pub teams: usize,
     pub bunkers: Vec<usize>,

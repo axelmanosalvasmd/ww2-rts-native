@@ -7,7 +7,7 @@ use std::{
     path::PathBuf,
 };
 
-pub(crate) const VERSION: u64 = 1;
+pub(crate) const VERSION: u64 = 2;
 const MAX_SAVE_BYTES: u64 = 128 * 1024 * 1024;
 
 #[derive(Clone)]
@@ -71,7 +71,7 @@ impl SaveStore {
         meta: Value,
         saved_at: u64,
     ) -> Result<String, String> {
-        if state["version"] != VERSION {
+        if !matches!(state["version"].as_u64(), Some(1 | VERSION)) {
             return Err("unsupported save version".into());
         }
         let bytes = serde_json::to_vec(state).map_err(|e| e.to_string())?;
@@ -161,7 +161,7 @@ impl SaveStore {
             return Err("save too large".into());
         }
         let value: Value = serde_json::from_slice(&bytes).map_err(|e| e.to_string())?;
-        if value["version"] != VERSION {
+        if !matches!(value["version"].as_u64(), Some(1 | VERSION)) {
             return Err("unsupported save version".into());
         }
         if !value.is_object()
@@ -170,6 +170,15 @@ impl SaveStore {
                 .all(|key| value.get(key).is_some())
         {
             return Err("incomplete save".into());
+        }
+        if value["version"] == VERSION
+            && !value["g"]["state"][1].as_array().is_some_and(|fields| {
+                fields
+                    .iter()
+                    .any(|entry| entry[0] == json!(["string", "elimination"]))
+            })
+        {
+            return Err("incomplete v2 checkpoint".into());
         }
         Ok(value)
     }
