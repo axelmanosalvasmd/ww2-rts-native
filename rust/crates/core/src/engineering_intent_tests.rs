@@ -279,7 +279,7 @@ fn eng31_trench_wear_caves_in_and_vehicle_contact_crushes_it() {
     let mut m = scene();
     let c = 25 * 64 + 25;
     m.world.set_cell(c, b'T').unwrap();
-    for expected in [b'T', b'+'] {
+    for expected in *b"T+" {
         env(&mut m, |e, w, ctx| {
             let skip = BTreeSet::new();
             let mut hit = DamageContext::plain(&skip);
@@ -506,7 +506,7 @@ fn eng54_ground_cover_tracks_depth_and_remaining_cell_health() {
             close(terrain::cover_q(&m.world.game, &m.rules, c), 0.75);
         }
     }
-    for ch in [b'M', b'F', b'+'] {
+    for ch in *b"MF+" {
         m.world.set_cell(c, ch).unwrap();
         let wear = m.world.game.wear.as_ref().unwrap()[c];
         assert!(if ch == b'+' {

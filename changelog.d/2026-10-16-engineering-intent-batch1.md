@@ -1,1 +1,2 @@
 - Add selected native engineering tests for trench behavior, house protection, fire, terrain wear, weather, mutations and shared field projects. Close house type boundaries, all six garrison cover/vision cases and rainy house fire damage gaps; keep 26 incomplete rows out of this batch.
+- Write two byte loops in the engineering tests as byte strings, which Clippy 1.99 requires (`byte_char_slices`).
