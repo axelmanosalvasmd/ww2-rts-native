@@ -31,6 +31,7 @@ pub(crate) fn plan(
     counter: Option<&str>,
     budget: f64,
     available_engineers: usize,
+    reserves: (f64, f64),
     level: Level,
 ) -> Result<Shopping, String> {
     let input = observation.input();
@@ -244,11 +245,18 @@ pub(crate) fn plan(
     {
         commands.push(json!({"t":"recover"}));
     }
-    if classic && engineers < if context.free_nodes > 0 { 2 } else { 1 } {
+    if classic
+        && engineers
+            < if crate::commander_construction::free_nodes(observation) > 0 {
+                2
+            } else {
+                1
+            }
+    {
         buy = "engineer";
     }
     let reserve = if mine.len() >= 3 {
-        context.build_reserve + context.fort_reserve
+        reserves.0 + reserves.1
     } else {
         0.0
     };
@@ -349,6 +357,15 @@ mod tests {
         .unwrap()
     }
     fn run(observation: &Observation, budget: f64, mind: &Mind, counter: Option<&str>) -> Shopping {
+        run_reserved(observation, budget, mind, counter, (0.0, 0.0))
+    }
+    fn run_reserved(
+        observation: &Observation,
+        budget: f64,
+        mind: &Mind,
+        counter: Option<&str>,
+        reserves: (f64, f64),
+    ) -> Shopping {
         let catalog = Catalog::compiled().unwrap();
         let mine: Vec<_> = observation
             .input()
@@ -374,6 +391,7 @@ mod tests {
                 .iter()
                 .filter(|u| u.owner == 0 && u.kind == "engineer")
                 .count(),
+            reserves,
             Level::Normal,
         )
         .unwrap()
@@ -564,7 +582,12 @@ mod tests {
             &[],
             Context {
                 mode: Mode::Classic,
-                free_nodes: 1,
+                nodes: vec![crate::commander_tactics::NodeObservation {
+                    at: Point { x: 70.0, z: 70.0 },
+                    rate: 0.0,
+                    fuel: false,
+                    visible: true,
+                }],
                 ..context(Faction::Germany)
             },
         );
@@ -574,7 +597,7 @@ mod tests {
             &[],
             Context {
                 mode: Mode::Classic,
-                free_nodes: 0,
+                nodes: vec![],
                 ..context(Faction::Germany)
             },
         );
@@ -585,12 +608,10 @@ mod tests {
             &[],
             Context {
                 large_army: true,
-                build_reserve: p,
-                fort_reserve: p,
                 ..context(Faction::Germany)
             },
         );
-        let r = run(&o, p * 5.0, &Mind::default(), None);
+        let r = run_reserved(&o, p * 5.0, &Mind::default(), None, (p, p));
         assert_eq!(r.commands.len(), 3);
         assert_eq!(r.remaining_mp, p * 2.0);
         let o = observation(

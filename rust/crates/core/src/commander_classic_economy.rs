@@ -17,7 +17,9 @@ pub(crate) struct Economy {
     pub commands: Vec<Value>,
     pub reserve: f64,
     pub remaining_mp: f64,
+    #[cfg(test)]
     pub free_nodes: usize,
+    pub builders: Vec<u32>,
     pub rush: bool,
 }
 fn distance(a: Point, b: Point) -> f64 {
@@ -50,7 +52,9 @@ pub(crate) fn plan(
         commands: vec![],
         reserve: 0.0,
         remaining_mp: budget,
+        #[cfg(test)]
         free_nodes: 0,
+        builders: Vec::new(),
         rush: false,
     };
     // World uses different ownership and frontier rules and is deliberately excluded.
@@ -80,9 +84,12 @@ pub(crate) fn plan(
         .nodes
         .iter()
         .enumerate()
-        .filter(|(i, _)| !context.claimed_nodes.contains(i))
+        .filter(|(i, n)| !crate::commander_construction::node_claimed(observation, *i, n.at))
         .collect();
-    result.free_nodes = free.len();
+    #[cfg(test)]
+    {
+        result.free_nodes = free.len();
+    }
     let now = input.tick as f64 / 20.0;
     let adaptive = Skill::for_level(level).adaptive;
     result.rush = adaptive
@@ -132,13 +139,13 @@ pub(crate) fn plan(
     let engineers: Vec<_> = available
         .iter()
         .copied()
-        .filter(|u| u.kind == "engineer")
+        .filter(|u| u.kind == "engineer" && !u.riding)
         .collect();
     let ids: BTreeSet<_> = engineers.iter().map(|u| u.id).collect();
     memory.retain(|id, _| ids.contains(id));
     let mut taken: BTreeSet<_> = memory.values().copied().collect();
     for u in engineers {
-        if u.retreating || u.build {
+        if u.retreating || u.build || u.target_id != 0 || u.dig || u.entrench || u.garrison {
             continue;
         }
         let fix = own
@@ -157,6 +164,7 @@ pub(crate) fn plan(
             result
                 .commands
                 .push(json!({"t":"assist","ids":[u.id],"id":fix.id}));
+            result.builders.push(u.id);
             continue;
         }
         let Some(kind) = next else {
@@ -183,10 +191,12 @@ pub(crate) fn plan(
                     json!({"t":"build","ids":[u.id],"kind":"depot","x":node.at.x,"z":node.at.z}),
                 );
                 result.remaining_mp -= cost;
+                result.builders.push(u.id);
             } else if u.path.is_empty() {
                 result
                     .commands
                     .push(json!({"t":"move","orders":[[u.id,node.at.x,node.at.z]]}));
+                result.builders.push(u.id);
             }
         } else {
             // The source object literal evaluates its flak expression for every non-depot next.
@@ -217,6 +227,7 @@ pub(crate) fn plan(
                     .commands
                     .push(json!({"t":"build","ids":[u.id],"kind":kind,"x":at.x,"z":at.z}));
                 result.remaining_mp -= cost;
+                result.builders.push(u.id);
             }
         }
     }

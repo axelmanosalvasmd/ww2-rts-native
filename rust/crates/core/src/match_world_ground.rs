@@ -78,6 +78,9 @@ impl Match {
     }
     pub(crate) fn validate_world_path_service(&self) -> Result<(), String> {
         for unit in self.world.game.units.values() {
+            if self.validate_rail_tick_actor(unit.id)? {
+                continue;
+            }
             self.validate_world_ground_actor(unit)?;
             let control = &self.commands.units[&unit.id];
             if control.attack_id != 0

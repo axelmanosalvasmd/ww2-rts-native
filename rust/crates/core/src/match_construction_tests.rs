@@ -1,6 +1,6 @@
 use super::*;
 use crate::{
-    economy::Faction,
+    economy::{Faction, Mode},
     economy_state::ArmySize,
     game::Point,
     map::AuthoritativeMap,
@@ -167,6 +167,7 @@ fn rare_placement_rejects_after_draft_routes_without_publishing_or_warming_live_
                     timer: 0.0,
                     orbit: 0.0,
                     mission: None,
+                    attack_pick: 0,
                     downed: false,
                 },
             );
@@ -993,7 +994,12 @@ fn mode91_site_refund_updates_wallet_and_spending_without_a_death() {
     );
     assert_eq!(m.story, story);
     assert_eq!(m.start.economy.players[0].mp, wallet);
-    m.advance_tick().unwrap();
+    for _ in 0..3 {
+        m.advance_tick().unwrap();
+        let snapshot = crate::recipient_snapshot::SnapshotCache::new(&m).unwrap();
+        snapshot.recipient(0).unwrap();
+        snapshot.recipient(1).unwrap();
+    }
     assert_eq!(m.commands.units[&worker].build_target, None);
     assert_eq!(m.story[0].losses, before[0].losses);
     assert_eq!(m.story[0].built, before[0].built);

@@ -139,3 +139,41 @@ fn original_walk_recipient_routes_and_live_deferred_requests_match() {
     }
     assert!(cases >= 20 && actions >= 100, "fixture lost batch coverage");
 }
+
+#[test]
+fn mov20_engaged_short_move_behind_sets_reverse_before_runtime_drive() {
+    let fixture: Value = serde_json::from_slice(include_bytes!(
+        "../../tests/fixtures/mov-wrapper-batch.json"
+    ))
+    .unwrap();
+    let mut case = fixture["cases"][0].clone();
+    case["initial"] = json!([{"kind":"tank","owner":0,"x":30.0,"z":20.0,"fields":{}}]);
+    let mut m = initial(&case);
+    m.world.game.units.get_mut(&1).unwrap().rot = 0.0;
+    m.combat.initialize(1).hit_at = m.world.game.tick as f64;
+    m.begin_path_tick(4096, 20).unwrap();
+    let behind = Point { x: 24.0, z: 20.0 };
+    let command = Command::Move {
+        orders: vec![super::MoveOrder {
+            unit: 1,
+            at: behind,
+        }],
+        control_ids: None,
+        attack_move: false,
+        queue: false,
+        together: false,
+        face: None,
+    };
+    assert_eq!(m.execute_command(0, &command, false).unwrap(), None);
+    let u = &m.world.game.units[&1];
+    assert_eq!(u.reverse, u.path.last().copied());
+    assert!(u.reverse.is_some());
+    let start_x = u.x;
+    m.move_unit_with_command_routes(1, 1.0).unwrap().unwrap();
+    let u = &m.world.game.units[&1];
+    assert!(
+        u.x < start_x,
+        "the accepted command backs the tank toward its goal"
+    );
+    assert!(u.rot.abs() < 0.1, "the hull keeps facing its opponent");
+}

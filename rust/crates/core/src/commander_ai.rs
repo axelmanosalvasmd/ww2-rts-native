@@ -244,6 +244,7 @@ impl Observation {
                 context.munitions,
                 context.fuel,
                 context.sight,
+                context.caution,
                 context.build_reserve,
                 context.fort_reserve,
             ]
@@ -257,6 +258,29 @@ impl Observation {
                     .claimed_nodes
                     .iter()
                     .any(|i| *i >= context.nodes.len())
+                || context
+                    .hidden_spawns
+                    .iter()
+                    .any(|i| *i >= input.players.len())
+                || context.site_nodes.iter().any(|p| !within(*p))
+                || context.caution <= 0.0
+                || context.known_buildings.iter().any(|b| {
+                    b.id == 0
+                        || b.owner >= input.players.len()
+                        || !within(b.at)
+                        || !catalog
+                            .unit(&b.kind)
+                            .is_ok_and(|d| d.get("building").and_then(Value::boolean) == Some(true))
+                })
+                || context
+                    .known_buildings
+                    .windows(2)
+                    .any(|w| w[0].id >= w[1].id)
+                || context
+                    .owned_nodes
+                    .iter()
+                    .any(|i| *i >= context.nodes.len())
+                || context.known_depots.iter().any(|p| !finite_point(*p))
                 || context.height.as_ref().is_some_and(|h| h.len() != cells)
                 || context
                     .smokes

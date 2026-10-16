@@ -400,3 +400,183 @@ fn intent_ai54_classic_repairs_use_strict_health_and_distance_limits() {
         assert_eq!(result.commands.iter().any(|c| c["t"] == "assist"), repairs);
     }
 }
+
+#[test]
+fn classic_construction_excludes_mounted_and_busy_engineers_before_site_draws() {
+    for busy in 0..7 {
+        let mut input = fixture(&[]);
+        input.units[1].retreating = true;
+        match busy {
+            0 => input.units[0].riding = true,
+            1 => input.units[0].build = true,
+            2 => input.units[0].dig = true,
+            3 => input.units[0].entrench = true,
+            4 => input.units[0].garrison = true,
+            5 => input.units[0].target_id = 10,
+            _ => input.units[0].retreating = true,
+        }
+        let (result, random) = run(input.clone(), &[], &mut BTreeMap::new(), Level::Normal);
+        assert!(result.commands.is_empty());
+        assert!(result.builders.is_empty());
+        draws(&random, 0);
+        input.units[1].retreating = false;
+        let (result, random) = run(input, &[], &mut BTreeMap::new(), Level::Normal);
+        assert_eq!(result.builders, vec![2]);
+        assert_eq!(result.commands.len(), 1);
+        assert_eq!(result.commands[0]["ids"], json!([2]));
+        draws(&random, 1);
+    }
+}
+
+#[test]
+fn classic_consolidated_construction_assignments_precede_fortification_and_rush() {
+    for job in ["build", "assist", "move"] {
+        let mut input = fixture(if job == "assist" { &["barracks"] } else { &[] });
+        input.tick = 4000;
+        if job == "assist" {
+            input
+                .runtime
+                .as_mut()
+                .unwrap()
+                .units
+                .get_mut(&11)
+                .unwrap()
+                .built = 0.5;
+        } else if job == "move" {
+            input.runtime.as_mut().unwrap().nodes = vec![
+                node(90.0, 1.0, false, false),
+                node(120.0, 2.0, false, false),
+            ];
+        }
+        for under_rush in [false, true] {
+            let recent = if under_rush {
+                vec![Sighting {
+                    id: 100,
+                    kind: "rifle".into(),
+                    owner: 1,
+                    at: Point { x: 70.0, z: 40.0 },
+                    time: 200.0,
+                    worth: 100.0,
+                }]
+            } else {
+                vec![]
+            };
+            let (economy, _) = run(input.clone(), &recent, &mut BTreeMap::new(), Level::Normal);
+            assert_eq!(economy.builders, vec![1, 2]);
+            assert!(economy.commands.iter().all(|c| c["t"] == job));
+            let observation = Observation::new(input.clone()).unwrap();
+            if !under_rush {
+                let available: Vec<_> = observation
+                    .input()
+                    .units
+                    .iter()
+                    .filter(|u| u.kind == "engineer")
+                    .collect();
+                let control = crate::commander_fortification::plan_after_builds(
+                    &observation,
+                    &available,
+                    economy.remaining_mp,
+                    economy.reserve,
+                    0.0,
+                    &terrain(observation.input()),
+                    |_| true,
+                    &mut BTreeMap::new(),
+                    &economy.commands,
+                )
+                .unwrap();
+                assert!(
+                    control.commands.iter().any(|c| c["kind"] == "tower"),
+                    "{job}: idle crew must have fortification work"
+                );
+            }
+            let mut random = MatchRandom::new(617);
+            let commands = crate::commander_tactics::plan(
+                &observation,
+                &recent,
+                &mut State::default(),
+                Level::Normal,
+                &mut random,
+            )
+            .unwrap();
+            let jobs: Vec<_> = commands
+                .iter()
+                .filter(|c| {
+                    matches!(
+                        c["t"].as_str(),
+                        Some("build" | "assist" | "move" | "dig" | "entrench" | "retreat")
+                    )
+                })
+                .cloned()
+                .collect();
+            assert_eq!(jobs, economy.commands, "{job}, rush={under_rush}");
+            draws(&random, if job == "build" { 2 } else { 0 });
+        }
+    }
+}
+
+#[test]
+fn classic_consolidated_wallet_spends_build_costs_and_reserves_once_before_shopping() {
+    let catalog = Catalog::compiled().unwrap();
+    let cost = number(catalog.unit("motorpool").unwrap(), "cost");
+    let rifle = economy::price_of(Mode::Classic, "rifle").unwrap().mp;
+    for extra in [-1.0, 0.0] {
+        let mut input = fixture(&["depot", "depot", "barracks"]);
+        for id in 50..53 {
+            input.units.push(unit(id, "mg", 60.0, 80.0));
+        }
+        input.runtime.as_mut().unwrap().faction = economy::Faction::Germany;
+        input.manpower = cost * 3.0 + rifle + extra;
+        let observation = Observation::new(input.clone()).unwrap();
+        let commands = crate::commander_tactics::plan(
+            &observation,
+            &[],
+            &mut State::default(),
+            Level::Normal,
+            &mut MatchRandom::new(617),
+        )
+        .unwrap();
+        let builds: Vec<_> = commands.iter().filter(|c| c["t"] == "build").collect();
+        assert_eq!(builds.len(), 2);
+        assert!(builds.iter().all(|c| c["kind"] == "motorpool"));
+        let buys: Vec<_> = commands.iter().filter(|c| c["t"] == "buy").collect();
+        assert_eq!(buys.len(), usize::from(extra == 0.0));
+        assert!(buys.iter().all(|c| c["unit"] == "rifle"));
+        assert_eq!(
+            input.manpower - cost * builds.len() as f64 - rifle * buys.len() as f64,
+            cost + if extra < 0.0 { rifle - 1.0 } else { 0.0 }
+        );
+    }
+}
+
+#[test]
+fn classic_rush_frees_endangered_engineer_while_safe_engineer_builds_once() {
+    let mut input = fixture(&[]);
+    input.tick = 4000;
+    input.units[0].at.x = 75.0;
+    let recent = [Sighting {
+        id: 100,
+        kind: "rifle".into(),
+        owner: 1,
+        at: Point { x: 70.0, z: 40.0 },
+        time: 200.0,
+        worth: 100.0,
+    }];
+    let observation = Observation::new(input).unwrap();
+    let mut random = MatchRandom::new(617);
+    let commands = crate::commander_tactics::plan(
+        &observation,
+        &recent,
+        &mut State::default(),
+        Level::Normal,
+        &mut random,
+    )
+    .unwrap();
+    let builds: Vec<_> = commands.iter().filter(|c| c["t"] == "build").collect();
+    assert_eq!(builds.len(), 1);
+    assert_eq!(builds[0]["kind"], "barracks");
+    assert_eq!(builds[0]["ids"], json!([2]));
+    let moves: Vec<_> = commands.iter().filter(|c| c["t"] == "move").collect();
+    assert_eq!(moves.len(), 1);
+    assert_eq!(moves[0]["orders"], json!([[1, 40.0, 40.0]]));
+    draws(&random, 1);
+}

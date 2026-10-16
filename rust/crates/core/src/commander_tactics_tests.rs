@@ -270,6 +270,11 @@ fn intent_ai36_reinforcement_wait_uses_finished_hq_radius_and_available_budget()
         .get_mut(&2)
         .unwrap()
         .built = 0.999;
+    let commands = run(input.clone(), &mut State::default(), Level::Normal);
+    assert!(acts(&commands, "assist", 1));
+    assert!(!acts(&commands, "retreat", 1));
+    // An active combat target excludes the fighter from the assist crew.
+    input.units[0].target_id = 99;
     assert!(acts(
         &run(input, &mut State::default(), Level::Normal),
         "retreat",

@@ -10,10 +10,16 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
     }
     for (slot, owner) in owners.iter_mut().enumerate() {
         owner.insert("movement".into(), super::movement_for(state, slot)?);
+        if !state.aviation.planes.is_empty() {
+            owner.insert("air".into(), json!([]));
+        }
     }
     let catalog = Catalog::compiled().map_err(|_| SnapshotError::Rules)?;
     for u in state.world.game.units.values() {
         let own = &mut owners[u.owner];
+        if let Some(air) = u.air {
+            push(own, "air", aircraft::row(state, u.id, air)?);
+        }
         if let Some(building) = state.production.building(u.id) {
             let mut row = vec![json!(u.id)];
             let progress = if let Some(head) = building.jobs().first() {
@@ -85,12 +91,37 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
                             .filter(|t| state.world.game.players[u.owner].sees(t.id));
                         (4, target.map_or(*at, Unit::at))
                     }
-                    Command::Dig {
+                    Command::Enter {
                         ids,
                         at,
                         queue: false,
+                    } if ids.as_slice() == [i64::from(u.id)] => (9, *at),
+                    Command::Assist {
+                        ids,
+                        target,
+                        at: Some(at),
+                        queue: false,
+                    } if ids.as_slice() == [i64::from(u.id)]
+                        && (1..=i64::from(u32::MAX)).contains(target) =>
+                    {
+                        (8, *at)
+                    }
+                    Command::Cover {
+                        ids,
+                        at: Some(at),
+                        queue: false,
+                    } if ids.as_slice() == [i64::from(u.id)] => (1, *at),
+                    Command::Dig {
+                        ids,
+                        at,
+                        direction,
+                        queue: false,
                         ..
-                    } if ids.as_slice() == [i64::from(u.id)] => (7, *at),
+                    } if ids.as_slice() == [i64::from(u.id)]
+                        && direction.is_none_or(f64::is_finite) =>
+                    {
+                        (7, *at)
+                    }
                     Command::Entrench {
                         ids,
                         order:
@@ -172,6 +203,9 @@ fn center(state: &Match, cell: usize) -> Result<Point, SnapshotError> {
 }
 fn plan(state: &Match, u: &Unit) -> Result<(u8, Point), SnapshotError> {
     let g = &state.world.game;
+    if u.air.is_some() {
+        return Ok(aircraft::plan(state, u));
+    }
     let c = &state.commands.units[&u.id];
     if let Some(ride) = g.units.get(&u.board) {
         return Ok((9, ride.at()));
@@ -216,6 +250,10 @@ fn plan(state: &Match, u: &Unit) -> Result<(u8, Point), SnapshotError> {
         .or_else(|| u.path.last().copied())
         .map_or((0, Point { x: 0., z: 0. }), |at| (1, at)))
 }
+
+#[cfg(test)]
+#[path = "owners_tests.rs"]
+mod queued_tests;
 
 #[cfg(test)]
 mod movement_tests {

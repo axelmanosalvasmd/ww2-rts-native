@@ -22,10 +22,30 @@ impl ActorPolicy<'_> {
     }
 }
 
+/// Modes that use the ordinary ground systems and recipient routing.
+pub(crate) fn ordinary_ground_mode(game: &Game, mode: Mode) -> bool {
+    matches!(
+        (mode, game.mode),
+        (Mode::Default | Mode::Conquest, None) | (Mode::Tutorial, Some(ModeKind::Tutorial))
+    )
+}
+
 /// Validate only the represented actor modes, not their complete tick capabilities.
 pub(crate) fn checked_game_mode(game: &Game, mode: Mode) -> Result<(), String> {
     match (mode, game.mode) {
-        (Mode::Default | Mode::Conquest, None) | (Mode::World, Some(ModeKind::World)) => Ok(()),
+        (Mode::Default | Mode::Conquest, None)
+        | (Mode::Classic, Some(ModeKind::Classic))
+        | (Mode::Tutorial, Some(ModeKind::Tutorial))
+        | (Mode::World, Some(ModeKind::World)) => Ok(()),
+        (Mode::Horde, Some(ModeKind::Horde))
+            if (2..=6).contains(&game.players.len())
+                && game.players.iter().enumerate().all(|(slot, player)| {
+                    player.slot == slot
+                        && player.team == if slot + 1 == game.players.len() { 1 } else { 0 }
+                }) =>
+        {
+            Ok(())
+        }
         _ => Err("actor mode does not match canonical Game mode".into()),
     }
 }
@@ -51,6 +71,17 @@ impl Match {
     /// This is an actor lookup gate. The sole tick owner validates phase capabilities separately.
     pub(crate) fn validate_actor_mode(&self) -> Result<(), String> {
         checked_game_mode(&self.world.game, self.options.mode)?;
+        if self.options.mode == Mode::Horde
+            && self.horde.as_ref().is_none_or(|horde| {
+                horde.defenders.checked_add(1) != Some(self.world.game.players.len())
+                    || horde.slot != horde.defenders
+            })
+        {
+            return Err("Horde actor policy requires canonical defender and enemy slots".into());
+        }
+        if self.options.mode == Mode::Tutorial {
+            self.validate_tutorial_state()?;
+        }
         if self.options.mode == Mode::World
             && (self.world_runtime.is_none() || self.world.geography().is_none())
         {

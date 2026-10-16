@@ -1127,6 +1127,13 @@ impl Match {
             research,
             runtime: Some(crate::commander_tactics::Context {
                 mode: self.options.mode,
+                naval: g.naval,
+                caution: crate::weather::WeatherRules::compiled()
+                    .map_err(|e| e.to_string())?
+                    .ai_caution(Some(&self.start.weather)),
+                known_buildings: vec![],
+                hidden_spawns: BTreeSet::new(),
+                site_nodes: vec![],
                 horde: false,
                 defender: false,
                 faction: self.options.players[owner].faction,
@@ -1158,10 +1165,11 @@ impl Match {
                         .collect()
                 },
                 sight: g.sight_mul(&self.rules),
+                nodes: Vec::new(),
+                known_depots: Vec::new(),
+                owned_nodes: BTreeSet::new(),
                 build_reserve: 0.0,
                 fort_reserve: 0.0,
-                free_nodes: 0,
-                nodes: Vec::new(),
                 claimed_nodes: std::collections::BTreeSet::new(),
                 support: self.start.players[owner]
                     .support
@@ -1177,6 +1185,12 @@ impl Match {
                             u.id,
                             crate::commander_tactics::UnitFacts {
                                 built: u.built.unwrap_or(1.0),
+                                hold_position: u.owner == owner && u.hold_pos,
+                                queued_orders: if u.owner == owner {
+                                    self.commands.units.get(&u.id).map_or(0, |c| c.orders.len())
+                                } else {
+                                    0
+                                },
                                 auto_retreat: u.owner == owner
                                     && self
                                         .commands
@@ -1190,6 +1204,10 @@ impl Match {
                                         .is_some_and(|c| c.trucks.contains_key(&u.id)),
                                 amove: None,
                                 airborne: u.air.is_some() && vision::airborne(u),
+                                wall_work: u.owner == owner
+                                    && self.field_works.jobs().get(&u.id).is_some_and(|job| {
+                                        job.kind == crate::field_works::FortKind::Wall
+                                    }),
                                 stock: if u.owner == owner {
                                     self.logistics.get(u.id).map(|r| {
                                         crate::commander_tactics::Stock {
