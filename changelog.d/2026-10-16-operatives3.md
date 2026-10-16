@@ -1,0 +1,1 @@
+- Add server checks for operative token takeover, ordered lobby updates, cleaned renames, silent army-command rejection and offline membership. Cover every seat and operative recipient on each tick through an ordinary VP victory, the ending hold, lobby return, a new start and restart. Spectator and save/load coverage remains separate.

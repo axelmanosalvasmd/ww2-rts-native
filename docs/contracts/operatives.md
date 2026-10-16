@@ -125,5 +125,51 @@ the stream does not exist. String names are cleaned and broadcast to all room
 members; non-string names are ignored (`server.js:194,634-635`).
 
 FPS-39 remains unclaimed because its load branch belongs to the save/load
-stream. The remaining assigned NET and IF rows stay for a later batch; this
-batch does not infer their complete coverage from these narrower FPS checks.
+stream. OPERATIVES-2 does not infer complete NET or IF coverage from these
+narrower FPS checks.
+
+## OPERATIVES-3 verification scope
+
+This follow-up adds server tests without changing shipping behavior relative
+to PR #371. It proves only the operative portions of these five rows:
+
+- NET-25: `net25_operative_live_takeover_preserves_person_and_ignores_old_socket_close`
+  covers a live replacement in lobby and play, token precedence over the requested
+  role and commander, the exact replaced message before close, retained person
+  state, input reset, and silence from late messages and a late close on the old
+  socket (`server.js:596-603,614,620,719`).
+- NET-28: `net28_net29_operative_broadcasts_keep_change_order_and_shifted_commander_identity`
+  checks actual broadcasts to both seats and both operatives in change order.
+  Each roster entry has exactly `name`, `commander`, `online`. Operative lobby
+  fields remain `role:"operative"`, `you:-1`, `spectator:false`, `amHost:false`.
+  Removing a non-final seat moves the commander's index; removing that commander
+  leaves -1 even after another human takes the index (`server.js:338-350`).
+- NET-29: the same broadcast test checks cleaning, the 16-character limit,
+  empty-name fallback and silence for non-string names. The existing
+  `operative_resync_and_rename_cover_lobby_play_pause_and_ending` also covers
+  rename broadcasts during play, pause, ending and the returned lobby
+  (`server.js:194,635,638`).
+- NET-46: `operative_permission_whitelist_is_silent_except_name_and_latency_ping`
+  checks valid and malformed army commands, host actions, save/load requests,
+  seat changes and map pings. They produce no messages, queued commands, roster
+  changes or deny-budget consumption (`server.js:630-636`).
+- NET-82: `net82_operative_offline_identity_survives_lobby_cleanup_deadline`
+  checks offline roster publication, retained membership past ten seconds and
+  token reuse. The live disconnect test also checks cleared input, an idle soldier,
+  no pause and no offline respawn. The live takeover test checks that closing a
+  replaced socket leaves its successor online (`server.js:568-575,718-725`).
+
+`operative_room_members_deliver_every_tick_through_natural_finish_lobby_and_restart`
+adds a room-level lifecycle check. An ordinary Conquest objective earns VP to
+finish the match. Both seat snapshots and both independent operative views are
+collected on every advancing tick; full seat reads preserve the production
+terrain outboxes. Actual scheduled socket delivery retains equal cadence for
+every online recipient. One operative disconnects and reconnects during play.
+Both retain their roles through the full ending hold and lobby return, then
+receive fresh starts on a new match and restart (`server.js:307-319,392-413,560-565,718-725,738-760`).
+
+Spectator portions of NET-25/28/29/46/82 remain with SPECTATORS. Save listings and
+loaded starts remain with save/load. FPS-39, NET-26, NET-40, NET-53 and IF-28 are
+not claimed by this batch. No World, wire, ABI, header or privacy rule is added.
+In particular, the confirmed exact attacker position through age 10 and the
+single cached-path nonowner mask at `shared/sim.js:5903` remain unchanged.
