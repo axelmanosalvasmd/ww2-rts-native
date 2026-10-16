@@ -65,6 +65,8 @@ mod math;
 mod mode_intent_batch1;
 #[path = "../mode_point_services.rs"]
 mod mode_point_services;
+#[path = "../mov_settling.rs"]
+mod mov_settling;
 #[path = "../objectives.rs"]
 mod objectives;
 #[path = "../observed_memory.rs"]
