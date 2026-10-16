@@ -255,7 +255,7 @@ fn intent_ai54_classic_repairs_help_and_rush_reserve_precede_construction() {
     };
     let (result, random) = run(
         input.clone(),
-        &[threat.clone()],
+        std::slice::from_ref(&threat),
         &mut BTreeMap::new(),
         Level::Normal,
     );
