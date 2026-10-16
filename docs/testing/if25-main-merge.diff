@@ -387,6 +387,69 @@ index e835d256..b70fe42f 100644
 +#[cfg(test)]
 +#[path = "commander_field_if25_tests.rs"]
 +mod if25_tests;
+diff --git a/rust/crates/core/src/commander_field_runtime_tests.rs b/rust/crates/core/src/commander_field_runtime_tests.rs
+index de96068e..e5e720bc 100644
+--- a/rust/crates/core/src/commander_field_runtime_tests.rs
++++ b/rust/crates/core/src/commander_field_runtime_tests.rs
+@@ -11 +11,3 @@ use crate::{
+-    recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCache, SnapshotError},
++    recipient_snapshot::{
++        DeliveryState, SelectedSeat, SnapshotCache, SnapshotCapability, SnapshotError,
++    },
+@@ -119,0 +122,50 @@ fn tick_and_collect(state: &mut Match, delivery: Option<&mut DeliveryState>) {
++    if state.options.mode == Mode::Classic {
++        let expected: Vec<_> = (0..state.start.players.len())
++            .map(|slot| {
++                let own: Vec<_> = state
++                    .world
++                    .game
++                    .units
++                    .values()
++                    .filter(|unit| unit.owner == slot)
++                    .map(|unit| u64::from(unit.id))
++                    .collect();
++                let hidden: Vec<_> = state
++                    .world
++                    .game
++                    .units
++                    .values()
++                    .filter(|unit| {
++                        !state.world.game.reveal
++                            && !state.world.game.allied(unit.owner, slot)
++                            && !state.world.game.players[slot].sees(unit.id)
++                    })
++                    .map(|unit| u64::from(unit.id))
++                    .collect();
++                (own, hidden)
++            })
++            .collect();
++        let jobs = state.field_works.jobs().len();
++        let frame = delivery.capture(state, &[false; 2], &[false; 2]).unwrap();
++        for (slot, (own, hidden)) in expected.iter().enumerate() {
++            let projection = frame.recipient(slot).unwrap();
++            let rows = projection.fields["units"].as_array().unwrap();
++            for id in own {
++                assert!(rows.iter().any(|row| row[0].as_u64() == Some(*id)));
++            }
++            for id in hidden {
++                assert!(rows.iter().all(|row| row[0].as_u64() != Some(*id)));
++            }
++            assert_eq!(
++                projection.fields["works"].as_array().unwrap().len(),
++                if slot == 0 { jobs } else { 0 }
++            );
++            assert!(projection.fields["cells"].is_array());
++            assert!(
++                projection
++                    .missing
++                    .contains(&SnapshotCapability::WrecksAndFoundMines)
++            );
++        }
++        return;
++    }
+@@ -168 +220 @@ fn intent_ai50_gate_order_completes_in_each_real_ordinary_mode_with_supported_se
+-        let mut delivery = if matches!(mode, Mode::Default | Mode::Conquest) {
++        let mut delivery = if matches!(mode, Mode::Default | Mode::Conquest | Mode::Classic) {
 diff --git a/rust/crates/core/src/commander_fortification.rs b/rust/crates/core/src/commander_fortification.rs
 index 0d7470d8..632ab10d 100644
 --- a/rust/crates/core/src/commander_fortification.rs
@@ -849,6 +912,47 @@ index d0693362..88a9d5ee 100644
 +            |a, b| distance(unit.at(), a.at) - distance(unit.at(), b.at),
 +        )
 +        .map(|store| store.at)
+diff --git a/rust/crates/core/src/match_reactions/retreat_home_tests.rs b/rust/crates/core/src/match_reactions/retreat_home_tests.rs
+index 4d116171..37e2fbee 100644
+--- a/rust/crates/core/src/match_reactions/retreat_home_tests.rs
++++ b/rust/crates/core/src/match_reactions/retreat_home_tests.rs
+@@ -7 +7 @@ use crate::{
+-    recipient_snapshot::{DeliveryState, SnapshotCache, SnapshotError},
++    recipient_snapshot::{DeliveryState, SnapshotCache, SnapshotCapability, SnapshotError},
+@@ -331 +331 @@ fn mov48_manual_retreat_exits_house_moves_home_and_delivers_every_seat() {
+-fn mov48_classic_retreat_completes_through_native_ticks_with_delivery_guard_retained() {
++fn mov48_classic_retreat_completes_through_native_ticks_and_private_seat_projections() {
+@@ -347,0 +348 @@ fn mov48_classic_retreat_completes_through_native_ticks_with_delivery_guard_reta
++    let mut delivery = DeliveryState::new(&m).unwrap();
+@@ -349,0 +351,23 @@ fn mov48_classic_retreat_completes_through_native_ticks_with_delivery_guard_reta
++        let retreating = m.world.game.units[&id].retreating;
++        let hidden = !m.world.game.reveal && !m.world.game.players[1].sees(id);
++        let frame = delivery.capture(&mut m, &[false; 2], &[false; 2]).unwrap();
++        for slot in 0..2 {
++            let projection = frame.recipient(slot).unwrap();
++            let row = projection.fields["units"]
++                .as_array()
++                .unwrap()
++                .iter()
++                .find(|row| row[0].as_u64() == Some(u64::from(id)));
++            if slot == 0 {
++                assert_eq!(row.unwrap()[12].as_u64().unwrap() & 1 != 0, retreating);
++            } else if hidden {
++                assert!(row.is_none());
++            }
++            assert!(projection.fields["cells"].is_array());
++            assert_eq!(projection.fields["works"], serde_json::json!([]));
++            assert!(
++                projection
++                    .missing
++                    .contains(&SnapshotCapability::WrecksAndFoundMines)
++            );
++        }
+@@ -359,4 +382,0 @@ fn mov48_classic_retreat_completes_through_native_ticks_with_delivery_guard_reta
+-    assert!(matches!(
+-        SnapshotCache::new(&m),
+-        Err(SnapshotError::UnsupportedMode)
+-    ));
 diff --git a/rust/crates/server/src/lobby.rs b/rust/crates/server/src/lobby.rs
 index a4b42f4c..8dfa57a0 100644
 --- a/rust/crates/server/src/lobby.rs

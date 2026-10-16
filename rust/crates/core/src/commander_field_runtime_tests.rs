@@ -8,7 +8,9 @@ use crate::{
     match_commands::Command,
     match_runtime::{Match, MatchOptions, PlayerConfig},
     orders::OrderKey,
-    recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCache, SnapshotError},
+    recipient_snapshot::{
+        DeliveryState, SelectedSeat, SnapshotCache, SnapshotCapability, SnapshotError,
+    },
     weather::WeatherChoice,
 };
 use serde_json::{Value, json};
@@ -117,6 +119,56 @@ fn tick_and_collect(state: &mut Match, delivery: Option<&mut DeliveryState>) {
         ));
         return;
     };
+    if state.options.mode == Mode::Classic {
+        let expected: Vec<_> = (0..state.start.players.len())
+            .map(|slot| {
+                let own: Vec<_> = state
+                    .world
+                    .game
+                    .units
+                    .values()
+                    .filter(|unit| unit.owner == slot)
+                    .map(|unit| u64::from(unit.id))
+                    .collect();
+                let hidden: Vec<_> = state
+                    .world
+                    .game
+                    .units
+                    .values()
+                    .filter(|unit| {
+                        !state.world.game.reveal
+                            && !state.world.game.allied(unit.owner, slot)
+                            && !state.world.game.players[slot].sees(unit.id)
+                    })
+                    .map(|unit| u64::from(unit.id))
+                    .collect();
+                (own, hidden)
+            })
+            .collect();
+        let jobs = state.field_works.jobs().len();
+        let frame = delivery.capture(state, &[false; 2], &[false; 2]).unwrap();
+        for (slot, (own, hidden)) in expected.iter().enumerate() {
+            let projection = frame.recipient(slot).unwrap();
+            let rows = projection.fields["units"].as_array().unwrap();
+            for id in own {
+                assert!(rows.iter().any(|row| row[0].as_u64() == Some(*id)));
+            }
+            for id in hidden {
+                assert!(rows.iter().all(|row| row[0].as_u64() != Some(*id)));
+            }
+            assert_eq!(
+                projection.fields["works"].as_array().unwrap().len(),
+                if slot == 0 { jobs } else { 0 }
+            );
+            assert!(projection.fields["cells"].is_array());
+            assert!(
+                projection
+                    .missing
+                    .contains(&SnapshotCapability::WrecksAndFoundMines)
+            );
+        }
+        return;
+    }
     let selected: Vec<_> = (0..state.start.players.len())
         .map(|slot| SelectedSeat {
             slot,
@@ -165,7 +217,7 @@ fn intent_ai50_gate_order_completes_in_each_real_ordinary_mode_with_supported_se
             json!({"t":"dig","kind":"gate","ids":[builder],
             "x":80.0,"z":45.0,"dir":0.0}),
         );
-        let mut delivery = if matches!(mode, Mode::Default | Mode::Conquest) {
+        let mut delivery = if matches!(mode, Mode::Default | Mode::Conquest | Mode::Classic) {
             Some(DeliveryState::new(&state).unwrap())
         } else {
             assert!(matches!(

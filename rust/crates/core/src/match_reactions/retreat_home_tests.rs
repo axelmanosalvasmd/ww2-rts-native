@@ -4,7 +4,7 @@ use crate::{
     game::PlaneState,
     match_commands::{Command, MoveOutcome, UnitControl},
     misc_retreat_support_tests::{delivered_tick, publish_rifle, scene, seats},
-    recipient_snapshot::{DeliveryState, SnapshotCache, SnapshotError},
+    recipient_snapshot::{DeliveryState, SnapshotCache, SnapshotCapability, SnapshotError},
     supply_convoys::{ConvoyState, Store, StoreId, Truck, TruckState},
 };
 
@@ -328,7 +328,7 @@ fn mov48_manual_retreat_exits_house_moves_home_and_delivers_every_seat() {
 }
 
 #[test]
-fn mov48_classic_retreat_completes_through_native_ticks_with_delivery_guard_retained() {
+fn mov48_classic_retreat_completes_through_native_ticks_and_private_seat_projections() {
     let mut m = scene(Mode::Classic);
     let id = publish_rifle(&mut m, Point { x: 70., z: 70. });
     m.world.game.units.get_mut(&id).unwrap().hold_pos = true;
@@ -345,8 +345,32 @@ fn mov48_classic_retreat_completes_through_native_ticks_with_delivery_guard_reta
         .unwrap(),
         None
     );
+    let mut delivery = DeliveryState::new(&m).unwrap();
     for _ in 0..1000 {
         m.advance_tick().unwrap();
+        let retreating = m.world.game.units[&id].retreating;
+        let hidden = !m.world.game.reveal && !m.world.game.players[1].sees(id);
+        let frame = delivery.capture(&mut m, &[false; 2], &[false; 2]).unwrap();
+        for slot in 0..2 {
+            let projection = frame.recipient(slot).unwrap();
+            let row = projection.fields["units"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|row| row[0].as_u64() == Some(u64::from(id)));
+            if slot == 0 {
+                assert_eq!(row.unwrap()[12].as_u64().unwrap() & 1 != 0, retreating);
+            } else if hidden {
+                assert!(row.is_none());
+            }
+            assert!(projection.fields["cells"].is_array());
+            assert_eq!(projection.fields["works"], serde_json::json!([]));
+            assert!(
+                projection
+                    .missing
+                    .contains(&SnapshotCapability::WrecksAndFoundMines)
+            );
+        }
         if !m.world.game.units[&id].retreating {
             break;
         }
@@ -356,10 +380,6 @@ fn mov48_classic_retreat_completes_through_native_ticks_with_delivery_guard_reta
     assert!(distance(u.at(), home) <= 15.);
     assert_eq!(m.commands.units[&id].outcome, Some(MoveOutcome::Arrived));
     assert!(m.tick_state.fault().is_none());
-    assert!(matches!(
-        SnapshotCache::new(&m),
-        Err(SnapshotError::UnsupportedMode)
-    ));
 }
 
 #[test]

@@ -103,3 +103,15 @@ No Cargo, formatter, staging or GitHub writes were run. Parent qualification rem
 Rustfmt normalized the resolved source layout without changing literals, test names or assertions. The linked automatic-tree difference includes that formatting. Documentation changes add this complete merge record and diff, extend the literal consumer map for the active field dispatcher, record its compatibility choice in the existing engineering design fragment, and add one integration changelog fragment. These documentation edits introduce no runtime behavior.
 
 The active-holder tie assertion uses a borrowed one-element slice, as required by strict Clippy, preserving its expected JSON value without a clone. Final integrated qualification is recorded on the PR at its exact producing head.
+
+
+## Classic lifecycle assertion repair
+
+The integrated run at `3a3d1c9fce54fd47b3186618d0bcd32bc6dafc27` ran 359 tests: 357 passed and two failed. `/tmp/if25-integrated-qualified.log` records stale `SnapshotError::UnsupportedMode` expectations at `commander_field_runtime_tests.rs:171` and `match_reactions/retreat_home_tests.rs:359`. Frozen main `9e5bf12439cead3ede90fdf7e62b73fcb7ed1881` admitted only Default/Conquest projections. The retained IF-25 parent already includes `decaafd959627f00a0e5d7c170ab3a778fdcb6d2`, which admits Classic unit/ghost/engineering projections. Full Classic list composition still rejects its node lists, and no admission guard is changed here.
+
+Rewritten tests:
+
+- `intent_ai50_gate_order_completes_in_each_real_ordinary_mode_with_supported_seat_snapshots`: retains every Gate payment, cell, completion, actor-validation and later-tick assertion. Classic now calls actual `DeliveryState::capture` for every seat each tick, checks owned units, hidden-enemy exclusion, allied-only work rows, terrain delivery and the explicit missing list capability. Default/Conquest retain complete selected delivery. Assault/Annihilation retain their existing mode refusals.
+- `mov48_classic_retreat_completes_through_native_ticks_with_delivery_guard_retained` is renamed to `mov48_classic_retreat_completes_through_native_ticks_and_private_seat_projections`: retains route completion, home radius, arrival outcome and no-fault assertions. Every movement tick now captures both seat projections, compares the owner's encoded retreat flag with canonical state, rejects hidden enemy rows and checks terrain/work privacy plus the explicit missing list capability.
+
+The only additional source changes are imports of `SnapshotCapability` required by these assertions. The change adds `changelog.d/2026-10-16-classic-lifecycle-projection-tests.md`; the automatic-tree diff artifact must be regenerated after parent formatting. No runtime behavior, complete Classic snapshot claim or World admission changes. These repairs have not been executed by the subagent; final qualification remains parent-owned.
