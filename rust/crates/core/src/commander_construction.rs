@@ -6,6 +6,7 @@ use crate::{
     game::{CELL, Game, LAND, MOVE},
     match_runtime::{find_site, foot_center, footprint},
     math,
+    random::{MatchRandom, StreamId},
 };
 use serde_json::{Value, json};
 
@@ -176,6 +177,7 @@ pub(crate) fn plan(
     need_armor: bool,
     terrain: &Game,
     sees: impl Fn(Point) -> bool,
+    random: &mut MatchRandom,
 ) -> Result<Plan, String> {
     if !budget.is_finite() {
         return Err("non-finite construction budget".into());
@@ -291,9 +293,73 @@ pub(crate) fn plan(
     } else {
         cost
     };
-    // Construction-mode actions require their separate mode providers. Shopping still
-    // receives the next non-depot cost from the delivered construction decision inputs.
     if classic {
+        // World construction remains with its detached mode provider. This branch
+        // consumes only ordinary Classic facts already delivered to the seat.
+        if context.mode != Mode::Classic {
+            return Ok(plan);
+        }
+        for worker in available.iter().copied().filter(|u| {
+            u.owner == input.slot
+                && u.kind == "engineer"
+                && u.hp > 0.0
+                && !u.retreating
+                && !u.build
+                && !u.riding
+        }) {
+            let mut repairs = Vec::new();
+            for &u in &own {
+                if built(u) < 1.0 || u.hp < number(rule(&u.kind)?, "hpPer")? * 0.7 {
+                    repairs.push(u);
+                }
+            }
+            let repair = crate::sort::first_by(repairs, |a, b| {
+                distance(worker.at, a.at) - distance(worker.at, b.at)
+            });
+            if let Some(fix) = repair.filter(|u| distance(worker.at, u.at) < 60.0) {
+                plan.commands
+                    .push(json!({"t":"assist","ids":[worker.id],"id":fix.id}));
+                plan.builders.push(worker.id);
+                continue;
+            }
+            let Some(kind) = next.filter(|kind| *kind != "depot") else {
+                continue;
+            };
+            // The prototype evaluates its flak angle even when indexing another
+            // building's fixed offset. Keep one draw per eligible engineer/look.
+            let flak_angle = (random.next_fraction(StreamId::Ai(input.slot as u32)) - 0.5) * 2.0;
+            let offset = match kind {
+                "barracks" => 0.9,
+                "motorpool" => -0.9,
+                "airfield" => std::f64::consts::PI,
+                "flakpos" => flak_angle,
+                _ => 0.0,
+            };
+            let angle = math::atan2(
+                input.height as f64 * CELL / 2.0 - home.z,
+                input.width as f64 * CELL / 2.0 - home.x,
+            ) + offset;
+            let aim = Point {
+                x: home.x + math::cos(angle) * 16.0,
+                z: home.z + math::sin(angle) * 16.0,
+            };
+            let definition = rule(kind)?;
+            let spot = site(
+                observation,
+                terrain,
+                aim,
+                number(definition, "size")? as usize,
+                flag(definition, "coast"),
+                &sees,
+            )?;
+            if let Some(at) = spot.filter(|_| budget >= cost) {
+                plan.commands
+                    .push(json!({"t":"build","ids":[worker.id],"kind":kind,"x":at.x,"z":at.z}));
+                plan.builders.push(worker.id);
+                // Commands are attempts. Classic proposals all see the delivered
+                // wallet; admission consumes funds later, in emission order.
+            }
+        }
         return Ok(plan);
     }
     let builders = catalog

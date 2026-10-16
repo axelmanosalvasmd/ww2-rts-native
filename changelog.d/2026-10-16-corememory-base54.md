@@ -1,0 +1,1 @@
+- Add explicit detached World fort capture with damage-preserving ownership, matching footprint transfer and Gate reset. Captured forts survive their former nation's elimination. Keep default World fort capture refusal and restore its split-phase and terminal-state regressions.

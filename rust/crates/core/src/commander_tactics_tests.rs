@@ -462,3 +462,100 @@ fn intent_ai51_tier_savings_protect_shopping_and_spare_budget_can_buy() {
             .any(|c| c["t"] == "buy" && c["unit"] == "rifle")
     );
 }
+
+#[test]
+fn intent_ai66_planner_cover_and_angle_use_one_seat_draw_per_destination() {
+    use crate::{
+        commander_ai,
+        game::{CELL, COVER, MOVE},
+    };
+    for covered in [false, true] {
+        for bounded in [false, true] {
+            let mut input = fixture(vec![
+                unit(1, "rifle", 40.0),
+                unit(2, "rifle", 44.0),
+                unit(3, "rifle", 48.0),
+            ]);
+            let cx = (120.0 / CELL) as usize;
+            let cy = (20.0 / CELL) as usize;
+            let cells = [(cx - 1, cy - 1), (cx + 1, cy - 1), (cx, cy + 1)];
+            if covered {
+                for (x, y) in cells {
+                    input.flags[y * input.width + x] = COVER;
+                }
+                input.flags[cy * input.width + cx] = COVER | MOVE;
+            }
+            if bounded {
+                input.runtime = None;
+            }
+            let observation = Observation::new(input).unwrap();
+            let mut random = MatchRandom::new(6601);
+            random.next_fraction(StreamId::Combat);
+            random.next_fraction(StreamId::Ai(1));
+            let mut expected = random.clone();
+            let destinations: Vec<_> = (0..3)
+                .map(|_| {
+                    let fraction = expected.next_fraction(StreamId::Ai(0));
+                    if covered {
+                        let (x, y) = cells[(fraction * 3.0).floor() as usize];
+                        Point {
+                            x: (x as f64 + 0.5) * CELL,
+                            z: (y as f64 + 0.5) * CELL,
+                        }
+                    } else {
+                        let angle = fraction * std::f64::consts::PI * 2.0;
+                        Point {
+                            x: 120.0 + math::cos(angle) * 4.0,
+                            z: 20.0 + math::sin(angle) * 4.0,
+                        }
+                    }
+                })
+                .collect();
+            let actual: Vec<_> = if bounded {
+                let planned = commander_ai::plan(
+                    &observation,
+                    &mut commander_ai::SourceState::default(),
+                    Level::Normal,
+                    &mut random,
+                )
+                .unwrap();
+                assert_eq!(planned.draws, 3);
+                planned
+                    .commands
+                    .into_iter()
+                    .flat_map(|command| match command {
+                        crate::match_commands::Command::Move { orders, .. } => {
+                            orders.into_iter().map(|o| o.at).collect()
+                        }
+                        _ => Vec::new(),
+                    })
+                    .collect()
+            } else {
+                plan(
+                    &observation,
+                    &[],
+                    &mut State::default(),
+                    Level::Normal,
+                    &mut random,
+                )
+                .unwrap()
+                .into_iter()
+                .filter(|c| c["t"] == "move")
+                .flat_map(|c| {
+                    c["orders"]
+                        .as_array()
+                        .unwrap()
+                        .iter()
+                        .map(|r| Point {
+                            x: r[1].as_f64().unwrap(),
+                            z: r[2].as_f64().unwrap(),
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect()
+            };
+            assert_eq!(actual, destinations, "covered={covered}, bounded={bounded}");
+            assert_eq!(random, expected);
+        }
+    }
+}

@@ -120,7 +120,16 @@ fn run(input: Input, budget: f64, sees: impl Fn(Point) -> bool) -> Plan {
         .iter()
         .filter(|u| u.owner == 0 && u.id < 10)
         .collect();
-    plan(&observation, &squads, budget, false, &ground, sees).unwrap()
+    plan(
+        &observation,
+        &squads,
+        budget,
+        false,
+        &ground,
+        sees,
+        &mut MatchRandom::new(77),
+    )
+    .unwrap()
 }
 fn kind(plan: &Plan) -> Option<&str> {
     plan.commands.first().and_then(|c| c["kind"].as_str())
@@ -309,15 +318,183 @@ fn if25_construction_builder_ties_keep_available_order_and_repairs_keep_observat
     let observation = Observation::new(input).unwrap();
     let units = &observation.input().units;
     let available = [&units[1], &units[0]];
-    let result = plan(&observation, &available, 2000.0, false, &ground, |_| true).unwrap();
+    let result = plan(
+        &observation,
+        &available,
+        2000.0,
+        false,
+        &ground,
+        |_| true,
+        &mut MatchRandom::new(77),
+    )
+    .unwrap();
     assert_eq!(
         result.commands[0],
         serde_json::json!({"t":"assist","ids":[2],"id":10})
     );
     let available = [&units[0], &units[1]];
-    let result = plan(&observation, &available, 2000.0, false, &ground, |_| true).unwrap();
+    let result = plan(
+        &observation,
+        &available,
+        2000.0,
+        false,
+        &ground,
+        |_| true,
+        &mut MatchRandom::new(77),
+    )
+    .unwrap();
     assert_eq!(
         result.commands[0],
         serde_json::json!({"t":"assist","ids":[1],"id":10})
     );
+}
+
+#[test]
+fn intent_ai66_classic_site_draws_once_per_eligible_engineer_even_without_build() {
+    use crate::random::StreamId;
+    for (buildings, next) in [
+        (vec!["hq"], "barracks"),
+        (vec!["hq", "barracks"], "motorpool"),
+        (
+            vec!["hq", "barracks", "motorpool", "depot", "depot", "depot"],
+            "airfield",
+        ),
+        (vec!["hq", "barracks", "motorpool"], "flakpos"),
+    ] {
+        for (budget, visible) in [(0.0, true), (2000.0, false), (2000.0, true)] {
+            let mut input = fixture(&buildings);
+            input.runtime.as_mut().unwrap().mode = Mode::Classic;
+            for worker in &mut input.units[..2] {
+                worker.kind = "engineer".into();
+            }
+            if next == "flakpos" {
+                let mut plane = unit(40, "fighter", 60.0, 60.0);
+                plane.owner = 1;
+                input.units.push(plane);
+                input.runtime.as_mut().unwrap().units.insert(
+                    40,
+                    UnitFacts {
+                        built: 1.0,
+                        airborne: true,
+                        ..UnitFacts::default()
+                    },
+                );
+            }
+            let ground = terrain(&input);
+            let observation = Observation::new(input).unwrap();
+            let workers: Vec<_> = observation.input().units[..2].iter().collect();
+            let mut random = MatchRandom::new(661);
+            let mut expected = random.clone();
+            for _ in 0..2 {
+                expected.next_fraction(StreamId::Ai(0));
+            }
+            let result = plan(
+                &observation,
+                &workers,
+                budget,
+                false,
+                &ground,
+                |_| visible,
+                &mut random,
+            )
+            .unwrap();
+            assert_eq!(
+                random, expected,
+                "{next}, budget={budget}, visible={visible}"
+            );
+            if budget == 0.0 || !visible {
+                assert!(result.commands.is_empty());
+            } else {
+                assert_eq!(result.commands.len(), 2);
+                assert!(
+                    result
+                        .commands
+                        .iter()
+                        .all(|c| c["t"] == "build" && c["kind"] == next)
+                );
+                if next != "flakpos" {
+                    assert_eq!(result.commands[0]["x"], result.commands[1]["x"]);
+                    assert_eq!(result.commands[0]["z"], result.commands[1]["z"]);
+                }
+            }
+        }
+    }
+    for reason in ["retreat", "building", "repair", "depot", "complete"] {
+        let buildings = if reason == "complete" {
+            vec!["hq", "barracks", "motorpool", "airfield"]
+        } else {
+            vec!["hq"]
+        };
+        let mut input = fixture(&buildings);
+        input.runtime.as_mut().unwrap().mode = Mode::Classic;
+        for worker in &mut input.units[..2] {
+            worker.kind = "engineer".into();
+            worker.retreating = reason == "retreat";
+            worker.build = reason == "building";
+        }
+        if reason == "repair" {
+            input.units[2].hp *= 0.5;
+        }
+        if reason == "depot" {
+            input
+                .runtime
+                .as_mut()
+                .unwrap()
+                .nodes
+                .push(Point { x: 100.0, z: 100.0 });
+        }
+        let ground = terrain(&input);
+        let observation = Observation::new(input).unwrap();
+        let workers = observation.input().units[..2].iter().collect::<Vec<_>>();
+        let mut random = MatchRandom::new(662);
+        let before = random.clone();
+        let result = plan(
+            &observation,
+            &workers,
+            2000.0,
+            false,
+            &ground,
+            |_| true,
+            &mut random,
+        )
+        .unwrap();
+        assert_eq!(random, before, "{reason}");
+        if reason == "repair" {
+            assert!(result.commands.iter().all(|c| c["t"] == "assist"));
+        } else {
+            assert!(result.commands.is_empty(), "{reason}");
+        }
+    }
+}
+
+#[test]
+fn if25_classic_repair_ties_keep_observation_order_for_each_engineer() {
+    let mut input = fixture(&["hq", "barracks"]);
+    input.runtime.as_mut().unwrap().mode = Mode::Classic;
+    for worker in &mut input.units[..2] {
+        worker.kind = "engineer".into();
+    }
+    input.units[3].at = input.units[2].at;
+    for building in &mut input.units[2..] {
+        building.hp *= 0.5;
+    }
+    let ground = terrain(&input);
+    let observation = Observation::new(input).unwrap();
+    let units = &observation.input().units;
+    for workers in [[&units[1], &units[0]], [&units[0], &units[1]]] {
+        let result = plan(
+            &observation,
+            &workers,
+            2000.0,
+            false,
+            &ground,
+            |_| true,
+            &mut MatchRandom::new(663),
+        )
+        .unwrap();
+        assert_eq!(result.commands.len(), 2);
+        for (command, worker) in result.commands.iter().zip(workers) {
+            assert_eq!(*command, json!({"t":"assist","ids":[worker.id],"id":10}));
+        }
+    }
 }

@@ -179,3 +179,51 @@ mod tests {
         }
     }
 }
+
+#[cfg(test)]
+mod ai66_tests {
+    use super::*;
+
+    #[test]
+    fn intent_ai66_seat_seed_and_every_box_muller_sample_consume_two_draws() {
+        for seed in [0, 7, u32::MAX] {
+            let mut first = Timing::new(seed, 0);
+            let other = Timing::new(seed, 1);
+            assert_ne!(first, other);
+            for slot in 0..4_u32 {
+                let mut timing = Timing::new(seed, slot);
+                let mixed = seed ^ slot.wrapping_add(1).wrapping_mul(0x9E37_79B1);
+                let mut source = Timing {
+                    value_bits: f64::from(mixed).to_bits(),
+                    draws: 0,
+                };
+                for (median, spread) in [
+                    (3.2, 0.2),
+                    (0.5, 0.35),
+                    (0.32, 0.35),
+                    (1.4, 0.5),
+                    (0.0, 0.0),
+                ] {
+                    let before = timing.draws();
+                    let a = source.fraction();
+                    let b = source.fraction();
+                    let gauss = math::pow(-2.0 * math::log(1.0 - a), 0.5)
+                        * math::cos(2.0 * std::f64::consts::PI * b);
+                    let expected = median
+                        * math::exp(math::max(
+                            -4.0 * spread,
+                            math::min(4.0 * spread, gauss * spread),
+                        ));
+                    assert_eq!(
+                        timing.sample(median, spread).unwrap().to_bits(),
+                        expected.to_bits()
+                    );
+                    assert_eq!(timing.draws(), before + 2);
+                    assert_eq!(timing, source);
+                }
+            }
+            first.sample(3.2, 0.2).unwrap();
+            assert_eq!(other.draws(), 0);
+        }
+    }
+}

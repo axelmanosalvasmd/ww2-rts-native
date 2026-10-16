@@ -312,3 +312,188 @@ fn base54_fort_capture_refusal_keeps_elimination_atomic() {
     }
     assert_eq!(m.world_runtime.as_ref().unwrap().regions[region].team, -1);
 }
+
+fn detached_capture(
+    m: &mut Match,
+) -> Result<crate::match_world_elimination::WorldRegionEffects, String> {
+    m.grid.rebuild(&m.world.game.units);
+    let order = m.world.game.units.keys().copied().collect::<Vec<_>>();
+    m.apply_world_regions_with_fort_capture(&order, 0.05)
+}
+
+fn add_gate(m: &mut Match, region: usize, owner: usize) -> u32 {
+    let cell = m
+        .world
+        .geography()
+        .unwrap()
+        .region_map
+        .as_ref()
+        .unwrap()
+        .iter()
+        .enumerate()
+        .find(|(cell, index)| {
+            **index == region as i16 && world_can_stamp(&m.world.game, &m.rules, &[*cell])
+        })
+        .unwrap()
+        .0;
+    let id = m.world_building(owner, "gate", cell).unwrap();
+    m.commands.units.get_mut(&id).unwrap().gate = Some(crate::match_gates::GateControl {
+        open: Some(false),
+        remaining: 0.35,
+    });
+    id
+}
+
+#[test]
+fn base54_detached_capture_keeps_damage_and_resets_only_seized_gate_controls() {
+    let (mut m, region, mut forts) = capture_scene();
+    let gate = add_gate(&mut m, region, LOCAL_DEFENDER_OWNER);
+    forts.push(gate);
+    let friendly = add_gate(&mut m, region, 0);
+    let dead = add_gate(&mut m, region, LOCAL_DEFENDER_OWNER);
+    m.world.game.units.get_mut(&dead).unwrap().hp = 0.0;
+    let outside_region = ranked_guards(&m)
+        .into_iter()
+        .find(|&r| r != region)
+        .unwrap();
+    let outside = add_gate(&mut m, outside_region, LOCAL_DEFENDER_OWNER);
+    let untouched = [friendly, dead, outside].map(|id| {
+        (
+            id,
+            format!("{:?}", m.world.game.units[&id]),
+            m.commands.units[&id].gate,
+        )
+    });
+    let before = forts
+        .iter()
+        .map(|id| {
+            let unit = m.world.game.units.get_mut(id).unwrap();
+            unit.hp *= 0.37;
+            (
+                *id,
+                unit.hp,
+                unit.built,
+                unit.cells.clone().unwrap(),
+                unit.at(),
+            )
+        })
+        .collect::<Vec<_>>();
+    let effects = detached_capture(&mut m).unwrap();
+    assert_eq!(
+        effects.captures,
+        vec![crate::match_world_regions::WorldCapture {
+            region_index: region,
+            owner: 0
+        }]
+    );
+    for (id, hp, built, cells, at) in before {
+        let unit = &m.world.game.units[&id];
+        assert_eq!(
+            (unit.owner, unit.hp, unit.built, unit.at()),
+            (0, hp, built, at)
+        );
+        for cell in cells {
+            assert_eq!(m.building_cells[&(cell as usize)].owner, 0);
+            assert_eq!(m.building_cells[&(cell as usize)].unit, id);
+        }
+        assert!(m.grid.owned_by(&m.world.game.units, 0).contains(&id));
+        assert!(
+            !m.grid
+                .owned_by(&m.world.game.units, LOCAL_DEFENDER_OWNER)
+                .contains(&id)
+        );
+    }
+    assert_eq!(
+        m.commands.units[&gate].gate,
+        Some(crate::match_gates::GateControl::default())
+    );
+    for (id, unit, gate) in untouched {
+        assert_eq!(format!("{:?}", m.world.game.units[&id]), unit);
+        assert_eq!(m.commands.units[&id].gate, gate);
+    }
+    // Repeating the detached phase preserves the newly owned assets and their damage.
+    assert!(detached_capture(&mut m).unwrap().captures.is_empty());
+}
+
+#[test]
+fn base54_detached_capture_survives_previous_nation_elimination() {
+    let (mut m, region, mut forts) = capture_scene();
+    forts.push(add_gate(&mut m, region, 1));
+    for id in &forts {
+        let unit = m.world.game.units.get_mut(id).unwrap();
+        unit.owner = 1;
+        unit.hp *= 0.5;
+        for &cell in unit.cells.as_ref().unwrap() {
+            m.building_cells.get_mut(&(cell as usize)).unwrap().owner = 1;
+        }
+    }
+    for state in &mut m.world_runtime.as_mut().unwrap().regions {
+        if state.team == 1 {
+            state.team = -1;
+            state.progress = 0.0;
+            state.capper = None;
+        }
+    }
+    let before = forts
+        .iter()
+        .map(|id| (*id, m.world.game.units[id].hp))
+        .collect::<Vec<_>>();
+    let effects = detached_capture(&mut m).unwrap();
+    assert!(m.start.economy.players[1].out);
+    assert!(!effects.removed.is_empty());
+    assert!(effects.removed.iter().all(|u| !forts.contains(&u.id)));
+    for (id, hp) in before {
+        assert_eq!(
+            (m.world.game.units[&id].owner, m.world.game.units[&id].hp),
+            (0, hp)
+        );
+    }
+    assert!(m.world.game.units.values().all(|u| u.owner != 1));
+    assert_eq!(m.finish.unwrap().winner, 0);
+    assert!(detached_capture(&mut m).unwrap().captures.is_empty());
+}
+
+#[test]
+fn base54_detached_capture_leaves_replacement_footprint_rows_unchanged() {
+    let (mut m, _, forts) = capture_scene();
+    let fort = forts[0];
+    let cells = m.world.game.units[&fort].cells.clone().unwrap();
+    let cell = cells[0] as usize;
+    let replacement = BuildingCell {
+        unit: u32::MAX,
+        owner: 1,
+        at: Point { x: 9.0, z: 11.0 },
+    };
+    m.building_cells.insert(cell, replacement);
+    detached_capture(&mut m).unwrap();
+    assert_eq!(m.world.game.units[&fort].owner, 0);
+    assert_eq!(m.building_cells[&cell], replacement);
+    for cell in cells.into_iter().skip(1) {
+        assert_eq!(m.building_cells[&(cell as usize)].owner, 0);
+    }
+}
+
+#[test]
+fn base54_detached_capture_failure_keeps_gate_owner_and_footprint_atomic() {
+    let (mut m, region, _) = capture_scene();
+    let gate = add_gate(&mut m, region, LOCAL_DEFENDER_OWNER);
+    m.story[0].captures = f64::NAN;
+    let units = format!("{:?}", m.world.game.units);
+    let footprints = m.building_cells.clone();
+    let control = m.commands.units[&gate].gate;
+    let regions = m.world_runtime.as_ref().unwrap().regions.clone();
+    let wallets = m.start.economy.clone();
+    assert!(detached_capture(&mut m).is_err());
+    assert_eq!(format!("{:?}", m.world.game.units), units);
+    assert_eq!(m.building_cells, footprints);
+    assert_eq!(m.commands.units[&gate].gate, control);
+    assert_eq!(m.world_runtime.as_ref().unwrap().regions, regions);
+    assert_eq!(m.start.economy, wallets);
+    m.story[0].captures = 0.0;
+    detached_capture(&mut m).unwrap();
+    assert_eq!(m.world.game.units[&gate].owner, 0);
+    assert_eq!(
+        m.commands.units[&gate].gate,
+        Some(crate::match_gates::GateControl::default())
+    );
+}

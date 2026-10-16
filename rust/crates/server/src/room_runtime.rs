@@ -464,3 +464,7 @@ mod tests;
 #[cfg(test)]
 #[path = "scenario_recipient_tests.rs"]
 mod scenario_recipient_tests;
+
+#[cfg(test)]
+#[path = "core_memory_order_tests.rs"]
+mod core_memory_order_tests;

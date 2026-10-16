@@ -550,6 +550,7 @@ fn plan_inner(
         (adaptive || skill.memory) && strategic_recent.iter().any(|s| armor(&s.kind)),
         &sight_game,
         sees,
+        random,
     )?;
     budget = construction.remaining_mp;
     let build_reserve = if rush { 0.0 } else { construction.reserve };

@@ -6,7 +6,7 @@ The recipient fields below are identical to the prototype. This document adds no
 
 ## Admitted execution
 
-Default and Conquest matches admit authored groups, all ordinary condition kinds, match/player/team contexts, once/risingEdge/whileTrue repeats, announcements, objective actions, reinforcement rosters and per-cell damage/destroy actions. Region targets require World and remain refused. World, Horde, Tutorial, Classic, Assault and Annihilation admission stays closed for authored scenarios. Legacy timed triggers keep their existing executor. The implementation follows `shared/scenarios.js:88-170` and the canonical tools at `shared/sim.js:4882-4923`.
+Default and Conquest matches admit authored groups, all ordinary condition kinds, match/player/team contexts, once/risingEdge/whileTrue repeats, announcements, objective actions, reinforcement rosters and per-cell damage/destroy actions. Region targets require World and remain refused. Classic additionally admits empty authored groups with objective and announcement actions, allowing its existing team ghosts to accompany mission data. Classic spawning, reinforcements and damage remain refused. World, Horde, Tutorial, Assault and Annihilation admission stays closed for authored scenarios. Legacy timed triggers keep their existing executor. The implementation follows `shared/scenarios.js:88-170` and the canonical tools at `shared/sim.js:4882-4923`.
 
 Announcement text may be a string, an array, an object with `en`, or a single-translation object. Multiple translations without `en` remain refused because their fallback requires the prototype's object insertion order. No authored mission ships in this batch and public map rows continue to omit private scenario definitions.
 
@@ -47,3 +47,15 @@ The native state decomposition differs from JavaScript's single `g.scenario` obj
 `authored_objectives_save_v2_rejects_downgrade_and_restores_mission_and_pending_say` checks actual room save/load version selection, atomic downgrade refusal, restored objective state and the pending announcement.
 
 The scenario engine continuation adds ordinary lifecycle witnesses for MODE-83, MODE-84 and MODE-85. MODE-81 startup rollback, MODE-82 complete repeat/budget scheduling and NET-55 scenario objective and announcement team scoping across contexts are follow-up rows. Region conditions remain excluded while World admission is closed. Ordinary production queues retain their existing refusal guard; queued population/type accounting is checked as a detached actuator component. No parity status changes are included.
+
+## Classic recipient composition (CORE-MEMORY-ORDER)
+
+Classic uses the same objective and Say shapes and policies above, alongside
+the existing six-field team ghost rows at `shared/sim.js:6036-6037`. This follows
+the mode-independent `scenarioFor` and `scenarioShotFor` functions at
+`shared/scenarios.js:171-175`; neither visibility nor remembered buildings
+change mission permission. `core_memory_order_tests` proves a genuinely
+observed enemy building remains as a team ghost while private mission rows
+arrive, survives a checkpoint, updates on rediscovery and reaches the normal
+Classic ending without a snapshot fault. No new recipient field is introduced.
+World delivery remains deferred.

@@ -1,0 +1,1 @@
+- Add Classic non-depot AI site planning and its per-engineer random draw, including fixed-angle buildings and failed placement or budget checks. Keep planner randomness independent from commander timing and add ordinary match, recipient snapshot and draw-count tests. World room admission and Classic depot economy remain outside this change.
