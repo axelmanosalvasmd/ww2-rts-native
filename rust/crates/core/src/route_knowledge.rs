@@ -64,7 +64,7 @@ pub struct InitialTerrain<'a> {
     pub shoals: Option<&'a [bool]>,
     pub house_kinds: Option<&'a [u8]>,
     /// None explicitly means this public authored map has no toughness override.
-    pub toughness: Option<&'a [f64]>,
+    pub toughness: Option<&'a [f32]>,
     pub trench_front: Option<&'a [f32]>,
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -246,7 +246,7 @@ impl RouteKnowledge {
             if !valid_char(ground) || !valid_char(object) {
                 return Err(KnowledgeError::InvalidValue);
             }
-            let toughness = initial.toughness.map_or(1.0, |v| v[c]);
+            let toughness = initial.toughness.map_or(1.0, |v| f64::from(v[c]));
             if !toughness.is_finite() || toughness < 0.0 {
                 return Err(KnowledgeError::InvalidValue);
             }
