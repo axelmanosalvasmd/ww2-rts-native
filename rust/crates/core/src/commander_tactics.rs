@@ -20,6 +20,8 @@ pub struct Stock {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct UnitFacts {
     pub built: f64,
+    pub hold_position: bool,
+    pub queued_orders: usize,
     pub auto_retreat: bool,
     pub convoy: bool,
     pub stock: Option<Stock>,
@@ -27,8 +29,20 @@ pub struct UnitFacts {
     pub airborne: bool,
 }
 #[derive(Clone, Debug, PartialEq)]
+pub struct KnownBuilding {
+    pub id: u32,
+    pub kind: String,
+    pub owner: usize,
+    pub at: Point,
+}
+#[derive(Clone, Debug, PartialEq)]
 pub struct Context {
     pub mode: Mode,
+    pub naval: bool,
+    pub caution: f64,
+    pub known_buildings: Vec<KnownBuilding>,
+    pub hidden_spawns: BTreeSet<usize>,
+    pub site_nodes: Vec<Point>,
     pub horde: bool,
     pub defender: bool,
     pub faction: Faction,
@@ -48,6 +62,11 @@ impl Default for Context {
     fn default() -> Self {
         Self {
             mode: Mode::Conquest,
+            naval: false,
+            caution: 1.0,
+            known_buildings: vec![],
+            hidden_spawns: BTreeSet::new(),
+            site_nodes: vec![],
             horde: false,
             defender: false,
             faction: Faction::Usa,
@@ -160,6 +179,8 @@ pub struct Situation {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct State {
     pub mind: Mind,
+    pub raid: Option<crate::commander_classic_rules::Raid>,
+    pub assault: crate::commander_assault::AssaultState,
     pub situation: Option<Situation>,
     pub aim: Option<(usize, f64)>,
     pub supply_waiting: BTreeSet<u32>,
@@ -470,13 +491,16 @@ fn plan_inner(
     let (research_commands, reserved, research_mun) = research(observation, context)?;
     commands.extend(research_commands);
     let mut budget = input.manpower - reserved;
-    if let Some(forward) =
-        crate::commander_forward_hq::plan(observation, &available_units, budget, &sight_game, sees)?
-    {
-        budget -= forward.cost;
-        mine.retain(|u| u.id != forward.unit);
-        commands.push(forward.command);
-    }
+    let base_plan = crate::commander_skirmish_base::plan(
+        observation,
+        &available_units,
+        budget,
+        &sight_game,
+        sees,
+    )?;
+    budget -= base_plan.spent;
+    mine.retain(|u| base_plan.assigned != Some(u.id));
+    commands.extend(base_plan.commands);
     let count = |kind: &str| mine.iter().filter(|u| u.kind == kind).count();
     let watched = |id| context.horde || state.mind.watched(id, now, skill.notice);
     let mut sit = Situation {
@@ -667,10 +691,53 @@ fn plan_inner(
             state.aim = Some((i, sit.until));
         }
     }
-    let shopping = crate::commander_shopping::plan(
+    let delivered_recent: Vec<_> = sightings
+        .iter()
+        .filter(|s| !allied(Some(s.owner)) && now - s.time <= 60.0)
+        .collect();
+    let strategic_recent = if context.mode.is_construction() && skill.adaptive {
+        &delivered_recent
+    } else {
+        &remembered
+    };
+    let adaptive = crate::commander_classic_rules::plan(
         observation,
+        context,
         &mine,
-        &remembered,
+        &available_units,
+        strategic_recent,
+        &mut state.raid,
+        skill,
+    )?;
+    let targets = crate::commander_classic_rules::targets(observation, context)?;
+    let my_value: f64 = mine.iter().map(|u| worth(u, definition(u))).sum();
+    let their_value: f64 = targets.first().and_then(|t| t.0).map_or(0.0, |owner| {
+        strategic_recent
+            .iter()
+            .filter(|s| {
+                now - s.time < 30.0 && input.players[s.owner].team == input.players[owner].team
+            })
+            .map(|s| s.worth)
+            .sum()
+    });
+    let strong_enough = !context.mode.is_construction()
+        || !skill.adaptive
+        || my_value > 1.1 * context.caution * their_value;
+    let mut shopping_input = input.clone();
+    let shopping_context = shopping_input.runtime.as_mut().unwrap();
+    shopping_context.build_reserve = if adaptive.rush {
+        0.0
+    } else {
+        math::max(context.build_reserve, base_plan.reserve)
+    };
+    if adaptive.rush {
+        shopping_context.fort_reserve = 0.0;
+    }
+    let shopping_observation = Observation::new(shopping_input).map_err(|e| e.to_string())?;
+    let shopping = crate::commander_shopping::plan(
+        &shopping_observation,
+        &mine,
+        strategic_recent,
         armor_seen.len(),
         &state.mind,
         sit.counter,
@@ -703,9 +770,15 @@ fn plan_inner(
     let heading = load.clone();
     let mut retreat = Vec::new();
     let mut moves = Vec::new();
-    let mut attacks = Vec::new();
-    let mut armed = BTreeSet::new();
-    let mut busy = BTreeSet::new();
+    let mut attacks = adaptive.attacks;
+    commands.extend(adaptive.commands);
+    let mut armed = adaptive.busy.clone();
+    let mut busy = adaptive.busy;
+    if let Some((kind, at)) = adaptive.support
+        && let Some(command) = support.call(kind, at, None, &sit, context, skill, now)?
+    {
+        commands.push(command);
+    }
     let mut hands = 0;
     let base = |u: &UnitObservation| {
         if context.mode.is_construction() {
@@ -858,6 +931,26 @@ fn plan_inner(
                 continue;
             }
         }
+        if mine.len() >= math::round(skill.base_army as f64 * context.caution) as usize
+            && strong_enough
+            && sit.kind == SituationKind::Push
+            && !targets.is_empty()
+        {
+            if hands < skill.hands {
+                let target = targets
+                    .iter()
+                    .min_by(|a, b| {
+                        dist(u.at, a.2)
+                            .total_cmp(&dist(u.at, b.2))
+                            .then(a.1.cmp(&b.1))
+                    })
+                    .unwrap();
+                hands += 1;
+                attacks.push((u.id, target.2));
+                armed.insert(u.id);
+            }
+            continue;
+        }
         let best = (0..input.points.len())
             .filter(|&i| {
                 available(i)
@@ -993,6 +1086,41 @@ fn plan_inner(
     };
     moves.retain(safe);
     attacks.retain(safe);
+    let mut operation_situation = sit.clone();
+    if sit.kind == SituationKind::Push
+        && sit.at.is_none()
+        && strong_enough
+        && mine.len() >= math::round(skill.base_army as f64 * context.caution) as usize
+        && let Some(target) = targets.first()
+    {
+        operation_situation.at = Some(target.2);
+    }
+    let recovering = retreat.iter().copied().collect();
+    let operation = if context.horde {
+        crate::commander_assault::Plan::default()
+    } else {
+        crate::commander_assault::plan(
+            observation,
+            context,
+            &state.mind,
+            Some(&operation_situation),
+            skill,
+            now,
+            &mut state.assault,
+            crate::commander_assault::Options {
+                busy: &busy,
+                recovering: &recovering,
+                sightings,
+                support_at: support.last,
+                handoff: false,
+                region: None,
+            },
+        )?
+    };
+    let controlled = state.assault.controlled(now);
+    moves.retain(|(id, _)| !controlled.contains(id));
+    attacks.retain(|(id, _)| !controlled.contains(id));
+    retreat.retain(|id| !controlled.contains(id));
     if !retreat.is_empty() {
         commands.push(json!({"t":"retreat","ids":retreat}));
     }
@@ -1001,6 +1129,7 @@ fn plan_inner(
             commands.push(json!({"t":kind,"orders":orders.into_iter().map(|(id,p)|json!([id,p.x,p.z])).collect::<Vec<_>>()}));
         }
     }
+    commands.extend(operation.commands);
     state.called = support.last;
     state.decision = Some(Decision {
         situation: sit.kind,
@@ -1062,7 +1191,7 @@ impl SupportBudget {
 }
 
 // This geometry world contains only delivered terrain and public smoke. It holds no live actors.
-fn sight_game(observation: &Observation, context: &Context) -> crate::game::Game {
+pub(crate) fn sight_game(observation: &Observation, context: &Context) -> crate::game::Game {
     let i = observation.input();
     crate::game::Game {
         w: i.width,
@@ -1102,3 +1231,7 @@ mod tests;
 #[cfg(test)]
 #[path = "commander_tactics_strategy_tests.rs"]
 mod strategy_tests;
+
+#[cfg(test)]
+#[path = "commander_batch7_tests.rs"]
+mod batch7_tests;

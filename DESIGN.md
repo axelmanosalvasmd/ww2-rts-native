@@ -4869,3 +4869,49 @@ prototype's `Object.hasOwn(unitTypes, v)` and `unitTypes[v]` coerce that array t
 the property name `"rifle"`. This stricter choice rejects malformed schema values
 instead of carrying JavaScript property-key coercion into the native validator.
 It does not admit or execute general authored scenarios.
+
+## MAC-AI-5: staged assaults and detached base tactics (2026-10-16)
+
+The seat tactics planner now calls a stateless skirmish construction pass before
+shopping. It finishes or repairs an existing building before searching for a
+new site, reserves the next facility's cost and removes an assigned builder
+from that look's combat candidates. The same detached geometry helper uses
+remembered terrain, delivered occupancy, building lanes and caller-supplied
+supply-node positions. Node positions are placement facts, separate from the
+Classic economy's node rates, visibility and engineer assignments in PR #342.
+No additional terrain or mine memory decoder is introduced here.
+
+Classic adaptive tactics consume delivered building ghosts and the last minute
+of strategic sighting reports. Empty current ground can invalidate a tactical
+armor contact without erasing the recent rush, depot-guard or army-value report.
+World recon skips homes marked undiscovered by the caller. This consumes
+existing delivery knowledge without discovering any new spawn. Raids retain
+two unit IDs privately and prefer armored cars. Stable unit IDs,
+building IDs and player indices break distance ties. Classic and World remain
+detached planner contexts; their Match and recipient admission guards stay shut.
+The ordinary producer supplies public naval and weather facts and leaves the
+unsupported modes' building ghosts and node positions empty.
+
+Staged assaults retain their members and release times outside canonical Match
+orders. Their breadth-first placement search uses delivered terrain and native
+LOS, the prototype's left/right/up/down neighbor order and a 2,048-cell limit.
+Assembly, advance, engagement, regroup and withdrawal use the pinned tuning.
+Operation claims and recent player releases suppress the quick movement and
+retreat orders from that look. Orders still pass through canonical admission.
+Horde scheduling, seat delivery and Classic economy construction remain the
+separate work in #340, #342 and runtime/horde-ai-20261016.
+
+The row evidence is Rust intent tests checked against the pinned prototype,
+with literal expected values for tuning and pure placement cases. No Source
+recorder is added. An ordinary Conquest lifecycle exercises private assault and
+raid state, admits their movement orders and collects both recipient snapshots
+through a natural VP finish and ending ticks. This does not admit Classic,
+World, Assault or Horde rooms and does not alter public ingress, snapshots,
+privacy, wire shapes, FFI or the full logistics guards.
+
+AI-48 is held for remembered bridge, original-ground and found-mine job inputs
+and receipt-driven field-work retries, including the pending seat-delivery work.
+AI-49 needs the missing Garrison actuator and complete holder fortification.
+AI-50 needs the currently unsupported Gate actuator and its complete lifecycle.
+AI-56 remains held for that HQ fortification dependency, despite the existing
+70-metre defender rule and the added detached bunker-target selection.

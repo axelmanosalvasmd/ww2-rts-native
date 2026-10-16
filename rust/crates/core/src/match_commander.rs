@@ -1127,6 +1127,13 @@ impl Match {
             research,
             runtime: Some(crate::commander_tactics::Context {
                 mode: self.options.mode,
+                naval: g.naval,
+                caution: crate::weather::WeatherRules::compiled()
+                    .map_err(|e| e.to_string())?
+                    .ai_caution(Some(&self.start.weather)),
+                known_buildings: vec![],
+                hidden_spawns: BTreeSet::new(),
+                site_nodes: vec![],
                 horde: false,
                 defender: false,
                 faction: self.options.players[owner].faction,
@@ -1175,6 +1182,12 @@ impl Match {
                             u.id,
                             crate::commander_tactics::UnitFacts {
                                 built: u.built.unwrap_or(1.0),
+                                hold_position: u.owner == owner && u.hold_pos,
+                                queued_orders: if u.owner == owner {
+                                    self.commands.units.get(&u.id).map_or(0, |c| c.orders.len())
+                                } else {
+                                    0
+                                },
                                 auto_retreat: u.owner == owner
                                     && self
                                         .commands

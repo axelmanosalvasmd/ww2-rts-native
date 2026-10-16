@@ -650,8 +650,8 @@ fn intent_ai11_ai_attempts_and_human_replay_share_costs_and_denials() {
     use crate::{match_commands::Command, orders::OrderKey};
     let mut ai = runtime_match();
     let mut human = runtime_match();
-    ai.start.economy.players[0].mp = 100.0;
-    human.start.economy.players[0].mp = 100.0;
+    ai.start.economy.players[0].mp = 1000.0;
+    human.start.economy.players[0].mp = 1000.0;
     let delivered = ai
         .human_commander_observation(
             &mut crate::match_human_observation::HumanObservationMemory::new(0),
@@ -677,8 +677,8 @@ fn intent_ai11_ai_attempts_and_human_replay_share_costs_and_denials() {
     let h = human.apply_commands(1, false).unwrap();
     assert_eq!(a, h);
     assert_eq!(a[0].denial, None);
-    assert_eq!(ai.start.economy.players[0].mp, 0.0);
-    assert_eq!(human.start.economy.players[0].mp, 0.0);
+    assert_eq!(ai.start.economy.players[0].mp, 900.0);
+    assert_eq!(human.start.economy.players[0].mp, 900.0);
     // Refusal happens against the current wallet, after planning from an earlier delivery.
     let mut denied = runtime_match();
     denied.start.economy.players[0].mp = 0.0;
