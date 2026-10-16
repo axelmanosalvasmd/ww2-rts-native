@@ -69,6 +69,14 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
         if !mode.is_null() {
             fields.insert("mode".into(), mode);
         }
+        if state.options.mode == Mode::Classic {
+            let nodes = state
+                .classic_snapshot_nodes()
+                .map_err(|_| SnapshotError::Rules)?
+                .ok_or(SnapshotError::Rules)?;
+            fields.insert("nodes".into(), json!(nodes));
+            fields.insert("ghosts".into(), json!([]));
+        }
         // Reuse Source's six-field ghost rows. Never consult a hidden live building here.
         if matches!(state.options.mode, Mode::Classic | Mode::World)
             && let Some((_, rows)) = state

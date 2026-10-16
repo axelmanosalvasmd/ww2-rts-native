@@ -1,4 +1,4 @@
-//! Internal Conquest projections and an explicitly admitted quiet seat envelope.
+//! Internal ordinary and Classic projections over the canonical recipient owners.
 //! Unsupported canonical actors remain explicit. No transport contract is added.
 use crate::{
     catalog::Catalog,
@@ -117,13 +117,21 @@ pub struct SnapshotCache<'a> {
 }
 impl<'a> SnapshotCache<'a> {
     pub fn new(state: &'a Match) -> Result<Self, SnapshotError> {
-        if !matches!(state.options.mode, Mode::Default | Mode::Conquest)
-            || state.world.game.mode.is_some()
+        let classic = state.options.mode == Mode::Classic
+            && state.world.game.mode == Some(crate::game::ModeKind::Classic);
+        if !(classic
+            || matches!(state.options.mode, Mode::Default | Mode::Conquest)
+                && state.world.game.mode.is_none())
             || state.world.geography().is_some()
             || state.assault.is_some()
             || state.world_runtime.is_some()
         {
             return Err(SnapshotError::UnsupportedMode);
+        }
+        if classic {
+            state
+                .validate_elimination_state()
+                .map_err(|_| SnapshotError::Rules)?;
         }
         let g = &state.world.game;
         let cells = g.w.checked_mul(g.h).ok_or(SnapshotError::Rules)?;
@@ -472,6 +480,10 @@ fn economy_fields(state: &Match, slot: usize) -> Result<Map<String, Value>, Snap
     for (key, value) in [("mp", p.mp.floor()), ("inc", r(p.inc))] {
         fields.insert(key.into(), json!(value));
     }
+    if state.options.mode == Mode::Classic {
+        fields.insert("mun".into(), json!(p.mun.floor()));
+        fields.insert("fuel".into(), json!(p.fuel.floor()));
+    }
     for (key, value) in [("fuelInc", p.fuel_inc), ("upkeep", p.upkeep)] {
         if let Some(value) = value {
             finite(&[value])?;
@@ -583,6 +595,20 @@ impl Match {
     /// Bind hosted purchases to the current ordinary snapshot capabilities.
     pub fn restrict_to_ordinary_snapshots(&mut self) -> Result<(), SnapshotError> {
         self.preflight_ordinary_snapshot()?;
+        // A queued plane can later emit AntiAir or PlaneDown. Keep hosted
+        // training closed until the aviation event adapter is integrated.
+        for (id, building) in self.production.buildings() {
+            if building.jobs().iter().any(|job| {
+                self.rules
+                    .kind(&job.kind)
+                    .is_some_and(|kind| self.rules.kinds[kind].air)
+            }) {
+                return Err(SnapshotError::Unsupported {
+                    unit: id,
+                    capability: SnapshotCapability::Air,
+                });
+            }
+        }
         self.ordinary_snapshot_only = true;
         Ok(())
     }
@@ -1119,3 +1145,7 @@ mod map_house_selected_tests;
 #[cfg(test)]
 #[path = "recipient_snapshot/net52_tests.rs"]
 mod net52_tests;
+
+#[cfg(test)]
+#[path = "recipient_snapshot/production_state_tests.rs"]
+mod production_state_tests;

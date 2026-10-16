@@ -1207,7 +1207,7 @@ pub fn prepare_ordinary_recipient_lists(
             crate::recipient_lists::RecipientLists {
                 wrecks,
                 found_mines,
-                nodes: None,
+                nodes: state.classic_snapshot_nodes()?,
             },
         ));
     }
