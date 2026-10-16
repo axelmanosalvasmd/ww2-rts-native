@@ -1,0 +1,1 @@
+- Record owner decisions A, B and C in the parity inventory: 10 approved differences, 31 Rust-only acceptances for Unreal-owned client rows, and 15 World admission deferrals for milestone R1. Keep four already ported World components unchanged and document the differences in DESIGN.md.
