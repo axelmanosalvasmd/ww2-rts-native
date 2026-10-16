@@ -1,0 +1,1 @@
+- Correct the test-only ZeroProjectIdentity dispatch expectation for selection orders that first encounter the unchanged dangling membership. Keep exact reason comparisons, all 33 faults and 136 planned atomicity attempts; native qualification remains pending.

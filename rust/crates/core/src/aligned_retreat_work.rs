@@ -255,7 +255,15 @@ fn genuine_retreat_reservation_preflight_is_atomic_and_filters_foreign_corruptio
             fault.validator_error()
         );
         for ids in [&[3, 2][..], &[1, 2][..], &[2, 1][..], &[1, 1, 4, 3, 2][..]] {
-            selected_error(&mut w, ids, &format!("{fault:?}"), &fault.dispatch_error());
+            // Moving the shared record leaves worker 1's membership dangling.
+            // The first selected worker determines which canonical check fails.
+            let expected = match (fault, ids[0]) {
+                (Fault::ZeroProjectIdentity, 1) => {
+                    "ground retreat reservation: invalid field-work membership identity".into()
+                }
+                _ => fault.dispatch_error(),
+            };
+            selected_error(&mut w, ids, &format!("{fault:?}"), &expected);
         }
         w.state.field_works = original;
     }

@@ -1,5 +1,13 @@
 # Three Crossroads Native: design decisions
 
+## Zero-project reservation reason (2026-10-16, source only)
+
+Correct only the exact dispatch expectation for `ZeroProjectIdentity` when the existing selection starts with worker 1. The unchanged injection moves the shared project record to key zero and rebinds worker 2 alone. Worker 1 still references the removed record, so its canonical membership predicate fails before the project-record checks. Orders `[1,2]` and `[1,1,4,3,2]` therefore expect membership identity; `[3,2]` and `[2,1]` retain project projection. Worker 2's direct-validator expectation and every other fault expectation remain exact. No error normalization or alternative accepted reason is added.
+
+This private child of `2dff236e6a2fddb4e0a0349f61c7fa08fc96f061` preserves the complete injection, 33 faults, four selection orders, 136 planned atomicity attempts, all input and prefix controls, actors, waits, runtime providers, fixtures, registries and parity cells. The parent's actual test01/test02 passes and first test03 failure remain attributed to Rust tree `89b4b7fc58bb4057635ca6339d88e3cee9c27ec7`: 29 prior reason matches and all 30 recorded attempts atomic. The old I/O exit101 and formatting failure remain raw failures; prior formatting success stays on its producing head, and the eight Source passes stay on `614e7a6c` / Rust `7322ccb53d7a609b68ef62d13f706100c777395c`.
+
+Source, Node, Cargo, rustc, native, formatting, lint, discovery and CI execution at this child are zero. Root owns any new literal head/selection/slot grant, independent review and publication. This correction does not complete CMB-144 or establish owner consent, defaults or provider adoption. Stop mappings and loaded-carrier ejection remain held.
+
 ## Private ground replay registration (2026-10-15, native unrun)
 
 Register the existing `aligned_retreat_scuttle.rs` test module as `aligned_replay::ground_commands` after `startup_state`. This source-only child of `614e7a6ce84449bbfcf387715da1673993051586` adds exactly the three-line private registration that Root authorized. Removing those three lines reproduces the complete parent adapter byte for byte, including Replay::new's 16,384-value validation, draw/layout/startup/shot receipts and comparison behavior. Existing observer bodies, test hooks, runtime providers, callers, schemas, fixtures, registries and parity cells remain unchanged. AUDIT_COMBAT separately owns only the PR269 rebase and does not import this child.
