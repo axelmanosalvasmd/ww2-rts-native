@@ -226,8 +226,21 @@ fn mode44_host_nextwave_ignores_guest_pause_and_active_wave_then_ticks_and_recon
     assert!(hub.rooms["ABC"].native.is_none());
     assert!(ra.try_recv().is_err() && rb.try_recv().is_err());
     command(&mut hub, &a, json!({"t":"start"}), 0);
-    outputs(&mut hub, &mut ra, 0);
-    outputs(&mut hub, &mut rb, 0);
+    let host_start = outputs(&mut hub, &mut ra, 0);
+    let guest_start = outputs(&mut hub, &mut rb, 0);
+    assert!(
+        hub.rooms["ABC"].native.is_some(),
+        "initial host Start did not attach: host={host_start:?}, guest={guest_start:?}"
+    );
+    for (slot, messages) in [(0, &host_start), (1, &guest_start)] {
+        let starts = messages
+            .iter()
+            .filter(|message| message["t"] == "start")
+            .collect::<Vec<_>>();
+        assert_eq!(starts.len(), 1, "seat {slot}: {messages:?}");
+        assert_eq!(starts[0]["you"], slot);
+        assert_eq!(starts[0]["names"], json!(["a", "b", "Horde"]));
+    }
     let prior = identity(&hub);
     command(&mut hub, &a, json!({"t":"start"}), 0);
     assert_eq!(identity(&hub), prior);

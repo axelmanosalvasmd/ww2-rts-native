@@ -28,3 +28,7 @@ and visible static contacts. Throw events use the existing local event filter.
 Aircraft weapons keep their existing restriction. Recorded AI support attempts
 are restricted to the support kinds the hosted recipient adapter can deliver,
 before payment or mutation.
+
+The global snapshot wreck cache admits canonical Horde through actor-mode and
+Horde-economy validation, alongside the per-seat snapshot checks. Other game
+modes and mismatched Horde state retain their refusals.

@@ -302,12 +302,17 @@ pub struct OrdinaryRawLists {
 impl crate::match_runtime::Match {
     pub fn ordinary_snapshot_raw_lists(&self) -> Result<OrdinaryRawLists, String> {
         let game = &self.world.game;
-        if !matches!(
+        let horde =
+            self.options.mode == crate::economy::Mode::Horde && game.mode == Some(ModeKind::Horde);
+        if horde {
+            self.validate_actor_mode()?;
+            self.validate_horde_economy()?;
+        } else if !matches!(
             self.options.mode,
             crate::economy::Mode::Default | crate::economy::Mode::Conquest
         ) || game.mode.is_some()
         {
-            return Err("global ordinary lists require absent Game mode".into());
+            return Err("global ordinary lists require Conquest or canonical Horde".into());
         }
         let mut ids = std::collections::BTreeSet::new();
         let mut rows = Vec::with_capacity(game.wrecks.len());

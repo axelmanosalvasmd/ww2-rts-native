@@ -60,6 +60,11 @@ contact and ticket cleanup, collecting every canonical seat throughout and
 continuing healthy ticks afterward. Exact adapter tests protect flight shape,
 ground fog, shooter privacy and rejection before delivery mutation.
 
+`canonical_horde_global_lists_survive_ticks_and_every_seat_delivery` validates
+the room's global snapshot-list cache through sixteen ordinary Horde ticks and
+every-seat delivery. Mismatched mode tags, missing/corrupt Horde state and
+invalid global wreck identity remain refused.
+
 ## Limits
 
 No World admission, FFI/header, parity status or reference changes. Existing
