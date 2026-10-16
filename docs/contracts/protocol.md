@@ -38,11 +38,11 @@ These are new relative to the reference. The pinned browser client and Node serv
 
 ## Corrections the Rust server makes
 
-These began as privacy proposals. Both owners' recorded decisions on 2026-10-16 retain the reference behavior for item 1 and choose the cached reference path for item 3. See Axel's [owner confirmation](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6218552386) and Julio's [clarification](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6217661080). The spectator alternatives in item 2 below are historical proposals, outside this operative batch.
+These began as privacy proposals. Both owners' recorded decisions on 2026-10-16 retain the reference behavior for items 1 and 2 and choose the cached reference path for item 3. See Axel's [owner confirmation](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6218552386) and Julio's [clarification](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6217661080).
 
 1. **The companion's hit direction.** Rust retains the exact reference behavior: `operative.from` sends the attacker's position rounded to metres while `tick - hitAt <= 10`, even when the attacker is hidden; otherwise it is null (`server.js:294-306`). The earlier proposal to replace it with a point 20 m along the bearing is not adopted. The browser client uses the bearing (`client/operative-view.js:342`).
-2. **Spectators outside World Conquest.** At the pin, anyone who joins a running match with a new token becomes a spectator and sees the whole map, so a player can watch the enemy from a second tab. Tokens are free to make, so no rule based on who joined when closes this. Options for Axel: (a) an observer delay: spectator snapshots run a fixed time behind the match (for example 60 s), which the browser client handles unchanged; (b) spectators get seat 0's team view, as in World Conquest; (c) keep the reference behavior until accounts exist. Julio proposes (a).
-3. **Owner-only flag bits.** Rust uses one nonowner mask, exactly the cached reference expression `2047 | 32768 | (7 << 20) | RIDING_FLAG` (`shared/sim.js:5903`). It clears gate-open, companion and cargo bits for allies and enemies. The uncached reference path's different mask (`shared/sim.js:6044`) is recorded as `differs` by the owner decision. Nonowner cooldown is 0, and target identity is retained only when visible to the recipient (`shared/sim.js:5899-5905`).
+2. **Spectators outside World Conquest.** Owner clarification J on 2026-10-16 selects (c), the reference behavior: the whole map with no delay outside World. The proposed observer delay and seat 0 team view are not adopted. World alone uses seat 0's team view and remains closed on R1. See [ordinary spectator delivery](spectators-v0.md) for prototype-identical fields and tests.
+3. **Owner-only flag bits.** Rust uses one nonowner mask, exactly the cached reference expression `2047 | 32768 | (7 << 20) | RIDING_FLAG` (`shared/sim.js:5903`). It clears gate-open, companion and cargo bits for allies and enemies. The uncached reference path's different mask (`shared/sim.js:6044`) is recorded as `differs` by the owner decision. Nonowner cooldown is 0, and target identity is retained only when visible to the recipient (`shared/sim.js:5899-5905`). See [ordinary spectator delivery](spectators-v0.md).
 
 ## Error and recovery behavior
 
@@ -70,8 +70,8 @@ The in-process recorder does not exercise WebSocket framing, close codes, subpro
 1. **JSON over WebSocket** works in the Unreal client on Linux. Keep the reference wire shapes for this phase.
 2. **`proto` and `client`:** the Unreal client will send `proto: 0` and a client identifier in its next integration follow-up; the build running on 2026-10-12 does not send them yet.
 
-## Still open (product and security decisions)
+## Recorded product and privacy decisions
 
-1. Spectators (correction 2): observer delay, seat 0's team view, or the reference behavior.
-2. Flag bits for allies (correction 3): whether teammates see open gates, companions and carried squads.
-3. The companion's hit direction (correction 1): the proposed point 20 m along the bearing.
+1. Spectators (correction 2): resolved to reference behavior by owner clarification J, 2026-10-16.
+2. Flag bits for allies (correction 3): resolved to the cached prototype mask by owner clarification, 2026-10-16.
+3. The companion's hit direction (correction 1): resolved to the reference's exact rounded attacker position through age 10 by both owners on 2026-10-16.

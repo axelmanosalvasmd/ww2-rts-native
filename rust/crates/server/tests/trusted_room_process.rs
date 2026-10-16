@@ -46,7 +46,7 @@ fn begin(host: &mut Client, guest: &mut Client) -> (Value, Value) {
 }
 
 #[test]
-fn ordinary_binary_opt_in_rejects_public_roles_and_retains_default_refusal() {
+fn ordinary_binary_opt_in_admits_spectators_and_retains_other_refusals() {
     for args in [
         vec!["--trusted-room", "ABC"],
         vec!["--seed", "1"],
@@ -73,7 +73,6 @@ fn ordinary_binary_opt_in_rejects_public_roles_and_retains_default_refusal() {
         ("XYZ", json!({})),
         ("ABC", json!({"listing":{"public":true}})),
         ("ABC", json!({"listing":{"tutorial":true}})),
-        ("ABC", json!({"spectate":true})),
         ("ABC", json!({"role":"operative"})),
         ("ABC", json!({"role":"spectator"})),
         ("ABC", json!({"token":""})),
@@ -108,8 +107,18 @@ fn ordinary_binary_opt_in_rejects_public_roles_and_retains_default_refusal() {
     assert_eq!(lobby["players"][2]["ai"], true);
     host.send(json!({"t":"kick","slot":2}));
     host.until(|m| m["t"] == "lobby" && m["players"].as_array().is_some_and(|p| p.len() == 2));
+    let mut watcher = Client::open(
+        server.address,
+        "ABC",
+        json!({"t":"hello","token":"watcher","name":"Watcher","spectate":true}),
+    );
+    let watching = watcher.until(|m| m["t"] == "lobby");
+    assert_eq!(watching["spectator"], true);
+    assert_eq!(watching["you"], -1);
     host.send(json!({"t":"spectate"}));
-    host.deny("spectate");
+    let released = host.until(|m| m["t"] == "lobby" && m["spectator"] == true);
+    assert_eq!(released["players"].as_array().unwrap().len(), 1);
+    assert_eq!(released["spectators"].as_array().unwrap().len(), 2);
     assert!(host.barrier().iter().all(|m| m["t"] != "start"));
     assert!(server.receipts().is_empty());
 }
