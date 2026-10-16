@@ -1,3 +1,3 @@
-- Preserve prototype numeric-sort ties, signed zero and NaN behavior in simulation, AI and convoy consumers. AI point selection also skips NaN scores produced by finite-input overflow.
+- Preserve prototype numeric-sort ties, signed zero and NaN behavior in simulation, AI and convoy consumers. AI point selection also skips NaN scores produced by finite-input overflow. Tests compare exact prototype values and exercise native consumers.
 - Add optional native game workers with room routing, combined room listings, crash restart and coordinated shutdown through existing socket messages. Fair polling keeps requests serviceable when maintenance stays due.
 - Keep AI-12's complete local planning mirror and IF-26's full float-key and JSON equality matrix unproven; their missing consumers and the separate Horde plan comparison are documented.

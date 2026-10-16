@@ -110,18 +110,26 @@ the isolated admitted provider API; they do not lift that match guard.
 
 ## Validation
 
-Parent validation on the Vostro, before refreshing onto main `1cb49541`:
+Parent validation on the Vostro:
 
-- All 15 focused IF-25/NET-96 tests passed. The first compilation needed an
-  explicit `f64` annotation in the finite-comparator test; no test had run yet.
-- All 263 selected existing core/server regression tests passed, including
-  test registration, affected consumers and the existing server suite.
-- All four NET-96 tests passed again after correcting JavaScript whitespace
-  handling in the shard-count parser.
-- Strict workspace Clippy passed before that parser correction; the final
-  main refresh requires a new Clippy and format check.
+- At merge `fb1c2d214b0d86b24a929fbac4845f18d41d4cb5`, after merging main
+  `1cb49541`, all 24 selected tests passed: the 15 stream tests, eight incoming
+  Horde tests and test registration. Formatting and strict workspace Clippy
+  passed too.
+- At `f0781aa86d3724304a953f9009b879ee9111fc83`, after correcting worker
+  scheduling fairness, all four NET-96 socket/hash tests passed again, along
+  with `cargo fmt --all --check` and
+  `cargo clippy --locked --workspace --all-targets -j4 -- -D warnings`.
+  Its core sources are unchanged from the 24-test producer.
+- Before the main refresh, all 263 selected existing core/server regression
+  tests passed. That earlier broad run is separate from the integration
+  selection above. The first focused compilation needed an explicit `f64`
+  annotation in one new test, before any tests ran.
 
-Cargo used four jobs, S1 or S3, each slot's target directory, a 6 GiB memory
-limit and no swap. Pure prototype evaluation above completed. The independent
-source reviewer ran no Cargo and found no concrete defects. No result here
-is transferred to a changed integration tree without its required checks.
+Test runs selected only `ww2-core` and `ww2-server` with four jobs. Every Cargo
+invocation held one S1-S3 lock, used its slot target directory, applied the
+6 GiB memory limit with no swap, and released its lock when Cargo finished.
+The independent reviewer ran no Cargo and confirmed the scheduling issue
+from source; the final correction removes its fixed-priority cause. The
+publication documentation commit preserves the tested Rust sources, tests
+and Cargo configuration of `f0781aa8`.
