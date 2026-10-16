@@ -20,6 +20,10 @@ fn p(x: f64, z: f64) -> Point {
 }
 
 fn scene(rows: &[(&str, usize, f64, f64)]) -> Match {
+    scene_with_teams(rows, &[0, 1])
+}
+
+fn scene_with_teams(rows: &[(&str, usize, f64, f64)], teams: &[i32]) -> Match {
     let map = AuthoritativeMap::from_json(
         &serde_json::to_vec(&json!({
             "name":"combat intent", "w":96, "h":96,
@@ -35,18 +39,19 @@ fn scene(rows: &[(&str, usize, f64, f64)]) -> Match {
         MatchOptions {
             seed: 701,
             mode: Mode::Conquest,
-            players: vec![
-                PlayerConfig {
-                    name: "A".into(),
-                    team: 0,
-                    faction: Faction::Usa,
-                },
-                PlayerConfig {
-                    name: "B".into(),
-                    team: 1,
-                    faction: Faction::Germany,
-                },
-            ],
+            players: teams
+                .iter()
+                .enumerate()
+                .map(|(slot, &team)| PlayerConfig {
+                    name: format!("Player {slot}"),
+                    team,
+                    faction: if slot == 0 {
+                        Faction::Usa
+                    } else {
+                        Faction::Germany
+                    },
+                })
+                .collect(),
             shuffle: false,
             army: ArmySize::Standard,
             weather: WeatherChoice::Map,
@@ -62,18 +67,15 @@ fn scene(rows: &[(&str, usize, f64, f64)]) -> Match {
     .unwrap();
     // Component setup uses authored physical terrain and canonical unit owners.
     m.world = World::from_map(&map).unwrap();
-    m.world.game.players = vec![
-        Player {
-            slot: 0,
-            team: 0,
+    m.world.game.players = teams
+        .iter()
+        .enumerate()
+        .map(|(slot, &team)| Player {
+            slot,
+            team,
             visible: vec![],
-        },
-        Player {
-            slot: 1,
-            team: 1,
-            visible: vec![],
-        },
-    ];
+        })
+        .collect();
     m.building_cells.clear();
     m.commands = MatchCommands::new(4096);
     m.firing = Default::default();
@@ -118,7 +120,7 @@ fn scene(rows: &[(&str, usize, f64, f64)]) -> Match {
         m.world.game.units.insert(id, u);
     }
     m.next_unit_id = rows.len() as u32 + 1;
-    for owner in 0..2 {
+    for owner in 0..teams.len() {
         m.world.register_recipient(Recipient::Player(owner));
         m.world.game.players[owner].visible = m
             .world
@@ -249,6 +251,119 @@ fn cmb84_hold_fire_blocks_automatic_fire_and_grenades_but_allows_attack() {
 }
 
 #[test]
+fn cmb84_aircraft_hold_fire_guards_patrol_anti_air_and_support_interception() {
+    use crate::{
+        game::{PlaneState, Strike, StrikeKind},
+        match_aviation::{MissionKind, PlaneMission},
+        match_support::{SupportEvent, SupportKind, SupportTiming},
+    };
+    let mut patrol = scene(&[("rifle", 1, 54., 40.)]);
+    let plane = patrol.spawn_aircraft(0, "attacker").unwrap();
+    let aircraft = patrol.world.game.units.get_mut(&plane).unwrap();
+    aircraft.air = Some(PlaneState::Station);
+    aircraft.x = 40.;
+    aircraft.z = 40.;
+    rebuild(&mut patrol);
+    patrol.aviation.planes.get_mut(&plane).unwrap().mission = Some(PlaneMission {
+        kind: MissionKind::Patrol,
+        target: None,
+        at: p(54., 40.),
+    });
+    patrol.commands.units.get_mut(&plane).unwrap().hold_fire = true;
+    patrol.world.game.players[0].visible = vec![1];
+    patrol.firing.get_mut(plane).unwrap().target_id = 1;
+    let ammo = patrol.aviation.planes[&plane].ammo;
+    patrol.step_aircraft(plane, 0.3).unwrap();
+    assert_eq!(patrol.aviation.planes[&plane].ammo, ammo);
+    assert_eq!(patrol.firing.get(plane).unwrap().target_id, 0);
+    assert!(patrol.firing.flights.is_empty());
+
+    for kind in ["mg", "flak", "fighter"] {
+        let mut m = if kind == "fighter" {
+            scene(&[])
+        } else {
+            scene(&[(kind, 0, 40., 40.)])
+        };
+        if kind == "fighter" {
+            assert_eq!(m.spawn_aircraft(0, kind).unwrap(), 1);
+            m.world.game.units.get_mut(&1).unwrap().air = Some(PlaneState::Station);
+        }
+        let target = m.spawn_aircraft(1, "attacker").unwrap();
+        let u = m.world.game.units.get_mut(&target).unwrap();
+        u.air = Some(PlaneState::Station);
+        u.x = 50.;
+        u.z = 40.;
+        let gun = m.world.game.units.get_mut(&1).unwrap();
+        gun.x = 40.;
+        gun.z = 40.;
+        gun.still = Some(3.);
+        m.world.game.players[0].visible = vec![target];
+        rebuild(&mut m);
+        assert_eq!(
+            command(
+                &mut m,
+                json!({"t":"stance","key":"holdFire","ids":[1],"on":true})
+            ),
+            None
+        );
+        let hp = m.world.game.units[&target].hp;
+        m.step_aircraft_anti_air(&[1], 0.3).unwrap();
+        assert_eq!(
+            m.world.game.units[&target].hp, hp,
+            "{kind} holds anti-air fire"
+        );
+        assert!(m.aviation.take_events().is_empty());
+        if kind == "fighter" {
+            assert_eq!(
+                command(&mut m, json!({"t":"attack","ids":[1],"target":target})),
+                None
+            );
+        } else {
+            assert_eq!(
+                command(
+                    &mut m,
+                    json!({"t":"stance","key":"holdFire","ids":[1],"on":false})
+                ),
+                None
+            );
+        }
+        m.step_aircraft_anti_air(&[1], 0.3).unwrap();
+        assert!(
+            m.world.game.units[&target].hp < hp,
+            "{kind} resumes permitted anti-air fire"
+        );
+    }
+    for held in [true, false] {
+        let mut m = scene(&[("flak", 0, 40., 40.)]);
+        m.commands.units.get_mut(&1).unwrap().hold_fire = held;
+        m.world.game.strikes.push(Strike {
+            kind: StrikeKind::Recon,
+            owner: 1,
+            x: 40.,
+            z: 40.,
+            dir: 0.,
+            live: false,
+            runtime: Some(SupportTiming {
+                kind: SupportKind::Recon,
+                delay: 0.,
+                left: 1.,
+                next: 0.,
+            }),
+        });
+        m.step_support_strikes(&[1], 0.05).unwrap();
+        let fired = m
+            .support
+            .take_events()
+            .iter()
+            .any(|e| matches!(e, SupportEvent::Flak { unit: 1, .. }));
+        assert_eq!(
+            fired, !held,
+            "Hold Fire guards the interception attempt before its random roll"
+        );
+    }
+}
+
+#[test]
 fn cmb85_hold_position_keeps_exact_destination_and_blocks_idle_spacing() {
     let mut m = scene(&[("rifle", 0, 40., 40.), ("rifle", 0, 41., 40.)]);
     assert_eq!(
@@ -276,12 +391,26 @@ fn cmb86_target_threat_hysteresis_visibility_and_explicit_lock() {
         ("rifle", 1, 51., 40.),
     ]);
     assert_eq!(acquire(&mut m, 1), 2);
+    m.world.game.units.get_mut(&3).unwrap().x = 48.5;
+    rebuild(&mut m);
     m.firing.get_mut(1).unwrap().retarget = 0.;
     assert_eq!(
         acquire(&mut m, 1),
         2,
-        "near equal choices keep current target"
+        "8.5 m challenger cannot displace 10 m current target"
     );
+    m.world.game.units.get_mut(&3).unwrap().x = 46.5;
+    rebuild(&mut m);
+    m.firing.get_mut(1).unwrap().retarget = 0.;
+    assert_eq!(
+        acquire(&mut m, 1),
+        3,
+        "6.5 m challenger crosses the hysteresis margin"
+    );
+    // Restore the farther challenger so incoming fire must change the decision.
+    m.world.game.units.get_mut(&3).unwrap().x = 51.;
+    rebuild(&mut m);
+    m.firing.get_mut(1).unwrap().target_id = 2;
     m.combat.get_mut(1).unwrap().hit_by = Some(3);
     m.combat.get_mut(1).unwrap().hit_at = 200.;
     m.firing.get_mut(1).unwrap().retarget = 0.;
@@ -649,6 +778,95 @@ fn cmb104_109_113_aimed_families_launch_once_and_manual_halts_auto_keeps_route()
     }
 }
 
+fn finish_ability_flight(m: &mut Match) {
+    for _ in 0..100 {
+        m.capture_firing_prior().unwrap();
+        m.world.game.tick += 1;
+        m.step_firing_flights().unwrap();
+        m.advance_firing_grenades(0.05).unwrap();
+    }
+    assert!(m.firing.flights.is_empty());
+    assert!(m.firing.grenades.is_empty());
+}
+
+#[test]
+fn cmb104_109_grenades_satchel_and_petard_impact_hurt_both_teams_and_structures() {
+    for kind in ["rifle", "medium", "ranger", "commando", "churchill"] {
+        let mut m = scene(&[
+            (kind, 0, 41., 41.),
+            ("rifle", 1, 47., 43.),
+            ("rifle", 0, 47., 39.),
+            ("tank", 1, 49., 41.),
+            ("rifle", 1, 65., 41.),
+        ]);
+        let before: Vec<_> = (2..=5).map(|id| m.world.game.units[&id].hp).collect();
+        assert_eq!(
+            command(&mut m, json!({"t":"ability","ids":[1],"x":47,"z":41})),
+            None
+        );
+        m.step_aimed_ability(1).unwrap();
+        for id in 2..=5 {
+            assert_eq!(m.world.game.units[&id].hp, before[id as usize - 2]);
+        }
+        finish_ability_flight(&mut m);
+        for id in 2..=4 {
+            assert!(
+                m.world.game.units[&id].hp < before[id as usize - 2],
+                "{kind} blast hurts unit {id}"
+            );
+        }
+        assert_eq!(
+            m.world.game.units[&2].hp, m.world.game.units[&3].hp,
+            "{kind} applies the same blast to friend and foe"
+        );
+        assert_eq!(
+            m.world.game.units[&5].hp, before[3],
+            "outside the blast radius"
+        );
+        let after: Vec<_> = (2..=5).map(|id| m.world.game.units[&id].hp).collect();
+        finish_ability_flight(&mut m);
+        assert_eq!(
+            after,
+            (2..=5)
+                .map(|id| m.world.game.units[&id].hp)
+                .collect::<Vec<_>>(),
+            "linked ticket cannot explode twice"
+        );
+
+        let mut structure = scene(&[(kind, 0, 41., 41.), ("bunker", 1, 47., 43.)]);
+        // Beside the trajectory: only the blast can damage this section.
+        let cell = terrain(&mut structure, 47., 43., b'B');
+        structure.world.game.units.get_mut(&2).unwrap().hp = 1000.;
+        structure
+            .world
+            .register_building_structure(2, &[cell], 1000., 1000.)
+            .unwrap();
+        rebuild(&mut structure);
+        assert_eq!(
+            command(
+                &mut structure,
+                json!({"t":"ability","ids":[1],"x":47,"z":41})
+            ),
+            None
+        );
+        structure.step_aimed_ability(1).unwrap();
+        finish_ability_flight(&mut structure);
+        assert!(
+            structure.world.game.units[&2].hp < 1000.,
+            "{kind} damages the registered structure"
+        );
+        assert!(
+            structure
+                .world
+                .game
+                .sections
+                .get(&(cell as u32))
+                .is_none_or(|section| section.hp < 1000.),
+            "{kind} damages its structural section"
+        );
+    }
+}
+
 #[test]
 fn cmb106_ap_loads_once_and_sets_family_cooldown() {
     for (kind, cd) in [("at", 45.), ("tankdestroyer", 45.), ("tiger", 40.)] {
@@ -877,22 +1095,54 @@ fn cmb122_satchel_requires_seen_ordered_structure_with_safe_reach() {
 }
 
 #[test]
-fn cmb123_vision_is_team_shared_and_changes_on_native_pass() {
-    let mut m = scene(&[("rifle", 0, 40., 40.), ("rifle", 1, 60., 40.)]);
-    m.world.game.players.push(Player {
-        slot: 2,
-        team: 0,
-        visible: vec![],
-    });
-    vision::update_vision(&mut m.world.game, &m.rules, &m.grid);
+fn cmb123_vision_is_team_shared_and_refreshes_through_match_ticks() {
+    let mut m = scene_with_teams(
+        &[("rifle", 0, 40., 40.), ("rifle", 1, 60., 40.)],
+        &[0, 1, 0],
+    );
+    for control in m.commands.units.values_mut() {
+        control.hold_fire = true;
+    }
+    for unit in m.world.game.units.values_mut() {
+        unit.hold_pos = true;
+    }
+    for player in &mut m.world.game.players {
+        player.visible.clear();
+    }
+    // The authored scene replaced startup buildings, so it needs empty production rows.
+    m.production =
+        crate::production::ProductionState::new(vec![
+            crate::economy::TechState::new(1, 0, 0, 0)
+                .unwrap();
+            3
+        ])
+        .unwrap();
+    m.world.game.tick = 0;
+    m.initialize_tick_scene(200, Default::default()).unwrap();
+    m.advance_tick().unwrap();
+    assert_eq!(m.world.game.tick, 201);
+    assert_eq!(m.world.game.vision_tick, Some(201));
     assert!(m.world.game.players[0].sees(2));
     assert_eq!(
         m.world.game.players[0].visible,
         m.world.game.players[2].visible
     );
     m.world.game.units.get_mut(&2).unwrap().x = 140.;
-    rebuild(&mut m);
-    vision::update_vision(&mut m.world.game, &m.rules, &m.grid);
+    for tick in 202..=204 {
+        m.advance_tick().unwrap();
+        assert_eq!(m.world.game.tick, tick);
+        assert_eq!(m.world.game.vision_tick, Some(201));
+        assert!(
+            m.world.game.players[0].sees(2),
+            "visibility remains cached between passes"
+        );
+        assert_eq!(
+            m.world.game.players[0].visible,
+            m.world.game.players[2].visible
+        );
+    }
+    m.advance_tick().unwrap();
+    assert_eq!(m.world.game.vision_tick, Some(205));
     assert!(!m.world.game.players[0].sees(2));
     assert_eq!(
         m.world.game.players[0].visible,
@@ -1116,6 +1366,18 @@ fn cmb139_attack_denies_missing_allied_hidden_and_unarmed() {
         None
     );
     assert_eq!(m.commands.units[&1].attack_id, 2);
+    let plane = m.spawn_aircraft(1, "fighter").unwrap();
+    m.world.game.units.get_mut(&plane).unwrap().air = Some(crate::game::PlaneState::Out);
+    m.world.game.players[0].visible.push(plane);
+    assert!(m.world.game.players[0].sees(plane));
+    assert_eq!(
+        command(&mut m, json!({"t":"attack","ids":[1],"target":plane})),
+        Some(Denial::Needs)
+    );
+    assert_eq!(
+        m.commands.units[&1].attack_id, 2,
+        "rejected aircraft order preserves ground target"
+    );
 }
 
 #[test]

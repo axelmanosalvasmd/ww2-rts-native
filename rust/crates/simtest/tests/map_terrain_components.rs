@@ -451,3 +451,420 @@ fn map48_complete_original_slope_journey_uses_production_movement() {
         }
     }
 }
+
+#[test]
+fn map49_complete_original_cliff_and_depression_checks() {
+    let rules = Rules::compiled().unwrap();
+    let from = Point { x: 5.0, z: 5.0 };
+    let across = Point { x: 35.0, z: 5.0 };
+    let heights: Vec<String> = (0..20)
+        .map(|y| {
+            if y < 15 {
+                "00000000022000000000".into()
+            } else {
+                "0".repeat(20)
+            }
+        })
+        .collect();
+    let cliff = original_scene(empty(), Some(heights.clone())).game;
+    let detour = path(&cliff, &rules, "rifle", from, across);
+    assert!(
+        !detour.is_empty() && detour.iter().any(|p| p.z > 15.0 * 2.0),
+        "test.js:646: a two-level cliff forces the path below the raised wall"
+    );
+    let slope = original_scene(
+        empty(),
+        Some(heights.iter().map(|row| row.replace('2', "1")).collect()),
+    )
+    .game;
+    let direct = path(&slope, &rules, "rifle", from, across);
+    assert!(
+        !direct.is_empty(),
+        "the one-level control must find a route"
+    );
+    assert!(
+        direct.iter().all(|p| p.z < 15.0 * 2.0),
+        "test.js:646: a one-level slope may cross directly"
+    );
+
+    // The complete original Depressions body includes both sight predicates
+    // and its path refusal. The earlier MAP50 test remains unchanged.
+    let gully = original_scene(empty(), Some(vec!["00000000bbbb00000000".into(); 20])).game;
+    assert!(
+        !los(&gully, &rules, (5.0, 20.0), (21.0, 20.0)),
+        "Depressions: gully floor is out of sight from beside it"
+    );
+    assert!(
+        los(&gully, &rules, (18.0, 20.0), (22.0, 20.0)),
+        "Depressions: the floor is visible from inside"
+    );
+    assert!(
+        path(&gully, &rules, "rifle", from, Point { x: 21.0, z: 5.0 }).is_empty(),
+        "Depressions: a two-level drop is a cliff"
+    );
+
+    // Production noCliffs/segmentCliffClear: level-zero diagonal endpoints
+    // require both side cells to be within one level of the starting cell.
+    let mut corners = 0;
+    for (east, south, expected) in [
+        ('0', '0', true),
+        ('1', '1', true),
+        ('2', '0', false),
+        ('0', '2', false),
+        ('b', '0', false),
+        ('0', 'b', false),
+        ('1', 'a', true),
+        ('2', '2', false),
+    ] {
+        let mut heights = vec![vec!['0'; 20]; 20];
+        heights[9][10] = east;
+        heights[10][9] = south;
+        let heights = heights
+            .into_iter()
+            .map(|row| row.into_iter().collect::<String>())
+            .collect();
+        let corner = original_scene(empty(), Some(heights)).game;
+        assert_eq!(
+            ww2_core::terrain::segment_cliff_clear(
+                &corner,
+                Point { x: 19.0, z: 19.0 },
+                Point { x: 21.0, z: 21.0 },
+            ),
+            expected,
+            "diagonal corner levels {east}/{south}"
+        );
+        corners += 1;
+    }
+    assert_eq!(corners, 8);
+}
+
+// MAP owned feature batch. Behavior tests call the shipping providers directly;
+// retained fixtures remain the exact oracle for tables and pure grid queries.
+#[test]
+fn map01_cell_coordinates_centres_and_seeded_boundary_queries() {
+    use ww2_core::game::CELL;
+    let input = original_map("authored:default.json");
+    let w = world(&input);
+    assert_eq!(CELL, 2.0);
+    use ww2_core::{
+        economy::{Faction, Mode},
+        economy_state::ArmySize,
+        match_runtime::{Match, MatchOptions, PlayerConfig},
+        weather::WeatherChoice,
+    };
+    let map = AuthoritativeMap::from_json(&serde_json::to_vec(&input).unwrap()).unwrap();
+    let instance = Match::new(
+        &map,
+        MatchOptions {
+            seed: 701,
+            mode: Mode::Default,
+            players: (0..3)
+                .map(|team| PlayerConfig {
+                    name: format!("p{team}"),
+                    team,
+                    faction: Faction::try_from((team % 2) as u8).unwrap(),
+                })
+                .collect(),
+            shuffle: false,
+            army: ArmySize::Standard,
+            weather: WeatherChoice::Map,
+            weather_seed: Some(1),
+            living_weather: false,
+            map_key: None,
+            tech: false,
+            supply: false,
+            logistics: false,
+            sandbox: false,
+        },
+    )
+    .unwrap();
+    let mut actual: Vec<_> = instance
+        .start
+        .players
+        .iter()
+        .map(|p| (p.spawn.x.to_bits(), p.spawn.z.to_bits()))
+        .collect();
+    actual.sort();
+    let mut expected: Vec<_> = map
+        .spawns()
+        .iter()
+        .map(|p| {
+            (
+                ((p.x * 2 + 1) as f64).to_bits(),
+                ((p.y * 2 + 1) as f64).to_bits(),
+            )
+        })
+        .collect();
+    expected.sort();
+    assert_eq!(actual, expected);
+    assert!(
+        instance
+            .start
+            .players
+            .iter()
+            .any(|p| p.spawn.x == 81.0 && p.spawn.z == 13.0)
+    );
+    assert!(!map.points().is_empty());
+    assert_eq!(instance.start.points.len(), map.points().len());
+    for (native, authored) in instance.start.points.iter().zip(map.points()) {
+        exact(native.at.x, (authored.x * 2 + 1) as f64, "point centre x");
+        exact(native.at.z, (authored.y * 2 + 1) as f64, "point centre z");
+    }
+    for c in 0..w.game.w * w.game.h {
+        assert_eq!(
+            w.game.cell_of(
+                (c % w.game.w) as f64 * 2.0 + 1.0,
+                (c / w.game.w) as f64 * 2.0 + 1.0
+            ),
+            Some(c)
+        );
+    }
+    // Integer numerators make the independent expected floor exact, including
+    // negative subcell coordinates. A fixed LCG never uses wall-clock entropy.
+    let mut seed = 0x2922_9094u32;
+    for _ in 0..10_000 {
+        seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        let nx = (seed % ((w.game.w as u32 + 4) * 512)) as i64 - 1024;
+        seed = seed.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+        let nz = (seed % ((w.game.h as u32 + 4) * 512)) as i64 - 1024;
+        let (cx, cy) = (nx.div_euclid(512), nz.div_euclid(512));
+        let expected = if cx < 0 || cy < 0 || cx >= w.game.w as i64 || cy >= w.game.h as i64 {
+            -1
+        } else {
+            cy * w.game.w as i64 + cx
+        };
+        assert_eq!(
+            w.game.cell_index(nx as f64 / 256.0, nz as f64 / 256.0),
+            expected
+        );
+    }
+}
+
+#[test]
+fn map03_off_map_flags_and_rays_block_all_four_edges() {
+    use ww2_core::game::SIGHT;
+    let rules = Rules::compiled().unwrap();
+    let g = original_scene(empty(), None).game;
+    for (x, z) in [(-0.001, 20.0), (40.0, 20.0), (20.0, -0.001), (20.0, 40.0)] {
+        assert_eq!(g.cell_index(x, z), -1);
+        assert_eq!(g.flags_at(x, z), MOVE | SIGHT);
+    }
+    for to in [(-5.0, 21.0), (45.0, 21.0), (21.0, -5.0), (21.0, 45.0)] {
+        assert!(!los(&g, &rules, (21.0, 21.0), to), "off-map ray {to:?}");
+    }
+    assert!(los(&g, &rules, (1.0, 1.0), (39.0, 39.0)));
+}
+
+fn batch_put(map: &mut Value, field: &str, x: usize, y: usize, ch: u8) {
+    let row = map[field][y].as_str().unwrap();
+    let mut bytes = row.as_bytes().to_vec();
+    bytes[x] = ch;
+    map[field][y] = json!(String::from_utf8(bytes).unwrap());
+}
+
+#[test]
+fn map16_layer_composition_material_round_trip_and_invalid_stacks() {
+    let mut input = original_scene_input(empty(), None);
+    input["worldVersion"] = json!(2);
+    input["layers"] = json!({"ground":empty(), "objects":empty(), "mines":empty(),
+        "groundMaterials":[{"c":168,"material":"concrete"}],
+        "mineMaterials":[{"c":168,"material":"steel"}]});
+    batch_put(&mut input["layers"], "ground", 8, 8, b'D');
+    batch_put(&mut input["layers"], "mines", 8, 8, b'N');
+    batch_put(&mut input, "rows", 8, 8, b'N');
+    let map = AuthoritativeMap::from_json(&serde_json::to_vec(&input).unwrap()).unwrap();
+    let round = AuthoritativeMap::from_json(&serde_json::to_vec(map.source()).unwrap()).unwrap();
+    assert_eq!(map.source(), round.source());
+    assert_eq!(map.layers().ground[168], b'D');
+    assert_eq!(map.layers().mines[168], 1);
+    assert_eq!(map.layers().base_materials[&168], "concrete");
+    assert_eq!(map.layers().mine_materials[&168], "steel");
+    assert_eq!(map.layers().materials[&168], "concrete");
+    assert_eq!(World::from_map(&round).unwrap().game.physical(168), b'D');
+    // A mine never replaces the physical material or ground flags.
+    let mut hedge = input.clone();
+    batch_put(&mut hedge["layers"], "objects", 8, 8, b'H');
+    let map = AuthoritativeMap::from_json(&serde_json::to_vec(&hedge).unwrap()).unwrap();
+    assert!(!map.layers().materials.contains_key(&168));
+    assert_eq!(
+        World::from_map(&map).unwrap().material_name(168, false),
+        Some("wood")
+    );
+    for (ground, object, mine, composed, valid) in [
+        (b'W', b'=', b'.', b'=', true),
+        (b'.', b'=', b'.', b'=', false),
+        (b'W', b'H', b'.', b'H', false),
+        (b'W', b'.', b'N', b'N', false),
+        (b'D', b'R', b'N', b'N', true),
+        (b'D', b'R', b'N', b'R', false),
+    ] {
+        let mut m = input.clone();
+        batch_put(&mut m["layers"], "ground", 8, 8, ground);
+        batch_put(&mut m["layers"], "objects", 8, 8, object);
+        batch_put(&mut m["layers"], "mines", 8, 8, mine);
+        batch_put(&mut m, "rows", 8, 8, composed);
+        assert_eq!(
+            AuthoritativeMap::from_json(&serde_json::to_vec(&m).unwrap()).is_ok(),
+            valid,
+            "stack {ground}/{object}/{mine}/{composed}"
+        );
+    }
+}
+
+#[test]
+fn map21_all_authored_moods_defaults_overrides_and_fog_lift() {
+    use ww2_core::weather::{MapWeatherInfo, WeatherKind, WeatherRules, map_mood};
+    let fixture: Value =
+        serde_json::from_str(include_str!("../../core/tests/fixtures/weather.json")).unwrap();
+    let rules = WeatherRules::compiled().unwrap();
+    let mut checked = 0;
+    for row in fixture["authored"].as_array().unwrap() {
+        let name = row["name"].as_str().unwrap();
+        let input = original_map(&format!("authored:{name}.json"));
+        let info = MapWeatherInfo {
+            name: input["name"].as_str(),
+            mood: input["mood"].as_str(),
+            weather: input["weather"].as_str(),
+        };
+        let expected = fixture["metadata"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["key"] == name)
+            .unwrap();
+        assert_eq!(
+            map_mood(info, Some(name)).name(),
+            expected["mood"].as_str().unwrap()
+        );
+        let mut plan = rules.map_weather(info, Some(name));
+        assert_eq!(
+            plan.now.name(),
+            expected["expected"]["now"].as_str().unwrap()
+        );
+        if plan.now == WeatherKind::Fog {
+            assert!(!plan.step(4_799));
+            assert!(plan.step(4_800));
+            assert_eq!(plan.now, WeatherKind::Clear);
+            assert!(!plan.step(4_801));
+        }
+        checked += 1;
+    }
+    assert_eq!(checked, 33);
+    let override_map = MapWeatherInfo {
+        name: Some("winter"),
+        mood: Some("dust"),
+        weather: Some("rain"),
+    };
+    assert_eq!(map_mood(override_map, Some("ardennes")).name(), "dust");
+    assert_eq!(rules.map_weather(override_map, None).now.name(), "rain");
+}
+
+#[test]
+fn map27_map28_map35_map40_cover_flags_health_fire_and_destruction() {
+    use ww2_core::{
+        environment::{Context, EnvironmentRuntime},
+        game::{COVER, SIGHT},
+    };
+    let rules = Rules::compiled().unwrap();
+    for (ch, hp, blocks_sight, burn, into) in [
+        (b'H', 60.0, true, Some(14.0), b'.'),
+        (b'#', 150.0, false, None, b'+'),
+        (b'X', 40.0, false, None, b'.'),
+        (b'O', 200.0, false, Some(20.0), b'.'),
+    ] {
+        let mut rows = empty();
+        let mut bytes = rows[8].as_bytes().to_vec();
+        bytes[8] = ch;
+        rows[8] = String::from_utf8(bytes).unwrap();
+        let mut w = original_scene(rows, None);
+        let c = 168;
+        assert_eq!(w.game.cell_hp[c], hp);
+        assert_eq!(w.game.flags[c] & SIGHT != 0, blocks_sight);
+        assert_eq!(w.game.flags[c] & MOVE, 0);
+        if ch != b'X' {
+            assert_ne!(w.game.flags[c] & COVER, 0);
+        }
+        let mut env = EnvironmentRuntime::default();
+        let grid = SpatialGrid::new(&w.game.units, 16.0);
+        let (mut seed, mut next_id) = (123456789, 1000);
+        let mut ctx = Context {
+            tick: 0,
+            seed: &mut seed,
+            next_id: &mut next_id,
+            unit_order: &[],
+            grid: &grid,
+            rain: 0.0,
+            wet: 0.0,
+            wind_angle: 0.0,
+            wind_strength: 0.0,
+        };
+        if let Some(duration) = burn {
+            env.ignite(&mut w, c, &mut ctx).unwrap();
+            assert_eq!(w.fires.get(&c).copied(), Some(duration));
+        }
+        env.wreck_cell(&mut w, c, None, &mut ctx).unwrap();
+        assert_eq!(w.game.physical(c), into);
+        assert_eq!(w.game.flags[c] & (MOVE | SIGHT), 0);
+        assert_eq!(ww2_core::terrain::max_hp(&w.game, &rules, c), 0.0);
+    }
+}
+
+#[test]
+fn map29_crater_start_depth_quality_clamp_and_woods_sight_budget() {
+    let rules = Rules::compiled().unwrap();
+    let mut rows = empty();
+    rows[8] = "+".repeat(20);
+    let mut w = original_scene(rows, None);
+    for c in 160..180 {
+        assert!((0.3..=0.6).contains(&w.game.wear.as_ref().unwrap()[c]));
+    }
+    for wear in [0.0f32, 0.3, 0.6, 1.0] {
+        w.game.wear.as_mut().unwrap()[168] = wear;
+        exact(
+            ww2_core::terrain::cover_q(&w.game, &rules, 168),
+            (0.55 + f64::from(wear)).min(1.4),
+            "crater cover quality",
+        );
+    }
+    for (trees, visible) in [(3, true), (4, false)] {
+        let mut rows = empty();
+        rows[8] = format!("....{}{}", "O".repeat(trees), ".".repeat(16 - trees));
+        let w = original_scene(rows, None);
+        assert_eq!(los(&w.game, &rules, (1.0, 17.0), (35.0, 17.0)), visible);
+        exact(
+            ww2_core::terrain::cover_q(&w.game, &rules, 164),
+            0.6,
+            "woods quality",
+        );
+    }
+}
+
+#[test]
+fn map32_map37_map38_authored_depth_road_presence_and_wet_speeds() {
+    let rules = Rules::compiled().unwrap();
+    for ch in *b"FMD" {
+        let mut rows = empty();
+        rows[8] = String::from_utf8(vec![ch; 20]).unwrap();
+        let mut w = original_scene(rows, None);
+        assert_eq!(w.roads, ch == b'D');
+        for c in 160..180 {
+            let depth = w.game.wear.as_ref().unwrap()[c];
+            if ch != b'D' {
+                assert!((0.2..=0.8).contains(&depth));
+            }
+            for wet in [0.0, 1.0] {
+                w.game.wet = Some(wet);
+                let expected = match ch {
+                    b'F' => (0.75 + (0.35 - 0.75) * f64::from(depth)) * (1.0 - 0.3 * wet),
+                    b'M' => (0.7 + (0.35 - 0.7) * f64::from(depth)) * (1.0 - 0.2 * wet),
+                    _ => 1.35 + (1.0 - 1.35) * f64::from(depth),
+                };
+                exact(
+                    ground_mul(&w.game, &rules, c, true),
+                    expected,
+                    "authored ground speed",
+                );
+            }
+        }
+    }
+}

@@ -1,0 +1,1 @@
+- Marked 57 rows ported across six parity files, citing native intent tests merged in #285, #288, #292, #293 and #297, each reviewed against the prototype under Axel's 2026-10-16 evidence standard: movement (11), fps (19), interface (4), maps (17), server (NET-83) and combat (5). FPS-13 and IF-09 stay open for stronger tests.
