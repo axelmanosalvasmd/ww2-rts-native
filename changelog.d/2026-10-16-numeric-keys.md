@@ -1,0 +1,4 @@
+- Preserve numeric sort ties and NaN comparator behavior in native simulation, AI and supply consumers. Remove incidental ID tie-breakers where the prototype preserves input order.
+- Fold signed zero and NaN in numeric coordinate keys, avoid overflowing quarter-metre cache keys, and compare deferred Horde plans using JSON number equality.
+- Add a private core codec for external AI policy and observation memory. Restore ordinary commander attention fresh, retain native routing and planner state, and keep existing version 1 saves readable. Hosted AI room save/load remains separate.
+- Leave IF-25 unproven as a full row because its inventory includes closed World paths. The sort audit also lists ordinary feature planners that still lack native implementations.

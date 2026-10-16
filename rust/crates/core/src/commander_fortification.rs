@@ -140,30 +140,26 @@ pub(crate) fn plan_after_builds(
         if step >= 6 || step > 0 && tier < 2 {
             continue;
         }
-        let threat = input
-            .players
-            .iter()
-            .enumerate()
-            .filter(|(_, p)| p.team != input.players[input.slot].team && !p.out)
-            .min_by(|(ai, a), (bi, b)| {
-                distance(hq.at, a.spawn)
-                    .total_cmp(&distance(hq.at, b.spawn))
-                    .then(ai.cmp(bi))
-            })
-            .map_or(
-                Point {
-                    x: input.width as f64 * CELL / 2.0,
-                    z: input.height as f64 * CELL / 2.0,
-                },
-                |(_, p)| p.spawn,
-            );
+        let threat = crate::sort::first_by(
+            input
+                .players
+                .iter()
+                .enumerate()
+                .filter(|(_, p)| p.team != input.players[input.slot].team && !p.out),
+            |(_, a), (_, b)| distance(hq.at, a.spawn) - distance(hq.at, b.spawn),
+        )
+        .map_or(
+            Point {
+                x: input.width as f64 * CELL / 2.0,
+                z: input.height as f64 * CELL / 2.0,
+            },
+            |(_, p)| p.spawn,
+        );
         let angle = math::atan2(threat.z - hq.at.z, threat.x - hq.at.x);
         let fx = math::cos(angle);
         let fz = math::sin(angle);
-        crew.sort_by(|a, b| {
-            distance(a.at, hq.at)
-                .total_cmp(&distance(b.at, hq.at))
-                .then(a.id.cmp(&b.id))
+        crate::sort::sort_by(&mut crew, |a, b| {
+            distance(a.at, hq.at) - distance(b.at, hq.at)
         });
         let worker = crew[0];
         let wall_cost = catalog

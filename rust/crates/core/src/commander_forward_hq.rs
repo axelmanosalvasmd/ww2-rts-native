@@ -111,19 +111,12 @@ pub(crate) fn plan(
     if army.len() < 3 || crew.is_empty() {
         return Ok(None);
     }
-    army.sort_by_key(|u| u.id);
     let front = Point {
         x: army.iter().map(|u| u.at.x).sum::<f64>() / army.len() as f64,
         z: army.iter().map(|u| u.at.z).sum::<f64>() / army.len() as f64,
     };
-    let near = hqs
-        .into_iter()
-        .min_by(|a, b| {
-            distance(a.at, front)
-                .total_cmp(&distance(b.at, front))
-                .then(a.id.cmp(&b.id))
-        })
-        .unwrap();
+    let near =
+        crate::sort::first_by(hqs, |a, b| distance(a.at, front) - distance(b.at, front)).unwrap();
     let far = distance(near.at, front);
     if far < 70.0 {
         return Ok(None);
@@ -178,14 +171,8 @@ pub(crate) fn plan(
             if footprint(&ground, cell, size).is_none() {
                 continue;
             }
-            let builder = crew
-                .iter()
-                .min_by(|a, b| {
-                    distance(a.at, at)
-                        .total_cmp(&distance(b.at, at))
-                        .then(a.id.cmp(&b.id))
-                })
-                .unwrap();
+            crate::sort::sort_by(&mut crew, |a, b| distance(a.at, at) - distance(b.at, at));
+            let builder = crew[0];
             return Ok(Some(Forward {
                 command: serde_json::json!({"t":"build", "ids":[builder.id], "kind":"hq", "x":at.x, "z":at.z}),
                 unit: builder.id,
@@ -531,5 +518,17 @@ mod tests {
                 "obstacle {obstacle}"
             );
         }
+    }
+
+    #[test]
+    fn if25_forward_hq_builder_ties_keep_available_order() {
+        let input = fixture();
+        let ground = terrain(&input);
+        let observation = Observation::new(input).unwrap();
+        let units = &observation.input().units;
+        let available = [&units[0], &units[1], &units[2]];
+        assert_eq!(plan(&observation, &available, 200.0, &ground, |_| true).unwrap().unwrap().unit, 1);
+        let available = [&units[2], &units[1], &units[0]];
+        assert_eq!(plan(&observation, &available, 200.0, &ground, |_| true).unwrap().unwrap().unit, 3);
     }
 }

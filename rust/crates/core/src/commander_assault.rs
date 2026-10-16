@@ -22,7 +22,7 @@ pub const COOLDOWN: f64 = 18.0;
 pub const SUPPORT_REAR: f64 = 8.0;
 pub const SEARCH_CELLS: usize = 2048;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Phase {
     Assemble,
     Advance,
@@ -37,12 +37,12 @@ impl Phase {
         !matches!(self, Self::Complete | Self::Abandon)
     }
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Role {
     Line,
     Support,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Member {
     pub id: u32,
     pub role: Role,
@@ -52,7 +52,7 @@ pub struct Member {
     pub placement: Option<Point>,
     pub acknowledged: bool,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Operation {
     pub id: u64,
     pub phase: Phase,
@@ -63,7 +63,8 @@ pub struct Operation {
     pub stage: Point,
     pub initial: usize,
     pub members: Vec<Member>,
-    pub reason: Option<&'static str>,
+    #[serde(deserialize_with = "crate::save_state::optional_static_string")]
+    pub reason: Option<crate::save_state::StaticStr>,
 }
 impl Operation {
     fn change(&mut self, phase: Phase, now: f64) {
@@ -79,7 +80,7 @@ impl Operation {
         self.members.clear();
     }
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AssaultState {
     pub operation: Option<Operation>,
     pub released: BTreeMap<u32, f64>,
@@ -456,11 +457,7 @@ pub fn plan(
                     })
             })
             .collect();
-        candidates.sort_by(|a, b| {
-            dist(a.at, at)
-                .total_cmp(&dist(b.at, at))
-                .then(a.id.cmp(&b.id))
-        });
+        crate::sort::sort_by(&mut candidates, |a, b| dist(a.at, at) - dist(b.at, at));
         let line: Vec<_> = candidates
             .iter()
             .copied()

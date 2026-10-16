@@ -14,7 +14,7 @@ pub const ORDER_LIMIT: usize = 240;
 
 /// Only the owner's intent, detached at observation time. Position and health
 /// changes alone do not supersede a queued order; new routes and Stop do.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct OwnPlan {
     pub path_generation: u64,
     pub goal: Option<Point>,
@@ -36,7 +36,39 @@ pub struct OwnPlan {
     pub hold: bool,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+impl OwnPlan {
+    fn same_intent(&self, other: &Self) -> bool {
+        if self.path_generation != other.path_generation {
+            return false;
+        }
+        let equal = |left: &Self, right: &Self| {
+            left == right || crate::numeric_keys::json_fields_equal(left, right)
+        };
+        if self.dig == other.dig {
+            return equal(self, other);
+        }
+        // ai-view.js:35 decodes digging as its destination, not the paid job's
+        // elapsed work, occupied-cell retries or approach cache. Keep native
+        // fort kind as intent too, so a replacement job still supersedes it.
+        let same_dig = match (&self.dig, &other.dig) {
+            (Some(left), Some(right)) => {
+                left.kind == right.kind
+                    && crate::numeric_keys::json_fields_equal(&left.at, &right.at)
+            }
+            _ => false,
+        };
+        if !same_dig {
+            return false;
+        }
+        let mut left = self.clone();
+        let mut right = other.clone();
+        left.dig = None;
+        right.dig = None;
+        equal(&left, &right)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct OwnUnit {
     pub id: u32,
     pub owner: usize,
@@ -46,7 +78,7 @@ pub struct OwnUnit {
     pub plan: OwnPlan,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Wave {
     pub slot: usize,
     pub number: u32,
@@ -61,7 +93,7 @@ pub struct Live {
 }
 
 /// A seat-owned packet. Enemy inputs contain only a visible bunker destination.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct View {
     pub tick: i64,
     pub wave: Wave,
@@ -69,14 +101,14 @@ pub struct View {
     pub bunker: Option<Point>,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 struct Pending {
     id: u32,
     before: OwnPlan,
     command: Command,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct HordeCommander {
     owner: usize,
     delivered: Option<View>,
@@ -88,6 +120,14 @@ pub struct HordeCommander {
 }
 
 impl HordeCommander {
+    pub(crate) fn reset_saved_delivery(&mut self) {
+        self.delivered = None;
+    }
+
+    pub(crate) fn save_owner(&self) -> usize {
+        self.owner
+    }
+
     pub fn new(owner: usize) -> Self {
         Self {
             owner,
@@ -149,7 +189,7 @@ impl HordeCommander {
                     && unit.hp > 0.0
                     && !unit.air
                     && !unit.plan.retreating
-                    && unit.plan == job.before
+                    && unit.plan.same_intent(&job.before)
             });
             if !valid {
                 self.pending.pop_front();
@@ -382,10 +422,9 @@ impl Match {
                     && g.players[owner].sees(u.id)
             })
             .collect::<Vec<_>>();
-        bunkers.sort_by(|a, b| {
+        crate::sort::sort_by(&mut bunkers, |a, b| {
             crate::math::hypot(a.x - spawn.x, a.z - spawn.z)
-                .total_cmp(&crate::math::hypot(b.x - spawn.x, b.z - spawn.z))
-                .then(a.id.cmp(&b.id))
+                - crate::math::hypot(b.x - spawn.x, b.z - spawn.z)
         });
         let round = |v| crate::math::round(v * 10.0) / 10.0;
         Ok(View {
