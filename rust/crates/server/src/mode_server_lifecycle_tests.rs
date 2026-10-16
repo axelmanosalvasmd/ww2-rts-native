@@ -13,6 +13,36 @@ fn drain(hub: &mut Hub, receiver: &mut mpsc::Receiver<Output>, now: u64) {
 }
 
 #[test]
+fn net50_nextwave_messages_leave_ordinary_rooms_running() {
+    let (mut hub, a, mut ra, b, mut rb) = room();
+    hub.attach_native("ABC", native_match(), 0).unwrap();
+    initial_start(&mut ra);
+    initial_start(&mut rb);
+    for callback in 0..6_u64 {
+        let now = callback * 50;
+        for connection in [&a, &b] {
+            hub.message("ABC", connection, &mut true, json!({"t":"nextwave"}), now);
+        }
+        hub.poll_native(now, now * 1_000_000);
+        drain(&mut hub, &mut ra, now);
+        drain(&mut hub, &mut rb, now);
+        let status = hub.native_status("ABC").unwrap();
+        assert_eq!(status.tick, callback as i64 + 1);
+        assert!(status.fault.is_none());
+        assert!(
+            hub.rooms["ABC"]
+                .native
+                .as_ref()
+                .unwrap()
+                .runtime
+                .state()
+                .horde
+                .is_none()
+        );
+    }
+}
+
+#[test]
 fn mode89_host_holds_for_120_callbacks_with_60_frames_and_team_or_draw_outcomes() {
     for draw in [false, true] {
         let (mut hub, a, mut ra, b, mut rb) = room();
@@ -209,6 +239,9 @@ fn mode95_disconnect_propagates_each_tick_freezes_income_and_vp_and_refuses_comm
         assert_eq!(state.start.economy.players[0].mp, before[0].mp);
         assert_eq!(state.start.economy.players[0].vp, before[0].vp);
         assert_eq!(state.start.economy.players[0].inc, 0.0);
+        assert_eq!(state.start.economy.players[0].mun, before[0].mun);
+        assert_eq!(state.start.economy.players[0].fuel, before[0].fuel);
+        assert!(runtime.fault().is_none());
         assert_eq!(state.start.points[0].owner, Some(0));
         assert_eq!(state.start.points[1].owner, Some(1));
         assert!(!state.start.points[0].contested && !state.start.points[1].contested);
@@ -288,4 +321,47 @@ fn mode95_disconnect_propagates_each_tick_freezes_income_and_vp_and_refuses_comm
     assert!(hub.native_status("ABC").unwrap().fault.is_none());
     drain(&mut hub, &mut replacement_rx, 30_602);
     drain(&mut hub, &mut rb, 30_602);
+}
+
+#[test]
+fn net47_away_classic_seat_freezes_munitions_and_fuel_until_present_again() {
+    use ww2_core::economy_state::{Context, EconomyState, ModeContext, PlayerEconomy};
+    let mut economy = EconomyState {
+        players: (0..2)
+            .map(|slot| PlayerEconomy {
+                team: slot,
+                away: slot == 0,
+                mp: 50.0,
+                mun: 20.0,
+                fuel: 10.0,
+                ..PlayerEconomy::default()
+            })
+            .collect(),
+    };
+    let context = Context {
+        mode: ModeContext {
+            kind: ww2_core::economy::Mode::Classic,
+            ..ModeContext::default()
+        },
+        army: ww2_core::economy_state::ArmySize::Standard,
+        units: &[],
+        drops: &[],
+        points: &[],
+        nodes: &[],
+        world: None,
+    };
+    for _ in 0..6 {
+        economy.advance_income(&context, 0.05, false).unwrap();
+        let away = &economy.players[0];
+        assert_eq!(
+            (away.mp, away.mun, away.fuel, away.inc),
+            (50.0, 20.0, 10.0, 0.0)
+        );
+        let present = &economy.players[1];
+        assert!(present.mp > 50.0 && present.mun > 20.0 && present.fuel > 10.0);
+    }
+    economy.players[0].away = false;
+    economy.advance_income(&context, 0.05, false).unwrap();
+    let returned = &economy.players[0];
+    assert!(returned.mp > 50.0 && returned.mun > 20.0 && returned.fuel > 10.0);
 }

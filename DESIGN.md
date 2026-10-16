@@ -16,6 +16,12 @@ Read current main before integration: it lacks ai_receipt_input and ai_delivered
 
 # Three Crossroads Native: design decisions
 
+## AI delivery scheduling and Horde break control (2026-10-16)
+
+The shared AI scheduler accepts the caller's tick, snapshot-delivery beat and finished flag. It retains caller-owned views and refreshes every requested view before invoking any brain. Commanders act every tick once a view exists; scripted and Horde brains use the existing difficulty and seat stagger. Horde requests a view on every delivered beat. The scheduler reads no Match authority and owns no wall-clock timer, so it can consume delivered packets without depending on the pending AI snapshot decoder. Server AI activation remains a separate integration.
+
+Horde break control changes only the existing inactive break clock to zero. The existing Horde phase starts the wave and owns its purchases and spawns. The server checks host authority and pause state before invoking the core rule. Full Horde tick, snapshot and room admission stay guarded.
+
 ## Typed scenario conditions and core refunds (2026-10-16)
 
 Scenario condition evaluation borrows typed authored state while reading current units, point owners and World region teams from Match. A caller supplies the context and shares an explicit work budget across evaluations. This keeps condition reads separate from scenario admission, trigger scheduling, actions and recipient projection. The evaluator follows the pinned condition semantics, including historical captures, pending arrivals, context fallback and short-circuit work charges. A 64-level guard protects callers that construct trees directly; validated authored trees remain below it.

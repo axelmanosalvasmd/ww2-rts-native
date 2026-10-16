@@ -59,6 +59,38 @@ fn living_ground(m: &Match) -> Vec<u32> {
         .map(|u| u.id)
         .collect()
 }
+
+#[test]
+fn net50_ending_a_break_starts_one_wave_on_the_next_horde_phase_only() {
+    let mut m = scene(1, ArmySize::Standard);
+    let before = m.horde.clone().unwrap();
+    let actors = m.world.game.units.len();
+    assert!(m.end_horde_break().unwrap());
+    let mut expected = before;
+    expected.time_left = 0.0;
+    assert_eq!(m.horde.as_ref(), Some(&expected));
+    assert_eq!(m.world.game.units.len(), actors);
+    assert!(
+        m.end_horde_break().unwrap(),
+        "repeated requests do not spawn"
+    );
+    m.step_horde(0.05).unwrap();
+    let active = m.horde.clone().unwrap();
+    assert_eq!(active.wave, 1);
+    assert!(active.active);
+    assert!(!m.end_horde_break().unwrap());
+    assert_eq!(m.horde.as_ref(), Some(&active));
+    for _ in 0..4 {
+        m.step_horde(0.05).unwrap();
+        assert_eq!(m.horde.as_ref().unwrap().wave, 1);
+    }
+    assert!(
+        m.validate_tick_state().is_err(),
+        "full Horde hosting stays guarded"
+    );
+    assert!(m.preflight_ordinary_snapshot().is_err());
+}
+
 #[test]
 fn horde_setup_builds_one_fortified_shared_base_and_internal_enemy() {
     let mut m = scene(2, ArmySize::Large);
