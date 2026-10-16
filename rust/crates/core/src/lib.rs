@@ -26,6 +26,7 @@ mod mov_runtime_batch;
 mod native_order_intent_tests;
 
 pub mod ai_schedule;
+pub mod ai_seat_view;
 pub mod ai_view;
 pub mod assault_runtime;
 pub mod catalog;
@@ -37,6 +38,7 @@ pub mod commander_abilities;
 pub mod commander_ability_policy;
 pub mod commander_ai;
 pub mod commander_assault;
+mod commander_classic_economy;
 pub mod commander_classic_rules;
 mod commander_construction;
 mod commander_fortification;

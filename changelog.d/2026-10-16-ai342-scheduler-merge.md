@@ -1,0 +1,2 @@
+- Consolidate AI scheduling on main's caller-fed scheduler. Port both AI-14 tests to caller-owned delivered views, retaining observation ordering, undelivered-seat waits, private-view checks and queued orders through victory, and assert that every AI callback stops after a winner. Keep the existing scheduler tests and single Classic construction dispatch.
+- Restore compilation after the Classic runner and save/load merges by deriving serialization for elimination state and its resource nodes. Existing mode admission guards remain in place.

@@ -37,6 +37,13 @@ pub struct KnownBuilding {
     pub at: Point,
 }
 #[derive(Clone, Debug, PartialEq)]
+pub struct NodeObservation {
+    pub at: Point,
+    pub rate: f64,
+    pub fuel: bool,
+    pub visible: bool,
+}
+#[derive(Clone, Debug, PartialEq)]
 pub struct Context {
     pub mode: Mode,
     pub naval: bool,
@@ -56,12 +63,13 @@ pub struct Context {
     pub sight: f64,
     pub support: BTreeMap<String, f64>,
     /// Resource positions and enemy depot memories already delivered to this seat.
-    pub nodes: Vec<Point>,
+    pub nodes: Vec<NodeObservation>,
     pub known_depots: Vec<Point>,
     /// Indices of delivered nodes on owned World ground. Other modes use every node.
     pub owned_nodes: BTreeSet<usize>,
     pub build_reserve: f64,
     pub fort_reserve: f64,
+    pub claimed_nodes: BTreeSet<usize>,
 }
 impl Default for Context {
     fn default() -> Self {
@@ -88,6 +96,7 @@ impl Default for Context {
             owned_nodes: BTreeSet::new(),
             build_reserve: 0.0,
             fort_reserve: 0.0,
+            claimed_nodes: BTreeSet::new(),
         }
     }
 }
@@ -195,6 +204,7 @@ pub struct State {
     pub decision: Option<Decision>,
     pub called: Option<f64>,
     pub cleared_sightings: BTreeMap<u32, f64>,
+    pub node: BTreeMap<u32, usize>,
     pub(crate) fort_steps: BTreeMap<u32, u8>,
 }
 #[derive(Clone, Debug, PartialEq)]
@@ -532,20 +542,22 @@ fn plan_inner(
     let mut budget = input.manpower - reserved;
     let mut newly_busy = BTreeSet::new();
     let adaptive = context.mode.is_construction() && skill.adaptive;
-    let rush = adaptive
-        && now < 240.0
-        && strategic_recent.iter().any(|e| {
-            now - e.time < 5.0
-                && input.units.iter().any(|u| {
-                    u.owner == input.slot
-                        && boolean(definition(u), "building")
-                        && dist(u.at, e.at) < 35.0
-                })
-        });
-    let construction = crate::commander_construction::plan(
+    let rush_at = crate::commander_classic_rules::rush_at(observation, strategic_recent, skill)?;
+    let rush = rush_at.is_some();
+    // Engineers escaping a nearby rush remain available to defense, not construction.
+    let construction_units: Vec<_> = available_units
+        .iter()
+        .copied()
+        .filter(|u| !rush_at.is_some_and(|at| u.kind == "engineer" && dist(u.at, at) < 25.0))
+        .collect();
+    let construction = crate::commander_construction::plan_with_classic(
         observation,
-        &available_units,
+        &construction_units,
         budget,
+        strategic_recent,
+        &mut state.node,
+        level,
+        random,
         (adaptive || skill.memory) && strategic_recent.iter().any(|s| armor(&s.kind)),
         &sight_game,
         sees,

@@ -1,13 +1,16 @@
 //! Construction proposals from delivered facts. The caller performs canonical admission.
 use crate::{
     catalog::{Catalog, Value as Rule},
-    commander_ai::{Observation, Point, UnitObservation},
+    commander_ai::{Level, Observation, Point, UnitObservation},
+    commander_mind::Sighting,
     economy::{self, Mode},
     game::{CELL, Game, LAND, MOVE},
     match_runtime::{find_site, foot_center, footprint},
     math,
+    random::MatchRandom,
 };
 use serde_json::{Value, json};
+use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Plan {
@@ -30,6 +33,17 @@ fn number(rule: &Rule, key: &str) -> Result<f64, String> {
         .ok_or_else(|| format!("missing construction rule {key}"))
 }
 
+pub(crate) fn node_claimed(observation: &Observation, index: usize, at: Point) -> bool {
+    let input = observation.input();
+    let context = input.runtime.as_ref().unwrap();
+    context.claimed_nodes.contains(&index)
+        || input
+            .units
+            .iter()
+            .any(|u| u.kind == "depot" && u.hp > 0.0 && distance(u.at, at) < 8.0)
+        || context.known_depots.iter().any(|&p| distance(p, at) < 8.0)
+}
+
 fn unclaimed_nodes(observation: &Observation) -> Vec<Point> {
     let input = observation.input();
     let Some(context) = &input.runtime else {
@@ -38,17 +52,9 @@ fn unclaimed_nodes(observation: &Observation) -> Vec<Point> {
     context
         .nodes
         .iter()
-        .copied()
-        .filter(|&node| {
-            !input
-                .units
-                .iter()
-                .any(|u| u.kind == "depot" && u.hp > 0.0 && distance(u.at, node) < 8.0)
-                && !context
-                    .known_depots
-                    .iter()
-                    .any(|&at| distance(at, node) < 8.0)
-        })
+        .enumerate()
+        .filter(|(i, node)| !node_claimed(observation, *i, node.at))
+        .map(|(_, node)| node.at)
         .collect()
 }
 
@@ -99,7 +105,7 @@ pub(crate) fn site(
         context
             .site_nodes
             .iter()
-            .chain(&context.nodes)
+            .chain(context.nodes.iter().map(|n| &n.at))
             .map(|p| (*p, 5.0)),
     );
     avoid.extend(input.players.iter().map(|p| (p.spawn, 6.0)));
@@ -135,16 +141,21 @@ pub(crate) fn site(
     let Some(cells) = footprint(&ground, cell, size) else {
         return Ok(None);
     };
-    if context.site_nodes.iter().chain(&context.nodes).any(|node| {
-        let x = math::round(node.x / CELL - 1.0);
-        let y = math::round(node.z / CELL - 1.0);
-        x >= 0.0
-            && y >= 0.0
-            && x < ground.w as f64
-            && y < ground.h as f64
-            && footprint(&ground, y as usize * ground.w + x as usize, 2)
-                .is_some_and(|reserved| cells.iter().any(|cell| reserved.contains(cell)))
-    }) {
+    if context
+        .site_nodes
+        .iter()
+        .chain(context.nodes.iter().map(|n| &n.at))
+        .any(|node| {
+            let x = math::round(node.x / CELL - 1.0);
+            let y = math::round(node.z / CELL - 1.0);
+            x >= 0.0
+                && y >= 0.0
+                && x < ground.w as f64
+                && y < ground.h as f64
+                && footprint(&ground, y as usize * ground.w + x as usize, 2)
+                    .is_some_and(|reserved| cells.iter().any(|cell| reserved.contains(cell)))
+        })
+    {
         return Ok(None);
     }
     if coastal
@@ -167,6 +178,49 @@ pub(crate) fn site(
         return Ok(None);
     }
     Ok(Some(at))
+}
+
+/// The single construction pass, with Classic delegated to its richer node planner.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn plan_with_classic(
+    observation: &Observation,
+    available: &[&UnitObservation],
+    budget: f64,
+    recent: &[&Sighting],
+    memory: &mut BTreeMap<u32, usize>,
+    level: Level,
+    random: &mut MatchRandom,
+    need_armor: bool,
+    terrain: &Game,
+    sees: impl Fn(Point) -> bool,
+) -> Result<Plan, String> {
+    if !budget.is_finite() {
+        return Err("non-finite construction budget".into());
+    }
+    if observation
+        .input()
+        .runtime
+        .as_ref()
+        .is_some_and(|c| c.mode == Mode::Classic)
+    {
+        let economy = crate::commander_classic_economy::plan(
+            observation,
+            available,
+            recent,
+            memory,
+            level,
+            budget,
+            terrain,
+            random,
+        )?;
+        return Ok(Plan {
+            commands: economy.commands,
+            remaining_mp: economy.remaining_mp,
+            reserve: economy.reserve,
+            builders: economy.builders,
+        });
+    }
+    plan(observation, available, budget, need_armor, terrain, sees)
 }
 
 pub(crate) fn plan(
@@ -226,7 +280,7 @@ pub(crate) fn plan(
                     .nodes
                     .iter()
                     .enumerate()
-                    .any(|(i, p)| p == at && context.owned_nodes.contains(&i))
+                    .any(|(i, n)| n.at == *at && context.owned_nodes.contains(&i))
         })
         .collect();
     let depots = own.iter().filter(|u| u.kind == "depot").count();
