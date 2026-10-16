@@ -1170,6 +1170,11 @@ impl Match {
                 owned_nodes: BTreeSet::new(),
                 build_reserve: 0.0,
                 fort_reserve: 0.0,
+                initial_chars: Some(self.world.initial().chars.clone()),
+                initial_height: self.world.initial().height.clone(),
+                mines: Vec::new(),
+                found_mines: Vec::new(),
+                ground_flights: false,
                 support: self.start.players[owner]
                     .support
                     .iter()
@@ -1211,6 +1216,12 @@ impl Match {
                                         .as_ref()
                                         .is_some_and(|c| c.trucks.contains_key(&u.id)),
                                 amove: None,
+                                queued_amove: None,
+                                attack_target: if u.owner == owner {
+                                    self.commands.units[&u.id].attack_id
+                                } else {
+                                    0
+                                },
                                 airborne: u.air.is_some() && vision::airborne(u),
                                 wall_work: u.owner == owner
                                     && self.field_works.jobs().get(&u.id).is_some_and(|job| {

@@ -196,9 +196,60 @@ pub(crate) fn plan_after_builds(
                 result.remaining_mp -= cost;
                 result.builders.push(worker.id);
             }
+        } else {
+            let square =
+                math::round(angle / std::f64::consts::FRAC_PI_2) * std::f64::consts::FRAC_PI_2;
+            let wx = math::round(math::cos(square));
+            let wz = math::round(math::sin(square));
+            let mid = Point {
+                x: hq.at.x + wx * 24.0,
+                z: hq.at.z + wz * 24.0,
+            };
+            let px = -wz;
+            let pz = wx;
+            let edge = |side: f64, span: f64| Point {
+                x: mid.x + px * side * span,
+                z: mid.z + pz * side * span,
+            };
+            let ids: Vec<_> = crew.iter().take(2).map(|u| u.id).collect();
+            let line = |from: Point, to: Point, queue: bool| json!({"t":"entrench","ids":ids,"pattern":"line","fort":"wall","x":from.x,"z":from.z,"x2":to.x,"z2":to.z,"queue":queue});
+            if step == 2 {
+                result
+                    .commands
+                    .push(line(edge(1.0, 4.0), edge(1.0, 14.0), false));
+                result
+                    .commands
+                    .push(line(edge(-1.0, 4.0), edge(-1.0, 14.0), true));
+                result.builders.extend(ids.iter().copied());
+            } else if step == 3 {
+                let cell = (mid.z / CELL).floor() as isize * input.width as isize
+                    + (mid.x / CELL).floor() as isize;
+                if mid.x >= 0.0
+                    && mid.z >= 0.0
+                    && mid.x < input.width as f64 * CELL
+                    && mid.z < input.height as f64 * CELL
+                    && cell >= 0
+                    && terrain.flags[cell as usize] & MOVE == 0
+                    && sees(mid)
+                {
+                    result.commands.push(json!({"t":"dig","kind":"gate","ids":[worker.id],"x":mid.x,"z":mid.z,"dir":math::atan2(pz,px)}));
+                    result.builders.push(worker.id);
+                    result.remaining_mp -= catalog
+                        .table("FORTS")
+                        .map_err(|e| e.to_string())?
+                        .get("gate")
+                        .map_or(0.0, |r| number(r, "cost"));
+                }
+            } else {
+                let from = edge(if step == 4 { 1.0 } else { -1.0 }, 14.0);
+                let to = Point {
+                    x: from.x - wx * 14.0,
+                    z: from.z - wz * 14.0,
+                };
+                result.commands.push(line(from, to, false));
+                result.builders.extend(ids.iter().copied());
+            }
         }
-        // Wall dispatch remains separate; gate Dig is refused by the canonical caller.
-        // Their unspent funds remain available to shopping; never charge a denied job.
         steps.insert(hq.id, step + 1);
         return Ok(result);
     }

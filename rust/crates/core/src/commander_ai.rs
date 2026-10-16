@@ -276,8 +276,18 @@ impl Observation {
                     .nodes
                     .iter()
                     .chain(&context.known_depots)
+                    .chain(&context.mines)
+                    .chain(&context.found_mines)
                     .any(|p| !finite_point(*p))
                 || context.height.as_ref().is_some_and(|h| h.len() != cells)
+                || context
+                    .initial_chars
+                    .as_ref()
+                    .is_some_and(|v| v.len() != cells)
+                || context
+                    .initial_height
+                    .as_ref()
+                    .is_some_and(|v| v.len() != cells)
                 || context
                     .smokes
                     .iter()
@@ -288,6 +298,7 @@ impl Observation {
                         || !f.built.is_finite()
                         || !f.cooldown.is_finite()
                         || f.amove.is_some_and(|p| !finite_point(p))
+                        || f.queued_amove.is_some_and(|p| !finite_point(p))
                         || f.stock.as_ref().is_some_and(|r| {
                             !r.provisions.is_finite()
                                 || r.ammo.is_some_and(|v| !v.is_finite())

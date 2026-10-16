@@ -11,6 +11,8 @@ use crate::{
 };
 use serde_json::{Value, json};
 
+mod privacy_matrix;
+
 fn point(value: &Value) -> Point {
     Point {
         x: value["x"].as_f64().unwrap(),

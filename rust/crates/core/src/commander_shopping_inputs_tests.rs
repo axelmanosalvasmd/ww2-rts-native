@@ -297,13 +297,14 @@ fn intent_ai33_classic_reserves_only_non_depot_builds_and_rush_releases_them() {
 }
 
 #[test]
-fn intent_ai33_deferred_fort_jobs_do_not_consume_the_shopping_wallet() {
+fn intent_ai33_wall_plans_defer_payment_and_gate_reserves_its_price() {
     let mut input = fixture(vec![
         unit(1, "rifle", 30.0),
         unit(2, "mg", 32.0),
         unit(3, "mg", 34.0),
         unit(4, "hq", 20.0),
     ]);
+    input.players[1].spawn = Point { x: 140.0, z: 20.0 };
     input.tick = 3000;
     let observation = Observation::new(input).unwrap();
     let context = observation.input().runtime.as_ref().unwrap();
@@ -321,9 +322,26 @@ fn intent_ai33_deferred_fort_jobs_do_not_consume_the_shopping_wallet() {
             &mut BTreeMap::from([(4, step)]),
         )
         .unwrap();
-        assert_eq!(r.remaining_mp, 300.0);
+        let gate = Catalog::compiled()
+            .unwrap()
+            .table("FORTS")
+            .unwrap()
+            .get("gate")
+            .unwrap()
+            .get("cost")
+            .and_then(Rule::number)
+            .unwrap();
+        assert_eq!(r.remaining_mp, if step == 3 { 300.0 - gate } else { 300.0 });
         assert_eq!(r.reserve, 0.0);
-        assert!(r.commands.is_empty());
+        assert_eq!(r.commands.len(), if step == 2 { 2 } else { 1 });
+        assert!(
+            r.commands
+                .iter()
+                .all(|c| c["t"] == if step == 3 { "dig" } else { "entrench" })
+        );
+        for command in &r.commands {
+            crate::match_commands::Command::from_json(command).unwrap();
+        }
     }
 }
 
