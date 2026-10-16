@@ -124,9 +124,9 @@ impl HordeCommander {
     }
     fn active(&mut self, live: Live, observed: Wave) -> bool {
         let valid = !live.winner
-            && live.wave.is_some_and(|wave| {
-                wave.slot == self.owner && wave.active && wave == observed
-            });
+            && live
+                .wave
+                .is_some_and(|wave| wave.slot == self.owner && wave.active && wave == observed);
         if !valid {
             self.clear();
             return false;
@@ -168,7 +168,10 @@ impl HordeCommander {
         if view.tick < 0
             || view.tick > live.tick
             || view.wave.slot != self.owner
-            || self.delivered.as_ref().is_some_and(|old| old.tick > view.tick)
+            || self
+                .delivered
+                .as_ref()
+                .is_some_and(|old| old.tick > view.tick)
         {
             return Err("invalid Horde observation boundary".into());
         }
@@ -189,13 +192,21 @@ impl HordeCommander {
         if !self.active(live, view.wave) {
             return Ok(Vec::new());
         }
-        let Command::Move { orders, queue: false, .. } = &command else {
+        let Command::Move {
+            orders,
+            queue: false,
+            ..
+        } = &command
+        else {
             return Ok(vec![command]);
         };
         let mut direct = Vec::new();
         for order in orders {
-            let unit = u32::try_from(order.unit).ok().and_then(|id| view.units.get(&id));
-            let Some(unit) = unit.filter(|u| u.owner == self.owner && !u.air && !u.structure) else {
+            let unit = u32::try_from(order.unit)
+                .ok()
+                .and_then(|id| view.units.get(&id));
+            let Some(unit) = unit.filter(|u| u.owner == self.owner && !u.air && !u.structure)
+            else {
                 direct.push(order.clone());
                 continue;
             };
@@ -203,7 +214,11 @@ impl HordeCommander {
             if let Command::Move { orders, .. } = &mut single {
                 *orders = vec![order.clone()];
             }
-            let job = Pending { id: unit.id, before: unit.plan.clone(), command: single };
+            let job = Pending {
+                id: unit.id,
+                before: unit.plan.clone(),
+                command: single,
+            };
             if let Some(existing) = self.pending.iter_mut().find(|p| p.id == unit.id) {
                 *existing = job;
             } else if self.pending.len() < ORDER_LIMIT {
@@ -236,18 +251,44 @@ impl HordeCommander {
         let Some(at) = view.bunker else {
             return Ok(Vec::new());
         };
-        let orders = view.units.values().filter(|u| {
-            let p = &u.plan;
-            u.owner == self.owner && u.hp > 0.0 && !u.air && !u.structure
-                && !p.retreating && p.path.is_empty() && p.amove.is_none()
-                && p.goal.is_none() && p.attack == 0 && p.target == 0
-                && p.dig.is_none() && !p.entrench && p.build.is_none()
-                && p.enter.is_none() && p.fire_at.is_none() && p.nade.is_none()
-        }).map(|u| MoveOrder { unit: i64::from(u.id), at }).collect::<Vec<_>>();
-        self.submit(live, Command::Move {
-            orders, control_ids: None, attack_move: true, queue: false,
-            together: false, face: None,
-        })
+        let orders = view
+            .units
+            .values()
+            .filter(|u| {
+                let p = &u.plan;
+                u.owner == self.owner
+                    && u.hp > 0.0
+                    && !u.air
+                    && !u.structure
+                    && !p.retreating
+                    && p.path.is_empty()
+                    && p.amove.is_none()
+                    && p.goal.is_none()
+                    && p.attack == 0
+                    && p.target == 0
+                    && p.dig.is_none()
+                    && !p.entrench
+                    && p.build.is_none()
+                    && p.enter.is_none()
+                    && p.fire_at.is_none()
+                    && p.nade.is_none()
+            })
+            .map(|u| MoveOrder {
+                unit: i64::from(u.id),
+                at,
+            })
+            .collect::<Vec<_>>();
+        self.submit(
+            live,
+            Command::Move {
+                orders,
+                control_ids: None,
+                attack_move: true,
+                queue: false,
+                together: false,
+                face: None,
+            },
+        )
     }
 }
 
@@ -256,58 +297,110 @@ impl Match {
         Live {
             tick: self.world.game.tick,
             winner: self.finish.is_some(),
-            wave: self.horde.as_ref().filter(|_| {
-                self.options.mode == crate::economy::Mode::Horde
-                    && self.world.game.mode == Some(crate::game::ModeKind::Horde)
-            }).map(|h| Wave { slot: h.slot, number: h.wave, active: h.active }),
+            wave: self
+                .horde
+                .as_ref()
+                .filter(|_| {
+                    self.options.mode == crate::economy::Mode::Horde
+                        && self.world.game.mode == Some(crate::game::ModeKind::Horde)
+                })
+                .map(|h| Wave {
+                    slot: h.slot,
+                    number: h.wave,
+                    active: h.active,
+                }),
         }
     }
     /// Own intent only. No foreign path, economy, support or hidden target position.
     pub(crate) fn horde_own_unit(&self, id: u32, owner: usize) -> Result<OwnUnit, String> {
-        let u = self.world.game.units.get(&id).filter(|u| u.owner == owner)
+        let u = self
+            .world
+            .game
+            .units
+            .get(&id)
+            .filter(|u| u.owner == owner)
             .ok_or("Horde intent requires an owned unit")?;
         let c = self.commands.units.get(&id).ok_or("missing own control")?;
-        let target = self.firing.units.get(&id).ok_or("missing own firing state")?.target_id;
-        let seen = |target| self.world.game.units.get(&target).is_some_and(|unit| {
-            self.world.game.reveal || self.world.game.allied(owner, unit.owner)
-                || (self.world.game.players[owner].sees(target)
-                    && (unit.air.is_none() || crate::vision::airborne(unit)))
-        });
+        let target = self
+            .firing
+            .units
+            .get(&id)
+            .ok_or("missing own firing state")?
+            .target_id;
+        let seen = |target| {
+            self.world.game.units.get(&target).is_some_and(|unit| {
+                self.world.game.reveal
+                    || self.world.game.allied(owner, unit.owner)
+                    || (self.world.game.players[owner].sees(target)
+                        && (unit.air.is_none() || crate::vision::airborne(unit)))
+            })
+        };
         Ok(OwnUnit {
-            id, owner, hp: u.hp, air: u.air.is_some(), structure: self.rules.kinds[u.kind].structure,
+            id,
+            owner,
+            hp: u.hp,
+            air: u.air.is_some(),
+            structure: self.rules.kinds[u.kind].structure,
             plan: OwnPlan {
-                path_generation: u.path_gen, goal: u.world_goal, route_end: c.route_end,
-                outcome: c.outcome, outcome_tick: c.outcome_tick, path: u.path.clone(),
-                amove: u.amove, attack: if seen(c.attack_id) { c.attack_id } else { 0 },
-                target: if seen(target) { target } else { 0 }, retreating: u.retreating,
-                orders: c.orders.clone(), dig: self.field_works.jobs().get(&id).cloned(),
-                entrench: u.entrench, build: c.build_target, enter: c.enter,
-                fire_at: c.fire_at, nade: c.nade, hold: u.hold_pos,
+                path_generation: u.path_gen,
+                goal: u.world_goal,
+                route_end: c.route_end,
+                outcome: c.outcome,
+                outcome_tick: c.outcome_tick,
+                path: u.path.clone(),
+                amove: u.amove,
+                attack: if seen(c.attack_id) { c.attack_id } else { 0 },
+                target: if seen(target) { target } else { 0 },
+                retreating: u.retreating,
+                orders: c.orders.clone(),
+                dig: self.field_works.jobs().get(&id).cloned(),
+                entrench: u.entrench,
+                build: c.build_target,
+                enter: c.enter,
+                fire_at: c.fire_at,
+                nade: c.nade,
+                hold: u.hold_pos,
             },
         })
     }
     /// Explicit core component observation; it does not open recipient snapshots.
     pub fn horde_commander_observation(&self, owner: usize) -> Result<View, String> {
-        let wave = self.horde_commander_live().wave.filter(|w| w.slot == owner)
+        let wave = self
+            .horde_commander_live()
+            .wave
+            .filter(|w| w.slot == owner)
             .ok_or("not the scripted Horde seat")?;
         let g = &self.world.game;
         let spawn = self.start.players[owner].spawn;
-        let mut bunkers = g.units.values().filter(|u| {
-            u.hp > 0.0 && self.rules.kinds[u.kind].name == "bunker"
-                && !g.allied(owner, u.owner) && g.players[owner].sees(u.id)
-        }).collect::<Vec<_>>();
-        bunkers.sort_by(|a,b| {
-            crate::math::hypot(a.x-spawn.x, a.z-spawn.z)
-                .total_cmp(&crate::math::hypot(b.x-spawn.x, b.z-spawn.z))
+        let mut bunkers = g
+            .units
+            .values()
+            .filter(|u| {
+                u.hp > 0.0
+                    && self.rules.kinds[u.kind].name == "bunker"
+                    && !g.allied(owner, u.owner)
+                    && g.players[owner].sees(u.id)
+            })
+            .collect::<Vec<_>>();
+        bunkers.sort_by(|a, b| {
+            crate::math::hypot(a.x - spawn.x, a.z - spawn.z)
+                .total_cmp(&crate::math::hypot(b.x - spawn.x, b.z - spawn.z))
                 .then(a.id.cmp(&b.id))
         });
         let round = |v| crate::math::round(v * 10.0) / 10.0;
         Ok(View {
-            tick: g.tick, wave,
-            units: g.units.values().filter(|u| u.owner == owner)
+            tick: g.tick,
+            wave,
+            units: g
+                .units
+                .values()
+                .filter(|u| u.owner == owner)
                 .map(|u| self.horde_own_unit(u.id, owner).map(|row| (u.id, row)))
-                .collect::<Result<_,_>>()?,
-            bunker: bunkers.first().map(|u| Point { x: round(u.x), z: round(u.z) }),
+                .collect::<Result<_, _>>()?,
+            bunker: bunkers.first().map(|u| Point {
+                x: round(u.x),
+                z: round(u.z),
+            }),
         })
     }
 }
