@@ -1,0 +1,1 @@
+- Record ordinary Source command operands on stderr before the unchanged admission assertion. Preserve the bd4 failed attempt and leave the pinned stance-envelope correction proposed and unapplied; the diagnostic is unexecuted.

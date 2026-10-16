@@ -102,6 +102,13 @@ class Scene {
   issue(command, owner = 0) { this.pending.push({ owner, command }); }
   step() {
     for (const { owner, command } of this.pending.splice(0)) {
+      console.error('MOV_SOURCE_PRE_COMMAND ' + JSON.stringify(encode({
+        scene: this.spec, owner, command, sequence: this.commands.length + 1,
+        tick: this.g.tick, winner: this.g.winner, players: this.g.players,
+        units: this.g.units, chars: this.g.chars, flags: this.g.flags, height: this.g.height,
+        pathRetryLimitPresent: Object.hasOwn(this.g, 'pathRetryLimit'), pathRetryLimit: this.g.pathRetryLimit,
+        pathStats: this.g.pathStats, randomState: this.randomState, randomReceipts: this.randomReceipts,
+      }, { runs: true })));
       assert.equal(this.withRandom(() => raw.command(this.g, owner, command)), undefined, 'real Source command admission');
       this.commands.push({ tick: this.g.tick + 1, owner, sequence: this.commands.length + 1, command });
     }

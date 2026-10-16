@@ -1,5 +1,13 @@
 # Three Crossroads Native: design decisions
 
+## MOV ordinary admission operand receipt, unexecuted (2026-10-15)
+
+The actual ordinary-gen attempt at `bd4d4a1b0ed1bce579ac21f0ecbad4e07045f121` failed once in the first retry scene constructor: command admission returned `blocked`, expected `undefined`. The retained log in `/tmp/mov-five-2240-actual-55cfa430/` does not record its operands. Add a read-only stderr receipt immediately before the unchanged command call and assertion. It records the scene, command, owner, sequence, pre-command tick, winner, players, units, terrain, retry-limit presence/value, path statistics and random stream. It does not invoke Source or consume randomness itself.
+
+Pinned Source `e4e579a` dispatches HoldPosition through `t: 'stance', key: 'holdPos'` at shared/sim.js:3574, while this recorder authors `t: 'holdPos'` at constructor, purchase and release sites. That spelling has no command branch and reaches the `blocked` fallback at line3812. The minimal proposed correction is to use the pinned stance envelope at those three sites with identical IDs, owners and on values. This diagnostic child leaves that proposal unapplied. Constructor base placement and producer paths were inspected; no geometric collision or successful future admission is claimed.
+
+All original predicates, scene inputs, consumers, fixtures, registries, runtime providers and parity cells remain exact. The parent failure stays failed; its other three Source stages stay unrun. This child has zero Source, Node, Cargo, native, formatter, linter, discovery or CI executions. PR268 head241 and merge011a evidence remains separately attributed. A new literal exact-head Root grant is required for any later execution.
+
 ## MOV next-five bounded source successor after LOG271 (2026-10-15)
 
 Integrate only the frozen ab2bd4ca owned Source/consumer delta above fetched main f7c51b1a. Preserve PR268's qualified 9c7b branch and report independently. Strengthen ordinary caps three and default twenty with per-search receipts, full fresh-command allowances and later-tick queued unreachable feedback. Give each Source companion its declared initial random stream and require equal idle pre-intervention state before changing only the control reaction timer; keep separation active for all eighty ticks. Bind full original bodies/helpers and the eleven-type bridge's original code hashes to shared authored inputs. Preserve the entire old 78-case fixture, original test body and verdicts.
