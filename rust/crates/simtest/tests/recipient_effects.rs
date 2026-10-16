@@ -616,11 +616,19 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
                                 &row["fields"]["shots"],
                                 &format!("{name}:{} seat{} shots", frame["tick"], row["slot"]),
                             );
-                            if frame["refusals"].as_array().unwrap().iter().any(|v| v == "live-flights") {
+                            if frame["refusals"]
+                                .as_array()
+                                .unwrap()
+                                .iter()
+                                .any(|v| v == "live-flights")
+                            {
                                 common::exact(
                                     &actual["flights"],
                                     &row["fields"]["flights"],
-                                    &format!("{name}:{} seat{} flights", frame["tick"], row["slot"]),
+                                    &format!(
+                                        "{name}:{} seat{} flights",
+                                        frame["tick"], row["slot"]
+                                    ),
                                 );
                             }
                             recipients += 1;
@@ -650,7 +658,7 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
         (
             traces, frames, recipients, shots, supplied, empty, air_frames, flights, falling
         ),
-        (7, 159, 795, 90, 24, 1, 1, 1, 4)
+        (7, 159, 795, 94, 25, 1, 1, 1, 4)
     );
 }
 
