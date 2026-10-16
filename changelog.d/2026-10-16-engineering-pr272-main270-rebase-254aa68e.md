@@ -1,0 +1,1 @@
+- Rebase the first five engineering checks onto PR270 main, preserving both DESIGN histories, incoming CMB/MOV/NET checks, all Acceptance cells and authentic fixtures. Keep next-five work separate and require new exact-head native qualification.

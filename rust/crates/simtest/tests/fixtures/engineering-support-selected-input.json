@@ -1,0 +1,27 @@
+{
+  "reference": "e4e579a838aabae3b1d9dadbc17a0a87147bc52d",
+  "nativeSeed": 701,
+  "startupRandom": 0.5,
+  "names": ["a", "b"],
+  "spawnSentinel": {"x": -1000, "z": -1000},
+  "map": {
+    "spawns": [{"x": 1, "y": 1}, {"x": 18, "y": 1}, {"x": 1, "y": 18}],
+    "points": [{"x": 4, "y": 4}]
+  },
+  "checks": [
+    "Bombing",
+    "Fortifications wire",
+    "test.js:701",
+    "Scarring",
+    "Shelling short of a crater marks the ground",
+    "A blast that lowers a cliff makes a previously unreachable region walkable"
+  ],
+  "nativeScenes": [
+    "Bombing:0",
+    "Fortifications wire:0",
+    "test.js:701:0",
+    "Scarring:0",
+    "Scarring:1",
+    "A blast that lowers a cliff makes a previously unreachable region walkable:0"
+  ]
+}

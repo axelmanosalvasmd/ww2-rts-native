@@ -1,0 +1,79 @@
+--- a/harness/engineering-support-selected-fixture.mjs
++++ b/harness/engineering-support-selected-fixture.mjs
+@@ -127,12 +127,25 @@
+ }
+ function run(g, secs) {
+   const scene = capture(g), before = g.tick, prior = Math.random;
++  // The original hedge callback pins only its first artillery run to this function.
++  const originalConstant = scene.name === 'test.js:701:0' && before === 0;
++  if (originalConstant) assert.equal(secs, sim.SUPPORT.artillery.delay + 5);
+   Math.random = () => {
+     const stack = new Error().stack;
+     assert.ok(stack.includes('stepStrikes'), `${scene.name}: unexpected random purpose ${stack}`);
+     const site = stack.split('\n').find(line => line.includes(`${simURL}:`));
+     assert.ok(site);
+     scene.drawSites.set(site.trim(), (scene.drawSites.get(site.trim()) ?? 0) + 1);
++    if (originalConstant) {
++      const value = prior(), index = scene.originalConstantDraws ?? 0;
++      assert.equal(value, 0.5, 'original hedge callback constant');
++      assert.ok(index < 20 && site.includes('shared/sim.js:5287:'), 'original artillery call site/count');
++      scene.originalConstantTape ??= [];
++      scene.originalConstantTape.push({ index, tick: g.tick, axis: index % 2 === 0 ? 'along' : 'side',
++        bits: bits(value), site: site.trim().replace(reference, 'reference/ww2-rts') });
++      scene.originalConstantDraws = index + 1;
++      return value;
++    }
+     return scene.rng.next();
+   };
+   try {
+@@ -192,7 +205,8 @@
+ for (const scene of scenes) {
+   assert.ok(scene.setup && scene.initial);
+   scene.final = scene.frames.at(-1) ?? scene.componentFinal ?? scene.initial;
+-  scene.draws = scene.rng.count();
++  scene.nativeSamplerDraws = scene.rng.count();
++  scene.draws = scene.nativeSamplerDraws + (scene.originalConstantDraws ?? 0);
+   scene.drawSites = [...scene.drawSites].map(([site, count]) => ({ site: site.replace(reference, 'reference/ww2-rts'), count }));
+   assert.equal(scene.drawSites.reduce((n, row) => n + row.count, 0), scene.draws);
+   delete scene.rng;
+@@ -201,6 +215,40 @@
+ clean();
+ const bytes = gzipSync(JSON.stringify({ reference: pin, node: process.version, arch: process.arch, input, checks, scenes }) + '\n', { level: 9 });
+ const output = `${root}/rust/crates/simtest/tests/fixtures/engineering-support-selected.json.gz`;
++// Reversible expected-value deltas avoid a test compression dependency in the rules core.
++function differences(a, b, path = [], out = []) {
++  if (Object.is(a, b)) return out;
++  if (Array.isArray(a) && Array.isArray(b) && a.length === b.length) {
++    for (let i = 0; i < a.length; i++) differences(a[i], b[i], [...path, i], out);
++  } else if (a && b && typeof a === 'object' && typeof b === 'object' &&
++      !Array.isArray(a) && !Array.isArray(b) && Object.keys(a).length === Object.keys(b).length &&
++      Object.keys(a).every(key => Object.hasOwn(b, key))) {
++    for (const key of Object.keys(a)) differences(a[key], b[key], [...path, key], out);
++  } else out.push([path, b]);
++  return out;
++}
++const hedge = scenes.find(scene => scene.name === 'test.js:701:0');
++assert.equal(hedge.originalConstantDraws, 20);
++assert.equal(hedge.nativeSamplerDraws, 0);
++const { frames, ...hedgeScene } = hedge;
++let previous = hedge.initial;
++hedgeScene.frameChanges = frames.map(frame => { const diff = differences(previous, frame); previous = frame; return diff; });
++let rebuilt = structuredClone(hedge.initial);
++for (let i = 0; i < frames.length; i++) {
++  for (const [path, value] of hedgeScene.frameChanges[i]) {
++    if (!path.length) { rebuilt = structuredClone(value); continue; }
++    let parent = rebuilt;
++    for (const key of path.slice(0, -1)) { assert.ok(Object.hasOwn(parent, key)); parent = parent[key]; }
++    assert.ok(Object.hasOwn(parent, path.at(-1)));
++    parent[path.at(-1)] = structuredClone(value);
++  }
++  assert.deepEqual(rebuilt, frames[i], `entire original hedge frame ${i + 1} survives delta encoding`);
++}
++const coreBytes = Buffer.from(JSON.stringify({ format: 'engineering-hedge-original-v1', reference: pin,
++  node: process.version, arch: process.arch, input, check: checks.find(check => check.name === 'test.js:701'), scene: hedgeScene }) + '\n');
++const coreOutput = `${root}/rust/crates/core/tests/fixtures/engineering-hedge-original.json`;
+ if (process.argv.includes('--check')) assert.ok(readFileSync(output).equals(bytes), 'authentic capture bytes unchanged');
+ else writeFileSync(output, bytes);
++if (process.argv.includes('--check')) assert.ok(readFileSync(coreOutput).equals(coreBytes), 'original core hedge capture bytes unchanged');
++else writeFileSync(coreOutput, coreBytes);
+ console.error(`${process.argv.includes('--check') ? 'Verified' : 'Recorded'} ${checks.length} original acceptance selections, ${scenes.length} scenes, ${scenes.reduce((n, scene) => n + scene.frames.length, 0)} full Source ticks`);

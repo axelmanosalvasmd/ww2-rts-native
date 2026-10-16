@@ -43,6 +43,7 @@ impl fmt::Display for MapError {
             Self::Invalid { field, reason } if field == "rows" || field == "heights" => {
                 f.write_str(reason)
             }
+            Self::Invalid { field, reason } if field == "structures" => write!(f, "{reason}"),
             Self::Invalid { field, reason } => write!(f, "{field}: {reason}"),
             Self::Unsupported { feature } => {
                 write!(f, "unsupported authoritative map feature: {feature}")

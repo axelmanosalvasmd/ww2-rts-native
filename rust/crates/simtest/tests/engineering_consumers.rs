@@ -960,3 +960,6 @@ fn actual_match_constructors_consume_all_authored_weather_plans() {
     // These are Source draw observations. Native purpose streams intentionally
     // differ, so this does not claim a shared global RNG or whole-match replay.
 }
+
+#[path = "engineering_consumers/support_selected.rs"]
+mod support_selected;

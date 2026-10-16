@@ -1,0 +1,1 @@
+- Apply the 60 exact formatter changes in nine engineering Rust files after the guarded format check reached the private child. Preserve all predicates and fixtures; the twenty native checks remain pending.
