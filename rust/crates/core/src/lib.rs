@@ -65,6 +65,7 @@ pub mod match_actor;
 pub mod match_aircraft_commands;
 pub mod match_aircraft_ticks;
 pub mod match_aviation;
+mod match_base_commands;
 mod match_carrier_tick;
 pub mod match_carriers;
 pub mod match_combat;
@@ -149,3 +150,6 @@ pub mod staged_observer;
 pub mod world_route_retention;
 
 pub mod startup_tables;
+
+#[cfg(test)]
+mod bases_runtime_construction_tests;

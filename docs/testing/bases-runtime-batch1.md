@@ -1,0 +1,25 @@
+# BASES runtime batch 1
+
+This batch adds ordinary Match cancellation and rally commands. The internal command decoder dispatches them through the recorded queue. Public R1 ingress still admits only its existing Move, Stop and Stance families. The reference remains `e4e579a`, and wire, ABI, privacy, World adapters and constructor admission are unchanged.
+
+Cancellation refunds 75% of the site cost and subtracts that refund from MP spent. A prepared World transaction clears the structure, current sections, falling sections and footprint before the wallet and story updates publish. Combat and firing attribution and historical footprint ownership remain available. Builders drop their missing target on their next unit turn. Cancellation does not produce a casualty, bounty or collapse. Repeated cancellation gives no second refund.
+
+Producer rally commands update the canonical building rally, including on an unfinished producer. Scalar `id` takes precedence over `ids`. The personal rally must be inside the map on a cell without MOVE. Real recruits use the building rally first, then the personal rally. This batch exercises those shared behaviors in ordinary Conquest. Classic and Horde remain outside its complete row claims.
+
+The tests use the ordinary constructor and the actual tick runner. A trusted arena adds workers through staged publication, supplies MP and silences irrelevant opening actors. It does not fabricate Classic or World mode admission. Test names describe the behavior actually exercised.
+
+| Row | Test | Coverage |
+| --- | --- | --- |
+| BASE-23 | `match_base_commands::tests::intent_base23_recorded_rallies_route_real_recruits_with_building_precedence` | Recorded personal/building rallies and first arrival of two actual recruits; denial and bounds cases in the neighboring test. Classic no-personal-rally and shared Horde access remain NEXT. |
+| BASE-29 | `bases_runtime_construction_tests::base29_ordinary_crews_finish_sites_and_unfinished_producers_and_pillboxes_stay_inactive` | Actual crew scaling, range exclusion, HP growth, completion, producer/prerequisite gating and unfinished/finished Pillbox fire. Classic startup and Sudden Death remain NEXT. |
+| BASE-30 | `bases_runtime_construction_tests::base30_ordinary_assist_repairs_health_and_restores_a_supported_failed_footprint_section_for_free` | Actual Assist repairs HP and a breached supported section without spending MP, with two-worker scaling. Logistics provisions and Sudden Death remain NEXT. |
+| BASE-31 | `match_base_commands::tests::intent_base31_cancel_refunds_once_removes_sections_and_prevents_ghost_rubble` | Owner checks, 75% refund, physical/falling-section removal, post-cancel shelling, 60 ticks without ghost collapse and site reuse. Other tests cover atomic refusal, 20 cancellation cycles and cancellation after a Tower takes a failed corner. Depot/node release remains NEXT. |
+| BASE-33 | `bases_runtime_construction_tests::base33_ordinary_death_collapses_every_section_and_allows_rebuilding_on_its_rubble` | Actual combat actuator and tick-owned death, all footprint sections failed, collapse event, rubble, paid rebuild and real recruitment. Depot/node release remains NEXT. |
+| BASE-37 | `bases_runtime_construction_tests::base37_motor_pool_needs_a_live_finished_barracks_and_then_produces_a_real_tank` | Motor Pool refused without a Barracks and while it is unfinished, accepted after completion; its unfinished producer refuses a tank and its completed producer creates one. Existing catalog checks cover the exact static definition; BASE-48's test exercises the T2 path. Proposed complete native-intent proof, subject to prototype review. |
+| BASE-48 | `bases_runtime_construction_tests::base48_ordinary_buy_and_build_unlock_at_company_and_battalion_hq_tiers` | Real HQ research to T2/T3 gates Mortar, Pillbox, Motor Pool, Ranger and Airfield commands. Wall/Gate Dig and Entrench gates remain NEXT. |
+
+Only BASE-37 is proposed as proven. Partial tests do not complete the other six rows. No parity table is edited.
+
+Other owned work remains NEXT: BASE-01, 02, 03, 05, 09, 10, 12, 14, 17, 18, 19, 21, 22, 24, 26, 27, 38, 39, 44, 45, 47, 49, 50, 52, 53, 54, 56, 57 and 59. Start with Classic startup, nodes and canonical construction-mode commands, then training and snapshots. BASE-46 and BASE-55 are BLOCKED on World admission and its unresolved owner decisions. This batch does not relax those guards. There are no deliberate behavior differences proposed.
+
+Validation on the Vostro with Rust 1.99.0: 34 focused native tests passed, including all 11 new core tests and the new public R1 ingress guard. The selection also ran existing command, construction and recruitment tests and the exact compiled-catalog check. `cargo fmt --all --check` and locked workspace/all-target Clippy with `-D warnings` passed. These checks used S1 with four build jobs, MemoryMax 6 GiB and no swap, then released the slot. Full workspace tests, hosted checks and owner runtime acknowledgment were not run by this stream.

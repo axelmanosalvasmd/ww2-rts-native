@@ -80,6 +80,14 @@ pub enum Command {
         at: Option<Point>,
         queue: bool,
     },
+    CancelSite {
+        id: i64,
+    },
+    Rally {
+        ids: Vec<i64>,
+        id: Option<i64>,
+        at: Point,
+    },
     Destroy {
         ids: Vec<i64>,
         id: Option<i64>,
@@ -447,6 +455,26 @@ impl Command {
                 }
             }
 
+            Some("cancel") => Ok(Self::CancelSite {
+                id: object.get("id").and_then(safe_id).unwrap_or(-1),
+            }),
+            Some("rally") => Ok(Self::Rally {
+                ids,
+                // A present invalid scalar must not fall back to a personal rally.
+                id: object.get("id").map(|v| safe_id(v).unwrap_or(-1)),
+                at: Point {
+                    x: object
+                        .get("x")
+                        .and_then(|v| v.as_f64())
+                        .filter(|v| v.is_finite())
+                        .ok_or(Denial::Blocked)?,
+                    z: object
+                        .get("z")
+                        .and_then(|v| v.as_f64())
+                        .filter(|v| v.is_finite())
+                        .ok_or(Denial::Blocked)?,
+                },
+            }),
             Some("destroy") => Ok(Self::Destroy {
                 ids,
                 id: object.get("id").and_then(safe_id),
@@ -671,6 +699,7 @@ impl Command {
     }
     fn valid(&self) -> bool {
         match self {
+            Self::Rally { at, .. } => at.x.is_finite() && at.z.is_finite(),
             Self::Attack { at, .. } => at.is_none_or(|p| p.x.is_finite() && p.z.is_finite()),
             Self::Dig {
                 ids, at, direction, ..
@@ -863,6 +892,12 @@ impl crate::match_runtime::Match {
         {
             return self.ground_retreat_command(owner, ids);
         }
+        if let Command::CancelSite { id } = command {
+            return self.execute_cancel_site(owner, *id);
+        }
+        if let Command::Rally { ids, id, at } = command {
+            return self.execute_rally(owner, ids, *id, *at);
+        }
         if let Command::Destroy { ids, id } = command {
             return self.execute_destroy(owner, ids, *id);
         }
@@ -973,6 +1008,8 @@ impl crate::match_runtime::Match {
             | Command::Retreat { ids } => ids.clone(),
             Command::Build { .. }
             | Command::Assist { .. }
+            | Command::CancelSite { .. }
+            | Command::Rally { .. }
             | Command::Destroy { .. }
             | Command::Board { .. }
             | Command::Unload { .. }
@@ -1329,6 +1366,8 @@ impl crate::match_runtime::Match {
             }
             Command::Build { .. }
             | Command::Assist { .. }
+            | Command::CancelSite { .. }
+            | Command::Rally { .. }
             | Command::Destroy { .. }
             | Command::Board { .. }
             | Command::Unload { .. }

@@ -186,6 +186,10 @@ pub struct EnvironmentRuntime {
     pub(crate) wreck_metadata: BTreeMap<u32, WreckMetadata>,
 }
 impl EnvironmentRuntime {
+    pub(crate) fn cancel_building_sections(&mut self, sections: &BTreeSet<String>) {
+        self.falling_sections
+            .retain(|falling| !sections.contains(&falling.section));
+    }
     pub fn contacts(&self) -> &[String] {
         &self.contacts
     }
