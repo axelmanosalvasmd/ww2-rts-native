@@ -1,0 +1,1 @@
+- Add 36 native BASE and LOG feature tests, with row maps identifying 15 complete behaviors and the remaining gaps. Extend coverage for population rounding, reserve eligibility, supply-distance saturation, carrier refill, source selection, free supply and upkeep scaling. Keep LOG-18 held for missing handoff coverage and preserve the R1 logistics-off deviation.
