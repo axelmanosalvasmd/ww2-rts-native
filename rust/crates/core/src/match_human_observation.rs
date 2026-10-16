@@ -306,10 +306,9 @@ impl Match {
         let g = &self.world.game;
         if g.mode.is_some()
             || !(0..=SAFE_TICK).contains(&g.tick)
-            || (g.tick % 2 != 0 && self.finish.is_none())
         {
             return Err(
-                "human commander requires an ordinary delivery or final observation boundary"
+                "human commander requires an ordinary observation boundary"
                     .into(),
             );
         }

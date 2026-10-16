@@ -11,6 +11,7 @@ mod horde_records;
 pub use horde_records::RecordStore as HordeRecords;
 mod native_startup;
 mod saves;
+mod room_ai;
 mod trusted_room;
 pub use trusted_room::TrustedRoomConfig;
 pub mod room_runtime;

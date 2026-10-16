@@ -1,0 +1,3 @@
+- Restore ordinary-room AI planner memory and fresh human helpers from version 1 saves, retaining surplus connected humans as spectators and pausing for the loading host.
+- Reset a returning human seat's private planner, observation memory and commander helper while preserving its identity and accepted orders. Start and restart create fresh helpers for every seat.
+- Run recipient-filtered AI commanders in configured private two-seat Conquest rooms, with the existing lobby difficulty controls and snapshot capability guards.
