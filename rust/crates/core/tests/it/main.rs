@@ -57,6 +57,10 @@ mod human_commander_state;
 mod human_commander_timing;
 #[path = "../interface_intent.rs"]
 mod interface_intent;
+#[path = "../interface_runtime_batch3.rs"]
+mod interface_runtime_batch3;
+#[path = "../interface_stream_consumers.rs"]
+mod interface_stream_consumers;
 #[path = "../legacy_scenario.rs"]
 mod legacy_scenario;
 #[path = "../logistics.rs"]
