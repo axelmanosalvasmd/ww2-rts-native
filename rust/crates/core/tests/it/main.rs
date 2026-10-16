@@ -9,6 +9,8 @@
 mod authoritative_maps;
 #[path = "../base_audit_features.rs"]
 mod base_audit_features;
+#[path = "../client_cell_state.rs"]
+mod client_cell_state;
 #[path = "../client_view.rs"]
 mod client_view;
 #[path = "../combat.rs"]
@@ -45,6 +47,10 @@ mod human_commander_inputs;
 mod human_commander_state;
 #[path = "../human_commander_timing.rs"]
 mod human_commander_timing;
+#[path = "../interface_math_intent.rs"]
+mod interface_math_intent;
+#[path = "../interface_motion_intent.rs"]
+mod interface_motion_intent;
 #[path = "../legacy_scenario.rs"]
 mod legacy_scenario;
 #[path = "../logistics.rs"]
