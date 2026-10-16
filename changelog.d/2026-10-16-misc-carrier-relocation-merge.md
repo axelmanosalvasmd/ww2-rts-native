@@ -1,0 +1,1 @@
+- Keep carrier wreck ejection and garrison entry, exit and setup relocation on the shared unit-field and spatial-grid commit path after integrating the movement batch. Existing tests now check immediate grid membership for these placements.

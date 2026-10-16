@@ -979,7 +979,7 @@ fn intent_ai33_fortification_state_survives_full_match_and_every_seat_snapshot()
         .unwrap()
         .id;
     assert_eq!(policy.tactics.fort_steps.get(&hq), Some(&2));
-    // Existing gate admission keeps unsupported actors and links out.
+    // Gate commands reject an ineligible or missing builder.
     for raw in [json!({"t":"dig","kind":"gate","ids":[3],"x":50.0,"z":50.0})] {
         let tick = m.world.game.tick as u64 + 1;
         m.enqueue_command(
@@ -994,7 +994,7 @@ fn intent_ai33_fortification_state_survives_full_match_and_every_seat_snapshot()
         sequence += 1;
         assert_eq!(
             m.advance_tick().unwrap().commands[0].denial,
-            Some(Denial::Unsupported)
+            Some(Denial::NoBuilders)
         );
         for _ in 0..8 {
             m.advance_tick().unwrap();

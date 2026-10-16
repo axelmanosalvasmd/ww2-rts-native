@@ -14,7 +14,7 @@ use crate::{
     unit_publication::StagedUnit,
 };
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum HordeProfile {
     Mixed,
     Infantry,
@@ -54,7 +54,7 @@ pub struct HordePoolUnit {
     pub cost: f64,
     pub weight: f64,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct HordeState {
     pub slot: usize,
     pub defenders: usize,
@@ -300,6 +300,20 @@ fn along_route(mut at: Point, route: &[Point], mut left: f64) -> Point {
     at
 }
 impl Match {
+    /// End only the break clock. Wave purchases and spawning stay in the Horde phase.
+    pub fn end_horde_break(&mut self) -> Result<bool, String> {
+        if self.options.mode != Mode::Horde {
+            return Ok(false);
+        }
+        self.validate_horde_phase(0.0)?;
+        let horde = self.horde.as_mut().expect("validated Horde state");
+        if horde.active {
+            return Ok(false);
+        }
+        horde.time_left = 0.0;
+        Ok(true)
+    }
+
     /// Explicit core vision phase. This does not admit Horde to ordinary ticking or delivery.
     pub fn refresh_horde_visibility(&mut self) -> Result<(), String> {
         self.validate_horde_phase(0.0)?;

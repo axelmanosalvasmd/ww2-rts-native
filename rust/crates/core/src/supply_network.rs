@@ -59,13 +59,13 @@ pub struct SupplyUnit<'a> {
     pub fact: ObjectiveUnit<'a>,
     pub built: Option<f64>,
 }
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct TeamNetwork {
     pub team: i32,
     pub steps: Vec<u16>,
     pub closed: Vec<u8>,
 }
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct GroundSupplyNetwork {
     pub width: usize,
     pub height: usize,

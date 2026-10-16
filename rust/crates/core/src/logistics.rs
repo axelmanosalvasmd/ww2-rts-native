@@ -202,7 +202,7 @@ pub fn ammo_price(def: Option<&Definition<'_>>) -> f64 {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Reserves {
     /// Whole carried projectiles; capacity and cargo price are fixed at initialization.
     pub ammo: f64,
@@ -221,7 +221,7 @@ pub struct Reserves {
     pub supply_rate: Option<f64>,
     pub cut_for: Option<f64>,
 }
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Stock {
     /// Ammunition cargo credits, rather than physical projectile count.
     pub ammo: f64,
@@ -236,7 +236,7 @@ pub struct Shortage {
     pub forced: bool,
     pub stranded: bool,
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct LogisticsState {
     units: BTreeMap<UnitId, Reserves>,
 }

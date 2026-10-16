@@ -94,7 +94,7 @@ pub const WEAPONS: [Weapon; 2] = [
 /// Opaque source keys are interned in admission order. Zero means no follower.
 pub type CompanionId = u32;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Input {
     pub forward: f64,
     pub strafe: f64,
@@ -106,7 +106,7 @@ pub struct Input {
     pub sprint: bool,
     pub weapon: usize,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Companion {
     pub id: CompanionId,
     pub key: String,
@@ -213,7 +213,7 @@ fn safe_integer(value: &Value) -> Option<i64> {
 }
 
 /// Fields absent from the canonical Unit and UnitControl rows.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Soldier {
     pub companion: CompanionId,
     pub vy: f64,
@@ -240,7 +240,7 @@ impl Soldier {
         }
     }
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Companions {
     /// Ascending IDs preserve original Map insertion order, independently of opaque keys.
     pub records: BTreeMap<CompanionId, Companion>,

@@ -24,14 +24,14 @@ use crate::{
     world::World,
 };
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct PlayerConfig {
     pub name: String,
     pub team: i32,
     pub faction: Faction,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct MatchOptions {
     pub seed: u64,
     pub mode: Mode,
@@ -48,20 +48,21 @@ pub struct MatchOptions {
     pub sandbox: bool,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct PlayerStart {
     pub config: PlayerConfig,
     pub spawn: Point,
     pub support: BTreeMap<String, f64>,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, serde::Serialize, serde::Deserialize)]
 pub struct LivingWeather {
     pub raining: bool,
     pub next: f64,
 }
 
 /// Materialized startup choices. The RNG records exactly the streams used to make them.
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct StartPlan {
     pub dimensions: (usize, usize),
     pub players: Vec<PlayerStart>,
@@ -94,6 +95,7 @@ fn number(v: &Value, name: &str) -> Result<f64, String> {
 
 enum StartupProfile {
     Conquest,
+    Elimination,
     Tutorial,
     Horde,
     World(MatchRandom),
@@ -111,6 +113,21 @@ impl StartPlan {
             options,
             rules,
             StartupProfile::Conquest,
+            #[cfg(test)]
+            None,
+        )
+    }
+
+    pub(crate) fn prepare_elimination(
+        map: &crate::map::AuthoritativeMap,
+        options: &MatchOptions,
+        rules: &Rules,
+    ) -> Result<Self, String> {
+        Self::prepare_mode(
+            map,
+            options,
+            rules,
+            StartupProfile::Elimination,
             #[cfg(test)]
             None,
         )
@@ -185,6 +202,10 @@ impl StartPlan {
         profile: StartupProfile,
         #[cfg(test)] replay: Option<crate::aligned_replay::Replay>,
     ) -> Result<Self, String> {
+        let elimination_mode = matches!(&profile, StartupProfile::Elimination);
+        if elimination_mode && !matches!(options.mode, Mode::Annihilation | Mode::Classic) {
+            return Err("elimination startup requires Annihilation or Classic".into());
+        }
         let world_mode = matches!(&profile, StartupProfile::World(_));
         let tutorial = matches!(&profile, StartupProfile::Tutorial);
         // Validation permits saving authored missions. Their executor is not admitted yet.
@@ -206,6 +227,7 @@ impl StartPlan {
             return Err("Tutorial profile requires Tutorial mode".into());
         }
         if !world_mode
+            && !elimination_mode
             && !tutorial
             && defender_team.is_none()
             && !horde_mode
@@ -376,7 +398,7 @@ impl StartPlan {
         let army_key = options.army.key();
         let income_scale = number(field(field(cfg, "armies")?, army_key)?, "income")?;
         let initial_mp = number(
-            if world_mode {
+            if world_mode || options.mode == Mode::Classic {
                 field(cfg, "classic")?
             } else {
                 cfg
@@ -419,7 +441,12 @@ impl StartPlan {
             .iter()
             .enumerate()
             .filter_map(|(i, p)| {
-                ((defender_team.is_none() && !tutorial && !horde_mode) || p.mp > 0.0).then_some(i)
+                (!(defender_team.is_some()
+                    || options.mode == Mode::Annihilation
+                    || tutorial
+                    || horde_mode)
+                    || p.mp > 0.0)
+                    .then_some(i)
             })
             .collect();
         let points = map
@@ -521,7 +548,7 @@ impl StartPlan {
             l
         });
         let starting_kinds = field(
-            if world_mode {
+            if world_mode || options.mode == Mode::Classic {
                 field(cfg, "classic")?
             } else {
                 cfg
@@ -631,7 +658,7 @@ impl StartPlan {
 }
 
 /// Owner and position retained for a building footprint after its unit is removed.
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct BuildingCell {
     pub unit: u32,
     pub owner: usize,
@@ -640,6 +667,7 @@ pub struct BuildingCell {
 
 /// Authoritative startup state. Each mode admits only its implemented phases.
 /// Live terrain and units have a single owner in `world.game`.
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Match {
     pub aviation: crate::match_aviation::AviationState,
     pub support: crate::match_support::SupportState,
@@ -647,11 +675,13 @@ pub struct Match {
     pub abilities: crate::match_abilities::AbilityState,
     pub recovery: crate::match_recovery::RecoveryState,
     pub assault: Option<crate::assault_runtime::AssaultState>,
+    pub elimination: Option<crate::elimination_modes::EliminationState>,
     pub horde: Option<crate::match_horde::HordeState>,
     pub commands: crate::match_commands::MatchCommands,
     pub combat: crate::match_combat::CombatState,
     pub environment: crate::environment::EnvironmentRuntime,
     pub companions: crate::companions::Companions,
+    #[serde(skip)]
     pub world_runtime: Option<crate::match_world::WorldRuntime>,
     pub rail_runs: BTreeMap<u32, crate::match_world_rails::RailRun>,
     /// Team-shared last observed buildings for ordinary rooms and the explicit Classic core phase.
@@ -685,6 +715,7 @@ pub struct Match {
     pub(crate) tutorial: Option<crate::match_tutorial::TutorialRuntime>,
     pub timeline: Vec<crate::match_end::MatchSample>,
     pub next_unit_id: u32,
+    #[serde(skip, default = "crate::save_state::compiled_rules")]
     pub rules: Rules,
 }
 
@@ -836,6 +867,7 @@ impl Match {
             abilities: crate::match_abilities::AbilityState::default(),
             recovery: crate::match_recovery::RecoveryState::default(),
             assault: None,
+            elimination: None,
             horde: None,
             commands: crate::match_commands::MatchCommands::new(4096),
             combat: crate::match_combat::CombatState::default(),
@@ -877,7 +909,7 @@ impl Match {
     }
 
     pub(crate) fn complete_skirmish_start(&mut self) -> Result<(), String> {
-        if self.options.mode != Mode::Tutorial {
+        if !matches!(self.options.mode, Mode::Classic | Mode::Tutorial) {
             self.setup_bases()?;
         }
         for unit in self.world.game.units.values() {
@@ -886,7 +918,11 @@ impl Match {
             self.abilities.initialize(unit.id);
             self.recovery.initialize(unit.id);
             if !self.commands.units.contains_key(&unit.id) {
-                let control = crate::match_commands::UnitControl::new(unit, &self.rules)?;
+                let control = crate::match_commands::UnitControl::new_for_mode(
+                    unit,
+                    &self.rules,
+                    self.options.mode,
+                )?;
                 self.commands.insert(unit.id, control);
             }
         }
@@ -943,13 +979,13 @@ impl Match {
         } else {
             self.validate_ordinary_finish_state()?;
             economy::ModeContext {
-                kind: if self.options.mode == Mode::Tutorial {
-                    Mode::Tutorial
-                } else {
+                kind: if matches!(self.options.mode, Mode::Default | Mode::Conquest) {
                     Mode::Default
+                } else {
+                    self.options.mode
                 },
+                defender_team: self.assault.map(|state| state.defender_team),
                 income_excluded_slot: self.tutorial.as_ref().map(|runtime| runtime.enemy()),
-                ..Default::default()
             }
         };
         let winner_decided = winner_decided || self.finish.is_some();
@@ -1052,7 +1088,18 @@ impl Match {
                         units: &income_units,
                         drops: &[],
                         points: &income_points,
-                        nodes: &[],
+                        nodes: &self.elimination.as_ref().map_or_else(Vec::new, |state| {
+                            state
+                                .nodes
+                                .iter()
+                                .map(|node| economy::Node {
+                                    depot: node.depot.map(u64::from),
+                                    rate: node.rate,
+                                    fuel: node.fuel,
+                                    region: None,
+                                })
+                                .collect::<Vec<_>>()
+                        }),
                         world: None,
                     },
                     dt,

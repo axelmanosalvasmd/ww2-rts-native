@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 impl Match {
     fn ground_orders_open(&self) -> Result<(), String> {
         if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
-            return Err("ground orders require ordinary Default or Conquest".into());
+            return Err("ground orders require a matching ordinary mode".into());
         }
         Ok(())
     }
@@ -266,6 +266,28 @@ impl Match {
         if self.ground_orders_open().is_err() {
             return Ok(Some(Denial::Unsupported));
         }
+        if !matches!(
+            self.options.mode,
+            crate::economy::Mode::Default
+                | crate::economy::Mode::Conquest
+                | crate::economy::Mode::Tutorial
+        ) && ids
+            .iter()
+            .filter_map(|raw| u32::try_from(*raw).ok())
+            .any(|id| {
+                self.convoys
+                    .as_ref()
+                    .is_some_and(|state| state.trucks.contains_key(&id))
+                    && self
+                        .world
+                        .game
+                        .units
+                        .get(&id)
+                        .is_some_and(|u| u.owner == owner)
+            })
+        {
+            return Ok(Some(Denial::Unsupported));
+        }
         let command = Command::Retreat { ids: ids.to_vec() };
         let mut selected = self.ground_order_rows(owner, ids, &command)?;
         // Convoy commands inspect every truck before the ordinary troop selection cap.
@@ -422,10 +444,11 @@ impl Match {
             }
             let mut u = self.world.game.units[&id].clone();
             let draft = &drafts[&id];
-            u.x = draft.x;
-            u.z = draft.z;
-            u.garrison = draft.garrison;
-            self.grid.update(id, &u);
+            crate::unit_placement::place_unit(&mut self.grid, &mut u, |u| {
+                u.x = draft.x;
+                u.z = draft.z;
+                u.garrison = draft.garrison;
+            });
             self.apply_retreat_route(u, home, route)
                 .expect("complete retreat batch admitted");
             let ability = self.abilities.get_mut(id).unwrap();
@@ -726,5 +749,45 @@ mod tests {
             ),
             before
         );
+        // These modes admit ordinary Retreat, but neither merge parent admitted convoys.
+        for (mode, kind) in [
+            (
+                crate::economy::Mode::Assault,
+                crate::game::ModeKind::Assault,
+            ),
+            (
+                crate::economy::Mode::Annihilation,
+                crate::game::ModeKind::Annihilation,
+            ),
+            (
+                crate::economy::Mode::Classic,
+                crate::game::ModeKind::Classic,
+            ),
+        ] {
+            m.options.mode = mode;
+            m.world.game.mode = Some(kind);
+            let mut ids = vec![1; 50];
+            ids.push(4);
+            assert_eq!(
+                m.execute_command(0, &Command::Retreat { ids }, false)
+                    .unwrap(),
+                Some(crate::match_commands::Denial::Unsupported),
+                "{mode:?} convoy Retreat must remain refused"
+            );
+            assert_eq!(
+                format!(
+                    "{:?}",
+                    (
+                        &m.world.game.units,
+                        &m.commands.units,
+                        &m.commands.requests,
+                        &m.routing_fog,
+                        &m.convoys
+                    )
+                ),
+                before,
+                "{mode:?} refusal must precede follow, routing and convoy writes"
+            );
+        }
     }
 }

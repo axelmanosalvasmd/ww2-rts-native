@@ -1,3 +1,21 @@
+## Owner parity decisions A, B and C (2026-10-16)
+
+The [recorded owner decisions](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6217590741) approve the differences below, the Rust-only acceptance of the listed client rows, and World deferral for milestone R1. Julio recorded both owners' decisions after Axel's voice approval; Axel's written confirmation on #5 is requested in that comment. This section records the decisions for STATUS-ABC.
+
+Approved `differs` decisions relative to prototype `e4e579a`:
+
+- CMB-159, MODE-21, MODE-22: per-purpose seeded streams and staged creation replace the prototype's global draw order, following AGENTS.md determinism so matches replay from their seed and orders.
+- IF-05: non-trench arc, ring and strongpoint dig patterns are rejected as an approved restriction of the supported dig patterns.
+- NET-15, NET-20: display names are truncated on Unicode scalar boundaries to avoid splitting a scalar.
+- IF-10: prediction and authoritative movement compare signed zero as equal, so the sign of numeric zero does not affect equality.
+- IF-23: snapshots never reorder the canonical gameplay grid, so snapshot creation cannot change gameplay query order.
+- MAP-22: validated embedded maps replace corrupt-file fallback, removing that file-loading recovery path for embedded maps.
+- NET-04: R1 keeps uncompressed JSON WebSocket v0; compression is deferred to a later version-gated proposal.
+
+For group B, `accepted` applies only to the Rust part of each row marked "Unreal-only; client parity owned by Axel". Unreal implementation and client parity remain Axel's responsibility. Existing server duties, including MOV-107's row tail, remain recorded in the rows.
+
+For group C, `dropped` means "World admission deferred for milestone R1; reopen when World opens". Rows that also describe ordinary matches retain their prototype requirements; the R1 deferral does not claim those behaviors are implemented. Ported World components MAP-59, BASE-46, LOG-26 and LOG-27 remain `ported`.
+
 ## Seat lifecycle controls and metadata (2026-10-16)
 
 Socket `pause` and `resume` remain rejected through `UNAVAILABLE`, including for the host. The existing host-side `RoomRuntime` pause APIs remain available without a public client caller. The server owns the supplied wall-clock deadlines and the one-second pause/frame cadence; the deterministic core receives no timer. Paused ingress ignores new orders while preserving the queue for resume. Operative and AI room admission remain closed on R1.
@@ -27,11 +45,33 @@ is added. A full ordinary match test keeps Enter queued behind movement, enters
 the house, captures an objective and earns a VP victory while delivering every
 seat's snapshot on each tick and during the ending hold.
 
+## Gate lifecycle in ordinary matches (2026-10-16)
+
+Gate jobs use the existing paid field-work owner. Placement rounds the line to the grid, while the paid job retains the original direction for its work row and crew escape. Each of its three cells publishes a finished Gate through the existing building factory, structural sections and shared actor allocator. The existing occupied-cell retries, construction time, cancellation and story owners apply to both concrete kinds.
+
+Gate openness and its half-second timer live in the existing unit-control metadata, with the same lifetime as other retained control facts. A completed building checks its Gate before the ordinary early continue. It reads the canonical spatial grid, retaining the prototype's bucket query for threats and its strict hull-distance predicate for occupied passages. Terrain changes use World::set_cell, including the existing version and observation journals. Snapshots use the existing 65536 owner flag and unchanged nonowner mask; no row tail, field or encoding is added. Paid and waiting Gate requests are limited to Default/Conquest without enabled logistics or convoys. Tutorial and construction modes remain guarded, as do World Gate ticks and full logistics delivery.
+
+Gate passage follows the pinned prototype. `shared/sim.js:4252-4262` changes the terrain object between open ground and K, preserving the underlying surface through `setCell` at :2731-2738. Pathfinding reads those terrain flags (:3088-3094). The Gate actor remains a traffic obstacle in `shared/local-traffic.js:101-113`, a swept vehicle obstacle in `shared/movement.js:44-50`, and an immovable crowd-separation body in `shared/sim.js:5198-5229`, whether open or closed. Native traffic, vehicle movement and separation retain those same bodies. Open terrain can therefore admit a route without allowing a squad or tank through the three adjacent Gate bodies. Tests cover passage through the same terrain gap without Gate actors, then obstruction in open, closed and reopened states on plain ground, roads, paths and mud. Component tests check traffic, separation displacement in both actor orders, and vehicle sweeps with a body-free control. The existing full-match lifecycle still collects every seat's snapshot each tick through victory and eight ending ticks. Placement, timers, hysteresis and occupied-passage protection retain the existing exact prototype component checks.
+
+Depot admission is not widened to skirmish modes. The prototype permits Depots only in construction modes, and the canonical Classic node owner and runner belong to PR #301. BASE-12/26/31/33 remain dropped from this stream until that foundation can carry paid claims, refunds and destruction release. AI-49 awaits garrison integration in PR #302; AI-50 and AI-56 still need complete holder/HQ planning and delivered facts beyond this Gate actuator. No parity status or acceptance cells are changed.
+
 ## Tutorial runtime over existing Match systems (2026-10-16)
 
 The explicit `Match::new_tutorial` constructor adds the unattended Enemy seat and uses the existing `tutorial_steps` definitions. Tutorial shares the ordinary ground, routing, combat, objective and support systems. Its private step state owns only the current index, spawned IDs and pending dialogue. Lines leave through the core tick report from tick 40; no server or client transport is introduced. The runner advances at most one step per tick after capture and income, and finishes at the bridgehead through the common Match finish state.
 
 Instant Tutorial recruitment reuses the existing admission, debit and unit-publication transaction, with a separate home-placement path because Tutorial has no production buildings. The public Conquest production component keeps its existing mode gate. Tutorial reinforcements use the player's spawn and exclude the unattended enemy. The prototype's 5 MP/s base income and lack of a defeat condition are preserved. Public server admission, agreed interfaces and parity statuses stay unchanged.
+
+## Miscellaneous core components and relocation ownership (2026-10-16)
+
+The existing `prepare_map_save` component is checked against the pinned server projection on all 33 authored maps and two nested-field/default cases. Its 8 MiB limit counts incoming bytes before parsing or dropping unknown properties. Host persistence and editor network access remain outside this component.
+
+Rendered cell-centre sampling is separate from simulation height queries. `terrain_surface::FrozenSurface` retains the original nominal levels while callers supply the current terrain and road mask. It reports centre heights, frozen water lines, channel depth and cliff edges without adding Match state or replacing Unreal mesh construction, ramps, cliff rims or picking. The pinned original relief recorder covers all 33 authored maps and four synthetic cases, with 663,399 centre and water samples.
+
+`WorldRailLine::is_open` reads current physical bridge cells and current region teams on each query. Bridge collapse and repair therefore need no cached connectivity flag. This is a core line predicate, not a train scheduler or World admission change. Existing structural damage remains the sole owner of support propagation, ground casualties, terrain logs and falling debris.
+
+Admitted relocation callers now commit their prepared unit fields and spatial membership through one crate-private helper. Staged spawns and buildings retain canonical publication, and movers keep their direct updates. Starting-base clearance updates membership immediately instead of waiting for startup's final rebuild. Owner and bucket memberships and nearest distances are checked against fresh grids. Exact source fixtures retain query order, and runtime encounter order is preserved. The existing World guard-home assignment remains unchanged, as at the pin.
+
+The local retreat home selector uses finished owned HQs in skirmish modes, shared allied HQs for Horde defenders, finished owned production buildings in Classic, and spawn in other non-World modes. World keeps its existing region-aware selector. Convoy withdrawal, garrison work awaiting #302 and aircraft recipient delivery stay with their existing owners and guards. Support price/key tests do not open Classic/World support admission or the five support kinds that recipient snapshots still refuse. Editor save networking, persistence, FFI, wire formats and contracts are unchanged.
 
 ## Concrete work and waiting Dig orders (2026-10-16)
 
@@ -64,6 +104,27 @@ Start this candidate from literal40fe9e296b46060241693c6c627ecd615d4f8ea4 in the
 Read current main before integration: it lacks ai_receipt_input and ai_delivered_sight and their Observation/Match/vision integration. Therefore prior AI01/02/04/06 candidates remain held on main; the test PR proposes only AI08/19/20/21/22/23/24/27. AI05's authorized history successor remains on the prior preserved branch, where its actual28-test PASS belongs to0aaea3da/Rust2f9cf68c. No old result transfers to this new unrun source. The14-name focused filter selects nine new and five existing library tests. Both full63-row maps and a concrete PR body live under docs/testing. Root owns the new integrated execution grant, independent review, public PR and proven-row ledger/status follow-up.
 
 # Three Crossroads Native: design decisions
+
+## AI delivery scheduling and Horde break control (2026-10-16)
+
+The shared AI scheduler accepts the caller's tick, snapshot-delivery beat and finished flag. It retains caller-owned views and refreshes every requested view before invoking any brain. Commanders act every tick once a view exists; scripted and Horde brains use the existing difficulty and seat stagger. Horde requests a view on every delivered beat. The scheduler reads no Match authority and owns no wall-clock timer, so it can consume delivered packets without depending on the separate AI snapshot decoder. Server AI activation remains a separate integration.
+
+Horde break control changes only the existing inactive break clock to zero. The existing Horde phase starts the wave and owns its purchases and spawns. The server checks host authority and pause state before invoking the core rule. Full Horde tick, snapshot and room admission stay guarded.
+
+## MODE runtime A: shared ordinary phases (2026-10-16)
+
+Assault, Annihilation and Classic use the existing ordinary tick phases behind a
+strict option/Game mode-pair predicate. A shared EliminationState owns the two
+new modes' team count, bunker maxima, Classic clock and resource nodes; it does
+not add another clock, unit store or wallet. Annihilation's defeat phase precedes
+point capture/income, while Classic's decay, defeat and finish remain late.
+Defeat processes players in slot order and each army in unit-ID order; equal
+transfer distances break on the recipient's player slot. World fort capture stages ownership and grid changes in the existing
+terrain transaction, then updates matching footprint rows only after validation.
+No FFI, wire, contract, privacy or server admission changes accompany these core
+paths. The intent witnesses and remaining limits are in
+[MODE runtime A](docs/testing/mode-runtime-a.md).
+
 
 ## Private Horde director queue (2026-10-16)
 

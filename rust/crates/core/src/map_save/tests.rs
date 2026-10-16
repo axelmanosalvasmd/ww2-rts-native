@@ -8,8 +8,7 @@ use crate::{
     weather::WeatherChoice,
 };
 
-#[path = "../../../server/src/authoritative-map-data.rs"]
-mod shipped;
+use crate::shipped_map_fixtures as shipped;
 
 fn document() -> Value {
     json!({"name":"Editor", "w":60,"h":60,"rows":vec![".".repeat(60);60],

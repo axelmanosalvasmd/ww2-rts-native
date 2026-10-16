@@ -1,86 +1,110 @@
-//! Core AI room phase: deliver every requested seat view before any seat acts.
-//! The host advances the match first and supplies its actual snapshot beat.
+//! Caller-fed AI delivery scheduling, independent of Match authority and transport.
+//! Views belong to the caller. This module neither constructs observations nor admits seats.
+use crate::commander_ai::Level;
 
-use std::collections::BTreeSet;
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Brain {
+    Commander,
+    Scripted,
+    Horde,
+}
 
-/// A brain owns private seat state. Observation must use the recipient path;
-/// action submits through the same admission path as a person's orders.
-pub trait Brain<C> {
-    type View;
-    type Output;
-    type Error;
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Seat {
+    pub slot: usize,
+    pub level: Level,
+    pub brain: Brain,
+}
 
-    fn wants_view(&self, context: &C, slot: usize) -> bool;
-    fn observe(&mut self, context: &mut C, slot: usize) -> Result<Self::View, Self::Error>;
-    fn act(
+pub struct DeliveredSeat<V> {
+    pub seat: Seat,
+    pub view: Option<V>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ScheduleError {
+    InvalidTick,
+    DuplicateSeat,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Beat {
+    pub tick: i64,
+    pub sent: bool,
+    pub finished: bool,
+}
+
+#[derive(Default)]
+pub struct Schedule {
+    last_tick: Option<i64>,
+}
+
+impl Schedule {
+    /// Refresh every requested view before invoking any brain. Commanders act every
+    /// tick; scripted and Horde brains use the shared difficulty/seat stagger.
+    /// `sent` is the caller's delivery beat, not a newly calculated cadence.
+    pub fn tick<V>(
         &mut self,
-        context: &mut C,
-        slot: usize,
-        delivered: &Self::View,
-    ) -> Result<Self::Output, Self::Error>;
-}
-
-#[derive(Clone, Debug)]
-struct Seat<B, V> {
-    slot: usize,
-    brain: B,
-    delivered: Option<V>,
-}
-
-/// The supplied order is stable across both loops. A newly attached seat has
-/// no delivered view, so it waits for a snapshot beat before it may act.
-#[derive(Clone, Debug)]
-pub struct Schedule<B, V> {
-    seats: Vec<Seat<B, V>>,
-}
-
-impl<B, V> Schedule<B, V> {
-    pub fn new(seats: impl IntoIterator<Item = (usize, B)>) -> Result<Self, &'static str> {
-        let mut slots = BTreeSet::new();
-        let mut ordered = Vec::new();
-        for (slot, brain) in seats {
-            if !slots.insert(slot) {
-                return Err("duplicate AI seat");
-            }
-            ordered.push(Seat {
-                slot,
-                brain,
-                delivered: None,
-            });
+        beat: Beat,
+        seats: &mut [DeliveredSeat<V>],
+        mut commander_wants_view: impl FnMut(Seat) -> bool,
+        mut observe: impl FnMut(Seat) -> V,
+        mut act: impl FnMut(Seat, &V),
+    ) -> Result<(), ScheduleError> {
+        let Beat {
+            tick,
+            sent,
+            finished,
+        } = beat;
+        if !(0..=9_007_199_254_740_991).contains(&tick)
+            || self.last_tick.is_some_and(|last| tick <= last)
+        {
+            return Err(ScheduleError::InvalidTick);
         }
-        Ok(Self { seats: ordered })
+        for (index, entry) in seats.iter().enumerate() {
+            if seats[..index]
+                .iter()
+                .any(|old| old.seat.slot == entry.seat.slot)
+            {
+                return Err(ScheduleError::DuplicateSeat);
+            }
+        }
+        self.last_tick = Some(tick);
+        if finished {
+            return Ok(());
+        }
+        if sent {
+            for entry in seats.iter_mut() {
+                let seat = entry.seat;
+                let wants = match seat.brain {
+                    Brain::Commander => commander_wants_view(seat),
+                    Brain::Scripted => seat.level.wants_view(tick, seat.slot),
+                    Brain::Horde => true,
+                };
+                if wants {
+                    entry.view = Some(observe(seat));
+                }
+            }
+        }
+        for entry in seats {
+            if let Some(view) = &entry.view
+                && (entry.seat.brain == Brain::Commander
+                    || entry.seat.level.due(tick, entry.seat.slot))
+            {
+                act(entry.seat, view);
+            }
+        }
+        Ok(())
     }
 
-    /// Call after the simulation step. An unsent tick retains the last view.
-    /// Observation errors prevent the action phase; action errors return to
-    /// the host, which owns recovery and must not retry committed actions.
-    pub fn after_step<C>(
-        &mut self,
-        context: &mut C,
-        sent: bool,
-    ) -> Result<Vec<(usize, B::Output)>, B::Error>
-    where
-        B: Brain<C, View = V>,
-    {
-        let mut fresh = Vec::new();
-        for (index, seat) in self.seats.iter_mut().enumerate() {
-            if sent && seat.brain.wants_view(context, seat.slot) {
-                fresh.push((index, seat.brain.observe(context, seat.slot)?));
-            }
+    /// Clear the prior match's delivery receipts and clock before reusing seats.
+    pub fn reset<V>(&mut self, seats: &mut [DeliveredSeat<V>]) {
+        self.last_tick = None;
+        for entry in seats {
+            entry.view = None;
         }
-        for (index, view) in fresh {
-            self.seats[index].delivered = Some(view);
-        }
-        let mut outputs = Vec::new();
-        for seat in &mut self.seats {
-            if let Some(view) = &seat.delivered {
-                outputs.push((seat.slot, seat.brain.act(context, seat.slot, view)?));
-            }
-        }
-        Ok(outputs)
     }
 }
 
 #[cfg(test)]
-#[path = "ai_schedule/tests.rs"]
 mod tests;
