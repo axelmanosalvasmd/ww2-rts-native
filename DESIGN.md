@@ -4319,3 +4319,9 @@ The old 7f8 autocast and 848 Source serialization failures remain at their
 producing heads. No new Source recorder, capture or evidence bundle is added.
 Root must grant one focused nextest batch on the frozen source head with
 --no-fail-fast; failed rows are dropped individually without semantic retry.
+
+Before native execution, source review corrected the authored rifle/sniper
+profile-test distance: at 5 m, the launch solver's 0.025-second minimum time
+prevents those projectiles from reaching their profile speed. Their targets
+now sit 20 m away; the profile, speed bound, height, lifetime and no-early-damage
+checks are unchanged. No native or Source attempt preceded this input correction.

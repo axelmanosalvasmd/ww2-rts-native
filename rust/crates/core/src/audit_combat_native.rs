@@ -318,7 +318,8 @@ fn cmb48_round_launch_has_profile_height_lifetime_and_no_early_damage() {
         ("at", 150.0, 9.81),
         ("flamer", 40.0, 0.0),
     ] {
-        let mut m = scene(&[(name, 0, 20.0, 20.0), ("rifle", 1, 25.0, 20.0)]);
+        let distance = if speed > 200.0 { 20.0 } else { 5.0 };
+        let mut m = scene(&[(name, 0, 20.0, 20.0), ("rifle", 1, 20.0 + distance, 20.0)]);
         let hp = m.world.game.units[&2].hp;
         m.fire_weapon(1, 2, false).unwrap();
         let f = m.firing.flights.values().next().unwrap();
