@@ -41,15 +41,7 @@ pub struct LocalDefender {
     pub spawn: Point,
     pub visible: Vec<u32>,
 }
-/// Intentional remembered building rows. Live units and health remain in Game.
-#[derive(Clone, Debug, PartialEq)]
-pub struct KnownBuilding {
-    pub id: u32,
-    pub kind: usize,
-    pub owner: usize,
-    pub at: Point,
-    pub built: Option<f64>,
-}
+pub use crate::vision::KnownBuilding;
 pub struct WorldRuntime {
     pub memory: crate::world_memory::WorldMemory,
     pub regions: Vec<RegionState>,
@@ -320,7 +312,10 @@ impl Match {
             recipients: Vec::new(),
             routing_fog: crate::fog::Fog::default(),
             tick_state: crate::match_tick::TickState::default(),
+            ordinary_snapshot_only: false,
             world_runtime: Some(runtime),
+            rail_runs: BTreeMap::new(),
+            classic_known_buildings: Default::default(),
             commands: crate::match_commands::MatchCommands::new(4096),
             grid: SpatialGrid::new(&world.game.units, 16.0),
             world,
@@ -339,6 +334,7 @@ impl Match {
             story: vec![crate::match_story::PlayerStory::default(); count],
             fallen: crate::match_story::FallenLocations::default(),
             finish: None,
+            tutorial: None,
             timeline: Vec::new(),
             next_unit_id: 1,
             rules,
@@ -635,7 +631,7 @@ impl Match {
                 (*at, home, distance)
             })
             .collect();
-        guarded.sort_by(|a, b| b.2.total_cmp(&a.2));
+        crate::sort::sort_by(&mut guarded, |a, b| b.2 - a.2);
         let count = guarded.len();
         for (index, (at, home, _)) in guarded.into_iter().enumerate() {
             if index as f64 >= count as f64 * 0.4 {
@@ -761,7 +757,9 @@ impl Match {
         Ok(())
     }
 }
-fn world_can_stamp(game: &Game, rules: &crate::rules::Rules, cells: &[usize]) -> bool {
+/// Test a bounded, nonempty footprint against physical terrain and live occupancy.
+/// World ownership, visibility and rail exclusions are separate placement queries.
+pub fn world_can_stamp(game: &Game, rules: &crate::rules::Rules, cells: &[usize]) -> bool {
     if cells.is_empty()
         || cells.iter().any(|&c| {
             c >= game.flags.len()

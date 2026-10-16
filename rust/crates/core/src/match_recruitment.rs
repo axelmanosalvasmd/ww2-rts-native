@@ -128,8 +128,7 @@ fn admission_facts<'a>(
         || count != start.economy.players.len()
         || player_rallies.len() != count
         || game.tick < 0
-        || (game.mode.is_some() && !horde)
-        || (options.mode == crate::economy::Mode::Horde && !horde)
+        || (!crate::match_actor::ordinary_ground_mode(game, options.mode) && !horde)
         || options.logistics
     {
         return Err(RecruitError::InvalidState("Conquest recruitment state"));
@@ -252,10 +251,157 @@ impl Match {
         if self.finish.is_some() || wallet.away || wallet.out {
             return Err(production::Error::Denied(Denial::Blocked).into());
         }
-        self.validate_conquest_finish_state()
+        self.validate_ordinary_finish_state()
             .map_err(RecruitError::Story)?;
+        if self
+            .rules
+            .kind(kind)
+            .is_some_and(|index| self.rules.kinds[index].air)
+        {
+            return self.recorded_aircraft_buy(slot, kind, from);
+        }
         let staged = recruit_parts!(self).stage(slot, kind, from, false)?;
         self.finish_recorded_buy(staged)
+    }
+    fn recorded_aircraft_buy(
+        &mut self,
+        slot: usize,
+        name: &str,
+        from: Option<u32>,
+    ) -> Result<CompletedRecruitUnit, RecruitError> {
+        // Parked planes need aircraft rows too. Refuse before payment or publication
+        // while the host uses the ordinary snapshot adapter.
+        if self.ordinary_snapshot_only {
+            return Err(RecruitError::Placement(
+                crate::produced_units::Error::UnsupportedAir,
+            ));
+        }
+        let facts = admission_facts(
+            &self.world.game,
+            &self.start,
+            &self.options,
+            &self.rules,
+            &self.player_rallies,
+        )?;
+        let context = facts.context(&self.options, self.world.game.naval);
+        let faction = self.start.players[slot].config.faction;
+        let admitted = self
+            .production
+            .prepare_recruit(&context, &mut self.start.economy, slot, faction, name, from)?
+            .request()
+            .clone();
+        self.validate_aviation()
+            .map_err(|e| RecruitError::Routing(e.to_string()))?;
+        let kind = self
+            .rules
+            .kind(name)
+            .ok_or(RecruitError::InvalidState("aircraft kind"))?;
+        let id = self.next_unit_id;
+        if self.aviation.planes.contains_key(&id)
+            || self.combat.get(id).is_some()
+            || self.firing.get(id).is_some()
+            || self.abilities.get(id).is_some()
+            || self.recovery.get(id).is_some()
+        {
+            return Err(RecruitError::InvalidState("occupied aircraft identity"));
+        }
+        let maker = self
+            .world
+            .game
+            .units
+            .get(&admitted.building)
+            .ok_or(RecruitError::InvalidState("missing aircraft maker"))?;
+        let catalog = Catalog::compiled().map_err(|e| RecruitError::Admission(e.into()))?;
+        let definition = catalog
+            .unit(name)
+            .map_err(|e| RecruitError::Admission(e.into()))?;
+        let fuel = catalog
+            .table("CFG")
+            .map_err(|e| RecruitError::Admission(e.into()))?
+            .get("air")
+            .and_then(|v| v.get("station"))
+            .and_then(|v| v.number())
+            .ok_or(RecruitError::InvalidState("aircraft fuel rule"))?;
+        let ammo = definition
+            .get("ammo")
+            .and_then(|v| v.number())
+            .ok_or(RecruitError::InvalidState("aircraft ammunition rule"))?;
+        let mut draft = crate::unit_publication::StagedUnit::aircraft(
+            &self.world.game,
+            &self.rules,
+            slot,
+            kind,
+            id,
+            u32::try_from(self.world.game.units.len())
+                .map_err(|_| RecruitError::InvalidState("aircraft count"))?,
+            self.start.players[slot].spawn,
+            maker.at(),
+        )
+        .map_err(RecruitError::Publication)?;
+        draft.recruitment = Some(RecruitMetadata {
+            building: admitted.building,
+            initial_rally: None,
+            initial_route_status: None,
+        });
+        let prepared = self.production.prepare_recruit(
+            &context,
+            &mut self.start.economy,
+            slot,
+            faction,
+            name,
+            from,
+        )?;
+        if prepared.request() != &admitted {
+            return Err(RecruitError::InvalidState("aircraft admission changed"));
+        }
+        let publication = crate::unit_publication::prepare_publication(
+            crate::unit_publication::PublicationParts {
+                units: &mut self.world.game.units,
+                grid: &mut self.grid,
+                controls: &mut self.commands.units,
+                recruitment: &mut self.recruit_metadata,
+                next_id: &mut self.next_unit_id,
+            },
+            &self.rules,
+            self.start.players.len(),
+            vec![draft],
+        )
+        .map_err(RecruitError::Publication)?;
+        let story = crate::match_story::prepare_story_updates(
+            &mut self.story,
+            false,
+            &[crate::match_story::StoryChange {
+                slot: Some(slot),
+                key: crate::match_story::StoryKey::MpSpent,
+                amount: admitted.spend.mp,
+            }],
+        )
+        .map_err(RecruitError::Story)?;
+        let purchase = prepared.commit();
+        publication.publish_with(|u, _| {
+            self.aviation.planes.insert(
+                u.id,
+                crate::match_aviation::AircraftRuntime {
+                    fuel,
+                    ammo,
+                    timer: 0.0,
+                    orbit: 0.0,
+                    mission: None,
+                    attack_pick: 0,
+                    downed: false,
+                },
+            );
+            self.combat.initialize(u.id).hit_by = Some(0);
+            self.firing.initialize(u.id);
+            self.abilities.initialize(u.id);
+            self.recovery.initialize(u.id);
+        });
+        story.commit();
+        Ok(CompletedRecruitUnit {
+            unit: id,
+            purchase,
+            route_status: None,
+        })
     }
     fn finish_recorded_buy(
         &mut self,
@@ -334,6 +480,10 @@ impl Match {
         winner_decided: bool,
         routing: Option<RecruitRouting<'_>>,
     ) -> Result<CompletedRecruitUnit, RecruitError> {
+        if self.options.mode == crate::economy::Mode::Tutorial {
+            self.validate_tutorial_state()
+                .map_err(RecruitError::Story)?;
+        }
         let mut parts = recruit_parts!(self);
         let mut staged = parts.stage(slot, kind, from, winner_decided)?;
         let mut paths = parts.commands.paths.clone();
@@ -372,31 +522,45 @@ impl RecruitParts<'_> {
         )?;
         let count = facts.count;
         let context = facts.context(self.options, game.naval);
-        let prepared = self.production.prepare_recruit(
-            &context,
-            &mut self.start.economy,
-            slot,
-            self.start.players[slot].config.faction,
-            kind,
-            from,
-        )?;
+        let prepared = if self.options.mode == crate::economy::Mode::Tutorial {
+            self.production.prepare_tutorial_recruit(
+                &context,
+                &mut self.start.economy,
+                slot,
+                self.start.players[slot].config.faction,
+                kind,
+            )?
+        } else {
+            self.production.prepare_recruit(
+                &context,
+                &mut self.start.economy,
+                slot,
+                self.start.players[slot].config.faction,
+                kind,
+                from,
+            )?
+        };
         let request = prepared.request();
-        let maker = game
-            .units
-            .get(&request.building)
-            .ok_or(RecruitError::InvalidState("admitted maker missing"))?;
-        let building_rally =
-            *self
+        let maker = if self.options.mode == crate::economy::Mode::Tutorial {
+            None
+        } else {
+            let maker = game
+                .units
+                .get(&request.building)
+                .ok_or(RecruitError::InvalidState("admitted maker missing"))?;
+            let rally = *self
                 .building_rallies
                 .get(&maker.id)
                 .ok_or(RecruitError::InvalidState(
                     "canonical producer rally missing",
                 ))?;
-        if self.production.building(maker.id).is_none() {
-            return Err(RecruitError::InvalidState(
-                "canonical producer state missing",
-            ));
-        }
+            if self.production.building(maker.id).is_none() {
+                return Err(RecruitError::InvalidState(
+                    "canonical producer state missing",
+                ));
+            }
+            Some((maker, rally))
+        };
         let kind_index = self
             .rules
             .kind(kind)
@@ -419,31 +583,51 @@ impl RecruitParts<'_> {
         let catalog = Catalog::compiled().map_err(|e| RecruitError::Admission(e.into()))?;
         let mut view = terrain_view(game);
         view.versions = self.versions;
-        let placed = self
-            .produced_placer
-            .produce(
-                self.rules,
-                catalog,
-                view,
-                &game.units,
-                ProduceInput {
-                    id: *self.next_unit_id,
-                    owner: slot,
-                    kind: kind_index,
-                    scatter_index: u32::try_from(game.units.len())
-                        .map_err(|_| RecruitError::InvalidState("unit count"))?,
-                    player_spawn: self.start.players[slot].spawn,
-                    player_rally: self.player_rallies[slot],
-                    building: ProductionBuilding {
-                        at: maker.at(),
-                        kind: maker.kind,
-                        rally: building_rally,
+        let placed = if let Some((maker, building_rally)) = maker {
+            self.produced_placer
+                .produce(
+                    self.rules,
+                    catalog,
+                    view,
+                    &game.units,
+                    ProduceInput {
+                        id: *self.next_unit_id,
+                        owner: slot,
+                        kind: kind_index,
+                        scatter_index: u32::try_from(game.units.len())
+                            .map_err(|_| RecruitError::InvalidState("unit count"))?,
+                        player_spawn: self.start.players[slot].spawn,
+                        player_rally: self.player_rallies[slot],
+                        building: ProductionBuilding {
+                            at: maker.at(),
+                            kind: maker.kind,
+                            rally: building_rally,
+                        },
+                        mode: self.options.mode,
+                        tick: game.tick as u64,
                     },
-                    mode: self.options.mode,
-                    tick: game.tick as u64,
-                },
-            )
-            .map_err(RecruitError::Placement)?;
+                )
+                .map_err(RecruitError::Placement)?
+        } else {
+            self.produced_placer
+                .produce_tutorial(
+                    self.rules,
+                    catalog,
+                    view,
+                    &game.units,
+                    crate::produced_units::TutorialProduceInput {
+                        id: *self.next_unit_id,
+                        owner: slot,
+                        kind: kind_index,
+                        scatter_index: u32::try_from(game.units.len())
+                            .map_err(|_| RecruitError::InvalidState("unit count"))?,
+                        home: self.start.players[slot].spawn,
+                        rally: self.player_rallies[slot],
+                        tick: game.tick as u64,
+                    },
+                )
+                .map_err(RecruitError::Placement)?
+        };
         let request = prepared.request().clone();
         drop(prepared);
         // Preflight canonical unit/allocator/control publication before reading routing.
@@ -502,14 +686,24 @@ impl RecruitParts<'_> {
         )?;
         let count = facts.count;
         let context = facts.context(self.options, game.naval);
-        let prepared = self.production.prepare_recruit(
-            &context,
-            &mut self.start.economy,
-            slot,
-            self.start.players[slot].config.faction,
-            &kind,
-            from,
-        )?;
+        let prepared = if self.options.mode == crate::economy::Mode::Tutorial {
+            self.production.prepare_tutorial_recruit(
+                &context,
+                &mut self.start.economy,
+                slot,
+                self.start.players[slot].config.faction,
+                &kind,
+            )?
+        } else {
+            self.production.prepare_recruit(
+                &context,
+                &mut self.start.economy,
+                slot,
+                self.start.players[slot].config.faction,
+                &kind,
+                from,
+            )?
+        };
         let request = prepared.request();
         if request != &admitted {
             return Err(RecruitError::InvalidState(

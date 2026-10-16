@@ -66,8 +66,7 @@ impl Match {
         }
         for id in &planned {
             let unit = &self.world.game.units[id];
-            let combat = self
-                .combat
+            self.combat
                 .get(*id)
                 .ok_or("missing World elimination combat metadata")?;
             if unit.entrench || unit.build {
@@ -78,22 +77,36 @@ impl Match {
             if self.field_works.is_active(*id) != unit.dig {
                 return Err("invalid World elimination paid-work projection".into());
             }
-            if unit.riding || combat.carrier.is_some() || !combat.cargo.is_empty() {
+        }
+        let planned_ids: BTreeSet<_> = planned.iter().copied().collect();
+        let wrecks_building = planned
+            .iter()
+            .any(|id| self.rules.kinds[self.world.game.units[id].kind].building);
+        for (&id, unit) in &self.world.game.units {
+            if !planned_ids.contains(&id) && !wrecks_building {
+                continue;
+            }
+            let Some(metadata) = self.combat.get(id) else {
+                continue;
+            };
+            if !unit.riding && metadata.carrier.is_none() && metadata.cargo.is_empty() {
+                continue;
+            }
+            if !self.validate_rail_tick_actor(id)? {
                 return Err("unsupported World elimination: cargo and rider links".into());
             }
-        }
-        if planned
-            .iter()
-            .any(|id| self.rules.kinds[self.world.game.units[id].kind].building)
-            && self.world.game.units.values().any(|unit| {
-                unit.riding
-                    || self
-                        .combat
-                        .get(unit.id)
-                        .is_some_and(|m| m.carrier.is_some() || !m.cargo.is_empty())
-            })
-        {
-            return Err("unsupported World building elimination: current cargo and riders".into());
+            // Source deletes a nation's train and its squads together, without unloading.
+            let removing = planned_ids.contains(&id);
+            if metadata
+                .carrier
+                .is_some_and(|train| planned_ids.contains(&train) != removing)
+                || metadata
+                    .cargo
+                    .iter()
+                    .any(|rider| planned_ids.contains(rider) != removing)
+            {
+                return Err("World elimination would split a train and its passengers".into());
+            }
         }
         let mut transaction = self.world.begin_transaction().map_err(|e| e.to_string())?;
         let mut environment = self.environment.clone();
@@ -207,6 +220,12 @@ impl Match {
     /// All fallible preparation has succeeded. This is metadata removal, not combat death.
     pub(crate) fn retire_world_metadata(&mut self, removed: &[Unit]) {
         for unit in removed {
+            for &train in self.rail_runs.keys() {
+                if let Some(metadata) = self.combat.get_mut(train) {
+                    metadata.cargo.retain(|&id| id != unit.id);
+                }
+            }
+            self.rail_runs.remove(&unit.id);
             self.field_works.cancel(unit.id);
             self.commands.units.remove(&unit.id);
             self.commands.requests.retire_unit(unit.id);

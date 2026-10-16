@@ -1,0 +1,5 @@
+- Connect aircraft purchases to their production building, wallet debit, full sortie reserves and ordinary unit metadata. Purchased planes stay at base instead of taking the ground rally route.
+- Execute queued aircraft Move and Attack orders when the plane is ready, preserve the eight-order limit during a sortie, and let queued bomber area commands take effect immediately.
+- Connect garrison entry and carrier ejection to the live tick, and run World trains through loading, travel, unloading and retirement without leaving stale passenger links.
+- Keep naval shore denials, World paratrooper admission, private air-effect projection and client squad followers outside this runtime batch because their interfaces or consumers remain unavailable.
+- Replaced obsolete aircraft weapon and queued-order refusal checks with supported paths. Removed the old missing-carrier tick refusal case because wreck ejection now handles an absent carrier, and kept malformed reciprocal-link and unregistered-train guards.

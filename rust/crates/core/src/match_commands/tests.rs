@@ -21,6 +21,7 @@ fn pt(p: Option<Point>) -> Value {
     p.map_or(Value::Null, |p| json!([bits(p.x), bits(p.z)]))
 }
 fn snapshot(m: &Match) -> Value {
+    crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
     Value::Array(m.world.game.units.values().map(|u| {
  let c=&m.commands.units[&u.id];let f=&m.firing.units[&u.id];
  let mut row=json!({"id":u.id,"x":bits(u.x),"z":bits(u.z),"rot":bits(u.rot),"aim":bits(c.aim),"path":u.path.iter().map(|p|pt(Some(*p))).collect::<Vec<_>>(),"reverse":pt(u.reverse),"pace":bits(u.pace),"worldGoal":pt(u.world_goal),"amove":pt(u.amove),"attackId":c.attack_id,"targetId":f.target_id,"follow":c.follow,"holdFire":c.hold_fire,"holdPos":u.hold_pos,"auto":c.auto_cast,"autoRetreat":c.auto_retreat});

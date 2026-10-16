@@ -21,6 +21,8 @@ extern crate self as ww2_core;
 #[cfg(test)]
 mod aligned_replay;
 #[cfg(test)]
+mod mov_runtime_batch;
+#[cfg(test)]
 mod native_order_intent_tests;
 
 pub mod ai_schedule;
@@ -30,7 +32,12 @@ pub mod catalog;
 pub mod client_view;
 pub mod combat;
 pub mod command_destinations;
+pub mod command_feedback;
 pub mod commander_ai;
+pub mod commander_assault;
+pub mod commander_classic_rules;
+mod commander_construction;
+mod commander_fortification;
 mod commander_forward_hq;
 pub mod commander_mind;
 mod commander_shopping;
@@ -50,12 +57,14 @@ pub mod fog;
 pub mod formation;
 pub mod game;
 pub mod grid;
+pub mod horde_commander;
 pub mod human_commander;
 pub mod human_commander_inputs;
 pub mod human_commander_policy;
 pub mod human_commander_state;
 pub mod human_commander_timing;
 pub mod match_horde;
+pub mod recipient_availability;
 
 #[cfg(test)]
 use crate as core_api;
@@ -68,6 +77,7 @@ pub mod match_companion_effects;
 mod match_companion_tick;
 pub mod match_companions;
 pub mod scenario_validation;
+pub mod seat_commander;
 
 pub(crate) mod existing_observers;
 pub mod logistics;
@@ -91,6 +101,9 @@ pub mod match_cover;
 mod match_destroy;
 pub mod match_end;
 pub mod match_firing;
+pub mod match_garrison;
+
+mod match_gates;
 pub mod match_ground_contact;
 pub mod match_ground_orders;
 pub mod match_ground_support;
@@ -104,6 +117,7 @@ pub mod match_runtime;
 pub mod match_story;
 pub mod match_support;
 pub mod match_tick;
+pub mod match_tutorial;
 pub mod match_withdrawal;
 pub mod match_world_elimination;
 pub mod match_world_end;
@@ -136,9 +150,11 @@ pub mod supply_convoys;
 pub mod supply_network;
 pub mod supply_routes;
 pub mod terrain;
+pub mod terrain_surface;
 pub mod traffic;
 pub mod traffic_knowledge;
 pub mod tutorial_steps;
+mod unit_placement;
 pub mod unit_publication;
 pub mod unit_spawn;
 pub mod vehicle;
@@ -162,7 +178,9 @@ pub mod match_world_tick;
 
 pub mod match_world_memory;
 pub mod world_memory;
+pub mod world_placement;
 pub mod world_recipient_metadata;
+pub mod world_supply;
 pub mod world_territories;
 
 pub mod staged_observer;
@@ -171,6 +189,12 @@ pub mod world_route_retention;
 
 pub mod startup_tables;
 
+#[cfg(test)]
+mod cmb5_ability_tests;
+#[cfg(test)]
+mod cmb5_base_dispatch_tests;
+#[cfg(test)]
+mod cmb5_match_tests;
 #[cfg(test)]
 mod combat_feature_tests;
 
@@ -182,3 +206,25 @@ mod engineering_intent_tests;
 
 #[cfg(test)]
 mod mov_intent_batch;
+
+#[cfg(test)]
+mod misc_bridge_tests;
+
+#[cfg(test)]
+mod misc_retreat_support_tests;
+
+#[cfg(test)]
+mod misc_map_save_tests;
+
+#[cfg(test)]
+#[path = "../../server/src/authoritative-map-data.rs"]
+pub(crate) mod shipped_map_fixtures;
+
+#[cfg(test)]
+mod point_supply_intent_tests;
+
+#[cfg(test)]
+mod mov_followup_speed_tests;
+
+#[cfg(test)]
+mod mov_followup_garrison_tests;

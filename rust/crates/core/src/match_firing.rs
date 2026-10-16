@@ -89,6 +89,17 @@ pub enum LaunchEvent {
         at: Point,
     },
     SmallArms(SmallArmsEvent),
+    /// Public, ephemeral Horde effects. These add no retained projectile state.
+    Breath {
+        shooter: UnitId,
+        target: UnitId,
+        owner: usize,
+        target_owner: usize,
+        at: Point,
+    },
+    BreathShell {
+        at: Point,
+    },
     Environment(crate::environment::Effect),
     Contact(ContactEvent),
     Expiry {
@@ -203,6 +214,16 @@ impl LaunchEvent {
                 }
                 value
             }
+            Self::Breath {
+                shooter,
+                target,
+                owner,
+                target_owner,
+                at,
+            } => {
+                json!({"f":shooter,"t":target,"fo":crate::game::source_owner_json(*owner),"to":crate::game::source_owner_json(*target_owner),"x":at.x,"z":at.z,"hit":true,"k":"kaiju","pub":true})
+            }
+            Self::BreathShell { at } => json!({"k":"shell","x":at.x,"z":at.z,"pub":true}),
             Self::Environment(e) => e.to_json(),
             Self::Expiry {
                 id,
@@ -266,6 +287,7 @@ pub struct LiveFlight {
     pub sequence: u32,
     pub max_contacts: u32,
     pub near: f64,
+    /// Launch cell, or usize::MAX for an aircraft launched outside the map.
     pub start_cell: usize,
     pub intended: Option<UnitId>,
     pub damage_scale: f64,
@@ -341,8 +363,17 @@ impl Match {
                 crate::economy::Mode::Default | crate::economy::Mode::Conquest,
                 None
             ) | (
+                crate::economy::Mode::Classic,
+                Some(crate::game::ModeKind::Classic)
+            ) | (
+                crate::economy::Mode::Tutorial,
+                Some(crate::game::ModeKind::Tutorial)
+            ) | (
                 crate::economy::Mode::World,
                 Some(crate::game::ModeKind::World)
+            ) | (
+                crate::economy::Mode::Horde,
+                Some(crate::game::ModeKind::Horde)
             )
         ) {
             return Err("weapon execution requires ordinary Conquest mode".into());
@@ -366,8 +397,7 @@ impl Match {
         self.firing.prior_tick = Some(self.world.game.tick + 1);
         Ok(())
     }
-    /// Admit aircraft as observed context only. Their canonical sortie owner
-    /// validates physical state and metadata; this does not admit air weapons.
+    /// Validate aircraft through their canonical sortie owner before ground or air firing.
     pub(crate) fn validate_aircraft_firing_context(&self) -> Result<(), String> {
         if self
             .world
@@ -376,7 +406,7 @@ impl Match {
             .values()
             .any(|u| u.air.is_some() || self.rules.kinds.get(u.kind).is_some_and(|kind| kind.air))
         {
-            self.validate_aviation()
+            self.validate_aviation_observation()
                 .map_err(|error| error.to_string())?;
             if self.world.game.units.values().any(|u| {
                 u.air.is_some() && (u.x.abs() > 1_073_741_824.0 || u.z.abs() > 1_073_741_824.0)
@@ -411,7 +441,7 @@ impl Match {
         }
         Ok(())
     }
-    fn firing_damage_view<'a>(
+    pub(crate) fn firing_damage_view<'a>(
         &'a mut self,
         unit_order: &'a [UnitId],
     ) -> (crate::match_combat::DamageWorld<'a>, &'a mut FiringState) {
@@ -588,7 +618,7 @@ impl Match {
             shooter: p.shooter,
             kind: p.source_kind,
             owner: p.owner as i32,
-            airborne: false,
+            airborne: self.rules.kinds[p.source_kind].air,
         };
         let impact = Impact {
             owner: p.owner as i32,
@@ -764,7 +794,14 @@ impl Match {
                 || p.source_kind >= self.rules.kinds.len()
                 || crate::match_actor::checked_game_owner(&self.world.game, p.owner).is_err()
                 || self.combat.get(p.shooter).is_none()
-                || p.start_cell >= self.world.game.flags.len()
+                || (p.start_cell >= self.world.game.flags.len()
+                    && (p.start_cell != usize::MAX
+                        || !self.rules.kinds[p.source_kind].air
+                        || self
+                            .world
+                            .game
+                            .cell_of(p.launch_origin.x, p.launch_origin.z)
+                            .is_some()))
                 || p.max_contacts > 16
                 || p.sequence > p.max_contacts
                 || ![
@@ -947,17 +984,10 @@ impl Match {
         let g = &self.world.game;
         let level_height = n(self.firing_config()?, "levelHeight", 2.5);
         let mut best: Option<FlightContact> = None;
-        for c in projectiles::crossed_cells(
-            projectiles::BodyPosition { x: a.x, z: a.z },
-            projectiles::BodyPosition { x: b.x, z: b.z },
-            CELL,
-            g.w,
-            g.h,
-        )
-        .map_err(|e| format!("flight cell traversal: {e:?}"))?
-        {
+        for c in self.flight_crossed_cells(a, b)? {
             let ch = g.physical(c);
             if p.sequence == 0
+                && p.start_cell < g.flags.len()
                 && (c == p.start_cell
                     || (ch == b'#'
                         && (c % g.w).abs_diff(p.start_cell % g.w) <= 1
@@ -1071,7 +1101,120 @@ impl Match {
         }
         Ok(best)
     }
-    fn fire_weapon(&mut self, id: UnitId, target: UnitId, moving: bool) -> Result<(), String> {
+    fn fire_breath(&mut self, id: UnitId, target: UnitId) -> Result<(), String> {
+        self.supported_firing_mode()?;
+        if self.options.mode != crate::economy::Mode::Horde {
+            return Err("beam firing requires canonical Horde mode".into());
+        }
+        self.validate_firing_units()?;
+        let g = &self.world.game;
+        let u = g.units.get(&id).ok_or("missing breath shooter")?;
+        let t = g.units.get(&target).ok_or("missing breath target")?;
+        if self.rules.kinds[u.kind].name != "kaiju" {
+            return Err("unsupported beam weapon".into());
+        }
+        let w = self.weapon(u)?.ok_or("missing breath weapon")?;
+        let (at, owner, target_owner) = (u.at(), u.owner, t.owner);
+        let length = dist(at, t.at());
+        let d = if length == 0.0 { 1.0 } else { length };
+        let direction = Point {
+            x: (t.x - at.x) / d,
+            z: (t.z - at.z) / d,
+        };
+        let range = n(w, "range", 0.0);
+        let width = n(w, "beam", 0.0);
+        let interval = n(w, "interval", 0.0);
+        let scar = n(
+            self.firing_config()?
+                .get("scar")
+                .ok_or("missing scar rules")?,
+            "tank",
+            0.0,
+        );
+        let profile = ExplosionSource::weapon(u.kind, &self.rules).map_err(|e| e.to_string())?;
+        let unit_order = g.units.keys().copied().collect::<Vec<_>>();
+        let mut targets = Vec::new();
+        let skip_buildings = BTreeSet::new();
+        for v in g.units.values() {
+            if v.hp <= 0.0 || v.air.is_some() || v.riding || g.allied(owner, v.owner) {
+                continue;
+            }
+            let dx = v.x - at.x;
+            let dz = v.z - at.z;
+            let along = dx * direction.x + dz * direction.z;
+            if along > 0.0
+                && along <= range
+                && (dz * direction.x - dx * direction.z).abs()
+                    <= width + n(self.definition(v)?, "radius", 1.5)
+            {
+                targets.push(v.id);
+            }
+        }
+        let (mut damage, firing) = self.firing_damage_view(&unit_order);
+        for victim in targets {
+            let hurt = damage
+                .hurt(victim, profile, 1.0, owner as i32, firing)
+                .map_err(|e| e.to_string())?;
+            firing
+                .events
+                .push(LaunchEvent::Environment(crate::environment::Effect::Hurt(
+                    hurt,
+                )));
+        }
+        let mut memory = crate::environment::DamageMemory::default();
+        let mut hit = crate::environment::DamageContext::plain(&skip_buildings);
+        hit.owner = Some(owner as i32);
+        hit.actor_order = Some(&unit_order);
+        hit.memory = Some(&mut memory);
+        let mut sample = 4.0;
+        while sample <= range {
+            damage
+                .terrain_blast_emitting(
+                    crate::environment::Blast {
+                        at: Point {
+                            x: at.x + direction.x * sample,
+                            z: at.z + direction.z * sample,
+                        },
+                        radius: width,
+                        damage: profile.terrain.unwrap_or(0.0),
+                        scar,
+                    },
+                    &mut hit,
+                    &mut |effect| firing.events.push(LaunchEvent::Environment(effect)),
+                )
+                .map_err(|e| e.to_string())?;
+            sample += CELL;
+        }
+        firing.events.push(LaunchEvent::Breath {
+            shooter: id,
+            target,
+            owner,
+            target_owner,
+            at: Point {
+                x: at.x + direction.x * range,
+                z: at.z + direction.z * range,
+            },
+        });
+        let mut sample = 8.0;
+        while sample <= range {
+            firing.events.push(LaunchEvent::BreathShell {
+                at: Point {
+                    x: at.x + direction.x * sample,
+                    z: at.z + direction.z * sample,
+                },
+            });
+            sample += 8.0;
+        }
+        self.firing.initialize(id).cooldown = interval;
+        self.world.game.units.get_mut(&id).unwrap().shot_at = Some(self.world.game.tick as f64);
+        Ok(())
+    }
+    pub(crate) fn fire_weapon(
+        &mut self,
+        id: UnitId,
+        target: UnitId,
+        moving: bool,
+    ) -> Result<(), String> {
         let g = &self.world.game;
         let u = &g.units[&id];
         let t = &g.units[&target];
@@ -1086,6 +1229,9 @@ impl Match {
             self.launch_weapon_salvo(id, at, None)?;
             self.firing.initialize(id).cooldown = interval * supply_rate;
             return Ok(());
+        }
+        if flag(w, "beam") {
+            return self.fire_breath(id, target);
         }
         let per_model = flag(w, "perModel");
         let requested = if per_model {
@@ -1179,8 +1325,7 @@ impl Match {
         let bearing = math::atan2(aim.z - u.z, aim.x - u.x);
         let from = projectiles::Point3::new(
             u.x,
-            f64::from(g.level_at(u.x, u.z)) * level_height
-                + if u.garrison.is_some() { 3.5 } else { 1.2 },
+            f64::from(g.level_at(u.x, u.z)) * level_height + self.weapon_launch_height(u),
             u.z,
         );
         let profile = projectiles::projectile_profile(
@@ -1263,7 +1408,7 @@ impl Match {
                 sequence: 0,
                 max_contacts: profile.max_contacts,
                 near: profile.near,
-                start_cell: g.cell_of(u.x, u.z).ok_or("shooter outside battlefield")?,
+                start_cell: self.weapon_start_cell(u)?,
                 intended: Some(target),
                 damage_scale,
                 armor_piercing: ap,
@@ -1459,8 +1604,8 @@ impl Match {
             self.commands.units.get_mut(&id).unwrap().aim = u.rot;
             return Ok(());
         };
-        if flag(w, "beam") {
-            return Err("beam firing is unsupported".into());
+        if flag(w, "beam") && self.options.mode != crate::economy::Mode::Horde {
+            return Err("beam firing requires canonical Horde mode".into());
         }
         let hull = !kind.infantry && !kind.structure && !moving;
         if hull {
@@ -1800,7 +1945,7 @@ impl Match {
         row.retarget -= dt;
         Ok(())
     }
-    fn pick_firing_target(&self, id: UnitId) -> Result<UnitId, String> {
+    pub(crate) fn pick_firing_target(&self, id: UnitId) -> Result<UnitId, String> {
         let g = &self.world.game;
         let u = &g.units[&id];
         let w = self.weapon(u)?.ok_or("unarmed target selection")?;
@@ -1809,17 +1954,19 @@ impl Match {
         let team = actor.team;
         let salvo = flag(w, "salvo");
         let pool = if salvo {
-            self.grid
-                .unordered(&g.units, (u.x, u.z), n(w, "range", 0.0) + 6.0, |_, t| {
-                    !t.riding && !g.allied(t.owner, u.owner) && actor.sees(t.id)
-                })
+            self.grid.unordered(
+                &g.units,
+                (u.x, u.z),
+                self.weapon_range(u, w)? + 6.0,
+                |_, t| !t.riding && !g.allied(t.owner, u.owner) && actor.sees(t.id),
+            )
         } else {
             vec![]
         };
         let targets = self.grid.in_order(
             &g.units,
             (u.x, u.z),
-            n(w, "range", 0.0) + if g.naval { 55.0 } else { 0.0 },
+            self.weapon_range(u, w)? + if g.naval { 55.0 } else { 0.0 },
             |_, t| t.hp > 0.0 && t.air.is_none() && !g.allied(t.owner, u.owner) && actor.sees(t.id),
         );
         let mut best = 0;
@@ -1953,6 +2100,26 @@ impl Match {
     fn weapon(&self, u: &Unit) -> Result<Option<&'static Value>, String> {
         Ok(self.definition(u)?.get("w"))
     }
+    pub(crate) fn weapon_range(&self, unit: &Unit, weapon: &Value) -> Result<f64, String> {
+        let range = n(weapon, "range", 0.0);
+        let name = &self.rules.kinds[unit.kind].name;
+        let in_pit = matches!(name.as_str(), "mg" | "at" | "mortar" | "flak" | "howitzer")
+            && self.world.game.cell_of(unit.x, unit.z).is_some_and(|cell| {
+                self.field_works.pits().contains(&cell) && self.world.game.chars[cell] == b'T'
+            });
+        if !in_pit {
+            return Ok(range);
+        }
+        let bonus = Catalog::compiled()
+            .map_err(|e| e.to_string())?
+            .table("FORTS")
+            .map_err(|e| e.to_string())?
+            .get("nest")
+            .and_then(|v| v.get("range"))
+            .and_then(Value::number)
+            .ok_or("missing Gun Pit range rule")?;
+        Ok(range * bonus)
+    }
     fn hull_point(&self, from: Point, target: &Unit) -> Point {
         let h = self.rules.kinds[target.kind].hull;
         if h == 0.0 {
@@ -2026,7 +2193,7 @@ impl Match {
         let Some(w) = self.weapon(u)? else {
             return Ok(false);
         };
-        let range = n(w, "range", 0.0);
+        let range = self.weapon_range(u, w)?;
         if range == 0.0
             || !self.logistics.can_fire(u.id, 1.0)
             || t.hp <= 0.0
@@ -2039,7 +2206,7 @@ impl Match {
             return Ok(false);
         }
         if u.air.is_some() {
-            return Err("air weapon firing is unsupported".into());
+            return Ok(true);
         }
         Ok(if flag(w, "salvo") {
             dist(u.at(), self.hull_point(u.at(), t)) >= n(w, "minRange", f64::NAN)
@@ -2166,8 +2333,8 @@ impl Match {
             || self.combat.get(id).is_none()
             || self.firing.get(id).is_none()
             || self.logistics.get(id).is_some_and(|r| !r.ammo.is_finite())
-            || u.air.is_some()
-            || flag(self.definition(u)?, "air")
+            || (u.air.is_some() != flag(self.definition(u)?, "air"))
+            || (self.rules.kinds[u.kind].air && !vision::airborne(u))
             || u.riding
             || ![at.x, at.z].iter().all(|v| v.is_finite())
             || !(0.0..=self.world.game.w as f64 * CELL).contains(&at.x)
@@ -2225,7 +2392,7 @@ impl Match {
         let height = n(self.firing_config()?, "levelHeight", 2.5);
         let from = projectiles::Point3::new(
             u.x,
-            f64::from(g.level_at(u.x, u.z)) * height + if u.garrison.is_some() { 3.5 } else { 1.2 },
+            f64::from(g.level_at(u.x, u.z)) * height + self.weapon_launch_height(u),
             u.z,
         );
         let end = projectiles::Point3::new(
@@ -2262,7 +2429,7 @@ impl Match {
             sequence: 0,
             max_contacts: profile.max_contacts,
             near: profile.near,
-            start_cell: g.cell_of(u.x, u.z).ok_or("shooter outside battlefield")?,
+            start_cell: self.weapon_start_cell(u)?,
             intended: None,
             damage_scale: 1.0,
             armor_piercing: false,
@@ -2471,9 +2638,23 @@ mod world_ground_actor_tests;
 #[path = "mov_audit_reaction_tests.rs"]
 mod mov_audit;
 
+#[path = "match_firing_geometry.rs"]
+mod geometry;
+
+#[cfg(test)]
+#[path = "runtime_combat_batch3.rs"]
+mod runtime_batch3;
+
+#[cfg(test)]
+#[path = "audit_combat_damage.rs"]
+mod audit_damage;
 #[cfg(test)]
 #[path = "audit_combat_native.rs"]
 mod audit_native;
+
+#[cfg(test)]
+#[path = "engineering_runtime2_pit_tests.rs"]
+mod engineering_runtime2_pit_tests;
 
 #[cfg(test)]
 #[path = "map_feature_tests.rs"]
@@ -2482,3 +2663,7 @@ mod map_feature_tests;
 #[cfg(test)]
 #[path = "map_intent_batch2_tests.rs"]
 mod map_intent_batch2;
+
+#[cfg(test)]
+#[path = "match_kaiju_tests.rs"]
+mod match_kaiju_tests;

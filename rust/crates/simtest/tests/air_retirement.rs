@@ -129,6 +129,7 @@ fn scene(f: &Value, case: &Value) -> Match {
                 timer: a["timer"].as_f64().unwrap(),
                 orbit: a["ang"].as_f64().unwrap(),
                 mission: None,
+                attack_pick: 0,
                 downed: false,
             }
         });

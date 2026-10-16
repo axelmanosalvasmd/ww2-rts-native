@@ -1,7 +1,6 @@
 //! Paid sites and the source-positioned builder/crew phases. No second job or queue authority.
 use crate::{
     catalog::{Catalog, Value},
-    economy::Mode,
     game::Unit,
     grid::UnitId,
     match_commands::UnitControl,
@@ -266,8 +265,7 @@ impl Match {
 
     /// Read-only admission. The sole runner calls this before inputs and again before its clock.
     pub fn validate_construction_tick(&self) -> Result<(), String> {
-        if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
-            || self.world.game.mode.is_some()
+        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
             || self.world.game.tick < 0
         {
             return Err("construction phases require ordinary Conquest".into());
@@ -324,9 +322,7 @@ impl Match {
         id: UnitId,
         frame: &mut ConstructionFrame,
     ) -> Result<(), String> {
-        if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
-            || self.world.game.mode.is_some()
-        {
+        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
             return Err("construction worker requires ordinary Conquest".into());
         }
         if frame.tick != self.world.game.tick || frame.workers.contains(&id) {
@@ -413,7 +409,7 @@ impl Match {
         if frame.tick != self.world.game.tick {
             return Err("stale construction crew frame".into());
         }
-        self.validate_conquest_finish_state()?;
+        self.validate_ordinary_finish_state()?;
         let dt = self.rules.movement.tick;
         if !dt.is_finite() || dt <= 0.0 {
             return Err("invalid construction interval".into());
@@ -549,7 +545,7 @@ impl Match {
         command: &crate::match_commands::Command,
     ) -> Result<Vec<UnitId>, String> {
         self.validate_construction_tick()?;
-        self.validate_conquest_finish_state()?;
+        self.validate_ordinary_finish_state()?;
         if owner >= self.world.game.players.len()
             || !self.start.economy.players[owner].mp.is_finite()
         {
@@ -667,11 +663,12 @@ impl Match {
                         None,
                     )
                     .map_err(|e| format!("construction garrison exit: {e:?}"))?;
-                unit.x = (cell % game.w) as f64 * crate::game::CELL + crate::game::CELL / 2.0;
-                unit.z = (cell / game.w) as f64 * crate::game::CELL + crate::game::CELL / 2.0;
-                unit.garrison = None;
+                crate::unit_placement::place_unit(&mut preview.grid, &mut unit, |unit| {
+                    unit.x = (cell % game.w) as f64 * crate::game::CELL + crate::game::CELL / 2.0;
+                    unit.z = (cell / game.w) as f64 * crate::game::CELL + crate::game::CELL / 2.0;
+                    unit.garrison = None;
+                });
                 preview.physical.world.game.units.insert(id, unit.clone());
-                preview.grid.update(id, &unit);
             }
             preview.routed = true;
             let receipt = crate::match_routing::refresh_recipient_parts(

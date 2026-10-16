@@ -1,0 +1,1 @@
+- Updated the low-tier Gate rejection test to expect the tier denial now that ordinary matches support paid Gates. The test retains its unchanged-state, empty-job and subsequent tick and snapshot checks.

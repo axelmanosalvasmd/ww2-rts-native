@@ -25,11 +25,7 @@ fn denial(reason: Reason) -> Denial {
 }
 impl Match {
     pub(super) fn validate_field_work_state(&self) -> Result<(), String> {
-        if !matches!(
-            self.options.mode,
-            crate::economy::Mode::Default | crate::economy::Mode::Conquest
-        ) || self.world.game.mode.is_some()
-        {
+        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
             return Err("Match field works support Conquest only".into());
         }
         if self.world.game.tick < 0 || self.world.game.tick > 9_007_199_254_740_991 {
@@ -114,6 +110,9 @@ impl Match {
         };
         if winner_decided || player.away || player.out {
             return Ok(Some(Denial::Blocked));
+        }
+        if kind == FortKind::Gate && !self.ordinary_gate_mode() {
+            return Ok(Some(Denial::Unsupported));
         }
         self.validate_field_work_state()?;
         let tier_denial = self.dig_tier_denial(owner, kind)?;
@@ -274,11 +273,14 @@ impl Match {
                     )
                     .expect("prepared field cancellation");
                     prepared.commit(&mut self.field_works);
-                    self.world.game.units.insert(id, unit);
+                    crate::unit_placement::place_unit(
+                        &mut self.grid,
+                        self.world.game.units.get_mut(&id).unwrap(),
+                        |current| *current = unit,
+                    );
                     self.commands.units.insert(id, control);
                     self.firing.units.insert(id, firing);
                     *self.abilities.get_mut(id).unwrap() = ability;
-                    self.grid.update(id, &self.world.game.units[&id]);
                     story.commit();
                     return Ok(None);
                 }
@@ -373,9 +375,9 @@ impl Match {
             .field_works
             .step_unit(&mut self.world, id, dt)
             .map_err(|e| format!("field work step: {e}"))?;
-        if let Some((cell, direction)) = result.wall {
+        if let Some((kind, cell, direction)) = result.concrete {
             let wall = self.next_unit_id;
-            self.place_starting_building(owner, "wall", cell)?;
+            self.place_starting_building(owner, kind.as_str(), cell)?;
             self.world.game.units.get_mut(&wall).unwrap().rot = direction;
         }
         if result.completed.is_some() {
