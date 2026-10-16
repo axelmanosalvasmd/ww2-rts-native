@@ -149,3 +149,6 @@ pub mod staged_observer;
 pub mod world_route_retention;
 
 pub mod startup_tables;
+
+#[cfg(test)]
+mod engineering_intent_tests;
