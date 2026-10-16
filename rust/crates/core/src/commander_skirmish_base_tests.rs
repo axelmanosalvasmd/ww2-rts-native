@@ -111,7 +111,7 @@ fn terrain(input: &Input) -> Game {
         sections: BTreeMap::new(),
     }
 }
-fn run(input: Input, budget: f64, sees: impl Fn(Point) -> bool) -> BasePlan {
+fn run(input: Input, budget: f64, sees: impl Fn(Point) -> bool) -> Plan {
     let ground = terrain(&input);
     let observation = Observation::new(input).unwrap();
     let squads: Vec<_> = observation
@@ -120,9 +120,9 @@ fn run(input: Input, budget: f64, sees: impl Fn(Point) -> bool) -> BasePlan {
         .iter()
         .filter(|u| u.owner == 0 && u.id < 10)
         .collect();
-    plan(&observation, &squads, budget, &ground, sees).unwrap()
+    plan(&observation, &squads, budget, false, &ground, sees).unwrap()
 }
-fn kind(plan: &BasePlan) -> Option<&str> {
+fn kind(plan: &Plan) -> Option<&str> {
     plan.commands.first().and_then(|c| c["kind"].as_str())
 }
 fn tier(input: &mut Input, n: u8) {
@@ -146,9 +146,9 @@ fn intent_ai52_rebuilds_hq_then_unlocks_production_and_tier_two_armory() {
     ] {
         let result = run(fixture(&buildings), 2000.0, |_| true);
         assert_eq!(kind(&result), Some(expected));
-        assert_eq!(result.assigned, Some(1));
+        assert_eq!(result.builders, vec![1]);
         assert_eq!(result.reserve, 0.0);
-        assert!(result.spent > 0.0);
+        assert!(result.remaining_mp < 2000.0);
     }
     let mut input = fixture(&["hq", "barracks", "motorpool", "airfield"]);
     tier(&mut input, 2);
@@ -193,7 +193,7 @@ fn intent_ai52_finishes_before_repair_and_repairs_strictly_below_eighty_percent(
 fn intent_ai52_nearest_free_builder_working_freeze_and_unaffordable_reserve() {
     let mut input = fixture(&["hq"]);
     input.units[0].target_id = 10;
-    assert_eq!(run(input.clone(), 2000.0, |_| true).assigned, Some(2));
+    assert_eq!(run(input.clone(), 2000.0, |_| true).builders, vec![2]);
     input.units[0].build = true;
     let working = run(input, 2000.0, |_| true);
     assert!(working.commands.is_empty());
@@ -201,7 +201,7 @@ fn intent_ai52_nearest_free_builder_working_freeze_and_unaffordable_reserve() {
     let poor = run(fixture(&[]), 0.0, |_| true);
     assert!(poor.commands.is_empty());
     assert_eq!(poor.reserve, 200.0);
-    assert_eq!(poor.spent, 0.0);
+    assert_eq!(poor.remaining_mp, 0.0);
 }
 
 #[test]
@@ -250,7 +250,10 @@ fn intent_ai52_naval_coast_horde_shared_bases_and_construction_mode_exclusion() 
     for mode in [Mode::Classic, Mode::World] {
         let mut input = fixture(&[]);
         input.runtime.as_mut().unwrap().mode = mode;
-        assert_eq!(run(input, 2000.0, |_| true), BasePlan::default());
+        let plan = run(input, 2000.0, |_| true);
+        assert!(plan.commands.is_empty());
+        assert!(plan.builders.is_empty());
+        assert_eq!(plan.remaining_mp, 2000.0);
     }
 }
 

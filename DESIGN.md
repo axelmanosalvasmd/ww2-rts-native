@@ -10,6 +10,14 @@ Concrete cells use the existing finished-building publisher so their unit, contr
 
 Waiting Dig orders use the existing unit queue and ordinary paid Dig activation. The recipient adapter emits the existing engineering order kind for those waiting orders. Default/Conquest admission remains bounded; Classic and World field-work rooms stay guarded. No FFI, header, wire schema, contract or privacy policy changes.
 
+## AI shopping construction inputs (2026-10-16)
+
+Shopping receives the remaining budget and the reserves produced by the same detached planning pass. The observation no longer carries estimated build and fortification reserve amounts or a precomputed free-node count. Public resource positions, delivered depot memories and explicit owned-node indices provide the inputs. Node claims use only delivered depots and remembered enemy depots, at strictly less than eight metres. World engineer demand counts every unclaimed delivered node; its construction reserve considers only nodes on delivered owned ground.
+
+Construction and fortification proposals use the existing canonical command path. Builders assigned earlier in the pass remain busy, so later movement cannot replace their new jobs. Fortification still computes its reserve after base construction or repair. Assigned workers stay excluded, and proposed building positions join the fortification site exclusions so two jobs cannot spend against overlapping footprints. A delivered own-worker wall-work fact distinguishes wall Dig from ordinary Dig when deciding whether another crew may fortify. Candidate and worker ties use stable node indices and unit IDs. Fortification progress belongs to the existing private per-seat policy state, outside Match and recipient snapshots. Wall fortification dispatch remains separate work. Gate Dig remains unsupported at command admission. The planner computes their reserve thresholds but emits neither command and charges neither cost.
+
+The live observation producer remains limited to Default and Conquest. Classic and World shopping and reserve decisions can be exercised with detached inputs; this does not admit those modes or complete their construction and observation providers. Full construction, fortification and FireAt chores remain separate parity work. No FFI, C header, wire, contract or privacy change is included.
+
 ## Runtime engineering: native bridge identity (2026-10-16)
 
 Paid bridges and Fill use the existing field-work jobs and canonical World mutations. Newly constructed bridge graphs use deterministic identities derived from the first cell and the append-only structure count. Repair reuses an existing bridge section identity, restores wood and 200 HP, and reconnects neighboring sections. These graph identities stay separate from the shared actor ID allocator, so construction does not advance actor IDs. Support, terrain invalidation and hull-width queries continue to use the canonical graph and physical terrain. This is an internal identity choice; no new wire or ABI shape is introduced.
@@ -4921,3 +4929,21 @@ AI-49 needs the missing Garrison actuator and complete holder fortification.
 AI-50 needs the currently unsupported Gate actuator and its complete lifecycle.
 AI-56 remains held for that HQ fortification dependency, despite the existing
 70-metre defender rule and the added detached bunker-target selection.
+
+## PR 352 repair after AI-33 integration (2026-10-16)
+
+PR #352 merges after #351. The merged tactics caller runs one construction
+pass in `commander_construction`, retaining AI-33's reserves and rider
+exclusion together with the skirmish repair, tech, visible-site, supply-node
+and coast rules. Forward HQ planning follows repairs within that pass.
+Later assault planning receives a detached view with this look's build,
+assist and field-work assignments mirrored into unit state, as the prototype
+does before its assault pass. Assault threats use the same live sightings
+that tactics retains after clearing visible empty ground. Recent strategic
+reports still serve the separate Classic adaptive rules.
+
+The regression tests exercise construction assignments during an assault
+phase transition and distinguish cleared contacts from armor still under
+fog. Ordinary Conquest lifecycle coverage also runs the tactics caller,
+canonical commands and every seat's snapshots through victory and ending
+ticks. Existing mode, command, tick and snapshot guards remain in force.

@@ -639,3 +639,143 @@ fn intent_ai55_world_recon_uses_only_discovered_enemy_homes() {
             .any(|c| c["t"] == "support" && c["kind"] == "recon" && c["x"] == 150.0)
     );
 }
+
+#[test]
+fn ai_batch7_tactics_caller_survives_ordinary_match_and_every_seat_snapshot() {
+    use crate::{
+        economy::Faction,
+        economy_state::ArmySize,
+        map::AuthoritativeMap,
+        match_commands::Command,
+        match_runtime::{Match, MatchOptions, PlayerConfig},
+        orders::OrderKey,
+        recipient_snapshot::{DeliveryState, SelectedSeat},
+        unit_publication::StagedUnit,
+        weather::WeatherChoice,
+    };
+    let map = AuthoritativeMap::from_json(
+        &serde_json::to_vec(&json!({
+            "name":"AI batch seven tactics lifecycle","w":160,"h":80,
+            "rows":vec![".".repeat(160);80],
+            "spawns":[{"x":4,"y":4},{"x":155,"y":75}],
+            "points":[{"x":20,"y":30},{"x":55,"y":30,"mp":0,"vp":0}]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let mut m = Match::new(
+        &map,
+        MatchOptions {
+            seed: 7553,
+            mode: Mode::Conquest,
+            players: (0..2)
+                .map(|team| PlayerConfig {
+                    name: format!("Seat {team}"),
+                    team,
+                    faction: Faction::Usa,
+                })
+                .collect(),
+            shuffle: false,
+            army: ArmySize::Standard,
+            weather: WeatherChoice::Map,
+            weather_seed: Some(1),
+            living_weather: false,
+            map_key: None,
+            tech: false,
+            supply: false,
+            logistics: false,
+            sandbox: false,
+        },
+    )
+    .unwrap();
+    for (i, kind) in ["rifle", "rifle", "mg"].iter().enumerate() {
+        let id = m.next_unit_id;
+        let draft = StagedUnit::ordinary(
+            &m.world.game,
+            &m.rules,
+            0,
+            m.rules.kind(kind).unwrap(),
+            id,
+            i as u32,
+            m.start.players[0].spawn,
+            Some(Point {
+                x: 31.0 + i as f64 * 4.0,
+                z: 41.0,
+            }),
+        )
+        .unwrap();
+        m.publish_starting_unit(draft).unwrap();
+    }
+    m.start.win_vp = 30.0;
+    m.start.points[0].owner = Some(0);
+    m.start.points[1].owner = Some(1);
+    let mut state = State::default();
+    let mut random = MatchRandom::new(7553);
+    let mut delivery = DeliveryState::new(&m).unwrap();
+    let mut sequence = 0;
+    let mut planned = 0;
+    let mut emitted = 0;
+    let mut saw_assemble = false;
+    let mut saw_phase_change = false;
+    let mut finish = None;
+    for _ in 0..800 {
+        if m.world.game.tick % 2 == 0 && m.finish.is_none() {
+            let observation = m.opening_commander_observation(0).unwrap();
+            let commands = plan(&observation, &[], &mut state, Level::Normal, &mut random).unwrap();
+            planned += 1;
+            if let Some(operation) = &state.assault.operation {
+                saw_assemble |= operation.phase == crate::commander_assault::Phase::Assemble
+                    && !operation.members.is_empty();
+                saw_phase_change |= saw_assemble
+                    && operation.phase != crate::commander_assault::Phase::Assemble
+                    && !operation.members.is_empty();
+            }
+            for value in commands {
+                m.enqueue_command(
+                    OrderKey {
+                        tick: m.world.game.tick as u64 + 1,
+                        issuer: 0,
+                        sequence,
+                    },
+                    Command::from_json(&value).unwrap(),
+                )
+                .unwrap();
+                sequence += 1;
+                emitted += 1;
+            }
+        }
+        let report = m.advance_tick().unwrap();
+        assert!(
+            report
+                .commands
+                .iter()
+                .all(|command| command.denial.is_none()),
+            "{:?}",
+            report.commands
+        );
+        assert_eq!(m.tick_state.fault(), None);
+        let selected = [0, 1].map(|slot| SelectedSeat {
+            slot,
+            full: false,
+            omit: false,
+        });
+        let frame = delivery
+            .capture_selected_with_tick_events(&mut m, &selected, &report.events)
+            .unwrap()
+            .unwrap();
+        for slot in 0..2 {
+            assert_eq!(frame.recipient(slot).unwrap().into_json()["t"], "s");
+        }
+        if m.finish.is_some() {
+            let end = *finish.get_or_insert(m.world.game.tick);
+            if m.world.game.tick >= end + 8 {
+                break;
+            }
+        }
+    }
+    assert!(planned > 0 && emitted > 0);
+    assert!(saw_assemble && saw_phase_change);
+    assert!(m.finish.is_some());
+    assert!(m.world.game.tick >= finish.unwrap() + 8);
+    assert_eq!(m.tick_state.fault(), None);
+}

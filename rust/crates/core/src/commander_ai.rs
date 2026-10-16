@@ -268,6 +268,15 @@ impl Observation {
                     .known_buildings
                     .windows(2)
                     .any(|w| w[0].id >= w[1].id)
+                || context
+                    .owned_nodes
+                    .iter()
+                    .any(|i| *i >= context.nodes.len())
+                || context
+                    .nodes
+                    .iter()
+                    .chain(&context.known_depots)
+                    .any(|p| !finite_point(*p))
                 || context.height.as_ref().is_some_and(|h| h.len() != cells)
                 || context
                     .smokes

@@ -27,6 +27,7 @@ pub struct UnitFacts {
     pub stock: Option<Stock>,
     pub amove: Option<Point>,
     pub airborne: bool,
+    pub wall_work: bool,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct KnownBuilding {
@@ -54,9 +55,13 @@ pub struct Context {
     pub smokes: Vec<crate::game::Smoke>,
     pub sight: f64,
     pub support: BTreeMap<String, f64>,
+    /// Resource positions and enemy depot memories already delivered to this seat.
+    pub nodes: Vec<Point>,
+    pub known_depots: Vec<Point>,
+    /// Indices of delivered nodes on owned World ground. Other modes use every node.
+    pub owned_nodes: BTreeSet<usize>,
     pub build_reserve: f64,
     pub fort_reserve: f64,
-    pub free_nodes: usize,
 }
 impl Default for Context {
     fn default() -> Self {
@@ -78,9 +83,11 @@ impl Default for Context {
             smokes: Vec::new(),
             sight: 1.0,
             support: BTreeMap::new(),
+            nodes: Vec::new(),
+            known_depots: Vec::new(),
+            owned_nodes: BTreeSet::new(),
             build_reserve: 0.0,
             fort_reserve: 0.0,
-            free_nodes: 0,
         }
     }
 }
@@ -188,6 +195,7 @@ pub struct State {
     pub decision: Option<Decision>,
     pub called: Option<f64>,
     pub cleared_sightings: BTreeMap<u32, f64>,
+    pub(crate) fort_steps: BTreeMap<u32, u8>,
 }
 #[derive(Clone, Debug, PartialEq)]
 pub struct Decision {
@@ -488,19 +496,71 @@ fn plan_inner(
             mine.push(u);
         }
     }
+    let delivered_recent: Vec<_> = sightings
+        .iter()
+        .filter(|s| !allied(Some(s.owner)) && now - s.time <= 60.0)
+        .collect();
+    let strategic_recent = if context.mode.is_construction() && skill.adaptive {
+        &delivered_recent
+    } else {
+        &remembered
+    };
     let (research_commands, reserved, research_mun) = research(observation, context)?;
+    let tier_savings = if research_commands.is_empty() {
+        reserved
+    } else {
+        0.0
+    };
     commands.extend(research_commands);
     let mut budget = input.manpower - reserved;
-    let base_plan = crate::commander_skirmish_base::plan(
+    let mut newly_busy = BTreeSet::new();
+    let adaptive = context.mode.is_construction() && skill.adaptive;
+    let rush = adaptive
+        && now < 240.0
+        && strategic_recent.iter().any(|e| {
+            now - e.time < 5.0
+                && input.units.iter().any(|u| {
+                    u.owner == input.slot
+                        && boolean(definition(u), "building")
+                        && dist(u.at, e.at) < 35.0
+                })
+        });
+    let construction = crate::commander_construction::plan(
         observation,
         &available_units,
         budget,
+        (adaptive || skill.memory) && strategic_recent.iter().any(|s| armor(&s.kind)),
         &sight_game,
         sees,
     )?;
-    budget -= base_plan.spent;
-    mine.retain(|u| base_plan.assigned != Some(u.id));
-    commands.extend(base_plan.commands);
+    budget = construction.remaining_mp;
+    let build_reserve = if rush { 0.0 } else { construction.reserve };
+    mine.retain(|u| !construction.builders.contains(&u.id));
+    available_units.retain(|u| !construction.builders.contains(&u.id));
+    newly_busy.extend(construction.builders);
+    commands.extend(construction.commands);
+    let mut fort_reserve = 0.0;
+    if !rush {
+        let fortification = crate::commander_fortification::plan_after_builds(
+            observation,
+            &available_units,
+            budget,
+            build_reserve,
+            tier_savings,
+            &sight_game,
+            sees,
+            &mut state.fort_steps,
+            &commands,
+        )?;
+        budget = fortification.remaining_mp;
+        fort_reserve = fortification.reserve;
+        available_units.retain(|u| !fortification.builders.contains(&u.id));
+        if fortification.commands.iter().any(|c| c["t"] == "build") {
+            mine.retain(|u| !fortification.builders.contains(&u.id));
+        }
+        newly_busy.extend(fortification.builders);
+        commands.extend(fortification.commands);
+    }
     let count = |kind: &str| mine.iter().filter(|u| u.kind == kind).count();
     let watched = |id| context.horde || state.mind.watched(id, now, skill.notice);
     let mut sit = Situation {
@@ -691,15 +751,6 @@ fn plan_inner(
             state.aim = Some((i, sit.until));
         }
     }
-    let delivered_recent: Vec<_> = sightings
-        .iter()
-        .filter(|s| !allied(Some(s.owner)) && now - s.time <= 60.0)
-        .collect();
-    let strategic_recent = if context.mode.is_construction() && skill.adaptive {
-        &delivered_recent
-    } else {
-        &remembered
-    };
     let adaptive = crate::commander_classic_rules::plan(
         observation,
         context,
@@ -723,19 +774,8 @@ fn plan_inner(
     let strong_enough = !context.mode.is_construction()
         || !skill.adaptive
         || my_value > 1.1 * context.caution * their_value;
-    let mut shopping_input = input.clone();
-    let shopping_context = shopping_input.runtime.as_mut().unwrap();
-    shopping_context.build_reserve = if adaptive.rush {
-        0.0
-    } else {
-        math::max(context.build_reserve, base_plan.reserve)
-    };
-    if adaptive.rush {
-        shopping_context.fort_reserve = 0.0;
-    }
-    let shopping_observation = Observation::new(shopping_input).map_err(|e| e.to_string())?;
     let shopping = crate::commander_shopping::plan(
-        &shopping_observation,
+        observation,
         &mine,
         strategic_recent,
         armor_seen.len(),
@@ -743,6 +783,14 @@ fn plan_inner(
         sit.counter,
         budget,
         available_engineers,
+        if adaptive.rush {
+            (0.0, 0.0)
+        } else {
+            (
+                math::max(context.build_reserve, build_reserve),
+                math::max(context.fort_reserve, fort_reserve),
+            )
+        },
         level,
     )?;
     let buy = shopping.buy;
@@ -774,6 +822,7 @@ fn plan_inner(
     commands.extend(adaptive.commands);
     let mut armed = adaptive.busy.clone();
     let mut busy = adaptive.busy;
+    busy.extend(newly_busy);
     if let Some((kind, at)) = adaptive.support
         && let Some(command) = support.call(kind, at, None, &sit, context, skill, now)?
     {
@@ -1096,11 +1145,31 @@ fn plan_inner(
         operation_situation.at = Some(target.2);
     }
     let recovering = retreat.iter().copied().collect();
+    // Later assault phases must see this look's construction and field-work assignments.
+    let mut operation_input = input.clone();
+    for command in &commands {
+        for id in command["ids"].as_array().into_iter().flatten() {
+            let Some(unit) = id
+                .as_u64()
+                .and_then(|id| operation_input.units.iter_mut().find(|u| u.id as u64 == id))
+            else {
+                continue;
+            };
+            match command["t"].as_str() {
+                Some("build" | "assist") => unit.build = true,
+                Some("dig") => unit.dig = true,
+                Some("entrench") => unit.entrench = true,
+                _ => {}
+            }
+        }
+    }
+    let operation_observation = Observation::new(operation_input).map_err(|e| e.to_string())?;
+    let live_sightings: Vec<_> = remembered.iter().map(|s| (*s).clone()).collect();
     let operation = if context.horde {
         crate::commander_assault::Plan::default()
     } else {
         crate::commander_assault::plan(
-            observation,
+            &operation_observation,
             context,
             &state.mind,
             Some(&operation_situation),
@@ -1110,7 +1179,7 @@ fn plan_inner(
             crate::commander_assault::Options {
                 busy: &busy,
                 recovering: &recovering,
-                sightings,
+                sightings: &live_sightings,
                 support_at: support.last,
                 handoff: false,
                 region: None,
@@ -1235,3 +1304,11 @@ mod strategy_tests;
 #[cfg(test)]
 #[path = "commander_batch7_tests.rs"]
 mod batch7_tests;
+
+#[cfg(test)]
+#[path = "commander_shopping_inputs_tests.rs"]
+mod shopping_inputs_tests;
+
+#[cfg(test)]
+#[path = "commander_tactics_regression_tests.rs"]
+mod regression_tests;
