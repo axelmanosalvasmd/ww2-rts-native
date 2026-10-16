@@ -516,7 +516,7 @@ fn base22_23_classic_paid_waiter_and_rally_preflight_errors_preserve_canonical_s
     let at = m.world.game.units[&hq].at();
     let site = m.next_unit_id;
     let build = Command::from_json(
-        &json!({"t":"build","kind":"barracks","ids":[engineer],"x":at.x+20.,"z":at.z}),
+        &json!({"t":"build","kind":"barracks","ids":[engineer],"x":at.x+24.,"z":at.z}),
     )
     .unwrap();
     let placement = build_failure_operands(&m, 0, &build);

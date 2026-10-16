@@ -4646,3 +4646,77 @@ Root on the first genuine failure. No old grant extends to this child.
 No owned BASE row or Acceptance cell changes. Whole-mode and Shipyard/enemy
 claims, total retirement and recipient/reconnect composition remain held.
 Root owns independent review, Hermes readback and runtime integration.
+
+
+## BASE Rally fault-control placement input (2026-10-15, source only)
+
+The actual failed producer `4f60f0d9f82b0f9789f70eda27b1fa24442578e5`,
+Rust tree `73717971c99c4304adf24d18ed9fed0e43923a70`, records tick 3040
+before the Barracks request at (37,17). Allied Engineer 6 is alive at (35,17),
+cell 1041 inside the nine-cell footprint. Native match_construction.rs:1017-1036
+and pinned Source shared/sim.js:1012-1019 both block living ground, nonriding,
+nonstructure occupants regardless of alliance. The complete 564-line failure,
+raw unequal `Some(Blocked)` / `None` pair and decoded operands remain retained
+in `/tmp/impl-bases-consumer-cycle2-d699fc97/qualify-4f60f0d9/`. This is an
+occupied authored site, with no demonstrated provider defect.
+
+Change only the independent fault-control command's x offset from HQ + 20 to
+HQ + 24. The HQ is at (17,17), so the new request and snapped center are (41,17).
+With CELL 2 and Barracks size 3, pinned placementCheck and footprint produce
+top-left (19,7) and cells 915,916,917,1043,1044,1045,1171,1172,1173.
+No captured actor occupies those cells, and no captured resource-node reservation
+intersects them. The authored flat map is open ground there, outside all three
+startup HQ footprints. This history has no earlier Build, Move, section contact
+or terrain command. Both allied finished HQs see the center directly under
+Source teamSees (distances 24 and 10, vision 30). The captured owner wallet and
+selected Engineer remain unchanged. These are static input checks, not an
+executed placement decision or a prediction that this test passes.
+
+Read the entire fault-control history before selecting the input. Retain real
+income, three paid jobs, head progress, the story-bookkeeping error and complete
+Preserved comparison, restored story bookkeeping, the successful waiting refund,
+the allied paid purchase and the first maker's Rally. Keep the Build success
+assertion and its actual-operand diagnostic unchanged. The new real site's Rally
+bookkeeping is still removed only after successful Build. The multi-maker Rally
+must still report missing producer metadata and preserve the entire canonical
+state, including the first maker's prior Rally. No actor pose, HP, orders, wallet,
+clock, RNG, provider, occupancy rule or expected state is reset or changed.
+
+This test constructs its own input and Match and never calls frames or replay.
+It is an independently authored native bookkeeping fault control, outside the
+five recorded Source scenes. The four sibling tests still replay those scenes
+without changes. Their recipe, fixture and every recorded command remain exact.
+The fixture is 486,928 bytes, SHA256
+`0a6bf3a9dbf01f1efa578a2b3b882dd1854ca96dd3533cb01063f079e31702ca`,
+with Source generation/check attributed to `aaf0cf6f` and freeze to `8b6837f2`.
+No paired Source input changes, so this edit needs no replacement capture.
+This fixture does not prove the independent fault control's changed input.
+Any later paired Source input change requires a new authentic Source capture;
+the old fixture must not be described as matching that changed input.
+
+Preserve all 33 older native bodies, seven recipes, six actual ENOENT fixture
+states, 939 parity IDs and full Acceptance cells, registries and incoming/owned
+providers. The full typed tree receipt and reversible binary/full-index patches
+are private in `placement-input-4f60f0d9/` under the same evidence directory.
+All 170 prior evidence files and later producing-head failures remain exact.
+No newer main is imported; this is one direct child of the exact failed head.
+
+Locally ACK issue #5 through 6204835501, PR16 replies 6137154230/6137379059
+and PR195 reply 6156740603 as receipt only. Root reports main 011a39d0 after
+PR268; Hermes requests literal-main CI confirmation before PR269 qualification.
+That request remains with Root and imports no newer main into this failed-head
+child. The held World registration readback grants this worker no World scope. Six-call ABI 2, accepted startup
+content/schema and pending transport/privacy boundaries remain unchanged.
+No public acknowledgment, provider adoption or comparison-default mapping occurs.
+
+Source, Node, Cargo, rustc, native, formatter, lint, discovery, release and CI
+jobs are zero. The parent's one pass, one failure, three unrun and 165 skipped
+remain tied to 4f60f0d9; all five names are unrun on this child. Root alone may
+grant future SAME5 qualification on the literal child SHA and Rust tree with
+an assigned exclusive slot, external target, inherited flock, current guard,
+four actual CPUs, 6 GiB, zero swap, 400 percent CPU, jobs4/thread1, 400-second
+bound and free -g plus at least 20 GiB disk space before each job. The maximum
+remains three simultaneous jobs. Stop on the first genuine failure, terminate
+and release the inherited flock, then notify Root before reporting. No old
+grant transfers. No slot, runtime integration, publication or parity change
+is made here. Root owns independent review, Hermes readback and integration.

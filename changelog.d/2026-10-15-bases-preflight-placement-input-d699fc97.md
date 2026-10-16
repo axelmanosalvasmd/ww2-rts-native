@@ -1,0 +1,1 @@
+- Move the independent BASE Rally bookkeeping fault control's Barracks request four metres east of its occupied authored site. Preserve the occupancy guard and every assertion. Source, native and formatting checks remain unrun on this child.
