@@ -34,6 +34,7 @@ pub(crate) fn ordinary_ground_mode(game: &Game, mode: Mode) -> bool {
 pub(crate) fn checked_game_mode(game: &Game, mode: Mode) -> Result<(), String> {
     match (mode, game.mode) {
         (Mode::Default | Mode::Conquest, None)
+        | (Mode::Classic, Some(ModeKind::Classic))
         | (Mode::Tutorial, Some(ModeKind::Tutorial))
         | (Mode::World, Some(ModeKind::World)) => Ok(()),
         (Mode::Horde, Some(ModeKind::Horde))

@@ -3,6 +3,11 @@
 //! Store positions are the reference's 40-tick synchronization cache, not authoritative unit
 //! positions. World supplies current unit facts and applies typed movement/spawn operations.
 //! This module does not own wallets, units, terrain, pathfinding or a network contract.
+#[cfg(test)]
+mod alert_tests;
+#[cfg(test)]
+mod manual_tests;
+
 use crate::{
     game::Point,
     grid::UnitId,

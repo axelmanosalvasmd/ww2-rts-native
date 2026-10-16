@@ -302,9 +302,10 @@ fn along_route(mut at: Point, route: &[Point], mut left: f64) -> Point {
 impl Match {
     /// Refresh the core vision component, including active-wave Horde markers.
     /// Full Horde tick and recipient admission remain separate guarded paths.
-    pub fn update_horde_vision(&mut self) -> Result<(), String> {
+    pub fn refresh_horde_visibility(&mut self) -> Result<(), String> {
         self.validate_horde_phase(0.0)?;
         let h = self.horde.as_ref().ok_or("missing Horde state")?;
+        let defender_team = self.world.game.players[0].team;
         let threshold = number(cfg()?, "reveal")?;
         let few = h.budget == 0.0 && h.left <= threshold;
         let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
@@ -327,13 +328,18 @@ impl Match {
         }
         crate::vision::update_vision(&mut self.world.game, &self.rules, &self.grid);
         for player in &mut self.world.game.players {
-            if player.team == 0 {
+            if player.team == defender_team {
                 player.visible.extend_from_slice(&marked);
                 player.visible.sort_unstable();
                 player.visible.dedup();
             }
         }
         Ok(())
+    }
+
+    /// Refresh the same guarded Horde vision phase used by combat visibility.
+    pub fn update_horde_vision(&mut self) -> Result<(), String> {
+        self.refresh_horde_visibility()
     }
 
     pub(crate) fn validate_horde_economy(&self) -> Result<(), String> {

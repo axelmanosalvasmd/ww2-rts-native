@@ -1,0 +1,5 @@
+- Connect manual convoy retreat to the nearest active allied source, checking the full selection before changing routes and preserving carried stock. Keep full logistics ticks and complete logistics snapshots guarded.
+- Add 25 intent tests for manual truck orders, scheduler alerts, point supply cuts and their income, radio, reinforcement and territory effects. Cover capture-square edges and the 40-tick supply beat. Classic/World cache construction and train boarding remain held.
+- Replace the test for unconditional convoy retreat refusal with atomic refusal when no supply source exists, including trucks beyond the ordinary troop selection cap.
+- Compare matching player rows directly in the Classic income test, retaining the allied Munitions and MP checks.
+- Rewrite LOG-45's injected Horde, Tutorial and World refusal expectations for the current mode validators. Retain both supply settings, unchanged points and wallets, no tick fault and snapshot refusal. Point supply remains disabled in these modes, matching prototype `shared/sim.js:746`.

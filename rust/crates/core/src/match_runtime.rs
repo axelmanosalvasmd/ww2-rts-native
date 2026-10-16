@@ -302,7 +302,7 @@ impl StartPlan {
             deployment::spawn_slots(available.len(), &teams, Some(&distances), selection)
                 .map_err(|e| format!("spawn allocation: {e:?}"))?
         };
-        let mut authored_slots: Vec<_> = if world_mode {
+        let mut authored_slots: Vec<_> = if world_mode || tutorial {
             slots.clone()
         } else {
             slots.iter().map(|&slot| available[slot]).collect()
@@ -653,6 +653,8 @@ pub struct Match {
     pub environment: crate::environment::EnvironmentRuntime,
     pub companions: crate::companions::Companions,
     pub world_runtime: Option<crate::match_world::WorldRuntime>,
+    /// Team-shared last observed buildings for ordinary rooms and the explicit Classic core phase.
+    pub classic_known_buildings: crate::vision::BuildingMemory,
     pub world: World,
     pub start: StartPlan,
     pub options: MatchOptions,
@@ -837,6 +839,7 @@ impl Match {
             environment: crate::environment::EnvironmentRuntime::default(),
             companions: crate::companions::Companions::default(),
             world_runtime: None,
+            classic_known_buildings: Default::default(),
             grid: SpatialGrid::new(&world.game.units, 16.0),
             recipients: Vec::new(),
             routing_fog: crate::fog::Fog::default(),
