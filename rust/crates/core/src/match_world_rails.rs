@@ -1325,7 +1325,7 @@ mod intent_tests {
         assert_eq!(
             m.apply_rail_order(0, &[i64::from(id)], Point { x: 193.0, z: 65.0 })
                 .unwrap(),
-            Some(Denial::Cooldown)
+            Some(Denial::Needs)
         );
         (m, id, train)
     }

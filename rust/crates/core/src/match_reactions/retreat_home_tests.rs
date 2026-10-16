@@ -267,7 +267,7 @@ fn mov48_retreat_actual_ground_displacement_is_one_and_a_half_normal_speed() {
         &retreat.rules,
         &mut retreat.grid,
         id,
-        0.05,
+        1.0,
     )
     .unwrap();
     crate::movement::move_unit(
@@ -275,7 +275,7 @@ fn mov48_retreat_actual_ground_displacement_is_one_and_a_half_normal_speed() {
         &normal.rules,
         &mut normal.grid,
         id,
-        0.05,
+        1.0,
     )
     .unwrap();
     let ordinary_moved = distance(at, normal.world.game.units[&id].at());
