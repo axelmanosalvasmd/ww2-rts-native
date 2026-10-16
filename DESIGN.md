@@ -4675,3 +4675,37 @@ Prepare the five local Rust/Status pairs LOG-03/04/10/15/24 as a reviewable port
 ## Owned-only logistics rebase after MAP267 (2026-10-15)
 
 Rebase PR271 from preserved4cbc3922 onto exact incoming main f7b0e5889e3b707beb6d18c4ea8d20a7d9f7b578 by replaying only its seven owned non-merge commits. Main262 and all incoming G1/engineering history are already ancestors of f7 and are not replayed. Preserve the three owned base-correction annotations from mergec350 as an explicit owned documentation step; the other two old merges introduce no unique owned annotation lines. Retain complete incoming MAP five-row validation/runtime/tests and every incoming path. Reconstruct the aggregate typed union independently from common base262, old4cbc and incomingf7 before replay, then compare every path, mode, type and blob. Exactly five logistics Rust/Status pairs and all55 Acceptance/other cells remain as reviewed; causal fixture, reader and recorder stay byte-identical to producing9efa. The successor is a new integration head: prior4cbc ACCEPT and9efa execution do not transfer. No Source, Cargo, formatter, lint, native, discovery or hosted job is run during reconstruction; Root must record a new exact scope before reservedS1 is used.
+
+## First fifty remaining NET behavior candidates (2026-10-16, unrun)
+
+Axel6206861267 approves rules1-5 of6206834165 exactly. Native behavior checks
+and a reviewer reading the prototype now qualify behavior intent. Hermes's
+additional notes6206844573 were not adopted. Exact table, pure-function and
+single-component comparisons retain their existing rule. This decision changes
+no runtime, wire, interface, reference, privacy policy or client responsibility.
+
+Prepare the first50 candidates of Root's full82-row NET_IMPL range in one
+feature batch. The [compact map](docs/testing/net-batch50.md) lists every row,
+its literal native check and individual incomplete reason. Add grouped native
+checks for HTTP/discovery, hello and stale membership, lobby authority and seat
+transitions, trusted lifecycle, command refusal, and recipient privacy. They
+call existing production Hub, router, Match, RoomRuntime, SnapshotCache,
+DeliveryState and ClientView APIs. Only test registrations and new test/docs
+files change. Ordinary Conquest omits mun/fuel wire fields despite internal
+accounting wallets; the check preserves that existing presence rule.
+
+Keep all original parity cells, fixtures, registries and old consumers. Preserve
+41f1,186's historical thirteen passes and8348's actual pointer-witness failure
+without rerunning or transferring them. This private child starts at41f1; the
+separate incoming66a3 MAP merge remains in the earlier data-only projection.
+Root owns later integration and publication. No new Source recorder, captured
+fixture, provenance bundle or unsupported provider is added.
+
+The new suite is UNRUN. One fresh Root-granted focused nextest job selects
+package(ww2-server) and test(net_batch50), uses no-fail-fast to isolate failed
+rows, and runs tests on one thread with four build jobs. The whole50-window
+is considered, but incomplete or failed rows remain held while others continue.
+No one-job-per-row loop, semantic retry or old13 replay is authorized. Actual
+slot/caps/current guard/inherited flock/external target/free-g/20GiB checks
+remain Root-controlled. Runtime changes would need Hermes's exact-head ack;
+intentional player-visible differences still need DESIGN/differs/Axel agreement.

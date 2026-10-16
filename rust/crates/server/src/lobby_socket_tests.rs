@@ -1710,3 +1710,6 @@ async fn net27_websocket_stale_parsed_buy_is_silent_before_and_after_due_cleanup
     })
     .await;
 }
+
+#[path = "net_batch50_socket_tests.rs"]
+mod net_batch50_socket;
