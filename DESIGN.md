@@ -32,6 +32,24 @@ Read current main before integration: it lacks ai_receipt_input and ai_delivered
 
 # Three Crossroads Native: design decisions
 
+## Private Horde director queue (2026-10-16)
+
+The core seat dispatcher selects the human commander for ordinary seats and a
+scripted director for the internal Horde seat. The director retains its latest
+detached observation, uses Normal's 40-tick stagger and drains movement on every
+delivered observation beat. Live wave state prevents an old observation from
+dispatching after a break, wave replacement or match finish.
+
+Pending Horde movements belong to the director, outside canonical unit order
+queues. Each emitted movement is an ordinary single-unit command attempt for
+the existing admission path. Typed owner intent, including native route identity,
+replaces the prototype's JSON fingerprint. A same-cell Move or idle Stop changes
+that identity and invalidates pending work. Replacing a queued unit preserves its
+FIFO position; all callbacks for one observed tick share a four-order allowance.
+This adds core components without admitting full Horde ticking, recipient
+snapshots or hosting. Full-match lifecycle coverage uses an ordinary Conquest
+match with a detached wave context and the existing recipient snapshots.
+
 ## Typed scenario conditions and core refunds (2026-10-16)
 
 Scenario condition evaluation borrows typed authored state while reading current units, point owners and World region teams from Match. A caller supplies the context and shares an explicit work budget across evaluations. This keeps condition reads separate from scenario admission, trigger scheduling, actions and recipient projection. The evaluator follows the pinned condition semantics, including historical captures, pending arrivals, context fallback and short-circuit work charges. A 64-level guard protects callers that construct trees directly; validated authored trees remain below it.
