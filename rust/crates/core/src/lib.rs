@@ -192,3 +192,7 @@ mod misc_retreat_support_tests;
 
 #[cfg(test)]
 mod misc_map_save_tests;
+
+#[cfg(test)]
+#[path = "../../server/src/authoritative-map-data.rs"]
+pub(crate) mod shipped_map_fixtures;

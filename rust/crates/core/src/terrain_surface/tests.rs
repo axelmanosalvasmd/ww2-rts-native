@@ -5,8 +5,7 @@ use crate::{
 };
 use serde_json::Value;
 
-#[path = "../../../server/src/authoritative-map-data.rs"]
-mod shipped;
+use crate::shipped_map_fixtures as shipped;
 
 fn expand<T>(runs: &Value, read: impl Fn(&Value) -> T) -> Vec<T>
 where

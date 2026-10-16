@@ -172,7 +172,7 @@ impl FrozenSurface {
     }
 
     fn neighbours(&self, c: usize, mut visit: impl FnMut(usize)) {
-        if c % self.w > 0 {
+        if !c.is_multiple_of(self.w) {
             visit(c - 1);
         }
         if c % self.w + 1 < self.w {

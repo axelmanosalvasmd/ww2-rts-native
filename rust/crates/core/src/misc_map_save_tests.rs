@@ -4,8 +4,7 @@ use crate::{
 };
 use serde_json::Value;
 
-#[path = "../../server/src/authoritative-map-data.rs"]
-mod shipped;
+use crate::shipped_map_fixtures as shipped;
 
 #[test]
 fn map23_existing_save_component_matches_original_projection_for_all_shipped_maps_and_field_matrix()

@@ -400,7 +400,7 @@ impl DamageWorld<'_> {
                             .retain(|id| *id != rider);
                         self.combat.get_mut(rider).unwrap().carrier = None;
                         let u = self.world.game.units.get_mut(&rider).unwrap();
-                        crate::unit_placement::place_unit(&mut self.grid, u, |u| {
+                        crate::unit_placement::place_unit(self.grid, u, |u| {
                             u.riding = false;
                             u.x = at.x;
                             u.z = at.z;
