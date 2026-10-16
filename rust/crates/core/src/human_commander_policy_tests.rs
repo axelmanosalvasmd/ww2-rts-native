@@ -1122,3 +1122,5 @@ fn intent_ai12_refused_garrison_still_keeps_the_squad_busy_for_that_look() {
         "a new look must discard the refused reservation"
     );
 }
+#[path = "commander_field_live_tests.rs"]
+mod field_live_tests;
