@@ -29,6 +29,81 @@ fn room() -> (
     (hub, a, ra, b, rb)
 }
 
+#[test]
+fn conquest_no_mans_land_r1_starts_and_delivers_both_seats() {
+    let (mut hub, host, mut host_rx, _, mut peer_rx) = room();
+    hub.message(
+        "ABC",
+        &host,
+        &mut true,
+        json!({"t":"map","name":"no-mans-land"}),
+        0,
+    );
+    for rx in [&mut host_rx, &mut peer_rx] {
+        while rx.try_recv().is_ok() {}
+    }
+    // Use the same Start dispatch and approved R1 profile as the ordinary CLI.
+    hub.message("ABC", &host, &mut true, json!({"t":"start"}), 0);
+    for (slot, rx) in [&mut host_rx, &mut peer_rx].into_iter().enumerate() {
+        let mut start = None;
+        while let Ok(output) = rx.try_recv() {
+            let Output::Json(message) = output else {
+                panic!("start handshake must precede snapshots");
+            };
+            assert_ne!(message["t"], "deny", "{message}");
+            if message["t"] == "start" {
+                start = Some(message);
+            }
+        }
+        let start = start.expect("each commander receives Start");
+        assert_eq!(start["you"], slot);
+        assert_eq!(start["map"]["w"], 120);
+        assert_eq!(start["map"]["h"], 90);
+        assert_eq!(start["map"]["trenchFacing"], true);
+        assert_eq!(start["spawns"].as_array().unwrap().len(), 2);
+        assert!(start["cells"].is_array() && start["fog"].is_object());
+    }
+    let state = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state();
+    assert_eq!(state.start.points.len(), 9);
+    assert!(state.scenario.is_none());
+    let front = state.world.initial().trench_front.as_ref().unwrap();
+    assert!(front.iter().any(|v| v.is_nan()));
+    assert!(front.iter().any(|v| v.is_finite()));
+    assert_eq!(
+        state
+            .world
+            .initial()
+            .chars
+            .iter()
+            .filter(|&&c| c == b'T')
+            .count(),
+        675
+    );
+    let mut delivered = [0; 2];
+    for tick in 1..=6 {
+        let now = (tick - 1) * 50;
+        hub.poll_native(now, now * 1_000_000);
+        let status = hub.native_status("ABC").unwrap();
+        assert_eq!(status.tick, tick as i64);
+        assert_eq!(status.fault, None);
+        assert!(!status.paused);
+        for (slot, rx) in [&mut host_rx, &mut peer_rx].into_iter().enumerate() {
+            while let Ok(output) = rx.try_recv() {
+                let Output::Snapshot(write) = output else {
+                    panic!("running match must deliver recipient snapshots");
+                };
+                assert_eq!(write.slot, slot);
+                let message: Value = serde_json::from_str(&write.json).unwrap();
+                assert_eq!(message["t"], "s");
+                delivered[slot] += 1;
+                hub.complete_snapshot(&write, true, now);
+            }
+            assert_eq!(delivered[slot], tick / 2);
+        }
+    }
+    assert_eq!(delivered, [3, 3]);
+}
+
 type AccountSnapshot = (u64, u64, usize, SnapshotDelivery, SeatBackpressure, bool);
 type RoomIdentity = (crate::NativeRoomStatus, String, Value, Vec<AccountSnapshot>);
 

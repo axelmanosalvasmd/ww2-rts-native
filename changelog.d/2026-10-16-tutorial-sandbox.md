@@ -1,0 +1,1 @@
+- Strengthen the Tutorial setup intent test across one to five human players: shared spawn and team, idle Enemy with no manpower or starting force, disabled bases and supply systems, and immediate home recruitment for every human, including a tier-2 vehicle without HQ research.
