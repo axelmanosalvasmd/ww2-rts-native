@@ -21,3 +21,5 @@ The #369 merge `8332fee594be74893ae0ce4e968b0df788c2f412` has tree `d41c634d0fab
 No parity status cells are changed. Owner decisions I/J/L and the lossless nested-state/v1 request in #5 comment 6219544899 are acknowledged. Operative coverage in #374/#378 and mission/spectator coverage in #400 are not presented as new proof.
 
 Default authored maps require the compiled `house` tag already repaired in #374. A returning start refreshes recipient routing/fog caches, so the takeover test compares accepted orders, unit state, RNG and tick independently of delivery caches. Callback assertions use the actual simulation snapshot boundary because the first host poll can consume two due ticks. Final validation is reported in the PR body with its producing SHA.
+
+The broader regression run exposed an inherited construction test that required odd-tick observation refusal. Its construction and recipient-lifecycle assertions remain; its final observation checks now accept both tick parities, matching host-controlled delivery cadence.

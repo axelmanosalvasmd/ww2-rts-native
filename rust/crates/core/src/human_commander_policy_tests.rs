@@ -864,11 +864,11 @@ fn intent_ai33_construction_spending_survives_ordinary_ticks_and_recipient_snaps
     }
     assert_eq!(m.tick_state.fault(), None);
     assert_eq!(m.world.game.units[&id].built, Some(1.0));
-    let view = m.human_commander_observation(
+    // Adaptive host snapshot cadence can deliver observations on either tick parity.
+    m.human_commander_observation(
         &mut crate::match_human_observation::HumanObservationMemory::new(0),
-    );
-    // Delivery is on even ticks, so advance once to the next ordinary observation boundary.
-    assert!(view.is_err());
+    )
+    .unwrap();
     m.advance_tick().unwrap();
     m.human_commander_observation(
         &mut crate::match_human_observation::HumanObservationMemory::new(0),

@@ -2,3 +2,4 @@
 - Reset a returning human seat's private planner, observation memory and commander helper while preserving its identity and accepted orders. Start and restart create fresh helpers for every seat.
 - Run recipient-filtered AI commanders in configured private two-seat Conquest rooms, with the existing lobby difficulty controls and snapshot capability guards.
 - Include the default map's compiled house tag in checkpoint decoding, carrying the same repair as the operative stream. Prepare spectator starts before publishing a loaded room.
+- Let the host's snapshot cadence choose commander observation ticks. Update the construction lifecycle test to accept observations on both tick parities.
