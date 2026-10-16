@@ -36,7 +36,11 @@ fn scene() -> Match {
             sequence: 2,
             max_contacts: 3,
             near: 0.0,
-            start_cell: usize::MAX,
+            start_cell: state
+                .world
+                .game
+                .cell_of(solution.origin.x, solution.origin.z)
+                .unwrap(),
             intended: Some(3),
             damage_scale: 1.0,
             armor_piercing: false,
@@ -134,6 +138,7 @@ fn live_flight_until_stops_at_fog_or_visible_static_contact_only() {
 #[test]
 fn malformed_live_flight_refuses_before_delivery_memory_changes() {
     let mut state = scene();
+    state.validate_firing_tick_state().unwrap();
     let mut delivery = DeliveryState::new(&state).unwrap();
     let before = delivery.clone();
     let world = format!("{:?}", state.world);

@@ -81,7 +81,7 @@ fn shots(state: &Match, events: &[TickEvent]) -> Value {
                 }
                 TickEvent::Environment(effect) => effect.to_json(),
                 TickEvent::Firing(event) => event.to_json(&state.rules),
-                TickEvent::Support(_) | TickEvent::Aviation(_) => {
+                TickEvent::Support(_) | TickEvent::Aviation(_) | TickEvent::Horde(_) => {
                     panic!("five-map fixture has no active support or aircraft producer")
                 }
             })

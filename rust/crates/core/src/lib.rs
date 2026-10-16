@@ -33,15 +33,20 @@ pub mod client_view;
 pub mod combat;
 pub mod command_destinations;
 pub mod command_feedback;
+mod commander_actions;
 pub mod commander_ai;
 pub mod commander_assault;
 pub mod commander_classic_rules;
 mod commander_construction;
+mod commander_engineering;
 mod commander_fortification;
 mod commander_forward_hq;
 pub mod commander_mind;
+mod commander_mirror;
 mod commander_shopping;
 pub mod commander_tactics;
+#[cfg(test)]
+mod commander_union_tests;
 pub mod companion_ray;
 pub mod companions;
 pub mod conquest_end;
@@ -256,3 +261,6 @@ pub mod recipient_placement;
 
 #[cfg(test)]
 mod production_lifecycle_intent_tests;
+
+#[cfg(test)]
+mod ai_privacy_modes_tests;

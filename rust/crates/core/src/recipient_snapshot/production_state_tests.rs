@@ -309,7 +309,7 @@ fn base59_classic_snapshots_publish_exact_nodes_and_private_research_rallies_thr
 }
 
 #[test]
-fn queued_aircraft_cannot_bind_a_room_before_aviation_event_delivery() {
+fn queued_aircraft_bind_a_room_with_integrated_aviation_delivery() {
     let mut m = scene(false);
     m.start.economy.players[0].mp = 5000.;
     m.start.economy.players[0].fuel = 5000.;
@@ -318,13 +318,15 @@ fn queued_aircraft_cannot_bind_a_room_before_aviation_event_delivery() {
         .unwrap();
     m.recorded_world_buy(0, "fighter", Some(field)).unwrap();
     let jobs = m.production.building(field).unwrap().jobs().to_vec();
-    assert_eq!(
-        m.restrict_to_ordinary_snapshots(),
-        Err(SnapshotError::Unsupported {
-            unit: field,
-            capability: SnapshotCapability::Air,
-        })
-    );
-    assert!(!m.ordinary_snapshot_only);
+    assert_eq!(m.restrict_to_ordinary_snapshots(), Ok(()));
+    assert!(m.ordinary_snapshot_only);
     assert_eq!(m.production.building(field).unwrap().jobs(), jobs);
+    let mut delivery = DeliveryState::new(&m).unwrap();
+    for _ in 0..4 {
+        let report = m.advance_tick().unwrap();
+        let rows = snapshots(&mut m, &mut delivery, &report.events);
+        assert_eq!(rows.len(), 3);
+        assert!(rows.iter().all(|row| row["tick"] == report.tick));
+    }
+    assert!(m.tick_state.fault().is_none());
 }

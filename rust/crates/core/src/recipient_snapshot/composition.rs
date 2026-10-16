@@ -108,6 +108,10 @@ pub(super) fn complete(
     }
     // Admission inspected each actual canonical actor/list owner. Their
     // absent output is a represented source result for this bounded frame.
+    projection
+        .fields
+        .entry("flights")
+        .or_insert_with(|| json!([]));
     projection.fields.insert("shots".into(), json!([]));
     projection.fields.entry("air").or_insert_with(|| json!([]));
     projection.fields.insert(
@@ -184,6 +188,7 @@ pub(super) fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(
     {
         return Err(refused(SnapshotCapability::ShotsAndFlights));
     }
+    projectiles::validate(state)?;
     if !state.firing.flights.is_empty() || !state.firing.salvos.is_empty() {
         state
             .validate_firing_tick_state()

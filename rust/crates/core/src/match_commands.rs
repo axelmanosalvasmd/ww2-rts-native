@@ -1084,6 +1084,15 @@ impl crate::match_runtime::Match {
             direction,
         } = command
         {
+            // Recorded AI orders share the hosted recipient capability boundary.
+            // Refuse plane-backed effects before payment, cooldown or story writes.
+            if self.ordinary_snapshot_only
+                && !crate::recipient_snapshot::SUPPORTED_SUPPORT_KINDS
+                    .iter()
+                    .any(|supported| supported.name() == kind)
+            {
+                return Ok(Some(Denial::Unsupported));
+            }
             return match self.admit_support(owner, kind, *at, *direction) {
                 Ok(denial) => Ok(denial.map(|d| match d {
                     crate::match_support::SupportDenial::Blocked => Denial::Blocked,
@@ -2492,6 +2501,10 @@ mod compound;
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+#[path = "match_commands/support_capability_tests.rs"]
+mod support_capability_tests;
 
 pub(crate) struct MovingRequestContext<'a, 'terrain> {
     pub(crate) unit: &'a mut Unit,

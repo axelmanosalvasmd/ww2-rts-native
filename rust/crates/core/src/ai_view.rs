@@ -5,6 +5,8 @@ use crate::{catalog::Catalog, math, recipient_snapshot::SupportedSeatSnapshot};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
+mod horde;
+
 /// Metadata already available to the human client from match start.
 #[derive(Clone, Debug, PartialEq)]
 pub struct PublicMap {
@@ -17,6 +19,13 @@ pub struct PublicMap {
 /// All values are owned. Unit entries use the prototype's decoded field names.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SeatView {
+    pub initial_chars: Vec<u8>,
+    pub initial_height: Option<Vec<i8>>,
+    pub works: Vec<Value>,
+    pub chars: Vec<u8>,
+    pub flags: Vec<u16>,
+    pub height: Option<Vec<i8>>,
+    pub naval: bool,
     pub local_defenders: Option<Value>,
     pub tick: i64,
     pub units: BTreeMap<u32, Value>,
@@ -45,6 +54,12 @@ pub struct SeatMemory {
     tick: Option<i64>,
     building_seen: BTreeMap<u32, f64>,
     mines: BTreeSet<usize>,
+    initial_chars: Vec<u8>,
+    initial_height: Option<Vec<i8>>,
+    chars: Vec<u8>,
+    flags: Vec<u16>,
+    height: Option<Vec<i8>>,
+    naval: bool,
 }
 
 type Result<T> = std::result::Result<T, String>;
@@ -82,6 +97,16 @@ fn truth(value: &Value) -> bool {
     value
         .as_bool()
         .unwrap_or_else(|| value.as_f64().is_some_and(|v| v != 0.0))
+}
+fn terrain_flag(terrain: &crate::catalog::Value, ch: u8) -> Result<u16> {
+    let value = terrain
+        .get(&char::from(ch).to_string())
+        .and_then(crate::catalog::Value::number)
+        .unwrap_or(0.0);
+    if !value.is_finite() || value < 0.0 || value > f64::from(u16::MAX) || value.fract() != 0.0 {
+        return Err("invalid AI terrain flags".into());
+    }
+    Ok(value as u16)
 }
 fn point(x: &Value, z: &Value) -> Result<Value> {
     Ok(json!({"x":number(x)?,"z":number(z)?}))
@@ -125,6 +150,7 @@ impl SeatMemory {
         for player in &mut map.players {
             *player = json!({"name":player["name"],"team":player["team"],"faction":player["faction"],"spawn":player["spawn"]});
         }
+        let cells = map.width * map.height;
         Ok(Self {
             slot,
             binding: None,
@@ -132,7 +158,41 @@ impl SeatMemory {
             tick: None,
             building_seen: BTreeMap::new(),
             mines: BTreeSet::new(),
+            initial_chars: vec![b'?'; cells],
+            initial_height: None,
+            chars: vec![b'?'; cells],
+            flags: vec![0; cells],
+            height: None,
+            naval: false,
         })
+    }
+
+    /// Supply the public starting map, with authored mines already hidden.
+    pub fn with_terrain(
+        mut self,
+        chars: Vec<u8>,
+        height: Option<Vec<i8>>,
+        naval: bool,
+    ) -> Result<Self> {
+        let cells = self.map.width * self.map.height;
+        if self.tick.is_some()
+            || chars.len() != cells
+            || height.as_ref().is_some_and(|h| h.len() != cells)
+        {
+            return Err("invalid AI public terrain dimensions or initialization phase".into());
+        }
+        let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
+        let terrain = catalog.table("TERRAIN").map_err(|e| e.to_string())?;
+        self.flags = chars
+            .iter()
+            .map(|ch| terrain_flag(terrain, *ch))
+            .collect::<Result<_>>()?;
+        self.initial_chars = chars.clone();
+        self.initial_height = height.clone();
+        self.chars = chars;
+        self.height = height;
+        self.naval = naval;
+        Ok(self)
     }
 
     /// Consume the same complete internal result the human recipient receives.
@@ -246,11 +306,45 @@ impl SeatMemory {
             })
             .collect::<Vec<_>>();
         for row in optional_rows(&snap["cells"])? {
+            let row = rows(row)?;
+            if row.len() < 2 {
+                return Err("short AI terrain row".into());
+            }
             let c = usize::try_from(integer(&row[0])?).map_err(|_| "invalid AI mine cell")?;
             if c >= self.map.width * self.map.height {
                 return Err("invalid AI mine cell".into());
             }
-            if row[1] == "N" && truth(&row[4]["mineOwned"]) {
+            let ch = row[1]
+                .as_str()
+                .filter(|s| s.len() == 1 && s.is_ascii())
+                .ok_or("invalid AI terrain character")?
+                .as_bytes()[0];
+            let data = row.get(4).unwrap_or(&Value::Null);
+            let surface = data["object"]
+                .as_str()
+                .filter(|s| *s != ".")
+                .or_else(|| data["ground"].as_str())
+                .unwrap_or(".");
+            if surface.len() != 1 || !surface.is_ascii() {
+                return Err("invalid AI terrain surface".into());
+            }
+            let terrain = catalog.table("TERRAIN").map_err(|e| e.to_string())?;
+            self.chars[c] = ch;
+            self.flags[c] = terrain_flag(
+                terrain,
+                if ch == b'N' {
+                    surface.as_bytes()[0]
+                } else {
+                    ch
+                },
+            )?;
+            if let Some(level) = row.get(2).filter(|v| !v.is_null()) {
+                let level =
+                    i8::try_from(integer(level)?).map_err(|_| "invalid AI terrain height")?;
+                self.height
+                    .get_or_insert_with(|| vec![0; self.map.width * self.map.height])[c] = level;
+            }
+            if ch == b'N' && truth(&data["mineOwned"]) {
                 self.mines.insert(c);
             } else {
                 self.mines.remove(&c);
@@ -371,7 +465,8 @@ impl SeatMemory {
             }
         }
         self.tick = Some(tick);
-        Ok(SeatView { local_defenders: world.then(||json!({"slot":-1,"name":"Local defenders","team":-1,"faction":0,"spawn":null,"out":false})), tick, units, players, points, nodes, mines, found_mines,
+        Ok(SeatView { initial_chars:self.initial_chars.clone(), initial_height:self.initial_height.clone(), works:optional_rows(&snap["works"])?.to_vec(), chars:self.chars.clone(), flags:self.flags.clone(), height:self.height.clone(), naval:self.naval,
+            local_defenders: world.then(||json!({"slot":-1,"name":"Local defenders","team":-1,"faction":0,"spawn":null,"out":false})), tick, units, players, points, nodes, mines, found_mines,
             weather:json!({"now":snap["weather"][0].as_str().unwrap_or("clear"),"next":snap["weather"][1],"left":snap["weather"][2]}),
             mode:snap["mode"].clone(),army:snap["army"].clone(),smokes,strikes,covers,known_buildings:known,claimed_nodes,logistics })
     }
@@ -496,14 +591,24 @@ impl SeatMemory {
 }
 
 impl crate::match_runtime::Match {
+    pub(super) fn require_ai_recipient_mode(&self) -> Result<()> {
+        use crate::{economy::Mode, game::ModeKind};
+        if !matches!(
+            (self.options.mode, self.world.game.mode),
+            (Mode::Default | Mode::Conquest, None)
+                | (Mode::Classic, Some(ModeKind::Classic))
+                | (Mode::Assault, Some(ModeKind::Assault))
+                | (Mode::Annihilation, Some(ModeKind::Annihilation))
+                | (Mode::Horde, Some(ModeKind::Horde))
+        ) {
+            return Err("AI delivery requires a canonical ordinary mode pair".into());
+        }
+        Ok(())
+    }
+
     /// Build a consumer from the same public start metadata given to ordinary clients.
     pub fn ordinary_ai_view_memory(&self, slot: usize) -> Result<SeatMemory> {
-        if !matches!(
-            self.options.mode,
-            crate::economy::Mode::Default | crate::economy::Mode::Conquest
-        ) {
-            return Err("ordinary AI delivery requires Default or Conquest".into());
-        }
+        self.require_ai_recipient_mode()?;
         let map = PublicMap {
             width: self.world.game.w,
             height: self.world.game.h,
@@ -523,7 +628,26 @@ impl crate::match_runtime::Match {
                 .map(|p| json!({"x":p.at.x,"z":p.at.z,"vp":p.vp,"mp":p.mp}))
                 .collect(),
         };
-        let mut memory = SeatMemory::new(slot, map)?;
+        let initial = self.world.initial();
+        let chars = initial
+            .chars
+            .iter()
+            .enumerate()
+            .map(|(c, &ch)| {
+                if initial.mines[c] == 0 {
+                    ch
+                } else if initial.objects[c] != b'.' {
+                    initial.objects[c]
+                } else {
+                    initial.ground[c]
+                }
+            })
+            .collect();
+        let mut memory = SeatMemory::new(slot, map)?.with_terrain(
+            chars,
+            initial.height.clone(),
+            self.world.game.naval,
+        )?;
         memory.binding = Some((
             self.options.seed,
             self.world.initial().chars.as_ptr() as usize,
@@ -539,6 +663,7 @@ impl crate::match_runtime::Match {
         delivery: &mut crate::recipient_snapshot::DeliveryState,
         full: bool,
     ) -> Result<SeatView> {
+        self.require_ai_recipient_mode()?;
         if memory.binding
             != Some((
                 self.options.seed,
@@ -566,3 +691,5 @@ impl crate::match_runtime::Match {
 
 #[cfg(test)]
 mod tests;
+
+pub mod commander;

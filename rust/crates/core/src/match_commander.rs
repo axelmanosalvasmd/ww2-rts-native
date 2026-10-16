@@ -1358,6 +1358,11 @@ impl Match {
                 fort_reserve: 0.0,
                 field: None,
                 world: None,
+                initial_chars: Some(self.world.initial().chars.clone()),
+                initial_height: self.world.initial().height.clone(),
+                mines: Vec::new(),
+                found_mines: Vec::new(),
+                ground_flights: false,
                 support: self.start.players[owner]
                     .support
                     .iter()
@@ -1373,6 +1378,15 @@ impl Match {
                             crate::commander_tactics::UnitFacts {
                                 built: u.built.unwrap_or(1.0),
                                 hold_position: u.owner == owner && u.hold_pos,
+                                hold_fire: u.owner == owner && self.commands.units[&u.id].hold_fire,
+                                auto_cast: u.owner == owner && self.commands.units[&u.id].auto_cast,
+                                cooldown: if u.owner == owner {
+                                    self.abilities
+                                        .get(u.id)
+                                        .map_or(0.0, |a| math::max(0.0, a.cooldown.ceil()))
+                                } else {
+                                    0.0
+                                },
                                 queued_orders: if u.owner == owner {
                                     self.commands.units.get(&u.id).map_or(0, |c| c.orders.len())
                                 } else {
@@ -1390,6 +1404,12 @@ impl Match {
                                         .as_ref()
                                         .is_some_and(|c| c.trucks.contains_key(&u.id)),
                                 amove: None,
+                                queued_amove: None,
+                                attack_target: if u.owner == owner {
+                                    self.commands.units[&u.id].attack_id
+                                } else {
+                                    0
+                                },
                                 airborne: u.air.is_some() && vision::airborne(u),
                                 wall_work: u.owner == owner
                                     && self.field_works.jobs().get(&u.id).is_some_and(|job| {

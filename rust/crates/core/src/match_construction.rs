@@ -308,20 +308,6 @@ impl Match {
 
     /// Read-only admission. The sole runner calls this before inputs and again before its clock.
     pub fn validate_construction_tick(&self) -> Result<(), String> {
-        // Horde exposes assigned facility work, not the ordinary construction phase.
-        if self.options.mode == crate::economy::Mode::Horde
-            && !self.commands.units.iter().any(|(worker, control)| {
-                control.build_target.is_some()
-                    && self
-                        .world
-                        .game
-                        .units
-                        .get(worker)
-                        .is_some_and(|unit| unit.build)
-            })
-        {
-            return Err("construction phases require ordinary Conquest".into());
-        }
         self.validate_construction_inputs()
     }
 

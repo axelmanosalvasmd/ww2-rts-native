@@ -22,6 +22,7 @@ pub enum ShotRef<'a> {
     Environment(&'a Effect),
     Scenario(&'a SayAction),
     AuthoredScenario(&'a crate::authored_scenario::ScenarioSay),
+    Horde(&'a crate::match_horde::HordeEvent),
 }
 
 impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
@@ -33,6 +34,7 @@ impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
             TickEvent::Support(value) => Ok(Self::Support(value)),
             TickEvent::Environment(value) => Ok(Self::Environment(value)),
             TickEvent::Scenario(value) => Ok(Self::Scenario(value)),
+            TickEvent::Horde(value) => Ok(Self::Horde(value)),
             TickEvent::Aviation(value) => Ok(Self::Aviation(value)),
             TickEvent::AuthoredScenario(value) => Ok(Self::AuthoredScenario(value)),
         }
@@ -210,6 +212,15 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
             value.validate(state).map_err(|_| SnapshotError::Rules)?;
             Ok(value.shot_json())
         }
+        ShotRef::Horde(value) => {
+            if state.options.mode != Mode::Horde {
+                return Err(SnapshotError::Rules);
+            }
+            match value {
+                crate::match_horde::HordeEvent::BossSurfaced { at } => finite(&[at.x, at.z])?,
+            }
+            Ok(value.shot_json())
+        }
         ShotRef::Scenario(value) => {
             validate_public_say(value).map_err(|_| SnapshotError::Rules)?;
             if state.scenario.is_none()
@@ -351,10 +362,29 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
                     owner(state, *seat)?;
                     numbers(&[at.x, at.z])?;
                 }
-                // Operative shots and Horde breath effects retain their separate admission.
-                LaunchEvent::SmallArms(_)
-                | LaunchEvent::Breath { .. }
-                | LaunchEvent::BreathShell { .. } => return Err(refused()),
+                LaunchEvent::SmallArms(_) => return Err(refused()),
+                LaunchEvent::Breath {
+                    shooter,
+                    target,
+                    owner: from,
+                    target_owner: to,
+                    at,
+                } => {
+                    if state.options.mode != Mode::Horde {
+                        return Err(refused());
+                    }
+                    identity(u64::from(*shooter))?;
+                    identity(u64::from(*target))?;
+                    owner(state, *from)?;
+                    owner(state, *to)?;
+                    numbers(&[at.x, at.z])?;
+                }
+                LaunchEvent::BreathShell { at } => {
+                    if state.options.mode != Mode::Horde {
+                        return Err(refused());
+                    }
+                    numbers(&[at.x, at.z])?;
+                }
                 LaunchEvent::Contact(value) => {
                     kind(state, value.kind)?;
                     identity(value.flight)?;

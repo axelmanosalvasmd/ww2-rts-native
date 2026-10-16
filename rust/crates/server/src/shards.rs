@@ -315,6 +315,7 @@ async fn run_worker(
     hub.configure_saves(config.saves_dir);
     hub.configure_maps(config.map_editor);
     hub.configure_records(config.horde_records);
+    hub.configure_authored_maps(config.authored_maps_dir);
     if let Err(error) = hub.configure_diagnostics(config.diagnostic_dir, config.tick_log) {
         let _ = started.send(Err(error));
         return Ok(());

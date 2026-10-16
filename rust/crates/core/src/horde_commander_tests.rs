@@ -8,7 +8,7 @@ use crate::{
     match_human_observation::{HumanObservationMemory, HumanShot},
     match_runtime::{MatchOptions, PlayerConfig},
     orders::OrderKey,
-    recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCache, SnapshotError},
+    recipient_snapshot::{DeliveryState, SelectedSeat, SnapshotCache},
     seat_commander::{Advance, Brain, Delivered},
     unit_publication::StagedUnit,
     weather::WeatherChoice,
@@ -352,10 +352,7 @@ fn intent_ai16_real_dispatch_uses_human_seats_and_scripted_horde() {
     assert!(state.pending() > 0);
     assert_eq!(state.policy_facts.as_ref().unwrap().tick, 26);
     assert!(m.validate_tick_state().is_err());
-    assert!(matches!(
-        SnapshotCache::new(&m),
-        Err(SnapshotError::UnsupportedMode)
-    ));
+    SnapshotCache::new(&m).unwrap();
     assert!(m.opening_commander_observation(slot).is_err());
     for mutation in 0..3 {
         let mut stale = director.clone();

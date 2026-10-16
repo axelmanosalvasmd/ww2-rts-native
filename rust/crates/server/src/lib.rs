@@ -1,4 +1,4 @@
-//! Lobby transport and trusted native room attachment. Public match start remains unavailable.
+//! Lobby transport, hosted Horde and trusted ordinary native matches.
 pub mod authoritative_maps;
 mod commander_ingress;
 mod diagnostics;
@@ -10,6 +10,7 @@ pub use map_editor::MapEditor;
 mod horde_records;
 pub use horde_records::RecordStore as HordeRecords;
 mod native_startup;
+mod room_ai;
 mod saves;
 mod trusted_room;
 pub use trusted_room::TrustedRoomConfig;
@@ -62,6 +63,8 @@ pub struct Config {
     pub map_editor: Option<MapEditor>,
     /// Best Horde runs, shared with workers. Hosting admission remains separate.
     pub horde_records: HordeRecords,
+    /// Optional private authoring source, reread for each hosted Horde start/restart.
+    pub authored_maps_dir: Option<std::path::PathBuf>,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -73,6 +76,7 @@ impl Default for Config {
             saves_dir: "saves".into(),
             map_editor: None,
             horde_records: HordeRecords::new("horde-records.json"),
+            authored_maps_dir: None,
         }
     }
 }
@@ -172,6 +176,7 @@ async fn serve_inner(
     hub.configure_saves(config.saves_dir);
     hub.configure_maps(config.map_editor.clone());
     hub.configure_records(config.horde_records);
+    hub.configure_authored_maps(config.authored_maps_dir);
     hub.configure_diagnostics(config.diagnostic_dir, config.tick_log)?;
     // Dropping or aborting this future invalidates the same stopped authority
     // used under the Hub lock, even when graceful shutdown never runs.

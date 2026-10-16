@@ -77,7 +77,9 @@ fn context<'a>(
     Context {
         mode: ModeContext {
             kind: options.mode,
-            ..Default::default()
+            defender_team: (options.mode == Mode::Horde).then_some(0),
+            income_excluded_slot: (options.mode == Mode::Horde)
+                .then(|| options.players.len().saturating_sub(1)),
         },
         army: options.army,
         tech_enabled: options.tech,
@@ -117,6 +119,7 @@ impl Match {
             Mode::Annihilation => self.world.game.mode == Some(ModeKind::Annihilation),
             Mode::Classic => self.world.game.mode == Some(ModeKind::Classic),
             Mode::Tutorial => self.validate_tutorial_state().is_ok(),
+            Mode::Horde => self.validate_horde_economy().is_ok(),
             Mode::World => {
                 self.world.game.mode == Some(ModeKind::World) && self.world_runtime.is_some()
             }
@@ -208,16 +211,6 @@ impl Match {
                     return Err(ProductionStepError::InvalidState("training rally position"));
                 }
                 for job in row.jobs() {
-                    if self.ordinary_snapshot_only
-                        && self
-                            .rules
-                            .kind(&job.kind)
-                            .is_some_and(|kind| self.rules.kinds[kind].air)
-                    {
-                        return Err(ProductionStepError::Placement(
-                            crate::produced_units::Error::UnsupportedAir,
-                        ));
-                    }
                     validate_training_birth(self.options.mode, &self.rules, &job.kind)?;
                 }
             }
@@ -280,16 +273,6 @@ impl Match {
             from,
         )?;
         validate_training_birth(self.options.mode, &self.rules, kind)?;
-        if self.ordinary_snapshot_only
-            && self
-                .rules
-                .kind(kind)
-                .is_some_and(|index| self.rules.kinds[index].air)
-        {
-            return Err(ProductionStepError::Placement(
-                crate::produced_units::Error::UnsupportedAir,
-            ));
-        }
         let building = prepared.building();
         if !registered.contains(&building) {
             return Err(ProductionStepError::InvalidState(
@@ -473,16 +456,6 @@ impl Match {
                 ));
             }
             for job in self.production.building(building).unwrap().jobs() {
-                if self.ordinary_snapshot_only
-                    && self
-                        .rules
-                        .kind(&job.kind)
-                        .is_some_and(|kind| self.rules.kinds[kind].air)
-                {
-                    return Err(ProductionStepError::Placement(
-                        crate::produced_units::Error::UnsupportedAir,
-                    ));
-                }
                 validate_training_birth(self.options.mode, &self.rules, &job.kind)?;
             }
         }
