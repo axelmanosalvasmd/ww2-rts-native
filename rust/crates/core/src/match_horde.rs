@@ -8,6 +8,7 @@ use crate::{
     map::AuthoritativeMap,
     match_runtime::{Match, MatchOptions, PlayerConfig, StartPlan, terrain_view},
     math,
+    navigation::Versions,
     pathfinding::{PathRules, PathTerrain, Pathfinding},
     produced_units::Door,
     unit_publication::StagedUnit,
@@ -420,10 +421,18 @@ impl Match {
         let kind = self.rules.kind(name).ok_or("unknown Horde unit")?;
         let id = self.next_unit_id;
         let heading = math::atan2(target.z - gate.z, target.x - gate.x);
+        let mut view = terrain_view(&self.world.game);
+        view.versions = Versions {
+            infantry: self.world.versions.infantry,
+            vehicle: self.world.versions.vehicle,
+            naval: self.world.versions.naval,
+            obstruction: self.world.versions.obstruction,
+            knowledge: 0,
+        };
         let placement = self
             .produced_placer
             .step_out(
-                terrain_view(&self.world.game),
+                view,
                 &self.rules,
                 kind,
                 id,

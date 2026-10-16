@@ -369,6 +369,22 @@ fn mode47_profile_purchases_bound_work_memory_and_unaffordable_remainder() {
         defining_cost >= 4500.0,
         "defining share is bought before the general pool"
     );
+    let mut quota_spent = 0.0;
+    let quota_end = h
+        .reserve
+        .iter()
+        .position(|name| {
+            assert!(h.profile.types().contains(&name.as_str()));
+            quota_spent += pool.iter().find(|u| &u.kind == name).unwrap().cost;
+            quota_spent >= h.total_budget * h.profile.share()
+        })
+        .expect("the defining purchases reach their quota");
+    assert!(
+        h.reserve[quota_end + 1..]
+            .iter()
+            .any(|name| !h.profile.types().contains(&name.as_str())),
+        "purchases return to the general pool after the defining quota is reached"
+    );
     let spent: f64 = h
         .reserve
         .iter()
@@ -400,6 +416,48 @@ fn mode47_profile_purchases_bound_work_memory_and_unaffordable_remainder() {
     assert_eq!(h.reserve.len(), 1);
     assert!(["rifle", "conscript"].contains(&h.reserve[0].as_str()));
     assert_eq!(h.profile_spent, 0.0);
+}
+#[test]
+fn horde_vehicle_entry_refreshes_clearance_after_adjacent_tank_trap() {
+    let mut m = scene(1, ArmySize::Standard);
+    let slot = m.horde.as_ref().unwrap().slot;
+    let gate = Point { x: 61.0, z: 91.0 };
+    let target = Point { x: 61.0, z: 61.0 };
+    let first = m
+        .spawn_horde_ground(slot, "tank", gate, target, 0, 3.0)
+        .unwrap();
+    let unit = m.world.game.units.remove(&first).unwrap();
+    m.grid.remove_unit(first);
+    let profile = &m.rules.kinds[unit.kind];
+    let trap = (unit.z / CELL) as usize * m.world.game.w + (unit.x / CELL) as usize + 1;
+    assert_eq!(m.world.game.chars[trap], b'.');
+    let before = m.world.versions;
+    m.world.set_cell(trap, b'Y').unwrap();
+    assert!(m.world.versions.vehicle > before.vehicle);
+    assert!(m.world.versions.obstruction > before.obstruction);
+    assert!(
+        !crate::vehicle_navigation::destination_clear(
+            terrain_view(&m.world.game),
+            unit.at(),
+            profile.radius,
+            profile.block(),
+        ),
+        "the adjacent trap overlaps the original entry's vehicle clearance"
+    );
+    let next = m
+        .spawn_horde_ground(slot, "tank", gate, target, 0, 3.0)
+        .unwrap();
+    let next = &m.world.game.units[&next];
+    assert!(
+        crate::vehicle_navigation::destination_clear(
+            terrain_view(&m.world.game),
+            next.at(),
+            m.rules.kinds[next.kind].radius,
+            m.rules.kinds[next.kind].block(),
+        ),
+        "the later entry must clear the new tank trap after warming the placement cache"
+    );
+    assert_ne!(next.at(), unit.at());
 }
 #[test]
 fn mode48_reserve_enters_last_first_on_tenth_ticks_with_stars_and_field_cap() {

@@ -212,6 +212,7 @@ fn mode80_authored_units_share_global_ids_and_128_limit_and_exclude_non_ground_t
     assert_eq!(exclusions, BTreeSet::from(["structure", "building", "air"]));
     for (key, value) in [
         ("type", json!("missing")),
+        ("type", json!(["rifle"])),
         ("side", json!(2)),
         ("x", json!(32)),
         ("y", json!(-1)),
@@ -354,6 +355,7 @@ fn mode80_actions_rosters_boxes_and_total_tick_work_use_exact_limits() {
         ("expires", json!(7201)),
         ("roster", json!([])),
         ("roster", json!([{"type":"missing","count":1}])),
+        ("roster", json!([{"type":["rifle"],"count":1}])),
         ("roster", json!([{"type":"rifle","count":33}])),
         (
             "roster",
@@ -444,6 +446,28 @@ fn mode80_actions_rosters_boxes_and_total_tick_work_use_exact_limits() {
     assert_eq!(check(&map), Ok(()), "team/player work uses spawn count");
     map["scenario"]["triggers"][0]["scope"] = json!("player");
     map["scenario"]["triggers"][0]["actions"][0]["box"] = json!([0, 0, 0, 254]);
+    rejects(&map, "total trigger work exceeds 4096");
+}
+
+#[test]
+fn mode80_reinforcement_units_count_toward_total_tick_work_limit() {
+    let mut map = map();
+    let mut action = reinforce();
+    action["roster"] = json!([{"type":"rifle","count":31}]);
+    let mut actions = vec![action; 8];
+    actions[7]["roster"][0]["count"] = json!(30);
+    // 16 * (one condition + eight actions + 7 * 31 + 30 units) = 4096.
+    map["scenario"]["triggers"] = json!(
+        (0..16)
+            .map(|i| trigger(
+                &format!("work{i}"),
+                json!({"kind":"time","seconds":0}),
+                actions.clone()
+            ))
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(check(&map), Ok(()));
+    map["scenario"]["triggers"][0]["actions"][7]["roster"][0]["count"] = json!(31);
     rejects(&map, "total trigger work exceeds 4096");
 }
 

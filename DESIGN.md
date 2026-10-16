@@ -4824,3 +4824,20 @@ and Unreal acceptance are not completed by these selected component rows.
 ## AI sighting test lint correction (2026-10-16)
 
 PR #274 strict Clippy rejected a nested conditional in the stillness-reset assertion. Combine the existing option match and movement threshold with a let chain. The condition, assertions and authored inputs stay the same.
+
+## Horde wave phase and scenario type validation (2026-10-16)
+
+`Match::step_horde` is an explicit late phase after ordinary capture, income
+and death removal. It does not advance the clock or run combat. Wave purchases,
+reserve entry and clearing use canonical Match state; newly entered units act
+on the following tick. Full Horde tick and server admission remain guarded.
+Vehicle entry must pass the current World navigation and obstruction versions
+to the persistent production placer, just as ordinary recruitment does, so
+terrain changes invalidate cached clearance between entries.
+
+Native scenario validation deliberately requires a JSON string for each authored
+unit or reinforcement roster `type`. It rejects `type: ["rifle"]`, whereas the
+prototype's `Object.hasOwn(unitTypes, v)` and `unitTypes[v]` coerce that array to
+the property name `"rifle"`. This stricter choice rejects malformed schema values
+instead of carrying JavaScript property-key coercion into the native validator.
+It does not admit or execute general authored scenarios.

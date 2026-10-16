@@ -1,5 +1,42 @@
 # MODE runtime B
 
+## PR #298 review corrections
+
+The FIX-298 follow-up merges main through `09e03d07` into the existing public
+branch and keeps `3882b93c` in its ancestry. It addresses the review with:
+
+- `horde_vehicle_entry_refreshes_clearance_after_adjacent_tank_trap`: warm the
+  persistent placer with a tank, remove it, add an adjacent tank trap through
+  `World::set_cell`, and require clearance for the later entry.
+- `mode47_profile_purchases_bound_work_memory_and_unaffordable_remainder`:
+  require defining purchases through the quota, then a general-pool purchase
+  outside the profile.
+- `mode80_reinforcement_units_count_toward_total_tick_work_limit`: accept
+  reinforcement-only work at 4096 and reject one additional roster unit at 4097.
+- The existing authored-unit and action validation tests reject array-valued
+  `type` fields. `DESIGN.md` records that stricter schema choice and the explicit
+  late Horde phase boundary.
+
+The corrected tank-trap regression failed before the runtime fix at
+`the later entry must clear the new tank trap after warming the placement cache`.
+This ran on the merged branch with `spawn_horde_ground` still unchanged from
+`3882b93c`. The first fixture attempt used barbed wire (`X`) and failed the
+vehicle-version setup assertion; correcting it to tank traps (`Y`) produced
+the intended stale-clearance failure. Both runs used S3 with a 6 GiB memory
+limit, zero swap and zero nextest retries, and released the slot on exit.
+
+After passing the current World versions to the placer, all 24 selected Horde,
+scenario-validation and vehicle-navigation tests pass (304 skipped, zero retries).
+From `rust/`, `cargo fmt --all --check` and
+`cargo clippy --locked --workspace --all-targets -j4 -- -D warnings` also pass.
+This first post-fix sequence used S3 with the same memory and swap limits and released
+the slot with exit 0. No full-workspace test run or Source execution was needed.
+
+After the final main merge through `09e03d07`, the same 24 tests pass again
+(320 skipped, zero retries), as do the formatting check and strict workspace
+Clippy above. S3 is released with exit 0. These final results cover the merged
+Rust tree; the remaining edits only record this verification.
+
 Baseline: main `9f468518`, prototype `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`.
 The assigned branch was rebased onto current main before editing. No private
 runtime history, Source recorder, captured fixture or provenance bundle is imported.
