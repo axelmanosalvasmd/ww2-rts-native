@@ -1,0 +1,1 @@
+- Record the BASE 13-pass/1-fail run, corrected startup 1-pass run and LOG 41-pass run with separate producing heads. Account for all 64 assigned rows in normal testing maps; keep 15 provisional review candidates and 49 incomplete rows separate, with parity files unchanged.

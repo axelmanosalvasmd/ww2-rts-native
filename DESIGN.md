@@ -1,5 +1,28 @@
 # Three Crossroads Native: design decisions
 
+## BASE/LOG native feature results (2026-10-16)
+
+The full owned range is accounted for: 16 BASE and 48 LOG rows, with 36 new
+native tests and literal test/prototype/gap maps in the two normal testing
+documents. Parity files remain byte-identical to the incoming baseline.
+
+Keep producing heads separate. The 0315 run at `fe5d4560` stopped at compile
+time with zero tests. The 0345 run at `cb6717a7` selected 14 BASE tests:
+13 passed and the authored zero-point startup map failed validation. Its
+valid-map successor is `84586de0`, Rust tree `2e0dc035`. At that head,
+0345-next ran LOG41 with 41 passes and no failures; 0350 ran only the
+corrected startup check with one pass. The 13 previous successful BASE
+checks were not repeated. All processes and systemd launchers are terminal,
+and inherited locks were released before row reports. Original normal
+logs remain in their respective `/tmp/native-feature-batches-*` directories.
+
+Four BASE and eleven LOG candidates now await independent prototype-intent
+review. The other 49 assigned rows retain explicit incomplete clauses. No
+runtime, interface, fixture, reference or parity status changes follow from
+these tests. Root owns integrated-head qualification, review, the proof
+ledger and publication. No new behavior capture or evidence bundle is made.
+
+
 ## BASE first native result and valid startup map (2026-10-16)
 
 Root's one 0345 S1 run at `cb6717a7` selected 14 tests: 13 passed and the

@@ -3,7 +3,7 @@
 
 [Axel approved rules 1 to 5](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6206861267) without added conditions. Native behavior tests and reviewer prototype readback qualify behavior rows. Exact tables, pure functions and existing component fixtures retain their comparisons. No new behavior recorder, capture or provenance bundle is used.
 
-This window contains 16 assigned rows. Tests are implemented but unrun pending a new literal Root grant. Every status above is unchanged. Candidates require an actual native pass and reviewer confirmation before promotion. Held entries are excluded from promotion while other rows continue.
+This window contains 16 assigned rows. Native results are recorded below with their producing heads. The parity file is unchanged. Candidates require reviewer prototype confirmation before promotion. Held entries are excluded from promotion while other rows continue.
 
 | Row | Literal native test mapping | Prototype reference at e4e579a | Scope and remaining work |
 |---|---|---|---|
@@ -45,3 +45,23 @@ open-ground point without changing any startup wallet/cap assertion. The
 corrected test requires a fresh exact-head grant; the 13 successful tests do
 not need another run solely for this setup correction. All parity files stay
 unchanged. LOG has not run.
+
+## Corrected startup result and final BASE scope
+
+The corrected startup test passed once at `84586de051855ba1ea68a747fdf89e9219be8206`,
+Rust tree `2e0dc035226bf3b34a86bf9a23e9645b5b6622de`, under Root's 0350 S1
+grant: one selected, one passed, zero failed, 181 skipped. The runner and
+systemd launcher ended with exit zero and the inherited lock was released.
+Normal output remains at `/tmp/native-feature-batches-0350/base_audit/`.
+The prior 13 passing tests were not repeated. Their actual result remains the
+0345 run at `cb6717a7`; its failed zero-point map is preserved separately.
+
+All eight new BASE tests now have passing results, with the original six
+retained component checks passing at `cb6717a7`. This is producing-head
+attribution, not a claim that all 14 were rerun at `84586de0`. Four proposed
+complete-intent candidates await independent prototype review: BASE-04,
+BASE-06, BASE-08 and BASE-16. The other 12 assigned rows retain their listed
+missing clauses. The valid Conquest startup check does not establish every
+mode's initial wallet or unknown army-key normalization. No further native
+job is needed for the current authored BASE window unless review identifies
+a concrete gap or Root qualifies an integrated head.

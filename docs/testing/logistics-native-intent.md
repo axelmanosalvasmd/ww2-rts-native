@@ -3,7 +3,7 @@
 
 [Axel approved rules 1 to 5](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6206861267) without added conditions. Native behavior tests and reviewer prototype readback qualify behavior rows. Exact tables, pure functions and existing component fixtures retain their comparisons. No new behavior recorder, capture or provenance bundle is used.
 
-This window contains 48 assigned rows. Tests are implemented but unrun pending a new literal Root grant. Every status above is unchanged. Candidates require an actual native pass and reviewer confirmation before promotion. Held entries are excluded from promotion while other rows continue.
+This window contains 48 assigned rows. Native results are recorded below with their producing head. The parity file is unchanged. Candidates require reviewer prototype confirmation before promotion. Held entries are excluded from promotion while other rows continue.
 
 | Row | Literal native test mapping | Prototype reference at e4e579a | Scope and remaining work |
 |---|---|---|---|
@@ -57,3 +57,23 @@ This window contains 48 assigned rows. Tests are implemented but unrun pending a
 | `LOG-55` | None, held | `client/symbols.js:302`, `client/symbols.js:314`; models checked in `test-logistics-client.mjs` | Held: Unreal client behavior; no Rust implementation is assigned by this row and no client test is claimed. |
 
 The first BASE14 invocation at `fe5d456091ddd36aa79dee9e9ee56d4208ff3eb7` stopped during compilation with five E0506/E0502 borrow errors. No native test was selected or executed. The process ended with exit 101 and its inherited lock was released. Original output remains at `/tmp/native-feature-batches-0315/base_audit/native.log`. The successor gives unchanged fact transitions separate input storage; all assertions and expected values are preserved. LOG has not run. A new exact-head grant is required for either selection.
+
+## Actual LOG41 result and final scope
+
+At producing `84586de051855ba1ea68a747fdf89e9219be8206`, Rust tree
+`2e0dc035226bf3b34a86bf9a23e9645b5b6622de`, Root's 0345-next S1 grant ran
+the complete focused selection once: 41 selected, 41 passed, zero failed,
+141 skipped. These comprise all 28 new feature tests and 13 retained exact
+or component checks. The runner and systemd launcher ended with exit zero;
+the inherited lock was released before reporting results. Normal logs and
+terminal results remain in `/tmp/native-feature-batches-0345-next/base_audit/`.
+The earlier BASE compilation failure and BASE 13/1 run remain separate.
+
+Eleven proposed complete-intent/component candidates await independent
+prototype review: LOG-02, LOG-06, LOG-16, LOG-18, LOG-19, LOG-23, LOG-25,
+LOG-28, LOG-30, LOG-41 and LOG-48. The other 37 assigned rows retain their
+individual incomplete or client-owned clauses even when a partial test
+passed. All 48 rows are accounted for; no row is promoted. This test-only
+contribution changes no runtime, interface, fixture, reference pin or parity
+file. No further native job is needed for the current LOG window unless
+review identifies a concrete gap or Root qualifies an integrated head.
