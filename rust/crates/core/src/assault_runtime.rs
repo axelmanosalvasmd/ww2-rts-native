@@ -268,4 +268,6 @@ fn can_stamp_start(game: &Game, cells: &[usize]) -> bool {
 }
 
 #[cfg(test)]
+mod fortified_start_tests;
+#[cfg(test)]
 mod tests;

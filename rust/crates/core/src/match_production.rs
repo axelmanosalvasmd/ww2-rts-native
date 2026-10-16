@@ -73,10 +73,12 @@ fn context<'a>(
     units: &'a [UnitView<'a>],
     regions: Option<&'a [Region]>,
     sudden_death: bool,
+    income_excluded_slot: Option<usize>,
 ) -> Context<'a> {
     Context {
         mode: ModeContext {
             kind: options.mode,
+            income_excluded_slot,
             ..Default::default()
         },
         army: options.army,
@@ -122,6 +124,7 @@ impl Match {
             Mode::Annihilation => self.world.game.mode == Some(ModeKind::Annihilation),
             Mode::Classic => self.world.game.mode == Some(ModeKind::Classic),
             Mode::Tutorial => self.validate_tutorial_state().is_ok(),
+            Mode::Horde => self.validate_horde_economy().is_ok(),
             Mode::World => {
                 self.world.game.mode == Some(ModeKind::World) && self.world_runtime.is_some()
             }
@@ -174,6 +177,7 @@ impl Match {
             &units,
             regions.as_deref(),
             self.elimination_sudden_death(),
+            self.horde.as_ref().map(|state| state.slot),
         );
         self.production
             .validate_phases(&context, &self.start.economy, dt)?;
@@ -260,6 +264,7 @@ impl Match {
             &units,
             regions.as_deref(),
             self.elimination_sudden_death(),
+            self.horde.as_ref().map(|state| state.slot),
         );
         let registered = self
             .production
@@ -336,6 +341,7 @@ impl Match {
             &units,
             regions.as_deref(),
             self.elimination_sudden_death(),
+            self.horde.as_ref().map(|state| state.slot),
         );
         // Queue and wallet drafts are small. A rejected refund must leave both owners intact.
         let mut production = self.production.clone();
@@ -382,6 +388,7 @@ impl Match {
             &units,
             regions.as_deref(),
             self.elimination_sudden_death(),
+            self.horde.as_ref().map(|state| state.slot),
         );
         let prepared =
             self.production
@@ -416,6 +423,7 @@ impl Match {
             &units,
             regions.as_deref(),
             self.elimination_sudden_death(),
+            self.horde.as_ref().map(|state| state.slot),
         );
         Ok(self
             .production
@@ -470,6 +478,7 @@ impl Match {
                 &units,
                 regions.as_deref(),
                 self.elimination_sudden_death(),
+                self.horde.as_ref().map(|state| state.slot),
             );
             let prepared = self.production.prepare_building_step(
                 &context,
@@ -615,6 +624,7 @@ impl Match {
             &units,
             regions.as_deref(),
             self.elimination_sudden_death(),
+            self.horde.as_ref().map(|state| state.slot),
         );
         let prepared =
             self.production

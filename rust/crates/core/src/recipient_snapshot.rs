@@ -1,4 +1,4 @@
-//! Internal Conquest projections and an explicitly admitted quiet seat envelope.
+//! Internal ordinary-mode projections and an explicitly admitted quiet seat envelope.
 //! Unsupported canonical actors remain explicit. No transport contract is added.
 use crate::{
     catalog::Catalog,
@@ -110,11 +110,13 @@ pub struct SnapshotCache<'a> {
 }
 impl<'a> SnapshotCache<'a> {
     pub fn new(state: &'a Match) -> Result<Self, SnapshotError> {
-        if !matches!(state.options.mode, Mode::Default | Mode::Conquest)
-            || state.world.game.mode.is_some()
+        if !crate::match_actor::ordinary_ground_mode(&state.world.game, state.options.mode)
             || state.world.geography().is_some()
-            || state.assault.is_some()
             || state.world_runtime.is_some()
+            || state.options.mode != Mode::Assault && state.assault.is_some()
+            || state.world.game.mode.is_some() && state.validate_ordinary_finish_state().is_err()
+            || matches!(state.options.mode, Mode::Annihilation | Mode::Classic)
+                && state.validate_elimination_state().is_err()
         {
             return Err(SnapshotError::UnsupportedMode);
         }
@@ -460,8 +462,12 @@ fn economy_fields(state: &Match, slot: usize) -> Result<Map<String, Value>, Snap
     let p = &state.start.economy.players[slot];
     finite(&[p.mp, p.mun, p.fuel, p.inc, p.vp])?;
     let mut fields = Map::new();
-    // Ordinary Conquest does not initialize the source player mun/fuel fields.
-    // Canonical accounting zeros do not make those wire fields present.
+    // Construction modes initialize these currencies; accounting zeros elsewhere
+    // do not make the prototype's absent fields present on the wire.
+    if state.options.mode.is_construction() {
+        fields.insert("mun".into(), json!(p.mun.floor()));
+        fields.insert("fuel".into(), json!(p.fuel.floor()));
+    }
     for (key, value) in [("mp", p.mp.floor()), ("inc", r(p.inc))] {
         fields.insert(key.into(), json!(value));
     }
@@ -1112,3 +1118,7 @@ mod map_house_selected_tests;
 #[cfg(test)]
 #[path = "recipient_snapshot/net52_tests.rs"]
 mod net52_tests;
+
+#[cfg(test)]
+#[path = "economy_currency_tests.rs"]
+mod economy_currency_tests;

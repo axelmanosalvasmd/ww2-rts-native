@@ -1,0 +1,1 @@
+- Verify fortified starts with exact trench and sandbag arcs, movement gaps, bunker placement, four finished corner Flak Emplacements, and blocked, steep and cramped placement fallbacks. Cover Assault defenders, every Annihilation seat and the shared Horde base; full Horde tick and snapshot admission remain guarded.

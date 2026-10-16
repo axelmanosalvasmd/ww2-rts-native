@@ -1,0 +1,2 @@
+- Project Classic Munitions and Fuel to their owner with the prototype's flooring, and admit matching Assault, Annihilation, Classic and Tutorial states through the internal recipient cache. World and Horde cache admission remain guarded.
+- Test currency initialization, rounding, omission, support payments and aimed ability payments through ordinary ticks and every-seat snapshots. Replace the earlier Classic snapshot-refusal assertions with projection checks.
