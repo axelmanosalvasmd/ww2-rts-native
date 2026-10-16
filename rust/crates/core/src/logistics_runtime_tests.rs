@@ -6,7 +6,7 @@ use crate::{
     match_commands::{Command, Denial, MoveOrder, Stance},
     match_runtime::{Match, MatchOptions, PlayerConfig},
     match_tick::TickPhase,
-    recipient_snapshot::{DeliveryState, SnapshotCapability, SnapshotError},
+    recipient_snapshot::DeliveryState,
     weather::WeatherChoice,
 };
 use serde_json::json;
@@ -84,27 +84,25 @@ fn withdrawal_turn(m: &mut Match, id: u32) {
     m.advance_unit_reserves(id).unwrap();
     m.advance_supply_withdrawal(id).unwrap();
 }
-fn assert_closed(m: &mut Match) {
-    assert!(
-        m.validate_tick_state()
-            .unwrap_err()
-            .contains("reserve and convoy tick phases")
-    );
+fn assert_deliverable(m: &mut Match) {
+    m.validate_tick_state().unwrap();
     let mut delivery = DeliveryState::new(m).unwrap();
-    let before = delivery.clone();
-    assert!(matches!(
-        delivery.capture_with_lists(m, &[true, true], &[false, false], &[]),
-        Err(SnapshotError::Unsupported {
-            capability: SnapshotCapability::Logistics,
-            ..
-        })
-    ));
-    assert_eq!(delivery, before);
+    let frame = delivery
+        .capture_with_lists(m, &[true, true], &[false, false], &[])
+        .unwrap();
+    for owner in 0..2 {
+        frame.recipient(owner).unwrap();
+    }
     assert!(m.tick_state.fault().is_none());
 }
 #[test]
-fn logistics_runtime_full_tick_and_complete_snapshot_guards_stay_closed() {
-    for (enabled, convoys) in [(true, true), (true, false), (false, true)] {
+fn logistics_runtime_full_tick_requires_matching_convoy_state() {
+    let (mut enabled, _) = scene(true);
+    let report = enabled.advance_tick().unwrap();
+    assert!(report.phases.contains(&TickPhase::UnitReserves));
+    assert!(report.phases.contains(&TickPhase::Convoys));
+    assert_deliverable(&mut enabled);
+    for (enabled, convoys) in [(true, false), (false, true)] {
         let (mut m, id) = scene(true);
         m.options.logistics = enabled;
         if !convoys {
@@ -114,12 +112,16 @@ fn logistics_runtime_full_tick_and_complete_snapshot_guards_stay_closed() {
         let reserves = m.logistics.get(id).unwrap().clone();
         let control = m.commands.units[&id].clone();
         let error = m.advance_tick().unwrap_err();
-        assert!(error.reason.contains("reserve and convoy tick phases"));
+        assert!(
+            error
+                .reason
+                .contains("logistics requires initialized convoy state")
+        );
         assert!(error.events.is_empty());
         assert_eq!(m.world.game.tick, tick);
         assert_eq!(m.logistics.get(id).unwrap(), &reserves);
         assert_eq!(m.commands.units[&id], control);
-        assert_closed(&mut m);
+        assert!(m.tick_state.fault().is_none());
     }
 }
 #[test]
@@ -186,7 +188,7 @@ fn logistics_runtime_log12_withdrawal_cancels_orders_and_routes_without_teleport
         .unwrap()
         .at;
     assert!((crate::math::hypot(goal.x - home.x, goal.z - home.z) - 10.).abs() < 1e-9);
-    assert_closed(&mut m);
+    assert_deliverable(&mut m);
 }
 #[test]
 fn logistics_runtime_log12_stranded_retries_and_nearby_handoff_needs_no_path() {
@@ -230,11 +232,13 @@ fn logistics_runtime_log12_stranded_retries_and_nearby_handoff_needs_no_path() {
     assert!(!near.logistics.get(id).unwrap().stranded);
 }
 #[test]
-fn logistics_runtime_log13_player_hold_escape_stances_and_recovery() {
+fn logistics_runtime_log13_player_hold_escape_stance_refusal_and_recovery() {
     let (mut m, id) = scene(true);
     force(&mut m, id, Point { x: 65., z: 45. });
     withdrawal_turn(&mut m, id);
     let ids = vec![i64::from(id)];
+    let control = m.commands.units[&id].clone();
+    let hold_position = m.world.game.units[&id].hold_pos;
     for stance in [Stance::HoldFire, Stance::HoldPosition, Stance::AutoRetreat] {
         assert_eq!(
             m.execute_command(
@@ -244,17 +248,14 @@ fn logistics_runtime_log13_player_hold_escape_stances_and_recovery() {
                     stance,
                     on: true
                 },
-                false
+                false,
             )
             .unwrap(),
-            None
+            Some(Denial::Needs),
         );
+        assert_eq!(m.commands.units[&id], control);
+        assert_eq!(m.world.game.units[&id].hold_pos, hold_position);
     }
-    assert!(
-        m.commands.units[&id].hold_fire
-            && m.commands.units[&id].auto_retreat
-            && m.world.game.units[&id].hold_pos
-    );
     assert_eq!(
         m.execute_command(0, &Command::Stop { ids: ids.clone() }, false)
             .unwrap(),
@@ -283,7 +284,7 @@ fn logistics_runtime_log13_player_hold_escape_stances_and_recovery() {
         Some(Denial::Blocked)
     );
     withdrawal_turn(&mut m, id);
-    assert_closed(&mut m);
+    assert_deliverable(&mut m);
     m.execute_command(0, &Command::Stop { ids: ids.clone() }, false)
         .unwrap();
     m.execute_command(0, &Command::Retreat { ids }, false)
@@ -378,9 +379,9 @@ fn logistics_runtime_log12_withdrawal_cancels_canonical_build_and_shared_project
         assert!(!u.build && !u.entrench && !u.dig);
         assert!(m.commands.units[&id].build_target.is_none());
         assert!(m.field_works.membership(id).is_none() && !m.field_works.is_active(id));
-        assert_closed(&mut m);
+        assert_deliverable(&mut m);
         withdrawal_turn(&mut m, id);
-        assert_closed(&mut m);
+        assert_deliverable(&mut m);
     }
 }
 #[test]
@@ -397,9 +398,9 @@ fn logistics_runtime_log12_empty_fuel_and_emergency_strands_without_removal() {
     assert_eq!(u.at(), at);
     assert!(u.path.is_empty() && !u.retreating && u.hp > 0.);
     assert!(m.logistics.get(id).unwrap().stranded);
-    assert_closed(&mut m);
+    assert_deliverable(&mut m);
     withdrawal_turn(&mut m, id);
-    assert_closed(&mut m);
+    assert_deliverable(&mut m);
 }
 #[test]
 fn logistics_runtime_log13_stranded_defense_cannot_chase_or_interrupt_escape() {
@@ -459,12 +460,12 @@ fn logistics_runtime_log12_forced_garrison_exits_through_withdrawal_adapter() {
     withdrawal_turn(&mut m, id);
     assert!(m.world.game.units[&id].garrison.is_none());
     assert!(m.world.game.units[&id].hp > 0.);
-    assert_closed(&mut m);
+    assert_deliverable(&mut m);
     withdrawal_turn(&mut m, id);
-    assert_closed(&mut m);
+    assert_deliverable(&mut m);
 }
 #[test]
-fn logistics_runtime_convoy_adapter_keeps_full_ticks_and_snapshots_closed() {
+fn logistics_runtime_convoy_adapter_keeps_full_ticks_and_snapshots_supported() {
     let (mut m, id) = scene(true);
     force(&mut m, id, Point { x: 65., z: 45. });
     m.logistics.get_mut(id).unwrap().cut_for = Some(10.0);
@@ -482,10 +483,10 @@ fn logistics_runtime_convoy_adapter_keeps_full_ticks_and_snapshots_closed() {
             .values()
             .any(|u| u.id >= first && m.rules.kinds[u.kind].name == "truck")
     );
-    assert_closed(&mut m);
+    assert_deliverable(&mut m);
     for _ in 0..3 {
         m.step_supply_convoys(false).unwrap();
-        assert_closed(&mut m);
+        assert_deliverable(&mut m);
     }
     assert!(m.tick_state.fault().is_none());
 }

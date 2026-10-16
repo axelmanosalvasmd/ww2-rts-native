@@ -843,7 +843,7 @@ impl supply_convoys::World for ConvoyWorld<'_> {
                 (
                     u.at(),
                     self.rules.kinds[u.kind].radius,
-                    self.rules.kinds[u.kind].name != "truck",
+                    self.rules.kinds[u.kind].name == "truck",
                 )
             })
             .collect::<Vec<_>>();
