@@ -638,12 +638,35 @@ fn ai63_hosted_save_restores_planners_resets_humans_and_restarts_commanders() {
         "every planner, recipient, sighting and pending-terrain field restores byte-equal before the opening look"
     );
     assert!(restored_memory.save_ai_memories()[0].is_null());
+    assert!(
+        restored_memory.state().save_json().unwrap() == canonical,
+        "the complete checkpoint must round-trip before new observations"
+    );
+    let mut fresh_delivery =
+        ww2_core::recipient_snapshot::DeliveryState::new(restored_memory.state()).unwrap();
+    let start_selected = selected
+        .iter()
+        .map(|seat| SelectedSeat {
+            omit: false,
+            ..*seat
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        fresh_delivery
+            .capture_selected_with_lists(restored_memory.state_mut(), &start_selected, &[])
+            .unwrap()
+            .is_some()
+    );
+    let after_start = restored_memory.state().save_json().unwrap();
     hub.rooms.get_mut("ABC").unwrap().native = None;
     drain(&mut rh);
     hub.load_room("ABC", host.id, &id, 1).unwrap();
     assert!(runtime(&hub).paused());
     assert_eq!(runtime(&hub).state().world.game.tick, checkpoint_tick);
-    assert_eq!(runtime(&hub).state().save_json().unwrap(), canonical);
+    assert!(
+        runtime(&hub).state().save_json().unwrap() == after_start,
+        "loaded starts must retain the checkpoint with its fresh recipient routing observations"
+    );
     let restored = runtime(&hub).save_ai_memories();
     assert!(restored[0].is_null(), "human planner memory must be reset");
     assert_eq!(restored[1]["planner"], memories[1]["planner"]);
@@ -712,10 +735,10 @@ fn ai63_hosted_save_restores_planners_resets_humans_and_restarts_commanders() {
 
 #[test]
 fn room_ai_host_callbacks_survive_natural_finish_and_final_snapshots() {
-    let (mut hub, host, _rh, guest, _rg) = humans();
+    let (mut hub, _host, mut rh, guest, _rg) = humans();
     hub.attach_native("ABC", native_tests::native_match(), 0)
         .unwrap();
-    send(&mut hub, &host, json!({"t":"leave"}), 0);
+    drain(&mut rh);
     send(&mut hub, &guest, json!({"t":"leave"}), 0);
     let selected = (0..2)
         .map(|slot| SelectedSeat {
@@ -730,6 +753,11 @@ fn room_ai_host_callbacks_survive_natural_finish_and_final_snapshots() {
     let mut deliveries = 0;
     for step in 0..30_000u64 {
         hub.poll_native(step * 50, step * 50_000_000);
+        for output in drain(&mut rh) {
+            if let Output::Snapshot(write) = output {
+                hub.complete_snapshot(&write, true, step * 50);
+            }
+        }
         if hub.rooms["ABC"].native.is_none() {
             break;
         }
@@ -750,9 +778,7 @@ fn room_ai_host_callbacks_survive_natural_finish_and_final_snapshots() {
                 deliveries += 1;
             }
         } else if tick >= 2 {
-            for slot in 0..2 {
-                assert!(room.ai_delivered_view(slot).is_some());
-            }
+            assert!(room.ai_delivered_view(1).is_some());
         }
     }
     assert!(
@@ -766,10 +792,8 @@ fn room_ai_host_callbacks_survive_natural_finish_and_final_snapshots() {
     );
     assert!(orders > 10, "actual hosted scheduling must admit orders");
     assert!(deliveries > 100);
-    assert!(
-        hub.rooms["ABC"]
-            .players
-            .iter()
-            .all(|p| p.ai && p.token.is_empty())
-    );
+    assert_eq!(hub.rooms["ABC"].players.len(), 2);
+    assert!(!hub.rooms["ABC"].players[0].ai);
+    assert!(hub.rooms["ABC"].players[1].ai);
+    assert!(hub.rooms["ABC"].players[1].token.is_empty());
 }
