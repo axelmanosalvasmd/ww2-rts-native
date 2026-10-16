@@ -1052,3 +1052,15 @@ fn mode91_site_refund_refusals_preserve_paid_site_and_story() {
         );
     }
 }
+
+#[test]
+fn mov67_unfinished_building_publication_indexes_the_footprint_pose_immediately() {
+    let (mut m, worker) = scene();
+    let site = build(&mut m, worker);
+    let unit = &m.world.game.units[&site];
+    assert_eq!(unit.owner, 0);
+    assert_eq!(unit.built, Some(0.0));
+    assert!(!unit.cells.as_ref().unwrap().is_empty());
+    assert_eq!(m.rules.kinds[unit.kind].name, "flakpos");
+    crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
+}

@@ -171,6 +171,73 @@ mod tests {
     }
 
     #[test]
+    fn mov67_sandbox_placements_index_every_spawn_kind_before_ticks_and_delivery() {
+        use crate::recipient_snapshot::{DeliveryState, SelectedSeat};
+        use crate::unit_placement::tests::assert_current;
+        let kinds = scene(false)
+            .rules
+            .kinds
+            .iter()
+            .filter(|kind| !kind.structure)
+            .map(|kind| kind.name.clone())
+            .collect::<Vec<_>>();
+        for kind in kinds {
+            let mut m = scene(false);
+            // The requested cell is blocked; ground actors must publish the resolved pose.
+            m.world.set_cell(20 * 60 + 20, b'W').unwrap();
+            for enemy in [false, true] {
+                let id = m.next_unit_id;
+                assert_eq!(
+                    m.execute_command(
+                        0,
+                        &Command::Spawn {
+                            kind: kind.clone(),
+                            at: Point { x: 41.0, z: 41.0 },
+                            enemy,
+                        },
+                        false
+                    )
+                    .unwrap(),
+                    None,
+                    "{kind}"
+                );
+                let u = &m.world.game.units[&id];
+                assert_eq!(u.owner, usize::from(enemy));
+                if u.air.is_some() {
+                    assert_eq!(u.at(), m.aircraft_base(u.owner, u.at()).unwrap());
+                } else if !m.rules.kinds[u.kind].naval {
+                    assert_ne!(u.at(), Point { x: 41.0, z: 41.0 });
+                }
+                assert_current(&m.world.game, &m.grid);
+            }
+            for c in m.commands.units.values_mut() {
+                c.hold_fire = true;
+                c.auto_cast = false;
+            }
+            let selected = (0..3)
+                .map(|slot| SelectedSeat {
+                    slot,
+                    full: false,
+                    omit: false,
+                })
+                .collect::<Vec<_>>();
+            let mut delivery = DeliveryState::new(&m).unwrap();
+            for _ in 0..6 {
+                let report = m.advance_tick().unwrap();
+                let frame = delivery
+                    .capture_selected_with_tick_events(&mut m, &selected, &report.events)
+                    .unwrap()
+                    .unwrap();
+                for seat in &selected {
+                    assert_eq!(frame.recipient(seat.slot).unwrap().into_json()["t"], "s");
+                }
+                assert_current(&m.world.game, &m.grid);
+            }
+            assert!(m.tick_state.fault().is_none());
+        }
+    }
+
+    #[test]
     fn sandbox_enemy_uses_first_nonallied_roster_seat_without_payment() {
         let mut m = scene(false);
         let before = m.start.economy.clone();

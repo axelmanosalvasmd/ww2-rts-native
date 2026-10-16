@@ -591,3 +591,51 @@ fn mode85_queue_reservations_block_arrivals_before_ordinary_lifecycle_resumes() 
         finish(&mut m, &mut delivery);
     }
 }
+
+#[test]
+fn mov67_scenario_setup_and_successive_arrivals_index_resolved_poses_before_ticks() {
+    use crate::unit_placement::tests::assert_current;
+    let mut m = scene(definition(
+        json!([
+            {"id":"same","units":[
+                {"id":"a","type":"rifle","side":0,"x":60,"y":40},
+                {"id":"b","type":"rifle","side":0,"x":60,"y":40}]}
+        ]),
+        vec![],
+    ));
+    let setup = ids(&m, "same");
+    assert_ne!(
+        m.world.game.units[&setup[0]].at(),
+        m.world.game.units[&setup[1]].at()
+    );
+    assert_current(&m.world.game, &m.grid);
+    let mut poses = Vec::new();
+    for order in [
+        json!({"kind":"hold"}),
+        json!({"kind":"move","at":[40,30]}),
+        json!({"kind":"attackMove","at":[40,30]}),
+    ] {
+        let id = m
+            .scenario_arrive(0, "rifle", [40, 20], &order)
+            .unwrap()
+            .unwrap();
+        let u = &m.world.game.units[&id];
+        assert_eq!(u.owner, 0);
+        assert!(!poses.contains(&u.at()));
+        poses.push(u.at());
+        assert_eq!(
+            m.world.game.flags[m.world.game.cell_of(u.x, u.z).unwrap()]
+                & m.rules.kinds[u.kind].block(),
+            0
+        );
+        assert_current(&m.world.game, &m.grid);
+    }
+    assert_eq!(poses[0], Point { x: 81.0, z: 41.0 });
+    assert_eq!(poses[1], Point { x: 79.0, z: 39.0 });
+    let mut delivery = DeliveryState::new(&m).unwrap();
+    for _ in 0..6 {
+        tick(&mut m, &mut delivery);
+        assert_current(&m.world.game, &m.grid);
+    }
+    finish(&mut m, &mut delivery);
+}
