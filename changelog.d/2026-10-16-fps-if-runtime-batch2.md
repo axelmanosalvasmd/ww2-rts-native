@@ -1,0 +1,7 @@
+- Add recipient-only composed cell state and JavaScript-compatible 32-bit conversion and multiplication helpers.
+- Preserve the tracked/wheeled flag in typed vehicle profiles, including fallback profiles, for presentation consumers.
+- Add focused interface helper tests and reuse the existing exact projectile, grid and authored-map path checks. The C header, FFI, wire format and privacy rules are unchanged; operative room transport and Unreal adoption remain pending.
+- Check actual match seeding across constructor state and 40 recorded-command ticks, alongside the existing private-seed host restart and reconnect test.
+- Leave IF-10 open: its literal server-bit acceptance conflicts with the prototype predictor's signed zero and the authoritative collision guard's zero normalization. Malformed received height metadata remains outside the composed-cell checks; existing decoder admission is unchanged.
+- Leave IF-23 unclaimed: Rust snapshots do not perform the prototype's canonical grid rebuild. Existing exact grid/path tests remain component evidence, and snapshot-order policy needs owner review.
+- Format the seed replay test. On Vostro, all 20 focused checks pass, including the 1,236-message decoder replay.
