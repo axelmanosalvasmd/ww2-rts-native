@@ -1,0 +1,2 @@
+- Add atomic core refunds for waiting production jobs and unfinished building sites, including MP-spent accounting. Verify existing paid infantry reinforcement and vehicle repair counters and their post-finish freeze.
+- Add typed scenario condition evaluation against live match facts, with bounded work and checks for ownership, capture history, authored losses, groups, areas and completion dependencies. Authored scenario admission and trigger scheduling remain pending.
