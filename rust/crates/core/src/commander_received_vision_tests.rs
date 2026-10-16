@@ -1,7 +1,8 @@
 use super::*;
 use crate::{
-    game::{CELL, SIGHT},
-    mov_audit_test_support as scene,
+    game::{CELL, Point, SIGHT, Smoke},
+    grid::SpatialGrid,
+    mov_audit_test_support as scene, vision,
 };
 
 fn assert_same_geometry(a: &Game, b: &Game) {
@@ -138,4 +139,45 @@ fn delivered_allied_aircraft_use_the_public_airborne_state() {
     let received = received_game(&m, &observation).unwrap();
     assert_eq!(received.units[&id].air, Some(PlaneState::Out));
     assert_eq!((received.units[&id].x, received.units[&id].z), (40.0, 50.0));
+}
+
+#[test]
+fn live_sight_changes_cannot_rewrite_a_delivered_observation() {
+    let mut m = scene::scene();
+    scene::spawn(&mut m, "rifle", 0, Point { x: 40.0, z: 50.0 });
+    let own = m
+        .world
+        .game
+        .units
+        .values()
+        .find(|unit| unit.owner == 0 && m.rules.kinds[unit.kind].name == "hq")
+        .unwrap()
+        .id;
+    let plane = m.spawn_aircraft(0, "fighter").unwrap();
+    let aircraft = m.world.game.units.get_mut(&plane).unwrap();
+    aircraft.x = 40.0;
+    aircraft.z = 50.0;
+    aircraft.air = Some(PlaneState::Out);
+    m.grid.update(plane, &m.world.game.units[&plane]);
+    let observation = m.opening_commander_observation(0).unwrap();
+    let before = received_game(&m, &observation).unwrap();
+    m.world.game.units.get_mut(&own).unwrap().built = Some(0.25);
+    m.world.game.units.get_mut(&plane).unwrap().air = Some(PlaneState::Base);
+    m.world.game.weather = m.rules.weather.iter().position(|weather| {
+        !weather.rains && weather.sight != observation.input().runtime.as_ref().unwrap().sight
+    });
+    m.world.game.smokes.push(Smoke {
+        id: 99,
+        x: 40.0,
+        z: 50.0,
+        r: 12.0,
+        remaining: Some(10.0),
+    });
+    assert_same_geometry(&before, &received_game(&m, &observation).unwrap());
+    let fresh = m.opening_commander_observation(0).unwrap();
+    let after = received_game(&m, &fresh).unwrap();
+    assert_eq!(after.units[&own].built, Some(0.25));
+    assert_eq!(after.units[&plane].air, Some(PlaneState::Base));
+    assert_ne!(before.weather, after.weather);
+    assert_ne!(before.smokes, after.smokes);
 }

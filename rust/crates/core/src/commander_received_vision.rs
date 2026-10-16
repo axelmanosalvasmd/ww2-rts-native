@@ -2,10 +2,9 @@
 use crate::{
     catalog::Catalog,
     commander_ai::Observation,
-    game::{Game, PlaneState, Player, Point, Smoke},
-    grid::SpatialGrid,
+    game::{Game, PlaneState, Player},
     match_runtime::Match,
-    math, unit_spawn, vision,
+    unit_spawn,
 };
 use std::collections::BTreeMap;
 
@@ -13,7 +12,7 @@ use std::collections::BTreeMap;
 pub(crate) fn received_game(m: &Match, observation: &Observation) -> Result<Game, String> {
     let input = observation.input();
     let owner = input.slot;
-    let routing = m.recipient_routing(owner)?;
+    m.validate_recipient(owner)?;
     let initial = m.world.initial();
     let cells = input
         .width
@@ -31,17 +30,26 @@ pub(crate) fn received_game(m: &Match, observation: &Observation) -> Result<Game
     {
         return Err("received sight packet binding mismatch".into());
     }
-    let mut height = initial.height.clone().unwrap_or_else(|| vec![0; cells]);
+    let context = input
+        .runtime
+        .as_ref()
+        .ok_or("missing delivered sight facts")?;
+    let height = context.height.clone().unwrap_or_else(|| vec![0; cells]);
     if height.len() != cells {
         return Err("invalid public sight heights".into());
     }
-    for observed in routing.remembered() {
-        let cell = observed.row.cell;
-        if cell >= cells {
-            return Err("invalid received sight cell".into());
-        }
-        height[cell] = observed.row.height;
-    }
+    // Sight geometry only needs the delivered multiplier, not the live weather state.
+    let weather = if context.sight == 1.0 {
+        None
+    } else {
+        Some(
+            m.rules
+                .weather
+                .iter()
+                .position(|weather| !weather.rains && weather.sight == context.sight)
+                .ok_or("unrepresented delivered sight multiplier")?,
+        )
+    };
     let team = input.players[owner].team;
     let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
     let mut units = BTreeMap::new();
@@ -71,43 +79,17 @@ pub(crate) fn received_game(m: &Match, observation: &Observation) -> Result<Game
         .map_err(|e| format!("received sight actor: {e:?}"))?;
         unit.hp = row.hp;
         unit.supp = row.supp;
-        unit.built = canonical.built;
-        unit.air = canonical.air.map(|_| {
-            if vision::airborne(canonical) {
-                PlaneState::Out
-            } else {
-                PlaneState::Base
-            }
+        let facts = context
+            .units
+            .get(&row.id)
+            .ok_or("missing delivered allied sight facts")?;
+        unit.built = Some(facts.built);
+        unit.air = m.rules.kinds[kind].air.then_some(if facts.airborne {
+            PlaneState::Out
+        } else {
+            PlaneState::Base
         });
         units.insert(row.id, unit);
-    }
-    let canonical = &m.world.game;
-    let grid = SpatialGrid::new(&canonical.units, 16.0);
-    let mut smokes = Vec::new();
-    for smoke in &canonical.smokes {
-        if canonical.reveal
-            || vision::team_sees(
-                canonical,
-                &m.rules,
-                &grid,
-                team,
-                Point {
-                    x: smoke.x,
-                    z: smoke.z,
-                },
-            )
-        {
-            if ![smoke.x, smoke.z, smoke.r].iter().all(|n| n.is_finite()) || smoke.r < 0.0 {
-                return Err("invalid received smoke".into());
-            }
-            smokes.push(Smoke {
-                id: smoke.id,
-                remaining: None,
-                x: math::round(smoke.x * 10.0) / 10.0,
-                z: math::round(smoke.z * 10.0) / 10.0,
-                r: smoke.r,
-            });
-        }
     }
     Ok(Game {
         w: input.width,
@@ -130,7 +112,7 @@ pub(crate) fn received_game(m: &Match, observation: &Observation) -> Result<Game
         terrain_version: 0,
         mode: None,
         naval: false,
-        weather: canonical.weather,
+        weather,
         rain: 0.0,
         players: input
             .players
@@ -143,7 +125,7 @@ pub(crate) fn received_game(m: &Match, observation: &Observation) -> Result<Game
             })
             .collect(),
         units,
-        smokes,
+        smokes: context.smokes.clone(),
         strikes: Vec::new(),
         sections: BTreeMap::new(),
     })

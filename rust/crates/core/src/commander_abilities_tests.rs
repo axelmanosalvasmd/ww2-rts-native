@@ -51,6 +51,7 @@ fn observation(mut units: Vec<UnitObservation>) -> Observation {
         chars: vec![b'.'; 16384],
         manpower: 1000.0,
         research: None,
+        runtime: None,
     })
     .unwrap()
 }
