@@ -1444,7 +1444,7 @@ impl Hub {
                 let away = room
                     .players
                     .iter()
-                    .map(|person| !person.online())
+                    .map(|person| person.connection.is_none() && !person.ai)
                     .collect::<Vec<_>>();
                 let native = room.native.as_mut().unwrap();
                 if let Err(error) = native.runtime.set_away(&away) {
@@ -2157,8 +2157,8 @@ mod tests {
     #[test]
     fn observer_hosts_ai_room_and_cannot_change_another_humans_faction() {
         let mut h = Hub::new(32, String::new());
-        let (a, _) = client(1);
-        let (b, _) = client(2);
+        let (a, _ra) = client(1);
+        let (b, _rb) = client(2);
         join(&mut h, &a, "a", false, 0);
         join(&mut h, &b, "b", false, 0);
         h.message(

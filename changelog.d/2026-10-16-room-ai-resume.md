@@ -3,3 +3,4 @@
 - Restore compiled house structure names and grenade blast effect names in native combat saves, which previously failed loading with an unknown compiled string.
 - Check hosted AI completion with a connected human host and verify that loaded starts preserve the game while refreshing recipient routing observations.
 - Track AI shot batches by delivery rather than game tick, so reading a recipient frame twice at one tick cannot fault a resumed commander.
+- Preserve away-wallet behavior until a socket is removed, while AI seats remain present. Update the old AI-refusal, observer-readiness and pause-order tests for the hosted lifecycle; paused snapshots must stay at tick zero.

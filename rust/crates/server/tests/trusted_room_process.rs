@@ -208,12 +208,17 @@ fn ordinary_binary_absent_seat_start_and_restart_auto_pause_then_same_token_resu
     let lobby = host.until(|m| m["t"] == "lobby" && m["players"][1]["connected"] == false);
     assert_eq!(lobby["players"].as_array().unwrap().len(), 2);
     host.send(json!({"t":"start"}));
-    let first = host.until(|m| m["t"] == "start");
     assert_eq!(
         host.until(|m| m["t"] == "pause" && m["paused"] == true)["reason"],
         "drop"
     );
-    assert!(host.barrier().iter().all(|m| m["t"] != "s"));
+    let first = host.until(|m| m["t"] == "start");
+    assert!(
+        host.barrier()
+            .iter()
+            .filter(|m| m["t"] == "s")
+            .all(|m| m["tick"] == 0)
+    );
     let mut guest = Client::open(
         server.address,
         "ABC",
@@ -231,9 +236,9 @@ fn ordinary_binary_absent_seat_start_and_restart_auto_pause_then_same_token_resu
     drop(guest);
     host.until(|m| m["t"] == "lobby" && m["players"][1]["connected"] == false);
     host.send(json!({"t":"restart"}));
+    host.until(|m| m["t"] == "pause" && m["paused"] == true);
     let second = host.until(|m| m["t"] == "start");
     assert!(second["matchId"].as_u64().unwrap() > first["matchId"].as_u64().unwrap());
-    host.until(|m| m["t"] == "pause" && m["paused"] == true);
     let mut guest = Client::open(
         server.address,
         "ABC",
