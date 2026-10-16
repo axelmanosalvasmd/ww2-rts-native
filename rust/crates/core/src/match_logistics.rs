@@ -89,10 +89,7 @@ impl Match {
         &self,
         unit: &Unit,
     ) -> Result<Option<logistics::Reserves>, String> {
-        if !matches!(
-            self.options.mode,
-            crate::economy::Mode::Default | crate::economy::Mode::Conquest
-        ) {
+        if !crate::match_actor::ordinary_mode(&self.world.game, self.options.mode) {
             return Err("new reserves require ordinary Conquest".into());
         }
         if unit.id == 0
@@ -349,10 +346,7 @@ impl Match {
         self.validate_supply_context(true)
     }
     fn validate_supply_context(&self, garrisons: bool) -> Result<(), String> {
-        if !matches!(
-            self.options.mode,
-            crate::economy::Mode::Default | crate::economy::Mode::Conquest
-        ) {
+        if !crate::match_actor::ordinary_mode(&self.world.game, self.options.mode) {
             return Err("supply adapter supports ordinary Conquest only".into());
         }
         let g = &self.world.game;

@@ -346,6 +346,8 @@ impl Match {
             mode: match self.options.mode {
                 crate::economy::Mode::World => "world",
                 crate::economy::Mode::Assault => "assault",
+                crate::economy::Mode::Classic => "classic",
+                crate::economy::Mode::Annihilation => "annihilation",
                 _ => "conquest",
             },
         }))

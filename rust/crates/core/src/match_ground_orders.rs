@@ -1,7 +1,6 @@
 //! Ground Attack/Retreat over the existing recorded queue and canonical owners.
 use crate::{
     catalog::Catalog,
-    economy::Mode,
     existing_observers::{ExistingObservers, PreparedGroundExit},
     game::{Point, Unit},
     grid::UnitId,
@@ -15,10 +14,8 @@ use std::collections::BTreeMap;
 
 impl Match {
     fn ground_orders_open(&self) -> Result<(), String> {
-        if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
-            || self.world.game.mode.is_some()
-        {
-            return Err("ground orders require ordinary Default or Conquest".into());
+        if !crate::match_actor::ordinary_mode(&self.world.game, self.options.mode) {
+            return Err("ground orders require a matching ordinary mode".into());
         }
         Ok(())
     }

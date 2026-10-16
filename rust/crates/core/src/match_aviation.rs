@@ -2,7 +2,6 @@
 //! Combat owns HP attribution/XP and Logistics owns physical ground AA rounds.
 use crate::{
     catalog::{Catalog, Value},
-    economy::Mode,
     game::{PlaneState, Point},
     grid::UnitId,
     match_firing::FiringUnit,
@@ -140,9 +139,9 @@ struct AntiAirStep {
 impl Match {
     pub(crate) fn validate_aviation(&self) -> Result<(), AviationError> {
         let g = &self.world.game;
-        if !matches!(self.options.mode, Mode::Default | Mode::Conquest) || g.mode.is_some() {
+        if !crate::match_actor::ordinary_mode(g, self.options.mode) {
             return Err(AviationError::Unsupported(
-                "aviation currently requires ordinary Conquest",
+                "aviation requires a matching ordinary mode",
             ));
         }
         if g.tick < 0
@@ -222,11 +221,9 @@ impl Match {
     }
     /// Nearest finished own airfield, otherwise the source off-map base past HQ.
     pub fn aircraft_base(&self, owner: usize, at: Point) -> Result<Point, AviationError> {
-        if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
-            || self.world.game.mode.is_some()
-        {
+        if !crate::match_actor::ordinary_mode(&self.world.game, self.options.mode) {
             return Err(AviationError::Unsupported(
-                "air base currently requires ordinary Conquest",
+                "air base requires a matching ordinary mode",
             ));
         }
         if owner >= self.start.players.len() || !finite(at) {

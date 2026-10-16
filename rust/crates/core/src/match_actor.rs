@@ -22,11 +22,23 @@ impl ActorPolicy<'_> {
     }
 }
 
+/// Ordinary modes use commander actors and require their matching canonical mode.
+pub(crate) fn ordinary_mode(game: &Game, mode: Mode) -> bool {
+    matches!(
+        (mode, game.mode),
+        (Mode::Default | Mode::Conquest, None)
+            | (Mode::Assault, Some(ModeKind::Assault))
+            | (Mode::Annihilation, Some(ModeKind::Annihilation))
+            | (Mode::Classic, Some(ModeKind::Classic))
+    )
+}
+
 /// Validate only the represented actor modes, not their complete tick capabilities.
 pub(crate) fn checked_game_mode(game: &Game, mode: Mode) -> Result<(), String> {
-    match (mode, game.mode) {
-        (Mode::Default | Mode::Conquest, None) | (Mode::World, Some(ModeKind::World)) => Ok(()),
-        _ => Err("actor mode does not match canonical Game mode".into()),
+    if ordinary_mode(game, mode) || (mode == Mode::World && game.mode == Some(ModeKind::World)) {
+        Ok(())
+    } else {
+        Err("actor mode does not match canonical Game mode".into())
     }
 }
 pub(crate) fn checked_game_owner(game: &Game, owner: usize) -> Result<i32, String> {

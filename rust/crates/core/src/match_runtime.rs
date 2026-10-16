@@ -93,6 +93,7 @@ fn number(v: &Value, name: &str) -> Result<f64, String> {
 
 enum StartupProfile {
     Conquest,
+    Elimination,
     World(MatchRandom),
     Assault { defender_team: i32 },
 }
@@ -108,6 +109,21 @@ impl StartPlan {
             options,
             rules,
             StartupProfile::Conquest,
+            #[cfg(test)]
+            None,
+        )
+    }
+
+    pub(crate) fn prepare_elimination(
+        map: &crate::map::AuthoritativeMap,
+        options: &MatchOptions,
+        rules: &Rules,
+    ) -> Result<Self, String> {
+        Self::prepare_mode(
+            map,
+            options,
+            rules,
+            StartupProfile::Elimination,
             #[cfg(test)]
             None,
         )
@@ -152,6 +168,10 @@ impl StartPlan {
         profile: StartupProfile,
         #[cfg(test)] replay: Option<crate::aligned_replay::Replay>,
     ) -> Result<Self, String> {
+        let elimination_mode = matches!(&profile, StartupProfile::Elimination);
+        if elimination_mode && !matches!(options.mode, Mode::Annihilation | Mode::Classic) {
+            return Err("elimination startup requires Annihilation or Classic".into());
+        }
         let world_mode = matches!(&profile, StartupProfile::World(_));
         let defender_team = match &profile {
             StartupProfile::Assault { defender_team } => Some(*defender_team),
@@ -164,6 +184,7 @@ impl StartPlan {
             return Err("Assault startup requires explicit Assault mode".into());
         }
         if !world_mode
+            && !elimination_mode
             && defender_team.is_none()
             && !matches!(options.mode, Mode::Default | Mode::Conquest)
         {
@@ -320,7 +341,7 @@ impl StartPlan {
         };
         let income_scale = number(field(field(cfg, "armies")?, army_key)?, "income")?;
         let initial_mp = number(
-            if world_mode {
+            if world_mode || options.mode == Mode::Classic {
                 field(cfg, "classic")?
             } else {
                 cfg
@@ -356,7 +377,10 @@ impl StartPlan {
             .points()
             .iter()
             .enumerate()
-            .filter_map(|(i, p)| (defender_team.is_none() || p.mp > 0.0).then_some(i))
+            .filter_map(|(i, p)| {
+                (!(defender_team.is_some() || options.mode == Mode::Annihilation) || p.mp > 0.0)
+                    .then_some(i)
+            })
             .collect();
         let points = map
             .points()
@@ -457,7 +481,7 @@ impl StartPlan {
             l
         });
         let starting_kinds = field(
-            if world_mode {
+            if world_mode || options.mode == Mode::Classic {
                 field(cfg, "classic")?
             } else {
                 cfg
@@ -564,6 +588,7 @@ pub struct Match {
     pub abilities: crate::match_abilities::AbilityState,
     pub recovery: crate::match_recovery::RecoveryState,
     pub assault: Option<crate::assault_runtime::AssaultState>,
+    pub elimination: Option<crate::elimination_modes::EliminationState>,
     pub commands: crate::match_commands::MatchCommands,
     pub combat: crate::match_combat::CombatState,
     pub environment: crate::environment::EnvironmentRuntime,
@@ -734,6 +759,7 @@ impl Match {
             abilities: crate::match_abilities::AbilityState::default(),
             recovery: crate::match_recovery::RecoveryState::default(),
             assault: None,
+            elimination: None,
             commands: crate::match_commands::MatchCommands::new(4096),
             combat: crate::match_combat::CombatState::default(),
             environment: crate::environment::EnvironmentRuntime::default(),
@@ -770,19 +796,25 @@ impl Match {
     }
 
     pub(crate) fn complete_skirmish_start(&mut self) -> Result<(), String> {
-        self.setup_bases()?;
+        if self.options.mode != Mode::Classic {
+            self.setup_bases()?;
+        }
         for unit in self.world.game.units.values() {
             self.combat.initialize(unit.id);
             self.firing.initialize(unit.id);
             self.abilities.initialize(unit.id);
             self.recovery.initialize(unit.id);
             if !self.commands.units.contains_key(&unit.id) {
-                let control = crate::match_commands::UnitControl::new(unit, &self.rules)?;
+                let control = crate::match_commands::UnitControl::new_for_mode(
+                    unit,
+                    &self.rules,
+                    self.options.mode,
+                )?;
                 self.commands.insert(unit.id, control);
             }
         }
         self.grid.rebuild(&self.world.game.units);
-        if self.world.game.mode.is_none() {
+        if crate::match_actor::ordinary_mode(&self.world.game, self.options.mode) {
             self.initialize_recipient_routing()?;
             self.initialize_logistics()?;
         }
@@ -824,7 +856,7 @@ impl Match {
         capture_income: bool,
     ) -> Result<Vec<crate::objectives::Captured>, String> {
         use crate::{economy_state as economy, objectives};
-        self.validate_conquest_finish_state()?;
+        self.validate_match_finish_state()?;
         let winner_decided = winner_decided || self.finish.is_some();
         let dt = self.rules.movement.tick;
         let game = &self.world.game;
@@ -920,12 +952,31 @@ impl Match {
             wallets
                 .advance_income(
                     &economy::Context {
-                        mode: economy::ModeContext::default(),
+                        mode: economy::ModeContext {
+                            kind: if matches!(self.options.mode, Mode::Default | Mode::Conquest) {
+                                Mode::Default
+                            } else {
+                                self.options.mode
+                            },
+                            defender_team: self.assault.map(|state| state.defender_team),
+                            ..Default::default()
+                        },
                         army: self.options.army,
                         units: &income_units,
                         drops: &[],
                         points: &income_points,
-                        nodes: &[],
+                        nodes: &self.elimination.as_ref().map_or_else(Vec::new, |state| {
+                            state
+                                .nodes
+                                .iter()
+                                .map(|node| economy::Node {
+                                    depot: node.depot.map(u64::from),
+                                    rate: node.rate,
+                                    fuel: node.fuel,
+                                    region: None,
+                                })
+                                .collect::<Vec<_>>()
+                        }),
                         world: None,
                     },
                     dt,
@@ -1161,7 +1212,12 @@ pub(crate) fn foot_center(game: &Game, cell: usize, size: usize) -> Point {
         z: (cell / game.w) as f64 * CELL + size as f64 * CELL / 2.0,
     }
 }
-fn find_site(game: &Game, at: Point, size: usize, avoid: &[(Point, f64)]) -> Option<usize> {
+pub(crate) fn find_site(
+    game: &Game,
+    at: Point,
+    size: usize,
+    avoid: &[(Point, f64)],
+) -> Option<usize> {
     let x = at.x.max(0.0).min(game.w as f64 * CELL - 1.0);
     let z = at.z.max(0.0).min(game.h as f64 * CELL - 1.0);
     let start = (z / CELL).floor() as usize * game.w + (x / CELL).floor() as usize;

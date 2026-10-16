@@ -1,0 +1,4 @@
+- Add bounded Classic and Annihilation core constructors, elimination and victory phases, and connect Assault to the ordinary tick runner. Add intent tests for setup, defeat, Sudden Death, bunker behavior and lobby setting permissions.
+- Transfer captured World forts through canonical unit ownership, spatial membership and footprint rows, including simultaneous former-owner elimination. Replace obsolete fort-refusal tests with successful-transfer checks while retaining atomic failure and frozen-result checks.
+- Apply Annihilation's howitzer reduction to bunker explosions. Charge Classic support and abilities in Munitions. Keep World server admission off and preserve unsupported linked-carrier and logistics boundaries.
+- Use finished Classic production buildings for retreat and allied production buildings for paid recovery. Update obsolete Assault routing/income refusals and mode-refusal tests to keep testing unsupported Horde admission.

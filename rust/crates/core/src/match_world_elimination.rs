@@ -6,7 +6,7 @@ use crate::{
     match_combat::CombatState,
     match_runtime::Match,
     match_world::{RegionState, ResourceNode},
-    match_world_regions::WorldCapture,
+    match_world_regions::{WorldCapture, WorldFortTransfer},
     world::WorldTransaction,
 };
 use std::collections::BTreeSet;
@@ -47,21 +47,23 @@ impl Match {
         &self,
         live_order: &[u32],
         regions: &[RegionState],
+        transfers: &[WorldFortTransfer],
     ) -> Result<Option<WorldEliminationDraft>, String> {
         self.validate_world_live_order(live_order)?;
         let mut planned = Vec::new();
         // Source repeats this for already-out players too. It does not transfer to a teammate.
         for (slot, player) in self.start.economy.players.iter().enumerate() {
             if !regions.iter().any(|r| r.team == player.team) {
-                planned.extend(
-                    live_order
+                planned.extend(live_order.iter().copied().filter(|id| {
+                    transfers
                         .iter()
-                        .copied()
-                        .filter(|id| self.world.game.units[id].owner == slot),
-                );
+                        .find(|t| t.id == *id)
+                        .map_or(self.world.game.units[id].owner, |t| t.owner)
+                        == slot
+                }));
             }
         }
-        if planned.is_empty() {
+        if planned.is_empty() && transfers.is_empty() {
             return Ok(None);
         }
         for id in &planned {
@@ -99,6 +101,16 @@ impl Match {
         let mut environment = self.environment.clone();
         let mut grid = self.grid.clone_for_transaction();
         let mut combat = self.combat.clone();
+        for transfer in transfers {
+            let unit = transaction
+                .world
+                .game
+                .units
+                .get_mut(&transfer.id)
+                .ok_or("missing staged World fort")?;
+            unit.owner = transfer.owner;
+            grid.update(transfer.id, unit);
+        }
         let mut seed = self.start.environment_seed;
         let mut next_id = self.next_unit_id;
         let mut survivors = live_order.to_vec();

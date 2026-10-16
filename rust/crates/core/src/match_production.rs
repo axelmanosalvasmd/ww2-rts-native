@@ -72,6 +72,7 @@ fn context<'a>(
     naval: bool,
     units: &'a [UnitView<'a>],
     regions: Option<&'a [Region]>,
+    sudden_death: bool,
 ) -> Context<'a> {
     Context {
         mode: ModeContext {
@@ -81,17 +82,45 @@ fn context<'a>(
         army: options.army,
         tech_enabled: options.tech,
         naval,
-        sudden_death: false,
+        sudden_death,
         units,
         drops: &[],
         world: regions.map(|regions| WorldContext { regions }),
     }
 }
+fn validate_training_birth(
+    mode: Mode,
+    rules: &Rules,
+    name: &str,
+) -> Result<(), ProductionStepError> {
+    if mode == Mode::World {
+        return crate::match_world_tick::validate_world_future_birth(rules, name)
+            .map_err(ProductionStepError::Control);
+    }
+    let kind = rules.kind(name).ok_or(ProductionStepError::InvalidState(
+        "unknown queued birth kind",
+    ))?;
+    if rules.kinds[kind].air {
+        return Err(ProductionStepError::Placement(
+            crate::produced_units::Error::UnsupportedAir,
+        ));
+    }
+    if rules.kinds[kind].rail {
+        return Err(ProductionStepError::InvalidState(
+            "queued railway birth is unsupported",
+        ));
+    }
+    Ok(())
+}
+
 impl Match {
     fn production_step_context(&self) -> Result<usize, ProductionStepError> {
         let count = self.start.players.len();
         let supported = match self.options.mode {
             Mode::Default | Mode::Conquest => self.world.game.mode.is_none(),
+            Mode::Assault => self.world.game.mode == Some(ModeKind::Assault),
+            Mode::Annihilation => self.world.game.mode == Some(ModeKind::Annihilation),
+            Mode::Classic => self.world.game.mode == Some(ModeKind::Classic),
             Mode::World => {
                 self.world.game.mode == Some(ModeKind::World) && self.world_runtime.is_some()
             }
@@ -143,6 +172,7 @@ impl Match {
             self.world.game.naval,
             &units,
             regions.as_deref(),
+            self.elimination_sudden_death(),
         );
         self.production
             .validate_phases(&context, &self.start.economy, dt)?;
@@ -161,9 +191,9 @@ impl Match {
                 ));
             }
             if !row.jobs().is_empty() {
-                if self.options.mode != Mode::World {
+                if !self.options.mode.is_construction() {
                     return Err(ProductionStepError::InvalidState(
-                        "nonempty Conquest training queue",
+                        "nonempty skirmish training queue",
                     ));
                 }
                 if self.options.logistics
@@ -182,14 +212,13 @@ impl Match {
                     return Err(ProductionStepError::InvalidState("training rally position"));
                 }
                 for job in row.jobs() {
-                    crate::match_world_tick::validate_world_future_birth(&self.rules, &job.kind)
-                        .map_err(ProductionStepError::Control)?;
+                    validate_training_birth(self.options.mode, &self.rules, &job.kind)?;
                 }
             }
         }
         Ok(())
     }
-    /// Recorded World Buy queues training, without an immediate birth. Canonical
+    /// Recorded construction-mode Buy queues training, without an immediate birth. Canonical
     /// production admission precedes publication checks and atomic MP-spent payment.
     pub(crate) fn recorded_world_buy(
         &mut self,
@@ -207,11 +236,20 @@ impl Match {
         {
             return Err(production::Error::Denied(production::Denial::Blocked).into());
         }
-        let phase = self
-            .validate_world_phase_context(0.0)
-            .map_err(ProductionStepError::Control)?;
-        self.validate_world_path_service()
-            .map_err(ProductionStepError::Routing)?;
+        if self.options.mode == Mode::World {
+            self.validate_world_phase_context(0.0)
+                .map_err(ProductionStepError::Control)?;
+            self.validate_world_path_service()
+                .map_err(ProductionStepError::Routing)?;
+        } else if self.options.mode == Mode::Classic {
+            self.validate_elimination_state()
+                .map_err(ProductionStepError::Control)?;
+        } else {
+            return Err(ProductionStepError::InvalidState(
+                "queued Buy requires construction mode",
+            ));
+        }
+        let regions = self.production_regions()?;
         self.validate_production_phases(0.0)?;
         let count = self.production_step_context()?;
         let units = units(&self.world.game, &self.rules, count)?;
@@ -219,7 +257,8 @@ impl Match {
             &self.options,
             self.world.game.naval,
             &units,
-            Some(&phase.regions),
+            regions.as_deref(),
+            self.elimination_sudden_death(),
         );
         let registered = self
             .production
@@ -234,8 +273,7 @@ impl Match {
             kind,
             from,
         )?;
-        crate::match_world_tick::validate_world_future_birth(&self.rules, kind)
-            .map_err(ProductionStepError::Control)?;
+        validate_training_birth(self.options.mode, &self.rules, kind)?;
         let building = prepared.building();
         if !registered.contains(&building) {
             return Err(ProductionStepError::InvalidState(
@@ -293,6 +331,7 @@ impl Match {
             self.world.game.naval,
             &units,
             regions.as_deref(),
+            self.elimination_sudden_death(),
         );
         let prepared =
             self.production
@@ -311,6 +350,38 @@ impl Match {
         story.commit();
         Ok(cost)
     }
+
+    /// Cancel a waiting construction-mode training job through canonical wallet admission.
+    pub fn cancel_training(
+        &mut self,
+        slot: usize,
+        building: u32,
+        job: u64,
+    ) -> Result<crate::economy::Price, ProductionStepError> {
+        if self.finish.is_some()
+            || self
+                .start
+                .economy
+                .players
+                .get(slot)
+                .is_none_or(|p| p.away || p.out)
+        {
+            return Err(production::Error::Denied(production::Denial::Blocked).into());
+        }
+        let count = self.production_step_context()?;
+        let regions = self.production_regions()?;
+        let units = units(&self.world.game, &self.rules, count)?;
+        let context = context(
+            &self.options,
+            self.world.game.naval,
+            &units,
+            regions.as_deref(),
+            self.elimination_sudden_death(),
+        );
+        Ok(self
+            .production
+            .cancel(&context, &mut self.start.economy, slot, building, job)?)
+    }
     /// Called at the source early lab phase, before the per-unit loop. Existing
     /// research continues after a winner and for away seats; out seats pause.
     pub fn step_research(
@@ -325,6 +396,7 @@ impl Match {
             self.world.game.naval,
             &units,
             regions.as_deref(),
+            self.elimination_sudden_death(),
         );
         Ok(self
             .production
@@ -341,7 +413,7 @@ impl Match {
         if !dt.is_finite() || dt < 0.0 {
             return Err(production::Error::InvalidInput("dt").into());
         }
-        if self.options.mode != Mode::World
+        if !self.options.mode.is_construction()
             && self
                 .production
                 .building(building)
@@ -367,8 +439,7 @@ impl Match {
                 ));
             }
             for job in self.production.building(building).unwrap().jobs() {
-                crate::match_world_tick::validate_world_future_birth(&self.rules, &job.kind)
-                    .map_err(ProductionStepError::Control)?;
+                validate_training_birth(self.options.mode, &self.rules, &job.kind)?;
             }
         }
         let regions = self.production_regions()?;
@@ -379,6 +450,7 @@ impl Match {
                 self.world.game.naval,
                 &units,
                 regions.as_deref(),
+                self.elimination_sudden_death(),
             );
             let prepared = self.production.prepare_building_step(
                 &context,
@@ -523,6 +595,7 @@ impl Match {
             self.world.game.naval,
             &units,
             regions.as_deref(),
+            self.elimination_sudden_death(),
         );
         let prepared =
             self.production

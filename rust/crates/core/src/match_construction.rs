@@ -156,8 +156,8 @@ impl Match {
 
     /// Read-only admission. The sole runner calls this before inputs and again before its clock.
     pub fn validate_construction_tick(&self) -> Result<(), String> {
-        if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
-            || self.world.game.mode.is_some()
+        if self.validate_actor_mode().is_err()
+            || self.options.mode == Mode::World
             || self.world.game.tick < 0
         {
             return Err("construction phases require ordinary Conquest".into());
@@ -214,9 +214,7 @@ impl Match {
         id: UnitId,
         frame: &mut ConstructionFrame,
     ) -> Result<(), String> {
-        if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
-            || self.world.game.mode.is_some()
-        {
+        if self.validate_actor_mode().is_err() || self.options.mode == Mode::World {
             return Err("construction worker requires ordinary Conquest".into());
         }
         if frame.tick != self.world.game.tick || frame.workers.contains(&id) {
@@ -303,7 +301,7 @@ impl Match {
         if frame.tick != self.world.game.tick {
             return Err("stale construction crew frame".into());
         }
-        self.validate_conquest_finish_state()?;
+        self.validate_match_finish_state()?;
         let dt = self.rules.movement.tick;
         if !dt.is_finite() || dt <= 0.0 {
             return Err("invalid construction interval".into());
@@ -346,13 +344,24 @@ impl Match {
                         available = f64::INFINITY;
                     }
                 }
+                let cap = if self.elimination_sudden_death() {
+                    number(classic, "decay")? * 0.6
+                } else {
+                    f64::INFINITY
+                };
                 let amount = math::min(
                     available,
-                    full * (number(classic, "repair")? * crew * (recovery / workers.len() as f64))
-                        * dt,
+                    full * math::min(
+                        number(classic, "repair")? * crew * (recovery / workers.len() as f64),
+                        cap,
+                    ) * dt,
                 );
+
                 (built, amount)
             } else {
+                if self.elimination_sudden_death() {
+                    continue;
+                }
                 let time = definition
                     .get("buildTime")
                     .and_then(Value::number)
@@ -439,7 +448,7 @@ impl Match {
         command: &crate::match_commands::Command,
     ) -> Result<Vec<UnitId>, String> {
         self.validate_construction_tick()?;
-        self.validate_conquest_finish_state()?;
+        self.validate_match_finish_state()?;
         if owner >= self.world.game.players.len()
             || !self.start.economy.players[owner].mp.is_finite()
         {
@@ -784,6 +793,9 @@ impl Match {
             queue,
         };
         let selected = self.construction_selection(owner, ids, &command)?;
+        if self.elimination_sudden_death() {
+            return Ok(Some(Denial::SuddenDeath));
+        }
         if !crate::economy::build_kinds(self.options.mode)
             .map_err(|e| e.to_string())?
             .contains(&name)

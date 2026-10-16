@@ -558,9 +558,9 @@ impl ProductionState {
             wallets.population_cap(&context, slot)?,
         ))
     }
-    /// Prepare instant Conquest recruitment without changing wallets or queues.
-    /// Default represents the absent mode object of ordinary Conquest. Other
-    /// modes are outside this API. Winner/away/out/rate admission stays with Match.
+    /// Prepare instant skirmish recruitment without changing wallets or queues.
+    /// Default represents the absent Conquest mode object. Winner, away, out and
+    /// rate admission stay with Match; construction modes use training queues.
     pub fn prepare_recruit<'a, 'facts>(
         &'a self,
         c: &'a Context<'facts>,
@@ -572,8 +572,13 @@ impl ProductionState {
     ) -> Result<PreparedRecruit<'a, 'facts>, Error> {
         self.validate(c, wallets)?;
         self.slot(slot)?;
-        if !matches!(c.mode.kind, Mode::Default | Mode::Conquest) {
-            return Err(Error::InvalidInput("recruitment supports Conquest only"));
+        if !matches!(
+            c.mode.kind,
+            Mode::Default | Mode::Conquest | Mode::Assault | Mode::Annihilation
+        ) {
+            return Err(Error::InvalidInput(
+                "recruitment requires a represented skirmish mode",
+            ));
         }
         let cat = Catalog::compiled()?;
         let Ok(def) = cat.unit(kind) else {

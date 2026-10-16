@@ -122,7 +122,8 @@ fn admission_facts<'a>(
         || count != start.economy.players.len()
         || player_rallies.len() != count
         || game.tick < 0
-        || game.mode.is_some()
+        || crate::match_actor::checked_game_mode(game, options.mode).is_err()
+        || options.mode.is_construction()
         || options.logistics
     {
         return Err(RecruitError::InvalidState("Conquest recruitment state"));
@@ -244,7 +245,7 @@ impl Match {
         if self.finish.is_some() || wallet.away || wallet.out {
             return Err(production::Error::Denied(Denial::Blocked).into());
         }
-        self.validate_conquest_finish_state()
+        self.validate_match_finish_state()
             .map_err(RecruitError::Story)?;
         let staged = recruit_parts!(self).stage(slot, kind, from, false)?;
         self.finish_recorded_buy(staged)

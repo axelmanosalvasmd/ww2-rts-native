@@ -691,8 +691,8 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
                 m.world.game.mode = Some(ww2_core::game::ModeKind::World);
             }
             "unsupported mode" => {
-                m.options.mode = Mode::Classic;
-                m.world.game.mode = Some(ww2_core::game::ModeKind::Classic);
+                m.options.mode = Mode::Horde;
+                m.world.game.mode = Some(ww2_core::game::ModeKind::Horde);
             }
             _ => unreachable!(),
         }

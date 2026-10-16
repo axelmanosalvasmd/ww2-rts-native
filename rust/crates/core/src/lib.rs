@@ -35,6 +35,7 @@ pub mod conquest_end;
 pub mod deployment;
 pub mod economy;
 pub mod economy_state;
+pub mod elimination_modes;
 pub mod environment;
 pub mod environment_debris;
 pub mod field_works;

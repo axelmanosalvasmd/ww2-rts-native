@@ -39,7 +39,7 @@ impl Match {
         Ok(())
     }
 
-    /// Conquest returns to the nearest living, finished owned HQ, then the spawn.
+    /// Return to the nearest finished owned base, or the spawn. Classic accepts every producer.
     pub fn reaction_home(&self, id: UnitId) -> Result<Point, String> {
         let unit = self
             .world
@@ -73,7 +73,18 @@ impl Match {
                 .kinds
                 .get(building.kind)
                 .ok_or("unknown retreat building")?;
-            if kind.name != "hq" {
+            let base = if self.options.mode == crate::economy::Mode::Classic {
+                Catalog::compiled()
+                    .map_err(|e| e.to_string())?
+                    .unit(&kind.name)
+                    .map_err(|e| e.to_string())?
+                    .get("produces")
+                    .and_then(Value::boolean)
+                    .unwrap_or(false)
+            } else {
+                kind.name == "hq"
+            };
+            if !base {
                 continue;
             }
             let d = distance(unit.at(), building.at());

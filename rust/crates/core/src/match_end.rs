@@ -1,5 +1,4 @@
-//! Canonical finish and source timeline. Explicit Conquest, Assault and bounded World phases use this state;
-//! other mode reasons reserve their source meaning without enabling those runtime modes.
+//! Canonical finish and timeline for represented Conquest, Assault, elimination and World phases.
 use crate::{
     economy::Mode,
     game::{CELL, LOCAL_DEFENDER_OWNER, ModeKind, Point},
@@ -76,6 +75,8 @@ impl Match {
         match (self.options.mode, self.world.game.mode) {
             (Mode::Default | Mode::Conquest, None)
             | (Mode::Assault, Some(ModeKind::Assault))
+            | (Mode::Annihilation, Some(ModeKind::Annihilation))
+            | (Mode::Classic, Some(ModeKind::Classic))
             | (Mode::World, Some(ModeKind::World)) => Ok(()),
             _ => Err("finish/story supports represented Conquest, Assault and World only".into()),
         }
@@ -290,7 +291,8 @@ impl Match {
                 }
                 if hp > 0.0
                     && self.rules.kinds[kind].structure
-                    && (self.options.mode == Mode::World || self.rules.kinds[kind].name == "bunker")
+                    && (matches!(self.options.mode, Mode::World | Mode::Classic)
+                        || self.rules.kinds[kind].name == "bunker")
                     && let Some(owner) = players.get(owner)
                 {
                     structures[owner.team as usize] += 1.0;

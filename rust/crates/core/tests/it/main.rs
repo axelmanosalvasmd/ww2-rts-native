@@ -57,6 +57,8 @@ mod match_combat;
 mod match_routing;
 #[path = "../math.rs"]
 mod math;
+#[path = "../mode_runtime_world.rs"]
+mod mode_runtime_world;
 #[path = "../objectives.rs"]
 mod objectives;
 #[path = "../observed_memory.rs"]

@@ -259,6 +259,7 @@ fn actual_support_admission_strikes_and_timers_match_source() {
                     SupportDenial::Blocked => "blocked",
                     SupportDenial::Cooldown => "cooldown",
                     SupportDenial::Manpower => "mp",
+                    SupportDenial::Munitions => "mun",
                     SupportDenial::Unseen => "unseen",
                     SupportDenial::Population => "pop",
                 })

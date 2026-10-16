@@ -25,12 +25,8 @@ fn denial(reason: Reason) -> Denial {
 }
 impl Match {
     fn validate_field_work_state(&self) -> Result<(), String> {
-        if !matches!(
-            self.options.mode,
-            crate::economy::Mode::Default | crate::economy::Mode::Conquest
-        ) || self.world.game.mode.is_some()
-        {
-            return Err("Match field works support Conquest only".into());
+        if !crate::match_actor::ordinary_mode(&self.world.game, self.options.mode) {
+            return Err("Match field works require a matching ordinary mode".into());
         }
         if self.world.game.tick < 0 || self.world.game.tick > 9_007_199_254_740_991 {
             return Err("invalid field-work clock".into());

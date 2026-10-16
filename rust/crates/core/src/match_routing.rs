@@ -601,8 +601,8 @@ fn validate_context<'a>(
     }) {
         return Err("routing needs valid unique wreck identities and positions".into());
     }
-    if !matches!(context.options.mode, Mode::Default | Mode::Conquest) || g.mode.is_some() {
-        return Err("owned routing currently supports ordinary Conquest".into());
+    if !crate::match_actor::ordinary_mode(g, context.options.mode) {
+        return Err("owned routing requires a matching ordinary mode".into());
     }
     if g.players.len() != context.start.players.len()
         || g.players.len() != context.options.players.len()

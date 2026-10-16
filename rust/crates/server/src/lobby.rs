@@ -2037,3 +2037,7 @@ mod trusted_room_tests;
 #[cfg(test)]
 #[path = "lobby_socket_tests.rs"]
 mod lobby_socket_tests;
+
+#[cfg(test)]
+#[path = "mode_runtime_a_tests.rs"]
+mod mode_runtime_a_tests;
