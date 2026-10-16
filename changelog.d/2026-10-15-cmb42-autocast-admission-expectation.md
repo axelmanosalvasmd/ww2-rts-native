@@ -1,0 +1,1 @@
+- Correct the private CMB42 recorder's post-purchase autocast expectation for Source types with no ability. Preserve the command, denial receipt and prior tick-51 failure; new Source generation and both-case qualification remain unrun.

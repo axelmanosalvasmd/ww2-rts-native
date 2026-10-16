@@ -157,7 +157,7 @@ export async function recordCmb42Genuine({reference,pin,clean}){
      assert(u.hp>0,'every real actor survives');
     }
    }
-   function consume(owner,command,sequence=null){
+   function consume(owner,command,sequence=null,expected=undefined){
     if(sequence===null)inputs.push({index:inputs.length,event:'immediate-command',record:records.length,owner,command:raw(command)});
     random.context({phase:`command:${phase}`,tick:g.tick,owner,sequence,command:command.t});
     const begin=random.draws.length,environmentBegin=random.environment.length,before=[...g.units.keys()],wallet=g.players[owner].mp,spent=g.story?.[owner]?.mpSpent??0;
@@ -165,7 +165,7 @@ export async function recordCmb42Genuine({reference,pin,clean}){
     receipt('command-consumed',{owner,sequence,command,result,beforeIds:before,
      born:[...g.units.keys()].filter(id=>!before.includes(id)),walletBefore:wallet,walletAfter:g.players[owner].mp,
      spentBefore:spent,spentAfter:g.story?.[owner]?.mpSpent??0,drawRange:[begin,random.draws.length],environmentRange:[environmentBegin,random.environment.length]});
-    assert.equal(result,undefined,`ordinary ${command.t} command admitted`);
+    assert.equal(result,expected,`ordinary ${command.t} command matches declared admission`);
    }
    function queue(owner,command){
     const row={owner,sequence:++sequences[owner],tick:g.tick+1,command};
@@ -223,7 +223,7 @@ export async function recordCmb42Genuine({reference,pin,clean}){
     bindings[label]=u.id;maxActors++;
     receipt('purchase-provider',{label,id:u.id,producer:producer.id,kind,owner,price});
     for(const [key,on]of [['holdFire',true],['holdPos',true],['autoRetreat',false]])consume(owner,{t:'stance',ids:[u.id],key,on});
-    consume(owner,{t:'autocast',ids:[u.id],on:false});
+    consume(owner,{t:'autocast',ids:[u.id],on:false},null,sim.UNITS[kind].ab.id==='none'?'needs':undefined);
     return u;
    }
    function stage(goals){
