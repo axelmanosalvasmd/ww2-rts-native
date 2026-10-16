@@ -5,6 +5,9 @@ use crate::{catalog::Catalog, math, recipient_snapshot::SupportedSeatSnapshot};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
+mod commander;
+pub use commander::CommanderViewMemory;
+
 /// Metadata already available to the human client from match start.
 #[derive(Clone, Debug, PartialEq)]
 pub struct PublicMap {
