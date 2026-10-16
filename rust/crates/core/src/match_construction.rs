@@ -790,7 +790,7 @@ impl Match {
         {
             return Ok(Some(Denial::Blocked));
         }
-        if matches!(name, "depot" | "shipyard" | "supplycache") {
+        if name == "depot" {
             return Ok(Some(Denial::Unsupported));
         }
         let types = crate::economy::builder_types(self.options.mode).map_err(|e| e.to_string())?;
@@ -871,6 +871,9 @@ impl Match {
         {
             return self.construction_denial(&selected, Denial::Tier);
         }
+        if name == "supplycache" && !self.options.logistics {
+            return self.construction_denial(&selected, Denial::Blocked);
+        }
         let size = number(definition, "size")? as usize;
         let x = math::round(at.x / CELL - size as f64 / 2.0);
         let z = math::round(at.z / CELL - size as f64 / 2.0);
@@ -890,6 +893,28 @@ impl Match {
             .preflight_cell_rows(&cells)
             .map_err(|e| e.to_string())?;
         let g = &self.world.game;
+        if definition.get("coast").and_then(Value::boolean) == Some(true) {
+            if !g.naval {
+                return self.construction_denial(&selected, Denial::Blocked);
+            }
+            let coastal = cells.iter().any(|&cell| {
+                let x = (cell % g.w) as isize;
+                let z = (cell / g.w) as isize;
+                (-2..=2).any(|dz| {
+                    (-2..=2).any(|dx| {
+                        let (x, z) = (x + dx, z + dz);
+                        x >= 0
+                            && z >= 0
+                            && x < g.w as isize
+                            && z < g.h as isize
+                            && g.flags[z as usize * g.w + x as usize] & crate::game::LAND == 0
+                    })
+                })
+            });
+            if !coastal {
+                return self.construction_denial(&selected, Denial::Coast);
+            }
+        }
         let min = cells
             .iter()
             .map(|&c| g.height.as_ref().map_or(0, |h| h[c]))
