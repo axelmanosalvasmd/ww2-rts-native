@@ -1269,11 +1269,14 @@ fn mode53_core_reveal_requires_active_spent_budget_and_at_most_three_left() {
         );
     }
     assert!(m.advance_tick().is_err());
+    assert_eq!(
+        m.validate_aviation().unwrap_err().to_string(),
+        "missing combat metadata"
+    );
     assert!(
         matches!(
             crate::recipient_snapshot::SnapshotCache::new(&m),
-            Err(crate::recipient_snapshot::SnapshotError::MissingState { .. })
-                | Err(crate::recipient_snapshot::SnapshotError::Unsupported { .. })
+            Err(crate::recipient_snapshot::SnapshotError::Rules)
         ),
         "vision-only actors have no complete recipient metadata"
     );
