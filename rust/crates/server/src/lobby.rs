@@ -425,6 +425,7 @@ impl Room {
         if let Some(last) = &self.result {
             let mut report = last.report.clone();
             report["you"] = you
+                .filter(|_| report.get("story").is_some_and(Value::is_array))
                 .and_then(|slot| self.players[slot].last_match.clone())
                 .unwrap_or(Value::Null);
             result["result"] = report;
@@ -500,6 +501,66 @@ impl Room {
             }
             return false;
         }
+        if host && matches!(t, "pause" | "resume" | "end") && self.native.is_some() {
+            let native = self.native.as_mut().unwrap();
+            if native.runtime.fault().is_some()
+                || !me.connection.as_ref().is_some_and(Connection::ready)
+            {
+                me.deny(t, "blocked", now);
+                return false;
+            }
+            let message = match t {
+                "pause" => native.runtime.pause(
+                    seated.unwrap(),
+                    &me.name,
+                    crate::room_runtime::PauseReason::Host,
+                    now,
+                ),
+                _ => Ok(Some(native.runtime.resume(now))),
+            };
+            match message {
+                Ok(Some(message)) => {
+                    for person in self.players.iter().chain(&self.spectators) {
+                        if let Some(connection) = &person.connection {
+                            connection.send(message.clone());
+                        }
+                    }
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    native.runtime.fault_stop(error);
+                    return false;
+                }
+            }
+            if t == "end" {
+                let status = crate::NativeRoomStatus {
+                    epoch: native.epoch,
+                    tick: native.runtime.state().world.game.tick,
+                    held: native.runtime.held(),
+                    ending_complete: true,
+                    paused: false,
+                    fault: None,
+                };
+                self.result = Some(RoomResult {
+                    report: json!({"ended":true}),
+                    status,
+                });
+                self.native = None;
+                self.retain_seats(|_, person| {
+                    person.ai || person.connection.as_ref().is_some_and(Connection::ready)
+                });
+                return true;
+            }
+            return false;
+        }
+        // Host controls above remain usable during pause. Other gameplay is ignored.
+        if self
+            .native
+            .as_ref()
+            .is_some_and(|native| native.runtime.paused())
+        {
+            return false;
+        }
         if CommanderIngress::recognizes(t)
             && let Some(native) = &mut self.native
         {
@@ -522,6 +583,11 @@ impl Room {
             if let Some(denial) = denial {
                 me.deny(t, denial.name(), now);
             }
+            return false;
+        }
+        if attached && seated.is_some() && !UNAVAILABLE.contains(&t) {
+            // Unknown orders use the prototype's ordinary blocked feedback.
+            me.deny(t, "blocked", now);
             return false;
         }
         // Other gameplay and public setup admission remain unavailable.

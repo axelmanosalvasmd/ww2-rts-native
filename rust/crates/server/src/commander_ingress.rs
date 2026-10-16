@@ -15,7 +15,24 @@ pub(crate) struct CommanderIngress {
 }
 impl CommanderIngress {
     pub fn recognizes(t: &str) -> bool {
-        matches!(t, "move" | "amove" | "stop" | "stance")
+        matches!(
+            t,
+            "move"
+                | "amove"
+                | "stop"
+                | "stance"
+                | "garrison"
+                | "dig"
+                | "entrench"
+                | "cover"
+                | "assist"
+                | "retreat"
+                | "rally"
+                | "tech"
+                | "cancel"
+                | "cancelProduction"
+                | "destroy"
+        )
     }
     pub fn enqueue(&mut self, state: &mut Match, slot: usize, raw: &Value) -> Result<(), Denial> {
         let name = match raw["t"].as_str() {
@@ -23,12 +40,36 @@ impl CommanderIngress {
             Some("amove") => "amove",
             Some("stop") => "stop",
             Some("stance") => "stance",
+            Some("garrison") => "garrison",
+            Some("dig") => "dig",
+            Some("entrench") => "entrench",
+            Some("cover") => "cover",
+            Some("assist") => "assist",
+            Some("retreat") => "retreat",
+            Some("rally") => "rally",
+            Some("tech") => "tech",
+            Some("cancel") => "cancel",
+            Some("cancelProduction") => "cancelProduction",
+            Some("destroy") => "destroy",
             _ => return Err(Denial::Blocked),
         };
         let command = Command::from_json(raw)?;
         if !matches!(
             command,
-            Command::Move { .. } | Command::Stop { .. } | Command::Stance { .. }
+            Command::Move { .. }
+                | Command::Stop { .. }
+                | Command::Stance { .. }
+                | Command::Enter { .. }
+                | Command::Dig { .. }
+                | Command::Entrench { .. }
+                | Command::Cover { .. }
+                | Command::Assist { .. }
+                | Command::Retreat { .. }
+                | Command::Rally { .. }
+                | Command::Technology { .. }
+                | Command::Cancel { .. }
+                | Command::CancelProduction { .. }
+                | Command::Destroy { .. }
         ) {
             return Err(Denial::Blocked);
         }
@@ -46,7 +87,15 @@ impl CommanderIngress {
         let rows = match &command {
             Command::Move { orders, .. } => orders.iter().map(|o| o.unit).collect::<Vec<_>>(),
             Command::Stop { ids } | Command::Stance { ids, .. } => ids.clone(),
-            _ => unreachable!(),
+            Command::Enter { ids, .. }
+            | Command::Dig { ids, .. }
+            | Command::Entrench { ids, .. }
+            | Command::Cover { ids, .. }
+            | Command::Assist { ids, .. }
+            | Command::Retreat { ids }
+            | Command::Rally { ids, .. }
+            | Command::Destroy { ids, .. } => ids.clone(),
+            _ => Vec::new(),
         };
         for raw in rows.iter().take(50.max(state.world.game.units.len())) {
             let Some(unit) = u32::try_from(*raw)
