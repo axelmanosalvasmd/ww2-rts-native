@@ -1,0 +1,1 @@
+- Map ENG-15/16/17/23/24 to fourteen existing native checks and prototype intent under Axel's approved rules; preserve historical results and keep integrated batch qualification pending.

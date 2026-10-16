@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## Five engineering rows under native intent rules (2026-10-16)
+
+Axel's issue5 decision [6206861267](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6206861267) approves rules 1-5 without the additional conditions suggested by Hermes. The [compact native intent map](docs/runtime/engineering-five-native-intent.md) links ENG-15/16/17/23/24 to the existing fourteen checks and the prototype behaviors read at e4e579a. No missing control was found within the assigned five checks, so this change adds no test, runtime code, recorder, fixture or evidence bundle. Existing pure-function comparisons and historical raw failures remain intact.
+
+Root combines these five rows with IMPL_ENGINEERING's 36 into one engineering batch after PR272. Literal-main integration, fresh grouped native qualification and review remain pending; b28 passes retain their producing head. A grouped job uses --no-fail-fast to isolate failed rows without semantic retry. Runtime integration still needs Hermes's exact-head acknowledgment; intentional player-visible differences retain DESIGN/differs/Axel agreement. All earlier design history remains below unchanged.
+
 ## Five literal engineering checks qualified at b28 (2026-10-15, docs only)
 
 The producing head `b28ca8e531426cc240103b6936a8abd8cb68986d`, Rust tree `866795e6e303acc529e53381e45c7fa4b6b37baa`, passed formatting, all fourteen exact native selections once each and strict locked core/all-target ci-test Clippy. The independent predicate audit accepts the complete literal Acceptance checks for ENG-15, ENG-16, ENG-17, ENG-23 and ENG-24 individually. This private documentation child updates only those five Rust/Status pairs to `ported`. All Acceptance bytes, every other table cell and the entire tested Rust tree remain unchanged. The [row evidence](docs/runtime/engineering-five-literal-checks-b28.md) records the exact mapping, source locators, actual producing-head receipts and broader held clauses.
