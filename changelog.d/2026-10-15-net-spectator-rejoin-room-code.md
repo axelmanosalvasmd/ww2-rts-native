@@ -1,0 +1,1 @@
+- Repair the spectator-rejoin socket witness by replacing its invalid 13-byte room code `WatchIdentity` with the supported 7-byte `watchid` in all six uses. Preserve every assertion and the raw producing-head failure. All 13 selected consumers and quality gates remain unrun on the repair child; all five NET rows remain held.

@@ -1,0 +1,111 @@
+{
+  "kind": "static source bindings only, no execution or oracle recording",
+  "native_base": "f7b0e5889e3b707beb6d18c4ea8d20a7d9f7b578",
+  "owned_source": "681404030495af8ac40f97a4a2150da5141ab51e",
+  "reference_commit": "e4e579a838aabae3b1d9dadbc17a0a87147bc52d",
+  "sources": [
+    {
+      "path": "server.js",
+      "git_blob": "6f699c3c4f9b3e04c4985dfd38183d0bcffc1018",
+      "sha256": "79baa6671dc9e26a504811a7d656491c3d2177d3567a3e69b3eb8ccbbd06b297",
+      "read_sites": [
+        {
+          "first_line": 194,
+          "last_line": 194,
+          "text": "const cleanName = (n) => String(n || '').replace(/[<>&\"']/g, '').trim().slice(0, 16) || 'Soldier';"
+        },
+        {
+          "first_line": 333,
+          "last_line": 333,
+          "text": "const newPlayer = (room, p) => ({ ...p, team: Array.from({ length: MAX_PLAYERS }, (_, i) => i).find(t => !room.players.some(q => q.team === t)), faction: room.players.length % 3 });"
+        },
+        {
+          "first_line": 338,
+          "last_line": 350,
+          "text": "async function lobby(room) {\n  const maps = await listMaps(), horde = room.mode === 'horde' ? await hordeMaps() : undefined;\n  const saves = listSaves(saves_dir(), room.code).map(s => ({ id: s.id, kind: s.kind, savedAt: s.savedAt, mode: s.mode, minutes: s.minutes, names: s.names, world: s.world }));\n  everyone(room).forEach((p) => { const i = room.players.indexOf(p); send(p.ws, {\n    role: p.role ?? 'commander', commander: p.role === 'operative' ? room.players.indexOf(p.commander) : undefined, operatives: (room.operatives ?? []).map(o => ({ name: o.name, commander: room.players.indexOf(o.commander), online: connected(o) })), spectator: i < 0 && p.role !== 'operative', amHost: isHost(room, p), spectators: room.spectators.map(s => s.name),\n    listed: !!room.listed, saves,\n    hordeMaps: horde, hordeBest: room.mode === 'horde' ? recordOf(room) : null,\n    t: 'lobby', code: room.code, state: room.state, you: i, host: hostOf(room), maps, mapName: room.mode === 'world' ? 'world' : room.mapName, spawns: seats(room), publicUrl: PUBLIC_URL,\n    mode: room.mode, worldSize: room.worldSize ?? 'huge', defenderTeam: room.defenderTeam, army: room.army ?? 'standard', weather: room.weather ?? 'map', sandbox: !!room.sandbox,\n    // a finished match's result carries this player's own outcome (you); a match the host ended has none\n    result: room.result ? { ...room.result, you: room.result.story && i >= 0 ? p.lastMatch ?? null : null } : null,\n    players: room.players.map(q => ({ name: q.name, connected: connected(q) || !!q.ai, ai: !!q.ai, team: q.team, faction: q.faction, level: q.ai ? q.level ?? 'normal' : null })),\n  }); });"
+        },
+        {
+          "first_line": 568,
+          "last_line": 574,
+          "text": "function scheduleSeatCleanup(room, player) {\n  clock.clearTimeout(player.cleanupTimer);\n  player.cleanupTimer = clock.setTimeout(() => {\n    if (player.ws || player.ai || room.state !== 'lobby' || !room.players.includes(player)) return;\n    retainSeats(room, room.players.filter(p => p !== player));\n    lobby(room);\n  }, 10_000);"
+        },
+        {
+          "first_line": 584,
+          "last_line": 602,
+          "text": "  ws.on('message', async (raw) => {\n    let msg;\n    try { msg = JSON.parse(raw); } catch { return; }\n    if (!msg || typeof msg !== 'object') return;\n    if (!me) {\n      if (msg.t !== 'hello' || typeof msg.token !== 'string' || typeof msg.name !== 'string') return;\n      room = rooms.get(code);\n      if (!room && rooms.size >= MAX_ROOMS) { send(ws, { t: 'full', reason: 'capacity' }); return ws.close(); }\n      // the Tutorial button makes a private room that starts the tutorial as soon as its player is in\n      const tutorial = !room && msg.listing?.tutorial === true;\n      if (!room) rooms.set(code, room = { code, listed: msg.listing?.public === true && !tutorial, title: (typeof msg.listing?.title === 'string' ? msg.listing.title : 'Open skirmish').replace(/[<>&\"'\\x00-\\x1f]/g, '').trim().slice(0, 48) || 'Open skirmish', players: [], spectators: [], state: 'lobby', game: null, mode: tutorial ? 'tutorial' : 'conquest', defenderTeam: 0, matchId: 0, mapName: tutorial ? 'tutorial' : 'default', mapSpawns: tutorial ? TUTORIAL_SPAWNS : MAP.spawns });\n      const token = String(msg.token || '').slice(0, 40), name = cleanName(msg.name);\n      me = everyone(room).find(p => p.token === token && token);\n      if (me) {\n        const old = me.ws;\n        clock.clearTimeout(me.cleanupTimer);\n        me.ws = ws; me.name = name;\n        if (room.game && room.players.includes(me) && !me.ai) { resetAI(room.game, room.players.indexOf(me)); resetCommander(room.game, room.players.indexOf(me)); }\n        if (old && old !== ws) { send(old, { t: 'replaced' }); old.close(); }"
+        },
+        {
+          "first_line": 604,
+          "last_line": 620,
+          "text": "      else if (msg.role === 'operative') {\n        const commander = Number.isInteger(msg.commander) && room.players[msg.commander];\n        if (!commander || commander.ai || (room.operatives ?? []).length >= 4 || !token || room.mode === 'world') { send(ws, { t: 'deny', cmd: 'join', reason: 'commander' }); return ws.close(1008, 'operative needs human commander; world mode unsupported'); }\n        (room.operatives ??= []).push(me = { token, name, ws, role: 'operative', commander });\n      }\n      else if (room.state === 'lobby' && room.players.length < MAX_PLAYERS && (!room.listed || room.players.length < seats(room)) && msg.spectate !== true) addSeat(room, me = newPlayer(room, { token, name, ws }));\n      else if (room.spectators.length < MAX_SPECTATORS) room.spectators.push(me = { token, name, ws }); // no seat to take, or asked to watch\n      else { send(ws, { t: 'full', reason: room.state === 'play' ? 'started' : 'seats' }); return ws.close(); }\n      room.emptySince = null;\n      lobby(room);\n      if (room.state !== 'lobby' && room.game) me.role === 'operative' ? sendOperativeStart(room, me) : room.players.includes(me) ? sendStart(room, room.players.indexOf(me)) : sendStart(room, 0, me);\n      if (room.pause?.reason === 'drop' && room.pause.player === me) resumeRoom(room);\n      if (tutorial && room.players[0] === me) await startMatch(room);\n      return;\n    }\n    const slot = room.players.indexOf(me), seated = slot >= 0, host = isHost(room, me);\n    if (me.ws !== ws || (!seated && !room.spectators.includes(me) && !(room.operatives ?? []).includes(me))) return; // a replaced socket may still be open for a moment; a freed seat has no slot"
+        },
+        {
+          "first_line": 621,
+          "last_line": 638,
+          "text": "    if (msg.t === 'ping') {\n      if ('x' in msg || 'z' in msg) return mapPing(room, me, slot, msg, send);\n      if (Number.isFinite(msg.rtt)) me.rtt = Math.min(9999, Math.max(0, Math.round(msg.rtt)));\n      if (diag) { me.diagAt = Date.now(); me.diagClient = cleanClient(msg.d); }\n      // srv, for the stats overlay (client/stats.js): the slowest 5% of recent ticks that sent a snapshot in ms (the\n      // number the tick meter holds to its 40 ms budget) and the ticks between snapshots\n      const meter = room.state === 'play' && room.tickMeter;\n      return send(ws, { t: 'pong', c: msg.c, ...(meter && { srv: [Math.round(tickStats(meter).snapshotTick.p95 * 10) / 10, room.snapEvery] }) });\n    }\n    if (me.role === 'operative') {\n      if (msg.t === 'fps' && room.state === 'play' && room.game && !room.pause) {\n        const now = clock.now();\n        if (now - (me.inputAt ?? 0) >= 20) { me.inputAt = now; operativeInput(room.game, me.token, msg); }\n      } else if (msg.t === 'resync' && me.net) me.net.full = true;\n      else if (msg.t === 'name' && typeof msg.name === 'string') { me.name = cleanName(msg.name); lobby(room); }\n      return; // No army orders, host powers, seat changes or full-map spectator fallback.\n    }\n    if (msg.t === 'name' && typeof msg.name === 'string') { me.name = cleanName(msg.name); lobby(room); }"
+        },
+        {
+          "first_line": 704,
+          "last_line": 714,
+          "text": "    } else if (msg.t === 'spectate' && seated && room.state === 'lobby' && room.spectators.length < MAX_SPECTATORS) {\n      retainSeats(room, room.players.filter(p => p !== me)); room.spectators.push(me); lobby(room); // give up the seat and watch\n    } else if (msg.t === 'sit' && !seated && room.state === 'lobby' && room.players.length < MAX_PLAYERS && (!room.listed || room.players.length < seats(room))) {\n      room.spectators = room.spectators.filter(s => s !== me); addSeat(room, Object.assign(me, newPlayer(room, me))); lobby(room);\n    } else if (msg.t === 'leave' && seated && room.state === 'play' && !me.ai) {\n      // an AI takes over your army so the match goes on for the others; you can join the lobby again afterwards\n      handToAi(room, me);\n      send(ws, { t: 'left' }); ws.close();\n    } else if (seated && room.state === 'play' && room.game && !room.pause) {\n      const reason = command(room.game, slot, msg);\n      if (reason && allowDeny(me, clock.now())) send(ws, { t: 'deny', cmd: msg.t, reason });"
+        }
+      ]
+    },
+    {
+      "path": "shared/command-feedback.js",
+      "git_blob": "8972bd6efdf05563c9ed515a098067f8eff58854",
+      "sha256": "e851bb8f7e48291bd75f09be66fdeecbe7dca68dcc82c839c5c033083ce77a07",
+      "read_sites": [
+        {
+          "first_line": 1,
+          "last_line": 8,
+          "text": "// Keep denial traffic bounded per player, including across reconnects.\nexport function allowDeny(player, now = Date.now()) {\n  const recent = (player.denyTimes ?? []).filter(t => now - t < 1000);\n  player.denyTimes = recent;\n  if (recent.length >= 4) return false;\n  recent.push(now);\n  return true;\n}"
+        }
+      ]
+    },
+    {
+      "path": "test.js",
+      "git_blob": "a44686f8539404990d926727d65a9eb207edb8cf",
+      "sha256": "886a77743bcb4618fb22b3be4d2fa859de0c6efdcef1dd66cca1767d717e66b8",
+      "read_sites": [
+        {
+          "first_line": 5047,
+          "last_line": 5060,
+          "text": "// Server: a replaced or departed socket cannot keep controlling its old player slot.\nawait check(\"Server\", async () => {\n  const h = await serverHarness(), code = 'replaced';\n  const old = await h.connect(code, { token: 'host', name: 'Old' });\n  const current = await h.connect(code, { token: 'host', name: 'Current' });\n  await old.late({ t: 'name', name: 'Stale' });\n  assert.equal(current.lobby().players[0].name, 'Current', 'server replaced socket cannot rename its former player');\n  await h.connect(code, { token: 'guest', name: 'Guest' });\n  await current.send({ t: 'start' }); await current.wait('start');\n  const before = h.game(code).units.size;\n  await current.send({ t: 'leave' });\n  await current.late({ t: 'buy', unit: 'rifle' });\n  assert.equal(h.game(code).units.size, before, 'server departed socket cannot buy for the AI that took over');\n  await h.close();"
+        },
+        {
+          "first_line": 5134,
+          "last_line": 5147,
+          "text": "// Server: JSON objects masquerading as names or tokens cannot crash text conversion.\nawait check(\"Server\", async () => {\n  const h = await serverHarness(), code = 'badtext', invalid = { toString: null, valueOf: null };\n  const p = await h.connect(code, { hello: false });\n  for (const field of ['token', 'name']) {\n    await p.send({ t: 'hello', token: 'host', name: 'Host', [field]: invalid });\n    assert.equal(p.messages.length, 0, 'server malformed hello text does not claim a player slot');\n    assert.equal(p.closed, false, `server malformed hello ${field} does not throw`);\n  }\n  await p.send({ t: 'hello', token: 'host', name: 'Host' }); await p.wait('lobby');\n  await p.send({ t: 'name', name: invalid });\n  assert.equal(p.closed, false, 'server malformed rename does not throw');\n  assert.equal(p.lobby().players[0].name, 'Host', 'server malformed rename preserves the player name');\n  await h.close();"
+        },
+        {
+          "first_line": 5845,
+          "last_line": 5853,
+          "text": "    await check(async code => {\n      const [ana, ben] = await humans(code), room = await start(code, ana), player = room.players[0], matchId = room.matchId;\n      assert.ok(Number.isSafeInteger(matchId) && matchId > 0, 'start identifies the match');\n      const replacement = await h.connect(code, { token: ana.token, name: 'Ana' });\n      await ana.wait('replaced'); await h.settleServer();\n      assert.equal(ana.closed, true, 'the replaced socket is closed after its message');\n      assert.equal(room.players[0], player, 'replacement keeps the same player object');\n      assert.equal(room.pause, null, 'replacement does not trigger a drop pause');\n      assert.equal((await replacement.wait('start')).matchId, matchId, 'same-match reconnect keeps its match id');"
+        },
+        {
+          "first_line": 5906,
+          "last_line": 5915,
+          "text": "    await check(async code => {\n      const [ana] = await humans(code, ['Ana']);\n      const { MAX_PLAYERS } = await import('./shared/sim.js');\n      for (let i = 1; i < MAX_PLAYERS; i++) await ana.send({ t: 'addAi' });\n      const invite = await h.connect(code, { token: code + 'invite', name: 'Invite' });\n      assert.equal(last(invite, 'lobby').spectator, true, 'a full lobby seats nobody else: the invite watches');\n      assert.equal(last(invite, 'lobby').you, -1, 'a spectator has no seat');\n      for (let i = 1; i < 8; i++) await h.connect(code, { token: code + 'watch' + i, name: 'Watch' });\n      const full = await h.connect(code, { token: code + 'late', name: 'Late' });\n      assert.equal(last(full, 'full').reason, 'seats', 'a room with eight spectators turns the next one away');"
+        },
+        {
+          "first_line": 5917,
+          "last_line": 5944,
+          "text": "    // Spectators: a late invite watches the running match with the fog lifted, commands nothing and can sit down afterwards.\n    await check(async code => {\n      const [ana, ben] = await humans(code), room = await start(code, ana);\n      const invite = await h.connect(code, { token: code + 'invite', name: 'Invite' });\n      assert.equal(last(invite, 'lobby').spectator, true, 'an invite cannot claim a new seat during play: it watches');\n      const begin = await invite.wait('start');\n      assert.equal(begin.you, 0, 'a spectator watches from the first seat');\n      assert.equal(begin.fog, undefined, 'a spectator gets no fog mask');\n      const after = invite.messages.length; await h.tick(2);\n      const seen = await invite.wait('s', () => true, after);\n      assert.equal(seen.units.length, room.game.units.size, 'a spectator sees every unit');\n      assert.equal(seen.fog, undefined, 'a spectator gets no fog changes');\n      assert.ok(last(ana, 's').units.length < seen.units.length, 'the seat it watches from still sees only its own side');\n      const tick = room.game.tick;\n      await invite.send({ t: 'leave' }); await invite.send({ t: 'end' }); await invite.send({ t: 'pause' }); await invite.send({ t: 'stop', ids: [...room.game.units.keys()] });\n      assert.ok(room.state === 'play' && !room.pause && room.players.every(p => !p.ai), 'a spectator cannot leave for a player, end or pause the match');\n      assert.ok(!last(invite, 'deny'), 'the orders of a spectator are dropped without an answer');\n      await h.tick(); assert.equal(room.game.tick, tick + 1, 'the match runs on');\n      // Lobby replies can trail the fixed server settle on a busy machine: wait for the reply each assertion reads.\n      let before = invite.messages.length;\n      await ben.close(); await ana.send({ t: 'end' });\n      assert.equal((await invite.wait('lobby', m => m.state === 'lobby', before)).state, 'lobby', 'the spectator is back in the lobby with everyone');\n      before = invite.messages.length;\n      await invite.send({ t: 'sit' });\n      assert.equal((await invite.wait('lobby', m => m.spectator === false, before)).spectator, false, 'a spectator can take a seat in the lobby');\n      assert.equal(room.players.length, 2, 'the disconnected match seat was freed for the invite');\n      await invite.send({ t: 'spectate' });\n      assert.deepEqual([room.players.length, room.spectators.length, last(invite, 'lobby').you], [1, 1, -1], 'a seated player can step back to watch');"
+        }
+      ]
+    },
+    {
+      "path": "test-public-lobby.js",
+      "git_blob": "a83147f6e26085db694d14e929972b640d15c47f",
+      "sha256": "c7e8ea4604310b7788a3789a47901657d5d9d357b6c28629c04198e3381b9186",
+      "read_sites": [
+        {
+          "first_line": 52,
+          "last_line": 56,
+          "text": "  await connect('publicone');\n  entry = (await (await fetch(base + '/api/rooms')).json()).rooms[0];\n  assert.equal(entry.joinable, false, 'map seat capacity, not global capacity');\n  const late = await connect('publicone');\n  assert.equal(late.messages.find(m => m.t === 'lobby')?.spectator, true, 'a late join cannot overfill a listed map');"
+        }
+      ]
+    }
+  ]
+}

@@ -691,13 +691,36 @@ fn truthy(v: &Value) -> bool {
         _ => true,
     }
 }
+fn display_space(c: char) -> bool {
+    // ECMAScript TrimString uses WhiteSpace plus LineTerminator, not Rust's
+    // Unicode White_Space property. In particular FEFF trims and 0085 stays.
+    matches!(
+        c,
+        '\u{0009}'..='\u{000d}'
+            | '\u{0020}'
+            | '\u{00a0}'
+            | '\u{1680}'
+            | '\u{2000}'..='\u{200a}'
+            | '\u{2028}'
+            | '\u{2029}'
+            | '\u{202f}'
+            | '\u{205f}'
+            | '\u{3000}'
+            | '\u{feff}'
+    )
+}
+
 fn clean(s: &str, length: usize, fallback: &str, controls: bool) -> String {
     let filtered: String = s
         .chars()
         .filter(|c| !"<>&\"'".contains(*c) && !(controls && (*c as u32) < 32))
         .collect();
     // JavaScript slices UTF-16 code units, including a possible lone surrogate at the boundary.
-    let units: Vec<_> = filtered.trim().encode_utf16().take(length).collect();
+    let units: Vec<_> = filtered
+        .trim_matches(display_space)
+        .encode_utf16()
+        .take(length)
+        .collect();
     let name = String::from_utf16_lossy(&units);
     if name.is_empty() {
         fallback.into()

@@ -1,5 +1,216 @@
 # Three Crossroads Native: design decisions
 
+## Private next-five NET composition after PR270 (2026-10-15, source only)
+
+Compose the true owned delta from private186e9355 onto literal PR270 merge
+abd715f12cf532b854e38ebc6e2cb9886fd48b4f. Its tree equals qualified a2c9.
+Keep all six incoming selected bodies byte for byte, including the strict
+60001/60000/60051 expiry witness and complete host-fallback behavior. Add the
+18 existing next-five consumers once, without names, input or assertion changes.
+The shared rig keeps its 11 equal helper bodies and gains only the private
+parsed-frame gate, close helper, typed observations and required wiring.
+
+The inherited active cleaner change uses the ECMAScript trim character set:
+FEFF trims and NEL remains. Filtering, limits and fallbacks stay intact. This
+private source composition does not adopt exact UTF16 storage or routing.
+The complete inactive proposal is retained as archival material and remains
+unregistered. Server clock and parsed-frame controls remain cfg(test); the
+normal parser, authority, FFI, wire and protected runtime providers stay exact.
+
+All 939 IDs, 942 row occurrences, Acceptance cells and incoming parity statuses
+remain exact. NET20/21/25/27/29 remain held. Full string-domain compatibility,
+operative and active-spectator behavior, live reset and departure/handover
+remain separate. No default, interface or client adoption follows from receipt.
+
+Historical 186 qualification remains 13 selected PASS plus fmt and Clippy at
+Rust7794fe27 only. Preserve the original8348 pointer failure, e7 room-key failure,
+older raw module/body pairs and all first-five producing-head evidence. Those
+results do not qualify this composition. All project execution on this new
+source is UNRUN; Root supplied no executable job, slot or publication grant.
+A separate exact-head/selection/slot grant is required for qualification.
+
+The following private186 sections are retained verbatim as historical records.
+Their then-current branch, queue, UNRUN and pending statements describe those
+producing checkpoints; they do not overwrite the incoming qualified evidence.
+
+## NET25 retained-person witness correction (2026-10-15, source only)
+
+At producing head `8348adcad2a9bcbb6ea797580b64d12b501fe855`, test07
+fails at socket consumer line 492. Only its saved Person address differs;
+token, RTT 37, team 4 and faction 1 match. The actual result remains 6 PASS,
+1 FAIL, 6 UNRUN with fmt PASS and Clippy UNRUN. Test04's valid `watchid` input
+repair passes at 8348. Parent e7's raw failure and earlier source reviews
+remain historical evidence, including the new exact 8348 F2 REVISE.
+
+The locked Rig read observes the actual Hub without cloning it. Every due
+lobby expiry calls retain_seats, which takes the old Vec and pushes retained
+Person values into a replacement Vec. This legally moves the values even
+when no seat expires. JavaScript's token object and captured cleanup closure
+(server.js:568-574,596-602; test.js:5796-5806,5845-5853 at e4e579a) require
+retained logical identity and socket authority. A movable Rust value's heap
+address does not establish those properties. No shipping provider repair is
+indicated by this failure or applied here.
+
+Declare test-only overlap before editing test07. Replace its address tuple
+with existing complete PersonObservation and room_people observations before
+EOF, after actual disconnect, after early polls, immediately after rejoin and
+after both due polls. Only the expected name, connection and disconnect time
+change at their real lifecycle boundaries. The unique nonempty token remains
+at seat 1, RTT 37, team 4, faction 1 and every other Person data field survive, and
+the returned socket has a new connection ID with the same ready tx/cancel
+channels after cleanup. The retired ID has no remaining membership. This
+would reject default reconstruction that loses RTT or team/faction, duplicate
+token membership, changed private state, or a substituted socket channel.
+These are source-derived counterfactuals, not executed mutation tests.
+
+Only this consumer changes. Existing helpers, all other 17 bodies, all 13
+selected names/order, packets, actors, waits, clock values and expected frames
+remain exact 8348. Original 14 preimages, full raw patches and typed tree unions are
+frozen outside the checkout. DESIGN's prior content is retained below this
+section; the same commit adds a new changelog fragment. No parity cell moves.
+All 13 selected consumers, fmt and Clippy are UNRUN on this correction. No
+Source, Cargo, native, fmt, lint, discovery or CI execution is authorized.
+
+Independent Reviewer3's F2 classification agrees with this source diagnosis;
+it approves no future head. Current issue5 receipt through 6204344676 remains
+separate from consent. ABI 2's six calls and accepted content/schema keep their
+scope; transport 199 and draft 201 adoption remain pending. Full UTF16 storage/
+wire/decoder/Unreal, operative and active-spectator matrices, in-play resets,
+live canonical buy and persistent NET48 AI handover remain held. PR270 stays
+frozen at 88a5, qualified 2399 remains separate, and Root alone owns literal
+post269 main integration, publication, ledger and any NEW exact execution grant.
+
+## NET spectator-rejoin room-code repair (2026-10-15, unrun child)
+
+The actual fourth native test at producing head
+`e7a51d6a2a6579eb68342e07eba2234414c518e1` receives close opcode8 at the
+JSON reader before hello/rejoin assertions. Its first join uses
+`WatchIdentity`, 13 ASCII bytes. Native lib.rs:316-319 admits only3-12
+ASCII alphanumeric bytes. Pinned Source e4e579a server.js:580-581 uses
+`/^[a-z0-9]{3,12}$/i`; client/main.js:148 and client/room-session.js:3-9
+also validate3-12 alphanumeric characters after lowercasing. This authored
+room code is invalid in both servers. No admission-length gap is established.
+The raw reader did not capture a close reason; the bad-room explanation comes
+from inspecting these admission predicates.
+
+Declare test-only overlap before editing the existing socket consumer.
+Replace exactly its six room-key literals with `watchid`, seven lowercase
+ASCII bytes. Tokens, names, role hints, identity/token/RTT comparisons,
+replaced/close checks, peer rename and malformed-rename silence stay exact.
+All other17 complete consumer bodies and helpers stay byte-exact to e7a51d6a.
+The original14 raw bodies remain preserved in earlier immutable commits and
+the external packet; this repair does not overwrite their preimages.
+
+Retain the clean producing branch, save refs/WIP/evidence, fetch origin and
+branch from exact e7a51d6a as the bounded qualification-repair exception.
+Fetched main remains f7c51b1a; no rebase or PR270 integration is attempted.
+Original evidence remains `/tmp/net-five-2210-qualification/`, with copied
+raw failure and hashes in `/tmp/net-five-watchid-repair-2252/`.
+The prior result stays3PASS/1FAIL/9UNRUN at e7a51d6a only. All13 selected
+consumers, fmt and Clippy are UNRUN on this repair child. No Source, Cargo,
+native, formatter, lint, discovery or CI execution is authorized here.
+
+All five rows remain held. Exact lone display-unit storage/writers/decoder/
+Unreal, operative and active-spectator matrices, successful live buy and
+persistent NET48 AI handover stay unsupported. No external admission,
+runtime provider, contract, wire, fixture or parity status changes. Frozen
+PR270 at88a5 and qualified2399 retain their refs and producing-head results.
+Receipt of issue5 through6203495034 acknowledges the exact-head conditions
+and serial268/269/270 sequence separately from consent. ABI2 and accepted
+startup content/schema keep their scopes; transport/client adoption stays
+pending. Root alone owns a new exact-head/selection/slot grant and ledger.
+
+## NET exact-head formatter child (2026-10-15)
+
+The first actual guarded fmt check at producing head
+`9c046d434f07ab549b01e1e7c8e0e97782fe0a0d` exits 1 with 36 layout hunks
+in the socket test module and its test-only parser gate. Apply only the
+printed formatter output under Root's explicit mechanical exception.
+Reconstruction of all 36 diagnostic hunks matches the resulting file bytes.
+Input and assertion literals remain exact. The original 14 raw bodies and
+complete 18-consumer preimage remain in 9c046d43 and the external proof packet.
+
+The initial missing optional cpuset telemetry file stopped the wrapper before
+Cargo. Its raw failure stays separate; actual kernel affinity and mandatory
+memory, swap and CPU quota checks remain strict. The fmt check and formatter
+application both terminated and released the inherited S1 lock before their
+notices. All 13 selected native consumers and strict Clippy remain unrun.
+Root must bind the frozen formatter child before any further native execution.
+No row, provider, wire, ABI or historical result is promoted by formatting.
+The proof packet is `/tmp/net-five-2210-qualification/`.
+
+## NET ordinary consumers on PR271 main (2026-10-15, unrun source)
+
+Start a fresh private branch at fetched mainf7c51b1a and retain the complete
+owned848a4008 source delta. All14 existing consumers and their helper prefix
+stay byte-exact. Strengthen only newer watcher-sit, rejoin and stale-frame
+controls to require full literal recipient rosters after real transitions.
+The original parser gate, ordinary due callback and expiring control remain;
+no provider or clock-counter substitute is added. The
+[source record](docs/testing/net-five-fresh-2152.md) gives exact pending names,
+source bindings, preserved history and unsupported clauses. Every row and
+Acceptance cell remains unchanged. No execution result transfers here.
+
+PR270 remains frozen88a5, qualified2399 stays separate and literal post269
+integration remains Root-owned. Full UTF16 storage/wire/client adoption,
+in-play spectator/operative matrices and liveBuy/NET48 AI takeover stay held.
+A new exact-head/selection/slot grant precedes all Source/native execution.
+
+## Decisive NET lobby controls (2026-10-15, unrun source)
+
+A fresh private branch starts at fetched main f7b0e588 and retains the complete
+c85dd9e9 bounded text/consumer source. Four added TCP consumers cover seven
+missing/non-string text forms, the literal eight-watcher boundary, actual
+rejoin cancellation beside an expiring offline control, and a replaced parsed
+frame dispatched before or after an actual due callback. A typed observation
+retains every Person data field, including token units, current connection ID,
+RTT, denial timestamps and last-match value. Expected roster rows and denial
+counts remain explicit; preserved before/after state is an invariance check.
+
+At 9951 the ordinary clock schedules its next callback at10001. Polling10000
+runs none; polling10001 must remove the genuinely disconnected control seat
+while keeping the returning seat. The two stale-frame cases retain three
+real refusals at9951, dispatch the held TCP frame at9999 or10001, and require
+the replacement's fourth refusal at10001 followed by a silent fifth attempt.
+These controls distinguish stale silence from an unavailable live response.
+They prove no successful live purchase or persistent human-to-AI handover.
+[The source note](docs/testing/net-five-decisive-source.md) records exact names,
+Source bindings, pending execution and the provider clauses that remain held.
+
+No existing consumer body or historical result is replaced. All five NET rows,
+every Acceptance cell and incoming main history remain unchanged. The full
+UTF16 storage/wire proposal stays unregistered compatibility material. Current
+RoomRuntime, core AI, ingress, operative admission and in-play spectator guards
+remain untouched. All Source/Node/Cargo/native/fmt/lint/discovery/CI execution
+requires a new exact grant. PR270 still waits for Root's literal post269 main.
+
+## Next five NET consumers on fresh main (2026-10-15, source only)
+
+Reconstruct the required NET-20/21/25/27/29 consumers from retained Git object
+68140403 onto main f7b0e588. Preserve nine authored unrun bodies and three
+relevant prior owned bodies exactly, without restoring first-five statuses,
+private fixtures or unrelated candidates. Two additional unrun controls bind
+actual producer state to all three recipient rosters and require a parsed
+replaced frame to preserve the current person's denial budget, with successful
+current-socket controls. [The source record](docs/testing/net-next-five-source.md)
+names the bodies, exact Source bindings, negative controls and unsupported clauses.
+
+The bounded active repair uses ECMAScript trim characters in the existing
+cleaner: FEFF trims and NEL remains. Display control preservation, filtering,
+fallback and UTF16 limits stay intact; lone display units still use the existing
+lossy conversion. The instance-local test clock and parsed-frame scheduling gate
+are compiled out of production. The full exact-UTF16 JSON/storage/writer package
+remains inactive review material. No wire, ABI, recipient decoder, privacy,
+operative admission, live-buy/leave or RoomRuntime/core-AI handover is adopted.
+
+All incoming main source and history are retained except those explicit owned
+cleaner/test additions. Direct CHANGELOG, every parity cell, fixtures, harness,
+core and Unreal remain exact. Published PR270 at88a5 and private R1 at2399189c
+stay separate pending Root's literal post269 main; their historical results
+are not this head's proof. All Source, Node, Cargo, native, fmt, lint, discovery
+and CI execution remains frozen pending a new exact-head/selection/slot grant.
+This bounded task makes no public update or row promotion.
+
 ## NET19 strict-boundary witness repair (2026-10-15, qualified at6843e977)
 
 Read the full exact88a5 independent review. R1 is correct: the 59,951 poll leaves the clock due at60,001, so the old60,000 observation performs zero expiry callbacks. Its historical de30 PASS does not oppose an inclusive expiry mutation. The shipping strict predicate remains correct. NET22/23/24/30 retain their complete component assessments; no new full-match or admission gate applies.

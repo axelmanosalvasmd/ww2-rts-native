@@ -61,6 +61,18 @@ impl Drop for ServeLifetime {
     }
 }
 
+#[cfg(test)]
+struct TestIngressPause {
+    connection: u64,
+    command: &'static str,
+    entered: tokio::sync::oneshot::Sender<()>,
+    release: tokio::sync::oneshot::Receiver<()>,
+    dispatched: tokio::sync::oneshot::Sender<()>,
+}
+
+#[cfg(test)]
+type TestIngressGate = Arc<Mutex<Option<TestIngressPause>>>;
+
 #[derive(Clone)]
 struct Server {
     hub: Arc<Mutex<Hub>>,
@@ -68,8 +80,38 @@ struct Server {
     clock: Instant,
     #[cfg(test)]
     test_now_ms: Option<Arc<AtomicU64>>,
+    #[cfg(test)]
+    test_ingress_pause: Option<TestIngressGate>,
 }
 impl Server {
+    #[cfg(test)]
+    async fn pause_test_ingress(
+        &self,
+        connection: u64,
+        value: &Value,
+    ) -> Option<tokio::sync::oneshot::Sender<()>> {
+        let pause = if let Some(shared) = &self.test_ingress_pause {
+            let mut pending = shared.lock().await;
+            if pending
+                .as_ref()
+                .is_some_and(|pause| pause.connection == connection && value["t"] == pause.command)
+            {
+                pending.take()
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        if let Some(pause) = pause {
+            let _ = pause.entered.send(());
+            let _ = pause.release.await;
+            Some(pause.dispatched)
+        } else {
+            None
+        }
+    }
+
     fn now(&self) -> u64 {
         #[cfg(test)]
         if let Some(now) = &self.test_now_ms {
@@ -156,6 +198,8 @@ async fn serve_inner(
         clock: Instant::now(),
         #[cfg(test)]
         test_now_ms: None,
+        #[cfg(test)]
+        test_ingress_pause: None,
     };
     if let Some(ready) = ready {
         let _ = ready.send(NativeRoomControl {
@@ -324,7 +368,13 @@ async fn socket_loop(
                     }
                 };
                 if let Ok(value) = serde_json::from_slice(&bytes) {
+                    #[cfg(test)]
+                    let dispatched = server.pause_test_ingress(connection.id, &value).await;
                     server.hub.lock().await.message(&code,&connection,&mut joined,value,server.now());
+                    #[cfg(test)]
+                    if let Some(dispatched) = dispatched {
+                        let _ = dispatched.send(());
+                    }
                 }
             }
         }

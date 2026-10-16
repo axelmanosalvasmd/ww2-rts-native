@@ -1,0 +1,1 @@
+- Replace NET25 test07's unstable Person-address check with complete retained-state, token/seat and current-socket channel observations across the same cleanup callbacks. Preserve the other 17 consumers and all inputs. The correction is unrun; the recorded 8348 result remains 6 passed, 1 failed and 6 unrun, with broader NET clauses held.

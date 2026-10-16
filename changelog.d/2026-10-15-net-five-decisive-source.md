@@ -1,0 +1,2 @@
+- Add four unrun TCP consumers for malformed text forms, the eight-watcher boundary, reconnect cleanup with a real expiring control, and stale parsed input before and after a due callback. Preserve the prior14 consumers and every parity cell.
+- Keep lone-unit display storage, in-play spectators, operative reuse and persistent AI handover held. No Source, native, formatter, lint or CI result is claimed.

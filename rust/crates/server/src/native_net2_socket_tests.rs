@@ -104,6 +104,7 @@ async fn sockets(check: impl FnOnce(&mut Rig, [Receiver; 2]) + Send + 'static) {
         next: Arc::new(std::sync::atomic::AtomicU64::new(1)),
         clock: std::time::Instant::now(),
         test_now_ms: None,
+        test_ingress_pause: None,
     };
     let (stop, stopped) = watch::channel(false);
     let (finish, finished) = oneshot::channel();

@@ -1,0 +1,1 @@
+- Compose the private next-five NET consumers onto literal PR270 merge abd715f1, preserving all six qualified incoming bodies and every parity cell. Retain the existing trim repair, test-only parsed-frame gate, inactive text proposal and producing-head failures/results. The new source is unrun and all five complete next-row checks stay held.

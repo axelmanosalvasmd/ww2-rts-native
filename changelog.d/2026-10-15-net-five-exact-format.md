@@ -1,0 +1,1 @@
+- Apply the exact formatter output for 36 NET socket-consumer and parser-gate layout hunks. Preserve every input and assertion literal, the original 14 raw bodies in producing9c046d43, and the unchanged 13-test selection. Native qualification and strict Clippy remain pending a new child binding.
