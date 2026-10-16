@@ -20,3 +20,14 @@ Merged PR #369 at `161bbe3880f0ac06187c64bfe3ff2dab0856841c`, including its
 the complete garrisoned movement and production-cancel tests from #296/#366
 with #369's complete FireAt/compound refusal test. All three are retained.
 Other merge changes are automatic, including `room_runtime.rs`.
+
+Merged PR #375 at `d2954b59b539e82d386ed1f6c1245664c69a6d19` for convoy
+tick and recipient delivery. Four conflict regions:
+
+- `save-format.md`: retain the base optional elimination-field documentation.
+- `recipient_snapshot.rs`, module registration: retain both flights and logistics.
+- Same file, projection: retain both flight insertion and optional logistics insertion.
+- `server/src/main.rs`, help text: retain base MAX_ROOMS/static-root help and
+  update logistics to on, matching the incoming runtime configuration.
+
+All other changes are automatic.

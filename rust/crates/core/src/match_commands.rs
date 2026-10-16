@@ -2247,7 +2247,12 @@ impl crate::match_runtime::Match {
                 c.move_result = Some(MoveResult::Completed {
                     tick: self.world.game.tick,
                 });
-            } else if u.path.is_empty()
+            } else if !self
+                .convoys
+                .as_ref()
+                .and_then(|s| s.trucks.get(&id))
+                .is_some_and(|c| !c.manual)
+                && u.path.is_empty()
                 && crate::math::hypot(u.x - goal.x, u.z - goal.z) > 0.25
                 && u.repath <= 0.0
             {
@@ -2569,6 +2574,11 @@ impl crate::match_runtime::Match {
                 .convoys
                 .as_ref()
                 .is_some_and(|state| state.trucks.contains_key(&id));
+        let automatic_convoy = self
+            .convoys
+            .as_ref()
+            .and_then(|s| s.trucks.get(&id))
+            .is_some_and(|c| !c.manual);
         let fuel_speed = self.logistics.get(id).and_then(|r| {
             r.fuel.map(|fuel| {
                 let available = fuel
@@ -2610,7 +2620,7 @@ impl crate::match_runtime::Match {
             id,
             suppression_speed,
             &mut |_, _, u, to, why| {
-                if error.is_some() {
+                if automatic_convoy || error.is_some() {
                     return;
                 }
                 match why {
