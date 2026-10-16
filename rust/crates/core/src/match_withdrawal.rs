@@ -194,8 +194,9 @@ impl Match {
                 .collect::<Vec<_>>()
         });
         // Stable sorting preserves the source Map insertion order for equal distances.
-        stores
-            .sort_by(|(a, _), (b, _)| distance(*a, unit.at()).total_cmp(&distance(*b, unit.at())));
+        crate::sort::sort_by(&mut stores, |(a, _), (b, _)| {
+            distance(a, unit.at()) - distance(b, unit.at())
+        });
         for (at, entity) in stores {
             let length = distance(at, unit.at());
             let d = math::max(0.0, length - 10.0);

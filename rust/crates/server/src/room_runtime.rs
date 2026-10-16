@@ -100,7 +100,8 @@ impl RoomRuntime {
             })
             .collect())
     }
-    pub fn new(state: Match, now_ms: u64) -> Result<Self, String> {
+    pub fn new(mut state: Match, now_ms: u64) -> Result<Self, String> {
+        state.tick_state.restrict_aircraft_weapons_for_delivery();
         state.validate_tick_state()?;
         state
             .preflight_ordinary_snapshot()

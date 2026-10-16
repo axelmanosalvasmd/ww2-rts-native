@@ -1217,15 +1217,14 @@ impl DamageWorld<'_> {
                             .map(|_| *c)
                     })
                     .collect::<Vec<_>>();
-                cells.sort_by(|a, b| {
+                crate::sort::sort_by(&mut cells, |a, b| {
                     let pos = |c: usize| Point {
                         x: (c % self.world.game.w) as f64 * 2. + 1.,
                         z: (c / self.world.game.w) as f64 * 2. + 1.,
                     };
-                    let a = pos(*a);
-                    let b = pos(*b);
-                    math::hypot(a.x - at.x, a.z - at.z)
-                        .total_cmp(&math::hypot(b.x - at.x, b.z - at.z))
+                    let a = pos(a);
+                    let b = pos(b);
+                    math::hypot(a.x - at.x, a.z - at.z) - math::hypot(b.x - at.x, b.z - at.z)
                 });
                 if let Some(&c) = cells.first() {
                     let skip_cells = BTreeSet::new();
@@ -1398,6 +1397,8 @@ impl crate::match_runtime::Match {
             .filter(|id| self.world.game.units.contains_key(id))
             .collect::<Vec<_>>();
         self.validate_retirement_sidecars(&ordered)?;
+        self.validate_carrier_ejections(&ordered)
+            .map_err(|_| CombatError::InvalidInput("carrier ejection preflight"))?;
         for id in &ordered {
             let u = &self.world.game.units[id];
             if self.actor_policy(u.owner).is_err() || u.kind >= self.rules.kinds.len() {
@@ -1525,6 +1526,14 @@ impl crate::match_runtime::Match {
                 continue;
             };
             let metadata = self.combat.get(u.id).unwrap().clone();
+            if !metadata.cargo.is_empty() {
+                for effect in self
+                    .eject_carrier_riders(id)
+                    .map_err(|_| CombatError::InvalidInput("carrier ejection"))?
+                {
+                    emit(effect);
+                }
+            }
             let bounty = self.retirement_bounty(&u, metadata.last_hit)?;
             self.retire_unit_sidecars(&mut u)?;
             self.world.game.units.remove(&u.id);

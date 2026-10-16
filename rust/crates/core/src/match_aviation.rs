@@ -68,12 +68,14 @@ pub enum AviationEvent {
 pub struct AviationState {
     pub planes: BTreeMap<UnitId, AircraftRuntime>,
     pub anti_air: BTreeMap<UnitId, AntiAirRuntime>,
+    pub(crate) attack_picks: BTreeMap<UnitId, UnitId>,
     pub events: Vec<AviationEvent>,
 }
 impl AviationState {
     pub fn remove(&mut self, id: UnitId) {
         self.planes.remove(&id);
         self.anti_air.remove(&id);
+        self.attack_picks.remove(&id);
     }
     pub fn take_events(&mut self) -> Vec<AviationEvent> {
         std::mem::take(&mut self.events)
@@ -220,6 +222,20 @@ impl Match {
                         .is_some_and(|m| !finite(m.at) || m.target == Some(0))
                 {
                     return Err(AviationError::Invalid("invalid sortie metadata"));
+                }
+                if a.mission
+                    .is_some_and(|mission| mission.kind == MissionKind::Area)
+                    && !catalog()?
+                        .unit(&self.rules.kinds[u.kind].name)
+                        .map_err(|e| AviationError::Actuation(e.to_string()))?
+                        .get("w")
+                        .and_then(|w| w.get("salvo"))
+                        .and_then(Value::boolean)
+                        .unwrap_or(false)
+                {
+                    return Err(AviationError::Invalid(
+                        "area mission requires a bomber salvo",
+                    ));
                 }
             } else if self.rules.kinds[u.kind].air {
                 return Err(AviationError::Invalid("missing aircraft physical state"));
@@ -406,30 +422,30 @@ impl Match {
             return Ok(false);
         }
         if mission.kind == MissionKind::Area {
-            return Err(AviationError::Unsupported(
-                "aircraft area-salvo actuator is unavailable",
-            ));
-        }
-        if !self.commands.units[&id].hold_fire {
-            return Err(AviationError::Unsupported(
-                "aircraft automatic ground-fire actuator is unavailable",
-            ));
+            let def = catalog()?
+                .unit(&self.rules.kinds[u.kind].name)
+                .map_err(|e| AviationError::Actuation(e.to_string()))?;
+            if !def
+                .get("w")
+                .and_then(|w| w.get("salvo"))
+                .and_then(Value::boolean)
+                .unwrap_or(false)
+            {
+                return Err(AviationError::Invalid(
+                    "area mission requires a bomber salvo",
+                ));
+            }
         }
         if mission.kind == MissionKind::Attack {
             let target = mission
                 .target
                 .and_then(|target| self.world.game.units.get(&target));
-            if self.rules.kinds[u.kind].name != "fighter"
-                || target.is_none_or(|t| {
-                    t.air.is_none()
-                        || t.hp <= 0.0
-                        || self.world.game.allied(owner, t.owner)
-                        || !self.world.game.players[owner].sees(t.id)
-                })
-            {
-                return Err(AviationError::Unsupported(
-                    "aircraft ground-attack weapon actuator is unavailable",
-                ));
+            if target.is_none_or(|t| {
+                t.hp <= 0.0
+                    || self.world.game.allied(owner, t.owner)
+                    || !self.world.game.players[owner].sees(t.id)
+            }) {
+                return Err(AviationError::Invalid("invalid aircraft attack target"));
             }
         }
         if mission.kind == MissionKind::Escort {
@@ -555,31 +571,6 @@ impl Match {
                     || a.mission.is_none())
             {
                 state = PlaneState::Home;
-            }
-            if state != PlaneState::Home {
-                if !self.commands.units[&id].hold_fire {
-                    return Err(AviationError::Unsupported(
-                        "aircraft automatic ground-fire actuator is unavailable",
-                    ));
-                }
-                if let Some(m) = a.mission {
-                    if m.kind == MissionKind::Area {
-                        return Err(AviationError::Unsupported(
-                            "aircraft area-salvo actuator is unavailable",
-                        ));
-                    }
-                    if m.kind == MissionKind::Attack
-                        && m.target
-                            .and_then(|target| self.world.game.units.get(&target))
-                            .is_some_and(|t| {
-                                t.air.is_none() && !self.world.game.allied(u.owner, t.owner)
-                            })
-                    {
-                        return Err(AviationError::Unsupported(
-                            "aircraft ground-attack weapon actuator is unavailable",
-                        ));
-                    }
-                }
             }
             let center = a.mission.map_or(base, |m| m.at);
             let radius = if a

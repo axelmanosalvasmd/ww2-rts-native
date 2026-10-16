@@ -211,7 +211,7 @@ fn aircraft_runner_admission_refuses_unrepresented_phases_before_queue_or_clock_
                 issuer: 0,
                 sequence: 1,
             },
-            Command::from_json(&json!({"t":"stance","ids":[id],"key":"holdFire","on":true}))
+            Command::from_json(&json!({"t":"stance","ids":[id],"key":"holdFire","on":kind != 2}))
                 .unwrap(),
         )
         .unwrap();
@@ -226,6 +226,21 @@ fn aircraft_runner_admission_refuses_unrepresented_phases_before_queue_or_clock_
             m.story,
             m.world.game.tick
         );
+        if kind == 2 {
+            m.validate_aircraft_runner_boundary(1).unwrap();
+            assert_eq!(m.world.game.tick, 0);
+            assert_eq!(m.commands.pending_commands(), 1);
+            for tick in 1..=4 {
+                let report = m.advance_tick().unwrap();
+                assert_eq!(report.tick, tick);
+                assert!(report.commands.iter().all(|result| result.denial.is_none()));
+                assert!(!m.commands.units[&id].hold_fire);
+                assert!(m.tick_state.fault().is_none());
+                assert!(m.firing.events.is_empty());
+            }
+            assert_eq!(m.commands.pending_commands(), 0);
+            continue;
+        }
         assert!(
             m.validate_aircraft_runner_boundary(1).is_err(),
             "guard {kind}"
