@@ -46,6 +46,14 @@ pub struct EndingAction {
     pub complete: bool,
 }
 
+/// Host control over an existing Horde clock. This does not admit Horde rooms.
+pub(crate) fn end_horde_break(state: &mut Match, host: bool, paused: bool) -> Result<bool, String> {
+    if !host || paused {
+        return Ok(false);
+    }
+    state.end_horde_break()
+}
+
 /// A caller-owned output batch retains real tick effects until a scheduled send.
 /// It is not another simulation state or producer event authority.
 pub struct RoomRuntime {
@@ -289,6 +297,11 @@ impl RoomRuntime {
     }
     pub fn paused(&self) -> bool {
         self.pause.is_some()
+    }
+    pub(crate) fn next_wave(&mut self, host: bool) -> Result<bool, String> {
+        self.running()?;
+        let paused = self.paused();
+        end_horde_break(&mut self.state, host, paused)
     }
     pub fn pause_message(&self, now_ms: u64) -> Value {
         if let Some(pause) = &self.pause {

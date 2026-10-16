@@ -17,6 +17,50 @@ use ww2_core::{
     weather::WeatherChoice,
 };
 
+#[test]
+fn net50_host_control_respects_pause_and_mode_without_admitting_horde_rooms() {
+    let map = AuthoritativeMap::from_json(
+        &serde_json::to_vec(&json!({
+            "name":"Host Horde control", "w":60,"h":60,"rows":vec![".".repeat(60);60],
+            "spawns":[{"x":30,"y":5},{"x":10,"y":54},{"x":50,"y":54}],
+            "defend":[0], "points":[{"x":30,"y":30}]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let ordinary_options = arena(&[]).options;
+    let mut options = ordinary_options.clone();
+    options.players.truncate(1);
+    options.mode = Mode::Horde;
+    let mut state = Match::new_horde(&map, options).unwrap();
+    let before = state.horde.clone();
+    for (host, paused) in [(false, false), (false, true), (true, true)] {
+        assert!(!end_horde_break(&mut state, host, paused).unwrap());
+        assert_eq!(state.horde, before);
+    }
+    assert!(end_horde_break(&mut state, true, false).unwrap());
+    assert_eq!(state.horde.as_ref().unwrap().time_left, 0.0);
+    assert!(RoomRuntime::new(state, 0).is_err());
+
+    let mut runtime = RoomRuntime::new(Match::new(&map, ordinary_options).unwrap(), 0).unwrap();
+    for _ in 0..6 {
+        assert!(!runtime.next_wave(true).unwrap());
+        runtime.advance_tick(&[false, false]).unwrap();
+        let frames = runtime
+            .collect_frame(
+                &[SelectedSeat {
+                    slot: 0,
+                    full: true,
+                    omit: false,
+                }],
+                FrameKind::Scheduled,
+            )
+            .unwrap();
+        assert_eq!(frames.len(), 1);
+        assert!(runtime.fault().is_none());
+    }
+}
+
 // The scene uses the same actual publication boundary as the tick-event provider's
 // native failure arena. It supplies inputs only, never an expected event buffer.
 fn arena(specs: &[(&str, usize, Point)]) -> Match {
