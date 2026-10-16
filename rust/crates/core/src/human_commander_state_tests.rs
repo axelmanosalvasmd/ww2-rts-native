@@ -890,3 +890,128 @@ fn intent_ai17_scripted_stagger_and_four_tick_view_window() {
     }
     assert_eq!(Level::Normal.every(), 40);
 }
+
+#[test]
+fn intent_ai19_detached_resets_survive_ordinary_ticks_and_recipient_snapshots() {
+    use crate::{
+        economy::{Faction, Mode},
+        economy_state::ArmySize,
+        map::AuthoritativeMap,
+        match_runtime::{Match, MatchOptions, PlayerConfig},
+        recipient_snapshot::DeliveryState,
+        weather::WeatherChoice,
+    };
+
+    let map = AuthoritativeMap::from_json(
+        &serde_json::to_vec(&json!({
+            "name": "Detached commander lifecycle", "w": 64, "h": 64,
+            "rows": vec![".".repeat(64); 64],
+            "spawns": [{"x": 4, "y": 4}, {"x": 59, "y": 59}],
+            "points": [{"x": 27, "y": 10}, {"x": 13, "y": 27}, {"x": 32, "y": 32}]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let mut game = Match::new(
+        &map,
+        MatchOptions {
+            seed: 71,
+            mode: Mode::Conquest,
+            players: vec![
+                PlayerConfig {
+                    name: "A".into(),
+                    team: 0,
+                    faction: Faction::Usa,
+                },
+                PlayerConfig {
+                    name: "B".into(),
+                    team: 1,
+                    faction: Faction::try_from(1).unwrap(),
+                },
+            ],
+            shuffle: false,
+            army: ArmySize::Standard,
+            weather: WeatherChoice::Map,
+            weather_seed: None,
+            living_weather: false,
+            map_key: None,
+            tech: false,
+            supply: false,
+            logistics: false,
+            sandbox: false,
+        },
+    )
+    .unwrap();
+    let spawn = game.start.players[0].spawn;
+    // The host owns these detached states. This test does not activate room AI.
+    let mut commander = HumanState::new(71, 0, spawn);
+    let mut other = HumanState::new(71, 1, game.start.players[1].spawn);
+    let mut delivery = DeliveryState::new(&game).unwrap();
+    assert!(commander.snapshot().is_none());
+    assert_eq!(commander.camera(), None);
+    for tick in 1..=8 {
+        game.advance_tick().unwrap();
+        assert_eq!(game.world.game.tick, tick);
+        assert!(game.tick_state.fault().is_none());
+        let simulation_rng = game.start.random.snapshot();
+        let environment_seed = game.start.environment_seed;
+
+        if tick == 3 {
+            // A human takes control. Private attention is discarded immediately.
+            commander.reset();
+        }
+        if tick == 5 {
+            // The human leaves. The host records a fresh seed before resuming AI.
+            commander.reset_with_seed(72);
+            assert!(commander.snapshot().is_none());
+        }
+        if (3..5).contains(&tick) {
+            assert!(commander.snapshot().is_none());
+            assert_eq!(commander.camera(), None);
+        } else {
+            let advance = commander
+                .advance::<(), _>(
+                    game.human_commander_control(0, "normal").unwrap(),
+                    None,
+                    &empty_batch(),
+                    |_| panic!("opening must wait before planning"),
+                )
+                .unwrap();
+            assert_eq!(advance, HumanAdvance::default());
+            let runtime = commander.snapshot().unwrap();
+            assert_eq!(runtime.camera, spawn);
+            assert!(runtime.inputs.is_empty());
+            assert!(runtime.selection.is_empty());
+            let mut expected = Timing::new(if tick < 5 { 71 } else { 72 }, 0);
+            let delay = expected.opening_delay(Skill::for_level("normal")).unwrap();
+            let opening = runtime.look.as_ref().unwrap().at;
+            let initialized_at = if tick < 5 { 1 } else { 5 };
+            assert_eq!(opening, initialized_at + delay);
+            assert!(opening > tick as u64);
+            assert_eq!(runtime.timing, expected);
+            let before_other = commander.snapshot();
+            other
+                .advance::<(), _>(
+                    game.human_commander_control(1, "normal").unwrap(),
+                    None,
+                    &empty_batch(),
+                    |_| panic!("other seat opening must wait"),
+                )
+                .unwrap();
+            assert_eq!(commander.snapshot(), before_other);
+            assert_ne!(runtime.timing, other.snapshot().unwrap().timing);
+        }
+        assert_eq!(game.start.random.snapshot(), simulation_rng);
+        assert_eq!(game.start.environment_seed, environment_seed);
+        if tick % 2 == 0 {
+            let frame = delivery
+                .capture_with_lists(&mut game, &[false; 2], &[false; 2], &[])
+                .unwrap();
+            for slot in 0..2 {
+                let packet = frame.recipient(slot).unwrap().into_json();
+                assert_eq!(packet["tick"], tick);
+                assert!(!packet["units"].as_array().unwrap().is_empty());
+            }
+        }
+    }
+}

@@ -1,3 +1,11 @@
+## Seat lifecycle controls and metadata (2026-10-16)
+
+Socket `pause` and `resume` remain rejected through `UNAVAILABLE`, including for the host. The existing host-side `RoomRuntime` pause APIs remain available without a public client caller. The server owns the supplied wall-clock deadlines and the one-second pause/frame cadence; the deterministic core receives no timer. Paused ingress ignores new orders while preserving the queue for resume. Operative and AI room admission remain closed on R1.
+
+Every admitted seat receives the existing roster-ordered `online` and `ping` arrays, as in reference `e4e579a` (`server.js:504,774`, `server/room-tick.js:30`). AI seats project `true` and `-1`, and unknown human RTT stays null. The common frame sender applies these fields to scheduled, paused and catch-up delivery without changing recipient visibility or wire shape.
+
+AI-19 evidence covers the existing detached core state: lazy spawn camera, private RNG, sampled opening delay and explicit resets through ordinary ticks and both recipient snapshots. It does not enable room AI or its takeover/departure callers. Only AI-19 and NET-66 are claimed. NET-79 is dropped because socket pause/resume ingress needs owner approval. NET-80 remains outside the proven set because live AI handover and loaded-save pause need separate activation and save work.
+
 ## Tutorial runtime over existing Match systems (2026-10-16)
 
 The explicit `Match::new_tutorial` constructor adds the unattended Enemy seat and uses the existing `tutorial_steps` definitions. Tutorial shares the ordinary ground, routing, combat, objective and support systems. Its private step state owns only the current index, spawned IDs and pending dialogue. Lines leave through the core tick report from tick 40; no server or client transport is introduced. The runner advances at most one step per tick after capture and income, and finishes at the bridgehead through the common Match finish state.
