@@ -167,6 +167,7 @@ fn rare_placement_rejects_after_draft_routes_without_publishing_or_warming_live_
                     timer: 0.0,
                     orbit: 0.0,
                     mission: None,
+                    attack_pick: 0,
                     downed: false,
                 },
             );

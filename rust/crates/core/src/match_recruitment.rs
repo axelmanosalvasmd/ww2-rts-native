@@ -388,6 +388,7 @@ impl Match {
                     timer: 0.0,
                     orbit: 0.0,
                     mission: None,
+                    attack_pick: 0,
                     downed: false,
                 },
             );

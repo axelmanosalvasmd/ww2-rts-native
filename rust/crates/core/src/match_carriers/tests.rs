@@ -627,7 +627,7 @@ fn invalid_or_unavailable_carrier_work_preserves_canonical_state() {
     assert!(matches!(
         m.apply_unit_riding(1, 0.05).unwrap(),
         RidingOutcome::Ejected(crate::environment::Hurt { killed: false, .. })
-        ));
+    ));
     assert!(!m.world.game.units[&1].riding);
     assert!(m.combat.get(2).unwrap().cargo.is_empty());
 }

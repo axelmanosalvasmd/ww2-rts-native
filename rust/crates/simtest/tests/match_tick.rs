@@ -649,7 +649,7 @@ fn trusted_tick_scene_stages_clock_paths_and_empty_queue_without_replay() {
 }
 
 #[test]
-fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
+fn garrison_retreat_ticks_and_unsupported_reaction_actors_reject_before_writes() {
     use ww2_core::{match_commands::Command, orders::OrderKey};
     let fixture: Value = serde_json::from_str(include_str!("fixtures/match-tick.json")).unwrap();
     for actor in [
@@ -739,10 +739,28 @@ fn unsupported_reaction_actors_reject_before_clock_commands_or_timers() {
             .iter()
             .map(|player| player.support.clone())
             .collect::<Vec<_>>();
+        if actor == "garrison" {
+            m.validate_tick_state().unwrap();
+            let report = m.advance_tick().unwrap();
+            assert_eq!(report.tick, 1);
+            assert_eq!(report.commands.len(), 1);
+            assert_eq!(report.commands[0].denial, None);
+            assert_eq!(m.world.game.units[&id].garrison, None);
+            assert!(m.world.game.units[&id].retreating);
+            assert!(m.firing.get(id).unwrap().cooldown < firing.get(id).unwrap().cooldown);
+            assert!(m.abilities.get(id).unwrap().cooldown < abilities.get(id).unwrap().cooldown);
+            assert_eq!(m.commands.next_tick(), Some(2));
+            assert_eq!(m.commands.pending_commands(), 1);
+            assert!(m.tick_state.fault().is_none());
+            for _ in 0..2 {
+                m.advance_tick().unwrap();
+            }
+            assert!(m.tick_state.fault().is_none());
+            continue;
+        }
         let error = m.advance_tick().unwrap_err();
         assert!(
             error.reason.contains(match actor {
-                "garrison" => "automatic garrison retreat tick exit",
                 "logistics" | "convoys" => "reserve and convoy tick phases",
                 "mode mismatch" | "unsupported mode" => {
                     "tick execution requires represented ordinary or World mode"

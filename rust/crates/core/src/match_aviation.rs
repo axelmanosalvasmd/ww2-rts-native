@@ -41,6 +41,8 @@ pub struct AircraftRuntime {
     pub timer: f64,
     pub orbit: f64,
     pub mission: Option<PlaneMission>,
+    /// Cached automatic choice, separate from this step's visible firing target.
+    pub attack_pick: UnitId,
     pub downed: bool,
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -321,6 +323,7 @@ impl Match {
             timer: 0.0,
             orbit: 0.0,
             mission: None,
+            attack_pick: 0,
             downed: false,
         };
         let mut placer = crate::unit_spawn::SpawnPlacer::new();
@@ -498,7 +501,7 @@ impl Match {
         let base = self.aircraft_base(u.owner, at)?;
         firing.cooldown -= dt;
         firing.retarget -= dt;
-        // Retain the automatic choice until its half-second retarget window expires.
+        firing.target_id = 0;
         if matches!(state, PlaneState::Base | PlaneState::Rearm) {
             at = base;
             if state == PlaneState::Rearm {
@@ -697,10 +700,11 @@ impl Match {
             let target = self
                 .pick_firing_target(id)
                 .map_err(AviationError::Actuation)?;
+            self.aviation.planes.get_mut(&id).unwrap().attack_pick = target;
             self.firing.get_mut(id).unwrap().retarget = 0.5;
             target
         } else {
-            self.firing.get(id).unwrap().target_id
+            self.aviation.planes[&id].attack_pick
         };
         if target != 0
             && self

@@ -163,7 +163,7 @@ fn actual_aircraft_runner_matches_original_whole_steps_without_output_injection(
     assert_eq!(ticks, f["steps"].as_u64().unwrap());
 }
 #[test]
-fn aircraft_runner_admission_refuses_unrepresented_phases_before_queue_or_clock_writes() {
+fn aircraft_runner_admits_weapons_and_refuses_malformed_phases_before_writes() {
     let f = fixture();
     let trace = &f["traces"][0];
     for kind in 0..6 {
@@ -211,8 +211,10 @@ fn aircraft_runner_admission_refuses_unrepresented_phases_before_queue_or_clock_
                 issuer: 0,
                 sequence: 1,
             },
-            Command::from_json(&json!({"t":"stance","ids":[id],"key":"holdFire","on":true}))
-                .unwrap(),
+            Command::from_json(
+                &json!({"t":"stance","ids":[id],"key":"holdFire","on":!matches!(kind, 2 | 3)}),
+            )
+            .unwrap(),
         )
         .unwrap();
         let before = format!(
@@ -226,6 +228,22 @@ fn aircraft_runner_admission_refuses_unrepresented_phases_before_queue_or_clock_
             m.story,
             m.world.game.tick
         );
+        if matches!(kind, 2 | 3) {
+            m.validate_aircraft_runner_boundary(1).unwrap();
+            let report = m.advance_tick().unwrap();
+            assert_eq!(report.tick, 1);
+            assert_eq!(report.commands.len(), 1);
+            assert_eq!(report.commands[0].denial, None);
+            assert!(!m.commands.units[&id].hold_fire);
+            assert_eq!(m.commands.pending_commands(), 0);
+            assert_eq!(m.commands.next_tick(), Some(2));
+            assert!(m.aviation.planes[&id].mission.is_some());
+            for _ in 0..2 {
+                m.advance_tick().unwrap();
+            }
+            assert!(m.tick_state.fault().is_none());
+            continue;
+        }
         assert!(
             m.validate_aircraft_runner_boundary(1).is_err(),
             "guard {kind}"
