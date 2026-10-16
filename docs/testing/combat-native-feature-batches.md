@@ -82,7 +82,7 @@ The first runner and systemd launcher both terminated with exit100, and
 Normal logs remain at `/tmp/native-feature-batches-0308/cmb_impl/`. No
 semantic retry, repair, Source job or new capture/bundle followed. The three
 failed test bodies remain exact at their producing head. Keep those rows
-out of a passing public batch; Root owns any scope-only diagnostic exclusion.
+out of a passing public batch; The three failed diagnostics are now explicitly ignored, with every body unchanged; Root owns publication and final integration scope.
 
 Second-window proposed selection, pending a new literal grant: packages
 `ww2-core`, `ww2-simtest`, `ww2-server`; one nextest job, expected9 tests,

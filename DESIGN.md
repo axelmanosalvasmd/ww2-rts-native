@@ -4288,3 +4288,12 @@ Eleven other second-window rows remain client/delegated/replay gaps, each
 listed in the row map. No row is promoted. Register only these new tests
 and request a separate focused9-instance nextest job; no first-window
 failure is selected or retried. Shipping runtime and interfaces stay exact.
+
+After the first batch is terminal, apply the authorized failed-row drop by
+adding only three explicit ignore attributes for CMB94/126/137. Removing
+those three attributes reproduces the complete previous module byte for
+byte, including every failed input and assertion. The failures remain on
+producing38317a14 and in the original native log. No test is repaired,
+weakened or retried. This excludes failed diagnostics from a normal passing
+subset while the first40 new passing tests and second-window tests stay
+enabled. The separate nine-test second selection is unchanged.

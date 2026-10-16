@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Exclude the three failed first-window combat rows from normal test runs with explicit ignored diagnostics. Preserve their assertions, inputs and `38317a14` failures exactly; do not repair or rerun them. Other combat tests and the pending second window remain enabled.
+
 - Run the first native combat batch once: 49 selected, 46 passed and 3 failed at `38317a14`; retain the failed CMB-94/126/137 bodies and drop those rows from candidates. Add five native tests for the second 16-row window, keeping all missing/client/delegated clauses pending and every Acceptance cell exact. No semantic retry or new Source capture.
 
 - Check native barrage shell counts and exact family cooldowns in the new combat suite. Compare snapshot cooldowns through their numeric value so JSON float storage does not change the intended assertion. These tests remain unrun.
