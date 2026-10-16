@@ -41,10 +41,18 @@ fn ours(m: &Match) -> Vec<i64> {
         .collect()
 }
 fn command(m: &mut Match, owner: usize, command: Command) {
+    eprintln!(
+        "Tutorial direct command before owner={owner} command={command:?}\n{}",
+        transition_operands(m)
+    );
     assert_eq!(
         m.execute_command(owner, &command, m.finish.is_some())
             .unwrap(),
         None
+    );
+    eprintln!(
+        "Tutorial direct command accepted owner={owner} command={command:?}\n{}",
+        transition_operands(m)
     );
 }
 fn go(m: &mut Match, at: Point, attack: bool) {
@@ -64,6 +72,84 @@ fn go(m: &mut Match, at: Point, attack: bool) {
             face: None,
         },
     );
+}
+// Observe only discrete intent/target boundaries. Continuous pose, HP and timer
+// changes are operands at those boundaries, not triggers for a per-tick dump.
+fn transition_key(m: &Match) -> String {
+    let units = m
+        .world
+        .game
+        .units
+        .values()
+        .map(|u| {
+            let intent = m.commands.units.get(&u.id).map(|c| {
+                format!(
+                    "orders={:?} attack_id={} follow={} auto_retreat={} auto_cast={} \
+                     hold_fire={} outcome={:?}/{:?} result={:?} route_end={:?}",
+                    c.orders,
+                    c.attack_id,
+                    c.follow,
+                    c.auto_retreat,
+                    c.auto_cast,
+                    c.hold_fire,
+                    c.outcome,
+                    c.outcome_tick,
+                    c.move_result,
+                    c.route_end,
+                )
+            });
+            format!(
+                "id={} owner={} alive={} attack={} retreating={} path_empty={} \
+                 amove={:?} world_goal={:?} hold_pos={} garrison={:?} \
+                 target={:?} intent={intent:?}",
+                u.id,
+                u.owner,
+                u.hp > 0.0,
+                u.attack,
+                u.retreating,
+                u.path.is_empty(),
+                u.amove,
+                u.world_goal,
+                u.hold_pos,
+                u.garrison,
+                m.firing.units.get(&u.id).map(|f| f.target_id),
+            )
+        })
+        .collect::<Vec<_>>();
+    let goal = m.tutorial_state().map(|s| (s.step(), s.spawned()));
+    format!("goal={goal:?} finish={:?} units={units:?}", m.finish)
+}
+fn transition_operands(m: &Match) -> String {
+    let units = m
+        .world
+        .game
+        .units
+        .values()
+        .map(|u| {
+            format!(
+                "id={} kind={} at={:?} hp={} supp={} path_len={} path_end={:?} \
+                 shot_at={:?} firing={:?} recovery={:?} combat={:?} ability={:?}",
+                u.id,
+                m.rules.kinds[u.kind].name,
+                u.at(),
+                u.hp,
+                u.supp,
+                u.path.len(),
+                u.path.last(),
+                u.shot_at,
+                m.firing.units.get(&u.id),
+                m.recovery.get(u.id),
+                m.combat.get(u.id),
+                m.abilities.get(u.id),
+            )
+        })
+        .collect::<Vec<_>>();
+    format!(
+        "tick={} {}\noperands={units:?}\neconomy={:?}",
+        m.world.game.tick,
+        transition_key(m),
+        m.start.economy.players,
+    )
 }
 fn timeout_operands(m: &Match) -> String {
     let game = &m.world.game;
@@ -138,13 +224,29 @@ fn timeout_operands(m: &Match) -> String {
 fn until(m: &mut Match, done: impl Fn(&Match) -> bool, budget: usize, said: &mut usize) {
     let mut command_results = Vec::new();
     let mut last_report = None;
+    let mut previous_key = transition_key(m);
+    let mut previous_operands = transition_operands(m);
+    eprintln!("Tutorial wait start budget={budget}\n{previous_operands}");
     for _ in 0..budget {
         if done(m) {
+            eprintln!("Tutorial wait goal satisfied\n{previous_operands}");
             return;
         }
         let report = m
             .advance_tick()
             .unwrap_or_else(|e| panic!("Tutorial tick {}: {}", e.tick, e.reason));
+        let current_key = transition_key(m);
+        let current_operands = transition_operands(m);
+        if current_key != previous_key {
+            eprintln!(
+                "Tutorial transition before\n{previous_operands}\n\
+                 Tutorial transition after\n{current_operands}\n\
+                 tick_commands={:?} route_requests={:?} retired={:?}",
+                report.commands, report.route_requests, report.retired,
+            );
+        }
+        previous_key = current_key;
+        previous_operands = current_operands;
         *said += report.tutorial_lines.len();
         if !report.commands.is_empty() {
             command_results.push((report.tick, report.commands.clone()));
@@ -152,6 +254,7 @@ fn until(m: &mut Match, done: impl Fn(&Match) -> bool, budget: usize, said: &mut
         last_report = Some(report);
         assert!(!ours(m).is_empty(), "Tutorial lost its human army");
     }
+    eprintln!("Tutorial wait budget exhausted budget={budget}\n{previous_operands}");
     assert!(
         done(m),
         "Tutorial did not reach its next actual goal: {:?}\n{}\n\

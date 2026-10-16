@@ -1,5 +1,37 @@
 # Three Crossroads Native: design decisions
 
+## Tutorial attack and return transition receipts (2026-10-15, source only)
+
+The retained native failure at `de7b9815596f2d73d5f1b2eb31272d90806db84a`
+(Rust tree `35d49a461554352e6d32e9206e4181ebce48d6d3`) ends at tick7081,
+step5 Trench. Defenders9/10 remain alive with HP65.33333333333323/55.
+Human squads1/2/6 are near home with no paths or attack-move goals; their
+retained arrival ticks are1411/1681/2107. This proves false clearance only.
+It does not establish the earlier attack/return transition or its cause.
+The older01 timeout and42 crushing failure retain their own attribution.
+
+Add immutable test-helper receipts around existing direct commands and
+waits. Within each existing wait, compare discrete goal, roster/liveness,
+attack/retreat, path-empty, attack-move/world goal, garrison, queued order,
+stance, arrival/result/route-end and firing-target state after each actual
+tick. Emit adjacent before/after operands only when that key changes.
+Include actual positions, HP/suppression, path length/end, last-shot tick,
+firing/recovery/combat/ability metadata and wallets at those boundaries,
+plus the actual report's commands, route requests and retirements.
+Wait entry, observed goal satisfaction and budget exhaustion also emit
+operands. Successful direct-command receipts follow the unchanged None
+assertion. They do not invent recorded-boundary command results.
+
+Output is bounded by existing wait budgets and command calls, with at most
+one transition pair per actual tick. There is no truncating journal, new
+simulation step, predicate call, wait, input or order. Diagnostics borrow
+Match immutably and leave every shipping provider unchanged. The complete
+5027-byte progression body and all assertions, constructor behavior,
+fixtures, registries, parity cells and original16 selections stay exact.
+No causal fix, owner consent, provider adoption or passing proof is claimed.
+All new-head Source/Node/Cargo/rustc/native/fmt/lint/discovery/CI counts are0.
+Any future qualification needs a new literal head/selection/slot Root grant.
+
 ## Tutorial Trench timeout operands (2026-10-15, execution pending)
 
 The original full Tutorial test at `01f895e60f695bc3c12de28549e6e80c1a4cdd26`

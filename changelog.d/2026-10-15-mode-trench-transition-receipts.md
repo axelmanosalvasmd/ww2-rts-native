@@ -1,0 +1,1 @@
+- Add read-only Tutorial test receipts at existing command, goal, attack, retreat, arrival and target transitions. Preserve the full progression and historical failures; the earlier return-home cause remains unproven and this source-only child is unrun.
