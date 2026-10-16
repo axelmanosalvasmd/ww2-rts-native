@@ -76,67 +76,97 @@ fn tech_build(
     Ok(next.or_else(|| (tier >= 2 && !has("armory", false)).then_some("armory")))
 }
 
-fn site_near(
+/// Source siteNear plus the visible placement and coastal checks, using only delivered facts.
+pub(crate) fn site(
     observation: &Observation,
-    catalog: &Catalog,
-    ground: &Game,
+    terrain: &Game,
     aim: Point,
     size: usize,
-    planned: &[(Point, f64)],
-) -> Result<Option<usize>, String> {
+    coastal: bool,
+    sees: impl Fn(Point) -> bool,
+) -> Result<Option<Point>, String> {
     let input = observation.input();
-    let context = input
-        .runtime
-        .as_ref()
-        .ok_or("missing construction context")?;
+    let context = input.runtime.as_ref().ok_or("missing site context")?;
+    let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
     let half = size as f64 * CELL / 2.0;
-    let mut avoid: Vec<_> = context.nodes.iter().copied().map(|n| (n, 5.0)).collect();
+    let mut ground = terrain.clone();
+    let mut avoid: Vec<_> = input
+        .points
+        .iter()
+        .map(|p| (p.at, observation.point_radius() + 2.0))
+        .collect();
     avoid.extend(
-        input
-            .points
+        context
+            .site_nodes
             .iter()
-            .map(|p| (p.at, observation.point_radius() + 2.0)),
+            .chain(&context.nodes)
+            .map(|p| (*p, 5.0)),
     );
     avoid.extend(input.players.iter().map(|p| (p.spawn, 6.0)));
     for u in &input.units {
         if u.hp <= 0.0 {
             continue;
         }
-        let rule = catalog.unit(&u.kind).map_err(|e| e.to_string())?;
-        if flag(rule, "structure") {
-            avoid.push((u.at, number(rule, "radius")? + half + 4.0));
+        let def = catalog.unit(&u.kind).map_err(|e| e.to_string())?;
+        if flag(def, "structure") {
+            avoid.push((u.at, number(def, "radius")? + half + 4.0));
+        } else if !flag(def, "air")
+            && !u.riding
+            && let Some(c) = ground.cell_of(u.at.x, u.at.z)
+        {
+            ground.flags[c] |= MOVE;
         }
     }
-    avoid.extend(
-        planned
-            .iter()
-            .map(|&(at, radius)| (at, radius + half + 4.0)),
-    );
-    Ok(find_site(
-        ground,
+    let Some(cell) = find_site(
+        &ground,
         Point {
             x: aim.x - half,
             z: aim.z - half,
         },
         size,
         &avoid,
-    ))
-}
-
-fn coast(ground: &Game, cells: &[usize]) -> bool {
-    cells.iter().any(|&cell| {
-        (-2..=2).any(|dz| {
-            (-2..=2).any(|dx| {
-                let x = (cell % ground.w) as isize + dx;
-                let z = (cell / ground.w) as isize + dz;
-                x >= 0
-                    && z >= 0
-                    && (x as usize) < ground.w
-                    && (z as usize) < ground.h
-                    && ground.flags[z as usize * ground.w + x as usize] & LAND == 0
-            })
-        })
-    })
+    ) else {
+        return Ok(None);
+    };
+    let at = foot_center(&ground, cell, size);
+    if !sees(at) {
+        return Ok(None);
+    }
+    let Some(cells) = footprint(&ground, cell, size) else {
+        return Ok(None);
+    };
+    if context.site_nodes.iter().chain(&context.nodes).any(|node| {
+        let x = math::round(node.x / CELL - 1.0);
+        let y = math::round(node.z / CELL - 1.0);
+        x >= 0.0
+            && y >= 0.0
+            && x < ground.w as f64
+            && y < ground.h as f64
+            && footprint(&ground, y as usize * ground.w + x as usize, 2)
+                .is_some_and(|reserved| cells.iter().any(|cell| reserved.contains(cell)))
+    }) {
+        return Ok(None);
+    }
+    if coastal
+        && (!context.naval
+            || !cells.iter().any(|&c| {
+                let x = (c % ground.w) as isize;
+                let z = (c / ground.w) as isize;
+                (-2..=2).any(|dz| {
+                    (-2..=2).any(|dx| {
+                        let (x, z) = (x + dx, z + dz);
+                        x >= 0
+                            && z >= 0
+                            && x < ground.w as isize
+                            && z < ground.h as isize
+                            && ground.flags[z as usize * ground.w + x as usize] & LAND == 0
+                    })
+                })
+            }))
+    {
+        return Ok(None);
+    }
+    Ok(Some(at))
 }
 
 pub(crate) fn plan(
@@ -315,23 +345,21 @@ pub(crate) fn plan(
         plan.builders.push(worker.id);
         return Ok(plan);
     }
+    if let Some(forward) =
+        crate::commander_forward_hq::plan(observation, available, budget, terrain, &sees)?
+    {
+        plan.commands.push(forward.command);
+        plan.builders.push(forward.unit);
+        plan.remaining_mp -= forward.cost;
+        plan.reserve = 0.0;
+        return Ok(plan);
+    }
     let Some(kind) = next else { return Ok(plan) };
     if budget < cost {
         return Ok(plan);
     }
     let definition = rule(kind)?;
     let size = number(definition, "size")? as usize;
-    let mut ground = terrain.clone();
-    for u in &input.units {
-        if u.hp > 0.0
-            && !flag(rule(&u.kind)?, "structure")
-            && !flag(rule(&u.kind)?, "air")
-            && !u.riding
-            && let Some(cell) = ground.cell_of(u.at.x, u.at.z)
-        {
-            ground.flags[cell] |= MOVE;
-        }
-    }
     for radius in [12.0, 20.0, 30.0, 42.0] {
         for index in 0..8 {
             let angle = index as f64 * std::f64::consts::FRAC_PI_4;
@@ -339,18 +367,17 @@ pub(crate) fn plan(
                 x: home.x + math::cos(angle) * radius,
                 z: home.z + math::sin(angle) * radius,
             };
-            let Some(cell) = site_near(observation, catalog, &ground, aim, size, &[])? else {
+            let Some(at) = site(
+                observation,
+                terrain,
+                aim,
+                size,
+                flag(definition, "coast"),
+                &sees,
+            )?
+            else {
                 continue;
             };
-            let at = foot_center(&ground, cell, size);
-            if !sees(at)
-                || flag(definition, "coast")
-                    && !(context.naval
-                        && footprint(&ground, cell, size)
-                            .is_some_and(|cells| coast(&ground, &cells)))
-            {
-                continue;
-            }
             plan.commands
                 .push(json!({"t":"build","ids":[worker.id],"kind":kind,"x":at.x,"z":at.z}));
             plan.builders.push(worker.id);
@@ -361,3 +388,7 @@ pub(crate) fn plan(
     }
     Ok(plan)
 }
+
+#[cfg(test)]
+#[path = "commander_skirmish_base_tests.rs"]
+mod tests;
