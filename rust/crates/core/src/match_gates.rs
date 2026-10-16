@@ -13,8 +13,7 @@ impl Match {
         !matches!(
             self.options.mode,
             crate::economy::Mode::Tutorial | crate::economy::Mode::Horde
-        )
-            && crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
+        ) && crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
             && !self.options.logistics
             && self.convoys.is_none()
     }

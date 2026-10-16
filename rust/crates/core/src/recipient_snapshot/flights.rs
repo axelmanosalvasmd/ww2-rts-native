@@ -65,9 +65,7 @@ pub(super) fn project_perspective(
             }
         }
         row["until"] = json!(until);
-        if (full_map && g.units.contains_key(&p.shooter))
-            || (!full_map && seen_by(state, slot, p.shooter))
-        {
+        if full_map || seen_by(state, slot, p.shooter) {
             row["f"] = json!(p.shooter);
             row["fo"] = json!(p.owner);
         }

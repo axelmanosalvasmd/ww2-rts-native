@@ -1575,11 +1575,11 @@ mod if25_tests;
 mod aircraft_tests;
 
 #[cfg(test)]
-#[path = "commander_support_tests.rs"]
-mod support_tests;
-#[cfg(test)]
 #[path = "commander_field_assault_tests.rs"]
 mod field_assault_tests;
+#[cfg(test)]
+#[path = "commander_support_tests.rs"]
+mod support_tests;
 
 #[cfg(test)]
 #[path = "commander_field_policy_tests.rs"]

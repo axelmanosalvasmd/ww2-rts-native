@@ -15,6 +15,7 @@ fn outputs(hub: &mut Hub, rx: &mut mpsc::Receiver<Output>, now: u64) -> Vec<Valu
     while let Ok(output) = rx.try_recv() {
         match output {
             Output::Json(value) => result.push(value),
+            Output::Watcher(json) => result.push(serde_json::from_str(&json).unwrap()),
             Output::Snapshot(frame) => {
                 result.push(serde_json::from_str(&frame.json).unwrap());
                 hub.complete_snapshot(&frame, true, now);

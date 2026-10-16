@@ -30,6 +30,6 @@ aviation batch.
 
 The integration with main's watcher stream also retains live flight rows.
 Prototype `server.js:204-220,248` gives watchers reveal and full unit visibility;
-`shared/sim.js:5962-5999` then emits the same flight fields, live shooter
-identities and a contact-bounded 0.15-second horizon. The native watcher uses
+`shared/sim.js:5962-5999` then emits the same flight fields, retained shooter
+identities, including retired actors and a contact-bounded 0.15-second horizon. The native watcher uses
 that full-map perspective without changing seated fog or match state.

@@ -66,11 +66,7 @@ fn horde_watchers_receive_complete_seat_names_at_start_and_late_join() {
     let state = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state();
     let horde = state.horde.as_ref().unwrap().slot;
     assert_eq!(horde, 2);
-    let expected = json!([
-        "P1",
-        "P2",
-        state.start.players[horde].config.name
-    ]);
+    let expected = json!(["P1", "P2", state.start.players[horde].config.name]);
     let messages = initial.drain(&mut hub, 0);
     let start = messages.iter().find(|value| value["t"] == "start").unwrap();
     assert_eq!(start["names"], expected);

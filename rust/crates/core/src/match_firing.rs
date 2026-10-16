@@ -1042,7 +1042,9 @@ impl Match {
                 && t.air.is_none()
                 && !t.riding
                 && t.id != p.shooter
-                && recipient.is_none_or(|(slot, full_map)| full_map || crate::recipient_snapshot::seen_by(self, slot, t.id))
+                && recipient.is_none_or(|(slot, full_map)| {
+                    full_map || crate::recipient_snapshot::seen_by(self, slot, t.id)
+                })
                 && (p.blast_source.is_some() || !g.allied(p.owner, t.owner))
         });
         candidates.sort_unstable();
