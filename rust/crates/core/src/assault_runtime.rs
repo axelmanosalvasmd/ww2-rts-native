@@ -146,7 +146,7 @@ impl Match {
         Ok(prepared.map(|finish| self.publish_match_finish(finish)))
     }
 
-    fn fortify_assault(&mut self, owner: usize) -> Result<(), String> {
+    pub(crate) fn fortify_assault(&mut self, owner: usize) -> Result<(), String> {
         let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
         let assault = catalog
             .table("CFG")
