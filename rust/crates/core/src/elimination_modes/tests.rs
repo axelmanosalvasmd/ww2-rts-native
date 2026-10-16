@@ -53,17 +53,15 @@ fn scene(mode: Mode, teams: &[i32]) -> Match {
     .unwrap()
 }
 #[test]
-fn classic_and_annihilation_keep_physical_logistics_uninitialized() {
-    for mode in [Mode::Classic, Mode::Annihilation] {
-        let mut m = scene(mode, &[0, 1]);
-        m.options.logistics = true;
-        let before = (m.logistics.clone(), m.convoys.clone(), m.supply_net.clone());
-        assert_eq!(
-            m.initialize_logistics().unwrap_err(),
-            "supply adapter supports ordinary Conquest only"
-        );
-        assert_eq!((m.logistics, m.convoys, m.supply_net), before);
-    }
+fn annihilation_keeps_physical_logistics_uninitialized() {
+    let mut m = scene(Mode::Annihilation, &[0, 1]);
+    m.options.logistics = true;
+    let before = (m.logistics.clone(), m.convoys.clone(), m.supply_net.clone());
+    assert_eq!(
+        m.initialize_logistics().unwrap_err(),
+        "supply adapter supports ordinary Conquest and Classic only"
+    );
+    assert_eq!((m.logistics, m.convoys, m.supply_net), before);
 }
 
 fn ids(m: &Match, owner: usize, name: &str) -> Vec<u32> {

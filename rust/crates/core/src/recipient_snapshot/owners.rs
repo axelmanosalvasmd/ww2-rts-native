@@ -16,9 +16,12 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
     }
     let catalog = Catalog::compiled().map_err(|_| SnapshotError::Rules)?;
     for u in state.world.game.units.values() {
-        let own = &mut owners[u.owner];
         if let Some(air) = u.air {
-            push(own, "air", aircraft::row(state, u.id, air)?);
+            push(
+                &mut owners[u.owner],
+                "air",
+                aircraft::row(state, u.id, air)?,
+            );
         }
         if let Some(building) = state.production.building(u.id) {
             let mut row = vec![json!(u.id)];
@@ -41,14 +44,27 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
             finite(&[point.x, point.z])?;
             row.extend([json!(r(point.x)), json!(r(point.z))]);
             row.extend(building.queue().map(|kind| json!(kind)));
-            push(own, "queues", json!(row));
+            // Source sim.js:387,6022 shares defender facilities in Horde.
+            // Paid identities and refund values remain owner-only at :6024.
+            for (slot, owner) in owners.iter_mut().enumerate() {
+                let shared = state.options.mode == Mode::Horde
+                    && state
+                        .horde
+                        .as_ref()
+                        .is_some_and(|horde| slot != horde.slot && u.owner != horde.slot)
+                    && state.world.game.allied(u.owner, slot);
+                if slot == u.owner || shared {
+                    push(owner, "queues", json!(row));
+                }
+            }
             let jobs = building.rows().into_iter().map(|row| {
                 finite(&[row.job.charge.mp, row.job.charge.fuel])?;
                 Ok(json!({"id":row.job.id,"type":row.job.kind,"mp":row.job.charge.mp,
                     "fuel":row.job.charge.fuel,"status":match row.status { JobStatus::Active=>"active",JobStatus::Waiting=>"waiting"}}))
             }).collect::<Result<Vec<_>, SnapshotError>>()?;
-            push(own, "productionJobs", json!([u.id, jobs]));
+            push(&mut owners[u.owner], "productionJobs", json!([u.id, jobs]));
         }
+        let own = &mut owners[u.owner];
         let control = state
             .commands
             .units

@@ -1,5 +1,5 @@
-//! Deterministic Horde setup and explicit late wave phase. Public tick admission
-//! remains guarded until the other Horde mode owners are connected.
+//! Deterministic Horde setup and the late wave phase in the ordinary runner.
+//! Hosted attachment still waits for complete aviation event delivery.
 use crate::{
     catalog::{Catalog, Value},
     economy::{Faction, Mode},
@@ -78,7 +78,7 @@ pub struct HordeState {
 }
 /// The caller detaches these public world effects at the same boundary as other
 /// phase events. They do not define snapshot or wire fields.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum HordeEvent {
     BossSurfaced { at: Point },
 }
@@ -314,7 +314,7 @@ impl Match {
         Ok(true)
     }
 
-    /// Explicit core vision phase. This does not admit Horde to ordinary ticking or delivery.
+    /// Horde visibility refresh, including the public reveal of remaining ground enemies.
     pub fn refresh_horde_visibility(&mut self) -> Result<(), String> {
         self.validate_horde_phase(0.0)?;
         let horde = self.horde.as_ref().unwrap();
@@ -385,8 +385,8 @@ impl Match {
             report,
         }))
     }
-    /// Explicit constructor for the Horde-owned wave phase. Generic `Match::new`
-    /// and ordinary `advance_tick` retain their existing admission guards.
+    /// Construct the Horde-owned base and waves for the ordinary tick runner.
+    /// Hosted attachment retains its aviation delivery guard.
     pub fn new_horde(map: &AuthoritativeMap, mut options: MatchOptions) -> Result<Self, String> {
         if options.mode != Mode::Horde || !(1..=5).contains(&options.players.len()) {
             return Err("Horde needs Horde mode and one through five defenders".into());
@@ -743,7 +743,7 @@ impl Match {
         }
         Ok(events)
     }
-    fn validate_horde_phase(&self, dt: f64) -> Result<(), String> {
+    pub(crate) fn validate_horde_phase(&self, dt: f64) -> Result<(), String> {
         let m = self.horde.as_ref().ok_or("missing Horde state")?;
         if self.options.mode != Mode::Horde
             || self.world.game.mode != Some(ModeKind::Horde)
@@ -801,3 +801,7 @@ impl Match {
 #[cfg(test)]
 #[path = "match_horde_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "match_horde_ground_tests.rs"]
+mod ground_tests;

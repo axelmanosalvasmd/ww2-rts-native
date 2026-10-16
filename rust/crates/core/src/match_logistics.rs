@@ -380,12 +380,18 @@ impl Match {
         self.validate_supply_context()
     }
     fn validate_supply_context(&self) -> Result<(), String> {
-        if !matches!(
-            self.options.mode,
-            crate::economy::Mode::Default | crate::economy::Mode::Conquest
-        ) || self.world.game.mode.is_some()
-        {
-            return Err("supply adapter supports ordinary Conquest only".into());
+        let supported = matches!(
+            (self.options.mode, self.world.game.mode),
+            (
+                crate::economy::Mode::Default | crate::economy::Mode::Conquest,
+                None
+            ) | (
+                crate::economy::Mode::Classic,
+                Some(crate::game::ModeKind::Classic)
+            )
+        );
+        if !supported {
+            return Err("supply adapter supports ordinary Conquest and Classic only".into());
         }
         let g = &self.world.game;
         let birth_slots = u32::try_from(g.players.len()).map_err(|_| "invalid supply roster")?;
@@ -608,7 +614,7 @@ impl Match {
             .ok_or("missing army population scale")?;
         let ctx = supply_convoys::Context {
             enabled: true,
-            construction: false,
+            construction: self.options.mode.is_construction(),
             tick: self.world.game.tick as u64,
             winner: false,
             army_pop: pop,

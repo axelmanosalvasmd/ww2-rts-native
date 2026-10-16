@@ -83,9 +83,8 @@ pub struct RecipientProjection {
     pub missing: Vec<SnapshotCapability>,
 }
 
-/// The public Horde mode component, separate from complete recipient admission.
-/// No seat data or hidden purchase state enters this row. The complete Horde
-/// snapshot and host remain guarded by their existing mode checks.
+/// The public Horde mode row excludes seat data and hidden purchase state.
+/// Hosted attachment separately requires complete aviation event delivery.
 pub fn horde_mode_row(state: &Match) -> Result<Value, SnapshotError> {
     let mode = state.horde_projection().map_err(|_| SnapshotError::Rules)?;
     let horde = state.horde.as_ref().ok_or(SnapshotError::Rules)?;
@@ -114,7 +113,10 @@ impl<'a> SnapshotCache<'a> {
     pub fn new(state: &'a Match) -> Result<Self, SnapshotError> {
         let classic = state.options.mode == Mode::Classic
             && state.world.game.mode == Some(crate::game::ModeKind::Classic);
+        let horde = state.options.mode == Mode::Horde
+            && state.world.game.mode == Some(crate::game::ModeKind::Horde);
         if !(classic
+            || horde
             || matches!(state.options.mode, Mode::Default | Mode::Conquest)
                 && state.world.game.mode.is_none())
             || state.world.geography().is_some()
@@ -126,6 +128,11 @@ impl<'a> SnapshotCache<'a> {
         if classic {
             state
                 .validate_elimination_state()
+                .map_err(|_| SnapshotError::Rules)?;
+        }
+        if horde {
+            state
+                .validate_horde_economy()
                 .map_err(|_| SnapshotError::Rules)?;
         }
         let g = &state.world.game;
@@ -591,6 +598,14 @@ fn economy_fields(state: &Match, slot: usize) -> Result<Map<String, Value>, Snap
 impl Match {
     /// Bind hosted purchases to the current ordinary snapshot capabilities.
     pub fn restrict_to_ordinary_snapshots(&mut self) -> Result<(), SnapshotError> {
+        // Horde waves create aircraft from wave ten. Hosted attachment stays
+        // held on #369 until every aviation event can survive room delivery.
+        if self.options.mode == Mode::Horde {
+            return Err(SnapshotError::Unsupported {
+                unit: 0,
+                capability: SnapshotCapability::Air,
+            });
+        }
         self.preflight_ordinary_snapshot()?;
         // A queued plane can later emit AntiAir or PlaneDown. Keep hosted
         // training closed until the aviation event adapter is integrated.

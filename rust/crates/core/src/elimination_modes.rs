@@ -162,16 +162,14 @@ impl Match {
 
     fn new_elimination_shell(
         map: &crate::map::AuthoritativeMap,
-        mut options: MatchOptions,
+        options: MatchOptions,
     ) -> Result<Self, String> {
         if map.source().get("scenario").is_some() {
             return Err("elimination startup does not apply authored scenarios".into());
         }
-        // These bounded modes have no reserves/convoy publication adapter yet.
-        if options.logistics {
-            return Err("elimination startup does not support logistics".into());
+        if options.logistics && options.mode != Mode::Classic {
+            return Err("Annihilation startup does not support logistics".into());
         }
-        options.logistics = false;
         let rules = crate::rules::Rules::compiled().map_err(|e| e.to_string())?;
         let start = StartPlan::prepare_elimination(map, &options, &rules)?;
         let teams = options

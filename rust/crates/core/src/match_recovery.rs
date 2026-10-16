@@ -128,6 +128,7 @@ impl Match {
                     | crate::economy::Mode::Assault
                     | crate::economy::Mode::Annihilation
                     | crate::economy::Mode::Classic
+                    | crate::economy::Mode::Horde
             )
             || !amount.is_finite()
             || amount < 0.0
@@ -190,6 +191,7 @@ impl Match {
                     | crate::economy::Mode::Assault
                     | crate::economy::Mode::Annihilation
                     | crate::economy::Mode::Classic
+                    | crate::economy::Mode::Horde
             )
             || !amount.is_finite()
             || amount < 0.

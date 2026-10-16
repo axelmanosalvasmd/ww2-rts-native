@@ -285,11 +285,22 @@ fn intent_ai16_real_dispatch_uses_human_seats_and_scripted_horde() {
         "unsent tick retains delivered packet"
     );
     assert!(state.pending() > 0);
-    assert!(m.validate_tick_state().is_err());
-    assert!(matches!(
-        SnapshotCache::new(&m),
-        Err(SnapshotError::UnsupportedMode)
-    ));
+    assert_eq!(
+        m.validate_tick_state(),
+        Err("command tick is not the next queued tick".into())
+    );
+    let cache = SnapshotCache::new(&m).unwrap();
+    for recipient in 0..m.world.game.players.len() {
+        cache.recipient(recipient).unwrap();
+    }
+    drop(cache);
+    assert_eq!(
+        m.restrict_to_ordinary_snapshots(),
+        Err(SnapshotError::Unsupported {
+            unit: 0,
+            capability: crate::recipient_snapshot::SnapshotCapability::Air,
+        })
+    );
     assert!(m.opening_commander_observation(slot).is_err());
     for mutation in 0..3 {
         let mut stale = director.clone();

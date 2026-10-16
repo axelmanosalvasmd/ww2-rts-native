@@ -19,6 +19,7 @@ pub enum ShotRef<'a> {
     Support(&'a SupportEvent),
     Environment(&'a Effect),
     Scenario(&'a SayAction),
+    Horde(&'a crate::match_horde::HordeEvent),
 }
 
 impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
@@ -30,6 +31,7 @@ impl<'a> TryFrom<&'a TickEvent> for ShotRef<'a> {
             TickEvent::Support(value) => Ok(Self::Support(value)),
             TickEvent::Environment(value) => Ok(Self::Environment(value)),
             TickEvent::Scenario(value) => Ok(Self::Scenario(value)),
+            TickEvent::Horde(value) => Ok(Self::Horde(value)),
             TickEvent::Aviation(_) => Err(SnapshotError::Unsupported {
                 unit: 0,
                 capability: SnapshotCapability::Air,
@@ -202,6 +204,14 @@ fn event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
 
 fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
     match shot {
+        ShotRef::Horde(value) => {
+            state
+                .validate_horde_phase(0.0)
+                .map_err(|_| SnapshotError::Rules)?;
+            let crate::match_horde::HordeEvent::BossSurfaced { at } = value;
+            finite(&[at.x, at.z])?;
+            Ok(value.shot_json())
+        }
         ShotRef::Scenario(value) => {
             validate_public_say(value).map_err(|_| SnapshotError::Rules)?;
             if state.scenario.is_none()
@@ -270,13 +280,25 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
                     owner(state, *seat)?;
                     numbers(&[at.x, at.z, *spread])?;
                 }
+                LaunchEvent::Breath {
+                    shooter,
+                    target,
+                    owner: seat,
+                    target_owner,
+                    at,
+                } => {
+                    identity(u64::from(*shooter))?;
+                    identity(u64::from(*target))?;
+                    owner(state, *seat)?;
+                    owner(state, *target_owner)?;
+                    numbers(&[at.x, at.z])?;
+                }
+                LaunchEvent::BreathShell { at } => {
+                    numbers(&[at.x, at.z])?;
+                }
                 // SmallArms is an operative payload. Throw is shared by ordinary
                 // abilities and operatives, with no retained source provenance.
-                // Horde breath effects also remain outside ordinary recipient admission.
-                LaunchEvent::Throw { .. }
-                | LaunchEvent::SmallArms(_)
-                | LaunchEvent::Breath { .. }
-                | LaunchEvent::BreathShell { .. } => return Err(refused()),
+                LaunchEvent::Throw { .. } | LaunchEvent::SmallArms(_) => return Err(refused()),
                 LaunchEvent::Contact(value) => {
                     kind(state, value.kind)?;
                     identity(value.flight)?;

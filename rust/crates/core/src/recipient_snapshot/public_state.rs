@@ -65,6 +65,9 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
     let mut result = Vec::with_capacity(g.players.len());
     for slot in 0..g.players.len() {
         let mut fields = Map::new();
+        if state.options.mode == Mode::Horde {
+            fields.insert("mode".into(), horde_mode_row(state)?);
+        }
         if state.options.mode == Mode::Classic {
             let classic = state.elimination.as_ref().ok_or(SnapshotError::Rules)?;
             let time_left = classic.time_left.ok_or(SnapshotError::Rules)?;

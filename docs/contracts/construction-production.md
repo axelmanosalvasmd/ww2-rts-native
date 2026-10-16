@@ -31,3 +31,38 @@ The Classic producer, node publication and recipient privacy paths are covered
 by native tests in `recipient_snapshot::production_state_tests` and the trusted
 room lifecycle test. BASE-59 remains incomplete until the logistics and hosted
 Horde runtime streams provide their mode-specific delivery paths.
+
+## Horde ground queues and Classic logistics continuation
+
+The continuation on #390 and #375 publishes Horde's accessible defender
+producers to each defender in canonical unit order. The enemy's producers
+remain excluded from defender access and defenders' rows stay hidden from the
+enemy. Only `queues` are shared; `productionJobs`, orders, plans, air state,
+research, personal rallies and wallets retain their existing recipient owner.
+These are the same rules as `shared/sim.js:387,5916-5917,6018,6022-6028`.
+Horde purchases remain immediate, so the published producer queue and paid-job
+arrays remain empty, as in the prototype.
+
+Classic logistics uses #375's unchanged recipient projection from
+`shared/supply-convoys.js:646-659`. New trained troops initialize reserves through
+the same canonical initializer as other births, before the paid head job is
+consumed (`shared/sim.js:1065-1079,5352`); completed structures do not gain troop
+reserves. Construction-mode sources use finished standing HQs, including the
+absence of a fallback source after the HQ is lost
+(`shared/supply-convoys.js:105-111`). No JSON field is added or reinterpreted.
+
+The ordinary Horde tick runner also forwards the existing public boss
+announcement exactly as `{k:"say",text:"THE KAIJU HAS SURFACED",x,z,pub:true}`
+from `shared/sim.js:939`'s boss-wave path. It is public for every recipient and
+contains no purchase seed, reserve, profile history or private target.
+Hosted Horde remains held on #369 because wave ten introduces aircraft whose
+aviation events are not yet supported by this branch's delivery adapter.
+The ground recipient producer is exercised separately through the ordinary
+runner, every-seat delivery and terminal ticks.
+
+Kaiju ground breath events retain the exact existing beam and shell shapes
+from `shared/sim.js:4373-4374`. Outside World, `pub:true` sends each event to
+every recipient, then hidden `f` and `t` are removed while `fo` and `to` remain
+(`shared/sim.js:6080-6087`). The adapter validates coordinates, identities and
+owners, and reuses the ordinary shot filter. No flight object is created by
+these ephemeral ground events.
