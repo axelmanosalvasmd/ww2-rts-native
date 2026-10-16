@@ -45,7 +45,8 @@ ordinary capability guards still reject unsupported simulation state.
 
 Terrain keeps the prototype's seat 0 team mine knowledge despite lifting fog:
 unfound enemy mines remain hidden, and `foundMines` contains seat 0's team
-findings (`shared/sim.js:5859-5884,6073-6077`). Terrain, fog, pending events and
+findings (`shared/sim.js:5859-5884,6073-6077`). Pending terrain is rechecked only
+when terrain or vision revisions change (`shared/sim.js:5846-5856`). Terrain, fog, pending events and
 remembered lists owned by commander seats are not drained by a watcher read.
 
 Spectator army commands produce no reply and never enter the command queue

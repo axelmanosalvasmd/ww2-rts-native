@@ -38,7 +38,7 @@ These are new relative to the reference. The pinned browser client and Node serv
 
 ## Corrections the Rust server makes
 
-The three privacy choices below keep the existing message shapes. Owner clarifications on 2026-10-16 retain reference spectator behavior and select the cached flag mask. The companion correction remains pending (#5), with browser and Unreal fixtures required before adoption.
+The three privacy choices below keep the existing message shapes. This stream records the 2026-10-16 owner clarifications for spectator behavior and the cached flag mask. Operative delivery is handled by its own stream.
 
 1. **The companion's hit direction.** At the pin, `operative.from` sends the hidden attacker's position to the metre for 10 ticks after a hit (NET and FPS limitations). The browser client uses only its bearing (`client/operative-view.js:342`). The Rust server sends a point 20 m from the soldier along that bearing instead: the hit indicator is unchanged and the attacker's range stays hidden.
 2. **Spectators outside World Conquest.** Owner clarification J on 2026-10-16 selects (c), the reference behavior: the whole map with no delay outside World. The proposed observer delay and seat 0 team view are not adopted. World alone uses seat 0's team view and remains closed on R1. See [ordinary spectator delivery](spectators-v0.md) for prototype-identical fields and tests.

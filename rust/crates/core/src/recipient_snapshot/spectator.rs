@@ -6,6 +6,7 @@ use crate::{match_tick::TickEvent, observed_memory::ObservedRow};
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct SpectatorDelivery {
     dimensions: Option<(usize, usize)>,
+    terrain_key: Option<(u32, i64)>,
     terrain: Vec<ObservedRow>,
     positions: std::collections::BTreeMap<usize, usize>,
 }
@@ -15,6 +16,7 @@ impl SpectatorDelivery {
         SnapshotCache::new(state)?;
         Ok(Self {
             dimensions: Some((state.world.game.w, state.world.game.h)),
+            terrain_key: None,
             terrain: Vec::new(),
             positions: std::collections::BTreeMap::new(),
         })
@@ -151,6 +153,15 @@ impl SpectatorDelivery {
         if self.dimensions.is_some_and(|old| old != dimensions) {
             return Err(SnapshotError::InvalidRecipient);
         }
+        let key = (g.terrain_version, g.vision_tick.unwrap_or(-1));
+        // The prototype rechecks pending terrain only when terrain or vision changes.
+        if self.terrain_key == Some(key) {
+            return Ok(if full {
+                Value::Array(self.terrain.iter().map(cell_json).collect())
+            } else {
+                json!([])
+            });
+        }
         let team = g
             .players
             .first()
@@ -240,6 +251,7 @@ impl SpectatorDelivery {
             }
         }
         self.dimensions = Some(dimensions);
+        self.terrain_key = Some(key);
         Ok(if full {
             Value::Array(self.terrain.iter().map(cell_json).collect())
         } else {
@@ -467,6 +479,11 @@ mod tests {
         // independently of maintained unit visibility and canonical reveal.
         state.world.game.units.get_mut(&2).unwrap().x = 35.;
         state.world.game.units.get_mut(&2).unwrap().z = 35.;
+        assert_eq!(
+            stream.capture(&state, &[], false).unwrap()["cells"],
+            json!([])
+        );
+        state.world.game.vision_tick = Some(state.world.game.vision_tick.unwrap_or(-1) + 1);
         let next = stream.capture(&state, &[], false).unwrap();
         assert!(
             next["cells"]

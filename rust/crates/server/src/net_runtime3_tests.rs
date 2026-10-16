@@ -190,7 +190,10 @@ fn net97_socket_gauge_counts_utf8_without_diagnostics_and_rolls_back_failed_enqu
     without_diagnostics.send(json!({"t":"pong"}));
     let output = rx.try_recv().unwrap();
     assert!(matches!(output, Output::Json(_)));
-    assert_eq!(without_diagnostics.buffered_bytes(), output.diagnostic_bytes());
+    assert_eq!(
+        without_diagnostics.buffered_bytes(),
+        output.diagnostic_bytes()
+    );
     without_diagnostics.complete_bytes(output.diagnostic_bytes());
     assert_eq!(without_diagnostics.buffered_bytes(), 0);
 }
