@@ -205,6 +205,14 @@ fn focus_notice_then_attack_and_queued_onward_use_actual_command_admission() {
             if orders.iter().any(|o| o.unit == i64::from(id) && o.at == onward[&id])))
         );
     }
+    for _ in 0..4 {
+        m.advance_tick().unwrap();
+        let cache = crate::recipient_snapshot::SnapshotCache::new(&m).unwrap();
+        for slot in 0..2 {
+            cache.recipient(slot).unwrap();
+        }
+        assert!(m.tick_state.fault().is_none());
+    }
 }
 
 #[test]

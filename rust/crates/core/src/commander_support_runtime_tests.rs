@@ -72,6 +72,14 @@ fn support_uses_delivered_stationary_history_and_real_admission_receipts() {
             .unwrap(),
         Some(SupportDenial::Cooldown)
     );
+    for _ in 0..4 {
+        m.advance_tick().unwrap();
+        let cache = crate::recipient_snapshot::SnapshotCache::new(&m).unwrap();
+        for slot in 0..2 {
+            cache.recipient(slot).unwrap();
+        }
+        assert!(m.tick_state.fault().is_none());
+    }
 }
 
 #[test]

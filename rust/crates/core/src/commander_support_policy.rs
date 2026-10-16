@@ -254,10 +254,10 @@ pub fn plan(
         if let Some(at) = target.filter(|at| in_situation(*at)) {
             return Ok(Some(support("artillery", at)));
         }
-    } else if can("strafe")? {
-        if let Some(at) = cluster(10.0, true).filter(|at| in_situation(*at)) {
-            return Ok(Some(support("strafe", at)));
-        }
+    } else if can("strafe")?
+        && let Some(at) = cluster(10.0, true).filter(|at| in_situation(*at))
+    {
+        return Ok(Some(support("strafe", at)));
     }
     if can("recon")?
         && enemies.is_empty()

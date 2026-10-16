@@ -90,6 +90,14 @@ fn abilities_wait_for_observed_notice_then_use_canonical_admission() {
             m.execute_command(0, &command, false).unwrap(),
             Some(Denial::Cooldown)
         );
+        for _ in 0..4 {
+            m.advance_tick().unwrap();
+            let cache = crate::recipient_snapshot::SnapshotCache::new(&m).unwrap();
+            for slot in 0..2 {
+                cache.recipient(slot).unwrap();
+            }
+            assert!(m.tick_state.fault().is_none());
+        }
     }
 }
 
@@ -123,18 +131,18 @@ fn human_schedule_delays_ability_attempts_and_repeats_from_the_same_seed() {
                 &hurts,
             )
             .unwrap();
-            if let Some(receipt) = result.input {
-                if let Some(command) = &receipt.command {
-                    assert!(
-                        now > receipt.origin,
-                        "motor input must follow its planning look"
-                    );
-                    let command = Command::from_json(command).unwrap();
-                    assert_eq!(m.execute_command(0, &command, false).unwrap(), None);
-                    assert!(m.abilities.get(own).unwrap().buff > 0.0);
-                    attempts.push(receipt);
-                    break;
-                }
+            if let Some(receipt) = result.input
+                && let Some(command) = &receipt.command
+            {
+                assert!(
+                    now > receipt.origin,
+                    "motor input must follow its planning look"
+                );
+                let command = Command::from_json(command).unwrap();
+                assert_eq!(m.execute_command(0, &command, false).unwrap(), None);
+                assert!(m.abilities.get(own).unwrap().buff > 0.0);
+                attempts.push(receipt);
+                break;
             }
         }
         assert_eq!(
