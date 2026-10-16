@@ -126,7 +126,7 @@ impl Match {
     pub(crate) fn carrier_boundary(&self, id: UnitId) -> bool {
         let u = &self.world.game.units[&id];
         let k = &self.rules.kinds[u.kind];
-        k.naval || k.rail || k.air || u.rail || u.air.is_some() || u.garrison.is_some()
+        k.rail || k.air || u.rail || u.air.is_some() || u.garrison.is_some()
     }
     fn carrier_command_open(&self, owner: usize, winner_decided: bool) -> bool {
         self.start
@@ -353,9 +353,23 @@ impl Match {
             .and_then(|v| v.number())
             .ok_or("missing boarding reach")?;
         let at = c.at();
-        let reachable = self.world.game.flags[self.world.game.cell_of(u.x, u.z).unwrap()] & MOVE
-            == 0
-            && crate::pathfinding::walkable(view(self), u.at(), at, MOVE, 0.15);
+        let g = &self.world.game;
+        let reachable = g.flags[g.cell_of(u.x, u.z).unwrap()] & MOVE == 0
+            && if self.rules.kinds[c.kind].naval {
+                crate::terrain::segment_cliff_clear(g, u.at(), at)
+                    && crate::projectiles::crossed_cells(
+                        crate::projectiles::BodyPosition { x: u.x, z: u.z },
+                        crate::projectiles::BodyPosition { x: c.x, z: c.z },
+                        CELL,
+                        g.w,
+                        g.h,
+                    )
+                    .map_err(|e| format!("boat boarding line: {e:?}"))?
+                    .into_iter()
+                    .all(|cell| g.flags[cell] & MOVE == 0 || g.physical(cell) == b'W')
+            } else {
+                crate::pathfinding::walkable(view(self), u.at(), at, MOVE, 0.15)
+            };
         if math::hypot(u.x - c.x, u.z - c.z) <= reach && reachable {
             u.path_gen
                 .checked_add(1)
@@ -460,6 +474,17 @@ impl Match {
             }
             return Ok(RidingOutcome::OnFoot);
         };
+        if self.world.game.units.contains_key(&carrier) {
+            self.validate_carrier_unit(carrier)?;
+            if self.carrier_boundary(carrier) {
+                return Err("unsupported riding carrier".into());
+            }
+            if self.world.game.units[&carrier].hp > 0.0
+                && !self.combat.get(carrier).unwrap().cargo.contains(&id)
+            {
+                return Err("inconsistent rider relation".into());
+            }
+        }
         if self
             .world
             .game
@@ -603,7 +628,15 @@ impl Match {
             if self.world.game.units.get(&id).is_some_and(|u| u.hp <= 0.0)
                 && self.combat.get(id).is_some_and(|m| !m.cargo.is_empty())
             {
-                self.prepare_carrier_ejections(id)?;
+                if self.options.mode == crate::economy::Mode::World
+                    && self.world.game.mode == Some(crate::game::ModeKind::World)
+                    && self.rail_runs.contains_key(&id)
+                {
+                    // Registered World trains eject through the rail owner before retirement.
+                    self.validate_rail_tick_actor(id)?;
+                } else {
+                    self.prepare_carrier_ejections(id)?;
+                }
             }
         }
         Ok(())
@@ -663,7 +696,9 @@ impl Match {
             .copied()
             .filter(|id| !self.combat.get(*id).unwrap().cargo.is_empty())
             .collect();
-        if carriers.iter().any(|id| self.carrier_boundary(*id)) {
+        if carriers.iter().any(|id| {
+            self.carrier_boundary(*id) || self.rules.kinds[self.world.game.units[id].kind].naval
+        }) {
             return Ok(Some(Denial::Unsupported));
         }
         let mut placer = SpawnPlacer::new();

@@ -334,6 +334,91 @@ fn original_world_march_home_visibility_cover_and_first_contact() {
         );
     }
 }
+
+#[test]
+fn mov08_world_march_moves_calm_owned_squad_faster_than_combat_squad() {
+    let f = fixture();
+    let cases = f["march"].as_array().unwrap();
+    let mut checked = 0;
+    for case in cases {
+        let name = case["name"].as_str().unwrap();
+        let mut m = make(&f);
+        setup(&mut m, &case["input"]);
+        let unit = &m.world.game.units[&7];
+        let march = m.world_march_multiplier(unit).unwrap();
+        let expected = u64::from_str_radix(case["expectedBits"].as_str().unwrap(), 16).unwrap();
+        assert_eq!(march.to_bits(), expected, "{name}");
+        if m.rules.kinds[unit.kind].air {
+            assert!(!crate::movement::reaches_block(&m.rules, unit), "{name}");
+            continue;
+        }
+        if unit.x < 0.0 {
+            continue;
+        }
+        let start = unit.at();
+        let kind = unit.kind;
+        let mut actual = m.world.game.clone();
+        let mut baseline = m.world.game.clone();
+        if m.rules.kinds[kind].naval {
+            actual.flags.fill(0);
+            baseline.flags.fill(0);
+        }
+        for game in [&mut actual, &mut baseline] {
+            let u = game.units.get_mut(&7).unwrap();
+            u.path = vec![Point {
+                x: start.x + 20.0,
+                z: start.z,
+            }];
+            u.path_gen += 1;
+        }
+        let mut actual_grid = SpatialGrid::new(&actual.units, 16.0);
+        let mut baseline_grid = SpatialGrid::new(&baseline.units, 16.0);
+        let mut routes =
+            |_: &crate::game::Game,
+             _: &crate::rules::Rules,
+             _: &mut crate::game::Unit,
+             _: Point,
+             _: crate::movement::RouteRequest| panic!("no route request: {name}");
+        let moved = crate::movement::move_unit_with_march(
+            &mut actual,
+            &m.rules,
+            &mut actual_grid,
+            7,
+            1.0,
+            &mut routes,
+            &TrafficKnowledge::physical(),
+            march,
+        )
+        .unwrap()
+        .unwrap();
+        let base = crate::movement::move_unit_with_march(
+            &mut baseline,
+            &m.rules,
+            &mut baseline_grid,
+            7,
+            1.0,
+            &mut routes,
+            &TrafficKnowledge::physical(),
+            1.0,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(
+            moved.speed.to_bits(),
+            (base.speed * march).to_bits(),
+            "{name} speed"
+        );
+        if m.rules.kinds[kind].infantry || m.rules.kinds[kind].naval {
+            assert!(
+                ((actual.units[&7].x - start.x) - (baseline.units[&7].x - start.x) * march).abs()
+                    < 1e-10,
+                "{name} distance",
+            );
+        }
+        checked += 1;
+    }
+    assert_eq!(checked, 16);
+}
 fn vision_mask(m: &mut Match, owner: usize, cells: &Value) {
     let team = m.actor_policy(owner).unwrap().team;
     let mut fog = TeamFog::new(512 * 512);

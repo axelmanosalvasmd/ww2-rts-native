@@ -289,7 +289,7 @@ fn completed_recruit_rally_does_not_relabel_a_later_cover_route() {
     compare(&m, 3);
 }
 #[test]
-fn reaction_timer_and_unsupported_exit_preserve_canonical_state() {
+fn reaction_timer_and_unsupported_retreat_preserve_canonical_state() {
     let f = fixture();
     let mut m = make(&f, &f["cases"][0]);
     let id = 1;
@@ -302,6 +302,7 @@ fn reaction_timer_and_unsupported_exit_preserve_canonical_state() {
     let before = snapshot(&m, id);
     assert!(m.retreat_unit(id).is_err());
     assert_eq!(snapshot(&m, id), before);
+    assert!(m.world.game.units[&id].riding);
     m.world.game.units.get_mut(&id).unwrap().riding = false;
     for (build, entrench, dig) in [
         (true, false, false),
@@ -388,4 +389,70 @@ fn accepted_retreat_cancels_paid_work_after_route_preflight_without_refund() {
     assert!(!m.world.game.units[&id].dig);
     assert!(m.world.game.units[&id].retreating);
     assert_eq!(m.start.economy.players[u.owner].mp, paid);
+}
+
+#[test]
+fn wounded_garrison_automatically_exits_and_retreats_during_tick() {
+    let mut rows = vec![".".repeat(64); 64];
+    for row in &mut rows[30..32] {
+        row.replace_range(30..32, "BB");
+    }
+    let map = AuthoritativeMap::from_json(
+        &serde_json::to_vec(&json!({
+            "name":"Automatic house retreat", "w":64, "h":64, "rows":rows,
+            "spawns":[{"x":2,"y":2},{"x":61,"y":61}],
+            "points":[{"x":32,"y":40}], "buildings":[]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let mut m = Match::new(
+        &map,
+        MatchOptions {
+            seed: 71,
+            mode: Mode::Conquest,
+            players: (0..2)
+                .map(|team| PlayerConfig {
+                    name: format!("P{team}"),
+                    team,
+                    faction: Faction::Usa,
+                })
+                .collect(),
+            shuffle: false,
+            army: ArmySize::Standard,
+            weather: WeatherChoice::Map,
+            weather_seed: Some(1),
+            living_weather: false,
+            map_key: None,
+            tech: false,
+            supply: false,
+            logistics: false,
+            sandbox: false,
+        },
+    )
+    .unwrap();
+    let id = m
+        .world
+        .game
+        .units
+        .values()
+        .find(|u| u.owner == 0 && m.rules.kinds[u.kind].infantry)
+        .unwrap()
+        .id;
+    let u = m.world.game.units.get_mut(&id).unwrap();
+    u.x = 61.0;
+    u.z = 61.0;
+    u.garrison = Some(30 * 64 + 30);
+    u.hp = 1.0;
+    m.grid.update(id, u);
+    assert!(m.automatic_retreat_candidate(id).unwrap());
+    let before = m.world.game.units[&id].at();
+    m.advance_tick().unwrap();
+    let u = &m.world.game.units[&id];
+    assert_eq!(u.garrison, None);
+    assert!(u.retreating);
+    assert_ne!(u.at(), before);
+    assert!(u.world_goal.is_some());
+    assert!(!u.path.is_empty());
+    m.advance_tick().unwrap();
 }

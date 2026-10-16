@@ -194,7 +194,7 @@ fn held_flights_rearming_and_continuous_aa_match_every_original_call() {
     assert_eq!(checkpoints, 3410);
 }
 #[test]
-fn unavailable_weapon_and_invalid_late_metadata_refuse_before_mutation() {
+fn invalid_late_aircraft_metadata_refuses_before_mutation() {
     use ww2_core::match_aviation::{AviationError, MissionKind, PlaneMission};
     let f = fixture();
     let mut m = scene(&f["traces"][0]);
@@ -495,8 +495,11 @@ fn mixed_attack_cancels_canonical_project_and_preflights_every_selected_actor() 
 }
 
 #[test]
-fn unsupported_mixed_aircraft_selections_reject_before_supply_or_control_writes() {
-    use ww2_core::match_commands::{Command, Denial};
+fn mixed_aircraft_selections_preserve_canonical_supply_and_control_boundaries() {
+    use ww2_core::{
+        match_aviation::MissionKind,
+        match_commands::{Command, Denial},
+    };
     let f = aircraft_command_fixture();
     let trace = f["traces"]
         .as_array()
@@ -532,7 +535,49 @@ fn unsupported_mixed_aircraft_selections_reject_before_supply_or_control_writes(
         let reserves = m.logistics.get(1002).unwrap().clone();
         let command = Command::from_json(raw).unwrap();
         let denial = m.execute_command(0, &command, false).unwrap();
-        if matches!(index, 0..=2 | 5) {
+        if index == 3 {
+            assert_eq!(denial, None, "queued mixed selection");
+            let mut after = command_snapshot(&m);
+            for id in [1000, 1002] {
+                let control = &m.commands.units[&id];
+                assert_eq!(control.orders.len(), 2);
+                let Command::Move { orders, queue, .. } = control.orders.back().unwrap() else {
+                    panic!("queued mixed move must retain a normalized Move");
+                };
+                assert!(!queue);
+                assert_eq!(orders.len(), 1);
+                assert_eq!(orders[0].unit, i64::from(id));
+                assert_eq!(
+                    orders[0].at,
+                    if id == 1000 {
+                        Point { x: 22.0, z: 23.0 }
+                    } else {
+                        Point { x: 20.0, z: 21.0 }
+                    }
+                );
+                assert_eq!(control.follow, 0);
+                let row = after
+                    .as_array_mut()
+                    .unwrap()
+                    .iter_mut()
+                    .find(|row| row["id"] == id)
+                    .unwrap();
+                let prior = before
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .find(|row| row["id"] == id)
+                    .unwrap();
+                row["orders"] = prior["orders"].clone();
+                row["follow"] = prior["follow"].clone();
+            }
+            assert_eq!(after, before);
+            assert_eq!(m.logistics.get(1002).unwrap(), &reserves);
+            assert!(!m.commands.units[&1002].supply_hold);
+            assert!(!m.commands.units[&1002].supply_escape);
+            assert!(m.field_works.membership(1002).is_some());
+            assert_eq!(m.commands.path_requests().used(), 0);
+        } else if matches!(index, 0..=2 | 5) {
             assert_eq!(denial, None, "case {index}");
             assert_eq!(m.world.game.units[&1000].air, Some(PlaneState::Out));
             let mission = m.aviation.planes[&1000].mission.unwrap();
@@ -637,7 +682,12 @@ fn unsupported_mixed_aircraft_selections_reject_before_supply_or_control_writes(
         assert_eq!(m.commands.path_requests().used(), 0);
     }
     let mut m = command_scene(trace);
-    assert!(m.start_queued_orders(1000, false).is_err());
+    m.start_queued_orders(1000, false).unwrap();
+    assert!(m.commands.units[&1000].orders.is_empty());
+    let mission = m.aviation.planes[&1000].mission.unwrap();
+    assert_eq!(mission.kind, MissionKind::Patrol);
+    assert_eq!(mission.at, Point { x: 8.0, z: 8.0 });
+    assert_eq!(m.world.game.units[&1000].air, Some(PlaneState::Out));
     m.commands.units.get_mut(&1000).unwrap().orders.clear();
     m.start_queued_orders(1000, false).unwrap();
     m.prepare_unit_commands(1000, false).unwrap();
@@ -823,8 +873,7 @@ fn aircraft_tick_hooks_match_observed_original_full_step_phases() {
 }
 
 #[test]
-fn aircraft_tick_preflight_rejects_unrepresented_phases_before_mutation() {
-    use ww2_core::match_aviation::AviationError;
+fn aircraft_tick_preflight_admits_weapons_and_queue_but_rejects_malformed_state() {
     let f = aircraft_tick_fixture();
     let mut m = scene(&f["traces"][0]);
     let before = aircraft_phase_snapshot(&m);
@@ -853,10 +902,13 @@ fn aircraft_tick_preflight_rejects_unrepresented_phases_before_mutation() {
         ww2_core::match_commands::Command::from_json(&json!({"t":"move","orders":[[1000,30,30]]}))
             .unwrap(),
     );
-    assert!(matches!(
-        m.validate_aircraft_turns(0.05),
-        Err(AviationError::Unsupported(_))
-    ));
+    let before = aircraft_phase_snapshot(&m);
+    m.validate_aircraft_turns(0.05).unwrap();
+    assert_json(
+        &aircraft_phase_snapshot(&m),
+        &before,
+        "queued order admission",
+    );
     m.world.game.units.get_mut(&1000).unwrap().hp = 0.0;
     let dead = aircraft_phase_snapshot(&m);
     m.validate_aircraft_turns(0.05).unwrap();

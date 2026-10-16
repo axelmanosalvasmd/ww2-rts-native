@@ -104,7 +104,7 @@ impl RoomRuntime {
         state.tick_state.restrict_aircraft_weapons_for_delivery();
         state.validate_tick_state()?;
         state
-            .preflight_ordinary_snapshot()
+            .restrict_to_ordinary_snapshots()
             .map_err(|e| format!("snapshot admission: {e:?}"))?;
         state.ordinary_snapshot_raw_lists()?;
         let delivery =

@@ -660,6 +660,7 @@ fn cmb49_off_map_aircraft_rounds_hit_border_houses_on_the_true_segment() {
                         target: None,
                         at: target,
                     }),
+                    attack_pick: 0,
                     downed: false,
                 },
             );
