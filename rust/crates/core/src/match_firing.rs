@@ -341,6 +341,9 @@ impl Match {
                 crate::economy::Mode::Default | crate::economy::Mode::Conquest,
                 None
             ) | (
+                crate::economy::Mode::Tutorial,
+                Some(crate::game::ModeKind::Tutorial)
+            ) | (
                 crate::economy::Mode::World,
                 Some(crate::game::ModeKind::World)
             )
