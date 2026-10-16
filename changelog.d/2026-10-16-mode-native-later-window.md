@@ -1,0 +1,1 @@
+- Record the first native MODE batch's nine passes and one authored-test failure without retrying it. Exclude the unchanged failed MODE-03 body, hold incomplete Tutorial assertions, and add native Tutorial-map, generated-World roster and live timeline checks with mappings for all 33 remaining owned rows. No rows are promoted before execution and prototype review.

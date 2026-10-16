@@ -55,6 +55,8 @@ mod match_routing;
 mod math;
 #[path = "../mode_native_batch.rs"]
 mod mode_native_batch;
+#[path = "../mode_native_later_batch.rs"]
+mod mode_native_later_batch;
 #[path = "../objectives.rs"]
 mod objectives;
 #[path = "../observed_memory.rs"]

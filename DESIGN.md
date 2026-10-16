@@ -1,5 +1,26 @@
 # Three Crossroads Native: design decisions
 
+## MODE first actual results and later window (2026-10-16)
+
+The first actual native intent batch at 5b034faa, Rust5742a3e3, ran all ten
+selected tests once: nine passed and one failed, with retries disabled.
+MODE-03's authored test reads absent lobby field map, while the payload uses
+mapName. Preserve that failed body as an ignored excluded diagnostic rather
+than changing its assertion or rerunning it. Its map-lock comparison is also
+vacuous. No runtime defect or MODE-03 completion is claimed. MODE-58 lacks a
+birth-distance assertion and MODE-64 lacks a decisive MP-floor witness.
+They remain held despite their passing tests. Other partial rows remain held.
+MODE-32/59/62/65 are passing candidates pending prototype intent review.
+
+Implement the second window over all remaining 33 owned IDs. Three new
+native tests load both Tutorial objectives, generate Huge/Massive World
+matches with actual home/guard rosters and alliance/hold controls, and
+advance 201 real Tutorial ticks to check sampling and read-only getters.
+Keep the existing authored-map exact fixture, generalized-scenario gaps,
+all-mode guards and Unreal ownership visible. This changes only tests and
+documentation. The second window has not run and promotes no rows.
+
+
 ## Native mode intent tests (2026-10-16, execution pending)
 
 Axel approved the five native-intent qualification rules in issue #5 comment
