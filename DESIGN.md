@@ -1,5 +1,11 @@
 # Three Crossroads Native: design decisions
 
+## Native MOV intent tests, first 50 owned rows (2026-10-16)
+
+Apply Axel decision 6206861267 exactly: native behavior tests and prototype intent review qualify behavior rows; cheap exact tables, pure functions and existing component comparisons retain their exact checks. Add `mov_intent_batch` as a test-only core module for the first 50 rows assigned in MOV_IMPL.json, through MOV-90. Each row names its test in movement.md. Native authored scenes select canonical `Command::Stance { stance: HoldPosition }`, Move, Board, Unload, purchase, movement, traffic, separation, recovery and aircraft APIs. No Source output or new behavior capture supplies expected state. Runtime owners, admission guards, the reference pin and interfaces are unchanged.
+
+Seven tests explicitly ignore unavailable house entry, carrier ejection/shock, train operation, fighter seeking and aircraft ground weapons. Tests with narrower coverage retain their limitations in movement.md. No test has run and no row is promoted. The previous Source failure at cfcda299 remains failed; its `t: holdPos` proposal is not applied or rerun. Root must grant one focused nextest job with `--no-fail-fast` for this frozen batch. Failed or incomplete rows stay in progress while independent rows continue.
+
 ## MOV ordinary admission operand receipt, unexecuted (2026-10-15)
 
 The actual ordinary-gen attempt at `bd4d4a1b0ed1bce579ac21f0ecbad4e07045f121` failed once in the first retry scene constructor: command admission returned `blocked`, expected `undefined`. The retained log in `/tmp/mov-five-2240-actual-55cfa430/` does not record its operands. Add a read-only stderr receipt immediately before the unchanged command call and assertion. It records the scene, command, owner, sequence, pre-command tick, winner, players, units, terrain, retry-limit presence/value, path statistics and random stream. It does not invoke Source or consume randomness itself.

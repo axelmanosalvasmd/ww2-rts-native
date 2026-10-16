@@ -4,6 +4,8 @@ Unreleased entries that are not yet collected live in `changelog.d/`, one file p
 
 ## Unreleased
 
+- Add 50 native MOV intent tests and literal row mappings under Axel decision 6206861267. Seven unavailable behavior actuators have explicit ignored tests; native execution and prototype review remain pending. Preserve existing Source failures and artifacts without new behavior captures.
+
 - Prepare a private MOV41/46/47/52/54 source successor above LOG271 while preserving PR268 separately. Tighten ordinary retry and idle causal controls, bind complete original checks and bridge inputs, and preserve the full old 78-case corpus. New Source captures and native qualification remain pending.
 
 - Mark MAP-04/05/07/117 ported after six exact native checks pass at `7cbfcddd`: three strict original validation-message readers, the full map corpus, complete XL/Hill Assault check and affected BASE replay. Formatting recheck and strict core/simtest all-target Clippy also pass. Retain MAP-97's separate historical debug/release proof, all 140 Acceptance cells and the tested Rust tree; MAP-06/19/100 remain held.
