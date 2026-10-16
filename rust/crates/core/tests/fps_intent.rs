@@ -336,7 +336,8 @@ fn fps12_stale_and_offline_input_decelerate_without_firing() {
 fn fps13_movement_respects_stance_diagonals_acceleration_and_jump() {
     let (mut m, id) = scene();
     turn(&mut m, id, json!({"forward":1}));
-    assert_eq!(m.world.game.units[&id].vx, Some(1.5));
+    let ground_velocity_change = m.world.game.units[&id].vx.unwrap();
+    assert_eq!(ground_velocity_change, 1.5);
     for (extra, speed) in [
         (json!({"forward":1}), 4.5),
         (json!({"forward":1,"sprint":true}), 7.0),
@@ -361,9 +362,19 @@ fn fps13_movement_respects_stance_diagonals_acceleration_and_jump() {
     assert_eq!(b.vy, 4.6 - 15.0 * 0.05);
     assert_eq!(b.jy, b.vy * 0.05);
     let vx = m.world.game.units[&id].vx.unwrap();
+    assert_eq!(vx, 0.0);
+    assert!(b.jy > 0.0);
     turn(&mut m, id, json!({"jump":1,"crouch":true,"forward":1}));
     assert!(!m.companions.soldiers[&id].crouch);
-    assert!((m.world.game.units[&id].vx.unwrap() - vx).abs() <= 0.3 + 1e-12);
+    // Forward at yaw zero steers toward +x, with less control than on the ground.
+    let air_velocity_change = m.world.game.units[&id].vx.unwrap() - vx;
+    assert!(
+        air_velocity_change > 0.0,
+        "air control must accelerate forward"
+    );
+    assert!(air_velocity_change < ground_velocity_change);
+    assert!((air_velocity_change - 0.3).abs() < 1e-12);
+    assert_eq!(m.world.game.units[&id].vz, Some(0.0));
     for _ in 0..25 {
         turn(&mut m, id, json!({"jump":1}));
     }
