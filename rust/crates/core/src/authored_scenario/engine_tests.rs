@@ -12,6 +12,10 @@ use crate::{
 };
 
 fn scene(data: Value) -> Match {
+    scene_sized(data, ArmySize::Standard)
+}
+
+fn scene_sized(data: Value, army: ArmySize) -> Match {
     let map = AuthoritativeMap::from_json(
         &serde_json::to_vec(&json!({
             "name":"Ordinary authored mission", "w":96, "h":96,
@@ -38,7 +42,7 @@ fn scene(data: Value) -> Match {
                 })
                 .collect(),
             shuffle: false,
-            army: ArmySize::Standard,
+            army,
             weather: WeatherChoice::Map,
             weather_seed: Some(1),
             living_weather: false,
@@ -110,7 +114,14 @@ fn checkpoint(m: &mut Match, delivery: &mut DeliveryState) {
 
 fn finish(m: &mut Match, delivery: &mut DeliveryState) {
     // The ordinary VP owner decides the result while the authored state remains installed.
-    m.start.points[0].owner = Some(0);
+    m.start.points[0].owner = m
+        .start
+        .economy
+        .players
+        .iter()
+        .enumerate()
+        .find(|(_, p)| p.team == 0 && !p.out)
+        .map(|(slot, _)| slot);
     m.start.points[0].vp = 20.0;
     m.start.win_vp = m
         .start
@@ -590,4 +601,198 @@ fn mode85_queue_reservations_block_arrivals_before_ordinary_lifecycle_resumes() 
         }
         finish(&mut m, &mut delivery);
     }
+}
+
+#[test]
+fn mode82_contexts_repeats_cooldown_and_arrival_order_survive_checkpoint_and_finish() {
+    let mut once = trigger("once", json!({"kind":"time","seconds":0}));
+    once["scope"] = json!("player");
+    once["recipients"] = json!("side");
+    let mut team = trigger("team", json!({"kind":"time","seconds":0}));
+    team["scope"] = json!("team");
+    team["side"] = json!(2);
+    let mut edge = trigger(
+        "edge",
+        json!({"kind":"ownership","target":"bridgehead","side":0}),
+    );
+    edge["repeat"] = json!({"mode":"risingEdge","cooldown":0.2,"max":2});
+    let mut continuous = trigger("continuous", json!({"kind":"time","seconds":0}));
+    continuous["repeat"] = json!({"mode":"whileTrue","cooldown":0.1,"max":3});
+    let mut arrival = trigger("arrival", json!({"kind":"time","seconds":0}));
+    arrival["actions"] = json!([reinforce("entry", [40, 20], "rifle", 10.0)]);
+    let arrived = trigger(
+        "arrived",
+        json!({"kind":"groupCount","group":"entry","op":"atLeast","count":1}),
+    );
+    let mut m = scene(definition(
+        json!([{"id":"entry","units":[]}]),
+        vec![once, team, edge, continuous, arrival, arrived],
+    ));
+    let mut delivery = DeliveryState::new(&m).unwrap();
+    m.start.points[0].owner = Some(0);
+    tick(&mut m, &mut delivery);
+    for slot in 0..3 {
+        assert_eq!(count(&m, "once", &format!("player:{slot}")), 1);
+    }
+    assert_eq!(count(&m, "team", "team:0"), 1);
+    assert_eq!(count(&m, "team", "team:1"), 0);
+    assert_eq!(count(&m, "edge", "match"), 1);
+    assert_eq!(count(&m, "continuous", "match"), 1);
+    assert_eq!(
+        ids(&m, "entry").len(),
+        1,
+        "post-trigger arrival pass publishes this tick"
+    );
+    assert_eq!(
+        count(&m, "arrived", "match"),
+        0,
+        "later triggers precede the final arrival pass"
+    );
+    tick(&mut m, &mut delivery);
+    assert_eq!(
+        count(&m, "arrived", "match"),
+        1,
+        "next tick sees the arrival"
+    );
+    assert_eq!(
+        count(&m, "continuous", "match"),
+        1,
+        "cooldown prevents every-tick execution"
+    );
+    m.start.points[0].owner = None;
+    tick(&mut m, &mut delivery);
+    assert_eq!(count(&m, "continuous", "match"), 2);
+    m.start.points[0].owner = Some(0);
+    tick(&mut m, &mut delivery);
+    assert_eq!(
+        count(&m, "edge", "match"),
+        1,
+        "edge during cooldown is consumed"
+    );
+    checkpoint(&mut m, &mut delivery);
+    tick(&mut m, &mut delivery);
+    assert_eq!(
+        count(&m, "edge", "match"),
+        1,
+        "remaining true after cooldown is not a new edge"
+    );
+    m.start.points[0].owner = None;
+    tick(&mut m, &mut delivery);
+    m.start.points[0].owner = Some(0);
+    tick(&mut m, &mut delivery);
+    assert_eq!(count(&m, "edge", "match"), 2);
+    for _ in 0..6 {
+        tick(&mut m, &mut delivery);
+    }
+    assert_eq!(count(&m, "continuous", "match"), 3);
+    assert_eq!(count(&m, "edge", "match"), 2);
+    for slot in 0..3 {
+        assert_eq!(count(&m, "once", &format!("player:{slot}")), 1);
+    }
+    finish(&mut m, &mut delivery);
+}
+
+#[test]
+fn mode82_out_contexts_and_disallowed_reinforcement_skip_the_entire_batch() {
+    let mut player = trigger("players", json!({"kind":"time","seconds":0}));
+    player["scope"] = json!("player");
+    let mut team = trigger("teams", json!({"kind":"time","seconds":0}));
+    team["scope"] = json!("team");
+    let mut batch = trigger("batch", json!({"kind":"time","seconds":0}));
+    batch["actions"] = json!([
+        {"kind":"say","text":"must not leak"},
+        {"kind":"objectiveActivate","objective":"global"},
+        reinforce("blocked",[40,20],"rifle",10.0)]);
+    let mut m = scene(definition(
+        json!([{"id":"blocked","units":[]}]),
+        vec![player, team, batch],
+    ));
+    // The economy owner carries elimination state; game players contain vision only.
+    m.start.economy.players[0].out = true;
+    let mut delivery = DeliveryState::new(&m).unwrap();
+    let (_, events) = tick(&mut m, &mut delivery);
+    assert_eq!(count(&m, "players", "player:0"), 0);
+    assert_eq!(count(&m, "players", "player:1"), 1);
+    assert_eq!(count(&m, "players", "player:2"), 1);
+    assert_eq!(
+        count(&m, "teams", "team:0"),
+        1,
+        "living ally represents the team"
+    );
+    assert_eq!(count(&m, "teams", "team:1"), 1);
+    assert_eq!(count(&m, "batch", "match"), 0);
+    assert!(m.authored_scenario.as_ref().unwrap().objectives.is_empty());
+    assert!(m.authored_scenario.as_ref().unwrap().deferred.is_empty());
+    assert!(
+        events
+            .iter()
+            .all(|e| !matches!(e,TickEvent::AuthoredScenario(s) if s.text=="must not leak"))
+    );
+    checkpoint(&mut m, &mut delivery);
+    for _ in 0..4 {
+        tick(&mut m, &mut delivery);
+    }
+    assert_eq!(count(&m, "batch", "match"), 0);
+    finish(&mut m, &mut delivery);
+}
+
+#[test]
+fn mode82_tick_budget_stops_later_triggers_and_recovers_on_the_next_tick() {
+    // Static authored work is small. Scanning canonical actors spends the dynamic budget.
+    let queries = (0..31)
+        .map(|_| json!({"kind":"areaEntry","area":"entry","side":0}))
+        .collect::<Vec<_>>();
+    let expensive = (0..3)
+        .map(|i| {
+            trigger(
+                &format!("scan{i}"),
+                json!({"kind":"any","conditions":queries}),
+            )
+        })
+        .collect::<Vec<_>>();
+    let later = trigger("later", json!({"kind":"time","seconds":0}));
+    let mut triggers = expensive;
+    triggers.push(later);
+    let mut m = scene_sized(definition(json!([]), triggers), ArmySize::Massive);
+    // Publish through the canonical owner, including all required runtime sidecars.
+    for i in 0..128 {
+        let at = [10 + i % 16, 50 + i / 16];
+        if m.scenario_arrive(0, "rifle", at, &json!({"kind":"hold"}))
+            .unwrap()
+            .is_none()
+        {
+            break;
+        }
+    }
+    let units = m.world.game.units.len();
+    assert!(
+        3 * 31 * (units + 1) > 4096,
+        "fixture must exhaust the shared work budget: {units}"
+    );
+    let mut delivery = DeliveryState::new(&m).unwrap();
+    tick(&mut m, &mut delivery);
+    assert_eq!(count(&m, "scan0", "match"), 0);
+    assert_eq!(
+        count(&m, "later", "match"),
+        0,
+        "exhaustion ends this tick's evaluation"
+    );
+    // A real unit entering the area makes the first query short-circuit on the next tick.
+    let id = m
+        .world
+        .game
+        .units
+        .values()
+        .find(|u| u.owner == 0)
+        .unwrap()
+        .id;
+    relocate(&mut m, id, [40, 20]);
+    tick(&mut m, &mut delivery);
+    assert_eq!(count(&m, "scan0", "match"), 1);
+    assert_eq!(count(&m, "later", "match"), 1);
+    checkpoint(&mut m, &mut delivery);
+    for _ in 0..3 {
+        tick(&mut m, &mut delivery);
+    }
+    finish(&mut m, &mut delivery);
 }

@@ -2442,3 +2442,7 @@ mod save_load_tests;
 
 #[path = "lobby_saves.rs"]
 mod save_runtime;
+
+#[cfg(test)]
+#[path = "scenario_start_tests.rs"]
+mod scenario_start_tests;

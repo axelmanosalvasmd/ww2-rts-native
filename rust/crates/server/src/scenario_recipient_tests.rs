@@ -236,3 +236,184 @@ fn mode86_ordinary_room_filters_scenario_reads_without_execution_and_keeps_norma
     }
     assert_eq!(runtime.held(), 120);
 }
+
+#[test]
+fn net55_scenario_contexts_inherit_and_override_recipient_policy_without_reveal_leaks() {
+    let (base, mut raw) = mission();
+    raw["scenario"] = json!({"version":1,"groups":[],"areas":[],"objectives":[
+        {"id":"local","text":"Local"},
+        {"id":"team","text":{"en":"Team"}},
+        {"id":"override","text":"Override","recipients":"team","side":2}],
+        "triggers":[
+            {"id":"players","scope":"player","recipients":"side","condition":{"kind":"time","seconds":0},"actions":[
+                {"kind":"objectiveActivate","objective":"local"},
+                {"kind":"say","text":"Seat"}]},
+            {"id":"teams","scope":"team","recipients":"team","condition":{"kind":"time","seconds":0},"actions":[
+                {"kind":"objectiveActivate","objective":"team"},
+                {"kind":"say","text":{"en":"Team"}},
+                {"kind":"say","text":"Public override","recipients":"public"}]},
+            {"id":"override","scope":"match","recipients":"side","side":1,"condition":{"kind":"time","seconds":0},"actions":[
+                {"kind":"objectiveActivate","objective":"override"},
+                {"kind":"say","text":"Action override","recipients":"team","side":2}]},
+            {"id":"complete","scope":"player","recipients":"side","condition":{"kind":"time","seconds":0.15},"actions":[
+                {"kind":"objectiveComplete","objective":"local"}]}]});
+    let map = AuthoritativeMap::from_json(&serde_json::to_vec(&raw).unwrap()).unwrap();
+    let mut state = Match::new(&map, base.options.clone()).unwrap();
+    state.world.game.reveal = true;
+    // Nonempty ordinary team lists remain scoped alongside the scenario rows.
+    state
+        .support
+        .covers
+        .push(ww2_core::match_support::FighterCover {
+            owner: 2,
+            team: 0,
+            at: ww2_core::game::Point { x: 31.0, z: 31.0 },
+            radius: 20.0,
+            remaining: 10.0,
+        });
+    let mine = 40 * 64 + 40;
+    state.world.set_cell(mine, b'N').unwrap();
+    state.world.mines.insert(mine, 1);
+    state.world.mine_seen.insert(mine, 1);
+    state.start.economy.players[0].mp = 10_000.0;
+    let builder = state
+        .world
+        .game
+        .units
+        .values()
+        .find(|u| u.owner == 0 && state.rules.kinds[u.kind].name == "rifle")
+        .unwrap()
+        .id;
+    use ww2_core::field_works::{FortKind, Pattern, ProjectMaterial, ProjectOrder};
+    assert_eq!(
+        state
+            .execute_entrench(
+                0,
+                &[i64::from(builder)],
+                ProjectOrder::New {
+                    pattern: Some(Pattern::Line),
+                    material: ProjectMaterial::Fort(FortKind::Trench),
+                    from: Some(ww2_core::game::Point { x: 21.0, z: 21.0 }),
+                    to: Some(ww2_core::game::Point { x: 29.0, z: 21.0 }),
+                },
+                false,
+                false
+            )
+            .unwrap(),
+        None
+    );
+    let mut runtime = RoomRuntime::new(state, 0).unwrap();
+    runtime.advance_tick(&[false; 3]).unwrap();
+    let first = read(&mut runtime, FrameKind::Scheduled);
+    for slot in 0..3 {
+        let team_slot = if slot == 1 { 1 } else { 0 };
+        let execution = format!("scenario:{}", slot + 1);
+        let team_execution = format!("scenario:{}", if slot == 1 { 5 } else { 4 });
+        let mut objectives = vec![
+            json!({"id":"local","scope":format!("player:{slot}"),"text":"Local","state":"active",
+                "recipients":"side","side":slot,"updated":0.05,"execution":execution}),
+            json!({"id":"team","scope":format!("team:{}",if slot==1 {1} else {0}),"text":{"en":"Team"},"state":"active",
+                "recipients":"team","side":team_slot,"updated":0.05,"execution":team_execution}),
+        ];
+        if slot != 1 {
+            objectives.push(
+                json!({"id":"override","scope":"match","text":"Override","state":"active",
+                "recipients":"team","side":2,"updated":0.05,"execution":"scenario:6"}),
+            );
+        }
+        assert_eq!(
+            first[slot]["scenario"],
+            json!({"version":1,"objectives":objectives})
+        );
+        let shot = |text: &str, localized: Value, policy: &str, side: usize, execution: &str| {
+            json!({
+            "k":"say","text":text,"localized":localized,"scenarioRecipients":policy,
+            "scenarioSide":side,"pub":policy=="public","execution":execution,"atTick":1})
+        };
+        let mut shots = vec![shot("Seat", json!("Seat"), "side", slot, &execution)];
+        if slot != 1 {
+            shots.push(shot("Team", json!({"en":"Team"}), "team", 0, "scenario:4"));
+        }
+        shots.push(shot(
+            "Public override",
+            json!("Public override"),
+            "public",
+            0,
+            "scenario:4",
+        ));
+        if slot == 1 {
+            shots.push(shot("Team", json!({"en":"Team"}), "team", 1, "scenario:5"));
+        }
+        shots.push(shot(
+            "Public override",
+            json!("Public override"),
+            "public",
+            1,
+            "scenario:5",
+        ));
+        if slot != 1 {
+            shots.push(shot(
+                "Action override",
+                json!("Action override"),
+                "team",
+                2,
+                "scenario:6",
+            ));
+        }
+        assert_eq!(first[slot]["shots"], json!(shots));
+        assert!(
+            first[slot].get("ghosts").is_none(),
+            "Conquest has no construction-mode building ghosts"
+        );
+        if slot == 1 {
+            assert_eq!(first[slot]["covers"], json!([]));
+            assert_eq!(first[slot]["works"], json!([]));
+            assert_eq!(first[slot]["foundMines"], json!([]));
+        } else {
+            assert_eq!(first[slot]["covers"], json!([[31.0, 31.0, 20.0, 10.0]]));
+            assert!(!first[slot]["works"].as_array().unwrap().is_empty());
+            assert_eq!(first[slot]["works"], first[0]["works"]);
+            assert_eq!(first[slot]["foundMines"], json!([mine]));
+        }
+    }
+    let saved = runtime.state().save_json().unwrap();
+    let mut restored = RoomRuntime::new(Match::from_save_json(saved).unwrap(), 0).unwrap();
+    for slot in 0..3 {
+        let current = read(&mut restored, FrameKind::Current);
+        assert_eq!(current[slot]["scenario"], first[slot]["scenario"]);
+        assert_eq!(current[slot]["shots"], json!([]));
+    }
+    for _ in 0..6 {
+        runtime.advance_tick(&[false; 3]).unwrap();
+        restored.advance_tick(&[false; 3]).unwrap();
+        let messages = read(&mut runtime, FrameKind::Scheduled);
+        let saved_messages = read(&mut restored, FrameKind::Scheduled);
+        for slot in 0..3 {
+            assert_eq!(messages[slot]["scenario"], saved_messages[slot]["scenario"]);
+            if runtime.state().world.game.tick >= 3 {
+                assert_eq!(
+                    messages[slot]["scenario"]["objectives"][0]["state"],
+                    "complete"
+                );
+                assert_eq!(
+                    messages[slot]["scenario"]["objectives"][0]["execution"],
+                    format!("scenario:{}", 7 + slot)
+                );
+            }
+            assert_eq!(messages[slot]["shots"], json!([]));
+        }
+        assert!(runtime.fault().is_none());
+        assert!(restored.fault().is_none());
+    }
+    runtime.state_mut().start.economy.players[1].vp = runtime.state().start.win_vp;
+    runtime.advance_tick(&[false; 3]).unwrap();
+    read(&mut runtime, FrameKind::Scheduled);
+    assert_eq!(runtime.state().finish.unwrap().winner, 1);
+    for _ in 0..120 {
+        if runtime.hold_callback().unwrap().unwrap().advance {
+            runtime.advance_tick(&[false; 3]).unwrap();
+            read(&mut runtime, FrameKind::Scheduled);
+        }
+        assert!(runtime.fault().is_none());
+    }
+}
