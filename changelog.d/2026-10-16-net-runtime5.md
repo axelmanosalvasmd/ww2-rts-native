@@ -1,1 +1,2 @@
 - Project canonical aircraft in internal recipient unit rows, including allied visibility, airborne enemy filtering and the grounded flag. Add NET-52 checks across three seats, all five aircraft states, end reveal and ordinary ticks. Complete hosted aircraft snapshots remain refused.
+- Extend the NET-52 aircraft journey through a captured-point Conquest victory at tick 7,497 and three further ticks, checking 22,500 recipient projections and reveal through the real finish path. Preserve complete aircraft snapshot refusal.

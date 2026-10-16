@@ -7,7 +7,7 @@ NET-52 describes the `units` list for a receiving seat. The existing native pred
 Proven row:
 
 - NET-52: `recipient_snapshot::net52_tests::net52_units_include_allies_visible_enemies_airborne_planes_and_end_reveal`. Three seats cover own and allied units without visible membership, hidden and visible ground enemies, all five enemy aircraft states, grounded friendly aircraft, airborne enemies outside vision and end reveal. Row shape and the grounded flag are asserted.
-- NET-52 safety: `recipient_snapshot::net52_tests::net52_aircraft_ticks_and_recipient_delivery_preserve_room_admission_guard`. A canonical patrol advances 12 ordinary ticks and collects each seat's terrain/fog/recipient projection after every tick without a runner fault. The owner's mission plan is retained. Removing the required aviation metadata refuses projection.
+- NET-52 safety: `recipient_snapshot::net52_tests::net52_aircraft_ticks_and_recipient_delivery_preserve_room_admission_guard`. A recorded Move sends an allied rifle to capture a neutral authored 5-VP point. The unchanged Conquest VP goal is earned through ordinary ticks, which continue through victory and three further ticks. Every tick collects all three seats' terrain/fog/recipient projections without a runner fault. The patrol traverses all five aircraft states. The owner's initial mission plan is retained, and the ordinary victory path reveals every unit to every seat, including a previously hidden enemy plane at base. No ownership, score, finish or reveal is installed in this journey. Removing the required aviation metadata still refuses projection.
 
 This is internal recipient projection coverage. `RecipientProjection::missing` explicitly retains `Air`: private aircraft lists are outside this batch. The complete snapshot adapter still refuses aircraft before room attachment, and the test checks that refusal before and after ticking. No Match field, command admission, transport, wire schema, C header, contract or recipient policy changes. No Source recorder or fixture was added. NET-54 and hosted aircraft remain separate work.
 
@@ -23,4 +23,6 @@ Dropped rows:
 
 Differs candidates: none. The task range is exhausted. No work from PRs #335, #340 or #296 was imported.
 
-Validation uses only `ww2-core` tests at `-j4`, with the shared Cargo slot, 6 GiB memory cap and no swap. Before publication, run formatting and the brief's strict workspace all-target Clippy check after merging current main. Hosted checks and parity status updates belong to the orchestrator.
+Validation uses only `ww2-core` tests at `-j4`, with the shared Cargo slot, 6 GiB memory cap and no swap. Before publication, run formatting and strict `ww2-core` all-target Clippy after merging current main. Hosted checks and parity status updates belong to the orchestrator.
+
+The finish-journey repair passed on Vostro: team 0 won by VP at tick 7,497; the run ended at tick 7,500 after collecting 22,500 recipient projections. The two NET-52 tests and all 30 recipient snapshot tests passed with zero failures. Formatting and strict locked `ww2-core` all-target Clippy passed in S3 with 6 GiB memory and no swap; S3 was released. Complete aircraft snapshots remain refused.
