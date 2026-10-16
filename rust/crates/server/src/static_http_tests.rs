@@ -65,7 +65,9 @@ impl TestServer {
             static_root: root,
             ..Config::default()
         };
-        let shutdown = async { let _ = stopped.await; };
+        let shutdown = async {
+            let _ = stopped.await;
+        };
         let task = tokio::spawn(async move {
             if shards == 1 {
                 serve(listener, config, shutdown).await
@@ -384,13 +386,23 @@ async fn static_assets_survive_sharded_front_with_maps_and_confinement() {
     let page = server.get("/play", &[]).await;
     assert_eq!(page.status, 200);
     assert_eq!(page.body, b"<html>game and editor</html>");
-    let script = server.get("/shared/game.js", &[("Accept-Encoding", "gzip")]).await;
+    let script = server
+        .get("/shared/game.js", &[("Accept-Encoding", "gzip")])
+        .await;
     assert_eq!(script.status, 200);
     assert_eq!(script.headers["content-encoding"], "gzip");
     let mut decoded = Vec::new();
-    GzDecoder::new(&script.body[..]).read_to_end(&mut decoded).unwrap();
+    GzDecoder::new(&script.body[..])
+        .read_to_end(&mut decoded)
+        .unwrap();
     assert_eq!(decoded, b"export const native = true;");
-    assert_eq!(server.get("/shared/%2e%2e/client/index.html", &[]).await.status, 404);
+    assert_eq!(
+        server
+            .get("/shared/%2e%2e/client/index.html", &[])
+            .await
+            .status,
+        404
+    );
     assert_eq!(server.get("/maps", &[]).await.status, 200);
     assert_eq!(server.get("/maps/no-map.json", &[]).await.status, 404);
     server.stop().await;

@@ -141,7 +141,10 @@ pub async fn serve_sharded(
     }
     let (stop, stopped) = watch::channel(false);
     let lifetime = Lifetime { stop: stop.clone() };
-    let static_files = config.static_root.clone().map(static_files::StaticFiles::new);
+    let static_files = config
+        .static_root
+        .clone()
+        .map(static_files::StaticFiles::new);
     let (workers, mut supervisors) = start_workers(config, trusted, count, stopped.clone());
     let front = Front {
         static_files,

@@ -364,9 +364,7 @@ fn recon_refuses_before_reservation_and_keeps_ordinary_r1_snapshots_flowing() {
         let actor = rifles(&hub, 0)[0];
         let at = state(&hub).world.game.units[&actor].at();
         let wallet = state(&hub).start.economy.players[0].mp;
-        for message in [
-            json!({"t":"support","kind":"recon","x":at.x,"z":at.z}),
-        ] {
+        for message in [json!({"t":"support","kind":"recon","x":at.x,"z":at.z})] {
             send(&mut hub, &a, message, 0);
         }
         assert_eq!(state(&hub).commands.pending_commands(), 0);
@@ -375,9 +373,7 @@ fn recon_refuses_before_reservation_and_keeps_ordinary_r1_snapshots_flowing() {
         assert!(state(&hub).commands.units[&actor].orders.is_empty());
         assert_eq!(
             drain(&mut ra),
-            vec![
-                json!({"t":"deny","cmd":"support","reason":"unsupported"}),
-            ]
+            vec![json!({"t":"deny","cmd":"support","reason":"unsupported"}),]
         );
         // A supported input still receives the first host sequence after refusal.
         send(&mut hub, &a, json!({"t":"stop","ids":[actor]}), 0);
