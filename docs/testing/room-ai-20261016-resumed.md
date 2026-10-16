@@ -10,6 +10,7 @@ This PR stacks on #369 and #342; merges after #373. Prototype remains `e4e579a83
 - Merge `0a7a2011` imports #373 branch `fix/main-elimination-serde-20261016` at `4edfcd5e8b795aa47fde114de7d51d7eb6430078`. Two conflicted hunks were resolved additively. In `lobby.rs`, retain both `room_ai_tests` and `save_load_tests` behind their own test attributes, plus the unconditional `save_runtime` module. In `room_runtime.rs`, retain all AI access/activation/reset/schedule methods and all save/hold/event restoration methods, closing the AI method before the save methods. No assertion was removed.
 - Merge `9a30fc4a` imports #342 branch `runtime/ai-batch6-20261016` at `f27dc9c8b75f55a764043e126a4e0ce79e1c69b0`. Automatic merge, no hand-edited hunks. Its scheduler and test registrations remain intact.
 - Merge `81cd6485` imports main `fd714e36430cdfac864e6af00f346067c84d7863`. Automatic documentation-only merge, no hand-edited hunks.
+- The final main merge imports `b113bb95` after #373, #381 and #382 merged. The Rust merge is automatic, with no hand-edited code or test hunks. The only manual addition to the merge result is this merge-record paragraph in this file. The only incoming Rust changes are the No Man's Land server regression and Tutorial core tests; the serde hotfix was already present. The PR body identifies the final merge commit and producing Rust tree.
 
 ## Intended row mapping
 
