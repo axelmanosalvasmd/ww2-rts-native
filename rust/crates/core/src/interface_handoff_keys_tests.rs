@@ -54,7 +54,10 @@ fn if26_handoff_consumer_reuses_quarter_metre_keys_and_resets_on_epoch_and_geome
     request.store.x = 30.0;
     let updated = PathTerrain {
         navigation: TerrainView {
-            versions: Versions { obstruction: 1, ..Default::default() },
+            versions: Versions {
+                obstruction: 1,
+                ..Default::default()
+            },
             ..terrain.navigation
         },
         ..terrain

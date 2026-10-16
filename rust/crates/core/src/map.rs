@@ -595,7 +595,11 @@ fn normalize_layers(
                 return Err(invalid("worldVersion", "layers require version 2"));
             }
             let ground = rows(&layer["ground"], w, h, BASE, "layers.ground")?;
-            let allowed = if authoritative { OBJECT } else { b".BH#TXY=RNAQKO" };
+            let allowed = if authoritative {
+                OBJECT
+            } else {
+                b".BH#TXY=RNAQKO"
+            };
             let authored = rows(&layer["objects"], w, h, allowed, "layers.objects")?;
             let mines = layer
                 .get("mines")
@@ -867,13 +871,7 @@ impl AuthoritativeMap {
             .collect();
         let n = physical.len();
         let mut house = vec![0; n];
-        for block in house_kinds_where(
-            |c| physical[c] == b'B',
-            n,
-            self.w,
-            &self.buildings,
-            None,
-        )? {
+        for block in house_kinds_where(|c| physical[c] == b'B', n, self.w, &self.buildings, None)? {
             for c in block.cells {
                 house[c] = block.kind;
             }
@@ -1083,7 +1081,9 @@ pub fn house_kinds_where(
         let mut kind = houses
             .iter()
             .rposition(|house| {
-                house.get("min").and_then(crate::catalog::Value::number)
+                house
+                    .get("min")
+                    .and_then(crate::catalog::Value::number)
                     .is_some_and(|minimum| queue.len() as f64 >= minimum)
             })
             .ok_or_else(|| MapError::Catalog("no default house kind".into()))?;
@@ -1092,7 +1092,10 @@ pub fn house_kinds_where(
                 kind = *named_kind;
             }
         }
-        out.push(HouseBlock { cells: queue, kind: kind as u8 });
+        out.push(HouseBlock {
+            cells: queue,
+            kind: kind as u8,
+        });
     }
     Ok(out)
 }
@@ -1139,7 +1142,9 @@ pub fn inside_known_region(
     if let Some(runs) = runs {
         let x = (at.x / cell).floor();
         let y = (at.z / cell).floor();
-        return runs.iter().any(|r| y == r[0] as f64 && x >= r[1] as f64 && x < r[2] as f64);
+        return runs
+            .iter()
+            .any(|r| y == r[0] as f64 && x >= r[1] as f64 && x < r[2] as f64);
     }
     bounds.is_some_and(|[x0, z0, x1, z1]| at.x >= x0 && at.z >= z0 && at.x < x1 && at.z < z1)
 }

@@ -26,7 +26,6 @@ mod native_order_intent_tests;
 pub mod assault_runtime;
 pub mod catalog;
 pub mod client_view;
-pub mod recipient_availability;
 pub mod combat;
 pub mod command_destinations;
 pub mod commander_ai;
@@ -51,6 +50,7 @@ pub mod human_commander_policy;
 pub mod human_commander_state;
 pub mod human_commander_timing;
 pub mod match_horde;
+pub mod recipient_availability;
 
 #[cfg(test)]
 use crate as core_api;

@@ -31,3 +31,5 @@ CLIENT ROWS: none. These assigned rows all have server/core work. No differs can
 ## Validation
 
 Native qualification pending. All three shared Cargo slots were occupied during initial attempts; those attempts launched no Cargo process. An acquired S1 slot ran the formatter, which stopped before compilation because the new ceiling helper preceded a module attribute. The helper was moved below the attribute; the slot was released. No native test ran in that failed formatting attempt. Later source checks also corrected missing-seat spectator/default-action behavior and numeric identity comparisons before native qualification.
+
+The next acquired S3 slot completed formatting, then native compilation stopped on a missing `DamageContext` import in the collection tests (E0433). No test executed. The import is corrected and qualification is pending; the slot was released after Cargo exited.

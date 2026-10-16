@@ -216,9 +216,15 @@ fn if03_query_reads_only_delivered_rows_and_leaves_recipient_state_unchanged() {
     );
     let mut v = view(snapshot());
     assert!(availability(Some(&v), &json!({})).unwrap().ok);
-    assert!(availability(Some(&v), &json!({"t":"buy","unit":"rifle","slot":-0.0})).unwrap().ok);
+    assert!(
+        availability(Some(&v), &json!({"t":"buy","unit":"rifle","slot":-0.0}))
+            .unwrap()
+            .ok
+    );
     assert_eq!(
-        availability(Some(&v), &json!({"watching":true})).unwrap().reason,
+        availability(Some(&v), &json!({"watching":true}))
+            .unwrap()
+            .reason,
         "You are spectating"
     );
     let before = v.clone();

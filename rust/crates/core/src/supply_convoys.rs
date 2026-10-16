@@ -2389,27 +2389,64 @@ mod interface_sort_tests {
     }
     fn unit(id: UnitId, x: f64) -> UnitView {
         UnitView {
-            projected: false, id, owner: Some(0), role: UnitRole::Other,
-            hp: 100.0, built: 1.0, at: Point { x, z: 0.0 }, still: 0.0,
-            cargo_len: 0, region_cache: false, riding: None, path: vec![],
-            world_goal: None, orders: vec![], orders_pending: false, amove: None, stuck: 0.0,
+            projected: false,
+            id,
+            owner: Some(0),
+            role: UnitRole::Other,
+            hp: 100.0,
+            built: 1.0,
+            at: Point { x, z: 0.0 },
+            still: 0.0,
+            cargo_len: 0,
+            region_cache: false,
+            riding: None,
+            path: vec![],
+            world_goal: None,
+            orders: vec![],
+            orders_pending: false,
+            amove: None,
+            stuck: 0.0,
         }
     }
     fn reserve(provisions: f64) -> Reserves {
         Reserves {
-            ammo: 0.0, ammo_max: 0.0, ammo_price: 0.0, ammo_credit: None,
-            provisions, fuel: None, emergency: None, warning: None, forced: false,
-            stranded: false, exhausted: false, supply_rate: None, cut_for: Some(10.0),
+            ammo: 0.0,
+            ammo_max: 0.0,
+            ammo_price: 0.0,
+            ammo_credit: None,
+            provisions,
+            fuel: None,
+            emergency: None,
+            warning: None,
+            forced: false,
+            stranded: false,
+            exhausted: false,
+            supply_rate: None,
+            cut_for: Some(10.0),
         }
     }
     fn context(players: &[Player]) -> Context<'_> {
         Context {
-            enabled: true, construction: false, tick: 0, winner: false, army_pop: 1.0,
-            players, width: 1, chars: b".", aid: &[], points: &[],
+            enabled: true,
+            construction: false,
+            tick: 0,
+            winner: false,
+            army_pop: 1.0,
+            players,
+            width: 1,
+            chars: b".",
+            aid: &[],
+            points: &[],
         }
     }
     fn player() -> Player {
-        Player { slot: 0, team: 0, spawn: Point { x: 0.0, z: 0.0 }, out: false, away: false }
+        Player {
+            slot: 0,
+            team: 0,
+            spawn: Point { x: 0.0, z: 0.0 },
+            out: false,
+            away: false,
+        }
     }
 
     #[test]
@@ -2424,7 +2461,11 @@ mod interface_sort_tests {
             let mut world = TestWorld(vec![unit(30, 100.0), unit(10, 101.0), unit(20, 102.0)]);
             let targets = ConvoyState::default().targets(ctx, 0, &reserves, &mut world);
             assert_eq!(targets.len(), 1);
-            let expected = if provisions[0] == 30.0 { vec![10, 20, 30] } else { vec![30, 10, 20] };
+            let expected = if provisions[0] == 30.0 {
+                vec![10, 20, 30]
+            } else {
+                vec![30, 10, 20]
+            };
             assert_eq!(targets[0].members, expected);
             assert_eq!(targets[0].unit, Some(expected[0]));
         }
@@ -2441,12 +2482,31 @@ mod interface_sort_tests {
         let mut state = ConvoyState::default();
         let target = state.targets(ctx, 0, &reserves, &mut world).remove(0);
         let mut truck = Truck {
-            state: TruckState::Unloading, cargo: Stock { ammo: 1.0, provisions: 16.0, fuel: 0.0 },
-            target: Some(target), origin: StoreId::Source(1), timer: 8.0, manual: false,
-            hold: false, route: vec![], destination: None, route_failure: None, retry: None,
+            state: TruckState::Unloading,
+            cargo: Stock {
+                ammo: 1.0,
+                provisions: 16.0,
+                fuel: 0.0,
+            },
+            target: Some(target),
+            origin: StoreId::Source(1),
+            timer: 8.0,
+            manual: false,
+            hold: false,
+            route: vec![],
+            destination: None,
+            route_failure: None,
+            retry: None,
         };
         // Ammunition remains after service, so this test does not request a return route.
-        state.deliver(ctx, &unit(99, 0.0), &mut truck, &mut reserves, &mut world, 1.0);
+        state.deliver(
+            ctx,
+            &unit(99, 0.0),
+            &mut truck,
+            &mut reserves,
+            &mut world,
+            1.0,
+        );
         assert_eq!(reserves.get(30).unwrap().provisions, 15.0);
         assert_eq!(reserves.get(10).unwrap().provisions, 1.0);
     }
@@ -2470,19 +2530,47 @@ mod interface_sort_tests {
     fn convoy_origins_keep_equidistant_and_overflow_distance_ties_in_store_order() {
         let players = [player()];
         let ctx = context(&players);
-        for (target_x, xs) in [(0.0, [10.0, -10.0]), (-f64::MAX, [f64::MAX, f64::MAX / 2.0])] {
+        for (target_x, xs) in [
+            (0.0, [10.0, -10.0]),
+            (-f64::MAX, [f64::MAX, f64::MAX / 2.0]),
+        ] {
             let mut state = ConvoyState::default();
-            state.stores = xs.into_iter().enumerate().map(|(i, x)| Store {
-                id: StoreId::Source((10 - i) as u32), owner: 0, at: Point { x, z: 0.0 },
-                source: true, entity: None, capacity: empty(), buckets: vec![], donations: vec![],
-                active: true, support: false, point: None,
-            }).collect();
+            state.stores = xs
+                .into_iter()
+                .enumerate()
+                .map(|(i, x)| Store {
+                    id: StoreId::Source((10 - i) as u32),
+                    owner: 0,
+                    at: Point { x, z: 0.0 },
+                    source: true,
+                    entity: None,
+                    capacity: empty(),
+                    buckets: vec![],
+                    donations: vec![],
+                    active: true,
+                    support: false,
+                    point: None,
+                })
+                .collect();
             let target = Target {
-                id: TargetId::Unit(1), unit: Some(1), store: None, owner: 0,
-                at: Point { x: target_x, z: 0.0 }, members: vec![1], need: empty(), priority: None, relief: None,
+                id: TargetId::Unit(1),
+                unit: Some(1),
+                store: None,
+                owner: 0,
+                at: Point {
+                    x: target_x,
+                    z: 0.0,
+                },
+                members: vec![1],
+                need: empty(),
+                priority: None,
+                relief: None,
             };
             assert_eq!(validate(ctx), Ok(()));
-            assert_eq!(state.origins(ctx, 0, &target), vec![StoreId::Source(10), StoreId::Source(9)]);
+            assert_eq!(
+                state.origins(ctx, 0, &target),
+                vec![StoreId::Source(10), StoreId::Source(9)]
+            );
             if target_x != 0.0 {
                 let a = distance(state.stores[0].at, target.at);
                 let b = distance(state.stores[1].at, target.at);
