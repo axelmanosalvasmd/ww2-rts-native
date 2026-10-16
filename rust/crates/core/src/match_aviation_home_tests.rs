@@ -137,6 +137,15 @@ fn mov84_nearest_finished_accessible_airfield_and_initial_home_survive_ordinary_
                 u.hp = 1800.;
             }
         }
+        if !matches!(mode, Mode::Default | Mode::Conquest | Mode::Classic) {
+            // These mode runners have the same home primitive, but their full
+            // recipient admission remains outside this delivery batch.
+            for _ in 0..4 {
+                state.advance_tick().unwrap();
+            }
+            assert!(state.tick_state.fault().is_none());
+            continue;
+        }
         let selected: Vec<_> = (0..state.start.players.len())
             .map(|slot| SelectedSeat {
                 slot,
@@ -191,14 +200,31 @@ fn delivered_tick(state: &mut Match, delivery: &mut DeliveryState) -> Vec<serde_
             omit: false,
         })
         .collect::<Vec<_>>();
+    let classic = (state.options.mode == Mode::Classic).then(|| {
+        let public = state.elimination.as_ref().unwrap();
+        (
+            json!({"kind":"classic", "timeLeft": public.time_left.unwrap().max(0.).ceil(), "suddenDeath": public.sudden_death}),
+            public.nodes.iter().map(|n| json!([(n.at.x * 10.).round() / 10., (n.at.z * 10.).round() / 10., n.rate, u8::from(n.fuel)])).collect::<Vec<_>>(),
+            state.start.economy.players.iter().map(|p| (p.mun.floor(), p.fuel.floor())).collect::<Vec<_>>()
+        )
+    });
     let frame = delivery
         .capture_selected_with_tick_events(state, &selected, &report.events)
         .unwrap()
         .unwrap();
-    let snapshots = selected
+    let snapshots: Vec<_> = selected
         .iter()
         .map(|seat| frame.recipient(seat.slot).unwrap().into_json())
         .collect();
+    if let Some((mode, nodes, wallets)) = classic {
+        for (slot, snapshot) in snapshots.iter().enumerate() {
+            assert_eq!(snapshot["mode"], mode);
+            assert_eq!(snapshot["nodes"], json!(nodes));
+            assert_eq!(snapshot["mun"], wallets[slot].0);
+            assert_eq!(snapshot["fuel"], wallets[slot].1);
+            assert!(snapshot["mode"].get("teams").is_none());
+        }
+    }
     assert!(state.tick_state.fault().is_none());
     snapshots
 }
@@ -207,6 +233,19 @@ fn delivered_tick(state: &mut Match, delivery: &mut DeliveryState) -> Vec<serde_
 fn mov84_classic_constructs_two_airfields_and_trains_each_plane_at_its_paid_producer() {
     use crate::match_commands::Command;
     let mut state = scene(Mode::Classic);
+    {
+        let initial = crate::recipient_snapshot::SnapshotCache::new(&state).unwrap();
+        for slot in 0..state.start.players.len() {
+            let fields = initial.recipient(slot).unwrap().fields;
+            assert_eq!(fields["ghosts"], json!([]));
+            assert_eq!(
+                fields["mode"],
+                json!({"kind":"classic", "timeLeft":1500., "suddenDeath":false})
+            );
+            assert_eq!(fields["mun"], 0.);
+            assert_eq!(fields["fuel"], 0.);
+        }
+    }
     for control in state.commands.units.values_mut() {
         control.hold_fire = true;
         control.auto_cast = false;

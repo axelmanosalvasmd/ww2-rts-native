@@ -65,6 +65,33 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
     let mut result = Vec::with_capacity(g.players.len());
     for slot in 0..g.players.len() {
         let mut fields = Map::new();
+        if state.options.mode == Mode::Classic {
+            let classic = state.elimination.as_ref().ok_or(SnapshotError::Rules)?;
+            let time = classic.time_left.ok_or(SnapshotError::Rules)?;
+            finite(&[time])?;
+            fields.insert(
+                "mode".into(),
+                json!({
+                    "kind":"classic", "timeLeft": math::max(0., time.ceil()),
+                    "suddenDeath": classic.sudden_death
+                }),
+            );
+            let nodes = classic
+                .nodes
+                .iter()
+                .map(|node| {
+                    finite(&[node.at.x, node.at.z, node.rate])?;
+                    Ok(json!([
+                        r(node.at.x),
+                        r(node.at.z),
+                        node.rate,
+                        u8::from(node.fuel)
+                    ]))
+                })
+                .collect::<Result<Vec<_>, SnapshotError>>()?;
+            fields.insert("nodes".into(), json!(nodes));
+            fields.insert("ghosts".into(), json!([]));
+        }
         // Reuse Source's six-field ghost rows. Never consult a hidden live building here.
         if matches!(state.options.mode, Mode::Classic | Mode::World)
             && let Some((_, rows)) = state
