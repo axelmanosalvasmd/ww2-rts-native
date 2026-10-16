@@ -1,1 +1,1 @@
-- Reconciled editor persistence with the elimination hotfix: ordinary match saves retain v1 and load older bodies without elimination state. Authored scenario persistence reserves one shared v2 schema.
+- Reconciled editor persistence with the elimination hotfix: ordinary match saves retain v1 and load older bodies without elimination state. Authored scenario persistence reserves one shared v2 schema. The contract index uses the same v1 policy.
