@@ -1,0 +1,3 @@
+- AI commanders plan remembered bridge repairs, spoiled-ground filling, found-mine clearing, point defenses, complete HQ fortifications, and World travel from detached recipient facts. Field assignments retain their 90-second memory and keep builders out of later tactical orders.
+- Gates now run in matching ordinary modes, including Assault, Annihilation and Classic. World room admission stays closed. Tests cover Assault roles, HQ reserves and geometry, World planner orders, and ordinary engineering state through ticks and recipient snapshots.
+- Replaced the test that required HQ wall and gate steps to emit no orders with checks for the implemented work and gate spending.

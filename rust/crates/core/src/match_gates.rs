@@ -10,12 +10,7 @@ pub struct GateControl {
 
 impl Match {
     pub(crate) fn ordinary_gate_mode(&self) -> bool {
-        matches!(
-            self.options.mode,
-            crate::economy::Mode::Default | crate::economy::Mode::Conquest
-        ) && self.world.game.mode.is_none()
-            && !self.options.logistics
-            && self.convoys.is_none()
+        crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
     }
 
     pub(crate) fn validate_gate_actor(&self, id: UnitId) -> Result<(), String> {
@@ -32,7 +27,7 @@ impl Match {
         }
         if let Some(gate) = gate {
             if !self.ordinary_gate_mode() {
-                return Err("Gate runtime requires an ordinary Default or Conquest match".into());
+                return Err("Gate runtime requires a matching ordinary ground mode".into());
             }
             if !gate.remaining.is_finite() || !(0.0..=0.5).contains(&gate.remaining) {
                 return Err("invalid gate check timer".into());
@@ -131,3 +126,7 @@ impl Match {
 #[cfg(test)]
 #[path = "match_gate_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "commander_field_runtime_tests.rs"]
+mod commander_field_runtime_tests;
