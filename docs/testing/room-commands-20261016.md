@@ -155,3 +155,9 @@ The final FireAt fixtures initialize ordinary logistics after their authored gun
 setup. Ground, bomber and destroyer commands therefore exercise the composed
 R1 logistics and flight owners together, rather than qualifying only a
 logistics-disabled room. Final execution must cover that stronger fixture.
+
+Final workspace Clippy found four seated test adapters missing main's
+`Output::Watcher` variant. The adapters in `net_runtime_tests.rs`,
+`net_runtime_command_tests.rs`, `room_command_ingress_tests.rs` and
+`trusted_room_lobby_tests.rs` now panic explicitly if watcher output reaches
+a seated commander. No prior assertion or runtime guard is removed.

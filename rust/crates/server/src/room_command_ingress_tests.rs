@@ -11,6 +11,7 @@ fn drain(hub: &mut Hub, rx: &mut mpsc::Receiver<Output>, now: u64) -> Vec<Value>
                 messages.push(serde_json::from_str(&write.json).unwrap());
                 hub.complete_snapshot(&write, true, now);
             }
+            Output::Watcher(_) => panic!("watcher output reached a seated commander"),
             Output::Close(..) => panic!("unexpected close"),
         }
     }
