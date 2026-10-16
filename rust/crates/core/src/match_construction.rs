@@ -48,6 +48,116 @@ fn number(value: &Value, key: &str) -> Result<f64, String> {
 }
 
 impl Match {
+    /// Tear down an owned unfinished site for the original 75 percent MP refund.
+    /// This administrative removal creates no death, bounty, rubble or built counter.
+    pub fn cancel_construction(
+        &mut self,
+        owner: usize,
+        id: UnitId,
+    ) -> Result<Option<crate::match_commands::Denial>, String> {
+        use crate::match_commands::Denial;
+        use crate::match_story::{StoryChange, StoryKey, prepare_story_updates};
+        if self.finish.is_some()
+            || self
+                .start
+                .economy
+                .players
+                .get(owner)
+                .is_none_or(|p| p.away || p.out)
+        {
+            return Ok(Some(Denial::Blocked));
+        }
+        self.validate_match_finish_state()?;
+        let Some(unit) = self.world.game.units.get(&id) else {
+            return Ok(Some(Denial::Unseen));
+        };
+        let kind = self
+            .rules
+            .kinds
+            .get(unit.kind)
+            .ok_or("invalid cancelled site kind")?;
+        if unit.owner != owner || !kind.building || unit.built.is_none_or(|built| built >= 1.0) {
+            return Ok(Some(Denial::Unseen));
+        }
+        if unit.id != id || unit.built.is_none_or(|b| !b.is_finite() || b < 0.0) {
+            return Err("invalid cancelled site identity or progress".into());
+        }
+        let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
+        let refund = number(catalog.unit(&kind.name).map_err(|e| e.to_string())?, "cost")? * 0.75;
+        let wallet = self.start.economy.players[owner].mp + refund;
+        if !wallet.is_finite() {
+            return Err("construction refund overflow".into());
+        }
+        let structure = self
+            .world
+            .structures
+            .iter()
+            .find(|s| s.entity_id == Some(id))
+            .ok_or("missing cancelled site structure")?;
+        let structure_id = structure.id.clone();
+        let cells = structure.cells.clone();
+        let sections: BTreeSet<_> = structure.section_ids.iter().cloned().collect();
+        let mut physical = self.world.begin_transaction().map_err(|e| e.to_string())?;
+        physical.world.game.units.remove(&id);
+        for &cell in &cells {
+            if physical
+                .world
+                .sections
+                .get(&cell)
+                .is_some_and(|s| s.structure_id == structure_id)
+            {
+                physical.world.sections.remove(&cell);
+                physical.world.game.sections.remove(&(cell as u32));
+            }
+        }
+        physical.world.structures.retain(|s| s.id != structure_id);
+        physical
+            .world
+            .detached_sections
+            .retain(|key, _| !sections.contains(key));
+        for &cell in &cells {
+            physical
+                .world
+                .set_cell(cell, b'.')
+                .map_err(|e| e.to_string())?;
+        }
+        let physical = physical
+            .prepare_publication(&mut self.world)
+            .map_err(|e| e.to_string())?;
+        let story = prepare_story_updates(
+            &mut self.story,
+            false,
+            &[StoryChange {
+                slot: Some(owner),
+                key: StoryKey::MpSpent,
+                amount: -refund,
+            }],
+        )?;
+        physical.commit();
+        self.environment.cancel_structure_sections(&sections);
+        self.grid.remove_unit(id);
+        self.field_works.cancel(id);
+        self.commands.units.remove(&id);
+        self.commands.requests.retire_unit(id);
+        self.combat.remove(id);
+        self.firing.remove(id);
+        self.abilities.remove(id);
+        self.recovery.remove(id);
+        self.logistics.remove(id);
+        self.production.remove_building(id);
+        self.building_rallies.remove(&id);
+        self.recruit_metadata.remove(&id);
+        if let Some(world) = self.world_runtime.as_mut() {
+            for node in &mut world.nodes {
+                if node.depot == Some(id) {
+                    node.depot = None;
+                }
+            }
+        }
+        self.start.economy.players[owner].mp = wallet;
+        story.commit();
+        Ok(None)
+    }
     fn validate_construction_actor(&self, id: UnitId) -> Result<(), String> {
         let unit = self
             .world
