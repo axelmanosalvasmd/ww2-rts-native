@@ -618,7 +618,10 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
                                 common::exact(
                                     &actual["flights"],
                                     &row["fields"]["flights"],
-                                    &format!("{name}:{} seat{} live flights", frame["tick"], row["slot"]),
+                                    &format!(
+                                        "{name}:{} seat{} live flights",
+                                        frame["tick"], row["slot"]
+                                    ),
                                 );
                             }
                             recipients += 1;

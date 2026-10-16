@@ -29,9 +29,9 @@ test registrations merge without manual edits.
 - `rust/crates/core/src/commander_tactics.rs:1338`: retain the chores test
   module and all incoming batch7, shopping-input, regression and IF-25 modules.
   The planner body merged automatically and keeps both sets of behavior.
-- `rust/crates/core/src/match_commands.rs:779`: retain bounded Group validation
+- `rust/crates/core/src/match_commands.rs:780`: retain bounded Group validation
   and incoming Rail/Enter/FireAt finite-coordinate validation in one match.
-- `rust/crates/core/src/match_commands.rs:1641`: retain Group and incoming
+- `rust/crates/core/src/match_commands.rs:1646`: retain Group and incoming
   command variants, including Attack, in the terminal unreachable arms.
   Attack keeps its inherited mixed-aircraft/ground dispatcher above this
   match. No attack guard is removed.
@@ -40,14 +40,14 @@ test registrations merge without manual edits.
 - `rust/crates/core/src/recipient_snapshot/composition.rs:108`: retain both
   projected flights and projected aircraft, defaulting only missing entries
   to empty arrays. Shots retain the caller-owned batch adapter.
-- `rust/crates/core/src/recipient_snapshot/composition.rs:186`: retain #337's
+- `rust/crates/core/src/recipient_snapshot/composition.rs:189`: retain #337's
   canonical firing validation and every salvo bound. Retain main's aircraft
   owner admission and aviation-event refusal. All other actor, logistics,
   scenario, producer-buffer and grenade guards remain intact.
 - `rust/crates/core/src/match_commands.rs:75`: remove the automatically merged
   duplicate FireAt enum variant, retaining main's identical shared variant
   and serde derives. Keep Group as the inherited internal compound wrapper.
-- `rust/crates/core/src/match_commands.rs:515`: keep main's single finite
+- `rust/crates/core/src/match_commands.rs:519`: keep main's single finite
   Rail/Garrison/FireAt JSON parser and remove #337's redundant FireAt parser.
   Queue and coordinate semantics are identical.
 - `rust/crates/core/src/match_commands.rs:979`: route ground-only FireAt to
@@ -63,16 +63,20 @@ test registrations merge without manual edits.
   #337 adapter now supports live ground flights. Compare complete recorded
   shots and live-flight rows for every seat instead. The new launch frame
   adds one frame, five recipient outputs, four shot rows and one supplied
-  event. The final count assertion at line 650 becomes 159/795/94/25. Keep
+  event. The final count assertion at line 655 becomes 159/795/94/25. Keep
   the source fixture, numeric-bit
   comparisons, random-state preservation, empty-selection atomicity and all
   separate malformed-batch refusals unchanged. This is a deliberate replaced
   behavior test, explained in the changelog fragment.
-- `rust/crates/core/src/match_firing/fire_at_tests.rs:454`: add a merge
+- `rust/crates/core/src/match_firing/fire_at_tests.rs:452`: add a merge
   regression proving mixed tank/bomber FireAt refuses Unsupported without
   state writes, bomber-only FireAt still sets an Area mission, and tank-only
   FireAt sets the ground cell without changing that aircraft mission.
 
+
+The formatting follow-up changes only line wrapping in the composition
+flight entry, exact-flight comparison message, and two new regression calls.
+It changes no behavior or assertion.
 
 ## Scope and overlap
 

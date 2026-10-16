@@ -465,20 +465,14 @@ fn fire_at_preserves_aircraft_area_dispatch_and_mixed_selection_refusal() {
         before
     );
     assert_eq!(
-        dispatch(
-            &mut m,
-            json!({"t":"fireat","ids":[bomber],"x":43.,"z":41.})
-        ),
+        dispatch(&mut m, json!({"t":"fireat","ids":[bomber],"x":43.,"z":41.})),
         None
     );
     let mission = m.aviation.planes[&bomber].mission.unwrap();
     assert_eq!(mission.kind, crate::match_aviation::MissionKind::Area);
     assert_eq!(m.commands.units[&tank].fire_at, None);
     assert_eq!(
-        dispatch(
-            &mut m,
-            json!({"t":"fireat","ids":[tank],"x":43.,"z":41.})
-        ),
+        dispatch(&mut m, json!({"t":"fireat","ids":[tank],"x":43.,"z":41.})),
         None
     );
     assert_eq!(m.commands.units[&tank].fire_at, Some(20 * 80 + 21));
