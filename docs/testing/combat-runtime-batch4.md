@@ -8,7 +8,7 @@ Compound clicks dispatch up to eight whitelisted parts through the existing inte
 
 Retreat prepares every selected aircraft before committing ground routes, then sends eligible aircraft home and applies the existing ground retreat reset. It also cancels active construction through the canonical work owner, leaving the paid unfinished site and wallet intact. Foreign and missing IDs are not acted on. The old simtest case requiring mixed aircraft/ground Retreat to return Unsupported is removed; the new native test requires the supported behavior instead. The full selection still passes convoy and forced-logistics checks, including IDs beyond the troop execution cap. Aircraft placeholders preserve the original cap positions. Existing convoy and unsupported-mode guards remain in place.
 
-The remaining checks exercise existing World guard visibility and command delegation to the field-work and support owners. CMB-147 and CMB-148 are index rows: these tests prove command admission, ownership, payment and actual owner progress, not every engineering material or off-map support effect. Queued standalone Dig remains explicitly Unsupported.
+The remaining checks exercise existing World guard visibility and command delegation to the field-work and support owners. CMB-147 and CMB-148 are index rows: these tests prove command admission, ownership, payment and actual owner progress, not every engineering material or off-map support effect. Queued standalone Dig uses main's canonical waiting-order owner after the repair: admission normalizes the order and defers payment without replacing active work.
 
 ## Row checks
 
