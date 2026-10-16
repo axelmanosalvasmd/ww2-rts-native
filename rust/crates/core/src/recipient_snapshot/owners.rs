@@ -203,7 +203,9 @@ fn plan(state: &Match, u: &Unit) -> Result<(u8, Point), SnapshotError> {
     if let Some(at) = state.project_goal(u.id).map_err(|_| SnapshotError::Rules)? {
         return Ok((7, at));
     }
-    // Building-site identity is not represented by this engineering slice.
+    if let Some(site) = c.build_target.and_then(|id| g.units.get(&id)) {
+        return Ok((8, site.at()));
+    }
     if let Some(cell) = c.enter {
         return Ok((9, center(state, cell)?));
     }
