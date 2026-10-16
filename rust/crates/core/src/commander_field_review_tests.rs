@@ -86,7 +86,7 @@ fn intent_ai48_classic_raid_cannot_replace_this_looks_paid_field_assignment() {
 fn intent_ai48_existing_construction_builder_cannot_be_reassigned_to_field_work() {
     let mut input = repair_scene();
     input.units[0].build = true;
-    let observation = Observation::new(input).unwrap();
+    let observation = Observation::new(input.clone()).unwrap();
     let mut commands = Vec::new();
     field::field_work(
         &observation,
@@ -101,6 +101,23 @@ fn intent_ai48_existing_construction_builder_cannot_be_reassigned_to_field_work(
     assert!(
         commands.is_empty(),
         "construction must retain its worker: {commands:?}"
+    );
+    input.units[0] = unit(1, "engineer", 40.0);
+    let observation = Observation::new(input).unwrap();
+    let mut commands = Vec::new();
+    field::field_work(
+        &observation,
+        &mut field::State::default(),
+        &mut BTreeSet::new(),
+        |raw| {
+            commands.push(raw);
+            true
+        },
+    )
+    .unwrap();
+    assert!(
+        commands.is_empty(),
+        "economy engineers stay outside field squads"
     );
 }
 

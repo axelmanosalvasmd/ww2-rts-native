@@ -2,4 +2,4 @@
 - Gates now run in matching ordinary modes, including Assault, Annihilation and Classic. World room admission stays closed. Tests cover Assault roles, HQ reserves and geometry, World planner orders, and ordinary engineering state through ticks and recipient snapshots.
 - Replaced the test that required HQ wall and gate steps to emit no orders with checks for the implemented work and gate spending.
 - Added literal row mappings and strict lint coverage for 44 registered native intent checks.
-- World region and transport decisions retain the shared commander defense, retreat, research, support and raid policies.
+- World region and transport decisions retain the shared commander defense, retreat, research, support and raid policies. Threatened engineers escape before receiving construction work, and economy engineers stay out of combat-squad field assignments.

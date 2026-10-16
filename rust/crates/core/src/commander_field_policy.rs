@@ -141,7 +141,7 @@ pub fn field_work(
     let squads: Vec<_> = input
         .units
         .iter()
-        .filter(|u| u.owner == input.slot && u.hp > 0.0)
+        .filter(|u| u.owner == input.slot && u.hp > 0.0 && u.kind != "engineer")
         .collect();
     let quiet = |p| {
         !input

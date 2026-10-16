@@ -559,18 +559,37 @@ fn plan_inner(
     let mut budget = input.manpower - reserved;
     let mut newly_busy = BTreeSet::new();
     let adaptive = context.mode.is_construction() && skill.adaptive;
-    let rush = adaptive
-        && now < 240.0
-        && strategic_recent.iter().any(|e| {
-            now - e.time < 5.0
+    let rushing: Vec<_> = strategic_recent
+        .iter()
+        .copied()
+        .filter(|e| {
+            adaptive
+                && now < 240.0
+                && now - e.time < 5.0
                 && input.units.iter().any(|u| {
                     u.owner == input.slot
                         && boolean(definition(u), "building")
                         && dist(u.at, e.at) < 35.0
                 })
-        });
+        })
+        .collect();
+    let rush = !rushing.is_empty();
+    let rush_at = rush.then(|| Point {
+        x: rushing.iter().map(|s| s.at.x).sum::<f64>() / rushing.len() as f64,
+        z: rushing.iter().map(|s| s.at.z).sum::<f64>() / rushing.len() as f64,
+    });
+    // Reserve endangered engineers for the shared escape order before creating new work.
+    let construction_crew: Vec<_> = available_units
+        .iter()
+        .copied()
+        .filter(|u| {
+            !(world_policy
+                && u.kind == "engineer"
+                && rush_at.is_some_and(|at| dist(u.at, at) < 25.0))
+        })
+        .collect();
     let construction = if world_policy {
-        crate::commander_world_policy::construction(observation, &available_units, budget)?
+        crate::commander_world_policy::construction(observation, &construction_crew, budget)?
     } else {
         crate::commander_construction::plan(
             observation,

@@ -305,6 +305,7 @@ fn intent_ai33_fort_jobs_charge_gate_and_leave_deferred_wall_segments_for_ticks(
         unit(4, "hq", 20.0),
     ]);
     input.tick = 3000;
+    input.players[1].spawn = Point { x: 140.0, z: 20.0 };
     let observation = Observation::new(input).unwrap();
     let context = observation.input().runtime.as_ref().unwrap();
     let ground = sight_game(&observation, context);
