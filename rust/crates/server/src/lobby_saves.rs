@@ -133,7 +133,7 @@ impl Hub {
         }
         let state = Match::from_save_json(saved["g"]["state"].clone())?;
         if state.authored_scenario.is_some() && saved["version"] != crate::saves::AUTHORED_VERSION {
-            return Err("authored scenarios require save version 3".into());
+            return Err("authored scenarios require save version 2".into());
         }
         if !matches!(state.options.mode, Mode::Default | Mode::Conquest)
             || state.options.logistics

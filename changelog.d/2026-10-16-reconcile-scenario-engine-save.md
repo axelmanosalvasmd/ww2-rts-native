@@ -1,0 +1,1 @@
+- Kept the scenario engine on the complete authored v2 schema shared with objective missions, preserving ordinary v1 saves and atomic downgrade refusal. Replaced the obsolete v2-refusal test with refusal of the superseded v3 envelope.

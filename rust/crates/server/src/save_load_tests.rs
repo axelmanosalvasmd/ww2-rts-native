@@ -770,7 +770,7 @@ fn save_between_frames_restores_unsent_events_once_without_consuming_live_terrai
 }
 
 #[test]
-fn authored_objectives_save_v3_rejects_downgrade_and_restores_mission_and_pending_say() {
+fn authored_objectives_save_v2_rejects_downgrade_and_restores_mission_and_pending_say() {
     let dir = TestDir::new();
     let (mut hub, host, mut ra, _guest, mut rb) = setup(&dir);
     let native = hub.rooms["ABC"].native.as_ref().unwrap();
@@ -798,12 +798,11 @@ fn authored_objectives_save_v3_rejects_downgrade_and_restores_mission_and_pendin
     let mission = runtime.state().authored_scenario.clone();
     let id = hub.save_room("ABC", host.id).unwrap();
     let mut saved = hub.saves.read("ABC", &id).unwrap();
-    assert_eq!(saved["version"], 3);
+    assert_eq!(saved["version"], 2);
     hub.rooms.get_mut("ABC").unwrap().native = None;
-    // Schema v2 lacks contextual trigger facts and pending arrivals. Refuse it
-    // before native restoration, preserving the lobby and epoch.
+    // The superseded version 3 is refused before restoration, preserving the lobby and epoch.
     let mut legacy = saved.clone();
-    legacy["version"] = json!(2);
+    legacy["version"] = json!(3);
     let bad = "ABC-1800000000002-manual";
     let mut zipper = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
     zipper
@@ -825,7 +824,7 @@ fn authored_objectives_save_v3_rejects_downgrade_and_restores_mission_and_pendin
     let epoch = hub.next_epoch;
     assert_eq!(
         hub.load_room("ABC", host.id, &downgraded, 2).unwrap_err(),
-        "authored scenarios require save version 3"
+        "authored scenarios require save version 2"
     );
     assert_eq!(hub.next_epoch, epoch);
     assert!(hub.rooms["ABC"].native.is_none());

@@ -19,3 +19,15 @@ The #383 checkpoint follow-up changes these source hunks: `Objective.scope`; typ
 Before publication #376 also merges current main `fd714e36430cdfac864e6af00f346067c84d7863`. Its merge-tree tree is `394306ec262bad2d5c3d2b41aef8279e00160447`; merge commit `0640ef9f` retains it exactly, without manual hunks. Its only incoming files are the existing owner-closure status documentation and fragment. #383 already contains those main changes and merges that final #376 head as an ancestry-only update.
 
 The contract-index descriptions are also reconciled: #376 names ordinary v1 with optional elimination; #383 names ordinary v1 and shared authored v2. These replace the stale global v2 writer description inherited from SAVE-2.
+
+## #386: scenario engine
+
+Original head: `fa383c9cfa38bd6a7ec88c2e397ea18ad07e1225`. Incoming #383 `7ea29c2f017672d73aa56ce1cba19cdd6d9848c7` produced merge-tree tree `fa1a127caeda027f0e330faa6b641196c2134d9c`. There were five conflicted paths.
+
+- `docs/contracts/README.md`: one version-description hunk chooses ordinary v1/shared authored v2.
+- `docs/contracts/save-format.md`: two hunks choose the incoming v2 envelope row and rationale. The incoming complete field table, elimination policy and prototype references survive.
+- `docs/contracts/scenario-objectives.md`: one hunk chooses the incoming shared checkpoint paragraph while retaining the engine's admission, scope, lifecycle and arrival documentation.
+- `core/src/scenario_conditions.rs`: one comment hunk retains the engine's current-runtime wording; both serde derives remain.
+- `core/src/authored_scenario.rs`: ten conflict markers cover imports, deferred initializer declaration, initial group population, deferred field initialization, deferred/full-step implementation, contextual action dispatch, startup arrival setup, objective scope validation, deferred validation and tick dispatch. Every hunk takes the engine implementation. The complete file remains byte-identical to original #386; canonical persisted types are identical to reconciled #383. The new checkpoint-history regression merges automatically into the tests file.
+
+Merge commit `cf421a4d` contains those resolutions. The final #383 contract-index/ancestry update merges automatically afterward. The engine's follow-up changes `AUTHORED_VERSION` from 3 to 2, aligns the authored load error and test name/assertions, and tests unsupported v3 instead of refusing valid v2. Its design, changelog and contract verification name follow the same policy. No engine behavior or existing row assertions are removed. The old v2 refusal is deliberately replaced because v2 now carries the full schema on both scenario branches.
