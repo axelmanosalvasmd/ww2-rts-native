@@ -20,6 +20,8 @@ macro_rules! aligned_environment_draw {
 extern crate self as ww2_core;
 #[cfg(test)]
 mod aligned_replay;
+#[cfg(test)]
+mod native_order_intent_tests;
 
 pub mod assault_runtime;
 pub mod catalog;
