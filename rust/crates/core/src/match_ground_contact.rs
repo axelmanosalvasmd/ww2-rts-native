@@ -100,6 +100,35 @@ impl Match {
         let g = &self.world.game;
         let ch = g.chars[c];
         let infantry = profile.infantry;
+        let hostile_mine = if ch == b'N' {
+            let source_owner = self.world.mines.get(&c).copied().unwrap_or(-1);
+            let owner = if source_owner >= 0 {
+                Some(source_owner as usize)
+            } else if source_owner == -1 && self.uses_world_routes() {
+                Some(crate::game::LOCAL_DEFENDER_OWNER)
+            } else {
+                None
+            };
+            if owner.is_some_and(|owner| g.allied(owner, g.units[&id].owner)) {
+                None
+            } else {
+                if source_owner < -1
+                    || source_owner >= 0 && source_owner as usize >= g.players.len()
+                {
+                    return Err("invalid mine layer identity".into());
+                }
+                Some(source_owner)
+            }
+        } else {
+            None
+        };
+        if let Some(source_owner) = hostile_mine {
+            let ids: Vec<_> = g.units.keys().copied().collect();
+            let (mut damage, _) = self.firing_damage_view(&ids);
+            damage
+                .preflight_mine_detonation(c, source_owner)
+                .map_err(|e| format!("moved mine detonation: {e}"))?;
+        }
         if !infantry {
             let g = &self.world.game;
             let wet = crate::terrain::wet_at(g, c);
@@ -149,31 +178,14 @@ impl Match {
                 before_dust
             };
         }
-        let g = &self.world.game;
-        let unit = &g.units[&id];
-        if ch == b'N' {
-            let source_owner = self.world.mines.get(&c).copied().unwrap_or(-1);
-            let owner = if source_owner >= 0 {
-                Some(source_owner as usize)
-            } else if source_owner == -1 && self.uses_world_routes() {
-                Some(crate::game::LOCAL_DEFENDER_OWNER)
-            } else {
-                None
-            };
-            if !owner.is_some_and(|owner| g.allied(owner, unit.owner)) {
-                if source_owner < -1
-                    || source_owner >= 0 && source_owner as usize >= g.players.len()
-                {
-                    return Err("invalid mine layer identity".into());
-                }
-                let ids: Vec<_> = g.units.keys().copied().collect();
-                let (mut damage, retarget) = self.firing_damage_view(&ids);
-                damage
-                    .detonate_mine_emitting(c, source_owner, retarget, out)
-                    .map_err(|e| format!("moved mine detonation: {e}"))?;
-                if self.world.game.units[&id].hp <= 0. {
-                    return Ok(());
-                }
+        if let Some(source_owner) = hostile_mine {
+            let ids: Vec<_> = self.world.game.units.keys().copied().collect();
+            let (mut damage, retarget) = self.firing_damage_view(&ids);
+            damage
+                .detonate_mine_emitting(c, source_owner, retarget, out)
+                .map_err(|e| format!("moved mine detonation: {e}"))?;
+            if self.world.game.units[&id].hp <= 0. {
+                return Ok(());
             }
         }
         Ok(())

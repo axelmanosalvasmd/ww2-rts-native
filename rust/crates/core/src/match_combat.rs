@@ -681,14 +681,12 @@ pub enum ContactTarget {
     Cell(usize),
 }
 impl DamageWorld<'_> {
-    /// Remove the triggering mine before applying its unit-only blast.
-    pub(crate) fn detonate_mine_emitting(
+    /// Check mine contact before the caller publishes movement effects.
+    pub(crate) fn preflight_mine_detonation(
         &mut self,
         cell: usize,
         owner: i32,
-        retarget: &mut dyn RetargetSink,
-        emit: &mut dyn FnMut(environment::Effect),
-    ) -> Result<(), CombatError> {
+    ) -> Result<(ExplosionSource, f64), CombatError> {
         self.validate()?;
         self.environment_preflight()?;
         if self.world.game.chars.get(cell) != Some(&b'N')
@@ -705,6 +703,18 @@ impl DamageWorld<'_> {
             .ok_or(CombatError::Rules)?;
         let profile = ExplosionSource::from_catalog(mine, None, false)?;
         let radius = number(mine, "blast")?;
+        Ok((profile, radius))
+    }
+
+    /// Remove the triggering mine before applying its unit-only blast.
+    pub(crate) fn detonate_mine_emitting(
+        &mut self,
+        cell: usize,
+        owner: i32,
+        retarget: &mut dyn RetargetSink,
+        emit: &mut dyn FnMut(environment::Effect),
+    ) -> Result<(), CombatError> {
+        let (profile, radius) = self.preflight_mine_detonation(cell, owner)?;
         let at = Point {
             x: (cell % self.world.game.w) as f64 * crate::game::CELL + 1.,
             z: (cell / self.world.game.w) as f64 * crate::game::CELL + 1.,
