@@ -935,10 +935,10 @@ impl Match {
         let mut points = self.start.points.clone();
         let mut wallets = self.start.economy.clone();
         let mut placer = SpawnPlacer::new();
-        let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
-        let cfg = catalog.table("CFG").map_err(|e| e.to_string())?;
-        let supply_beat = number(field(cfg, "supply")?, "every")? as i64;
-        if supply && self.options.supply && game.tick % supply_beat == 1 {
+        if supply
+            && objectives::point_supply_due(self.options.mode, self.options.supply, game.tick)
+                .map_err(|e| format!("point supply scheduling: {e:?}"))?
+        {
             objectives::supply_lines(
                 terrain_view(game),
                 &mut points,

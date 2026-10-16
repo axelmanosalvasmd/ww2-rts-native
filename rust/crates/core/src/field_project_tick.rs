@@ -66,6 +66,11 @@ impl FieldWorksRuntime {
                 || !job.direction.is_finite()
                 || !job.elapsed.is_finite()
                 || job.elapsed < 0.0
+                || job.waits > 23
+                || job.kind != FortKind::Wall && job.waits != 0
+                || job
+                    .step_back
+                    .is_some_and(|p| !position(p) || job.kind != FortKind::Wall)
                 || !(job.elapsed + dt).is_finite()
                 || job.front.is_some_and(|n| !n.is_finite())
                 || job.reach.is_some_and(|n| !n.is_finite() || n < 0.0)
