@@ -1,8 +1,36 @@
+## Seat lifecycle controls and metadata (2026-10-16)
+
+Socket `pause` and `resume` remain rejected through `UNAVAILABLE`, including for the host. The existing host-side `RoomRuntime` pause APIs remain available without a public client caller. The server owns the supplied wall-clock deadlines and the one-second pause/frame cadence; the deterministic core receives no timer. Paused ingress ignores new orders while preserving the queue for resume. Operative and AI room admission remain closed on R1.
+
+Every admitted seat receives the existing roster-ordered `online` and `ping` arrays, as in reference `e4e579a` (`server.js:504,774`, `server/room-tick.js:30`). AI seats project `true` and `-1`, and unknown human RTT stays null. The common frame sender applies these fields to scheduled, paused and catch-up delivery without changing recipient visibility or wire shape.
+
+AI-19 evidence covers the existing detached core state: lazy spawn camera, private RNG, sampled opening delay and explicit resets through ordinary ticks and both recipient snapshots. It does not enable room AI or its takeover/departure callers. Only AI-19 and NET-66 are claimed. NET-79 is dropped because socket pause/resume ingress needs owner approval. NET-80 remains outside the proven set because live AI handover and loaded-save pause need separate activation and save work.
+
+## Tutorial runtime over existing Match systems (2026-10-16)
+
+The explicit `Match::new_tutorial` constructor adds the unattended Enemy seat and uses the existing `tutorial_steps` definitions. Tutorial shares the ordinary ground, routing, combat, objective and support systems. Its private step state owns only the current index, spawned IDs and pending dialogue. Lines leave through the core tick report from tick 40; no server or client transport is introduced. The runner advances at most one step per tick after capture and income, and finishes at the bridgehead through the common Match finish state.
+
+Instant Tutorial recruitment reuses the existing admission, debit and unit-publication transaction, with a separate home-placement path because Tutorial has no production buildings. The public Conquest production component keeps its existing mode gate. Tutorial reinforcements use the player's spawn and exclude the unattended enemy. The prototype's 5 MP/s base income and lack of a defeat condition are preserved. Public server admission, agreed interfaces and parity statuses stay unchanged.
+
 ## Concrete work and waiting Dig orders (2026-10-16)
+
+## Interface collection order and recipient queries (2026-10-16)
+
+Field hospitals use insertion order plus keyed membership, matching the prototype's Map semantics. Replacing an owner preserves placement order; removing and rebuilding a hospital appends it. World transactions clone both parts, and recovery and logistics consume the ordered iterator. Existing fire, soak, contact, navigation and live ascending-unit traversal keep their native implementations, with focused consumer tests for each collection. The hospital test advances an ordinary one-VP match through victory and three subsequent ticks, capturing complete snapshots for every seat without a fault. The World training test exercises the existing live unit loop without changing World admission or claiming World snapshot delivery.
+
+Availability and denial queries borrow only the reconstructed recipient ClientView. Map presentation helpers consume only the supplied received map; authoritative map validation still uses its stricter layer validation. The pure queries compare against pinned JavaScript fixtures, while collection tests assert the prototype's traversal intent. ABI exports and Unreal adoption remain separate. No header, wire, contract, privacy or public ingress change is included.
 
 Concrete cells use the existing finished-building publisher so their unit, control, combat, firing, ability, recovery, production and terrain records share the normal Match owners. The paid job retains its bounded occupancy retry count. A separate step-back goal keeps a deferred crew escape valid when the deterministic path budget is exhausted. This preserves the intended four-metre escape on a later tick without changing wall cost, build time or retry limits.
 
 Waiting Dig orders use the existing unit queue and ordinary paid Dig activation. The recipient adapter emits the existing engineering order kind for those waiting orders. Default/Conquest admission remains bounded; Classic and World field-work rooms stay guarded. No FFI, header, wire schema, contract or privacy policy changes.
+
+## AI shopping construction inputs (2026-10-16)
+
+Shopping receives the remaining budget and the reserves produced by the same detached planning pass. The observation no longer carries estimated build and fortification reserve amounts or a precomputed free-node count. Public resource positions, delivered depot memories and explicit owned-node indices provide the inputs. Node claims use only delivered depots and remembered enemy depots, at strictly less than eight metres. World engineer demand counts every unclaimed delivered node; its construction reserve considers only nodes on delivered owned ground.
+
+Construction and fortification proposals use the existing canonical command path. Builders assigned earlier in the pass remain busy, so later movement cannot replace their new jobs. Fortification still computes its reserve after base construction or repair. Assigned workers stay excluded, and proposed building positions join the fortification site exclusions so two jobs cannot spend against overlapping footprints. A delivered own-worker wall-work fact distinguishes wall Dig from ordinary Dig when deciding whether another crew may fortify. Candidate and worker ties use stable node indices and unit IDs. Fortification progress belongs to the existing private per-seat policy state, outside Match and recipient snapshots. Wall fortification dispatch remains separate work. Gate Dig remains unsupported at command admission. The planner computes their reserve thresholds but emits neither command and charges neither cost.
+
+The live observation producer remains limited to Default and Conquest. Classic and World shopping and reserve decisions can be exercised with detached inputs; this does not admit those modes or complete their construction and observation providers. Full construction, fortification and FireAt chores remain separate parity work. No FFI, C header, wire, contract or privacy change is included.
 
 ## Runtime engineering: native bridge identity (2026-10-16)
 
@@ -16,11 +44,37 @@ Read current main before integration: it lacks ai_receipt_input and ai_delivered
 
 # Three Crossroads Native: design decisions
 
+## Private Horde director queue (2026-10-16)
+
+The core seat dispatcher selects the human commander for ordinary seats and a
+scripted director for the internal Horde seat. The director retains its latest
+detached observation, uses Normal's 40-tick stagger and drains movement on every
+delivered observation beat. Live wave state prevents an old observation from
+dispatching after a break, wave replacement or match finish.
+
+Pending Horde movements belong to the director, outside canonical unit order
+queues. Each emitted movement is an ordinary single-unit command attempt for
+the existing admission path. Typed owner intent, including native route identity,
+replaces the prototype's JSON fingerprint. A same-cell Move or idle Stop changes
+that identity and invalidates pending work. Replacing a queued unit preserves its
+FIFO position; all callbacks for one observed tick share a four-order allowance.
+This adds core components without admitting full Horde ticking, recipient
+snapshots or hosting. Full-match lifecycle coverage uses an ordinary Conquest
+match with a detached wave context and the existing recipient snapshots.
+
 ## Typed scenario conditions and core refunds (2026-10-16)
 
 Scenario condition evaluation borrows typed authored state while reading current units, point owners and World region teams from Match. A caller supplies the context and shares an explicit work budget across evaluations. This keeps condition reads separate from scenario admission, trigger scheduling, actions and recipient projection. The evaluator follows the pinned condition semantics, including historical captures, pending arrivals, context fallback and short-circuit work charges. A 64-level guard protects callers that construct trees directly; validated authored trees remain below it.
 
 Waiting-job refunds prepare small production and wallet drafts before publishing the negative MP-spent tally. Site cancellation uses the existing World transaction before the wallet, story and metadata cleanup commit. These core operations add no network admission. Full MODE-91 remains held beyond the selected refund and recovery checks. MODE-83 proves the condition component, not an admitted authored-scenario match.
+
+## Editable map drafts and bounded save preparation (2026-10-16)
+
+Map authoring uses an in-memory draft separate from `World` and `Match`. Selection moves retain the selected layer's material overrides and authored section identities, health and supports. Failed bounds or collision checks leave the draft unchanged. Removal and support pruning can leave an invalid draft, which must pass the ordinary map validator before saving. This keeps unsupported surviving sections visible as authoring errors instead of silently repairing their anchors.
+
+The map loader now calls the scenario validator added in #298. A validated scenario can be edited and prepared for saving, but every startup profile rejects explicit authored scenarios before creating match state because their executor is absent. The previous fixture assertion that scenarios were unsupported by the loader now checks their retained definition. No command, event, flag or other live match state was added.
+
+`map_save::prepare_map_save` applies the prototype's save-field projection and an 8 MiB limit to incoming bytes before parsing, including discarded properties. It prepares bytes in memory and validates the projected document again. HTTP editor authorization, persistence and server integration remain absent, so MAP-23 remains component-only. The existing 16 MiB authoritative-loader limit is unchanged. Generated World documents are outside the demonstrated save scope. MAP-57's rendered-ground sampler and MAP-90's station-yard construction integration remain unimplemented; World admission stays guarded. MAP-92 retains field-specific diagnostics and stronger bounded integer checks for region IDs and ordered bounds, reported as differs candidates rather than approved differences.
 
 
 ## First-five engineering merged with MAP273 main (2026-10-16, source only)

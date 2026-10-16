@@ -2312,6 +2312,11 @@ impl crate::match_runtime::Match {
         let kind = unit.kind;
         let before = unit.at();
         let dt = self.rules.movement.tick;
+        let limit_travel = self.logistics.get(id).is_some()
+            || self
+                .convoys
+                .as_ref()
+                .is_some_and(|state| state.trucks.contains_key(&id));
         let fuel_speed = self.logistics.get(id).and_then(|r| {
             r.fuel.map(|fuel| {
                 let available = fuel
@@ -2346,7 +2351,7 @@ impl crate::match_runtime::Match {
         )
         .map_err(|e| format!("movement recipient traffic: {e:?}"))?;
         // The final multiplier applies after retreat/sprint select their speed.
-        let moved = crate::movement::move_unit_with_march(
+        let moved = crate::movement::move_unit_with_march_and_limit(
             &mut self.world.game,
             &self.rules,
             &mut self.grid,
@@ -2404,6 +2409,7 @@ impl crate::match_runtime::Match {
             },
             &traffic_knowledge,
             fuel_speed.unwrap_or(1.0),
+            limit_travel,
         )
         .map_err(|e| format!("movement recipient traffic: {e:?}"))?;
         if fuel_speed.is_some()

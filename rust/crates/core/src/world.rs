@@ -142,6 +142,40 @@ impl std::ops::Deref for OrderedMineSeen {
         &self.bits
     }
 }
+/// Field hospitals retain placement order when recovery and convoy sources are collected.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct OrderedAid {
+    order: Vec<usize>,
+    owners: BTreeMap<usize, usize>,
+}
+impl OrderedAid {
+    pub fn insert(&mut self, cell: usize, owner: usize) -> Option<usize> {
+        if !self.owners.contains_key(&cell) {
+            self.order.push(cell);
+        }
+        self.owners.insert(cell, owner)
+    }
+    pub fn remove(&mut self, cell: &usize) -> Option<usize> {
+        let prior = self.owners.remove(cell);
+        if prior.is_some() {
+            self.order.retain(|c| c != cell);
+        }
+        prior
+    }
+    pub fn iter(&self) -> impl Iterator<Item = (&usize, &usize)> {
+        self.order.iter().map(|cell| (cell, &self.owners[cell]))
+    }
+    pub fn clear(&mut self) {
+        self.order.clear();
+        self.owners.clear();
+    }
+}
+impl std::ops::Deref for OrderedAid {
+    type Target = BTreeMap<usize, usize>;
+    fn deref(&self) -> &Self::Target {
+        &self.owners
+    }
+}
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct FailureMetadata {
     pub impulse: Option<f64>,
@@ -240,7 +274,7 @@ pub struct World {
     pub roads: bool,
     pub mines: BTreeMap<usize, i32>,
     pub mine_seen: OrderedMineSeen,
-    pub aid: BTreeMap<usize, usize>,
+    pub aid: OrderedAid,
     pub fires: OrderedFires,
     pub structures: Vec<WorldStructure>,
     pub sections: BTreeMap<usize, SectionMetadata>,
@@ -575,7 +609,7 @@ impl World {
             roads,
             mines,
             mine_seen: OrderedMineSeen::default(),
-            aid: BTreeMap::new(),
+            aid: OrderedAid::default(),
             fires: OrderedFires::default(),
             structures: Vec::new(),
             sections: BTreeMap::new(),
@@ -894,7 +928,7 @@ impl World {
                 .unwrap_or(f64::NAN)
         } else {
             self.rules.movement.terrain_hp(ch).unwrap_or(0.0)
-                * self.game.tough.as_ref().map_or(1.0, |t| t[c])
+                * self.game.tough.as_ref().map_or(1.0, |t| f64::from(t[c]))
         }
     }
     fn state_of(&self, c: usize) -> u8 {

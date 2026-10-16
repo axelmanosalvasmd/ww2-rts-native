@@ -17,13 +17,7 @@ fn slot(v: &Value) -> Option<usize> {
     v.as_u64().map(|n| n as usize)
 }
 fn army(v: &Value) -> ArmySize {
-    match v.as_str().unwrap() {
-        "standard" => ArmySize::Standard,
-        "large" => ArmySize::Large,
-        "massive" => ArmySize::Massive,
-        "endless" => ArmySize::Endless,
-        _ => panic!(),
-    }
+    ArmySize::from_key(v.as_str().unwrap())
 }
 fn players(v: &Value) -> Vec<PlayerEconomy> {
     a(v).iter()

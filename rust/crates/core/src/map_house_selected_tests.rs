@@ -75,7 +75,7 @@ fn check_cells(m: &Match, expected: &Value) {
         assert_eq!(json!(g.house[c]), row["house"]);
         assert_eq!(bits(f64::from(g.cell_hp[c])), row["hp"]);
         assert_eq!(
-            g.tough.as_ref().map_or(1.0, |v| v[c]).to_bits(),
+            g.tough.as_ref().map_or(1.0, |v| f64::from(v[c])).to_bits(),
             row["tough"].as_f64().unwrap().to_bits()
         );
         let s = &row["section"];

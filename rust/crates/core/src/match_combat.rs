@@ -243,7 +243,11 @@ impl DamageWorld<'_> {
         CombatContext {
             tick: self.world.game.tick as f64,
             mode: self.mode,
-            horde_defenders: 0,
+            horde_defenders: if self.mode == Mode::Horde {
+                self.world.game.players.len().saturating_sub(1) as u32
+            } else {
+                0
+            },
             allied: self.alliance(owner, target),
             tech_enabled: self.tech_enabled,
             attacker_tech: usize::try_from(owner)
@@ -676,6 +680,47 @@ pub enum ContactTarget {
     Cell(usize),
 }
 impl DamageWorld<'_> {
+    /// Remove the triggering mine before applying its unit-only blast.
+    pub(crate) fn detonate_mine_emitting(
+        &mut self,
+        cell: usize,
+        owner: i32,
+        retarget: &mut dyn RetargetSink,
+        emit: &mut dyn FnMut(environment::Effect),
+    ) -> Result<(), CombatError> {
+        self.validate()?;
+        self.environment_preflight()?;
+        if self.world.game.chars.get(cell) != Some(&b'N')
+            || owner < -1
+            || owner >= 0 && owner as usize >= self.world.game.players.len()
+        {
+            return Err(CombatError::InvalidInput("mine identity"));
+        }
+        let mine = Catalog::compiled()
+            .map_err(|_| CombatError::Rules)?
+            .table("CFG")
+            .map_err(|_| CombatError::Rules)?
+            .get("mine")
+            .ok_or(CombatError::Rules)?;
+        let profile = ExplosionSource::from_catalog(mine, None, false)?;
+        let radius = number(mine, "blast")?;
+        let at = Point {
+            x: (cell % self.world.game.w) as f64 * crate::game::CELL + 1.,
+            z: (cell / self.world.game.w) as f64 * crate::game::CELL + 1.,
+        };
+        self.world
+            .mutate_cell(
+                cell,
+                crate::world::CellChange {
+                    mine: Some(false),
+                    ground: Some(b'+'),
+                    ..Default::default()
+                },
+            )
+            .map_err(environment::EnvironmentError::from)?;
+        self.explosion_emitting(at, radius, profile, owner, None, None, None, retarget, emit)
+    }
+
     /// Resolve the original local-contact damage. Flight motion/selection remains with firing.
     #[allow(clippy::too_many_arguments)]
     pub fn local_contact(
@@ -948,6 +993,7 @@ impl DamageWorld<'_> {
         };
         let damage = base
             * shrug
+            * combat::bunker_mul(target.kind, context.mode, context.horde_defenders)?
             * fall
             * if combat::retreat_protected(target.retreat)? {
                 number(cfg, "retreatDamage")?
@@ -1270,6 +1316,7 @@ impl crate::match_runtime::Match {
             .kill_bounty(
                 crate::economy_state::ModeContext {
                     kind: self.options.mode,
+                    income_excluded_slot: self.horde.as_ref().map(|h| h.slot),
                     ..Default::default()
                 },
                 self.actor_policy(unit.owner)
@@ -1384,7 +1431,7 @@ impl crate::match_runtime::Match {
             || !self.aviation.planes.is_empty()
             || !self.aviation.anti_air.is_empty()
         {
-            self.validate_aviation()
+            self.validate_aviation_observation()
                 .map_err(|_| CombatError::InvalidInput("aircraft retirement registry"))?;
         }
         let mut wallets = self

@@ -145,9 +145,7 @@ fn strip(s: &Strike, along: f64, side: f64) -> Point {
 }
 impl Match {
     pub(crate) fn validate_support(&self) -> Result<(), SupportError> {
-        if !matches!(self.options.mode, Mode::Default | Mode::Conquest)
-            || self.world.game.mode.is_some()
-        {
+        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
             return Err(SupportError::Unsupported(
                 "support currently requires Conquest",
             ));

@@ -2,28 +2,6 @@
 use super::*;
 
 impl Match {
-    pub(crate) fn weapon_range(&self, unit: &Unit, weapon: &Value) -> Result<f64, String> {
-        let pit = matches!(
-            self.rules.kinds[unit.kind].name.as_str(),
-            "mg" | "at" | "mortar" | "flak" | "howitzer"
-        ) && self.world.game.cell_of(unit.x, unit.z).is_some_and(|cell| {
-            self.field_works.pits().contains(&cell) && self.world.game.chars[cell] == b'T'
-        });
-        let multiplier = if pit {
-            Catalog::compiled()
-                .map_err(|e| e.to_string())?
-                .table("FORTS")
-                .map_err(|e| e.to_string())?
-                .get("nest")
-                .and_then(|v| v.get("range"))
-                .and_then(Value::number)
-                .ok_or("missing gun-pit range")?
-        } else {
-            1.0
-        };
-        Ok(n(weapon, "range", 0.0) * multiplier)
-    }
-
     pub(super) fn weapon_start_cell(&self, unit: &Unit) -> Result<usize, String> {
         let g = &self.world.game;
         if unit.air.is_some() && g.w > 0 && g.h > 0 {

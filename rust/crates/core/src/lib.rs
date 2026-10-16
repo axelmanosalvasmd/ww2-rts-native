@@ -23,12 +23,15 @@ mod aligned_replay;
 #[cfg(test)]
 mod native_order_intent_tests;
 
+pub mod ai_view;
 pub mod assault_runtime;
 pub mod catalog;
 pub mod client_view;
 pub mod combat;
 pub mod command_destinations;
 pub mod commander_ai;
+mod commander_construction;
+mod commander_fortification;
 mod commander_forward_hq;
 pub mod commander_mind;
 mod commander_shopping;
@@ -48,12 +51,14 @@ pub mod fog;
 pub mod formation;
 pub mod game;
 pub mod grid;
+pub mod horde_commander;
 pub mod human_commander;
 pub mod human_commander_inputs;
 pub mod human_commander_policy;
 pub mod human_commander_state;
 pub mod human_commander_timing;
 pub mod match_horde;
+pub mod recipient_availability;
 
 #[cfg(test)]
 use crate as core_api;
@@ -66,10 +71,15 @@ pub mod match_companion_effects;
 mod match_companion_tick;
 pub mod match_companions;
 pub mod scenario_validation;
+pub mod seat_commander;
 
 pub(crate) mod existing_observers;
 pub mod logistics;
 pub mod map;
+pub mod map_authoring;
+pub mod map_save;
+#[cfg(test)]
+mod map_world_validation_tests;
 pub mod match_abilities;
 pub mod match_actor;
 pub mod match_aircraft_commands;
@@ -98,6 +108,7 @@ pub mod match_runtime;
 pub mod match_story;
 pub mod match_support;
 pub mod match_tick;
+pub mod match_tutorial;
 pub mod match_withdrawal;
 pub mod match_world_elimination;
 pub mod match_world_end;

@@ -10,13 +10,24 @@ use crate::{
     random::{MatchRandom, StreamId},
 };
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Level {
     Easy,
+    #[default]
     Normal,
     Hard,
 }
 impl Level {
+    /// Lobby choices are exact names. A missing choice is handled by the seat default.
+    pub fn from_key(key: &str) -> Option<Self> {
+        match key {
+            "easy" => Some(Self::Easy),
+            "normal" => Some(Self::Normal),
+            "hard" => Some(Self::Hard),
+            _ => None,
+        }
+    }
+
     pub fn every(self) -> i64 {
         match self {
             Self::Easy => 120,
@@ -229,15 +240,18 @@ impl Observation {
             .ok_or(PolicyError::Catalog)?;
         if let Some(context) = &input.runtime {
             let finite_point = |p: Point| p.x.is_finite() && p.z.is_finite();
-            if ![
-                context.munitions,
-                context.fuel,
-                context.sight,
-                context.build_reserve,
-                context.fort_reserve,
-            ]
-            .iter()
-            .all(|v| v.is_finite())
+            if ![context.munitions, context.fuel, context.sight]
+                .iter()
+                .all(|v| v.is_finite())
+                || context
+                    .owned_nodes
+                    .iter()
+                    .any(|i| *i >= context.nodes.len())
+                || context
+                    .nodes
+                    .iter()
+                    .chain(&context.known_depots)
+                    .any(|p| !finite_point(*p))
                 || context.height.as_ref().is_some_and(|h| h.len() != cells)
                 || context
                     .smokes
