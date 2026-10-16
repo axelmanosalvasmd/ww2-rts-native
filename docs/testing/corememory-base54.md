@@ -66,3 +66,9 @@ Execution belongs to the root agent. Requested core filters are `base54_` and
 `mode74_`; requested simtest filters are `world_regions`, `world_finish`,
 `world_phases` and `world_epilogue`. This subagent has run no Cargo command,
 prototype process, recorder, hosted CI, commit, merge or push.
+
+Root qualification at `74986341` passed all six `base54_` tests, both MODE-74
+detached capture checks and the restored World refusal regressions. That run
+had four failures elsewhere in the composed branch. Use the PR body for the
+final producing-head receipt; the earlier component results do not qualify
+unexecuted successor source.

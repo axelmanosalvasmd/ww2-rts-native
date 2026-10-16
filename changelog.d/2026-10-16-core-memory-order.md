@@ -4,3 +4,4 @@
 - Correct the new detached-fort owner assertion and AI snapshot tick assertion so the composed intent tests compile.
 - Admit the existing Classic wreck-list cache path so composed room frames and checkpoints can reach its recipient snapshots.
 - Correct the Classic producer used by the new queue-order test without changing its ordering assertions.
+- Record the composed merge audit, test repairs and deferred World reconnect scope for review.

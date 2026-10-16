@@ -5,7 +5,7 @@ It merges #396 (`bc9088f7b7a616795d0581527bdee3085e5b716e`) for Classic
 building ghosts, #394 (`d2b7e3b772930c72b26c43363512cd2ca3224e08`) for mission
 recipients and #336 (`5057a6b50084220ab5f9cb45908486ae7e7f6f62`) for fort
 construction and the retained default capture refusal. These components are
-needed by the assigned rows. The hotfix #373 remains a merge prerequisite.
+needed by the assigned rows. The #373 prerequisite is fulfilled: its hotfix is now on main.
 
 Acknowledged locally, without issue writes: owner decisions C and L at #5
 comment 6217590741 and Axel's confirmation 6218552386. AI reads the recipient
@@ -17,10 +17,10 @@ acknowledgment, hosted CI, parity status and merge belong to the orchestrator.
 
 - MAP-100 (non-World):
   `room_runtime::core_memory_order_tests::map100_ordinary_reconnect_rescout_and_hidden_counterfactual_keep_delivered_memory`.
-  A three-seat Conquest match observes a changed road, withdraws its allied
+  A three-seat Conquest match receives an incremental changed-road row, withdraws its allied
   scout and retains the observed row. Two restored branches differ only in
-  hidden terrain. Complete allied snapshots and complete reconnect start
-  envelopes remain equal. Rescouting delivers the current road and elevation;
+  hidden terrain and enemy health, yet complete allied snapshots and reconnect
+  start envelopes remain equal. Rescouting delivers the current road and elevation;
   never-observed changes remain absent. Each advancing tick delivers every
   seat. The authored map remains public in ordinary modes, as in
   `server.js:463-465`; remembered changes arrive in `cells`.
@@ -75,6 +75,13 @@ and authored schema sections, and clarified that the AI codec itself does not
 increment the envelope version (non-authored v1, authored v2). All Rust and
 registration hunks merged automatically. #336 merged automatically.
 
+Main `b113bb959f95499f04b47213bd27efb805f18e95` was merged automatically
+in `f7f01d2ae3154e307493450f299f7506b612d50a`. A merge-tree comparison found
+no manual differences. The incoming changes are the #381/#382 startup and
+Tutorial tests and their changelog fragments. The refreshed #5 message
+`julio-373-merged-decisions-20261016` confirms the hotfix merge and keeps
+deferred World clauses named for R1. No parity status is edited here.
+
 The BASE-54 document lists every additional hand edit required to reconcile
 inherited #301 positive World-fort expectations with #336's retained refusal.
 These are separate from the automatic merge results.
@@ -90,3 +97,7 @@ witness's unsupported events, and a Classic production fixture using the wrong
 producer. Repairs and renewed qualification follow; this partial run alone does
 not qualify the final tree. The preceding `400ce57d` attempt failed compilation
 on two new test assertions; both were corrected before this run.
+
+The final producing-head qualification receipt belongs in the PR body. This
+record preserves the earlier failing run and its exact scope; it does not
+transfer those results to a successor tree.
