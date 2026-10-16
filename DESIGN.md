@@ -4299,3 +4299,23 @@ The Source generation at `8484936ebc90db8ffdc630478df433e794eea504` escaped with
 Before the unchanged full catch serialization, synchronously write a separate private original-error-diagnostic.json with bounded original error name, message and stack, the case name, last recorded phase/tick/index, last input tick and scalar capture counts. Error strings are limited to 128, 2,048 and 8,192 UTF-16 code units. Absent scalar data is null. The last recorded tick describes the completed observation prefix, not necessarily the failing tick. This diagnostic never includes active capture objects. Exclusive creation preserves an earlier diagnostic; a failed diagnostic write still proceeds to the original full packet path. The original full failure serialization and rethrow remain unchanged.
 
 Only the catch gains code. Successful captures, inputs, commands, random draws, runtime rules, assertions and admission expectations remain unchanged. No Source, Node, Cargo, rustc, native, formatting, lint, discovery or CI job runs for this child. The diagnostic is unexecuted source, not new scene proof. Preserve the prior hidden-recipient objection: Hold Fire, range and visibility remain combined. All parity cells, providers, FFI, wire and contracts remain unchanged; no adoption or qualification follows. A new literal-head, selection and slot grant remains necessary for execution.
+
+## Owned combat native intent tests (2026-10-16, unrun)
+
+Apply Axel's approved rules 1 to 5 from issue #5 comment6206861267 to the
+39-row AUDIT_COMBAT window. The new cfg(test) suite uses the existing Match
+firing, contact, damage, support, retirement, visibility, reaction and recovery
+providers with declared component inputs and seeded native randomness. One
+paid-birth case executes recorded_buy. No expected observation seeds a result,
+and no runtime guard, FireAt/beam/air actuator, replay default or reference pin
+changes. Static catalog and pure-function exact checks remain intact.
+
+The 32 new tests exercise 34 owned rows. Five rows lack runnable providers;
+partial rows retain their individually listed gaps. All 39 remain in progress
+until the applicable native tests pass and a reviewer confirms complete intent
+coverage from the prototype. The compact [row map](docs/testing/combat-native-intent-window.md)
+records literal tests, prototype references and the remaining branches.
+The old 7f8 autocast and 848 Source serialization failures remain at their
+producing heads. No new Source recorder, capture or evidence bundle is added.
+Root must grant one focused nextest batch on the frozen source head with
+--no-fail-fast; failed rows are dropped individually without semantic retry.

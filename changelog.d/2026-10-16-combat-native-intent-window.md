@@ -1,0 +1,1 @@
+- Add 32 native combat feature tests and literal test mappings for the 39-row owned combat window under Axel's approved native intent rule. Keep missing and partial providers in progress, preserve prior failures, and leave all new native results and reviewer qualification pending.
