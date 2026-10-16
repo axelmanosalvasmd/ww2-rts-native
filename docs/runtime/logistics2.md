@@ -55,5 +55,7 @@ The default-map restart regression also preserves its complete authored structur
 graph. It exposed the missing `house` decoder entry; recognizing this existing
 canonical kind changes no checkpoint fields or version.
 
-Validation is pending until the parent executes the registered focused checks,
-formatting and strict workspace Clippy under the shared slot protocol.
+Qualification uses the registered focused checks, formatting and strict workspace
+Clippy under the shared slot protocol. The PR records the actual producing head,
+Rust tree and results. Hosted checks and Hermes' exact-head runtime acknowledgment
+remain with the orchestrator.

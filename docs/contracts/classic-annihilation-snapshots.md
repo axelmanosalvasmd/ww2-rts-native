@@ -41,5 +41,6 @@ Focused source tests are registered in `recipient_snapshot::elimination_tests`:
 - `elimination_snapshot_admission_rejects_missing_state_and_other_modes` checks
   missing owners, invalid timers, mismatched mode pairs and excluded modes.
 
-These tests are source additions until the integration run executes them. Full
-match lifecycle validation belongs to the LOGISTICS-2 integration checks.
+The LOGISTICS-2 integration checks provide full match lifecycle validation. The
+PR records actual executions with their producing head and Rust tree; source
+inspection alone does not qualify these tests as passed.

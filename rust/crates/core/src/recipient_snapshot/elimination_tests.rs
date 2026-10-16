@@ -56,7 +56,7 @@ fn classic_complete_snapshots_keep_private_currency_and_public_prototype_nodes()
         player.mun = 11.99 + slot as f64 * 10.;
         player.fuel = 41.99 + slot as f64 * 10.;
         player.fuel_inc = Some(2.26 + slot as f64);
-        player.upkeep = Some(3.14 + slot as f64);
+        player.upkeep = Some(3.12 + slot as f64);
     }
     let mode = state.elimination.as_mut().unwrap();
     mode.time_left = Some(12.01);
