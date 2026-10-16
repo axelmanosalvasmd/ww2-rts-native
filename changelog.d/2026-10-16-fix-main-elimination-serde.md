@@ -1,0 +1,1 @@
+- Fix main failing to compile after elimination modes and versioned saves merged by serializing elimination state and its resource nodes. Add a Classic checkpoint round trip through sudden death and next-tick continuation, and document version 1 keys and compatibility. Room admission for Annihilation and Classic remains closed.

@@ -1,0 +1,1 @@
+- Add engineering regression checks for dry-ground bridge refusal, exact directed bridge previews, building blast damage ordering and overflow, and rubble settlement, vehicle exclusion, persistence and Fill clearing.

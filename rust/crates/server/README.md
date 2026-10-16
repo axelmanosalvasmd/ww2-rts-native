@@ -28,7 +28,7 @@ The lobby JSON preserves the reference fields, with `proto: 0` added. `rules` re
 
 `start` and `restart` return `deny` with `reason: scenario`. `save` and `loadSave` return `reason: save`. These known commands return `reason: blocked`: `resync`, `fps`, `end`, `nextwave`, `pause`, `resume`, `handAi`, `leave`, and all 31 gameplay commands in `docs/parity/protocol-messages.md`. Denials are limited to four per rolling second per identity, including across reconnects. Tutorial auto-start is refused with `scenario`. The room stays in the lobby. Operative joins are refused with `deny {cmd: "join", reason: "commander"}` and close 1008.
 
-These denials are explicit capability limits of this incomplete slice, not claims that the reference sends them in lobby state. There is no `start` envelope, snapshot stream, simulation clock, AI execution, pause, results, replay, save/load, Horde records, map editing, static browser hosting, diagnostics, sharding, bundled host integration or account authentication. Privacy decisions about in-match spectators, flag bits and companion hit direction remain untouched.
+These denials are explicit capability limits of this incomplete slice, not claims that the reference sends them in lobby state. There is no `start` envelope, snapshot stream, simulation clock, AI execution, pause, results, replay, save/load, Horde records, map editing, static browser hosting, diagnostics, bundled host integration or account authentication. Privacy decisions about in-match spectators, flag bits and companion hit direction remain untouched.
 
 Axum's WebSocket transport does not negotiate permessage-deflate here, so messages use uncompressed text. Each client has a bounded queue of 64 outbound messages; a stalled client is closed with 1013. Those are transport limitations of the slice. Names that end exactly halfway through a UTF-16 surrogate pair are emitted with a replacement character, whereas the reference can serialize the lone surrogate. Token identity retains the original code units and is unaffected.
 
@@ -91,3 +91,27 @@ An absent or unready retained seat does not block start or healthy restart: the 
 Every successful publication retains a complete private option/derived-seed receipt in its runtime and logs `NATIVE_MATCH` JSON to stderr. The explicit seed is reused for each fresh identity; weather seed None uses the existing constructor derivation, whose actual result is recorded. `NATIVE_REFUSED` and `NATIVE_FAULT` are host diagnostics. Tokens and private authoring data are excluded. No seed, receipt, capability, terminal-fault field or new envelope is sent to clients. Start keeps its existing 13 fields, and ingress remains move/amove/stop/stance. These host logs are private operator output.
 
 `tests/trusted_room_process.rs` launches the ordinary executable and uses real TCP/WebSocket clients with ClientView decoding. Its assertions cover the chosen profile, private admission, both seat controls, absent-seat start/reconnect, healthy restart and genuine authored mine-contact fault refusal. Internal tests separately compare failed preparation and old-write authority. Verification results are recorded in DESIGN; test source alone does not establish a pass or actual Unreal consumer adoption.
+
+Set `WW2_DIAG=1` to append one JSON record per active room every five seconds to `logs/diag-<room>.jsonl`, relative to the server's working directory. Records include tick throughput and percentiles, maintenance scheduler delay, late ticks, snapshot cadence and each player's RTT, ping silence, queued UTF-8 payload bytes and clamped browser ping metrics. `WW2_TICKLOG=1` prints phase p50/p95 values every thirty seconds. Both options default off. Library hosts can set `Config.diagnostic_dir` and `Config.tick_log`. File errors or a full 64-record output queue discard diagnostic records while gameplay continues.
+
+`WW2_SHARDS=N` selects 1-64 game workers, defaulting to one. Above one, a front serves HTTP and assigns each decoded `/ws?room=CODE` to FNV-1a(CODE) modulo N, using the prototype's UTF-16 hash. Each worker has its own operating-system thread, Tokio runtime, room limit and Hub. `/api/rooms` merges the existing public directory fields in worker order. Existing maps are immutable and served by the front. Other paths cannot upgrade to WebSocket.
+
+A worker panic closes its connections and discards its rooms. The supervisor starts a fresh worker after one second; the other workers keep their rooms. A room's old match is never resumed or retried. Front shutdown stops all game workers, closes their sockets and invalidates their native controls. This also applies when the serving future is dropped. An abort that terminates the whole process still terminates all its threads.
+
+Trusted-room mode applies its existing private, code-bound admission policy to every worker. Only the room's assigned worker receives connections for the authorized code. Public starts, World admission and logistics guards stay unchanged. The internal worker channels carry sockets, directory requests and readiness; they add no client messages. Horde record persistence and mutable map editing remain unavailable, so there is no record relay or map invalidation channel. The tests and validation are listed in [the NET-96 evidence note](../../../docs/testing/ai-if-net96.md).
+
+## Versioned ordinary match saves
+
+Attached ordinary human matches accept host `save` and lobby `loadSave`. The
+executable writes beneath `SAVES_DIR`, defaulting to `saves/`; library hosts set
+`Config.saves_dir`. Each body is versioned gzipped JSON, with a separate room
+summary. Lobby save lists contain no token or authoritative map data. The format,
+all message shapes and prototype sources are in
+[`docs/contracts/save-format.md`](../../../docs/contracts/save-format.md).
+
+A load validates the match, raw map, roster and recipient starts before replacing
+the lobby. It opens an indefinite host pause; only the current host can resume
+the loaded room. World autosaves, AI planner restoration, surplus running
+spectators, editor writes and Horde records remain unavailable in this slice.
+The save and load denials described in the initial lobby section still apply
+when these admission conditions are absent.

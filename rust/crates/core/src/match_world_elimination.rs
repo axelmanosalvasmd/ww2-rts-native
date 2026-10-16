@@ -6,7 +6,7 @@ use crate::{
     match_combat::CombatState,
     match_runtime::Match,
     match_world::{RegionState, ResourceNode},
-    match_world_regions::WorldCapture,
+    match_world_regions::{WorldCapture, WorldFortTransfer},
     world::WorldTransaction,
 };
 use std::collections::BTreeSet;
@@ -47,27 +47,28 @@ impl Match {
         &self,
         live_order: &[u32],
         regions: &[RegionState],
+        transfers: &[WorldFortTransfer],
     ) -> Result<Option<WorldEliminationDraft>, String> {
         self.validate_world_live_order(live_order)?;
         let mut planned = Vec::new();
         // Source repeats this for already-out players too. It does not transfer to a teammate.
         for (slot, player) in self.start.economy.players.iter().enumerate() {
             if !regions.iter().any(|r| r.team == player.team) {
-                planned.extend(
-                    live_order
+                planned.extend(live_order.iter().copied().filter(|id| {
+                    transfers
                         .iter()
-                        .copied()
-                        .filter(|id| self.world.game.units[id].owner == slot),
-                );
+                        .find(|t| t.id == *id)
+                        .map_or(self.world.game.units[id].owner, |t| t.owner)
+                        == slot
+                }));
             }
         }
-        if planned.is_empty() {
+        if planned.is_empty() && transfers.is_empty() {
             return Ok(None);
         }
         for id in &planned {
             let unit = &self.world.game.units[id];
-            let combat = self
-                .combat
+            self.combat
                 .get(*id)
                 .ok_or("missing World elimination combat metadata")?;
             if unit.entrench || unit.build {
@@ -78,27 +79,51 @@ impl Match {
             if self.field_works.is_active(*id) != unit.dig {
                 return Err("invalid World elimination paid-work projection".into());
             }
-            if unit.riding || combat.carrier.is_some() || !combat.cargo.is_empty() {
+        }
+        let planned_ids: BTreeSet<_> = planned.iter().copied().collect();
+        let wrecks_building = planned
+            .iter()
+            .any(|id| self.rules.kinds[self.world.game.units[id].kind].building);
+        for (&id, unit) in &self.world.game.units {
+            if !planned_ids.contains(&id) && !wrecks_building {
+                continue;
+            }
+            let Some(metadata) = self.combat.get(id) else {
+                continue;
+            };
+            if !unit.riding && metadata.carrier.is_none() && metadata.cargo.is_empty() {
+                continue;
+            }
+            if !self.validate_rail_tick_actor(id)? {
                 return Err("unsupported World elimination: cargo and rider links".into());
             }
-        }
-        if planned
-            .iter()
-            .any(|id| self.rules.kinds[self.world.game.units[id].kind].building)
-            && self.world.game.units.values().any(|unit| {
-                unit.riding
-                    || self
-                        .combat
-                        .get(unit.id)
-                        .is_some_and(|m| m.carrier.is_some() || !m.cargo.is_empty())
-            })
-        {
-            return Err("unsupported World building elimination: current cargo and riders".into());
+            // Source deletes a nation's train and its squads together, without unloading.
+            let removing = planned_ids.contains(&id);
+            if metadata
+                .carrier
+                .is_some_and(|train| planned_ids.contains(&train) != removing)
+                || metadata
+                    .cargo
+                    .iter()
+                    .any(|rider| planned_ids.contains(rider) != removing)
+            {
+                return Err("World elimination would split a train and its passengers".into());
+            }
         }
         let mut transaction = self.world.begin_transaction().map_err(|e| e.to_string())?;
         let mut environment = self.environment.clone();
         let mut grid = self.grid.clone_for_transaction();
         let mut combat = self.combat.clone();
+        for transfer in transfers {
+            let unit = transaction
+                .world
+                .game
+                .units
+                .get_mut(&transfer.id)
+                .ok_or("missing staged World fort")?;
+            unit.owner = transfer.owner;
+            grid.update(transfer.id, unit);
+        }
         let mut seed = self.start.environment_seed;
         let mut next_id = self.next_unit_id;
         let mut survivors = live_order.to_vec();
@@ -207,6 +232,12 @@ impl Match {
     /// All fallible preparation has succeeded. This is metadata removal, not combat death.
     pub(crate) fn retire_world_metadata(&mut self, removed: &[Unit]) {
         for unit in removed {
+            for &train in self.rail_runs.keys() {
+                if let Some(metadata) = self.combat.get_mut(train) {
+                    metadata.cargo.retain(|&id| id != unit.id);
+                }
+            }
+            self.rail_runs.remove(&unit.id);
             self.field_works.cancel(unit.id);
             self.commands.units.remove(&unit.id);
             self.commands.requests.retire_unit(unit.id);

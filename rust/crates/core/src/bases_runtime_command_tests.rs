@@ -164,7 +164,7 @@ fn cancellation_refuses_finished_sites_and_stages_wallet_and_terrain_atomically(
     assert!(
         m.execute_command(
             0,
-            &Command::CancelSite {
+            &Command::Cancel {
                 id: i64::from(site)
             },
             false
@@ -347,10 +347,10 @@ fn rally_selection_denials_and_bounds_preserve_personal_and_producer_state() {
             &Command::Rally {
                 ids: vec![],
                 id: None,
-                at: Point {
+                at: Some(Point {
                     x: f64::NAN,
                     z: 1.0
-                }
+                })
             },
             false
         )
@@ -390,7 +390,7 @@ fn cancel_accepts_a_site_after_an_admitted_replacement_takes_a_failed_corner() {
             issuer: 0,
             sequence: 1,
         },
-        Command::CancelSite {
+        Command::Cancel {
             id: i64::from(site),
         },
     )

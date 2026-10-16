@@ -305,8 +305,12 @@ fn make(input: &Json) -> Match {
     );
     m.world.game.trench_front =
         (!start["trenchFrontBits"].is_null()).then(|| f32_values(&start["trenchFrontBits"]));
-    m.world.game.tough = (!start["toughBits"].is_null())
-        .then(|| run_values(&start["toughBits"]).iter().map(f).collect());
+    m.world.game.tough = (!start["toughBits"].is_null()).then(|| {
+        run_values(&start["toughBits"])
+            .iter()
+            .map(|v| f(v) as f32)
+            .collect()
+    });
     let versions = start["terrainVersions"].as_array().unwrap();
     m.world.game.terrain_version = versions[0].as_u64().unwrap() as u32;
     m.world.versions.obstruction = versions[1].as_u64().unwrap();

@@ -1,0 +1,3 @@
+- Connect paid Concrete Wall digging to finished building publication, bounded occupied-cell retries and crew step-back paths. Fill and Wall now work in line, zigzag and double field projects.
+- Allow queued Dig orders to pay when activated and skip unaffordable work. Preserve pending Dig orders in recipient snapshots, and replace tests that expected Wall and queued Dig to be unsupported.
+- Add ordinary-match tick and recipient checks for concrete and queued Dig. Terrain-fire orders and live rail disconnection remain pending.

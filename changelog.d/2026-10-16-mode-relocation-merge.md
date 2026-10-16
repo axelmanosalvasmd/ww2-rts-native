@@ -1,0 +1,1 @@
+- Integrate the bounded mode runners with the shared retreat-home and relocation helpers, preserving mode admission guards and all movement, carrier and garrison tests.

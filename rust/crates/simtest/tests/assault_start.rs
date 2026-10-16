@@ -440,21 +440,34 @@ fn explicit_assault_start_matches_original_create_game() {
                         route["path"],
                         "case{index} complete Hill waypoint bits"
                     );
-                    // Live owned-recipient routing stays refused separately from the raw component query.
-                    assert_eq!(
-                        m.refresh_recipient_routing(0).unwrap_err(),
-                        "owned routing currently supports ordinary Conquest"
-                    );
+                    // Assault now uses the same owned routing phase as ordinary skirmishes.
+                    m.refresh_recipient_routing(0).unwrap();
                 }
                 kind => panic!("unknown selected Assault check {kind}"),
             }
         } else {
             assert!(index < 43, "new cases need their named-check scope");
         }
-        // Constructor availability must not quietly admit the incomplete mode to a Conquest phase.
+        // Conquest-specific wrappers stay guarded; shared capture/income admits Assault.
         assert!(m.apply_conquest_victory().is_err());
         assert!(m.sample_conquest_tick().is_err());
-        assert!(m.apply_point_economy(&[], false).is_err());
+        let vp = m
+            .start
+            .economy
+            .players
+            .iter()
+            .map(|p| p.vp)
+            .collect::<Vec<_>>();
+        assert!(m.apply_point_economy(&[], false).unwrap().is_empty());
+        assert_eq!(
+            m.start
+                .economy
+                .players
+                .iter()
+                .map(|p| p.vp)
+                .collect::<Vec<_>>(),
+            vp
+        );
     }
     assert_eq!(fixture["cases"].as_array().unwrap().len(), 57);
     let validation = fixture["selectedValidation"].as_array().unwrap();

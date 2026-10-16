@@ -24,13 +24,9 @@ fn denial(reason: Reason) -> Denial {
     }
 }
 impl Match {
-    fn validate_field_work_state(&self) -> Result<(), String> {
-        if !matches!(
-            self.options.mode,
-            crate::economy::Mode::Default | crate::economy::Mode::Conquest
-        ) || self.world.game.mode.is_some()
-        {
-            return Err("Match field works support Conquest only".into());
+    pub(super) fn validate_field_work_state(&self) -> Result<(), String> {
+        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
+            return Err("Match field works require a matching ordinary mode".into());
         }
         if self.world.game.tick < 0 || self.world.game.tick > 9_007_199_254_740_991 {
             return Err("invalid field-work clock".into());
@@ -73,8 +69,33 @@ impl Match {
         Ok(())
     }
 
+    pub(super) fn dig_tier_denial(
+        &self,
+        owner: usize,
+        kind: FortKind,
+    ) -> Result<Option<Denial>, String> {
+        let catalog = crate::catalog::Catalog::compiled().map_err(|e| e.to_string())?;
+        let tier = catalog
+            .table("FORTS")
+            .map_err(|e| e.to_string())?
+            .get(kind.as_str())
+            .and_then(|f| f.get("tier"))
+            .and_then(crate::catalog::Value::number)
+            .unwrap_or(1.);
+        Ok((self.options.tech
+            && tier
+                > f64::from(
+                    self.production
+                        .player(owner)
+                        .ok_or("missing dig research")?
+                        .tech()
+                        .tier(),
+                ))
+        .then_some(Denial::Tier))
+    }
+
     /// Called by the typed dispatcher after its global recorded-input checks.
-    /// Only the first selected ID is considered. Queued digs are explicitly unsupported.
+    /// Only the first selected ID is considered.
     pub fn execute_dig(
         &mut self,
         owner: usize,
@@ -90,12 +111,16 @@ impl Match {
         if winner_decided || player.away || player.out {
             return Ok(Some(Denial::Blocked));
         }
+        if kind == FortKind::Gate && !self.ordinary_gate_mode() {
+            return Ok(Some(Denial::Unsupported));
+        }
         self.validate_field_work_state()?;
+        let tier_denial = self.dig_tier_denial(owner, kind)?;
         let Some(id) = ids.first().copied().and_then(|id| u32::try_from(id).ok()) else {
-            return Ok(Some(Denial::NoBuilders));
+            return Ok(tier_denial.or(Some(Denial::NoBuilders)));
         };
         let Some(unit) = self.world.game.units.get(&id) else {
-            return Ok(Some(Denial::NoBuilders));
+            return Ok(tier_denial.or(Some(Denial::NoBuilders)));
         };
         let profile = self
             .rules
@@ -111,9 +136,13 @@ impl Match {
             && !control.operative
             && !self.logistics.get(id).is_some_and(|r| r.forced);
         if !eligible {
-            return Ok(Some(Denial::NoBuilders));
+            return Ok(tier_denial.or(Some(Denial::NoBuilders)));
         }
         crate::match_construction::validate_build_activity(unit, control)?;
+        self.commands.units.get_mut(&id).unwrap().follow = 0;
+        if let Some(denial) = tier_denial {
+            return Ok(Some(denial));
+        }
         if unit.path_gen == u64::MAX {
             return Err("dig path identity exhausted".into());
         }
@@ -244,11 +273,14 @@ impl Match {
                     )
                     .expect("prepared field cancellation");
                     prepared.commit(&mut self.field_works);
-                    self.world.game.units.insert(id, unit);
+                    crate::unit_placement::place_unit(
+                        &mut self.grid,
+                        self.world.game.units.get_mut(&id).unwrap(),
+                        |current| *current = unit,
+                    );
                     self.commands.units.insert(id, control);
                     self.firing.units.insert(id, firing);
                     *self.abilities.get_mut(id).unwrap() = ability;
-                    self.grid.update(id, &self.world.game.units[&id]);
                     story.commit();
                     return Ok(None);
                 }
@@ -262,6 +294,9 @@ impl Match {
         let job = self.field_works.jobs.get_mut(&id)?;
         if unit.hp <= 0. || unit.retreating || !unit.path.is_empty() {
             return None;
+        }
+        if let Some(goal) = job.step_back {
+            return Some(goal);
         }
         let distance = math::hypot(unit.x - job.at.x, unit.z - job.at.z);
         if distance.partial_cmp(&job.reach.unwrap_or(3.)) != Some(std::cmp::Ordering::Greater) {
@@ -319,34 +354,41 @@ impl Match {
             }
             return Ok(());
         }
-        let completes = job.cells.len() == 1
-            && job.elapsed + dt
-                >= self
-                    .field_works
-                    .span(&self.world, id, job.kind)
-                    .map_err(|e| e.to_string())?;
-        let updates = if completes {
-            vec![StoryChange {
-                slot: Some(unit.owner),
-                key: StoryKey::Built,
-                amount: 1.,
-            }]
-        } else {
-            Vec::new()
-        };
-        let story = prepare_story_updates(&mut self.story, self.finish.is_some(), &updates)?;
+        let owner = unit.owner;
+        if job.elapsed + dt
+            >= self
+                .field_works
+                .span(&self.world, id, job.kind)
+                .map_err(|e| e.to_string())?
+        {
+            drop(prepare_story_updates(
+                &mut self.story,
+                self.finish.is_some(),
+                &[StoryChange {
+                    slot: Some(owner),
+                    key: StoryKey::Built,
+                    amount: 1.,
+                }],
+            )?);
+        }
         let result = self
             .field_works
             .step_unit(&mut self.world, id, dt)
             .map_err(|e| format!("field work step: {e}"))?;
+        if let Some((kind, cell, direction)) = result.concrete {
+            let wall = self.next_unit_id;
+            self.place_starting_building(owner, kind.as_str(), cell)?;
+            self.world.game.units.get_mut(&wall).unwrap().rot = direction;
+        }
         if result.completed.is_some() {
             self.world.game.units.get_mut(&id).unwrap().dig = false;
         }
-        story.commit();
-        debug_assert!(
-            result.route.is_none(),
-            "in-reach work cannot request a route"
-        );
+        if result.completed.is_some() {
+            self.record_built(owner)?;
+        }
+        if let Some(goal) = result.route {
+            self.request_command_path(id, goal, RequestKind::Dig)?;
+        }
         Ok(())
     }
 }
@@ -354,3 +396,7 @@ impl Match {
 #[cfg(test)]
 #[path = "match_engineering_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "engineering_concrete_tests.rs"]
+mod concrete_tests;
