@@ -234,7 +234,7 @@ macro_rules! recruit_parts {
     };
 }
 impl Match {
-    /// Execute recorded Conquest purchases against the canonical finish and seat state.
+    /// Execute recorded ordinary or Horde purchases against canonical finish and seat state.
     /// Routing borrows the actual refreshed recipient projection, never a copied view.
     pub fn recorded_buy(
         &mut self,
@@ -251,8 +251,12 @@ impl Match {
         if self.finish.is_some() || wallet.away || wallet.out {
             return Err(production::Error::Denied(Denial::Blocked).into());
         }
-        self.validate_ordinary_finish_state()
-            .map_err(RecruitError::Story)?;
+        if self.options.mode == crate::economy::Mode::Horde {
+            self.validate_horde_economy()
+        } else {
+            self.validate_ordinary_finish_state()
+        }
+        .map_err(RecruitError::Story)?;
         let staged = recruit_parts!(self).stage(slot, kind, from, false)?;
         self.finish_recorded_buy(staged)
     }

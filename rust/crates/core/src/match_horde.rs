@@ -300,6 +300,42 @@ fn along_route(mut at: Point, route: &[Point], mut left: f64) -> Point {
     at
 }
 impl Match {
+    /// Refresh the core vision component, including active-wave Horde markers.
+    /// Full Horde tick and recipient admission remain separate guarded paths.
+    pub fn update_horde_vision(&mut self) -> Result<(), String> {
+        self.validate_horde_phase(0.0)?;
+        let h = self.horde.as_ref().ok_or("missing Horde state")?;
+        let threshold = number(cfg()?, "reveal")?;
+        let few = h.budget == 0.0 && h.left <= threshold;
+        let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
+        let mut marked = Vec::new();
+        for u in self.world.game.units.values() {
+            let kind = self
+                .rules
+                .kinds
+                .get(u.kind)
+                .ok_or("invalid Horde vision unit kind")?;
+            let boss = catalog
+                .unit(&kind.name)
+                .map_err(|e| e.to_string())?
+                .get("boss")
+                .and_then(Value::boolean)
+                .unwrap_or(false);
+            if h.active && u.owner == h.slot && u.air.is_none() && (few || boss) {
+                marked.push(u.id);
+            }
+        }
+        crate::vision::update_vision(&mut self.world.game, &self.rules, &self.grid);
+        for player in &mut self.world.game.players {
+            if player.team == 0 {
+                player.visible.extend_from_slice(&marked);
+                player.visible.sort_unstable();
+                player.visible.dedup();
+            }
+        }
+        Ok(())
+    }
+
     pub(crate) fn validate_horde_economy(&self) -> Result<(), String> {
         self.validate_horde_phase(0.0)?;
         self.validate_match_finish_state()
@@ -430,6 +466,7 @@ impl Match {
         state.prepare_profile(1.0)?;
         result.horde = Some(state);
         result.complete_skirmish_start()?;
+        result.initialize_recipient_routing()?;
         Ok(result)
     }
     fn horde_income(&self) -> Result<f64, String> {

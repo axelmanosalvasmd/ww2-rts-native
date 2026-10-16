@@ -3,9 +3,8 @@
 //! `aimPoint`, `inStrip`, the camouflage and trench rules). Its answers match the JavaScript exactly
 //! (`harness/vision-check.mjs`).
 //!
-//! Not ported yet, because Conquest does not use them: the Horde stragglers and boss shown through the fog,
-//! the remembered enemy buildings of Classic and World Conquest (`g.ghosts`), and World Conquest's neutral
-//! guards. A game in those modes gets everything else right and lacks those three.
+//! Horde wave markers are composed by `Match::update_horde_vision`; this pass has no wave state.
+//! Remembered enemy buildings and World neutral guards are handled by their Match components.
 
 use std::collections::HashMap;
 

@@ -600,7 +600,22 @@ fn validate_context<'a>(
     }) {
         return Err("routing needs valid unique wreck identities and positions".into());
     }
-    if !crate::match_actor::ordinary_ground_mode(g, context.options.mode) {
+    let horde = context.options.mode == crate::economy::Mode::Horde
+        && context.start.shared_defenders == g.players.len().checked_sub(1)
+        && crate::match_actor::checked_game_mode(g, context.options.mode).is_ok()
+        && g.players.iter().enumerate().all(|(slot, player)| {
+            context
+                .start
+                .players
+                .get(slot)
+                .is_some_and(|p| p.config.team == player.team)
+                && context
+                    .options
+                    .players
+                    .get(slot)
+                    .is_some_and(|p| p.team == player.team)
+        });
+    if !crate::match_actor::ordinary_ground_mode(g, context.options.mode) && !horde {
         return Err("owned routing currently supports ordinary Conquest".into());
     }
     if g.players.len() != context.start.players.len()
