@@ -1,0 +1,1 @@
+- Add passive Tutorial test receipts for stored firing, ability, visibility, reserve, terrain and context operands, plus existing tick events at event and autocast-clock boundaries. Preserve the original progression and all runtime providers. The Trench failure remains unexplained; the new diagnostic child has no executable qualification.

@@ -1,5 +1,44 @@
 # Three Crossroads Native: design decisions
 
+## Tutorial passive firing and ability operands (2026-10-15, source only)
+
+The actual `1a8d99e9ef9e5dca8fdc30ff190675b3f98e5b85` failure remains
+0 passed,1 failed,151 filtered at tick7081, with Trench defenders9/10 alive.
+Its three human auto-retreats at1179/1467/1756 fit the pinned Source HP
+predicate. Living defenders correctly prevent clearance. The read-only
+causal inspection establishes no runtime defect or repair. Its reports and
+complete unequal producing-head logs remain separate from this child.
+
+Extend only the existing test diagnostic wrappers. Emit stored full actor
+and control fields, physical reserves, complete current kind definitions
+(including weapon range/reload and ability tuning), actual team visibility,
+production tech, stances, mode/options, homes, support clocks, firing claims,
+flights, grenade tickets, salvos, weather, smoke and local actor/garrison
+terrain. Existing HP, hit-source, cooldown and recovery operands remain.
+Add the stored aimed point to the discrete key. Also emit the same adjacent
+before/after pair when the actual TickReport has events or its current-unit
+clock matches the existing staggered ten-tick autocast schedule. Print the
+report's existing events in order, phases, unit order and prior poses.
+At most one pair is emitted per existing tick. No event is synthesized.
+
+All diagnostic helpers borrow Match immutably. Catalog reads use the same
+compiled definitions already initialized by the constructor. No targeting,
+LOS, autocast, grid, path, visibility refresh or damage provider is called
+again; no RNG state is read through a consuming API or changed. These are
+tick-boundary operands and actual emitted-source receipts, not an intra-tick
+candidate/LOS decision trace or a causal verdict. Local terrain is limited
+to the nine cells around each actor and garrison; intervening LOS cells and
+transient per-actor decisions are not independently captured. Munitions0
+alone remains no cause claim because Tutorial ability cost is zero.
+
+The original5027-byte progression, inputs, assertions, waits and tick calls
+remain exact. Shipping providers, all939 rows and Acceptance cells,
+fixtures, registries, interfaces, wire and guards stay unchanged. This
+child runs no Source,Node,Cargo,rustc,native,fmt,lint,discovery or CI job.
+There is no new-head pass, alternative passing journey or runtime fix.
+Root alone may grant a later exact-head single progression or original16
+qualification and owns independent review, slots, publication and merging.
+
 ## Tutorial attack and return transition receipts (2026-10-15, source only)
 
 The retained native failure at `de7b9815596f2d73d5f1b2eb31272d90806db84a`

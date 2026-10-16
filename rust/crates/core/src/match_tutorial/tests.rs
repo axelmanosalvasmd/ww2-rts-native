@@ -85,13 +85,14 @@ fn transition_key(m: &Match) -> String {
             let intent = m.commands.units.get(&u.id).map(|c| {
                 format!(
                     "orders={:?} attack_id={} follow={} auto_retreat={} auto_cast={} \
-                     hold_fire={} outcome={:?}/{:?} result={:?} route_end={:?}",
+                     hold_fire={} nade={:?} outcome={:?}/{:?} result={:?} route_end={:?}",
                     c.orders,
                     c.attack_id,
                     c.follow,
                     c.auto_retreat,
                     c.auto_cast,
                     c.hold_fire,
+                    c.nade,
                     c.outcome,
                     c.outcome_tick,
                     c.move_result,
@@ -145,10 +146,94 @@ fn transition_operands(m: &Match) -> String {
         })
         .collect::<Vec<_>>();
     format!(
-        "tick={} {}\noperands={units:?}\neconomy={:?}",
+        "tick={} {}\noperands={units:?}\neconomy={:?}\n{}",
         m.world.game.tick,
         transition_key(m),
         m.start.economy.players,
+        decision_operands(m),
+    )
+}
+// Stored boundary operands only. Do not rerun targeting, autocast or LOS providers.
+fn decision_operands(m: &Match) -> String {
+    let game = &m.world.game;
+    let kinds = game.units.values().map(|u| u.kind).collect::<BTreeSet<_>>();
+    let definitions = kinds
+        .into_iter()
+        .map(|kind| {
+            let name = &m.rules.kinds[kind].name;
+            let definition = crate::catalog::Catalog::compiled().and_then(|c| c.unit(name));
+            format!("kind={name} definition={definition:?}")
+        })
+        .collect::<Vec<_>>();
+    let actors = game
+        .units
+        .values()
+        .map(|u| {
+            format!(
+                "unit={u:?} control={:?} reserves={:?}",
+                m.commands.units.get(&u.id),
+                m.logistics.get(u.id),
+            )
+        })
+        .collect::<Vec<_>>();
+    let mut cells = BTreeSet::new();
+    for cell in game
+        .units
+        .values()
+        .flat_map(|u| [game.cell_of(u.x, u.z), u.garrison].into_iter().flatten())
+    {
+        let (x, z) = (cell % game.w, cell / game.w);
+        for row in z.saturating_sub(1)..=(z + 1).min(game.h - 1) {
+            for col in x.saturating_sub(1)..=(x + 1).min(game.w - 1) {
+                cells.insert(row * game.w + col);
+            }
+        }
+    }
+    let terrain = cells
+        .into_iter()
+        .map(|cell| {
+            (
+                cell,
+                game.chars.get(cell).copied().map(char::from),
+                game.flags.get(cell),
+                game.cell_hp.get(cell),
+                game.trench_front.as_ref().and_then(|v| v.get(cell)),
+                game.ground.as_ref().and_then(|v| v.get(cell)),
+                game.objects.as_ref().and_then(|v| v.get(cell)),
+                game.house.get(cell),
+                game.height.as_ref().and_then(|v| v.get(cell)),
+                game.tough.as_ref().and_then(|v| v.get(cell)),
+            )
+        })
+        .collect::<Vec<_>>();
+    format!(
+        "boundary_decisions tick={} vision_tick={:?} dt={} options={:?} \
+         mode={:?} naval={} reveal={} terrain_version={} dimensions={:?}\n\
+         actors={actors:?}\ndefinitions={definitions:?}\n\
+         visibility_and_teams={:?}\nstarts_and_support_clocks={:?}\n\
+         production_and_tech={:?}\nfiring_sources_and_clocks={:?}\nsupport={:?}\n\
+         weather={:?} rain={} wet={:?} wind={:?} smokes={:?} strikes={:?}\n\
+         terrain(cell, char, flags, hp, trench_front, ground, objects, house, height, tough)={terrain:?}",
+        game.tick,
+        game.vision_tick,
+        m.rules.movement.tick,
+        m.options,
+        game.mode,
+        game.naval,
+        game.reveal,
+        game.terrain_version,
+        (game.w, game.h),
+        game.players,
+        m.start.players,
+        m.production,
+        m.firing,
+        m.support,
+        game.weather.and_then(|i| m.rules.weather.get(i)),
+        game.rain,
+        game.wet,
+        m.start.wind,
+        game.smokes,
+        game.strikes,
     )
 }
 fn timeout_operands(m: &Match) -> String {
@@ -237,12 +322,28 @@ fn until(m: &mut Match, done: impl Fn(&Match) -> bool, budget: usize, said: &mut
             .unwrap_or_else(|e| panic!("Tutorial tick {}: {}", e.tick, e.reason));
         let current_key = transition_key(m);
         let current_operands = transition_operands(m);
-        if current_key != previous_key {
+        // Sample the existing staggered clock without asking an ability provider.
+        // This is a boundary receipt, not proof of an intra-tick decision.
+        let autocast_clock_boundary = m
+            .world
+            .game
+            .units
+            .keys()
+            .any(|&id| (report.tick + i64::from(id)) % 10 == 0);
+        if current_key != previous_key || !report.events.is_empty() || autocast_clock_boundary {
             eprintln!(
                 "Tutorial transition before\n{previous_operands}\n\
                  Tutorial transition after\n{current_operands}\n\
-                 tick_commands={:?} route_requests={:?} retired={:?}",
-                report.commands, report.route_requests, report.retired,
+                 tick_commands={:?} route_requests={:?} retired={:?}\n\
+                 autocast_clock_boundary={autocast_clock_boundary} \
+                 tick_events={:?} phases={:?} unit_order={:?} prior={:?}",
+                report.commands,
+                report.route_requests,
+                report.retired,
+                report.events,
+                report.phases,
+                report.unit_order,
+                report.prior,
             );
         }
         previous_key = current_key;
