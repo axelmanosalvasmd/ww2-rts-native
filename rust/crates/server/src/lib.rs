@@ -384,3 +384,7 @@ mod native_socket_tests;
 #[cfg(test)]
 #[path = "session_batch_socket_tests.rs"]
 mod session_batch_socket_tests;
+
+#[cfg(test)]
+#[path = "net_batch50_http_tests.rs"]
+mod net_batch50_http;

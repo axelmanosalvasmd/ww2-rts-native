@@ -2166,3 +2166,7 @@ mod net_runtime_tests;
 #[cfg(test)]
 #[path = "net_runtime_command_tests.rs"]
 mod net_runtime_command_tests;
+
+#[cfg(test)]
+#[path = "net_batch50_lobby_tests.rs"]
+mod net_batch50;

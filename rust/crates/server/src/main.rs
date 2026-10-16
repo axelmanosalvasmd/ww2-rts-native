@@ -180,3 +180,7 @@ mod tests {
         assert!(bind_address(None, None, None, Some(":3000")).is_err());
     }
 }
+
+#[cfg(test)]
+#[path = "net_bind_tests.rs"]
+mod net_batch50_bind;
