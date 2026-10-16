@@ -589,7 +589,9 @@ fn original_ordinary_batches_match_selected_shot_rows_and_numeric_bits() {
                                 .unwrap();
                             assert!(!partial.fields.contains_key("flights"));
                             assert!(
-                                partial.missing.contains(&SnapshotCapability::ShotsAndFlights)
+                                partial
+                                    .missing
+                                    .contains(&SnapshotCapability::ShotsAndFlights)
                             );
                         }
                     }
