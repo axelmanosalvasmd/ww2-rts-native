@@ -18,7 +18,7 @@ Read current main before integration: it lacks ai_receipt_input and ai_delivered
 
 ## AI delivery scheduling and Horde break control (2026-10-16)
 
-The shared AI scheduler accepts the caller's tick, snapshot-delivery beat and finished flag. It retains caller-owned views and refreshes every requested view before invoking any brain. Commanders act every tick once a view exists; scripted and Horde brains use the existing difficulty and seat stagger. Horde requests a view on every delivered beat. The scheduler reads no Match authority and owns no wall-clock timer, so it can consume delivered packets without depending on the pending AI snapshot decoder. Server AI activation remains a separate integration.
+The shared AI scheduler accepts the caller's tick, snapshot-delivery beat and finished flag. It retains caller-owned views and refreshes every requested view before invoking any brain. Commanders act every tick once a view exists; scripted and Horde brains use the existing difficulty and seat stagger. Horde requests a view on every delivered beat. The scheduler reads no Match authority and owns no wall-clock timer, so it can consume delivered packets without depending on the separate AI snapshot decoder. Server AI activation remains a separate integration.
 
 Horde break control changes only the existing inactive break clock to zero. The existing Horde phase starts the wave and owns its purchases and spawns. The server checks host authority and pause state before invoking the core rule. Full Horde tick, snapshot and room admission stay guarded.
 
@@ -27,6 +27,14 @@ Horde break control changes only the existing inactive break clock to zero. The 
 Scenario condition evaluation borrows typed authored state while reading current units, point owners and World region teams from Match. A caller supplies the context and shares an explicit work budget across evaluations. This keeps condition reads separate from scenario admission, trigger scheduling, actions and recipient projection. The evaluator follows the pinned condition semantics, including historical captures, pending arrivals, context fallback and short-circuit work charges. A 64-level guard protects callers that construct trees directly; validated authored trees remain below it.
 
 Waiting-job refunds prepare small production and wallet drafts before publishing the negative MP-spent tally. Site cancellation uses the existing World transaction before the wallet, story and metadata cleanup commit. These core operations add no network admission. Full MODE-91 remains held beyond the selected refund and recovery checks. MODE-83 proves the condition component, not an admitted authored-scenario match.
+
+## Editable map drafts and bounded save preparation (2026-10-16)
+
+Map authoring uses an in-memory draft separate from `World` and `Match`. Selection moves retain the selected layer's material overrides and authored section identities, health and supports. Failed bounds or collision checks leave the draft unchanged. Removal and support pruning can leave an invalid draft, which must pass the ordinary map validator before saving. This keeps unsupported surviving sections visible as authoring errors instead of silently repairing their anchors.
+
+The map loader now calls the scenario validator added in #298. A validated scenario can be edited and prepared for saving, but every startup profile rejects explicit authored scenarios before creating match state because their executor is absent. The previous fixture assertion that scenarios were unsupported by the loader now checks their retained definition. No command, event, flag or other live match state was added.
+
+`map_save::prepare_map_save` applies the prototype's save-field projection and an 8 MiB limit to incoming bytes before parsing, including discarded properties. It prepares bytes in memory and validates the projected document again. HTTP editor authorization, persistence and server integration remain absent, so MAP-23 remains component-only. The existing 16 MiB authoritative-loader limit is unchanged. Generated World documents are outside the demonstrated save scope. MAP-57's rendered-ground sampler and MAP-90's station-yard construction integration remain unimplemented; World admission stays guarded. MAP-92 retains field-specific diagnostics and stronger bounded integer checks for region IDs and ordered bounds, reported as differs candidates rather than approved differences.
 
 
 ## First-five engineering merged with MAP273 main (2026-10-16, source only)
