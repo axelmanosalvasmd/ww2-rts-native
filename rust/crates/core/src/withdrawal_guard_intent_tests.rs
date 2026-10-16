@@ -1,4 +1,4 @@
-//! LOG-14 guards over canonical reserves. Full logistics ticks and World rooms stay guarded.
+//! LOG-14 guards over canonical reserves. World rooms and inconsistent convoy state stay guarded.
 use crate::{
     catalog::Catalog,
     economy::{Faction, Mode},
@@ -10,7 +10,7 @@ use crate::{
     match_runtime::{Match, MatchOptions, PlayerConfig},
     match_support::{SupportEvent, SupportKind, SupportTiming},
     random::MatchRandom,
-    recipient_snapshot::{DeliveryState, SnapshotCache, SnapshotCapability, SnapshotError},
+    recipient_snapshot::{DeliveryState, SnapshotCache, SnapshotCapability},
     unit_spawn::initial_unit,
     weather::WeatherChoice,
     world_generation::{WorldSize, generate_world},
@@ -165,7 +165,8 @@ fn log14_forced_progress_survives_ordinary_ticks_and_each_seat_snapshot() {
         let cache = SnapshotCache::new(&m).unwrap();
         for seat in 0..m.start.players.len() {
             let projection = cache.recipient(seat).unwrap();
-            assert!(projection.missing.contains(&SnapshotCapability::Logistics));
+            assert!(!projection.missing.contains(&SnapshotCapability::Logistics));
+            assert!(!projection.fields.contains_key("logistics"));
             if seat == 0 {
                 let row = projection.fields["units"]
                     .as_array()
@@ -176,34 +177,25 @@ fn log14_forced_progress_survives_ordinary_ticks_and_each_seat_snapshot() {
                 assert_eq!(row[12].as_u64().unwrap() & 1 != 0, tick != 1);
             }
         }
+        let reserves = m.logistics.get(id).unwrap().clone();
         let mut delivery = DeliveryState::new(&m).unwrap();
-        assert!(matches!(
-            delivery.capture_quiescent(&mut m, &[true; 2], &[false; 2], &[]),
-            Err(SnapshotError::Unsupported {
-                capability: SnapshotCapability::Logistics,
-                ..
-            })
-        ));
-        let reserves = m.logistics.remove(id).unwrap();
-        {
-            let mut delivery = DeliveryState::new(&m).unwrap();
-            let frame = delivery
-                .capture_quiescent(&mut m, &[true; 2], &[false; 2], &[])
-                .unwrap();
-            for seat in 0..2 {
-                let snapshot = frame.recipient(seat).unwrap().into_json();
-                assert_eq!(snapshot["t"], "s");
-            }
+        let frame = delivery
+            .capture_quiescent(&mut m, &[true; 2], &[false; 2], &[])
+            .unwrap();
+        for seat in 0..2 {
+            let snapshot = frame.recipient(seat).unwrap().into_json();
+            assert_eq!(snapshot["t"], "s");
+            assert!(snapshot.get("logistics").is_none());
         }
-        m.logistics.insert(id, reserves);
+        assert_eq!(m.logistics.get(id).unwrap(), &reserves);
     }
     assert!(m.world.game.units[&id].x > before);
-    // Existing reserves exercise the consumer without admitting the missing supply phases.
+    // Enabling physical logistics still requires its canonical convoy state.
     m.options.logistics = true;
     assert!(
         m.validate_tick_state()
             .unwrap_err()
-            .contains("reserve and convoy tick phases")
+            .contains("logistics requires initialized convoy state")
     );
 }
 
