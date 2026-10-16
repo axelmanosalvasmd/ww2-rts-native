@@ -1,0 +1,4 @@
+- Project normalized queued Assist and Take Cover orders alongside the merged Dig encoding through the existing owner-only snapshot rows. Keep raw Build and aimed Ability orders guarded, and check paid Build-to-Assist and Cover queues through ordinary ticks and complete seat snapshots.
+- Project all eight canonical support strike kinds in internal recipient views. Keep complete room delivery and the shared support admission list limited to Artillery, Smoke and Cover until plane arrival and payload event encodings are agreed. Check these three support lifetimes and match finish with snapshots for every R1 seat.
+- House-entry and FireAt command variants are absent on this main branch. Spectator or operative runtime delivery remains unavailable.
+- Keep the preceding Dig position when queuing Take Cover. Check the combined queue through paid trench completion and through an unaffordable Dig skip, with complete snapshots for both seats.

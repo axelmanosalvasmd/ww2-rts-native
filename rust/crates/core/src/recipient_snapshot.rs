@@ -32,6 +32,7 @@ pub use composition::{GroundListDeliveryFrame, QuiescentDeliveryFrame, Supported
 pub use delivery::{DeliveryFrame, DeliveryState};
 pub use selected::{SelectedDeliveryFrame, SelectedGroundListFrame, SelectedSeat};
 pub use shots::{SelectedGroundShotFrame, ShotRef};
+pub use support::SUPPORTED_SUPPORT_KINDS;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SnapshotCapability {
