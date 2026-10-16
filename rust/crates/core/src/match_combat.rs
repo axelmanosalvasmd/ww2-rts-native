@@ -1260,6 +1260,27 @@ pub struct RetirementProgress {
     pub routes_retained: usize,
 }
 impl crate::match_runtime::Match {
+    fn retirement_bounty(
+        &self,
+        unit: &crate::game::Unit,
+        last_hit: Option<i32>,
+    ) -> Result<Option<(usize, f64)>, CombatError> {
+        self.start
+            .economy
+            .kill_bounty(
+                crate::economy_state::ModeContext {
+                    kind: self.options.mode,
+                    ..Default::default()
+                },
+                self.actor_policy(unit.owner)
+                    .map_err(|_| CombatError::InvalidInput("bounty victim"))?
+                    .economy_slot,
+                &self.rules.kinds[unit.kind].name,
+                last_hit.and_then(|owner| usize::try_from(owner).ok()),
+            )
+            .map_err(|_| CombatError::InvalidInput("bounty payment"))
+    }
+
     /// Validate every captured potential removal, including living garrisons
     /// that an earlier building retirement can kill in this same ordered pass.
     fn validate_retirement_sidecars(&self, ids: &[UnitId]) -> Result<(), CombatError> {
@@ -1330,11 +1351,6 @@ impl crate::match_runtime::Match {
             .filter(|id| self.world.game.units.contains_key(id))
             .collect::<Vec<_>>();
         self.validate_retirement_sidecars(&ordered)?;
-        let cfg = Catalog::compiled()
-            .map_err(|_| CombatError::Rules)?
-            .table("CFG")
-            .map_err(|_| CombatError::Rules)?;
-        let bounty = number(cfg, "bounty")?;
         for id in &ordered {
             let u = &self.world.game.units[id];
             if self.actor_policy(u.owner).is_err() || u.kind >= self.rules.kinds.len() {
@@ -1381,17 +1397,10 @@ impl crate::match_runtime::Match {
         }
         for id in &ordered {
             let u = &self.world.game.units[id];
-            let killer = self
-                .combat
-                .get(u.id)
-                .unwrap()
-                .last_hit
-                .and_then(|o| usize::try_from(o).ok())
-                .filter(|o| {
-                    !self.world.game.allied(*o, u.owner) && !self.start.economy.players[*o].out
-                });
-            if let Some(k) = killer {
-                wallets[k] += number(definition(u.kind, &self.rules)?, "cost")? * bounty;
+            if let Some((k, amount)) =
+                self.retirement_bounty(u, self.combat.get(u.id).unwrap().last_hit)?
+            {
+                wallets[k] += amount;
                 if !wallets[k].is_finite() {
                     return Err(CombatError::InvalidInput("bounty overflow"));
                 }
@@ -1457,13 +1466,6 @@ impl crate::match_runtime::Match {
             .copied()
             .filter(|id| self.world.game.units.contains_key(id))
             .collect::<Vec<_>>();
-        let bounty = number(
-            Catalog::compiled()
-                .map_err(|_| CombatError::Rules)?
-                .table("CFG")
-                .map_err(|_| CombatError::Rules)?,
-            "bounty",
-        )?;
         for id in ordered {
             let Some(mut u) = self
                 .world
@@ -1476,6 +1478,7 @@ impl crate::match_runtime::Match {
                 continue;
             };
             let metadata = self.combat.get(u.id).unwrap().clone();
+            let bounty = self.retirement_bounty(&u, metadata.last_hit)?;
             self.retire_unit_sidecars(&mut u)?;
             self.world.game.units.remove(&u.id);
             self.grid.remove_unit(u.id);
@@ -1528,8 +1531,8 @@ impl crate::match_runtime::Match {
             self.building_rallies.remove(&u.id);
             // Source buildingCells retains historical ruin ownership/position after retirement.
 
-            if let Some(killer) = enemy.filter(|k| !self.start.economy.players[*k].out) {
-                self.start.economy.players[killer].mp += number(def, "cost")? * bounty;
+            if let Some((killer, amount)) = bounty {
+                self.start.economy.players[killer].mp += amount;
             }
             progress.completed += 1;
         }
