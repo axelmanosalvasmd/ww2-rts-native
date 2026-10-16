@@ -1,5 +1,17 @@
 # Three Crossroads Native: design decisions
 
+## MODE completed native windows (2026-10-16)
+
+The second focused batch at c5eb12f4, Rust765129ae, passed all four tests once
+with retries disabled. Native-generated Huge/Massive matches exercise the
+complete unattended guard rosters, hidden actor, alliances and initial
+controls. The Tutorial map and both zero-VP objectives match the retained
+exact authored-map fixture. The Tutorial sampling/getter test remains partial
+for MODE-86/93. All 83 assigned rows are mapped as windows50+33. Six proposed
+full-intent candidates (32/59/62/65/70/73) await prototype review; the other
+77 stay held. No parity status, runtime or failed test body changes here.
+
+
 ## MODE proof map placement (2026-10-16)
 
 Keep native feature tests and their compact row mappings separate from parity

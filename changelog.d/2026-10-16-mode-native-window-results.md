@@ -1,0 +1,1 @@
+- Record the second native MODE window's four passes on c5eb12f4, preserving the first window's nine passes and one failure on 5b034faa. Map all 83 assigned rows, with six proposed candidates awaiting prototype review and 77 held rows. Leave parity statuses and Rust unchanged.

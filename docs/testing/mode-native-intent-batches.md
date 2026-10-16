@@ -81,17 +81,17 @@ The second window covers every remaining assigned ID below. New tests in
 `rust/crates/core/tests/mode_native_later_batch.rs` exercise native-generated
 World startup, authored Tutorial map data and actual Tutorial tick sampling.
 The existing complete authored-map fixture supplies the cheap exact data
-comparison for MODE-70. The three new tests have not run. No new Source
-recorder, captured fixture or provenance bundle is used.
+comparison for MODE-70. The three new tests and the existing exact map test passed once at c5eb12f4.
+No new Source recorder, captured fixture or provenance bundle is used.
 
 | Row | Native test | Qualification or remaining reason |
 |---|---|---|
 | MODE-68 | none | incomplete: full journey remains blocked at retained Trench failure; existing entry/predicate evidence unchanged |
 | MODE-69 | none | incomplete: retained original full Tutorial fails at tick7081 before bridgehead; no repair or alternative victory claim |
-| MODE-70 | `mode_native_later_batch::mode70_tutorial_map_keeps_both_zero_vp_objectives`; `authoritative_maps::authoritative_maps_match_pinned_validation_and_static_terrain` | candidate; exact authored map data plus native Tutorial startup; execution and prototype review pending |
+| MODE-70 | `mode_native_later_batch::mode70_tutorial_map_keeps_both_zero_vp_objectives`; `authoritative_maps::authoritative_maps_match_pinned_validation_and_static_terrain` | native PASS at c5eb12f4: exact authored data and Tutorial startup; prototype intent review pending |
 | MODE-71 | `mode_native_later_batch::mode71_73_generated_world_starts_homes_and_unattended_guards` | partial: native generation and startup; fresh server seed and World public start absent |
 | MODE-72 | none | incomplete: existing exact geography tests retained; no fresh full home-selection qualification in this window |
-| MODE-73 | `mode_native_later_batch::mode71_73_generated_world_starts_homes_and_unattended_guards` | candidate: native guard rosters, hidden actor, alliance and controls; execution and prototype review pending |
+| MODE-73 | `mode_native_later_batch::mode71_73_generated_world_starts_homes_and_unattended_guards` | native PASS at c5eb12f4: generated guard rosters, hidden actor, alliance and controls; prototype intent review pending |
 | MODE-74 | none | incomplete: canonical World phases exist; full fort-transfer capture consequence remains refused |
 | MODE-75 | none | incomplete: bounded World elimination exists; full rider/cargo/logistics consequences remain refused |
 | MODE-76 | none | incomplete: bounded World victory exists; no fresh native all-threshold outcome test in this window |
@@ -119,3 +119,33 @@ recorder, captured fixture or provenance bundle is used.
 | MODE-101 | none | incomplete: Unreal report owner scope; no client implementation in this checkout |
 | MODE-102 | none | incomplete: Unreal lobby presentation owner scope; native controls alone do not prove rendering |
 | MODE-103 | none | incomplete: Unreal objective presentation owner scope; general scenario HUD absent |
+
+## Actual results and review handoff
+
+The second batch ran once at `c5eb12f4b3f6d522f3838361092089521ab55da3`
+(Rust `765129ae63640b36c309534c43a1c4470f3ad5b2`): 4 selected,
+4 passed, 0 failed, 146 skipped, retries 0. The S3 runner and outer systemd
+launcher both returned 0 and released the inherited flock before this report.
+Normal output remains at `/tmp/native-feature-batches-0335/mode_impl/native.log`.
+The selected functions were:
+
+- `authoritative_maps::authoritative_maps_match_pinned_validation_and_static_terrain`
+- `mode_native_later_batch::mode70_tutorial_map_keeps_both_zero_vp_objectives`
+- `mode_native_later_batch::mode71_73_generated_world_starts_homes_and_unattended_guards`
+- `mode_native_later_batch::mode86_93_reading_durable_state_does_not_step_or_resample`
+
+All 83 assigned IDs are accounted for in the 50- and 33-row windows above.
+The six proposed complete-intent candidates are MODE-32, MODE-59, MODE-62,
+MODE-65, MODE-70 and MODE-73. All require prototype intent review. The other
+77 rows stay held for their listed failure, incomplete native coverage or
+Unreal ownership. A passing partial test does not promote its row.
+
+This task's delta begins at `8a5af066`. It changes tests and documentation,
+including scoped test registrations. The inherited Tutorial runtime/history
+and its still-enabled original full journey are unchanged. That journey's
+known tick7081 failure was never selected in these two new batches. Whole
+suite or current-main integration success is not claimed. Root owns any
+runtime adoption, exact-head Hermes acknowledgment, publication, merged-proof
+ledger and later parity status updates. The parity file is byte-identical
+to its inherited version. No public action, Source job, new captured fixture,
+provenance bundle, semantic repair or semantic retry occurred here.
