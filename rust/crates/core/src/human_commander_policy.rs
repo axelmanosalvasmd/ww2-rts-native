@@ -58,11 +58,7 @@ pub fn advance(
     view: Option<&HumanView<Observation>>,
     hurts: &OwnerHurtBatch,
 ) -> Result<HumanAdvance, Error> {
-    let level = match control.level {
-        "easy" => Level::Easy,
-        "hard" => Level::Hard,
-        _ => Level::Normal,
-    };
+    let level = Level::from_key(control.level).unwrap_or_default();
     let mut next_state = state.clone();
     let mut next_policy = policy.clone();
     let result = next_state.advance(control, view, hurts, |screen| {
