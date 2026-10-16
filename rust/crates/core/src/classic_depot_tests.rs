@@ -15,6 +15,8 @@ use serde_json::{Value as Json, json};
 
 #[path = "base_consumer_completion_tests.rs"]
 mod consumers;
+#[path = "base_native_intent_tests.rs"]
+mod native_intent;
 #[path = "classic_depot_income_tests.rs"]
 mod income;
 #[path = "classic_depot_lifecycle_tests.rs"]

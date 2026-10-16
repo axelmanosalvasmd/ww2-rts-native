@@ -4843,3 +4843,30 @@ external target, inherited exclusive flock, four actual CPUs, 6 GiB, zero swap,
 400 percent CPU, jobs4/thread1, a 400-second bound, and free -g plus at least
 20 GiB disk before each job. Maximum three jobs and first-failure terminal,
 flock-release and Root notification before REPORT remain required.
+
+## BASE native intent test batch (2026-10-16, execution pending)
+
+Axel's owner decision 6206861267 approves rules 1 to 5 without the conditions
+proposed in 6206844573. Behavior rows use native intent tests plus a reviewer
+reading the pinned prototype. Data tables, pure functions and single-component
+fixtures retain exact comparison. This changes evidence qualification only.
+
+The assigned 27-row range is one candidate window in docs/parity/bases.md.
+base_native_intent_tests.rs adds one named test per row over existing Match
+constructors, paid commands, canonical queue state and independent borrowed
+production facts. Component wallets are explicit inputs, never replacements
+for live wallets. The Match checks earn funds through existing ticks. They do
+not map Source NaN observations to native zero or alter shipping defaults.
+The natural Classic deadline check advances the existing clock from startup.
+The table in bases.md lists each literal test, prototype reference and gap.
+All rows remain in progress until their native check passes and a reviewer
+confirms coverage. Partial catalog or component checks do not establish missing
+World recovery, naval/cache admission, Horde callers or full public snapshots.
+
+There are no runtime, interface, reference-pin or intentional gameplay changes.
+The existing 33 original bodies and five consumer bodies are preserved; the
+new module has separate names. Existing recipes, fixtures, artifacts and the
+1243b165 result (2 PASS, 1 FAIL, 2 UNRUN) remain historical and unchanged.
+No new Source recorder, captured behavior fixture or provenance bundle is made.
+No Cargo or native test has run for this candidate. Root owns the next literal
+focused nextest grant, using --no-fail-fast to isolate failing rows in one job.
