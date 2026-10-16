@@ -50,9 +50,19 @@ enters the canonical recorded command queue for the next tick.
 AI packets contain only the seat's decoded recipient snapshot, public starting
 terrain and public rules. Remembered terrain updates only from delivered cells.
 Owner-only plans, wallets and cooldowns are not taken from another seat. No
-policy receives a Game or Match authority handle. Existing actor, retained
-projectile, full-tick and recipient guards remain in force, including the
-restriction on aircraft weapons whose effects are not yet deliverable.
+policy receives a Game or Match authority handle. Full-tick and recipient guards remain in force. Retained ground flights,
+grenade tickets and salvo schedules are validated before a frame can publish.
+Aircraft weapons and plane-backed support keep their existing hosted restriction.
+
+Ground flight rows match `shared/sim.js:5963-5999`: `flight`, `kind`, optional
+`effect`, `seq`, `x`, `y`, `z`, `v:[vx,vy,vz]`, `gravity`, `time`, `launched`,
+`expires`, and `until`. Only currently visible ground cells produce a row.
+`f` and `fo` appear only when the shooter is seen; no target identity is added.
+`until` stops at expiry, 0.15 seconds, the first hidden cell, or the first visible
+static contact. Throw events match `shared/sim.js:5424-5427` and use
+`{f,fo,x,z,k:"throw",physical:true,local:true}`. The same ground visibility and
+shooter-field rules apply (`shared/sim.js:5998-6009`). Grenade tickets and salvo
+schedules remain internal and add no wire row.
 
 Horde record persistence and `result.horde`/`hordeBest` remain the separate
 MODE-55 work. This batch delivers the ordinary story/result fields and does not

@@ -67,8 +67,8 @@ impl DeliveryState {
 
     /// Project the complete supplied batch before any selected memory owner
     /// publishes. The host retains the scheduled global batch-reset policy.
-    /// Persistent flight/AIR/debris actors and undrained producer buffers still
-    /// refuse through the existing complete-frame admission.
+    /// Retained flights pass their canonical validation before delivery.
+    /// Unsupported AIR/debris actors and undrained producer buffers still refuse.
     pub fn capture_selected_with_shots<'a>(
         &mut self,
         state: &'a mut Match,
@@ -281,9 +281,16 @@ fn raw_event(state: &Match, shot: ShotRef<'_>) -> Result<Value, SnapshotError> {
                     owner(state, *seat)?;
                     numbers(&[at.x, at.z, *spread])?;
                 }
-                // SmallArms is an operative payload. Throw is shared by ordinary
-                // abilities and operatives, with no retained source provenance.
-                LaunchEvent::Throw { .. } | LaunchEvent::SmallArms(_) => return Err(refused()),
+                LaunchEvent::Throw {
+                    shooter,
+                    owner: seat,
+                    at,
+                } => {
+                    identity(u64::from(*shooter))?;
+                    owner(state, *seat)?;
+                    numbers(&[at.x, at.z])?;
+                }
+                LaunchEvent::SmallArms(_) => return Err(refused()),
                 LaunchEvent::Breath {
                     shooter,
                     target,
@@ -350,7 +357,7 @@ fn allied(state: &Match, slot: usize, row: &Value, key: &str) -> bool {
         .is_some_and(|owner| state.world.game.allied(owner, slot))
 }
 
-fn flight_visible(state: &Match, visible: &[u8], at: Point) -> bool {
+pub(super) fn flight_visible(state: &Match, visible: &[u8], at: Point) -> bool {
     state.world.game.reveal
         || state
             .world
@@ -359,7 +366,7 @@ fn flight_visible(state: &Match, visible: &[u8], at: Point) -> bool {
             .is_some_and(|cell| visible[cell] != 0)
 }
 
-fn until(state: &Match, visible: &[u8], shot: &Value) -> Result<f64, SnapshotError> {
+pub(super) fn until(state: &Match, visible: &[u8], shot: &Value) -> Result<f64, SnapshotError> {
     let value = |key: &str| shot[key].as_f64().ok_or(SnapshotError::Rules);
     let time = value("time")?;
     let expires = value("expires")?;
@@ -665,11 +672,6 @@ mod tests {
                 owner: 0,
                 at: Point { x: 13.0, z: 13.0 },
                 direction: 0.0,
-            }),
-            TickEvent::Firing(LaunchEvent::Throw {
-                shooter: 1,
-                owner: 0,
-                at: Point { x: 13.0, z: 13.0 },
             }),
             TickEvent::Environment(metadata.clone()),
         ] {

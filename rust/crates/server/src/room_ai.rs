@@ -203,3 +203,7 @@ impl RoomAi {
 #[cfg(test)]
 #[path = "room_ai_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "room_ai_combat_tests.rs"]
+mod combat_tests;

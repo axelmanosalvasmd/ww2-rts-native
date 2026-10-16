@@ -22,6 +22,8 @@ mod engineering;
 mod falling;
 #[path = "recipient_snapshot/owners.rs"]
 mod owners;
+#[path = "recipient_snapshot/projectiles.rs"]
+mod projectiles;
 #[path = "recipient_snapshot/public_state.rs"]
 mod public_state;
 #[path = "recipient_snapshot/selected.rs"]
@@ -163,6 +165,7 @@ impl<'a> SnapshotCache<'a> {
         }
         engineering::validate(state)?;
         aircraft::validate(state)?;
+        projectiles::validate(state)?;
         let rows = state
             .world
             .game
@@ -176,6 +179,11 @@ impl<'a> SnapshotCache<'a> {
         let mut public = public;
         for (fields, support) in public.iter_mut().zip(support) {
             fields.extend(support);
+        }
+        if !state.firing.flights.is_empty() {
+            for (slot, fields) in public.iter_mut().enumerate() {
+                fields.insert("flights".into(), projectiles::for_seat(state, slot)?);
+            }
         }
         for (fields, works) in public.iter_mut().zip(engineering::capture(state)?) {
             fields.insert("works".into(), works);

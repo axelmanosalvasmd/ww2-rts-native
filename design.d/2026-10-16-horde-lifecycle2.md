@@ -20,3 +20,11 @@ rules; they do not recover filtered authority. AI orders enter the next tick's
 ordinary queue. No new wire fields, RNG version, FFI surface or World admission
 are introduced. The existing aircraft weapon restriction protects complete
 recipient delivery.
+
+Ground abilities can retain flights, grenade tickets and salvo schedules across
+snapshot beats. The recipient adapter validates those states before delivery,
+projects only flights visible on the ground, and bounds extrapolation by fog
+and visible static contacts. Throw events use the existing local event filter.
+Aircraft weapons keep their existing restriction. Recorded AI support attempts
+are restricted to the support kinds the hosted recipient adapter can deliver,
+before payment or mutation.

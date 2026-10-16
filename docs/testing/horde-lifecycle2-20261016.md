@@ -53,6 +53,13 @@ terrain, sighting expiry and transaction rollback. A real six-tick Horde
 recipient test proves hidden HP, suppression and cooldown mutations never enter
 the policy packet or consume the match random stream.
 
+`hosted_horde_ai_grenade_survives_every_seat_delivery_until_natural_detonation`
+uses an actual scripted Horde policy decision and ordinary recorded admission.
+It follows the retained grenade flight, throw delivery, natural explosive
+contact and ticket cleanup, collecting every canonical seat throughout and
+continuing healthy ticks afterward. Exact adapter tests protect flight shape,
+ground fog, shooter privacy and rejection before delivery mutation.
+
 ## Limits
 
 No World admission, FFI/header, parity status or reference changes. Existing
