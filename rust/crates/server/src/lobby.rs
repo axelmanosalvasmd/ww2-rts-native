@@ -130,6 +130,12 @@ struct Person {
 }
 
 impl Person {
+    fn online(&self) -> bool {
+        self.ai || self.connection.as_ref().is_some_and(Connection::ready)
+    }
+    fn ping(&self) -> Option<f64> {
+        if self.ai { Some(-1.0) } else { self.rtt }
+    }
     fn deny(&mut self, command: &str, reason: &str, now: u64) {
         self.denies.retain(|at| now.saturating_sub(*at) < 1_000);
         if self.denies.len() < 4 {
@@ -426,6 +432,36 @@ impl Room {
             if let Some(name) = msg["name"].as_str() {
                 me.name = clean(name, 16, "Soldier", false);
                 return true;
+            }
+            return false;
+        }
+        if matches!(t, "pause" | "resume")
+            && host
+            && let Some(native) = &mut self.native
+        {
+            if native.runtime.fault().is_some() || native.runtime.held() >= 120 {
+                return false;
+            }
+            let message = if t == "pause" {
+                native.runtime.pause(
+                    seated.expect("native host has a commander seat"),
+                    &me.name,
+                    crate::room_runtime::PauseReason::Host,
+                    now,
+                )
+            } else {
+                Ok(Some(native.runtime.resume(now)))
+            };
+            match message {
+                Ok(Some(message)) => {
+                    for person in self.people() {
+                        if let Some(connection) = &person.connection {
+                            connection.send(message.clone());
+                        }
+                    }
+                }
+                Ok(None) => {}
+                Err(error) => self.native.as_mut().unwrap().runtime.fault_stop(error),
             }
             return false;
         }
@@ -1055,12 +1091,8 @@ impl Hub {
         kind: FrameKind,
         dropped: &mut Vec<(String, u64)>,
     ) -> Option<(f64, f64)> {
-        let online = room
-            .players
-            .iter()
-            .map(|p| p.connection.as_ref().is_some_and(Connection::ready))
-            .collect::<Vec<_>>();
-        let ping = room.players.iter().map(|p| p.rtt).collect::<Vec<_>>();
+        let online = room.players.iter().map(Person::online).collect::<Vec<_>>();
+        let ping = room.players.iter().map(Person::ping).collect::<Vec<_>>();
         let native = room.native.as_mut()?;
         let began = Instant::now();
         let captured = match native.runtime.collect_frame(selected, kind) {
@@ -2229,3 +2261,7 @@ mod net83_followup_tests;
 #[cfg(test)]
 #[path = "net_runtime2_tests.rs"]
 mod net_runtime2;
+
+#[cfg(test)]
+#[path = "seat_lifecycle_tests.rs"]
+mod seat_lifecycle_tests;

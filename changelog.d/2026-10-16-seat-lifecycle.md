@@ -1,0 +1,3 @@
+- Connect host pause and resume to the existing server controls. Paused rooms preserve queued orders and keep sending a frame once a second.
+- Publish AI seats as online with ping -1 through the existing roster fields. AI room admission remains closed.
+- Test core AI seat initialization and resets through ordinary ticks and recipient snapshots, and test human drop expiry, reconnect and host release. Live AI handover and loaded-save pause remain outside this change.
