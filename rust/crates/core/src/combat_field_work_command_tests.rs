@@ -41,22 +41,30 @@ fn cmb147_field_work_commands_delegate_dig_patterns_and_joins() {
     let work = m.field_works.clone();
     let mp = m.start.economy.players[0].mp;
     let story = m.story.clone();
-    for (raw, denial) in [
-        (
-            json!({"t":"dig","ids":[3],"x":40,"z":40}),
-            Denial::NoBuilders,
-        ),
-        (
-            json!({"t":"dig","ids":[1],"x":40,"z":40,"queue":true}),
-            Denial::Unsupported,
-        ),
-    ] {
-        assert_eq!(command(&mut m, raw), Some(denial));
-        assert_eq!(m.field_works, work);
-        assert_eq!(m.start.economy.players[0].mp, mp);
-        assert_eq!(m.story, story);
-        assert!(m.commands.units.values().all(|c| c.orders.is_empty()));
-    }
+    assert_eq!(
+        command(&mut m, json!({"t":"dig","ids":[3],"x":40,"z":40})),
+        Some(Denial::NoBuilders)
+    );
+    assert_eq!(m.field_works, work);
+    assert_eq!(m.start.economy.players[0].mp, mp);
+    assert_eq!(m.story, story);
+    assert!(m.commands.units.values().all(|c| c.orders.is_empty()));
+
+    assert_eq!(
+        command(&mut m, json!({"t":"dig","ids":[1],"x":40,"z":40,"queue":true})),
+        None
+    );
+    let waiting = &m.commands.units[&1].orders;
+    assert_eq!(waiting.len(), 1);
+    assert!(matches!(
+        waiting.front().unwrap(),
+        Command::Dig { ids, kind: FortKind::Trench, at, direction: Some(direction), queue: false }
+            if ids == &[1] && *at == p(40., 40.) && direction.is_finite()
+    ));
+    assert!(m.commands.units.iter().all(|(id, c)| *id == 1 || c.orders.is_empty()));
+    assert_eq!(m.field_works, work);
+    assert_eq!(m.start.economy.players[0].mp, mp);
+    assert_eq!(m.story, story);
 
     // Compare dispatch with the existing planner, without duplicating its geometry.
     for (pattern, fort) in [
