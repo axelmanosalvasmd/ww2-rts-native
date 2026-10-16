@@ -321,3 +321,132 @@ fn base52_first_fitting_site_moves_away_from_a_nearby_income_point() {
         assert!(crate::math::hypot(building.x - point.x, building.z - point.z) >= 13.0);
     }
 }
+
+#[test]
+fn mode01_non_world_mode_rows_match_the_prototype_public_fields() {
+    use crate::recipient_snapshot::{
+        DeliveryState, SnapshotCache, SnapshotCapability, SnapshotError, mode_row,
+    };
+
+    // Prototype sim.js:5895-5898; Tutorial's initial goal is tutorial.js:11.
+    // Partial delivery retains its explicit missing capabilities in every admitted mode.
+    for mode in MODES {
+        let mut m = create(mode, ArmySize::Standard).unwrap();
+        let expected = match mode {
+            Mode::Conquest => Json::Null,
+            Mode::Assault => json!({
+                "kind":"assault", "defenderTeam":1,"attackerTeam":0,
+                "timeLeft":900.0,"suddenDeath":false,"total":1
+            }),
+            Mode::Annihilation => json!({
+                "kind":"annihilation","suddenDeath":false,"bunkers":[1,1]
+            }),
+            Mode::Classic => json!({
+                "kind":"classic","timeLeft":1500.0,"suddenDeath":false
+            }),
+            Mode::Horde => json!({
+                "kind":"horde","defenderTeam":0,"attackerTeam":1,
+                "timeLeft":45.0,"suddenDeath":false,"wave":0,"left":0.0,
+                "active":false,"slot":2,
+                "nextProfile":m.horde_projection().unwrap().next_profile.unwrap().as_str()
+            }),
+            Mode::Tutorial => json!({
+                "kind":"tutorial","suddenDeath":false,"slot":2,
+                "goal":"Move your squads up to the hedgerow","step":0,"steps":9
+            }),
+            _ => unreachable!(),
+        };
+        assert_eq!(mode_row(&m).unwrap(), expected, "{mode:?}");
+        if mode == Mode::Tutorial {
+            assert!(matches!(
+                SnapshotCache::new(&m),
+                Err(SnapshotError::UnsupportedMode)
+            ));
+        } else {
+            let count = m.start.players.len();
+            let mut delivery = DeliveryState::new(&m).unwrap();
+            let frame = delivery
+                .capture(&mut m, &vec![true; count], &vec![false; count])
+                .unwrap();
+            assert_eq!(
+                frame.slots().collect::<Vec<_>>(),
+                (0..count).collect::<Vec<_>>()
+            );
+            for slot in 0..count {
+                let projection = frame.recipient(slot).unwrap();
+                if mode == Mode::Conquest {
+                    assert!(projection.fields.get("mode").is_none());
+                } else {
+                    assert_eq!(projection.fields["mode"], expected, "{mode:?} seat {slot}");
+                }
+                assert_eq!(
+                    projection.missing,
+                    vec![
+                        SnapshotCapability::WrecksAndFoundMines,
+                        SnapshotCapability::ShotsAndFlights,
+                        SnapshotCapability::TeamEffects,
+                        SnapshotCapability::Logistics,
+                    ]
+                );
+            }
+        }
+    }
+    let mut default = create(Mode::Conquest, ArmySize::Standard).unwrap();
+    default.options.mode = Mode::Default;
+    assert_eq!(mode_row(&default).unwrap(), Json::Null);
+}
+
+#[test]
+fn mode01_horde_row_omits_unset_profile_boss_and_active_next_profile() {
+    use crate::recipient_snapshot::mode_row;
+
+    let mut m = create(Mode::Horde, ArmySize::Standard).unwrap();
+    // setupHorde (sim.js:859-861) sets neither profile nor boss before wave 1.
+    let startup = mode_row(&m).unwrap();
+    assert!(startup.get("profile").is_none());
+    assert!(startup.get("boss").is_none());
+    assert!(startup.get("nextProfile").is_some());
+    let horde = m.horde.as_mut().unwrap();
+    horde.wave = 1;
+    horde.active = true;
+    horde.profile = crate::match_horde::HordeProfile::Armor;
+    horde.boss = Some([100.0, 200.0]);
+    let active = mode_row(&m).unwrap();
+    assert_eq!(active["profile"], "armor");
+    assert_eq!(active["boss"], json!([100.0, 200.0]));
+    assert!(active.get("nextProfile").is_none());
+    // sim.js:955 writes null once an active wave has no living boss.
+    m.horde.as_mut().unwrap().boss = None;
+    assert_eq!(mode_row(&m).unwrap().get("boss"), Some(&Json::Null));
+}
+
+#[test]
+fn mode01_mode_rows_round_timers_and_refuse_invalid_values_or_mode_pairs() {
+    use crate::recipient_snapshot::{SnapshotError, mode_row};
+
+    let mut assault = create(Mode::Assault, ArmySize::Standard).unwrap();
+    let mut classic = create(Mode::Classic, ArmySize::Standard).unwrap();
+    for (time, expected) in [(3.01, 4.0), (3.0, 3.0), (-0.1, 0.0), (-3.5, 0.0)] {
+        assault.assault.as_mut().unwrap().time_left = time;
+        classic.elimination.as_mut().unwrap().time_left = Some(time);
+        assert_eq!(mode_row(&assault).unwrap()["timeLeft"], json!(expected));
+        assert_eq!(mode_row(&classic).unwrap()["timeLeft"], json!(expected));
+    }
+    for time in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        assault.assault.as_mut().unwrap().time_left = time;
+        classic.elimination.as_mut().unwrap().time_left = Some(time);
+        assert_eq!(mode_row(&assault), Err(SnapshotError::InvalidNumber));
+        assert_eq!(mode_row(&classic), Err(SnapshotError::InvalidNumber));
+    }
+    classic.elimination.as_mut().unwrap().time_left = None;
+    assert_eq!(mode_row(&classic), Err(SnapshotError::Rules));
+    for mode in MODES {
+        let mut m = create(mode, ArmySize::Standard).unwrap();
+        m.world.game.mode = if mode == Mode::Conquest {
+            Some(crate::game::ModeKind::Tutorial)
+        } else {
+            None
+        };
+        assert_eq!(mode_row(&m), Err(SnapshotError::UnsupportedMode));
+    }
+}

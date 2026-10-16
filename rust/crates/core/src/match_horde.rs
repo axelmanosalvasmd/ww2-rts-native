@@ -395,8 +395,15 @@ impl Match {
     /// Explicit Horde constructor. Generic `Match::new` keeps its ordinary setup;
     /// the shared tick runner admits this canonical Horde state.
     pub fn new_horde(map: &AuthoritativeMap, mut options: MatchOptions) -> Result<Self, String> {
-        if options.mode != Mode::Horde || !(1..=5).contains(&options.players.len()) {
-            return Err("Horde needs Horde mode and one through five defenders".into());
+        if options.mode != Mode::Horde || !(1..=6).contains(&options.players.len()) {
+            return Err("Horde startup needs Horde mode and one through six players".into());
+        }
+        // createGame falls back before appending the Horde or changing teams/options.
+        if options.players.len() == 6 || map.defend().is_none_or(|d| d.is_empty()) {
+            options.mode = Mode::Conquest;
+            // createGame's logistics whitelist still uses the requested Horde mode.
+            options.logistics = false;
+            return Self::new(map, options);
         }
         let defend = map
             .defend()

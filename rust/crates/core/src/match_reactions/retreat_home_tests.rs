@@ -4,7 +4,7 @@ use crate::{
     game::PlaneState,
     match_commands::{Command, MoveOutcome, UnitControl},
     misc_retreat_support_tests::{delivered_tick, publish_rifle, scene, seats},
-    recipient_snapshot::{DeliveryState, SnapshotCache, SnapshotError},
+    recipient_snapshot::{DeliveryState, SnapshotCache, SnapshotCapability, SnapshotError},
     supply_convoys::{ConvoyState, Store, StoreId, Truck, TruckState},
 };
 
@@ -34,6 +34,27 @@ fn building(m: &mut Match, name: &str, owner: usize, at: Point) -> u32 {
     m.world.game.units.insert(id, u);
     m.grid.rebuild(&m.world.game.units);
     id
+}
+
+fn long_route_scene(mode: Mode) -> Match {
+    let map = crate::map::AuthoritativeMap::from_json(
+        &serde_json::to_vec(&serde_json::json!({
+            "name":"Retreat through route legs", "w":160, "h":96,
+            "rows":vec![".".repeat(160);96],
+            "heights":vec!["0".repeat(160);96],
+            "spawns":[{"x":8,"y":8},{"x":145,"y":80}],
+            "points":[{"id":"neutral","x":80,"y":48,"mp":0,"vp":0}]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let options = scene(mode).options;
+    if mode == Mode::Classic {
+        Match::new_classic(&map, options)
+    } else {
+        Match::new(&map, options)
+    }
+    .unwrap()
 }
 
 #[test]
@@ -327,13 +348,46 @@ fn mov48_manual_retreat_exits_house_moves_home_and_delivers_every_seat() {
     assert!(m.tick_state.fault().is_none());
 }
 
-#[test]
-fn mov48_classic_retreat_completes_through_native_ticks_with_delivery_guard_retained() {
-    let mut m = scene(Mode::Classic);
-    let id = publish_rifle(&mut m, Point { x: 70., z: 70. });
+fn classic_retreat_projection_tick(m: &mut Match, delivery: &mut DeliveryState) {
+    m.advance_tick().unwrap();
+    let mode = m.elimination.as_ref().unwrap();
+    let expected = serde_json::json!({
+        "kind":"classic",
+        "timeLeft":crate::math::max(0.0, mode.time_left.unwrap().ceil()),
+        "suddenDeath":mode.sudden_death
+    });
+    let count = m.start.players.len();
+    let frame = delivery
+        .capture(m, &vec![false; count], &vec![false; count])
+        .unwrap();
+    assert_eq!(
+        frame.slots().collect::<Vec<_>>(),
+        (0..count).collect::<Vec<_>>()
+    );
+    for slot in 0..count {
+        let projection = frame.recipient(slot).unwrap();
+        assert_eq!(projection.fields["mode"], expected, "Classic seat {slot}");
+        assert_eq!(
+            projection.missing,
+            vec![
+                SnapshotCapability::WrecksAndFoundMines,
+                SnapshotCapability::ShotsAndFlights,
+                SnapshotCapability::TeamEffects,
+                SnapshotCapability::Logistics,
+            ]
+        );
+    }
+}
+
+fn retreat_through_legs(mode: Mode) {
+    let mut m = long_route_scene(mode);
+    let at = Point { x: 281., z: 41. };
+    let id = publish_rifle(&mut m, at);
     m.world.game.units.get_mut(&id).unwrap().hold_pos = true;
     m.commands.units.get_mut(&id).unwrap().hold_fire = true;
     let home = m.reaction_home(id).unwrap();
+    let selected = seats(&m);
+    let mut delivery = DeliveryState::new(&m).unwrap();
     assert_eq!(
         m.execute_command(
             0,
@@ -345,21 +399,57 @@ fn mov48_classic_retreat_completes_through_native_ticks_with_delivery_guard_reta
         .unwrap(),
         None
     );
-    for _ in 0..1000 {
-        m.advance_tick().unwrap();
+    let first_leg = *m.world.game.units[&id].path.last().unwrap();
+    assert!(distance(first_leg, home) > 64.);
+    assert!(distance(at, first_leg) <= 65.);
+    let mut reached_first_leg = false;
+    let mut leg_ends = BTreeSet::new();
+    for _ in 0..2500 {
+        if mode == Mode::Classic {
+            classic_retreat_projection_tick(&mut m, &mut delivery);
+        } else {
+            delivered_tick(&mut m, &mut delivery, &selected);
+        }
+        let u = &m.world.game.units[&id];
+        if let Some(end) = u.path.last() {
+            leg_ends.insert((end.x.to_bits(), end.z.to_bits()));
+        }
+        reached_first_leg |= distance(u.at(), first_leg) < 2.;
+        if u.retreating {
+            assert_eq!(u.world_goal, Some(home));
+            assert_eq!(m.firing.get(id).unwrap().target_id, 0);
+        }
         if !m.world.game.units[&id].retreating {
             break;
         }
     }
     let u = &m.world.game.units[&id];
+    assert!(reached_first_leg, "the first bounded leg must be traversed");
+    assert!(leg_ends.len() >= 3, "retreat must continue onto later legs");
     assert!(!u.retreating && u.world_goal.is_none());
     assert!(distance(u.at(), home) <= 15.);
     assert_eq!(m.commands.units[&id].outcome, Some(MoveOutcome::Arrived));
     assert!(m.tick_state.fault().is_none());
-    assert!(matches!(
-        SnapshotCache::new(&m),
-        Err(SnapshotError::UnsupportedMode)
-    ));
+    for _ in 0..3 {
+        if mode == Mode::Classic {
+            classic_retreat_projection_tick(&mut m, &mut delivery);
+        } else {
+            delivered_tick(&mut m, &mut delivery, &selected);
+        }
+    }
+    assert!(m.tick_state.fault().is_none());
+}
+
+#[test]
+fn mov48_ordinary_retreat_traverses_multiple_legs_and_delivers_every_seat() {
+    for mode in [Mode::Default, Mode::Conquest] {
+        retreat_through_legs(mode);
+    }
+}
+
+#[test]
+fn mov48_classic_retreat_traverses_multiple_legs_with_every_seat_partial_delivery() {
+    retreat_through_legs(Mode::Classic);
 }
 
 #[test]
