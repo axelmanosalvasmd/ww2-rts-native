@@ -127,10 +127,10 @@ impl EnvironmentRuntime {
         }
         let mut sections: Vec<_> = structure.section_ids.iter().zip(&structure.cells).collect();
         // Stable sorting preserves the structure's source order when distances tie.
-        sections.sort_by(|(_, a), (_, b)| {
-            let a = center(w, **a);
-            let b = center(w, **b);
-            math::hypot(a.x - at.x, a.z - at.z).total_cmp(&math::hypot(b.x - at.x, b.z - at.z))
+        crate::sort::sort_by(&mut sections, |(_, a), (_, b)| {
+            let a = center(w, *a);
+            let b = center(w, *b);
+            math::hypot(a.x - at.x, a.z - at.z) - math::hypot(b.x - at.x, b.z - at.z)
         });
         let skip = BTreeSet::new();
         let hit = DamageContext {

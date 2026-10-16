@@ -271,11 +271,10 @@ impl Match {
             }
         }
         let from = game.units[&id].at();
-        edges.sort_by(|&a, &b| {
+        crate::sort::sort_by(&mut edges, |a, b| {
             let a = tutorial_cell(game.w, a);
             let b = tutorial_cell(game.w, b);
-            math::hypot(a.x - from.x, a.z - from.z)
-                .total_cmp(&math::hypot(b.x - from.x, b.z - from.z))
+            math::hypot(a.x - from.x, a.z - from.z) - math::hypot(b.x - from.x, b.z - from.z)
         });
         let cell = *edges.first().ok_or("Tutorial house has no free edge")?;
         self.tutorial_order(id, tutorial_cell(game.w, cell), false)?;

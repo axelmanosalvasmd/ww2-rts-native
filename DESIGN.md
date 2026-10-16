@@ -10,6 +10,12 @@ AI-19 evidence covers the existing detached core state: lazy spawn camera, priva
 
 Tutorial startup selects authored spawn indices 0 and 1 directly. It must not map those indices through the non-Assault spawn list, which can move both sides when a map marks its first spawns Assault-only. World already uses direct authored indices; ordinary Conquest keeps its existing filtered allocation. Horde continues to select the middle entry of the authored defender list and the first non-defender index. No persistent state, command or recipient capability is added.
 
+## Native room worker supervision (2026-10-16)
+
+`WW2_SHARDS` selects up to 64 game workers behind the existing HTTP and WebSocket routes. Each worker owns an OS thread, a current-thread Tokio runtime and an independent room hub. The front hashes the decoded room query using the prototype's FNV-1a over UTF-16 code units, dispatches the existing socket, and concatenates room lists in worker order. A worker panic closes its sockets and invalidates its host controls; its supervisor creates a fresh hub after one second. Front shutdown stops all workers.
+
+Threads replace the prototype's child processes and loopback socket replay. Private readiness and directory channels replace process IPC without adding socket messages. Immutable maps stay front-owned; native save records and map editing remain unavailable, so no record or map-invalidation protocol is introduced. Every worker retains the existing trusted-room code policy. Public start, command admission, World admission and logistics guards keep their existing scope.
+
 ## Tutorial runtime over existing Match systems (2026-10-16)
 
 The explicit `Match::new_tutorial` constructor adds the unattended Enemy seat and uses the existing `tutorial_steps` definitions. Tutorial shares the ordinary ground, routing, combat, objective and support systems. Its private step state owns only the current index, spawned IDs and pending dialogue. Lines leave through the core tick report from tick 40; no server or client transport is introduced. The runner advances at most one step per tick after capture and income, and finishes at the bridgehead through the common Match finish state.
