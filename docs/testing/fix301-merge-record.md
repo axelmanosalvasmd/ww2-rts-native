@@ -465,3 +465,46 @@ ee6540daa231ad8eec1fc827d8931cb2c85d09280ebbf83cb4a1134a9254edaf  /tmp/fix301-be
 b41eed0957426719ca8e1583f9fba022f8d97bae408a6d6f26fc0ab8041168a7  /tmp/fix301-fmt.log
 3fbf08ec86c29792613eda60df0bd23eb628da684e4497bf4896183faff84ee7  /tmp/fix301-clippy.log
 ```
+
+
+## M8: merge relocation and movement follow-up from current main
+
+- Parent 1: PR #301 head `16ee13d25be7f9d0ba3cf3af33f0d0eb2ede25f2`.
+- Parent 2 (merged main): `4bff5c9109e7f5a46e474c3dd216e43442b2c68c`, including #339 and #363.
+- Reused the clean `fix-301ci` worktree and local branch `fix/301ci-20261016`. This merge is pushed normally to `runtime/mode-a-20261016`.
+- Reconstructed automatic merge: `git merge-tree --write-tree 16ee13d2 4bff5c91` exits 1 with tree `87f7b85f30a2734856bf4133075adcfae4c75d98`. Only `rust/crates/core/src/match_reactions.rs` conflicts, in two blocks. The following rows account for both hand-edited blocks; no other source hunk is hand-edited.
+
+| Hunk | File:line | Main side | #301 side | Resolution | Admission effect |
+| --- | --- | --- | --- | --- | --- |
+| M8-01 | `rust/crates/core/src/match_reactions.rs:98` | Documents the mode-aware home selector, including shared allied Horde HQs. | Documents owned bases and Classic producers. | Keep main's documentation for the shared selector. | Comment only; no admission change. |
+| M8-02 | `rust/crates/core/src/match_reactions.rs:119` | Calls `ground_home` with mode, units, rules, spawn, players and the optional Horde slot. Its Classic branch recognizes every truthy `produces` value. | Inlines an owned-building scan, with a boolean-only Classic `produces` check. | Keep main's shared `ground_home` call. The resolved file is byte-identical to main. Classic still selects the nearest finished owned producer; Assault and Annihilation remain skirmish modes. | No mode refused by both parents is admitted. Main's Tutorial spawn rule and Horde ally/enemy restrictions remain; World still delegates to its region-aware selector before this call. Public hosting, actor pairing, repair and snapshot guards are unchanged. |
+
+### M8 preservation checks
+
+Acknowledged `axel-301-ack-f7f9e274` and its requirement for a fresh hunk record and exact-head qualification after source conflict edits. The fourteen MODE candidates remain unchanged. The coordinator retains fresh content acknowledgment, hosted checks and PR merge. No GitHub issue post is made.
+
+- `match_world_elimination.rs` and `match_world_end.rs` merge without conflicts and remain byte-identical to the #301 parent. Their canonical World checks, linked-state refusals and staged fort ownership handling remain intact. World hosting and recipient snapshot admission stay closed.
+- Both building repair entry points retain `validate_actor_mode` and the explicit Default, Conquest, Assault, Annihilation and Classic allowlist. Tutorial, Horde and World remain refused.
+- Main's relocation helper is reused unchanged by carriers, garrison and the incoming exit paths. No placement implementation is duplicated. Main's terrain sampling, bridge collapse and all #363 movement/garrison tests are retained.
+- No test or guard is removed or weakened. Existing `#[cfg(test)]` gates, both reaction test modules and the incoming test registrations remain intact. The Classic home, Horde home, Tutorial repair and World refusal tests are included in the focused selection.
+- No FFI, header, wire, contract, privacy, reference pin or parity-table change is authored. No Source/Node execution, full workspace test run or force-push is performed.
+
+### M8 validation
+
+Vostro, Rust 1.99.0, all Cargo commands from `rust/` in locked S1, using `/tmp/ww2-native-target-S1-0e8d6d9b`, `MemoryMax=6G`, `MemorySwapMax=0` and four build jobs where applicable. Each Cargo command releases its slot immediately on exit.
+
+- Tested Rust tree: `92a61eec5d7d43642c73b1e3da48c76ba5b25ac2`. Only documentation and the changelog are edited after these checks.
+- `cargo fmt --all --check`: PASS.
+- `cargo clippy --locked --workspace --all-targets -j4 -- -D warnings`: PASS.
+- Independent read-only source audit found no merge-introduced admission expansion in actor validation, repair, ordinary tick, World regions/elimination/end, reactions, carrier/garrison relocation, server startup and recipient snapshots. The audit ran no Cargo.
+- Focused command: `cargo nextest run --locked --cargo-profile ci-test -j4 -p ww2-core -p ww2-simtest --retries 0 --no-fail-fast -E 'test(elimination) | test(classic) | test(world_end) | test(world_epilogue) | test(world_phases) | test(mode_runtime_world) | test(reactions) | test(recovery) | test(abilit) | test(memory) | test(match_tutorial) | test(tutorial_steps) | test(horde) | test(misc_retreat_support) | test(unit_placement) | test(match_carriers) | test(match_garrison) | test(mov_followup) | test(misc_bridge) | test(terrain_surface) | test(convoy_retreat)'`: 235 passed (202 core, 33 simtest), 0 failed, 1,143 skipped across seven binaries. Run ID `dbac7e77-b609-46d9-8866-1c50958c9e26`. The single slow test is MODE-71 World construction (90.462 seconds), which passed without retry.
+- The first filter does not select the separate `world_finish` module. A supplemental run uses the same command and packages with `-E 'test(world_finish)'`: 5 passed (1 core, 4 simtest), 0 failed, 1,373 skipped. Run ID `a7ccdb75-abee-4028-a246-6b5ed4a9f05c`. Combined unique total: 240 passed, comprising 203 core and 37 simtest tests.
+
+Raw logs and SHA256:
+
+```text
+33f19962fdb9148a9c83bf765dad27096107d8456e84910e82f51a970d75057b  /tmp/fix301-m8-fmt.log
+f5ceb511a83d774f4971ed67c33610dd2e53399113bc473040571f56edb04a7b  /tmp/fix301-m8-clippy.log
+e94826e6de03b593b3054ab5b591af4c7bb405782387958c1bb4998391708192  /tmp/fix301-m8-focused.log
+f750bf9918bcdd31bf4178a09e63c8a4280e3847a1f0aebc8ada4bada67e8d8a  /tmp/fix301-m8-world-finish.log
+```
