@@ -293,6 +293,13 @@ impl Room {
         self.players.len() < MAX_PLAYERS
             && (!self.listed || self.players.len() < self.capacity(maps))
     }
+    fn start_ready(&self, maps: &Value) -> bool {
+        !self.players.is_empty()
+            && self.players.len() <= self.capacity(maps)
+            && (self.mode != "assault"
+                || (self.players.iter().any(|p| p.team == self.defender)
+                    && self.players.iter().any(|p| p.team != self.defender)))
+    }
     fn add_seat(&mut self, mut p: Person) {
         p.team = (0..MAX_PLAYERS)
             .find(|team| !self.players.iter().any(|p| p.team == *team))
@@ -1589,6 +1596,11 @@ impl Hub {
         } else if room.native.is_some() {
             return Err("start requires lobby state".into());
         }
+        if !room.start_ready(&self.maps) {
+            return Err(
+                "start requires one through capacity players and both Assault sides".into(),
+            );
+        }
         if room.listed || room.mode != "conquest" || room.sandbox {
             return Err("R1 requires private Conquest and sandbox off".into());
         }
@@ -2409,6 +2421,10 @@ mod native_ingress_tests;
 #[cfg(test)]
 #[path = "trusted_room_lobby_tests.rs"]
 mod trusted_room_tests;
+
+#[cfg(test)]
+#[path = "mode_startup2_tests.rs"]
+mod mode_startup2_tests;
 
 #[cfg(test)]
 #[path = "lobby_socket_tests.rs"]
