@@ -25,7 +25,9 @@ impl ActorPolicy<'_> {
 /// Validate only the represented actor modes, not their complete tick capabilities.
 pub(crate) fn checked_game_mode(game: &Game, mode: Mode) -> Result<(), String> {
     match (mode, game.mode) {
-        (Mode::Default | Mode::Conquest, None) | (Mode::World, Some(ModeKind::World)) => Ok(()),
+        (Mode::Default | Mode::Conquest, None)
+        | (Mode::Classic, Some(ModeKind::Classic))
+        | (Mode::World, Some(ModeKind::World)) => Ok(()),
         _ => Err("actor mode does not match canonical Game mode".into()),
     }
 }

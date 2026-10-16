@@ -28,6 +28,7 @@ pub mod catalog;
 pub mod client_view;
 pub mod combat;
 pub mod command_destinations;
+pub mod command_feedback;
 pub mod commander_ai;
 mod commander_forward_hq;
 pub mod commander_mind;
@@ -163,6 +164,10 @@ pub mod world_route_retention;
 
 pub mod startup_tables;
 
+#[cfg(test)]
+mod cmb5_ability_tests;
+#[cfg(test)]
+mod cmb5_base_dispatch_tests;
 #[cfg(test)]
 mod combat_feature_tests;
 

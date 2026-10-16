@@ -269,6 +269,40 @@ fn along_route(mut at: Point, route: &[Point], mut left: f64) -> Point {
     at
 }
 impl Match {
+    /// Explicit core vision phase. This does not admit Horde to ordinary ticking or delivery.
+    pub fn refresh_horde_visibility(&mut self) -> Result<(), String> {
+        self.validate_horde_phase(0.0)?;
+        let horde = self.horde.as_ref().unwrap();
+        let defender_team = self.world.game.players[0].team;
+        let few = horde.budget == 0.0 && horde.left <= number(cfg()?, "reveal")?;
+        let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
+        let mut revealed = Vec::new();
+        if horde.active {
+            for unit in self.world.game.units.values() {
+                if unit.owner == horde.slot
+                    && unit.air.is_none()
+                    && (few
+                        || catalog
+                            .unit(&self.rules.kinds[unit.kind].name)
+                            .map_err(|e| e.to_string())?
+                            .get("boss")
+                            .and_then(Value::boolean)
+                            .unwrap_or(false))
+                {
+                    revealed.push(unit.id);
+                }
+            }
+        }
+        crate::vision::update_vision(&mut self.world.game, &self.rules, &self.grid);
+        for player in &mut self.world.game.players {
+            if player.team == defender_team {
+                player.visible.extend_from_slice(&revealed);
+                player.visible.sort_unstable();
+                player.visible.dedup();
+            }
+        }
+        Ok(())
+    }
     /// Explicit constructor for the Horde-owned wave phase. Generic `Match::new`
     /// and ordinary `advance_tick` retain their existing admission guards.
     pub fn new_horde(map: &AuthoritativeMap, mut options: MatchOptions) -> Result<Self, String> {
