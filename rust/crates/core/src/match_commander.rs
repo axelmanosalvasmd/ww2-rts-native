@@ -1170,6 +1170,8 @@ impl Match {
                 owned_nodes: BTreeSet::new(),
                 build_reserve: 0.0,
                 fort_reserve: 0.0,
+                field: None,
+                world: None,
                 support: self.start.players[owner]
                     .support
                     .iter()
