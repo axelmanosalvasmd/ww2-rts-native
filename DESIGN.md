@@ -111,6 +111,21 @@ The shared AI scheduler accepts the caller's tick, snapshot-delivery beat and fi
 
 Horde break control changes only the existing inactive break clock to zero. The existing Horde phase starts the wave and owns its purchases and spawns. The server checks host authority and pause state before invoking the core rule. Full Horde tick, snapshot and room admission stay guarded.
 
+## MODE runtime A: shared ordinary phases (2026-10-16)
+
+Assault, Annihilation and Classic use the existing ordinary tick phases behind a
+strict option/Game mode-pair predicate. A shared EliminationState owns the two
+new modes' team count, bunker maxima, Classic clock and resource nodes; it does
+not add another clock, unit store or wallet. Annihilation's defeat phase precedes
+point capture/income, while Classic's decay, defeat and finish remain late.
+Defeat processes players in slot order and each army in unit-ID order; equal
+transfer distances break on the recipient's player slot. World fort capture stages ownership and grid changes in the existing
+terrain transaction, then updates matching footprint rows only after validation.
+No FFI, wire, contract, privacy or server admission changes accompany these core
+paths. The intent witnesses and remaining limits are in
+[MODE runtime A](docs/testing/mode-runtime-a.md).
+
+
 ## Private Horde director queue (2026-10-16)
 
 The core seat dispatcher selects the human commander for ordinary seats and a

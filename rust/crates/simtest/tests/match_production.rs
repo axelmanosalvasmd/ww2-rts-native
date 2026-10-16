@@ -882,7 +882,7 @@ fn ordinary_training_refusal_precedes_research_progress() {
     assert_eq!(
         m.validate_production_phases(0.05),
         Err(ProductionStepError::InvalidState(
-            "nonempty Conquest training queue"
+            "nonempty skirmish training queue"
         ))
     );
     assert_eq!(unchanged(&m), before);

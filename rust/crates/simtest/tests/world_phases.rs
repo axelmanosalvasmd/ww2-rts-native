@@ -224,36 +224,47 @@ fn malformed_income_facts_and_current_orders_leave_their_phase_unchanged() {
 }
 
 #[test]
-fn combined_refusal_is_atomic_but_separate_income_is_an_explicit_committed_phase() {
+fn fort_transfer_matches_split_phases_and_logistics_refusal_keeps_income_boundaries() {
     let f = fixture();
     let case = &f["cases"][2];
-    let mut split = load(&f, case);
     let order = ids(&case["capturedOrder"]);
-    let facts = final_captured(&split, &order, &BTreeMap::new());
-    split.apply_world_income(&facts, 0.05).unwrap();
-    actions(&mut split, case, "between");
     let fort = json!({"id":999,"owner":1,"type":"pillbox","x":193.,"z":65.,"hp":500.,"built":1.,"retreating":false,"riding":0});
-    world_scene::update_unit(&mut split, &fort, true);
     let mut current = ids(&case["regionOrder"]);
     current.push(999);
-    let after_income = view(&split, &current);
-    assert!(
-        split
-            .apply_world_regions(&current, 0.05)
-            .unwrap_err()
-            .contains("fort")
-    );
-    assert_eq!(view(&split, &current), after_income);
-    let mut combined = load(&f, case);
-    actions(&mut combined, case, "between");
-    world_scene::update_unit(&mut combined, &fort, true);
-    let before = view(&combined, &current);
-    assert!(
-        combined
-            .apply_world_capture_income_and_elimination(&order, &current, 0.05)
-            .unwrap_err()
-            .contains("fort")
-    );
-    assert_eq!(view(&combined, &current), before);
-    assert_ne!(combined.start.economy, split.start.economy);
+    for logistics in [false, true] {
+        let mut split = load(&f, case);
+        let facts = final_captured(&split, &order, &BTreeMap::new());
+        split.apply_world_income(&facts, 0.05).unwrap();
+        actions(&mut split, case, "between");
+        world_scene::update_unit(&mut split, &fort, true);
+        split.options.logistics = logistics;
+        let after_income = view(&split, &current);
+        let mut combined = load(&f, case);
+        actions(&mut combined, case, "between");
+        world_scene::update_unit(&mut combined, &fort, true);
+        combined.options.logistics = logistics;
+        let before = view(&combined, &current);
+        let split_result = split.apply_world_regions(&current, 0.05);
+        let combined_result =
+            combined.apply_world_capture_income_and_elimination(&order, &current, 0.05);
+        if logistics {
+            assert!(split_result.unwrap_err().contains("logistics"));
+            assert!(combined_result.unwrap_err().contains("logistics"));
+            assert_eq!(view(&split, &current), after_income);
+            assert_eq!(view(&combined, &current), before);
+            assert_ne!(combined.start.economy, split.start.economy);
+            assert_eq!(split.world.game.units[&999].owner, 1);
+            assert_eq!(combined.world.game.units[&999].owner, 1);
+        } else {
+            let split_effects = split_result.unwrap();
+            let combined_effects = combined_result.unwrap();
+            assert_eq!(split_effects.captures, combined_effects.captures);
+            assert_eq!(split_effects.captures.len(), 1);
+            assert_eq!(split.world.game.units[&999].owner, 0);
+            assert_eq!(combined.world.game.units[&999].owner, 0);
+            assert_eq!(split.world.game.units[&999].hp, 500.0);
+            assert_eq!(view(&combined, &current), view(&split, &current));
+            assert_eq!(combined.start.economy, split.start.economy);
+        }
+    }
 }

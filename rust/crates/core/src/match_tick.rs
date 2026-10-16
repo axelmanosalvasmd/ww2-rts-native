@@ -1,4 +1,4 @@
-//! Deterministic Conquest tick scheduling over the canonical Match state.
+//! Deterministic ordinary-mode and bounded World ticks over canonical Match state.
 //!
 //! This integration grows by attaching the independently verified phase adapters.
 //! Reports identify phases still absent; a clock advance is not playable-match proof.
@@ -84,18 +84,9 @@ impl TickPathConfig {
 pub struct TickState {
     pub(crate) fault: Option<String>,
     started: bool,
-    aircraft_weapons_restricted: bool,
     paths: TickPathConfig,
 }
 impl TickState {
-    /// Recipient rooms cannot publish aircraft projectile flights until owner decision E.
-    /// This restriction does not change command admission or the standalone combat provider.
-    pub fn restrict_aircraft_weapons_for_delivery(&mut self) {
-        self.aircraft_weapons_restricted = true;
-    }
-    pub(crate) fn aircraft_weapons_allowed(&self) -> bool {
-        !self.aircraft_weapons_restricted
-    }
     pub fn fault(&self) -> Option<&str> {
         self.fault.as_deref()
     }
@@ -145,7 +136,7 @@ pub struct TickReport {
     /// One owned sequence in actual emission order, detached from producer buffers.
     pub events: Vec<TickEvent>,
     pub retired: Vec<crate::match_combat::RetiredUnit>,
-    /// Administrative territory removals never enter ordinary death/story callbacks.
+    /// Administrative mode removals never enter ordinary death/story callbacks.
     pub world_removed: Vec<crate::game::Unit>,
 }
 impl TickReport {
@@ -300,6 +291,12 @@ impl crate::match_runtime::Match {
             && game.mode == Some(crate::game::ModeKind::World);
         if !(world || crate::match_actor::ordinary_ground_mode(game, self.options.mode)) {
             return Err("tick execution requires represented ordinary or World mode".into());
+        }
+        if matches!(
+            self.options.mode,
+            crate::economy::Mode::Classic | crate::economy::Mode::Annihilation
+        ) {
+            self.validate_elimination_state()?;
         }
         if self.options.mode == crate::economy::Mode::Tutorial {
             self.validate_tutorial_state()?;
@@ -478,14 +475,7 @@ impl crate::match_runtime::Match {
         }
         self.tick_environment_phase(EnvironmentPhase::Debris, events)?;
         phases.push(TickPhase::Debris);
-        if matches!(
-            self.options.mode,
-            crate::economy::Mode::World | crate::economy::Mode::Tutorial
-        ) {
-            self.sample_match_tick()?;
-        } else {
-            self.sample_conquest_tick()?;
-        }
+        self.sample_match_tick()?;
         phases.push(TickPhase::StorySample);
         self.start.weather.step(tick as u64);
         self.world.game.weather = Some(self.start.weather.now as usize);
@@ -596,7 +586,7 @@ impl crate::match_runtime::Match {
             let skip_ground =
                 building && (!kind.weapon || unit.built.is_some_and(|built| built < 1.0));
             // Source advances a completed building's queue before its building continue.
-            if self.options.mode == crate::economy::Mode::World && building && building_complete {
+            if self.options.mode.is_construction() && building && building_complete {
                 self.step_training(id, dt)
                     .map_err(|error| format!("training turn: {error:?}"))?;
             }
@@ -859,10 +849,28 @@ impl crate::match_runtime::Match {
             world_removed = result.removed;
             phases.push(TickPhase::WorldRegions);
         } else {
+            if self.options.mode == crate::economy::Mode::Annihilation {
+                let eliminated = self.apply_annihilation_elimination()?;
+                events.extend(eliminated.effects.into_iter().map(TickEvent::Environment));
+                world_removed.extend(eliminated.removed);
+            }
             self.apply_point_capture_income(&unit_order)?;
             phases.push(TickPhase::PointCaptureIncome);
+            match self.options.mode {
+                crate::economy::Mode::Assault => {
+                    self.apply_assault_victory(dt)?;
+                }
+                crate::economy::Mode::Annihilation | crate::economy::Mode::Classic => {
+                    let eliminated = self.apply_elimination_victory(dt)?;
+                    events.extend(eliminated.effects.into_iter().map(TickEvent::Environment));
+                    world_removed.extend(eliminated.removed);
+                }
+                crate::economy::Mode::Tutorial => {}
+                _ => {
+                    self.apply_conquest_victory()?;
+                }
+            }
             if self.options.mode != crate::economy::Mode::Tutorial {
-                self.apply_conquest_victory()?;
                 phases.push(TickPhase::Victory);
             }
         }

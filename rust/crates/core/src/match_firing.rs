@@ -357,27 +357,7 @@ fn dist(a: Point, b: Point) -> f64 {
 
 impl Match {
     fn supported_firing_mode(&self) -> Result<(), String> {
-        if !matches!(
-            (self.options.mode, self.world.game.mode),
-            (
-                crate::economy::Mode::Default | crate::economy::Mode::Conquest,
-                None
-            ) | (
-                crate::economy::Mode::Classic,
-                Some(crate::game::ModeKind::Classic)
-            ) | (
-                crate::economy::Mode::Tutorial,
-                Some(crate::game::ModeKind::Tutorial)
-            ) | (
-                crate::economy::Mode::World,
-                Some(crate::game::ModeKind::World)
-            ) | (
-                crate::economy::Mode::Horde,
-                Some(crate::game::ModeKind::Horde)
-            )
-        ) {
-            return Err("weapon execution requires ordinary Conquest mode".into());
-        }
+        crate::match_actor::checked_game_mode(&self.world.game, self.options.mode)?;
         self.validate_actor_mode()
     }
     /// Capture poses before the tick advances and before weather or environment movement.
@@ -981,6 +961,28 @@ impl Match {
         start_fraction: f64,
         end_fraction: f64,
     ) -> Result<Option<FlightContact>, String> {
+        self.flight_contact_for(p, a, b, start_fraction, end_fraction, None)
+    }
+    /// Snapshot extrapolation uses current poses and only visible unit bodies.
+    /// Terrain remains canonical, matching flightUntil at the prototype pin.
+    pub(crate) fn visible_flight_contact(
+        &self,
+        p: &LiveFlight,
+        a: projectiles::Point3,
+        b: projectiles::Point3,
+        slot: usize,
+    ) -> Result<Option<FlightContact>, String> {
+        self.flight_contact_for(p, a, b, 1.0, 1.0, Some(slot))
+    }
+    fn flight_contact_for(
+        &self,
+        p: &LiveFlight,
+        a: projectiles::Point3,
+        b: projectiles::Point3,
+        start_fraction: f64,
+        end_fraction: f64,
+        recipient: Option<usize>,
+    ) -> Result<Option<FlightContact>, String> {
         let g = &self.world.game;
         let level_height = n(self.firing_config()?, "levelHeight", 2.5);
         let mut best: Option<FlightContact> = None;
@@ -1034,6 +1036,7 @@ impl Match {
                 && t.air.is_none()
                 && !t.riding
                 && t.id != p.shooter
+                && recipient.is_none_or(|slot| crate::recipient_snapshot::seen_by(self, slot, t.id))
                 && (p.blast_source.is_some() || !g.allied(p.owner, t.owner))
         });
         candidates.sort_unstable();
@@ -1043,12 +1046,15 @@ impl Match {
             if def.building && t.cells.as_ref().is_some_and(|c| !c.is_empty()) {
                 continue;
             }
-            let old = self
-                .firing
-                .prior
-                .get(&id)
-                .copied()
-                .unwrap_or_else(|| t.pose());
+            let old = if recipient.is_some() {
+                t.pose()
+            } else {
+                self.firing
+                    .prior
+                    .get(&id)
+                    .copied()
+                    .unwrap_or_else(|| t.pose())
+            };
             let before = projectiles::BodyPosition {
                 x: old.x + (t.x - old.x) * start_fraction,
                 z: old.z + (t.z - old.z) * start_fraction,

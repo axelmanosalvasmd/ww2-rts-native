@@ -165,6 +165,31 @@ fn horde_setup_builds_one_fortified_shared_base_and_internal_enemy() {
         m.validate_aviation().is_err(),
         "Horde aircraft combat phases stay guarded"
     );
+    m.validate_actor_mode().unwrap();
+    let building = m
+        .world
+        .game
+        .units
+        .values()
+        .find(|unit| m.rules.kinds[unit.kind].name == "barracks")
+        .unwrap()
+        .id;
+    let before = format!("{:?}", m.world.game);
+    let journal = m.world.journal_end().unwrap();
+    assert_eq!(
+        m.begin_construction_tick().unwrap_err(),
+        "construction phases require ordinary Conquest"
+    );
+    assert_eq!(
+        m.preflight_building_repair(building, 1.0).unwrap_err(),
+        "invalid Conquest repair request"
+    );
+    assert_eq!(
+        m.repair_building_sections(building, 1.0).unwrap_err(),
+        "invalid Conquest repair request"
+    );
+    assert_eq!(format!("{:?}", m.world.game), before);
+    assert_eq!(m.world.journal_end().unwrap(), journal);
     let five = scene(5, ArmySize::Standard);
     assert_eq!(
         five.start.players.len(),

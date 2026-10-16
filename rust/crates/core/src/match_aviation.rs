@@ -2,7 +2,6 @@
 //! Combat owns HP attribution/XP and Logistics owns physical ground AA rounds.
 use crate::{
     catalog::{Catalog, Value},
-    economy::Mode,
     game::{PlaneState, Point},
     grid::UnitId,
     match_firing::FiringUnit,
@@ -152,12 +151,12 @@ impl Match {
         let g = &self.world.game;
         if !(crate::match_actor::ordinary_ground_mode(g, self.options.mode)
             || horde_spawn
-                && self.options.mode == Mode::Horde
+                && self.options.mode == crate::economy::Mode::Horde
                 && g.mode == Some(crate::game::ModeKind::Horde)
                 && self.start.shared_defenders.is_some())
         {
             return Err(AviationError::Unsupported(
-                "aviation currently requires ordinary Conquest",
+                "aviation requires a matching ordinary mode",
             ));
         }
         if g.tick < 0
@@ -252,12 +251,12 @@ impl Match {
     /// Nearest finished own airfield, otherwise the source off-map base past HQ.
     pub fn aircraft_base(&self, owner: usize, at: Point) -> Result<Point, AviationError> {
         if !(crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode)
-            || self.options.mode == Mode::Horde
+            || self.options.mode == crate::economy::Mode::Horde
                 && self.world.game.mode == Some(crate::game::ModeKind::Horde)
                 && self.start.shared_defenders.is_some())
         {
             return Err(AviationError::Unsupported(
-                "air base currently requires ordinary Conquest",
+                "air base requires a matching ordinary mode",
             ));
         }
         if owner >= self.start.players.len() || !finite(at) {
@@ -677,9 +676,7 @@ impl Match {
         self.aviation.planes.insert(id, next.runtime);
         self.firing.units.insert(id, next.firing);
         self.grid.update(id, &self.world.game.units[&id]);
-        if self.tick_state.aircraft_weapons_allowed() {
-            self.step_aircraft_weapons(id)?;
-        }
+        self.step_aircraft_weapons(id)?;
         Ok(())
     }
     fn prepare_aircraft_anti_air(

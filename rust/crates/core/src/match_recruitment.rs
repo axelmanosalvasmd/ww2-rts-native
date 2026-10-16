@@ -129,6 +129,7 @@ fn admission_facts<'a>(
         || player_rallies.len() != count
         || game.tick < 0
         || (!crate::match_actor::ordinary_ground_mode(game, options.mode) && !horde)
+        || options.mode.is_construction()
         || options.logistics
     {
         return Err(RecruitError::InvalidState("Conquest recruitment state"));
@@ -251,7 +252,11 @@ impl Match {
         if self.finish.is_some() || wallet.away || wallet.out {
             return Err(production::Error::Denied(Denial::Blocked).into());
         }
-        self.validate_ordinary_finish_state()
+        if self.options.mode == crate::economy::Mode::Tutorial {
+            self.validate_tutorial_state()
+                .map_err(RecruitError::Story)?;
+        }
+        self.validate_match_finish_state()
             .map_err(RecruitError::Story)?;
         if self
             .rules
@@ -269,13 +274,6 @@ impl Match {
         name: &str,
         from: Option<u32>,
     ) -> Result<CompletedRecruitUnit, RecruitError> {
-        // Parked planes need aircraft rows too. Refuse before payment or publication
-        // while the host uses the ordinary snapshot adapter.
-        if self.ordinary_snapshot_only {
-            return Err(RecruitError::Placement(
-                crate::produced_units::Error::UnsupportedAir,
-            ));
-        }
         let facts = admission_facts(
             &self.world.game,
             &self.start,
