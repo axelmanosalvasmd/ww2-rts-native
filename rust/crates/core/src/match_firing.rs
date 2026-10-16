@@ -2615,5 +2615,9 @@ mod audit_native;
 mod map_feature_tests;
 
 #[cfg(test)]
+#[path = "map_intent_batch2_tests.rs"]
+mod map_intent_batch2;
+
+#[cfg(test)]
 #[path = "match_kaiju_tests.rs"]
 mod match_kaiju_tests;

@@ -1,0 +1,1 @@
+- Add native intent tests for aircraft return triggers, rearming, anti-air controls and ammunition, ground-hazard immunity, hull escape and sideways sliding, and wreck obstruction until blast removal. Aircraft automatic weapons and bomber area orders remain deferred to PR #302.
