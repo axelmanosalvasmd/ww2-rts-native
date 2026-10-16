@@ -766,7 +766,7 @@ impl ConvoyState {
                         .map(|s| (s.id.clone(), distance(s.at, host.at)))
                 })
                 .collect();
-            nearby.sort_by(|a, b| a.1.total_cmp(&b.1));
+            crate::sort::sort_by_ref(&mut nearby, |a, b| a.1 - b.1);
             for (id, _) in nearby {
                 let s = self.store_mut(&id).unwrap();
                 if s.source {
@@ -978,12 +978,8 @@ impl ConvoyState {
             .filter(|u| u.owner == Some(owner) && u.hp > 0.0 && reserves.get(u.id).is_some())
             .collect();
         let mut assigned = BTreeSet::new();
-        troops.sort_by(|a, b| {
-            reserves
-                .get(a.id)
-                .unwrap()
-                .provisions
-                .total_cmp(&reserves.get(b.id).unwrap().provisions)
+        crate::sort::sort_by(&mut troops, |a, b| {
+            reserves.get(a.id).unwrap().provisions - reserves.get(b.id).unwrap().provisions
         });
         let mut targets = vec![];
         for u in troops.clone() {
@@ -1062,10 +1058,8 @@ impl ConvoyState {
                 });
             }
         }
-        targets.sort_by(|a, b| {
-            a.priority
-                .unwrap_or(0.0)
-                .total_cmp(&b.priority.unwrap_or(0.0))
+        crate::sort::sort_by_ref(&mut targets, |a, b| {
+            a.priority.unwrap_or(f64::NAN) - b.priority.unwrap_or(f64::NAN)
         });
         troops.clear();
         targets
@@ -1100,7 +1094,7 @@ impl ConvoyState {
             }
             out.push((s.id.clone(), distance(s.at, target.at)));
         }
-        out.sort_by(|a, b| a.1.total_cmp(&b.1));
+        crate::sort::sort_by_ref(&mut out, |a, b| a.1 - b.1);
         out.into_iter().map(|r| r.0).collect()
     }
     #[allow(clippy::too_many_arguments)]
@@ -1210,7 +1204,9 @@ impl ConvoyState {
                     .iter()
                     .filter_map(|id| self.store(id).cloned())
                     .collect();
-                s.sort_by(|a, b| distance(a.at, u.at).total_cmp(&distance(b.at, u.at)));
+                crate::sort::sort_by_ref(&mut s, |a, b| {
+                    distance(a.at, u.at) - distance(b.at, u.at)
+                });
                 s.into_iter().next()
             });
         let Some(origin) = origin else {
@@ -1289,12 +1285,8 @@ impl ConvoyState {
                         && u.owner.is_some_and(|o| friendly(ctx, o, truck_owner))
                 })
                 .collect();
-            members.sort_by(|a, b| {
-                reserves
-                    .get(a.id)
-                    .unwrap()
-                    .provisions
-                    .total_cmp(&reserves.get(b.id).unwrap().provisions)
+            crate::sort::sort_by_ref(&mut members, |a, b| {
+                reserves.get(a.id).unwrap().provisions - reserves.get(b.id).unwrap().provisions
             });
             let mut served = false;
             for troop in &members {
@@ -1667,7 +1659,9 @@ impl ConvoyState {
                     .iter()
                     .filter_map(|id| self.store(id).cloned())
                     .collect();
-                sources.sort_by(|a, b| distance(a.at, u.at).total_cmp(&distance(b.at, u.at)));
+                crate::sort::sort_by_ref(&mut sources, |a, b| {
+                    distance(a.at, u.at) - distance(b.at, u.at)
+                });
                 if let Some(source) = sources.first() {
                     target = Some(source.at);
                     c.origin = source.id.clone();
@@ -2170,7 +2164,9 @@ impl ConvoyState {
                         .iter()
                         .filter_map(|id| self.store(id))
                         .collect();
-                    sources.sort_by(|a, b| distance(a.at, u.at).total_cmp(&distance(b.at, u.at)));
+                    crate::sort::sort_by_ref(&mut sources, |a, b| {
+                        distance(a.at, u.at) - distance(b.at, u.at)
+                    });
                     sources.first().map(|s| s.at)
                 } else {
                     rows.iter()
@@ -2367,3 +2363,6 @@ impl ConvoyState {
         })
     }
 }
+
+#[cfg(test)]
+mod if25_tests;

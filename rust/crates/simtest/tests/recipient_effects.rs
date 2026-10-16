@@ -187,6 +187,7 @@ fn reload(state: &mut Match, source: &Value) {
                     timer: n(&recorded["timer"]),
                     orbit: n(&recorded["ang"]),
                     mission: None,
+                    attack_pick: 0,
                     downed: truthy(&recorded["down"]),
                 },
             );

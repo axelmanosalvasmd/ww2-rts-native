@@ -96,7 +96,7 @@ impl Match {
         Ok(home)
     }
 
-    /// Source retreat reset. Air, carrier and building exit need their own actuator.
+    /// Ground retreat reset, sharing the command's staged house exit when needed.
     pub fn retreat_unit(&mut self, id: UnitId) -> Result<(), String> {
         let u = self
             .world
@@ -105,8 +105,14 @@ impl Match {
             .get(&id)
             .ok_or("missing retreat unit")?
             .clone();
-        if u.air.is_some() || u.riding || u.garrison.is_some() {
-            return Err("air, carrier or garrison retreat is unsupported".into());
+        if u.air.is_some() || u.riding {
+            return Err("air or carrier retreat is unsupported".into());
+        }
+        if u.garrison.is_some() {
+            if let Some(denial) = self.ground_retreat_command(u.owner, &[i64::from(id)])? {
+                return Err(format!("garrison retreat refused: {denial:?}"));
+            }
+            return Ok(());
         }
         if u.id != id
             || u.dig != self.field_works.is_active(id)
@@ -204,6 +210,14 @@ impl Match {
         let def = catalog.unit(&kind.name).map_err(|e| e.to_string())?;
         let cfg = catalog.table("CFG").map_err(|e| e.to_string())?;
         if !c.auto_retreat
+            || u.hp <= 0.0
+            || u.riding
+            || kind.air
+            || u.air.is_some()
+            || self
+                .convoys
+                .as_ref()
+                .is_some_and(|state| state.trucks.contains_key(&id))
             || u.retreating
             || kind.speed <= 0.0
             || u.hp >= number(def, "models")? * number(def, "hpPer")? * number(cfg, "autoRetreat")?
@@ -539,3 +553,7 @@ impl Match {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+#[path = "match_reactions/intent_tests.rs"]
+mod intent_tests;

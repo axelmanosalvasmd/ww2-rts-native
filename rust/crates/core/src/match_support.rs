@@ -1179,3 +1179,6 @@ impl Match {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod cmb66_tests;

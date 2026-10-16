@@ -295,11 +295,12 @@ mod tests {
                 assert_eq!(m.world.game.units[&id].hp, 0.0);
                 assert_eq!(m.combat.get(id).unwrap().last_hit, Some(0));
             }
+            let mut retirement_effects = Vec::new();
             if exit == "missing carrier" {
                 // Death can happen after the rider's turn. Its next turn sees
                 // the already retired carrier and must still eject normally.
                 let order = m.world.game.units.keys().copied().collect::<Vec<_>>();
-                m.retire_dead(&order).unwrap();
+                retirement_effects = m.retire_dead(&order).unwrap().shots;
                 assert!(!m.world.game.units.contains_key(&carrier));
             }
             let report = m.advance_tick().unwrap_or_else(|e| panic!("{exit}: {e}"));
@@ -333,13 +334,22 @@ mod tests {
                     .get(carrier)
                     .is_none_or(|meta| meta.cargo.is_empty())
             );
-            let hurt = report
-                .environment()
-                .find_map(|effect| match effect {
+            // Retirement now ejects the carrier's complete cargo immediately.
+            // Its caller owns those returned effects; the tick must not emit them twice.
+            let hurts = retirement_effects
+                .iter()
+                .chain(report.environment())
+                .filter_map(|effect| match effect {
                     Effect::Hurt(hurt) if hurt.unit == rider => Some(hurt),
                     _ => None,
                 })
-                .expect("thrown exit publishes hurt through the existing tick event stream");
+                .collect::<Vec<_>>();
+            assert_eq!(
+                hurts.len(),
+                1,
+                "{exit}: one thrown-exit hurt across retirement and tick"
+            );
+            let hurt = hurts[0];
             assert_eq!(hurt.owner, 0);
             assert_eq!(hurt.from, None);
             assert_eq!(hurt.killed, matches!(exit, "injury" | "stranded"));

@@ -10,6 +10,23 @@ AI-19 evidence covers the existing detached core state: lazy spawn camera, priva
 
 Tutorial startup selects authored spawn indices 0 and 1 directly. It must not map those indices through the non-Assault spawn list, which can move both sides when a map marks its first spawns Assault-only. World already uses direct authored indices; ordinary Conquest keeps its existing filtered allocation. Horde continues to select the middle entry of the authored defender list and the first non-defender index. No persistent state, command or recipient capability is added.
 
+## Native room worker supervision (2026-10-16)
+
+`WW2_SHARDS` selects up to 64 game workers behind the existing HTTP and WebSocket routes. Each worker owns an OS thread, a current-thread Tokio runtime and an independent room hub. The front hashes the decoded room query using the prototype's FNV-1a over UTF-16 code units, dispatches the existing socket, and concatenates room lists in worker order. A worker panic closes its sockets and invalidates its host controls; its supervisor creates a fresh hub after one second. Front shutdown stops all workers.
+
+Threads replace the prototype's child processes and loopback socket replay. Private readiness and directory channels replace process IPC without adding socket messages. Immutable maps stay front-owned; native save records and map editing remain unavailable, so no record or map-invalidation protocol is introduced. Every worker retains the existing trusted-room code policy. Public start, command admission, World admission and logistics guards keep their existing scope.
+
+## Queued house entry snapshot compatibility (2026-10-16)
+
+Queued native Enter orders use the pinned prototype's existing garrison kind 9
+and stored house coordinates in the owner-only waiting-order row. Serialization
+accepts only the normalized singleton actor with `queue: false`, then applies the
+existing finite-coordinate and rounding checks. Activation, house selection and
+player command behavior stay with the canonical garrison owner. No wire meaning
+is added. A full ordinary match test keeps Enter queued behind movement, enters
+the house, captures an objective and earns a VP victory while delivering every
+seat's snapshot on each tick and during the ending hold.
+
 ## Tutorial runtime over existing Match systems (2026-10-16)
 
 The explicit `Match::new_tutorial` constructor adds the unattended Enemy seat and uses the existing `tutorial_steps` definitions. Tutorial shares the ordinary ground, routing, combat, objective and support systems. Its private step state owns only the current index, spawned IDs and pending dialogue. Lines leave through the core tick report from tick 40; no server or client transport is introduced. The runner advances at most one step per tick after capture and income, and finishes at the bridgehead through the common Match finish state.
@@ -94,6 +111,18 @@ Map authoring uses an in-memory draft separate from `World` and `Match`. Selecti
 The map loader now calls the scenario validator added in #298. A validated scenario can be edited and prepared for saving, but every startup profile rejects explicit authored scenarios before creating match state because their executor is absent. The previous fixture assertion that scenarios were unsupported by the loader now checks their retained definition. No command, event, flag or other live match state was added.
 
 `map_save::prepare_map_save` applies the prototype's save-field projection and an 8 MiB limit to incoming bytes before parsing, including discarded properties. It prepares bytes in memory and validates the projected document again. HTTP editor authorization, persistence and server integration remain absent, so MAP-23 remains component-only. The existing 16 MiB authoritative-loader limit is unchanged. Generated World documents are outside the demonstrated save scope. MAP-57's rendered-ground sampler and MAP-90's station-yard construction integration remain unimplemented; World admission stays guarded. MAP-92 retains field-specific diagnostics and stronger bounded integer checks for region IDs and ordered bounds, reported as differs candidates rather than approved differences.
+
+
+## Movement actors and review repairs (2026-10-16)
+
+The movement runtime connects house entry and exit, carrier wreck ejection, World train passengers and aircraft purchases, orders and weapon actuation to the existing Match owners. Game keeps pose and movement state; combat keeps carrier links; rail and aviation metadata keep their actor-specific lifecycle. Public ingress admission remains bounded by its existing gates.
+
+Rooms using ordinary recipient snapshots bind that capability limit to the Match at attachment. Their aircraft purchases return the existing unsupported denial before payment or publication, including orders queued before attachment, because even parked aircraft require rows this adapter cannot carry. Standalone aircraft actuation remains available. Aircraft projectile contacts retain the source kind's air flag, so hits on surviving vehicles do not create ground-fire reaction memory.
+
+Aircraft shots keep their true off-map origin and collision segment. Only the terrain-cell traversal is clipped to the battlefield, so off-map launches neither abort the tick nor shift the shot to an unrelated edge cell. This follows the same geometry rule as the combat runtime repair in PR #299. Wounded house occupants leave through the existing ground-exit path before automatic retreat. World elimination admits validated train links and retires their metadata with the removed actors. Mixed Attack selections send orders to both aircraft and ground actors through their existing command paths.
+
+The movement witnesses discover a narrow crossing from terrain, measure arrival against the retained destination, and require a directly hit tank to die under dive bombing. These are prototype-intent repairs, with no FFI, header, wire, contract or privacy change. Owner acknowledgment and broader client adoption remain separate from these focused native checks.
+
 
 
 ## First-five engineering merged with MAP273 main (2026-10-16, source only)
@@ -2925,6 +2954,18 @@ The server timing components consume explicit host timestamps and measured durat
 Each room's meter keeps 200 samples for six phases and the last 50 snapshot tick durations. Snapshot phase samples are recorded on scheduled snapshot ticks, including those with no eligible sockets. Percentiles use the source's ordered ranks. After ten snapshot samples, a check each second raises the interval above a 40 ms p95, up to four ticks. A p95 below 24 ms for ten seconds lowers it one step, down to two ticks. A value equal to either threshold resets the recovery window. A decided winner requests a snapshot on every tick without changing the meter.
 
 Timing controls transport cadence only; the AI retains its previously recorded fixed schedule and vision beat. Non-finite or negative durations and exhausted check deadlines fail before any history changes. The original default meter and unchanged host polling loop match eight traces with 747 samples and seven traces with 34 polls, including ring wraps and exact stall/threshold boundaries. At 315f46a, 23 server debug tests and all 173 release workspace tests pass, together with strict workspace Clippy, formatting and release FFI. The same sequence retains the delta, list and backpressure tests. Fresh core compilation followed package cleanup in both profiles. Actual room-loop callbacks and diagnostic logging remain pending.
+
+## Aircraft ground fire and gun-pit range (2026-10-16)
+
+The ordinary Default/Conquest unit loop connects aircraft movement to the existing firing producer before continuing to the next actor. Aircraft choose an eligible ordered ground target first, otherwise use their half-second automatic target cache; Hold Fire suppresses automatic fire while explicit attack and area missions remain authorized. Guns and rockets use `fire_weapon`, and bomber area missions use `launch_weapon_salvo`, so rounds keep the shared physical flight, collision, damage and event owners. Aircraft launch 20 metres above the local terrain and spend one sortie ammunition unit per volley or bomber stick. The tick owner detaches launch events immediately after each aircraft turn, including before propagating errors, just as it does for ground fire. A later actor can then start a queued order without finding an undetached producer buffer. Off-map launches retain their real origins; collision traversal clips the traveled segment to the battlefield and does not exempt a border cell as if it contained the shooter.
+
+Wreck ejection during a rider turn publishes direct environment events before the ground turn continues. Carrier retirement ejects its complete cargo immediately and returns those effects to its caller; a later tick must not reproduce them. The scuttle regression checks exactly one passenger Hurt across the producing retirement and tick phases.
+
+Aircraft admission accepts automatic weapons and keeps queued sorties unsupported. Area missions require a bomber salvo weapon during both command admission and restored-state validation, so an inconsistent fighter mission cannot enter the tick. The command fixtures represent the ground unit's entrench flag with canonical project membership, preserving cancellation and consistency checks for mixed aircraft and ground Move or Stop. Mixed Attack first prepares aircraft without mutation, then uses the existing ground Attack transaction for all ground rows, then applies the prepared aircraft orders. Both selection orders cancel canonical projects; malformed field-work state still refuses before either actor changes.
+
+Gun-pit range follows the prototype's `inPit` and `rangeOf` rule: only MG, AT, mortar, flak and howitzer teams standing on a completed registered pit whose cell is still trench (`T`) receive the compiled `FORTS.nest.range` multiplier (1.25). Both target search and final range eligibility use the same helper. Other units, unfinished pits and pits whose trench has been destroyed receive ordinary weapon range. These connections use the existing internal owners and introduce no FFI, header, wire, contract or privacy changes.
+
+R1 rooms restrict aircraft weapon emission when they take ownership of a Match. The restriction lives in the canonical tick state and gates the aircraft weapon call after movement. It preserves aircraft missions, movement, fuel, rearming and command admission, while leaving the standalone core firing provider available for internal combat checks. A pre-existing live projectile still fails the unchanged recipient preflight. This restriction remains until owner decision E defines projectile-flight delivery; aviation events retain their existing refusals. An ordinary attacker/bomber room test requires a firing opportunity, unchanged sortie ammunition, no flights, a map-income victory and a recipient snapshot for every seat on every tick. Public R1 still cannot order aircraft.
 
 ## Canonical combat metadata (2026-10-13)
 

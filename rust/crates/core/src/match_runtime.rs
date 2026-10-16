@@ -680,6 +680,7 @@ pub struct Match {
     pub environment: crate::environment::EnvironmentRuntime,
     pub companions: crate::companions::Companions,
     pub world_runtime: Option<crate::match_world::WorldRuntime>,
+    pub rail_runs: BTreeMap<u32, crate::match_world_rails::RailRun>,
     /// Team-shared last observed buildings for ordinary rooms and the explicit Classic core phase.
     pub classic_known_buildings: crate::vision::BuildingMemory,
     pub world: World,
@@ -702,6 +703,8 @@ pub struct Match {
     pub firing: crate::match_firing::FiringState,
     pub capture_ticks: Vec<Option<i64>>,
     pub tick_state: crate::match_tick::TickState,
+    /// Host admission stays bound to this match across ticks and recorded commands.
+    pub(crate) ordinary_snapshot_only: bool,
     /// Canonical source counters. Event owners must record accepted effects exactly once.
     pub story: Vec<crate::match_story::PlayerStory>,
     pub fallen: crate::match_story::FallenLocations,
@@ -867,6 +870,7 @@ impl Match {
             environment: crate::environment::EnvironmentRuntime::default(),
             companions: crate::companions::Companions::default(),
             world_runtime: None,
+            rail_runs: BTreeMap::new(),
             classic_known_buildings: Default::default(),
             grid: SpatialGrid::new(&world.game.units, 16.0),
             recipients: Vec::new(),
@@ -888,6 +892,7 @@ impl Match {
             firing: crate::match_firing::FiringState::default(),
             capture_ticks: vec![None; point_count],
             tick_state: crate::match_tick::TickState::default(),
+            ordinary_snapshot_only: false,
             story: vec![crate::match_story::PlayerStory::default(); player_count],
             fallen: crate::match_story::FallenLocations::default(),
             finish: None,
@@ -1128,7 +1133,6 @@ impl Match {
             catalog.table("CFG").map_err(|e| e.to_string())?,
             "pointRadius",
         )?;
-        let mut placer = SpawnPlacer::new();
         for owner in 0..self.start.players.len() {
             if self.horde.is_some() && owner != 0 {
                 continue;
@@ -1183,33 +1187,7 @@ impl Match {
                 avoid.push((at, 12.0));
             }
         }
-        let game = &mut self.world.game;
-        for unit in game.units.values_mut() {
-            let kind = &self.rules.kinds[unit.kind];
-            if kind.structure || kind.air {
-                continue;
-            }
-            let x = (unit.x / CELL).floor() as usize;
-            let y = (unit.z / CELL).floor() as usize;
-            if x < game.w && y < game.h && game.flags[y * game.w + x] & MOVE != 0 {
-                let view = TerrainView {
-                    width: game.w,
-                    height: game.h,
-                    flags: &game.flags,
-                    heights: game.height.as_deref(),
-                    world_known: false,
-                    knowledge_id: 0,
-                    versions: Versions::default(),
-                    changed: None,
-                    changes: &[],
-                };
-                let c = placer
-                    .nearest_free(view, unit.at(), kind.block(), None)
-                    .map_err(|e| format!("base clearance: {e:?}"))?;
-                unit.x = (c % game.w) as f64 * CELL + CELL / 2.0;
-                unit.z = (c / game.w) as f64 * CELL + CELL / 2.0;
-            }
-        }
+        self.relocate_trapped_setup_units()?;
         Ok(())
     }
 

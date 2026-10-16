@@ -84,9 +84,18 @@ impl TickPathConfig {
 pub struct TickState {
     pub(crate) fault: Option<String>,
     started: bool,
+    aircraft_weapons_restricted: bool,
     paths: TickPathConfig,
 }
 impl TickState {
+    /// Recipient rooms cannot publish aircraft projectile flights until owner decision E.
+    /// This restriction does not change command admission or the standalone combat provider.
+    pub fn restrict_aircraft_weapons_for_delivery(&mut self) {
+        self.aircraft_weapons_restricted = true;
+    }
+    pub(crate) fn aircraft_weapons_allowed(&self) -> bool {
+        !self.aircraft_weapons_restricted
+    }
     pub fn fault(&self) -> Option<&str> {
         self.fault.as_deref()
     }
@@ -390,7 +399,8 @@ impl crate::match_runtime::Match {
                 continue;
             }
             if kind.rail {
-                return Err("rail tick actor is not connected".into());
+                self.validate_rail_tick_actor(id)?;
+                continue;
             }
             // The canonical carrier preflight admits riding; Source skips this
             // ordinary reaction/timer block after the early pose update.
@@ -398,7 +408,14 @@ impl crate::match_runtime::Match {
                 continue;
             }
             if unit.garrison.is_some() && self.automatic_retreat_candidate(id)? {
-                return Err("automatic garrison retreat tick exit is not connected".into());
+                if unit.build {
+                    return Err("automatic garrison retreat has unsupported construction".into());
+                }
+                crate::existing_observers::PreparedGroundExit::prepare(
+                    &self.world.game,
+                    &self.rules,
+                    id,
+                )?;
             }
         }
         Ok(())
@@ -534,6 +551,34 @@ impl crate::match_runtime::Match {
                 result?;
                 continue;
             }
+            if self.rules.kinds[unit.kind].rail {
+                self.step_rail_train(id, dt)?;
+                continue;
+            }
+            if self.options.mode == crate::economy::Mode::World {
+                let before_riding = unit.riding;
+                let before_hp = unit.hp;
+                if self.sync_rail_passenger(id, dt)? {
+                    continue;
+                }
+                let u = &self.world.game.units[&id];
+                if before_riding && !u.riding && u.hp < before_hp {
+                    events.push(TickEvent::Environment(crate::environment::Effect::Hurt(
+                        crate::environment::Hurt {
+                            unit: id,
+                            owner: u.owner,
+                            at: u.at(),
+                            killed: u.hp <= 0.0,
+                            from: None,
+                            local: false,
+                        },
+                    )));
+                    if u.hp <= 0.0 {
+                        continue;
+                    }
+                }
+            }
+            let unit = &self.world.game.units[&id];
             let factor = movement::supp_speed(unit.supp);
             // Reserve adapters attach before this pre-timer order phase.
             if self.options.mode == crate::economy::Mode::World {
@@ -557,19 +602,34 @@ impl crate::match_runtime::Match {
                 continue;
             }
             if self.options.mode != crate::economy::Mode::World {
-                if self
-                    .step_aircraft_turn(id, dt)
-                    .map_err(|error| format!("aircraft turn: {error}"))?
-                {
+                let result = self.step_aircraft_turn(id, dt);
+                self.take_firing_tick_events(events);
+                if result.map_err(|error| format!("aircraft turn: {error}"))? {
                     continue;
                 }
-                match self.apply_unit_riding(id, dt)? {
+                let riding = self.apply_unit_riding(id, dt);
+                events.extend(
+                    self.firing
+                        .take_events()
+                        .into_iter()
+                        .map(|event| match event {
+                            crate::match_firing::LaunchEvent::Environment(effect) => {
+                                TickEvent::Environment(effect)
+                            }
+                            event => TickEvent::Firing(event),
+                        }),
+                );
+                match riding? {
                     crate::match_carriers::RidingOutcome::Riding => continue,
                     crate::match_carriers::RidingOutcome::OnFoot => {}
                     crate::match_carriers::RidingOutcome::Ejected(hurt) => {
+                        let killed = hurt.killed;
                         events.push(TickEvent::Environment(crate::environment::Effect::Hurt(
                             hurt,
                         )));
+                        if killed {
+                            continue;
+                        }
                     }
                 }
             }
@@ -603,7 +663,10 @@ impl crate::match_runtime::Match {
             self.take_firing_tick_events(events);
             result?;
             self.apply_tutorial_garrison(id)?;
-            // Boarding uses its live owner-view goal and the existing path scheduler.
+            if self.options.mode != crate::economy::Mode::World {
+                self.apply_unit_entry_with_routes(id)?;
+            }
+            // Boarding uses the live owner-view goal and the current path scheduler.
             if self.options.mode != crate::economy::Mode::World
                 && matches!(
                     self.apply_unit_boarding_with_routes(id)?,
@@ -871,6 +934,11 @@ impl crate::match_runtime::Match {
         progress: &mut crate::match_combat::RetirementProgress,
         events: &mut Vec<TickEvent>,
     ) -> Result<(), String> {
+        events.extend(
+            self.eject_dead_rail_passengers()?
+                .into_iter()
+                .map(TickEvent::Environment),
+        );
         // Building collapse can kill a later captured unit during cleanup, so
         // preflight every potential callback before the first removal.
         let facts = unit_order
@@ -901,6 +969,12 @@ impl crate::match_runtime::Match {
             events.push(TickEvent::Environment(effect));
         })
         .map_err(|e| format!("death cleanup: {e:?}"))?;
+        let removed_ids = progress
+            .removed
+            .iter()
+            .map(|record| record.unit.id)
+            .collect::<Vec<_>>();
+        self.retire_rail_links(&removed_ids);
         for record in &progress.removed {
             self.companion_died(record.unit.id)?;
             progress.companions_notified += 1;

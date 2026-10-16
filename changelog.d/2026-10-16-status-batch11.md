@@ -1,0 +1,1 @@
+- Mark 28 movement rows ported from merged native intent tests (#302): MOV-02, 08, 15, 20, 45, 51, 53, 54, 55, 56, 57, 58, 59, 60, 68, 69, 70, 73, 74, 76, 77, 78, 82, 87, 99, 100, 104, 105.
