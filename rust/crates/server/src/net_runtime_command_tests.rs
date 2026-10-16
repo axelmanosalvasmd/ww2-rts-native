@@ -238,3 +238,91 @@ fn intent_net43_paused_orders_are_ignored_and_replacement_keeps_stable_issuer_an
     assert!(rb.try_recv().is_err());
     assert!(denies(drain(&mut ra)).is_empty());
 }
+
+#[test]
+fn recon_and_queued_cover_refuse_before_reservation_and_keep_ordinary_r1_snapshots_flowing() {
+    for trusted in [false, true] {
+        let mut hub = Hub::new(32, String::new());
+        if trusted {
+            hub.configure_trusted_room(Some(
+                crate::TrustedRoomConfig::new("ABC", 3936341).unwrap(),
+            ));
+        }
+        let (a, mut ra) = client(1);
+        let (b, mut rb) = client(2);
+        join(&mut hub, &a, "a", 0);
+        join(&mut hub, &b, "b", 0);
+        if trusted {
+            hub.start_trusted("ABC", a.id, false, 0).unwrap();
+        } else {
+            hub.attach_native("ABC", native_tests::native_match(), 0)
+                .unwrap();
+        }
+        drain(&mut ra);
+        drain(&mut rb);
+        let actor = rifles(&hub, 0)[0];
+        let at = state(&hub).world.game.units[&actor].at();
+        let wallet = state(&hub).start.economy.players[0].mp;
+        for message in [
+            json!({"t":"support","kind":"recon","x":at.x,"z":at.z}),
+            json!({"t":"cover","ids":[actor],"queue":true}),
+        ] {
+            send(&mut hub, &a, message, 0);
+        }
+        assert_eq!(state(&hub).commands.pending_commands(), 0);
+        assert_eq!(state(&hub).start.economy.players[0].mp, wallet);
+        assert!(state(&hub).world.game.strikes.is_empty());
+        assert!(state(&hub).commands.units[&actor].orders.is_empty());
+        assert_eq!(
+            drain(&mut ra),
+            vec![
+                json!({"t":"deny","cmd":"support","reason":"unsupported"}),
+                json!({"t":"deny","cmd":"cover","reason":"unsupported"}),
+            ]
+        );
+        // A supported input still receives the first host sequence after refusal.
+        send(&mut hub, &a, json!({"t":"stop","ids":[actor]}), 0);
+        assert_eq!(
+            state(&hub)
+                .commands
+                .pending_tick(1)
+                .next()
+                .unwrap()
+                .0
+                .sequence,
+            1
+        );
+        let mut snapshots = [0; 2];
+        for callback in 0..8 {
+            hub.poll_native(callback * 50, callback * 50_000_000);
+            for (slot, rx) in [&mut ra, &mut rb].into_iter().enumerate() {
+                while let Ok(output) = rx.try_recv() {
+                    match output {
+                        Output::Snapshot(write) => {
+                            let message: Value = serde_json::from_str(&write.json).unwrap();
+                            assert_eq!(message["t"], "s");
+                            assert!(message["units"].is_array());
+                            snapshots[slot] += 1;
+                            hub.complete_snapshot(&write, true, callback * 50);
+                        }
+                        other => panic!("unexpected output: {other:?}"),
+                    }
+                }
+            }
+            let status = hub.native_status("ABC").unwrap();
+            assert!(
+                status.fault.is_none(),
+                "trusted={trusted}: {:?}",
+                status.fault
+            );
+            assert_eq!(status.tick, callback as i64 + 1);
+        }
+        assert!(snapshots.iter().all(|count| *count >= 2), "{snapshots:?}");
+        assert_eq!(state(&hub).commands.pending_commands(), 0);
+        assert!(
+            hub.accounts
+                .values()
+                .all(|account| account.pressure.inflight() == 0)
+        );
+    }
+}

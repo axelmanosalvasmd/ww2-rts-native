@@ -70,7 +70,8 @@ fn intent_net85_latency_echo_clamp_and_measured_play_telemetry_are_personal() {
         .unwrap();
     drain(&mut ra);
     drain(&mut rb);
-    // Exercise the production meter, including its cadence change and p95 rounding.
+    // Twenty snapshot samples have p50 12.14, p95 41.26 and maximum 99.94 ms.
+    // The pong must report the rounded p95 and the production cadence change.
     let runtime = &mut hub
         .rooms
         .get_mut("ABC")
@@ -79,11 +80,11 @@ fn intent_net85_latency_echo_clamp_and_measured_play_telemetry_are_personal() {
         .as_mut()
         .unwrap()
         .runtime;
-    for _ in 0..10 {
+    for duration in std::iter::repeat_n(12.14, 18).chain([41.26]) {
         runtime
             .record_timing(
                 TickSample {
-                    durations: [41.26, 0., 0., 0., 0., 0.],
+                    durations: [duration, 0., 0., 0., 0., 0.],
                     sent: true,
                 },
                 100,
@@ -93,7 +94,7 @@ fn intent_net85_latency_echo_clamp_and_measured_play_telemetry_are_personal() {
     runtime
         .record_timing(
             TickSample {
-                durations: [41.26, 0., 0., 0., 0., 0.],
+                durations: [99.94, 0., 0., 0., 0., 0.],
                 sent: true,
             },
             1000,
@@ -124,6 +125,16 @@ fn intent_net86_map_ping_validates_before_budget_and_reaches_only_ready_human_te
     join(&mut hub, &ally, "ally", 0);
     join(&mut hub, &enemy, "enemy", 0);
     send(&mut hub, &a, json!({"t":"team","slot":1,"v":0}), 0);
+    drain(&mut ra);
+    drain(&mut r_ally);
+    drain(&mut r_enemy);
+    send(&mut hub, &a, json!({"t":"ping","x":1,"z":2}), 0);
+    assert!(
+        drain(&mut ra).is_empty()
+            && drain(&mut r_ally).is_empty()
+            && drain(&mut r_enemy).is_empty()
+    );
+    assert!(hub.rooms["ABC"].players[0].map_pings.is_empty());
     let mut options = native_tests::native_match().options;
     options.players[1].team = 0;
     options.players.push(PlayerConfig {
@@ -136,6 +147,22 @@ fn intent_net86_map_ping_validates_before_budget_and_reaches_only_ready_human_te
     drain(&mut ra);
     drain(&mut r_ally);
     drain(&mut r_enemy);
+    let (unseated, mut r_unseated) = client(5);
+    send(&mut hub, &unseated, json!({"t":"ping","x":1,"z":2}), 0);
+    assert!(drain(&mut r_unseated).is_empty());
+    // Native attachment admits only human commanders. Move one admitted person
+    // temporarily to exercise the spectator guard without widening admission.
+    let spectator = hub.rooms.get_mut("ABC").unwrap().players.pop().unwrap();
+    hub.rooms.get_mut("ABC").unwrap().spectators.push(spectator);
+    send(&mut hub, &enemy, json!({"t":"ping","x":1,"z":2}), 0);
+    assert!(
+        drain(&mut ra).is_empty()
+            && drain(&mut r_ally).is_empty()
+            && drain(&mut r_enemy).is_empty()
+    );
+    let spectator = hub.rooms.get_mut("ABC").unwrap().spectators.pop().unwrap();
+    assert!(spectator.map_pings.is_empty());
+    hub.rooms.get_mut("ABC").unwrap().players.push(spectator);
     let game = &hub.rooms["ABC"]
         .native
         .as_ref()
@@ -204,6 +231,39 @@ fn intent_net86_map_ping_validates_before_budget_and_reaches_only_ready_human_te
         vec![json!({"t":"ping","from":0,"x":1.0,"z":2.0})]
     );
     assert!(drain(&mut r_ally).is_empty() && drain(&mut r_enemy).is_empty());
+    // Exercise the defensive AI filters after human-only native admission.
+    // A ready connection ensures the AI recipient check is independently needed.
+    ally.cancel.send_replace(false);
+    hub.rooms.get_mut("ABC").unwrap().players[1].ai = true;
+    send(&mut hub, &ally, json!({"t":"ping","x":1,"z":2}), 5001);
+    assert!(
+        drain(&mut rr).is_empty()
+            && drain(&mut r_ally).is_empty()
+            && drain(&mut r_enemy).is_empty()
+    );
+    assert!(hub.rooms["ABC"].players[1].map_pings.is_empty());
+    send(
+        &mut hub,
+        &replacement,
+        json!({"t":"ping","x":1,"z":2}),
+        5002,
+    );
+    assert_eq!(
+        drain(&mut rr),
+        vec![json!({"t":"ping","from":0,"x":1.0,"z":2.0})]
+    );
+    assert!(drain(&mut r_ally).is_empty() && drain(&mut r_enemy).is_empty());
+    hub.rooms.get_mut("ABC").unwrap().players[1].ai = false;
+    send(
+        &mut hub,
+        &replacement,
+        json!({"t":"ping","x":1,"z":2}),
+        5003,
+    );
+    let expected = json!({"t":"ping","from":0,"x":1.0,"z":2.0});
+    assert_eq!(drain(&mut rr), vec![expected.clone()]);
+    assert_eq!(drain(&mut r_ally), vec![expected]);
+    assert!(drain(&mut r_enemy).is_empty());
 }
 
 #[test]
@@ -234,7 +294,8 @@ fn intent_net51_only_current_host_ends_match_and_frees_offline_seats_without_lat
     assert_eq!(messages[1]["state"], "lobby");
     assert_eq!(messages[1]["result"], json!({"ended":true,"you":null}));
     assert_eq!(hub.rooms["ABC"].players.len(), 1);
-    assert!(hub.accounts.values().all(|account| account.room != "ABC"));
+    // Socket accounting survives end even when its room no longer runs a match.
+    assert!(hub.accounts.contains_key(&replacement.id));
     hub.poll_native(1000, 1_000_000_000);
     assert!(drain(&mut rr).is_empty());
     assert!(hub.rooms["ABC"].native.is_none());

@@ -1648,7 +1648,8 @@ impl Hub {
                 room.retain_seats(|_, p| {
                     p.ai || p.connection.as_ref().is_some_and(Connection::ready)
                 });
-                self.accounts.retain(|_, account| account.room != code);
+                // In-flight writes still belong to their sockets. A later start
+                // resets delivery through start_stream while retaining this ledger.
                 room.broadcast(&self.maps, &self.public_url);
                 return;
             }

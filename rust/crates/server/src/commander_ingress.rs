@@ -44,6 +44,13 @@ impl CommanderIngress {
             _ => return Err(Denial::Blocked),
         };
         let command = Command::from_json(raw)?;
+        // Every attached room uses the same recipient snapshot adapter. These
+        // core states have no representation there, so refuse before reserving.
+        if matches!(&command, Command::Support { kind, .. } if kind == "recon")
+            || matches!(&command, Command::Cover { queue: true, .. })
+        {
+            return Err(Denial::Unsupported);
+        }
         let state_player = state
             .start
             .economy
