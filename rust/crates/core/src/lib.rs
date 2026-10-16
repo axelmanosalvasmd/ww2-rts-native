@@ -25,12 +25,17 @@ mod mov_runtime_batch;
 #[cfg(test)]
 mod native_order_intent_tests;
 
+pub mod ai_view;
 pub mod assault_runtime;
 pub mod catalog;
 pub mod client_view;
 pub mod combat;
 pub mod command_destinations;
 pub mod commander_ai;
+mod commander_forward_hq;
+pub mod commander_mind;
+mod commander_shopping;
+pub mod commander_tactics;
 pub mod companion_ray;
 pub mod companions;
 pub mod conquest_end;
@@ -68,6 +73,10 @@ pub mod scenario_validation;
 pub(crate) mod existing_observers;
 pub mod logistics;
 pub mod map;
+pub mod map_authoring;
+pub mod map_save;
+#[cfg(test)]
+mod map_world_validation_tests;
 pub mod match_abilities;
 pub mod match_actor;
 pub mod match_aircraft_commands;
@@ -89,6 +98,7 @@ pub mod match_ground_orders;
 pub mod match_ground_support;
 pub mod match_human_observation;
 pub mod match_logistics;
+mod match_rally;
 pub mod match_reactions;
 pub mod match_recovery;
 pub mod match_routing;
@@ -96,6 +106,7 @@ pub mod match_runtime;
 pub mod match_story;
 pub mod match_support;
 pub mod match_tick;
+pub mod match_tutorial;
 pub mod match_withdrawal;
 pub mod match_world_elimination;
 pub mod match_world_end;
@@ -155,6 +166,7 @@ pub mod match_world_tick;
 pub mod match_world_memory;
 pub mod world_memory;
 pub mod world_recipient_metadata;
+pub mod world_territories;
 
 pub mod staged_observer;
 

@@ -9,6 +9,14 @@
 mod authoritative_maps;
 #[path = "../base_audit_features.rs"]
 mod base_audit_features;
+#[path = "../bases_batch3_economy.rs"]
+mod bases_batch3_economy;
+#[path = "../bases_batch3_rally.rs"]
+mod bases_batch3_rally;
+#[path = "../bases_batch3_runtime.rs"]
+mod bases_batch3_runtime;
+#[path = "../bases_batch3_training.rs"]
+mod bases_batch3_training;
 #[path = "../client_view.rs"]
 mod client_view;
 #[path = "../combat.rs"]
@@ -49,6 +57,10 @@ mod human_commander_state;
 mod human_commander_timing;
 #[path = "../interface_intent.rs"]
 mod interface_intent;
+#[path = "../interface_runtime_batch3.rs"]
+mod interface_runtime_batch3;
+#[path = "../interface_stream_consumers.rs"]
+mod interface_stream_consumers;
 #[path = "../legacy_scenario.rs"]
 mod legacy_scenario;
 #[path = "../logistics.rs"]
@@ -75,6 +87,9 @@ mod mov_aircraft_immunity;
 mod mov_hull_clearance;
 #[path = "../mov_wreck_journey.rs"]
 mod mov_wreck_journey;
+
+#[path = "../mov_settling.rs"]
+mod mov_settling;
 #[path = "../objectives.rs"]
 mod objectives;
 #[path = "../observed_memory.rs"]

@@ -12,7 +12,7 @@ fn room() -> (
     let mut make = |id, token| {
         let (tx, rx) = mpsc::channel(64);
         let (cancel, _) = watch::channel(false);
-        let c = Connection { id, tx, cancel };
+        let c = Connection::new(id, tx, cancel);
         hub.message(
             "ABC",
             &c,

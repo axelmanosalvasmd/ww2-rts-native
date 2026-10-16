@@ -218,6 +218,17 @@ impl Match {
         let order = match order {
             ProjectOrder::New {
                 pattern,
+                material: ProjectMaterial::Wall,
+                from,
+                to,
+            } => ProjectOrder::New {
+                pattern,
+                material: ProjectMaterial::Fort(FortKind::Wall),
+                from,
+                to,
+            },
+            ProjectOrder::New {
+                pattern,
                 material: ProjectMaterial::Fill,
                 from,
                 to,
@@ -235,11 +246,7 @@ impl Match {
         if winner || player.out || player.away {
             return Ok(Some(Denial::Blocked));
         }
-        if !matches!(
-            self.options.mode,
-            crate::economy::Mode::Default | crate::economy::Mode::Conquest
-        ) || self.world.game.mode.is_some()
-        {
+        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
             return Ok(Some(Denial::Unsupported));
         }
         let defs = definitions().map_err(|e| e.to_string())?;
@@ -284,11 +291,12 @@ impl Match {
             return Ok(Some(Denial::Unsupported));
         }
         if let ProjectOrder::New {
-            material: ProjectMaterial::Wall,
+            material: ProjectMaterial::Fort(kind),
             ..
         } = order
+            && let Some(denial) = self.dig_tier_denial(owner, kind)?
         {
-            return Ok(Some(Denial::Unsupported));
+            return Ok(self.finish_project_selection(&mine, Some(denial)));
         }
         let existing = match order {
             ProjectOrder::Join { project, .. } => Some(project),

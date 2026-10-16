@@ -1,0 +1,1 @@
+- Add native intent checks for convoy job selection, dispatch scheduling, delivery, safe routes and route repair (LOG-33, LOG-35, LOG-36, LOG-37 and LOG-38). Full logistics ticks and complete snapshots remain guarded; all additions are test-only.
