@@ -78,6 +78,11 @@ pub enum Command {
         commands: Vec<serde_json::Value>,
         queue: bool,
     },
+    Spawn {
+        kind: String,
+        at: Point,
+        enemy: bool,
+    },
     Build {
         ids: Vec<i64>,
         kind: String,
@@ -496,6 +501,34 @@ impl Command {
                     .collect(),
                 queue: object.get("queue").and_then(|v| v.as_bool()) == Some(true),
             }),
+            Some("spawn") => {
+                let kind = object
+                    .get("unit")
+                    .and_then(|v| v.as_str())
+                    .ok_or(Denial::Blocked)?;
+                let x = object
+                    .get("x")
+                    .and_then(|v| v.as_f64())
+                    .filter(|v| v.is_finite())
+                    .ok_or(Denial::Blocked)?;
+                let z = object
+                    .get("z")
+                    .and_then(|v| v.as_f64())
+                    .filter(|v| v.is_finite())
+                    .ok_or(Denial::Blocked)?;
+                let enemy = object.get("enemy").is_some_and(|v| match v {
+                    serde_json::Value::Null => false,
+                    serde_json::Value::Bool(v) => *v,
+                    serde_json::Value::Number(v) => v.as_f64().is_some_and(|v| v != 0.0),
+                    serde_json::Value::String(v) => !v.is_empty(),
+                    serde_json::Value::Array(_) | serde_json::Value::Object(_) => true,
+                });
+                Ok(Self::Spawn {
+                    kind: kind.into(),
+                    at: Point { x, z },
+                    enemy,
+                })
+            }
             Some("build" | "assist") => {
                 let at = object
                     .get("x")
@@ -800,9 +833,10 @@ impl Command {
     }
     fn valid(&self) -> bool {
         match self {
-            Self::Rail { at, .. } | Self::Enter { at, .. } | Self::FireAt { at, .. } => {
-                at.x.is_finite() && at.z.is_finite()
-            }
+            Self::Spawn { at, .. }
+            | Self::Rail { at, .. }
+            | Self::Enter { at, .. }
+            | Self::FireAt { at, .. } => at.x.is_finite() && at.z.is_finite(),
             Self::Attack { at, .. } => at.is_none_or(|p| p.x.is_finite() && p.z.is_finite()),
             Self::Dig {
                 ids, at, direction, ..
@@ -953,6 +987,9 @@ impl crate::match_runtime::Match {
         }
         if matches!(command, Command::Unsupported) {
             return Ok(Some(Denial::Unsupported));
+        }
+        if let Command::Spawn { kind, at, enemy } = command {
+            return self.sandbox_spawn(owner, kind, *at, *enemy);
         }
         if let Command::Compound { commands, queue } = command {
             return self.execute_compound_orders(owner, commands, *queue, winner_decided);
@@ -1156,6 +1193,7 @@ impl crate::match_runtime::Match {
             Command::Supply { .. }
             | Command::LogisticsResume { .. }
             | Command::Compound { .. }
+            | Command::Spawn { .. }
             | Command::Build { .. }
             | Command::Assist { .. }
             | Command::Cancel { .. }
@@ -1628,6 +1666,7 @@ impl crate::match_runtime::Match {
             | Command::LogisticsResume { .. }
             | Command::Compound { .. }
             | Command::Attack { .. }
+            | Command::Spawn { .. }
             | Command::Build { .. }
             | Command::Assist { .. }
             | Command::Cancel { .. }

@@ -37,6 +37,7 @@ impl CommanderIngress {
                 | "fireat"
                 | "supply"
                 | "logisticsResume"
+                | "spawn"
         )
     }
     pub fn enqueue(&mut self, state: &mut Match, slot: usize, raw: &Value) -> Result<(), Denial> {
@@ -61,6 +62,7 @@ impl CommanderIngress {
             Some("fireat") => "fireat",
             Some("supply") => "supply",
             Some("logisticsResume") => "logisticsResume",
+            Some("spawn") => "spawn",
             _ => return Err(Denial::Blocked),
         };
         let command = Command::from_json(raw)?;
@@ -85,6 +87,7 @@ impl CommanderIngress {
                 | Command::FireAt { .. }
                 | Command::Supply { .. }
                 | Command::LogisticsResume { .. }
+                | Command::Spawn { .. }
         ) {
             return Err(Denial::Blocked);
         }

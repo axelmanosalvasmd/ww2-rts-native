@@ -1114,8 +1114,8 @@ impl Match {
     }
     fn fire_breath(&mut self, id: UnitId, target: UnitId) -> Result<(), String> {
         self.supported_firing_mode()?;
-        if self.options.mode != crate::economy::Mode::Horde {
-            return Err("beam firing requires canonical Horde mode".into());
+        if self.options.mode != crate::economy::Mode::Horde && !self.options.sandbox {
+            return Err("beam firing requires Horde or sandbox".into());
         }
         self.validate_firing_units()?;
         let g = &self.world.game;
@@ -1610,8 +1610,11 @@ impl Match {
             self.commands.units.get_mut(&id).unwrap().aim = u.rot;
             return Ok(());
         };
-        if flag(w, "beam") && self.options.mode != crate::economy::Mode::Horde {
-            return Err("beam firing requires canonical Horde mode".into());
+        if flag(w, "beam")
+            && self.options.mode != crate::economy::Mode::Horde
+            && !self.options.sandbox
+        {
+            return Err("beam firing requires Horde or sandbox".into());
         }
         let hull = !kind.infantry && !kind.structure && !moving;
         if hull {

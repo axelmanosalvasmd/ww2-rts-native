@@ -1801,8 +1801,8 @@ impl Hub {
                 "start requires one through capacity players and both Assault sides".into(),
             );
         }
-        if room.listed || room.mode != "conquest" || room.sandbox {
-            return Err("R1 requires private Conquest and sandbox off".into());
+        if room.listed || room.mode != "conquest" {
+            return Err("R1 requires private Conquest".into());
         }
         if room.players.len() != 2
             || room.players.iter().any(|p| p.ai || p.token.is_empty())
@@ -1853,7 +1853,7 @@ impl Hub {
                 tech: true,
                 supply: true,
                 logistics: logistics_enabled_for(&room.mode, map.source()),
-                sandbox: false,
+                sandbox: room.sandbox,
             },
         )
         .map_err(|e| e.to_string())?;
@@ -2702,6 +2702,10 @@ mod net83_followup_tests;
 #[cfg(test)]
 #[path = "mode_runtime_a_tests.rs"]
 mod mode_runtime_a_tests;
+
+#[cfg(test)]
+#[path = "sandbox_runtime_tests.rs"]
+mod sandbox_runtime_tests;
 
 #[cfg(test)]
 #[path = "net_runtime3_tests.rs"]
