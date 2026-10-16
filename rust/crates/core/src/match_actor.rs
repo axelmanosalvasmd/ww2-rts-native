@@ -22,21 +22,23 @@ impl ActorPolicy<'_> {
     }
 }
 
-/// Modes that use the ordinary ground systems and recipient routing.
+/// Ordinary modes use commander actors and require their matching canonical mode.
 pub(crate) fn ordinary_ground_mode(game: &Game, mode: Mode) -> bool {
     matches!(
         (mode, game.mode),
-        (Mode::Default | Mode::Conquest, None) | (Mode::Tutorial, Some(ModeKind::Tutorial))
+        (Mode::Default | Mode::Conquest, None)
+            | (Mode::Assault, Some(ModeKind::Assault))
+            | (Mode::Annihilation, Some(ModeKind::Annihilation))
+            | (Mode::Classic, Some(ModeKind::Classic))
+            | (Mode::Tutorial, Some(ModeKind::Tutorial))
     )
 }
 
 /// Validate only the represented actor modes, not their complete tick capabilities.
 pub(crate) fn checked_game_mode(game: &Game, mode: Mode) -> Result<(), String> {
     match (mode, game.mode) {
-        (Mode::Default | Mode::Conquest, None)
-        | (Mode::Classic, Some(ModeKind::Classic))
-        | (Mode::Tutorial, Some(ModeKind::Tutorial))
-        | (Mode::World, Some(ModeKind::World)) => Ok(()),
+        _ if ordinary_ground_mode(game, mode) => Ok(()),
+        (Mode::World, Some(ModeKind::World)) => Ok(()),
         (Mode::Horde, Some(ModeKind::Horde))
             if (2..=6).contains(&game.players.len())
                 && game.players.iter().enumerate().all(|(slot, player)| {

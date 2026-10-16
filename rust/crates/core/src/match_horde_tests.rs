@@ -61,6 +61,38 @@ fn living_ground(m: &Match) -> Vec<u32> {
         .map(|u| u.id)
         .collect()
 }
+
+#[test]
+fn net50_ending_a_break_starts_one_wave_on_the_next_horde_phase_only() {
+    let mut m = scene(1, ArmySize::Standard);
+    let before = m.horde.clone().unwrap();
+    let actors = m.world.game.units.len();
+    assert!(m.end_horde_break().unwrap());
+    let mut expected = before;
+    expected.time_left = 0.0;
+    assert_eq!(m.horde.as_ref(), Some(&expected));
+    assert_eq!(m.world.game.units.len(), actors);
+    assert!(
+        m.end_horde_break().unwrap(),
+        "repeated requests do not spawn"
+    );
+    m.step_horde(0.05).unwrap();
+    let active = m.horde.clone().unwrap();
+    assert_eq!(active.wave, 1);
+    assert!(active.active);
+    assert!(!m.end_horde_break().unwrap());
+    assert_eq!(m.horde.as_ref(), Some(&active));
+    for _ in 0..4 {
+        m.step_horde(0.05).unwrap();
+        assert_eq!(m.horde.as_ref().unwrap().wave, 1);
+    }
+    assert!(
+        m.validate_tick_state().is_err(),
+        "full Horde hosting stays guarded"
+    );
+    assert!(m.preflight_ordinary_snapshot().is_err());
+}
+
 #[test]
 fn horde_setup_builds_one_fortified_shared_base_and_internal_enemy() {
     let mut m = scene(2, ArmySize::Large);
@@ -133,6 +165,31 @@ fn horde_setup_builds_one_fortified_shared_base_and_internal_enemy() {
         m.validate_aviation().is_err(),
         "Horde aircraft combat phases stay guarded"
     );
+    m.validate_actor_mode().unwrap();
+    let building = m
+        .world
+        .game
+        .units
+        .values()
+        .find(|unit| m.rules.kinds[unit.kind].name == "barracks")
+        .unwrap()
+        .id;
+    let before = format!("{:?}", m.world.game);
+    let journal = m.world.journal_end().unwrap();
+    assert_eq!(
+        m.begin_construction_tick().unwrap_err(),
+        "construction phases require ordinary Conquest"
+    );
+    assert_eq!(
+        m.preflight_building_repair(building, 1.0).unwrap_err(),
+        "invalid Conquest repair request"
+    );
+    assert_eq!(
+        m.repair_building_sections(building, 1.0).unwrap_err(),
+        "invalid Conquest repair request"
+    );
+    assert_eq!(format!("{:?}", m.world.game), before);
+    assert_eq!(m.world.journal_end().unwrap(), journal);
     let five = scene(5, ArmySize::Standard);
     assert_eq!(
         five.start.players.len(),

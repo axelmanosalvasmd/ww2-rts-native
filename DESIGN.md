@@ -1,3 +1,21 @@
+## Owner parity decisions A, B and C (2026-10-16)
+
+The [recorded owner decisions](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6217590741) approve the differences below, the Rust-only acceptance of the listed client rows, and World deferral for milestone R1. Julio recorded both owners' decisions after Axel's voice approval; Axel's written confirmation on #5 is requested in that comment. This section records the decisions for STATUS-ABC.
+
+Approved `differs` decisions relative to prototype `e4e579a`:
+
+- CMB-159, MODE-21, MODE-22: per-purpose seeded streams and staged creation replace the prototype's global draw order, following AGENTS.md determinism so matches replay from their seed and orders.
+- IF-05: non-trench arc, ring and strongpoint dig patterns are rejected as an approved restriction of the supported dig patterns.
+- NET-15, NET-20: display names are truncated on Unicode scalar boundaries to avoid splitting a scalar.
+- IF-10: prediction and authoritative movement compare signed zero as equal, so the sign of numeric zero does not affect equality.
+- IF-23: snapshots never reorder the canonical gameplay grid, so snapshot creation cannot change gameplay query order.
+- MAP-22: validated embedded maps replace corrupt-file fallback, removing that file-loading recovery path for embedded maps.
+- NET-04: R1 keeps uncompressed JSON WebSocket v0; compression is deferred to a later version-gated proposal.
+
+For group B, `accepted` applies only to the Rust part of each row marked "Unreal-only; client parity owned by Axel". Unreal implementation and client parity remain Axel's responsibility. Existing server duties, including MOV-107's row tail, remain recorded in the rows.
+
+For group C, `dropped` means "World admission deferred for milestone R1; reopen when World opens". Rows that also describe ordinary matches retain their prototype requirements; the R1 deferral does not claim those behaviors are implemented. Ported World components MAP-59, BASE-46, LOG-26 and LOG-27 remain `ported`.
+
 ## Seat lifecycle controls and metadata (2026-10-16)
 
 Socket `pause` and `resume` remain rejected through `UNAVAILABLE`, including for the host. The existing host-side `RoomRuntime` pause APIs remain available without a public client caller. The server owns the supplied wall-clock deadlines and the one-second pause/frame cadence; the deterministic core receives no timer. Paused ingress ignores new orders while preserving the queue for resume. Operative and AI room admission remain closed on R1.
@@ -86,6 +104,27 @@ Start this candidate from literal40fe9e296b46060241693c6c627ecd615d4f8ea4 in the
 Read current main before integration: it lacks ai_receipt_input and ai_delivered_sight and their Observation/Match/vision integration. Therefore prior AI01/02/04/06 candidates remain held on main; the test PR proposes only AI08/19/20/21/22/23/24/27. AI05's authorized history successor remains on the prior preserved branch, where its actual28-test PASS belongs to0aaea3da/Rust2f9cf68c. No old result transfers to this new unrun source. The14-name focused filter selects nine new and five existing library tests. Both full63-row maps and a concrete PR body live under docs/testing. Root owns the new integrated execution grant, independent review, public PR and proven-row ledger/status follow-up.
 
 # Three Crossroads Native: design decisions
+
+## AI delivery scheduling and Horde break control (2026-10-16)
+
+The shared AI scheduler accepts the caller's tick, snapshot-delivery beat and finished flag. It retains caller-owned views and refreshes every requested view before invoking any brain. Commanders act every tick once a view exists; scripted and Horde brains use the existing difficulty and seat stagger. Horde requests a view on every delivered beat. The scheduler reads no Match authority and owns no wall-clock timer, so it can consume delivered packets without depending on the separate AI snapshot decoder. Server AI activation remains a separate integration.
+
+Horde break control changes only the existing inactive break clock to zero. The existing Horde phase starts the wave and owns its purchases and spawns. The server checks host authority and pause state before invoking the core rule. Full Horde tick, snapshot and room admission stay guarded.
+
+## MODE runtime A: shared ordinary phases (2026-10-16)
+
+Assault, Annihilation and Classic use the existing ordinary tick phases behind a
+strict option/Game mode-pair predicate. A shared EliminationState owns the two
+new modes' team count, bunker maxima, Classic clock and resource nodes; it does
+not add another clock, unit store or wallet. Annihilation's defeat phase precedes
+point capture/income, while Classic's decay, defeat and finish remain late.
+Defeat processes players in slot order and each army in unit-ID order; equal
+transfer distances break on the recipient's player slot. World fort capture stages ownership and grid changes in the existing
+terrain transaction, then updates matching footprint rows only after validation.
+No FFI, wire, contract, privacy or server admission changes accompany these core
+paths. The intent witnesses and remaining limits are in
+[MODE runtime A](docs/testing/mode-runtime-a.md).
+
 
 ## Private Horde director queue (2026-10-16)
 

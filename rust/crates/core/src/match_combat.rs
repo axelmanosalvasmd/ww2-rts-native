@@ -969,6 +969,17 @@ impl DamageWorld<'_> {
         } else {
             1.
         };
+        let shrug = shrug
+            * if self.mode == Mode::Annihilation
+                && self.rules.kinds[u.kind].name == "bunker"
+                && profile
+                    .weapon_kind
+                    .is_some_and(|kind| self.rules.kinds[kind].name == "howitzer")
+            {
+                number(cfg.get("assault").ok_or(CombatError::Rules)?, "howitzerMul")?
+            } else {
+                1.0
+            };
         let cover = if u.garrison.is_some() {
             profile
                 .anti_garrison

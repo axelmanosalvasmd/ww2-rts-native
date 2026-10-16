@@ -1,5 +1,5 @@
 //! Source World finish after capture, home relocation and army elimination preparation.
-//! The region actuator owns those prerequisites and refuses unrepresented fort/removal effects.
+//! The region actuator owns those prerequisites and refuses unrepresented removal effects.
 use crate::{
     catalog::{Catalog, Value},
     economy::Mode,
@@ -98,6 +98,16 @@ impl Match {
         survivors: &[WorldFinishUnitFacts],
         removed: &[u32],
     ) -> Result<Option<(MatchFinish, MatchSample)>, String> {
+        self.prepare_world_finish_after_region_changes(wallets, regions, survivors, removed, &[])
+    }
+    pub(crate) fn prepare_world_finish_after_region_changes(
+        &self,
+        wallets: &EconomyState,
+        regions: &[RegionState],
+        survivors: &[WorldFinishUnitFacts],
+        removed: &[u32],
+        transfers: &[crate::match_world_regions::WorldFortTransfer],
+    ) -> Result<Option<(MatchFinish, MatchSample)>, String> {
         if self.options.mode != Mode::World || self.world.game.mode != Some(ModeKind::World) {
             return Err("World finish requires explicit canonical World mode".into());
         }
@@ -106,7 +116,14 @@ impl Match {
         }
         self.validate_match_finish_state()?;
         self.validate_sample_units()?;
-        let current = self.world_finish_unit_facts()?;
+        let mut current = self.world_finish_unit_facts()?;
+        for transfer in transfers {
+            let unit = current
+                .iter_mut()
+                .find(|u| u.id == transfer.id)
+                .ok_or("unknown World finish fort transfer")?;
+            unit.owner = transfer.owner;
+        }
         let removable = wallets
             .players
             .iter()

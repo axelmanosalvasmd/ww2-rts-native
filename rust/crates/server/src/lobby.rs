@@ -585,6 +585,14 @@ impl Room {
             }
             return false;
         }
+        if t == "nextwave"
+            && let Some(native) = &mut self.native
+        {
+            if let Err(error) = native.runtime.next_wave(host) {
+                native.runtime.fault_stop(error);
+            }
+            return false;
+        }
         if attached && seated.is_some() && !UNAVAILABLE.contains(&t) {
             // Unknown orders use the prototype's ordinary blocked feedback.
             me.deny(t, "blocked", now);
@@ -2435,6 +2443,10 @@ mod net_batch50;
 #[cfg(test)]
 #[path = "net83_followup_tests.rs"]
 mod net83_followup_tests;
+
+#[cfg(test)]
+#[path = "mode_runtime_a_tests.rs"]
+mod mode_runtime_a_tests;
 
 #[cfg(test)]
 #[path = "net_runtime3_tests.rs"]

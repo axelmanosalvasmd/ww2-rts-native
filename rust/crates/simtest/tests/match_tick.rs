@@ -698,8 +698,8 @@ fn garrison_retreat_ticks_and_unsupported_reaction_actors_reject_before_writes()
                 m.world.game.mode = Some(ww2_core::game::ModeKind::World);
             }
             "unsupported mode" => {
-                m.options.mode = Mode::Classic;
-                m.world.game.mode = Some(ww2_core::game::ModeKind::Classic);
+                m.options.mode = Mode::Horde;
+                m.world.game.mode = Some(ww2_core::game::ModeKind::Horde);
             }
             _ => unreachable!(),
         }

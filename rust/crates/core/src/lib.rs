@@ -25,6 +25,7 @@ mod mov_runtime_batch;
 #[cfg(test)]
 mod native_order_intent_tests;
 
+pub mod ai_schedule;
 pub mod ai_view;
 pub mod assault_runtime;
 pub mod catalog;
@@ -47,6 +48,7 @@ pub mod conquest_end;
 pub mod deployment;
 pub mod economy;
 pub mod economy_state;
+pub mod elimination_modes;
 #[cfg(test)]
 mod engineering_runtime_assertion_tests;
 pub mod environment;
