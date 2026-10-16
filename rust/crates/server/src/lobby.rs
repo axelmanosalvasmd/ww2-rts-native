@@ -228,6 +228,7 @@ struct AttachedRuntime {
 struct PreparedNative {
     attached: AttachedRuntime,
     starts: Vec<(usize, Value)>,
+    watcher_start: Option<Value>,
     resume: Value,
     pause: Option<Value>,
 }
@@ -1001,20 +1002,28 @@ impl Hub {
             crate::native_startup::NativeStartup::prepare(&state, settings)?
         };
         // Canonical runtime admission completes before changing the room or accounts.
-        let levels = room.players.iter().map(|person| {
-            if person.ai {
-                ww2_core::commander_ai::Level::from_key(person.level)
-                    .map(Some).ok_or("invalid AI difficulty".to_owned())
-            } else { Ok(None) }
-        }).collect::<Result<Vec<_>, String>>()?;
+        let levels = room
+            .players
+            .iter()
+            .map(|person| {
+                if person.ai {
+                    ww2_core::commander_ai::Level::from_key(person.level)
+                        .map(Some)
+                        .ok_or("invalid AI difficulty".to_owned())
+                } else {
+                    Ok(None)
+                }
+            })
+            .collect::<Result<Vec<_>, String>>()?;
         let ai = crate::room_ai::RoomAi::new(&state, &levels)?;
         let mut runtime = RoomRuntime::new(state, now)?;
         let resume = runtime.resume(now);
         for (slot, person) in room.players.iter().enumerate() {
-            if !person.ai && person
-                .connection
-                .as_ref()
-                .is_none_or(|connection| !connection.ready())
+            if !person.ai
+                && person
+                    .connection
+                    .as_ref()
+                    .is_none_or(|connection| !connection.ready())
             {
                 runtime.auto_pause(slot, &person.name, now)?;
             }
@@ -1026,6 +1035,11 @@ impl Hub {
             .map(|p| p.name.clone())
             .collect::<Vec<_>>();
         let starts = runtime.collect_starts(&slots, &startup, &names, epoch)?;
+        let watcher_start = if room.spectators.is_empty() {
+            None
+        } else {
+            Some(runtime.collect_watcher_start(&startup, &names, epoch)?)
+        };
         let pause = runtime.paused().then(|| runtime.pause_message(now));
         Ok(PreparedNative {
             attached: AttachedRuntime {
@@ -1041,6 +1055,7 @@ impl Hub {
                 diagnostics: crate::diagnostics::RoomDiagnostics::default(),
             },
             starts,
+            watcher_start,
             resume,
             pause,
         })
@@ -1050,6 +1065,7 @@ impl Hub {
         let PreparedNative {
             attached,
             starts,
+            watcher_start,
             resume,
             pause,
         } = prepared;
@@ -1079,31 +1095,14 @@ impl Hub {
                 self.accounts.get_mut(&connection.id).unwrap().full_terrain = false;
             }
         }
-        if !room.spectators.is_empty() {
-            let native = room.native.as_mut().unwrap();
-            let names = room
-                .players
-                .iter()
-                .map(|p| p.name.clone())
-                .collect::<Vec<_>>();
-            match native
-                .runtime
-                .collect_watcher_start(&native.startup, &names, epoch)
-            {
-                Ok(start) => {
-                    if native.watch_started {
-                        native.watch_delivery.request_full();
-                    }
-                    for person in &room.spectators {
-                        if let Some(connection) = &person.connection {
-                            connection.send(start.clone());
-                            if let Some(pause) = &pause {
-                                connection.send(pause.clone());
-                            }
-                        }
+        if let Some(start) = watcher_start {
+            for person in &room.spectators {
+                if let Some(connection) = &person.connection {
+                    connection.send(start.clone());
+                    if let Some(pause) = &pause {
+                        connection.send(pause.clone());
                     }
                 }
-                Err(error) => native.runtime.fault_stop(error),
             }
         }
         if let Some(receipt) = &room.native.as_ref().unwrap().receipt {
@@ -1493,11 +1492,7 @@ impl Hub {
                     native.ingress.discard_feedback();
                     continue;
                 }
-                let connected = room
-                    .players
-                    .iter()
-                    .map(Person::online)
-                    .collect::<Vec<_>>();
+                let connected = room.players.iter().map(Person::online).collect::<Vec<_>>();
                 let pause = match native.runtime.poll_pause(&connected, now_ms) {
                     Ok(pause) => pause,
                     Err(error) => {
@@ -1604,7 +1599,11 @@ impl Hub {
                     }
                 }
                 let sent = native.runtime.should_snapshot(report.tick);
-                if let Err(error) = native.ai.advance(native.runtime.state_mut(), sent, &report.events) {
+                if let Err(error) =
+                    native
+                        .ai
+                        .advance(native.runtime.state_mut(), sent, &report.events)
+                {
                     native.runtime.fault_stop(format!("room AI: {error}"));
                     continue;
                 }
@@ -1747,9 +1746,14 @@ impl Hub {
         if room.players.len() != 2
             || room.players.iter().any(|p| !p.ai && p.token.is_empty())
             || room.players[0].team == room.players[1].team
-            || (!room.players[0].ai && !room.players[1].ai && room.players[0].token == room.players[1].token)
+            || (!room.players[0].ai
+                && !room.players[1].ai
+                && room.players[0].token == room.players[1].token)
         {
-            return Err("R1 requires exactly two commanders on opposing teams and distinct human tokens".into());
+            return Err(
+                "R1 requires exactly two commanders on opposing teams and distinct human tokens"
+                    .into(),
+            );
         }
         if !matches!(
             room.weather.as_str(),
@@ -1825,8 +1829,21 @@ impl Hub {
             {
                 return true;
             }
-            "addAi" if self.rooms.get(code).is_some_and(|room| room.native.is_none() && room.has_seat(&self.maps)) => return false,
-            "level" if self.rooms.get(code).is_some_and(|room| room.native.is_none() && room.players.iter().any(|p| p.ai)) => return false,
+            "addAi"
+                if self
+                    .rooms
+                    .get(code)
+                    .is_some_and(|room| room.native.is_none() && room.has_seat(&self.maps)) =>
+            {
+                return false;
+            }
+            "level"
+                if self.rooms.get(code).is_some_and(|room| {
+                    room.native.is_none() && room.players.iter().any(|p| p.ai)
+                }) =>
+            {
+                return false;
+            }
             "addAi" | "level" => Err("AI setup needs an available lobby seat".into()),
             _ => return false,
         };

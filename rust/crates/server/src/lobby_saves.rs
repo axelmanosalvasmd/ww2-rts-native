@@ -124,9 +124,7 @@ impl Hub {
         }
         let saved = room.saves.read(code, id)?;
         // Closed room capabilities remain closed even when a file is valid JSON.
-        if saved["settings"]["mode"] != "conquest"
-            || !saved["guard"].is_null()
-        {
+        if saved["settings"]["mode"] != "conquest" || !saved["guard"].is_null() {
             return Err("save needs an unavailable room capability".into());
         }
         let state = Match::from_save_json(saved["g"]["state"].clone())?;
@@ -153,7 +151,9 @@ impl Hub {
                 if !seat["ai"].is_boolean() {
                     return Err("invalid saved AI flag".to_owned());
                 }
-                if seat["ai"] == true { return Ok(Vec::new()); }
+                if seat["ai"] == true {
+                    return Ok(Vec::new());
+                }
                 if let Some(text) = seat["token"].as_str() {
                     return Ok(text.encode_utf16().collect::<Vec<_>>());
                 }
@@ -173,7 +173,9 @@ impl Hub {
         let mut used = std::collections::BTreeSet::new();
         // Finish every token match before assigning any connected fallback.
         for (slot, token) in tokens.iter().enumerate() {
-            if seats[slot]["ai"] == true { continue; }
+            if seats[slot]["ai"] == true {
+                continue;
+            }
             if let Some((index, _)) = present
                 .iter()
                 .enumerate()
@@ -184,7 +186,9 @@ impl Hub {
             }
         }
         for (slot, owner) in owners.iter_mut().enumerate() {
-            if seats[slot]["ai"] == true { continue; }
+            if seats[slot]["ai"] == true {
+                continue;
+            }
             if owner.is_none()
                 && let Some((index, _)) = present.iter().enumerate().find(|(index, p)| {
                     p.connection.as_ref().is_some_and(Connection::ready) && !used.contains(index)
@@ -194,10 +198,18 @@ impl Hub {
                 used.insert(index);
             }
         }
-        let mut spectators = present.iter().enumerate()
-            .filter(|(index, p)| !used.contains(index) && p.connection.as_ref().is_some_and(Connection::ready))
-            .map(|(_, p)| (*p).clone()).collect::<Vec<_>>();
-        for person in &mut spectators { person.disconnected = None; person.last_match = None; }
+        let mut spectators = present
+            .iter()
+            .enumerate()
+            .filter(|(index, p)| {
+                !used.contains(index) && p.connection.as_ref().is_some_and(Connection::ready)
+            })
+            .map(|(_, p)| (*p).clone())
+            .collect::<Vec<_>>();
+        for person in &mut spectators {
+            person.disconnected = None;
+            person.last_match = None;
+        }
         let mut players = Vec::new();
         for (slot, seat) in seats.iter().enumerate() {
             let team = seat["team"]
@@ -287,15 +299,23 @@ impl Hub {
             .attached
             .runtime
             .restore_saved_events(saved["g"]["pendingEvents"].clone())?;
-        prepared.attached.ai.restore(prepared.attached.runtime.state(), &saved["ai"])?;
+        prepared
+            .attached
+            .ai
+            .restore(prepared.attached.runtime.state(), &saved["ai"])?;
         // Host pauses use the person name, including a surplus spectator host.
         // The slot is consulted only by drop pauses.
-        let host = staged.players.iter()
+        let host = staged
+            .players
+            .iter()
             .position(|p| p.connection.as_ref().is_some_and(|c| c.id == connection_id))
             .unwrap_or(0);
-        let host_name = staged.people()
+        let host_name = staged
+            .people()
             .find(|p| p.connection.as_ref().is_some_and(|c| c.id == connection_id))
-            .ok_or("loading host disappeared")?.name.clone();
+            .ok_or("loading host disappeared")?
+            .name
+            .clone();
         // Replace a missing-seat drop pause with the prototype's indefinite host pause.
         prepared
             .attached
