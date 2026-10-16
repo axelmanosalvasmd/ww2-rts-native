@@ -183,9 +183,7 @@ impl crate::match_runtime::Match {
             .filter_map(|(&c, &bits)| ((bits >> team & 1) != 0 && g.chars[c] == b'N').then_some(c))
             .collect();
         match (self.options.mode, g.mode) {
-            _ if crate::match_actor::ordinary_ground_mode(g, self.options.mode)
-                && self.options.mode != crate::economy::Mode::Tutorial =>
-            {
+            _ if crate::match_actor::ordinary_ground_mode(g, self.options.mode) => {
                 let wrecks = self.observed_wreck_rows(owner)?;
                 Ok(RecipientLists {
                     wrecks,
@@ -309,9 +307,7 @@ impl crate::match_runtime::Match {
         if horde {
             self.validate_actor_mode()?;
             self.validate_horde_economy()?;
-        } else if !crate::match_actor::ordinary_ground_mode(game, self.options.mode)
-            || self.options.mode == crate::economy::Mode::Tutorial
-        {
+        } else if !crate::match_actor::ordinary_ground_mode(game, self.options.mode) {
             return Err("global ordinary lists require represented ordinary mode".into());
         }
         let mut ids = std::collections::BTreeSet::new();

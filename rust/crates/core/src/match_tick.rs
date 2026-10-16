@@ -104,6 +104,7 @@ pub enum TickEvent {
     Environment(crate::environment::Effect),
     Scenario(crate::legacy_scenario::SayAction),
     Horde(crate::match_horde::HordeEvent),
+    Tutorial(crate::match_tutorial::TutorialLine),
 }
 
 /// A failed phase keeps the effects already emitted at their original boundaries.
@@ -892,6 +893,7 @@ impl crate::match_runtime::Match {
         } else {
             Vec::new()
         };
+        events.extend(tutorial_lines.iter().cloned().map(TickEvent::Tutorial));
         Ok(TickReport {
             tutorial_lines,
             tick,

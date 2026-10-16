@@ -854,7 +854,7 @@ fn away_seat_stops_ordinary_wallet_income_and_cannot_command() {
 }
 
 #[test]
-fn unimplemented_roles_and_public_lifecycle_remain_explicit_refusals() {
+fn unimplemented_roles_and_lifecycle_commands_remain_explicit_refusals() {
     let (mut hub, mut host, _guest) = room();
     let mut operative = Peer::new(3);
     operative.send(&mut hub, "ABC", json!({"t":"hello","token":"operative","name":"Operative","role":"operative","commander":0}), 0);
@@ -866,7 +866,7 @@ fn unimplemented_roles_and_public_lifecycle_remain_explicit_refusals() {
         operative.output.try_recv(),
         Ok(Output::Close(1008, "operative unavailable"))
     ));
-    for (index, name) in ["start", "restart", "end", "leave", "handAi", "nextwave"]
+    for (index, name) in ["restart", "end", "leave", "handAi", "nextwave"]
         .iter()
         .enumerate()
     {

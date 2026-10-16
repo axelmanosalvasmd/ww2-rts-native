@@ -258,10 +258,9 @@ async fn intent_net96_front_routes_lists_and_runs_native_matches_in_separate_wor
             .map(|room| room["title"].as_str().unwrap())
             .collect();
         assert_eq!(titles, ["First", "Second"]);
-        host.send(json!({"t":"start"}));
-        let denied = host.until("deny");
-        assert_eq!(denied["cmd"], "start");
-        assert_eq!(denied["reason"], "scenario");
+        friend.send(json!({"t":"start"}));
+        friend.send(json!({"t":"ping","c":17}));
+        assert_eq!(friend.until("pong")["c"], 17);
         let (headers, map) = http(address, "/maps/default", false);
         assert!(headers.starts_with("HTTP/1.0 200"));
         assert!(map.get("scenario").is_none());

@@ -125,13 +125,23 @@ impl<'a> SnapshotCache<'a> {
         if !(horde
             || matches!(
                 state.options.mode,
-                Mode::Default | Mode::Conquest | Mode::Assault | Mode::Annihilation | Mode::Classic
+                Mode::Default
+                    | Mode::Conquest
+                    | Mode::Assault
+                    | Mode::Annihilation
+                    | Mode::Classic
+                    | Mode::Tutorial
             ) && crate::match_actor::ordinary_ground_mode(&state.world.game, state.options.mode))
             || state.world.geography().is_some()
             || (state.options.mode != Mode::Assault && state.assault.is_some())
             || state.world_runtime.is_some()
         {
             return Err(SnapshotError::UnsupportedMode);
+        }
+        if state.options.mode == Mode::Tutorial {
+            state
+                .validate_tutorial_state()
+                .map_err(|_| SnapshotError::Rules)?;
         }
         if state.options.mode == Mode::Assault {
             state
@@ -179,6 +189,20 @@ impl<'a> SnapshotCache<'a> {
                 return Err(SnapshotError::Rules);
             }
             finite(&[u.x, u.z])?;
+        }
+        if !state.firing.flights.is_empty()
+            || !state.firing.salvos.is_empty()
+            || !state.firing.grenades.is_empty()
+        {
+            state
+                .validate_firing_tick_state()
+                .map_err(|_| SnapshotError::Rules)?;
+            state
+                .validate_firing_salvos()
+                .map_err(|_| SnapshotError::Rules)?;
+            state
+                .validate_firing_grenade_step(0.)
+                .map_err(|_| SnapshotError::Rules)?;
         }
         engineering::validate(state)?;
         aircraft::validate(state)?;

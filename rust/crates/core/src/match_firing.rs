@@ -1471,13 +1471,7 @@ impl Match {
         Ok(())
     }
 
-    /// Physical salvos retain the reference timer's two draws for each emitted segment.
-    /// The projectile already carries the physical payload, so this timer emits no second blast.
-    pub fn advance_firing_salvos(&mut self, dt: f64) -> Result<(), String> {
-        self.supported_firing_mode()?;
-        if !dt.is_finite() || dt < 0.0 {
-            return Err("invalid salvo timer step".into());
-        }
+    pub(crate) fn validate_firing_salvos(&self) -> Result<(), String> {
         if self.firing.salvos.iter().any(|s| {
             s.left == 0
                 || s.left > 4096
@@ -1490,6 +1484,17 @@ impl Match {
         }) {
             return Err("invalid physical salvo".into());
         }
+        Ok(())
+    }
+
+    /// Physical salvos retain the reference timer's two draws for each emitted segment.
+    /// The projectile already carries the physical payload, so this timer emits no second blast.
+    pub fn advance_firing_salvos(&mut self, dt: f64) -> Result<(), String> {
+        self.supported_firing_mode()?;
+        if !dt.is_finite() || dt < 0.0 {
+            return Err("invalid salvo timer step".into());
+        }
+        self.validate_firing_salvos()?;
         for s in &mut self.firing.salvos {
             s.next -= dt;
             if s.next > 0.0 {

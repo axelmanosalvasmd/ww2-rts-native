@@ -80,7 +80,8 @@ impl HumanShot {
             crate::match_tick::TickEvent::Environment(event) => Self::environment(event),
             crate::match_tick::TickEvent::Aviation(_)
             | crate::match_tick::TickEvent::Scenario(_)
-            | crate::match_tick::TickEvent::Horde(_) => Self::Other,
+            | crate::match_tick::TickEvent::Horde(_)
+            | crate::match_tick::TickEvent::Tutorial(_) => Self::Other,
         }
     }
 

@@ -133,7 +133,7 @@ impl StartPlan {
         )
     }
 
-    pub(crate) fn prepare_tutorial(
+    pub fn prepare_tutorial(
         map: &crate::map::AuthoritativeMap,
         options: &MatchOptions,
         rules: &Rules,

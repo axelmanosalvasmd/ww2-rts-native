@@ -64,7 +64,8 @@ fn ordinary_binary_opt_in_admits_spectators_and_retains_other_refusals() {
     let default = BinaryServer::start(false, SEED);
     let mut ordinary = Client::join(default.address, "a");
     ordinary.send(json!({"t":"start"}));
-    assert_eq!(ordinary.deny("start")["reason"], "scenario");
+    assert_eq!(ordinary.until(|m| m["t"] == "start")["you"], 0);
+    assert_eq!(ordinary.until(|m| m["t"] == "s")["online"], json!([true]));
     ordinary.send(json!({"t":"restart"}));
     assert_eq!(ordinary.deny("restart")["reason"], "scenario");
     assert!(default.receipts().is_empty());

@@ -1,0 +1,1 @@
+- Rewrote `intent_log45_nonconquest_point_supply_seam_refuses_before_mutation` to expect a rules error for a Tutorial match missing its runtime state, matching Tutorial snapshot admission. Point-supply refusal, unchanged points and wallets, and Horde/World snapshot refusal remain covered.
