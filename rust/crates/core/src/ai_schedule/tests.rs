@@ -273,3 +273,6 @@ fn scripted_difficulty_stagger_and_invalid_inputs_do_not_refresh_views() {
         assert_eq!(seats[0].view, prior);
     }
 }
+
+#[path = "seat_delivery_tests.rs"]
+mod seat_delivery;
