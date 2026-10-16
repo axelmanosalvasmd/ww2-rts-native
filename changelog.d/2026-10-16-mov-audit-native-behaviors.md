@@ -2,3 +2,4 @@
 - Add a reduced powered-step regression for the missing source-inspected logistics/convoy movement clamp. Runtime repair and row promotion remain pending.
 - Use the native gunboat catalog entry in the naval smoothing check, corrected by source inspection before the batch runs.
 - Record the single native batch at e1c69647: 18 selected, 12 passed and 6 failed. Keep eight native-PASS rows pending prototype review and seven failed/incomplete rows in progress, with explicit reasons and no retry or runtime repair.
+- Keep row IDs in the appended result table code-formatted so inventory parsers count only the canonical movement rows.

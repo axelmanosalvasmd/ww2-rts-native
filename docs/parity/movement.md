@@ -446,20 +446,20 @@ All fifteen rows remain in progress. Eight have passing native tests ready for p
 
 | Row | Native outcome | Promotion boundary |
 | --- | --- | --- |
-| MOV-11 | Walk/backing/block/yield and protected-cover separation passed. Bridge matrix failed before its first scene. | Held: the authored central capture point is on river terrain, rejected as `points: must be on open ground`. No bridge journey ran. |
-| MOV-23 | Reduced powered-step assertion failed. | Held: the component truck has no enabled logistics context. This is not proof of an ordinary runtime defect; the logistics clamp and connected runner remain incomplete. |
-| MOV-24 | Stall recovery and post-separation progress passed. | Held: the mapped bridge/deferred-recovery journey did not run because of MOV-11's scene admission failure. |
-| MOV-25 | Hull priority, ordered facing and wall refusal passed. | Prototype-intent review pending. |
-| MOV-26 | Actual-damage backoff, front-first motion, timer and capture exception passed. | Prototype-intent review pending. |
-| MOV-27 | Clear exact click, blocked-radius snap and edge margin passed. | Prototype-intent review pending. |
-| MOV-28 | Narrow/wide bridge navigation and incremental/fresh clearance passed. | Prototype-intent review pending. |
-| MOV-29 | Both query checks and actual ordinary/World team-memory selection after hidden edits passed. | Prototype-intent review pending. |
-| MOV-30 | Authored bank prerequisite failed. | Held: the initial native leg is already walkable, so this scene does not exercise the intended fallback. |
-| MOV-33 | Score-only heap tie check passed, then expansion-count prerequisite failed (actual 2, expected 1). | Held: the heuristic checks did not execute. The authored count is not a demonstrated runtime defect. |
-| MOV-35 | Open-ground, mine and bunker checks passed, then a wire segment failed the blanket 2 m ray assertion. | Held: the test imposes a stronger condition on every adjacent segment than the smoother's shortcut guard. Later road/mud/naval checks did not execute. |
-| MOV-36 | Disconnected rejection, edit reconnection, fresh rebuild and hill cases passed. | Prototype-intent review pending. |
-| MOV-37 | History closure and reconnection passed, then raw local region IDs differed. | Held: incremental `[11,22,23]` and fresh `[11,12,13]` both produced goal 4842 and `limited=true`. Raw local IDs are not stable across rebuilds; the cache-eviction tail did not run. |
-| MOV-38 | Small-map full routes and World/large-map 32-cell limits passed. | Prototype-intent review pending. |
-| MOV-40 | FIFO, zero budget, dead/stale disposal and synchronous command-route checks passed. | Prototype-intent review pending. |
+| `MOV-11` | Walk/backing/block/yield and protected-cover separation passed. Bridge matrix failed before its first scene. | Held: the authored central capture point is on river terrain, rejected as `points: must be on open ground`. No bridge journey ran. |
+| `MOV-23` | Reduced powered-step assertion failed. | Held: the component truck has no enabled logistics context. This is not proof of an ordinary runtime defect; the logistics clamp and connected runner remain incomplete. |
+| `MOV-24` | Stall recovery and post-separation progress passed. | Held: the mapped bridge/deferred-recovery journey did not run because of MOV-11's scene admission failure. |
+| `MOV-25` | Hull priority, ordered facing and wall refusal passed. | Prototype-intent review pending. |
+| `MOV-26` | Actual-damage backoff, front-first motion, timer and capture exception passed. | Prototype-intent review pending. |
+| `MOV-27` | Clear exact click, blocked-radius snap and edge margin passed. | Prototype-intent review pending. |
+| `MOV-28` | Narrow/wide bridge navigation and incremental/fresh clearance passed. | Prototype-intent review pending. |
+| `MOV-29` | Both query checks and actual ordinary/World team-memory selection after hidden edits passed. | Prototype-intent review pending. |
+| `MOV-30` | Authored bank prerequisite failed. | Held: the initial native leg is already walkable, so this scene does not exercise the intended fallback. |
+| `MOV-33` | Score-only heap tie check passed, then expansion-count prerequisite failed (actual 2, expected 1). | Held: the heuristic checks did not execute. The authored count is not a demonstrated runtime defect. |
+| `MOV-35` | Open-ground, mine and bunker checks passed, then a wire segment failed the blanket 2 m ray assertion. | Held: the test imposes a stronger condition on every adjacent segment than the smoother's shortcut guard. Later road/mud/naval checks did not execute. |
+| `MOV-36` | Disconnected rejection, edit reconnection, fresh rebuild and hill cases passed. | Prototype-intent review pending. |
+| `MOV-37` | History closure and reconnection passed, then raw local region IDs differed. | Held: incremental `[11,22,23]` and fresh `[11,12,13]` both produced goal 4842 and `limited=true`. Raw local IDs are not stable across rebuilds; the cache-eviction tail did not run. |
+| `MOV-38` | Small-map full routes and World/large-map 32-cell limits passed. | Prototype-intent review pending. |
+| `MOV-40` | FIFO, zero budget, dead/stale disposal and synchronous command-route checks passed. | Prototype-intent review pending. |
 
 The six failed tests remain enabled at the producing source head. A later integration must exclude or explicitly ignore those retained failed-row cases before claiming a green public suite. This result record changes no native test or runtime code.
