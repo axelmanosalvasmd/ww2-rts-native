@@ -909,7 +909,7 @@ impl crate::match_runtime::Match {
         } = command
         {
             if *queue {
-                return Ok(Some(Denial::Unsupported));
+                return self.queue_dig(owner, ids, *kind, *at, *direction, winner_decided);
             }
             return self.execute_dig(owner, ids, *kind, *at, *direction, winner_decided);
         }

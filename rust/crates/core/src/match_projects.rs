@@ -218,6 +218,17 @@ impl Match {
         let order = match order {
             ProjectOrder::New {
                 pattern,
+                material: ProjectMaterial::Wall,
+                from,
+                to,
+            } => ProjectOrder::New {
+                pattern,
+                material: ProjectMaterial::Fort(FortKind::Wall),
+                from,
+                to,
+            },
+            ProjectOrder::New {
+                pattern,
                 material: ProjectMaterial::Fill,
                 from,
                 to,
@@ -284,11 +295,12 @@ impl Match {
             return Ok(Some(Denial::Unsupported));
         }
         if let ProjectOrder::New {
-            material: ProjectMaterial::Wall,
+            material: ProjectMaterial::Fort(kind),
             ..
         } = order
+            && let Some(denial) = self.dig_tier_denial(owner, kind)?
         {
-            return Ok(Some(Denial::Unsupported));
+            return Ok(self.finish_project_selection(&mine, Some(denial)));
         }
         let existing = match order {
             ProjectOrder::Join { project, .. } => Some(project),
