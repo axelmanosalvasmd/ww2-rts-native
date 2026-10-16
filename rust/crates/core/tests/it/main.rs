@@ -55,6 +55,8 @@ mod legacy_scenario;
 mod logistics;
 #[path = "../logistics_features.rs"]
 mod logistics_features;
+#[path = "../map_world_batch2.rs"]
+mod map_world_batch2;
 #[path = "../match_combat.rs"]
 mod match_combat;
 #[path = "../match_routing.rs"]
@@ -65,6 +67,15 @@ mod math;
 mod mode_intent_batch1;
 #[path = "../mode_point_services.rs"]
 mod mode_point_services;
+#[path = "../mov_aircraft_controls.rs"]
+mod mov_aircraft_controls;
+#[path = "../mov_aircraft_immunity.rs"]
+mod mov_aircraft_immunity;
+#[path = "../mov_hull_clearance.rs"]
+mod mov_hull_clearance;
+#[path = "../mov_wreck_journey.rs"]
+mod mov_wreck_journey;
+
 #[path = "../mov_settling.rs"]
 mod mov_settling;
 #[path = "../objectives.rs"]
