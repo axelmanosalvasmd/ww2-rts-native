@@ -402,7 +402,9 @@ impl SeatMemory {
                         let at = point(&row[2], &row[3])?;
                         u["path"] = json!(
                             row[4..]
-                                .as_chunks::<2>().0.iter()
+                                .as_chunks::<2>()
+                                .0
+                                .iter()
                                 .map(|p| point(&p[0], &p[1]))
                                 .collect::<Result<Vec<_>>>()?
                         );
@@ -471,7 +473,9 @@ impl SeatMemory {
                         }
                         u["orders"] = json!(
                             row[2..2 + count * 3]
-                                .as_chunks::<3>().0.iter()
+                                .as_chunks::<3>()
+                                .0
+                                .iter()
                                 .map(|o| json!({"kind":o[0],"x":o[1],"z":o[2]}))
                                 .collect::<Vec<_>>()
                         );
