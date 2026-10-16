@@ -581,7 +581,7 @@ fn intent_ai50_builders_follow_mode_and_assault_attackers_never_fortify() {
 
 #[test]
 fn intent_ai50_gate_checks_every_planned_cell_sight_and_buildable_delivered_terrain() {
-    for terrain in [b'.', b'+', b'R', b'D', b'M', b'H'] {
+    for terrain in *b".+RDMH" {
         let mut input = fixture();
         input.chars.fill(terrain);
         let mut steps = BTreeMap::from([(10, 3)]);

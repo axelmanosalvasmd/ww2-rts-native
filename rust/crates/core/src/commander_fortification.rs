@@ -220,7 +220,7 @@ pub(crate) fn plan_after_builds(
                 x: hq.at.x + fx * forward - fz * side,
                 z: hq.at.z + fz * forward + fx * side,
             };
-            if let Some(at) = site(observation, terrain, kind, aim, &allowed, earlier)? {
+            if let Some(at) = site(observation, terrain, kind, aim, allowed, earlier)? {
                 result.commands.push(json!({"t":"build","ids":[worker.id],"kind":kind,"x":at.x,"z":at.z,"dir":angle}));
                 result.remaining_mp -= cost;
                 result.builders.push(worker.id);
@@ -251,7 +251,7 @@ pub(crate) fn plan_after_builds(
                         let from = at_side(gap * side);
                         let to = at_side(14.0 * side);
                         if context.mode != Mode::World
-                            || world_line_site(terrain, from, to, worker.at, &allowed)?
+                            || world_line_site(terrain, from, to, worker.at, allowed)?
                         {
                             result.commands.push(line(
                                 from,
@@ -267,7 +267,7 @@ pub(crate) fn plan_after_builds(
                 }
                 3 => {
                     let direction = math::atan2(pz, px);
-                    if gate_site(terrain, mid, direction, &allowed)? {
+                    if gate_site(terrain, mid, direction, allowed)? {
                         result.commands.push(json!({"t":"dig", "kind":"gate",
                             "ids":[worker.id], "x":mid.x, "z":mid.z, "dir":direction}));
                         result.remaining_mp -= catalog
@@ -286,7 +286,7 @@ pub(crate) fn plan_after_builds(
                         z: end.z - wz * 14.0,
                     };
                     if context.mode != Mode::World
-                        || world_line_site(terrain, end, to, worker.at, &allowed)?
+                        || world_line_site(terrain, end, to, worker.at, allowed)?
                     {
                         result.commands.push(line(end, to, false));
                         result.builders.extend(ids.iter().copied());
