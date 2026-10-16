@@ -382,10 +382,18 @@ fn intent_log45_nonconquest_point_supply_seam_refuses_before_mutation() {
     // The flood component has no mode input. Mode exclusions belong to adapters.
     // Inject only mode identity into the ordinary scene to test its admission
     // boundary. These inputs are not admitted Horde, Tutorial or World rooms.
-    for (mode, kind) in [
-        (Mode::Horde, ModeKind::Horde),
-        (Mode::Tutorial, ModeKind::Tutorial),
-        (Mode::World, ModeKind::World),
+    for (mode, kind, refusal) in [
+        (Mode::Horde, ModeKind::Horde, "missing Horde state"),
+        (
+            Mode::Tutorial,
+            ModeKind::Tutorial,
+            "missing Tutorial runtime",
+        ),
+        (
+            Mode::World,
+            ModeKind::World,
+            "ordinary finish state requires Conquest or Tutorial",
+        ),
     ] {
         for supply in [true, false] {
             let mut m = arena(supply);
@@ -395,10 +403,7 @@ fn intent_log45_nonconquest_point_supply_seam_refuses_before_mutation() {
             let ids = m.world.game.units.keys().copied().collect::<Vec<_>>();
             let points = m.start.points.clone();
             let wallets = m.start.economy.clone();
-            assert_eq!(
-                m.apply_point_supply(&ids),
-                Err("victory phase supports ordinary Conquest only".into())
-            );
+            assert_eq!(m.apply_point_supply(&ids), Err(refusal.into()));
             assert_eq!(m.start.points, points);
             assert_eq!(m.start.economy, wallets);
             assert!(m.tick_state.fault().is_none());
