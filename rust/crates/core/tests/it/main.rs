@@ -53,8 +53,6 @@ mod interface_intent;
 mod interface_map_helpers;
 #[path = "../interface_sort_intent.rs"]
 mod interface_sort_intent;
-#[path = "../recipient_availability.rs"]
-mod recipient_availability;
 #[path = "../legacy_scenario.rs"]
 mod legacy_scenario;
 #[path = "../logistics.rs"]
@@ -91,6 +89,8 @@ mod produced_units;
 mod production;
 #[path = "../projectiles.rs"]
 mod projectiles;
+#[path = "../recipient_availability.rs"]
+mod recipient_availability;
 #[path = "../recruitment.rs"]
 mod recruitment;
 #[path = "../route_knowledge.rs"]

@@ -74,8 +74,8 @@ pub fn deny_sentence(code: &str, command: Option<&str>) -> Result<String, String
 }
 fn resources(s: &Value, mp: f64, fuel: f64, mun: f64) -> Availability {
     if num(&s["mp"]) < mp { no(format!("Needs {mp} MP")) }
-    else if fuel != 0.0 && !(num(&s["fuel"]) >= fuel) { no(format!("Needs {fuel} fuel")) }
-    else if mun != 0.0 && !(num(&s["mun"]) >= mun) { no(format!("Needs {mun} munitions")) }
+    else if fuel != 0.0 && num(&s["fuel"]).partial_cmp(&fuel).is_none_or(|order| order.is_lt()) { no(format!("Needs {fuel} fuel")) }
+    else if mun != 0.0 && num(&s["mun"]).partial_cmp(&mun).is_none_or(|order| order.is_lt()) { no(format!("Needs {mun} munitions")) }
     else { yes() }
 }
 fn queued<'a>(s: &'a Value, unit: &UnitRow) -> &'a [Value] {
@@ -87,7 +87,7 @@ fn production_access(s: &Value, action: &Value, owner: i32, slot: i32) -> bool {
     if s["mode"]["kind"] != "horde" || num(&s["mode"]["slot"]) == f64::from(slot)
         || num(&s["mode"]["slot"]) == f64::from(owner) || owner < 0 || slot < 0 { return false; }
     let teams = rows(&action["teams"]);
-    teams.get(owner as usize).zip(teams.get(slot as usize)).is_some_and(|(a,b)| a == b)
+    teams.get(owner as usize).zip(teams.get(slot as usize)).is_some_and(|(a,b)| num(a) == num(b))
 }
 
 /// The action has the browser's local selection/seat/team fields, not an authoritative command.
@@ -95,8 +95,11 @@ fn production_access(s: &Value, action: &Value, owner: i32, slot: i32) -> bool {
 pub fn availability(view: Option<&ClientView>, action: &Value) -> Result<Availability, String> {
     let Some(view) = view.filter(|v| !v.state().is_null()) else { return Ok(no("Waiting for the army")); };
     let s = view.state();
-    let slot = action["slot"].as_i64().and_then(|v| i32::try_from(v).ok()).ok_or("availability needs a seat")?;
-    if action["watching"] == true || (slot >= 0 && s["out"][slot as usize] == true) {
+    if action["watching"] == true {
+        return Ok(no("You are spectating"));
+    }
+    let slot = action["slot"].as_f64().filter(|v| v.fract() == 0.0 && *v >= f64::from(i32::MIN) && *v <= f64::from(i32::MAX)).map(|v|v as i32);
+    if slot.is_some_and(|slot| slot >= 0 && s["out"][slot as usize] == true) {
         return Ok(no("You are spectating"));
     }
     let catalog = Catalog::compiled().map_err(|e| e.to_string())?;
@@ -106,10 +109,10 @@ pub fn availability(view: Option<&ClientView>, action: &Value) -> Result<Availab
     let classic = mode.is_construction();
     let skirmish = mode.is_skirmish();
     let sudden = classic && s["mode"]["suddenDeath"] == true;
-    let own: Vec<_> = view.units().filter(|u| u.owner == slot).collect();
+    let own: Vec<_> = view.units().filter(|u| Some(u.owner) == slot).collect();
     let selected: Vec<_> = own.iter().copied().filter(|u| rows(&action["ids"]).iter().any(|id| num(id) == f64::from(u.id))).collect();
     let queue: Vec<_> = own.iter().flat_map(|u| queued(s, u)).filter_map(Value::as_str).collect();
-    let facilities: Vec<_> = view.units().filter(|u| production_access(s, action, u.owner, slot)).collect();
+    let facilities: Vec<_> = view.units().filter(|u| slot.is_some_and(|slot| production_access(s, action, u.owner, slot))).collect();
     let population = |need: f64| -> Result<Availability, String> {
         let mut used = 0.0;
         for u in &own { if !flag(unit(&u.kind)?, "structure") { used += economy::pop_use(&u.kind).map_err(|e|e.to_string())?; } }
@@ -123,7 +126,7 @@ pub fn availability(view: Option<&ClientView>, action: &Value) -> Result<Availab
     };
     let required_tier = |kind: &str| -> Result<Option<Availability>, String> {
         let required = economy::tier_of(kind).map_err(|e|e.to_string())?;
-        Ok((!s["tech"].is_null() && f64::from(required) > num(&s["tech"]["tier"])).then(|| tier_name(required).map(|name| no(format!("Needs {name}")))).transpose()?)
+        (!s["tech"].is_null() && f64::from(required) > num(&s["tech"]["tier"])).then(|| tier_name(required).map(|name| no(format!("Needs {name}")))).transpose()
     };
     let selected_crew = |builders: &[&str]| -> Availability {
         let crew: Vec<_> = selected.iter().filter(|u| builders.contains(&u.kind.as_str())).collect();
@@ -134,9 +137,9 @@ pub fn availability(view: Option<&ClientView>, action: &Value) -> Result<Availab
     let result = match action["t"].as_str().unwrap_or("") {
         "cancelProduction" => {
             if sudden { return Ok(no("Not during Sudden Death")); }
-            let jobs = rows(&s["productionJobs"]).iter().find(|r|r[0] == action["id"]).map(|r| rows(&r[1])).unwrap_or(&[]);
+            let jobs = rows(&s["productionJobs"]).iter().find(|r|num(&r[0]) == num(&action["id"])).map(|r| rows(&r[1])).unwrap_or(&[]);
             if own.iter().any(|u| f64::from(u.id) == num(&action["id"]) && u.built >= 1.0)
-                && jobs.iter().any(|j| j["id"] == action["job"] && j["status"] == "waiting") { yes() }
+                && jobs.iter().any(|j| num(&j["id"]) == num(&action["job"]) && j["status"] == "waiting") { yes() }
             else { no("That recruit is no longer waiting") }
         }
         "buy" => {
@@ -202,7 +205,7 @@ pub fn availability(view: Option<&ClientView>, action: &Value) -> Result<Availab
             if sudden { return Ok(no("Not during Sudden Death")); }
             let kind = action["kind"].as_str().ok_or("tech needs a kind")?;
             let technology = match kind { "tier"=>Technology::Tier,"inf"=>Technology::Infantry,"guns"=>Technology::Guns,"armor"=>Technology::Armor,_=>return Err("unknown research kind".into()) };
-            let byte = |v:&Value| v.as_u64().and_then(|n|u8::try_from(n).ok()).ok_or("invalid recipient research state");
+            let byte = |v:&Value| v.as_f64().filter(|n|n.fract() == 0.0 && (0.0..=255.0).contains(n)).map(|n|n as u8).ok_or("invalid recipient research state");
             let state = TechState::new(byte(&t["tier"])?,byte(&t["armory"]["inf"])?,byte(&t["armory"]["guns"])?,byte(&t["armory"]["armor"])?).map_err(|e|e.to_string())?;
             let Some(cost) = economy::tech_cost(state,technology,mode).map_err(|e|e.to_string())? else { return Ok(no("Fully researched")); };
             if rows(&t["lab"]).iter().any(|r| r[0] == kind) { return Ok(no("Already researching")); }

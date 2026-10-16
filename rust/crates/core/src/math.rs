@@ -18,11 +18,6 @@
 //! JavaScript has a single NaN, so a NaN result here may carry any payload; compare it as NaN.
 //! `tests/math.rs` checks the original functions against `harness/math-fixture.mjs`.
 
-/// IEEE 754 ceiling uses Rust's rounding primitive, without a platform math-library call.
-pub fn ceil(x: f64) -> f64 {
-    x.ceil()
-}
-
 // The following is adapted from fdlibm (http://www.netlib.org/fdlibm).
 //
 // ====================================================
@@ -42,6 +37,11 @@ pub fn ceil(x: f64) -> f64 {
 // like as decimal literals. Each literal still parses to the bits in the hex comment beside it, and
 // keeping the text as V8 has it makes the port easy to check line by line.
 #![allow(clippy::excessive_precision, clippy::approx_constant)]
+
+/// Ceiling for recipient cooldown labels, alongside the core's other rounding helpers.
+pub fn ceil(x: f64) -> f64 {
+    x.ceil()
+}
 
 // ---------- word access (the C macros EXTRACT_WORDS, GET_HIGH_WORD, SET_LOW_WORD, ...) ----------
 

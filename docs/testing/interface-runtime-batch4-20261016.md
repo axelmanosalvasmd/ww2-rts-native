@@ -23,11 +23,11 @@ Map and availability queries retain no state and read only caller-supplied recip
 - IF-26: grouping, retry identity, quarter-metre handoff cache and recipient cell equality have focused consumer tests. The native Horde movement planner lacks the prototype `ownPlan` JSON guard (`shared/ai.js:187-194`).
 - IF-25: actual convoy priorities/distances now preserve numeric subtraction ties; AI tests exercise current minimum scans and nonfinite admission. Most prototype AI sort consumers are absent. Admitted raw reserves and finite distance overflow can produce NaN comparisons, so a zero-NaN claim is not established.
 - IF-04: shared core fort placement exists, including supported bridge ordering and sight masking, but there is no complete recipient-only building/fort preview adapter. Both `wall` and `gate` return `UnsupportedKind`. Existing field-work and bridge-preview checks provide bounded evidence, not row completion.
-- IF-12: authoritative map validation and path helpers exist, but scenario migration/execution and the complete editor fairness worker path are not implemented. The prototype fairness worker runs whole AI matches through its host schedule.
+- IF-12: authoritative map validation and path helpers exist, but complete authored-scenario support and the editor fairness worker path remain incomplete. The prototype fairness worker runs whole AI matches through its host schedule.
 - IF-30: no complete seeded six-AI Classic/Conquest outcome harness exists on main. Current AI policy and mode admission do not support that complete run. Whole-match outcome/statistic criteria also need owner agreement under PARITY.md; an independent-stream exact hash is not a substitute.
 
 CLIENT ROWS: none. These assigned rows all have server/core work. No differs candidate is proposed.
 
 ## Validation
 
-Native qualification pending. All three shared Cargo slots were occupied during initial attempts; no Cargo process was launched by those attempts.
+Native qualification pending. All three shared Cargo slots were occupied during initial attempts; those attempts launched no Cargo process. An acquired S1 slot ran the formatter, which stopped before compilation because the new ceiling helper preceded a module attribute. The helper was moved below the attribute; the slot was released. No native test ran in that failed formatting attempt. Later source checks also corrected missing-seat spectator/default-action behavior and numeric identity comparisons before native qualification.
