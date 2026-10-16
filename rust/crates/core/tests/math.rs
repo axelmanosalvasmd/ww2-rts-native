@@ -264,3 +264,42 @@ fn edge_cases_match_node() {
         failures.join("\n")
     );
 }
+
+#[test]
+fn map64_floor_preserves_exact_world_thresholds_and_priority_boundaries() {
+    // Math.floor at the pinned prototype uses the same IEEE floor operation
+    // called directly by native world generation. Check both sides of the
+    // integer thresholds used for landform passes and road priorities.
+    for (input, expected) in [
+        (0.0f64, 0.0f64),
+        (-0.0, -0.0),
+        (f64::from_bits(1), 0.0),
+        (-f64::from_bits(1), -1.0),
+        (f64::INFINITY, f64::INFINITY),
+        (f64::NEG_INFINITY, f64::NEG_INFINITY),
+        (4_503_599_627_370_495.5, 4_503_599_627_370_495.0),
+        (4_503_599_627_370_496.0, 4_503_599_627_370_496.0),
+    ] {
+        assert_eq!(
+            input.floor().to_bits(),
+            expected.to_bits(),
+            "floor({input:?})"
+        );
+    }
+    for integer in [
+        -4.0f64, -3.0, -2.0, -1.0, 1.0, 2.0, 3.0, 4.0, 65535.0, 65536.0,
+    ] {
+        for (input, expected) in [
+            (integer.next_down(), integer - 1.0),
+            (integer, integer),
+            (integer.next_up(), integer),
+        ] {
+            assert_eq!(
+                input.floor().to_bits(),
+                expected.to_bits(),
+                "floor({input:?})"
+            );
+        }
+    }
+    assert!(f64::NAN.floor().is_nan());
+}

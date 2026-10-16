@@ -1,0 +1,1 @@
+- Add native NET behavior tests for lobby authority, recipient privacy, reconnect delivery, pause payloads and result bookkeeping. Record 16 proposed complete rows and 66 held rows, including unresolved Unicode cleaning and unsupported role/transport paths. No shipping code or parity status changes.
