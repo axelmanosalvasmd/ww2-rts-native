@@ -80,6 +80,13 @@ pub enum Command {
         at: Option<Point>,
         queue: bool,
     },
+    Cancel {
+        id: i64,
+    },
+    CancelProduction {
+        id: i64,
+        job: Option<i64>,
+    },
     Destroy {
         ids: Vec<i64>,
         id: Option<i64>,
@@ -457,6 +464,13 @@ impl Command {
                 }
             }
 
+            Some("cancel") => Ok(Self::Cancel {
+                id: object.get("id").and_then(safe_id).unwrap_or(-1),
+            }),
+            Some("cancelProduction") => Ok(Self::CancelProduction {
+                id: object.get("id").and_then(safe_id).unwrap_or(-1),
+                job: object.get("job").and_then(safe_id),
+            }),
             Some("rally") => Ok(Self::Rally {
                 ids,
                 id: object.get("id").map(|value| safe_id(value).unwrap_or(-1)),
@@ -885,6 +899,30 @@ impl crate::match_runtime::Match {
         {
             return self.ground_retreat_command(owner, ids);
         }
+        if let Command::Cancel { id } = command {
+            return match u32::try_from(*id) {
+                Ok(id) => self.cancel_construction(owner, id),
+                Err(_) => Ok(Some(Denial::Unseen)),
+            };
+        }
+        if let Command::CancelProduction { id, job } = command {
+            if !self.options.mode.is_construction() {
+                return Ok(Some(Denial::Needs));
+            }
+            let (Ok(id), Some(job)) = (u32::try_from(*id), *job) else {
+                return Ok(Some(Denial::Unseen));
+            };
+            // Zero cannot name an allocated job. Safe negative IDs retain the
+            // canonical producer checks and the notWaiting refusal.
+            let job = u64::try_from(job).unwrap_or(0);
+            return match self.cancel_training(owner, id, job) {
+                Ok(_) => Ok(None),
+                Err(crate::match_runtime::ProductionStepError::Production(
+                    crate::production::Error::Denied(d),
+                )) => Ok(Some(d.into())),
+                Err(e) => Err(format!("recorded production cancellation: {e:?}")),
+            };
+        }
         if let Command::Destroy { ids, id } = command {
             return self.execute_destroy(owner, ids, *id);
         }
@@ -995,6 +1033,8 @@ impl crate::match_runtime::Match {
             | Command::Retreat { ids } => ids.clone(),
             Command::Build { .. }
             | Command::Assist { .. }
+            | Command::Cancel { .. }
+            | Command::CancelProduction { .. }
             | Command::Destroy { .. }
             | Command::Rally { .. }
             | Command::Board { .. }
@@ -1352,6 +1392,8 @@ impl crate::match_runtime::Match {
             }
             Command::Build { .. }
             | Command::Assist { .. }
+            | Command::Cancel { .. }
+            | Command::CancelProduction { .. }
             | Command::Destroy { .. }
             | Command::Rally { .. }
             | Command::Board { .. }

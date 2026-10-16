@@ -536,7 +536,10 @@ fn conquest_abilities_match_original_source_phases() {
                     false,
                 )
                 .unwrap_err();
-            assert!(error.contains("Conquest"), "{name} mode rejection: {error}");
+            assert!(
+                error.contains("actor mode does not match"),
+                "{name} mode rejection: {error}"
+            );
             assert_eq!(snapshot(&m, &order, &[]), before);
             unsupported += 1;
             continue;

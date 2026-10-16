@@ -4983,3 +4983,9 @@ phase transition and distinguish cleared contacts from armor still under
 fog. Ordinary Conquest lifecycle coverage also runs the tactics caller,
 canonical commands and every seat's snapshots through victory and ending
 ticks. Existing mode, command, tick and snapshot guards remain in force.
+
+## Construction-mode building memory (CMB-130 deferred, 2026-10-16)
+
+Building memory follows the prototype's `isConstructionMode` gate: Classic and World only (`shared/sim.js:384,4444`). World keeps its existing memory phase, and Classic keeps its explicit component refresh. Default and Conquest no longer accumulate remembered buildings. The recipient adapter also gates the existing six-field `ghosts` encoding on Classic/World, matching `shared/sim.js:6037`, so ordinary snapshots omit the field even if component memory is present.
+
+Classic full ticks and non-ordinary recipient snapshots remain guarded. CMB-130 is dropped from this batch's claim: building memory runs in Classic/World only; waits on #301 Classic runner and World admission. Its component tests retain last-observed identity, type, owner, position and construction progress, shared team sight, hidden changes, unseen destruction and ground/airborne invalidation. Default/Conquest regressions cover seeing a barracks, retreating, hidden changes, retirement, VP finish and revisit with no memory or ghosts. Ability, base dispatch, research and bunker checks retain their full-match continuations and every-seat snapshots. No ABI, wire shape, contract or public command admission changes.
