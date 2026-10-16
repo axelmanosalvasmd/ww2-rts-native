@@ -1,0 +1,2 @@
+- Add internal FireAt orders, compound dispatch, queued owner plans, direct terrain shells and repeated area salvos. Terrain fire consumes carried rounds and applies the existing shortage penalty.
+- Project active ground projectiles through the existing recipient flight rows, including fog clipping and hidden shooter removal, so terrain fire survives ordinary ticks and snapshot delivery. Public FireAt ingress remains blocked.

@@ -1,3 +1,9 @@
+## FireAt runtime and recipient lifetime (2026-10-16)
+
+Internal FireAt uses the existing unit-control cell, queued command owner and deterministic projectile state. Waiting orders normalize to one unit and a cell-center point, projected as existing owner order kind 5. Active plans use the same kind. Direct guns approach intact terrain, accept a first wall only when it belongs to the target structure, and stop after the target cell is destroyed. Salvos keep firing on open ground until replaced. Both use the existing ammunition and shortage owners.
+
+The complete recipient adapter previously rejected all persistent projectiles. Ground flights now use the existing prototype flight row, current fog visibility, hidden shooter removal and a visual horizon clipped by fog and visible contacts. This changes no row shape, contract or public command whitelist. Public `fireat` and compound `orders` remain blocked. World tactical FireAt, aircraft area missions, and replacing a pending aimed ability remain closed at admission; they need their own runtime adapters. AI house-shelling and medic chores remain separate work.
+
 ## Runtime engineering: native bridge identity (2026-10-16)
 
 Paid bridges and Fill use the existing field-work jobs and canonical World mutations. Newly constructed bridge graphs use deterministic identities derived from the first cell and the append-only structure count. Repair reuses an existing bridge section identity, restores wood and 200 HP, and reconnects neighboring sections. These graph identities stay separate from the shared actor ID allocator, so construction does not advance actor IDs. Support, terrain invalidation and hull-width queries continue to use the canonical graph and physical terrain. This is an internal identity choice; no new wire or ABI shape is introduced.

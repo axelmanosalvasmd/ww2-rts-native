@@ -944,6 +944,29 @@ impl Match {
         start_fraction: f64,
         end_fraction: f64,
     ) -> Result<Option<FlightContact>, String> {
+        self.flight_contact_query(p, a, b, start_fraction, end_fraction, false, &|_| true)
+    }
+    /// Recipient extrapolation uses current poses and only recipient-visible bodies.
+    pub(crate) fn visible_flight_contact(
+        &self,
+        p: &LiveFlight,
+        a: projectiles::Point3,
+        b: projectiles::Point3,
+        seen: &impl Fn(UnitId) -> bool,
+    ) -> Result<Option<FlightContact>, String> {
+        self.flight_contact_query(p, a, b, 1., 1., true, seen)
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn flight_contact_query(
+        &self,
+        p: &LiveFlight,
+        a: projectiles::Point3,
+        b: projectiles::Point3,
+        start_fraction: f64,
+        end_fraction: f64,
+        stationary: bool,
+        seen: &impl Fn(UnitId) -> bool,
+    ) -> Result<Option<FlightContact>, String> {
         let g = &self.world.game;
         let level_height = n(self.firing_config()?, "levelHeight", 2.5);
         let mut best: Option<FlightContact> = None;
@@ -1001,6 +1024,7 @@ impl Match {
         // Exact unit-contact ties use numeric IDs instead of bucket or registration history.
         let mut candidates = self.grid.in_order(&g.units, center, reach, |_, t| {
             t.hp > 0.0
+                && seen(t.id)
                 && t.air.is_none()
                 && !t.riding
                 && t.id != p.shooter
@@ -1013,12 +1037,15 @@ impl Match {
             if def.building && t.cells.as_ref().is_some_and(|c| !c.is_empty()) {
                 continue;
             }
-            let old = self
-                .firing
-                .prior
-                .get(&id)
-                .copied()
-                .unwrap_or_else(|| t.pose());
+            let old = if stationary {
+                t.pose()
+            } else {
+                self.firing
+                    .prior
+                    .get(&id)
+                    .copied()
+                    .unwrap_or_else(|| t.pose())
+            };
             let before = projectiles::BodyPosition {
                 x: old.x + (t.x - old.x) * start_fraction,
                 z: old.z + (t.z - old.z) * start_fraction,
@@ -1438,13 +1465,8 @@ impl Match {
             .units
             .get(&id)
             .ok_or("missing canonical unit control")?;
-        if kind.air
-            || kind.rail
-            || control.operative
-            || control.fire_at.is_some()
-            || control.nade.is_some()
-        {
-            return Err("air, rail, operative and ability/terrain firing are unsupported".into());
+        if kind.air || kind.rail || control.operative || control.nade.is_some() {
+            return Err("air, rail, operative and aimed ability firing are unsupported".into());
         }
         if u.riding {
             return Ok(());
@@ -1504,6 +1526,9 @@ impl Match {
             self.firing.initialize(id).target_id = 0;
             self.commands.units.get_mut(&id).unwrap().aim = rot;
             return Ok(());
+        }
+        if self.commands.units[&id].fire_at.is_some() {
+            return self.fire_at_weapon(id);
         }
         let current = self.firing.get(id).copied().unwrap_or_default();
         if hold_fire && attack == 0 {
@@ -2482,3 +2507,7 @@ mod map_feature_tests;
 #[cfg(test)]
 #[path = "map_intent_batch2_tests.rs"]
 mod map_intent_batch2;
+
+mod fire_at;
+#[cfg(test)]
+mod fire_at_tests;

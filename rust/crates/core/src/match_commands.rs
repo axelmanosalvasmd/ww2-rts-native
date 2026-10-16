@@ -67,6 +67,16 @@ pub enum Stance {
 /// Internal recorded input. This is not a WebSocket or C interface.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Command {
+    /// Bounded internal compound order, with queue inherited by every part.
+    Group {
+        commands: Vec<serde_json::Value>,
+        queue: bool,
+    },
+    FireAt {
+        ids: Vec<i64>,
+        at: Point,
+        queue: bool,
+    },
     Build {
         ids: Vec<i64>,
         kind: String,
@@ -612,6 +622,50 @@ impl Command {
                     face,
                 })
             }
+            Some("orders") => Ok(Self::Group {
+                commands: object
+                    .get("commands")
+                    .and_then(|v| v.as_array())
+                    .ok_or(Denial::Blocked)?
+                    .iter()
+                    .take(8)
+                    .filter(|v| {
+                        matches!(
+                            v["t"].as_str(),
+                            Some(
+                                "move"
+                                    | "amove"
+                                    | "attack"
+                                    | "garrison"
+                                    | "fireat"
+                                    | "escort"
+                                    | "assist"
+                                    | "rally"
+                                    | "entrench"
+                                    | "board"
+                            )
+                        )
+                    })
+                    .cloned()
+                    .collect(),
+                queue: object.get("queue").and_then(|v| v.as_bool()) == Some(true),
+            }),
+            Some("fireat") => Ok(Self::FireAt {
+                ids,
+                at: Point {
+                    x: object
+                        .get("x")
+                        .and_then(|v| v.as_f64())
+                        .filter(|v| v.is_finite())
+                        .ok_or(Denial::Blocked)?,
+                    z: object
+                        .get("z")
+                        .and_then(|v| v.as_f64())
+                        .filter(|v| v.is_finite())
+                        .ok_or(Denial::Blocked)?,
+                },
+                queue: object.get("queue").and_then(|v| v.as_bool()) == Some(true),
+            }),
             Some("cover") => Ok(Self::Cover {
                 ids,
                 queue: object.get("queue").and_then(|v| v.as_bool()) == Some(true),
@@ -676,6 +730,28 @@ impl Command {
     }
     fn valid(&self) -> bool {
         match self {
+            Self::Group { commands, .. } => {
+                commands.len() <= 8
+                    && commands.iter().all(|v| {
+                        v.is_object()
+                            && matches!(
+                                v["t"].as_str(),
+                                Some(
+                                    "move"
+                                        | "amove"
+                                        | "attack"
+                                        | "garrison"
+                                        | "fireat"
+                                        | "escort"
+                                        | "assist"
+                                        | "rally"
+                                        | "entrench"
+                                        | "board"
+                                )
+                            )
+                    })
+            }
+            Self::FireAt { at, .. } => at.x.is_finite() && at.z.is_finite(),
             Self::Attack { at, .. } => at.is_none_or(|p| p.x.is_finite() && p.z.is_finite()),
             Self::Dig {
                 ids, at, direction, ..
@@ -827,7 +903,33 @@ impl crate::match_runtime::Match {
         if matches!(command, Command::Unsupported) {
             return Ok(Some(Denial::Unsupported));
         }
+        if let Command::Group { commands, queue } = command {
+            let mut done = false;
+            let mut reason = None;
+            for part in commands.iter().take(8) {
+                let mut part = part.clone();
+                part["queue"] = serde_json::Value::Bool(*queue);
+                let denial = match Command::from_json(&part) {
+                    Ok(Command::Unsupported) => Some(Denial::Blocked),
+                    Ok(part) => self.execute_command(owner, &part, winner_decided)?,
+                    Err(denial) => Some(denial),
+                };
+                if let Some(denial) = denial {
+                    reason = reason.or(Some(denial));
+                } else {
+                    done = true;
+                }
+            }
+            return Ok(if done {
+                None
+            } else {
+                Some(reason.unwrap_or(Denial::Blocked))
+            });
+        }
         self.validate_building_activity_rows()?;
+        if let Command::FireAt { ids, at, queue } = command {
+            return self.ground_fire_at_command(owner, ids, *at, *queue);
+        }
         if let Command::Build {
             ids,
             kind,
@@ -976,7 +1078,9 @@ impl crate::match_runtime::Match {
             | Command::Attack { ids, .. }
             | Command::Escort { ids, .. }
             | Command::Retreat { ids } => ids.clone(),
-            Command::Build { .. }
+            Command::Group { .. }
+            | Command::FireAt { .. }
+            | Command::Build { .. }
             | Command::Assist { .. }
             | Command::Destroy { .. }
             | Command::Board { .. }
@@ -1332,7 +1436,9 @@ impl crate::match_runtime::Match {
                     self.commands.units.get_mut(&id).unwrap().auto_cast = *on;
                 }
             }
-            Command::Build { .. }
+            Command::Group { .. }
+            | Command::FireAt { .. }
+            | Command::Build { .. }
             | Command::Assist { .. }
             | Command::Destroy { .. }
             | Command::Board { .. }
@@ -1691,6 +1797,15 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
         kind: crate::path_requests::RequestKind,
     ) -> Option<Point> {
         use crate::path_requests::RequestKind;
+        if kind == RequestKind::FireAt {
+            return match self.match_state.current_fire_at_goal(id) {
+                Ok(goal) => goal,
+                Err(error) => {
+                    self.error = Some(error);
+                    None
+                }
+            };
+        }
         if kind == RequestKind::Dig {
             return self.match_state.current_dig_goal(id);
         }
@@ -1823,6 +1938,14 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
                         .unwrap()
                         .attack_id = 0
                 }
+                crate::path_requests::RequestKind::FireAt => {
+                    self.match_state
+                        .commands
+                        .units
+                        .get_mut(&u.id)
+                        .unwrap()
+                        .fire_at = None
+                }
                 crate::path_requests::RequestKind::Nade => {
                     self.match_state.commands.units.get_mut(&u.id).unwrap().nade = None;
                     let ability = self.match_state.abilities.get_mut(u.id).unwrap();
@@ -1882,6 +2005,9 @@ impl crate::match_runtime::Match {
         // current_goal cannot report errors through the scheduler's Option API.
         // Validate Board and Attack callbacks before observation or FIFO service can write.
         for request in self.commands.requests.queued_requests() {
+            if request.kind == crate::path_requests::RequestKind::FireAt {
+                self.current_fire_at_goal(request.unit)?;
+            }
             if request.kind == crate::path_requests::RequestKind::AttackId {
                 self.current_attack_goal(request.unit)?;
             }
@@ -2157,6 +2283,7 @@ impl crate::match_runtime::Match {
                 | crate::path_requests::RequestKind::Build
                 | crate::path_requests::RequestKind::Board
                 | crate::path_requests::RequestKind::AttackId
+                | crate::path_requests::RequestKind::FireAt
         ) {
             return Err("unsupported command path request".into());
         }
@@ -2174,6 +2301,9 @@ impl crate::match_runtime::Match {
         }
         if kind == crate::path_requests::RequestKind::AttackId {
             self.current_attack_goal(id)?;
+        }
+        if kind == crate::path_requests::RequestKind::FireAt {
+            self.current_fire_at_goal(id)?;
         }
         if kind == crate::path_requests::RequestKind::Board {
             self.current_board_goal(id)?;
