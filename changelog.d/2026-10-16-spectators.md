@@ -7,3 +7,4 @@
 - Retain spectator target IDs and shot identities after units die, matching the prototype's full visibility. Replace the test that expected dead identities to be omitted and check that seated recipients keep their existing redaction.
 - Assert delivery of every commander's and spectator's snapshot on each tick through ordinary victory and the ending hold.
 - Restore compilation after merging save support by adding the required serialization derives to elimination state and resource nodes.
+- Keep the merged save/load test helper exhaustive and reject unexpected spectator output on its seated connections.
