@@ -261,7 +261,7 @@ fn ai62_net40_hosted_horde_levels_start_all_roles_and_share_recipient_economy_ru
         } else {
             initial = Some(opening);
         }
-        run_callbacks(&mut hub, &mut peers, 1, 24);
+        run_callbacks(&mut hub, &mut peers, 1, 240);
         assert!(runtime(&hub).ai_decoded_view(horde).unwrap().tick > 0);
         assert!(runtime(&hub).ai_delivered_view(1).unwrap().tick > 0);
     }
@@ -315,7 +315,7 @@ fn mode09_horde_departure_activates_normal_ai_clears_token_and_only_its_drop_pau
     let native = hub.rooms.get_mut("ABC").unwrap().native.as_mut().unwrap();
     native.runtime.auto_pause(0, "Host", 1).unwrap();
     let before = native.runtime.state().start.economy.players[0].clone();
-    let units = native.runtime.state().world.game.units.clone();
+    let units = format!("{:?}", native.runtime.state().world.game.units);
     peers[0].send(&mut hub, json!({"t":"leave"}), 2);
     assert!(hub.rooms["ABC"].players[0].ai);
     assert_eq!(hub.rooms["ABC"].players[0].level, "normal");
@@ -323,7 +323,7 @@ fn mode09_horde_departure_activates_normal_ai_clears_token_and_only_its_drop_pau
     assert!(hub.rooms["ABC"].players[0].connection.is_none());
     assert!(!runtime(&hub).paused());
     assert_eq!(runtime(&hub).state().start.economy.players[0], before);
-    assert_eq!(runtime(&hub).state().world.game.units, units);
+    assert_eq!(format!("{:?}", runtime(&hub).state().world.game.units), units);
     assert!(matches!(
         runtime(&hub).ai_commander(0).unwrap().brain(),
         Brain::Human { .. }

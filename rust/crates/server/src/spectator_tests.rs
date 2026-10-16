@@ -51,6 +51,226 @@ fn room() -> (Hub, Peer, Peer) {
 }
 
 #[test]
+fn intent_net57_seated_fog_starts_deltas_and_reconnect_leave_watchers_unmasked() {
+    // Decode the prototype's URL-safe base-32 varints independently of the
+    // native encoder. Runs alternate unchanged/flipped, starting unchanged.
+    fn apply(mask: &mut [u8], packed: &str) {
+        let digits = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+        let (mut cursor, mut flip, mut length, mut shift) = (0, false, 0usize, 0);
+        for byte in packed.bytes() {
+            let digit = digits.iter().position(|&d| d == byte).unwrap();
+            length |= (digit & 31) << shift;
+            if digit & 32 != 0 {
+                shift += 5;
+                continue;
+            }
+            assert!(cursor + length <= mask.len());
+            if flip {
+                for cell in &mut mask[cursor..cursor + length] {
+                    *cell ^= 1;
+                }
+            }
+            cursor += length;
+            flip = !flip;
+            length = 0;
+            shift = 0;
+        }
+        assert_eq!(shift, 0);
+    }
+    fn start_mask(start: &Value, cells: usize) -> (Vec<u8>, Vec<u8>) {
+        assert_eq!(
+            start["fog"]
+                .as_object()
+                .unwrap()
+                .keys()
+                .map(String::as_str)
+                .collect::<Vec<_>>(),
+            ["e", "v"]
+        );
+        let mut seen = vec![0; cells];
+        let mut explored = vec![0; cells];
+        apply(&mut seen, start["fog"]["v"].as_str().unwrap());
+        apply(&mut explored, start["fog"]["e"].as_str().unwrap());
+        (seen, explored)
+    }
+    fn send_frame(hub: &mut Hub) {
+        let room = hub.rooms.get_mut("ABC").unwrap();
+        let selected = Hub::select_native(room, &mut hub.accounts, false).unwrap();
+        let mut dropped = Vec::new();
+        assert!(
+            Hub::send_native_frame(
+                room,
+                &mut hub.accounts,
+                &selected,
+                FrameKind::Scheduled,
+                &mut dropped,
+            )
+            .is_some()
+        );
+        assert!(dropped.is_empty());
+    }
+    fn snapshot(peer: &mut Peer, hub: &mut Hub) -> Value {
+        let messages = peer.drain(hub, 0);
+        let mut frames = messages.into_iter().filter(|v| v["t"] == "s");
+        let frame = frames.next().unwrap();
+        assert!(frames.next().is_none());
+        frame
+    }
+    let (mut hub, mut a, mut b) = room();
+    let mut watcher = Peer::new(3);
+    watcher.hello(&mut hub, true, 0);
+    watcher.drain(&mut hub, 0);
+    let mut state = native_tests::native_match();
+    for control in state.commands.units.values_mut() {
+        control.hold_fire = true;
+        control.auto_cast = false;
+    }
+    let cells = state.world.game.w * state.world.game.h;
+    hub.attach_native("ABC", state, 0).unwrap();
+    let mut masks = Vec::new();
+    let mut expected_fog = ww2_core::fog::Fog::default();
+    for peer in [&mut a, &mut b] {
+        let messages = peer.drain(&mut hub, 0);
+        let start = messages.iter().find(|v| v["t"] == "start").unwrap();
+        masks.push(start_mask(start, cells));
+    }
+    let watched = watcher.drain(&mut hub, 0);
+    assert!(
+        watched
+            .iter()
+            .find(|v| v["t"] == "start")
+            .unwrap()
+            .get("fog")
+            .is_none()
+    );
+    {
+        let state = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state();
+        for (slot, (seen, explored)) in masks.iter().enumerate() {
+            let fog = expected_fog.team(
+                &state.world.game,
+                &state.rules,
+                state.world.game.players[slot].team,
+            );
+            assert_eq!(*seen, fog.vis);
+            assert_eq!(*explored, fog.explored);
+            assert!(seen.contains(&0) && seen.contains(&1));
+        }
+    }
+    send_frame(&mut hub);
+    for peer in [&mut a, &mut b, &mut watcher] {
+        assert!(snapshot(peer, &mut hub).get("fog").is_none());
+    }
+    let initial = masks[0].0.clone();
+    // Relocate the team's observers to a distant map corner. Ordinary ticks
+    // and real vision passes must now hide old ground and reveal new ground.
+    {
+        let runtime = &mut hub
+            .rooms
+            .get_mut("ABC")
+            .unwrap()
+            .native
+            .as_mut()
+            .unwrap()
+            .runtime;
+        let state = runtime.state_mut();
+        let spawn = state.start.players[0].spawn;
+        let width = state.world.game.w as f64 * ww2_core::game::CELL;
+        let depth = state.world.game.h as f64 * ww2_core::game::CELL;
+        let x = if spawn.x < width / 2. {
+            width - 12.
+        } else {
+            12.
+        };
+        let z = if spawn.z < depth / 2. {
+            depth - 12.
+        } else {
+            12.
+        };
+        for unit in state.world.game.units.values_mut().filter(|u| u.owner == 0) {
+            unit.x = x;
+            unit.z = z;
+        }
+    }
+    let mut changed = false;
+    for _ in 0..6 {
+        let runtime = &mut hub
+            .rooms
+            .get_mut("ABC")
+            .unwrap()
+            .native
+            .as_mut()
+            .unwrap()
+            .runtime;
+        runtime.advance_tick(&[false; 2]).unwrap();
+        send_frame(&mut hub);
+        for (slot, peer) in [&mut a, &mut b].into_iter().enumerate() {
+            let frame = snapshot(peer, &mut hub);
+            let state = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state();
+            let fog = expected_fog.team(
+                &state.world.game,
+                &state.rules,
+                state.world.game.players[slot].team,
+            );
+            let before = masks[slot].0.clone();
+            if let Some(delta) = frame.get("fog") {
+                apply(
+                    &mut masks[slot].0,
+                    delta.as_str().expect("delta is one run string"),
+                );
+                assert_ne!(masks[slot].0, before, "unchanged vision must omit fog");
+                changed |= slot == 0;
+            } else {
+                assert_eq!(before, fog.vis);
+            }
+            assert_eq!(masks[slot].0, fog.vis);
+        }
+        assert!(snapshot(&mut watcher, &mut hub).get("fog").is_none());
+        assert!(hub.native_status("ABC").unwrap().fault.is_none());
+    }
+    assert!(changed);
+    assert!(
+        initial
+            .iter()
+            .zip(&masks[0].0)
+            .any(|(&old, &now)| old == 1 && now == 0)
+    );
+    assert!(
+        initial
+            .iter()
+            .zip(&masks[0].0)
+            .any(|(&old, &now)| old == 0 && now == 1)
+    );
+    let mut returning = Peer::new(4);
+    returning.send(&mut hub, json!({"t":"hello","token":"p1","name":"P1"}), 1);
+    let messages = returning.drain(&mut hub, 1);
+    let start = messages.iter().find(|v| v["t"] == "start").unwrap();
+    let (seen, explored) = start_mask(start, cells);
+    let state = hub.rooms["ABC"].native.as_ref().unwrap().runtime.state();
+    let fog = expected_fog.team(
+        &state.world.game,
+        &state.rules,
+        state.world.game.players[0].team,
+    );
+    assert_eq!(seen, masks[0].0);
+    assert_eq!(explored, fog.explored);
+    assert!(
+        initial
+            .iter()
+            .zip(&explored)
+            .all(|(&old, &ever)| old <= ever)
+    );
+    assert!(
+        seen.iter()
+            .zip(&explored)
+            .any(|(&now, &ever)| now == 0 && ever == 1)
+    );
+    send_frame(&mut hub);
+    for peer in [&mut returning, &mut b, &mut watcher] {
+        assert!(snapshot(peer, &mut hub).get("fog").is_none());
+    }
+}
+
+#[test]
 fn intent_net21_spectator_admission_and_full_reasons_follow_room_state() {
     for playing in [false, true] {
         let (mut hub, mut a, mut b) = room();

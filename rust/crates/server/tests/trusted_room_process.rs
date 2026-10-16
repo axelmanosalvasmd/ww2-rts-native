@@ -272,9 +272,6 @@ fn ordinary_binary_refuses_unsupported_settings_before_any_start_publication() {
         json!({"t":"mode","v":"classic"}),
         json!({"t":"mode","v":"horde"}),
         json!({"t":"mode","v":"tutorial"}),
-        json!({"t":"army","v":"large"}),
-        json!({"t":"army","v":"massive"}),
-        json!({"t":"army","v":"endless"}),
         json!({"t":"sandbox","v":true}),
         json!({"t":"team","slot":1,"v":0}),
     ];
@@ -465,4 +462,30 @@ fn room_ai_binary_starts_selected_difficulty_and_delivers_recipient_snapshots() 
         assert_eq!(snapshot["ping"][1].as_f64(), Some(-1.0));
     }
     assert_eq!(server.receipts().len(), 1);
+}
+
+#[test]
+fn mode06_binary_named_armies_start_and_deliver_to_both_sockets() {
+    for (key, income, pop) in [
+        ("standard", 1.0, 1.0),
+        ("large", 3.0, 2.5),
+        ("massive", 6.0, 5.0),
+        ("endless", 20.0, 5.0),
+    ] {
+        let server = BinaryServer::start(true, SEED);
+        let mut host = Client::join(server.address, "a");
+        let mut guest = Client::join(server.address, "b");
+        host.send(json!({"t":"army","v":key}));
+        host.barrier();
+        begin(&mut host, &mut guest);
+        for client in [&mut host, &mut guest] {
+            for _ in 0..3 {
+                let snapshot = client.until(|m| m["t"] == "s");
+                assert_eq!(snapshot["army"], json!({"pop":pop,"income":income}));
+            }
+        }
+        host.barrier();
+        assert_eq!(server.receipts()[0]["options"]["army"], key);
+        assert!(!server.log().contains("NATIVE_FAULT"));
+    }
 }

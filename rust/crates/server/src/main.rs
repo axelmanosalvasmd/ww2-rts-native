@@ -18,7 +18,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "--seed" if seed.is_none() => seed = Some(args.next().ok_or("--seed requires U64")?),
             "--help" | "-h" => {
                 println!(
-                    "ww2-server [--bind HOST:PORT] [--trusted-room CODE --seed U64]\nAddress priority: --bind, WW2_BIND, HOST/PORT, 127.0.0.1:3000. Port 0 selects a free port.\nWW2_SHARDS: 1-64 isolated game threads (default 1).\nHosted Horde: one through five defenders, with recipient-only server AI.\nWW2_AUTHORED_MAPS_DIR: optional private maps reread at Horde Start/Restart.\nTrusted Conquest: one private two-human room, standard army, sandbox off, logistics off (temporary). Seeds/receipts stay host-private."
+                    "ww2-server [--bind HOST:PORT] [--trusted-room CODE --seed U64]\nAddress priority: --bind, WW2_BIND, HOST/PORT, 127.0.0.1:3000. Port 0 selects a free port.\nWW2_SHARDS: 1-64 isolated game threads (default 1).\nHosted Horde: one through five defenders, with recipient-only server AI.\nWW2_AUTHORED_MAPS_DIR: optional private maps reread at Horde Start/Restart.\nTrusted Conquest: one private two-commander room, named armies, sandbox off, logistics off (temporary). Seeds/receipts stay host-private."
                 );
                 return Ok(());
             }
