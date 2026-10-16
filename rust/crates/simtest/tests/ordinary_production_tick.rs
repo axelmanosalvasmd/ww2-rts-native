@@ -436,7 +436,7 @@ fn restored_ordinary_training_queue_is_refused_before_the_clock() {
         let failure = m.advance_tick().unwrap_err();
         assert_eq!(
             failure.reason,
-            "production admission: InvalidState(\"nonempty Conquest training queue\")"
+            "production admission: InvalidState(\"nonempty skirmish training queue\")"
         );
         assert_eq!(failure.tick, 0);
         assert!(failure.events.is_empty());

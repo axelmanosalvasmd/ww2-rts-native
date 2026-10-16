@@ -195,9 +195,9 @@ fn unsupported_modes_and_later_bad_payloads_leave_firing_unchanged() {
                 .unwrap_err(),
             m.launch_weapon_salvo(1, at, None).unwrap_err(),
         ] {
-            assert!(
-                error.contains("ordinary Conquest mode"),
-                "{mode:?}/{kind:?}: {error}"
+            assert_eq!(
+                error, "actor mode does not match canonical Game mode",
+                "{mode:?}/{kind:?}"
             );
         }
         assert_eq!(m.firing, before);
