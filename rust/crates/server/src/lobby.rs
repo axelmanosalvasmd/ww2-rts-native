@@ -9,7 +9,7 @@ use std::{
     io::Write,
     sync::{
         Arc,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     time::Instant,
 };
@@ -32,6 +32,7 @@ pub(crate) struct Connection {
     pub id: u64,
     pub tx: mpsc::Sender<Output>,
     pub cancel: watch::Sender<bool>,
+    buffered: Option<Arc<AtomicU64>>,
 }
 
 #[derive(Debug)]
@@ -51,7 +52,51 @@ pub(crate) enum Output {
     Close(u16, &'static str),
 }
 
+impl Output {
+    pub(crate) fn diagnostic_bytes(&self) -> u64 {
+        match self {
+            Self::Json(value) => value.to_string().len() as u64,
+            Self::Snapshot(write) => write.json.len() as u64,
+            Self::Close(_, reason) => 2 + reason.len() as u64,
+        }
+    }
+}
 impl Connection {
+    pub(crate) fn new(id: u64, tx: mpsc::Sender<Output>, cancel: watch::Sender<bool>) -> Self {
+        Self {
+            id,
+            tx,
+            cancel,
+            buffered: None,
+        }
+    }
+    pub(crate) fn enable_diagnostics(&mut self) {
+        self.buffered = Some(Arc::new(AtomicU64::new(0)));
+    }
+    fn reserve_bytes(&self, bytes: u64) {
+        if let Some(buffered) = &self.buffered {
+            let _ = buffered.try_update(Ordering::Relaxed, Ordering::Relaxed, |n| {
+                Some(n.saturating_add(bytes))
+            });
+        }
+    }
+    pub(crate) fn complete_bytes(&self, bytes: u64) {
+        if let Some(buffered) = &self.buffered {
+            let _ = buffered.try_update(Ordering::Relaxed, Ordering::Relaxed, |n| {
+                Some(n.saturating_sub(bytes))
+            });
+        }
+    }
+    pub(crate) fn clear_bytes(&self) {
+        if let Some(buffered) = &self.buffered {
+            buffered.store(0, Ordering::Relaxed);
+        }
+    }
+    fn buffered_bytes(&self) -> u64 {
+        self.buffered
+            .as_ref()
+            .map_or(0, |n| n.load(Ordering::Relaxed))
+    }
     fn ready(&self) -> bool {
         !self.tx.is_closed() && !*self.cancel.borrow()
     }
@@ -62,9 +107,16 @@ impl Connection {
         self.output(Output::Close(code, reason));
     }
     fn snapshot(&self, write: SnapshotWrite) -> Result<(), SnapshotWrite> {
+        let bytes = if self.buffered.is_some() {
+            write.json.len() as u64
+        } else {
+            0
+        };
+        self.reserve_bytes(bytes);
         match self.tx.try_send(Output::Snapshot(write)) {
             Ok(()) => Ok(()),
             Err(error) => {
+                self.complete_bytes(bytes);
                 let _ = self.cancel.send(true);
                 let Output::Snapshot(write) = error.into_inner() else {
                     unreachable!()
@@ -74,7 +126,14 @@ impl Connection {
         }
     }
     fn output(&self, msg: Output) {
+        let bytes = if self.buffered.is_some() {
+            msg.diagnostic_bytes()
+        } else {
+            0
+        };
+        self.reserve_bytes(bytes);
         if self.tx.try_send(msg).is_err() {
+            self.complete_bytes(bytes);
             // A stalled client cannot make every other room wait or grow an unbounded queue.
             let _ = self.cancel.send(true);
         }
@@ -115,6 +174,7 @@ impl SnapshotAccount {
     }
 }
 
+#[derive(Clone)]
 struct Person {
     token: Vec<u16>,
     name: String,
@@ -127,10 +187,17 @@ struct Person {
     denies: Vec<u64>,
     rtt: Option<f64>,
     map_pings: Vec<u64>,
+    diagnostics: crate::diagnostics::PlayerDiagnostics,
     last_match: Option<Value>,
 }
 
 impl Person {
+    fn online(&self) -> bool {
+        self.ai || self.connection.as_ref().is_some_and(Connection::ready)
+    }
+    fn ping(&self) -> Option<f64> {
+        if self.ai { Some(-1.0) } else { self.rtt }
+    }
     fn deny(&mut self, command: &str, reason: &str, now: u64) {
         self.denies.retain(|at| now.saturating_sub(*at) < 1_000);
         if self.denies.len() < 4 {
@@ -149,6 +216,8 @@ struct AttachedRuntime {
     startup: crate::native_startup::NativeStartup,
     // Complete R1 options/seeds are a host receipt, never a client envelope.
     receipt: Option<Value>,
+    loaded_save: bool,
+    diagnostics: crate::diagnostics::RoomDiagnostics,
 }
 
 struct PreparedNative {
@@ -165,12 +234,14 @@ struct RoomResult {
 
 struct Room {
     code: String,
+    saves: crate::saves::SaveStore,
     listed: bool,
     title: String,
     players: Vec<Person>,
     spectators: Vec<Person>,
     mode: String,
     map: String,
+    loaded_spawns: Option<Value>,
     world_size: String,
     army: String,
     weather: String,
@@ -199,6 +270,14 @@ impl Room {
         person.is_some_and(|p| p.connection.as_ref().is_some_and(|c| c.id == id))
     }
     fn capacity(&self, maps: &Value) -> usize {
+        if !matches!(self.mode.as_str(), "world" | "horde" | "tutorial")
+            && let Some(spawns) = self.loaded_spawns.as_ref().and_then(Value::as_array)
+        {
+            return spawns
+                .iter()
+                .filter(|spawn| self.mode == "assault" || spawn["assault"] != true)
+                .count();
+        }
         match self.mode.as_str() {
             "world" => MAX_PLAYERS,
             "horde" | "tutorial" => MAX_PLAYERS - 1,
@@ -344,7 +423,7 @@ impl Room {
             "t":"lobby", "proto":0, "code": self.code, "state":if self.native.is_some() { "play" } else { "lobby" },
             "role":"commander", "operatives":[], "spectator":you.is_none(),
             "amHost":self.is_host(id), "spectators":self.spectators.iter().map(|p| &p.name).collect::<Vec<_>>(),
-            "listed":self.listed, "saves":[], "hordeBest":null,
+            "listed":self.listed, "saves":self.saves.lobby_list(&self.code), "hordeBest":null,
             "you":you.map_or(-1, |i| i as i64), "host":self.host().map_or(-1, |i| i as i64),
             "maps":maps.as_object().unwrap().keys().collect::<Vec<_>>(),
             "mapName":if self.mode == "world" { "world" } else { &self.map },
@@ -359,6 +438,7 @@ impl Room {
         if let Some(last) = &self.result {
             let mut report = last.report.clone();
             report["you"] = you
+                .filter(|_| report.get("story").is_some_and(Value::is_array))
                 .and_then(|slot| self.players[slot].last_match.clone())
                 .unwrap_or(Value::Null);
             result["result"] = report;
@@ -388,7 +468,7 @@ impl Room {
         }
         v
     }
-    fn command(&mut self, id: u64, msg: &Value, maps: &Value, now: u64) -> bool {
+    fn command(&mut self, id: u64, msg: &Value, maps: &Value, now: u64, diagnostics: bool) -> bool {
         let Some(t) = msg["t"].as_str() else {
             return false;
         };
@@ -455,6 +535,10 @@ impl Room {
                 if let Some(rtt) = msg["rtt"].as_f64().filter(|v| v.is_finite()) {
                     me.rtt = Some(rtt.round().clamp(0.0, 9999.0));
                 }
+                if diagnostics {
+                    me.diagnostics.at = Some(now);
+                    me.diagnostics.client = crate::diagnostics::clean_client(&msg["d"]);
+                }
                 let mut pong = json!({"t":"pong"});
                 if let Some(c) = msg.get("c") {
                     pong["c"] = c.clone();
@@ -473,42 +557,69 @@ impl Room {
             }
             return false;
         }
-        if matches!(t, "pause" | "resume")
-            && host
-            && seated.is_some()
-            && me.connection.as_ref().is_some_and(Connection::ready)
-            && let Some(native) = &mut self.native
-        {
-            let message = if t == "pause" {
-                native
-                    .runtime
-                    .pause(
-                        seated.unwrap(),
-                        &me.name,
-                        crate::room_runtime::PauseReason::Host,
-                        now,
-                    )
-                    .ok()
-                    .flatten()
-            } else if native.runtime.fault().is_none() {
-                Some(native.runtime.resume(now))
-            } else {
-                None
+        if host && matches!(t, "pause" | "resume" | "end") && self.native.is_some() {
+            let native = self.native.as_mut().unwrap();
+            if native.runtime.fault().is_some()
+                || !me.connection.as_ref().is_some_and(Connection::ready)
+            {
+                me.deny(t, "blocked", now);
+                return false;
+            }
+            let message = match t {
+                "pause" => native.runtime.pause(
+                    seated.unwrap(),
+                    &me.name,
+                    crate::room_runtime::PauseReason::Host,
+                    now,
+                ),
+                _ => Ok(Some(native.runtime.resume(now))),
             };
-            if let Some(message) = message {
-                for person in self.people() {
-                    if let Some(connection) = &person.connection {
-                        connection.send(message.clone());
+            match message {
+                Ok(Some(message)) => {
+                    for person in self.players.iter().chain(&self.spectators) {
+                        if let Some(connection) = &person.connection {
+                            connection.send(message.clone());
+                        }
                     }
                 }
+                Ok(None) => {}
+                Err(error) => {
+                    native.runtime.fault_stop(error);
+                    return false;
+                }
+            }
+            if t == "end" {
+                let status = crate::NativeRoomStatus {
+                    epoch: native.epoch,
+                    tick: native.runtime.state().world.game.tick,
+                    held: native.runtime.held(),
+                    ending_complete: true,
+                    paused: false,
+                    fault: None,
+                };
+                self.result = Some(RoomResult {
+                    report: json!({"ended":true}),
+                    status,
+                });
+                self.native = None;
+                self.retain_seats(|_, person| {
+                    person.ai || person.connection.as_ref().is_some_and(Connection::ready)
+                });
+                return true;
             }
             return false;
         }
-        if attached && matches!(t, "save" | "loadSave") {
-            me.deny(t, "save", now);
+        // Host controls above remain usable during pause. Other gameplay is ignored.
+        if self
+            .native
+            .as_ref()
+            .is_some_and(|native| native.runtime.paused())
+        {
             return false;
         }
-        if let Some(native) = &mut self.native {
+        if CommanderIngress::recognizes(t)
+            && let Some(native) = &mut self.native
+        {
             // The current connection was resolved from the stable roster above.
             // Paused rooms ignore ordinary orders just like the Source callback.
             if native.runtime.paused() || !me.connection.as_ref().is_some_and(Connection::ready) {
@@ -528,6 +639,19 @@ impl Room {
             if let Some(denial) = denial {
                 me.deny(t, denial.name(), now);
             }
+            return false;
+        }
+        if t == "nextwave"
+            && let Some(native) = &mut self.native
+        {
+            if let Err(error) = native.runtime.next_wave(host) {
+                native.runtime.fault_stop(error);
+            }
+            return false;
+        }
+        if attached && seated.is_some() && !UNAVAILABLE.contains(&t) {
+            // Unknown orders use the prototype's ordinary blocked feedback.
+            me.deny(t, "blocked", now);
             return false;
         }
         // Other gameplay and public setup admission remain unavailable.
@@ -579,6 +703,7 @@ impl Room {
                     denies: Vec::new(),
                     rtt: None,
                     map_pings: Vec::new(),
+                    diagnostics: crate::diagnostics::PlayerDiagnostics::default(),
                     last_match: None,
                 });
             }
@@ -632,6 +757,7 @@ impl Room {
                     return false;
                 }
                 self.map = name.into();
+                self.loaded_spawns = None;
             }
             "mode"
                 if host
@@ -670,6 +796,7 @@ impl Room {
                     }
                 }
                 self.mode = mode.into();
+                self.loaded_spawns = None;
             }
             "worldSize" if host => {
                 let value = msg
@@ -804,6 +931,9 @@ pub(crate) struct Hub {
     clock: CatchUpClock,
     stopped: Arc<AtomicBool>,
     trusted: Option<crate::TrustedRoomConfig>,
+    diagnostics: Option<crate::diagnostics::Recorder>,
+    tick_log: bool,
+    saves: crate::saves::SaveStore,
 }
 impl Hub {
     pub fn new(max_rooms: usize, public_url: String) -> Self {
@@ -818,7 +948,28 @@ impl Hub {
             clock: CatchUpClock::new(0),
             stopped: Arc::new(AtomicBool::new(false)),
             trusted: None,
+            diagnostics: None,
+            tick_log: false,
+            saves: crate::saves::SaveStore::new("saves".into()),
         }
+    }
+    pub(crate) fn configure_saves(&mut self, dir: std::path::PathBuf) {
+        self.saves = crate::saves::SaveStore::new(dir);
+        for room in self.rooms.values_mut() {
+            room.saves = self.saves.clone();
+        }
+    }
+    pub(crate) fn diagnostics_enabled(&self) -> bool {
+        self.diagnostics.is_some()
+    }
+    pub(crate) fn configure_diagnostics(
+        &mut self,
+        dir: Option<std::path::PathBuf>,
+        tick_log: bool,
+    ) -> std::io::Result<()> {
+        self.diagnostics = dir.map(crate::diagnostics::Recorder::new).transpose()?;
+        self.tick_log = tick_log;
+        Ok(())
     }
     pub fn attach_native(&mut self, code: &str, state: Match, now: u64) -> Result<u64, String> {
         let prepared = self.prepare_native(code, state, now, false)?;
@@ -840,6 +991,16 @@ impl Hub {
             return Err("server stopped".into());
         }
         let room = self.rooms.get(code).ok_or("room does not exist")?;
+        self.prepare_native_room(room, state, now, replace, None)
+    }
+    fn prepare_native_room(
+        &self,
+        room: &Room,
+        state: Match,
+        now: u64,
+        replace: bool,
+        raw_map: Option<&Value>,
+    ) -> Result<PreparedNative, String> {
         if room.native.is_some() && !replace {
             return Err("room already has a native runtime".into());
         }
@@ -871,16 +1032,18 @@ impl Hub {
             .checked_add(1)
             .filter(|epoch| *epoch <= crate::native_startup::MAX_MATCH_ID)
             .ok_or("native runtime epoch exhausted")?;
-        let startup = crate::native_startup::NativeStartup::prepare(
-            &state,
-            crate::native_startup::StartupSettings {
-                map: &room.map,
-                mode: &room.mode,
-                army: &room.army,
-                weather: &room.weather,
-                sandbox: room.sandbox,
-            },
-        )?;
+        let settings = crate::native_startup::StartupSettings {
+            map: &room.map,
+            mode: &room.mode,
+            army: &room.army,
+            weather: &room.weather,
+            sandbox: room.sandbox,
+        };
+        let startup = if let Some(raw) = raw_map {
+            crate::native_startup::NativeStartup::prepare_loaded(&state, settings, raw)?
+        } else {
+            crate::native_startup::NativeStartup::prepare(&state, settings)?
+        };
         // Canonical runtime admission completes before changing the room or accounts.
         let mut runtime = RoomRuntime::new(state, now)?;
         let resume = runtime.resume(now);
@@ -908,6 +1071,8 @@ impl Hub {
                 runtime,
                 startup,
                 receipt: None,
+                loaded_save: false,
+                diagnostics: crate::diagnostics::RoomDiagnostics::default(),
             },
             starts,
             resume,
@@ -924,6 +1089,7 @@ impl Hub {
         } = prepared;
         let epoch = attached.epoch;
         let room = self.rooms.get_mut(code).unwrap();
+        room.loaded_spawns = Some(attached.startup.raw_map()["spawns"].clone());
         room.native = Some(attached);
         room.result = None;
         self.next_epoch = epoch;
@@ -1133,12 +1299,8 @@ impl Hub {
         kind: FrameKind,
         dropped: &mut Vec<(String, u64)>,
     ) -> Option<(f64, f64)> {
-        let online = room
-            .players
-            .iter()
-            .map(|p| p.connection.as_ref().is_some_and(Connection::ready))
-            .collect::<Vec<_>>();
-        let ping = room.players.iter().map(|p| p.rtt).collect::<Vec<_>>();
+        let online = room.players.iter().map(Person::online).collect::<Vec<_>>();
+        let ping = room.players.iter().map(Person::ping).collect::<Vec<_>>();
         let native = room.native.as_mut()?;
         let began = Instant::now();
         let captured = match native.runtime.collect_frame(selected, kind) {
@@ -1271,6 +1433,9 @@ impl Hub {
                 return;
             }
         };
+        if let Some(recorder) = &mut self.diagnostics {
+            recorder.observe_poll(now_ns, poll.lateness_ns);
+        }
         for _ in 0..poll.ticks {
             if self.is_stopped() {
                 return;
@@ -1439,6 +1604,7 @@ impl Hub {
                 if let Err(error) = native.runtime.record_timing(sample, now_ms) {
                     native.runtime.fault_stop(error);
                 }
+                Self::record_diagnostics(room, &mut self.diagnostics, self.tick_log, now_ms);
             }
             // Expected socket losses are applied after every due callback and
             // before another tick, without interrupting healthy peer output.
@@ -1446,6 +1612,54 @@ impl Hub {
                 self.disconnected(&code, id, now_ms);
             }
         }
+    }
+    fn record_diagnostics(
+        room: &mut Room,
+        recorder: &mut Option<crate::diagnostics::Recorder>,
+        tick_log: bool,
+        now: u64,
+    ) {
+        let native = room.native.as_mut().expect("playing room");
+        if recorder.is_none() && !tick_log {
+            return;
+        }
+        let log_due = tick_log && native.diagnostics.phase_due(now);
+        for player in &mut room.players {
+            let buffered = player
+                .connection
+                .as_ref()
+                .map_or(0, Connection::buffered_bytes);
+            player.diagnostics.buffered = player.diagnostics.buffered.max(buffered);
+        }
+        let state = native.runtime.state();
+        let tps = recorder
+            .as_ref()
+            .and_then(|_| native.diagnostics.due(now, state.world.game.tick));
+        if !log_due && tps.is_none() {
+            return;
+        }
+        let stats = native.runtime.timing_stats();
+        let cadence = native.runtime.snapshot_cadence();
+        if log_due {
+            let line = crate::diagnostics::phase_log(&room.code, &stats, cadence);
+            let _ = writeln!(std::io::stderr().lock(), "{line}");
+        }
+        let (Some(recorder), Some(tps)) = (recorder, tps) else {
+            return;
+        };
+        let players = room.players.iter_mut().enumerate().map(|(slot, p)| {
+            let buffered = std::mem::take(&mut p.diagnostics.buffered);
+            if p.ai { return json!({"slot":slot,"ai":true}); }
+            json!({"slot":slot,"name":p.name,"on":p.connection.as_ref().is_some_and(Connection::ready),
+                "rtt":p.rtt,"quiet":p.diagnostics.at.map(|at| now.saturating_sub(at)),
+                "bufMax":buffered,"client":p.diagnostics.client})
+        }).collect::<Vec<_>>();
+        recorder.record(
+            &room.code,
+            json!({"tick":state.world.game.tick,"tps":tps,
+            "tickP50":stats.phases[0].p50,"tickP95":stats.phases[0].p95,
+            "snapEvery":cadence,"units":state.world.game.units.len(),"players":players}),
+        );
     }
     pub fn directory(&self) -> Value {
         json!({"rooms":self.room_order.iter().filter_map(|code| self.rooms.get(code)).filter(|r| r.listed && r.players.iter().any(|p| !p.ai && p.connection.is_some()))
@@ -1623,43 +1837,7 @@ impl Hub {
             return;
         }
         if *joined {
-            if msg["t"] == "end"
-                && let Some(room) = self.rooms.get_mut(code)
-                && room
-                    .native
-                    .as_ref()
-                    .is_some_and(|native| native.runtime.fault().is_none())
-                && room.is_host(connection.id)
-                && room.players.iter().any(|p| {
-                    p.connection
-                        .as_ref()
-                        .is_some_and(|c| c.id == connection.id && c.ready())
-                })
-            {
-                let mut native = room.native.take().unwrap();
-                let resume = native.runtime.resume(now);
-                for person in room.people() {
-                    if let Some(connection) = &person.connection {
-                        connection.send(resume.clone());
-                    }
-                }
-                room.result = Some(RoomResult {
-                    report: json!({"ended":true}),
-                    status: crate::NativeRoomStatus {
-                        epoch: native.epoch,
-                        tick: native.runtime.state().world.game.tick,
-                        held: native.runtime.held(),
-                        ending_complete: true,
-                        paused: false,
-                        fault: native.runtime.fault().map(str::to_owned),
-                    },
-                });
-                room.retain_seats(|_, p| {
-                    p.ai || p.connection.as_ref().is_some_and(Connection::ready)
-                });
-                // In-flight writes still belong to their sockets. A later start
-                // resets delivery through start_stream while retaining this ledger.
-                room.broadcast(&self.maps, &self.public_url);
+            if self.save_command(code, connection.id, &msg, now) {
                 return;
             }
             if self.trusted_command(code, connection.id, &msg, now) {
@@ -1681,7 +1859,13 @@ impl Hub {
                 return;
             }
             if let Some(room) = self.rooms.get_mut(code)
-                && room.command(connection.id, &msg, &self.maps, now)
+                && room.command(
+                    connection.id,
+                    &msg,
+                    &self.maps,
+                    now,
+                    self.diagnostics.is_some(),
+                )
             {
                 room.broadcast(&self.maps, &self.public_url);
             }
@@ -1713,10 +1897,12 @@ impl Hub {
         if !self.rooms.contains_key(code) {
             self.room_order.push(code.into());
         }
+        let saves = self.saves.clone();
         let room = self.rooms.entry(code.into()).or_insert_with(|| {
             let tutorial = msg["listing"]["tutorial"] == true;
             Room {
                 code: code.into(),
+                saves,
                 listed: msg["listing"]["public"] == true && !tutorial,
                 title: clean(
                     msg["listing"]["title"].as_str().unwrap_or("Open skirmish"),
@@ -1728,6 +1914,7 @@ impl Hub {
                 spectators: Vec::new(),
                 mode: if tutorial { "tutorial" } else { "conquest" }.into(),
                 map: if tutorial { "tutorial" } else { "default" }.into(),
+                loaded_spawns: None,
                 world_size: "huge".into(),
                 army: "standard".into(),
                 weather: "map".into(),
@@ -1812,6 +1999,7 @@ impl Hub {
                 denies: Vec::new(),
                 rtt: None,
                 map_pings: Vec::new(),
+                diagnostics: crate::diagnostics::PlayerDiagnostics::default(),
                 last_match: None,
             };
             if room.has_seat(&self.maps) && msg["spectate"] != true {
@@ -1979,7 +2167,7 @@ mod tests {
     fn client(id: u64) -> (Connection, mpsc::Receiver<Output>) {
         let (tx, rx) = mpsc::channel(64);
         let (cancel, _) = watch::channel(false);
-        (Connection { id, tx, cancel }, rx)
+        (Connection::new(id, tx, cancel), rx)
     }
     fn join(h: &mut Hub, c: &Connection, token: &str, spectate: bool, now: u64) {
         h.message("ABC",c,&mut false,json!({"t":"hello","token":token,"name":token,"spectate":spectate,"listing":{"public":true}}),now);
@@ -2353,5 +2541,24 @@ mod net_batch50;
 mod net83_followup_tests;
 
 #[cfg(test)]
+#[path = "mode_runtime_a_tests.rs"]
+mod mode_runtime_a_tests;
+
+#[cfg(test)]
+#[path = "net_runtime3_tests.rs"]
+mod net_runtime3;
+
+#[cfg(test)]
 #[path = "net_runtime2_tests.rs"]
 mod net_runtime2;
+
+#[cfg(test)]
+#[path = "seat_lifecycle_tests.rs"]
+mod seat_lifecycle_tests;
+
+#[cfg(test)]
+#[path = "save_load_tests.rs"]
+mod save_load_tests;
+
+#[path = "lobby_saves.rs"]
+mod save_runtime;

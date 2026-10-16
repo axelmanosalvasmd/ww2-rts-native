@@ -4,7 +4,7 @@ use super::*;
 fn client(id: u64) -> (Connection, mpsc::Receiver<Output>) {
     let (tx, rx) = mpsc::channel(256);
     let (cancel, _) = watch::channel(false);
-    (Connection { id, tx, cancel }, rx)
+    (Connection::new(id, tx, cancel), rx)
 }
 fn join(hub: &mut Hub, c: &Connection, token: &str, now: u64) {
     hub.message(

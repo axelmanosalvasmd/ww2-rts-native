@@ -10,6 +10,8 @@ use crate::{
     weather::{WeatherRow, WeatherRules},
 };
 use serde_json::{Map, Value, json};
+#[path = "recipient_snapshot/aircraft.rs"]
+mod aircraft;
 #[path = "recipient_snapshot/composition.rs"]
 mod composition;
 #[path = "recipient_snapshot/delivery.rs"]
@@ -79,6 +81,25 @@ pub struct RecipientProjection {
     pub missing: Vec<SnapshotCapability>,
 }
 
+/// The public Horde mode component, separate from complete recipient admission.
+/// No seat data or hidden purchase state enters this row. The complete Horde
+/// snapshot and host remain guarded by their existing mode checks.
+pub fn horde_mode_row(state: &Match) -> Result<Value, SnapshotError> {
+    let mode = state.horde_projection().map_err(|_| SnapshotError::Rules)?;
+    let horde = state.horde.as_ref().ok_or(SnapshotError::Rules)?;
+    let mut row = json!({
+        "kind": "horde", "defenderTeam": 0, "attackerTeam": 1,
+        "timeLeft": mode.time_left, "suddenDeath": false,
+        "profile": mode.profile.as_str(), "wave": mode.wave,
+        "left": mode.left, "active": mode.active, "boss": mode.boss,
+        "slot": horde.slot
+    });
+    if let Some(profile) = mode.next_profile {
+        row["nextProfile"] = json!(profile.as_str());
+    }
+    Ok(row)
+}
+
 /// Capture immutable rows for one send pass after canonical state changes.
 /// The Rust borrow prevents state mutation until every recipient is projected.
 pub struct SnapshotCache<'a> {
@@ -130,6 +151,7 @@ impl<'a> SnapshotCache<'a> {
             finite(&[u.x, u.z])?;
         }
         engineering::validate(state)?;
+        aircraft::validate(state)?;
         let rows = state
             .world
             .game
@@ -228,19 +250,6 @@ fn unit_row(state: &Match, u: &Unit) -> Result<Value, SnapshotError> {
         unit: u.id,
         capability,
     };
-    if u.air.is_some() || k.air {
-        return Err(unsupported(SnapshotCapability::Air));
-    }
-    if u.build {
-        return Err(unsupported(SnapshotCapability::Engineering));
-    }
-    let def = Catalog::compiled()
-        .map_err(|_| SnapshotError::Rules)?
-        .unit(&k.name)
-        .map_err(|_| SnapshotError::Rules)?;
-    if def.get("gate").is_some() {
-        return Err(unsupported(SnapshotCapability::GateState));
-    }
     let control = state
         .commands
         .units
@@ -249,6 +258,11 @@ fn unit_row(state: &Match, u: &Unit) -> Result<Value, SnapshotError> {
             unit: u.id,
             owner: "control",
         })?;
+    state
+        .validate_gate_actor(u.id)
+        .map_err(|_| unsupported(SnapshotCapability::GateState))?;
+    crate::match_construction::validate_build_activity(u, control)
+        .map_err(|_| unsupported(SnapshotCapability::Engineering))?;
     if control.operative {
         return Err(unsupported(SnapshotCapability::Operatives));
     }
@@ -291,6 +305,12 @@ fn unit_row(state: &Match, u: &Unit) -> Result<Value, SnapshotError> {
         u.built.unwrap_or(1.0),
     ])?;
     let mut flags = 0u64;
+    if u.air.is_some() && !vision::airborne(u) {
+        flags |= 512;
+    }
+    if control.gate.is_some_and(|gate| gate.open == Some(true)) {
+        flags |= 65536;
+    }
     if u.riding {
         flags |= 262144;
     }
@@ -324,6 +344,9 @@ fn unit_row(state: &Match, u: &Unit) -> Result<Value, SnapshotError> {
     }
     if u.amove.is_some() {
         flags |= 64;
+    }
+    if u.build {
+        flags |= 128;
     }
     if k.camo
         && u.still.is_some_and(|v| v >= 3.0)
@@ -550,6 +573,13 @@ fn economy_fields(state: &Match, slot: usize) -> Result<Map<String, Value>, Snap
 }
 
 impl Match {
+    /// Bind hosted purchases to the current ordinary snapshot capabilities.
+    pub fn restrict_to_ordinary_snapshots(&mut self) -> Result<(), SnapshotError> {
+        self.preflight_ordinary_snapshot()?;
+        self.ordinary_snapshot_only = true;
+        Ok(())
+    }
+
     /// Read-only admission of the currently supported ordinary actor frame.
     /// Trusted attachment validates every seat before installing the match.
     pub fn preflight_ordinary_snapshot(&self) -> Result<(), SnapshotError> {
@@ -1055,6 +1085,15 @@ pub(crate) mod tests {
             })
         ));
         m.abilities.initialize(1);
+        m.world.game.units.get_mut(&1).unwrap().build = true;
+        assert!(matches!(
+            SnapshotCache::new(&m),
+            Err(SnapshotError::Unsupported {
+                unit: 1,
+                capability: SnapshotCapability::Engineering
+            })
+        ));
+        m.world.game.units.get_mut(&1).unwrap().build = false;
         m.world.game.units.get_mut(&1).unwrap().dig = true;
         assert!(matches!(
             SnapshotCache::new(&m),
@@ -1069,3 +1108,7 @@ pub(crate) mod tests {
 #[cfg(test)]
 #[path = "map_house_selected_tests.rs"]
 mod map_house_selected_tests;
+
+#[cfg(test)]
+#[path = "recipient_snapshot/net52_tests.rs"]
+mod net52_tests;

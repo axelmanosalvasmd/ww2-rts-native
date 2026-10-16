@@ -1020,6 +1020,148 @@ fn reserves(m: &mut Match, id: u32, name: &str) {
 }
 
 #[test]
+fn log05_direct_and_salvo_launch_only_funded_whole_rounds() {
+    for (name, target, full_volley, available) in
+        [("rifle", "rifle", 5, 2.75), ("rocket", "rifle", 8, 2.75)]
+    {
+        let mut full = scene(&[(name, 0, 20.0, 20.0), (target, 1, 40.0, 20.0)]);
+        reserves(&mut full, 1, name);
+        full.fire_weapon(1, 2, false).unwrap();
+        assert_eq!(full.firing.flights.len(), full_volley, "{name}");
+        let mut m = scene(&[(name, 0, 20.0, 20.0), (target, 1, 40.0, 20.0)]);
+        reserves(&mut m, 1, name);
+        m.logistics.get_mut(1).unwrap().ammo = available;
+        m.fire_weapon(1, 2, false).unwrap();
+        assert_eq!(m.firing.flights.len(), 2, "{name}");
+        close(m.logistics.get(1).unwrap().ammo, 0.75);
+        if name == "rocket" {
+            assert_eq!(m.firing.salvos[0].left, 2);
+        }
+    }
+
+    let mut m = scene(&[("rocket", 0, 20.0, 20.0), ("rifle", 1, 40.0, 20.0)]);
+    reserves(&mut m, 1, "rocket");
+    m.logistics.get_mut(1).unwrap().ammo = 0.75;
+    let before = m.start.random.snapshot();
+    assert!(m.fire_weapon(1, 2, false).is_err());
+    assert_eq!(m.start.random.snapshot(), before);
+    assert_eq!(m.logistics.get(1).unwrap().ammo, 0.75);
+    assert!(m.firing.flights.is_empty());
+}
+
+#[test]
+fn log05_grenade_ability_spends_its_launched_rounds() {
+    let mut m = scene(&[("rifle", 0, 20.0, 20.0), ("rifle", 1, 40.0, 20.0)]);
+    reserves(&mut m, 1, "rifle");
+    m.logistics.get_mut(1).unwrap().ammo = 7.0;
+    assert_eq!(
+        m.execute_command(
+            0,
+            &crate::match_commands::Command::Ability {
+                ids: vec![1],
+                at: Some(Point { x: 30.0, z: 20.0 }),
+                queue: false,
+                automatic: false,
+            },
+            false,
+        )
+        .unwrap(),
+        None
+    );
+    m.step_aimed_ability(1).unwrap();
+    assert_eq!(m.firing.flights.len(), 1);
+    close(m.logistics.get(1).unwrap().ammo, 2.0);
+}
+
+#[test]
+fn log05_log08_ground_aa_tracks_fractional_rounds_and_nonstacking_damage() {
+    use crate::game::PlaneState;
+    let mut damage = Vec::new();
+    for (low_ammo, exhausted) in [(false, false), (true, false), (false, true), (true, true)] {
+        let mut m = scene(&[("mg", 0, 20.0, 20.0)]);
+        reserves(&mut m, 1, "mg");
+        let target = m.spawn_aircraft(1, "attacker").unwrap();
+        let plane = m.world.game.units.get_mut(&target).unwrap();
+        plane.air = Some(PlaneState::Station);
+        plane.x = 30.0;
+        plane.z = 20.0;
+        m.world.game.players[0].visible = vec![target];
+        m.grid.rebuild(&m.world.game.units);
+        let r = m.logistics.get_mut(1).unwrap();
+        r.ammo = if low_ammo { 2.0 } else { r.ammo_max };
+        r.exhausted = exhausted;
+        let initial_ammo = r.ammo;
+        let initial_hp = m.world.game.units[&target].hp;
+        m.step_aircraft_anti_air(&[1], 0.15).unwrap();
+        damage.push(initial_hp - m.world.game.units[&target].hp);
+        close(m.logistics.get(1).unwrap().ammo, initial_ammo);
+        close(
+            m.aviation.anti_air[&1].reserve.unwrap(),
+            if low_ammo || exhausted { 0.25 } else { 0.5 },
+        );
+        m.step_aircraft_anti_air(&[1], 0.15).unwrap();
+        if low_ammo || exhausted {
+            close(m.logistics.get(1).unwrap().ammo, initial_ammo);
+            m.step_aircraft_anti_air(&[1], 0.15).unwrap();
+            m.step_aircraft_anti_air(&[1], 0.15).unwrap();
+        }
+        close(m.logistics.get(1).unwrap().ammo, initial_ammo - 1.0);
+    }
+    close(damage[1], damage[0] / 2.0);
+    close(damage[2], damage[0] / 2.0);
+    close(damage[3], damage[0] / 2.0);
+}
+
+#[test]
+fn log08_direct_and_salvo_reload_penalty_does_not_stack() {
+    for name in ["rifle", "rocket"] {
+        let mut cooldowns = Vec::new();
+        for (low_ammo, exhausted) in [(false, false), (true, false), (false, true), (true, true)] {
+            let mut m = scene(&[(name, 0, 20.0, 20.0), ("rifle", 1, 40.0, 20.0)]);
+            reserves(&mut m, 1, name);
+            let r = m.logistics.get_mut(1).unwrap();
+            r.ammo = if low_ammo { 2.0 } else { r.ammo_max };
+            r.exhausted = exhausted;
+            m.fire_weapon(1, 2, false).unwrap();
+            assert!(!m.firing.flights.is_empty(), "{name}");
+            cooldowns.push(m.firing.get(1).unwrap().cooldown);
+        }
+        close(cooldowns[1], cooldowns[0] * 2.0);
+        close(cooldowns[2], cooldowns[0] * 2.0);
+        close(cooldowns[3], cooldowns[0] * 2.0);
+    }
+}
+
+#[test]
+fn log05_ammunition_abilities_refuse_shortage_before_state_changes() {
+    for name in ["rifle", "ranger", "mortar", "at", "mg"] {
+        let mut m = scene(&[(name, 0, 20.0, 20.0), ("rifle", 1, 40.0, 20.0)]);
+        reserves(&mut m, 1, name);
+        m.logistics.get_mut(1).unwrap().ammo = 0.0;
+        let random = m.start.random.snapshot();
+        let result = m.execute_command(
+            0,
+            &crate::match_commands::Command::Ability {
+                ids: vec![1],
+                at: Some(Point { x: 30.0, z: 20.0 }),
+                queue: false,
+                automatic: false,
+            },
+            false,
+        );
+        assert_eq!(
+            result.unwrap(),
+            Some(crate::match_commands::Denial::Ammo),
+            "{name}"
+        );
+        assert_eq!(m.logistics.get(1).unwrap().ammo, 0.0);
+        assert_eq!(m.start.random.snapshot(), random);
+        assert_eq!(m.abilities.get(1).unwrap().cooldown, 0.0);
+        assert!(m.firing.flights.is_empty());
+    }
+}
+
+#[test]
 fn cmb66_support_interception_checks_empty_ammo_setup_and_holdfire() {
     for (ammo, still, hold, attempts) in [
         (0.0, 10.0, false, 0),

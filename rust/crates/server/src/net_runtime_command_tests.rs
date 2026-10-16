@@ -5,7 +5,7 @@ use ww2_core::{match_commands::Command, orders::OrderKey};
 fn client(id: u64) -> (Connection, mpsc::Receiver<Output>) {
     let (tx, rx) = mpsc::channel(256);
     let (cancel, _) = watch::channel(false);
-    (Connection { id, tx, cancel }, rx)
+    (Connection::new(id, tx, cancel), rx)
 }
 fn join(hub: &mut Hub, connection: &Connection, token: &str, now: u64) {
     hub.message(
@@ -341,7 +341,7 @@ fn every_support_kind_keeps_ordinary_r1_scheduled_snapshots_flowing() {
 }
 
 #[test]
-fn recon_and_queued_cover_refuse_before_reservation_and_keep_ordinary_r1_snapshots_flowing() {
+fn recon_refuses_before_reservation_and_keeps_ordinary_r1_snapshots_flowing() {
     for trusted in [false, true] {
         let mut hub = Hub::new(32, String::new());
         if trusted {
@@ -366,7 +366,6 @@ fn recon_and_queued_cover_refuse_before_reservation_and_keep_ordinary_r1_snapsho
         let wallet = state(&hub).start.economy.players[0].mp;
         for message in [
             json!({"t":"support","kind":"recon","x":at.x,"z":at.z}),
-            json!({"t":"cover","ids":[actor],"queue":true}),
         ] {
             send(&mut hub, &a, message, 0);
         }
@@ -378,7 +377,6 @@ fn recon_and_queued_cover_refuse_before_reservation_and_keep_ordinary_r1_snapsho
             drain(&mut ra),
             vec![
                 json!({"t":"deny","cmd":"support","reason":"unsupported"}),
-                json!({"t":"deny","cmd":"cover","reason":"unsupported"}),
             ]
         );
         // A supported input still receives the first host sequence after refusal.

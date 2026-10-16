@@ -46,6 +46,14 @@ pub struct EndingAction {
     pub complete: bool,
 }
 
+/// Host control over an existing Horde clock. This does not admit Horde rooms.
+pub(crate) fn end_horde_break(state: &mut Match, host: bool, paused: bool) -> Result<bool, String> {
+    if !host || paused {
+        return Ok(false);
+    }
+    state.end_horde_break()
+}
+
 /// A caller-owned output batch retains real tick effects until a scheduled send.
 /// It is not another simulation state or producer event authority.
 pub struct RoomRuntime {
@@ -100,10 +108,11 @@ impl RoomRuntime {
             })
             .collect())
     }
-    pub fn new(state: Match, now_ms: u64) -> Result<Self, String> {
+    pub fn new(mut state: Match, now_ms: u64) -> Result<Self, String> {
+        state.tick_state.restrict_aircraft_weapons_for_delivery();
         state.validate_tick_state()?;
         state
-            .preflight_ordinary_snapshot()
+            .restrict_to_ordinary_snapshots()
             .map_err(|e| format!("snapshot admission: {e:?}"))?;
         state.ordinary_snapshot_raw_lists()?;
         let delivery =
@@ -126,6 +135,42 @@ impl RoomRuntime {
             #[cfg(test)]
             snapshot_production_calls: 0,
         })
+    }
+    pub(crate) fn save_json(&self) -> Result<Value, String> {
+        self.running()?;
+        if self.held >= 120 {
+            return Err("completed ending cannot be saved".into());
+        }
+        Ok(
+            json!({"state":self.state.save_json()?, "pendingEvents":Match::save_events_json(&self.pending_events)?,"held":self.held}),
+        )
+    }
+    pub(crate) fn restore_saved_hold(&mut self, held: &Value) -> Result<(), String> {
+        let held = held
+            .as_u64()
+            .and_then(|v| u16::try_from(v).ok())
+            .filter(|v| *v < 120)
+            .ok_or("invalid saved ending hold")?;
+        if held > 0 && self.state.finish.is_none() {
+            return Err("saved hold has no finish".into());
+        }
+        self.held = held;
+        Ok(())
+    }
+    pub(crate) fn restore_saved_events(&mut self, value: Value) -> Result<(), String> {
+        let events = Match::events_from_save_json(value)?;
+        let mut probe = Self::new(Match::from_save_json(self.state.save_json()?)?, 0)?;
+        probe.pending_events = events.clone();
+        let selected = (0..self.state.world.game.players.len())
+            .map(|slot| SelectedSeat {
+                slot,
+                full: true,
+                omit: false,
+            })
+            .collect::<Vec<_>>();
+        probe.collect_frame(&selected, FrameKind::Scheduled)?;
+        self.pending_events = events;
+        Ok(())
     }
     pub fn state(&self) -> &Match {
         &self.state
@@ -189,6 +234,12 @@ impl RoomRuntime {
             && self
                 .meter
                 .should_snapshot(tick as u64, self.state.finish.is_some())
+    }
+    pub(crate) fn timing_stats(&self) -> crate::tick_timing::TimingStats {
+        self.meter.stats()
+    }
+    pub(crate) fn snapshot_cadence(&self) -> u8 {
+        self.meter.snap_every()
     }
     pub fn record_timing(&mut self, sample: TickSample, now_ms: u64) -> Result<u8, String> {
         self.meter.record(sample, now_ms).map_err(|e| e.to_string())
@@ -262,8 +313,24 @@ impl RoomRuntime {
             self.meter.snap_every()
         ])
     }
+    pub(crate) fn open_loaded_pause(
+        &mut self,
+        slot: usize,
+        by: &str,
+        now_ms: u64,
+    ) -> Result<(), String> {
+        self.pause = None;
+        self.auto_paused.clear();
+        self.pause(slot, by, PauseReason::Host, now_ms)?;
+        Ok(())
+    }
     pub fn paused(&self) -> bool {
         self.pause.is_some()
+    }
+    pub(crate) fn next_wave(&mut self, host: bool) -> Result<bool, String> {
+        self.running()?;
+        let paused = self.paused();
+        end_horde_break(&mut self.state, host, paused)
     }
     pub fn pause_message(&self, now_ms: u64) -> Value {
         if let Some(pause) = &self.pause {

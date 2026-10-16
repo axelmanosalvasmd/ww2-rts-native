@@ -1,13 +1,16 @@
 //! Lobby transport and trusted native room attachment. Public match start remains unavailable.
 pub mod authoritative_maps;
 mod commander_ingress;
+mod diagnostics;
 mod lobby;
 mod maps;
 mod native_startup;
 mod static_files;
+mod saves;
 mod trusted_room;
 pub use trusted_room::TrustedRoomConfig;
 pub mod room_runtime;
+pub mod shards;
 pub mod snapshot_backpressure;
 pub mod snapshot_delta;
 pub mod snapshot_lists;
@@ -49,6 +52,11 @@ pub struct Config {
     pub public_url: String,
     /// Optional browser asset root, with access limited to the prototype's static prefixes.
     pub static_root: Option<std::path::PathBuf>,
+    /// Opt-in host JSONL output. No diagnostic fields enter recipient messages.
+    pub diagnostic_dir: Option<std::path::PathBuf>,
+    pub tick_log: bool,
+    /// Private match files, shared by game workers.
+    pub saves_dir: std::path::PathBuf,
 }
 impl Default for Config {
     fn default() -> Self {
@@ -56,6 +64,9 @@ impl Default for Config {
             max_rooms: 32,
             public_url: String::new(),
             static_root: None,
+            diagnostic_dir: None,
+            tick_log: false,
+            saves_dir: "saves".into(),
         }
     }
 }
@@ -153,6 +164,8 @@ async fn serve_inner(
 ) -> std::io::Result<()> {
     let mut hub = Hub::new(config.max_rooms.clamp(1, 256), config.public_url);
     hub.configure_trusted_room(trusted);
+    hub.configure_saves(config.saves_dir);
+    hub.configure_diagnostics(config.diagnostic_dir, config.tick_log)?;
     // Dropping or aborting this future invalidates the same stopped authority
     // used under the Hub lock, even when graceful shutdown never runs.
     let _lifetime = ServeLifetime(hub.stop_authority());
@@ -220,15 +233,19 @@ async fn static_or_maps(
     method: Method,
     headers: HeaderMap,
 ) -> Response<Body> {
-    if uri.path().starts_with("/maps/") || server.static_files.is_none() {
+    serve_static_or_maps(server.static_files.as_ref(), uri, method, headers).await
+}
+
+async fn serve_static_or_maps(
+    files: Option<&static_files::StaticFiles>,
+    uri: axum::http::Uri,
+    method: Method,
+    headers: HeaderMap,
+) -> Response<Body> {
+    if uri.path().starts_with("/maps/") || files.is_none() {
         return maps::serve(OriginalUri(uri), method, headers).await;
     }
-    server
-        .static_files
-        .as_ref()
-        .unwrap()
-        .serve(uri, headers)
-        .await
+    files.unwrap().serve(uri, headers).await
 }
 
 async fn directory(
@@ -306,7 +323,11 @@ async fn socket_loop(
         close(&mut socket, 1013, "connection identity exhausted").await;
         return;
     };
-    let connection = Connection { id, tx, cancel };
+    let mut connection = Connection::new(id, tx, cancel);
+    let diagnostics = server.hub.lock().await.diagnostics_enabled();
+    if diagnostics {
+        connection.enable_diagnostics();
+    }
     let mut joined = false;
     loop {
         tokio::select! {
@@ -314,6 +335,7 @@ async fn socket_loop(
             _ = stop.changed() => { close(&mut socket,1001,"server shutdown").await; break; }
             _ = cancelled.changed() => { close(&mut socket,1013,"too far behind").await; break; }
             Some(output) = rx.recv() => {
+                let diagnostic_bytes = if diagnostics { output.diagnostic_bytes() } else { 0 };
                 match output {
                     Output::Json(v) => if socket.send(Message::Text(v.to_string().into())).await.is_err() { break; },
                     Output::Snapshot(mut write) => {
@@ -332,6 +354,7 @@ async fn socket_loop(
                     }
                     Output::Close(c,r) => { close(&mut socket,c,r).await; break; }
                 }
+                connection.complete_bytes(diagnostic_bytes);
             }
             message = socket.recv() => {
                 let bytes = match message {
@@ -364,6 +387,7 @@ async fn socket_loop(
         }
     }
     hub.retire_connection(connection.id);
+    connection.clear_bytes();
 }
 
 #[cfg(test)]

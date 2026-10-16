@@ -1,0 +1,3 @@
+- Keep newly assigned AI builders and repair crews out of later assault phase orders, and stop cleared contacts from triggering assault withdrawal.
+- Consolidate base construction with AI-33 into one pass, preserving construction reserves, rider exclusions, adaptive choices, repairs, visible sites, supply-node lanes and coastal placement. PR #352 merges after #351.
+- Add tactics regression checks and an ordinary match lifecycle check through the tactics caller, with every seat's recipient snapshot collected each tick through victory and ending ticks.

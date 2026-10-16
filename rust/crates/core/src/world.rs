@@ -44,7 +44,7 @@ pub struct CellChange {
     pub material: Option<String>,
     pub height: Option<i8>,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct InitialTerrain {
     pub chars: Vec<u8>,
     pub ground: Vec<u8>,
@@ -53,7 +53,7 @@ pub struct InitialTerrain {
     pub height: Option<Vec<i8>>,
     pub trench_front: Option<Vec<f32>>,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Appearance {
     Intact,
     Damaged,
@@ -69,7 +69,7 @@ impl Appearance {
     }
 }
 /// Map-like timers with explicit first-insertion order, as required by fire RNG traversal.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct OrderedFires {
     order: Vec<usize>,
     timers: BTreeMap<usize, f64>,
@@ -109,7 +109,7 @@ impl OrderedFires {
     }
 }
 /// Mine discovery bits retain first-insertion order, including deletion and rediscovery.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct OrderedMineSeen {
     order: Vec<usize>,
     bits: BTreeMap<usize, u32>,
@@ -142,14 +142,48 @@ impl std::ops::Deref for OrderedMineSeen {
         &self.bits
     }
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+/// Field hospitals retain placement order when recovery and convoy sources are collected.
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct OrderedAid {
+    order: Vec<usize>,
+    owners: BTreeMap<usize, usize>,
+}
+impl OrderedAid {
+    pub fn insert(&mut self, cell: usize, owner: usize) -> Option<usize> {
+        if !self.owners.contains_key(&cell) {
+            self.order.push(cell);
+        }
+        self.owners.insert(cell, owner)
+    }
+    pub fn remove(&mut self, cell: &usize) -> Option<usize> {
+        let prior = self.owners.remove(cell);
+        if prior.is_some() {
+            self.order.retain(|c| c != cell);
+        }
+        prior
+    }
+    pub fn iter(&self) -> impl Iterator<Item = (&usize, &usize)> {
+        self.order.iter().map(|cell| (cell, &self.owners[cell]))
+    }
+    pub fn clear(&mut self) {
+        self.order.clear();
+        self.owners.clear();
+    }
+}
+impl std::ops::Deref for OrderedAid {
+    type Target = BTreeMap<usize, usize>;
+    fn deref(&self) -> &Self::Target {
+        &self.owners
+    }
+}
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FailureMetadata {
     pub impulse: Option<f64>,
     pub failed_at: Option<f64>,
     pub direction: Option<crate::game::Point>,
     pub settled_at: Option<f64>,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SectionMetadata {
     pub id: String,
     pub structure_id: String,
@@ -160,31 +194,33 @@ pub struct SectionMetadata {
     pub appearance: Appearance,
     pub failure: FailureMetadata,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DetachedSection {
     pub cell: usize,
     pub metadata: SectionMetadata,
     pub state: Section,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct WorldStructure {
     pub id: String,
-    pub kind: &'static str,
+    #[serde(deserialize_with = "crate::save_state::static_string")]
+    pub kind: crate::save_state::StaticStr,
     pub cells: Vec<usize>,
     pub section_ids: Vec<String>,
     pub entity_id: Option<u32>,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SectionRow {
     pub id: String,
     pub structure_id: String,
-    pub state: &'static str,
+    #[serde(deserialize_with = "crate::save_state::static_string")]
+    pub state: crate::save_state::StaticStr,
     pub hp: f64,
     pub max_hp: f64,
     pub material: String,
     pub anchor: bool,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CellData {
     pub ground: u8,
     pub object: u8,
@@ -199,7 +235,7 @@ pub struct CellData {
     pub rail: Option<u8>,
     pub station: Option<usize>,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CellRow {
     pub cell: usize,
     pub ch: u8,
@@ -207,12 +243,14 @@ pub struct CellRow {
     pub state: u8,
     pub data: CellData,
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 pub enum Recipient {
     Player(usize),
     Spectators,
 }
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct RegionVersions {
     pub infantry: u64,
     pub vehicle: u64,
@@ -224,7 +262,7 @@ pub struct Mutation {
     pub logged_index: Option<usize>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct World {
     pub game: Game,
     pub mine_layer: Vec<u8>,
@@ -240,14 +278,16 @@ pub struct World {
     pub roads: bool,
     pub mines: BTreeMap<usize, i32>,
     pub mine_seen: OrderedMineSeen,
-    pub aid: BTreeMap<usize, usize>,
+    pub aid: OrderedAid,
     pub fires: OrderedFires,
     pub structures: Vec<WorldStructure>,
     pub sections: BTreeMap<usize, SectionMetadata>,
     pub detached_sections: BTreeMap<String, DetachedSection>,
     initial: std::sync::Arc<InitialTerrain>,
+    #[serde(skip)]
     geography: Option<crate::world_map::WorldDefinition>,
     pub versions: RegionVersions,
+    #[serde(skip, default = "crate::save_state::compiled_rules")]
     rules: Rules,
     log: Vec<CellRow>,
     log_indexes: BTreeMap<usize, usize>,
@@ -575,7 +615,7 @@ impl World {
             roads,
             mines,
             mine_seen: OrderedMineSeen::default(),
-            aid: BTreeMap::new(),
+            aid: OrderedAid::default(),
             fires: OrderedFires::default(),
             structures: Vec::new(),
             sections: BTreeMap::new(),
@@ -894,7 +934,7 @@ impl World {
                 .unwrap_or(f64::NAN)
         } else {
             self.rules.movement.terrain_hp(ch).unwrap_or(0.0)
-                * self.game.tough.as_ref().map_or(1.0, |t| t[c])
+                * self.game.tough.as_ref().map_or(1.0, |t| f64::from(t[c]))
         }
     }
     fn state_of(&self, c: usize) -> u8 {

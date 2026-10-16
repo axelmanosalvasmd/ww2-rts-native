@@ -14,7 +14,7 @@ impl Peer {
         let (tx, output) = mpsc::channel(256);
         let (cancel, _) = watch::channel(false);
         Self {
-            connection: Connection { id, tx, cancel },
+            connection: Connection::new(id, tx, cancel),
             output,
             joined: false,
         }

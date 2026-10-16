@@ -1,0 +1,1 @@
+- Add focused native checks for support interception, bombing cadence and craters, dive delivery, paratrooper admission and landing without rally drift, and a recorded dive through the match tick runner.

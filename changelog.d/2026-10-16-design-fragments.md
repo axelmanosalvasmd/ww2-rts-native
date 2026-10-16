@@ -1,0 +1,1 @@
+- Record new decisions and measurements in `design.d/` fragments in the same commit as each change, so parallel pull requests avoid conflicts from appending to `DESIGN.md`. Add `scripts/collect-design.sh` to append fragments in filename order and delete them, with the changelog collector's recovery journal. Existing design text can still be edited directly.

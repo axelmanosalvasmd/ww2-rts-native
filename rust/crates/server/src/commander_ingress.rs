@@ -1,4 +1,4 @@
-//! Host stamps for ordinary commander input over the sole core queue.
+//! Host stamps for bounded ordinary commander input over the sole core queue.
 use serde_json::Value;
 use std::collections::BTreeMap;
 use ww2_core::{
@@ -15,7 +15,26 @@ pub(crate) struct CommanderIngress {
 }
 impl CommanderIngress {
     pub fn recognizes(t: &str) -> bool {
-        matches!(t, "move" | "amove" | "stop" | "stance")
+        matches!(
+            t,
+            "move"
+                | "amove"
+                | "stop"
+                | "stance"
+                | "garrison"
+                | "dig"
+                | "entrench"
+                | "cover"
+                | "assist"
+                | "retreat"
+                | "rally"
+                | "tech"
+                | "cancel"
+                | "cancelProduction"
+                | "destroy"
+                | "buy"
+                | "support"
+        )
     }
     pub fn enqueue(&mut self, state: &mut Match, slot: usize, raw: &Value) -> Result<(), Denial> {
         let name = match raw["t"].as_str() {
@@ -23,33 +42,46 @@ impl CommanderIngress {
             Some("amove") => "amove",
             Some("stop") => "stop",
             Some("stance") => "stance",
-            Some("build") => "build",
-            Some("assist") => "assist",
-            Some("destroy") => "destroy",
-            Some("board") => "board",
-            Some("unload") => "unload",
-            Some("entrench") => "entrench",
+            Some("garrison") => "garrison",
             Some("dig") => "dig",
+            Some("entrench") => "entrench",
+            Some("cover") => "cover",
+            Some("assist") => "assist",
+            Some("retreat") => "retreat",
+            Some("rally") => "rally",
             Some("tech") => "tech",
+            Some("cancel") => "cancel",
+            Some("cancelProduction") => "cancelProduction",
+            Some("destroy") => "destroy",
             Some("buy") => "buy",
             Some("support") => "support",
-            Some("cover") => "cover",
-            Some("attack") => "attack",
-            Some("escort") => "escort",
-            Some("retreat") => "retreat",
-            Some("ability") => "ability",
-            Some("autocast") => "autocast",
-            // The core's Unsupported value also represents unknown JSON names.
-            // Unknown gameplay messages retain the prototype's blocked reply.
             _ => return Err(Denial::Blocked),
         };
         let command = Command::from_json(raw)?;
-        // Every attached room uses the same recipient snapshot adapter. These
-        // core states have no representation there, so refuse before reserving.
+        if !matches!(
+            command,
+            Command::Move { .. }
+                | Command::Stop { .. }
+                | Command::Stance { .. }
+                | Command::Enter { .. }
+                | Command::Dig { .. }
+                | Command::Entrench { .. }
+                | Command::Cover { .. }
+                | Command::Assist { .. }
+                | Command::Retreat { .. }
+                | Command::Rally { .. }
+                | Command::Technology { .. }
+                | Command::Cancel { .. }
+                | Command::CancelProduction { .. }
+                | Command::Destroy { .. }
+                | Command::Buy { .. }
+                | Command::Support { .. }
+        ) {
+            return Err(Denial::Blocked);
+        }
         if matches!(&command, Command::Support { kind, .. }
             if !ww2_core::recipient_snapshot::SUPPORTED_SUPPORT_KINDS
                 .iter().any(|supported| supported.name() == kind))
-            || matches!(&command, Command::Cover { queue: true, .. })
         {
             return Err(Denial::Unsupported);
         }
@@ -62,17 +94,25 @@ impl CommanderIngress {
         if state.finish.is_some() || state_player.out || state_player.away {
             return Err(Denial::Blocked);
         }
-        // Preserve the bounded ground-control guards while other families use
-        // their canonical core admission. Foreign, missing and source-ineligible
-        // IDs retain the core's selection rules.
-        let rows = if Self::recognizes(name) {
-            match &command {
-                Command::Move { orders, .. } => orders.iter().map(|o| o.unit).collect::<Vec<_>>(),
-                Command::Stop { ids } | Command::Stance { ids, .. } => ids.clone(),
-                _ => return Err(Denial::Blocked),
-            }
-        } else {
-            Vec::new()
+        // R1 admits Conquest only. The prototype refuses production cancellation
+        // there, and no training queue may enter this room's tick state.
+        if matches!(command, Command::CancelProduction { .. }) {
+            return Err(Denial::Needs);
+        }
+        // This initial service slice covers ordinary ground controls. Foreign,
+        // missing and source-ineligible IDs retain the core's selection rules.
+        let rows = match &command {
+            Command::Move { orders, .. } => orders.iter().map(|o| o.unit).collect::<Vec<_>>(),
+            Command::Stop { ids } | Command::Stance { ids, .. } => ids.clone(),
+            Command::Enter { ids, .. }
+            | Command::Dig { ids, .. }
+            | Command::Entrench { ids, .. }
+            | Command::Cover { ids, .. }
+            | Command::Assist { ids, .. }
+            | Command::Retreat { ids }
+            | Command::Rally { ids, .. }
+            | Command::Destroy { ids, .. } => ids.clone(),
+            _ => Vec::new(),
         };
         for raw in rows.iter().take(50.max(state.world.game.units.len())) {
             let Some(unit) = u32::try_from(*raw)
@@ -109,7 +149,6 @@ impl CommanderIngress {
             if kind.air
                 || kind.naval
                 || unit.air.is_some()
-                || matches!(command, Command::Move { .. }) && unit.garrison.is_some()
                 || matches!(command, Command::Move { .. } | Command::Stop { .. }) && unit.build
                 || matches!(
                     command,
@@ -361,15 +400,9 @@ mod tests {
             state.validate_tick_state().unwrap();
             state.commands.units.get_mut(&actor).unwrap().auto_retreat = true;
             assert!(state.automatic_retreat_candidate(actor).unwrap());
-            if building {
-                // Core construction retreat is supported; this host slice still refuses it.
-                state.validate_tick_state().unwrap();
-            } else {
-                assert!(
-                    state.validate_tick_state().is_err(),
-                    "the prospective stance cannot reach an unrepresented garrison exit"
-                );
-            }
+            // Core construction and garrison retreat are supported. This host
+            // slice still refuses enabling the prospective stance in either.
+            state.validate_tick_state().unwrap();
             state.commands.units.get_mut(&actor).unwrap().auto_retreat = false;
             let before = format!(
                 "{:?}",
@@ -417,5 +450,69 @@ mod tests {
             before
         );
         assert_eq!(state.commands.pending_commands(), 0);
+    }
+    #[test]
+    fn garrisoned_move_and_amove_exit_and_keep_tick_snapshots_valid() {
+        for name in ["move", "amove"] {
+            let mut state = crate::lobby::native_tests::native_match();
+            let actor = state
+                .world
+                .game
+                .units
+                .values()
+                .find(|u| u.owner == 0 && state.rules.kinds[u.kind].name == "rifle")
+                .unwrap()
+                .id;
+            let house = state
+                .world
+                .game
+                .chars
+                .iter()
+                .position(|ch| *ch == b'B')
+                .unwrap();
+            let at = ww2_core::game::Point {
+                x: (house % state.world.game.w) as f64 * ww2_core::game::CELL + 1.,
+                z: (house / state.world.game.w) as f64 * ww2_core::game::CELL + 1.,
+            };
+            let unit = state.world.game.units.get_mut(&actor).unwrap();
+            unit.x = at.x;
+            unit.z = at.z;
+            unit.garrison = Some(house);
+            state.grid.update(actor, unit);
+            let mut ingress = CommanderIngress::default();
+            ingress
+                .enqueue(
+                    &mut state,
+                    0,
+                    &json!({"t":name,"orders":[[actor,at.x+12.,at.z+12.]]}),
+                )
+                .unwrap();
+            for _ in 0..4 {
+                let report = state.advance_tick().unwrap();
+                assert!(ingress.complete(&report.commands).is_empty());
+                assert!(state.world.game.units[&actor].garrison.is_none());
+                let cache = ww2_core::recipient_snapshot::SnapshotCache::new(&state).unwrap();
+                for slot in 0..2 {
+                    cache.recipient(slot).unwrap();
+                }
+            }
+            assert_ne!(state.world.game.units[&actor].at(), at);
+        }
+    }
+
+    #[test]
+    fn conquest_production_cancel_is_refused_without_reserving_input() {
+        let mut state = crate::lobby::native_tests::native_match();
+        let mut ingress = CommanderIngress::default();
+        assert_eq!(
+            ingress.enqueue(
+                &mut state,
+                0,
+                &json!({"t":"cancelProduction","id":1,"job":1})
+            ),
+            Err(Denial::Needs)
+        );
+        assert_eq!(state.commands.pending_commands(), 0);
+        assert!(ingress.feedback.is_empty());
     }
 }

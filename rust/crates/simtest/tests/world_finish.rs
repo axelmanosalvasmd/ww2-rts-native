@@ -85,7 +85,10 @@ fn world_finish_uses_actual_constructed_match_and_original_phase_order() {
                     .map(|v| v.as_u64().unwrap() as u32)
                     .collect();
                 let result = m.apply_world_capture_income(&order, step["dt"].as_f64().unwrap());
-                if case["supported"] == true {
+                // The fixture's old native admission label predates fort capture support.
+                let fort_capture =
+                    case["name"] == "winning capture needing fort transfer remains refusal";
+                if case["supported"] == true || fort_capture {
                     result.unwrap();
                     assert_eq!(snapshot(&m), step["after"], "{} after", case["name"]);
                     if let Some(report) = m.match_result().unwrap() {

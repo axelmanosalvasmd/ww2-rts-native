@@ -1,5 +1,30 @@
 # NET runtime batch 2
 
+## RESOLVE-296 successor
+
+Merge parents: PR `14a17955ec561a16618f2aa570589ce956362b6b` and #373
+`4edfcd5e8b795aa47fde114de7d51d7eb6430078`. Main support lifecycle,
+World, save/load, diagnostics and sharding guards are retained. The original
+batch account below is historical and does not qualify this successor.
+NET-43 remains partial.
+
+The successor matches #366 ground-command and host-control semantics, including
+its cover/garrison fixes and every-tick socket lifecycle proof. #296 adds
+`buy` and the three snapshot-supported support kinds. Broader attack, build,
+boarding, unload, escort and ability ingress stays refused pending its complete
+runtime and snapshot dependencies. The socket attack assertion remains main
+`blocked`, matching #366. Queued Cover now uses #366 delivery-safe behavior;
+its former refusal test retains Recon refusal and the original sequence,
+wallet and snapshot safety checks. Separate core and full-match tests cover
+queued Cover, garrison and entrenchment.
+
+Static delivery also reaches the sharded front, with a real HTTP regression.
+The changelog fragment records every conflict resolution and replaced test
+expectation. Existing historical results below remain tied to their producing
+heads. New local results are reported with the pushed successor SHA.
+
+## Original batch account
+
 Base: `origin/main` at `a076f316cdd7c48b52af2f706a5a908e4e935f97`. Branch: `runtime/net-batch2-20261016`. This batch starts from main and imports no commits or helpers from PR #284, #199 or #201. The 16 proposed rows in #284 are outside this batch. All 66 previous exclusions are accounted for below: 8 proposed proven rows, 57 dropped rows and 1 differs candidate. Parity tables are unchanged.
 
 Acknowledged owner decision [6206861267](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6206861267) and runtime acknowledgment requirement [6207938018](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6207938018). No issue comment was posted. The agreed ABI 2, existing JSON v0 shapes and reference pin `e4e579a838aabae3b1d9dadbc17a0a87147bc52d` remain the baseline. World admission stays off. There are no FFI, header, contract, prototype, privacy-policy or parity-status edits.
@@ -19,9 +44,9 @@ Static tests use temporary supplied assets through the actual production HTTP ro
 
 NET-16 launches the real binary at the default cap, a small override and both clamp limits. It checks exact capacity refusal/close and existing-room reachability. Its pure parser cases cover decimal/radix values, zero/invalid fallback, infinities and ECMAScript whitespace.
 
-NET-43 covers command entry and feedback for valid protocol messages with string tags, rather than claiming every gameplay family is implemented. A real constructor wallet pays for one queued rifle; a second purchase returns the core's `mp` denial to its issuer. Tests check host-stamped keys, whole malformed payload refusal, unknown tags, paused silence and replacement-socket delivery. The existing malformed/non-string-tag boundary is preserved. Unsupported core command families remain unsupported. Support admission uses the snapshot adapter's own allowed list before queue reservation. `every_support_kind_keeps_ordinary_r1_scheduled_snapshots_flowing` sends every catalog support kind with at least 200 MP and zero cooldown through ordinary and trusted R1 rooms, checks real admission or refusal, and collects scheduled snapshots without room faults. `recon_and_queued_cover_refuse_before_reservation_and_keep_ordinary_r1_snapshots_flowing` checks that ordinary and trusted R1 rooms continue delivering snapshots after both refusals.
+NET-43 covers command entry and feedback for valid protocol messages with string tags, rather than claiming every gameplay family is implemented. A real constructor wallet pays for one queued rifle; a second purchase returns the core's `mp` denial to its issuer. Tests check host-stamped keys, whole malformed payload refusal, unknown tags, paused silence and replacement-socket delivery. The existing malformed/non-string-tag boundary is preserved. Unsupported core command families remain unsupported. Support admission uses the snapshot adapter's own allowed list before queue reservation. `every_support_kind_keeps_ordinary_r1_scheduled_snapshots_flowing` sends every catalog support kind with at least 200 MP and zero cooldown through ordinary and trusted R1 rooms, checks real admission or refusal, and collects scheduled snapshots without room faults. `recon_refuses_before_reservation_and_keeps_ordinary_r1_snapshots_flowing` checks that ordinary and trusted R1 rooms continue delivering snapshots after Recon refusal.
 
-Recon, queued Cover and the refused support kinds (Strafe, Bombing, Dive and Para) are a temporary server-runtime gap under NET-43; the prototype admits them.
+Recon and the refused support kinds (Strafe, Bombing, Dive and Para) remain a temporary server-runtime gap under NET-43; queued Cover now has the #366 lifecycle repair.
 
 NET-51 covers healthy current-host manual end, pause release, offline-seat cleanup, retention of socket write ledgers, absence of later frames and a fresh subsequent match. Native preparation is synchronous under the Hub lock; no asynchronous start can finish after end. `manual_end_restart_old_completion_cannot_consume_current_snapshot_ticket` holds an old snapshot write, manually ends and starts a new match on the same socket, reserves a new snapshot, then completes the old and new writes and checks continued delivery. General asynchronous mode startup remains outside NET-37's proof.
 
