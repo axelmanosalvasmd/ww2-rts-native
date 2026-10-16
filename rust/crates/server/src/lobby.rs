@@ -2212,3 +2212,7 @@ mod combat_deny_tests;
 #[cfg(test)]
 #[path = "net_batch50_lobby_tests.rs"]
 mod net_batch50;
+
+#[cfg(test)]
+#[path = "net83_followup_tests.rs"]
+mod net83_followup_tests;
