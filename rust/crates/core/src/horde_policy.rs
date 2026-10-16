@@ -498,7 +498,7 @@ impl HordePolicy {
                 && p.target == 0
                 && p.nade.is_none()
                 && !aimed_intent
-                && p.dig.is_none()
+                && !p.is_digging()
                 && p.enter.is_none()
                 && p.fire_at.is_none()
                 && let Some(bunker) = bunker

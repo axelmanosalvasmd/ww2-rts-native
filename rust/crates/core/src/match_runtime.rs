@@ -180,7 +180,7 @@ impl StartPlan {
         )
     }
 
-    pub(crate) fn prepare_horde(
+    pub fn prepare_horde(
         map: &crate::map::AuthoritativeMap,
         options: &MatchOptions,
         rules: &Rules,
