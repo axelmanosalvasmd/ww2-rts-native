@@ -1,3 +1,21 @@
+## Owner parity decisions A, B and C (2026-10-16)
+
+The [recorded owner decisions](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6217590741) approve the differences below, the Rust-only acceptance of the listed client rows, and World deferral for milestone R1. Julio recorded both owners' decisions after Axel's voice approval; Axel's written confirmation on #5 is requested in that comment. This section records the decisions for STATUS-ABC.
+
+Approved `differs` decisions relative to prototype `e4e579a`:
+
+- CMB-159, MODE-21, MODE-22: per-purpose seeded streams and staged creation replace the prototype's global draw order, following AGENTS.md determinism so matches replay from their seed and orders.
+- IF-05: non-trench arc, ring and strongpoint dig patterns are rejected as an approved restriction of the supported dig patterns.
+- NET-15, NET-20: display names are truncated on Unicode scalar boundaries to avoid splitting a scalar.
+- IF-10: prediction and authoritative movement compare signed zero as equal, so the sign of numeric zero does not affect equality.
+- IF-23: snapshots never reorder the canonical gameplay grid, so snapshot creation cannot change gameplay query order.
+- MAP-22: validated embedded maps replace corrupt-file fallback, removing that file-loading recovery path for embedded maps.
+- NET-04: R1 keeps uncompressed JSON WebSocket v0; compression is deferred to a later version-gated proposal.
+
+For group B, `accepted` applies only to the Rust part of each row marked "Unreal-only; client parity owned by Axel". Unreal implementation and client parity remain Axel's responsibility. Existing server duties, including MOV-107's row tail, remain recorded in the rows.
+
+For group C, `dropped` means "World admission deferred for milestone R1; reopen when World opens". Rows that also describe ordinary matches retain their prototype requirements; the R1 deferral does not claim those behaviors are implemented. Ported World components MAP-59, BASE-46, LOG-26 and LOG-27 remain `ported`.
+
 ## Seat lifecycle controls and metadata (2026-10-16)
 
 Socket `pause` and `resume` remain rejected through `UNAVAILABLE`, including for the host. The existing host-side `RoomRuntime` pause APIs remain available without a public client caller. The server owns the supplied wall-clock deadlines and the one-second pause/frame cadence; the deterministic core receives no timer. Paused ingress ignores new orders while preserving the queue for resume. Operative and AI room admission remain closed on R1.
