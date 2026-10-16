@@ -286,12 +286,25 @@ impl Match {
                 ));
             }
         }
+        // Node footprints reject live ground troops. Only the search copy treats
+        // those cells as blocked; walking distances retain the original terrain.
+        let mut sites = self.world.game.clone();
+        for unit in self.world.game.units.values() {
+            if unit.hp > 0.0
+                && !self.rules.kinds[unit.kind].air
+                && !unit.riding
+                && !self.rules.kinds[unit.kind].structure
+                && let Some(cell) = self.world.game.cell_of(unit.x, unit.z)
+            {
+                sites.flags[cell] |= crate::game::MOVE;
+            }
+        }
         let mut nodes = Vec::<ResourceNode>::new();
         let mut walking = ClassicWalking::new(&self.world.game, &self.rules)?;
         for (at, rate, fuel, from) in wanted {
             let mut away = avoid.clone();
             away.extend(nodes.iter().map(|node| (node.at, 10.0)));
-            let mut selected = find_site(&self.world.game, at, 2, &away);
+            let mut selected = find_site(&sites, at, 2, &away);
             if let Some((a, b)) = from
                 && selected.is_some()
             {
@@ -303,7 +316,7 @@ impl Match {
                             x: at.x + math::cos(angle) * radius,
                             z: at.z + math::sin(angle) * radius,
                         };
-                        if let Some(cell) = find_site(&self.world.game, wanted, 2, &away) {
+                        if let Some(cell) = find_site(&sites, wanted, 2, &away) {
                             let center = foot_center(&self.world.game, cell, 2);
                             let da = walking.distance(&self.world.game, &self.rules, a, center)?;
                             let db = walking.distance(&self.world.game, &self.rules, b, center)?;
@@ -886,3 +899,7 @@ impl EliminationDraft {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+#[path = "elimination_modes/classic_nodes_tests.rs"]
+mod classic_nodes_tests;

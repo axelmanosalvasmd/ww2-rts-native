@@ -1228,3 +1228,5 @@ fn intent_ai66_classic_human_view_requires_matching_mode_and_keeps_quiet_policy_
     assert!(game.human_commander_observation(&mut memory).is_err());
     assert_eq!((memory, game.start.random.clone()), before);
 }
+#[path = "commander_field_live_tests.rs"]
+mod field_live_tests;

@@ -234,21 +234,19 @@ fn if25_ai_holder_work_from_delivered_point_survives_ordinary_ticks_and_all_seat
     let observation = &delivered.packet;
     let input = observation.input();
     let unit = input.units.iter().find(|u| u.id == worker).unwrap();
-    let command = point_holder::plan(
-        observation,
-        input.runtime.as_ref().unwrap(),
-        unit,
-        &input.points[0],
-        &[],
-        false,
-        1000.0,
-    )
-    .unwrap()
+    assert!(input.runtime.as_ref().unwrap().field.is_some());
+    let mut commands = Vec::new();
+    crate::commander_field_policy::holder(observation, unit, 0, false, |command| {
+        commands.push(command);
+        true
+    })
     .unwrap();
+    assert_eq!(commands.len(), 1);
+    let command = &commands[0];
     assert_eq!(command["kind"], "mines");
     assert_eq!(
         state
-            .execute_command(0, &Command::from_json(&command).unwrap(), false)
+            .execute_command(0, &Command::from_json(command).unwrap(), false)
             .unwrap(),
         None
     );

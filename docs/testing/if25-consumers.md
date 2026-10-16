@@ -52,11 +52,11 @@ Each named test exercises the actual producer or consumer. Earlier tests are inh
 
 | Line | Consumer | Direct witness or deferred boundary |
 | --- | --- | --- |
-| 45 | Remembered bridge-cell ordering | `if25_ai_bridge_ingestion_sorts_new_cells_and_preserves_prior_memory_ties` |
-| 65 | Nearest safe remembered blown bridge | `if25_ai_bridge_ingestion_sorts_new_cells_and_preserves_prior_memory_ties` |
-| 72 | Nearest idle bridge crew | `if25_ai_bridge_ingestion_sorts_new_cells_and_preserves_prior_memory_ties` |
-| 113 | Nearest idle fill crew | `if25_ai_fill_repeated_sort_keeps_the_earlier_far_cell_order_on_a_later_tie` |
-| 132 | Nearest idle mine-clear crew | `if25_ai_demine_repeated_sort_keeps_earlier_mine_order_on_a_later_tie` |
+| 45 | Remembered bridge-cell ordering | `if25_active_field_bridge_ingestion_and_gap_selection_keep_remembered_ties`; fallback `if25_ai_bridge_ingestion_sorts_new_cells_and_preserves_prior_memory_ties` |
+| 65 | Nearest safe remembered blown bridge | `if25_active_field_bridge_ingestion_and_gap_selection_keep_remembered_ties`; fallback `if25_ai_bridge_ingestion_sorts_new_cells_and_preserves_prior_memory_ties` |
+| 72 | Nearest idle bridge crew | `if25_active_field_bridge_crew_ties_keep_delivered_unit_order`; fallback `if25_ai_bridge_ingestion_sorts_new_cells_and_preserves_prior_memory_ties` |
+| 113 | Nearest idle fill crew | `if25_active_field_fill_reuses_earlier_far_cell_sort_for_later_equal_distance`; fallback `if25_ai_fill_repeated_sort_keeps_the_earlier_far_cell_order_on_a_later_tie` |
+| 132 | Nearest idle mine-clear crew | `if25_active_field_demine_reuses_earlier_far_mine_sort_for_later_equal_distance`; fallback `if25_ai_demine_repeated_sort_keeps_earlier_mine_order_on_a_later_tie` |
 | 316 | `src/commander_classic_rules.rs::targets`; Horde's observed bunker selector | `if25_ai_classic_targets_recon_depots_and_raiders_keep_stable_ties` |
 | 367 | `src/commander_tactics.rs`: held-threat distance then explicit ID fallback | `intent_ai29_watched_home_threat_precedes_committed_wait_and_uses_id_ties` |
 | 450 | `src/commander_tactics.rs`: visible enemy vector traversal retains observation sequence | `if25_ai_visible_enemy_traversal_preserves_delivered_order_for_guard_value` |
@@ -108,7 +108,13 @@ Each named test exercises the actual producer or consumer. Earlier tests are inh
 
 World inventory remains deferred: simulation 1209, 1210, 1256, 3549, 3551 and 3559; AI 634, 686 and 701. Detached existing rail tests remain component evidence only. No World room, tick, snapshot or rail-order admission is added.
 
+## Main integration
+
+Main advanced during qualification. Frozen main `9e5bf12439cead3ede90fdf7e62b73fcb7ed1881` adds the full delivered field policy. Complete field packets now use that policy exclusively, preserving its preflight, budget and denial fallback behavior; field-absent component observations use the earlier fallback. The five new active-field witnesses above exercise every engineering sort site on the live dispatcher. Holder ties and lifecycle exercise the active callback as well. The [complete merge record](if25-main-merge.md) explains all nine conflicting files and every additional edit. World components are retained, with no new World admission.
+
 ## Validation
+
+The following producing receipt predates the main integration. The PR body supplies the exact integrated head, native selection and results; the earlier pass below does not qualify the merge.
 
 The producing code commit is `e2ce89a9278b39139e11d73969c46d5d6952db0c`, Rust tree `bb8e46950d73774db8a3eb80a3601db427f32912`. This receipt update preserves that complete Rust tree.
 

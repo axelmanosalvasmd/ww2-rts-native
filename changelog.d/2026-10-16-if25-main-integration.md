@@ -1,0 +1,2 @@
+- Preserve the delivered field policy's placement checks and fallback commands while making its bridge, crew and point-holder choices use stable numeric sort order.
+- Carry live field memory through private AI saves and retain existing policy payloads with default fields. Exercise the active policy through ordinary engineering work, completion and every-seat snapshots.

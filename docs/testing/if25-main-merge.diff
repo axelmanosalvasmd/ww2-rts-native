@@ -1,0 +1,882 @@
+diff --git a/rust/crates/core/src/commander_engineering_lifecycle_tests.rs b/rust/crates/core/src/commander_engineering_lifecycle_tests.rs
+index 43aafa4c..2903a34e 100644
+--- a/rust/crates/core/src/commander_engineering_lifecycle_tests.rs
++++ b/rust/crates/core/src/commander_engineering_lifecycle_tests.rs
+@@ -113,0 +114,8 @@ fn scene(kind: &str) -> (Match, u32, usize) {
++fn crew(policy: &commander_tactics::State, kind: &str) -> Value {
++    serde_json::to_value(&policy.field).unwrap()[format!("{kind}_crew")].clone()
++}
++
++fn bridges(policy: &commander_tactics::State) -> Value {
++    serde_json::to_value(&policy.field).unwrap()["bridges"].clone()
++}
++
+@@ -132,0 +141,4 @@ fn if25_ai_engineering_delivered_fill_and_mines_survive_ordinary_ticks_and_all_s
++        let active = context
++            .field
++            .as_ref()
++            .expect("ordinary producer must select the active field policy");
+@@ -134,0 +147 @@ fn if25_ai_engineering_delivered_fill_and_mines_survive_ordinary_ticks_and_all_s
++            assert_eq!(active.initial_chars[cell], b'.');
+@@ -136,2 +149,2 @@ fn if25_ai_engineering_delivered_fill_and_mines_survive_ordinary_ticks_and_all_s
+-            assert_eq!(context.found_mines, [Point { x: 41.0, z: 41.0 }]);
+-            assert!(context.mines.is_empty());
++            assert_eq!(active.found_mines, [Point { x: 41.0, z: 41.0 }]);
++            assert!(active.mines.is_empty());
+@@ -170,6 +183,2 @@ fn if25_ai_engineering_delivered_fill_and_mines_survive_ordinary_ticks_and_all_s
+-        let jobs = if kind == "fill" {
+-            &resumed.engineering.fill_crew
+-        } else {
+-            &resumed.engineering.demine_crew
+-        };
+-        assert!(jobs[&worker].dug);
++        let jobs = crew(&resumed, kind);
++        assert_eq!(jobs[worker.to_string().as_str()]["dug"], true);
+@@ -183,6 +192 @@ fn if25_ai_engineering_delivered_fill_and_mines_survive_ordinary_ticks_and_all_s
+-        let jobs = if kind == "fill" {
+-            &resumed.engineering.fill_crew
+-        } else {
+-            &resumed.engineering.demine_crew
+-        };
+-        assert!(jobs.is_empty());
++        assert!(crew(&resumed, kind).as_object().unwrap().is_empty());
+@@ -204 +208,4 @@ fn if25_ai_engineering_remembered_bridge_crew_survives_rebuild_ticks_and_all_sea
+-            .bridge_cells
++            .field
++            .as_ref()
++            .expect("ordinary bridge packet must use the active field policy")
++            .bridges
+@@ -228,2 +235,5 @@ fn if25_ai_engineering_remembered_bridge_crew_survives_rebuild_ticks_and_all_sea
+-    assert_eq!(policy.engineering.bridges, [cell]);
+-    assert!(!policy.engineering.bridge_crew[&worker].dug);
++    assert_eq!(bridges(&policy), json!([cell]));
++    assert_eq!(
++        crew(&policy, "bridge")[worker.to_string().as_str()]["dug"],
++        false
++    );
+@@ -236 +246,4 @@ fn if25_ai_engineering_remembered_bridge_crew_survives_rebuild_ticks_and_all_sea
+-    assert!(resumed.engineering.bridge_crew[&worker].dug);
++    assert_eq!(
++        crew(&resumed, "bridge")[worker.to_string().as_str()]["dug"],
++        true
++    );
+@@ -248,2 +261,2 @@ fn if25_ai_engineering_remembered_bridge_crew_survives_rebuild_ticks_and_all_sea
+-    assert!(resumed.engineering.bridge_crew.is_empty());
+-    assert_eq!(resumed.engineering.bridges, [cell]);
++    assert!(crew(&resumed, "bridge").as_object().unwrap().is_empty());
++    assert_eq!(bridges(&resumed), json!([cell]));
+diff --git a/rust/crates/core/src/commander_field_if25_tests.rs b/rust/crates/core/src/commander_field_if25_tests.rs
+new file mode 100644
+index 00000000..e5372bf8
+--- /dev/null
++++ b/rust/crates/core/src/commander_field_if25_tests.rs
+@@ -0,0 +1,212 @@
++use super::*;
++use crate::{
++    commander_ai::{Input, PlayerObservation, PointObservation},
++    commander_tactics::Context,
++};
++
++fn unit(id: u32, x: f64, z: f64) -> UnitObservation {
++    UnitObservation {
++        id,
++        kind: "rifle".into(),
++        owner: 0,
++        at: Point { x, z },
++        hp: 100.0,
++        supp: 0.0,
++        target_id: 0,
++        cover: 0,
++        path: vec![],
++        attack_id: false,
++        retreating: false,
++        riding: false,
++        build: false,
++        dig: false,
++        entrench: false,
++        garrison: false,
++        enter: false,
++        fire_at: false,
++        nade: false,
++    }
++}
++
++fn input(units: Vec<UnitObservation>) -> Input {
++    let chars = vec![b'.'; 128 * 128];
++    Input {
++        width: 128,
++        height: 128,
++        tick: 200,
++        slot: 0,
++        players: [0, 1]
++            .map(|team| PlayerObservation {
++                team,
++                out: false,
++                spawn: Point { x: 101.0, z: 101.0 },
++            })
++            .into(),
++        units,
++        points: vec![],
++        flags: vec![0; chars.len()],
++        chars: chars.clone(),
++        manpower: 1000.0,
++        research: None,
++        runtime: Some(Context {
++            field: Some(Facts {
++                initial_chars: chars.clone(),
++                ground: chars,
++                ..Facts::default()
++            }),
++            ..Context::default()
++        }),
++    }
++}
++
++fn run(input: Input, state: &mut State) -> Vec<Value> {
++    let observation = Observation::new(input).unwrap();
++    let mut commands = Vec::new();
++    field_work(&observation, state, &mut BTreeSet::new(), |raw| {
++        commands.push(raw);
++        true
++    })
++    .unwrap();
++    commands
++}
++
++#[test]
++fn if25_active_field_bridge_ingestion_and_gap_selection_keep_remembered_ties() {
++    let left = 50 * 128 + 40;
++    let right = 50 * 128 + 60;
++    let mut i = input(vec![unit(1, 101.0, 91.0)]);
++    i.chars[left] = b'W';
++    i.chars[right] = b'W';
++    let facts = i.runtime.as_mut().unwrap().field.as_mut().unwrap();
++    facts.bridges.insert(right);
++    facts.bridges.insert(left);
++    let mut fresh = State::default();
++    assert_eq!(run(i.clone(), &mut fresh)[0]["x"], 81.0);
++    assert_eq!(fresh.bridges, [left, right]);
++    let mut prior = State::default();
++    let mut first = i.clone();
++    first
++        .runtime
++        .as_mut()
++        .unwrap()
++        .field
++        .as_mut()
++        .unwrap()
++        .bridges
++        .remove(&left);
++    first.manpower = 0.0;
++    assert!(run(first, &mut prior).is_empty());
++    assert_eq!(prior.bridges, [right]);
++    assert_eq!(run(i, &mut prior)[0]["x"], 121.0);
++    assert_eq!(prior.bridges, [right, left]);
++}
++
++#[test]
++fn if25_active_field_bridge_crew_ties_keep_delivered_unit_order() {
++    for swapped in [false, true] {
++        let positions = if swapped {
++            [(81.0, 111.0), (81.0, 91.0)]
++        } else {
++            [(81.0, 91.0), (81.0, 111.0)]
++        };
++        let mut i = input(vec![
++            unit(1, positions[0].0, positions[0].1),
++            unit(2, positions[1].0, positions[1].1),
++        ]);
++        let cell = 50 * 128 + 40;
++        i.chars[cell] = b'W';
++        i.runtime
++            .as_mut()
++            .unwrap()
++            .field
++            .as_mut()
++            .unwrap()
++            .bridges
++            .insert(cell);
++        let commands = run(i, &mut State::default());
++        assert_eq!(commands[0]["kind"], "bridge");
++        assert_eq!(commands[0]["ids"][0], 1);
++    }
++}
++
++#[test]
++fn if25_active_field_fill_reuses_earlier_far_cell_sort_for_later_equal_distance() {
++    for swapped in [false, true] {
++        let positions = if swapped {
++            [(151.0, 163.0), (161.0, 153.0)]
++        } else {
++            [(161.0, 153.0), (151.0, 163.0)]
++        };
++        let expected = if swapped { 2 } else { 1 };
++        let mut i = input(vec![
++            unit(1, positions[0].0, positions[0].1),
++            unit(2, positions[1].0, positions[1].1),
++        ]);
++        i.points.push(PointObservation {
++            at: Point { x: 111.0, z: 113.0 },
++            vp: 1.0,
++            mp: 1.0,
++            owner: Some(0),
++            cut: false,
++            locked: false,
++        });
++        for cell in [50 * 128 + 50, 61 * 128 + 60] {
++            i.chars[cell] = b'F';
++        }
++        let commands = run(i, &mut State::default());
++        assert_eq!(commands.len(), 1);
++        assert_eq!(commands[0]["kind"], "fill");
++        assert_eq!(commands[0]["x"], 121.0);
++        assert_eq!(commands[0]["z"], 123.0);
++        assert_eq!(commands[0]["ids"][0], expected);
++    }
++}
++
++#[test]
++fn if25_active_field_demine_reuses_earlier_far_mine_sort_for_later_equal_distance() {
++    for swapped in [false, true] {
++        let positions = if swapped {
++            [(121.0, 101.0), (101.0, 121.0)]
++        } else {
++            [(101.0, 121.0), (121.0, 101.0)]
++        };
++        let expected = if swapped { 2 } else { 1 };
++        let mut i = input(vec![
++            unit(1, positions[0].0, positions[0].1),
++            unit(2, positions[1].0, positions[1].1),
++        ]);
++        i.runtime
++            .as_mut()
++            .unwrap()
++            .field
++            .as_mut()
++            .unwrap()
++            .found_mines = vec![Point { x: 21.0, z: 31.0 }, Point { x: 121.0, z: 121.0 }];
++        let commands = run(i, &mut State::default());
++        assert_eq!(commands.len(), 1);
++        assert_eq!(commands[0]["kind"], "demine");
++        assert_eq!(commands[0]["x"], 121.0);
++        assert_eq!(commands[0]["ids"][0], expected);
++    }
++}
++
++#[test]
++fn if25_active_field_rejects_nonfinite_mine_facts_before_memory_mutation() {
++    let mut i = input(vec![unit(1, 101.0, 121.0)]);
++    i.runtime
++        .as_mut()
++        .unwrap()
++        .field
++        .as_mut()
++        .unwrap()
++        .found_mines = vec![Point {
++        x: f64::NAN,
++        z: 121.0,
++    }];
++    let mut state = State::default();
++    let before = state.clone();
++    if let Ok(observation) = Observation::new(i) {
++        assert!(field_work(&observation, &mut state, &mut BTreeSet::new(), |_| true).is_err());
++    }
++    assert_eq!(state, before);
++}
+diff --git a/rust/crates/core/src/commander_field_policy.rs b/rust/crates/core/src/commander_field_policy.rs
+index e835d256..b70fe42f 100644
+--- a/rust/crates/core/src/commander_field_policy.rs
++++ b/rust/crates/core/src/commander_field_policy.rs
+@@ -22 +22 @@ pub struct Facts {
+-#[derive(Clone, Debug, PartialEq)]
++#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+@@ -27 +27 @@ struct Sent {
+-#[derive(Clone, Debug, Default, PartialEq)]
++#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+@@ -29 +29 @@ pub struct State {
+-    bridges: BTreeSet<usize>,
++    bridges: Vec<usize>,
+@@ -91,4 +91,2 @@ fn nearest<'a>(squads: &[&'a UnitObservation], goal: Point) -> Option<&'a UnitOb
+-    squads.iter().copied().min_by(|a, b| {
+-        dist(a.at, goal)
+-            .total_cmp(&dist(b.at, goal))
+-            .then(a.id.cmp(&b.id))
++    crate::sort::first_by(squads.iter().copied(), |a, b| {
++        dist(a.at, goal) - dist(b.at, goal)
+@@ -116,0 +115,14 @@ pub fn field_work(
++    let mut remembered = BTreeSet::new();
++    if state
++        .bridges
++        .iter()
++        .any(|&cell| cell >= n || !remembered.insert(cell))
++        || [&state.bridge_crew, &state.fill_crew, &state.demine_crew]
++            .iter()
++            .any(|jobs| {
++                jobs.iter()
++                    .any(|(&id, job)| id == 0 || job.tick < 0 || job.tick > input.tick)
++            })
++    {
++        return Err("invalid field policy memory".into());
++    }
+@@ -152 +164,7 @@ pub fn field_work(
+-    state.bridges.extend(&facts.bridges);
++    let mut incoming = facts.bridges.iter().copied().collect::<Vec<_>>();
++    crate::sort::sort_by(&mut incoming, |a, b| a as f64 - b as f64);
++    for cell in incoming {
++        if !state.bridges.contains(&cell) {
++            state.bridges.push(cell);
++        }
++    }
+@@ -163,10 +181,8 @@ pub fn field_work(
+-        let gap = state
+-            .bridges
+-            .iter()
+-            .copied()
+-            .filter(|&c| input.chars[c] == b'W' && quiet(at(input.width, c)))
+-            .min_by(|&a, &b| {
+-                dist(at(input.width, a), spawn)
+-                    .total_cmp(&dist(at(input.width, b), spawn))
+-                    .then(a.cmp(&b))
+-            });
++        let gap = crate::sort::first_by(
++            state
++                .bridges
++                .iter()
++                .copied()
++                .filter(|&c| input.chars[c] == b'W' && quiet(at(input.width, c))),
++            |a, b| dist(at(input.width, a), spawn) - dist(at(input.width, b), spawn),
++        );
+@@ -249,0 +266 @@ pub fn field_work(
++        let mut idle = builders(&squads, busy, catalog);
+@@ -267 +284,2 @@ pub fn field_work(
+-                    let Some(u) = nearest(&builders(&squads, busy, catalog), spot) else {
++                    crate::sort::sort_by(&mut idle, |a, b| dist(a.at, spot) - dist(b.at, spot));
++                    let Some(u) = idle.first().copied() else {
+@@ -291,0 +310 @@ pub fn field_work(
++        let mut idle = builders(&squads, busy, catalog);
+@@ -296 +315,2 @@ pub fn field_work(
+-            let Some(u) = nearest(&builders(&squads, busy, catalog), spot) else {
++            crate::sort::sort_by(&mut idle, |a, b| dist(a.at, spot) - dist(b.at, spot));
++            let Some(u) = idle.first().copied() else {
+@@ -392,12 +412,11 @@ pub fn holder(
+-    let Some(foe) = input
+-        .players
+-        .iter()
+-        .enumerate()
+-        .filter(|(_, q)| q.team != team)
+-        .min_by(|(ai, a), (bi, b)| {
+-            dist(a.spawn, p.at)
+-                .total_cmp(&dist(b.spawn, p.at))
+-                .then(ai.cmp(bi))
+-        })
+-        .map(|(_, p)| p.spawn)
+-    else {
++    let Some(foe) = crate::sort::first_by(
++        input.players.iter().enumerate().filter(|(seat, q)| {
++            q.team != team
++                && !input
++                    .runtime
++                    .as_ref()
++                    .is_some_and(|context| context.hidden_spawns.contains(seat))
++        }),
++        |(_, a), (_, b)| dist(a.spawn, p.at) - dist(b.spawn, p.at),
++    )
++    .map(|(_, p)| p.spawn) else {
+@@ -556,0 +576,4 @@ pub(crate) fn can_submit(
++
++#[cfg(test)]
++#[path = "commander_field_if25_tests.rs"]
++mod if25_tests;
+diff --git a/rust/crates/core/src/commander_fortification.rs b/rust/crates/core/src/commander_fortification.rs
+index 0d7470d8..632ab10d 100644
+--- a/rust/crates/core/src/commander_fortification.rs
++++ b/rust/crates/core/src/commander_fortification.rs
+@@ -150,6 +149,0 @@ pub(crate) fn plan_after_builds(
+-<<<<<<< 6056545d76073cd70aefbaf5a7fa02b95553f7ec
+-        let threat = crate::sort::first_by(
+-=======
+-        if step >= 6 || step > 0 && tier < 2 {
+-            continue;
+-        }
+@@ -178,18 +172,2 @@ pub(crate) fn plan_after_builds(
+->>>>>>> 9e5bf12439cead3ede90fdf7e62b73fcb7ed1881
+-            input
+-                .players
+-                .iter()
+-                .enumerate()
+-<<<<<<< 6056545d76073cd70aefbaf5a7fa02b95553f7ec
+-                .filter(|(_, p)| p.team != input.players[input.slot].team && !p.out),
+-            |(_, a), (_, b)| distance(hq.at, a.spawn) - distance(hq.at, b.spawn),
+-        )
+-        .map_or(
+-            Point {
+-                x: input.width as f64 * CELL / 2.0,
+-                z: input.height as f64 * CELL / 2.0,
+-            },
+-            |(_, p)| p.spawn,
+-        );
+-=======
+-                .filter(|(seat, p)| {
++            crate::sort::first_by(
++                input.players.iter().enumerate().filter(|(seat, p)| {
+@@ -197,7 +175,4 @@ pub(crate) fn plan_after_builds(
+-                })
+-                .min_by(|(ai, a), (bi, b)| {
+-                    distance(hq.at, a.spawn)
+-                        .total_cmp(&distance(hq.at, b.spawn))
+-                        .then(ai.cmp(bi))
+-                })
+-                .map_or(center, |(_, p)| p.spawn)
++                }),
++                |(_, a), (_, b)| distance(hq.at, a.spawn) - distance(hq.at, b.spawn),
++            )
++            .map_or(center, |(_, p)| p.spawn)
+@@ -205 +179,0 @@ pub(crate) fn plan_after_builds(
+->>>>>>> 9e5bf12439cead3ede90fdf7e62b73fcb7ed1881
+diff --git a/rust/crates/core/src/commander_tactics.rs b/rust/crates/core/src/commander_tactics.rs
+index 58c3157b..30d115ec 100644
+--- a/rust/crates/core/src/commander_tactics.rs
++++ b/rust/crates/core/src/commander_tactics.rs
+@@ -217 +216,0 @@ pub struct State {
+-<<<<<<< 6056545d76073cd70aefbaf5a7fa02b95553f7ec
+@@ -222 +221 @@ pub struct State {
+-=======
++    #[serde(default)]
+@@ -223,0 +223 @@ pub struct State {
++    #[serde(default)]
+@@ -225 +224,0 @@ pub struct State {
+->>>>>>> 9e5bf12439cead3ede90fdf7e62b73fcb7ed1881
+@@ -595,13 +593,0 @@ fn plan_inner(
+-<<<<<<< 6056545d76073cd70aefbaf5a7fa02b95553f7ec
+-        });
+-    let construction = crate::commander_construction::plan_with_nodes(
+-        observation,
+-        &available_units,
+-        budget,
+-        (adaptive || skill.memory) && strategic_recent.iter().any(|s| armor(&s.kind)),
+-        &sight_game,
+-        sees,
+-        random,
+-        &mut state.node_assignments,
+-    )?;
+-=======
+@@ -628 +614 @@ fn plan_inner(
+-        crate::commander_construction::plan(
++        crate::commander_construction::plan_with_nodes(
+@@ -634,0 +621,2 @@ fn plan_inner(
++            random,
++            &mut state.node_assignments,
+@@ -637 +624,0 @@ fn plan_inner(
+->>>>>>> 9e5bf12439cead3ede90fdf7e62b73fcb7ed1881
+@@ -643,2 +630,3 @@ fn plan_inner(
+-    available_units
+-        .retain(|u| !construction.builders.contains(&u.id) || rush && u.kind == "engineer");
++    available_units.retain(|u| {
++        !construction.builders.contains(&u.id) || !world_policy && rush && u.kind == "engineer"
++    });
+@@ -671,31 +659,31 @@ fn plan_inner(
+-<<<<<<< 6056545d76073cd70aefbaf5a7fa02b95553f7ec
+-    let engineering = crate::commander_engineering::plan(
+-        observation,
+-        &mine,
+-        &enemies,
+-        &newly_busy,
+-        &mut state.engineering,
+-        sees,
+-    )?;
+-    newly_busy.extend(engineering.builders);
+-    commands.extend(engineering.commands);
+-=======
+-    state.field.armor_seen |= !armor_seen.is_empty() || enemies.iter().any(|u| armor(&u.kind));
+-    let mut field_input = input.clone();
+-    field_input.manpower = budget;
+-    let field_observation = Observation::new(field_input).map_err(|e| e.to_string())?;
+-    budget = crate::commander_field_policy::field_work(
+-        &field_observation,
+-        if world_policy {
+-            &mut state.world.field
+-        } else {
+-            &mut state.field
+-        },
+-        &mut newly_busy,
+-        |raw| {
+-            let accepted = crate::commander_field_policy::can_submit(&sight_game, &raw, sees);
+-            commands.push(raw);
+-            accepted
+-        },
+-    )?;
+->>>>>>> 9e5bf12439cead3ede90fdf7e62b73fcb7ed1881
++    if context.field.is_some() {
++        state.field.armor_seen |= !armor_seen.is_empty() || enemies.iter().any(|u| armor(&u.kind));
++        let mut field_input = input.clone();
++        field_input.manpower = budget;
++        let field_observation = Observation::new(field_input).map_err(|e| e.to_string())?;
++        budget = crate::commander_field_policy::field_work(
++            &field_observation,
++            if world_policy {
++                &mut state.world.field
++            } else {
++                &mut state.field
++            },
++            &mut newly_busy,
++            |raw| {
++                let accepted = crate::commander_field_policy::can_submit(&sight_game, &raw, sees);
++                commands.push(raw);
++                accepted
++            },
++        )?;
++    } else {
++        let engineering = crate::commander_engineering::plan(
++            observation,
++            &mine,
++            &enemies,
++            &newly_busy,
++            &mut state.engineering,
++            sees,
++        )?;
++        newly_busy.extend(engineering.builders);
++        commands.extend(engineering.commands);
++    }
+@@ -896 +884 @@ fn plan_inner(
+-        .filter(|u| !newly_busy.contains(&u.id))
++        .filter(|u| !newly_busy.contains(&u.id) || !world_policy && rush && u.kind == "engineer")
+@@ -1067 +1054,0 @@ fn plan_inner(
+-<<<<<<< 6056545d76073cd70aefbaf5a7fa02b95553f7ec
+@@ -1069 +1055,0 @@ fn plan_inner(
+-=======
+@@ -1071 +1056,0 @@ fn plan_inner(
+->>>>>>> 9e5bf12439cead3ede90fdf7e62b73fcb7ed1881
+@@ -1117,4 +1102,32 @@ fn plan_inner(
+-<<<<<<< 6056545d76073cd70aefbaf5a7fa02b95553f7ec
+-            if allied(input.points[i].owner)
+-                && first
+-                && let Some(command) = point_holder::plan(
++            if allied(input.points[i].owner) && first {
++                if context.field.is_some() {
++                    let mut holder_input = input.clone();
++                    holder_input.manpower = budget;
++                    let holder_observation =
++                        Observation::new(holder_input).map_err(|e| e.to_string())?;
++                    crate::commander_field_policy::holder(
++                        &holder_observation,
++                        u,
++                        i,
++                        state.field.armor_seen,
++                        |raw| {
++                            let accepted = if raw["t"] == "garrison" {
++                                sees(Point {
++                                    x: raw["x"].as_f64().unwrap_or(0.0),
++                                    z: raw["z"].as_f64().unwrap_or(0.0),
++                                })
++                            } else {
++                                crate::commander_field_policy::can_submit(&sight_game, &raw, sees)
++                            };
++                            if accepted && raw["t"] == "dig" && raw["kind"] == "mines" {
++                                budget -= num(
++                                    catalog.table("FORTS").unwrap().get("mines").unwrap(),
++                                    "cost",
++                                );
++                            }
++                            commands.push(raw);
++                            accepted
++                        },
++                    )?;
++                    busy.insert(u.id);
++                } else if let Some(command) = point_holder::plan(
+@@ -1128,35 +1141,3 @@ fn plan_inner(
+-                )?
+-            {
+-                commands.push(command);
+-=======
+-            if allied(input.points[i].owner) && first {
+-                let mut holder_input = input.clone();
+-                holder_input.manpower = budget;
+-                let holder_observation =
+-                    Observation::new(holder_input).map_err(|e| e.to_string())?;
+-                crate::commander_field_policy::holder(
+-                    &holder_observation,
+-                    u,
+-                    i,
+-                    state.field.armor_seen,
+-                    |raw| {
+-                        let accepted = if raw["t"] == "garrison" {
+-                            sees(Point {
+-                                x: raw["x"].as_f64().unwrap_or(0.0),
+-                                z: raw["z"].as_f64().unwrap_or(0.0),
+-                            })
+-                        } else {
+-                            crate::commander_field_policy::can_submit(&sight_game, &raw, sees)
+-                        };
+-                        if accepted && raw["t"] == "dig" && raw["kind"] == "mines" {
+-                            budget -= num(
+-                                catalog.table("FORTS").unwrap().get("mines").unwrap(),
+-                                "cost",
+-                            );
+-                        }
+-                        commands.push(raw);
+-                        accepted
+-                    },
+-                )?;
+-                busy.insert(u.id);
+->>>>>>> 9e5bf12439cead3ede90fdf7e62b73fcb7ed1881
++                )? {
++                    commands.push(command);
++                }
+@@ -1501 +1481,0 @@ mod if25_tests;
+-<<<<<<< 6056545d76073cd70aefbaf5a7fa02b95553f7ec
+@@ -1574,4 +1553,0 @@ fn enemies_near<'a>(
+-#[cfg(test)]
+-#[path = "if25_ai_lifecycle_tests.rs"]
+-mod if25_lifecycle_tests;
+-=======
+@@ -1580,0 +1557,3 @@ mod field_assault_tests;
++#[cfg(test)]
++#[path = "if25_ai_lifecycle_tests.rs"]
++mod if25_lifecycle_tests;
+@@ -1589 +1567,0 @@ mod field_review_tests;
+->>>>>>> 9e5bf12439cead3ede90fdf7e62b73fcb7ed1881
+diff --git a/rust/crates/core/src/commander_world_policy.rs b/rust/crates/core/src/commander_world_policy.rs
+index 6e39fa11..6ec97008 100644
+--- a/rust/crates/core/src/commander_world_policy.rs
++++ b/rust/crates/core/src/commander_world_policy.rs
+@@ -43 +43 @@ pub struct Facts {
+-#[derive(Clone, Debug, Default, PartialEq)]
++#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+diff --git a/rust/crates/core/src/elimination_modes.rs b/rust/crates/core/src/elimination_modes.rs
+index aa459a19..5f1a294b 100644
+--- a/rust/crates/core/src/elimination_modes.rs
++++ b/rust/crates/core/src/elimination_modes.rs
+@@ -252 +251,0 @@ impl Match {
+-<<<<<<< 6056545d76073cd70aefbaf5a7fa02b95553f7ec
+@@ -255,5 +253,0 @@ impl Match {
+-=======
+-        let mut pairs = Vec::new();
+-        let mut paired = BTreeSet::new();
+-        for (slot, player) in self.start.players.iter().enumerate() {
+->>>>>>> 9e5bf12439cead3ede90fdf7e62b73fcb7ed1881
+@@ -272,24 +265,0 @@ impl Match {
+-<<<<<<< 6056545d76073cd70aefbaf5a7fa02b95553f7ec
+-=======
+-            let mut enemies = self
+-                .start
+-                .players
+-                .iter()
+-                .enumerate()
+-                .filter(|(_, p)| p.config.team != player.config.team)
+-                .collect::<Vec<_>>();
+-            enemies.sort_by(|(a, p), (b, q)| {
+-                math::hypot(p.spawn.x - player.spawn.x, p.spawn.z - player.spawn.z)
+-                    .total_cmp(&math::hypot(
+-                        q.spawn.x - player.spawn.x,
+-                        q.spawn.z - player.spawn.z,
+-                    ))
+-                    .then(a.cmp(b))
+-            });
+-            for (other, _) in enemies.into_iter().take(2) {
+-                let pair = (slot.min(other), slot.max(other));
+-                if paired.insert(pair) {
+-                    pairs.push(pair);
+-                }
+-            }
+->>>>>>> 9e5bf12439cead3ede90fdf7e62b73fcb7ed1881
+diff --git a/rust/crates/core/src/elimination_modes/tests.rs b/rust/crates/core/src/elimination_modes/tests.rs
+index 0940bfda..1be9d1ad 100644
+--- a/rust/crates/core/src/elimination_modes/tests.rs
++++ b/rust/crates/core/src/elimination_modes/tests.rs
+@@ -683 +682,0 @@ fn classic_support_uses_munitions_and_abilities_refuse_an_empty_munitions_wallet
+-<<<<<<< 6056545d76073cd70aefbaf5a7fa02b95553f7ec
+@@ -740 +739 @@ fn if25_classic_node_pairs_keep_enemy_ties_and_first_discovery_order() {
+-=======
++
+@@ -743 +741,0 @@ mod classic_bases_tests;
+->>>>>>> 9e5bf12439cead3ede90fdf7e62b73fcb7ed1881
+diff --git a/rust/crates/core/src/human_commander_policy_tests.rs b/rust/crates/core/src/human_commander_policy_tests.rs
+index 545af86a..b8996b87 100644
+--- a/rust/crates/core/src/human_commander_policy_tests.rs
++++ b/rust/crates/core/src/human_commander_policy_tests.rs
+@@ -1047 +1046,0 @@ fn intent_ai33_fortification_state_survives_full_match_and_every_seat_snapshot()
+-<<<<<<< 6056545d76073cd70aefbaf5a7fa02b95553f7ec
+@@ -1232 +1230,0 @@ fn intent_ai66_classic_human_view_requires_matching_mode_and_keeps_quiet_policy_
+-=======
+@@ -1235 +1232,0 @@ mod field_live_tests;
+->>>>>>> 9e5bf12439cead3ede90fdf7e62b73fcb7ed1881
+diff --git a/rust/crates/core/src/if25_ai_lifecycle_tests.rs b/rust/crates/core/src/if25_ai_lifecycle_tests.rs
+index fbbd06ff..aca65848 100644
+--- a/rust/crates/core/src/if25_ai_lifecycle_tests.rs
++++ b/rust/crates/core/src/if25_ai_lifecycle_tests.rs
+@@ -237,10 +237,6 @@ fn if25_ai_holder_work_from_delivered_point_survives_ordinary_ticks_and_all_seat
+-    let command = point_holder::plan(
+-        observation,
+-        input.runtime.as_ref().unwrap(),
+-        unit,
+-        &input.points[0],
+-        &[],
+-        false,
+-        1000.0,
+-    )
+-    .unwrap()
++    assert!(input.runtime.as_ref().unwrap().field.is_some());
++    let mut commands = Vec::new();
++    crate::commander_field_policy::holder(observation, unit, 0, false, |command| {
++        commands.push(command);
++        true
++    })
+@@ -247,0 +244,2 @@ fn if25_ai_holder_work_from_delivered_point_survives_ordinary_ticks_and_all_seat
++    assert_eq!(commands.len(), 1);
++    let command = &commands[0];
+@@ -251 +249 @@ fn if25_ai_holder_work_from_delivered_point_survives_ordinary_ticks_and_all_seat
+-            .execute_command(0, &Command::from_json(&command).unwrap(), false)
++            .execute_command(0, &Command::from_json(command).unwrap(), false)
+diff --git a/rust/crates/core/src/if25_tactics_tests.rs b/rust/crates/core/src/if25_tactics_tests.rs
+index 5a223472..15131071 100644
+--- a/rust/crates/core/src/if25_tactics_tests.rs
++++ b/rust/crates/core/src/if25_tactics_tests.rs
+@@ -328,3 +328,3 @@ fn if25_ai_holder_spawn_ties_drive_mines_trenches_wire_traps_and_housing() {
+-    let propose = |input: crate::commander_ai::Input, armor| {
+-        let observation = Observation::new(input).unwrap();
+-        point_holder::plan(
++    let propose = |mut input: crate::commander_ai::Input, armor| {
++        let observation = Observation::new(input.clone()).unwrap();
++        let fallback = point_holder::plan(
+@@ -340 +340,24 @@ fn if25_ai_holder_spawn_ties_drive_mines_trenches_wire_traps_and_housing() {
+-        .unwrap()
++        .unwrap();
++        input.manpower = 1000.0;
++        let mines = input.runtime.as_ref().unwrap().mines.clone();
++        input.runtime.as_mut().unwrap().field = Some(crate::commander_field_policy::Facts {
++            initial_chars: input.chars.clone(),
++            ground: input.chars.clone(),
++            mines,
++            ..Default::default()
++        });
++        let observation = Observation::new(input).unwrap();
++        let mut active = Vec::new();
++        crate::commander_field_policy::holder(
++            &observation,
++            &observation.input().units[0],
++            0,
++            armor,
++            |command| {
++                active.push(command);
++                true
++            },
++        )
++        .unwrap();
++        assert_eq!(active.as_slice(), std::slice::from_ref(&fallback));
++        fallback
+diff --git a/rust/crates/core/src/lib.rs b/rust/crates/core/src/lib.rs
+index f8df63bc..67208d84 100644
+--- a/rust/crates/core/src/lib.rs
++++ b/rust/crates/core/src/lib.rs
+@@ -240,3 +239,0 @@ mod save_state;
+-<<<<<<< 6056545d76073cd70aefbaf5a7fa02b95553f7ec
+-mod numeric_keys;
+-=======
+@@ -245 +242 @@ pub mod commander_world_policy;
+->>>>>>> 9e5bf12439cead3ede90fdf7e62b73fcb7ed1881
++mod numeric_keys;
+diff --git a/rust/crates/core/src/match_ground_orders.rs b/rust/crates/core/src/match_ground_orders.rs
+index 62cf7b89..ca15b742 100644
+--- a/rust/crates/core/src/match_ground_orders.rs
++++ b/rust/crates/core/src/match_ground_orders.rs
+@@ -350,15 +349,0 @@ impl Match {
+-<<<<<<< 6056545d76073cd70aefbaf5a7fa02b95553f7ec
+-            if let Some(state) = self.convoys.as_ref().filter(|s| s.trucks.contains_key(id)) {
+-                let home = crate::sort::first_by(
+-                    state
+-                        .stores
+-                        .iter()
+-                        .filter(|s| s.active && s.source && self.world.game.allied(owner, s.owner)),
+-                    |a, b| {
+-                        crate::math::hypot(a.at.x - unit.x, a.at.z - unit.z)
+-                            - crate::math::hypot(b.at.x - unit.x, b.at.z - unit.z)
+-                    },
+-                )
+-                .map(|s| s.at);
+-                let Some(home) = home else {
+-=======
+@@ -371 +355,0 @@ impl Match {
+->>>>>>> 9e5bf12439cead3ede90fdf7e62b73fcb7ed1881
+diff --git a/rust/crates/core/src/match_human_observation.rs b/rust/crates/core/src/match_human_observation.rs
+index 792ffb07..35b4d6a0 100644
+--- a/rust/crates/core/src/match_human_observation.rs
++++ b/rust/crates/core/src/match_human_observation.rs
+@@ -611 +610,0 @@ fn apply_view_rows(
+-<<<<<<< 6056545d76073cd70aefbaf5a7fa02b95553f7ec
+@@ -629 +628 @@ fn apply_view_rows(
+-=======
++        }
+@@ -642,6 +640,0 @@ fn apply_view_rows(
+-        if let Some(runtime) = &mut input.runtime
+-            && let Some(height) = &mut runtime.height
+-        {
+-            height[row.cell] = row.height;
+->>>>>>> 9e5bf12439cead3ede90fdf7e62b73fcb7ed1881
+-        }
+@@ -680,0 +674,11 @@ fn complete_ordinary_facts(input: &mut Input, initial_chars: &[u8], initial_heig
++    if let Some(field) = &mut context.field {
++        field.free_nodes = context
++            .nodes
++            .iter()
++            .enumerate()
++            .filter(|(index, _)| !context.claimed_nodes.contains(index))
++            .map(|(_, at)| *at)
++            .collect();
++        context.mines = field.mines.clone();
++        context.found_mines = field.found_mines.clone();
++    }
+diff --git a/rust/crates/core/src/match_reactions.rs b/rust/crates/core/src/match_reactions.rs
+index d0693362..88a9d5ee 100644
+--- a/rust/crates/core/src/match_reactions.rs
++++ b/rust/crates/core/src/match_reactions.rs
+@@ -136 +136,2 @@ impl Match {
+-        self.convoys
++        let state = self
++            .convoys
+@@ -138,4 +139,3 @@ impl Match {
+-            .filter(|state| state.trucks.contains_key(&unit.id))?
+-            .stores
+-            .iter()
+-            .filter(|store| {
++            .filter(|state| state.trucks.contains_key(&unit.id))?;
++        crate::sort::first_by(
++            state.stores.iter().filter(|store| {
+@@ -143,3 +143,4 @@ impl Match {
+-            })
+-            .min_by(|a, b| distance(unit.at(), a.at).total_cmp(&distance(unit.at(), b.at)))
+-            .map(|store| store.at)
++            }),
++            |a, b| distance(unit.at(), a.at) - distance(unit.at(), b.at),
++        )
++        .map(|store| store.at)
+diff --git a/rust/crates/server/src/lobby.rs b/rust/crates/server/src/lobby.rs
+index a4b42f4c..8dfa57a0 100644
+--- a/rust/crates/server/src/lobby.rs
++++ b/rust/crates/server/src/lobby.rs
+@@ -1687 +1686,0 @@ impl Hub {
+-<<<<<<< 6056545d76073cd70aefbaf5a7fa02b95553f7ec
+@@ -1693 +1692 @@ impl Hub {
+-            army: ArmySize::Standard,
++            army: ArmySize::from_key(&room.army),
+@@ -1717,21 +1715,0 @@ impl Hub {
+-=======
+-        let state = crate::authoritative_maps::create_match(
+-            &room.map,
+-            MatchOptions {
+-                seed: trusted.seed,
+-                mode: Mode::Conquest,
+-                players,
+-                shuffle: true,
+-                army: ArmySize::from_key(&room.army),
+-                weather: WeatherChoice::from_reference(Some(&room.weather)),
+-                weather_seed: None,
+-                living_weather: true,
+-                map_key: Some(room.map.clone()),
+-                tech: true,
+-                supply: true,
+-                logistics: false,
+-                sandbox: false,
+-            },
+-        )
+-        .map_err(|e| e.to_string())?;
+->>>>>>> 9e5bf12439cead3ede90fdf7e62b73fcb7ed1881

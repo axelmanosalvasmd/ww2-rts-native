@@ -111,6 +111,14 @@ fn scene(kind: &str) -> (Match, u32, usize) {
     (state, worker, cell)
 }
 
+fn crew(policy: &commander_tactics::State, kind: &str) -> Value {
+    serde_json::to_value(&policy.field).unwrap()[format!("{kind}_crew")].clone()
+}
+
+fn bridges(policy: &commander_tactics::State) -> Value {
+    serde_json::to_value(&policy.field).unwrap()["bridges"].clone()
+}
+
 fn ticks(state: &mut Match, count: usize) {
     for _ in 0..count {
         state.advance_tick().unwrap();
@@ -130,11 +138,16 @@ fn if25_ai_engineering_delivered_fill_and_mines_survive_ordinary_ticks_and_all_s
         let mut memory = HumanObservationMemory::new(0);
         let view = state.human_commander_observation(&mut memory).unwrap();
         let context = view.packet.input().runtime.as_ref().unwrap();
+        let active = context
+            .field
+            .as_ref()
+            .expect("ordinary producer must select the active field policy");
         if kind == "fill" {
             assert!(context.spoiled_cells.contains(&cell));
+            assert_eq!(active.initial_chars[cell], b'.');
         } else {
-            assert_eq!(context.found_mines, [Point { x: 41.0, z: 41.0 }]);
-            assert!(context.mines.is_empty());
+            assert_eq!(active.found_mines, [Point { x: 41.0, z: 41.0 }]);
+            assert!(active.mines.is_empty());
         }
         let mut policy = commander_tactics::State::default();
         let mut random = MatchRandom::new(751);
@@ -167,12 +180,8 @@ fn if25_ai_engineering_delivered_fill_and_mines_survive_ordinary_ticks_and_all_s
         let view = state.human_commander_observation(&mut memory).unwrap();
         commander_tactics::plan(&view.packet, &[], &mut resumed, Level::Normal, &mut random)
             .unwrap();
-        let jobs = if kind == "fill" {
-            &resumed.engineering.fill_crew
-        } else {
-            &resumed.engineering.demine_crew
-        };
-        assert!(jobs[&worker].dug);
+        let jobs = crew(&resumed, kind);
+        assert_eq!(jobs[worker.to_string().as_str()]["dug"], true);
         ticks(&mut state, 240);
         assert!(!state.world.game.units[&worker].dig);
         assert_eq!(state.world.game.chars[cell], b'.');
@@ -180,12 +189,7 @@ fn if25_ai_engineering_delivered_fill_and_mines_survive_ordinary_ticks_and_all_s
         let view = state.human_commander_observation(&mut memory).unwrap();
         commander_tactics::plan(&view.packet, &[], &mut resumed, Level::Normal, &mut random)
             .unwrap();
-        let jobs = if kind == "fill" {
-            &resumed.engineering.fill_crew
-        } else {
-            &resumed.engineering.demine_crew
-        };
-        assert!(jobs.is_empty());
+        assert!(crew(&resumed, kind).as_object().unwrap().is_empty());
     }
 }
 
@@ -201,7 +205,10 @@ fn if25_ai_engineering_remembered_bridge_crew_survives_rebuild_ticks_and_all_sea
             .runtime
             .as_ref()
             .unwrap()
-            .bridge_cells
+            .field
+            .as_ref()
+            .expect("ordinary bridge packet must use the active field policy")
+            .bridges
             .contains(&cell)
     );
     assert_eq!(view.packet.input().chars[cell], b'W');
@@ -225,15 +232,21 @@ fn if25_ai_engineering_remembered_bridge_crew_survives_rebuild_ticks_and_all_sea
     );
     assert!(state.world.game.units[&worker].dig);
     assert_eq!(state.field_works.jobs()[&worker].kind.as_str(), "bridge");
-    assert_eq!(policy.engineering.bridges, [cell]);
-    assert!(!policy.engineering.bridge_crew[&worker].dug);
+    assert_eq!(bridges(&policy), json!([cell]));
+    assert_eq!(
+        crew(&policy, "bridge")[worker.to_string().as_str()]["dug"],
+        false
+    );
     let mut resumed: commander_tactics::State =
         serde_json::from_slice(&serde_json::to_vec(&policy).unwrap()).unwrap();
     assert_eq!(resumed, policy);
     ticks(&mut state, 4);
     let view = state.human_commander_observation(&mut memory).unwrap();
     commander_tactics::plan(&view.packet, &[], &mut resumed, Level::Normal, &mut random).unwrap();
-    assert!(resumed.engineering.bridge_crew[&worker].dug);
+    assert_eq!(
+        crew(&resumed, "bridge")[worker.to_string().as_str()]["dug"],
+        true
+    );
     let active: commander_tactics::State =
         serde_json::from_slice(&serde_json::to_vec(&resumed).unwrap()).unwrap();
     assert_eq!(active, resumed);
@@ -245,8 +258,8 @@ fn if25_ai_engineering_remembered_bridge_crew_survives_rebuild_ticks_and_all_sea
     let commands =
         commander_tactics::plan(&view.packet, &[], &mut resumed, Level::Normal, &mut random)
             .unwrap();
-    assert!(resumed.engineering.bridge_crew.is_empty());
-    assert_eq!(resumed.engineering.bridges, [cell]);
+    assert!(crew(&resumed, "bridge").as_object().unwrap().is_empty());
+    assert_eq!(bridges(&resumed), json!([cell]));
     assert!(
         !commands
             .iter()

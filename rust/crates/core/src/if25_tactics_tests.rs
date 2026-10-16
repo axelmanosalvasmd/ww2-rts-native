@@ -325,9 +325,9 @@ fn if25_ai_holder_spawn_ties_drive_mines_trenches_wire_traps_and_housing() {
     input.players[1].spawn = Point { x: 120.0, z: 20.0 };
     input.players[2].team = 1;
     input.players[2].spawn = Point { x: 40.0, z: 20.0 };
-    let propose = |input: crate::commander_ai::Input, armor| {
-        let observation = Observation::new(input).unwrap();
-        point_holder::plan(
+    let propose = |mut input: crate::commander_ai::Input, armor| {
+        let observation = Observation::new(input.clone()).unwrap();
+        let fallback = point_holder::plan(
             &observation,
             observation.input().runtime.as_ref().unwrap(),
             &observation.input().units[0],
@@ -337,7 +337,30 @@ fn if25_ai_holder_spawn_ties_drive_mines_trenches_wire_traps_and_housing() {
             1000.0,
         )
         .unwrap()
-        .unwrap()
+        .unwrap();
+        input.manpower = 1000.0;
+        let mines = input.runtime.as_ref().unwrap().mines.clone();
+        input.runtime.as_mut().unwrap().field = Some(crate::commander_field_policy::Facts {
+            initial_chars: input.chars.clone(),
+            ground: input.chars.clone(),
+            mines,
+            ..Default::default()
+        });
+        let observation = Observation::new(input).unwrap();
+        let mut active = Vec::new();
+        crate::commander_field_policy::holder(
+            &observation,
+            &observation.input().units[0],
+            0,
+            armor,
+            |command| {
+                active.push(command);
+                true
+            },
+        )
+        .unwrap();
+        assert_eq!(active.as_slice(), std::slice::from_ref(&fallback));
+        fallback
     };
     let right = propose(input.clone(), false);
     assert_eq!(right["kind"], "mines");
