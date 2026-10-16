@@ -136,9 +136,7 @@ fn equal(a: &Json, b: &Json, context: &str, path: &str) {
 fn compare_checkpoint(m: &Match, expected: &Json, scene: &str, checkpoint: &str, path: &str) {
     let context = format!(
         "scene={scene:?}; mode={:?}; checkpoint={checkpoint}; native_tick={}; fixture_tick={}",
-        m.options.mode,
-        m.world.game.tick,
-        expected["tick"]
+        m.options.mode, m.world.game.tick, expected["tick"]
     );
     equal(&project(m), expected, &context, path);
 }
@@ -309,7 +307,10 @@ fn replay(name: &str) -> Match {
             &m,
             &row["before"],
             name,
-            &format!("record[{index}] before op={} phase={}", row["op"], row["phase"]),
+            &format!(
+                "record[{index}] before op={} phase={}",
+                row["op"], row["phase"]
+            ),
             &format!("$[\"cases\"][{case_index}][\"records\"][{index}][\"before\"]"),
         );
         match row["op"].as_str().unwrap() {
@@ -478,7 +479,10 @@ fn replay(name: &str) -> Match {
             &m,
             &row["after"],
             name,
-            &format!("record[{index}] after op={} phase={}", row["op"], row["phase"]),
+            &format!(
+                "record[{index}] after op={} phase={}",
+                row["op"], row["phase"]
+            ),
             &format!("$[\"cases\"][{case_index}][\"records\"][{index}][\"after\"]"),
         );
     }

@@ -4792,3 +4792,54 @@ three jobs and first-failure stop/release/notify-before-report still apply.
 Old grants and green results do not transfer. Freeze one private child with raw
 binary/full-index forward and inverse patches, typed preservation and checksums,
 then stop. Root owns independent review and any later execution or integration.
+
+
+## BASE consumer printed-layout repair (2026-10-15, source only)
+
+This mechanical child starts at `6806dce786a138528f5d90d7e2587d79659cdf20`,
+Rust tree `6624d5b5c43ba4ed4cfc281fa078ee2f5369ea2c`, in the persistent
+d699fc97 physical checkout. Root's retained fmt invocation ran once and exited 1
+with exactly three wrapping diagnostics in `base_consumer_completion_tests.rs`
+at parent lines 136, 309 and 478. Its terminal and inherited-flock release are
+recorded before the v13 REPORT. Native5 and Clippy were unrun on that head.
+
+Before mutation, reconstruct every complete printed old/new context from the
+raw log and require each old context to occur exactly once. The expected whole
+consumer is 25,743 bytes, SHA256
+`849ae48c59cbc70f31af167a95acb07d49947b761235e63fdb4c7c125f97336e`.
+Applying the three inverse substitutions restores every parent byte. Only join
+the checkpoint context operands and expand the two record-label format calls
+as printed. Every literal, assertion, input, actor, projection, provider and
+replay operation retains its prior value and order. No formatter is run.
+
+The e25 producing-head result remains two PASS, one FAIL and two UNRUN. Its
+ordinary replay failed on native actual Json::String("0000000000000000") versus
+fixture expected Json::String("7ff8000000000000"). The cause remains unproven;
+this layout change supplies no native diagnosis or semantic repair. Preserve
+all prior raw failures, the 33 older test bodies, all five newest test bodies,
+seven recipes, fixture and registry bytes, shipping providers, FFI, wire,
+contracts, all 939 IDs and complete Acceptance/Status cells. The seventh fixture
+remains 486,928 bytes with SHA256
+`0a6bf3a9dbf01f1efa578a2b3b882dd1854ca96dd3533cb01063f079e31702ca`;
+the six older pending fixture paths remain actual ENOENT. Source capture stays
+attributed to `aaf0cf6f`, fixture freeze to `8b6837f2`.
+
+Locally acknowledge issue #5 through 6206488299 and PR16 replies
+6137154230/6137379059 plus PR195 reply 6156740603 as receipt only. The PR270
+main-push readback is an owner report, not an independently verified hosted
+result here. Root owns PR272/273 integration, the central slot ledger and any
+publication. Six-call ABI 2 and accepted startup content/schema scope stay
+unchanged. No provider, default, transport, privacy or Unreal adoption follows.
+
+Source, Node, Cargo, rustc, native, formatter, lint, discovery, release and CI
+jobs remain zero on this child. Formatting, compilation, the five selected
+native tests and Clippy remain unverified. Retain the complete typed union,
+prior packet artifacts and all 61 saved BASES refs. Freeze one private commit
+with full binary/full-index forward and inverse patches and notify Root of its
+literal head and Rust tree before future binding, then stop. Old grants and
+PASS results do not transfer. Any later execution requires a new Root grant
+for the literal head, selection and assigned slot with the current guard,
+external target, inherited exclusive flock, four actual CPUs, 6 GiB, zero swap,
+400 percent CPU, jobs4/thread1, a 400-second bound, and free -g plus at least
+20 GiB disk before each job. Maximum three jobs and first-failure terminal,
+flock-release and Root notification before REPORT remain required.

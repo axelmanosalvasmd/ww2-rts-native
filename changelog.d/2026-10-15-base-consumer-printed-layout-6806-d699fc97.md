@@ -1,0 +1,1 @@
+- Apply the three recorded consumer wrapping changes from the failed 6806 fmt check. Keep comparison values and replay behavior unchanged. Formatting, native tests and Clippy remain unrun on this child; the earlier zero-versus-NaN comparison failure remains unresolved.
