@@ -409,7 +409,7 @@ pub fn focus_plan(
         let old = orders.attack_target;
         if let Some(id) = old {
             let drop = match unit(observation, id) {
-                None => true,
+                None => next.targets.get(&u.id) == Some(&id),
                 Some(t) => {
                     t.hp <= 0.0
                         || t.retreating

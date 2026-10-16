@@ -69,9 +69,15 @@ impl Match {
         let geometry = crate::commander_received_vision::received_game(self, &view.packet)?;
         let grid = crate::grid::SpatialGrid::new(&geometry.units, 16.0);
         let team = view.packet.input().players[owner].team;
-        let visible_points = view.packet.input().points.iter().enumerate()
+        let visible_points = view
+            .packet
+            .input()
+            .points
+            .iter()
+            .enumerate()
             .filter(|(_, p)| vision::team_sees(&geometry, &self.rules, &grid, team, p.at))
-            .map(|(i, _)| i).collect();
+            .map(|(i, _)| i)
+            .collect();
         let facts = SupportFacts {
             mode: self.options.mode,
             munitions,

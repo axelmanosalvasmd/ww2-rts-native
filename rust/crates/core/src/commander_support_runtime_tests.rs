@@ -137,3 +137,59 @@ fn support_attempts_do_not_update_the_accepted_call_clock() {
     assert!(policy.accepted_call(60).is_err());
     assert_eq!(policy, before);
 }
+
+#[test]
+fn support_motor_receipts_repeat_and_enter_canonical_admission() {
+    let run = || {
+        let (mut m, _) = setup();
+        let mut view = m
+            .human_support_observation(&mut HumanObservationMemory::new(0))
+            .unwrap();
+        let mut state = HumanState::new(7301, 0, Point { x: 50.0, z: 50.0 });
+        let mut policy = SupportPolicy::new(0);
+        let hurts = OwnerHurtBatch {
+            generation: 0,
+            through_ordinal: 0,
+            events: Vec::new(),
+        };
+        let mut attempts = Vec::new();
+        for now in 0..1000 {
+            view.tick = now;
+            let mut input = view.packet.observation.input().clone();
+            input.tick = now as i64;
+            view.packet.observation = Observation::new(input).unwrap();
+            let result = advance_support(
+                &mut state,
+                &mut policy,
+                TickControl {
+                    now,
+                    live_owner_out: false,
+                    winner: false,
+                    level: "hard",
+                },
+                Some(&view),
+                &hurts,
+            )
+            .unwrap();
+            if let Some(receipt) = result.input
+                && let Some(raw) = &receipt.command
+            {
+                assert!(now > receipt.origin);
+                assert_eq!(raw["t"], "support");
+                assert_eq!(raw["kind"], "artillery");
+                assert_eq!(
+                    m.execute_command(0, &Command::from_json(raw).unwrap(), false)
+                        .unwrap(),
+                    None
+                );
+                policy.accepted_call(now).unwrap();
+                attempts.push(receipt);
+                break;
+            }
+        }
+        assert_eq!(attempts.len(), 1);
+        assert_eq!(m.world.game.strikes.len(), 1);
+        attempts
+    };
+    assert_eq!(run(), run());
+}
