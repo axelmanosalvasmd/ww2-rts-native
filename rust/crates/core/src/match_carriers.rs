@@ -1,5 +1,5 @@
 //! Ordinary ground carrier commands and physical boarding using canonical Match owners.
-//! Wreck ejection shares canonical placement, damage and grid owners. Boat commands, rail and garrison exit remain explicit boundaries.
+//! Wreck ejection and shore landings share canonical placement, damage and grid owners.
 
 use crate::{
     catalog::Catalog,
@@ -673,8 +673,8 @@ impl Match {
         }
         Ok(effects)
     }
-    /// Manual ground unload. Full ordered placements are staged before relations change;
-    /// no thrown damage, shore landing or rail drop is silently substituted.
+    /// Manual unload stages ordered placements before relations change. Boats stay
+    /// loaded unless dry or wadeable ground is within the prototype shore reach.
     pub fn carrier_unload_command(
         &mut self,
         owner: usize,
@@ -699,15 +699,37 @@ impl Match {
             .copied()
             .filter(|id| !self.combat.get(*id).unwrap().cargo.is_empty())
             .collect();
-        if carriers.iter().any(|id| {
-            self.carrier_boundary(*id) || self.rules.kinds[self.world.game.units[id].kind].naval
-        }) {
+        if carriers.iter().any(|id| self.carrier_boundary(*id)) {
             return Ok(Some(Denial::Unsupported));
         }
+        let shore = Catalog::compiled()
+            .map_err(|e| e.to_string())?
+            .table("CFG")
+            .map_err(|e| e.to_string())?
+            .get("shoreReach")
+            .and_then(|v| v.number())
+            .ok_or("missing shore reach")?;
         let mut placer = SpawnPlacer::new();
+        let mut landing = Vec::new();
+        for &carrier in &carriers {
+            let unit = &self.world.game.units[&carrier];
+            if self.rules.kinds[unit.kind].naval {
+                let cell = placer
+                    .nearest_free(view(self), unit.at(), MOVE, None)
+                    .map_err(|e| format!("shore landing: {e:?}"))?;
+                let at = Point {
+                    x: (cell % self.world.game.w) as f64 * CELL + CELL * 0.5,
+                    z: (cell / self.world.game.w) as f64 * CELL + CELL * 0.5,
+                };
+                if math::hypot(unit.x - at.x, unit.z - at.z) > shore {
+                    continue;
+                }
+            }
+            landing.push(carrier);
+        }
         let mut drops = Vec::new();
         let mut staged = BTreeSet::new();
-        for &carrier in &carriers {
+        for &carrier in &landing {
             if !staged.insert(carrier) {
                 continue;
             }
@@ -742,6 +764,9 @@ impl Match {
         if carriers.is_empty() {
             return Ok(Some(Denial::Needs));
         }
+        if landing.is_empty() {
+            return Ok(Some(Denial::Shore));
+        }
         for (carrier, id, at) in drops {
             self.combat
                 .get_mut(carrier)
@@ -764,3 +789,7 @@ impl Match {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+#[path = "match_carriers/transport_intent.rs"]
+mod transport_intent;
