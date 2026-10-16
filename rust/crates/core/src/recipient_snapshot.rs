@@ -204,6 +204,9 @@ impl<'a> SnapshotCache<'a> {
         fields.extend(self.owners[slot].clone());
         fields.extend(self.public[slot].clone());
         fields.insert("falling".into(), falling::project(self.state, slot)?);
+        if self.state.options.sandbox {
+            fields.insert("flights".into(), shots::live_flights(self.state, slot)?);
+        }
         Ok(RecipientProjection {
             fields,
             missing: vec![

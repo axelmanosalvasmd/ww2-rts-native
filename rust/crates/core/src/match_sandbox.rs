@@ -147,7 +147,7 @@ mod tests {
             players: (0..if horde { 2 } else { 3 })
                 .map(|slot| PlayerConfig {
                     name: format!("P{slot}"),
-                    team: slot,
+                    team: if !horde && slot == 2 { 0 } else { slot },
                     faction: Faction::Usa,
                 })
                 .collect(),
@@ -188,7 +188,7 @@ mod tests {
         );
         assert_eq!(m.execute_command(2, &command, false).unwrap(), None);
         let u = &m.world.game.units[&id];
-        assert_eq!(u.owner, 0);
+        assert_eq!(u.owner, 1, "skip the earlier allied seat");
         assert_eq!(m.rules.kinds[u.kind].name, "tiger");
         assert_eq!(u.at(), Point { x: 41.0, z: 41.0 });
         assert_eq!(m.start.economy, before);

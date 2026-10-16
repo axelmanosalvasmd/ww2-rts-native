@@ -29,6 +29,12 @@ Both rows also depend on:
   exact parser denial and spawn suppression during an internal pause.
 - `lobby::sandbox_runtime_tests::sandbox_kaiju_beam_damages_enemy_and_delivers_events_without_horde_state`:
   actual ordinary sandbox beam damage and recipient delivery, then six more ticks.
+- `lobby::sandbox_runtime_tests::sandbox_spawned_rifle_grenade_survives_throw_flight_and_expiry_for_every_seat`:
+  an actual spawned rifle, throw, retained flight and retirement, with both views on every tick.
+- `recipient_snapshot::shots::tests::sandbox_live_flights_use_current_pose_exact_shape_and_recipient_visibility`,
+  `recipient_snapshot::shots::tests::sandbox_live_flight_until_clips_current_visible_body_contact`,
+  `recipient_snapshot::shots::tests::sandbox_throw_uses_local_fog_and_shooter_redaction`:
+  exact live-flight and throw shapes, delayed launch, fog, hidden shooters and contact clipping.
 - `recipient_snapshot::shots::tests::sandbox_breath_is_public_but_hidden_actor_ids_are_removed`:
   exact public beam/shell shapes, hidden actor identity redaction and the
   nonsandbox event guard.

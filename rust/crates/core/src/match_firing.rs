@@ -966,6 +966,30 @@ impl Match {
         start_fraction: f64,
         end_fraction: f64,
     ) -> Result<Option<FlightContact>, String> {
+        self.flight_contact_filtered(p, a, b, start_fraction, end_fraction, false, |_| true)
+    }
+    /// Source flightUntil queries current static poses and visible unit contacts.
+    pub(crate) fn recipient_flight_contact(
+        &self,
+        p: &LiveFlight,
+        a: projectiles::Point3,
+        b: projectiles::Point3,
+        visible: impl Fn(UnitId) -> bool,
+    ) -> Result<Option<f64>, String> {
+        self.flight_contact_filtered(p, a, b, 1.0, 1.0, true, visible)
+            .map(|contact| contact.map(|c| c.hit.fraction))
+    }
+    #[allow(clippy::too_many_arguments)]
+    fn flight_contact_filtered(
+        &self,
+        p: &LiveFlight,
+        a: projectiles::Point3,
+        b: projectiles::Point3,
+        start_fraction: f64,
+        end_fraction: f64,
+        static_pose: bool,
+        visible: impl Fn(UnitId) -> bool,
+    ) -> Result<Option<FlightContact>, String> {
         let g = &self.world.game;
         let level_height = n(self.firing_config()?, "levelHeight", 2.5);
         let mut best: Option<FlightContact> = None;
@@ -1019,6 +1043,7 @@ impl Match {
                 && t.air.is_none()
                 && !t.riding
                 && t.id != p.shooter
+                && visible(t.id)
                 && (p.blast_source.is_some() || !g.allied(p.owner, t.owner))
         });
         candidates.sort_unstable();
@@ -1028,12 +1053,15 @@ impl Match {
             if def.building && t.cells.as_ref().is_some_and(|c| !c.is_empty()) {
                 continue;
             }
-            let old = self
-                .firing
-                .prior
-                .get(&id)
-                .copied()
-                .unwrap_or_else(|| t.pose());
+            let old = if static_pose {
+                t.pose()
+            } else {
+                self.firing
+                    .prior
+                    .get(&id)
+                    .copied()
+                    .unwrap_or_else(|| t.pose())
+            };
             let before = projectiles::BodyPosition {
                 x: old.x + (t.x - old.x) * start_fraction,
                 z: old.z + (t.z - old.z) * start_fraction,

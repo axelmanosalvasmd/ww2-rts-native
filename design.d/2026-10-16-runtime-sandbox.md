@@ -20,3 +20,10 @@ Horde. The firing and recipient guards admit these events only for sandbox;
 normal beam damage, public visual effects and identity redaction follow the
 prototype. This is needed for a spawned Kaiju to survive its first turn and
 attack without faulting delivery.
+
+Sandbox combat also requires retained projectiles between launch and contact.
+Their recipient rows reuse the canonical flight solution and contact geometry.
+The static recipient query filters unseen units and uses current poses without
+reading prior-tick motion or changing simulation state. Projectile visibility
+uses the ground cell; extrapolation stops at fog or a visible contact. Existing
+non-sandbox delivery restrictions remain unchanged.

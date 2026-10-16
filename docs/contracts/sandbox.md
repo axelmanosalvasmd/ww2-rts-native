@@ -1,7 +1,7 @@
 # Sandbox on R1
 
 Compatibility source: `reference/ww2-rts` at
-`e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. Owner decisions M, N and P
+`e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. Owner decisions E, M, N, O and P
 in issue #5 comment 6217590741 authorize the prototype commands, shapes and
 recipient rules. This implementation still needs Hermes' exact-head runtime ack.
 
@@ -69,3 +69,18 @@ Each recipient loses hidden `f` and `t` identities; the nonlocal event retains
 `fo` and `to`. Source: `shared/sim.js:4363-4377`, `:6080-6088`.
 Exact event-shape tests cover hidden identities and public delivery, and the
 server lifecycle test requires an actual beam hit followed by both seat views.
+
+Retained ground projectiles populate the existing `flights` array so combat in a
+sandbox can keep ticking between launch and contact. Source:
+`shared/sim.js:5966-5996`. Each row contains `flight`, `kind`, optional `effect`,
+`seq`, `x`, `y`, `z`, `v` (three velocity components), `gravity`, `time`,
+`launched`, `expires` and `until`. It includes `f` and `fo` only if that recipient
+sees the shooter. There are no target fields. Visibility uses the projectile's
+current ground cell. `until` clips extrapolation at fog boundaries and visible
+static contact; this projection does not resolve damage or mutate combat state.
+
+Sandbox grenade throws use
+`{ "f": shooter, "fo": owner, "x": x, "z": z, "k": "throw",
+"physical": true, "local": true }`, from `shared/sim.js:5421-5428`.
+These local events require ground-cell visibility and lose both `f` and `fo`
+when the shooter is hidden, as in `shared/sim.js:5998-6009`.

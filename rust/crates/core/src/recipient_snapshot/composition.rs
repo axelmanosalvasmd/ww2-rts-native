@@ -106,7 +106,7 @@ pub(super) fn complete(
     // Admission inspected each actual canonical actor/list owner. Their
     // absent output is a represented source result for this bounded frame.
     for name in ["flights", "shots"] {
-        projection.fields.insert(name.into(), json!([]));
+        projection.fields.entry(name).or_insert_with(|| json!([]));
     }
     projection.fields.entry("air").or_insert_with(|| json!([]));
     projection.fields.insert(
@@ -179,12 +179,33 @@ pub(super) fn admit_actors(state: &Match, outside_events: &[Effect]) -> Result<(
     };
     if !outside_events.is_empty()
         || !state.firing.events.is_empty()
-        || !state.firing.flights.is_empty()
-        || !state.firing.salvos.is_empty()
-        || !state.firing.grenades.is_empty()
+        || !state.options.sandbox
+            && (!state.firing.flights.is_empty()
+                || !state.firing.salvos.is_empty()
+                || !state.firing.grenades.is_empty())
         || !state.support.events.is_empty()
     {
         return Err(refused(SnapshotCapability::ShotsAndFlights));
+    }
+    if state.options.sandbox {
+        state
+            .validate_firing_tick_state()
+            .map_err(|_| SnapshotError::Rules)?;
+        state
+            .validate_firing_grenade_step(0.0)
+            .map_err(|_| SnapshotError::Rules)?;
+        if state.firing.salvos.iter().any(|s| {
+            s.left == 0
+                || s.left > 4096
+                || s.owner >= state.world.game.players.len()
+                || ![s.at.x, s.at.z, s.next, s.every, s.spread]
+                    .iter()
+                    .all(|v| v.is_finite())
+                || s.every <= 0.0
+                || s.spread < 0.0
+        }) {
+            return Err(SnapshotError::Rules);
+        }
     }
     // Aircraft state has an owner adapter. Aviation shot encodings still need
     // a contract, so undrained event payloads retain their admission guard.

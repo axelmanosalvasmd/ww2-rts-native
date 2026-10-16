@@ -397,3 +397,53 @@ fn sandbox_kaiju_beam_damages_enemy_and_delivers_events_without_horde_state() {
         room.tick();
     }
 }
+
+#[test]
+fn sandbox_spawned_rifle_grenade_survives_throw_flight_and_expiry_for_every_seat() {
+    use ww2_core::{game::Point, match_commands::Command};
+    let mut room = Sandbox::lobby();
+    room.start(true);
+    let at = room.runtime().state().start.players[1].spawn;
+    let rifle = room.runtime().state().next_unit_id;
+    room.send(1, json!({"t":"spawn","unit":"rifle","x":at.x,"z":at.z}));
+    room.tick();
+    let at = room.runtime().state().world.game.units[&rifle].at();
+    assert_eq!(
+        room.runtime()
+            .state_mut()
+            .execute_command(
+                1,
+                &Command::Ability {
+                    ids: vec![i64::from(rifle)],
+                    at: Some(Point {
+                        x: at.x - 8.0,
+                        z: at.z
+                    }),
+                    queue: false,
+                    automatic: false,
+                },
+                false
+            )
+            .unwrap(),
+        None
+    );
+    let (mut threw, mut flew) = (false, false);
+    for _ in 0..80 {
+        let (_, frames) = room.tick();
+        threw |= frames[1]["shots"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|s| s["k"] == "throw" && s["f"] == rifle);
+        flew |= !frames[1]["flights"].as_array().unwrap().is_empty();
+    }
+    assert!(
+        threw && flew,
+        "the spawned rifle must publish its real throw and retained flight"
+    );
+    assert!(room.runtime().state().firing.grenades.is_empty());
+    assert!(room.runtime().state().firing.flights.is_empty());
+    for _ in 0..6 {
+        room.tick();
+    }
+}
