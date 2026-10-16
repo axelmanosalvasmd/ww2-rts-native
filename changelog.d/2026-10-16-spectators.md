@@ -3,3 +3,4 @@
 - Drop spectator army commands silently and close spectators over 4 MiB behind with code 1013. Replace the old newcomer-refusal expectation with spectator admission. World, operatives and save loading remain deferred.
 - Count queued socket bytes with diagnostics off so spectator limits always apply. Update the old test that expected this counter to be disabled.
 - Refresh spectator terrain on the prototype's terrain and vision revision boundary, including hidden ruins.
+- Replace the process test that rejected spectator joins and lobby seat release with checks that admit them, while preserving the other R1 refusals.
