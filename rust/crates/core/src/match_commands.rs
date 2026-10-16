@@ -982,7 +982,7 @@ impl crate::match_runtime::Match {
             return self.execute_enter_command(owner, ids, *at, *queue);
         }
         if let Command::FireAt { ids, at, queue } = command {
-            return self.aircraft_area_command(owner, ids, *at, *queue);
+            return self.terrain_fire_command(owner, ids, *at, *queue);
         }
         if let Command::Entrench { ids, order, queue } = command {
             return self.execute_entrench(owner, ids, *order, *queue, winner_decided);
@@ -1952,6 +1952,15 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
                 }
             };
         }
+        if kind == RequestKind::FireAt {
+            return match self.match_state.current_terrain_fire_goal(id) {
+                Ok(goal) => goal,
+                Err(error) => {
+                    self.error = Some(error);
+                    None
+                }
+            };
+        }
         let u = self.match_state.world.game.units.get(&id)?;
         if u.hp <= 0.0 {
             return None;
@@ -2060,6 +2069,14 @@ impl crate::path_requests::PathRequestContext for RequestContext<'_> {
                     ability.aimed_auto = false;
                     ability.aimed_walked = false;
                 }
+                crate::path_requests::RequestKind::FireAt => {
+                    self.match_state
+                        .commands
+                        .units
+                        .get_mut(&u.id)
+                        .unwrap()
+                        .fire_at = None;
+                }
                 _ => {}
             }
             u.stuck = 0.0;
@@ -2118,6 +2135,9 @@ impl crate::match_runtime::Match {
             }
             if request.kind == crate::path_requests::RequestKind::Board {
                 self.current_board_goal(request.unit)?;
+            }
+            if request.kind == crate::path_requests::RequestKind::FireAt {
+                self.current_terrain_fire_goal(request.unit)?;
             }
         }
         if !self.uses_world_routes() {
@@ -2385,6 +2405,7 @@ impl crate::match_runtime::Match {
                 | crate::path_requests::RequestKind::Build
                 | crate::path_requests::RequestKind::Board
                 | crate::path_requests::RequestKind::AttackId
+                | crate::path_requests::RequestKind::FireAt
         ) {
             return Err("unsupported command path request".into());
         }
@@ -2405,6 +2426,9 @@ impl crate::match_runtime::Match {
         }
         if kind == crate::path_requests::RequestKind::Board {
             self.current_board_goal(id)?;
+        }
+        if kind == crate::path_requests::RequestKind::FireAt {
+            self.current_terrain_fire_goal(id)?;
         }
         let shootable = self.command_shootable()?;
         let mut requests = std::mem::take(&mut self.commands.requests);

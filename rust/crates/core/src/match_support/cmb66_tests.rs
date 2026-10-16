@@ -189,3 +189,32 @@ fn cmb66_flak_checks_ammo_setup_completion_hold_fire_alliance_range_and_rolls() 
     }
     assert_eq!(outcomes, [true, true]);
 }
+
+#[test]
+fn mov67_paradrop_publication_keeps_roster_poses_and_all_grid_memberships_current() {
+    let mut m = scene(&[]);
+    let (s, _) = strike(SupportKind::Para);
+    let first = m.next_unit_id;
+    m.drop_support(&s, 0.0).unwrap();
+    // Pinned sim.js:409,5261: three squads on the six-metre ring at direction 0.7.
+    let expected = [
+        ("rifle", Point { x: 45.0, z: 43.0 }),
+        ("rifle", Point { x: 35.0, z: 43.0 }),
+        ("mg", Point { x: 41.0, z: 35.0 }),
+    ];
+    assert_eq!(m.next_unit_id - first, 3);
+    for (index, (kind, at)) in expected.iter().enumerate() {
+        let id = first + index as u32;
+        let unit = &m.world.game.units[&id];
+        assert_eq!(m.rules.kinds[unit.kind].name, *kind);
+        assert_eq!(unit.owner, s.owner);
+        assert_eq!(unit.at(), *at);
+        assert_eq!(
+            m.world.game.flags[m.world.game.cell_of(unit.x, unit.z).unwrap()] & crate::game::MOVE,
+            0
+        );
+        assert!(m.combat.get(id).is_some() && m.firing.get(id).is_some());
+    }
+    assert_eq!(m.support.events.len(), 3);
+    crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
+}

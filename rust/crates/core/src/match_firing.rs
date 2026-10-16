@@ -966,6 +966,30 @@ impl Match {
         start_fraction: f64,
         end_fraction: f64,
     ) -> Result<Option<FlightContact>, String> {
+        self.flight_contact_visible(p, a, b, start_fraction, end_fraction, false, &|_| true)
+    }
+
+    pub(crate) fn recipient_flight_contact(
+        &self,
+        p: &LiveFlight,
+        a: projectiles::Point3,
+        b: projectiles::Point3,
+        visible: &impl Fn(UnitId) -> bool,
+    ) -> Result<Option<FlightContact>, String> {
+        self.flight_contact_visible(p, a, b, 1.0, 1.0, true, visible)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn flight_contact_visible(
+        &self,
+        p: &LiveFlight,
+        a: projectiles::Point3,
+        b: projectiles::Point3,
+        start_fraction: f64,
+        end_fraction: f64,
+        current_pose: bool,
+        visible: &impl Fn(UnitId) -> bool,
+    ) -> Result<Option<FlightContact>, String> {
         let g = &self.world.game;
         let level_height = n(self.firing_config()?, "levelHeight", 2.5);
         let mut best: Option<FlightContact> = None;
@@ -1019,6 +1043,7 @@ impl Match {
                 && t.air.is_none()
                 && !t.riding
                 && t.id != p.shooter
+                && visible(t.id)
                 && (p.blast_source.is_some() || !g.allied(p.owner, t.owner))
         });
         candidates.sort_unstable();
@@ -1028,12 +1053,15 @@ impl Match {
             if def.building && t.cells.as_ref().is_some_and(|c| !c.is_empty()) {
                 continue;
             }
-            let old = self
-                .firing
-                .prior
-                .get(&id)
-                .copied()
-                .unwrap_or_else(|| t.pose());
+            let old = if current_pose {
+                t.pose()
+            } else {
+                self.firing
+                    .prior
+                    .get(&id)
+                    .copied()
+                    .unwrap_or_else(|| t.pose())
+            };
             let before = projectiles::BodyPosition {
                 x: old.x + (t.x - old.x) * start_fraction,
                 z: old.z + (t.z - old.z) * start_fraction,
@@ -1543,6 +1571,17 @@ impl Match {
     }
 
     pub fn apply_unit_firing(&mut self, id: UnitId, moving: bool, dt: f64) -> Result<(), String> {
+        let suppression = self.world.game.units.get(&id).map_or(0.0, |u| u.supp);
+        self.apply_unit_firing_with_suppression(id, moving, dt, suppression)
+    }
+
+    pub(crate) fn apply_unit_firing_with_suppression(
+        &mut self,
+        id: UnitId,
+        moving: bool,
+        dt: f64,
+        terrain_suppression: f64,
+    ) -> Result<(), String> {
         self.supported_firing_mode()?;
         if !dt.is_finite() || dt < 0.0 {
             return Err("invalid firing step".into());
@@ -1568,13 +1607,8 @@ impl Match {
             .units
             .get(&id)
             .ok_or("missing canonical unit control")?;
-        if kind.air
-            || kind.rail
-            || control.operative
-            || control.fire_at.is_some()
-            || control.nade.is_some()
-        {
-            return Err("air, rail, operative and ability/terrain firing are unsupported".into());
+        if kind.air || kind.rail || control.operative {
+            return Err("air, rail and operative firing are unsupported".into());
         }
         if u.riding {
             return Ok(());
@@ -1584,6 +1618,7 @@ impl Match {
         }
         let attack = control.attack_id;
         let hold_fire = control.hold_fire;
+        let fire_at = control.fire_at;
         let Some(w) = self.weapon(u)? else {
             self.firing.initialize(id).target_id = 0;
             self.commands.units.get_mut(&id).unwrap().aim = u.rot;
@@ -1633,6 +1668,35 @@ impl Match {
         if n(w, "range", 0.0) == 0.0 || !self.logistics.can_fire(id, 1.0) || retreating {
             self.firing.initialize(id).target_id = 0;
             self.commands.units.get_mut(&id).unwrap().aim = rot;
+            return Ok(());
+        }
+        if let Some(cell) = fire_at {
+            let at = Point {
+                x: (cell % self.world.game.w) as f64 * CELL + CELL * 0.5,
+                z: (cell / self.world.game.w) as f64 * CELL + CELL * 0.5,
+            };
+            let u = &self.world.game.units[&id];
+            let ready = u.path.is_empty()
+                && dist(u.at(), at) <= self.weapon_range(u, w)?
+                && self.firing.get(id).unwrap().cooldown <= 0.0;
+            self.commands.units.get_mut(&id).unwrap().aim = math::atan2(at.z - u.z, at.x - u.x);
+            self.firing.initialize(id).target_id = 0;
+            if ready && flag(w, "salvo") && still.is_some_and(|s| s >= n(w, "setup", 0.0)) {
+                self.launch_weapon_salvo(id, at, None)?;
+                let supply_rate = self.logistics.shortage_rate(id);
+                self.firing.initialize(id).cooldown = n(w, "interval", 0.0) * supply_rate;
+            } else if ready && !flag(w, "salvo") && self.can_shell_cell(id, cell)? {
+                let rate = if terrain_suppression >= 90.0 {
+                    3.0
+                } else if terrain_suppression >= 50.0 {
+                    1.5
+                } else {
+                    1.0
+                };
+                let supply_rate = self.logistics.shortage_rate(id);
+                self.fire_terrain(id, cell)?;
+                self.firing.initialize(id).cooldown = n(w, "interval", 0.0) * rate * supply_rate;
+            }
             return Ok(());
         }
         let current = self.firing.get(id).copied().unwrap_or_default();
@@ -2305,6 +2369,113 @@ fn validate_blast(source: ExplosionSource) -> Result<(), String> {
 }
 
 impl Match {
+    /// A terrain shell uses the ordinary weapon profile and one carried round.
+    /// It retains no target link: subsequent terrain changes do not retarget it.
+    fn fire_terrain(&mut self, id: UnitId, cell: usize) -> Result<(), String> {
+        let g = &self.world.game;
+        if cell >= g.chars.len() {
+            return Err("terrain target outside battlefield".into());
+        }
+        let at = Point {
+            x: (cell % g.w) as f64 * CELL + CELL * 0.5,
+            z: (cell / g.w) as f64 * CELL + CELL * 0.5,
+        };
+        let end = self.launch_admission(id, at, 1)?;
+        if !self.logistics.can_fire(id, 1.0) {
+            return Err("insufficient terrain ammunition".into());
+        }
+        let u = &g.units[&id];
+        let w = self.weapon(u)?.ok_or("unarmed terrain firing")?;
+        let terrain = n(w, "shellTerrain", 0.0);
+        if terrain <= 0.0 {
+            return Err("weapon cannot shell terrain".into());
+        }
+        let cfg = self.firing_config()?;
+        let level_height = n(cfg, "levelHeight", 2.5);
+        let top = match g.physical(cell) {
+            b'B' | b'K' => 5.0,
+            b'H' => 1.8,
+            b'#' | b'Y' => 1.2,
+            b'Q' => 1.6,
+            b'R' | b'O' => 0.8,
+            b'=' => 0.25,
+            _ => 0.0,
+        };
+        let from = projectiles::Point3::new(
+            u.x,
+            f64::from(g.level_at(u.x, u.z)) * level_height + self.weapon_launch_height(u),
+            u.z,
+        );
+        let to = projectiles::Point3::new(
+            at.x,
+            f64::from(g.level_at(at.x, at.z)) * level_height
+                + math::max(0.2, math::min(1.2, top / 2.0)),
+            at.z,
+        );
+        let profile = projectiles::projectile_profile(
+            &self.rules.kinds[u.kind].name,
+            flag(w, "flame"),
+            n(w, "veh", 0.0),
+            true,
+        )
+        .map_err(|e| format!("terrain projectile profile: {e:?}"))?;
+        let solution = projectiles::launch_solution(
+            from,
+            to,
+            profile.speed.unwrap_or(1.0),
+            profile.gravity,
+            None,
+        )
+        .map_err(|e| format!("terrain launch solution: {e:?}"))?;
+        let born = g.tick as f64 * 0.05;
+        let first = self.firing.next_flight;
+        let flight = LiveFlight {
+            id: first,
+            owner: u.owner,
+            shooter: id,
+            source_kind: u.kind,
+            solution: projectiles::Flight {
+                origin: solution.origin,
+                velocity: solution.velocity,
+                gravity: solution.gravity,
+                stamp: born,
+            },
+            launch_origin: from,
+            launched: born,
+            last: born,
+            expires: born
+                + math::max(
+                    solution.duration + 0.15,
+                    n(w, "range", 20.0) / profile.speed.unwrap_or(1.0),
+                ),
+            sent: true,
+            energy: 1.0,
+            sequence: 0,
+            max_contacts: profile.max_contacts,
+            near: profile.near,
+            start_cell: self.weapon_start_cell(u)?,
+            intended: None,
+            damage_scale: 1.0,
+            armor_piercing: false,
+            ap_multiplier: 1.5,
+            ap_naval: false,
+            suppression: n(w, "supp", 0.0),
+            suppression_scale: 1.0,
+            volley_group: first,
+            explosive: true,
+            terrain,
+            scar: n(cfg.get("scar").ok_or("missing scar rules")?, "tank", 0.25),
+            blast_radius: None,
+            blast_source: None,
+            effect: None,
+        };
+        self.logistics.consume_ammo(id, 1.0);
+        self.firing.next_flight = end;
+        self.commit_physical_flight(flight);
+        self.world.game.units.get_mut(&id).unwrap().shot_at = Some(self.world.game.tick as f64);
+        Ok(())
+    }
+
     fn launch_admission(&self, id: UnitId, at: Point, count: u32) -> Result<u64, String> {
         self.supported_firing_mode()?;
         self.validate_firing_units()?;

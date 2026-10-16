@@ -367,6 +367,7 @@ impl crate::match_runtime::Match {
             self.validate_construction_tick()?;
             self.validate_gate_tick()?;
             self.validate_ground_attacks()?;
+            self.validate_terrain_fire_orders()?;
             self.validate_reaction_tick_actors()?;
             self.validate_field_project_tick(&current_order)?;
         }
@@ -455,6 +456,7 @@ impl crate::match_runtime::Match {
                 .map_err(|error| format!("aircraft published state: {error}"))?;
             self.validate_carrier_tick()?;
             self.validate_ground_attacks()?;
+            self.validate_terrain_fire_orders()?;
             self.validate_reaction_tick_actors()?;
             let current_order = self.world.game.units.keys().copied().collect::<Vec<_>>();
             self.validate_support_metadata()
@@ -586,6 +588,7 @@ impl crate::match_runtime::Match {
                 }
             }
             let unit = &self.world.game.units[&id];
+            let terrain_suppression = unit.supp;
             let factor = movement::supp_speed(unit.supp);
             if self.options.logistics {
                 self.advance_unit_reserves(id)?;
@@ -690,6 +693,7 @@ impl crate::match_runtime::Match {
             }
             self.apply_attack_move(id)?;
             if self.options.mode != crate::economy::Mode::World {
+                self.apply_terrain_fire_order(id)?;
                 self.apply_ground_attack(id)?;
             }
             self.react_unit(id)?;
@@ -714,7 +718,8 @@ impl crate::match_runtime::Match {
             }
             let moving = !unit.path.is_empty()
                 || crate::math::hypot(unit.x - before.x, unit.z - before.z) > 0.001;
-            let result = self.apply_unit_firing(id, moving, dt);
+            let result =
+                self.apply_unit_firing_with_suppression(id, moving, dt, terrain_suppression);
             self.take_firing_tick_events(events);
             result?;
         }

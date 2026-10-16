@@ -20,6 +20,8 @@ mod delivery;
 mod engineering;
 #[path = "recipient_snapshot/falling.rs"]
 mod falling;
+#[path = "recipient_snapshot/flights.rs"]
+mod flights;
 #[path = "recipient_snapshot/logistics.rs"]
 mod logistics;
 #[path = "recipient_snapshot/owners.rs"]
@@ -170,6 +172,11 @@ impl<'a> SnapshotCache<'a> {
         }
         for (fields, works) in public.iter_mut().zip(engineering::capture(state)?) {
             fields.insert("works".into(), works);
+        }
+        for (fields, flights) in public.iter_mut().zip(flights::capture(state)?) {
+            if !state.firing.flights.is_empty() {
+                fields.insert("flights".into(), flights);
+            }
         }
         Ok(Self {
             state,

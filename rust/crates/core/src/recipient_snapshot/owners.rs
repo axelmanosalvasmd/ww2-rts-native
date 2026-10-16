@@ -96,6 +96,11 @@ pub(super) fn capture(state: &Match) -> Result<Vec<Map<String, Value>>, Snapshot
                         at,
                         queue: false,
                     } if ids.as_slice() == [i64::from(u.id)] => (9, *at),
+                    Command::FireAt {
+                        ids,
+                        at,
+                        queue: false,
+                    } if ids.as_slice() == [i64::from(u.id)] => (5, *at),
                     Command::Assist {
                         ids,
                         target,

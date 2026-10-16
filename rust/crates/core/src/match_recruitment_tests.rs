@@ -149,6 +149,7 @@ fn recorded_buy_matches_original_commands_with_owned_routing() {
                     let (reason, unit) = match result {
                         Ok(done) => {
                             admitted += 1;
+                            crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
                             assert_eq!(
                                 m.combat.get(done.unit),
                                 Some(&crate::match_combat::UnitCombat::default()),

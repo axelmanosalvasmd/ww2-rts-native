@@ -146,6 +146,7 @@ fn horde_setup_builds_one_fortified_shared_base_and_internal_enemy() {
             .any(|u| m.rules.kinds[u.kind].name == "flakpos")
     );
     assert!(m.world.game.units.values().all(|u| u.owner != 2));
+    crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
     for (gate, spawn) in h
         .gates
         .iter()

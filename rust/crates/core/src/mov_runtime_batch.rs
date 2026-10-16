@@ -175,6 +175,7 @@ fn mov68_spawn_scatter_publication_has_monotonic_ids_defaults_and_current_grid()
             )
         );
         m.publish_starting_unit(draft).unwrap();
+        crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
         assert_eq!(m.next_unit_id, id + 1);
         let u = &m.world.game.units[&id];
         assert!(u.path.is_empty() && !u.riding && u.world_goal.is_none());
@@ -244,6 +245,7 @@ fn mov69_actual_recruitment_uses_free_ring_exits_and_spawn_ghosts() {
                 .in_order(&m.world.game.units, (u.x, u.z), 0.1, |_, _| true)
                 .contains(&id)
         );
+        crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
         born.push(id);
     }
     let producer = &m.world.game.units[&barracks];
@@ -264,6 +266,7 @@ fn mov104_naval_purchases_require_sea_launch_from_shipyard_and_respect_destroyer
     let yard = m.next_unit_id;
     m.place_starting_building(0, "shipyard", 25 * 80 + 32)
         .unwrap();
+    crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
     for kind in ["lcvp", "gunboat", "destroyer", "destroyer"] {
         let id = m.recorded_buy(0, kind, Some(yard)).unwrap().unit;
         let u = &m.world.game.units[&id];
@@ -282,6 +285,7 @@ fn mov104_naval_purchases_require_sea_launch_from_shipyard_and_respect_destroyer
                 .contains(&id)
         );
         assert_eq!(m.recruit_metadata[&id].building, yard);
+        crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
     }
     assert!(matches!(
         m.recorded_buy(0, "destroyer", Some(yard)),
@@ -297,6 +301,7 @@ fn mov51_aircraft_purchases_stay_at_maker_with_full_reserves_and_no_rally_walk()
     let field = m.next_unit_id;
     m.place_starting_building(0, "airfield", 30 * 80 + 30)
         .unwrap();
+    crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
     m.player_rallies[0] = Some(p(90., 90.));
     m.building_rallies.insert(field, Some(p(110., 110.)));
     for kind in ["fighter", "attacker"] {
@@ -311,8 +316,10 @@ fn mov51_aircraft_purchases_stay_at_maker_with_full_reserves_and_no_rally_walk()
         assert!(air.fuel > 0. && air.ammo > 0. && air.mission.is_none());
         assert!(m.start.economy.players[0].mp < before);
         let pose = u.pose();
+        crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
         for _ in 0..3 {
             m.advance_tick().unwrap();
+            crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
         }
         assert_eq!(m.world.game.units[&id].pose(), pose);
     }
