@@ -66,9 +66,15 @@ struct Server {
     hub: Arc<Mutex<Hub>>,
     next: Arc<AtomicU64>,
     clock: Instant,
+    #[cfg(test)]
+    test_now_ms: Option<Arc<AtomicU64>>,
 }
 impl Server {
     fn now(&self) -> u64 {
+        #[cfg(test)]
+        if let Some(now) = &self.test_now_ms {
+            return now.load(Ordering::Acquire);
+        }
         self.clock.elapsed().as_millis().min(u128::from(u64::MAX)) as u64
     }
 }
@@ -148,6 +154,8 @@ async fn serve_inner(
         hub: Arc::new(Mutex::new(hub)),
         next: Arc::new(AtomicU64::new(1)),
         clock: Instant::now(),
+        #[cfg(test)]
+        test_now_ms: None,
     };
     if let Some(ready) = ready {
         let _ = ready.send(NativeRoomControl {

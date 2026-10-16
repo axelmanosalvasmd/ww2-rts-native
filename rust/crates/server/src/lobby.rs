@@ -2033,3 +2033,7 @@ mod native_ingress_tests;
 #[cfg(test)]
 #[path = "trusted_room_lobby_tests.rs"]
 mod trusted_room_tests;
+
+#[cfg(test)]
+#[path = "lobby_socket_tests.rs"]
+mod lobby_socket_tests;
