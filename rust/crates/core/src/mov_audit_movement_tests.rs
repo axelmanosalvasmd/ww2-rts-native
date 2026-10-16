@@ -8,7 +8,7 @@ fn mov11_walk_budget_waypoints_backing_block_and_yield() {
     let mut g = ground();
     let kind = &rules.kinds[rules.kind("rifle").unwrap()];
     let knowledge = TrafficKnowledge::physical();
-    // A yielding route keeps each waypoint, so this covers actual multi-leg consumption without skip.
+    // One-metre initial legs avoid the infantry skip and exercise actual multi-leg consumption.
     let mut u = unit(&rules, "rifle", 1, point(20., 20.));
     let mut path = vec![point(21., 20.), point(21., 21.), point(24., 21.)];
     let steer = Steer::default();

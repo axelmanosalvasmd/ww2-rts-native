@@ -391,7 +391,7 @@ fn mov35_smoothing_preserves_roads_wire_mines_and_bunker_clearance() {
     assert!(detour.waypoints.len() > 1);
     let mut water = Field::new(64, 64);
     water.flags.fill(MOVE);
-    let boat = water.route(&mut Pathfinding::new(), "boat", from, to);
+    let boat = water.route(&mut Pathfinding::new(), "gunboat", from, to);
     assert_eq!(boat.status, PathStatus::Found);
     assert_eq!(boat.waypoints, vec![to]);
 }
