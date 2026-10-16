@@ -1,3 +1,4 @@
 - Add native intent tests and literal mappings for the complete 15-row MOV_AUDIT movement assignment, including bridge groups, protected cover, route recovery, hull responses, remembered navigation and path scheduling. Keep the rows in progress pending native results and prototype review; preserve earlier Source failures.
 - Add a reduced powered-step regression for the missing source-inspected logistics/convoy movement clamp. Runtime repair and row promotion remain pending.
 - Use the native gunboat catalog entry in the naval smoothing check, corrected by source inspection before the batch runs.
+- Record the single native batch at e1c69647: 18 selected, 12 passed and 6 failed. Keep eight native-PASS rows pending prototype review and seven failed/incomplete rows in progress, with explicit reasons and no retry or runtime repair.
