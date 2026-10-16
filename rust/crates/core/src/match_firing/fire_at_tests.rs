@@ -480,5 +480,8 @@ fn fire_at_dead_aircraft_keeps_main_needs_refusal_without_ground_validation() {
         dispatch(&mut m, json!({"t":"fireat","ids":[bomber],"x":41,"z":41})),
         Some(Denial::Needs)
     );
-    assert_eq!(format!("{:?}", (&m.world, &m.commands.units, &m.aviation)), before);
+    assert_eq!(
+        format!("{:?}", (&m.world, &m.commands.units, &m.aviation)),
+        before
+    );
 }
