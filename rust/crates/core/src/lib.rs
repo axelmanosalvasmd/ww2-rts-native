@@ -69,6 +69,7 @@ pub mod recipient_availability;
 
 #[cfg(test)]
 use crate as core_api;
+pub mod authored_mission;
 #[cfg(test)]
 #[path = "../tests/support/human_commander_facts.rs"]
 mod human_commander_test_facts;
