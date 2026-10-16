@@ -1,3 +1,14 @@
+## Queued house entry snapshot compatibility (2026-10-16)
+
+Queued native Enter orders use the pinned prototype's existing garrison kind 9
+and stored house coordinates in the owner-only waiting-order row. Serialization
+accepts only the normalized singleton actor with `queue: false`, then applies the
+existing finite-coordinate and rounding checks. Activation, house selection and
+player command behavior stay with the canonical garrison owner. No wire meaning
+is added. A full ordinary match test keeps Enter queued behind movement, enters
+the house, captures an objective and earns a VP victory while delivering every
+seat's snapshot on each tick and during the ending hold.
+
 ## Tutorial runtime over existing Match systems (2026-10-16)
 
 The explicit `Match::new_tutorial` constructor adds the unattended Enemy seat and uses the existing `tutorial_steps` definitions. Tutorial shares the ordinary ground, routing, combat, objective and support systems. Its private step state owns only the current index, spawned IDs and pending dialogue. Lines leave through the core tick report from tick 40; no server or client transport is introduced. The runner advances at most one step per tick after capture and income, and finishes at the bridgehead through the common Match finish state.

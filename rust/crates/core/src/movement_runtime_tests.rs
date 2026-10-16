@@ -164,6 +164,7 @@ fn mov20_rear_yield_goal_uses_reverse_without_an_explicit_retreat_order() {
         &steer,
         before,
         &TrafficKnowledge::physical(),
+        false,
     );
     assert!(u.x < before.x);
     assert!(u.move_speed < 0.0);
