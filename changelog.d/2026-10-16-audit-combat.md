@@ -1,0 +1,1 @@
+- Add 32 native combat regression tests on main, including stronger armor, suppression, cover and wreck controls. All 40 focused checks pass. Record 12 complete row claims and 27 dropped rows with their remaining gaps; leave runtime and parity tables unchanged.
