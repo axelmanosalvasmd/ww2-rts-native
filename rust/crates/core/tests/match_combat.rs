@@ -702,3 +702,63 @@ fn mid_tick_removal_keeps_surviving_spatial_bucket_order() {
     let owned = m.grid.owned_by(&m.world.game.units, 1);
     assert_eq!(owned, [3]);
 }
+
+#[test]
+fn cmb64_actual_retirement_pays_enemy_cost_bounty_and_excludes_friendly_death() {
+    let fixture: Value = serde_json::from_str(include_str!("fixtures/match-combat.json")).unwrap();
+    let case = fixture["cases"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|case| case["name"] == "wreck-lifecycle-bounty-and-friendly-death")
+        .unwrap();
+    let mut m = make(case);
+    let before = m
+        .start
+        .economy
+        .players
+        .iter()
+        .map(|p| p.mp)
+        .collect::<Vec<_>>();
+    let retired = m.retire_dead(&[2, 1, 3, 4]).unwrap();
+    assert_eq!(
+        retired
+            .retired
+            .iter()
+            .map(|row| row.unit.id)
+            .collect::<Vec<_>>(),
+        [2, 1, 3]
+    );
+    assert_eq!(m.start.economy.players[0].mp.to_bits(), before[0].to_bits());
+    assert_eq!(
+        m.start.economy.players[1].mp.to_bits(),
+        case["snapshots"][1]["wallets"][1]
+            .as_f64()
+            .unwrap()
+            .to_bits()
+    );
+    let catalog = Catalog::compiled().unwrap();
+    let cost = |kind| {
+        catalog
+            .unit(kind)
+            .unwrap()
+            .get("cost")
+            .unwrap()
+            .number()
+            .unwrap()
+    };
+    let bounty = catalog
+        .table("CFG")
+        .unwrap()
+        .get("bounty")
+        .unwrap()
+        .number()
+        .unwrap();
+    assert_eq!(
+        m.start.economy.players[1].mp,
+        before[1] + cost("tank") * bounty + cost("rifle") * bounty
+    );
+    assert!(!m.world.game.units.contains_key(&1));
+    assert!(!m.world.game.units.contains_key(&3));
+    assert!(m.world.game.units.contains_key(&4));
+}
