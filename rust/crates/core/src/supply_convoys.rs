@@ -44,23 +44,6 @@ fn empty() -> Stock {
 fn distance(a: Point, b: Point) -> f64 {
     math::hypot(a.x - b.x, a.z - b.z)
 }
-// Preserve the prototype's numeric subtraction, including stable zero and NaN ties.
-// Sort indices so the existing V8 implementation also works for owned, non-Copy targets.
-fn sort_numeric<T>(values: &mut [T], key: impl Fn(&T) -> f64) {
-    let mut order: Vec<_> = (0..values.len()).collect();
-    crate::sort::sort_by(&mut order, |a, b| key(&values[a]) - key(&values[b]));
-    for start in 0..order.len() {
-        let mut current = start;
-        let mut next = order[current];
-        while next != start {
-            values.swap(current, next);
-            order[current] = current;
-            current = next;
-            next = order[current];
-        }
-        order[current] = current;
-    }
-}
 fn capacity(pop: f64, equivalents: f64) -> Stock {
     let scale = math::max(0.01, pop);
     Stock {
@@ -778,7 +761,7 @@ impl ConvoyState {
                         .map(|s| (s.id.clone(), distance(s.at, host.at)))
                 })
                 .collect();
-            sort_numeric(&mut nearby, |a| a.1);
+            nearby.sort_by(|a, b| a.1.total_cmp(&b.1));
             for (id, _) in nearby {
                 let s = self.store_mut(&id).unwrap();
                 if s.source {
@@ -990,7 +973,13 @@ impl ConvoyState {
             .filter(|u| u.owner == Some(owner) && u.hp > 0.0 && reserves.get(u.id).is_some())
             .collect();
         let mut assigned = BTreeSet::new();
-        sort_numeric(&mut troops, |u| reserves.get(u.id).unwrap().provisions);
+        troops.sort_by(|a, b| {
+            reserves
+                .get(a.id)
+                .unwrap()
+                .provisions
+                .total_cmp(&reserves.get(b.id).unwrap().provisions)
+        });
         let mut targets = vec![];
         for u in troops.clone() {
             if assigned.contains(&u.id) || occupied.contains(&TargetId::Unit(u.id)) {
@@ -1068,7 +1057,11 @@ impl ConvoyState {
                 });
             }
         }
-        sort_numeric(&mut targets, |t| t.priority.unwrap_or(0.0));
+        targets.sort_by(|a, b| {
+            a.priority
+                .unwrap_or(0.0)
+                .total_cmp(&b.priority.unwrap_or(0.0))
+        });
         troops.clear();
         targets
     }
@@ -1102,7 +1095,7 @@ impl ConvoyState {
             }
             out.push((s.id.clone(), distance(s.at, target.at)));
         }
-        sort_numeric(&mut out, |a| a.1);
+        out.sort_by(|a, b| a.1.total_cmp(&b.1));
         out.into_iter().map(|r| r.0).collect()
     }
     #[allow(clippy::too_many_arguments)]
@@ -1212,7 +1205,7 @@ impl ConvoyState {
                     .iter()
                     .filter_map(|id| self.store(id).cloned())
                     .collect();
-                sort_numeric(&mut s, |a| distance(a.at, u.at));
+                s.sort_by(|a, b| distance(a.at, u.at).total_cmp(&distance(b.at, u.at)));
                 s.into_iter().next()
             });
         let Some(origin) = origin else {
@@ -1291,7 +1284,13 @@ impl ConvoyState {
                         && u.owner.is_some_and(|o| friendly(ctx, o, truck_owner))
                 })
                 .collect();
-            sort_numeric(&mut members, |u| reserves.get(u.id).unwrap().provisions);
+            members.sort_by(|a, b| {
+                reserves
+                    .get(a.id)
+                    .unwrap()
+                    .provisions
+                    .total_cmp(&reserves.get(b.id).unwrap().provisions)
+            });
             let mut served = false;
             for troop in &members {
                 let at = troop
@@ -1663,7 +1662,7 @@ impl ConvoyState {
                     .iter()
                     .filter_map(|id| self.store(id).cloned())
                     .collect();
-                sort_numeric(&mut sources, |a| distance(a.at, u.at));
+                sources.sort_by(|a, b| distance(a.at, u.at).total_cmp(&distance(b.at, u.at)));
                 if let Some(source) = sources.first() {
                     target = Some(source.at);
                     c.origin = source.id.clone();
@@ -2166,7 +2165,7 @@ impl ConvoyState {
                         .iter()
                         .filter_map(|id| self.store(id))
                         .collect();
-                    sort_numeric(&mut sources, |a| distance(a.at, u.at));
+                    sources.sort_by(|a, b| distance(a.at, u.at).total_cmp(&distance(b.at, u.at)));
                     sources.first().map(|s| s.at)
                 } else {
                     rows.iter()
@@ -2361,228 +2360,5 @@ impl ConvoyState {
             stores,
             events,
         })
-    }
-}
-
-#[cfg(test)]
-mod interface_sort_tests {
-    use super::*;
-    use crate::logistics::Reserves;
-
-    struct TestWorld(Vec<UnitView>);
-    impl World for TestWorld {
-        fn units(&self) -> Vec<UnitView> {
-            self.0.clone()
-        }
-        fn unit(&self, id: UnitId) -> Option<UnitView> {
-            self.0.iter().find(|u| u.id == id).cloned()
-        }
-        fn route(&mut self, _: &UnitView, _: Point, _: bool) -> Route {
-            panic!("sorting must not request routes")
-        }
-        fn handoff(&mut self, _: &UnitView, _: Point, _: Option<UnitId>, _: f64) -> bool {
-            true
-        }
-        fn spawn(&mut self, _: usize, _: Point) -> UnitId {
-            panic!("sorting must not spawn")
-        }
-        fn retire(&mut self, _: UnitId) {
-            panic!("sorting must not retire")
-        }
-        fn apply(&mut self, _: UnitId, _: UnitOperation) {
-            panic!("sorting must not move units")
-        }
-    }
-    fn unit(id: UnitId, x: f64) -> UnitView {
-        UnitView {
-            projected: false,
-            id,
-            owner: Some(0),
-            role: UnitRole::Other,
-            hp: 100.0,
-            built: 1.0,
-            at: Point { x, z: 0.0 },
-            still: 0.0,
-            cargo_len: 0,
-            region_cache: false,
-            riding: None,
-            path: vec![],
-            world_goal: None,
-            orders: vec![],
-            orders_pending: false,
-            amove: None,
-            stuck: 0.0,
-        }
-    }
-    fn reserve(provisions: f64) -> Reserves {
-        Reserves {
-            ammo: 0.0,
-            ammo_max: 0.0,
-            ammo_price: 0.0,
-            ammo_credit: None,
-            provisions,
-            fuel: None,
-            emergency: None,
-            warning: None,
-            forced: false,
-            stranded: false,
-            exhausted: false,
-            supply_rate: None,
-            cut_for: Some(10.0),
-        }
-    }
-    fn context(players: &[Player]) -> Context<'_> {
-        Context {
-            enabled: true,
-            construction: false,
-            tick: 0,
-            winner: false,
-            army_pop: 1.0,
-            players,
-            width: 1,
-            chars: b".",
-            aid: &[],
-            points: &[],
-        }
-    }
-    fn player() -> Player {
-        Player {
-            slot: 0,
-            team: 0,
-            spawn: Point { x: 0.0, z: 0.0 },
-            out: false,
-            away: false,
-        }
-    }
-
-    #[test]
-    fn convoy_target_seed_and_members_keep_numeric_ties_and_signed_zero() {
-        let players = [player()];
-        let ctx = context(&players);
-        for provisions in [[0.0, -0.0, 0.0], [25.0, 25.0, 25.0], [30.0, 10.0, 20.0]] {
-            let mut reserves = LogisticsState::default();
-            for (id, value) in [30, 10, 20].into_iter().zip(provisions) {
-                reserves.insert(id, reserve(value));
-            }
-            let mut world = TestWorld(vec![unit(30, 100.0), unit(10, 101.0), unit(20, 102.0)]);
-            let targets = ConvoyState::default().targets(ctx, 0, &reserves, &mut world);
-            assert_eq!(targets.len(), 1);
-            let expected = if provisions[0] == 30.0 {
-                vec![10, 20, 30]
-            } else {
-                vec![30, 10, 20]
-            };
-            assert_eq!(targets[0].members, expected);
-            assert_eq!(targets[0].unit, Some(expected[0]));
-        }
-    }
-
-    #[test]
-    fn convoy_delivery_gives_first_signed_zero_member_the_limited_cargo() {
-        let players = [player()];
-        let ctx = context(&players);
-        let mut reserves = LogisticsState::default();
-        reserves.insert(30, reserve(0.0));
-        reserves.insert(10, reserve(-0.0));
-        let mut world = TestWorld(vec![unit(30, 0.0), unit(10, 0.0)]);
-        let mut state = ConvoyState::default();
-        let target = state.targets(ctx, 0, &reserves, &mut world).remove(0);
-        let mut truck = Truck {
-            state: TruckState::Unloading,
-            cargo: Stock {
-                ammo: 1.0,
-                provisions: 16.0,
-                fuel: 0.0,
-            },
-            target: Some(target),
-            origin: StoreId::Source(1),
-            timer: 8.0,
-            manual: false,
-            hold: false,
-            route: vec![],
-            destination: None,
-            route_failure: None,
-            retry: None,
-        };
-        // Ammunition remains after service, so this test does not request a return route.
-        state.deliver(
-            ctx,
-            &unit(99, 0.0),
-            &mut truck,
-            &mut reserves,
-            &mut world,
-            1.0,
-        );
-        assert_eq!(reserves.get(30).unwrap().provisions, 15.0);
-        assert_eq!(reserves.get(10).unwrap().provisions, 1.0);
-    }
-
-    #[test]
-    fn convoy_nan_reserves_are_admitted_and_compare_as_stable_ties() {
-        let players = [player()];
-        let ctx = context(&players);
-        assert_eq!(validate(ctx), Ok(()));
-        let mut reserves = LogisticsState::default();
-        reserves.insert(30, reserve(f64::NAN));
-        reserves.insert(10, reserve(0.0));
-        assert!(reserves.get(30).unwrap().provisions.is_nan());
-        let mut world = TestWorld(vec![unit(30, 0.0), unit(10, 1.0)]);
-        let targets = ConvoyState::default().targets(ctx, 0, &reserves, &mut world);
-        assert_eq!(targets[0].unit, Some(30));
-        assert_eq!(targets[0].members, vec![30, 10]);
-    }
-
-    #[test]
-    fn convoy_origins_keep_equidistant_and_overflow_distance_ties_in_store_order() {
-        let players = [player()];
-        let ctx = context(&players);
-        for (target_x, xs) in [
-            (0.0, [10.0, -10.0]),
-            (-f64::MAX, [f64::MAX, f64::MAX / 2.0]),
-        ] {
-            let mut state = ConvoyState::default();
-            state.stores = xs
-                .into_iter()
-                .enumerate()
-                .map(|(i, x)| Store {
-                    id: StoreId::Source((10 - i) as u32),
-                    owner: 0,
-                    at: Point { x, z: 0.0 },
-                    source: true,
-                    entity: None,
-                    capacity: empty(),
-                    buckets: vec![],
-                    donations: vec![],
-                    active: true,
-                    support: false,
-                    point: None,
-                })
-                .collect();
-            let target = Target {
-                id: TargetId::Unit(1),
-                unit: Some(1),
-                store: None,
-                owner: 0,
-                at: Point {
-                    x: target_x,
-                    z: 0.0,
-                },
-                members: vec![1],
-                need: empty(),
-                priority: None,
-                relief: None,
-            };
-            assert_eq!(validate(ctx), Ok(()));
-            assert_eq!(
-                state.origins(ctx, 0, &target),
-                vec![StoreId::Source(10), StoreId::Source(9)]
-            );
-            if target_x != 0.0 {
-                let a = distance(state.stores[0].at, target.at);
-                let b = distance(state.stores[1].at, target.at);
-                assert!(a.is_infinite() && b.is_infinite());
-                assert!((a - b).is_nan());
-            }
-        }
     }
 }

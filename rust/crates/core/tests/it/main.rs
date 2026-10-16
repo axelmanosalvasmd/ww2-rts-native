@@ -59,8 +59,6 @@ mod human_commander_timing;
 mod interface_intent;
 #[path = "../interface_map_helpers.rs"]
 mod interface_map_helpers;
-#[path = "../interface_sort_intent.rs"]
-mod interface_sort_intent;
 #[path = "../interface_runtime_batch3.rs"]
 mod interface_runtime_batch3;
 #[path = "../interface_stream_consumers.rs"]

@@ -235,7 +235,7 @@ fn if03_query_reads_only_delivered_rows_and_leaves_recipient_state_unchanged() {
     );
     assert_eq!(v, before);
     v.apply(
-        &json!({"t":"s","units":[],"gone":[4],"held":[4,1^2^3^5],"mp":10000,"tech":{"tier":3}})
+        &json!({"t":"s","units":[],"gone":[4],"held":[4,5],"mp":10000,"tech":{"tier":3}})
             .to_string(),
     )
     .unwrap();
@@ -314,6 +314,27 @@ fn if03_one_thousand_pure_snapshot_queries_and_every_deny_code_match_prototype()
             deny_sentence(case["code"].as_str().unwrap(), case["command"].as_str()).unwrap(),
             case["expected"].as_str().unwrap(),
             "{case}"
+        );
+    }
+}
+
+#[test]
+fn if03_focused_denial_precedence_and_threshold_queries_match_prototype() {
+    let fixture: Value =
+        serde_json::from_str(include_str!("fixtures/interface-availability.json")).unwrap();
+    let cases = fixture["focusedCases"].as_array().unwrap();
+    assert!(!cases.is_empty());
+    let mut names = std::collections::BTreeSet::new();
+    for case in cases {
+        assert!(names.insert(case["name"].as_str().unwrap()));
+        let actual = availability(Some(&view(case["snapshot"].clone())), &case["action"])
+            .unwrap_or_else(|error| panic!("{}: {error}", case["name"]));
+        assert_eq!(
+            json!({"ok": actual.ok, "reason": actual.reason}),
+            case["expected"],
+            "{}: {}",
+            case["name"],
+            case["action"]
         );
     }
 }

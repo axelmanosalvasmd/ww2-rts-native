@@ -394,19 +394,18 @@ pub fn availability(view: Option<&ClientView>, action: &Value) -> Result<Availab
             if !money.ok {
                 return Ok(money);
             }
-            if let Some(needs) = def.get("needs").and_then(Rule::string) {
-                if !facilities
+            if let Some(needs) = def.get("needs").and_then(Rule::string)
+                && !facilities
                     .iter()
                     .any(|u| u.kind == needs && u.built >= 1.0 && u.hp > 0.0)
-                {
-                    return Ok(no(format!(
-                        "Needs a {}",
-                        unit(needs)?
-                            .get("name")
-                            .and_then(Rule::string)
-                            .unwrap_or(needs)
-                    )));
-                }
+            {
+                return Ok(no(format!(
+                    "Needs a {}",
+                    unit(needs)?
+                        .get("name")
+                        .and_then(Rule::string)
+                        .unwrap_or(needs)
+                )));
             }
             yes()
         }

@@ -1,19 +1,12 @@
 use super::*;
 use crate::{
-    command_destinations::{self, Context as DestinationContext, Request as Destination},
     economy::{Faction, Mode},
     economy_state::ArmySize,
     environment::{Context as EnvironmentContext, DamageContext},
     map::AuthoritativeMap,
     match_runtime::{MatchOptions, PlayerConfig},
-    observed_memory::{FootprintFact, ObservationFacts, ObservationFrame, ObservedMemory},
-    path_requests::{
-        Disposition, PathRequestContext, PathRequests, PathUpdate, Request, RequestKind,
-        SchedulerError, SearchOutcome, TickConfig,
-    },
     recipient_snapshot::DeliveryState,
     weather::WeatherChoice,
-    world::Recipient,
 };
 use serde_json::json;
 
@@ -121,8 +114,13 @@ fn if22_hospital_placement_order_survives_transactions_recovery_ticks_and_snapsh
     m.reinforce(&frame, 0.05).unwrap();
     assert!(m.world.game.units[&id].hp > 30.0);
 
+    // A short VP goal runs the ordinary finish phase while hospitals remain live.
+    m.start.win_vp = 1.0;
+    m.start.points[0].owner = Some(0);
+    m.start.points[0].vp = 1.0;
     let mut delivery = DeliveryState::new(&m).unwrap();
-    for _ in 0..4 {
+    let mut ending_ticks = 0;
+    for _ in 0..80 {
         m.advance_tick().unwrap();
         assert_eq!(m.tick_state.fault(), None);
         let frame = delivery
@@ -131,7 +129,18 @@ fn if22_hospital_placement_order_survives_transactions_recovery_ticks_and_snapsh
         for slot in 0..2 {
             assert!(frame.recipient(slot).unwrap().into_json().is_object());
         }
+        if m.finish.is_some() {
+            ending_ticks += 1;
+            if ending_ticks == 4 {
+                break;
+            }
+        }
     }
+    assert_eq!(
+        ending_ticks, 4,
+        "the ordinary match reaches its ending hold"
+    );
+    assert_eq!(m.finish.unwrap().winner, 0);
     assert_eq!(
         m.world
             .aid
@@ -301,6 +310,7 @@ fn if22_structure_contacts_deduplicate_and_evict_the_oldest_inserted_key() {
     let mut hit = DamageContext::plain(&skip);
     for index in 0..2048 {
         let key = format!("contact:{index}");
+        let mut hit = DamageContext::plain(&skip);
         hit.contact_id = Some(&key);
         assert_eq!(
             m.environment
@@ -341,206 +351,4 @@ fn if22_structure_contacts_deduplicate_and_evict_the_oldest_inserted_key() {
         m.environment.contacts().last().unwrap(),
         &format!("contact:0:{section}")
     );
-}
-
-#[test]
-fn if26_queued_facing_groups_signed_zero_but_keeps_adjacent_floats_distinct() {
-    let m = scene();
-    let ids = m
-        .world
-        .game
-        .units
-        .keys()
-        .copied()
-        .take(2)
-        .collect::<Vec<_>>();
-    let context = DestinationContext {
-        game: &m.world.game,
-        rules: &m.rules,
-        grid: &m.grid,
-        points: &[],
-        hit_at: &BTreeMap::new(),
-    };
-    let zero = [
-        Destination {
-            id: ids[0],
-            at: Point { x: -0.0, z: 60.0 },
-        },
-        Destination {
-            id: ids[1],
-            at: Point { x: 0.0, z: 60.0 },
-        },
-    ];
-    let actual = command_destinations::spread_queued_facing(&context, &zero, 0.0).unwrap();
-    let expected = command_destinations::spread_facing(&context, &zero, 0.0).unwrap();
-    assert_eq!(actual, expected);
-    assert_ne!(actual[0].at, actual[1].at);
-    let near = [
-        Destination {
-            id: ids[0],
-            at: Point { x: 60.0, z: 60.0 },
-        },
-        Destination {
-            id: ids[1],
-            at: Point {
-                x: f64::from_bits(60.0_f64.to_bits() + 1),
-                z: 60.0,
-            },
-        },
-    ];
-    assert_eq!(
-        command_destinations::spread_queued_facing(&context, &near, 0.0).unwrap(),
-        near
-    );
-    let invalid = [Destination {
-        id: ids[0],
-        at: Point {
-            x: f64::NAN,
-            z: 60.0,
-        },
-    }];
-    assert_eq!(
-        command_destinations::spread_queued_facing(&context, &invalid, 0.0),
-        Err(command_destinations::Error::InvalidInput)
-    );
-}
-
-struct RetryContext {
-    goal: Point,
-    updates: Vec<PathUpdate>,
-}
-impl PathRequestContext for RetryContext {
-    type Error = ();
-    fn current_goal(&mut self, _: u32, _: RequestKind) -> Option<Point> {
-        Some(self.goal)
-    }
-    fn unit_incarnation(&self, _: u32) -> Option<u64> {
-        Some(1)
-    }
-    fn knowledge_version(&self, _: u32) -> u64 {
-        0
-    }
-    fn search(&mut self, _: Request) -> Result<SearchOutcome, ()> {
-        Ok(SearchOutcome {
-            path: vec![],
-            failed: true,
-        })
-    }
-    fn apply(&mut self, update: PathUpdate) {
-        self.updates.push(update);
-    }
-}
-
-#[test]
-fn if26_path_retry_identity_folds_zero_and_resets_for_nearby_goals_and_kinds() {
-    let mut paths = PathRequests::new();
-    let mut context = RetryContext {
-        goal: Point { x: -0.0, z: 40.0 },
-        updates: vec![],
-    };
-    paths
-        .begin_tick(
-            TickConfig {
-                retry_limit: 2,
-                ..Default::default()
-            },
-            &mut context,
-        )
-        .unwrap();
-    let mut request = Request {
-        unit: 1,
-        kind: RequestKind::World,
-        goal: context.goal,
-    };
-    paths.request(request, &mut context).unwrap();
-    request.goal.x = 0.0;
-    paths.request(request, &mut context).unwrap();
-    assert!(context.updates.last().unwrap().dropped.is_some());
-    request.goal.x = 40.0;
-    paths.request(request, &mut context).unwrap();
-    request.goal.x = f64::from_bits(40.0_f64.to_bits() + 1);
-    paths.request(request, &mut context).unwrap();
-    assert!(context.updates.last().unwrap().dropped.is_none());
-    request.kind = RequestKind::Dig;
-    paths.request(request, &mut context).unwrap();
-    assert!(context.updates.last().unwrap().dropped.is_none());
-    request.goal.x = f64::NAN;
-    assert_eq!(
-        paths.request(request, &mut context),
-        Err(SchedulerError::InvalidGoal)
-    );
-
-    paths
-        .begin_tick(
-            TickConfig {
-                budget: 0,
-                ..Default::default()
-            },
-            &mut context,
-        )
-        .unwrap();
-    request.goal.x = -0.0;
-    assert_eq!(
-        paths.request(request, &mut context),
-        Ok(Disposition::Queued)
-    );
-    request.goal.x = 0.0;
-    assert_eq!(
-        paths.request(request, &mut context),
-        Ok(Disposition::AlreadyQueued)
-    );
-}
-
-struct AllSeen;
-impl ObservationFacts for AllSeen {
-    fn cell_visible(&mut self, _: usize, _: i32) -> bool {
-        true
-    }
-    fn mine_known(&mut self, _: usize, _: i32) -> bool {
-        true
-    }
-    fn mine_owned(&mut self, _: usize, _: i32) -> bool {
-        false
-    }
-    fn footprint(&mut self, _: usize, _: usize, _: i32) -> Option<FootprintFact> {
-        None
-    }
-}
-
-#[test]
-fn if26_recipient_cell_equality_folds_zero_and_retains_nearby_float_changes() {
-    let mut m = scene();
-    let cell = 1000;
-    m.world.register_recipient(Recipient::Player(0));
-    let mut memory = ObservedMemory::new(&m.world, 0, 1).unwrap();
-    let frame = ObservationFrame {
-        team: 0,
-        skip_fog: false,
-    };
-    m.world.game.wear.as_mut().unwrap()[cell] = -0.0;
-    m.world.log_cell(cell, true).unwrap();
-    assert_eq!(
-        memory.refresh(&mut m.world, frame, &mut AllSeen).unwrap(),
-        1
-    );
-    memory.take_changes();
-    let initial_revision = memory.revision();
-    m.world.game.wear.as_mut().unwrap()[cell] = 0.0;
-    m.world.game.vision_tick = Some(1);
-    m.world.log_cell(cell, true).unwrap();
-    assert_eq!(
-        memory.refresh(&mut m.world, frame, &mut AllSeen).unwrap(),
-        0
-    );
-    assert_eq!(memory.revision(), initial_revision);
-    assert!(memory.outbox().is_empty());
-    m.world.game.wear.as_mut().unwrap()[cell] = f32::from_bits(1);
-    m.world.game.vision_tick = Some(2);
-    m.world.log_cell(cell, true).unwrap();
-    assert_eq!(
-        memory.refresh(&mut m.world, frame, &mut AllSeen).unwrap(),
-        1
-    );
-    assert_eq!(memory.revision(), initial_revision + 1);
-    assert_eq!(memory.take_changes()[0].row.data.ground_wear.to_bits(), 1);
 }

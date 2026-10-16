@@ -1,5 +1,0 @@
-- Added recipient-only availability and denial queries with spectator/default-action handling and numeric identity comparisons, and pure received-map presentation helpers for terrain, houses, rails and territory borders.
-- Preserved field-hospital placement order through recovery and transactions, and used JavaScript numeric comparison for convoy priorities and distances, including signed-zero and NaN ties.
-- Added interface tests for live training births, ordered collections, float keys and recipient equality. Placement remains incomplete for recipient views; wall and gate remain unsupported, Horde plan equality and broader AI sort consumers remain missing, and authoring fairness and six-AI outcome runs remain pending.
-- Applied project formatting to the new interface helpers and corrected their test imports before native qualification.
-- Native qualification remains pending because shared Cargo slots were occupied after the corrected test import; no parity row is counted yet.
