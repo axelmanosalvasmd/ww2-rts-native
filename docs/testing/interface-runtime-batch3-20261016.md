@@ -1,11 +1,12 @@
 # IF-RUNTIME-2: recipient cover and deterministic state
 
 This branch starts at main `992633f820d3d9f7708d1135638f18ca69d7c752`,
-with prototype `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`. It imports
-nothing from PR #312. Row claims cover the server/core portion only.
-Unreal adoption and additional C queries remain separate work.
+with prototype `e4e579a838aabae3b1d9dadbc17a0a87147bc52d`, and merges
+main `89e07789` before final validation. It imports nothing from PR #312
+and claims server/core proof only. Unreal adoption and additional C queries
+remain separate work.
 
-## Candidate row checks
+## Row checks
 
 - IF-07: `if07_cover_classes_house_edges_and_exploration_match_prototype_rules`,
   `if07_directional_cover_uses_delivered_damage_hulls_and_settled_wrecks`,
@@ -22,7 +23,8 @@ Unreal adoption and additional C queries remain separate work.
   remain absent after projection and ClientView decoding. Full replacement
   and match restart remove prior rows. Direct review of the unchanged
   `rust/crates/ffi/include/ww2_core.h` finds only a recipient-view handle and
-  caller-supplied formation data, with no authoritative game handle.
+  caller-supplied formation data, with no authoritative game handle. The
+  unchanged FFI wrapper stores only ClientView and its panic-poison flag.
 - IF-20: `if20_match_streams_replay_across_rooms_and_unrelated_ai_draws`.
   Equal seeds produce equal startup units and forty ordinary combat ticks.
   Recorded Hold Fire orders then stop firing, eight real ticks settle the
@@ -73,7 +75,8 @@ recorder, captured fixture or provenance bundle.
 - IF-03: the recipient availability query, including all action denials,
   remains missing. Existing stateless economics alone is partial evidence.
 - IF-04: recipient building/fort preview coverage is incomplete; ordinary
-  fort admission still rejects bridge, fill, wall and gate.
+  fort admission still rejects wall and gate. Incoming main adds bridge and
+  fill providers, but does not establish the complete recipient preview.
 - IF-08: complete map, layer, road, territory and weather helper coverage
   is broader than the cover query.
 - IF-12: editor authoring and seeded whole-AI fairness execution are not
@@ -100,5 +103,14 @@ The mixed rows above remain unproven for their incomplete core/tool parts.
 
 ## Validation
 
-Pending focused native tests, formatting and strict workspace Clippy in a
-shared Cargo slot on the Vostro. No row is proven until its checks pass.
+On the Vostro, S2 passed all eleven selected native tests (six new, four
+existing consumer checks and the test registry), with 211 tests skipped.
+The formatting check and strict workspace/all-target Clippy passed.
+All Cargo commands use Rust 1.99.0, a 6 GiB scope, no swap and four build
+jobs in the slot target directory.
+
+Two earlier witness failures were corrected: derived unit equality rejects
+the intentional NaN pace sentinel, and complete snapshot admission rejects
+persistent flights. The final test compares pace bits explicitly and sends
+recorded Hold Fire orders before ordinary flight settling. Neither repair
+changes runtime providers or weakens a guard.

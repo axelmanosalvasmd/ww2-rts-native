@@ -53,7 +53,7 @@ fn if07_cover_classes_house_edges_and_exploration_match_prototype_rules() {
         ".T+ORH#W....",
     ];
     let knowledge = terrain(&rows);
-    let explored = vec![true; 72];
+    let explored = [true; 72];
     for (x, expected) in [
         (0, Open),
         (1, Heavy),
@@ -126,7 +126,7 @@ fn if07_cover_classes_house_edges_and_exploration_match_prototype_rules() {
 #[test]
 fn if07_directional_cover_uses_delivered_damage_hulls_and_settled_wrecks() {
     let mut knowledge = terrain(&["........", "....H...", "........"]);
-    let explored = vec![true; 24];
+    let explored = [true; 24];
     let at = Point { x: 5.5, z: 3.0 };
     let east = Some(Point { x: 25.5, z: 3.0 });
     let west = Some(Point { x: -14.5, z: 3.0 });
@@ -385,8 +385,28 @@ fn if20_match_streams_replay_across_rooms_and_unrelated_ai_draws() {
     // through the recorded boundary and let the actual flight phase settle them.
     for state in [&mut control, &mut replay] {
         for owner in 0..2 {
-            let ids = state.world.game.units.values().filter(|u| u.owner == owner).map(|u| i64::from(u.id)).collect();
-            state.enqueue_command(OrderKey { tick: 41, issuer: owner as u32, sequence: 1 }, Command::Stance { ids, stance: Stance::HoldFire, on: true }).unwrap();
+            let ids = state
+                .world
+                .game
+                .units
+                .values()
+                .filter(|u| u.owner == owner)
+                .map(|u| i64::from(u.id))
+                .collect();
+            state
+                .enqueue_command(
+                    OrderKey {
+                        tick: 41,
+                        issuer: owner as u32,
+                        sequence: 1,
+                    },
+                    Command::Stance {
+                        ids,
+                        stance: Stance::HoldFire,
+                        on: true,
+                    },
+                )
+                .unwrap();
         }
     }
     for _ in 0..8 {
@@ -397,7 +417,10 @@ fn if20_match_streams_replay_across_rooms_and_unrelated_ai_draws() {
         assert_units(&control, &replay);
     }
     assert!(control.firing.flights.is_empty() && replay.firing.flights.is_empty());
-    assert_eq!(snapshot(&mut control, &mut left_delivery), snapshot(&mut replay, &mut right_delivery));
+    assert_eq!(
+        snapshot(&mut control, &mut left_delivery),
+        snapshot(&mut replay, &mut right_delivery)
+    );
     assert!(control.tick_state.fault().is_none() && replay.tick_state.fault().is_none());
     let left = control.start.random.snapshot();
     let mut right = replay.start.random.snapshot();
