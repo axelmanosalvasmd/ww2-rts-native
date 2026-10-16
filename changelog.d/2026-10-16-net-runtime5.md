@@ -1,0 +1,1 @@
+- Project canonical aircraft in internal recipient unit rows, including allied visibility, airborne enemy filtering and the grounded flag. Add NET-52 checks across three seats, all five aircraft states, end reveal and ordinary ticks. Complete hosted aircraft snapshots remain refused.

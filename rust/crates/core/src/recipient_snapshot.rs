@@ -129,6 +129,14 @@ impl<'a> SnapshotCache<'a> {
             finite(&[u.x, u.z])?;
         }
         engineering::validate(state)?;
+        if g.units
+            .values()
+            .any(|u| u.air.is_some() || state.rules.kinds[u.kind].air)
+        {
+            state
+                .validate_aviation()
+                .map_err(|_| SnapshotError::Rules)?;
+        }
         let rows = state
             .world
             .game
@@ -184,6 +192,7 @@ impl<'a> SnapshotCache<'a> {
         Ok(RecipientProjection {
             fields,
             missing: vec![
+                SnapshotCapability::Air,
                 SnapshotCapability::WrecksAndFoundMines,
                 SnapshotCapability::Terrain,
                 SnapshotCapability::Fog,
@@ -227,9 +236,6 @@ fn unit_row(state: &Match, u: &Unit) -> Result<Value, SnapshotError> {
         unit: u.id,
         capability,
     };
-    if u.air.is_some() || k.air {
-        return Err(unsupported(SnapshotCapability::Air));
-    }
     let def = Catalog::compiled()
         .map_err(|_| SnapshotError::Rules)?
         .unit(&k.name)
@@ -289,6 +295,9 @@ fn unit_row(state: &Match, u: &Unit) -> Result<Value, SnapshotError> {
         u.built.unwrap_or(1.0),
     ])?;
     let mut flags = 0u64;
+    if u.air.is_some() && !vision::airborne(u) {
+        flags |= 512;
+    }
     if u.riding {
         flags |= 262144;
     }
@@ -1079,3 +1088,7 @@ pub(crate) mod tests {
 #[cfg(test)]
 #[path = "map_house_selected_tests.rs"]
 mod map_house_selected_tests;
+
+#[cfg(test)]
+#[path = "recipient_snapshot/net52_tests.rs"]
+mod net52_tests;
