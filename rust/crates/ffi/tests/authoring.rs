@@ -268,3 +268,192 @@ fn fairness_crosses_both_commander_beats_with_complete_recipient_delivery() {
     assert_eq!(result["timedOut"], true);
     assert_eq!(result["player_vp"].as_array().unwrap().len(), 2);
 }
+
+fn biased_map(mirror: bool) -> Value {
+    let mut source = json!({"name":"Biased authoring test","w":96,"h":96,
+        "rows":vec![".".repeat(96);96],
+        "spawns":[{"x":4,"y":4},{"x":91,"y":91}],
+        "points":[{"x":5,"y":5,"vp":5,"mp":0},{"x":5,"y":8,"vp":5,"mp":0},
+                  {"x":8,"y":5,"vp":5,"mp":0}]});
+    if mirror {
+        for point in source["points"].as_array_mut().unwrap() {
+            point["x"] = json!(95 - point["x"].as_u64().unwrap());
+            point["y"] = json!(95 - point["y"].as_u64().unwrap());
+        }
+    }
+    source
+}
+
+#[test]
+fn fairness_finishes_real_ai_matches_and_credits_actual_shuffled_starts() {
+    for mirror in [false, true] {
+        let source = biased_map(mirror);
+        assert_eq!(call(ww2_authoring_validate_map, &source), Value::Null);
+        for seed in [7, 77] {
+            let input = json!({"map":source,"seed":seed,"max_ticks":2400,
+                "options":{"players":2}});
+            let result = call(ww2_authoring_play_match, &input);
+            assert_eq!(result, call(ww2_authoring_play_match, &input));
+            assert_eq!(result["timedOut"], false, "{result}");
+            assert!(result["ticks"].as_u64().unwrap() > 80);
+            let winner = result["winner"].as_u64().unwrap() as usize;
+            assert_eq!(
+                result["players"][winner]["spawn"],
+                if mirror {
+                    json!({"x":183.0,"z":183.0})
+                } else {
+                    json!({"x":9.0,"z":9.0})
+                }
+            );
+            assert!(result["player_vp"][winner].as_f64().unwrap() >= 1200.0);
+            assert_eq!(result["winning_team"], result["players"][winner]["team"]);
+        }
+    }
+}
+
+#[test]
+fn preview_exposes_classic_resources_and_horde_roles() {
+    let mut source = biased_map(false);
+    source["points"] = json!([{"x":48,"y":48,"vp":1,"mp":1}]);
+    let classic = call(
+        ww2_authoring_create_preview,
+        &json!({"map":source,"options":{"mode":"classic","players":2}}),
+    );
+    assert_eq!(
+        classic["units"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|u| u["type"] == "hq")
+            .count(),
+        2
+    );
+    let nodes = classic["nodes"].as_array().unwrap();
+    assert!(nodes.iter().any(|node| node["fuel"] == true));
+    assert!(nodes.iter().any(|node| node["fuel"] == false));
+    source["defend"] = json!([0]);
+    let horde = call(
+        ww2_authoring_create_preview,
+        &json!({"map":source,"options":{"mode":"horde","players":2}}),
+    );
+    assert_eq!(horde["players"].as_array().unwrap().len(), 3);
+    assert_eq!(horde["players"][0]["spawn"], horde["players"][1]["spawn"]);
+    assert_eq!(horde["horde"]["slot"], 2);
+    let gate = &horde["horde"]["gates"][0];
+    assert_eq!(horde["horde"]["gates"].as_array().unwrap().len(), 1);
+    assert!((gate["x"].as_f64().unwrap() - 171.68629150101523).abs() < 1e-10);
+    assert!((gate["z"].as_f64().unwrap() - 171.68629150101523).abs() < 1e-10);
+    assert_eq!(horde["horde"]["active"], false);
+    assert!(horde["horde"]["timeLeft"].as_f64().unwrap() > 0.0);
+    assert_eq!(
+        horde["units"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|u| u["type"] == "bunker")
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn preview_assault_and_annihilation_preserve_roles_forts_and_point_filtering() {
+    let mut source = biased_map(false);
+    source["defend"] = json!([1]);
+    source["assaultTime"] = json!(600);
+    source["points"] = json!([{"x":48,"y":48,"vp":5,"mp":0},{"x":48,"y":50,"vp":1,"mp":1}]);
+    for mode in ["assault", "annihilation"] {
+        let preview = call(
+            ww2_authoring_create_preview,
+            &json!({"map":source,"options":{"mode":mode,"players":2}}),
+        );
+        assert_eq!(preview["points"].as_array().unwrap().len(), 1);
+        assert!(
+            preview["units"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|u| u["type"] == "bunker")
+        );
+        assert!(
+            preview["rows"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|r| r.as_str().unwrap().contains('T'))
+        );
+        if mode == "assault" {
+            assert_eq!(preview["players"][0]["spawn"], json!({"x":183.0,"z":183.0}));
+            assert_eq!(preview["players"][0]["team"], 0);
+            assert_eq!(preview["players"][1]["team"], 1);
+            assert_eq!(preview["assault"]["time_left"], 600.0);
+        } else {
+            assert_eq!(preview["elimination"]["bunkers"], json!([1, 1]));
+            assert_eq!(preview["elimination"]["time_left"], Value::Null);
+        }
+    }
+}
+
+#[test]
+fn fairness_moves_beyond_home_capture_range_before_winning() {
+    let source = json!({"name":"AI must leave home","w":128,"h":128,
+        "rows":vec![".".repeat(128);128],
+        "spawns":[{"x":4,"y":4},{"x":123,"y":123}],
+        "points":[{"x":20,"y":20,"vp":5,"mp":0},{"x":20,"y":23,"vp":5,"mp":0},
+                  {"x":23,"y":20,"vp":5,"mp":0}]});
+    let input = json!({"map":source,"seed":77,"max_ticks":3600,"options":{"players":2}});
+    let early = call(
+        ww2_authoring_play_match,
+        &json!({"map":source,"seed":77,"max_ticks":80,"options":{"players":2}}),
+    );
+    assert_eq!(early["player_vp"], json!([0.0, 0.0]));
+    let result = call(ww2_authoring_play_match, &input);
+    assert_eq!(result, call(ww2_authoring_play_match, &input));
+    assert_eq!(result["timedOut"], false, "{result}");
+    let winner = result["winner"].as_u64().unwrap() as usize;
+    assert_eq!(result["players"][winner]["spawn"], json!({"x":9.0,"z":9.0}));
+    assert!(result["player_vp"][winner].as_f64().unwrap() >= 1200.0);
+}
+
+#[test]
+fn horde_preview_without_defenders_keeps_the_prototype_conquest_fallback() {
+    let result = call(
+        ww2_authoring_create_preview,
+        &json!({"map":map(),"options":{"mode":"horde","players":2,"logistics":true}}),
+    );
+    assert_eq!(result["horde"], Value::Null);
+    assert_eq!(result["players"].as_array().unwrap().len(), 2);
+    assert_eq!(result["winVp"], 1200.0);
+}
+
+#[test]
+fn sixty_seeded_c_matches_reproduce_the_editor_unfair_verdict_by_authored_spawn() {
+    let source = biased_map(false);
+    let mut wins = [0_u32; 2];
+    let mut timeouts = 0;
+    let mut winning_seats = std::collections::BTreeSet::new();
+    for seed in 7..67 {
+        let result = call(ww2_authoring_play_match,
+            &json!({"map":source,"seed":seed,"max_ticks":2400,"options":{"players":2}}));
+        if result["timedOut"] == true {
+            timeouts += 1;
+            continue;
+        }
+        let winner = result["winner"].as_u64().unwrap() as usize;
+        winning_seats.insert(winner);
+        let spawn = &result["players"][winner]["spawn"];
+        let index = if spawn == &json!({"x":9.0,"z":9.0}) { 0 }
+            else if spawn == &json!({"x":183.0,"z":183.0}) { 1 }
+            else { panic!("winner has no authored spawn: {result}") };
+        wins[index] += 1;
+    }
+    // client/fairness.js credits the shuffled start; editor.js:392-399 uses this precedence.
+    let played = 60 - timeouts;
+    let percentages = wins.map(|n| if played == 0 { 0 } else { (f64::from(n) / f64::from(played) * 100.0).round() as u32 });
+    let verdict = if timeouts > 12 { "too-long" }
+        else if played < 60 { "too-few" }
+        else if percentages.iter().any(|p| *p < 30 || *p > 70) { "unfair" }
+        else { "fair" };
+    assert_eq!((wins,timeouts,percentages,verdict),([60,0],0,[100,0],"unfair"));
+    assert_eq!(winning_seats.len(),2,"spawn attribution must survive seat shuffling");
+}

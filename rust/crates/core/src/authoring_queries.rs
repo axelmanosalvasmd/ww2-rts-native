@@ -262,10 +262,10 @@ fn options(value: &Value, source: &AuthoritativeMap, shuffle: bool) -> Result<Ma
                     .ok_or("invalid weatherSeed")
             })
             .transpose()?,
-        living_weather: flag("livingWeather", false)?,
+        living_weather: flag("livingWeather", true)?,
         map_key: None,
         tech: flag("tech", false)?,
-        supply: flag("supply", false)?,
+        supply: flag("supply", true)?,
         logistics: flag("logistics", false)?,
         sandbox: flag("sandbox", false)?,
     })
@@ -276,7 +276,14 @@ fn construct(value: &Value, shuffle: bool) -> Result<Match> {
     if source.geography().is_some() {
         return Err("World authoring runtime is unavailable".into());
     }
-    let opts = options(value, &source, shuffle)?;
+    let mut opts = options(value, &source, shuffle)?;
+    // createGame treats an unavailable Horde selection as ordinary Conquest.
+    if opts.mode == Mode::Horde
+        && (source.defend().is_none_or(<[usize]>::is_empty) || opts.players.len() == 6)
+    {
+        opts.mode = Mode::Conquest;
+        opts.logistics = false;
+    }
     match opts.mode {
         Mode::Default | Mode::Conquest => Match::new(&source, opts),
         Mode::Classic => Match::new_classic(&source, opts),
@@ -335,11 +342,27 @@ pub fn create_preview(value: &Value) -> Result<Value> {
     shown["rows"] = json!(rows(&display_chars));
     shown["layers"] = json!({"ground":g.ground.as_deref().map(rows),"objects":display_objects.as_deref().map(rows),"mines":rows(&mines),"groundMaterials":materials(&state.world.base_materials),"objectMaterials":materials(&state.world.object_materials),"mineMaterials":materials(&state.world.mine_materials)});
     shown["points"]=json!(state.start.points.iter().map(|p|json!({"x":(p.at.x/crate::game::CELL).floor(),"y":(p.at.z/crate::game::CELL).floor(),"vp":p.vp,"mp":p.mp})).collect::<Vec<_>>());
+    let nodes = state
+        .elimination
+        .as_ref()
+        .map(|mode| {
+            mode.nodes
+                .iter()
+                .map(|node| json!({"x":node.at.x,"z":node.at.z,"fuel":node.fuel}))
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let horde = state.horde.as_ref().map(|mode| {
+        json!({
+            "slot":mode.slot,"defenders":mode.defenders,"bunker":mode.bunker,
+            "gates":mode.gates,"wave":mode.wave,"active":mode.active,"timeLeft":mode.time_left
+        })
+    });
     let units = g.units.values().map(|u| json!({"id":u.id,"type":state.rules.kinds[u.kind].name,"owner":u.owner,"x":u.x,"z":u.z})).collect::<Vec<_>>();
     Ok(
         json!({"map":shown,"w":g.w,"h":g.h,"rows":rows(&g.chars),"ground":g.ground.as_deref().map(rows),"objects":g.objects.as_deref().map(rows),
         "players":state.start.players.iter().map(|p|json!({"name":p.config.name,"team":p.config.team,"spawn":{"x":p.spawn.x,"z":p.spawn.z}})).collect::<Vec<_>>(),
-        "points":state.start.points,"winVp":state.start.win_vp,"units":units,"assault":state.assault,"elimination":state.elimination}),
+        "points":state.start.points,"winVp":state.start.win_vp,"units":units,"assault":state.assault,"elimination":state.elimination,"horde":horde,"nodes":nodes}),
     )
 }
 
@@ -444,12 +467,15 @@ pub fn find_path(value: &Value) -> Result<Value> {
     ))
 }
 
-/// Runs the existing bounded commander and ordinary tick runner. This is native outcome evidence.
+/// Runs detached AI matches on the ordinary simulation and human commander schedule.
 pub fn play_match(value: &Value) -> Result<Value> {
     use crate::{
         commander_ai::Level,
-        match_commander::{OpeningCommander, OpeningTick},
+        match_commands::Command,
+        match_human_observation::{HumanObservationMemory, HumanShot},
+        orders::OrderKey,
         recipient_snapshot::{DeliveryState, SelectedSeat},
+        seat_commander::{Advance, Delivered},
     };
     value
         .get("seed")
@@ -464,8 +490,21 @@ pub fn play_match(value: &Value) -> Result<Value> {
         return Err("fairness AI supports ordinary Conquest without logistics".into());
     }
     let mut seats = (0..state.start.players.len())
-        .map(|i| OpeningCommander::new(i, Level::Normal))
+        .map(|i| state.create_seat_commander(i, Level::Normal))
+        .collect::<Result<Vec<_>>>()?;
+    let mut memories = (0..seats.len())
+        .map(HumanObservationMemory::new)
         .collect::<Vec<_>>();
+    let mut sequences = vec![0; seats.len()];
+    // playMatch observes every seat at creation, before any simulation step or action.
+    let mut initial = memories
+        .iter_mut()
+        .map(|memory| {
+            state
+                .human_commander_observation(memory)
+                .map(|view| Some(Delivered::Human(Box::new(view))))
+        })
+        .collect::<Result<Vec<_>>>()?;
     let mut delivery = DeliveryState::new(&state).map_err(|e| format!("snapshot: {e:?}"))?;
     let selected = (0..seats.len())
         .map(|slot| SelectedSeat {
@@ -475,6 +514,7 @@ pub fn play_match(value: &Value) -> Result<Value> {
         })
         .collect::<Vec<_>>();
     let mut pending_events = Vec::new();
+    let mut generation = 0;
     while state.finish.is_none() && (state.world.game.tick as u64) < max_ticks {
         // Match::advance_tick guards active unsupported state. Its unavailable list also
         // names dormant phases (construction training, World rail and disabled logistics),
@@ -509,7 +549,8 @@ pub fn play_match(value: &Value) -> Result<Value> {
             return Err("unsupported active fairness phase".into());
         }
         pending_events.append(&mut report.events);
-        if state.world.game.tick % 2 == 0 || state.finish.is_some() {
+        let sent = state.world.game.tick % 2 == 0 || state.finish.is_some();
+        if sent {
             let frame = delivery
                 .capture_selected_with_tick_events(&mut state, &selected, &pending_events)
                 .map_err(|e| format!("snapshot: {e:?}"))?
@@ -521,14 +562,51 @@ pub fn play_match(value: &Value) -> Result<Value> {
                     .into_json();
             }
             drop(frame);
-            pending_events.clear();
         }
         if state.finish.is_none() {
-            for seat in &mut seats {
-                if let OpeningTick::Deferred(e) = state.tick_opening_commander(seat)? {
-                    return Err(format!("unavailable commander policy: {e:?}"));
+            let now = state.world.game.tick;
+            // Build every requested observation before any brain can enqueue an order.
+            let mut observed = Vec::with_capacity(seats.len());
+            for (slot, seat) in seats.iter().enumerate() {
+                let view = if seat.wants_view(now, sent) {
+                    Some(Delivered::Human(Box::new(
+                        state.human_commander_observation(&mut memories[slot])?,
+                    )))
+                } else {
+                    initial[slot].take()
+                };
+                observed.push(view);
+            }
+            let shots = pending_events
+                .iter()
+                .map(HumanShot::tick)
+                .collect::<Vec<_>>();
+            for (slot, (seat, view)) in seats.iter_mut().zip(observed).enumerate() {
+                let Advance::Human(advance) =
+                    state.advance_seat_commander(seat, view, generation, &shots)?
+                else {
+                    return Err("unexpected ordinary commander brain".into());
+                };
+                if let Some(raw) = advance.input.and_then(|input| input.command) {
+                    let command = Command::from_json(&raw)
+                        .map_err(|e| format!("commander command: {e:?}"))?;
+                    state
+                        .enqueue_command(
+                            OrderKey {
+                                tick: now as u64 + 1,
+                                issuer: slot as u32,
+                                sequence: sequences[slot],
+                            },
+                            command,
+                        )
+                        .map_err(|e| format!("commander queue: {e:?}"))?;
+                    sequences[slot] += 1;
                 }
             }
+        }
+        if sent {
+            pending_events.clear();
+            generation += 1;
         }
     }
     let winning_team = state.finish.map(|f| f.winner);
