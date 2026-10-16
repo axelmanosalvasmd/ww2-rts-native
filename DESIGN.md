@@ -4473,3 +4473,33 @@ publication and subsequent row eligibility.
 The inherited pre-MOV tables literally contained 248 ported rows, while
 the earlier report said 250. Retain that discrepancy without repairing
 tables or replacing the reported figure with a new global claim.
+
+
+## Five MAP terrain component rows qualified (2026-10-16)
+
+At producing head `170cfe002af0e9f787282a8ed0c8d83ff4cba8de`, Rust tree
+`e3d7a7e39b916154fe8a66c4dee40318f169aeba`, the new S1 grant runs formatting
+once, the same seven unique native functions once with serial fail-fast,
+and conditional strict locked core/simtest all-target ci-test Clippy.
+All stages pass: seven native passes, zero failures and 231 skipped.
+The actual inherited slot flock is released after each terminal process,
+and Root receives the final release notice before the result report.
+The first outer launch's compact taskset argument fails before the runner,
+Cargo or a lock starts. Root explicitly approves only its argv correction;
+the first actual project sequence is unchanged and is not retried.
+
+Record only MAP-25/31/47/48/50 Rust/Status pairs as ported for their complete
+selected Acceptance checks. Preserve all 939 Acceptance cells and every
+other row cell. The [row evidence](docs/runtime/map-terrain-components-170c-delivery.md)
+binds the 456-value ground table, nine footprints, original water sight,
+eight LOS/ridge/Depressions clauses, complete two-second Slope journey
+with 160 movement calls, and six returned-speed samples. Supporting
+18-ray LOS and movement replay gates add no CMB or MOV promotion.
+
+The one unchanged Source checker PASS remains attributed to `a99c2b38`.
+The failed `92c18323` admission and earlier `7f7acc9f` qualification remain
+separate producing-head evidence. This docs child changes no Rust byte,
+fixture, provider, registry, guard, FFI, wire, contract or reference.
+Root owns fresh exact-child review, incoming-main preservation, any hosted
+gates and publication. Wider terrain features, World, recipient delivery
+and Unreal acceptance are not completed by these selected component rows.
