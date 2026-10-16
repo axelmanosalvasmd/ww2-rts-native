@@ -1,0 +1,1 @@
+- Record that the current-main 5479cfbe source lacks the inherited Tutorial runtime used by the private MODE tests. Keep those passing results attributed to their tested heads and hold current-main adoption pending Root's explicit dependency decision and runtime acknowledgment.

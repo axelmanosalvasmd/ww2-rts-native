@@ -1,5 +1,16 @@
 # Three Crossroads Native: design decisions
 
+## MODE current-main dependency readback (2026-10-16)
+
+GitHub commit5479cfbe is readable, but has no match_tutorial.rs or Tutorial
+constructor/module in match_runtime.rs/lib.rs. The assigned checkout's
+Tutorial runtime is inherited unpublished work, outside this task's test-only
+delta. Keep the six proposed private-head row proofs distinct from current-
+main adoption. Tutorial candidates59/62/65/70 need explicit runtime dependency
+adoption and exact-head acknowledgment or remain held. Validator32 and
+World73 can be assessed independently. No shipping code changes here.
+
+
 ## MODE completed native windows (2026-10-16)
 
 The second focused batch at c5eb12f4, Rust765129ae, passed all four tests once

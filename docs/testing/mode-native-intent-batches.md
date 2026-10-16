@@ -149,3 +149,20 @@ runtime adoption, exact-head Hermes acknowledgment, publication, merged-proof
 ledger and later parity status updates. The parity file is byte-identical
 to its inherited version. No public action, Source job, new captured fixture,
 provenance bundle, semantic repair or semantic retry occurred here.
+
+## Current-main dependency boundary
+
+A read-only GitHub source check at `5479cfbe7218daccdde5ed089be641951c69227e`
+confirmed the commit and its `match_runtime.rs`, but `match_tutorial.rs`
+returns HTTP 404. Its `lib.rs` declares `tutorial_steps`, with no Tutorial
+runtime module, and `match_runtime.rs` has no Tutorial constructor. The
+Tutorial runtime in the assigned checkout is inherited from before this task.
+It is not included in this task's test and documentation delta.
+
+The passing Tutorial results for MODE-59/62/65/70 remain private-branch
+results. They cannot establish a current-main test-PR or status promotion.
+Root must explicitly adopt and review that runtime, with the required exact
+head acknowledgment, or hold those tests and rows. Do not import the full
+unpublished ancestry to satisfy the dependency. MODE-32's validator checks
+and MODE-73's World startup checks can be assessed separately. No new native
+job, runtime edit or public action was performed by this dependency check.
