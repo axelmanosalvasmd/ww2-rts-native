@@ -763,7 +763,16 @@ fn clean(s: &str, length: usize, fallback: &str, controls: bool) -> String {
         .filter(|c| !"<>&\"'".contains(*c) && !(controls && (*c as u32) < 32))
         .collect();
     // JavaScript slices UTF-16 code units, including a possible lone surrogate at the boundary.
-    let units: Vec<_> = filtered.trim().encode_utf16().take(length).collect();
+    // Its trim removes BOM but preserves U+0085, unlike Rust's Unicode trim.
+    let units: Vec<_> = filtered
+        .trim_matches(|c| {
+            matches!(c, '\u{0009}'..='\u{000d}' | ' ' | '\u{00a0}' | '\u{1680}'
+                | '\u{2000}'..='\u{200a}' | '\u{2028}' | '\u{2029}' | '\u{202f}'
+                | '\u{205f}' | '\u{3000}' | '\u{feff}')
+        })
+        .encode_utf16()
+        .take(length)
+        .collect();
     let name = String::from_utf16_lossy(&units);
     if name.is_empty() {
         fallback.into()
@@ -2116,6 +2125,173 @@ mod tests {
         assert_eq!(h.rooms["ABC"].players.len(), 2);
     }
     #[test]
+    fn map107_lobby_map_selection_obeys_mode_rules() {
+        fn lobby(rx: &mut mpsc::Receiver<Output>) -> Value {
+            let Output::Json(v) = rx.try_recv().expect("lobby broadcast") else {
+                panic!("expected lobby JSON");
+            };
+            assert_eq!(v["t"], "lobby");
+            assert_eq!(v["state"], "lobby");
+            assert!(rx.try_recv().is_err(), "unexpected extra output");
+            v
+        }
+        fn command(
+            h: &mut Hub,
+            c: &Connection,
+            rx: &mut mpsc::Receiver<Output>,
+            msg: Value,
+        ) -> Value {
+            h.message("ABC", c, &mut true, msg, 0);
+            lobby(rx)
+        }
+
+        // server.js:49-65,649-671. Derive Horde eligibility from original
+        // private maps, not the lobby catalogue's precomputed Horde flags.
+        let names = [
+            "ardennes-crossing",
+            "bastogne",
+            "bocage",
+            "crater-field",
+            "crossroads-village",
+            "default",
+            "el-alamein",
+            "helms-deep",
+            "hill-112",
+            "hill-112-xl",
+            "hot-gates",
+            "hurtgen-forest",
+            "island-towns",
+            "kasserine-pass",
+            "king-of-the-hill",
+            "monte-cassino",
+            "monte-cassino-xl",
+            "no-mans-land",
+            "pegasus-bridge",
+            "pegasus-bridge-xl",
+            "prokhorovka",
+            "river-towns",
+            "seawall",
+            "seawall-xl",
+            "seelow-heights",
+            "six-fronts",
+            "stalingrad-factory",
+            "test-arena",
+            "the-great-bridge",
+            "the-polder",
+            "three-islands",
+            "tutorial",
+            "twin-valleys",
+        ];
+        assert_eq!(names.len(), 33);
+        assert!(names.windows(2).all(|pair| pair[0] < pair[1]));
+        let horde = names
+            .iter()
+            .copied()
+            .filter(|name| {
+                crate::authoritative_maps::load(name).unwrap().source()["defend"]
+                    .as_array()
+                    .is_some_and(|defend| !defend.is_empty())
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(horde.len(), 17);
+        let all_maps = json!(names.as_slice());
+        let horde_maps = json!(horde);
+        let mut h = Hub::new(32, String::new());
+        let (host, mut rx) = client(1);
+        join(&mut h, &host, "host", false, 0);
+        let initial = lobby(&mut rx);
+        assert_eq!(initial["maps"], all_maps);
+        assert_eq!(initial["mode"], "conquest");
+        assert_eq!(initial["mapName"], "default");
+
+        for mode in ["conquest", "assault", "annihilation", "classic"] {
+            let v = command(&mut h, &host, &mut rx, json!({"t":"mode","v":mode}));
+            assert_eq!(v["mode"], mode);
+            assert_eq!(v["maps"], all_maps);
+            assert!(v.get("hordeMaps").is_none());
+            for name in names {
+                let v = command(&mut h, &host, &mut rx, json!({"t":"map","name":name}));
+                assert_eq!(v["mode"], mode);
+                assert_eq!(v["maps"], all_maps);
+                assert_eq!(v["mapName"], name, "{mode}/{name}");
+            }
+        }
+
+        assert!(!horde.contains(&"twin-valleys"));
+        let mut selected = command(&mut h, &host, &mut rx, json!({"t":"mode","v":"horde"}));
+        assert_eq!(selected["mode"], "horde");
+        assert_eq!(selected["maps"], all_maps);
+        assert_eq!(selected["hordeMaps"], horde_maps);
+        assert_eq!(selected["mapName"], horde[0]);
+        for name in &horde {
+            selected = command(&mut h, &host, &mut rx, json!({"t":"map","name":name}));
+            assert_eq!(selected["mapName"], *name);
+            assert_eq!(selected["hordeMaps"], horde_maps);
+        }
+        command(&mut h, &host, &mut rx, json!({"t":"mode","v":"conquest"}));
+        assert_eq!(
+            command(&mut h, &host, &mut rx, json!({"t":"mode","v":"horde"})),
+            selected,
+            "a defender map survives switching back to Horde"
+        );
+        for name in names.into_iter().filter(|name| !horde.contains(name)) {
+            h.message("ABC", &host, &mut true, json!({"t":"map","name":name}), 0);
+            assert!(rx.try_recv().is_err(), "Horde must ignore {name}");
+            // An unchanged name requests fresh output without repairing the map.
+            assert_eq!(
+                command(&mut h, &host, &mut rx, json!({"t":"name","name":"host"})),
+                selected
+            );
+            command(&mut h, &host, &mut rx, json!({"t":"mode","v":"conquest"}));
+            let v = command(&mut h, &host, &mut rx, json!({"t":"map","name":name}));
+            assert_eq!(v["mapName"], name);
+            selected = command(&mut h, &host, &mut rx, json!({"t":"mode","v":"horde"}));
+            assert_eq!(selected["mode"], "horde");
+            assert_eq!(selected["mapName"], horde[0], "fallback from {name}");
+            assert_eq!(selected["hordeMaps"], horde_maps);
+        }
+
+        let tutorial = command(&mut h, &host, &mut rx, json!({"t":"mode","v":"tutorial"}));
+        assert_eq!(tutorial["mode"], "tutorial");
+        assert_eq!(tutorial["mapName"], "tutorial");
+        assert_eq!(tutorial["maps"], all_maps);
+        assert!(tutorial.get("hordeMaps").is_none());
+        for name in names {
+            h.message("ABC", &host, &mut true, json!({"t":"map","name":name}), 0);
+            assert!(rx.try_recv().is_err(), "Tutorial must ignore {name}");
+            assert_eq!(
+                command(&mut h, &host, &mut rx, json!({"t":"name","name":"host"})),
+                tutorial
+            );
+        }
+
+        // World hides authored selections in lobby output only. Public
+        // start/restart stay refused; this is not hosted World evidence.
+        let world = command(&mut h, &host, &mut rx, json!({"t":"mode","v":"world"}));
+        assert_eq!(world["mode"], "world");
+        assert_eq!(world["mapName"], "world");
+        assert_eq!(world["maps"], all_maps);
+        assert_eq!(world["spawns"], 6);
+        for name in names {
+            assert_eq!(
+                command(&mut h, &host, &mut rx, json!({"t":"map","name":name})),
+                world
+            );
+        }
+        for t in ["start", "restart"] {
+            h.message("ABC", &host, &mut true, json!({"t":t}), 0);
+            assert!(
+                matches!(rx.try_recv(), Ok(Output::Json(v)) if v == json!({"t":"deny","cmd":t,"reason":"scenario"}))
+            );
+            assert!(rx.try_recv().is_err());
+            assert!(h.rooms["ABC"].native.is_none());
+        }
+        assert_eq!(
+            command(&mut h, &host, &mut rx, json!({"t":"name","name":"host"})),
+            world
+        );
+    }
+    #[test]
     fn settings_type_guards_and_horde_transition() {
         let mut h = Hub::new(32, String::new());
         let (a, _) = client(1);
@@ -2195,3 +2371,7 @@ mod net83_followup_tests;
 #[cfg(test)]
 #[path = "net_runtime3_tests.rs"]
 mod net_runtime3;
+
+#[cfg(test)]
+#[path = "net_runtime2_tests.rs"]
+mod net_runtime2;

@@ -5,6 +5,26 @@ use std::{net::Shutdown, process::Command};
 
 const SEED: u64 = 3936341;
 
+#[test]
+fn net14_public_url_environment_reaches_live_lobby_invites() {
+    for configured in [None, Some("https://invite.example/game")] {
+        let server = BinaryServer::start_with_public_url(false, SEED, configured);
+        let mut client = Client::open(
+            server.address,
+            "ABC",
+            json!({"t":"hello","token":"host","name":"Host"}),
+        );
+        let lobby = client.until(|m| m["t"] == "lobby");
+        assert_eq!(lobby["publicUrl"], configured.unwrap_or_default());
+        assert_eq!(lobby["code"], "ABC");
+        client.send(json!({"t":"name","name":"Renamed"}));
+        assert_eq!(
+            client.until(|m| m["t"] == "lobby")["publicUrl"],
+            configured.unwrap_or_default()
+        );
+    }
+}
+
 fn begin(host: &mut Client, guest: &mut Client) -> (Value, Value) {
     guest.send(json!({"t":"start","slot":0,"host":true}));
     assert_eq!(guest.deny("start")["reason"], "scenario");

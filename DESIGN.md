@@ -1,3 +1,7 @@
+## Runtime engineering: native bridge identity (2026-10-16)
+
+Paid bridges and Fill use the existing field-work jobs and canonical World mutations. Newly constructed bridge graphs use deterministic identities derived from the first cell and the append-only structure count. Repair reuses an existing bridge section identity, restores wood and 200 HP, and reconnects neighboring sections. These graph identities stay separate from the shared actor ID allocator, so construction does not advance actor IDs. Support, terrain invalidation and hull-width queries continue to use the canonical graph and physical terrain. This is an internal identity choice; no new wire or ABI shape is introduced.
+
 ## AI test-only integration on main40fe (2026-10-16, unrun)
 
 Start this candidate from literal40fe9e296b46060241693c6c627ecd615d4f8ea4 in the assigned physical checkout. Preserve prior8cb01c00 and passing0aaea3da refs. Import only nine new task tests in existing human_commander_state_tests.rs and match_human_observation/tests.rs. Main already has their complete helper types and test registration. No old81-line diagnostic helper, ai_receipt implementation, fixture, inherited runtime/history or replacement test provider is required. All docs/parity files stay exact main.
@@ -4828,3 +4832,20 @@ PR #274 strict Clippy rejected a nested conditional in the stillness-reset asser
 ## Native server diagnostics (2026-10-16)
 
 NET-97 uses the existing host tick meter and an opt-in bounded writer. `WW2_DIAG=1` appends room JSONL records under the process working directory's `logs/`; `WW2_TICKLOG=1` prints phase percentiles every thirty seconds. Library hosts choose a diagnostic directory through `Config`. A 64-record channel keeps file writes outside the room lock; full queues and file errors discard diagnostic records without affecting the match. Native scheduler delay measures excess over the ten-millisecond maintenance poll, providing the equivalent of the prototype's event-loop delay. Timestamps are Unix milliseconds. A separate optional socket gauge measures queued UTF-8 payload bytes for all output classes and preserves the existing UTF-16 snapshot admission threshold. Browser metrics stay host-private. None of these measurements enters the deterministic rules state or recipient snapshots.
+
+## Horde wave phase and scenario type validation (2026-10-16)
+
+`Match::step_horde` is an explicit late phase after ordinary capture, income
+and death removal. It does not advance the clock or run combat. Wave purchases,
+reserve entry and clearing use canonical Match state; newly entered units act
+on the following tick. Full Horde tick and server admission remain guarded.
+Vehicle entry must pass the current World navigation and obstruction versions
+to the persistent production placer, just as ordinary recruitment does, so
+terrain changes invalidate cached clearance between entries.
+
+Native scenario validation deliberately requires a JSON string for each authored
+unit or reinforcement roster `type`. It rejects `type: ["rifle"]`, whereas the
+prototype's `Object.hasOwn(unitTypes, v)` and `unitTypes[v]` coerce that array to
+the property name `"rifle"`. This stricter choice rejects malformed schema values
+instead of carrying JavaScript property-key coercion into the native validator.
+It does not admit or execute general authored scenarios.
