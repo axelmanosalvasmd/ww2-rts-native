@@ -255,7 +255,10 @@ impl RoomAi {
                 ww2_core::match_human_observation::HumanShot::Other
             })
             .collect();
-        consumer.generation = tick as u64;
+        consumer.generation = consumer
+            .generation
+            .checked_add(1)
+            .ok_or("AI delivered frame generation exhausted")?;
         let entry = self
             .delivered
             .iter_mut()

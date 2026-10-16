@@ -2,3 +2,4 @@
 - Send a loaded room's host pause between its lobby update and start, matching the prototype. Update the save test that previously required pause after start.
 - Restore compiled house structure names and grenade blast effect names in native combat saves, which previously failed loading with an unknown compiled string.
 - Check hosted AI completion with a connected human host and verify that loaded starts preserve the game while refreshing recipient routing observations.
+- Track AI shot batches by delivery rather than game tick, so reading a recipient frame twice at one tick cannot fault a resumed commander.
