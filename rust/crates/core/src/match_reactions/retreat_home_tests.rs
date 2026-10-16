@@ -36,6 +36,27 @@ fn building(m: &mut Match, name: &str, owner: usize, at: Point) -> u32 {
     id
 }
 
+fn long_route_scene(mode: Mode) -> Match {
+    let map = crate::map::AuthoritativeMap::from_json(
+        &serde_json::to_vec(&serde_json::json!({
+            "name":"Retreat through route legs", "w":160, "h":96,
+            "rows":vec![".".repeat(160);96],
+            "heights":vec!["0".repeat(160);96],
+            "spawns":[{"x":8,"y":8},{"x":145,"y":80}],
+            "points":[{"id":"neutral","x":80,"y":48,"mp":0,"vp":0}]
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let options = scene(mode).options;
+    if mode == Mode::Classic {
+        Match::new_classic(&map, options)
+    } else {
+        Match::new(&map, options)
+    }
+    .unwrap()
+}
+
 #[test]
 fn base57_skirmish_nearest_finished_accessible_hq_and_spawn_fallback() {
     let mut m = scene(Mode::Conquest);
@@ -327,13 +348,19 @@ fn mov48_manual_retreat_exits_house_moves_home_and_delivers_every_seat() {
     assert!(m.tick_state.fault().is_none());
 }
 
-#[test]
-fn mov48_classic_retreat_completes_through_native_ticks_with_delivery_guard_retained() {
-    let mut m = scene(Mode::Classic);
-    let id = publish_rifle(&mut m, Point { x: 70., z: 70. });
+fn retreat_through_legs(mode: Mode) {
+    let mut m = long_route_scene(mode);
+    let at = Point { x: 281., z: 41. };
+    let id = publish_rifle(&mut m, at);
     m.world.game.units.get_mut(&id).unwrap().hold_pos = true;
     m.commands.units.get_mut(&id).unwrap().hold_fire = true;
     let home = m.reaction_home(id).unwrap();
+    let selected = seats(&m);
+    let mut delivery = if mode == Mode::Classic {
+        None
+    } else {
+        Some(DeliveryState::new(&m).unwrap())
+    };
     assert_eq!(
         m.execute_command(
             0,
@@ -345,21 +372,66 @@ fn mov48_classic_retreat_completes_through_native_ticks_with_delivery_guard_reta
         .unwrap(),
         None
     );
-    for _ in 0..1000 {
-        m.advance_tick().unwrap();
+    let first_leg = *m.world.game.units[&id].path.last().unwrap();
+    assert!(distance(first_leg, home) > 64.);
+    assert!(distance(at, first_leg) <= 65.);
+    let mut reached_first_leg = false;
+    let mut leg_ends = BTreeSet::new();
+    for _ in 0..2500 {
+        if let Some(delivery) = &mut delivery {
+            delivered_tick(&mut m, delivery, &selected);
+        } else {
+            m.advance_tick().unwrap();
+            // Classic core ticks are supported; complete recipient delivery remains guarded.
+            assert!(matches!(
+                SnapshotCache::new(&m),
+                Err(SnapshotError::UnsupportedMode)
+            ));
+        }
+        let u = &m.world.game.units[&id];
+        if let Some(end) = u.path.last() {
+            leg_ends.insert((end.x.to_bits(), end.z.to_bits()));
+        }
+        reached_first_leg |= distance(u.at(), first_leg) < 2.;
+        if u.retreating {
+            assert_eq!(u.world_goal, Some(home));
+            assert_eq!(m.firing.get(id).unwrap().target_id, 0);
+        }
         if !m.world.game.units[&id].retreating {
             break;
         }
     }
     let u = &m.world.game.units[&id];
+    assert!(reached_first_leg, "the first bounded leg must be traversed");
+    assert!(leg_ends.len() >= 3, "retreat must continue onto later legs");
     assert!(!u.retreating && u.world_goal.is_none());
     assert!(distance(u.at(), home) <= 15.);
     assert_eq!(m.commands.units[&id].outcome, Some(MoveOutcome::Arrived));
     assert!(m.tick_state.fault().is_none());
-    assert!(matches!(
-        SnapshotCache::new(&m),
-        Err(SnapshotError::UnsupportedMode)
-    ));
+    for _ in 0..3 {
+        if let Some(delivery) = &mut delivery {
+            delivered_tick(&mut m, delivery, &selected);
+        } else {
+            m.advance_tick().unwrap();
+            assert!(matches!(
+                SnapshotCache::new(&m),
+                Err(SnapshotError::UnsupportedMode)
+            ));
+        }
+    }
+    assert!(m.tick_state.fault().is_none());
+}
+
+#[test]
+fn mov48_ordinary_retreat_traverses_multiple_legs_and_delivers_every_seat() {
+    for mode in [Mode::Default, Mode::Conquest] {
+        retreat_through_legs(mode);
+    }
+}
+
+#[test]
+fn mov48_classic_retreat_traverses_multiple_legs_with_delivery_guard_retained() {
+    retreat_through_legs(Mode::Classic);
 }
 
 #[test]
