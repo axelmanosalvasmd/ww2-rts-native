@@ -15,7 +15,7 @@ and component comparisons remain required. Prototype references below are
 `shared/sim.js` at `e4e579a`. The existing exact fixtures remain unchanged.
 
 The earlier R2 review accepted only BASE-32 on the retained private branch.
-Fresh source review at `ed4ad47d` accepts BASE-20 and BASE-32 against the
+Fresh source review at `c50a6c5d` accepts BASE-20 and BASE-32 against the
 pinned prototype and the full reviewer expectations. Reviewer execution
 counts are zero tests, Cargo runs, edits and GitHub writes. Passing a partial
 witness does not prove its entire row. BASE-52 retains only Conquest startup. No parity status changes
@@ -98,3 +98,23 @@ Locally acknowledged issue #5 through `6207938018`, owner decision `6206861267`,
 and contract replies PR16 `6137379059` and PR195 `6156740603`. These require
 no new runtime acknowledgment for this test-only change. Contracts retain
 the six-call ABI 2 and accepted startup content/schema boundaries.
+
+## Final validation
+
+Producing commit `c50a6c5d8d77f832afc6d2f5977f787af9481563`, Rust tree
+`35f335eb194ec018575c9ad2d16795a06e1229ac`, on the Vostro:
+
+- All 18 selected native tests pass, with 158 unrelated core-library tests
+  skipped, one test thread and zero retries.
+- Rust 1.99.0 `cargo fmt --manifest-path rust/Cargo.toml --all --check` passes.
+- Rust 1.99.0 `cargo clippy --manifest-path rust/Cargo.toml --locked --workspace --all-targets -j4 -- -D warnings` passes.
+
+The final selection was `test(match_construction::native_intent::)` with
+`-p ww2-core --lib`, four build jobs and the default test profile. All checks
+used locked slot S3, its assigned target directory, a 6 GiB memory limit and
+zero allowed swap; the slot was released at completion. Logs and producing
+objects are under `/tmp/impl-bases-20261016-validation/`.
+
+A final source review at that exact commit/Rust tree accepts BASE-20 and
+BASE-32. Other rows retain their gaps. The subsequent documentation commit
+records these results and preserves the validated Rust tree.
