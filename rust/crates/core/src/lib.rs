@@ -204,3 +204,9 @@ mod mov_intent_batch;
 
 #[cfg(test)]
 mod point_supply_intent_tests;
+
+#[cfg(test)]
+mod mov_followup_speed_tests;
+
+#[cfg(test)]
+mod mov_followup_garrison_tests;
