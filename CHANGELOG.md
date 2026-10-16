@@ -2,6 +2,10 @@
 
 Unreleased entries that are not yet collected live in `changelog.d/`, one file per change.
 
+- Fix a nested condition in the AI sighting test that strict Clippy rejected. The assertions and behavior are unchanged.
+
+- Add nine native tests for AI sightings, camera attention and paced inputs. The focused batch passes 14 tests; seven row intents are accepted for a separate status update after the test PR merges.
+
 ## Unreleased
 
 - Unreal (slice 1v integration): combine live-model portraits, bounded menus/recruitment/aircraft rows and crowded loss cards; source-keyed Spanish HUD text; native mouse capture, mesh selection and durable saved settings; original aircraft shadows/riders, moving wreck poses and authored moods; source-mesh base-building breaches and retained cooked CPU buffers. The required-FFI Linux editor build passes 154/154 Vulkan automation tests, eight Node harness tests, seven executable TCP tests and 165 lobby-preview cases. Four Great Bridge streams each adopt and agree on 4,200 snapshots. All sixteen mode rows finish with explicit Graphics (fifteen High, one Low), including 11 natural decisions. Six private Rust lifecycle lanes and the complete 33-map sweep total 13,145 adopted/agreeing snapshots with zero decoder errors on ordinary main f7c51b1a (32 map starts, No Man's Land refused). The Linux Development package passes SHA256SUMS, headless/rendered seated pairs (2,026 adopted/agreeing) and a cooked Low building-breach replay (85). Fresh live/package counters total 159,545 adopted/agreeing across 124 final logs; failed tries and recorded presentations are excluded. Forty-six curated browser/native pairs retain portrait/tooltip/crowded-card, shadow/contrast, water and collapse differences. No parity row accepted.

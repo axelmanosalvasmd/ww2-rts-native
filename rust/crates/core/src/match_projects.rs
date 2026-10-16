@@ -215,17 +215,38 @@ impl Match {
         queue: bool,
         winner: bool,
     ) -> Result<Option<Denial>, String> {
+        let order = match order {
+            ProjectOrder::New {
+                pattern,
+                material: ProjectMaterial::Wall,
+                from,
+                to,
+            } => ProjectOrder::New {
+                pattern,
+                material: ProjectMaterial::Fort(FortKind::Wall),
+                from,
+                to,
+            },
+            ProjectOrder::New {
+                pattern,
+                material: ProjectMaterial::Fill,
+                from,
+                to,
+            } => ProjectOrder::New {
+                pattern,
+                material: ProjectMaterial::Fort(FortKind::Fill),
+                from,
+                to,
+            },
+            order => order,
+        };
         let Some(player) = self.start.economy.players.get(owner) else {
             return Ok(Some(Denial::Blocked));
         };
         if winner || player.out || player.away {
             return Ok(Some(Denial::Blocked));
         }
-        if !matches!(
-            self.options.mode,
-            crate::economy::Mode::Default | crate::economy::Mode::Conquest
-        ) || self.world.game.mode.is_some()
-        {
+        if !crate::match_actor::ordinary_ground_mode(&self.world.game, self.options.mode) {
             return Ok(Some(Denial::Unsupported));
         }
         let defs = definitions().map_err(|e| e.to_string())?;
@@ -270,11 +291,12 @@ impl Match {
             return Ok(Some(Denial::Unsupported));
         }
         if let ProjectOrder::New {
-            material: ProjectMaterial::Fill | ProjectMaterial::Wall,
+            material: ProjectMaterial::Fort(kind),
             ..
         } = order
+            && let Some(denial) = self.dig_tier_denial(owner, kind)?
         {
-            return Ok(Some(Denial::Unsupported));
+            return Ok(self.finish_project_selection(&mine, Some(denial)));
         }
         let existing = match order {
             ProjectOrder::Join { project, .. } => Some(project),
@@ -411,11 +433,14 @@ impl Match {
             .map_err(|e| e.to_string())?;
         for row in staged {
             let id = row.unit.id;
-            self.world.game.units.insert(id, row.unit);
+            crate::unit_placement::place_unit(
+                &mut self.grid,
+                self.world.game.units.get_mut(&id).unwrap(),
+                |current| *current = row.unit,
+            );
             self.commands.units.insert(id, row.control);
             self.firing.units.insert(id, row.firing);
             *self.abilities.get_mut(id).unwrap() = row.ability;
-            self.grid.update(id, &self.world.game.units[&id]);
         }
         Ok(self.finish_project_selection(&mine, None))
     }

@@ -1,4 +1,298 @@
+## Owner parity decisions A, B and C (2026-10-16)
+
+The [recorded owner decisions](https://github.com/axelmanosalvasmd/ww2-rts-native/issues/5#issuecomment-6217590741) approve the differences below, the Rust-only acceptance of the listed client rows, and World deferral for milestone R1. Julio recorded both owners' decisions after Axel's voice approval; Axel's written confirmation on #5 is requested in that comment. This section records the decisions for STATUS-ABC.
+
+Approved `differs` decisions relative to prototype `e4e579a`:
+
+- CMB-159, MODE-21, MODE-22: per-purpose seeded streams and staged creation replace the prototype's global draw order, following AGENTS.md determinism so matches replay from their seed and orders.
+- IF-05: non-trench arc, ring and strongpoint dig patterns are rejected as an approved restriction of the supported dig patterns.
+- NET-15, NET-20: display names are truncated on Unicode scalar boundaries to avoid splitting a scalar.
+- IF-10: prediction and authoritative movement compare signed zero as equal, so the sign of numeric zero does not affect equality.
+- IF-23: snapshots never reorder the canonical gameplay grid, so snapshot creation cannot change gameplay query order.
+- MAP-22: validated embedded maps replace corrupt-file fallback, removing that file-loading recovery path for embedded maps.
+- NET-04: R1 keeps uncompressed JSON WebSocket v0; compression is deferred to a later version-gated proposal.
+
+For group B, `accepted` applies only to the Rust part of each row marked "Unreal-only; client parity owned by Axel". Unreal implementation and client parity remain Axel's responsibility. Existing server duties, including MOV-107's row tail, remain recorded in the rows.
+
+For group C, `dropped` means "World admission deferred for milestone R1; reopen when World opens". Rows that also describe ordinary matches retain their prototype requirements; the R1 deferral does not claim those behaviors are implemented. Ported World components MAP-59, BASE-46, LOG-26 and LOG-27 remain `ported`.
+
+## Seat lifecycle controls and metadata (2026-10-16)
+
+Socket `pause` and `resume` remain rejected through `UNAVAILABLE`, including for the host. The existing host-side `RoomRuntime` pause APIs remain available without a public client caller. The server owns the supplied wall-clock deadlines and the one-second pause/frame cadence; the deterministic core receives no timer. Paused ingress ignores new orders while preserving the queue for resume. Operative and AI room admission remain closed on R1.
+
+Every admitted seat receives the existing roster-ordered `online` and `ping` arrays, as in reference `e4e579a` (`server.js:504,774`, `server/room-tick.js:30`). AI seats project `true` and `-1`, and unknown human RTT stays null. The common frame sender applies these fields to scheduled, paused and catch-up delivery without changing recipient visibility or wire shape.
+
+AI-19 evidence covers the existing detached core state: lazy spawn camera, private RNG, sampled opening delay and explicit resets through ordinary ticks and both recipient snapshots. It does not enable room AI or its takeover/departure callers. Only AI-19 and NET-66 are claimed. NET-79 is dropped because socket pause/resume ingress needs owner approval. NET-80 remains outside the proven set because live AI handover and loaded-save pause need separate activation and save work.
+
+## Shared-enemy authored spawns (2026-10-16)
+
+Tutorial startup selects authored spawn indices 0 and 1 directly. It must not map those indices through the non-Assault spawn list, which can move both sides when a map marks its first spawns Assault-only. World already uses direct authored indices; ordinary Conquest keeps its existing filtered allocation. Horde continues to select the middle entry of the authored defender list and the first non-defender index. No persistent state, command or recipient capability is added.
+
+## Native room worker supervision (2026-10-16)
+
+`WW2_SHARDS` selects up to 64 game workers behind the existing HTTP and WebSocket routes. Each worker owns an OS thread, a current-thread Tokio runtime and an independent room hub. The front hashes the decoded room query using the prototype's FNV-1a over UTF-16 code units, dispatches the existing socket, and concatenates room lists in worker order. A worker panic closes its sockets and invalidates its host controls; its supervisor creates a fresh hub after one second. Front shutdown stops all workers.
+
+Threads replace the prototype's child processes and loopback socket replay. Private readiness and directory channels replace process IPC without adding socket messages. Immutable maps stay front-owned; native save records and map editing remain unavailable, so no record or map-invalidation protocol is introduced. Every worker retains the existing trusted-room code policy. Public start, command admission, World admission and logistics guards keep their existing scope.
+
+## Queued house entry snapshot compatibility (2026-10-16)
+
+Queued native Enter orders use the pinned prototype's existing garrison kind 9
+and stored house coordinates in the owner-only waiting-order row. Serialization
+accepts only the normalized singleton actor with `queue: false`, then applies the
+existing finite-coordinate and rounding checks. Activation, house selection and
+player command behavior stay with the canonical garrison owner. No wire meaning
+is added. A full ordinary match test keeps Enter queued behind movement, enters
+the house, captures an objective and earns a VP victory while delivering every
+seat's snapshot on each tick and during the ending hold.
+
+## Gate lifecycle in ordinary matches (2026-10-16)
+
+Gate jobs use the existing paid field-work owner. Placement rounds the line to the grid, while the paid job retains the original direction for its work row and crew escape. Each of its three cells publishes a finished Gate through the existing building factory, structural sections and shared actor allocator. The existing occupied-cell retries, construction time, cancellation and story owners apply to both concrete kinds.
+
+Gate openness and its half-second timer live in the existing unit-control metadata, with the same lifetime as other retained control facts. A completed building checks its Gate before the ordinary early continue. It reads the canonical spatial grid, retaining the prototype's bucket query for threats and its strict hull-distance predicate for occupied passages. Terrain changes use World::set_cell, including the existing version and observation journals. Snapshots use the existing 65536 owner flag and unchanged nonowner mask; no row tail, field or encoding is added. Paid and waiting Gate requests are limited to Default/Conquest without enabled logistics or convoys. Tutorial and construction modes remain guarded, as do World Gate ticks and full logistics delivery.
+
+Gate passage follows the pinned prototype. `shared/sim.js:4252-4262` changes the terrain object between open ground and K, preserving the underlying surface through `setCell` at :2731-2738. Pathfinding reads those terrain flags (:3088-3094). The Gate actor remains a traffic obstacle in `shared/local-traffic.js:101-113`, a swept vehicle obstacle in `shared/movement.js:44-50`, and an immovable crowd-separation body in `shared/sim.js:5198-5229`, whether open or closed. Native traffic, vehicle movement and separation retain those same bodies. Open terrain can therefore admit a route without allowing a squad or tank through the three adjacent Gate bodies. Tests cover passage through the same terrain gap without Gate actors, then obstruction in open, closed and reopened states on plain ground, roads, paths and mud. Component tests check traffic, separation displacement in both actor orders, and vehicle sweeps with a body-free control. The existing full-match lifecycle still collects every seat's snapshot each tick through victory and eight ending ticks. Placement, timers, hysteresis and occupied-passage protection retain the existing exact prototype component checks.
+
+Depot admission is not widened to skirmish modes. The prototype permits Depots only in construction modes, and the canonical Classic node owner and runner belong to PR #301. BASE-12/26/31/33 remain dropped from this stream until that foundation can carry paid claims, refunds and destruction release. AI-49 awaits garrison integration in PR #302; AI-50 and AI-56 still need complete holder/HQ planning and delivered facts beyond this Gate actuator. No parity status or acceptance cells are changed.
+
+## Tutorial runtime over existing Match systems (2026-10-16)
+
+The explicit `Match::new_tutorial` constructor adds the unattended Enemy seat and uses the existing `tutorial_steps` definitions. Tutorial shares the ordinary ground, routing, combat, objective and support systems. Its private step state owns only the current index, spawned IDs and pending dialogue. Lines leave through the core tick report from tick 40; no server or client transport is introduced. The runner advances at most one step per tick after capture and income, and finishes at the bridgehead through the common Match finish state.
+
+Instant Tutorial recruitment reuses the existing admission, debit and unit-publication transaction, with a separate home-placement path because Tutorial has no production buildings. The public Conquest production component keeps its existing mode gate. Tutorial reinforcements use the player's spawn and exclude the unattended enemy. The prototype's 5 MP/s base income and lack of a defeat condition are preserved. Public server admission, agreed interfaces and parity statuses stay unchanged.
+
+## Miscellaneous core components and relocation ownership (2026-10-16)
+
+The existing `prepare_map_save` component is checked against the pinned server projection on all 33 authored maps and two nested-field/default cases. Its 8 MiB limit counts incoming bytes before parsing or dropping unknown properties. Host persistence and editor network access remain outside this component.
+
+Rendered cell-centre sampling is separate from simulation height queries. `terrain_surface::FrozenSurface` retains the original nominal levels while callers supply the current terrain and road mask. It reports centre heights, frozen water lines, channel depth and cliff edges without adding Match state or replacing Unreal mesh construction, ramps, cliff rims or picking. The pinned original relief recorder covers all 33 authored maps and four synthetic cases, with 663,399 centre and water samples.
+
+`WorldRailLine::is_open` reads current physical bridge cells and current region teams on each query. Bridge collapse and repair therefore need no cached connectivity flag. This is a core line predicate, not a train scheduler or World admission change. Existing structural damage remains the sole owner of support propagation, ground casualties, terrain logs and falling debris.
+
+Admitted relocation callers now commit their prepared unit fields and spatial membership through one crate-private helper. Staged spawns and buildings retain canonical publication, and movers keep their direct updates. Starting-base clearance updates membership immediately instead of waiting for startup's final rebuild. Owner and bucket memberships and nearest distances are checked against fresh grids. Exact source fixtures retain query order, and runtime encounter order is preserved. The existing World guard-home assignment remains unchanged, as at the pin.
+
+The local retreat home selector uses finished owned HQs in skirmish modes, shared allied HQs for Horde defenders, finished owned production buildings in Classic, and spawn in other non-World modes. World keeps its existing region-aware selector. Convoy withdrawal, garrison work awaiting #302 and aircraft recipient delivery stay with their existing owners and guards. Support price/key tests do not open Classic/World support admission or the five support kinds that recipient snapshots still refuse. Editor save networking, persistence, FFI, wire formats and contracts are unchanged.
+
+## Concrete work and waiting Dig orders (2026-10-16)
+
+## Interface collection order and recipient queries (2026-10-16)
+
+Field hospitals use insertion order plus keyed membership, matching the prototype's Map semantics. Replacing an owner preserves placement order; removing and rebuilding a hospital appends it. World transactions clone both parts, and recovery and logistics consume the ordered iterator. Existing fire, soak, contact, navigation and live ascending-unit traversal keep their native implementations, with focused consumer tests for each collection. The hospital test advances an ordinary one-VP match through victory and three subsequent ticks, capturing complete snapshots for every seat without a fault. The World training test exercises the existing live unit loop without changing World admission or claiming World snapshot delivery.
+
+Availability and denial queries borrow only the reconstructed recipient ClientView. Map presentation helpers consume only the supplied received map; authoritative map validation still uses its stricter layer validation. The pure queries compare against pinned JavaScript fixtures, while collection tests assert the prototype's traversal intent. ABI exports and Unreal adoption remain separate. No header, wire, contract, privacy or public ingress change is included.
+
+Concrete cells use the existing finished-building publisher so their unit, control, combat, firing, ability, recovery, production and terrain records share the normal Match owners. The paid job retains its bounded occupancy retry count. A separate step-back goal keeps a deferred crew escape valid when the deterministic path budget is exhausted. This preserves the intended four-metre escape on a later tick without changing wall cost, build time or retry limits.
+
+Waiting Dig orders use the existing unit queue and ordinary paid Dig activation. The recipient adapter emits the existing engineering order kind for those waiting orders. Default/Conquest admission remains bounded; Classic and World field-work rooms stay guarded. No FFI, header, wire schema, contract or privacy policy changes.
+
+## AI shopping construction inputs (2026-10-16)
+
+Shopping receives the remaining budget and the reserves produced by the same detached planning pass. The observation no longer carries estimated build and fortification reserve amounts or a precomputed free-node count. Public resource positions, delivered depot memories and explicit owned-node indices provide the inputs. Node claims use only delivered depots and remembered enemy depots, at strictly less than eight metres. World engineer demand counts every unclaimed delivered node; its construction reserve considers only nodes on delivered owned ground.
+
+Construction and fortification proposals use the existing canonical command path. Builders assigned earlier in the pass remain busy, so later movement cannot replace their new jobs. Fortification still computes its reserve after base construction or repair. Assigned workers stay excluded, and proposed building positions join the fortification site exclusions so two jobs cannot spend against overlapping footprints. A delivered own-worker wall-work fact distinguishes wall Dig from ordinary Dig when deciding whether another crew may fortify. Candidate and worker ties use stable node indices and unit IDs. Fortification progress belongs to the existing private per-seat policy state, outside Match and recipient snapshots. Wall fortification dispatch remains separate work. Gate Dig remains unsupported at command admission. The planner computes their reserve thresholds but emits neither command and charges neither cost.
+
+The live observation producer remains limited to Default and Conquest. Classic and World shopping and reserve decisions can be exercised with detached inputs; this does not admit those modes or complete their construction and observation providers. Full construction, fortification and FireAt chores remain separate parity work. No FFI, C header, wire, contract or privacy change is included.
+
+## Runtime engineering: native bridge identity (2026-10-16)
+
+Paid bridges and Fill use the existing field-work jobs and canonical World mutations. Newly constructed bridge graphs use deterministic identities derived from the first cell and the append-only structure count. Repair reuses an existing bridge section identity, restores wood and 200 HP, and reconnects neighboring sections. These graph identities stay separate from the shared actor ID allocator, so construction does not advance actor IDs. Support, terrain invalidation and hull-width queries continue to use the canonical graph and physical terrain. This is an internal identity choice; no new wire or ABI shape is introduced.
+
+## AI test-only integration on main40fe (2026-10-16, unrun)
+
+Start this candidate from literal40fe9e296b46060241693c6c627ecd615d4f8ea4 in the assigned physical checkout. Preserve prior8cb01c00 and passing0aaea3da refs. Import only nine new task tests in existing human_commander_state_tests.rs and match_human_observation/tests.rs. Main already has their complete helper types and test registration. No old81-line diagnostic helper, ai_receipt implementation, fixture, inherited runtime/history or replacement test provider is required. All docs/parity files stay exact main.
+
+Read current main before integration: it lacks ai_receipt_input and ai_delivered_sight and their Observation/Match/vision integration. Therefore prior AI01/02/04/06 candidates remain held on main; the test PR proposes only AI08/19/20/21/22/23/24/27. AI05's authorized history successor remains on the prior preserved branch, where its actual28-test PASS belongs to0aaea3da/Rust2f9cf68c. No old result transfers to this new unrun source. The14-name focused filter selects nine new and five existing library tests. Both full63-row maps and a concrete PR body live under docs/testing. Root owns the new integrated execution grant, independent review, public PR and proven-row ledger/status follow-up.
+
 # Three Crossroads Native: design decisions
+
+## AI delivery scheduling and Horde break control (2026-10-16)
+
+The shared AI scheduler accepts the caller's tick, snapshot-delivery beat and finished flag. It retains caller-owned views and refreshes every requested view before invoking any brain. Commanders act every tick once a view exists; scripted and Horde brains use the existing difficulty and seat stagger. Horde requests a view on every delivered beat. The scheduler reads no Match authority and owns no wall-clock timer, so it can consume delivered packets without depending on the separate AI snapshot decoder. Server AI activation remains a separate integration.
+
+Horde break control changes only the existing inactive break clock to zero. The existing Horde phase starts the wave and owns its purchases and spawns. The server checks host authority and pause state before invoking the core rule. Full Horde tick, snapshot and room admission stay guarded.
+
+## MODE runtime A: shared ordinary phases (2026-10-16)
+
+Assault, Annihilation and Classic use the existing ordinary tick phases behind a
+strict option/Game mode-pair predicate. A shared EliminationState owns the two
+new modes' team count, bunker maxima, Classic clock and resource nodes; it does
+not add another clock, unit store or wallet. Annihilation's defeat phase precedes
+point capture/income, while Classic's decay, defeat and finish remain late.
+Defeat processes players in slot order and each army in unit-ID order; equal
+transfer distances break on the recipient's player slot. World fort capture stages ownership and grid changes in the existing
+terrain transaction, then updates matching footprint rows only after validation.
+No FFI, wire, contract, privacy or server admission changes accompany these core
+paths. The intent witnesses and remaining limits are in
+[MODE runtime A](docs/testing/mode-runtime-a.md).
+
+
+## Private Horde director queue (2026-10-16)
+
+The core seat dispatcher selects the human commander for ordinary seats and a
+scripted director for the internal Horde seat. The director retains its latest
+detached observation, uses Normal's 40-tick stagger and drains movement on every
+delivered observation beat. Live wave state prevents an old observation from
+dispatching after a break, wave replacement or match finish.
+
+Pending Horde movements belong to the director, outside canonical unit order
+queues. Each emitted movement is an ordinary single-unit command attempt for
+the existing admission path. Typed owner intent, including native route identity,
+replaces the prototype's JSON fingerprint. A same-cell Move or idle Stop changes
+that identity and invalidates pending work. Replacing a queued unit preserves its
+FIFO position; all callbacks for one observed tick share a four-order allowance.
+This adds core components without admitting full Horde ticking, recipient
+snapshots or hosting. Full-match lifecycle coverage uses an ordinary Conquest
+match with a detached wave context and the existing recipient snapshots.
+
+## Typed scenario conditions and core refunds (2026-10-16)
+
+Scenario condition evaluation borrows typed authored state while reading current units, point owners and World region teams from Match. A caller supplies the context and shares an explicit work budget across evaluations. This keeps condition reads separate from scenario admission, trigger scheduling, actions and recipient projection. The evaluator follows the pinned condition semantics, including historical captures, pending arrivals, context fallback and short-circuit work charges. A 64-level guard protects callers that construct trees directly; validated authored trees remain below it.
+
+Waiting-job refunds prepare small production and wallet drafts before publishing the negative MP-spent tally. Site cancellation uses the existing World transaction before the wallet, story and metadata cleanup commit. These core operations add no network admission. Full MODE-91 remains held beyond the selected refund and recovery checks. MODE-83 proves the condition component, not an admitted authored-scenario match.
+
+## Editable map drafts and bounded save preparation (2026-10-16)
+
+Map authoring uses an in-memory draft separate from `World` and `Match`. Selection moves retain the selected layer's material overrides and authored section identities, health and supports. Failed bounds or collision checks leave the draft unchanged. Removal and support pruning can leave an invalid draft, which must pass the ordinary map validator before saving. This keeps unsupported surviving sections visible as authoring errors instead of silently repairing their anchors.
+
+The map loader now calls the scenario validator added in #298. A validated scenario can be edited and prepared for saving, but every startup profile rejects explicit authored scenarios before creating match state because their executor is absent. The previous fixture assertion that scenarios were unsupported by the loader now checks their retained definition. No command, event, flag or other live match state was added.
+
+`map_save::prepare_map_save` applies the prototype's save-field projection and an 8 MiB limit to incoming bytes before parsing, including discarded properties. It prepares bytes in memory and validates the projected document again. HTTP editor authorization, persistence and server integration remain absent, so MAP-23 remains component-only. The existing 16 MiB authoritative-loader limit is unchanged. Generated World documents are outside the demonstrated save scope. MAP-57's rendered-ground sampler and MAP-90's station-yard construction integration remain unimplemented; World admission stays guarded. MAP-92 retains field-specific diagnostics and stronger bounded integer checks for region IDs and ordered bounds, reported as differs candidates rather than approved differences.
+
+
+## Movement actors and review repairs (2026-10-16)
+
+The movement runtime connects house entry and exit, carrier wreck ejection, World train passengers and aircraft purchases, orders and weapon actuation to the existing Match owners. Game keeps pose and movement state; combat keeps carrier links; rail and aviation metadata keep their actor-specific lifecycle. Public ingress admission remains bounded by its existing gates.
+
+Rooms using ordinary recipient snapshots bind that capability limit to the Match at attachment. Their aircraft purchases return the existing unsupported denial before payment or publication, including orders queued before attachment, because even parked aircraft require rows this adapter cannot carry. Standalone aircraft actuation remains available. Aircraft projectile contacts retain the source kind's air flag, so hits on surviving vehicles do not create ground-fire reaction memory.
+
+Aircraft shots keep their true off-map origin and collision segment. Only the terrain-cell traversal is clipped to the battlefield, so off-map launches neither abort the tick nor shift the shot to an unrelated edge cell. This follows the same geometry rule as the combat runtime repair in PR #299. Wounded house occupants leave through the existing ground-exit path before automatic retreat. World elimination admits validated train links and retires their metadata with the removed actors. Mixed Attack selections send orders to both aircraft and ground actors through their existing command paths.
+
+The movement witnesses discover a narrow crossing from terrain, measure arrival against the retained destination, and require a directly hit tank to die under dive bombing. These are prototype-intent repairs, with no FFI, header, wire, contract or privacy change. Owner acknowledgment and broader client adoption remain separate from these focused native checks.
+
+
+
+## First-five engineering merged with MAP273 main (2026-10-16, source only)
+
+Merge the preserved first-five head `d9f035f7afabaefe1389ef3153ebb160260a8efe` with literal main `66a3c3c0ceefda309bb9acc2db4d1e14c7d6434e`, retaining both parents. Freeze the complete typed incoming-plus-owned union before checkout mutation. Keep both complete DESIGN additions, the incoming MAP-25/31/47/48/50 checks and registry declaration, incoming MOV6/CMB6/NET5, all 939 IDs and Acceptance cells, both held World bodies and ignores, their 581-tick fixture and both authentic engineering fixtures. The only shared changed path is DESIGN; no provider source overlaps. All reviewed first-five source leaves stay exact to d9f035, and the separate next-five checkpoint stays outside this merge.
+
+Actual formatting, twenty exact selections once and strict core/simtest Clippy remain attributed to producing head d9f035 and Rust tree `1a003b0c9efbcb077359f9e5276fcfc238f1d068`. Those results do not qualify this merge. The unchanged twenty-selector text has SHA256 `c662e86ca405c558b906cb5bb52021fa38ce44460e18ffd75dd915313221eaf4`. No Source, Node, Cargo, rustc, native, formatting, lint, discovery or CI job runs in this bounded integration. Root alone may issue a new literal-head selection and slot grant, publish, obtain independent review and owner readback, run hosted gates and merge. Receipt implies no consent, comparison default, provider adoption, interface change or held World completion.
+
+
+## First-five engineering rebase onto PR270 main (2026-10-16, qualification pending)
+
+Replay only the four owned commits from first-five publication `50c083b295f36facac510bd1e2f090c81439219a` above frozen main `abd715f12cf532b854e38ebc6e2cb9886fd48b4f`. The complete pre-mutation typed union retains incoming CMB, MOV and NET changes, every existing fixture and registry, all 939 IDs and Acceptance cells, both held World bodies and their fixture. The sole overlapping path is DESIGN; retain both complete additions above its original body. Existing per-change fragments remain additive. Preserve the separate `0e262c02` next-five checkpoint without importing it.
+
+Historical Source results remain on `0ea36432`, authentic fixtures on `0a006369`, native formatting/twenty selections/Clippy on `ec1d2fee` and documentation ACCEPTs on `50c083b2`. None establishes execution of this integration head. The same twenty immutable selectors, eight core-lib, four core-it and eight simtest-it, require a new exact-head Root slot grant before formatting, focused qualification and strict locked core/simtest Clippy. Root alone publishes, obtains owner readback, runs hosted gates and merges. No default, ABI, wire, privacy or held World completion is adopted.
+
+## First five engineering checks: actual ec1d results and private documentation child (2026-10-15)
+
+The actual producer `ec1d2feebeb9eef6f2d8d62d29c05626bcb88470` (Rust tree `1997cc9e8e6a3ae72939bb9b1f416b04db2fed59`) passed formatting, all twenty original exact selections once (eight core-lib, four core-it, eight simtest-it), then strict locked core/simtest ci-test all-target Clippy. Every selected test reports 1 passed, 0 failed, 0 ignored and 0 measured. Raw results, caps and compiler/dep-info attribution remain under `/tmp/eng-ad3-qualification-254aa68e/child-ec1d2fee/`. These results belong to ec1d. This docs-only child preserves that entire Rust tree and claims zero new executions.
+
+Source generation and byte-check each passed once at `0ea364323157337003865abdedac65d5dbdb9696`, each with six selections, seven scenes and 5,977 ticks. Both authentic outputs remain exact to freeze child `0a00636947695e43c5935d3d231ba069fcc274b0`. Source-only ACCEPT remains scoped to 0ea. The [engineering evidence and limits](docs/parity/engineering.md#first-five-engineering-checks-qualified-native-evidence-and-private-status-candidate) record all twenty selectors and complete named predicates: 95-map diagnostics, original hedge/wire, five-pass Bombing, sixteen barrages, short-shelling client bits, Dive ring and the same-cache cliff route. Hedge retains 20 original constant-0.5 calls, zero sampler draws, all 492 strict frames and every-frame Source round-trip.
+
+Apply exactly the proposed five Rust/Status pairs for ENG-37/45/47/50/51 as a private publication candidate. Preserve all 939 IDs, every Acceptance cell, all other cells, incoming documentation and the tested Rust tree. Ported means the Rust side passes the named check; both-owner acceptance is separate. Paid Fill/ENG-52, full Fortifications, the broader weapon/material/geometry matrix and native whole-World journeys remain unproved by these twenty runs. MODE's separate ea2869a result is not imported. No comparison default, ABI, wire, privacy, BASE, queued-owner-view or MOV bridge change occurs. Historical f32/d81d/c49/ad3 failures remain attributed and preserved.
+
+Root retains the final-head independent review, exact-runtime-head Hermes readback, publication lease/queue, all nine final-head hosted gates and preservation before integration. The currently assigned Reviewer1 ec1d review supplies no assumed verdict on this child. This private commit confers no user consent or publication authority. The prior DESIGN title and entire body remain intact below; earlier pending statements describe their producing checkpoints.
+
+## Engineering exact formatter child (2026-10-15, native pending)
+
+The actual guarded format check at `ad3bfdfac0fc341712db1c7ee2a9d8009a414662` exited 1 with 60 formatting hunks in nine Rust files. It reached the existing `engineering_consumers/support_selected.rs` child without the previous missing-module diagnostic. This is formatter traversal evidence, with no rustc or native result. The full log and actual 4-7 affinity, 6 GiB memory, zero swap, 400% quota and 9 GiB available-memory receipt remain in `/tmp/eng-ad3-qualification-254aa68e/`.
+
+Root explicitly permits exact mechanical formatter output. Reconstruct all 60 diagnostic replacements, including the private module ordering, expression layout and trailing commas, directly from the retained log. Preserve every quoted literal, test name, assertion, input and fixture. Change no other Rust path. Freeze this child with this note and its changelog fragment, then obtain Root's exact child binding before the format recheck and unchanged twenty native selections. Source is not rerun; producing Source remains `0ea36432`, authentic fixture freeze remains `0a006369`, and prior c49/f32/d81d failures remain attributed and preserved. All five rows remain in progress; strict core/simtest Clippy is conditional on all twenty actual passes.
+
+## Engineering private child path after the S2 module-resolution failure (2026-10-15, source only)
+
+The actual S2 formatting check at `c49be698b4c90bae1e1ee32ffd1043346d260572` exited 1 because it could not resolve `support_selected` at `rust/crates/simtest/tests/it/../support_selected.rs`. Its full report and raw log remain in `/tmp/eng-five-main-f7c51b1a-254aa68e/REPORT.md` and `fmt.log`. The log also contains layout differences. This is a module-resolution failure during formatting; no rustc or native test ran. The earlier source-only ACCEPT did not prove compilation.
+
+Incoming `simtest/tests/it/main.rs:46-47` loads `../engineering_consumers.rs` through a path attribute. Give that file's existing private child declaration the explicit path `engineering_consumers/support_selected.rs`. The declaration is outside an inline module, so the attribute resolves relative to the containing source file's directory, as specified by the [Rust Reference](https://doc.rust-lang.org/reference/items/modules.html#the-path-attribute). Static inspection of the registration, directory and tracked child confirms the exact target. Keep both module names and the consolidated registry unchanged. Preserve every other parent-file byte and the complete child body.
+
+This repair adds only that attribute, this DESIGN section and one changelog fragment. All assertions, consumers, providers, fixtures, twenty selectors, parity tables and incoming logistics work remain intact. Source results retain producing head `0ea36432`; authentic fixtures retain child `0a006369`; the old f32 Source and d81d native failures remain preserved. All twenty native selections (eight core-lib, four core-it, eight simtest-it), formatting and strict Clippy need a new Root grant at the frozen child. No Source, Cargo, rustc, formatting, lint, native, discovery or CI job runs in this repair. ENG-37/45/47/50/51 stay in progress. MODE's separate `ea2869a` repair remains outside this branch.
+
+## First engineering five integrated onto PR271 main (2026-10-15, native pending)
+
+Integrate the qualified engineering source `0ea364323157337003865abdedac65d5dbdb9696` and both authentic fixtures from `0a00636947695e43c5935d3d231ba069fcc274b0` onto main `f7c51b1a0ebf850c5c22b560a595e4095ce39fdc`. Main's incoming logistics additions, complete parity tables and Acceptance cells remain intact. Independently freeze the expected full typed-tree union before applying it; the engineering code and fixture leaves retain their qualified mode, type and object IDs. Preserve main's complete DESIGN body and the engineering history below. No new Source run or semantic repair occurs.
+
+Source generation and byte-check results stay attributed to producer `0ea36432`; the source-only ACCEPT covers that immutable source. Neither establishes native success at this integration. The f32 Source and d81d native failures remain historical with their raw logs preserved. The unchanged twenty native selectors (eight core-lib, four core-it and eight simtest-it) require a new Root exact-head S2 grant, formatting, each exact selection once and conditional strict core/simtest Clippy. ENG-37/45/47/50/51 remain in progress, main remains 250/939, and MODE's separate `ea2869a` repair is excluded. No quota, row, ABI, wire, privacy or publication change is made.
+
+## First engineering five: authentic Source fixtures frozen (2026-10-15)
+
+Source generation and the subsequent exact byte-check each ran once and exited 0 at producing source head `0ea364323157337003865abdedac65d5dbdb9696`, a descendant of main `f7b0e5889e3b707beb6d18c4ea8d20a7d9f7b578`. Each invocation executed all six original selections, seven scenes and 5,977 full Source ticks with Node v24.21.0/x64. The canonical reference checkout was available, clean and pinned at `e4e579a838aabae3b1d9dadbc17a0a87147bc52d` before both invocations; its inputs were unchanged. No substitute reference path was needed.
+
+Freeze both authentic outputs together: `rust/crates/simtest/tests/fixtures/engineering-support-selected.json.gz` (39,546,415 bytes, SHA256 `a83ca23868826b6c6858362cef5c3d3e4184e2c152d4c2f3194a3f1fc7346dab`) and `rust/crates/core/tests/fixtures/engineering-hedge-original.json` (705,588 bytes, SHA256 `b12f1eeeb8f1f3a3ca82671962eece665c99b5a4fa0bbff27269ddf78f4790ee`). The original hedge callback passes its settled-rubble, path and moved-tank assertions. Its actual tape contains 20 constant-0.5 calls, alternating along/side at ticks 101, 110, 119, 128, 137, 146, 155, 164, 173 and 182, with zero native-sampler draws and absent OffMap state. Both invocations checked reversible reconstruction of all 492 captured hedge frames before comparing or writing output. This is Source capture evidence; native consumption and native stream preservation have not run.
+
+Both jobs verified the current S2 exact-head grant and unchanged Cargo-guard hash, actual scheduler affinity 4-7, memory.max 6,442,450,944 bytes, memory.swap.max 0, CPU quota 400%, jobs 4/thread 1 and at least 20 GiB free immediately before execution. Optional cpuset metadata was absent; actual kernel affinity supplied the four-CPU check. An exclusive S2 flock was inherited by each Node process through completion. Both processes are terminal and their inherited locks released. Raw logs, caps, results, original refs/dirty receipts, fixture hashes and preserved historical failures are in `/tmp/eng-five-S2-0ea36432-254aa68e/`.
+
+The earlier unexecuted sections below remain historical attribution. The f32 first Source failure and separate d81d native admission failure remain preserved with their original heads; the old gzip is retained in Git history and the private packet, and supplies no successor qualification. All incoming main parity/Acceptance cells, fixtures outside these two outputs, contracts, shipping sources, original predicates and twenty planned native selectors remain unchanged. ENG-37/45/47/50/51 remain in progress and main remains 245/939. No comparison-default mapping is adopted. Cargo, native tests, formatting, Clippy, other lint, discovery and CI remain unrun in this grant. Root retains the next exact-head grant, independent review, hosted checks and Hermes runtime-head acknowledgment before any merge.
+
+## Original hedge recorder repair applied (2026-10-15, unexecuted)
+
+The bounded task authorizes applying the exact recorder patch reviewed at `dbae41a9`. Apply its `3aaabf3648fb5d2bc570720d4932ae324f5f15ae35898ba3cdadeeff6af8d988` proposal after source integration `37ce59c8ba802f8cda26efefc16d9c05dc73613e`, without changing the original callback, helpers, assertion or authored input. The earlier proposal file and readback remain historical records. The recorder now calls the callback-installed function only during the original first 200 hedge ticks, records actual call sites/ticks/value bits, and exports a plain core fixture after checking reversible reconstruction of every frame. Twenty calls and 492 frames remain required expectations, not observed results. No fabricated tape, discarded draw or native RNG reset is introduced.
+
+The actual producers and consumers, entropy sources, preserved failures and unchanged twenty exact native selections are recorded in [the source-repair packet](docs/runtime/engineering-first-five-source-repair.md) and [the gate plan](docs/testing/engineering-first-five-source-repair-gates.md). Source generation/check remains six selections, seven scenes and 5,977 planned ticks. Freeze both authentic gzip and plain hedge JSON before any Cargo grant. The old gzip remains deliberately stale and the plain hedge fixture is absent. No Source, Node, Cargo, native, formatting, lint, discovery or CI command runs in this task; no row changes or publication occur. Root retains exact-head slot grants, independent review, hosted checks and Hermes runtime-head acknowledgment.
+
+## First engineering five integrated onto main f7b0e588 (2026-10-15, source only)
+
+Integrate only the owned ENG-37/45/47/50/51 source delta from `440136c8` through `dbae41a9` onto main `f7b0e5889e3b707beb6d18c4ea8d20a7d9f7b578`. Retain every incoming parity row, fixture, contract and protected test. Resolve the two internal overlaps by retaining both current MAP diagnostic arms and the structures arm before the generic fallback, and both private replay modules (startup observation and bounded engineering support). The existing ground-contact providers and all unrelated source remain intact outside the reviewed crushing delta. Shipping `random.rs`, `match_support.rs`, the generic 16,384-entry contract and independent seeded weather are unchanged.
+
+The following three engineering sections preserve the dbae implementation history. Their unapplied-patch and queue statements describe those checkpoints. No old PASS or source-only ACCEPT is transferred to this integration. The first-five publication lease precedes ENG_AUDIT; the separate `271c4509` trench candidate stays unimported and unrun. All five assigned rows remain in progress. Execution, discovery, formatting, lint, CI and publication are frozen until Root grants the exact successor and selections. No garrison provider, external API, wire or privacy change is included.
+
+## Original hedge input through the private core replay (2026-10-15, unexecuted)
+
+The actual `7f3a4ff6` source readback found two interval-control gaps in the private test mode: `end(0)` could succeed before any tick began, and a new tick with no overdue draw could begin without ending its predecessor. Add an explicit active flag, require begin/end pairs for all 200 ticks, admit draws only inside the active interval, and permit closure only after tick 200 ends with every call consumed. The real 492-frame consumer now requires that exact closed/inactive/exhausted receipt. Its original timeline and strict full-frame comparison remain intact.
+
+Expand the existing bounded-mode test with negative/zero/late and mismatched intervals, duplicate begin/end/finish, missing pairs, repeated/descending shell ticks, wrong purpose/axis/call site, NaN/infinity and nonconstant bit patterns, calls before/after intervals, and exhausted draws. Compare the complete receipt around rejected operations. Exercise the real fraction dispatcher with an unmapped caller as well as the checked draw method. During every active tick, separately compare seeded weather output and seed advance with its ordinary generator and require zero tape consumption.
+
+Keep the generic R1 constructor and its exactly 16,384-value contract unchanged. Expand its existing test to reject wrong capacities and malformed/nonfinite/out-of-range fractions, preserve its seeded-environment injection, consume all 16,384 values, and catch the expected no-fallback panic on draw 16,385. That disposable tape is deliberately not reused after its poisoned-lock panic. These are authored controls, not measured results. The same twenty prospective named gates remain; no Source, Cargo, formatter, native or lint job has run. Source patch application still awaits Root's exact read, and PR #266 retains the engineering publication lease. The ledger transfers ENG-15/16/17/23/24 to ENG_AUDIT; this batch keeps only ENG-37/45/47/50/51.
+
+User19:21 authorizes the bounded core cfg(test) implementation after the exact-f32 review found the recorder's explicit-input overwrite. Extend the existing private Replay rather than exposing a Match option or RNG field. Its engineering mode accepts exactly twenty recorded 0.5 fractions, validates ascending shell ticks and along/side pairs, and checks the actual native support call site and OffMap purpose at every draw. Missing, extra, wrong-purpose, wrong-axis, wrong-site and skipped/incomplete-tick inputs fail without consuming a replacement value. All 200 original ticks must complete before the tape closes and detaches. There are no discarded stream draws, seed restores or fallback values. Ordinary shipping MatchRandom and the support provider remain byte-identical.
+
+The original fixed Math.random function does not replace Source's independent seeded environment generator. In this mode the existing test environment adapter therefore keeps the original generator's value and seed advance, consuming no artillery entry. A named control compares both outputs and seed state and verifies that the tape receipt stays unchanged. Existing generic Replay mode retains its own environment interception and receipt format; its original regression joins the prospective focused gates.
+
+Move the original hedge Match consumer from simtest to a descendant of the private core Replay module. Construct and clear the same canonical scene, restore only authored initial facts, then attach the bounded tape after construction. Dispatch original support and move commands, retain the settled-house/rubble/path prerequisite at tick 252, publish the original late tank through its factory with allocator equality, and advance all 492 real ticks. Every complete frame and ordered collapse batch is compared, including the actual absent OffMap stream; no expected frame enters the Match. A snapshot at tick 200 requires every native purpose stream to equal its post-constructor state before detaching the tape.
+
+The recorder repair remains an unapplied patch for Root's exact-head read. It preserves the original callback, assertion and 200-tick constant interval, records actual call ticks/sites/value bits, and keeps the existing sampler everywhere else. Its proposed compact core fixture exports reversible expected-value deltas from the entire original frames, checking each reconstructed frame against the captured frame before writing. This avoids a new compression dependency in core. Native reconstructs only its detached expected JSON. Both this plain fixture and the updated gzip must come from a fresh authorized Source generation/check and be committed before Cargo. Neither exists as fresh evidence now; the old gzip and both d81d/f32 failure packets remain preserved.
+
+The prospective envelope is twenty exact focused selections: eight core unit tests, four consolidated core tests and eight consolidated simtest tests, including both unchanged registration guards. This adds the two independent short-shelling/river checks, the bounded-input control and existing generic Replay regression to the old sixteen, while moving the hedge consumer between targets. Planned native support ticks remain 5,397 and planned Source capture ticks remain 5,977. These are source-derived counts, not executions. Five row statuses stay in progress. Engineering publication follows ENG_AUDIT c961; Root owns slot grants, independent actual-head review and the Hermes runtime-head acknowledgment before merge.
+
+## Hedge entropy readback and independent engineering witnesses (2026-10-15, source only)
+
+The `f32f7dce` Source attempt exited 1 on the original settled-rubble assertion, wrote no new capture and released S3. Its recorder replaced the original callback's fixed `Math.random` function during the first 200 ticks. The [unapplied proposal](docs/proposals/eng-hedge-original-random.unapplied.patch) delegates to that captured function only for this selected run, validates its 0.5 value and records fixed calls separately from native-sampler draws. Every other run keeps the existing sampler. This patch is stored as review text only; recorder, authored input, compressed capture and runtime bytes remain identical to the failed head.
+
+This Source proposal alone cannot prove the native hedge replay. The shipping artillery caller requests two OffMap fractions per shell. Ten shells imply 20 calls if the original run completes; that is a source-derived prediction, not an observed receipt. The proposed Source run consumes 20 fixed-function calls and zero sampler calls, leaving its sampler state absent, while an ordinary native run consumes its purpose stream. The complete comparator must retain that distinction. A separately scoped test-only explicit-entropy consumer would need real call counts, purpose/order checks and a bounded cutoff, without a shipping RNG change, reset, expected-state import or comparison default. The current aligned test seam is private to cfg(test) and is not an available simtest production-dependency input.
+
+Independent of that unresolved hedge input, the support replay now checks actual accepted command dispatch for all five Bombing, sixteen artillery and one cliff-dive requests. A new native component check calls canonical Environment cell damage with the original short-shelling arguments, compares the complete recorded output and retains both scar bounds, open ground and client state bits. A second new check queues and advances the actual dive in two separately authored initial scenes, open ground and river, to protect the river-only second-dent exclusion. Its expected levels are Source-read assertions, not a new recording or executed native proof. These tests are unexecuted. They add two prospective filters beyond the old 16 and require a future Root gate update; the stopped grant is not reused.
+
+## Five engineering consumers through existing owners (2026-10-15, source only)
+
+The restored assignment now owns ENG-37/45/47/50/51. Preserve the earlier `440136c8` evidence child and all four completed weather rows. Structure validation retains the original bounds, graph and physical-footprint checks; its error grouping and validation order now match Source, including resolving support types after all section metadata. Structure errors display their original diagnostic without a second field prefix. The existing 95-map test now compares each of its 36 rejection messages exactly while retaining all valid graph/material/health assertions.
+
+Moved crushing calls the existing `EnvironmentRuntime::wreck_cell_emitting` at the actor's actual post-movement, pre-firing boundary. The sole tick caller appends committed effects directly to its chronological event batch, including a prefix if later work fails. The same World owns mutation, hp, versions, journal and logs. Wear and dust read the cell after crushing, as Source does. No extra terrain owner, event queue, RNG stream or clock is created. Old ordinary/World crush-refusal assertions are replaced by supported-crush checks; every hostile-mine and malformed-state refusal remains. The existing original World capture's heavy-crush case joins its canonical contact replay, with ordered effects and complete cell rows compared.
+
+The recovery imports only the support recorder, shared authored input, test child and authentic old capture from `d81d24cd05`, not its unrelated component batch. That head's native bombing test stopped on a capture point inside a house, before any gameplay tick. The new authored input moves the point from (10,10) to open (4,4) in both Source and native scenes; the old head/capture/raw failure remain the producing evidence. The original callbacks and wire block are read verbatim from pinned Source. The new native replays keep the existing 900 bombing ticks, 3,200 barrage ticks and 102 cliff ticks, add the original 343 wire and 492 hedge ticks, and compare the first 120 Scarring ticks before its unimplemented Fill continuation. These are planned counts, not measured passes. Full Source Scarring, including Fill, remains recorded without implying native ENG-52 support.
+
+The hedge continuation publishes only its original authored tank input through the canonical factory and metadata owner at the recorded boundary, asserting the native allocator first. It imports no expected HP, terrain or movement frame and makes no native purchase-parity claim. Move and support requests use actual queued dispatch; every frame advances the ordinary Match. The compressed file currently remains the unchanged old capture and intentionally does not match the new input. Root must grant generation and byte-check, then freeze that authentic successor before any native gate. All five row statuses stay in progress. No Source, Cargo, rustc, fmt, lint, native or CI job has run in this implementation turn.
+
+## NET19 strict-boundary witness repair (2026-10-15, qualified at6843e977)
+
+Read the full exact88a5 independent review. R1 is correct: the 59,951 poll leaves the clock due at60,001, so the old60,000 observation performs zero expiry callbacks. Its historical de30 PASS does not oppose an inclusive expiry mutation. The shipping strict predicate remains correct. NET22/23/24/30 retain their complete component assessments; no new full-match or admission gate applies.
+
+Create a private child of preserved88a5, without rebase or public update. Keep every original NET19 assertion, actual hello/EOF and ordinary Hub maintenance. A second real room becomes empty at clock1 after the original room records0. The due callback at60,001 must remove the older room at age60,001 while retaining the younger at exact age60,000; a later due callback at60,051 removes the younger. Read the existing clock due getter before/after these callbacks and actual empty_since/room-order state. No direct expire, scheduler reset, expected-state assignment, callback counter or runtime mutation occurs.
+
+An inclusive comparison would remove the younger during the same callback that demonstrably removed the older, so the new retention assertion is decisive by source inspection. No mutant execution has occurred. The exact repaired NET19 test passes once at `6843e97791f7e81b6ab07e5308b0fa9c4e3f6c80`: 1 passed, 0 failed, 57 filtered. Fmt check and strict locked core/server all-targets ci-test Clippy also exit0. Restore NET19 to ported only in this private same-Rust-tree documentation child; fresh independent review remains pending. Correct the former complete-proof claim without relabeling de30,9aa,7cca or14bdb evidence. The other five function bodies and all other row/Acceptance bytes remain exact. Use a changelog fragment; leave the frozen PR270 and separate text/proposal branch untouched. Each guarded job records actual CPU0-3/6GiB/swap0/400percent and immediate48GiB disk availability. The process exits and releases the exclusive S1 lock before Root notification and documentation work. The fresh native compiler receipt binds this checkout/Rust tree; the older14bdb advertised wrapper log ENOENT remains unchanged.
+
+## First five NET network components on current main (2026-10-15)
+
+NET-22/23/24/30 retain complete component evidence through actual TCP upgrade, WebSocket frames, ordinary Hub consumers and socket retirement. The NET19 strict-boundary claim at88a5 is replaced by the qualified6843e977 R1 repair above. The selected module also covers independent team/faction defaults, AI factory defaults, all 135 listed-capacity cases, host/kick guards and all three host-priority branches. [The evidence record](docs/testing/net-lobby-first-five.md) maps every literal clause to pinned Source and actual producing-head results. Every Acceptance cell and all other parity rows stay exact.
+
+The branch starts at main `7c9df2d5` and preserves its complete test-observer #265 tree. The added optional server clock and test module are compiled only under `cfg(test)`; existing test constructors select `None`. The production clock, transport, maintenance, role admission, public schema, ABI, reference and dependencies are unchanged. Pure factory and host predicates are judged as complete components, without adding unrelated start/result/endgame requirements from enclosing JavaScript scenarios.
+
+The three appended allocation, AI-factory and host-priority tests each pass once at `7cca098d` (1 passed, 0 failed, 57 filtered per command). The corrected NET19 test passes once at `de30e9a1` (1 passed, 0 failed, 64 filtered), and the exact NET24 matrix and host/kick bodies retain their `9aa846d5` passes. These are producing-head results, not fresh runs on this documentation child. At88a5 all six selected bodies were exact apart from mechanical formatting across their recorded source transfers. The private R1 child changes NET19 only; its new exact pass is attributed to6843e977.
+
+The initial `0210274f` formatter check reported layout only; mechanical child `7cca098d` preserves all non-whitespace test bytes. Strict Clippy there failed on the unused `Client::closed` helper. Reviewed child `14bdb0df` removes only its six lines, preserving all six test bodies byte for byte. Strict locked core/server all-targets ci-test Clippy then passes once, exit 0. The historical documentation child88a5 has Rust tree `55676b9ea76a7abedbed4ff6c90c21e51f93a905`; this R1 repair changes NET19 and has its own6843e977 qualification. This documentation child preserves that tested Rust tree `1bda51da32888b6123c2c5a17a124dbf1b0936e1`. No completed test, Source recorder or formatter was repeated for that helper deletion.
+
+The old NET19 scheduling failure remains attributed to `9aa846d5`. Its approved repair adds an ordinary poll at 59,951 ms before the unchanged 60,000/60,001 assertions: CatchUpClock's 50 ms cadence then places its next due callback at 60,001, rather than 60,050 after a backlog-dropping poll at 60,000. The test reaches the real expiry provider without direct expiry calls or clock resets. No provider defect is inferred from the failed test schedule.
+
+Private recovery `0c0c85d1`, its full 93-step fixture and failed sanitation/spectator logs remain in their original private branches and packets. They were never on main and are outside this selected-row PR. The separate text/UTF16 work stays private; NET-20/21/25/27/29 remain held. No baseline test, fixture or assertion is removed or weakened.
 
 ## Six restored combat checks after S3 qualification (2026-10-15)
 
@@ -3294,6 +3588,18 @@ Each room's meter keeps 200 samples for six phases and the last 50 snapshot tick
 
 Timing controls transport cadence only; the AI retains its previously recorded fixed schedule and vision beat. Non-finite or negative durations and exhausted check deadlines fail before any history changes. The original default meter and unchanged host polling loop match eight traces with 747 samples and seven traces with 34 polls, including ring wraps and exact stall/threshold boundaries. At 315f46a, 23 server debug tests and all 173 release workspace tests pass, together with strict workspace Clippy, formatting and release FFI. The same sequence retains the delta, list and backpressure tests. Fresh core compilation followed package cleanup in both profiles. Actual room-loop callbacks and diagnostic logging remain pending.
 
+## Aircraft ground fire and gun-pit range (2026-10-16)
+
+The ordinary Default/Conquest unit loop connects aircraft movement to the existing firing producer before continuing to the next actor. Aircraft choose an eligible ordered ground target first, otherwise use their half-second automatic target cache; Hold Fire suppresses automatic fire while explicit attack and area missions remain authorized. Guns and rockets use `fire_weapon`, and bomber area missions use `launch_weapon_salvo`, so rounds keep the shared physical flight, collision, damage and event owners. Aircraft launch 20 metres above the local terrain and spend one sortie ammunition unit per volley or bomber stick. The tick owner detaches launch events immediately after each aircraft turn, including before propagating errors, just as it does for ground fire. A later actor can then start a queued order without finding an undetached producer buffer. Off-map launches retain their real origins; collision traversal clips the traveled segment to the battlefield and does not exempt a border cell as if it contained the shooter.
+
+Wreck ejection during a rider turn publishes direct environment events before the ground turn continues. Carrier retirement ejects its complete cargo immediately and returns those effects to its caller; a later tick must not reproduce them. The scuttle regression checks exactly one passenger Hurt across the producing retirement and tick phases.
+
+Aircraft admission accepts automatic weapons and keeps queued sorties unsupported. Area missions require a bomber salvo weapon during both command admission and restored-state validation, so an inconsistent fighter mission cannot enter the tick. The command fixtures represent the ground unit's entrench flag with canonical project membership, preserving cancellation and consistency checks for mixed aircraft and ground Move or Stop. Mixed Attack first prepares aircraft without mutation, then uses the existing ground Attack transaction for all ground rows, then applies the prepared aircraft orders. Both selection orders cancel canonical projects; malformed field-work state still refuses before either actor changes.
+
+Gun-pit range follows the prototype's `inPit` and `rangeOf` rule: only MG, AT, mortar, flak and howitzer teams standing on a completed registered pit whose cell is still trench (`T`) receive the compiled `FORTS.nest.range` multiplier (1.25). Both target search and final range eligibility use the same helper. Other units, unfinished pits and pits whose trench has been destroyed receive ordinary weapon range. These connections use the existing internal owners and introduce no FFI, header, wire, contract or privacy changes.
+
+R1 rooms restrict aircraft weapon emission when they take ownership of a Match. The restriction lives in the canonical tick state and gates the aircraft weapon call after movement. It preserves aircraft missions, movement, fuel, rearming and command admission, while leaving the standalone core firing provider available for internal combat checks. A pre-existing live projectile still fails the unchanged recipient preflight. This restriction remains until owner decision E defines projectile-flight delivery; aviation events retain their existing refusals. An ordinary attacker/bomber room test requires a firing opportunity, unchanged sortie ammunition, no flights, a map-income victory and a recipient snapshot for every seat on every tick. Public R1 still cannot order aircraft.
+
 ## Canonical combat metadata (2026-10-13)
 
 `Match.combat` owns XP, last-hit owner, death impulse, incoming shooter/time, anti-tank hit time and ordered cargo/carrier identities. Health, suppression, position, path and garrison stay in `World.game`. `Game.riding` is the query flag kept in sync with the canonical carrier identity. Starting units and bases initialize the source defaults. Removed shooter metadata may remain until the firing producer releases its last projectile reference, preserving source XP after shooter removal. Firing keeps target/cooldown/retarget and supplies an infallible `RetargetSink`; aim and command switches belong to the separate canonical UnitControl. `Match.environment` owns the reviewed terrain/fire/debris runtime. These fields reserve internal producer ownership; they do not establish combat phase completion or change the ABI.
@@ -5333,3 +5639,345 @@ Forty-six curated matched browser/native image pairs include selecting guest HUD
 Visible limits remain: dark/different portrait studio with no shadow-catching floor; tiny crowded UI150 cards and split Spanish history text; a narrow Menu tooltip plus duplicate inline hint; minimap orientation differences; high-contrast native labels through fog; longer camp and aircraft shadows; white angular World frontier and thin world lines; brighter water/harder outer transition; darker wide ground and different haze; thinner/more upright native falling Bridge faces and different particles. Bare native tours hide HUD-created labels/rings/camps that remain on the source canvas. Native deliberately rebuilds the original Tutorial camp after late mode metadata, whereas the returning browser leaves a mast. All fifteen west-bank rifle members are alive/submitted in both clients; counts do not guarantee visibility through occlusion. No invented units were added. Five raw composite/diagnostic translator differences remain in the independent HUD-child oracle; 601 exact dictionary-key checks pass, without exhausting dynamic text. Full live aircraft/rider/wreck sequences, shader-deformed infantry selection envelopes, exhaustive menu/air-state/localization matrices, long-term World fog memory and human/platform input acceptance remain open. The child input matrix also retains inconsistent confinement under external pointer warps and missing live commander-seat reclaim return coverage. No parity row is accepted.
 
 An informal observation on shared loiko-linux (i7-12700K, RTX 4060, 1280x720, Seelow AI with five delivered unit rows) records High 6,485 frames over thirteen windows, frame-weighted mean 9.03 ms and worst 30.6 ms; Low 7,556 frames over thirteen windows, mean 8.61 ms and worst 27.4 ms. Startup/switch windows and screenshots are excluded. This is not an idle-machine benchmark, a p95 measurement or a large-army claim. Windows/macOS, FPS/editor and public hosting remain outside this verification.
+
+
+## MAP-47 footprint consumer readback (2026-10-15, source only)
+
+The seven cases at `ca34eb2c` did not distinguish infantry from vehicles,
+sample multiplicity, or the MOVE-only filter from a vehicle blocker mask.
+Add two cases to the existing test, without adding another test function
+or changing production code. A rifle straddles a ford, wire and trench;
+three ordered samples land in its centre cell. A tank samples worn rubble,
+whose VBLOCK flag must not exclude it from this speed average. Each has a
+matching call to the actual pinned Source helper. Nine footprint cases
+are now specified. This is a source coverage count, not a runtime result.
+
+Retain the original 456 ground values, water assertion, complete three
+MAP-50 checks, continuous Slope component and six grade/class calls. The
+five new tests and two retained fixture gates still give seven proposed
+unique native instances. No Source, Cargo, formatter, Clippy or discovery
+command runs here. All MAP Acceptance/Status cells and old fixture bytes
+remain unchanged. PR #267 stays frozen at its separate qualified `7996167c`.
+
+## MAP footprint input alignment before execution (2026-10-15)
+
+Source inspection after frozen `e253d4f0` shows that `World::set_cell`
+initializes natural mud/ford surface wear. The pure footprint matrix
+intentionally supplies zero wear to Source. Supply that same authored
+input after native terrain construction, before its first query. Keep
+the mutation provider unchanged. The old checkpoint remains in history
+and has no execution or failure to relabel. Also describe the original
+water layout as direct input rather than claiming an existing capture.
+All Source/native/fmt/Clippy commands remain unrun, and all parity cells
+remain byte-identical to frozen PR #267. Review must target this child.
+
+
+## Next MAP terrain component checks (2026-10-15)
+
+MAP-25/31/47/48/50 use the existing component comparison rule. The new
+simtest module calls the production terrain, map mutation, pathfinding,
+unit initialization, movement and LOS providers. It changes no runtime
+code, interfaces, map admission, guards or parity cells. PR #267 stays
+frozen at `47fe2eaf`; this work has its own branch and checkout.
+
+The ground input starts with `boundary:minimum` in the retained original
+map corpus. The existing mutation provider installs each of all 19 Source
+terrain letters, including runtime-only K/A. A literal dry-value table
+checks wear 0/0.5/1, wetness 0/1, infantry/vehicle and level 0/-1, for
+456 exact double comparisons. These are authored expected constants,
+not new recorded Source outputs. The separate Source checker must test
+them against the real pinned `groundMul` body before claiming agreement.
+Seven `speedMul` cases distinguish five ordered mixed samples, wall and
+water exclusion, zero-sample fallback, naval bypass, off-map exclusion
+and the actual 0.6-radius offset.
+
+The native water check keeps the original river/bridge/ford layout and
+exact cross-water sight coordinates. MAP-50 retains every assertion from
+`LOS`, `test.js:638` and `Depressions`, including the latter's unreachable
+cliff path. The existing 18-ray original fixture remains a separate gate
+for start/end exclusion, SIGHT blockers, three/four woods, directional
+rays, smoke, hills and raised eyes. No whole-match requirement is added.
+
+The Slope consumer ports the original two tanks' coordinates, orientations,
+goals and two-second comparison. Canonical native unit initialization and
+real pathfinding supply inputs to production movement. Native state feeds
+all 40 steps in each of the two scenes, for 160 movement calls. The original
+uphill deficit and downhill tolerance remain literal. Six further block
+calls test infantry and vehicle speed at a partial positive grade, a grade
+above one and a negative grade. This is a movement component check, not
+an ordinary Match tick, command-admission or recipient-delivery claim.
+No recorded expected states, health edits or random resets feed it.
+
+The Source checker only exposes the private ground/footprint helpers,
+without rewriting their bodies. It checks the same literal matrix and
+seven footprint cases, then evaluates the four original check bodies and
+their original shared helpers unchanged. The water sight assertion runs
+separately. It writes no fixture or reference file and never replaces the
+random generator. The existing movement/LOS fixture bytes remain intact.
+
+Measured execution status: zero Source commands and zero native tests,
+formatting or Clippy commands on this branch. The five new tests and the
+Source checker are uncompiled and unrun. Qualification needs a new exact
+slot grant, first-failure preservation and independent review. Status
+promotion stays held while PR #267 owns the maps publication lease.
+
+
+## Five MAP terrain checks on accepted main (2026-10-15, unrun)
+
+Start a fresh branch at fetched main `f7b0e5889e3b707beb6d18c4ea8d20a7d9f7b578`.
+Import only the frozen `47fe2eaf..3a4112b2` terrain-check delta. The source
+checker and five-test native module are exact frozen blobs, with one additive
+consolidated registry declaration. Preserve main's accepted `7996167c`
+validation/runtime changes, all foreign registrations, all 140 MAP Acceptance
+cells, every other table cell and both complete fixture trees. The earlier
+next-five sections above retain historical branch and PR references; PR267
+is now merged, and none of its old proof qualifies these new checks.
+
+Keep `9fde0f87d89c479cb70bec18a73cc059c87b6797` and its external report
+unchanged on their original ref. Its grid, weather and MAP-49 additions are
+not imported. This task owns only MAP-25/31/47/48/50. No status promotion
+or comparison-default mapping is applied. No provider, admission, interface,
+wire, ABI, reference or privacy change occurs.
+
+The complete proposed scope is 456 ground comparisons over all 19 letters,
+nine footprint cases with authored zero wear supplied after M/F mutation,
+infantry and repeated-cell sampling, MOVE-only filtering, original water
+sight, all eight assertions across LOS/ridge/Depressions, and the original
+two-second Slope journey (160 movement calls) plus six grade/class calls.
+The five new functions and two unchanged LOS/movement fixture tests form
+seven unique proposed native instances. These are source counts, not passes.
+
+Zero Source, Node, Cargo, native, fmt, lint, discovery or CI jobs ran here.
+Root must grant this integrated exact head and Source-first selection
+before any execution, then a guarded external slot for native qualification.
+The source-only private report records the full predicate map and expected
+typed tree union. Historical results, raw failures and original checks stay
+attributed to their producing heads. Root owns independent review, hosted
+checks and any publication. This checkpoint completes no row.
+
+
+## Five MAP terrain checks after PR271 (2026-10-15, qualification pending)
+
+Integrate the six owned paths from preserved beaf1896 onto literal PR271
+merge f7c51b1a. Keep the checker and native consumer bytes unchanged, and
+add only the terrain module to the incoming consolidated registry. Preserve
+main's complete DESIGN history, all LOG and accepted MAP validator changes,
+all 140 MAP Acceptance cells, every other parity cell and every fixture.
+The earlier beaf1896 global-ref assertion failure remains a metadata
+failure, with no Source or engine execution. This task checks only its
+owned MAP refs and main preservation, without constraining other writers.
+
+The selected predicates remain all 456 ground values, nine footprint cases
+with authored zero wear after M/F mutation, original water sight, all eight
+LOS/ridge/Depressions assertions and the complete original Slope clauses.
+Five new native functions and two unchanged fixture gates form seven
+proposed instances. Source-first and native execution require a new Root
+exact-head selection and slot grant. No previous result qualifies this
+integration, and no row status or comparison-default mapping changes.
+Locally acknowledge issue5 comments6201127263,6201618030,6202564980 and
+6202580526 with their conditions. Receipt grants no additional scope.
+ABI2, the e4e579a pin and draft contract status remain unchanged.
+
+
+## MAP terrain qualification formatter child (2026-10-15)
+
+The corrected explicit Rust 1.99.0 fmt check at `a99c2b38` ran and reported
+five layout hunks in `map_terrain_components.rs`. Apply exactly those raw
+diagnostic replacements, including trailing commas. Preserve every literal,
+assertion, input and other Rust byte. The prior bare-Cargo launcher failure
+and this actual formatter exit1 remain separate in their original packets.
+No native test or Clippy has run. Freeze this child for Root to bind before
+further qualification; Source remains attributed to `a99c2b38`.
+
+
+## MAP-31 authored objective admission repair (2026-10-15, unrun)
+
+At producing head `92c18323f55c1539877b96fa3b28108c72f067e6`, formatting
+passes and the ground consumer completes all 456 comparisons. The first
+native MAP-31 attempt then fails in AuthoritativeMap admission at the
+`points` open-ground guard, before World construction or any LOS query.
+The original blank helper places its point at cell (10, 10); the retained
+river authors water there. This is a test/harness input overlap. No LOS
+semantic failure was observed. Preserve that first failure and raw logs at
+`/tmp/map-native-92c18323-52b4776c/` without retrying or relabeling them.
+
+Separate the existing authored scene input from its World construction.
+Only the water scene replaces its point metadata, before admission and
+observations, with a neutral point at cell (2, 2), explicitly VP 0 and MP 0.
+The river's first ten columns are authored open ground, so this location
+follows directly from the input layout, without a query or expected answer.
+All other scenes retain their original point metadata. The original river,
+bridge and ford rows, heights, smoke, actor positions, rays, water flag
+predicate and LOS assertions are unchanged. No terrain provider, admission
+guard, expected output or production code changes.
+
+The owned Source water query consumes only dimensions, terrain flags and
+empty smoke, not objective metadata. It therefore needs no shared-input
+binding change. The Source checker remains byte-identical to its one-time
+`a99c2b38` PASS. That historical Source result and the producing `92c18323`
+ground PASS do not qualify this child. The other five selected native
+functions and Clippy were unrun at the first failure. All 140 MAP Acceptance
+cells and all other parity cells remain unchanged.
+
+Freeze this bounded source-only child of the failed exact head. Main
+`f7c51b1a` and all prior owned MAP refs and evidence remain preserved.
+No Source, Cargo, native, formatter, lint, discovery, retry or CI job runs
+under this repair task. Root alone records a new exact-head Source/native
+qualification scope, resources and slot selection after freeze. No row is
+promoted, and no whole-match, client, interface or owner-policy claim changes.
+
+
+## MAP terrain integration after PR268 (2026-10-15, source only)
+
+Carry only the six original MAP terrain-check paths and their bounded
+formatter and MAP-31 input repairs from preserved `7f7acc9f` onto literal
+main `011a39d0cfc1cbcdf28024fd73ff92f74f8639ac`. The checker and complete
+five-test module remain exact. Preserve all incoming DESIGN text as a
+complete prefix and add only one terrain declaration to the incoming
+consolidated registry. All six incoming MOV statuses, both complete held
+World tests with their ignore reasons, fixtures, LOG and G1 history, all
+939 gameplay IDs and every Acceptance cell remain unchanged.
+
+The MAP-31 authored point stays at cell (2, 2), neutral with VP 0 and MP 0,
+before admission. All five mechanical formatter hunks remain exact. No
+shipping provider, admission guard, interface, wire, FFI or reference changes.
+No MAP status proposal is applied. The private five-row publication packet
+at `/tmp/map-private-publication-7f7-52b4776c` remains unchanged.
+
+Actual formatting, seven native passes and strict Clippy belong only to
+producing `7f7acc9f`, Rust tree `09cf932889e3e2aa21587f2dbba3364f2c2e9695`.
+The one Source pass belongs to `a99c2b38`. The failed `92c18323` admission
+attempt and earlier raw failures remain preserved. None qualifies this
+successor. No Source, Node, Cargo, rustc, native, formatter, lint, discovery
+or CI job runs during integration. Any execution needs a new literal Root
+head, seven-function selection and guarded slot grant. Root owns review,
+publication and subsequent row eligibility.
+
+The inherited pre-MOV tables literally contained 248 ported rows, while
+the earlier report said 250. Retain that discrepancy without repairing
+tables or replacing the reported figure with a new global claim.
+
+
+## Five MAP terrain component rows qualified (2026-10-16)
+
+At producing head `170cfe002af0e9f787282a8ed0c8d83ff4cba8de`, Rust tree
+`e3d7a7e39b916154fe8a66c4dee40318f169aeba`, the new S1 grant runs formatting
+once, the same seven unique native functions once with serial fail-fast,
+and conditional strict locked core/simtest all-target ci-test Clippy.
+All stages pass: seven native passes, zero failures and 231 skipped.
+The actual inherited slot flock is released after each terminal process,
+and Root receives the final release notice before the result report.
+The first outer launch's compact taskset argument fails before the runner,
+Cargo or a lock starts. Root explicitly approves only its argv correction;
+the first actual project sequence is unchanged and is not retried.
+
+Record only MAP-25/31/47/48/50 Rust/Status pairs as ported for their complete
+selected Acceptance checks. Preserve all 939 Acceptance cells and every
+other row cell. The [row evidence](docs/runtime/map-terrain-components-170c-delivery.md)
+binds the 456-value ground table, nine footprints, original water sight,
+eight LOS/ridge/Depressions clauses, complete two-second Slope journey
+with 160 movement calls, and six returned-speed samples. Supporting
+18-ray LOS and movement replay gates add no CMB or MOV promotion.
+
+The one unchanged Source checker PASS remains attributed to `a99c2b38`.
+The failed `92c18323` admission and earlier `7f7acc9f` qualification remain
+separate producing-head evidence. This docs child changes no Rust byte,
+fixture, provider, registry, guard, FFI, wire, contract or reference.
+Root owns fresh exact-child review, incoming-main preservation, any hosted
+gates and publication. Wider terrain features, World, recipient delivery
+and Unreal acceptance are not completed by these selected component rows.
+
+## AI sighting test lint correction (2026-10-16)
+
+PR #274 strict Clippy rejected a nested conditional in the stillness-reset assertion. Combine the existing option match and movement threshold with a let chain. The condition, assertions and authored inputs stay the same.
+
+## Native server diagnostics (2026-10-16)
+
+NET-97 uses the existing host tick meter and an opt-in bounded writer. `WW2_DIAG=1` appends room JSONL records under the process working directory's `logs/`; `WW2_TICKLOG=1` prints phase percentiles every thirty seconds. Library hosts choose a diagnostic directory through `Config`. A 64-record channel keeps file writes outside the room lock; full queues and file errors discard diagnostic records without affecting the match. Native scheduler delay measures excess over the ten-millisecond maintenance poll, providing the equivalent of the prototype's event-loop delay. Timestamps are Unix milliseconds. A separate optional socket gauge measures queued UTF-8 payload bytes for all output classes and preserves the existing UTF-16 snapshot admission threshold. Browser metrics stay host-private. None of these measurements enters the deterministic rules state or recipient snapshots.
+
+## Horde wave phase and scenario type validation (2026-10-16)
+
+`Match::step_horde` is an explicit late phase after ordinary capture, income
+and death removal. It does not advance the clock or run combat. Wave purchases,
+reserve entry and clearing use canonical Match state; newly entered units act
+on the following tick. Full Horde tick and server admission remain guarded.
+Vehicle entry must pass the current World navigation and obstruction versions
+to the persistent production placer, just as ordinary recruitment does, so
+terrain changes invalidate cached clearance between entries.
+
+Native scenario validation deliberately requires a JSON string for each authored
+unit or reinforcement roster `type`. It rejects `type: ["rifle"]`, whereas the
+prototype's `Object.hasOwn(unitTypes, v)` and `unitTypes[v]` coerce that array to
+the property name `"rifle"`. This stricter choice rejects malformed schema values
+instead of carrying JavaScript property-key coercion into the native validator.
+It does not admit or execute general authored scenarios.
+
+## MAC-AI-5: staged assaults and detached base tactics (2026-10-16)
+
+The seat tactics planner now calls a stateless skirmish construction pass before
+shopping. It finishes or repairs an existing building before searching for a
+new site, reserves the next facility's cost and removes an assigned builder
+from that look's combat candidates. The same detached geometry helper uses
+remembered terrain, delivered occupancy, building lanes and caller-supplied
+supply-node positions. Node positions are placement facts, separate from the
+Classic economy's node rates, visibility and engineer assignments in PR #342.
+No additional terrain or mine memory decoder is introduced here.
+
+Classic adaptive tactics consume delivered building ghosts and the last minute
+of strategic sighting reports. Empty current ground can invalidate a tactical
+armor contact without erasing the recent rush, depot-guard or army-value report.
+World recon skips homes marked undiscovered by the caller. This consumes
+existing delivery knowledge without discovering any new spawn. Raids retain
+two unit IDs privately and prefer armored cars. Stable unit IDs,
+building IDs and player indices break distance ties. Classic and World remain
+detached planner contexts; their existing admission boundaries stay unchanged.
+The ordinary producer supplies public naval and weather facts and leaves the
+unsupported modes' building ghosts and node positions empty.
+
+Staged assaults retain their members and release times outside canonical Match
+orders. Their breadth-first placement search uses delivered terrain and native
+LOS, the prototype's left/right/up/down neighbor order and a 2,048-cell limit.
+Assembly, advance, engagement, regroup and withdrawal use the pinned tuning.
+Operation claims and recent player releases suppress the quick movement and
+retreat orders from that look. Orders still pass through canonical admission.
+Horde scheduling, seat delivery and Classic economy construction remain the
+separate work in #340, #342 and runtime/horde-ai-20261016.
+
+The row evidence is Rust intent tests checked against the pinned prototype,
+with literal expected values for tuning and pure placement cases. No Source
+recorder is added. An ordinary Conquest lifecycle exercises private assault and
+raid state, admits their movement orders and collects both recipient snapshots
+through a natural VP finish and ending ticks. This does not admit Classic,
+World, Assault or Horde rooms and does not alter public ingress, snapshots,
+privacy, wire shapes, FFI or the full logistics guards.
+
+AI-48 is held for remembered bridge, original-ground and found-mine job inputs
+and receipt-driven field-work retries, including the pending seat-delivery work.
+AI-49 needs the missing Garrison actuator and complete holder fortification.
+AI-50 needs the currently unsupported Gate actuator and its complete lifecycle.
+AI-56 remains held for that HQ fortification dependency, despite the existing
+70-metre defender rule and the added detached bunker-target selection.
+
+## PR 352 repair after AI-33 integration (2026-10-16)
+
+PR #352 merges after #351. The merged tactics caller runs one construction
+pass in `commander_construction`, retaining AI-33's reserves and rider
+exclusion together with the skirmish repair, tech, visible-site, supply-node
+and coast rules. Forward HQ planning follows repairs within that pass.
+Later assault planning receives a detached view with this look's build,
+assist and field-work assignments mirrored into unit state, as the prototype
+does before its assault pass. Assault threats use the same live sightings
+that tactics retains after clearing visible empty ground. Recent strategic
+reports still serve the separate Classic adaptive rules.
+
+The regression tests exercise construction assignments during an assault
+phase transition and distinguish cleared contacts from armor still under
+fog. Ordinary Conquest lifecycle coverage also runs the tactics caller,
+canonical commands and every seat's snapshots through victory and ending
+ticks. Existing mode, command, tick and snapshot guards remain in force.
+
+## Construction-mode building memory (CMB-130 deferred, 2026-10-16)
+
+Building memory follows the prototype's `isConstructionMode` gate: Classic and World only (`shared/sim.js:384,4444`). World keeps its existing memory phase, and Classic keeps its explicit component refresh. Default and Conquest no longer accumulate remembered buildings. The recipient adapter also gates the existing six-field `ghosts` encoding on Classic/World, matching `shared/sim.js:6037`, so ordinary snapshots omit the field even if component memory is present.
+
+Classic full ticks and non-ordinary recipient snapshots remain guarded. CMB-130 is dropped from this batch's claim: building memory runs in Classic/World only; waits on #301 Classic runner and World admission. Its component tests retain last-observed identity, type, owner, position and construction progress, shared team sight, hidden changes, unseen destruction and ground/airborne invalidation. Default/Conquest regressions cover seeing a barracks, retreating, hidden changes, retirement, VP finish and revisit with no memory or ghosts. Ability, base dispatch, research and bunker checks retain their full-match continuations and every-seat snapshots. No ABI, wire shape, contract or public command admission changes.

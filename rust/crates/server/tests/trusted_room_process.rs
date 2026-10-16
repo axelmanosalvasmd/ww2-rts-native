@@ -5,6 +5,26 @@ use std::{net::Shutdown, process::Command};
 
 const SEED: u64 = 3936341;
 
+#[test]
+fn net14_public_url_environment_reaches_live_lobby_invites() {
+    for configured in [None, Some("https://invite.example/game")] {
+        let server = BinaryServer::start_with_public_url(false, SEED, configured);
+        let mut client = Client::open(
+            server.address,
+            "ABC",
+            json!({"t":"hello","token":"host","name":"Host"}),
+        );
+        let lobby = client.until(|m| m["t"] == "lobby");
+        assert_eq!(lobby["publicUrl"], configured.unwrap_or_default());
+        assert_eq!(lobby["code"], "ABC");
+        client.send(json!({"t":"name","name":"Renamed"}));
+        assert_eq!(
+            client.until(|m| m["t"] == "lobby")["publicUrl"],
+            configured.unwrap_or_default()
+        );
+    }
+}
+
 fn begin(host: &mut Client, guest: &mut Client) -> (Value, Value) {
     guest.send(json!({"t":"start","slot":0,"host":true}));
     assert_eq!(guest.deny("start")["reason"], "scenario");
@@ -269,7 +289,7 @@ fn ordinary_binary_refuses_unsupported_settings_before_any_start_publication() {
 }
 
 #[test]
-fn ordinary_binary_genuine_mine_contact_latches_fault_and_refuses_restart() {
+fn ordinary_binary_genuine_mine_contact_detonates_and_keeps_delivering_snapshots() {
     let server = BinaryServer::start(true, SEED);
     let mut host = Client::join(server.address, "a");
     let mut guest = Client::join(server.address, "b");
@@ -321,49 +341,87 @@ fn ordinary_binary_genuine_mine_contact_latches_fault_and_refuses_restart() {
         "staging route must complete without a fault"
     );
     clients[west].send(json!({"t":"move","orders":[[unit.id,95.,79.]]}));
-    let fault = server.wait_fault();
-    eprintln!("R1_AUTHORED_MINE_FAULT {fault}");
-    assert_eq!(fault["matchId"], identity);
+    let mine_cell = 39 * authored["w"].as_u64().unwrap() + 47;
+    let blast = clients[west].until(|m| {
+        m["t"] == "s"
+            && m["cells"]
+                .as_array()
+                .is_some_and(|rows| rows.iter().any(|row| row[0] == mine_cell && row[1] == "+"))
+    });
+    let survivor = clients[west]
+        .view
+        .units()
+        .find(|u| u.id == unit.id)
+        .unwrap();
     assert!(
-        fault["error"]
-            .as_str()
-            .unwrap()
-            .contains("moved hostile mine detonation is not connected")
+        survivor.hp < unit.hp,
+        "genuine contact must damage the mover"
     );
-    let until_fault = clients[0].barrier();
-    assert!(
-        until_fault
-            .iter()
-            .filter(|m| m["t"] == "s")
-            .all(|m| m["tick"].as_i64().unwrap() < fault["tick"].as_i64().unwrap())
-    );
-    clients[0].send(json!({"t":"restart"}));
-    assert_eq!(clients[0].deny("restart")["reason"], "scenario");
+    assert!(survivor.supp > 0., "the blast must suppress infantry");
+    let after_blast = blast["tick"].as_u64().unwrap() + 10;
+    for client in &mut clients {
+        client.until(|m| m["t"] == "s" && m["tick"].as_u64().unwrap() >= after_blast);
+        assert_eq!(client.view.start().unwrap()["matchId"], identity);
+    }
+    assert!(!server.log().contains("NATIVE_FAULT"));
+    // Only the host may restart, even after a mine detonates.
     clients[1].send(json!({"t":"restart"}));
     clients[1].deny("restart");
-    for client in &mut clients {
-        assert!(
-            client
-                .barrier()
-                .iter()
-                .all(|m| m["t"] != "start" && m["t"] != "s")
-        );
-    }
-    assert_eq!(server.receipts().len(), 1);
+    clients[0].send(json!({"t":"restart"}));
+    let fresh = clients[0].until(|m| m["t"] == "start");
+    assert!(fresh["matchId"].as_u64().unwrap() > identity.as_u64().unwrap());
     assert_eq!(
-        server
-            .log()
-            .lines()
-            .filter(|l| l.starts_with("NATIVE_FAULT "))
-            .count(),
-        1
+        clients[1].until(|m| m["t"] == "start")["matchId"],
+        fresh["matchId"]
     );
-    assert!(
-        server
-            .log()
-            .contains("faulted match restart awaits a recovery policy")
-    );
+    for client in &mut clients {
+        client.until(|m| m["t"] == "s");
+        client.barrier();
+    }
+    assert_eq!(server.receipts().len(), 2);
+    assert!(!server.log().contains("NATIVE_FAULT"));
 }
 
 #[path = "trusted_room_process/net2.rs"]
 mod net2;
+
+#[test]
+fn net97_ordinary_binary_environment_writes_private_diagnostics_while_r1_snapshots_continue() {
+    let dir = std::env::temp_dir().join(format!("ww2-net97-process-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let server = BinaryServer::start_with_diagnostics(true, SEED, Some(&dir));
+    let mut host = Client::join(server.address, "a");
+    let mut guest = Client::join(server.address, "b");
+    begin(&mut host, &mut guest);
+    host.send(json!({"t":"ping","c":1,"d":[60,17,3],"rtt":30}));
+    let file = dir.join("logs/diag-ABC.jsonl");
+    let began = std::time::Instant::now();
+    let line = loop {
+        // Ordered frames prove the room keeps running while waiting for actual recorder output.
+        host.until(|m| m["t"] == "s");
+        guest.until(|m| m["t"] == "s");
+        if let Ok(data) = std::fs::read_to_string(&file)
+            && let Some(line) = data.lines().next()
+            && let Ok(value) = serde_json::from_str::<Value>(line)
+        {
+            break value;
+        }
+        assert!(
+            began.elapsed() < std::time::Duration::from_secs(20),
+            "diagnostic output deadline: {}",
+            server.log()
+        );
+    };
+    assert_eq!(line["players"][0]["client"]["fps"], 60.0);
+    assert_eq!(line["players"][1]["client"], Value::Null);
+    assert!(line["tick"].as_u64().unwrap() >= 100);
+    assert!(line["tickP95"].as_f64().unwrap() >= 0.0);
+    for client in [&mut host, &mut guest] {
+        let snapshot = client.until(|m| m["t"] == "s");
+        assert!(snapshot.get("client").is_none() && snapshot.get("loopP99").is_none());
+        assert!(client.view.unit_count() > 0);
+    }
+    assert!(!server.log().contains("NATIVE_FAULT"));
+    drop(server);
+    std::fs::remove_dir_all(dir).unwrap();
+}

@@ -1,6 +1,6 @@
 use super::*;
 use crate::{
-    economy::Faction,
+    economy::{Faction, Mode},
     economy_state::ArmySize,
     game::Point,
     map::AuthoritativeMap,
@@ -167,6 +167,7 @@ fn rare_placement_rejects_after_draft_routes_without_publishing_or_warming_live_
                     timer: 0.0,
                     orbit: 0.0,
                     mission: None,
+                    attack_pick: 0,
                     downed: false,
                 },
             );
@@ -289,6 +290,79 @@ fn captured_worker_health_and_pose_changes_do_not_recompute_crew_membership() {
     );
     assert_eq!(m.commands.units[&id].build_target, Some(site));
 }
+#[test]
+fn log09_building_repair_uses_average_engineer_recovery_rate() {
+    let cases: &[(&[(f64, bool)], f64)] = &[
+        (&[(120., false)], 1.),
+        (&[(30., false)], 1.),
+        (&[(29., false)], 0.5),
+        (&[(0., false)], 0.),
+        (&[(120., true)], 0.),
+        (
+            &[(120., false), (29., false), (120., true), (0., false)],
+            0.375,
+        ),
+    ];
+    let catalog = Catalog::compiled().unwrap();
+    let full = number(catalog.unit("flakpos").unwrap(), "hpPer").unwrap();
+    let classic = catalog.table("CFG").unwrap().get("classic").unwrap();
+    for &(states, rate) in cases {
+        let (mut m, id) = scene();
+        let site = build(&mut m, id);
+        // Keep the paid site's damaged sections; author it as a completed repair target.
+        m.world.game.units.get_mut(&site).unwrap().built = Some(1.);
+        let mut workers = vec![id];
+        for index in 1..states.len() {
+            workers.push(add_worker(
+                &mut m,
+                Point {
+                    x: 28.,
+                    z: 24. + index as f64 * 0.25,
+                },
+            ));
+        }
+        assert_eq!(
+            m.execute_assist(
+                0,
+                &workers.iter().map(|&id| i64::from(id)).collect::<Vec<_>>(),
+                i64::from(site),
+                false,
+            )
+            .unwrap(),
+            None
+        );
+        m.options.logistics = true;
+        m.initialize_logistics().unwrap();
+        for (&worker, &(provisions, exhausted)) in workers.iter().zip(states) {
+            let reserves = m.logistics.get_mut(worker).unwrap();
+            reserves.provisions = provisions;
+            reserves.exhausted = exhausted;
+        }
+        let crew = math::pow(workers.len() as f64, number(classic, "crew").unwrap());
+        let repair = number(classic, "repair").unwrap() * crew;
+        let unpenalized = full * repair * m.rules.movement.tick;
+        let expected = full * (repair * rate) * m.rules.movement.tick;
+        let before = m.world.game.units[&site].hp;
+        assert!(full - before > unpenalized);
+        let available = states
+            .iter()
+            .map(|&(provisions, _)| provisions * 5.)
+            .sum::<f64>();
+        assert!(available == 0. || available > unpenalized);
+        let mut frame = m.begin_construction_tick().unwrap();
+        for worker in workers {
+            m.step_construction_worker(worker, &mut frame).unwrap();
+        }
+        m.finish_construction_tick(frame).unwrap();
+        let repaired = m.world.game.units[&site].hp - before;
+        assert!(
+            (repaired - expected).abs() < 1e-10,
+            "states={states:?}: repaired {repaired}, expected {expected}"
+        );
+        assert_eq!(m.world.game.units[&site].built, Some(1.));
+    }
+}
+
 #[test]
 fn crew_capacity_and_layer_admission_precede_progress_story_and_section_health() {
     let (mut m, id) = scene();
@@ -862,6 +936,119 @@ fn r4_first_reached_guard_refuses_three_independent_faults_atomically() {
             readback(&state),
             before,
             "failed advance, defects={defects}"
+        );
+    }
+}
+
+#[test]
+fn mode91_site_refund_updates_wallet_and_spending_without_a_death() {
+    let (mut m, worker) = scene();
+    let wallet = m.start.economy.players[0].mp;
+    let before = m.story.clone();
+    let site = build(&mut m, worker);
+    let charge = wallet - m.start.economy.players[0].mp;
+    assert!(charge > 0.0);
+    assert_eq!(m.story[0].mp_spent, before[0].mp_spent + charge);
+    let structure = m
+        .world
+        .structures
+        .iter()
+        .find(|s| s.entity_id == Some(site))
+        .unwrap()
+        .clone();
+    let seed = m.start.random.snapshot();
+    assert_eq!(
+        m.cancel_construction(1, site).unwrap(),
+        Some(crate::match_commands::Denial::Unseen)
+    );
+    assert!(m.world.game.units.contains_key(&site));
+    assert_eq!(m.cancel_construction(0, site).unwrap(), None);
+    assert_eq!(m.start.economy.players[0].mp, wallet - charge * 0.25);
+    assert_eq!(m.story[0].mp_spent, before[0].mp_spent + charge * 0.25);
+    assert_eq!(m.story[0].built, before[0].built);
+    assert_eq!(m.story[0].losses, before[0].losses);
+    assert_eq!(m.story[1], before[1]);
+    assert_eq!(m.start.random.snapshot(), seed);
+    assert!(!m.world.game.units.contains_key(&site));
+    assert!(m.world.structures.iter().all(|s| s.entity_id != Some(site)));
+    assert!(
+        structure
+            .cells
+            .iter()
+            .all(|c| !m.world.sections.contains_key(c)
+                && !m.world.game.sections.contains_key(&(*c as u32))
+                && m.world.game.objects.as_ref().unwrap()[*c] == b'.')
+    );
+    assert!(
+        m.environment
+            .falling_sections()
+            .iter()
+            .all(|s| !structure.section_ids.contains(&s.section))
+    );
+    assert!(m.combat.get(site).is_none() && m.recovery.get(site).is_none());
+    let story = m.story.clone();
+    let wallet = m.start.economy.players[0].mp;
+    assert_eq!(
+        m.cancel_construction(0, site).unwrap(),
+        Some(crate::match_commands::Denial::Unseen)
+    );
+    assert_eq!(m.story, story);
+    assert_eq!(m.start.economy.players[0].mp, wallet);
+    for _ in 0..3 {
+        m.advance_tick().unwrap();
+        let snapshot = crate::recipient_snapshot::SnapshotCache::new(&m).unwrap();
+        snapshot.recipient(0).unwrap();
+        snapshot.recipient(1).unwrap();
+    }
+    assert_eq!(m.commands.units[&worker].build_target, None);
+    assert_eq!(m.story[0].losses, before[0].losses);
+    assert_eq!(m.story[0].built, before[0].built);
+}
+
+#[test]
+fn mode91_site_refund_refusals_preserve_paid_site_and_story() {
+    for gate in ["finished", "away", "out", "decided", "story", "terrain"] {
+        let (mut m, worker) = scene();
+        let site = build(&mut m, worker);
+        match gate {
+            "finished" => m.world.game.units.get_mut(&site).unwrap().built = Some(1.0),
+            "away" => m.start.economy.players[0].away = true,
+            "out" => m.start.economy.players[0].out = true,
+            "decided" => {
+                m.initialize_tick_scene_finish(0, crate::match_end::EndReason::Headquarters, None)
+                    .unwrap();
+            }
+            "story" => m.story[0].mp_spent = f64::INFINITY,
+            "terrain" => {
+                m.world.game.flags.pop();
+            }
+            _ => unreachable!(),
+        }
+        let before = format!(
+            "{:?}",
+            (
+                &m.world,
+                &m.story,
+                &m.start.economy,
+                &m.production,
+                &m.commands.units
+            )
+        );
+        let result = m.cancel_construction(0, site);
+        assert!(result.is_err() || result.unwrap().is_some(), "{gate}");
+        assert_eq!(
+            format!(
+                "{:?}",
+                (
+                    &m.world,
+                    &m.story,
+                    &m.start.economy,
+                    &m.production,
+                    &m.commands.units
+                )
+            ),
+            before,
+            "{gate}"
         );
     }
 }

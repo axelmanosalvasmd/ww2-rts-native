@@ -1,0 +1,1 @@
+- Carry the five private MAP terrain component checks onto main 011a39d0, preserving the six incoming MOV statuses, both held World checks and all fixtures. Retain the exact formatter and neutral MAP-31 point repairs; prior qualification stays attributed to its producing heads. No row status changes or project jobs run.

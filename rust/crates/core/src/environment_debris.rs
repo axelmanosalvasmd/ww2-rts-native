@@ -48,7 +48,7 @@ pub fn wreck_mass(kind: &str, radius: Option<f64>) -> f64 {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DebrisKind {
     Section,
     Wreck,
@@ -61,7 +61,7 @@ impl DebrisKind {
         }
     }
 }
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Vec3 {
     pub x: f64,
     pub y: f64,
@@ -128,7 +128,7 @@ impl Default for DebrisInput {
         }
     }
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DebrisBody {
     pub id: String,
     pub kind: DebrisKind,
@@ -152,7 +152,7 @@ pub struct DebrisBody {
     pub settled: bool,
     pub tilt: f64,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DebrisRow {
     pub id: String,
     pub kind: DebrisKind,

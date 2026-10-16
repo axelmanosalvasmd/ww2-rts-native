@@ -123,7 +123,7 @@ pub enum PathError {
     UnsupportedProfile,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum PathStatus {
     Found,
     Unreachable,
@@ -140,7 +140,7 @@ pub struct PathResult {
     pub expansions: usize,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct Pathfinding {
     navigation: Navigation,
     scratch: Scratch,
@@ -164,6 +164,18 @@ impl Clone for Pathfinding {
 }
 
 impl Pathfinding {
+    pub(crate) fn storage_pointers(&self) -> Vec<usize> {
+        self.vehicles.storage_pointers()
+    }
+
+    pub(crate) fn relocate_save_storage(
+        &mut self,
+        bindings: &std::collections::BTreeMap<usize, usize>,
+    ) {
+        self.navigation.relocate_save_storage(bindings);
+        self.vehicles.relocate_save_storage(bindings);
+    }
+
     /// The routing guard validated that these arrays belong to the same
     /// recipient. Keep old versions so the next search applies its change log.
     pub(crate) fn fork_for_terrain(
@@ -183,7 +195,7 @@ impl Pathfinding {
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 struct Scratch {
     scores: Vec<f32>,
     came: Vec<usize>,
@@ -759,7 +771,7 @@ fn cliff_clear(v: TerrainView<'_>, a: Point, b: Point) -> bool {
     x == ex && y == ey
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 struct Heap(Vec<(f64, usize)>);
 impl Heap {
     fn push(&mut self, score: f64, cell: usize) {
@@ -801,3 +813,7 @@ impl Heap {
         Some(top)
     }
 }
+
+#[cfg(test)]
+#[path = "mov_audit_path_tests.rs"]
+mod mov_audit;

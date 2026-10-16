@@ -1,0 +1,1 @@
+- Apply the five exact Rust 1.99.0 formatter hunks in the MAP terrain component checks, preserving literals, assertions and inputs. Retain both earlier diagnostics; native checks and strict Clippy remain pending on a Root-bound child.

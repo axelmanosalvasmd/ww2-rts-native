@@ -1,0 +1,1 @@
+- Integrate ENG-37/45/47/50/51 source and both authentic Source fixtures onto PR271 main while retaining incoming logistics work, all parity cells and historical failures. Native qualification remains pending a new exact-head grant.

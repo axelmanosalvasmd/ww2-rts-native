@@ -2,7 +2,7 @@
 //!
 //! Units, queues, drops, points and nodes must keep simulation order. World node regions
 //! are resolved by the caller against the authoritative map. This module does not capture
-//! points, resolve regions, buy units, complete queues or award kill/wave rewards.
+//! points, resolve regions, buy units, complete queues or award wave rewards.
 //! `Mode::Default` means no reference mode object; explicit Conquest and Tutorial modes
 //! retain the reference's Assault fallback for income. No ABI or wire format is defined here.
 //!
@@ -18,7 +18,7 @@ use crate::{
 };
 use std::{collections::BTreeMap, fmt};
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum ArmySize {
     #[default]
     Standard,
@@ -27,7 +27,17 @@ pub enum ArmySize {
     Endless,
 }
 impl ArmySize {
-    fn key(self) -> &'static str {
+    /// Normalize the core's army choice, including the prototype's unknown-key fallback.
+    pub fn from_key(key: &str) -> Self {
+        match key {
+            "large" => Self::Large,
+            "massive" => Self::Massive,
+            "endless" => Self::Endless,
+            _ => Self::Standard,
+        }
+    }
+
+    pub fn key(self) -> &'static str {
         match self {
             Self::Standard => "standard",
             Self::Large => "large",
@@ -55,7 +65,7 @@ impl Default for ModeContext {
 }
 
 /// The vector index is the player's slot, matching the reference's player array.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PlayerEconomy {
     pub team: i32,
     pub away: bool,
@@ -171,7 +181,7 @@ impl fmt::Display for Error {
 }
 impl std::error::Error for Error {}
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct EconomyState {
     pub players: Vec<PlayerEconomy>,
 }
@@ -191,6 +201,41 @@ fn finite(n: f64, name: &'static str) -> Result<(), Error> {
     }
 }
 impl EconomyState {
+    /// Resolve a retired actor's bounty. The caller owns death ordering and applies
+    /// the returned payment once, after wreck and building removal effects.
+    /// Neutral actors have no victim slot. The mode slot (Horde AI) never earns it.
+    pub fn kill_bounty(
+        &self,
+        mode: ModeContext,
+        victim: Option<usize>,
+        kind: &str,
+        last_hit: Option<usize>,
+    ) -> Result<Option<(usize, f64)>, Error> {
+        if let Some(victim) = victim {
+            self.slot(victim)?;
+        }
+        if let Some(excluded) = mode.income_excluded_slot {
+            self.slot(excluded)?;
+        }
+        let catalog = Catalog::compiled()?;
+        let cost = number(catalog.unit(kind)?, "cost")?;
+        let Some(killer) = last_hit else {
+            return Ok(None);
+        };
+        self.slot(killer)?;
+        let player = &self.players[killer];
+        if player.out
+            || Some(killer) == mode.income_excluded_slot
+            || victim.is_some_and(|victim| self.players[victim].team == player.team)
+        {
+            return Ok(None);
+        }
+        finite(player.mp, "bounty wallet")?;
+        let amount = cost * number(catalog.table("CFG")?, "bounty")?;
+        finite(player.mp + amount, "bounty wallet")?;
+        Ok(Some((killer, amount)))
+    }
+
     fn slot(&self, slot: usize) -> Result<(), Error> {
         if slot < self.players.len() {
             Ok(())

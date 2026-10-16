@@ -1,0 +1,2 @@
+- Record the PR #302 merge resolutions that preserve aircraft firing, queued house entry, Horde breath attacks and World rail-yard behavior from both branches.
+- Initialize the existing parked-aircraft recipient fixture's automatic target cache without changing its guards or assertions.

@@ -166,12 +166,14 @@ fn cell_row(row: &crate::world::CellRow) -> Value {
 fn canonical_world_contacts_match_original_commander_and_local_boundaries() {
     let f = fixture();
     assert_eq!(f["cases"].as_array().unwrap().len(), 12);
-    for case in &f["cases"].as_array().unwrap()[..10] {
+    let cases = f["cases"].as_array().unwrap();
+    for case in cases[..10].iter().chain(&cases[11..]) {
         let (mut m, id, c) = make(&f, case);
         let random = m.start.random.snapshot();
         let wind = m.start.wind;
         let seed = m.start.environment_seed;
         let mut prior_dust = case["initial"]["dust"].as_f64();
+        let mut shots = Vec::new();
         for pair in case["contacts"].as_array().unwrap().as_chunks::<2>().0 {
             let input = &pair[0];
             let expected = &pair[1];
@@ -180,8 +182,10 @@ fn canonical_world_contacts_match_original_commander_and_local_boundaries() {
             let versions = m.world.versions;
             // The workload mover's premature dust must not survive an infantry no-op or wet/mud contact.
             m.world.game.units.get_mut(&id).unwrap().dust = Some(999.0);
-            m.apply_moved_ground_contact(id, before, prior_dust)
-                .unwrap();
+            m.apply_moved_ground_contact_emitting(id, before, prior_dust, &mut |effect| {
+                shots.push(effect.to_json())
+            })
+            .unwrap();
             assert_eq!(
                 m.world.game.wear.as_ref().unwrap()[c].to_bits(),
                 expected["wearF32Bits"].as_u64().unwrap() as u32,
@@ -260,7 +264,10 @@ fn canonical_world_contacts_match_original_commander_and_local_boundaries() {
                 ),
                 expected["mines"]
             );
-            assert!(expected["shots"].as_array().unwrap().is_empty());
+            assert!(super::tests::exact_json_numbers(
+                &json!(shots),
+                &expected["shots"]
+            ));
             assert_eq!(m.start.random.snapshot(), random);
             assert_eq!(m.start.wind, wind);
             assert_eq!(m.start.environment_seed, seed);
@@ -274,7 +281,6 @@ fn world_contact_refusals_preserve_state_and_restore_precontact_dust() {
     let f = fixture();
     for boundary in [
         "hostile-mine",
-        "crush",
         "owner",
         "runtime",
         "mode",
@@ -293,7 +299,6 @@ fn world_contact_refusals_preserve_state_and_restore_precontact_dust() {
     ] {
         let index = match boundary {
             "hostile-mine" => 10,
-            "crush" => 11,
             _ => 2,
         };
         let case = &f["cases"][index];
@@ -347,8 +352,8 @@ fn world_contact_refusals_preserve_state_and_restore_precontact_dust() {
         let error = m
             .apply_moved_ground_contact(id, before, Some(-5.0))
             .unwrap_err();
-        if matches!(boundary, "hostile-mine" | "crush") {
-            assert!(error.contains("not connected"));
+        if boundary == "hostile-mine" {
+            assert!(error.contains("unit combat metadata"), "{error}");
         }
         assert_eq!(
             format!("{:?}", m.world),
@@ -411,7 +416,7 @@ fn mine_alliances_keep_ordinary_commanders_and_world_local_identity_distinct() {
         assert_eq!(m.world.game.chars[c], b'N');
         assert_eq!(m.world.game.wear.as_ref().unwrap()[c], wear);
         assert!(m.world.journal().is_empty() && m.world.new_cells().is_empty());
-        for invalid_owner in [-1, -2] {
+        for invalid_owner in [-2, 2] {
             m.world.mines.insert(c, invalid_owner);
             let prior_dust = m.world.game.units[&id].dust;
             let world = format!("{:?}", m.world);

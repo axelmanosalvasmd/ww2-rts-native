@@ -49,20 +49,39 @@ impl Match {
                     return Err("unsupported riding tick actor".into());
                 }
                 let carrier = meta.carrier.ok_or("missing riding carrier identity")?;
-                let parent = self
+                if self.world.game.units.contains_key(&carrier) {
+                    self.validate_carrier_unit(carrier)?;
+                    if self.carrier_boundary(carrier) || self.commands.units[&carrier].operative {
+                        return Err("unsupported riding tick carrier".into());
+                    }
+                }
+                let Some(parent) = self
                     .world
                     .game
                     .units
                     .get(&carrier)
                     .filter(|parent| parent.hp > 0.0)
-                    .ok_or("thrown carrier ejection tick phase is not connected")?;
-                self.validate_carrier_unit(carrier)?;
-                if self.carrier_boundary(carrier) || self.commands.units[&carrier].operative {
-                    return Err("unsupported riding tick carrier".into());
-                }
+                else {
+                    if self.combat.get(carrier).is_none() {
+                        self.prepare_carrier_ejection(id)?;
+                        continue;
+                    }
+                    if self
+                        .combat
+                        .get(carrier)
+                        .is_none_or(|m| !m.cargo.contains(&id))
+                    {
+                        return Err("inconsistent wrecked carrier relation".into());
+                    }
+                    self.prepare_carrier_ejections(carrier)?;
+                    continue;
+                };
                 if !self.combat.get(parent.id).unwrap().cargo.contains(&id) {
                     return Err("inconsistent reciprocal riding tick relation".into());
                 }
+                // A command or an earlier combat phase may wreck a currently live
+                // carrier. Admit its passenger's eventual physical exit as well.
+                self.prepare_carrier_ejection(id)?;
                 let cd = self
                     .abilities
                     .get(id)

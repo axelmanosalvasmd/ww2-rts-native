@@ -1,0 +1,1 @@
+- Marked 43 combat rows ported in `docs/parity/combat.md`, citing their native intent tests merged in #276 (CMB-83, 91, 140) and #278 (40 rows), each reviewed against the prototype under Axel's 2026-10-16 evidence standard. Six #278 rows the reviewer rated weak (CMB-84, 86, 104, 109, 123, 139) stay open for stronger tests.

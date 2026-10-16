@@ -46,7 +46,7 @@ pub struct Context<'a> {
     pub wind_angle: f64,
     pub wind_strength: f64,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Hurt {
     pub unit: u32,
     pub owner: usize,
@@ -55,7 +55,7 @@ pub struct Hurt {
     pub from: Option<i32>,
     pub local: bool,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Collapse {
     pub id: String,
     pub at: f64,
@@ -67,7 +67,7 @@ pub struct Collapse {
     pub entity: Option<u32>,
     pub owner: Option<usize>,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Effect {
     Hurt(Hurt),
     Collapse(Collapse),
@@ -166,7 +166,7 @@ impl<'a> DamageContext<'a> {
         }
     }
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct FallingSection {
     pub body: DebrisBody,
     pub section: String,
@@ -176,9 +176,10 @@ pub struct FallingSection {
     pub until: u64,
     pub impulse: f64,
 }
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, serde::Serialize, serde::Deserialize)]
 pub struct EnvironmentRuntime {
     #[cfg(test)]
+    #[serde(skip)]
     pub(crate) replay: Option<crate::aligned_replay::Replay>,
     contacts: Vec<String>,
     contact_members: BTreeSet<String>,
@@ -186,6 +187,10 @@ pub struct EnvironmentRuntime {
     pub(crate) wreck_metadata: BTreeMap<u32, WreckMetadata>,
 }
 impl EnvironmentRuntime {
+    pub(crate) fn cancel_structure_sections(&mut self, ids: &BTreeSet<String>) {
+        self.falling_sections
+            .retain(|section| !ids.contains(&section.section));
+    }
     pub fn contacts(&self) -> &[String] {
         &self.contacts
     }
@@ -1114,7 +1119,7 @@ impl EnvironmentRuntime {
             {
                 continue;
             }
-            cells.sort_by(|a, b| b.1.total_cmp(&a.1));
+            crate::sort::sort_by(&mut cells, |a, b| b.1 - a.1);
             let mut left = cells[0].1;
             for (c, _) in cells {
                 if left <= 0. {

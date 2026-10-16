@@ -200,9 +200,52 @@ fn vehicle_wear_matches_actual_source_full_step_contacts() {
 }
 
 #[test]
+fn crushing_replacements_follow_movement_and_publish_one_effect_before_wear() {
+    let f = fixture();
+    for (ch, into) in [(b'H', b'.'), (b'X', b'.'), (b'#', b'+'), (b'T', b'+')] {
+        let (mut m, id, c) = scene(&f["cases"][0]);
+        let movement = &f["cases"][0]["steps"][0]["movement"];
+        m.world.set_cell(c, ch).unwrap();
+        let before = Pose {
+            x: number(&movement["before"]["x"]),
+            z: number(&movement["before"]["z"]),
+            rot: 0.0,
+        };
+        let actor = m.world.game.units.get_mut(&id).unwrap();
+        actor.x = number(&movement["after"]["x"]);
+        actor.z = number(&movement["after"]["z"]);
+        let still = actor.pose();
+        let version = m.world.game.terrain_version;
+        let mut effects = Vec::new();
+        m.apply_moved_ground_contact_emitting(id, still, None, &mut |e| effects.push(e))
+            .unwrap();
+        assert_eq!(m.world.game.chars[c], ch, "an unmoved hull cannot crush");
+        assert!(effects.is_empty());
+        m.apply_moved_ground_contact_emitting(id, before, None, &mut |e| effects.push(e))
+            .unwrap();
+        assert_eq!(m.world.game.chars[c], into);
+        assert_eq!(m.world.game.terrain_version, version + 1);
+        assert_eq!(effects.len(), 1);
+        let crate::environment::Effect::Collapse(collapse) = &effects[0] else {
+            panic!("actual collapse event")
+        };
+        assert_eq!(collapse.id, format!("collapse:{}:{c}", m.world.game.tick));
+        assert!(collapse.section.is_none());
+        assert_eq!(m.world.game.cell_hp[c], 0.0);
+        assert_eq!(m.world.new_cells().last().unwrap().cell, c);
+        if into == b'.' {
+            assert!(
+                m.world.game.wear.as_ref().unwrap()[c] > 0.0,
+                "wear reads the newly cleared ground"
+            );
+        }
+    }
+}
+
+#[test]
 fn unavailable_contact_and_capacity_denials_preserve_world() {
     let fixture = fixture();
-    for boundary in ["crush", "mine", "capacity", "shape", "kind"] {
+    for boundary in ["capacity", "shape", "kind"] {
         let (mut m, id, c) = scene(&fixture["cases"][0]);
         let expected = &fixture["cases"][0]["steps"][0];
         let movement = &expected["movement"];
@@ -215,13 +258,6 @@ fn unavailable_contact_and_capacity_denials_preserve_world() {
         unit.x = number(&movement["after"]["x"]);
         unit.z = number(&movement["after"]["z"]);
         match boundary {
-            "crush" => {
-                m.world.set_cell(c, b'H').unwrap();
-            }
-            "mine" => {
-                m.world.set_cell(c, b'N').unwrap();
-                m.world.mines.insert(c, 1);
-            }
             "capacity" => {
                 m.world.game.wear.as_mut().unwrap()[c] = 0.9999;
                 m.world.game.terrain_version = u32::MAX;
@@ -240,17 +276,13 @@ fn unavailable_contact_and_capacity_denials_preserve_world() {
         let new_cells = m.world.new_cells().to_vec();
         let versions = m.world.versions;
         m.world.game.units.get_mut(&id).unwrap().dust = Some(1.0);
-        let error = m
-            .apply_moved_ground_contact(id, before, Some(-5.0))
+        m.apply_moved_ground_contact(id, before, Some(-5.0))
             .unwrap_err();
         assert_eq!(
             m.world.game.units[&id].dust,
             Some(-5.0),
             "dust follows completed contact"
         );
-        if matches!(boundary, "crush" | "mine") {
-            assert!(error.contains("not connected"));
-        }
         assert_eq!(m.world.game.wear, wear);
         assert_eq!(m.world.game.chars, chars);
         assert_eq!(m.world.journal(), journal);

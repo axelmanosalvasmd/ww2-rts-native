@@ -59,6 +59,8 @@ mod ground_support_tick;
 mod legacy_scenario_tick;
 #[path = "../map_height_queries.rs"]
 mod map_height_queries;
+#[path = "../map_terrain_components.rs"]
+mod map_terrain_components;
 #[path = "../mass_project_tick.rs"]
 mod mass_project_tick;
 #[path = "../match_aircraft_runner.rs"]
@@ -95,6 +97,8 @@ mod match_tick_events;
 mod mode14_spawn_layout;
 #[path = "../mode_predicates.rs"]
 mod mode_predicates;
+#[path = "../mode_runtime_b2.rs"]
+mod mode_runtime_b2;
 #[path = "../mode_startup_checks.rs"]
 mod mode_startup_checks;
 #[path = "../mov_border_rays.rs"]
@@ -167,6 +171,9 @@ mod world_route_retention;
 mod world_start;
 #[path = "../world_tick.rs"]
 mod world_tick;
+
+#[path = "../mode91_refunds.rs"]
+mod mode91_refunds;
 
 /// Fails when a `tests/*.rs` file is not compiled into this binary. Cargo's
 /// `autotests = false` would otherwise skip it without a word. The check reads

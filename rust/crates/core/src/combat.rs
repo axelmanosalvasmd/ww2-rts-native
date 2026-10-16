@@ -285,7 +285,7 @@ pub struct CombatContext {
     pub attacker_tech: Option<TechState>,
     pub defender_tech: Option<TechState>,
 }
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct DeathImpulse {
     pub direction: f64,
     pub magnitude: f64,

@@ -69,6 +69,11 @@ fn initial_structures_match_original_validation_graphs_materials_and_health() {
                 matches!(parsed, Err(MapError::Invalid { .. })),
                 "{name}: {parsed:?}"
             );
+            assert_eq!(
+                parsed.unwrap_err().to_string(),
+                case["error"].as_str().unwrap(),
+                "{name}: original validation message"
+            );
             invalid += 1;
             continue;
         }

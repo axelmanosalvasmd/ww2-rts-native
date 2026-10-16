@@ -1,0 +1,1 @@
+- Give the private engineering support test child an explicit path for the consolidated simtest registration after the S2 module-resolution failure. Preserve all checks and fixtures; compilation and the twenty native selections remain pending.

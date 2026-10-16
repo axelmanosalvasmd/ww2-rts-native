@@ -13,6 +13,8 @@ mod original;
 #[path = "aligned_replay_comparison.rs"]
 mod canonical;
 
+#[path = "engineering_support_replay.rs"]
+mod engineering_support;
 #[path = "aligned_replay_startup.rs"]
 mod startup_state;
 
@@ -32,6 +34,7 @@ struct Tape {
     layout: Option<Value>,
     startup: Option<Value>,
     shot: Option<(i64, u32, u32, u32)>,
+    engineering: Option<engineering_support::Scope>,
 }
 impl Replay {
     fn new(input: &Value) -> Result<Self, String> {
@@ -62,10 +65,15 @@ impl Replay {
             layout: None,
             startup: None,
             shot: None,
+            engineering: None,
         }))))
     }
     pub(crate) fn draw(&self, consumer: Value) -> f64 {
         let mut tape = self.0.lock().unwrap();
+        assert!(
+            tape.engineering.is_none(),
+            "engineering input requires a checked support consumer"
+        );
         let index = tape.used.len();
         let value = *tape
             .values
@@ -75,6 +83,10 @@ impl Replay {
         value
     }
     pub(crate) fn integer(&self, purpose: StreamId, caller: &Location<'_>) -> u64 {
+        assert!(
+            self.0.lock().unwrap().engineering.is_none(),
+            "engineering input does not admit integer draws"
+        );
         let consumer =
             if purpose == StreamId::Weather && caller.file().ends_with("match_runtime.rs") {
                 json!(["startup.environment.seed32"])
@@ -90,6 +102,13 @@ impl Replay {
         (self.draw(consumer) * 4_294_967_296.0) as u64
     }
     pub(crate) fn fraction(&self, purpose: StreamId, caller: &Location<'_>) -> f64 {
+        let engineering = self.0.lock().unwrap().engineering.is_some();
+        if engineering {
+            let role = engineering_support::role(caller.file(), caller.line());
+            return self
+                .engineering_draw(purpose, role)
+                .expect("original hedge explicit entropy consumer refused");
+        }
         let consumer =
             if purpose == StreamId::Terrain && caller.file().ends_with("match_runtime.rs") {
                 json!(["startup.layout.shuffle"])
@@ -167,15 +186,21 @@ impl Replay {
     }
     fn receipt(&self) -> Value {
         let tape = self.0.lock().unwrap();
-        json!({"capacity":tape.values.len(),"consumed":tape.used.len(),"unconsumed":tape.values.len()-tape.used.len(),
-            "exhausted":tape.used.len()==tape.values.len(),"draws":tape.used,"layout":tape.layout,"startup":tape.startup})
+        let mut receipt = json!({"capacity":tape.values.len(),"consumed":tape.used.len(),"unconsumed":tape.values.len()-tape.used.len(),
+            "exhausted":tape.used.len()==tape.values.len(),"draws":tape.used,"layout":tape.layout,"startup":tape.startup});
+        if let Some(scope) = &tape.engineering {
+            receipt["engineering"] = json!({"tick":scope.tick,"closed":scope.closed,"active":scope.active,"end":200,"sourceCalls":scope.entries});
+        }
+        receipt
     }
 }
 
 pub(crate) fn environment_draw(seed: &mut u32, replay: Option<&Replay>, consumer: Value) -> f64 {
     // Execute the original generator, including its seed advance, at the real consumer.
     let original = crate::weather_runtime::environment_random(seed);
-    replay.map_or(original, |r| r.draw(consumer))
+    replay
+        .filter(|r| r.0.lock().unwrap().engineering.is_none())
+        .map_or(original, |r| r.draw(consumer))
 }
 
 #[test]
@@ -190,9 +215,74 @@ fn tape_rejects_malformed_inputs_and_records_every_consumption() {
     assert_eq!(receipt["unconsumed"], 16382);
     assert_eq!(receipt["draws"][1]["index"], 1);
     assert_eq!(receipt["draws"][1]["consumer"], json!(["probe", 1]));
-    assert!(Replay::new(&json!({"tape":["3ff0000000000000"]})).is_err());
+    assert_eq!(receipt["capacity"], 16384);
+    assert!(
+        receipt.get("engineering").is_none(),
+        "R1 receipt has no engineering mode"
+    );
+    for capacity in [20, 16383, 16385] {
+        assert!(Replay::new(&json!({"tape":vec!["3fe0000000000000";capacity]})).is_err());
+    }
+    for bits in [
+        "7ff8000000000000",
+        "7ff0000000000000",
+        "fff0000000000000",
+        "3ff0000000000000",
+        "bfe0000000000000",
+        "invalid",
+        "",
+    ] {
+        let mut invalid = input.clone();
+        invalid["tape"][0] = json!(bits);
+        assert!(
+            Replay::new(&invalid).is_err(),
+            "invalid R1 fraction: {bits}"
+        );
+    }
+    let mut actual_seed = 739;
+    let mut ordinary_seed = actual_seed;
+    crate::weather_runtime::environment_random(&mut ordinary_seed);
+    assert_eq!(
+        environment_draw(
+            &mut actual_seed,
+            Some(&replay),
+            json!(["weather.wind.angle", 1])
+        )
+        .to_bits(),
+        0.5_f64.to_bits()
+    );
+    assert_eq!(
+        actual_seed, ordinary_seed,
+        "R1 still advances its original seeded generator"
+    );
+    assert_eq!(
+        replay.receipt()["consumed"],
+        3,
+        "R1 still injects its generic tape value"
+    );
+    for index in 3..16384 {
+        assert_eq!(
+            replay.draw(json!(["exhaustion", index])).to_bits(),
+            0.5_f64.to_bits()
+        );
+    }
+    let full = replay.receipt();
+    assert_eq!(full["capacity"], 16384);
+    assert_eq!(full["consumed"], 16384);
+    assert_eq!(full["unconsumed"], 0);
+    assert_eq!(full["exhausted"], true);
+
     assert!(replay.layout(&[1, 0], &[0, 1], 2).is_ok());
     assert!(replay.layout(&[1, 0], &[0], 2).is_err());
+    // The failed draw intentionally poisons this disposable tape's mutex.
+    let failure = std::panic::catch_unwind(|| replay.draw(json!(["exhausted.no-fallback"])));
+    let failure = failure.expect_err("the 16,385th draw must fail");
+    let message = failure
+        .downcast_ref::<String>()
+        .map(String::as_str)
+        .or_else(|| failure.downcast_ref::<&str>().copied())
+        .unwrap();
+    assert!(message.contains("shared random tape exhausted; no fallback"));
 }
 
 #[test]
