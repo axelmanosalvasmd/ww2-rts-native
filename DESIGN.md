@@ -1,5 +1,12 @@
 # Three Crossroads Native: design decisions
 
+
+## First-five engineering rebase onto PR270 main (2026-10-16, qualification pending)
+
+Replay only the four owned commits from first-five publication `50c083b295f36facac510bd1e2f090c81439219a` above frozen main `abd715f12cf532b854e38ebc6e2cb9886fd48b4f`. The complete pre-mutation typed union retains incoming CMB, MOV and NET changes, every existing fixture and registry, all 939 IDs and Acceptance cells, both held World bodies and their fixture. The sole overlapping path is DESIGN; retain both complete additions above its original body. Existing per-change fragments remain additive. Preserve the separate `0e262c02` next-five checkpoint without importing it.
+
+Historical Source results remain on `0ea36432`, authentic fixtures on `0a006369`, native formatting/twenty selections/Clippy on `ec1d2fee` and documentation ACCEPTs on `50c083b2`. None establishes execution of this integration head. The same twenty immutable selectors, eight core-lib, four core-it and eight simtest-it, require a new exact-head Root slot grant before formatting, focused qualification and strict locked core/simtest Clippy. Root alone publishes, obtains owner readback, runs hosted gates and merges. No default, ABI, wire, privacy or held World completion is adopted.
+
 ## First five engineering checks: actual ec1d results and private documentation child (2026-10-15)
 
 The actual producer `ec1d2feebeb9eef6f2d8d62d29c05626bcb88470` (Rust tree `1997cc9e8e6a3ae72939bb9b1f416b04db2fed59`) passed formatting, all twenty original exact selections once (eight core-lib, four core-it, eight simtest-it), then strict locked core/simtest ci-test all-target Clippy. Every selected test reports 1 passed, 0 failed, 0 ignored and 0 measured. Raw results, caps and compiler/dep-info attribution remain under `/tmp/eng-ad3-qualification-254aa68e/child-ec1d2fee/`. These results belong to ec1d. This docs-only child preserves that entire Rust tree and claims zero new executions.
