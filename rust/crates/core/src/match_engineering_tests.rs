@@ -139,6 +139,7 @@ fn make_mode(case: &Value, mode: Mode) -> Match {
     m
 }
 fn snapshot(m: &Match) -> Value {
+    crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
     encode(json!({
         "units":m.world.game.units.values().map(|u| {
             let c=&m.commands.units[&u.id];

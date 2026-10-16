@@ -270,11 +270,14 @@ impl Match {
                     )
                     .expect("prepared field cancellation");
                     prepared.commit(&mut self.field_works);
-                    self.world.game.units.insert(id, unit);
+                    crate::unit_placement::place_unit(
+                        &mut self.grid,
+                        self.world.game.units.get_mut(&id).unwrap(),
+                        |current| *current = unit,
+                    );
                     self.commands.units.insert(id, control);
                     self.firing.units.insert(id, firing);
                     *self.abilities.get_mut(id).unwrap() = ability;
-                    self.grid.update(id, &self.world.game.units[&id]);
                     story.commit();
                     return Ok(None);
                 }

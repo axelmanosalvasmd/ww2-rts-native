@@ -163,6 +163,7 @@ fn intent_mov76_wreck_throws_rider_out_hurts_it_and_deep_water_drowns_it() {
     assert!(!landed.world.game.units[&1].riding);
     assert_eq!(landed.combat.get(1).unwrap().carrier, None);
     assert!(landed.combat.get(2).unwrap().cargo.is_empty());
+    crate::unit_placement::tests::assert_current(&landed.world.game, &landed.grid);
 
     let mut drowned = make(case);
     prime(&mut drowned, 1, &json!({"riding": 2}));
@@ -188,6 +189,7 @@ fn intent_mov76_wreck_throws_rider_out_hurts_it_and_deep_water_drowns_it() {
     ));
     assert_eq!(drowned.world.game.units[&1].hp, 0.);
     assert!(!drowned.world.game.units[&1].riding);
+    crate::unit_placement::tests::assert_current(&drowned.world.game, &drowned.grid);
 }
 
 #[test]
@@ -342,6 +344,7 @@ fn intent_mov70_squad_enters_house_at_door_then_exits_to_free_cell() {
     m.apply_unit_entry_with_routes(1).unwrap();
     assert_eq!(m.world.game.units[&1].garrison, Some(door));
     assert_eq!(m.world.game.units[&1].at(), Point { x: 21., z: 21. });
+    crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
     m.execute_command(
         0,
         &Command::Move {
@@ -365,6 +368,7 @@ fn intent_mov70_squad_enters_house_at_door_then_exits_to_free_cell() {
         .cell_of(m.world.game.units[&1].x, m.world.game.units[&1].z)
         .unwrap();
     assert_eq!(m.world.game.flags[exit] & MOVE, 0);
+    crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
 }
 
 #[test]
@@ -384,6 +388,7 @@ fn intent_mov70_destroyed_door_cancels_entry_and_setup_escapes_blocked_cell() {
     let trapped = m.world.game.cell_of(20., 20.).unwrap();
     m.world.game.flags[trapped] |= MOVE;
     m.relocate_trapped_setup_units().unwrap();
+    crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
     let u = &m.world.game.units[&1];
     let free = m.world.game.cell_of(u.x, u.z).unwrap();
     assert_eq!(m.world.game.flags[free] & MOVE, 0);
@@ -451,6 +456,7 @@ fn intent_mov73_nearest_pairs_reserve_seats_and_exclude_retreating_squads() {
     assert_ne!(retreat.world.game.units[&1].board, 0);
 }
 fn snapshot(m: &Match) -> Value {
+    crate::unit_placement::tests::assert_current(&m.world.game, &m.grid);
     let units=m.world.game.units.values().map(|u| {
         let c=&m.commands.units[&u.id];let meta=m.combat.get(u.id).unwrap();let f=m.firing.get(u.id).unwrap();
         let flags=if u.riding {262144}else{0}|if meta.cargo.is_empty(){0}else{524288|((meta.cargo.len()as u32)<<23)};

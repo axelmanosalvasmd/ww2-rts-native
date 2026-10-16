@@ -422,10 +422,11 @@ impl Match {
             }
             let mut u = self.world.game.units[&id].clone();
             let draft = &drafts[&id];
-            u.x = draft.x;
-            u.z = draft.z;
-            u.garrison = draft.garrison;
-            self.grid.update(id, &u);
+            crate::unit_placement::place_unit(&mut self.grid, &mut u, |u| {
+                u.x = draft.x;
+                u.z = draft.z;
+                u.garrison = draft.garrison;
+            });
             self.apply_retreat_route(u, home, route)
                 .expect("complete retreat batch admitted");
             let ability = self.abilities.get_mut(id).unwrap();
