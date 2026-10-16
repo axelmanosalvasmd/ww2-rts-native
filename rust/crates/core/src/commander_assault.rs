@@ -22,7 +22,7 @@ pub const COOLDOWN: f64 = 18.0;
 pub const SUPPORT_REAR: f64 = 8.0;
 pub const SEARCH_CELLS: usize = 2048;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Phase {
     Assemble,
     Advance,
@@ -37,12 +37,12 @@ impl Phase {
         !matches!(self, Self::Complete | Self::Abandon)
     }
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Role {
     Line,
     Support,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Member {
     pub id: u32,
     pub role: Role,
@@ -52,7 +52,10 @@ pub struct Member {
     pub placement: Option<Point>,
     pub acknowledged: bool,
 }
-#[derive(Clone, Debug, PartialEq)]
+// The custom decoder returns compiled names instead of borrowing the save buffer.
+type SavedReason = &'static str;
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Operation {
     pub id: u64,
     pub phase: Phase,
@@ -63,7 +66,8 @@ pub struct Operation {
     pub stage: Point,
     pub initial: usize,
     pub members: Vec<Member>,
-    pub reason: Option<&'static str>,
+    #[serde(with = "saved_reason")]
+    pub reason: Option<SavedReason>,
 }
 impl Operation {
     fn change(&mut self, phase: Phase, now: f64) {
@@ -79,7 +83,7 @@ impl Operation {
         self.members.clear();
     }
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct AssaultState {
     pub operation: Option<Operation>,
     pub released: BTreeMap<u32, f64>,
@@ -716,3 +720,39 @@ pub fn plan(
 #[cfg(test)]
 #[path = "commander_assault_tests.rs"]
 mod tests;
+
+mod saved_reason {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    fn known(value: &str) -> Option<&'static str> {
+        match value {
+            "handoff" => Some("handoff"),
+            "timeout" => Some("timeout"),
+            "defense" => Some("defense"),
+            "regroup-blocked" => Some("regroup-blocked"),
+            "withdrawn" => Some("withdrawn"),
+            "members-unavailable" => Some("members-unavailable"),
+            "armor" => Some("armor"),
+            "machine-gun" => Some("machine-gun"),
+            "losses" => Some("losses"),
+            _ => None,
+        }
+    }
+    pub fn serialize<S: Serializer>(
+        value: &Option<&'static str>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        if value.is_some_and(|v| known(v).is_none()) {
+            return Err(serde::ser::Error::custom("unknown assault reason"));
+        }
+        value.serialize(serializer)
+    }
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Option<&'static str>, D::Error> {
+        Option::<String>::deserialize(deserializer)?
+            .map(|value| {
+                known(&value).ok_or_else(|| serde::de::Error::custom("unknown assault reason"))
+            })
+            .transpose()
+    }
+}

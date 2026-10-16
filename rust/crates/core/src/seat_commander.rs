@@ -41,6 +41,20 @@ pub struct SeatCommander {
     brain: Brain,
 }
 impl SeatCommander {
+    /// Save planner memory only. Camera, inputs, delivered packets and RNG stay transient.
+    pub fn planner_memory_json(&self) -> Result<serde_json::Value, String> {
+        match &self.brain {
+            Brain::Human { policy, .. } => policy.planner_memory_json(),
+            Brain::Horde(_) => Err("Horde planner checkpoints are not admitted".into()),
+        }
+    }
+    /// Restore on a freshly created seat commander to replay its opening look.
+    pub fn restore_planner_memory(&mut self, value: &serde_json::Value) -> Result<(), String> {
+        match &mut self.brain {
+            Brain::Human { policy, .. } => policy.restore_planner_memory(value),
+            Brain::Horde(_) => Err("Horde planner checkpoints are not admitted".into()),
+        }
+    }
     pub fn brain(&self) -> &Brain {
         &self.brain
     }

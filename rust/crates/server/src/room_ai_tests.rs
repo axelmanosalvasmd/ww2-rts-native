@@ -566,3 +566,210 @@ fn net49_new_online_host_can_handover_before_old_socket_disconnect_callback() {
     assert!(hub.rooms["ABC"].players[0].connection.is_none());
     assert!(runtime(&hub).fault().is_none());
 }
+
+#[test]
+fn ai63_hosted_save_restores_planners_resets_humans_and_restarts_commanders() {
+    struct SaveDir(std::path::PathBuf);
+    impl Drop for SaveDir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+    let directory =
+        SaveDir(std::env::temp_dir().join(format!("ww2-room-ai-save-{}", std::process::id())));
+    let mut hub = Hub::new(32, String::new());
+    hub.configure_saves(directory.0.clone());
+    let (host, mut rh) = client(1);
+    hello(&mut hub, &host, "a", 0);
+    send(&mut hub, &host, json!({"t":"addAi"}), 0);
+    send(&mut hub, &host, json!({"t":"level","slot":1,"v":"hard"}), 0);
+    hub.attach_native("ABC", native_tests::native_match(), 0)
+        .unwrap();
+    drain(&mut rh);
+    let map = crate::maps::public_map("default").unwrap();
+    // Human helper memory may exist at capture, but loading must discard it.
+    runtime_mut(&mut hub).activate_ai(&map, 0, "hard").unwrap();
+    let selected = (0..2)
+        .map(|slot| SelectedSeat {
+            slot,
+            full: true,
+            omit: true,
+        })
+        .collect::<Vec<_>>();
+    runtime_mut(&mut hub)
+        .collect_frame(&selected, FrameKind::Current)
+        .unwrap();
+    let opening = runtime(&hub).save_ai_memories();
+    for _ in 0..500 {
+        let room = runtime_mut(&mut hub);
+        room.advance_tick(&[false, false]).unwrap();
+        let sent = room.state().world.game.tick % 2 == 0;
+        if sent {
+            room.collect_frame(&selected, FrameKind::Scheduled).unwrap();
+        }
+        room.tick_ai(sent).unwrap();
+    }
+    let memories = runtime(&hub).save_ai_memories();
+    assert_eq!(
+        runtime(&hub).ai_clone_failure(),
+        Value::Null,
+        "a failure in the second seat must discard the first seat's memory too"
+    );
+    let before_load = runtime(&hub).ai_commander(1).unwrap().clone();
+    assert!(!memories[0].is_null());
+    assert_ne!(
+        memories[1]["planner"], opening[1]["planner"],
+        "exercise learned planner state before saving"
+    );
+    let id = hub.save_room("ABC", host.id).unwrap();
+    let saved = hub.saves.read("ABC", &id).unwrap();
+    assert_eq!(saved["ai"], memories);
+    assert_eq!(saved["seats"][1]["ai"], true);
+    assert_eq!(saved["seats"][1]["name"], "AI 1");
+    let checkpoint_tick = runtime(&hub).state().world.game.tick;
+    let canonical = runtime(&hub).state().save_json().unwrap();
+    let mut restored_memory =
+        RoomRuntime::new(Match::from_save_json(canonical.clone()).unwrap(), 0).unwrap();
+    restored_memory.activate_ai(&map, 1, "hard").unwrap();
+    restored_memory.restore_ai_memories(&memories).unwrap();
+    assert_eq!(
+        restored_memory.save_ai_memories()[1],
+        memories[1],
+        "every planner, recipient, sighting and pending-terrain field restores byte-equal before the opening look"
+    );
+    assert!(restored_memory.save_ai_memories()[0].is_null());
+    hub.rooms.get_mut("ABC").unwrap().native = None;
+    drain(&mut rh);
+    hub.load_room("ABC", host.id, &id, 1).unwrap();
+    assert!(runtime(&hub).paused());
+    assert_eq!(runtime(&hub).state().world.game.tick, checkpoint_tick);
+    assert_eq!(runtime(&hub).state().save_json().unwrap(), canonical);
+    let restored = runtime(&hub).save_ai_memories();
+    assert!(restored[0].is_null(), "human planner memory must be reset");
+    assert_eq!(restored[1]["planner"], memories[1]["planner"]);
+    use ww2_core::seat_commander::Brain;
+    let Brain::Human {
+        state: before_attention,
+        ..
+    } = before_load.brain()
+    else {
+        panic!("ordinary commander");
+    };
+    let fresh = runtime(&hub)
+        .state()
+        .create_seat_commander(1, ww2_core::commander_ai::Level::Hard)
+        .unwrap();
+    let Brain::Human {
+        state: fresh_attention,
+        ..
+    } = fresh.brain()
+    else {
+        panic!("ordinary commander");
+    };
+    let Brain::Human {
+        state: loaded_attention,
+        delivered,
+        ..
+    } = runtime(&hub).ai_commander(1).unwrap().brain()
+    else {
+        panic!("ordinary commander");
+    };
+    assert_ne!(
+        before_attention, fresh_attention,
+        "exercise a used commander's attention state"
+    );
+    assert_eq!(loaded_attention, fresh_attention);
+    assert!(delivered.is_none());
+    assert!(loaded_attention.wants_view(checkpoint_tick as u64));
+    assert_eq!(hub.rooms["ABC"].players[1].level, "hard");
+    assert!(hub.rooms["ABC"].players[1].ai);
+    assert!(hub.rooms["ABC"].players[1].token.is_empty());
+    let messages = drain(&mut rh)
+        .into_iter()
+        .filter_map(|o| match o {
+            Output::Json(v) => Some(v),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let lobby = messages.iter().position(|v| v["t"] == "lobby").unwrap();
+    let pause = messages
+        .iter()
+        .position(|v| v["t"] == "pause" && v["paused"] == true)
+        .unwrap();
+    let start = messages.iter().position(|v| v["t"] == "start").unwrap();
+    assert!(lobby < pause && pause < start);
+    send(&mut hub, &host, json!({"t":"resume"}), 2);
+    for step in 0..20 {
+        hub.poll_native(2 + step * 50, step * 50_000_000);
+        drain(&mut rh);
+        let room = runtime_mut(&mut hub);
+        room.collect_frame(&selected, FrameKind::Current).unwrap();
+        assert!(room.fault().is_none());
+        assert!(room.tick_failure().is_none());
+    }
+    assert!(runtime(&hub).state().world.game.tick > checkpoint_tick);
+}
+
+#[test]
+fn room_ai_host_callbacks_survive_natural_finish_and_final_snapshots() {
+    let (mut hub, host, _rh, guest, _rg) = humans();
+    hub.attach_native("ABC", native_tests::native_match(), 0)
+        .unwrap();
+    send(&mut hub, &host, json!({"t":"leave"}), 0);
+    send(&mut hub, &guest, json!({"t":"leave"}), 0);
+    let selected = (0..2)
+        .map(|slot| SelectedSeat {
+            slot,
+            full: true,
+            omit: true,
+        })
+        .collect::<Vec<_>>();
+    let mut finished_at = None;
+    let mut terminal_tick = 0;
+    let mut orders = 0;
+    let mut deliveries = 0;
+    for step in 0..30_000u64 {
+        hub.poll_native(step * 50, step * 50_000_000);
+        if hub.rooms["ABC"].native.is_none() {
+            break;
+        }
+        let room = runtime_mut(&mut hub);
+        assert!(room.fault().is_none(), "{:?}", room.fault());
+        assert!(room.tick_failure().is_none());
+        orders += room.state().commands.pending_commands();
+        let tick = room.state().world.game.tick;
+        if room.state().finish.is_some() {
+            finished_at.get_or_insert(tick);
+            terminal_tick = tick;
+            // Once victory is fixed, check final recipient frames on every callback.
+            // During play, only Hub's real snapshot cadence supplies observations.
+            let captured = room.collect_frame(&selected, FrameKind::Current).unwrap();
+            for (slot, frame) in captured.iter().enumerate() {
+                assert_eq!(frame.slot, slot);
+                assert_eq!(frame.message["tick"], tick);
+                deliveries += 1;
+            }
+        } else if tick >= 2 {
+            for slot in 0..2 {
+                assert!(room.ai_delivered_view(slot).is_some());
+            }
+        }
+    }
+    assert!(
+        hub.rooms["ABC"].native.is_none(),
+        "host callbacks must complete the match"
+    );
+    assert!(hub.rooms["ABC"].result.is_some());
+    assert!(
+        terminal_tick > finished_at.unwrap(),
+        "collect snapshots on advancing terminal ticks"
+    );
+    assert!(orders > 10, "actual hosted scheduling must admit orders");
+    assert!(deliveries > 100);
+    assert!(
+        hub.rooms["ABC"]
+            .players
+            .iter()
+            .all(|p| p.ai && p.token.is_empty())
+    );
+}

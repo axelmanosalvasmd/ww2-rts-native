@@ -175,24 +175,28 @@ impl Skill {
         s
     }
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum SituationKind {
     Defense,
     Wait,
     Push,
 }
-#[derive(Clone, Debug, PartialEq)]
+// The custom decoder returns compiled names instead of borrowing the save buffer.
+type SavedCounter = &'static str;
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Situation {
     pub kind: SituationKind,
     pub until: f64,
     pub point: Option<usize>,
     pub threat: Option<u32>,
     pub at: Option<Point>,
-    pub counter: Option<&'static str>,
+    #[serde(with = "saved_counter")]
+    pub counter: Option<SavedCounter>,
     pub safe: Option<usize>,
     pub failed_at: u8,
 }
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct State {
     pub mind: Mind,
     pub raid: Option<crate::commander_classic_rules::Raid>,
@@ -207,7 +211,7 @@ pub struct State {
     pub node: BTreeMap<u32, usize>,
     pub(crate) fort_steps: BTreeMap<u32, u8>,
 }
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Decision {
     pub situation: SituationKind,
     pub buy: String,
@@ -1326,3 +1330,27 @@ mod regression_tests;
 #[cfg(test)]
 #[path = "if25_tactics_tests.rs"]
 mod if25_tests;
+
+// Checkpoints restore only the fixed rule names used by the planner.
+mod saved_counter {
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    pub fn serialize<S: Serializer>(
+        value: &Option<&'static str>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        if value.is_some_and(|v| !matches!(v, "at" | "mg")) {
+            return Err(serde::ser::Error::custom("unknown planner counter"));
+        }
+        value.serialize(serializer)
+    }
+    pub fn deserialize<'de, D: Deserializer<'de>>(
+        deserializer: D,
+    ) -> Result<Option<&'static str>, D::Error> {
+        match Option::<String>::deserialize(deserializer)?.as_deref() {
+            None => Ok(None),
+            Some("at") => Ok(Some("at")),
+            Some("mg") => Ok(Some("mg")),
+            _ => Err(serde::de::Error::custom("unknown planner counter")),
+        }
+    }
+}

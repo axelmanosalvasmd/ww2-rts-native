@@ -39,7 +39,7 @@ The root has these seven required keys. The six content owners correspond to `se
 | `map` | Full raw authored map, including private layers and triggers. It is never replaced with `mapForClient`. The prototype uses `null` in World (`server.js:426`); native World restoration is refused. |
 | `seats` | Saved roster in simulation slot order, with the keys below (`server.js:425`). |
 | `settings` | Exactly the nine setting keys below (`server.js:419,426`). |
-| `ai` | Planner memories, separately owned from `g` (`shared/ai.js:159-165`). Currently `null`; non-null memories and AI seats are refused until hosted planner restoration exists. Commander state is not added to this envelope. |
+| `ai` | Planner memories, separately owned from `g` (`shared/ai.js:159-165`). Either `null` or an array in simulation slot order. Each non-null entry has `recipient`, `view`, `planner` and `cells`, as described below. Commander state is not added to this envelope. |
 
 Each saved seat has `name`, `token`, `ai`, `level`, `team`, `faction`. `name` removes a trailing ` (AI)`; `ai` is boolean; `level` is the difficulty string, or `null` for a human without an AI level; `team` and `faction` are the original numeric values (`server.js:425`). A valid UTF-16 token is saved as a JSON string. A token ending in an unpaired surrogate uses `{utf16: [code units]}` so the native server's existing truncated token identity survives JSON without replacement characters. This is a private format representation, not a socket field.
 
@@ -113,12 +113,32 @@ Annihilation and Classic remain excluded by ordinary recipient snapshot admissio
 
 `loadSave` requires the current host in a lobby and an ID belonging to that exact room (`server.js:694-695`). File decoding, native validation, settings, raw-map binding, roster binding and all recipient start snapshots must succeed before changing the room, epoch or delivery accounts. Failure sends `{t:"deny", cmd:"loadSave", reason:"save"}`.
 
-Human seat assignment follows the prototype's two passes (`server.js:439-445`). First every saved human matches an unused present identity by nonempty token, including offline identities. Then remaining seats take unused connected humans in present order. Current names and tokens survive a match; saved teams and factions replace current choices. Unmatched humans wait offline with their saved identities. This batch refuses AI seats, planner memories and surplus connected humans that would need running spectator delivery. Those cases remain incomplete under NET-92 and AI-63.
+Human seat assignment follows the prototype's two passes (`server.js:439-445`). First every saved human matches an unused present identity by nonempty token, including offline identities. Then remaining seats take unused connected humans in present order. Current names and tokens survive a match; saved teams and factions replace current choices. Unmatched humans wait offline with their saved identities. Saved AI seats keep their difficulty, team and faction, have no socket or token, and do not consume a connected human fallback. Surplus connected humans still require running spectator delivery and remain refused. Full NET-92 remains unclaimed.
 
-A successful load clears the previous result and opens an indefinite host pause with exactly `{t:"pause", paused:true, by:<current host name>, reason:"host", left:0}` (`server.js:393-412,470-485`). It resets drop-pause allowances. The playing lobby precedes every start, and every connected seat receives its start and pause before a tick can run. The loaded room ignores gameplay while paused. Its current host may send `resume`, which uses the existing `{t:"pause", paused:false, by:"", reason:"host", left:0}` shape. Guests remain refused. The host pause has no reconnect or time expiry.
+A successful load clears the previous result and opens an indefinite host pause with exactly `{t:"pause", paused:true, by:<current host name>, reason:"host", left:0}` (`server.js:393-412,470-485`). It resets drop-pause allowances. The playing lobby precedes every start, and every connected seat receives the loaded pause before its start, before a tick can run. The loaded room ignores gameplay while paused. Its current host may send `resume`, which uses the existing `{t:"pause", paused:false, by:"", reason:"host", left:0}` shape. Guests remain refused. The host pause has no reconnect or time expiry.
 
 ## Batch scope
 
 Intent tests cover the save portions of NET-28 and NET-80, plus NET-89, NET-91 and NET-93. They also compare a running saved match's continuation with uninterrupted native execution, using held fire, movement and queued AutoRetreat stance changes, collecting both seats' complete recipient snapshots on every tick through a VP victory and subsequent ending ticks. Unsupported-version refusal must preserve the lobby and epoch.
 
-NET-12 (editor writes), MODE-55 (Horde records), NET-90 (World autosave), the full NET-71 callback ordering, full NET-92 seat/AI/spectator restoration and AI-63 planner memory are not claimed by ordinary match persistence.
+NET-12 (editor writes), MODE-55 (Horde records), NET-90 (World autosave), the full NET-71 callback ordering, full NET-92 seat/AI/spectator restoration are not claimed by ordinary match persistence. AI-63 ordinary planner persistence is covered by the room AI continuation below.
+
+
+## Hosted AI planner memory
+
+The room AI extension implements AI-63 for admitted ordinary rooms. The top-level `ai` array corresponds to the prototype's external per-game, per-seat memories (`shared/ai.js:157-165`, `server.js:425-426`). It is private save data and adds no socket fields. An all-human room without helper memory still writes `null`; older version 1 files with `ai:null` remain loadable.
+
+Each entry contains these native owners:
+
+- `recipient`: the seat decoder's slot, public map, delivered clock, building observation times and discovered mines. The transient allocation binding is omitted and rebound to the new consumer.
+- `view`: the commander's delivered terrain characters, masks, elevation, naval flag, clock and remembered sightings, bound to that slot and map dimensions.
+- `planner`: version 1, seat owner, complete quiet-policy source state and tactics state. Tactics include Mind notice/lesson memory, raids, assault membership and phases, situation, aim, supply waits, released units, the current decision, support clocks, cleared sightings, node assignments and fortification progress.
+- `cells`: recipient terrain deltas delivered since the most recent strategic look, indexed by cell identity.
+
+The first three records use the existing tagged native value codec, preserving float bits and ordered maps. `cells` uses JSON cell rows with numeric keys encoded as object keys. None comes from an authoritative enemy observation. All entries are captured together; if any seat cannot be cloned, the save writes `ai:null` for all seats, matching `server/saves.js:16-22`.
+
+Loading stages every saved seat and validates its memory before publishing the room. Only saved AI seats receive memory. Human helper memories are discarded, matching `server.js:437-448`. AI levels default to Normal if absent. Names lose the handover suffix as in `server.js:425,441`; tokens remain empty for AI seats. Invalid AI levels, seat counts or bound memory records fail before publication.
+
+Camera attention, selection, input queues, delivered strategic packets and commander random streams are not saved. Each AI gets a fresh commander and an opening look after load (`shared/ai-human.js:35,55-69`). Restored strategic memory is combined with a newly delivered recipient start snapshot. This intentionally does not promise uninterrupted commander input or random-stream equality. The canonical match checkpoint and already admitted commands remain unchanged.
+
+`ai63_hosted_save_restores_planners_resets_humans_and_restarts_commanders` captures learned memory through the real room save store, checks human reset and fresh commander state, verifies lobby/pause/start ordering, resumes and collects every seat's recipient snapshot on later ticks. Core checkpoint tests exercise nonempty planner fields and wrong-seat refusal. Horde planner persistence and full all-role startup remain outside this ordinary-room extension.

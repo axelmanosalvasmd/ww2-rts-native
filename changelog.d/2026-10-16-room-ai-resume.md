@@ -1,0 +1,3 @@
+- Save and restore ordinary room AI planner and delivered-view memory separately from the match. Reset human helper memory and restart AI commander attention after loading; preserve AI seat identities and difficulty. If any memory cannot be cloned, save without all AI memories.
+- Send a loaded room's host pause between its lobby update and start, matching the prototype. Update the save test that previously required pause after start.
+- Restore compiled house structure names and grenade blast effect names in native combat saves, which previously failed loading with an unknown compiled string.

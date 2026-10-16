@@ -22,6 +22,14 @@ pub struct HumanPolicy {
     tactics: crate::commander_tactics::State,
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
+struct PlannerMemory {
+    version: u32,
+    owner: u32,
+    source: SourceState,
+    tactics: crate::commander_tactics::State,
+}
+
 impl HumanPolicy {
     pub fn new(owner: u32, recorded_match_seed: u64) -> Self {
         Self {
@@ -30,6 +38,26 @@ impl HumanPolicy {
             random: MatchRandom::new(recorded_match_seed),
             tactics: crate::commander_tactics::State::default(),
         }
+    }
+
+    /// Persist strategic memory separately from motor timing and random streams.
+    pub(crate) fn planner_memory_json(&self) -> Result<Value, String> {
+        crate::save_codec::to_value(&PlannerMemory {
+            version: 1,
+            owner: self.owner,
+            source: self.source.clone(),
+            tactics: self.tactics.clone(),
+        })
+    }
+
+    pub(crate) fn restore_planner_memory(&mut self, value: &Value) -> Result<(), String> {
+        let memory: PlannerMemory = crate::save_codec::from_value(value.clone())?;
+        if memory.version != 1 || memory.owner != self.owner {
+            return Err("planner memory belongs to another seat or version".into());
+        }
+        self.source = memory.source;
+        self.tactics = memory.tactics;
+        Ok(())
     }
 
     fn plan(

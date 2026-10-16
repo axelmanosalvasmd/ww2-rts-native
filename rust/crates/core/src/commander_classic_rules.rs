@@ -10,7 +10,7 @@ use crate::{
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Raid {
     pub target: u32,
     pub ids: Vec<u32>,

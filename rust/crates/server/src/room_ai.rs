@@ -12,6 +12,7 @@ use ww2_core::{
     seat_commander::{Advance, Delivered, SeatCommander},
 };
 
+#[derive(Clone)]
 struct Consumer {
     memory: SeatMemory,
     policy_view: CommanderViewMemory,
@@ -29,6 +30,86 @@ pub(super) struct RoomAi {
     fresh: BTreeMap<usize, Delivered>,
 }
 impl RoomAi {
+    fn save_memories_with(
+        &self,
+        seats: usize,
+        mut encode: impl FnMut(&Consumer) -> Result<Value, String>,
+    ) -> Value {
+        if self.consumers.is_empty() {
+            return Value::Null;
+        }
+        // The prototype retries the whole save without AI memory if any clone fails.
+        (0..seats)
+            .map(|slot| self.consumers.get(&slot).map(&mut encode).transpose())
+            .collect::<Result<Vec<_>, _>>()
+            .map_or(Value::Null, |memories| json!(memories))
+    }
+
+    pub fn save_memories(&self, seats: usize) -> Value {
+        self.save_memories_with(seats, |consumer| {
+            Ok(json!({
+                "recipient":consumer.memory.planner_memory_json()?,
+                "view":consumer.policy_view.planner_memory_json()?,
+                "planner":consumer.commander.planner_memory_json()?,
+                "cells":consumer.cells,
+            }))
+        })
+    }
+
+    pub fn restore_memories(&mut self, saved: &Value, seats: usize) -> Result<(), String> {
+        if saved.is_null() {
+            return Ok(());
+        }
+        let memories = saved
+            .as_array()
+            .filter(|m| m.len() == seats)
+            .ok_or("invalid saved planner seat count")?;
+        let mut staged = self.consumers.clone();
+        for (&slot, consumer) in &mut staged {
+            let memory = &memories[slot];
+            if memory.is_null() {
+                continue;
+            }
+            consumer
+                .memory
+                .restore_planner_memory(&memory["recipient"])?;
+            consumer
+                .policy_view
+                .restore_planner_memory(&memory["view"])?;
+            consumer
+                .commander
+                .restore_planner_memory(&memory["planner"])?;
+            consumer.cells = serde_json::from_value(memory["cells"].clone())
+                .map_err(|e| format!("saved planner terrain deltas: {e}"))?;
+        }
+        self.consumers = staged;
+        // Packets and attention state restart with an opening look after load.
+        self.fresh.clear();
+        for entry in &mut self.delivered {
+            entry.view = None;
+        }
+        Ok(())
+    }
+
+    #[cfg(test)]
+    pub fn commander(&self, slot: usize) -> Option<&SeatCommander> {
+        self.consumers.get(&slot).map(|c| &c.commander)
+    }
+
+    #[cfg(test)]
+    pub fn clone_failure(&self, seats: usize) -> Value {
+        let mut attempts = 0;
+        let result = self.save_memories_with(seats, |consumer| {
+            attempts += 1;
+            if attempts == 2 {
+                return Err("uncloneable seat memory".into());
+            }
+            consumer.commander.planner_memory_json()
+        });
+        assert_eq!(attempts, 2);
+        result
+    }
+
     #[cfg(test)]
     pub fn delivered_view(
         &self,

@@ -7,7 +7,7 @@ use crate::{
         Input, Observation, PlayerObservation, PointObservation, ResearchObservation,
         UnitObservation,
     },
-    commander_tactics::{Context, KnownBuilding, Stock, UnitFacts},
+    commander_tactics::{Context, KnownBuilding, NodeObservation, Stock, UnitFacts},
     economy::{Faction, Mode, TechState, Technology},
     game::{Point, Smoke},
     human_commander::{HumanSighting, HumanUnit, HumanView},
@@ -20,7 +20,7 @@ type Result<T> = std::result::Result<T, String>;
 
 /// Recreate for each match and seat handover. Initial terrain must be the public
 /// client map, with authored mines hidden, never the authoritative terrain.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CommanderViewMemory {
     slot: usize,
     width: usize,
@@ -86,6 +86,32 @@ fn tech_level(value: &Value) -> Result<u8> {
 }
 
 impl CommanderViewMemory {
+    pub fn planner_memory_json(&self) -> Result<Value> {
+        crate::save_codec::to_value(self)
+    }
+
+    pub fn restore_planner_memory(&mut self, value: &Value) -> Result<()> {
+        let restored: Self = crate::save_codec::from_value(value.clone())?;
+        if (
+            restored.slot,
+            restored.width,
+            restored.height,
+            restored.players,
+            restored.naval,
+        ) != (self.slot, self.width, self.height, self.players, self.naval)
+            || restored.chars.len() != self.chars.len()
+            || restored.flags.len() != self.flags.len()
+            || restored
+                .elevation
+                .as_ref()
+                .is_some_and(|h| h.len() != self.chars.len())
+        {
+            return Err("saved commander memory belongs to another seat or map".into());
+        }
+        *self = restored;
+        Ok(())
+    }
+
     pub fn new(
         slot: usize,
         map: PublicMap,
@@ -260,8 +286,20 @@ impl CommanderViewMemory {
                 context.support.insert(key.clone(), number(value)?);
             }
         }
-        context.nodes = view.nodes.iter().map(at).collect::<Result<Vec<_>>>()?;
-        context.site_nodes = context.nodes.clone();
+        context.site_nodes = view.nodes.iter().map(at).collect::<Result<Vec<_>>>()?;
+        context.nodes = view
+            .nodes
+            .iter()
+            .map(|node| {
+                Ok(NodeObservation {
+                    at: at(node)?,
+                    rate: number(&node["rate"])?,
+                    fuel: truth(&node["fuel"]),
+                    // A public resource position alone does not prove ground visibility.
+                    visible: false,
+                })
+            })
+            .collect::<Result<Vec<_>>>()?;
         context.known_buildings = view
             .known_buildings
             .iter()

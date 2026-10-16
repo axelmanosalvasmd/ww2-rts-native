@@ -174,6 +174,24 @@ impl RoomRuntime {
         self.running()?;
         self.ai.tick(&mut self.state, sent)
     }
+    #[cfg(test)]
+    pub(crate) fn ai_commander(
+        &self,
+        slot: usize,
+    ) -> Option<&ww2_core::seat_commander::SeatCommander> {
+        self.ai.commander(slot)
+    }
+    #[cfg(test)]
+    pub(crate) fn ai_clone_failure(&self) -> Value {
+        self.ai.clone_failure(self.state.start.players.len())
+    }
+    pub(crate) fn save_ai_memories(&self) -> Value {
+        self.ai.save_memories(self.state.start.players.len())
+    }
+    pub(crate) fn restore_ai_memories(&mut self, saved: &Value) -> Result<(), String> {
+        self.ai
+            .restore_memories(saved, self.state.start.players.len())
+    }
     pub(crate) fn save_json(&self) -> Result<Value, String> {
         self.running()?;
         if self.held >= 120 {

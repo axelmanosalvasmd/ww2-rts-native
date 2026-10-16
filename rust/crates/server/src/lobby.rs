@@ -1046,12 +1046,16 @@ impl Hub {
             }
         }
         room.broadcast(&self.maps, &self.public_url);
+        if let Some(pause) = &pause {
+            for person in room.people() {
+                if let Some(connection) = &person.connection {
+                    connection.send(pause.clone());
+                }
+            }
+        }
         for (slot, start) in starts {
             if let Some(connection) = &room.players[slot].connection {
                 connection.send(start);
-                if let Some(pause) = &pause {
-                    connection.send(pause.clone());
-                }
                 self.accounts.get_mut(&connection.id).unwrap().full_terrain = false;
             }
         }
